@@ -1268,9 +1268,7 @@ function compileServer(source, filename, options) {
 function compileServerComponent(node, ctx) {
 	const name = node.id.name;
 	if (node.async)
-		throw new Error(
-			`Component \`${name}\` is declared \`async\`, which vyre does not support.`,
-		);
+		throw new Error(`Component \`${name}\` is declared \`async\`, which vyre does not support.`);
 	if (node.generator)
 		throw new Error(
 			`Component \`${name}\` is declared as a generator, which vyre does not support.`,

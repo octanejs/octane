@@ -19,6 +19,12 @@ importers:
       '@changesets/cli':
         specifier: ^2.31.0
         version: 2.31.0(@types/node@24.13.2)
+      '@tsrx/prettier-plugin':
+        specifier: ^0.3.84
+        version: 0.3.84(prettier@3.8.4)
+      '@types/node':
+        specifier: ^24.3.0
+        version: 24.13.2
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260615.1
         version: 7.0.0-dev.20260615.1
@@ -720,6 +726,11 @@ packages:
 
   '@tsrx/core@0.1.32':
     resolution: {integrity: sha512-1U9etl7El6rVZvSOLcA83qpzfYMHhUXteovUliYJcc68CCI5+g9gzsQNFNcNnTCcWF54udLaon+xNIzUSUyPQw==}
+
+  '@tsrx/prettier-plugin@0.3.84':
+    resolution: {integrity: sha512-6LDTlz3pGO62iuUNfIci+Gz3FctUKP0Bqv2T60qu2XBTjOOqirp+qSrMyMEMeb9KfjThZtvDfAsNidnFtZ+8wQ==}
+    peerDependencies:
+      prettier: '>=2.0.0'
 
   '@tsrx/react@0.2.32':
     resolution: {integrity: sha512-Uha8bhOZfWdujupKe0z/d4H0N+PG/aM7CicFD89of3Jxa43EC9Pq/Yegas9ZpON8SXD6hwlMqNxZbRSfaRXG1w==}
@@ -2349,6 +2360,13 @@ snapshots:
       is-reference: 3.0.3
       magic-string: 0.30.21
       zimmerframe: 1.1.4
+    transitivePeerDependencies:
+      - '@typescript-eslint/types'
+
+  '@tsrx/prettier-plugin@0.3.84(prettier@3.8.4)':
+    dependencies:
+      '@tsrx/core': 0.1.32
+      prettier: 3.8.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 

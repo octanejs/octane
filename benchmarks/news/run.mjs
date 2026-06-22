@@ -28,7 +28,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TARGET_PORTS = { 'vyre': 5191, solid: 5192, react: 5193, ripple: 5194 };
+const TARGET_PORTS = { vyre: 5191, solid: 5192, react: 5193, ripple: 5194 };
 const args = process.argv.slice(2);
 const noBuild = args.includes('--no-build');
 const positional = args.filter((a) => !a.startsWith('--'));

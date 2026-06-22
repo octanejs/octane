@@ -68,14 +68,10 @@ function validate_root_boundary(rootBoundary) {
 
 	const boundary = /** @type {{ pending?: unknown, catch?: unknown }} */ (rootBoundary);
 	if (boundary.pending !== undefined && typeof boundary.pending !== 'function') {
-		throw new Error(
-			'[vite-plugin-vyre] rootBoundary.pending must be a component function.',
-		);
+		throw new Error('[vite-plugin-vyre] rootBoundary.pending must be a component function.');
 	}
 	if (boundary.catch !== undefined && typeof boundary.catch !== 'function') {
-		throw new Error(
-			'[vite-plugin-vyre] rootBoundary.catch must be a component function.',
-		);
+		throw new Error('[vite-plugin-vyre] rootBoundary.catch must be a component function.');
 	}
 }
 
@@ -99,9 +95,7 @@ export function resolveRippleConfig(raw, options = {}) {
 	// Validate
 	// ------------------------------------------------------------------
 	if (!raw) {
-		throw new Error(
-			'[vite-plugin-vyre] ripple.config.ts must export a default config object.',
-		);
+		throw new Error('[vite-plugin-vyre] ripple.config.ts must export a default config object.');
 	}
 
 	if (requireAdapter) {

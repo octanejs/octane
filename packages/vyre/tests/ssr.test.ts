@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from '../../tsrx-vyre/src/index.js';
+import { compile } from 'vyre/compiler';
 import * as RT from 'vyre/server';
 
 const FIXTURES = join(process.cwd(), 'packages/vyre/tests/_fixtures');

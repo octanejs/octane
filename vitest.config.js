@@ -1,5 +1,5 @@
 import { configDefaults, defineConfig } from 'vitest/config';
-import { vyre } from 'vyre/compiler/vite';
+import { vyre } from './packages/vyre/src/compiler/vite.js';
 
 export default defineConfig({
 	test: {
@@ -8,10 +8,7 @@ export default defineConfig({
 			{
 				test: {
 					name: 'vyre',
-					include: [
-						'packages/vyre/tests/**/*.test.tsrx',
-						'packages/vyre/tests/**/*.test.ts',
-					],
+					include: ['packages/vyre/tests/**/*.test.tsrx', 'packages/vyre/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					// Precompiles every fixture through @tsrx/react + esbuild before any
 					// test loads — runs in pure Node so esbuild's TextEncoder requirements

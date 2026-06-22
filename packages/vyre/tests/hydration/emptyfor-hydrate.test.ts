@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from '../../../tsrx-vyre/src/index.js';
+import { compile } from 'vyre/compiler';
 import { hydrate, flushSync } from '../../src/index.js';
 import * as ServerRT from 'vyre/server';
 import { FeedOrEmpty, WithEmpty } from './_fixtures/emptyfor.tsrx';

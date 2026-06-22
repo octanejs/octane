@@ -1,11 +1,4 @@
-import {
-	use,
-	useState,
-	useEffect,
-	useTransition,
-	startTransition,
-	useDeferredValue,
-} from 'vyre';
+import { use, useState, useEffect, useTransition, startTransition, useDeferredValue } from 'vyre';
 
 // ============================================================================
 // Gap 16 (Transitions): transition that throws synchronously (no suspend)

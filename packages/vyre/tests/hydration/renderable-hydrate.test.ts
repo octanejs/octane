@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from '../../../tsrx-vyre/src/index.js';
+import { compile } from 'vyre/compiler';
 import { createRoot, hydrate, flushSync, createElement, delegateEvents } from '../../src/index.js';
 import * as ServerRT from 'vyre/server';
 import { Inner, Counter, Hole, Layout, FragLayout } from './_fixtures/renderable.tsrx';
@@ -14,10 +14,7 @@ import { Inner, Counter, Hole, Layout, FragLayout } from './_fixtures/renderable
 
 delegateEvents(['click']);
 
-const FIXTURE = join(
-	process.cwd(),
-	'packages/vyre/tests/hydration/_fixtures/renderable.tsrx',
-);
+const FIXTURE = join(process.cwd(), 'packages/vyre/tests/hydration/_fixtures/renderable.tsrx');
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'renderable.tsrx', { mode: 'server' });
 	code = code.replace(

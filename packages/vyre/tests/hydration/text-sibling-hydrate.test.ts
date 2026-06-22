@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from '../../../tsrx-vyre/src/index.js';
+import { compile } from 'vyre/compiler';
 import { hydrate, flushSync } from '../../src/index.js';
 import * as ServerRT from 'vyre/server';
 import { TextAfterComp, TextBetweenComps, TextAfterIf } from './_fixtures/text-sibling.tsrx';
@@ -13,10 +13,7 @@ import { TextAfterComp, TextBetweenComps, TextAfterIf } from './_fixtures/text-s
 // removeChild). Now the position is resolved with the hole-aware child/sibling
 // walk + htextSwap adopts.
 
-const FIXTURE = join(
-	process.cwd(),
-	'packages/vyre/tests/hydration/_fixtures/text-sibling.tsrx',
-);
+const FIXTURE = join(process.cwd(), 'packages/vyre/tests/hydration/_fixtures/text-sibling.tsrx');
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'text-sibling.tsrx', { mode: 'server' });
 	code = code.replace(

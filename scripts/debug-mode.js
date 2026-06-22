@@ -25,7 +25,12 @@ if (!supportsServer && mode_type === 'server') {
 	mode_type = 'client';
 }
 
-if (mode_type !== 'client' && mode_type !== 'server' && mode_type !== 'all' && mode_type !== 'tsx') {
+if (
+	mode_type !== 'client' &&
+	mode_type !== 'server' &&
+	mode_type !== 'all' &&
+	mode_type !== 'tsx'
+) {
 	console.error(`Invalid mode: ${mode_type}. Must be 'client', 'server', 'all', or 'tsx'.`);
 	process.exit(1);
 }

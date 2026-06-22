@@ -14,14 +14,6 @@
 			}
 		},
 		{
-			"files": ["**/*.md"],
-			"options": {
-				"useTabs": false,
-				"printWidth": 82,
-				"proseWrap": "always"
-			}
-		},
-		{
 			"files": ["**/*.json"],
 			"options": {
 				"useTabs": false

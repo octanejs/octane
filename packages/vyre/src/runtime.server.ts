@@ -565,9 +565,7 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 					() =>
 						reject(
 							new Error(
-								'vyre SSR: a use(thenable) did not settle within ' +
-									SUSPENSE_TIMEOUT_MS +
-									'ms.',
+								'vyre SSR: a use(thenable) did not settle within ' + SUSPENSE_TIMEOUT_MS + 'ms.',
 							),
 						),
 					SUSPENSE_TIMEOUT_MS,

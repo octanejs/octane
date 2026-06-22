@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from '../../tsrx-vyre/src/index.js';
+import { compile } from 'vyre/compiler';
 import * as RT from 'vyre/server';
 
 // SSR Phase 4 — Suspense + data serialization. render() is async: a

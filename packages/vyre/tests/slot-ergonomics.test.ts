@@ -28,7 +28,7 @@ import {
 describe('slot ergonomics — public signature hides the compiler-injected slot', () => {
 	it('useState without a slot throws a clear, actionable error', () => {
 		expect(() => useState(0)).toThrow(/useState was called without a slot symbol/);
-		expect(() => useState(0)).toThrow(/@tsrx\/vyre\/vite/);
+		expect(() => useState(0)).toThrow(/vyre\/compiler\/vite/);
 		expect(() => useState(0)).toThrow(/Symbol\.for/);
 	});
 
