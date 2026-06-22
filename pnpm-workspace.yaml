@@ -2,6 +2,9 @@ packages:
   - packages/*
   - benchmarks/news/*
 
+allowBuilds:
+  esbuild: set this to true or false
+
 overrides:
   esrap: ^2.2.9
   # Solid 2.0 SSR alignment: vite-plugin-solid@3.0.0-next.5 pulls

@@ -4,11 +4,8 @@
 [![npm version](https://img.shields.io/npm/v/vyre?logo=npm)](https://www.npmjs.com/package/vyre)
 [![npm downloads](https://img.shields.io/npm/dm/vyre?logo=npm&label=downloads)](https://www.npmjs.com/package/vyre)
 
-vyre is a fast, TypeScript-first UI framework with the React API you already know
-— `useState`, `useEffect`, context, Suspense, transitions — minus the rules of
-hooks, class components, and server components. Components are authored in `.tsrx`
-and compiled to a tiny template-clone runtime with first-class SSR and hydration.
-
+**vyre is a fast, TypeScript-first UI framework with the React API you already
+know, without the need for the rules of hooks and with support for conditional hooks.**
 This package ships both the runtime and the compiler (exposed at `vyre/compiler`).
 
 To find out more, see the [main vyre README](../../README.md).
