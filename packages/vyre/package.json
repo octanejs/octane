@@ -1,0 +1,45 @@
+{
+  "name": "vyre",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "Template-clone UI renderer with a React-shape state model, authored in TSRX. Ships the runtime + the TSRX→vyre compiler (vyre/compiler).",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server/index.ts",
+    "./constants": "./src/constants.ts",
+    "./compiler": "./src/compiler/index.js",
+    "./compiler/vite": "./src/compiler/vite.js",
+    "./compiler/volar": "./src/compiler/volar.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@tsrx/core": "0.1.29",
+    "esrap": "^2.2.9"
+  },
+  "devDependencies": {
+    "@tsrx/react": "^0.2.32",
+    "esbuild": "^0.27.7",
+    "happy-dom": "^20.9.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vitest": "^4.1.6"
+  }
+}

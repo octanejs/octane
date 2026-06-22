@@ -1,0 +1,28 @@
+{
+  "name": "vyre-monorepo",
+  "private": true,
+  "type": "module",
+  "author": "Dominic Gannaway",
+  "license": "MIT",
+  "packageManager": "pnpm@11.1.1",
+  "scripts": {
+    "test": "vitest run",
+    "bench": "pnpm --filter @benchmarks/news bench",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsgo --noEmit -p packages/vyre/tsconfig.json && tsgo --noEmit -p packages/vite-plugin-vyre/tsconfig.typecheck.json",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@typescript/native-preview": "7.0.0-dev.20260619.1",
+    "prettier": "^3.8.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.6",
+    "jsdom": "^29.0.2",
+    "happy-dom": "^20.9.0",
+    "esbuild": "^0.27.7"
+  }
+}

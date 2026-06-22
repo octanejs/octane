@@ -1,0 +1,37 @@
+{
+	"useTabs": true,
+	"tabWidth": 2,
+	"singleQuote": true,
+	"jsxSingleQuote": false,
+	"printWidth": 100,
+	"plugins": ["@tsrx/prettier-plugin"],
+	"overrides": [
+		{
+			"files": ["*.tsrx"],
+			"options": {
+				"bracketSameLine": false,
+				"parser": "tsrx"
+			}
+		},
+		{
+			"files": ["**/*.md"],
+			"options": {
+				"useTabs": false,
+				"printWidth": 82,
+				"proseWrap": "always"
+			}
+		},
+		{
+			"files": ["**/*.json"],
+			"options": {
+				"useTabs": false
+			}
+		},
+		{
+			"files": ["**/*.yml", "**/*.yaml"],
+			"options": {
+				"singleQuote": false
+			}
+		}
+	]
+}

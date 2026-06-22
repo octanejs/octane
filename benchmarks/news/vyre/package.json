@@ -1,0 +1,16 @@
+{
+  "name": "vyre-news-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "news-site SSR+hydration bench fixture for vyre.",
+  "scripts": {
+    "dev": "vite --host --port 5191 --strictPort"
+  },
+  "dependencies": {
+    "vyre": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.0.12"
+  }
+}
