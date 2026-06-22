@@ -8,7 +8,7 @@
 know, without the need for the rules of hooks and with support for conditional hooks.**
 This package ships both the runtime and the compiler (exposed at `vyre/compiler`).
 
-To find out more, see the [main vyre README](../../README.md).
+To find out more, see the [main vyre README](https://github.com/vyre-ts/vyre#readme).
 
 > vyre is in **alpha** — ready to experiment with, not yet recommended for
 > production.

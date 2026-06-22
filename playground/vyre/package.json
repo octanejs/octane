@@ -1,0 +1,24 @@
+{
+  "name": "vyre-playground",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Playground for vyre — the template-clone renderer, compiled through vyre/compiler.",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "debug-all": "node ../../scripts/debug-mode.js all vyre/compiler",
+    "debug-client": "node ../../scripts/debug-mode.js client vyre/compiler",
+    "debug-ssr": "node ../../scripts/debug-mode.js server vyre/compiler",
+    "debug-volar": "node ../../scripts/debug-mode.js tsx vyre/compiler",
+    "debug-tsx": "pnpm run debug-volar"
+  },
+  "dependencies": {
+    "vyre": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^8.0.12"
+  }
+}

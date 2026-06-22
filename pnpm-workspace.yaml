@@ -1,9 +1,11 @@
 packages:
   - packages/*
   - benchmarks/news/*
+  - playground/*
 
 allowBuilds:
-  esbuild: set this to true or false
+  esbuild: true
+  playwright: true
 
 overrides:
   esrap: ^2.2.9

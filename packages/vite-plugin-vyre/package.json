@@ -11,6 +11,11 @@
   "publishConfig": {
     "access": "public"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vyre-ts/vyre.git",
+    "directory": "packages/vite-plugin-vyre"
+  },
   "module": "src/index.js",
   "main": "src/index.js",
   "bin": {

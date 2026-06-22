@@ -1,5 +1,6 @@
 # vyre
 
+[![CI](https://github.com/vyre-ts/vyre/actions/workflows/ci.yml/badge.svg)](https://github.com/vyre-ts/vyre/actions/workflows/ci.yml)
 [![status: alpha](https://img.shields.io/badge/status-alpha-orange)](#status)
 [![npm version](https://img.shields.io/npm/v/vyre?logo=npm)](https://www.npmjs.com/package/vyre)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -202,6 +203,15 @@ pnpm install      # install workspace dependencies
 pnpm test         # run the test suite
 pnpm typecheck    # type-check the packages
 pnpm format       # format with Prettier
+```
+
+### Playground
+
+A live playground under [`playground/vyre`](./playground/vyre) demos state, keyed
+lists, conditional rendering, `@switch`, dynamic components, and suspense:
+
+```bash
+pnpm --filter vyre-playground dev
 ```
 
 ## License

@@ -12,6 +12,7 @@ permissions: {}
 
 jobs:
   release:
+    if: github.repository == 'vyre-ts/vyre'
     permissions:
       contents: write
       pull-requests: write
