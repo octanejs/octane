@@ -5,39 +5,49 @@
 [![npm version](https://img.shields.io/npm/v/vyre?logo=npm)](https://www.npmjs.com/package/vyre)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**vyre is a fast, TypeScript-first UI framework with the React API you already
-know, without the need for the rules of hooks and with support for conditional hooks.**
+Vyre is a fast, TypeScript-first UI framework. It is the successor to
+[Inferno](https://github.com/infernojs/inferno), the React-like library that set
+out to stay close to the speed of hand-written DOM code. Vyre carries that
+performance-first goal forward and brings the programming model up to date. You
+get the React API you already know, a compiler that keeps the runtime small and
+fast, and hooks that no longer come with the rules of hooks.
+
+Anyone comfortable with React can pick up Vyre quickly. The familiar building
+blocks are all here and they behave the way you expect. The main difference is
+under the hood: Vyre compiles your components ahead of time, so a lot of the work
+React does at runtime is already done before the page loads. Hooks are tracked by
+call site rather than call order, which is what lets you call them conditionally.
+
+Components are written in `.tsrx`, a format that lets your TypeScript setup live
+right next to the markup it feeds.
+
+Created by [Dominic Gannaway](https://github.com/trueadm), who also created
+Inferno and has worked on React, Lexical, and Svelte.
 
 ## Status
 
-vyre is in **alpha**. The runtime, compiler, and SSR/hydration paths work and are
-covered by a large test suite, but APIs may still change and some features are
-still landing. It is ready to experiment with — not yet recommended for
-production.
+Vyre is alpha software. The runtime, compiler, and SSR/hydration paths all work
+and have a large test suite behind them, but the API can still change and some
+features are still landing. It is a good time to try it and report back. It is
+not ready for production yet.
 
-## Why vyre
+## Highlights
 
-- **The React API, minus the footguns.** `useState`, `useReducer`, `useEffect`,
+- The React API you already know: `useState`, `useReducer`, `useEffect`,
   `useLayoutEffect`, `useMemo`, `useCallback`, `useRef`, `useId`,
   `useImperativeHandle`, `useTransition`, `useDeferredValue`,
-  `useSyncExternalStore`, `useActionState`, `useFormStatus`, `useOptimistic`,
-  `createContext`/`useContext`, `memo`, portals, `Suspense`, and `startTransition`
-  all behave the way you expect. **Class components and server components are
-  intentionally not supported.**
-
-- **Conditional hooks — no rules of hooks.** The compiler gives every hook call
-  site a stable slot identity, so hook order can't desync. Guard a hook behind an
-  `if`, place it after an early `return`, or call it conditionally — it just
-  works.
-
-- **Fast by default.** Components compile to cloned templates with surgical
-  updates instead of a virtual DOM.
-
-- **Real DOM events.** vyre uses native, delegated DOM events — not a synthetic
-  event system — so event behavior matches the platform.
-
-- **TypeScript-first.** `.tsrx` lets your TypeScript setup live right next to the
-  UI it feeds, with full type-checking and editor support.
+  `useSyncExternalStore`, `useActionState`, `useFormStatus`, and `useOptimistic`,
+  plus `createContext`, `useContext`, `memo`, portals, `Suspense`, and
+  `startTransition`. Class components and server components are left out on
+  purpose.
+- No rules of hooks. The compiler gives every hook call site a stable identity,
+  so order never matters. A hook can sit inside a condition, after an early
+  return, or in a loop.
+- Performance was the whole reason Inferno existed, and Vyre keeps it. The
+  compiler does most of the work ahead of time, so the runtime stays small.
+- Real DOM events through delegation, rather than a synthetic event layer, so
+  event behavior matches the platform.
+- One authoring format, `.tsrx`, with full TypeScript support and editor tooling.
 
 ## Quick start
 
@@ -59,8 +69,8 @@ export default defineConfig({
 });
 ```
 
-> `vite-plugin-vyre` is the optional metaframework (dev SSR, routing, hydrate).
-> For a plain SPA you only need the `vyre()` compiler plugin shown above.
+`vite-plugin-vyre` is the optional metaframework (dev SSR, routing, hydrate). For
+a plain SPA you only need the `vyre()` compiler plugin shown above.
 
 ### Mount
 
@@ -73,7 +83,7 @@ const root = createRoot(document.getElementById('root')!);
 root.render(App, { title: 'Hello world!' });
 ```
 
-### Server render + hydrate
+### Server render and hydrate
 
 ```ts
 // entry-server.ts
@@ -99,8 +109,8 @@ hydrate(App, document.getElementById('app')!);
 ### Components
 
 A component is a function. Return a single JSX root directly, or open a `@{ ... }`
-setup scope when TypeScript setup (hooks, locals) sits next to the output. The
-scope ends with one output node — a JSX element or fragment.
+setup scope when TypeScript setup (hooks, locals) needs to sit next to the output.
+The scope ends with one output node, either a JSX element or a fragment.
 
 ```tsrx
 import { useState } from 'vyre';
@@ -115,7 +125,7 @@ export function Counter() @{
 ```
 
 Dynamic text holes are written `{expr as string}`. Events are ordinary JSX event
-props (`onClick`, `onInput`, …) backed by native, delegated DOM events.
+props like `onClick` and `onInput`, backed by native, delegated DOM events.
 
 ### State and effects
 
@@ -144,8 +154,8 @@ import { useState, useEffect } from 'vyre';
 export function Panel(props) @{
   const [n, setN] = useState(0);
 
-  // Early return BEFORE a hook — fine in vyre. Each hook call site has a stable
-  // compiler-assigned slot, so render order can't desync the hooks.
+  // An early return before a hook is fine in vyre. Each hook call site has a
+  // stable compiler-assigned slot, so render order can't desync the hooks.
   if (props.hidden) return;
 
   useEffect(() => {
@@ -185,18 +195,18 @@ export function Greeting(props) @{
 
 ## Packages
 
-This is a pnpm monorepo. The publishable packages are:
+This is a pnpm monorepo with two publishable packages:
 
-- **[`vyre`](./packages/vyre)** — the runtime **and** the compiler. Template-clone
-  rendering, the React-shaped hook API, server (SSR) and client (hydration) entry
-  points, plus the TSRX→vyre compiler exposed at `vyre/compiler` (and
+- [`vyre`](./packages/vyre) is the runtime and the compiler together. It covers
+  rendering, the hook API, the server (SSR) and client (hydration) entry points,
+  and the compiler itself, which is exposed at `vyre/compiler` (and
   `vyre/compiler/vite` for the build transform).
-- **[`vite-plugin-vyre`](./packages/vite-plugin-vyre)** — the metaframework plugin:
-  dev SSR, routing, and hydration wiring for full vyre apps.
+- [`vite-plugin-vyre`](./packages/vite-plugin-vyre) is the optional metaframework
+  plugin, with dev SSR, routing, and hydration wiring for full apps.
 
 ## Development
 
-vyre uses [pnpm](https://pnpm.io) for package management and workspace scripts.
+Vyre uses [pnpm](https://pnpm.io) for package management and workspace scripts.
 
 ```bash
 pnpm install      # install workspace dependencies
@@ -207,7 +217,7 @@ pnpm format       # format with Prettier
 
 ### Playground
 
-A live playground under [`playground/vyre`](./playground/vyre) demos state, keyed
+The playground under [`playground/vyre`](./playground/vyre) covers state, keyed
 lists, conditional rendering, `@switch`, dynamic components, and suspense:
 
 ```bash
