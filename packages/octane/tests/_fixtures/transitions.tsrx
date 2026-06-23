@@ -1,4 +1,4 @@
-import { use, useState, useTransition, startTransition, useDeferredValue } from 'vyre';
+import { use, useState, useTransition, startTransition, useDeferredValue } from 'octane-ts';
 
 // ---------------------------------------------------------------------------
 // useTransition basics — [isPending, start]. The setter returned from start

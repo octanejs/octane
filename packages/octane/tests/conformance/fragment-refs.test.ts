@@ -1,4 +1,4 @@
-// React canary `enableFragmentRefs` parity tests for vyre.
+// React canary `enableFragmentRefs` parity tests for octane.
 //
 // Stage 1 — basic attach contract: `<Fragment ref={r}>` populates the ref
 // with a FragmentInstance bound to its owning Block (sentinel field
@@ -20,7 +20,7 @@ describe('Fragment refs — basic attach (React enableFragmentRefs parity)', () 
 		const r = mount(FragmentObjectRef, { fragRef });
 		expect(fragRef.current).not.toBeNull();
 		expect(fragRef.current).toBeInstanceOf(FragmentInstance);
-		// `_ownerBlock` is the vyre analogue of React's `_fragmentFiber`
+		// `_ownerBlock` is the octane analogue of React's `_fragmentFiber`
 		// sanity check — proves the instance is bound to its owning Block.
 		expect((fragRef.current as FragmentInstance)._ownerBlock).toBeTruthy();
 		// The fragment is logically nested inside #parent — the parent div

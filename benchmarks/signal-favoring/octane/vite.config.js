@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
-import { vyre } from 'vyre/compiler/vite';
+import { octane } from 'octane-ts/compiler/vite';
 
 export default defineConfig({
-	plugins: [vyre()],
-	optimizeDeps: { exclude: ['vyre', 'vyre/compiler'] },
+	plugins: [octane()],
+	optimizeDeps: { exclude: ['octane-ts', 'octane-ts/compiler'] },
 	build: { target: 'esnext', minify: false },
 	server: { port: 5190, strictPort: true },
 });

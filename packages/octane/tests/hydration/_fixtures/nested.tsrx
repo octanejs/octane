@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // SSR Phase 6 (M1) — nested-component hydration. The server wraps each nested
 // component's output in a `<!--[-->…<!--]-->` range; the client componentSlot

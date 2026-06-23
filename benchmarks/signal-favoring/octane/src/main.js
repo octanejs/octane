@@ -1,4 +1,4 @@
-import { createRoot, flushSync } from 'vyre';
+import { createRoot, flushSync } from 'octane-ts';
 import App, {
 	bumpAt1,
 	bumpAt11,

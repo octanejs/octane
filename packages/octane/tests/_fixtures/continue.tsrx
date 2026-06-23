@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // New TSRX rejects `continue` inside `@for`. The old "skip this iteration"
 // pattern is rewritten as `@if (gate)` around the JSX to emit.

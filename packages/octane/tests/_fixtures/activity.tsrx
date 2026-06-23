@@ -1,4 +1,4 @@
-import { Activity, useState, useEffect, useLayoutEffect } from 'vyre';
+import { Activity, useState, useEffect, useLayoutEffect } from 'octane-ts';
 
 // Child logs render + effect mount/unmount, exposes its setState so the test can
 // bump state, and renders its count so state preservation is observable.

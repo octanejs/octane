@@ -1,7 +1,7 @@
 /**
- * Server component composition for the vyre renderer.
+ * Server component composition for the octane renderer.
  *
- * vyre's server ABI: a component body is `(scope, props, extra) => string`.
+ * octane's server ABI: a component body is `(scope, props, extra) => string`.
  * `render(Component, props)` invokes the ROOT directly as `Component(rootScope,
  * props, undefined)` and does NOT wrap it in block markers — and `hydrate()`
  * adopts the container's FIRST CHILD as the root's own node. So the wrapper must

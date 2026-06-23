@@ -65,7 +65,7 @@ export function SvgInsideForeignObjectClick(props) @{
 }
 
 // ---------------------------------------------------------------------------
-// Scoped <style> on SVG (vyre CSS-hashing pipeline)
+// Scoped <style> on SVG (octane CSS-hashing pipeline)
 // ---------------------------------------------------------------------------
 
 // The component-local `<style>` block targets `.wrap circle`. The pipeline

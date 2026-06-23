@@ -15,11 +15,11 @@
  * and the generated production server entry.
  */
 
-/** @import { RippleConfigOptions, ResolvedRippleConfig } from 'vite-plugin-vyre' */
+/** @import { RippleConfigOptions, ResolvedRippleConfig } from '@octane-ts/vite-plugin' */
 
 import path from 'node:path';
 import fs from 'node:fs';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 import { DEFAULT_OUTDIR } from './constants.js';
 
 const RIPPLE_EXTENSION_PATTERN = /\.tsrx$/;
@@ -46,11 +46,11 @@ function validate_render_route(route) {
 			typeof render_route.entry[1] === 'string');
 
 	if (!has_entry) {
-		throw new Error('[vite-plugin-vyre] RenderRoute requires a string/tuple `entry`.');
+		throw new Error('[@octane-ts/vite-plugin] RenderRoute requires a string/tuple `entry`.');
 	}
 
 	if (render_route.layout !== undefined && typeof render_route.layout !== 'string') {
-		throw new Error('[vite-plugin-vyre] RenderRoute `layout` must be a string path.');
+		throw new Error('[@octane-ts/vite-plugin] RenderRoute `layout` must be a string path.');
 	}
 }
 
@@ -63,15 +63,15 @@ function validate_root_boundary(rootBoundary) {
 		return;
 	}
 	if (!rootBoundary || typeof rootBoundary !== 'object') {
-		throw new Error('[vite-plugin-vyre] rootBoundary must be an object when provided.');
+		throw new Error('[@octane-ts/vite-plugin] rootBoundary must be an object when provided.');
 	}
 
 	const boundary = /** @type {{ pending?: unknown, catch?: unknown }} */ (rootBoundary);
 	if (boundary.pending !== undefined && typeof boundary.pending !== 'function') {
-		throw new Error('[vite-plugin-vyre] rootBoundary.pending must be a component function.');
+		throw new Error('[@octane-ts/vite-plugin] rootBoundary.pending must be a component function.');
 	}
 	if (boundary.catch !== undefined && typeof boundary.catch !== 'function') {
-		throw new Error('[vite-plugin-vyre] rootBoundary.catch must be a component function.');
+		throw new Error('[@octane-ts/vite-plugin] rootBoundary.catch must be a component function.');
 	}
 }
 
@@ -95,27 +95,27 @@ export function resolveRippleConfig(raw, options = {}) {
 	// Validate
 	// ------------------------------------------------------------------
 	if (!raw) {
-		throw new Error('[vite-plugin-vyre] ripple.config.ts must export a default config object.');
+		throw new Error('[@octane-ts/vite-plugin] ripple.config.ts must export a default config object.');
 	}
 
 	if (requireAdapter) {
 		if (!raw.adapter) {
 			throw new Error(
-				'[vite-plugin-vyre] Production builds require an `adapter` in ripple.config.ts. ' +
+				'[@octane-ts/vite-plugin] Production builds require an `adapter` in ripple.config.ts. ' +
 					'Install an adapter package (e.g. @ripple-ts/adapter-node) and set the `adapter` property.',
 			);
 		}
 
 		if (!raw.adapter.runtime) {
 			throw new Error(
-				'[vite-plugin-vyre] The adapter in ripple.config.ts is missing the `runtime` property. ' +
+				'[@octane-ts/vite-plugin] The adapter in ripple.config.ts is missing the `runtime` property. ' +
 					'Make sure your adapter exports runtime primitives.',
 			);
 		}
 	}
 
 	if (raw.router?.routes !== undefined && !Array.isArray(raw.router.routes)) {
-		throw new Error('[vite-plugin-vyre] router.routes must be an array.');
+		throw new Error('[@octane-ts/vite-plugin] router.routes must be an array.');
 	}
 
 	for (const route of raw.router?.routes ?? []) {
@@ -194,7 +194,7 @@ export async function loadRippleConfig(projectRoot, options = {}) {
 	const configPath = getRippleConfigPath(projectRoot);
 
 	if (!fs.existsSync(configPath)) {
-		throw new Error(`[vite-plugin-vyre] ripple.config.ts not found in ${projectRoot}`);
+		throw new Error(`[@octane-ts/vite-plugin] ripple.config.ts not found in ${projectRoot}`);
 	}
 
 	// When a running Vite dev server is available, use it directly.
@@ -215,7 +215,7 @@ export async function loadRippleConfig(projectRoot, options = {}) {
 		server: { middlewareMode: true },
 		plugins: [
 			{
-				name: 'vyre-config-tsrx-loader',
+				name: 'octane-config-tsrx-loader',
 				transform(source, id) {
 					if (!RIPPLE_EXTENSION_PATTERN.test(id)) return null;
 					const filename = id.replace(projectRoot, '');

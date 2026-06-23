@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'vyre';
+import { useState, useEffect } from 'octane-ts';
 
 // React-style guarded component: `if (cond) return;` early-exit followed by
-// hooks. vyre supports runtime-conditional hooks (each call site has
+// hooks. octane supports runtime-conditional hooks (each call site has
 // its own stable slot identity via Symbol.for, so hooks remain referenceable
 // even when the body short-circuits). The effect should fire when the guard
 // opens AND its deps change — and NOT fire while the guard is closed.

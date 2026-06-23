@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useEffectEvent, useRef } from 'vyre';
+import { useState, useCallback, useEffect, useEffectEvent, useRef } from 'octane-ts';
 
 // useCallback — same identity per deps; new identity when deps change.
 // We expose the callback identity via a passed-in observer.

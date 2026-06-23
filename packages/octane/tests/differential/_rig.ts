@@ -1,6 +1,6 @@
 /**
  * Differential testing rig — runs the SAME `.tsrx` fixture through BOTH
- * vyre AND @tsrx/react, mounts each into a hidden container, drives
+ * octane AND @tsrx/react, mounts each into a hidden container, drives
  * an identical event sequence on both, and asserts the resulting DOM is
  * byte-equivalent after each step. This is the gold-standard parity proof
  * for the "you can swap them around" claim: any divergence surfaces here
@@ -8,8 +8,8 @@
  * conformance test.
  *
  * Mechanics:
- *   - The vyre side just imports the .tsrx file directly — the
- *     existing Vitest plugin compiles it via packages/vyre/compiler.
+ *   - The octane side just imports the .tsrx file directly — the
+ *     existing Vitest plugin compiles it via packages/octane/compiler.
  *   - The React side reads the same .tsrx source, runs it through
  *     @tsrx/react's `compile()` to get React-shaped TSX, writes that TSX to
  *     a temp .tsx file, and dynamic-imports it so Vitest's built-in JSX
@@ -90,11 +90,11 @@ function hashString(s: string): string {
 
 /**
  * Normalise an `innerHTML` snapshot for comparison. We strip:
- *   - vyre's `<!--…-->` slot markers (start/end Comment nodes used as
+ *   - octane's `<!--…-->` slot markers (start/end Comment nodes used as
  *     range boundaries; React doesn't emit equivalents).
  *   - React's data-reactroot attribute residue (legacy, defensive).
  *   - Leading/trailing whitespace at the container boundary.
- *   - Whitespace-only text nodes between elements (vyre preserves
+ *   - Whitespace-only text nodes between elements (octane preserves
  *     authored whitespace from templates; React's JSX strips it). This is a
  *     compile-emission divergence, NOT a renderer-behaviour divergence, so
  *     we collapse to put both runtimes on equal footing.
@@ -176,7 +176,7 @@ function collapseInterTagWhitespace(s: string): string {
 }
 
 /**
- * Sort attribute names within each opening tag alphabetically. vyre
+ * Sort attribute names within each opening tag alphabetically. octane
  * emits attributes in template-clone order (basically authoring order, with
  * dynamic attribute updates appended at the end), while React's JSX runtime
  * preserves source order strictly. Both are equally valid per the HTML spec
@@ -227,7 +227,7 @@ export interface DiffPair {
 
 /**
  * Mount `srcPath`'s components under both runtimes. `rippleEntry` is the
- * export name to mount on the vyre side (and the same name will be
+ * export name to mount on the octane side (and the same name will be
  * used for React, since @tsrx/react produces identically-named exports).
  *
  * `initialProps` is passed to both renderers as the props of the mounted
@@ -238,11 +238,11 @@ export async function mountDifferential(
 	rippleEntry: string,
 	initialProps?: any,
 ): Promise<DiffPair> {
-	// vyre side — import via Vitest's normal pipeline (the
-	// vyre() plugin handles compilation).
+	// octane side — import via Vitest's normal pipeline (the
+	// octane() plugin handles compilation).
 	const rippleMod = await import(/* @vite-ignore */ srcPath);
 	const RippleComp = rippleMod[rippleEntry];
-	if (!RippleComp) throw new Error(`vyre export "${rippleEntry}" not found in ${srcPath}`);
+	if (!RippleComp) throw new Error(`octane export "${rippleEntry}" not found in ${srcPath}`);
 
 	// React side — compile, write, dynamic-import.
 	const reactMod = await loadReactFixture(srcPath);
@@ -331,7 +331,7 @@ export async function mountDifferential(
 		if (i !== r) {
 			throw new Error(
 				`Differential DOM divergence at step "${name}":\n` +
-					`  vyre: ${i}\n` +
+					`  octane: ${i}\n` +
 					`  @tsrx/react:  ${r}`,
 			);
 		}

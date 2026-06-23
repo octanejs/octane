@@ -1,11 +1,11 @@
 /** @import {Plugin, ResolvedConfig, ViteDevServer, UserConfig} from 'vite' */
-/** @import {RippleConfigOptions, ResolvedRippleConfig, RenderRoute} from 'vite-plugin-vyre' */
+/** @import {RippleConfigOptions, ResolvedRippleConfig, RenderRoute} from '@octane-ts/vite-plugin' */
 
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { vyre } from 'vyre/compiler/vite';
+import { octane } from 'octane-ts/compiler/vite';
 
 import { createRouter } from './server/router.js';
 import { createContext, runMiddlewareChain } from './server/middleware.js';
@@ -37,8 +37,8 @@ export {
 	rippleConfigExists,
 } from './load-config.js';
 
-const VIRTUAL_HYDRATE_ID = 'virtual:vyre-hydrate';
-const RESOLVED_VIRTUAL_HYDRATE_ID = '\0virtual:vyre-hydrate';
+const VIRTUAL_HYDRATE_ID = 'virtual:octane-hydrate';
+const RESOLVED_VIRTUAL_HYDRATE_ID = '\0virtual:octane-hydrate';
 const RIPPLE_EXTENSIONS = ['.tsrx'];
 
 /**
@@ -87,10 +87,10 @@ function has_route_config(config) {
 }
 
 /**
- * The vyre metaframework Vite plugin.
+ * The octane metaframework Vite plugin.
  *
- * Returns an ARRAY: `[vyre({ hmr }), metaPlugin]`. The first element is
- * vyre/compiler's transform plugin — it owns ALL `.tsrx` compilation, picking
+ * Returns an ARRAY: `[octane({ hmr }), metaPlugin]`. The first element is
+ * octane-ts/compiler's transform plugin — it owns ALL `.tsrx` compilation, picking
  * client vs server mode per-module from Vite's SSR signal (so the SAME file
  * compiles to a DOM-clone client body for the browser and to an HTML-building
  * server body when pulled via `ssrLoadModule`). The metaPlugin owns config,
@@ -114,7 +114,7 @@ export function ripple(inlineOptions = {}) {
 
 	/** @type {Plugin} */
 	const metaPlugin = {
-		name: 'vite-plugin-vyre',
+		name: '@octane-ts/vite-plugin',
 
 		/**
 		 * @param {UserConfig} userConfig
@@ -125,12 +125,12 @@ export function ripple(inlineOptions = {}) {
 				// SSR owns routing; do not let Vite SPA-fallback to index.html.
 				appType: 'custom',
 				optimizeDeps: {
-					exclude: [...new Set([...exclude, 'vyre', 'vyre/compiler', ...SERVER_ONLY_ADAPTER_IDS])],
+					exclude: [...new Set([...exclude, 'octane-ts', 'octane-ts/compiler', ...SERVER_ONLY_ADAPTER_IDS])],
 				},
 				// Workspace packages with TS source must be transformed by Vite's SSR
 				// pipeline (not require()'d raw) so ssrLoadModule gets transpiled code.
 				ssr: {
-					noExternal: ['vyre', 'vyre/compiler'],
+					noExternal: ['octane-ts', 'octane-ts/compiler'],
 				},
 			};
 		},
@@ -217,7 +217,7 @@ export function ripple(inlineOptions = {}) {
 					router = has_route_config(nextConfig) ? createRouter(nextConfig.router.routes) : null;
 					if (router) {
 						console.log(
-							`[vite-plugin-vyre] Loaded ${nextConfig.router.routes.length} routes from ripple.config.ts`,
+							`[@octane-ts/vite-plugin] Loaded ${nextConfig.router.routes.length} routes from ripple.config.ts`,
 						);
 					}
 				})()
@@ -232,13 +232,13 @@ export function ripple(inlineOptions = {}) {
 				await initPromise;
 			}
 
-			vite.middlewares.use(function vyreDevMiddleware(req, res, next) {
+			vite.middlewares.use(function octaneDevMiddleware(req, res, next) {
 				(async () => {
 					try {
 						await ensureConfigLoaded();
 					} catch (error) {
 						vite.ssrFixStacktrace(/** @type {Error} */ (error));
-						console.error('[vite-plugin-vyre] Failed to load ripple.config.ts:', error);
+						console.error('[@octane-ts/vite-plugin] Failed to load ripple.config.ts:', error);
 						next();
 						return;
 					}
@@ -270,7 +270,7 @@ export function ripple(inlineOptions = {}) {
 						if (freshConfig) rippleConfig = freshConfig;
 						if (JSON.stringify(previousRoutes) !== JSON.stringify(rippleConfig.router.routes)) {
 							console.log(
-								`[vite-plugin-vyre] Detected route changes. Reloaded ${rippleConfig.router.routes.length} routes`,
+								`[@octane-ts/vite-plugin] Detected route changes. Reloaded ${rippleConfig.router.routes.length} routes`,
 							);
 						}
 						router = createRouter(rippleConfig.router.routes);
@@ -306,7 +306,7 @@ export function ripple(inlineOptions = {}) {
 
 						await sendWebResponse(res, response);
 					} catch (error) {
-						console.error('[vite-plugin-vyre] Request error:', error);
+						console.error('[@octane-ts/vite-plugin] Request error:', error);
 						vite.ssrFixStacktrace(/** @type {Error} */ (error));
 						res.statusCode = 500;
 						res.setHeader('Content-Type', 'text/html');
@@ -317,7 +317,7 @@ export function ripple(inlineOptions = {}) {
 						);
 					}
 				})().catch((err) => {
-					console.error('[vite-plugin-vyre] Unhandled middleware error:', err);
+					console.error('[@octane-ts/vite-plugin] Unhandled middleware error:', err);
 					if (!res.headersSent) {
 						res.statusCode = 500;
 						res.end('Internal Server Error');
@@ -329,7 +329,7 @@ export function ripple(inlineOptions = {}) {
 		/**
 		 * HMR: let self-accepting client modules update normally; otherwise
 		 * invalidate the matching SSR modules so the next SSR request recompiles,
-		 * and full-reload. (vyre has no compile-time CSS cache — styles ride
+		 * and full-reload. (octane has no compile-time CSS cache — styles ride
 		 * `injectStyle` calls in the compiled body — so there is no CSS to diff.)
 		 */
 		hotUpdate: {
@@ -353,7 +353,7 @@ export function ripple(inlineOptions = {}) {
 	};
 
 	const hmr = inlineOptions.hmr;
-	return [vyre(hmr === undefined ? {} : { hmr }), metaPlugin];
+	return [octane(hmr === undefined ? {} : { hmr }), metaPlugin];
 }
 
 // Mainly to enforce types / DX.
@@ -447,7 +447,7 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 				return server[funcName];
 			},
 			async executeServerFunction(fn, body) {
-				const { executeServerFunction } = await vite.ssrLoadModule('vyre/server');
+				const { executeServerFunction } = await vite.ssrLoadModule('octane-ts/server');
 				return executeServerFunction(fn, body);
 			},
 			asyncContext,
@@ -456,7 +456,7 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 
 		await sendWebResponse(res, response);
 	} catch (error) {
-		console.error('[vite-plugin-vyre] RPC error:', error);
+		console.error('[@octane-ts/vite-plugin] RPC error:', error);
 		res.statusCode = 500;
 		res.setHeader('Content-Type', 'application/json');
 		res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'RPC failed' }));

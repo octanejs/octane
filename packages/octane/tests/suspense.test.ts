@@ -78,7 +78,7 @@ describe('Suspense — catch on rejection', () => {
 
 	it('catch reset() retries the try body with the latest props', async () => {
 		// RIPPLE-NEW EXTENSION: the `@catch (err, reset)` positional `reset`
-		// is an vyre-specific syntax. React's <ErrorBoundary> uses
+		// is an octane-specific syntax. React's <ErrorBoundary> uses
 		// `resetKeys` or an externally-supplied `resetErrorBoundary` callback
 		// for the equivalent flow. Same intent (retry the failed branch with
 		// fresh state), different surface. See SUSPENSE_DIVERGENCE.md.
@@ -376,7 +376,7 @@ describe('Suspense — parallel boundaries (no waterfall)', () => {
 		// next's current sequential-replay strategy — NOT a React-canonical
 		// contract. React's runtime would also waterfall in this pattern (the
 		// first use() must resolve before the body re-runs past it), so the
-		// shape of the divergence is more about vyre's per-replay
+		// shape of the divergence is more about octane's per-replay
 		// call counts than about user-visible behavior. See
 		// SUSPENSE_DIVERGENCE.md for the full picture.
 		//

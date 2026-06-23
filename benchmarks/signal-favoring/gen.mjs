@@ -3,7 +3,7 @@
 // Emits four <framework>/src/App.* files: 100 uniquely-named components in a
 // linear chain C1 → C2 → ... → C100. Stateful counters live at C1, C11, C21,
 // ..., C91. On `__bumpAt<N>`, signal frameworks (solid, ripple) re-evaluate
-// only the `{count}` text node inside CN; hook frameworks (react, vyre)
+// only the `{count}` text node inside CN; hook frameworks (react, octane)
 // re-render CN and cascade through CN+1..C100. The bench measures the median
 // cost of bumping at shallow, middle, and deep stateful positions plus
 // MOUNT and UNMOUNT.
@@ -23,10 +23,10 @@ for (let i = 1; i <= N; i += 10) STATEFUL_INDICES.push(i);
 const isStateful = (i) => i % 10 === 1;
 
 // ----------------------------------------------------------------------------
-// vyre (.tsrx, React-shape hooks)
+// octane (.tsrx, React-shape hooks)
 // ----------------------------------------------------------------------------
 function genRippleNew() {
-	let out = `import { useState } from 'vyre';\n\n`;
+	let out = `import { useState } from 'octane-ts';\n\n`;
 	out += `// 100 uniquely-named components in a chain. Stateful counters at C${STATEFUL_INDICES.join(', C')}.\n`;
 	out += `// hook-frameworks cascade re-renders down the chain on each bump.\n\n`;
 	// Module-level setters + bump exports
@@ -159,7 +159,7 @@ const bumpExports = STATEFUL_INDICES.map(
 ).join('\n');
 
 function genRippleNewMain() {
-	let out = `import { createRoot, flushSync } from 'vyre';\n`;
+	let out = `import { createRoot, flushSync } from 'octane-ts';\n`;
 	out += `import App, { ${bumpImports} } from './App.tsrx';\n\n`;
 	out += `const target = document.getElementById('main');\n`;
 	out += `let root = null;\n\n`;
@@ -210,7 +210,7 @@ function genReactMain() {
 	out += `  if (root) { root.unmount(); root = null; }\n`;
 	out += `  while (target.firstChild) target.removeChild(target.firstChild);\n`;
 	out += `};\n`;
-	// React's flushSync takes a thunk, same shape as ripple/vyre.
+	// React's flushSync takes a thunk, same shape as ripple/octane.
 	out += bumpExports.replace(/__WRAP__/g, 'flushSync') + '\n';
 	out += `window.__ready = true;\n`;
 	return out;
@@ -238,8 +238,8 @@ function genSolidMain() {
 // ----------------------------------------------------------------------------
 
 const targets = [
-	{ rel: 'vyre/src/App.tsrx', content: genRippleNew() },
-	{ rel: 'vyre/src/main.js', content: genRippleNewMain() },
+	{ rel: 'octane/src/App.tsrx', content: genRippleNew() },
+	{ rel: 'octane/src/main.js', content: genRippleNewMain() },
 	{ rel: 'ripple/src/App.tsrx', content: genRipple() },
 	{ rel: 'ripple/src/main.js', content: genRippleMain() },
 	{ rel: 'react/src/App.jsx', content: genReact() },

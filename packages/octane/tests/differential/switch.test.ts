@@ -10,7 +10,7 @@ const FIXTURE = resolve(__dirname, '../_fixtures/switch.tsrx');
 // are all canonical shapes that compile via @tsrx/react without issue.
 //
 // HookInCase is skipped — the fixture authors useState INSIDE @case
-// branch bodies, which vyre supports (per-block-boundary hook
+// branch bodies, which octane supports (per-block-boundary hook
 // slots reset on branch swap) but React's rules-of-hooks rejects
 // outright. Same shape as the RefInIf skip in refs-effects.test.ts.
 
@@ -67,7 +67,7 @@ describe('differential: switch.tsrx — @switch / @case', () => {
 		d.unmount();
 	});
 
-	// HookInCase belongs to the vyre-only conformance suite — it
+	// HookInCase belongs to the octane-only conformance suite — it
 	// pins per-block-boundary hook slot reset (useState INSIDE an @case
 	// branch), which React's rules-of-hooks rejects outright. Coverage at
 	// switch.test.ts:64; never differential.

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 import { hydrate, flushSync } from '../../src/index.js';
-import * as ServerRT from 'vyre/server';
+import * as ServerRT from 'octane-ts/server';
 // CLIENT-compiled components (normal .tsrx import path). Importing AsyncCounter
 // (which has an onClick) makes this module register click delegation at load.
 import { AsyncLeaf, AsyncCounter, AsyncUndef } from '../_fixtures/ssr-suspense.tsrx';
@@ -12,12 +12,12 @@ import { AsyncLeaf, AsyncCounter, AsyncUndef } from '../_fixtures/ssr-suspense.t
 // from the inline data <script>, so a hydrating use() returns synchronously
 // instead of re-suspending (and the adopted DOM is not rebuilt).
 
-const FIXTURE = join(process.cwd(), 'packages/vyre/tests/_fixtures/ssr-suspense.tsrx');
+const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/ssr-suspense.tsrx');
 
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'ssr-suspense.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]vyre\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
@@ -38,7 +38,7 @@ describe('hydrate — Suspense data seeding (SSR Phase 4)', () => {
 		const { body } = await ServerRT.render(server.AsyncLeaf, { promise: Promise.resolve('hello') });
 		expect(body).toBe(
 			'<div id="leaf">hello</div>' +
-				'<script type="application/json" data-vyre-suspense>["hello"]</script>',
+				'<script type="application/json" data-octane-suspense>["hello"]</script>',
 		);
 
 		container.innerHTML = body;
@@ -53,7 +53,7 @@ describe('hydrate — Suspense data seeding (SSR Phase 4)', () => {
 		expect(div.firstChild).toBe(textNode);
 		expect(div.textContent).toBe('hello');
 		// The seed <script> was consumed and removed from the live DOM.
-		expect(container.querySelector('script[data-vyre-suspense]')).toBeNull();
+		expect(container.querySelector('script[data-octane-suspense]')).toBeNull();
 		root.unmount();
 	});
 
@@ -76,7 +76,7 @@ describe('hydrate — Suspense data seeding (SSR Phase 4)', () => {
 		// adopted (not rebuilt), seed script consumed.
 		expect(container.querySelector('#undef')).toBe(div);
 		expect(div.textContent).toBe('is-undefined');
-		expect(container.querySelector('script[data-vyre-suspense]')).toBeNull();
+		expect(container.querySelector('script[data-octane-suspense]')).toBeNull();
 		root.unmount();
 	});
 
@@ -102,7 +102,7 @@ describe('hydrate — Suspense data seeding (SSR Phase 4)', () => {
 		});
 		expect(body).toBe(
 			'<main id="ac"><h1>Hi</h1><button id="ac-btn">count:0</button></main>' +
-				'<script type="application/json" data-vyre-suspense>["Hi"]</script>',
+				'<script type="application/json" data-octane-suspense>["Hi"]</script>',
 		);
 
 		container.innerHTML = body;

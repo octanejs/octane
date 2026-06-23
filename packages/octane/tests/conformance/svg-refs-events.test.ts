@@ -108,7 +108,7 @@ describe('SVG/MathML — delegated events', () => {
 // ============================================================================
 describe('SVG/MathML — scoped <style>', () => {
 	it('scoped <style> applies hash class to SVG element AND its descendants', () => {
-		// Mirrors vyre's CSS-hashing pipeline contract — the hash class
+		// Mirrors octane's CSS-hashing pipeline contract — the hash class
 		// is added to every element under the component so descendant selectors
 		// (`.wrap circle.<hash>`) match correctly. We assert the hash class is
 		// present on both the <svg> root and its <circle> descendant; if the

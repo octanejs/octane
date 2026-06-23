@@ -143,11 +143,11 @@ importers:
         specifier: catalog:default
         version: 1.61.0
 
-  benchmarks/js-framework/vyre:
+  benchmarks/js-framework/octane:
     dependencies:
-      vyre:
+      octane-ts:
         specifier: workspace:*
-        version: link:../../../packages/vyre
+        version: link:../../../packages/octane
     devDependencies:
       terser:
         specifier: catalog:default
@@ -219,11 +219,11 @@ importers:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
 
-  benchmarks/news/vyre:
+  benchmarks/news/octane:
     dependencies:
-      vyre:
+      octane-ts:
         specifier: workspace:*
-        version: link:../../../packages/vyre
+        version: link:../../../packages/octane
     devDependencies:
       vite:
         specifier: catalog:default
@@ -280,11 +280,11 @@ importers:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
 
-  benchmarks/recursive-context/vyre:
+  benchmarks/recursive-context/octane:
     dependencies:
-      vyre:
+      octane-ts:
         specifier: workspace:*
-        version: link:../../../packages/vyre
+        version: link:../../../packages/octane
     devDependencies:
       vite:
         specifier: catalog:default
@@ -341,24 +341,24 @@ importers:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
 
-  benchmarks/signal-favoring/vyre:
+  benchmarks/signal-favoring/octane:
     dependencies:
-      vyre:
+      octane-ts:
         specifier: workspace:*
-        version: link:../../../packages/vyre
+        version: link:../../../packages/octane
     devDependencies:
       vite:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
-  packages/vite-plugin-vyre:
+  packages/vite-plugin-octane:
     dependencies:
       '@ripple-ts/adapter':
         specifier: catalog:default
         version: 0.3.85
-      vyre:
+      octane-ts:
         specifier: workspace:*
-        version: link:../vyre
+        version: link:../octane
     devDependencies:
       '@types/node':
         specifier: catalog:default
@@ -370,7 +370,7 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
-  packages/vyre:
+  packages/octane:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
@@ -398,11 +398,11 @@ importers:
         specifier: catalog:default
         version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
 
-  playground/vyre:
+  playground/octane:
     dependencies:
-      vyre:
+      octane-ts:
         specifier: workspace:*
-        version: link:../../packages/vyre
+        version: link:../../packages/octane
     devDependencies:
       typescript:
         specifier: catalog:default

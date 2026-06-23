@@ -1,8 +1,8 @@
-# js-framework-benchmark — vyre
+# js-framework-benchmark — octane
 
 DOM-based benchmark that mirrors the canonical
 [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark)
-suite. Drives the same six-button + table fixture against `vyre` and times
+suite. Drives the same six-button + table fixture against `octane` and times
 each operation via Playwright.
 
 This complements the Node-only [`tracked-values`](../tracked-values.js)
@@ -13,7 +13,7 @@ auto-callback transform and stable event-bundle optimization pay off.
 
 ```
 benchmarks/js-framework/
-├── vyre/         # Vite app, dev server on :5176
+├── octane/         # Vite app, dev server on :5176
 ├── run.mjs             # Playwright harness — drives each target N iterations
 ├── package.json        # umbrella; depends on playwright
 ├── results/            # output / scratch
@@ -26,8 +26,8 @@ benchmarks/js-framework/
 # 1. From the repo root, install + sync workspaces:
 pnpm install
 
-# 2. Start the vyre bench dev server (terminal A):
-pnpm --filter vyre-jsbench dev
+# 2. Start the octane bench dev server (terminal A):
+pnpm --filter octane-jsbench dev
 
 # 3. Run the harness (terminal B):
 pnpm --filter ripple-js-framework-benchmarks bench
@@ -43,12 +43,12 @@ renderer's wall time, not Playwright transport.
 
 ## Comparing against an external baseline
 
-To compare vyre against another live target (e.g. the inferno-next bench at
+To compare octane against another live target (e.g. the inferno-next bench at
 `inferno/benchmarks/inferno-next/` on its dev port 5175), pass a `TARGETS` env:
 
 ```bash
 TARGETS='[
-  {"name":"vyre",  "url":"http://localhost:5176/", "ready":"#run"},
+  {"name":"octane",  "url":"http://localhost:5176/", "ready":"#run"},
   {"name":"inferno-next","url":"http://localhost:5175/", "ready":"#run"}
 ]' node run.mjs
 ```
@@ -57,7 +57,7 @@ The harness prints a side-by-side table, then a pairwise ratio block treating th
 FIRST target as the baseline:
 
 ```
-inferno-next / vyre ratio (median; <1 means inferno-next faster):
+inferno-next / octane ratio (median; <1 means inferno-next faster):
   run      1.07x  -- slower
   update   0.92x  ++ faster
   …
@@ -65,7 +65,7 @@ inferno-next / vyre ratio (median; <1 means inferno-next faster):
 
 ## What this fixture exercises
 
-The `Main.tsrx` source is intentionally tuned to the surface that vyre's
+The `Main.tsrx` source is intentionally tuned to the surface that octane's
 compiler optimizes:
 
 - **Auto-callback transform**: top-level handlers (`run`, `runLots`, `add`,
@@ -79,7 +79,7 @@ compiler optimizes:
 - **Keyed `@for` reconciliation**: `@for (const row of items; key row.id)` drives
   LIS-based reorder; `swap` only mutates the two affected rows.
 - **V8 hidden-class shape**: the `Block` class shape is preserved (see
-  [`feedback_inferno_next_perf`](../../packages/vyre/audit/) memory).
+  [`feedback_inferno_next_perf`](../../packages/octane/audit/) memory).
 
 ## Methodology caveats
 
@@ -88,7 +88,7 @@ compiler optimizes:
   code size and `optimize` flags are NOT what you'd ship — useful for iteration,
   not for absolute scoring.
 - For "publishable" numbers, build first
-  (`pnpm --filter vyre-jsbench build`), then
-  `pnpm --filter vyre-jsbench preview` to serve the production output, then
+  (`pnpm --filter octane-jsbench build`), then
+  `pnpm --filter octane-jsbench preview` to serve the production output, then
   run the harness against that.
 - Chromium is the default browser; results on Firefox / WebKit differ.

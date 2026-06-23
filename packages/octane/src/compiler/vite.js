@@ -1,12 +1,12 @@
 /**
- * Vite plugin for compiling .tsrx files via vyre/compiler compiler.
+ * Vite plugin for compiling .tsrx files via octane-ts/compiler compiler.
  *
  * Per-module target is chosen from Vite's SSR signal: a module compiled for the
  * server environment uses `mode: 'server'` (SSR HTML output), everything else
  * uses `mode: 'client'` (template-clone DOM runtime). This auto-detection is
  * what a standard Vite SSR setup relies on — the SAME `.tsrx` is compiled to
  * client code for the browser bundle and to server code when loaded through
- * `ssrLoadModule` / an SSR build (see playground/vyre-ssr).
+ * `ssrLoadModule` / an SSR build (see playground/octane-ssr).
  *
  * Options:
  *   - `ssr`: force the target for EVERY module — `true` always compiles server
@@ -17,13 +17,13 @@
  */
 import { compile } from './compile.js';
 
-export function vyre(options = {}) {
+export function octane(options = {}) {
 	let hmrEnabled = options.hmr;
 	// An explicit override of the per-module SSR auto-detection (true → always
 	// server, false → always client). `undefined` keeps auto-detection.
 	const forceSsr = options.ssr;
 	return {
-		name: 'vyre',
+		name: 'octane',
 		enforce: 'pre',
 		configResolved(config) {
 			if (hmrEnabled === undefined) hmrEnabled = config.command === 'serve';

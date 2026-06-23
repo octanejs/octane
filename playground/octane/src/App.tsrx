@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 import { Counter } from './demos/Counter.tsrx';
 import { KeyedList } from './demos/KeyedList.tsrx';
 import { Conditional } from './demos/Conditional.tsrx';
@@ -20,7 +20,7 @@ export function App() @{
 
 	<>
 		<header class="demo-header">
-			<h1>{'vyre playground'}</h1>
+			<h1>{'octane playground'}</h1>
 			<p>{'Template-clone renderer + TSRX directives. Each demo exercises a distinctive corner of the surface.'}</p>
 		</header>
 		<nav class="demo-nav">

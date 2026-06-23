@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 export function Classed(props) @{
 	<div class={props.kind}>{'x'}</div>

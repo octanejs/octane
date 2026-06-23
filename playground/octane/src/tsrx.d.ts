@@ -1,6 +1,6 @@
 // Ambient declaration for `.tsrx` modules so TypeScript can resolve imports
 // from .ts entry files. At runtime, .tsrx files are transformed by the
-// vyre Vite plugin (vyre/compiler/vite) into ES modules whose
+// octane Vite plugin (octane-ts/compiler/vite) into ES modules whose
 // exports are component functions.
 declare module '*.tsrx';
 

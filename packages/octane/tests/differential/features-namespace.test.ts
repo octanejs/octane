@@ -62,7 +62,7 @@ describe('differential: tsrx-features.tsrx — attribute shapes', () => {
 		// React 19 drops literal `xlink:href` as a non-standard DOM property,
 		// so the rig's _setup.ts rewrites the @tsrx/react-emitted prop key
 		// from `"xlink:href":` to camelCase `xlinkHref:`. React 19 then round-
-		// trips the namespaced attribute correctly. The vyre side
+		// trips the namespaced attribute correctly. The octane side
 		// authors the source as `xlink:href` directly; setAttributeNS in the
 		// runtime routes it through XLINK_NS. The DOM diff confirms identical
 		// serialization on both sides.
@@ -164,7 +164,7 @@ describe('differential: tsrx-features.tsrx — pure vs impure for-of bodies', ()
 // SVG/MathML namespace inheritance — the rig diffs innerHTML, but we also
 // reach into the DOM to confirm namespaceURI on host nodes on BOTH runtimes.
 // This proves React's JSX runtime placed the descendants in the correct
-// foreign-content namespace, which is the property the vyre compiler
+// foreign-content namespace, which is the property the octane compiler
 // also has to preserve.
 // ---------------------------------------------------------------------------
 

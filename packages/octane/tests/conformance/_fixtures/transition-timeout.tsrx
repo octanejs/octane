@@ -1,4 +1,4 @@
-import { use, useState, useTransition } from 'vyre';
+import { use, useState, useTransition } from 'octane-ts';
 
 // ============================================================================
 // Suspense Gap #6: transition-timeout fallback

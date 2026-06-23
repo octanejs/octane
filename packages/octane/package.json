@@ -1,9 +1,9 @@
 {
-  "name": "vyre",
+  "name": "octane-ts",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Template-clone UI renderer with a React-shape state model, authored in TSRX. Ships the runtime + the TSRX→vyre compiler (vyre/compiler).",
+  "description": "Template-clone UI renderer with a React-shape state model, authored in TSRX. Ships the runtime + the TSRX→octane compiler (octane-ts/compiler).",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -13,8 +13,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vyre-ts/vyre.git",
-    "directory": "packages/vyre"
+    "url": "git+https://github.com/octane-ts/octane.git",
+    "directory": "packages/octane"
   },
   "main": "src/index.ts",
   "module": "src/index.ts",

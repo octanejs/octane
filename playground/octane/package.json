@@ -1,21 +1,21 @@
 {
-  "name": "vyre-playground",
+  "name": "octane-playground",
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "description": "Playground for vyre — the template-clone renderer, compiled through vyre/compiler.",
+  "description": "Playground for octane — the template-clone renderer, compiled through octane-ts/compiler.",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host",
-    "debug-all": "node ../../scripts/debug-mode.js all vyre/compiler",
-    "debug-client": "node ../../scripts/debug-mode.js client vyre/compiler",
-    "debug-ssr": "node ../../scripts/debug-mode.js server vyre/compiler",
-    "debug-volar": "node ../../scripts/debug-mode.js tsx vyre/compiler",
+    "debug-all": "node ../../scripts/debug-mode.js all octane-ts/compiler",
+    "debug-client": "node ../../scripts/debug-mode.js client octane-ts/compiler",
+    "debug-ssr": "node ../../scripts/debug-mode.js server octane-ts/compiler",
+    "debug-volar": "node ../../scripts/debug-mode.js tsx octane-ts/compiler",
     "debug-tsx": "pnpm run debug-volar"
   },
   "dependencies": {
-    "vyre": "workspace:*"
+    "octane-ts": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:default",

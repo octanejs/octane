@@ -97,7 +97,7 @@ describe('differential: continue.tsrx — @if-as-continue inside @for', () => {
 		d.unmount();
 	});
 
-	// MultiContinue: SKIPPED — vyre groups all fragment-rooted siblings
+	// MultiContinue: SKIPPED — octane groups all fragment-rooted siblings
 	// emitted from @for into separate Block boundaries, so badges/A/B siblings
 	// serialise grouped by kind (all badges, then all A/B). React inlines via
 	// jsxs(Fragment) so siblings interleave per-iteration. Both are equally
@@ -182,7 +182,7 @@ describe('differential: nested.tsrx — declarations inside control bodies', () 
 });
 
 describe('differential: hooks.tsrx — callback/ref parity', () => {
-	// MemoTest / EffectMount / EffectDeps: SKIPPED — vyre's useMemo /
+	// MemoTest / EffectMount / EffectDeps: SKIPPED — octane's useMemo /
 	// useEffect signatures pass deps as positional arguments to the factory /
 	// callback (e.g. `useMemo((x) => x * 2, [props.n])`). React's hooks of the
 	// same name do not — the callback receives no args. The compiled React

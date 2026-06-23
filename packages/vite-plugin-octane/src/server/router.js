@@ -1,7 +1,7 @@
 /**
- * @typedef {import('vite-plugin-vyre').Route} Route
- * @typedef {import('vite-plugin-vyre').RenderRoute} RenderRoute
- * @typedef {import('vite-plugin-vyre').ServerRoute} ServerRoute
+ * @typedef {import('@octane-ts/vite-plugin').Route} Route
+ * @typedef {import('@octane-ts/vite-plugin').RenderRoute} RenderRoute
+ * @typedef {import('@octane-ts/vite-plugin').ServerRoute} ServerRoute
  */
 
 /**

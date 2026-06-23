@@ -1,4 +1,4 @@
-import { useActionState, useFormStatus, useOptimistic, useState } from 'vyre';
+import { useActionState, useFormStatus, useOptimistic, useState } from 'octane-ts';
 
 // useActionState wired to <form action={formAction}>. The action receives
 // (previousState, formData) and its resolved value becomes the new state.

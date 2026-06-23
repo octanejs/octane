@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 import { createRoot, hydrate, flushSync, createElement, delegateEvents } from '../../src/index.js';
-import * as ServerRT from 'vyre/server';
+import * as ServerRT from 'octane-ts/server';
 import { Inner, Counter, Hole, Layout, FragLayout } from './_fixtures/renderable.tsrx';
 
 // Renderable `{expr}` holes (no `as string` cast) — Ripple/React semantics:
@@ -14,11 +14,11 @@ import { Inner, Counter, Hole, Layout, FragLayout } from './_fixtures/renderable
 
 delegateEvents(['click']);
 
-const FIXTURE = join(process.cwd(), 'packages/vyre/tests/hydration/_fixtures/renderable.tsrx');
+const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/renderable.tsrx');
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'renderable.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]vyre\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

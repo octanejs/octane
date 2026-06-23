@@ -3,7 +3,7 @@ import { mountDifferential } from './_rig.js';
 import { resolve } from 'node:path';
 
 // Smoke-level differential coverage for createPortal. The previous blocker
-// — `_setup.ts`'s indiscriminate `vyre → react` import rewrite plus
+// — `_setup.ts`'s indiscriminate `octane → react` import rewrite plus
 // @tsrx/react's function-children-not-unwrapped lowering — was patched in
 // the same commit that added this file. The rig now:
 //   (1) strips createPortal out of the react named-import,

@@ -10,7 +10,7 @@ import { mount } from './_helpers';
  * emitted accept block does at dev time.
  *
  * The component bodies here use the same `(scope, props, extra)` signature
- * the vyre compiler emits. They follow the standard
+ * the octane compiler emits. They follow the standard
  * "clear-range-then-insert" pattern that compiled bodies use on re-render.
  */
 
@@ -89,8 +89,8 @@ describe('hmr — runtime wrapper', () => {
 
 	it('preserves hook state across update() — stable Symbol.for keys', () => {
 		// Both bodies use the SAME hook symbol (simulating the compiler's
-		// `Symbol.for('vyre:file.tsrx:Foo.useState#0')`-stable emit).
-		const HOOK_SYM = Symbol.for('vyre:hmr.test.ts:Counter.useState#0');
+		// `Symbol.for('octane:file.tsrx:Foo.useState#0')`-stable emit).
+		const HOOK_SYM = Symbol.for('octane:hmr.test.ts:Counter.useState#0');
 		const v1: ComponentBody<any> = ((scope: Scope, _props: any, _extra: any) => {
 			const [n] = useState(0, HOOK_SYM as any);
 			clearBlockRange(scope);
@@ -137,16 +137,16 @@ describe('hmr — runtime wrapper', () => {
 	});
 
 	it('compiler emits Symbol.for(...) for hook slots and an import.meta.hot.accept block', async () => {
-		const { compile } = await import('vyre/compiler');
+		const { compile } = await import('octane-ts/compiler');
 		const src =
-			"import { useState } from 'vyre';\n" +
+			"import { useState } from 'octane-ts';\n" +
 			'export function Foo() @{\n' +
 			'  const [n, setN] = useState(0);\n' +
 			'  <button onClick={() => setN(n + 1)}>{n as string}</button>\n' +
 			'}\n';
 		const { code } = compile(src, 'file.tsrx', { hmr: true });
 		// Stable Symbol.for-based hook slot (so re-imports get the same identity).
-		expect(code).toMatch(/Symbol\.for\("vyre:file\.tsrx:Foo\.useState#0"\)/);
+		expect(code).toMatch(/Symbol\.for\("octane:file\.tsrx:Foo\.useState#0"\)/);
 		// Inline HMR wrapping on the exported component.
 		expect(code).toMatch(/export const Foo = hmr\(function Foo/);
 		// Vite-shaped accept block.
@@ -155,7 +155,7 @@ describe('hmr — runtime wrapper', () => {
 	});
 
 	it('hmr option off → no wrapping, no accept block', async () => {
-		const { compile } = await import('vyre/compiler');
+		const { compile } = await import('octane-ts/compiler');
 		const src = "export function Foo() @{ <span>{'hi'}</span> }\n";
 		const { code } = compile(src, 'file.tsrx'); // no { hmr: true }
 		expect(code).not.toMatch(/hmr\(/);

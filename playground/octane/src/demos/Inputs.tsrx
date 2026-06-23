@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // Controlled inputs + derived display + @switch lowering for the kind picker.
 // Mixes input event handling with a discriminant-driven render.

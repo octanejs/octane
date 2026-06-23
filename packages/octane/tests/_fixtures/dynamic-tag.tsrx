@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // `<{expr}>` — dynamic-tag syntax. Lets a parent pick the rendered
 // component at the call site. Parser emits a JSXExpressionContainer at

@@ -1,9 +1,9 @@
 // React-canon useState / useReducer scenario parity.
 //
-// The earlier vyre API-parity audit flagged useState/useReducer as
+// The earlier octane API-parity audit flagged useState/useReducer as
 // the HIGHEST-RISK shallow-coverage area: 90+ React tests in
 // ReactHooksWithNoopRenderer-test.js vs ~12 hand-written scenarios in
-// vyre. The most subtle invariants — functional-updater queues,
+// octane. The most subtle invariants — functional-updater queues,
 // Object.is bailout, NaN bailout, lazy-init-once, multi-setter
 // batching, reducer-ref freshness — were unpinned. This file ports the
 // missing scenario set.

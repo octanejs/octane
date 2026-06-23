@@ -1,4 +1,4 @@
-import { useState, useReducer, useEffect } from 'vyre';
+import { useState, useReducer, useEffect } from 'octane-ts';
 
 // Render counter — every component below increments this so tests can
 // assert "rendered exactly N times". The mutable lives outside the
@@ -185,7 +185,7 @@ export function ReducerSameRefBailout() @{
 }
 
 // useReducer 3-arg lazy init form — React supports useReducer(reducer,
-// initialArg, init). vyre accepts the same signature; this pins it.
+// initialArg, init). octane accepts the same signature; this pins it.
 export function ReducerLazyInit(props) @{
 	const [n, dispatch] = useReducer((s, _a) => s + 1, props.seed, (seed) => seed * 10);
 	_setN = dispatch;

@@ -1,6 +1,6 @@
 /**
- * vyre/compiler compiler — compiles TSRX source into JS that targets
- * the vyre runtime.
+ * octane-ts/compiler compiler — compiles TSRX source into JS that targets
+ * the octane runtime.
  *
  * Architecture (mirrors PLAN-TEMPLATE-RUNTIME.md §6 and §7):
  *   1. Parse TSRX via @tsrx/core's parseModule.
@@ -827,7 +827,7 @@ function buildSourceMap(source, sourceName, segments) {
 }
 
 /**
- * Compile a .tsrx source string into JS targeting `vyre`.
+ * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
  * @param {{ hmr?: boolean, mode?: 'client' | 'server' }} [options] —
@@ -848,7 +848,7 @@ export function compile(source, filename, options) {
 	if (mode === 'server') {
 		// Server (SSR) codegen — Phase 1: static markup + dynamic text + attributes
 		// + nested components, emitted as HTML-string-building bodies importing the
-		// server runtime from 'vyre/server'. Control flow, portals, Activity
+		// server runtime from 'octane-ts/server'. Control flow, portals, Activity
 		// and component children are rejected (later phases).
 		return compileServer(source, filename, options);
 	}
@@ -1084,8 +1084,8 @@ export function compile(source, filename, options) {
 			body += compiled + '\n\n';
 			bodyLine += countNewlines(compiled + '\n\n');
 			if (hmrEnabled) hmrComponents.push({ name: c.id.name, exportKind: 'named' });
-		} else if (node.type === 'ImportDeclaration' && node.source.value === 'vyre') {
-			// Preserve ALL user-imported names from vyre (Portal, createContext,
+		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane-ts') {
+			// Preserve ALL user-imported names from octane (Portal, createContext,
 			// use, custom helpers, etc.) — merged into the single prelude import.
 			for (const sp of node.specifiers || []) {
 				const name = sp.imported?.name || sp.local?.name;
@@ -1178,7 +1178,7 @@ export function compile(source, filename, options) {
 	// we re-emit the prelude bits with the now-complete `runtimeNeeded` set.
 	const finalRuntimeImport =
 		ctx.runtimeNeeded.size > 0
-			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'vyre';\n\n`
+			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'octane-ts';\n\n`
 			: '';
 
 	// Everything before `body` in the output — shifts every body segment's
@@ -1214,7 +1214,7 @@ export function compile(source, filename, options) {
 
 function ssrUnsupported(what) {
 	throw new Error(
-		`vyre server render (SSR Phase 1) does not support ${what} yet. ` +
+		`octane server render (SSR Phase 1) does not support ${what} yet. ` +
 			`Phase 1 covers static markup, dynamic text, attributes and nested ` +
 			`components; control flow, portals and component children come later.`,
 	);
@@ -1251,8 +1251,8 @@ function compileServer(source, filename, options) {
 			body += compileServerComponent({ ...node.declaration, default: true }, ctx) + '\n\n';
 		} else if (node.type === 'ExportNamedDeclaration' && isComponentFunction(node.declaration)) {
 			body += compileServerComponent({ ...node.declaration, export: true }, ctx) + '\n\n';
-		} else if (node.type === 'ImportDeclaration' && node.source.value === 'vyre') {
-			// User imports from 'vyre' resolve to the server runtime instead.
+		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane-ts') {
+			// User imports from 'octane-ts' resolve to the server runtime instead.
 			for (const sp of node.specifiers || []) {
 				const name = sp.imported?.name || sp.local?.name;
 				if (name) ctx.runtimeNeeded.add(name);
@@ -1268,7 +1268,7 @@ function compileServer(source, filename, options) {
 
 	const runtimeImport =
 		ctx.runtimeNeeded.size > 0
-			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'vyre/server';\n\n`
+			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'octane-ts/server';\n\n`
 			: '';
 	const helpers = ctx.hoistedHelpers.length ? ctx.hoistedHelpers.join('\n') + '\n\n' : '';
 	const code = runtimeImport + helpers + body;
@@ -1280,10 +1280,10 @@ function compileServer(source, filename, options) {
 function compileServerComponent(node, ctx) {
 	const name = node.id.name;
 	if (node.async)
-		throw new Error(`Component \`${name}\` is declared \`async\`, which vyre does not support.`);
+		throw new Error(`Component \`${name}\` is declared \`async\`, which octane does not support.`);
 	if (node.generator)
 		throw new Error(
-			`Component \`${name}\` is declared as a generator, which vyre does not support.`,
+			`Component \`${name}\` is declared as a generator, which octane does not support.`,
 		);
 
 	const isExported = !!(node.export || node.default || node.exported);
@@ -1767,7 +1767,7 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash) {
  *
  * The stylesheet ALSO gets registered for module-level injection via the
  * existing cssInjections pipeline, so the rules are emitted in a
- * `<style data-vyre>` tag just like the auto-scoped case.
+ * `<style data-octane>` tag just like the auto-scoped case.
  *
  * `prepareStylesheetForRender(sheet, true)` switches the selector renderer
  * to "style expression" mode — selectors are emitted with hash classes
@@ -1847,19 +1847,19 @@ function applyCssScoping(componentNode, ctx) {
 
 function compileComponent(node, ctx, options) {
 	const name = node.id.name;
-	// The vyre target has no async/generator component model. Without this
+	// The octane target has no async/generator component model. Without this
 	// guard an `async function` / `function*` component body compiles to broken
 	// synchronous code with no diagnostic — the worst failure mode. Fail loudly.
 	if (node.async) {
 		throw new Error(
-			`Component \`${name}\` is declared \`async\`, which the vyre target does not support. ` +
+			`Component \`${name}\` is declared \`async\`, which the octane target does not support. ` +
 				`Load async data with \`use(promise)\` inside a \`@try\` / \`@pending\` boundary instead of ` +
 				`awaiting in the component body.`,
 		);
 	}
 	if (node.generator) {
 		throw new Error(
-			`Component \`${name}\` is declared as a generator (\`function*\`), which the vyre ` +
+			`Component \`${name}\` is declared as a generator (\`function*\`), which the octane ` +
 				`target does not support.`,
 		);
 	}
@@ -2252,7 +2252,7 @@ function allocHookSymbol(ctx, debugName) {
 	// collide across modules. `debugName` includes the component name + hook
 	// name + call-site index — stable provided the user doesn't reorder hooks
 	// between renders (which would violate React's rules anyway).
-	const stableKey = `vyre:${ctx.filename || '<anon>'}:${debugName}`;
+	const stableKey = `octane:${ctx.filename || '<anon>'}:${debugName}`;
 	ctx.hoistedHelpers.push(`const ${name} = Symbol.for(${JSON.stringify(stableKey)});`);
 	return name;
 }
@@ -2483,7 +2483,7 @@ function normalizeChildren(nodes) {
 			// `<title>`/`<meta>`/`<link>` directly and they hoist to document.head.
 			if (isHeadElementNode(n)) {
 				throw new Error(
-					'`<head>` is not supported in vyre. Render `<title>`, `<meta>`, and ' +
+					'`<head>` is not supported in octane. Render `<title>`, `<meta>`, and ' +
 						'`<link>` directly (anywhere in the component) — they are hoisted to ' +
 						'document.head automatically, React-19-style.',
 				);
@@ -4605,7 +4605,7 @@ function makeForCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', c
 	// `await` with no diagnostic.
 	if (node.await) {
 		throw new Error(
-			'`@for await (...)` (async iteration) is not supported by the vyre target. ' +
+			'`@for await (...)` (async iteration) is not supported by the octane target. ' +
 				'Use a synchronous `@for` over a materialized array, or resolve async data with ' +
 				'`use(promise)` first.',
 		);

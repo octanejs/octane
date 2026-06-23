@@ -1,6 +1,6 @@
 // Generates a deterministic lorem-ipsum article dataset shared by the bench
 // app(s). Run `node gen.mjs [count]` (default 50). Writes the SAME dataset into
-// every target app's src/data.js (vyre, solid, …) so each framework
+// every target app's src/data.js (octane, solid, …) so each framework
 // renders byte-identical content for a fair comparison.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -54,7 +54,7 @@ const out =
 
 // Every target app gets the identical dataset (skip a target whose src/ dir
 // doesn't exist yet, so adding a new target is just creating its folder).
-const TARGETS = ['vyre', 'solid', 'react', 'ripple'];
+const TARGETS = ['octane', 'solid', 'react', 'ripple'];
 const bytes = Buffer.byteLength(out);
 for (const target of TARGETS) {
 	const srcDir = path.resolve(__dirname, target, 'src');

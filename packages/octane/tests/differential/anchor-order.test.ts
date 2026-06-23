@@ -137,7 +137,7 @@ describe('differential: anchor-order.tsrx — tryBlock source order', () => {
 	it('tryBeforeSibling: catch branch preserves source order on throw', async () => {
 		const d = await mountDifferential(FIXTURE, 'tryBeforeSibling', { initialThrow: false });
 		await d.step('mount (try ok)', () => {});
-		// Toggling makes the child Thrower throw during its render — vyre's
+		// Toggling makes the child Thrower throw during its render — octane's
 		// tryBlock catches it via tryHelper, and the React side's TsrxErrorBoundary
 		// (lowered by @tsrx/react from @catch) catches via getDerivedStateFromError.
 		// Both renderers swap the @catch body into the SAME slot, so the .after
@@ -148,7 +148,7 @@ describe('differential: anchor-order.tsrx — tryBlock source order', () => {
 		});
 		// The catch's reset button calls `reset(); setThrowIt(false);` in the
 		// same handler. React's TsrxErrorBoundary clears `state.error` and then
-		// batches with setThrowIt → one commit, try body restored. vyre's
+		// batches with setThrowIt → one commit, try body restored. octane's
 		// requestReset rewinds slot state (branch=-1, err=null) and schedules
 		// the parent — sibling setState batches in the same commit, so when
 		// mountTry re-runs the body it sees throwIt=false and doesn't re-throw.

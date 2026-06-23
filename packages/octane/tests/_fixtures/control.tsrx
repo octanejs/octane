@@ -1,4 +1,4 @@
-import { useState, useId } from 'vyre';
+import { useState, useId } from 'octane-ts';
 
 export function Toggle() @{
 	const [on, setOn] = useState(false);

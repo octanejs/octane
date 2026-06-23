@@ -10,7 +10,7 @@ import {
 } from './_fixtures/portal-events.tsrx';
 
 // Each test allocates its own portal target attached to document.body, so the
-// vyre event-delegation listeners are scoped to that target (matching
+// octane event-delegation listeners are scoped to that target (matching
 // React-17-shape behaviour).
 let portalTarget: HTMLElement;
 
@@ -138,7 +138,7 @@ describe('portal — event delegation', () => {
 		portalTarget.appendChild(stray);
 		let leakedHandlerFired = false;
 		// Attach an $$click via the same DOM-property convention the runtime uses,
-		// to detect whether the (now-detached) vyre listener still runs.
+		// to detect whether the (now-detached) octane listener still runs.
 		(stray as any).$$click = () => {
 			leakedHandlerFired = true;
 		};

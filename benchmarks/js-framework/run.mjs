@@ -1,17 +1,17 @@
-// Local benchmark runner — drives vyre (and optionally other targets)
+// Local benchmark runner — drives octane (and optionally other targets)
 // via Playwright. Times each js-framework-benchmark operation and prints a
 // table. Uses page.evaluate(() => el.click()) to fire clicks SYNCHRONOUSLY
 // inside the page, bypassing per-click CDP mouse-simulation IPC overhead
 // (~10ms/click).
 //
 // Usage:
-//   pnpm --filter vyre-jsbench dev     # keep server on 5176
+//   pnpm --filter octane-jsbench dev     # keep server on 5176
 //   node benchmarks/js-framework/run.mjs [iterations]   # default 8
 //
 // To compare against an inferno-next baseline (or any other target whose
 // bench app exposes the same DOM contract), keep its dev server running
 // and pass a TARGETS env var:
-//   TARGETS='[{"name":"vyre","url":"http://localhost:5176/","ready":"#run"},
+//   TARGETS='[{"name":"octane","url":"http://localhost:5176/","ready":"#run"},
 //             {"name":"inferno-next","url":"http://localhost:5175/","ready":"#run"}]' \
 //     node run.mjs
 
@@ -23,7 +23,7 @@ const ROW_COUNT_LARGE = 10000; // matches the canonical suite's runlots / clear 
 
 const TARGETS = process.env.TARGETS
 	? JSON.parse(process.env.TARGETS)
-	: [{ name: 'vyre', url: 'http://localhost:5176/', ready: '#run' }];
+	: [{ name: 'octane', url: 'http://localhost:5176/', ready: '#run' }];
 
 const OPS = [
 	{ name: 'run', pre: 'empty', click: '#run' },
@@ -77,7 +77,7 @@ async function ensureState(page, pre) {
 }
 
 // Time ONLY the synchronous click handler: the target commits its DOM mutation
-// synchronously on the discrete click (vyre flushes on the event), so the
+// synchronously on the discrete click (octane flushes on the event), so the
 // post-click rAF + task wait was pure noise — ~16ms of frame latency + the paint
 // of up to 10K rows, which swamped and destabilised the real JS work. A gc()
 // right before each sample keeps a surprise collection from inflating it.

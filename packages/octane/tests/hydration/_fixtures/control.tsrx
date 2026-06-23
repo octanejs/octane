@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // SSR Phase 6 (M3) — @if / @switch hydration. The server wraps the TAKEN branch
 // in a `<!--[-->…<!--]-->` range; the client adopts it as the slot, brackets the

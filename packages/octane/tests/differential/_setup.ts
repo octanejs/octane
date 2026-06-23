@@ -37,7 +37,7 @@ function compileOne(srcPath: string): void {
 	try {
 		compiled = compileToReact(source, srcPath);
 	} catch {
-		// Some fixtures use vyre features that @tsrx/react rejects
+		// Some fixtures use octane features that @tsrx/react rejects
 		// (multi-ref, @switch, Dynamic shapes). Skip silently — a differential
 		// test that imports the missing precompile will surface the gap.
 		return;
@@ -56,12 +56,12 @@ function compileOne(srcPath: string): void {
 	} catch {
 		return;
 	}
-	// @tsrx/react preserves the user's authored `from 'vyre'` imports
+	// @tsrx/react preserves the user's authored `from 'octane-ts'` imports
 	// verbatim (it expects the user to author against the platform they're
 	// targeting). For our differential fixtures — which ARE authored against
-	// vyre — we rewrite the imports to React-side equivalents so the
+	// octane — we rewrite the imports to React-side equivalents so the
 	// React runtime supplies the hooks/components. The names of React's hooks
-	// match vyre's (useState, useEffect, useReducer, useMemo,
+	// match octane's (useState, useEffect, useReducer, useMemo,
 	// useCallback, useRef, useId, useImperativeHandle, useDeferredValue,
 	// useTransition, startTransition, createContext, memo, use, Fragment,
 	// Suspense), so a flat import rewrite is enough.
@@ -73,7 +73,7 @@ function compileOne(srcPath: string): void {
 	// createPortal out of the rewritten react import, (b) import the real one
 	// from react-dom under an internal alias, (c) shim a `createPortal` const
 	// that unwraps the thunk if present and forwards to the real impl.
-	let rewritten = transformed.code.replace(/from\s+["']vyre["']/g, 'from "react"');
+	let rewritten = transformed.code.replace(/from\s+["']octane-ts["']/g, 'from "react"');
 	if (/\bcreatePortal\b/.test(rewritten)) {
 		rewritten = rewritten.replace(
 			/(import\s*\{[^}]*?)\bcreatePortal\b\s*,?\s*([^}]*\}\s*from\s+"react";?)/,
@@ -87,8 +87,8 @@ ${rewritten}`;
 	// string-keyed JSX prop `"xlink:href":` by @tsrx/react, then dropped at
 	// render time. Rewriting the prop key to camelCase `xlinkHref:` makes
 	// React 19 round-trip it back to the namespaced `xlink:href` attribute
-	// with XLINK_NS — byte-identical to vyre's setAttributeNS path.
-	// Only applies to the React-side cache; the vyre fixture stays
+	// with XLINK_NS — byte-identical to octane's setAttributeNS path.
+	// Only applies to the React-side cache; the octane fixture stays
 	// authored as `xlink:href` in the source.
 	rewritten = rewritten.replace(/"xlink:href":/g, 'xlinkHref:');
 	const slug = basename(srcPath).replace(/\.tsrx$/, '');

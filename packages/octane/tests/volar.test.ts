@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compileToVolarMappings } from 'vyre/compiler/volar';
+import { compileToVolarMappings } from 'octane-ts/compiler/volar';
 
 /**
  * Volar mappings tests. We exercise the IDE-facing virtual-TSX pipeline:
@@ -16,7 +16,7 @@ import { compileToVolarMappings } from 'vyre/compiler/volar';
 describe('compileToVolarMappings', () => {
 	it('returns a VolarMappingsResult shape', () => {
 		const src =
-			"import { useState } from 'vyre';\n" +
+			"import { useState } from 'octane-ts';\n" +
 			'export function Counter() @{\n' +
 			'  const [n, setN] = useState(0);\n' +
 			'  <button onClick={() => setN(n + 1)}>{n as string}</button>\n' +
@@ -32,7 +32,7 @@ describe('compileToVolarMappings', () => {
 
 	it('preserves user identifiers in the generated TSX', () => {
 		const src =
-			"import { useState } from 'vyre';\n" +
+			"import { useState } from 'octane-ts';\n" +
 			'export function MyButton(props) @{\n' +
 			'  const [count, setCount] = useState(0);\n' +
 			"  <button onClick={() => setCount(count + 1)}>{(props.label + ':' + count) as string}</button>\n" +
@@ -75,7 +75,7 @@ describe('compileToVolarMappings', () => {
 
 	it('handles @if / @for / @try / @switch directives', () => {
 		const src =
-			"import { useState } from 'vyre';\n" +
+			"import { useState } from 'octane-ts';\n" +
 			'export function App(props) @{\n' +
 			'  const [n] = useState(0);\n' +
 			'  <div>\n' +

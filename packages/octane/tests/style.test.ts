@@ -26,7 +26,7 @@ import {
 	ScopedGlobalTag,
 } from './_fixtures/style.tsrx';
 
-// Helper: find the module-level <style data-vyre> tag for a given hash
+// Helper: find the module-level <style data-octane> tag for a given hash
 // and return its CSS text. Tests use this to assert how @tsrx/core's
 // stylesheet pipeline rewrote the source CSS (which selectors got hashed,
 // which got passed through, where `:global` opens a hole, etc.).
@@ -36,7 +36,7 @@ function styleSheetTextFor(el: Element): string {
 	const hashClass = Array.from(el.classList).find((c) => c.startsWith('tsrx-'));
 	if (!hashClass) throw new Error('element has no tsrx-<hash> class');
 	const sheets = Array.from(
-		document.head.querySelectorAll('style[data-vyre]'),
+		document.head.querySelectorAll('style[data-octane]'),
 	) as HTMLStyleElement[];
 	for (const s of sheets) {
 		if (s.textContent && s.textContent.includes(hashClass)) return s.textContent;
@@ -187,8 +187,8 @@ describe('style prop — inside for-of', () => {
 // ---------------------------------------------------------------------------
 
 function getInjectedStyles(): string[] {
-	return Array.from(document.querySelectorAll('style[data-vyre]')).map(
-		(s) => s.getAttribute('data-vyre')!,
+	return Array.from(document.querySelectorAll('style[data-octane]')).map(
+		(s) => s.getAttribute('data-octane')!,
 	);
 }
 

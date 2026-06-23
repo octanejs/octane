@@ -4,7 +4,7 @@ import { makeStore, Reader, SwappableReader } from './_fixtures/sync-external-st
 
 // React 18's useSyncExternalStore contract: subscribe on mount, unsubscribe
 // on unmount, re-render on every notify, fresh getSnapshot() every render.
-// vyre implements this on top of the existing useState + useEffect
+// octane implements this on top of the existing useState + useEffect
 // machinery, derived from the user's compiler-injected slot.
 
 describe('useSyncExternalStore', () => {

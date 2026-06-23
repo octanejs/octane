@@ -1,4 +1,4 @@
-import { useState, createContext, use } from 'vyre';
+import { useState, createContext, use } from 'octane-ts';
 
 // Balanced binary tree: depth D=10 → 1024 leaves, 2047 components.
 //

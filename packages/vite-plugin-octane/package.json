@@ -1,9 +1,9 @@
 {
-  "name": "vite-plugin-vyre",
+  "name": "@octane-ts/vite-plugin",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Vite metaframework plugin for the vyre renderer (dev SSR + routing + hydrate)",
+  "description": "Vite metaframework plugin for the octane renderer (dev SSR + routing + hydrate)",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -13,13 +13,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vyre-ts/vyre.git",
-    "directory": "packages/vite-plugin-vyre"
+    "url": "git+https://github.com/octane-ts/octane.git",
+    "directory": "packages/vite-plugin-octane"
   },
   "module": "src/index.js",
   "main": "src/index.js",
   "bin": {
-    "vyre-preview": "src/bin/preview.js"
+    "octane-preview": "src/bin/preview.js"
   },
   "exports": {
     ".": {
@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@ripple-ts/adapter": "catalog:default",
-    "vyre": "workspace:*"
+    "octane-ts": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:default",

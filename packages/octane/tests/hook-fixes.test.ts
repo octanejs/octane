@@ -14,7 +14,7 @@ import {
 	DepsAsArgs,
 } from './_fixtures/hook-fixes.tsrx';
 
-// Regression tests for the hook-parity fixes triaged against vyre.
+// Regression tests for the hook-parity fixes triaged against octane.
 
 describe('#1 effect cleanup lifecycle', () => {
 	it('fires the old cleanup exactly once on dep change, then once on unmount', () => {

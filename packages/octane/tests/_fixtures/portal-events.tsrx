@@ -1,4 +1,4 @@
-import { useState, createPortal } from 'vyre';
+import { useState, createPortal } from 'octane-ts';
 
 /**
  * Click handler INSIDE the portal contents — verifies the portal target gets

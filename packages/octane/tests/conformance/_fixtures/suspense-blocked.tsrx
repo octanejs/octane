@@ -1,4 +1,4 @@
-import { use, useState, useMemo, useDeferredValue } from 'vyre';
+import { use, useState, useMemo, useDeferredValue } from 'octane-ts';
 
 // ============================================================================
 // Gap 7 (Suspense): use() inside a useMemo body

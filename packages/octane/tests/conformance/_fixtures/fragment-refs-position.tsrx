@@ -1,4 +1,4 @@
-import { Fragment } from 'vyre';
+import { Fragment } from 'octane-ts';
 
 // Sibling before the fragment, fragment with one child, sibling after —
 // exercises every region compareDocumentPosition can report.

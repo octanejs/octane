@@ -270,7 +270,7 @@ describe('FragmentInstance.dispatchEvent — integration', () => {
 			onParent: () => parentClicked++,
 		});
 		fragRef.current!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-		// The onClick on #parent (delegated through vyre's event
+		// The onClick on #parent (delegated through octane's event
 		// system) sees the click. Confirms dispatchEvent and the surrounding
 		// component event tree compose correctly.
 		expect(parentClicked).toBe(1);

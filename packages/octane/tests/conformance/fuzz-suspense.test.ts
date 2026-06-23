@@ -1,7 +1,7 @@
 // FUZZ — Suspense / tryBlock differential.
 //
 // ARCHITECTURE
-// vyre's tryBlock is a single primitive that handles render-throws,
+// octane's tryBlock is a single primitive that handles render-throws,
 // effect-throws, use(thenable) suspension, soft-detach of the try body
 // while the pending arm is up, and TRANSITION_FALLBACK_TIMEOUT_MS for
 // transition-priority suspends. Hand-written suspense tests cover named
@@ -30,7 +30,7 @@ import { S1, S2, SSibling, SNested, SCatchReset } from './_fixtures/fuzz-suspens
 const NUM_CASES = parseInt(process.env.RIPPLE_FUZZ_SUSPENSE_CASES || '60', 10);
 
 // ─── Promise factories ──────────────────────────────────────────────
-// vyre accepts React-19-shaped pre-tagged promises (status set
+// octane accepts React-19-shaped pre-tagged promises (status set
 // ahead of use()). We build BOTH shapes — pre-fulfilled for the
 // baseline render, deferred for the live render — so the oracle compares
 // "if everything resolved synchronously" vs "if everything had to

@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'vyre';
+import { Fragment, useState } from 'octane-ts';
 
 // A fragment whose child set GROWS at runtime: #a is always present, #b mounts
 // when the toggle flips. Used to prove fragment listeners/observers added before

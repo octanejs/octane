@@ -1,14 +1,14 @@
 {
-  "name": "vyre-news-bench",
+  "name": "octane-news-bench",
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "news-site SSR+hydration bench fixture for vyre.",
+  "description": "news-site SSR+hydration bench fixture for octane.",
   "scripts": {
     "dev": "vite --host --port 5191 --strictPort"
   },
   "dependencies": {
-    "vyre": "workspace:*"
+    "octane-ts": "workspace:*"
   },
   "devDependencies": {
     "vite": "catalog:default"

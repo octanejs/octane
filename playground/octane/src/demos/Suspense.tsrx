@@ -1,6 +1,6 @@
-import { useState, use } from 'vyre';
+import { useState, use } from 'octane-ts';
 
-// @try / @pending / @catch — vyre's TSRX-flavored suspense surface.
+// @try / @pending / @catch — octane's TSRX-flavored suspense surface.
 // Clicking "fetch" starts a fake async request that the body await's via
 // use(). While pending, the @pending body renders. On reject, the @catch
 // branch surfaces the error and offers reset(). Reset clears the slot

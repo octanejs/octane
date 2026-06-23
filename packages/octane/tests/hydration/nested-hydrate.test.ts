@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 import { hydrate, flushSync } from '../../src/index.js';
-import * as ServerRT from 'vyre/server';
+import * as ServerRT from 'octane-ts/server';
 // CLIENT-compiled component (the onClick makes this module register click delegation).
 import { Panel } from './_fixtures/nested.tsrx';
 
@@ -11,12 +11,12 @@ import { Panel } from './_fixtures/nested.tsrx';
 // wraps the child in `<!--[-->…<!--]-->`, the client componentSlot adopts that
 // range, and the child adopts the server DOM (no rebuild) + becomes interactive.
 
-const FIXTURE = join(process.cwd(), 'packages/vyre/tests/hydration/_fixtures/nested.tsrx');
+const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/nested.tsrx');
 
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'nested.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]vyre\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

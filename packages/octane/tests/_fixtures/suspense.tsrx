@@ -1,4 +1,4 @@
-import { use, useState, useEffect, useMemo, useDeferredValue } from 'vyre';
+import { use, useState, useEffect, useMemo, useDeferredValue } from 'octane-ts';
 
 // ---------------------------------------------------------------------------
 // Basic Suspense flow — try/pending/catch with a use(promise) inside try.

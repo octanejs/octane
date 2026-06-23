@@ -1,9 +1,9 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // ============================================================================
 // MathML attribute breadth + namespace inheritance (Audit Batch 2 — MathML)
 // ============================================================================
-// These fixtures pin vyre's runtime attribute handling on MathML hosts.
+// These fixtures pin octane's runtime attribute handling on MathML hosts.
 // Each fixture exposes a single dynamic surface driven by props so the test
 // can exercise both the create (initial mount) and the update (re-render with
 // changed props) paths via mount() + update(). Mirrors the SVG Batch 2 shape

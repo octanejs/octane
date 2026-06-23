@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'vyre';
+import { useRef, useEffect } from 'octane-ts';
 
 // Array-valued ref form: `ref={[a, b]}` attaches BOTH refs to the same
 // element. Matches React's canonical convention (the `react-merge-refs`
@@ -6,7 +6,7 @@ import { useRef, useEffect } from 'vyre';
 // the array and applies each shape (function / object) independently.
 //
 // The effect body reads the target via a positional dep arg (`tgt`) while
-// closing over the `a`/`b` refs — exercising vyre's deps-as-args
+// closing over the `a`/`b` refs — exercising octane's deps-as-args
 // convention (the runtime spreads the deps array as positional arguments).
 export function ArrayRefsOneEl(props) @{
 	const a = useRef(null);

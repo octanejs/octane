@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, Fragment } from 'vyre';
+import { useState, useRef, useLayoutEffect, Fragment } from 'octane-ts';
 
 // React-19 commit-phase ref timing: a callback ref must fire with a CONNECTED
 // node (the subtree is in the document), and ref.current must be populated

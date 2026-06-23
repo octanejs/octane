@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect } from 'vyre';
+import { useState, useLayoutEffect } from 'octane-ts';
 
 // Regression fixture for the scheduler mid-flush rethrow bug. When one block
 // throws during a re-render with no enclosing @try, the error must not abandon

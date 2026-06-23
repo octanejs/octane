@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'vyre';
+import { useState, useCallback } from 'octane-ts';
 
 // Minimal hook demo — useState + memoized handler via useCallback.
 export function Counter() @{

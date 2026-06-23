@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'vyre';
+import { Fragment, useState } from 'octane-ts';
 
 // scrollIntoView target — single focusable child.
 export function ScrollTarget(props) @{

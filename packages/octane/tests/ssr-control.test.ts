@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 import { injectStyle } from '../src/index.js';
-import * as RT from 'vyre/server';
+import * as RT from 'octane-ts/server';
 
 // SSR Phase 3 — control flow (@if/@for/@switch/@try) + component children +
 // portals emitted to HTML strings with block markers, plus scoped-CSS de-dup.
 
-const FIXTURES = join(process.cwd(), 'packages/vyre/tests/_fixtures');
+const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 
 function evalServer(source: string, file: string): Record<string, any> {
 	let { code } = compile(source, file, { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]vyre\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
@@ -71,7 +71,7 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		const resolved = await RT.render(m.Boundary, { read: () => RT.use(Promise.resolve('x')) });
 		expect(resolved.body).toBe(
 			`<div>${OPEN}${OPEN}<span class="ok">x</span>${CLOSE}${CLOSE}</div>` +
-				`<script type="application/json" data-vyre-suspense>["x"]</script>`,
+				`<script type="application/json" data-octane-suspense>["x"]</script>`,
 		);
 		// A thrown error renders the @catch arm with the error.
 		const caught = (
@@ -104,12 +104,12 @@ describe('SSR Phase 3 — portals', () => {
 });
 
 describe('SSR Phase 3 — scoped CSS across the boundary', () => {
-	it('server css output is tagged <style data-vyre="hash"> tags', async () => {
+	it('server css output is tagged <style data-octane="hash"> tags', async () => {
 		const ssr = evalServer(readFileSync(join(FIXTURES, 'ssr.tsrx'), 'utf8'), 'ssr.tsrx');
 		const { css, body } = await RT.render(ssr.Scoped);
-		expect(css).toMatch(/^<style data-vyre="tsrx-[0-9a-f]+">.*<\/style>$/s);
+		expect(css).toMatch(/^<style data-octane="tsrx-[0-9a-f]+">.*<\/style>$/s);
 		// The hash on the body class matches the css tag's hash.
-		const hash = css.match(/data-vyre="(tsrx-[0-9a-f]+)"/)![1];
+		const hash = css.match(/data-octane="(tsrx-[0-9a-f]+)"/)![1];
 		expect(body).toContain(`class="box ${hash}"`);
 	});
 
@@ -117,13 +117,13 @@ describe('SSR Phase 3 — scoped CSS across the boundary', () => {
 		// Simulate the server-emitted <style> already present on the page.
 		const head = document.head;
 		const existing = document.createElement('style');
-		existing.setAttribute('data-vyre', 'tsrx-dedup');
+		existing.setAttribute('data-octane', 'tsrx-dedup');
 		existing.textContent = '.x.tsrx-dedup{color:red}';
 		head.appendChild(existing);
 
 		injectStyle('tsrx-dedup', '.x.tsrx-dedup{color:red}');
 
-		expect(head.querySelectorAll('style[data-vyre="tsrx-dedup"]').length).toBe(1);
+		expect(head.querySelectorAll('style[data-octane="tsrx-dedup"]').length).toBe(1);
 		existing.remove();
 	});
 });

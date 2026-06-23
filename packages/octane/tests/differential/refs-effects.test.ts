@@ -13,7 +13,7 @@ const EFFECT_TIMING_PATH = resolve(__dirname, '../_fixtures/effect-timing.tsrx')
 // useref-multi.tsrx, so the remaining components in useref.tsrx now precompile
 // cleanly via @tsrx/react. The differential tests below all exercise
 // runtime-shape parity for useRef. `DomRefObject` stays skipped — its
-// ripple-side useEffect body reads its deps positionally (an vyre-
+// ripple-side useEffect body reads its deps positionally (an octane-
 // specific calling convention), which React's useEffect doesn't honour, so
 // the React side throws on read of undefined.
 // ----------------------------------------------------------------------------
@@ -77,7 +77,7 @@ describe('differential: useref.tsrx — useRef persists / does not rerender / st
 	});
 });
 
-// RefInIf belongs to the vyre-only conformance suite — it pins
+// RefInIf belongs to the octane-only conformance suite — it pins
 // per-block-boundary hook slot reset (useRef + useState INSIDE an @if
 // branch), which React's rules-of-hooks rejects outright. Coverage at
 // useref.test.ts:65; never differential.
@@ -122,7 +122,7 @@ describe('differential: useref.tsrx — DOM refs (object form)', () => {
 describe('differential: useref.tsrx — DOM refs (callback form)', () => {
 	it('DomRefCallback: callback ref fires with element on mount', async () => {
 		// Callback-ref null-on-unmount semantics can diverge across React versions
-		// and vyre. Per the brief: don't pre-emptively make it pass — let
+		// and octane. Per the brief: don't pre-emptively make it pass — let
 		// the rig surface the shape if it differs. Currently blocked by the
 		// fixture-wide compile error.
 		const target = {} as any;
@@ -204,8 +204,8 @@ describe('differential: useref.tsrx — useRef lazy-ish initial value', () => {
 // effect-timing.tsrx — phase ordering, passive vs layout
 //
 // Bodies authored with LEXICAL capture (props.log inside the closure) rather
-// than the vyre positional-deps spread shape, so both runtimes drive
-// the same writes into the shared log. vyre still supports the
+// than the octane positional-deps spread shape, so both runtimes drive
+// the same writes into the shared log. octane still supports the
 // positional form for ripple-only fixtures; lexical capture is the
 // cross-runtime portable subset.
 // ----------------------------------------------------------------------------

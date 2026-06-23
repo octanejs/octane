@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'vyre/compiler';
-import * as RT from 'vyre/server';
+import { compile } from 'octane-ts/compiler';
+import * as RT from 'octane-ts/server';
 
 // SSR Phase 4 — Suspense + data serialization. render() is async: a
 // use(thenable) that hasn't resolved suspends the pass (the @try shows
@@ -10,12 +10,12 @@ import * as RT from 'vyre/server';
 // resolved success arm (or @catch on rejection). Each resolved value is appended
 // to `body` as an inline data <script> for the client to seed on hydration.
 
-const FIXTURES = join(process.cwd(), 'packages/vyre/tests/_fixtures');
+const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 
 function evalServer(source: string, file: string): Record<string, any> {
 	let { code } = compile(source, file, { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]vyre\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
@@ -30,7 +30,7 @@ const m = evalServer(
 const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
 const seed = (json: string) =>
-	`<script type="application/json" data-vyre-suspense>${json}</script>`;
+	`<script type="application/json" data-octane-suspense>${json}</script>`;
 
 function deferred<T>() {
 	let resolve!: (v: T) => void;
@@ -62,7 +62,7 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 		expect(out.body).toBe(
 			`<div id="box">${OPEN}${OPEN}<span class="err">nope</span>${CLOSE}${CLOSE}</div>`,
 		);
-		expect(out.body).not.toContain('data-vyre-suspense');
+		expect(out.body).not.toContain('data-octane-suspense');
 	});
 
 	it('resolves NESTED suspense across multiple passes (outer gates inner)', async () => {
@@ -95,7 +95,7 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 			outer: Promise.resolve('first'),
 			inner: Promise.resolve('second'),
 		});
-		const json = out.body.match(/data-vyre-suspense>(.*?)<\/script>/)![1];
+		const json = out.body.match(/data-octane-suspense>(.*?)<\/script>/)![1];
 		expect(JSON.parse(json)).toEqual(['first', 'second']);
 	});
 
@@ -104,7 +104,7 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 		// Body text is HTML-escaped as usual…
 		expect(out.body).toContain('<div id="leaf">&lt;/script&gt;&lt;x&gt;</div>');
 		// …and the JSON payload escapes every `<` to < (no literal `<` in it).
-		const json = out.body.match(/data-vyre-suspense>(.*?)<\/script>$/)![1];
+		const json = out.body.match(/data-octane-suspense>(.*?)<\/script>$/)![1];
 		expect(json).not.toContain('<');
 		expect(JSON.parse(json)).toEqual(['</script><x>']);
 	});
@@ -132,14 +132,14 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 	it('non-suspending components emit no seed <script>', async () => {
 		const out = await RT.render(m.Boundary, { promise: Promise.resolve('x') });
 		// (sanity: suspending one DOES seed)
-		expect(out.body).toContain('data-vyre-suspense');
+		expect(out.body).toContain('data-octane-suspense');
 		const plain = evalServer(
 			`export function Plain() @{ <div id="p">{'static'}</div> }`,
 			'plain.tsrx',
 		);
 		const out2 = await RT.render(plain.Plain);
 		expect(out2.body).toBe('<div id="p">static</div>');
-		expect(out2.body).not.toContain('data-vyre-suspense');
+		expect(out2.body).not.toContain('data-octane-suspense');
 	});
 
 	it('a use(thenable) that never settles fails the render via the suspense deadline (no hang)', async () => {

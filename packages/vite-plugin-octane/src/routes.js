@@ -1,8 +1,8 @@
 /**
- * @typedef {import('vite-plugin-vyre').Context} Context
- * @typedef {import('vite-plugin-vyre').Middleware} Middleware
- * @typedef {import('vite-plugin-vyre').RenderRouteOptions} RenderRouteOptions
- * @typedef {import('vite-plugin-vyre').ServerRouteOptions} ServerRouteOptions
+ * @typedef {import('@octane-ts/vite-plugin').Context} Context
+ * @typedef {import('@octane-ts/vite-plugin').Middleware} Middleware
+ * @typedef {import('@octane-ts/vite-plugin').RenderRouteOptions} RenderRouteOptions
+ * @typedef {import('@octane-ts/vite-plugin').ServerRouteOptions} ServerRouteOptions
  */
 
 /**
@@ -59,7 +59,7 @@ export function get_component_export(module, export_name) {
 }
 
 /**
- * Route for rendering vyre components with SSR
+ * Route for rendering octane components with SSR
  */
 export class RenderRoute {
 	/** @type {'render'} */

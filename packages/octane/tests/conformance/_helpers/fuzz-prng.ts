@@ -1,4 +1,4 @@
-// Tiny deterministic PRNG shared by vyre fuzz harnesses. Inline
+// Tiny deterministic PRNG shared by octane fuzz harnesses. Inline
 // mulberry32 (6 lines of state) seeded from a string hash so:
 //   - no `seedrandom` / `fast-check` dep on the test path
 //   - same seed → same case stream forever (CI repro = one env var)

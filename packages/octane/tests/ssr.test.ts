@@ -1,21 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'vyre/compiler';
-import * as RT from 'vyre/server';
+import { compile } from 'octane-ts/compiler';
+import * as RT from 'octane-ts/server';
 
-const FIXTURES = join(process.cwd(), 'packages/vyre/tests/_fixtures');
+const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 
 // SSR Phase 1: server render of static markup + dynamic text + attributes +
 // nested components. The compiler (mode: 'server') emits HTML-string-building
-// bodies that import from 'vyre/server'; we eval them with that same
+// bodies that import from 'octane-ts/server'; we eval them with that same
 // runtime module injected, then call render() and snapshot { head, body, css }.
 
 function evalServer(source: string, file: string): Record<string, any> {
 	let { code } = compile(source, file, { mode: 'server' });
 	// Bind the server-runtime import to the live module, and capture exports.
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]vyre\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

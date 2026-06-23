@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitest/config';
-import { vyre } from 'vyre/compiler/vite';
+import { octane } from 'octane-ts/compiler/vite';
 
 export default defineConfig({
-	plugins: [vyre()],
+	plugins: [octane()],
 	test: {
 		environment: 'jsdom',
 		include: ['tests/**/*.test.tsrx', 'tests/**/*.test.ts'],

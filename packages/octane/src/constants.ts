@@ -1,6 +1,6 @@
 /**
  * Hydration marker protocol — the single source of truth shared by the server
- * emit (the `vyre/compiler` compiler's server mode) and the client `hydrate`
+ * emit (the `octane-ts/compiler` compiler's server mode) and the client `hydrate`
  * runtime. The server writes these comment markers into the HTML it produces and
  * the client hydration cursor scans for them to align with the server output, so
  * BOTH sides must use byte-identical strings or hydration fails.
@@ -32,7 +32,7 @@ export const EMPTY_COMMENT = '<!---->';
  * render order) so a hydrating boundary returns synchronously instead of
  * re-suspending. Shared so server emit and client read stay byte-identical.
  */
-export const SUSPENSE_SCRIPT_ATTR = 'data-vyre-suspense';
+export const SUSPENSE_SCRIPT_ATTR = 'data-octane-suspense';
 
 /**
  * Sentinel marker for a `use(thenable)` value that resolved to `undefined`.

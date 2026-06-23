@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 import { hydrate, flushSync } from '../../src/index.js';
-import * as ServerRT from 'vyre/server';
+import * as ServerRT from 'octane-ts/server';
 import { TextAfterComp, TextBetweenComps, TextAfterIf } from './_fixtures/text-sibling.tsrx';
 
 // Regression for the website-tsrx-new migration: a `{x as string}` text hole
@@ -13,11 +13,11 @@ import { TextAfterComp, TextBetweenComps, TextAfterIf } from './_fixtures/text-s
 // removeChild). Now the position is resolved with the hole-aware child/sibling
 // walk + htextSwap adopts.
 
-const FIXTURE = join(process.cwd(), 'packages/vyre/tests/hydration/_fixtures/text-sibling.tsrx');
+const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/text-sibling.tsrx');
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'text-sibling.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]vyre\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

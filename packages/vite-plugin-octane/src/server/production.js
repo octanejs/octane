@@ -20,7 +20,7 @@ export { resolveRippleConfig } from '../load-config.js';
  */
 export function createHandler(_manifest, _deps) {
 	throw new Error(
-		'[vite-plugin-vyre] Production build (createHandler) is Phase 2 — not yet implemented. ' +
+		'[@octane-ts/vite-plugin] Production build (createHandler) is Phase 2 — not yet implemented. ' +
 			'Dev SSR works via `vite dev`.',
 	);
 }

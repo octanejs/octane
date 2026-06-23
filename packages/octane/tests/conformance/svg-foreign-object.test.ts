@@ -17,7 +17,7 @@ const XHTML_NS = 'http://www.w3.org/1999/xhtml';
 // ============================================================================
 // Reference: ReactDOMSVG-test.js — pins the HTML5 foreign-content rules that a
 // renderer MUST observe when walking from an SVG/MathML parent into an XHTML
-// child (and back). vyre routes static templates through the HTML5
+// child (and back). octane routes static templates through the HTML5
 // parser by wrapping the body in <svg>/<math>, so for STATIC content the
 // parser implements these rules for us; for dynamic bindings the compiler's
 // nsForSelf / nsForChildren walk (compile.js L44–L55) decides per-host how

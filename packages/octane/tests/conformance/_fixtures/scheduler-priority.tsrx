@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect, useEffect } from 'vyre';
+import { useState, useLayoutEffect, useEffect } from 'octane-ts';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Discrete-event sync-commit probe
@@ -12,7 +12,7 @@ export function ClickCounter() @{
 }
 
 // Snapshot probe — handler reads DOM after setState. React's contract says
-// the read sees the just-committed value. Pre-fix vyre sees stale DOM.
+// the read sees the just-committed value. Pre-fix octane sees stale DOM.
 export let snapshots: string[] = [];
 export function resetSnapshots() {
 	snapshots = [];

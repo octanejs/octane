@@ -1,16 +1,16 @@
 import { defineConfig } from 'vite';
-import { vyre } from 'vyre/compiler/vite';
+import { octane } from 'octane-ts/compiler/vite';
 
 // Mirrors the inferno-next bench's terser flags so build output is comparable
 // byte-for-byte across renderers: aggressive multi-pass compress with
 // reduce_vars off (preserves V8 hidden-class shape — see the
 // feedback_inferno_next_perf memory).
 export default defineConfig({
-	plugins: [vyre()],
+	plugins: [octane()],
 	optimizeDeps: {
 		// Both workspace packages export raw .ts source; pre-bundling would
 		// snapshot stale output for every edit.
-		exclude: ['vyre', 'vyre/compiler'],
+		exclude: ['octane-ts', 'octane-ts/compiler'],
 	},
 	build: {
 		target: 'esnext',

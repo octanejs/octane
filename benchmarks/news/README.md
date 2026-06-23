@@ -1,7 +1,7 @@
 # News SSR + hydration benchmark
 
 A large "news site" document (header + a `@for` feed of article cards, lorem
-ipsum) that measures, per target (**vyre**, **ripple**, **Solid 2.0**,
+ipsum) that measures, per target (**octane**, **ripple**, **Solid 2.0**,
 **React 19**):
 
 - **SSR render time** — the built `renderApp()` → HTML string, in Node, warm.
@@ -9,7 +9,7 @@ ipsum) that measures, per target (**vyre**, **ripple**, **Solid 2.0**,
   fresh page whose `#app` already holds the server-rendered DOM (timed in
   isolation via a deferred `window.__hydrate()`), with the production client
   bundle loaded. All targets commit hydration synchronously inside `__hydrate()` —
-  vyre and React via `flushSync`, Solid is synchronous — so this is the
+  octane and React via `flushSync`, Solid is synchronous — so this is the
   hydration _work_, not frame-scheduling latency. (React's `hydrateRoot` is
   concurrent and would otherwise defer the work out of the measured window,
   reading as near-zero; `flushSync` forces it to commit so the comparison is
@@ -19,7 +19,7 @@ ipsum) that measures, per target (**vyre**, **ripple**, **Solid 2.0**,
 **Production only.** The harness `vite build`s each target (client minified + an
 SSR bundle, `NODE_ENV=production`) and measures the BUILT artifacts — never dev.
 Dev numbers are misleading: unminified code plus the frameworks' _development_
-runtimes (React/Solid dev builds carry warning + validation overhead; vyre
+runtimes (React/Solid dev builds carry warning + validation overhead; octane
 dev transforms aren't optimized). The difference is large — e.g. React's
 `renderToString` measured ~2 ms in dev vs ~0.1–0.3 ms in production.
 
@@ -30,7 +30,7 @@ rebuild (`#app.innerHTML` unchanged) and that the page is interactive afterward
 All apps are authored in the SAME `.tsrx` source shape and render the same
 dataset, so the comparison is pure framework cost:
 
-- **vyre** — `vyre/compiler` (single runtime, `render()` + `hydrate()`).
+- **octane** — `octane-ts/compiler` (single runtime, `render()` + `hydrate()`).
 - **ripple** (original) — `@tsrx/ripple` + `ripple` (`ripple/server` `render()` →
   `{ head, body, css }` + `ripple` `hydrate()`). State via `track`. There's no
   transform-only Ripple vite plugin (the published one is the metaframework), so
@@ -41,9 +41,9 @@ dataset, so the comparison is pure framework cost:
   `react-dom/client` `hydrateRoot`; one JSX transform serves both, no two-build).
 
 Reactive state is authored per target (the one real authoring difference):
-vyre/React `useState`, Solid `createSignal`, original Ripple `track`.
+octane/React `useState`, Solid `createSignal`, original Ripple `track`.
 
-This bench exercises vyre's cursor-based hydration of **control flow +
+This bench exercises octane's cursor-based hydration of **control flow +
 nested components** (the `@for` feed adopts each item's `<!--[-->…<!--]-->` range;
 the `Header` component adopts its own range) — i.e. it only works because
 hydration was extended beyond single leaf templates.
@@ -53,7 +53,7 @@ hydration was extended beyond single leaf templates.
 ```bash
 pnpm install
 node benchmarks/news/gen.mjs 50          # regenerate the dataset into every target (default 50)
-node benchmarks/news/run.mjs vyre  # builds (prod) + benches; `run.mjs 20` also works
+node benchmarks/news/run.mjs octane  # builds (prod) + benches; `run.mjs 20` also works
 node benchmarks/news/run.mjs ripple 20   # original Ripple, 20 iterations (+5 warmup)
 node benchmarks/news/run.mjs solid 20    # Solid 2.0
 node benchmarks/news/run.mjs react 20    # React 19
@@ -61,7 +61,7 @@ node benchmarks/news/run.mjs react 20 --no-build   # reuse the existing dist/ (s
 ```
 
 `run.mjs [target] [iterations] [--no-build]` — `target` ∈
-`{vyre, ripple, solid, react}` (default `vyre`; a bare number is
+`{octane, ripple, solid, react}` (default `octane`; a bare number is
 treated as iterations for back-compat). Each run rebuilds the target's production
 client + SSR bundles unless `--no-build` is passed. Build output goes to
 `<target>/dist/` (git-ignored).
@@ -72,7 +72,7 @@ client + SSR bundles unless `--no-build` is passed. Build output goes to
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `gen.mjs`                      | Generates `<target>/src/data.js` for every target (deterministic lorem-ipsum).                                                       |
 | `<target>/src/App.tsrx`        | Header component + `@for` feed of article cards + footer.                                                                            |
-| `<target>/src/Header.tsrx`     | A stateful component (vyre/React `useState`, Solid `createSignal`, Ripple `track`) with a theme toggle.                        |
+| `<target>/src/Header.tsrx`     | A stateful component (octane/React `useState`, Solid `createSignal`, Ripple `track`) with a theme toggle.                        |
 | `<target>/src/entry-server.ts` | `renderApp()` → `{ head, body, css }`.                                                                                               |
 | `<target>/src/entry-client.ts` | Deferred `window.__hydrate()`.                                                                                                       |
 | `run.mjs`                      | `vite build` (client + SSR, prod) → static-serves the built artifacts + Playwright; measures SSR + hydration; prints median/min/p95. |
@@ -103,10 +103,10 @@ React's components use `className` (not `class`): `@tsrx/react` only rewrites
 bench components skip. `className` renders to the same `class` DOM attribute, so
 the document is identical to the other targets — it just avoids React's dev-mode
 _"Invalid DOM property `class`"_ warning. State uses React's own `useState`
-(vyre's is React-shaped, so the authoring is otherwise identical).
+(octane's is React-shaped, so the authoring is otherwise identical).
 
 ## Follow-ups
 
-- **`@if`/`@switch` hydration (vyre)**: not yet wired (the bench uses `@for`
+- **`@if`/`@switch` hydration (octane)**: not yet wired (the bench uses `@for`
   - components, which are). Hookless ("lite") nested components also don't hydrate
     yet — give a hydrated component a hook so it uses the full slot.

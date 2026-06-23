@@ -11,5 +11,5 @@
  * @returns {never}
  */
 export function generateServerEntry(_options) {
-	throw new Error('[vite-plugin-vyre] Server entry generation is Phase 2.');
+	throw new Error('[@octane-ts/vite-plugin] Server entry generation is Phase 2.');
 }

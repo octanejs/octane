@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 
 // Pin the stable event-bundle optimization: when an event handler arrow
 // has the shape `onClick={() => fn(a, b, c)}` (zero params, single

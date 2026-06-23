@@ -1,9 +1,9 @@
-# vyre SUSPENSE conformance audit
+# octane SUSPENSE conformance audit
 
 Files audited:
 
-- /Users/domgan/Projects/ripple/packages/vyre/**tests**/suspense.test.ts
-- /Users/domgan/Projects/ripple/packages/vyre/**tests**/\_fixtures/suspense.tsrx
+- /Users/domgan/Projects/ripple/packages/octane/**tests**/suspense.test.ts
+- /Users/domgan/Projects/ripple/packages/octane/**tests**/\_fixtures/suspense.tsrx
 
 | #   | Test name                                                                                                     | Fixture component                         | What it asserts                                                                                                                                                                                                                                                                                                                                                 | React upstream test file:line(s)                                                                             | Confidence | Notes                                                                                                                                                                        |
 | --- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -23,15 +23,15 @@ Files audited:
 | 14  | `use(thenable) is positional — second call returns its own value`                                             | `TwoUses`                                 | Multiple `use()` calls in body each return their own value, keyed positionally; per-block `thenableState[]` indexed by call order.                                                                                                                                                                                                                              | `ReactUse-test.js` (positional thenableState tests, ~L800-L900)                                              | med        | Best-guess citation; React tests this implicitly across many cases; no single canonical "positional" named test.                                                             |
 | 15  | `sibling try blocks render their fallbacks in one outer pass; both promises in flight before either suspends` | `SiblingBoundaries` (via `LeafA`+`LeafB`) | Two sibling boundaries render in one pass; both fallbacks visible simultaneously; resolving B first reveals B independently of A.                                                                                                                                                                                                                               | `ReactSuspenseWithNoopRenderer-test.js` ("sibling Suspense boundaries reveal independently", ~L600-L900)     | low        | Best-guess citation; React's parallel-siblings tests are spread across ReactSuspense-test.internal.js and ReactSuspenseList-test.internal.js.                                |
 | 16  | `useMemo pattern: both fetches kick off on initial render (network-parallel)`                                 | `ParallelInOneBoundary`                   | `useMemo([startA(), startB()], [cacheKey])` ensures both fetches start on the first render; final render succeeds regardless of resolve order. The useMemo factory runs exactly ONCE across replays (slot-cache on the held tryBlock survives suspend→resolve), so startA/startB fire once — matches React's fiber-scoped memo preservation (NOT a divergence). | `ReactUse-test.js` (useMemo + use for parallel fetches; React docs pattern)                                  | low        | Best-guess citation; this is a documented React pattern but not always covered by a single named test — closest in ReactCache + ReactUse tests.                              |
-| 17  | `WITHOUT useMemo, sequential use() inside one body waterfalls (documents the gotcha)`                         | `WaterfallBody`                           | Documents the negative case: sequential `use()` without `useMemo` produces waterfall — `startB` is never invoked until after `da` resolves and replay reaches the second `use()`.                                                                                                                                                                               | `ReactUse-test.js` (parallel-vs-waterfall discussion, scattered)                                             | low        | Best-guess citation; React doesn't have a named "documents the waterfall gotcha" test — this is vyre-specific documentation-as-test. See "potential extensions" below. |
+| 17  | `WITHOUT useMemo, sequential use() inside one body waterfalls (documents the gotcha)`                         | `WaterfallBody`                           | Documents the negative case: sequential `use()` without `useMemo` produces waterfall — `startB` is never invoked until after `da` resolves and replay reaches the second `use()`.                                                                                                                                                                               | `ReactUse-test.js` (parallel-vs-waterfall discussion, scattered)                                             | low        | Best-guess citation; React doesn't have a named "documents the waterfall gotcha" test — this is octane-specific documentation-as-test. See "potential extensions" below. |
 | 18  | `returns previous value while new value suspends; commits on microtask`                                       | `DeferredSwap`                            | `useDeferredValue(promise)` returns prior value on first render after prop change (no suspend, stale flag set). On microtask, commits new value, suspends, then resolves and flips back to fresh.                                                                                                                                                               | `ReactUse-test.js` or `useDeferredValue-test.js` (`useDeferredValue` + `use` integration)                    | low        | Best-guess citation; React 18+ tests this in dedicated useDeferredValue tests and in ReactUse-test.js; exact location varies.                                                |
 
-## Tests covering features that look like vyre-specific extensions / non-canonical React behavior
+## Tests covering features that look like octane-specific extensions / non-canonical React behavior
 
 - **Row 4 — `catch reset() retries the try body with the latest props`**: React
   uses the `<ErrorBoundary>` class component + `resetKeys` pattern (or
   `react-error-boundary`); the explicit `@catch (err, reset) { ... }` arm with a
-  callable `reset` bound to the local boundary is an vyre ergonomic
+  callable `reset` bound to the local boundary is an octane ergonomic
   extension. React itself does not give you a positional `reset` argument in
   JSX-form error boundaries.
 - **Row 16 —
@@ -39,7 +39,7 @@ Files audited:
   CORRECTION (reconciled with the test, which now asserts parity): this is NOT a
   divergence. An earlier draft of this audit claimed "non-keep mode rebuilds the
   try block on each retry, so useMemo's factory re-runs" — that is false. There is
-  no "non-keep mode" in the runtime; vyre holds the `tryBlock` across
+  no "non-keep mode" in the runtime; octane holds the `tryBlock` across
   suspend → resolve (`softDetachTryBlock` + tryBlock reuse in `attachResume`), so
   its `scope.hooks` survive and useMemo's slot-cache hits on every replay. The
   factory runs exactly once, matching React's fiber-scoped `memoizedState`
@@ -51,16 +51,16 @@ Files audited:
   This is explicitly a documentation-as-regression-test ("future contributors
   understand the constraint... any future optimization that accidentally fixes it
   will fail this test"). It is not asserting React-canonical behavior — it is
-  pinning the current vyre sequential-replay strategy.
+  pinning the current octane sequential-replay strategy.
 - **Row 2 —
   `resolves synchronously when the promise is pre-tagged as fulfilled`**: React
   internally honors `.status='fulfilled'` / `.value` on thenables passed to
   `use()`, but it is an underdocumented internal contract used by `cache()`.
-  vyre exposing this as a stable, externally-tested behavior is more of a
+  octane exposing this as a stable, externally-tested behavior is more of a
   public-API guarantee than a React-canonical conformance point.
 - **Syntax surface generally** — the `@try / @pending / @catch` JSX-extension arms
-  (with `.tsrx` files) are vyre-specific. The tests pin BEHAVIOR that
-  mirrors React, but the SURFACE is unique to vyre.
+  (with `.tsrx` files) are octane-specific. The tests pin BEHAVIOR that
+  mirrors React, but the SURFACE is unique to octane.
 
 ## Coverage summary
 

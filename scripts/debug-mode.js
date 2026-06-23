@@ -5,18 +5,18 @@ import { createRequire } from 'node:module';
 // Dumps the compiled output for every .tsrx file under a playground's ./src so
 // you can eyeball what the compiler emits. Resolve the target package relative
 // to the playground that invoked this script (process.cwd()), not relative to
-// scripts/, because the playground's `vyre` dependency is linked into its own
+// scripts/, because the playground's `octane` dependency is linked into its own
 // local node_modules.
 const require = createRequire(path.join(process.cwd(), 'package.json'));
-const package_name = process.argv[3] ?? 'vyre/compiler';
+const package_name = process.argv[3] ?? 'octane-ts/compiler';
 const pkg = require(package_name);
 const { compile } = pkg;
 const compile_to_volar_mappings = pkg.compile_to_volar_mappings ?? pkg.compileToVolarMappings;
 const FILE_EXTENSIONS = ['.tsrx'];
 
-// vyre/compiler (and @tsrx/ripple) accept a { mode } option and emit a distinct
+// octane-ts/compiler (and @tsrx/ripple) accept a { mode } option and emit a distinct
 // server build; other targets compile client-only.
-const supportsServer = package_name === 'vyre/compiler' || package_name === '@tsrx/ripple';
+const supportsServer = package_name === 'octane-ts/compiler' || package_name === '@tsrx/ripple';
 
 let mode_type = process.argv[2] || 'client';
 

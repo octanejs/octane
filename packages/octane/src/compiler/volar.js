@@ -1,5 +1,5 @@
 /**
- * Volar (IDE language-service) mappings for vyre .tsrx files.
+ * Volar (IDE language-service) mappings for octane .tsrx files.
  *
  * Editors load this entry point to get a TYPED virtual TSX file the
  * TypeScript language service can analyse — hover, autocomplete, go-to-def,
@@ -32,34 +32,34 @@ import {
 
 /**
  * Platform descriptor for `createJsxTransform`. Mirrors `tsrx-react`'s React
- * descriptor with the small set of differences for vyre:
+ * descriptor with the small set of differences for octane:
  *
- *   - `imports.errorBoundary` / `imports.dynamic` point at vyre
+ *   - `imports.errorBoundary` / `imports.dynamic` point at octane
  *     itself (we don't ship separate sub-packages for these — the runtime
  *     exports them directly).
- *   - `jsx.classAttrName: 'class'` because vyre keeps authored
+ *   - `jsx.classAttrName: 'class'` because octane keeps authored
  *     `class` instead of rewriting to React's `className`.
- *   - `jsx.multiRefStrategy: 'array'` — the vyre runtime accepts a
+ *   - `jsx.multiRefStrategy: 'array'` — the octane runtime accepts a
  *     plain array of refs natively (see the multi-ref attribute path in
  *     `src/runtime.ts`'s ref binding), so no `mergeRefs` helper is needed.
  *   - `validation.requireUseServerForAwait: false` — no server-component
- *     concept in vyre (no top-level await validation gates).
+ *     concept in octane (no top-level await validation gates).
  *
  * `imports.suspense` and `imports.fragment` aren't real components in
- * vyre (we lower `@try`/`@pending` to `tryBlock` and fragments to
+ * octane (we lower `@try`/`@pending` to `tryBlock` and fragments to
  * concrete templates), but the descriptor still needs a value because the
  * shared transform emits TSX-level `<Fragment>` / `<Suspense>` wrappers
- * when running in TSX mode. We point them at `vyre` so editors at
+ * when running in TSX mode. We point them at `octane` so editors at
  * least don't fail to resolve the imports; users won't actually see those
  * names in source. (Volar TSX is virtual — its imports never run.)
  */
-const VYRE_PLATFORM = {
-	name: 'vyre',
+const OCTANE_PLATFORM = {
+	name: 'octane',
 	imports: {
-		fragment: 'vyre',
-		suspense: 'vyre',
-		dynamic: 'vyre',
-		errorBoundary: 'vyre',
+		fragment: 'octane-ts',
+		suspense: 'octane-ts',
+		dynamic: 'octane-ts',
+		errorBoundary: 'octane-ts',
 		forOfIterableHelper: '@tsrx/core/runtime/iterable',
 	},
 	jsx: {
@@ -72,7 +72,7 @@ const VYRE_PLATFORM = {
 	},
 };
 
-const vyreTransform = createJsxTransform(VYRE_PLATFORM);
+const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
 
 /**
  * Compile a .tsrx source string to a Volar `VolarMappingsResult`.
@@ -99,7 +99,7 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments,
 	});
-	const transformed = vyreTransform(ast, source, filename, {
+	const transformed = octaneTransform(ast, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
 		typeOnly: true,

@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'vyre';
+import { useState, useSyncExternalStore } from 'octane-ts';
 
 // Leaf hydration fixtures (SSR Phase 2): single-root components with element
 // structure, single-text-children, attributes, and events — the shapes whose

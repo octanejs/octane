@@ -1,4 +1,4 @@
-import { useState, createContext, use, createPortal } from 'vyre';
+import { useState, createContext, use, createPortal } from 'octane-ts';
 
 // Multiple distinct contexts in one tree.
 export const ThemeCtx = createContext('light');

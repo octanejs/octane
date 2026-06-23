@@ -1,11 +1,11 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // Canonical js-framework-benchmark fixture. The six button IDs (run, runlots,
 // add, update, clear, swaprows) plus the per-row <a> tags in column 2
 // (select) and column 3 (remove) are addressable by the Playwright harness
 // at /Users/domgan/Projects/ripple/benchmarks/js-framework/run.mjs.
 //
-// All handlers are written to play to vyre's strengths:
+// All handlers are written to play to octane's strengths:
 //   * Top-level handlers (run / runLots / add / clear / update / swap) are
 //     auto-callback-wrapped because they only close over setItems /
 //     setSelected (both stable useState setters). Stable identity across
@@ -124,7 +124,7 @@ export default function Main() @{
 		<div class="jumbotron">
 			<div class="row">
 				<div class="col-md-6">
-					<h1>vyre</h1>
+					<h1>octane</h1>
 				</div>
 				<div class="col-md-6">
 					<div class="row">

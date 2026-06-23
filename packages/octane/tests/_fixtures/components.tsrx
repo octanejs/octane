@@ -1,4 +1,4 @@
-import { useState, createContext, use } from 'vyre';
+import { useState, createContext, use } from 'octane-ts';
 
 export function Label(props) @{
 	<span class="lbl">
@@ -61,7 +61,7 @@ export function DefaultOnly() @{
 // useState + useEffect. The host passes `props.k` as the component slot's
 // key — changing it triggers a fresh Block (state resets, cleanup fires,
 // mount effect runs again). Same key + new props re-renders in place.
-import { useEffect } from 'vyre';
+import { useEffect } from 'octane-ts';
 
 export let mountCount = 0;
 export let cleanupCount = 0;

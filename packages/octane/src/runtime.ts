@@ -1,5 +1,5 @@
 /**
- * vyre runtime — template-clone renderer with React-shape state model.
+ * octane runtime — template-clone renderer with React-shape state model.
  *
  * Architecture: see /PLAN-TEMPLATE-RUNTIME.md.
  *
@@ -854,7 +854,7 @@ export function withScope<P>(parent: Scope, key: symbol, body: ComponentBody<P>,
 
 /**
  * Lite component slot: allocates ONLY a per-call-site Scope — no Block, no
- * Comment markers, no CompSlot wrapper. Emitted by vyre/compiler at call
+ * Comment markers, no CompSlot wrapper. Emitted by octane-ts/compiler at call
  * sites whose callee is a same-module FunctionDeclaration that:
  *   - calls no hooks (lexical free-identifier check)
  *   - has no `use(...)`, no @try, no `children` param
@@ -1011,7 +1011,7 @@ function fireCleanupsOnly(scope: Scope): void {
  *
  * Invariant: every slot whose teardown requires recursing into a child Block
  * MUST be registered here. The runtime currently has exactly six creation
- * sites; the vyre/compiler compiler never creates slot objects directly.
+ * sites; the octane-ts/compiler compiler never creates slot objects directly.
  */
 function registerSlot(scope: Scope, slot: any): void {
 	const slots = scope._slots;
@@ -1091,7 +1091,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 // ---------------------------------------------------------------------------
 // Hooks — keyed by compile-time Symbol per call site
 //
-// The `slot` argument is COMPILER-INJECTED. vyre/compiler appends a
+// The `slot` argument is COMPILER-INJECTED. octane-ts/compiler appends a
 // `Symbol.for(stableId)` to every hook call; the symbol is what gives the
 // hook its per-call-site identity within a scope (and its cross-module
 // identity for HMR state preservation). The public signature marks `slot`
@@ -1103,9 +1103,9 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 
 function missingSlot(name: string): never {
 	throw new Error(
-		`${name} was called without a slot symbol. The Ripple compiler injects ` +
+		`${name} was called without a slot symbol. The octane compiler injects ` +
 			`per-call-site slot symbols; ensure your project loads this runtime ` +
-			`through the Vite plugin (vyre/compiler/vite). To call hooks by hand, ` +
+			`through the Vite plugin (octane-ts/compiler/vite). To call hooks by hand, ` +
 			`pass a stable symbol, e.g. useState(0, Symbol.for('my-stable-id')).`,
 	);
 }
@@ -1369,7 +1369,7 @@ export function useImperativeHandle<T>(
  * `onStoreChange`, the component re-renders and `getSnapshot()` runs again.
  *
  * `getServerSnapshot` is accepted for API compatibility but not used —
- * vyre has no SSR pipeline today; if/when one lands, this argument
+ * octane has no SSR pipeline today; if/when one lands, this argument
  * is where to plug in the server-side snapshot.
  *
  * Built on top of useState + useEffect. The user's `slot` is the call
@@ -1478,7 +1478,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 // Context — createContext + use() (React 19 shape, no useContext)
 // ---------------------------------------------------------------------------
 
-const CONTEXT_TAG = Symbol.for('vyre.context');
+const CONTEXT_TAG = Symbol.for('octane.context');
 
 export interface Context<T> {
 	$$kind: typeof CONTEXT_TAG;
@@ -1732,7 +1732,7 @@ let hydrating = false;
 // (`_root.firstChild.nextSibling…`) still resolves bindings correctly.
 let hydrateNode: Node | null = null;
 // Server-resolved `use(thenable)` values (SSR Phase 4), parsed from the inline
-// `<script data-vyre-suspense>` in `hydrate()` and consumed in render
+// `<script data-octane-suspense>` in `hydrate()` and consumed in render
 // order by `useThenable` so a hydrating boundary returns synchronously. Both are
 // touched ONLY under `if (hydrating)` and assigned ONLY in `hydrate()`, so they
 // constant-fold away with the rest of the hydration path in client-only builds.
@@ -1811,7 +1811,7 @@ export function htextSwap(posNode: Node | null, text: string): Text {
 // `<!--[-->…<!--]-->` range, so a raw sibling walk would land on the wrong node.
 // `child`/`sibling` are PURE navigators (they don't move the cursor): they treat
 // a whole `<!--[-->…<!--]-->` block as ONE logical sibling, which exactly matches
-// the single `<!>` placeholder the template uses for that hole — so vyre's
+// the single `<!>` placeholder the template uses for that hole — so octane's
 // existing path+childIndex binding resolution keeps working unchanged on the
 // server DOM. The `hydrateNode` cursor is set by each block call (forBlock /
 // ifBlock / componentSlot, to its content start) for the child's `clone()` to
@@ -1927,28 +1927,28 @@ export function attachRef(ref: any, el: Element | FragmentInstance | null): void
 // detaches the ref and destroys the instance on unmount.
 //
 // `Fragment` is exported as a sentinel symbol so user code can write
-// `import { Fragment } from 'vyre'` for parity with React. The
+// `import { Fragment } from 'octane-ts'` for parity with React. The
 // compiler matches on the JSX identifier 'Fragment' at the source-name
 // level, so the import is currently only for TS validity — but reserving
 // the symbol identity now keeps the door open for component-prop-name
 // resolution later.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const Fragment: unique symbol = Symbol.for('vyre.Fragment');
+export const Fragment: unique symbol = Symbol.for('octane.Fragment');
 
 /**
  * React-19 `<Activity mode="hidden"|"visible">` sentinel. The compiler matches
  * the `Activity` tag by NAME (so this export is only needed so user imports
- * `import { Activity } from 'vyre'` resolve); the runtime work happens in
+ * `import { Activity } from 'octane-ts'` resolve); the runtime work happens in
  * `activityBlock`.
  */
-export const Activity: unique symbol = Symbol.for('vyre.Activity');
+export const Activity: unique symbol = Symbol.for('octane.Activity');
 
 export class FragmentInstance {
 	/**
 	 * Sentinel that React's test suite asserts is truthy as a sanity-check
 	 * that the FragmentInstance is bound to its owning Block. Named
-	 * `_ownerBlock` (not React's `_fragmentFiber`) because vyre uses
+	 * `_ownerBlock` (not React's `_fragmentFiber`) because octane uses
 	 * Blocks, not fibers — same role.
 	 */
 	_ownerBlock: Block;
@@ -2654,7 +2654,7 @@ const _injectedStyles = new Set<string>();
 // Hoisted document metadata (React-19-shape) — `<title>`, `<meta>`, `<link>`
 // rendered ANYWHERE in a component are lifted to <document.head> by the compiler
 // emitting one `headBlock(scope, key, tag, attrs, text)` call per element
-// (instead of placing it in the body template). Because vyre re-invokes a
+// (instead of placing it in the body template). Because octane re-invokes a
 // component body on every render, this call recurs each render: the element is
 // created/adopted ONCE (keyed per call-site via `scope[key]`), its attributes
 // and text are re-applied each render (so `<title>{state}</title>` is reactive),
@@ -2722,16 +2722,16 @@ export function headBlock(
 export function injectStyle(id: string, css: string): void {
 	if (_injectedStyles.has(id)) return;
 	// SSR de-dup: the server already emitted this scoped stylesheet (the css of
-	// the RenderResult, a `<style data-vyre="hash">`). On a hydrated page
+	// the RenderResult, a `<style data-octane="hash">`). On a hydrated page
 	// the per-runtime Set is empty, so also check the DOM before re-injecting —
 	// otherwise hydration would append a duplicate <style>.
-	if (typeof document !== 'undefined' && document.querySelector(`style[data-vyre="${id}"]`)) {
+	if (typeof document !== 'undefined' && document.querySelector(`style[data-octane="${id}"]`)) {
 		_injectedStyles.add(id);
 		return;
 	}
 	_injectedStyles.add(id);
 	const el = document.createElement('style');
-	el.setAttribute('data-vyre', id);
+	el.setAttribute('data-octane', id);
 	el.textContent = css;
 	document.head.appendChild(el);
 }
@@ -3143,7 +3143,7 @@ export function portal(
  * so non-JSX call sites (storing in a variable, passing through props, etc.)
  * still produce something the runtime can dispatch on.
  */
-const PORTAL_TAG = Symbol.for('vyre.portal');
+const PORTAL_TAG = Symbol.for('octane.portal');
 export interface PortalDescriptor {
 	$$kind: typeof PORTAL_TAG;
 	body: ComponentBody;
@@ -3166,7 +3166,7 @@ export function createPortal(
 // unwraps it; props are evaluated fresh at each call site, so re-rendering with
 // `root.render(<App foo={next}/>)` updates props while keeping `type` identity.
 // ---------------------------------------------------------------------------
-const ELEMENT_TAG = Symbol.for('vyre.element');
+const ELEMENT_TAG = Symbol.for('octane.element');
 export interface ElementDescriptor<P = any> {
 	$$kind: typeof ELEMENT_TAG;
 	type: ComponentBody<P>;
@@ -3611,7 +3611,7 @@ export function memo<P>(
 // `HMR` is exported as a Symbol so user code (and the compiler emit) can
 // read `wrapper[HMR]` without colliding with anything else on the function.
 
-export const HMR: unique symbol = Symbol.for('vyre.hmr');
+export const HMR: unique symbol = Symbol.for('octane.hmr');
 
 interface HmrMeta {
 	fn: ComponentBody<any>;
@@ -4211,7 +4211,7 @@ export function useTransition(
 // from dispatch until the queue drains. The action's resolved value becomes the
 // new state. Errors route to the nearest @try boundary (else console.error).
 // `permalink` (SSR progressive enhancement) is accepted for signature parity and
-// ignored — vyre is client-only. Form auto-reset is intentionally skipped
+// ignored — octane is client-only. Form auto-reset is intentionally skipped
 // for useActionState forms (typed-in values are kept), matching React.
 // ---------------------------------------------------------------------------
 
@@ -6041,7 +6041,7 @@ export interface Root {
 	 * Render into this root. Two forms:
 	 *  - React-style:   `root.render(<App foo={x}/>)` — a single element descriptor
 	 *    (the compiler lowers the JSX to `createElement(App, {foo: x})`).
-	 *  - Body + props:  `root.render(App, { foo: x })` — the original vyre
+	 *  - Body + props:  `root.render(App, { foo: x })` — the original octane
 	 *    form, kept for direct (non-JSX) callers and existing test helpers.
 	 * Re-rendering with the same component (`type`/body) updates props in place;
 	 * a different component tears down and remounts.

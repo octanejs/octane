@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'vyre';
+import { useState, useEffect } from 'octane-ts';
 
 // Inner component that throws on render when `props.bang` is true.
 function ThrowsOnRender(props) @{

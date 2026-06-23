@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // ---------------------------------------------------------------------------
 // `style` prop — string form (cssText) inlined into the template.

@@ -1,4 +1,4 @@
-import { use, useState } from 'vyre';
+import { use, useState } from 'octane-ts';
 
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
 // use(promise) and renders the resolved value (not the @pending fallback); the
@@ -30,7 +30,7 @@ export function AsyncUndef(props) @{
 	</div>
 }
 
-// Mirrors the playground/vyre-ssr App shape: a bare use() (async data
+// Mirrors the playground/octane-ssr App shape: a bare use() (async data
 // seeded on hydrate) PLUS a useState counter with an onClick. Proves Phase 4
 // data seeding composes with stateful, interactive hydration in one single-root
 // component — and that a post-hydration re-render (the click) does NOT

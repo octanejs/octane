@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useImperativeHandle } from 'vyre';
+import { useState, useRef, useEffect, useImperativeHandle } from 'octane-ts';
 
 // Initial value only runs once — mutations persist across re-renders without
 // re-triggering them.
@@ -97,7 +97,7 @@ export function PerRowRef() @{
 
 // `ref={refObj}` attribute — object form attaches to the DOM node.
 // Effect body closes over props/ref lexically (works in both React and
-// vyre; the vyre positional-deps convention is supported
+// octane; the octane positional-deps convention is supported
 // but optional and would block React-side differential coverage).
 export function DomRefObject(props) @{
 	const ref = useRef(null);

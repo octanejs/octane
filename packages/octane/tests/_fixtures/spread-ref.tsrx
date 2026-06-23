@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // A `ref` arriving through a spread (`{...props.attrs}`) must behave exactly like
 // a direct `ref={}`: attach on mount, run a callback's React-19 cleanup-return

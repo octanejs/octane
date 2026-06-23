@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // Exposes its `setN` via a module-level shim so tests can fire updates from
 // outside the component body — exactly the situation `act()` warns about.

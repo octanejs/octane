@@ -1,4 +1,4 @@
-import { use, useState } from 'vyre';
+import { use, useState } from 'octane-ts';
 
 // SSR Phase 6 (M4) — @try hydration. The server (Phase 4) awaits use(promise),
 // renders the SUCCESS arm wrapped in a `<!--[-->…<!--]-->` range, and serializes

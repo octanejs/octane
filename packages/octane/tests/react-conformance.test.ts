@@ -5,7 +5,7 @@
  *
  * The goal: validate that hook semantics (effect ordering, dep comparison,
  * setter identity, layout-vs-passive timing) match React's contract so users
- * can treat vyre as a drop-in alternative.
+ * can treat octane as a drop-in alternative.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { mount, act } from './_helpers';

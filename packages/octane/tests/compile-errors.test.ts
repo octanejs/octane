@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 
 // Compile-error coverage: pin the maintained rejection messages so future
 // parser/compiler edits can't silently drop a guard. Each test asserts
@@ -9,7 +9,7 @@ import { compile } from 'vyre/compiler';
 describe('compile errors — rejected authoring patterns', () => {
 	it('rejects multiple `ref={…}` attributes on a single element', () => {
 		const src = `
-      import { useRef } from 'vyre';
+      import { useRef } from 'octane-ts';
       export function MultiRef() @{
         const a = useRef(null);
         const b = useRef(null);
@@ -22,7 +22,7 @@ describe('compile errors — rejected authoring patterns', () => {
 
 	it('allows a single `ref={[a, b]}` array form (canonical multi-attach)', () => {
 		const src = `
-      import { useRef } from 'vyre';
+      import { useRef } from 'octane-ts';
       export function ArrayRef() @{
         const a = useRef(null);
         const b = useRef(null);

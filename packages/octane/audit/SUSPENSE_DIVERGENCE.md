@@ -1,6 +1,6 @@
 # Suspense Divergences from React
 
-A registry of intentional behavior differences between vyre's Suspense
+A registry of intentional behavior differences between octane's Suspense
 implementation and React's. Each entry cites the test that pins the divergence so
 a future runtime change either updates this document OR removes the divergence by
 closing the gap.
@@ -19,7 +19,7 @@ Suspense boundaries to suspend, React holds the prior DOM of EVERY sibling until
 ALL their promises resolve. The user never sees a half-updated screen
 mid-transition.
 
-**vyre behavior:** We eagerly commit each sibling as its individual promise
+**octane behavior:** We eagerly commit each sibling as its individual promise
 resolves. `isPending` correctly stays true until both resolve (we match React on
 the counter contract and on prior-DOM-preservation per-sibling). What we diverge
 on is the per-sibling commit timing inside the transition window.
@@ -43,8 +43,8 @@ runtime work, no API surface change. Filed as a follow-up.
 component (typically third-party like `react-error-boundary`) with `resetKeys`,
 `onReset`, or an externally-supplied `resetErrorBoundary` callback.
 
-**vyre behavior:** The `@catch (err, reset)` positional `reset` is an
-vyre-specific TSRX syntax — same intent (retry the failed branch with fresh
+**octane behavior:** The `@catch (err, reset)` positional `reset` is an
+octane-specific TSRX syntax — same intent (retry the failed branch with fresh
 state), different surface.
 
 **Surface impact:** None at runtime. This is API-shape divergence only; the
@@ -62,7 +62,7 @@ remain as a documented surface difference.
 
 **Status:** This is NOT a divergence from React per se. React's runtime also
 waterfalls in this pattern (the first `use()` must resolve before the body re-runs
-past it). The test pins vyre's specific per-replay call-count behavior so a
+past it). The test pins octane's specific per-replay call-count behavior so a
 future optimization can't accidentally change it without a deliberate decision.
 
 **Surface impact:** N/A — this is a regression-pin, not a divergence.

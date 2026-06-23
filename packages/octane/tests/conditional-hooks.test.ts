@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from './_helpers';
 import { Guarded, PartialGuard } from './_fixtures/conditional-hooks.tsrx';
 
-// vyre supports runtime-conditional hooks: each hook call site gets a
+// octane supports runtime-conditional hooks: each hook call site gets a
 // stable Symbol.for(stableId) slot from the compiler, so `if (cond) return;`
 // before a `useEffect(…)` doesn't break the hook order assumption that
 // React's rules-of-hooks exists to defend. The hook simply doesn't run on

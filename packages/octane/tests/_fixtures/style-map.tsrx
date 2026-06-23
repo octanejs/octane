@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // Style map: a `<style>` element assigned to a `const` becomes a compile-
 // time object whose keys are the source class names and whose values are
@@ -7,7 +7,7 @@ import { useState } from 'vyre';
 // attribute containing exactly the hashed selector the rules target.
 //
 // The stylesheet ALSO gets registered for module-level injection, so the
-// rules end up in a `<style data-vyre>` tag and apply to anyone
+// rules end up in a `<style data-octane>` tag and apply to anyone
 // who renders with the hashed class.
 
 const styles = <style>

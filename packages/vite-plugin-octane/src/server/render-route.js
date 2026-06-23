@@ -8,15 +8,15 @@ import {
 } from '../routes.js';
 
 /**
- * @typedef {import('vite-plugin-vyre').Context} Context
- * @typedef {import('vite-plugin-vyre').RenderRoute} RenderRoute
- * @typedef {import('vite-plugin-vyre').ResolvedRippleConfig} ResolvedRippleConfig
+ * @typedef {import('@octane-ts/vite-plugin').Context} Context
+ * @typedef {import('@octane-ts/vite-plugin').RenderRoute} RenderRoute
+ * @typedef {import('@octane-ts/vite-plugin').ResolvedRippleConfig} ResolvedRippleConfig
  * @typedef {import('vite').ViteDevServer} ViteDevServer
  */
 
 /**
- * vyre RenderResult — `render()` is ASYNC and `css` is ALREADY a deduped
- * `<style data-vyre="hash">…</style>` string (NOT a Set<string> needing a
+ * octane RenderResult — `render()` is ASYNC and `css` is ALREADY a deduped
+ * `<style data-octane="hash">…</style>` string (NOT a Set<string> needing a
  * `get_css_for_hashes` lookup like Ripple). So CSS handling here is identity.
  *
  * @typedef {Object} RenderResult
@@ -43,12 +43,12 @@ export async function handleRenderRoute(route, context, vite, rippleConfig) {
 			/** @type {any} */ (globalThis).rpc_modules = new Map();
 		}
 
-		// Load the vyre server runtime. The wrappers call components directly
+		// Load the octane server runtime. The wrappers call components directly
 		// (no ssrComponent injection — the root must NOT be marker-wrapped), so
 		// only `render` is needed here.
-		const { render } = await vite.ssrLoadModule('vyre/server');
+		const { render } = await vite.ssrLoadModule('octane-ts/server');
 
-		// Load the page component (compiled in server mode by vyre()).
+		// Load the page component (compiled in server mode by octane()).
 		const entryPath = get_route_entry_path(route.entry);
 		const pageModule = await vite.ssrLoadModule(/** @type {string} */ (entryPath));
 		const PageComponent = get_component_export(
@@ -81,9 +81,9 @@ export async function handleRenderRoute(route, context, vite, rippleConfig) {
 			RootComponent = createPropsWrapper(/** @type {any} */ (PageComponent), pageProps);
 		}
 
-		// Render to HTML. vyre render() is async; head is '' in Phase 1
+		// Render to HTML. octane render() is async; head is '' in Phase 1
 		// (no document-head API yet). `body` already contains any inline
-		// <script data-vyre-suspense> seed.
+		// <script data-octane-suspense> seed.
 		/** @type {RenderResult} */
 		const { head, body, css } = await render(RootComponent);
 
@@ -122,7 +122,7 @@ export async function handleRenderRoute(route, context, vite, rippleConfig) {
 		let html = template.replace('<!--ssr-head-->', headContent).replace('<!--ssr-body-->', body);
 
 		// Inject the hydration entry before </body>.
-		const hydrationScript = `<script type="module" src="/@id/virtual:vyre-hydrate"></script>`;
+		const hydrationScript = `<script type="module" src="/@id/virtual:octane-hydrate"></script>`;
 		html = html.replace('</body>', `${hydrationScript}\n</body>`);
 
 		return new Response(html, {
@@ -132,7 +132,7 @@ export async function handleRenderRoute(route, context, vite, rippleConfig) {
 			},
 		});
 	} catch (error) {
-		console.error('[vyre] SSR render error:', error);
+		console.error('[octane] SSR render error:', error);
 
 		const errorHtml = generateErrorHtml(error, route);
 		return new Response(errorHtml, {

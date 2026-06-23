@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'vyre';
+import { useState, useEffect } from 'octane-ts';
 
 // ---------------------------------------------------------------------------
 // SPREAD attributes — `<div {...obj}>` routes each key through the right

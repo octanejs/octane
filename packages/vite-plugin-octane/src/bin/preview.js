@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * vyre-preview — Start the production SSR server.
+ * octane-preview — Start the production SSR server.
  *
  * Loads ripple.config.ts, reads `build.outDir`,
  * and spawns `node {outDir}/server/entry.js`.
@@ -24,12 +24,12 @@ try {
 	const entryPath = path.join(projectRoot, outDir, 'server', ENTRY_FILENAME);
 
 	if (!fs.existsSync(entryPath)) {
-		console.error(`[vyre-preview] Server entry not found: ${entryPath}`);
-		console.error('[vyre-preview] Did you run `pnpm build` first?');
+		console.error(`[octane-preview] Server entry not found: ${entryPath}`);
+		console.error('[octane-preview] Did you run `pnpm build` first?');
 		process.exit(1);
 	}
 
-	console.log(`[vyre-preview] Starting server from ${outDir}/server/${ENTRY_FILENAME}`);
+	console.log(`[octane-preview] Starting server from ${outDir}/server/${ENTRY_FILENAME}`);
 
 	const child = spawn(process.execPath, [entryPath], {
 		stdio: 'inherit',
@@ -41,6 +41,6 @@ try {
 	});
 } catch (e) {
 	const error = /** @type {Error} */ (e);
-	console.error('[vyre-preview] Failed to load config:', error.message);
+	console.error('[octane-preview] Failed to load config:', error.message);
 	process.exit(1);
 }

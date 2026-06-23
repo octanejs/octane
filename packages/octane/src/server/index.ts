@@ -1,9 +1,9 @@
 /**
- * `vyre/server` — server-rendering entry (SSR Phase 1).
+ * `octane-ts/server` — server-rendering entry (SSR Phase 1).
  *
- * Re-exports the server runtime. The `vyre/compiler` compiler, in
+ * Re-exports the server runtime. The `octane-ts/compiler` compiler, in
  * `mode: 'server'`, emits component modules that `import { … } from
- * 'vyre/server'` — pulling the server hook implementations and the `ssr*`
+ * 'octane-ts/server'` — pulling the server hook implementations and the `ssr*`
  * string-building helpers from here. `render(Component, props)` is the server
  * analogue of `createRoot().render()`.
  */

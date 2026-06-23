@@ -1,4 +1,4 @@
-import { Fragment } from 'vyre';
+import { Fragment } from 'octane-ts';
 
 // Two siblings inside the fragment — basic add-to-all-children probe.
 export function TwoChildren(props) @{

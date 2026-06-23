@@ -8,7 +8,7 @@
  *
  * Intentionally skipped from this batch:
  *   - EffectDepsObjectIs, AllDestroysBeforeCreates, SiblingCleanupOrder,
- *     LayoutVsPassive, EffectEventSubscriber: all use the vyre
+ *     LayoutVsPassive, EffectEventSubscriber: all use the octane
  *     useEffect((dep1, dep2) => …, [a, b]) form where deps are passed
  *     positionally INTO the effect body. The @tsrx/react compiler emits
  *     the same shape, but React's useEffect calls the body with zero args

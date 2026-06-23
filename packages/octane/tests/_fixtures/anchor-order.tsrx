@@ -1,8 +1,8 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // Source-order regression fixtures for the four control-flow block types
 // (@for, @if, @switch, @try). Each fixture places a block before AND/OR
-// after a static-element sibling — pre-anchor-fix, vyre appended the
+// after a static-element sibling — pre-anchor-fix, octane appended the
 // block's start/end Comment markers to the parent host AFTER the static
 // template content, flipping the visible DOM order. Differential tests in
 // __tests__/differential/anchor-order.test.ts diff every variant against

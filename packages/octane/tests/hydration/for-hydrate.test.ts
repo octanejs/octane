@@ -1,21 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 import { hydrate, flushSync } from '../../src/index.js';
-import * as ServerRT from 'vyre/server';
+import * as ServerRT from 'octane-ts/server';
 import { List } from './_fixtures/forlist.tsrx';
 
 // SSR Phase 6 (M2) — a keyed @for list hydrates: the server wraps the @for and
 // each item in block ranges; the client adopts them (no rebuild) and per-item
 // event handlers attach to the adopted DOM.
 
-const FIXTURE = join(process.cwd(), 'packages/vyre/tests/hydration/_fixtures/forlist.tsrx');
+const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/forlist.tsrx');
 
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'forlist.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]vyre\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
@@ -62,7 +62,7 @@ describe('hydrate — @for list (SSR Phase 6 / M2)', () => {
 		const betaPick = rows[1].querySelector('button.pick') as HTMLButtonElement;
 		flushSync(() => betaPick.click());
 		expect(onPick).toHaveBeenCalledTimes(1);
-		// vyre's per-row event-bundle optimization calls fn(...args, event),
+		// octane's per-row event-bundle optimization calls fn(...args, event),
 		// so the row id is the first argument.
 		expect(onPick.mock.calls[0][0]).toBe(2);
 		root.unmount();

@@ -32,7 +32,7 @@ export function App() @{
 			}
 		</main>
 		<footer class="foot">
-			{'The Ripple Times — SSR + hydration benchmark' as string}
+			{'The Octane Times — SSR + hydration benchmark' as string}
 		</footer>
 	</div>
 }

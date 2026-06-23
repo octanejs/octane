@@ -1,4 +1,4 @@
-import { use, useState, useReducer, useMemo, useRef, useEffect, createContext } from 'vyre';
+import { use, useState, useReducer, useMemo, useRef, useEffect, createContext } from 'octane-ts';
 
 // ============================================================================
 // Gap 2 (Suspense): `use()` accepts non-promise values

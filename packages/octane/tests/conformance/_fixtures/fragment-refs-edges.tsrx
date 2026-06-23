@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'vyre';
+import { Fragment, useState } from 'octane-ts';
 
 // Component that re-renders on demand without unmounting the fragment —
 // used to verify that the ref keeps the SAME instance across re-renders.

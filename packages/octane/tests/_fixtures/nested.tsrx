@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'vyre';
+import { useState, useEffect } from 'octane-ts';
 
 // ── Nested hooks ────────────────────────────────────────────────────────────
 // Each hook call site has its own compile-time Symbol slot, so hooks inside

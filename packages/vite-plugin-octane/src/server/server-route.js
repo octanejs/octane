@@ -1,7 +1,7 @@
 /**
- * @typedef {import('vite-plugin-vyre').Context} Context
- * @typedef {import('vite-plugin-vyre').ServerRoute} ServerRoute
- * @typedef {import('vite-plugin-vyre').Middleware} Middleware
+ * @typedef {import('@octane-ts/vite-plugin').Context} Context
+ * @typedef {import('@octane-ts/vite-plugin').ServerRoute} ServerRoute
+ * @typedef {import('@octane-ts/vite-plugin').Middleware} Middleware
  */
 
 import { runMiddlewareChain } from './middleware.js';
@@ -32,7 +32,7 @@ export async function handleServerRoute(route, context, globalMiddlewares) {
 
 		return response;
 	} catch (error) {
-		console.error('[ripple] API route error:', error);
+		console.error('[octane] API route error:', error);
 
 		// Return error response
 		const message = error instanceof Error ? error.message : 'Internal Server Error';

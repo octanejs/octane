@@ -1,4 +1,4 @@
-import { Fragment } from 'vyre';
+import { Fragment } from 'octane-ts';
 
 // Two focusable inputs side-by-side — covers basic focus() and focusLast().
 export function TwoInputs(props) @{

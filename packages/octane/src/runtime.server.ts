@@ -1,7 +1,7 @@
 /**
- * vyre server runtime (SSR Phase 1).
+ * octane server runtime (SSR Phase 1).
  *
- * The `vyre/compiler` compiler, in `mode: 'server'`, emits component bodies
+ * The `octane-ts/compiler` compiler, in `mode: 'server'`, emits component bodies
  * that build an HTML STRING (instead of cloning a DOM template) by calling the
  * `ssr*` helpers here, and that call these server hook implementations. The
  * server analogue of `createRoot().render()` is `render(Component, props)` →
@@ -71,7 +71,7 @@ const NOOP = (): void => {};
 
 // Matches the client runtime's `ELEMENT_TAG` (createElement descriptor marker)
 // so `ssrChild` can render a `<Comp/>`-as-value descriptor server-side too.
-const ELEMENT_TAG = Symbol.for('vyre.element');
+const ELEMENT_TAG = Symbol.for('octane.element');
 
 // ---------------------------------------------------------------------------
 // Escaping
@@ -219,7 +219,7 @@ export function ssrComponent(parent: SSRScope, comp: ServerComponent, props: any
 // Context
 // ---------------------------------------------------------------------------
 
-const CONTEXT_TAG = Symbol.for('vyre.context');
+const CONTEXT_TAG = Symbol.for('octane.context');
 
 export interface Context<T> {
 	$$kind: typeof CONTEXT_TAG;
@@ -253,7 +253,7 @@ export function useContext<T>(ctx: Context<T>): T {
 // yet. The nearest `@try` catches it and renders its `@pending` fallback (see the
 // compiler's ssrEmitTry) for this pass; render()'s loop then awaits the thenable
 // and re-renders. Distinct from real errors, which route to `@catch`.
-const SSR_SUSPENSE = Symbol('vyre.ssr.suspense');
+const SSR_SUSPENSE = Symbol('octane.ssr.suspense');
 export function ssrIsSuspense(err: unknown): boolean {
 	return err === SSR_SUSPENSE;
 }
@@ -472,8 +472,8 @@ function serializeSuspenseSeeds(values: unknown[]): string {
  * Render a server-compiled component (a function returning an HTML string) to
  * `{ head, body, css }`. `head` is empty (no document-head API yet); `css` is
  * the scoped stylesheets of the components that actually rendered, emitted as
- * ready-to-place `<style data-vyre="hash">…</style>` tags (one per hash,
- * deduped). The client's `injectStyle` matches that `data-vyre` hash and
+ * ready-to-place `<style data-octane="hash">…</style>` tags (one per hash,
+ * deduped). The client's `injectStyle` matches that `data-octane` hash and
  * skips re-injecting on hydration — so the styles cross the boundary once.
  *
  * Async because of Suspense (Phase 4): a `use(thenable)` that hasn't resolved
@@ -532,14 +532,14 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 		if (suspended.length === 0) {
 			let css = '';
 			for (const [hash, sheet] of cssMap) {
-				css += '<style data-vyre="' + hash + '">' + sheet + '</style>';
+				css += '<style data-octane="' + hash + '">' + sheet + '</style>';
 			}
 			if (serial.length > 0) body += serializeSuspenseSeeds(serial);
 			return { head: headBuf.html, body, css };
 		}
 		if (++attempt > MAX_SUSPENSE_PASSES) {
 			throw new Error(
-				'vyre SSR: exceeded ' +
+				'octane SSR: exceeded ' +
 					MAX_SUSPENSE_PASSES +
 					' suspense passes — a use(thenable) never resolved.',
 			);
@@ -565,7 +565,7 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 					() =>
 						reject(
 							new Error(
-								'vyre SSR: a use(thenable) did not settle within ' + SUSPENSE_TIMEOUT_MS + 'ms.',
+								'octane SSR: a use(thenable) did not settle within ' + SUSPENSE_TIMEOUT_MS + 'ms.',
 							),
 						),
 					SUSPENSE_TIMEOUT_MS,

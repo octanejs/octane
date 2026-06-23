@@ -11,8 +11,8 @@ export interface RipplePluginOptions {
 }
 
 /**
- * The vyre metaframework plugin. Returns an array:
- * `[vyre(), metaPlugin]` — the first compiles `.tsrx`, the second owns
+ * The octane metaframework plugin. Returns an array:
+ * `[octane(), metaPlugin]` — the first compiles `.tsrx`, the second owns
  * config / routing / dev SSR / hydrate.
  */
 export function ripple(options?: RipplePluginOptions): Plugin[];

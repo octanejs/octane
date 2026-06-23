@@ -1,21 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 import { hydrate, flushSync } from '../../src/index.js';
-import * as ServerRT from 'vyre/server';
+import * as ServerRT from 'octane-ts/server';
 import { Boundary } from './_fixtures/tryboundary.tsrx';
 
 // SSR Phase 6 (M4) — @try hydration. The server resolves use(promise) and renders
 // the success arm; the client adopts it and use() returns the seeded value, so the
 // boundary hydrates to its resolved arm (not @pending) and is interactive.
 
-const FIXTURE = join(process.cwd(), 'packages/vyre/tests/hydration/_fixtures/tryboundary.tsrx');
+const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/tryboundary.tsrx');
 
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'tryboundary.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]vyre\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
@@ -36,7 +36,7 @@ describe('hydrate — @try success arm (SSR Phase 6 / M4)', () => {
 		const { body } = await ServerRT.render(server.Boundary, { promise: Promise.resolve('hi') });
 		// Server resolved use() → success arm in a block range + a seed <script>.
 		expect(body).toContain('<button id="ok" class="ok">hi:0</button>');
-		expect(body).toContain('data-vyre-suspense>["hi"]</script>');
+		expect(body).toContain('data-octane-suspense>["hi"]</script>');
 
 		container.innerHTML = body;
 		const btn = container.querySelector('#ok') as HTMLButtonElement;

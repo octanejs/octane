@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useInsertionEffect } from 'vyre';
+import { useEffect, useLayoutEffect, useInsertionEffect } from 'octane-ts';
 
 // Three-phase ordering: insertion fires sync-before-layout-before-paint;
 // passive fires after paint. Cleanups of each phase fire before that phase's
 // new bodies (React's "all old cleanups before any new bodies" guarantee).
 //
-// Bodies close over props lexically. vyre ALSO spreads deps as
+// Bodies close over props lexically. octane ALSO spreads deps as
 // positional args, but lexical capture works in both runtimes — required
 // for differential parity (React calls effect bodies with zero args).
 export function PhaseOrder(props) @{

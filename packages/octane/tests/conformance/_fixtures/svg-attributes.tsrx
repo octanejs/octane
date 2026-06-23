@@ -1,9 +1,9 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // ============================================================================
 // SVG attribute breadth + namespace decision (Audit Batch 2)
 // ============================================================================
-// These fixtures pin vyre's runtime attribute handling on SVG hosts.
+// These fixtures pin octane's runtime attribute handling on SVG hosts.
 // Each fixture exposes a single dynamic surface driven by props, so the test
 // can exercise both the create (initial mount) and the update (re-render with
 // changed props) paths via mount() + update().

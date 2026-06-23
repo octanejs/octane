@@ -1,4 +1,4 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
 // <{expr}> dynamic-tag syntax — picks the rendered component from an
 // expression. Slot identity is stable; swapping the expression remounts

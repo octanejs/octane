@@ -1,6 +1,6 @@
-import { useState } from 'vyre';
+import { useState } from 'octane-ts';
 
-// @if + @else demo. Branch-local hooks are a vyre feature React
+// @if + @else demo. Branch-local hooks are a octane feature React
 // doesn't support — useState inside the @if body gets its own scope and
 // resets when the branch unmounts/remounts. Toggle to see counter reset.
 export function Conditional() @{

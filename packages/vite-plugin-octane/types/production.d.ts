@@ -5,7 +5,7 @@ import type {
 	ResolvedRippleConfig,
 	RippleConfigOptions,
 	RootBoundaryOptions,
-} from 'vite-plugin-vyre';
+} from '@octane-ts/vite-plugin';
 
 export function resolveRippleConfig(
 	raw: RippleConfigOptions,
@@ -36,8 +36,8 @@ export interface ServerManifest {
 }
 
 /**
- * vyre RenderResult — `render()` is async; `css` is ALREADY a ready,
- * deduped `<style data-vyre="hash">…</style>` string (NOT a Set<string>
+ * octane RenderResult — `render()` is async; `css` is ALREADY a ready,
+ * deduped `<style data-octane="hash">…</style>` string (NOT a Set<string>
  * needing a `getCss` lookup like Ripple).
  */
 export interface RenderResult {

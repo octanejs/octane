@@ -185,7 +185,7 @@ describe('Transitions — multiple-suspend edge cases', () => {
 		// sibling try-blocks to suspend; isPending must remain true until both
 		// promises resolve.
 		//
-		// KNOWN DIVERGENCE FROM REACT: vyre EAGERLY COMMITS each
+		// KNOWN DIVERGENCE FROM REACT: octane EAGERLY COMMITS each
 		// sibling as its individual promise resolves (assertion at line 181
 		// checks A:a2 while B is still pending). React's contract is "full
 		// wait" — both siblings keep their old content until BOTH resolve, so

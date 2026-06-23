@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'vyre/compiler';
+import { compile } from 'octane-ts/compiler';
 import { hydrate, flushSync } from '../../src/index.js';
-import * as ServerRT from 'vyre/server';
+import * as ServerRT from 'octane-ts/server';
 import { FeedOrEmpty, WithEmpty } from './_fixtures/emptyfor.tsrx';
 
 // SSR Phase 6 — empty @for hydration edge cases (Bugbot):
@@ -11,12 +11,12 @@ import { FeedOrEmpty, WithEmpty } from './_fixtures/emptyfor.tsrx';
 //    trailing component still adopts correctly.
 //  - zero items + @empty: the @empty content must be adopted in place.
 
-const FIXTURE = join(process.cwd(), 'packages/vyre/tests/hydration/_fixtures/emptyfor.tsrx');
+const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/emptyfor.tsrx');
 
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'emptyfor.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]vyre\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

@@ -1,9 +1,9 @@
-# vyre — TRANSITIONS + useDeferredValue conformance audit
+# octane — TRANSITIONS + useDeferredValue conformance audit
 
 Source files:
 
-- `/Users/domgan/Projects/ripple/packages/vyre/__tests__/_fixtures/transitions.tsrx`
-- `/Users/domgan/Projects/ripple/packages/vyre/__tests__/transitions.test.ts`
+- `/Users/domgan/Projects/ripple/packages/octane/__tests__/_fixtures/transitions.tsrx`
+- `/Users/domgan/Projects/ripple/packages/octane/__tests__/transitions.test.ts`
 
 Note on upstream references: React upstream tests are NOT vendored into this repo.
 Line numbers below are taken verbatim from the inline citations in the
@@ -55,7 +55,7 @@ preempts) that React documents but whose tests aren't cited inline.
 
 These are behaviors the suite asserts that either go further than, or differ from,
 documented React semantics — worth flagging because they may be
-vyre-specific contracts rather than React-conformant ones:
+octane-specific contracts rather than React-conformant ones:
 
 1. **`isStale` returned via fixture-level identity check** (test #5). The pattern
    `const isStale = props.promise !== deferred;` and the assertion that the FIRST
