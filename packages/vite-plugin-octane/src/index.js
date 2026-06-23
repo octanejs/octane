@@ -125,7 +125,9 @@ export function ripple(inlineOptions = {}) {
 				// SSR owns routing; do not let Vite SPA-fallback to index.html.
 				appType: 'custom',
 				optimizeDeps: {
-					exclude: [...new Set([...exclude, 'octane-ts', 'octane-ts/compiler', ...SERVER_ONLY_ADAPTER_IDS])],
+					exclude: [
+						...new Set([...exclude, 'octane-ts', 'octane-ts/compiler', ...SERVER_ONLY_ADAPTER_IDS]),
+					],
 				},
 				// Workspace packages with TS source must be transformed by Vite's SSR
 				// pipeline (not require()'d raw) so ssrLoadModule gets transpiled code.

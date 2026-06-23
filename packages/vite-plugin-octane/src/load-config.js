@@ -95,7 +95,9 @@ export function resolveRippleConfig(raw, options = {}) {
 	// Validate
 	// ------------------------------------------------------------------
 	if (!raw) {
-		throw new Error('[@octane-ts/vite-plugin] ripple.config.ts must export a default config object.');
+		throw new Error(
+			'[@octane-ts/vite-plugin] ripple.config.ts must export a default config object.',
+		);
 	}
 
 	if (requireAdapter) {
