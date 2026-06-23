@@ -1,0 +1,19 @@
+{
+  "name": "vyre-jsbench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "js-framework-benchmark fixture for vyre - drives 1000-row create/update/swap/select/remove against the production-built renderer for apples-to-apples perf measurement.",
+  "scripts": {
+    "dev": "vite --host --port 5176 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5176 --strictPort"
+  },
+  "dependencies": {
+    "vyre": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.0.12",
+    "terser": "^5.31.0"
+  }
+}

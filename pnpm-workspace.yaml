@@ -1,6 +1,13 @@
 packages:
   - packages/*
+  - benchmarks/news
   - benchmarks/news/*
+  - benchmarks/js-framework
+  - benchmarks/js-framework/*
+  - benchmarks/recursive-context
+  - benchmarks/recursive-context/*
+  - benchmarks/signal-favoring
+  - benchmarks/signal-favoring/*
   - playground/*
 
 allowBuilds:

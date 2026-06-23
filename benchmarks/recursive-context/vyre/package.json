@@ -1,0 +1,18 @@
+{
+  "name": "vyre-recursive-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "recursive-context bench fixture for vyre - exposes window.__mount/__update/__unmount/__reset for the Playwright harness.",
+  "scripts": {
+    "dev": "vite --host --port 5185 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5185 --strictPort"
+  },
+  "dependencies": {
+    "vyre": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.0.12"
+  }
+}

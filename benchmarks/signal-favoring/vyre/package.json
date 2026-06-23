@@ -1,0 +1,18 @@
+{
+  "name": "vyre-signal-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "signal-favoring bench fixture for vyre - 100-component chain with stateful counters every 10 levels.",
+  "scripts": {
+    "dev": "vite --host --port 5190 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5190 --strictPort"
+  },
+  "dependencies": {
+    "vyre": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.0.12"
+  }
+}
