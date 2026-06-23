@@ -997,6 +997,18 @@ export function compile(source, filename, options) {
 			if (reject) eligible = false;
 		}
 		info.eligible = eligible;
+		// Single-ELEMENT-root output: the component's body renders exactly one plain
+		// DOM element (not a component tag, fragment, or control-flow). Such a
+		// component self-delimits via that element on CLIENT mount — its
+		// `componentSlot` needs no `comp`/`/comp` markers (singleRoot path), exactly
+		// like a single-root `@for` item. (Output-shape based — independent of which
+		// hooks it calls.)
+		const render = compNode.body.render;
+		info.singleRoot =
+			render != null &&
+			(render.type === 'JSXElement' || render.type === 'Element') &&
+			!isComponentTag(render) &&
+			typeof (render.id?.name ?? render.openingElement?.name?.name) === 'string';
 	}
 
 	let body = '';
@@ -3137,8 +3149,15 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			if (anchorArg === '') anchorArg = ', undefined';
 			keyArg = `, (${cc.keyExpr})`;
 		}
+		// singleRoot is the 8th positional arg (after anchor, key). It's gated on
+		// no-key, so backfill anchor + key placeholders to land it in the right slot.
+		let singleRootArg = '';
+		if (cc.singleRoot) {
+			if (anchorArg === '') anchorArg = ', undefined';
+			singleRootArg = ', undefined, true';
+		}
 		afterLines.push(
-			`  componentSlot(__s, ${JSON.stringify('_comp$' + cc.id)}, __s.${bindingsName}._compHost$${cc.id}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg});`,
+			`  componentSlot(__s, ${JSON.stringify('_comp$' + cc.id)}, __s.${bindingsName}._compHost$${cc.id}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg});`,
 		);
 	}
 	for (const pc of ctx._portalCalls) {
@@ -3870,6 +3889,20 @@ function emitElementHtml(
 		// binding (path captured); the matching FragmentEnd pops and patches in
 		// the endPath. Stacked so nested <Fragment ref={…}> pairs cleanly.
 		const fragRefStack = [];
+		// When EVERY child is a component, each can APPEND to the host in source
+		// order instead of inserting before its own `<!>` placeholder — there's no
+		// static/template sibling to sit in front of, so appending lands them right
+		// (componentSlot/Lite with no anchor → appendChild). Restricted to the
+		// all-component case so hydration's adopt cursor can simply descend into the
+		// host's child stream (host.firstChild); mixed static+component children keep
+		// their placeholders, where the cursor would otherwise mis-track.
+		let allComponentChildren = children.length > 0;
+		for (const c of children) {
+			if (!(c.type === 'Element' && isComponentTag(c))) {
+				allComponentChildren = false;
+				break;
+			}
+		}
 		for (const child of children) {
 			const prevBaked = prevBakedText;
 			prevBakedText = false;
@@ -3941,15 +3974,22 @@ function emitElementHtml(
 						cssHash,
 					);
 					cc.hostPath = path;
-					// Emit a `<!>` anchor at the component's source-order position so
-					// componentSlot inserts BEFORE this anchor — preserving sibling
-					// order when a Component appears before static-element/text
-					// siblings. Without this, the slot's start/end markers get
-					// appended to the parent host AFTER the static template content.
-					cc.anchorPath = [...path, childIdx];
-					compCalls.push(cc);
-					html += '<!>';
-					childIdx++;
+					if (allComponentChildren) {
+						// All-component children: append to the host in source order (no
+						// `<!>` placeholder, no anchor). Hydration adopts from the cursor
+						// descending into the host (see componentSlot/Lite).
+						compCalls.push(cc);
+					} else {
+						// Emit a `<!>` anchor at the component's source-order position so
+						// componentSlot inserts BEFORE this anchor — preserving sibling
+						// order when a Component appears before static-element/text
+						// siblings. Without this, the slot's start/end markers get
+						// appended to the parent host AFTER the static template content.
+						cc.anchorPath = [...path, childIdx];
+						compCalls.push(cc);
+						html += '<!>';
+						childIdx++;
+					}
 				} else {
 					html += emitElementHtml(
 						child,
@@ -4394,21 +4434,28 @@ function makeCompCall(
 	//     hookless component that passed the pre-pass)
 	//   - no key=, no spread, no JSX children at the call site
 	let liteEligible = false;
+	// singleRoot: a NON-lite (hooks/`use`) same-module component whose body output
+	// is one plain element. Its componentSlot self-delimits via that element on
+	// client mount — no `comp`/`/comp` markers. (Lite components are already
+	// markerless, so this only matters for the full path.)
+	let singleRoot = false;
 	if (ctx.componentInfo && keyExpr == null) {
 		const tagName = node.openingElement?.name || node.id || node.name;
 		const isBareIdent =
 			tagName && (tagName.type === 'Identifier' || tagName.type === 'JSXIdentifier');
 		if (isBareIdent) {
 			const calleeInfo = ctx.componentInfo.get(compExpr);
-			if (calleeInfo && calleeInfo.eligible) {
+			if (calleeInfo) {
 				const hasSpread = propParts.some((p) => p.startsWith('...'));
 				const hasChildrenProp = propParts.some((p) => p.startsWith('"children":'));
-				liteEligible = !hasSpread && !hasChildrenProp;
+				const callSiteOk = !hasSpread && !hasChildrenProp;
+				if (calleeInfo.eligible) liteEligible = callSiteOk;
+				else if (calleeInfo.singleRoot) singleRoot = callSiteOk;
 			}
 		}
 	}
 
-	return { id, compExpr, propsExpr, hostPath: null, keyExpr, liteEligible };
+	return { id, compExpr, propsExpr, hostPath: null, keyExpr, liteEligible, singleRoot };
 }
 
 // ===========================================================================
