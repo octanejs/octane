@@ -104,6 +104,14 @@ export interface Block extends Scope {
 	body: ComponentBody;
 	props: any;
 	extra: any;
+	/**
+	 * True when this block OR any ancestor is a `memo()` block. Monotone up the
+	 * parentBlock chain (computed once at creation), so `useContextInternal` can
+	 * skip its memo-ancestor stamping walk entirely on the common no-memo tree —
+	 * the walk only ever stamps memo blocks, so if there are none above us it is
+	 * pure overhead (~ancestor-depth iterations per `use()` call).
+	 */
+	memoInChain: boolean;
 	pending: boolean;
 	disposed: boolean;
 	/** Set on item Blocks: pointer to the enclosing for-block's slot. */
@@ -641,6 +649,7 @@ class BlockImpl {
 	body: ComponentBody;
 	props: any;
 	extra: any;
+	memoInChain: boolean;
 	parentNode: Node;
 	parentBlock: Block | null;
 	startMarker: Node | null;
@@ -693,6 +702,11 @@ class BlockImpl {
 		this.body = body;
 		this.props = props;
 		this.extra = extra;
+		// Self-or-ancestor memo flag — OR of our own memo marker with the parent's
+		// flag, so the whole property is resolved in O(1) at creation instead of
+		// re-walked on every context read.
+		this.memoInChain =
+			(body as any)?.__memo === true || (parentBlock !== null && parentBlock.memoInChain === true);
 		this.parentNode = parentNode;
 		this.parentBlock = parentBlock;
 		this.startMarker = startMarker;
@@ -1556,9 +1570,15 @@ function useContextInternal<T>(context: Context<T>): T {
 	// with a stale value. Stamping memo ancestors lets the bailout detect the
 	// version change and decline to skip. Only memo blocks are stamped, so this
 	// costs nothing for the common no-memo tree.
-	for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
-		if ((b.body as any)?.__memo === true) {
-			(b.$$ctxReads ??= new Map()).set(context, context.$$version);
+	// Skip the walk entirely when no memo block sits at or above us — the loop
+	// would stamp nothing. `memoInChain` is precomputed at block creation, so the
+	// common no-memo tree pays a single boolean test instead of an ancestor walk
+	// per `use()` call.
+	if (CURRENT_BLOCK !== null && CURRENT_BLOCK.memoInChain) {
+		for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
+			if ((b.body as any)?.__memo === true) {
+				(b.$$ctxReads ??= new Map()).set(context, context.$$version);
+			}
 		}
 	}
 	let s: Scope | null = CURRENT_SCOPE;
