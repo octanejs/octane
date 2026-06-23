@@ -10,10 +10,10 @@
     "preview": "vite preview --port 5193 --strictPort"
   },
   "dependencies": {
-    "ripple": "^0.3.84"
+    "ripple": "catalog:default"
   },
   "devDependencies": {
-    "@ripple-ts/vite-plugin": "^0.3.84",
-    "vite": "^8.0.12"
+    "@ripple-ts/vite-plugin": "catalog:default",
+    "vite": "catalog:default"
   }
 }

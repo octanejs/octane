@@ -13,7 +13,7 @@
     "vyre": "workspace:*"
   },
   "devDependencies": {
-    "vite": "^8.0.12",
-    "terser": "^5.31.0"
+    "vite": "catalog:default",
+    "terser": "catalog:default"
   }
 }

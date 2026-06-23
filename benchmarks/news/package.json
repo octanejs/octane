@@ -13,7 +13,7 @@
     "bench:react": "node run.mjs react"
   },
   "dependencies": {
-    "playwright": "^1.49.0",
-    "vite": "^8.0.12"
+    "playwright": "catalog:default",
+    "vite": "catalog:default"
   }
 }

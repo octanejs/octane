@@ -4,6 +4,96 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@changesets/changelog-github':
+      specifier: ^0.7.0
+      version: 0.7.0
+    '@changesets/cli':
+      specifier: ^2.31.0
+      version: 2.31.0
+    '@ripple-ts/adapter':
+      specifier: ^0.3.85
+      version: 0.3.85
+    '@ripple-ts/vite-plugin':
+      specifier: ^0.3.85
+      version: 0.3.85
+    '@solidjs/web':
+      specifier: 2.0.0-beta.14
+      version: 2.0.0-beta.14
+    '@tsrx/core':
+      specifier: ^0.1.33
+      version: 0.1.33
+    '@tsrx/prettier-plugin':
+      specifier: ^0.3.85
+      version: 0.3.85
+    '@tsrx/react':
+      specifier: ^0.2.33
+      version: 0.2.33
+    '@tsrx/ripple':
+      specifier: ^0.1.33
+      version: 0.1.33
+    '@tsrx/solid':
+      specifier: ^ 0.1.33
+      version: 0.1.33
+    '@tsrx/vite-plugin-react':
+      specifier: ^0.0.65
+      version: 0.0.65
+    '@tsrx/vite-plugin-solid':
+      specifier: ^0.0.63
+      version: 0.0.63
+    '@types/node':
+      specifier: ^24.3.0
+      version: 24.13.2
+    '@vitejs/plugin-react':
+      specifier: ^6.0.3
+      version: 6.0.3
+    esbuild:
+      specifier: ^0.28.1
+      version: 0.28.1
+    happy-dom:
+      specifier: ^20.10.6
+      version: 20.10.6
+    jsdom:
+      specifier: ^29.0.2
+      version: 29.1.1
+    playwright:
+      specifier: ^1.61.0
+      version: 1.61.0
+    prettier:
+      specifier: ^3.8.3
+      version: 3.8.4
+    react:
+      specifier: ^19.2.0
+      version: 19.2.7
+    react-dom:
+      specifier: ^19.2.0
+      version: 19.2.7
+    ripple:
+      specifier: ^0.3.85
+      version: 0.3.85
+    solid-js:
+      specifier: 2.0.0-beta.14
+      version: 2.0.0-beta.14
+    terser:
+      specifier: ^5.31.0
+      version: 5.48.0
+    type-fest:
+      specifier: ^5.6.0
+      version: 5.7.0
+    typescript:
+      specifier: ^5.9.3
+      version: 5.9.3
+    vite:
+      specifier: ^8.0.16
+      version: 8.0.16
+    vite-plugin-solid:
+      specifier: 3.0.0-next.5
+      version: 3.0.0-next.5
+    vitest:
+      specifier: ^4.1.9
+      version: 4.1.9
+
 overrides:
   esrap: ^2.2.9
   babel-preset-solid: 2.0.0-beta.14
@@ -14,43 +104,43 @@ importers:
   .:
     devDependencies:
       '@changesets/changelog-github':
-        specifier: ^0.7.0
+        specifier: catalog:default
         version: 0.7.0
       '@changesets/cli':
-        specifier: ^2.31.0
+        specifier: catalog:default
         version: 2.31.0(@types/node@24.13.2)
       '@tsrx/prettier-plugin':
-        specifier: ^0.3.84
-        version: 0.3.84(prettier@3.8.4)
+        specifier: catalog:default
+        version: 0.3.85(prettier@3.8.4)
       '@types/node':
-        specifier: ^24.3.0
+        specifier: catalog:default
         version: 24.13.2
       '@typescript/native-preview':
-        specifier: 7.0.0-dev.20260615.1
-        version: 7.0.0-dev.20260615.1
+        specifier: 7.0.0-dev.20260616.1
+        version: 7.0.0-dev.20260616.1
       esbuild:
-        specifier: ^0.27.7
-        version: 0.27.7
+        specifier: catalog:default
+        version: 0.28.1
       happy-dom:
-        specifier: ^20.9.0
-        version: 20.10.4
+        specifier: catalog:default
+        version: 20.10.6
       jsdom:
-        specifier: ^29.0.2
+        specifier: catalog:default
         version: 29.1.1(@noble/hashes@2.2.0)
       prettier:
-        specifier: ^3.8.3
+        specifier: catalog:default
         version: 3.8.4
       typescript:
-        specifier: ^5.9.3
+        specifier: catalog:default
         version: 5.9.3
       vitest:
-        specifier: ^4.1.6
-        version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.4)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
 
   benchmarks/js-framework:
     dependencies:
       playwright:
-        specifier: ^1.49.0
+        specifier: catalog:default
         version: 1.61.0
 
   benchmarks/js-framework/vyre:
@@ -60,74 +150,74 @@ importers:
         version: link:../../../packages/vyre
     devDependencies:
       terser:
-        specifier: ^5.31.0
+        specifier: catalog:default
         version: 5.48.0
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   benchmarks/news:
     dependencies:
       playwright:
-        specifier: ^1.49.0
+        specifier: catalog:default
         version: 1.61.0
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   benchmarks/news/react:
     dependencies:
       react:
-        specifier: ^19.2.0
+        specifier: catalog:default
         version: 19.2.7
       react-dom:
-        specifier: ^19.2.0
+        specifier: catalog:default
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@tsrx/react':
-        specifier: ^0.2.32
-        version: 0.2.32(react@19.2.7)
+        specifier: catalog:default
+        version: 0.2.33(react@19.2.7)
       '@tsrx/vite-plugin-react':
-        specifier: ^0.0.64
-        version: 0.0.64(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+        specifier: catalog:default
+        version: 0.0.65(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   benchmarks/news/ripple:
     dependencies:
       ripple:
-        specifier: ^0.3.84
-        version: 0.3.84
+        specifier: catalog:default
+        version: 0.3.85
     devDependencies:
       '@tsrx/ripple':
-        specifier: ^0.1.32
-        version: 0.1.32
+        specifier: catalog:default
+        version: 0.1.33
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   benchmarks/news/solid:
     dependencies:
       '@solidjs/web':
-        specifier: 2.0.0-beta.14
+        specifier: catalog:default
         version: 2.0.0-beta.14(solid-js@2.0.0-beta.14)
       solid-js:
-        specifier: 2.0.0-beta.14
+        specifier: catalog:default
         version: 2.0.0-beta.14
     devDependencies:
       '@tsrx/solid':
-        specifier: ^0.1.32
-        version: 0.1.32(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)
+        specifier: catalog:default
+        version: 0.1.33(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)
       '@tsrx/vite-plugin-solid':
-        specifier: ^0.0.62
-        version: 0.0.62(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+        specifier: catalog:default
+        version: 0.0.63(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
       vite-plugin-solid:
-        specifier: 3.0.0-next.5
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+        specifier: catalog:default
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
 
   benchmarks/news/vyre:
     dependencies:
@@ -136,59 +226,59 @@ importers:
         version: link:../../../packages/vyre
     devDependencies:
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   benchmarks/recursive-context:
     dependencies:
       playwright:
-        specifier: ^1.49.0
+        specifier: catalog:default
         version: 1.61.0
 
   benchmarks/recursive-context/react:
     dependencies:
       react:
-        specifier: ^19.2.0
+        specifier: catalog:default
         version: 19.2.7
       react-dom:
-        specifier: ^19.2.0
+        specifier: catalog:default
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@vitejs/plugin-react':
-        specifier: ^4.3.4
-        version: 4.7.0(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+        specifier: catalog:default
+        version: 6.0.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   benchmarks/recursive-context/ripple:
     dependencies:
       ripple:
-        specifier: ^0.3.84
-        version: 0.3.84
+        specifier: catalog:default
+        version: 0.3.85
     devDependencies:
       '@ripple-ts/vite-plugin':
-        specifier: ^0.3.84
-        version: 0.3.84
+        specifier: catalog:default
+        version: 0.3.85
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   benchmarks/recursive-context/solid:
     dependencies:
       '@solidjs/web':
-        specifier: 2.0.0-beta.14
+        specifier: catalog:default
         version: 2.0.0-beta.14(solid-js@2.0.0-beta.14)
       solid-js:
-        specifier: 2.0.0-beta.14
+        specifier: catalog:default
         version: 2.0.0-beta.14
     devDependencies:
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
       vite-plugin-solid:
-        specifier: ^3.0.0-next.5
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+        specifier: catalog:default
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
 
   benchmarks/recursive-context/vyre:
     dependencies:
@@ -197,59 +287,59 @@ importers:
         version: link:../../../packages/vyre
     devDependencies:
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   benchmarks/signal-favoring:
     dependencies:
       playwright:
-        specifier: ^1.49.0
+        specifier: catalog:default
         version: 1.61.0
 
   benchmarks/signal-favoring/react:
     dependencies:
       react:
-        specifier: ^19.2.0
+        specifier: catalog:default
         version: 19.2.7
       react-dom:
-        specifier: ^19.2.0
+        specifier: catalog:default
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@vitejs/plugin-react':
-        specifier: ^4.3.4
-        version: 4.7.0(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+        specifier: catalog:default
+        version: 6.0.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   benchmarks/signal-favoring/ripple:
     dependencies:
       ripple:
-        specifier: ^0.3.84
-        version: 0.3.84
+        specifier: catalog:default
+        version: 0.3.85
     devDependencies:
       '@ripple-ts/vite-plugin':
-        specifier: ^0.3.84
-        version: 0.3.84
+        specifier: catalog:default
+        version: 0.3.85
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   benchmarks/signal-favoring/solid:
     dependencies:
       '@solidjs/web':
-        specifier: 2.0.0-beta.14
+        specifier: catalog:default
         version: 2.0.0-beta.14(solid-js@2.0.0-beta.14)
       solid-js:
-        specifier: 2.0.0-beta.14
+        specifier: catalog:default
         version: 2.0.0-beta.14
     devDependencies:
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
       vite-plugin-solid:
-        specifier: ^3.0.0-next.5
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+        specifier: catalog:default
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
 
   benchmarks/signal-favoring/vyre:
     dependencies:
@@ -258,55 +348,55 @@ importers:
         version: link:../../../packages/vyre
     devDependencies:
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   packages/vite-plugin-vyre:
     dependencies:
       '@ripple-ts/adapter':
-        specifier: ^0.3.84
-        version: 0.3.84
+        specifier: catalog:default
+        version: 0.3.85
       vyre:
         specifier: workspace:*
         version: link:../vyre
     devDependencies:
       '@types/node':
-        specifier: ^24.3.0
+        specifier: catalog:default
         version: 24.13.2
       type-fest:
-        specifier: ^5.6.0
+        specifier: catalog:default
         version: 5.7.0
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   packages/vyre:
     dependencies:
       '@tsrx/core':
-        specifier: 0.1.29
-        version: 0.1.29
+        specifier: catalog:default
+        version: 0.1.33
       esrap:
         specifier: ^2.2.9
         version: 2.2.11
     devDependencies:
       '@tsrx/react':
-        specifier: ^0.2.32
-        version: 0.2.32(react@19.2.7)
+        specifier: catalog:default
+        version: 0.2.33(react@19.2.7)
       esbuild:
-        specifier: ^0.27.7
-        version: 0.27.7
+        specifier: catalog:default
+        version: 0.28.1
       happy-dom:
-        specifier: ^20.9.0
-        version: 20.10.4
+        specifier: catalog:default
+        version: 20.10.6
       react:
-        specifier: ^19.0.0
+        specifier: catalog:default
         version: 19.2.7
       react-dom:
-        specifier: ^19.0.0
+        specifier: catalog:default
         version: 19.2.7(react@19.2.7)
       vitest:
-        specifier: ^4.1.6
-        version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.4)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
 
   playground/vyre:
     dependencies:
@@ -315,11 +405,11 @@ importers:
         version: link:../../packages/vyre
     devDependencies:
       typescript:
-        specifier: ^5.9.3
+        specifier: catalog:default
         version: 5.9.3
       vite:
-        specifier: ^8.0.12
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
 packages:
 
@@ -403,18 +493,6 @@ packages:
 
   '@babel/plugin-syntax-jsx@7.29.7':
     resolution: {integrity: sha512-TSu8+mHCoEaaCDEZ0I3+6mvTBYR4PCxQwf2z9/r5Tbztv6NaLR3B9thGTTxX2WGuGHJqRiAbKPeGTJ5XWXVg6A==}
-    engines: {node: '>=6.9.0'}
-    peerDependencies:
-      '@babel/core': ^7.0.0-0
-
-  '@babel/plugin-transform-react-jsx-self@7.29.7':
-    resolution: {integrity: sha512-TL0hMc9xzy86VD31nUiwzd5otRAcyEPcsegCxolO0PvcXuH1v0kECe/UIznYFihpkvU5wg/jk4v0TTEFfm53fw==}
-    engines: {node: '>=6.9.0'}
-    peerDependencies:
-      '@babel/core': ^7.0.0-0
-
-  '@babel/plugin-transform-react-jsx-source@7.29.7':
-    resolution: {integrity: sha512-06IyK09H3wi4cGbhDBwp5gUGo0IKtnYa8tyTiephirPCK6fbobVGiXMMI5zLQ4aKEYP3wZ3ArU44o+8KMrSG/Q==}
     engines: {node: '>=6.9.0'}
     peerDependencies:
       '@babel/core': ^7.0.0-0
@@ -545,158 +623,158 @@ packages:
   '@emnapi/wasi-threads@1.2.1':
     resolution: {integrity: sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w==}
 
-  '@esbuild/aix-ppc64@0.27.7':
-    resolution: {integrity: sha512-EKX3Qwmhz1eMdEJokhALr0YiD0lhQNwDqkPYyPhiSwKrh7/4KRjQc04sZ8db+5DVVnZ1LmbNDI1uAMPEUBnQPg==}
+  '@esbuild/aix-ppc64@0.28.1':
+    resolution: {integrity: sha512-Svl7tq8k/08+p6CXPpRjQ1fKX+1odH/BQbb48fV6fj3CWHhsoIOoY87w1oHXm0qEpkIK3ZfVgp0hed3XBXzXMQ==}
     engines: {node: '>=18'}
     cpu: [ppc64]
     os: [aix]
 
-  '@esbuild/android-arm64@0.27.7':
-    resolution: {integrity: sha512-62dPZHpIXzvChfvfLJow3q5dDtiNMkwiRzPylSCfriLvZeq0a1bWChrGx/BbUbPwOrsWKMn8idSllklzBy+dgQ==}
+  '@esbuild/android-arm64@0.28.1':
+    resolution: {integrity: sha512-34EGEbCIAgosYz6goLcopX6Mo7NyGv9tfwEM2/7Ce2VcVRk568iSvniGWcUXIy7wEDR1wzolcxcriFVrWYcwBg==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [android]
 
-  '@esbuild/android-arm@0.27.7':
-    resolution: {integrity: sha512-jbPXvB4Yj2yBV7HUfE2KHe4GJX51QplCN1pGbYjvsyCZbQmies29EoJbkEc+vYuU5o45AfQn37vZlyXy4YJ8RQ==}
+  '@esbuild/android-arm@0.28.1':
+    resolution: {integrity: sha512-0k2F129Xdio1TdJfzJ8sy1Q47vUD2NnwdhiAf7drUN1EBTfPf4hsFCtmMgu/6m8JSzsBrlmVjudMBQqOfG8usQ==}
     engines: {node: '>=18'}
     cpu: [arm]
     os: [android]
 
-  '@esbuild/android-x64@0.27.7':
-    resolution: {integrity: sha512-x5VpMODneVDb70PYV2VQOmIUUiBtY3D3mPBG8NxVk5CogneYhkR7MmM3yR/uMdITLrC1ml/NV1rj4bMJuy9MCg==}
+  '@esbuild/android-x64@0.28.1':
+    resolution: {integrity: sha512-dbwY7ltSMDWsRatcRpCnES4F+im88OCUgGZjy52shC7GqHRE/cYlxNbB4Z4UpJswpcc4Qxd2oE/ufM0p61IKng==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [android]
 
-  '@esbuild/darwin-arm64@0.27.7':
-    resolution: {integrity: sha512-5lckdqeuBPlKUwvoCXIgI2D9/ABmPq3Rdp7IfL70393YgaASt7tbju3Ac+ePVi3KDH6N2RqePfHnXkaDtY9fkw==}
+  '@esbuild/darwin-arm64@0.28.1':
+    resolution: {integrity: sha512-TZbWkQY7kvTAXbXUT7uVACR5cMHsDiSz9z7ZKAX/RTq/WJEk3QyRr0wZpNhBDX+/0CtdqUIJlOiodQcta6tY3Q==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [darwin]
 
-  '@esbuild/darwin-x64@0.27.7':
-    resolution: {integrity: sha512-rYnXrKcXuT7Z+WL5K980jVFdvVKhCHhUwid+dDYQpH+qu+TefcomiMAJpIiC2EM3Rjtq0sO3StMV/+3w3MyyqQ==}
+  '@esbuild/darwin-x64@0.28.1':
+    resolution: {integrity: sha512-zfdzgK9ACBNZLI/CyHTOx81SyNbM6YXn7rxSgX97VjyiPl9W1i4Ka4fgKECEoFCKGpvBj5qArWIGgQjOwkgskQ==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [darwin]
 
-  '@esbuild/freebsd-arm64@0.27.7':
-    resolution: {integrity: sha512-B48PqeCsEgOtzME2GbNM2roU29AMTuOIN91dsMO30t+Ydis3z/3Ngoj5hhnsOSSwNzS+6JppqWsuhTp6E82l2w==}
+  '@esbuild/freebsd-arm64@0.28.1':
+    resolution: {integrity: sha512-wG2EA8ENdEI0qhkSZMjfqrdY+ziCYCPMmtZjjIwOmXFjmyzEHn+UUxk5of+SYsjtfs3VpnlC7QLzSI5hY/rOAw==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [freebsd]
 
-  '@esbuild/freebsd-x64@0.27.7':
-    resolution: {integrity: sha512-jOBDK5XEjA4m5IJK3bpAQF9/Lelu/Z9ZcdhTRLf4cajlB+8VEhFFRjWgfy3M1O4rO2GQ/b2dLwCUGpiF/eATNQ==}
+  '@esbuild/freebsd-x64@0.28.1':
+    resolution: {integrity: sha512-i7dZ9vQgnvSCzi/rYCXNgtF/U+eKZNJBzu3eTQbRgHnM7tNSizLOkRFAl3qzVc/Op/u5YkHHa4pf/3DOYHthLQ==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [freebsd]
 
-  '@esbuild/linux-arm64@0.27.7':
-    resolution: {integrity: sha512-RZPHBoxXuNnPQO9rvjh5jdkRmVizktkT7TCDkDmQ0W2SwHInKCAV95GRuvdSvA7w4VMwfCjUiPwDi0ZO6Nfe9A==}
+  '@esbuild/linux-arm64@0.28.1':
+    resolution: {integrity: sha512-yHs+0uc8+nvEAfAfxrWQKK5peSNzBc4PegcMO0EJ2hT71uA7vB8Ihg2e77R2P7SG5uYjPbHlLLmve4LLLRCf0g==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [linux]
 
-  '@esbuild/linux-arm@0.27.7':
-    resolution: {integrity: sha512-RkT/YXYBTSULo3+af8Ib0ykH8u2MBh57o7q/DAs3lTJlyVQkgQvlrPTnjIzzRPQyavxtPtfg0EopvDyIt0j1rA==}
+  '@esbuild/linux-arm@0.28.1':
+    resolution: {integrity: sha512-qVXBOHQS+d5Y722GwJzJUtOLlX7km3CraOaGormF1pDtPd2C/l1SHRPgjLunLGe51Sh5YYWKMFDyV4SxgMQYTQ==}
     engines: {node: '>=18'}
     cpu: [arm]
     os: [linux]
 
-  '@esbuild/linux-ia32@0.27.7':
-    resolution: {integrity: sha512-GA48aKNkyQDbd3KtkplYWT102C5sn/EZTY4XROkxONgruHPU72l+gW+FfF8tf2cFjeHaRbWpOYa/uRBz/Xq1Pg==}
+  '@esbuild/linux-ia32@0.28.1':
+    resolution: {integrity: sha512-d1z4ZuP0ajrfz/FhGT4vv278rX8KnPPJx8i5+AtK7TYbx9Le9F1hyzurZpkEyjkGa9dUGhQow4C1NmeGvqxN2w==}
     engines: {node: '>=18'}
     cpu: [ia32]
     os: [linux]
 
-  '@esbuild/linux-loong64@0.27.7':
-    resolution: {integrity: sha512-a4POruNM2oWsD4WKvBSEKGIiWQF8fZOAsycHOt6JBpZ+JN2n2JH9WAv56SOyu9X5IqAjqSIPTaJkqN8F7XOQ5Q==}
+  '@esbuild/linux-loong64@0.28.1':
+    resolution: {integrity: sha512-M5sRjUVZrkm1OAPR3dlOYzNmN+loZKGVi1VUQGrwuqLcbR6qeAz+famMhjASeH3YVKvZz+zT1jlh/keC3Rj/lg==}
     engines: {node: '>=18'}
     cpu: [loong64]
     os: [linux]
 
-  '@esbuild/linux-mips64el@0.27.7':
-    resolution: {integrity: sha512-KabT5I6StirGfIz0FMgl1I+R1H73Gp0ofL9A3nG3i/cYFJzKHhouBV5VWK1CSgKvVaG4q1RNpCTR2LuTVB3fIw==}
+  '@esbuild/linux-mips64el@0.28.1':
+    resolution: {integrity: sha512-mRObBZeHh2OxcBFPWE/FjylkRgZdYuiTR3vaTozquCGOH14iP9oN4x4Ge81CoIDYQrXmIxpFumJBu5MtZpnQJQ==}
     engines: {node: '>=18'}
     cpu: [mips64el]
     os: [linux]
 
-  '@esbuild/linux-ppc64@0.27.7':
-    resolution: {integrity: sha512-gRsL4x6wsGHGRqhtI+ifpN/vpOFTQtnbsupUF5R5YTAg+y/lKelYR1hXbnBdzDjGbMYjVJLJTd2OFmMewAgwlQ==}
+  '@esbuild/linux-ppc64@0.28.1':
+    resolution: {integrity: sha512-slScBsMAb3GFDcdrCgLwZtPYRoH2H/youv10QiZyRjmsP48fznoveWytSgCI/R0ZcUgpc0ZhIUEx6LHts8yrfQ==}
     engines: {node: '>=18'}
     cpu: [ppc64]
     os: [linux]
 
-  '@esbuild/linux-riscv64@0.27.7':
-    resolution: {integrity: sha512-hL25LbxO1QOngGzu2U5xeXtxXcW+/GvMN3ejANqXkxZ/opySAZMrc+9LY/WyjAan41unrR3YrmtTsUpwT66InQ==}
+  '@esbuild/linux-riscv64@0.28.1':
+    resolution: {integrity: sha512-kw0owk1o0GFETUJyW0jc0G4Yzs0BHZn0JDZ8JRT088vjJYX777BAs1fDGxAC+q831qOs2DTC96mNsG2opdfyyQ==}
     engines: {node: '>=18'}
     cpu: [riscv64]
     os: [linux]
 
-  '@esbuild/linux-s390x@0.27.7':
-    resolution: {integrity: sha512-2k8go8Ycu1Kb46vEelhu1vqEP+UeRVj2zY1pSuPdgvbd5ykAw82Lrro28vXUrRmzEsUV0NzCf54yARIK8r0fdw==}
+  '@esbuild/linux-s390x@0.28.1':
+    resolution: {integrity: sha512-/lAIjX8aYFRByhh6L5rYtPEDRqa9de/4V/juOXcta5frjvzXO4/sqEtyytse0g3zZFuWu5cDN0MkLz2qRDD2Ag==}
     engines: {node: '>=18'}
     cpu: [s390x]
     os: [linux]
 
-  '@esbuild/linux-x64@0.27.7':
-    resolution: {integrity: sha512-hzznmADPt+OmsYzw1EE33ccA+HPdIqiCRq7cQeL1Jlq2gb1+OyWBkMCrYGBJ+sxVzve2ZJEVeePbLM2iEIZSxA==}
+  '@esbuild/linux-x64@0.28.1':
+    resolution: {integrity: sha512-u/anNYF2mmVOEDwLtnQ1wOr3EZ9sTNGLWrsYGYwHWzGA3Si84IOkHXlbWTD1NB+9/1lcnweYKO54uhxZydNzfA==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [linux]
 
-  '@esbuild/netbsd-arm64@0.27.7':
-    resolution: {integrity: sha512-b6pqtrQdigZBwZxAn1UpazEisvwaIDvdbMbmrly7cDTMFnw/+3lVxxCTGOrkPVnsYIosJJXAsILG9XcQS+Yu6w==}
+  '@esbuild/netbsd-arm64@0.28.1':
+    resolution: {integrity: sha512-oks0DYbLwWMmaakTsCb+zL4E+aHRVLom9IJZOAthMQEPiQmydXHkziYEsGYRx0uNV/IjEKGAV941JzH02pflqw==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [netbsd]
 
-  '@esbuild/netbsd-x64@0.27.7':
-    resolution: {integrity: sha512-OfatkLojr6U+WN5EDYuoQhtM+1xco+/6FSzJJnuWiUw5eVcicbyK3dq5EeV/QHT1uy6GoDhGbFpprUiHUYggrw==}
+  '@esbuild/netbsd-x64@0.28.1':
+    resolution: {integrity: sha512-aeL6lAnN89Hz43Mlh1G8ARasbuoYvSITDEx0tHh5b7jJnHcssqgjy9Yx430GDpmCa6OyrKoS0aNRjKundRizGg==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [netbsd]
 
-  '@esbuild/openbsd-arm64@0.27.7':
-    resolution: {integrity: sha512-AFuojMQTxAz75Fo8idVcqoQWEHIXFRbOc1TrVcFSgCZtQfSdc1RXgB3tjOn/krRHENUB4j00bfGjyl2mJrU37A==}
+  '@esbuild/openbsd-arm64@0.28.1':
+    resolution: {integrity: sha512-MEFJe5C3R8pwXdZ5Y21oo6m7ePiS0d9pWucn99O/wvyJZChoIQKrQDxKrGeW8F5+T0okTHesAmDeiHDTIq0V/Q==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [openbsd]
 
-  '@esbuild/openbsd-x64@0.27.7':
-    resolution: {integrity: sha512-+A1NJmfM8WNDv5CLVQYJ5PshuRm/4cI6WMZRg1by1GwPIQPCTs1GLEUHwiiQGT5zDdyLiRM/l1G0Pv54gvtKIg==}
+  '@esbuild/openbsd-x64@0.28.1':
+    resolution: {integrity: sha512-i/ZLIOafE0Z8cI/XANJAixoJL/uRAoS2xOA3rb0xN+KK0K177cMAsQYkzHtBrtMXAKuAc7HGgcWiZ/sRC1Nxgw==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [openbsd]
 
-  '@esbuild/openharmony-arm64@0.27.7':
-    resolution: {integrity: sha512-+KrvYb/C8zA9CU/g0sR6w2RBw7IGc5J2BPnc3dYc5VJxHCSF1yNMxTV5LQ7GuKteQXZtspjFbiuW5/dOj7H4Yw==}
+  '@esbuild/openharmony-arm64@0.28.1':
+    resolution: {integrity: sha512-ge+Z7EXFNt2BO1oAMsVpiQ8EwndV9i1xXerAeTIK7AtPs3bKFXQM7nlRxDSIUIMeueR1CNXxqztLzdNeReKBJg==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [openharmony]
 
-  '@esbuild/sunos-x64@0.27.7':
-    resolution: {integrity: sha512-ikktIhFBzQNt/QDyOL580ti9+5mL/YZeUPKU2ivGtGjdTYoqz6jObj6nOMfhASpS4GU4Q/Clh1QtxWAvcYKamA==}
+  '@esbuild/sunos-x64@0.28.1':
+    resolution: {integrity: sha512-BEjgtECkL3vY+SaSQ6nzVfiALUeFxpawyp8Jmf5PtYhf1Ug40N1h/hxlhts+f1FvSvarEigdxS3BlSMI2PJLcQ==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [sunos]
 
-  '@esbuild/win32-arm64@0.27.7':
-    resolution: {integrity: sha512-7yRhbHvPqSpRUV7Q20VuDwbjW5kIMwTHpptuUzV+AA46kiPze5Z7qgt6CLCK3pWFrHeNfDd1VKgyP4O+ng17CA==}
+  '@esbuild/win32-arm64@0.28.1':
+    resolution: {integrity: sha512-lCv9eK/H6ZJWbE7bh2nw54CZ9M2nupBxJcTsdk/QQnWkdSjKGuxmmH8/GWrlT1eMmZfn4dGcCjRte397WqfQXA==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [win32]
 
-  '@esbuild/win32-ia32@0.27.7':
-    resolution: {integrity: sha512-SmwKXe6VHIyZYbBLJrhOoCJRB/Z1tckzmgTLfFYOfpMAx63BJEaL9ExI8x7v0oAO3Zh6D/Oi1gVxEYr5oUCFhw==}
+  '@esbuild/win32-ia32@0.28.1':
+    resolution: {integrity: sha512-zvb/mB2bSCoJOpoCBgYKKpX6YM6mJBlBUVUtVj41DlZJVEB6/0CKlRYxP5wWl1C1ILiCoAU5wZZ4q1P3qeS6Eg==}
     engines: {node: '>=18'}
     cpu: [ia32]
     os: [win32]
 
-  '@esbuild/win32-x64@0.27.7':
-    resolution: {integrity: sha512-56hiAJPhwQ1R4i+21FVF7V8kSD5zZTdHcVuRFMW0hn753vVfQN8xlx4uOPT4xoGH0Z/oVATuR82AiqSTDIpaHg==}
+  '@esbuild/win32-x64@0.28.1':
+    resolution: {integrity: sha512-bm4Mowrv+GXMlpWX++EcXw/iLyd1o3+bJkC2DkWXYVvgZCqD/bSj9ctZeAMC3cIxgjRVR2Dufaiu4YPxr5gW1A==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
@@ -769,11 +847,11 @@ packages:
   '@oxc-project/types@0.133.0':
     resolution: {integrity: sha512-KzkdCd6Uxqnf6l3HOw1xfatAlUURA0g14cvBYFyJ5SaNOQbOUvBr9PKArcPcrNIeRsBdgcUzOGrhKveVpvOIGA==}
 
-  '@ripple-ts/adapter@0.3.84':
-    resolution: {integrity: sha512-6hOoBawCvHkQ67lCkTTEZGvk/aZD0x8KkdBQ0KUGdf+3RLdGIbE1cNV/S2EeKlLWEOcUGdfjvmqQgAndjPZvoA==}
+  '@ripple-ts/adapter@0.3.85':
+    resolution: {integrity: sha512-tit+9BRoFAVoJm5XvcuNBAjdMSB4yBPN6jy7Ot335KmbxYzJ8jeDpHDZDy8YbXlHsZSmbwi17F2FSOQqlBdm1w==}
 
-  '@ripple-ts/vite-plugin@0.3.84':
-    resolution: {integrity: sha512-iPn+yLhn7a9IbRG8ZN0Ith4sqwiUnX9Sb19YqeTbx3BYDP/XeIxuHgWwi+QnPQAggikYvPG7YVbA4uOLcBEUdw==}
+  '@ripple-ts/vite-plugin@0.3.85':
+    resolution: {integrity: sha512-KPUZ66bbvZfd+3yeDEJOiqVoeNwPGYvlay3fIxtRfpgrHB++ZrEuDi5TDU/AhnOfwClCBaLz0ta12vpXksTE3A==}
     hasBin: true
 
   '@rolldown/binding-android-arm64@1.0.3':
@@ -871,9 +949,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@rolldown/pluginutils@1.0.0-beta.27':
-    resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
-
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
@@ -893,38 +968,35 @@ packages:
     peerDependencies:
       acorn: ^8.9.0
 
-  '@tsrx/core@0.1.29':
-    resolution: {integrity: sha512-INfb2p2tt5SmbxenP16n2sAf7eyU6wA5jzWiwn22CDDiDsaUAGQ+RtyoFBUgKj5yNm8xzGul7K90pk40pf3cOw==}
+  '@tsrx/core@0.1.33':
+    resolution: {integrity: sha512-Djl0nwqYGdZiJHnMJBeyKUs05nErtDuLf1JoYNRvMlo49/80jZAtkpHGyrM/cnNCdhGWeQIccmENv7mOQ7sYNw==}
 
-  '@tsrx/core@0.1.32':
-    resolution: {integrity: sha512-1U9etl7El6rVZvSOLcA83qpzfYMHhUXteovUliYJcc68CCI5+g9gzsQNFNcNnTCcWF54udLaon+xNIzUSUyPQw==}
-
-  '@tsrx/prettier-plugin@0.3.84':
-    resolution: {integrity: sha512-6LDTlz3pGO62iuUNfIci+Gz3FctUKP0Bqv2T60qu2XBTjOOqirp+qSrMyMEMeb9KfjThZtvDfAsNidnFtZ+8wQ==}
+  '@tsrx/prettier-plugin@0.3.85':
+    resolution: {integrity: sha512-vU22piDZHXW+//7yvo99PFDiavBcglSvCDzqqMGYWtTNPM9NWsuSM3iTN8+m1Cm3KPTzebd2dvHJkAfxpTJmjw==}
     peerDependencies:
       prettier: '>=2.0.0'
 
-  '@tsrx/react@0.2.32':
-    resolution: {integrity: sha512-Uha8bhOZfWdujupKe0z/d4H0N+PG/aM7CicFD89of3Jxa43EC9Pq/Yegas9ZpON8SXD6hwlMqNxZbRSfaRXG1w==}
+  '@tsrx/react@0.2.33':
+    resolution: {integrity: sha512-ghR7Ha1N8aMrZleyrYYFf6cDvkQ8288OIFxU7YrGkPxvOma8jcNPuwmo54Ek7ht5N7tM1eG5kfj56oetNngd3g==}
     peerDependencies:
       react: '>=18'
 
-  '@tsrx/ripple@0.1.32':
-    resolution: {integrity: sha512-fkMG462CRG+MD4n+f+bPasUXYYeT+qxlqd6hXfsSqr5tQFACWDLbhOT8Yz4f5aAdRz9n8F4B2A/+GQhGgtYhxw==}
+  '@tsrx/ripple@0.1.33':
+    resolution: {integrity: sha512-EQgOEQBAJEg5DDeS0QdD3n3E8mYWTk5AJvgMUzzenZ1Pq9zGxUiP32gkdeGKaPKSclRfOiWv2spBrsvlBaVblw==}
 
-  '@tsrx/solid@0.1.32':
-    resolution: {integrity: sha512-VGNbab0y9RfccfzC4yO1yVNCIOZvCgKU2m04eLHBwUV7CNjt/+i/tzGm9uc+dQpkoZrflVEa2wQTXZPwRXp/Ow==}
+  '@tsrx/solid@0.1.33':
+    resolution: {integrity: sha512-WUiThWy+p+Hw49suImkPbSCNGzLigAbdrTguHg1bUrm8bbhTgnruHA6zREhltZPVZ4FtVrvJZHLl03WokbIYlw==}
     peerDependencies:
       '@solidjs/web': 2.0.0-beta.14
       solid-js: 2.0.0-beta.14
 
-  '@tsrx/vite-plugin-react@0.0.64':
-    resolution: {integrity: sha512-Zw7PFGSzhd8w4gsFh3K2yngGzYSaE+PA8wdfPncZBOFCgp+IxZxyTT466b9i7cx0WZE0XGWuhMFTOP8fEyopoQ==}
+  '@tsrx/vite-plugin-react@0.0.65':
+    resolution: {integrity: sha512-YxcMXjv57eL2vYnbc2aoiUONhvbv54wPR3SP8daCI5WZuJfCr6KrDjqgFuGbH2yPZ6CSC5DzrK2NTtXMAAmsvw==}
     peerDependencies:
       vite: '*'
 
-  '@tsrx/vite-plugin-solid@0.0.62':
-    resolution: {integrity: sha512-ND2t0DQD5OAN1exFVL/9gQNAF+CJHP7f5czMGFcrrGyL5GGgFFxk93J0QiApu+uc+EwkLrVkQADltrL7TTNrWw==}
+  '@tsrx/vite-plugin-solid@0.0.63':
+    resolution: {integrity: sha512-BQZ+ftC0aQ8o5UrXDElnOk65UPEUIjDQ5blUdLwemmChAAk2hB0xSZVgphTVSWaDOgNfjxm1GeAeUdlZjrSAcQ==}
     peerDependencies:
       vite: '*'
 
@@ -967,58 +1039,65 @@ packages:
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260615.1':
-    resolution: {integrity: sha512-EHrtoVGEEhIhsnGe+b8w0FoM9JfIw5SkoPwO8ifaU0PrYm2UbyPbj2I2hOTxtk458t0irvGz2+8cshylBRbKng==}
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260616.1':
+    resolution: {integrity: sha512-9SwegwwE7fYutnZJjTi2PeUXhKGFg82MGjSpCFD2cj5v9YQcs5oO5QsmeeMit4fMG8Z83Jy8knOF97d9NaQ7Bg==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [darwin]
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260615.1':
-    resolution: {integrity: sha512-BcDA56hkk6mrUpysaOVvrdACoX5d2SF1JTwHMoNjT1KysBicExS2wlH0eN0L01iDeqtB73XHl7A4zrKFmKzrBg==}
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260616.1':
+    resolution: {integrity: sha512-gl7R8OiwEBNxzs5wjbM9XOibTs5b6/gAgu0+En9pLpYuWR/EITs8Eh0mNQui4JYTp1SkoHvn09aRZKTQf21XTg==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [darwin]
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260615.1':
-    resolution: {integrity: sha512-TDAlBpyYCF7Z+ELTH+1tabDE6W3shl+H+Z+nmzaQio1I8pFvbwt2iLlE0Rc9CpRdIeaqr0ppMEgXHoeV3fZFWA==}
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260616.1':
+    resolution: {integrity: sha512-CJjplWoE+EeYtbyNeP4fyuh0QcPiQBZJSLqPS07E3ugo3d9M/IG8WnL+3GFQ0g1p4c6QC/+OC0oTTQnGcNdd2Q==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [linux]
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260615.1':
-    resolution: {integrity: sha512-YRXRS/7ZqrDKXBJhFQcZiOdnHRuRbWoL/QkggpoGfhIuSAh4HvTU0WEUnPM+jRnH2kUMfsSgd8EAnPvmuP7/VA==}
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260616.1':
+    resolution: {integrity: sha512-QWXQS2CrhSpXbng7vBtCVDszFgwVBuJU8MCFhxZL0hH6s+XjQDSNNkGO1oHueBr+7HbSkkyqfNYVNXvgVMUJLQ==}
     engines: {node: '>=16.20.0'}
     cpu: [arm]
     os: [linux]
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260615.1':
-    resolution: {integrity: sha512-/QDmRWt6abB7fw3yMchjlyDXej/7Dr8mYG4wvGGf6c1hc5Il5UpDQWNHejatdeKvAu+sszz8JhTuL8et47fTTg==}
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260616.1':
+    resolution: {integrity: sha512-UVySBNnGTAnul2kO2/EhlVZl0CeTDcd6Lzi+WkvgyCgapTcU0BX1selQ4MEPtbVWKUbt9HBhxNku2dyaCcmKVw==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [linux]
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260615.1':
-    resolution: {integrity: sha512-WTJOLoe2rxT0W1i8ndWk2MKrakxRFNki537JZxvKAmSTbyOZznHlW3O3dbryUtTBYA716DDqS3ci24kuIfvBdg==}
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260616.1':
+    resolution: {integrity: sha512-kdX0QcDXiESH0o5DFdSWw15Hth0EtQobT9tX28ofqBUwGU1FFhwTKzA6qo7chaYUSW5MMd6XIME9rBwk+WizLw==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [win32]
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260615.1':
-    resolution: {integrity: sha512-4cSCpXG7um18nwmLdU/SjoTv3OcO38/ufTiy1oWVccgGHLJqppiOP9/o+ElKIWhvrp78IaGy8+h3YqEjQ4/pcQ==}
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260616.1':
+    resolution: {integrity: sha512-EB0Pj/0+nXifS3+wN0HdR1mKu7IieSpjMXoDjdXtJAdiPGlmKazBgHj97qn6CBvXisgLx0Eyb7tLCEQNDG53cA==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [win32]
 
-  '@typescript/native-preview@7.0.0-dev.20260615.1':
-    resolution: {integrity: sha512-JJ8X1l7H1GrnseK1k30qfQqB8Pz6jw3IALZVIj5oXQeRbUCe0Wx3ljkJEmOpunogdhEfA8IlOggskbUjVsXKBQ==}
+  '@typescript/native-preview@7.0.0-dev.20260616.1':
+    resolution: {integrity: sha512-+AuZUl7nkLPXL1rwsyZZF7iasu0HkrL5O6aWwUC0cObD5EvNgxz3hXbBhsSvuJ8tb2JRpVwFsE0BHPcYVe5GkA==}
     engines: {node: '>=16.20.0'}
     hasBin: true
 
-  '@vitejs/plugin-react@4.7.0':
-    resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
-    engines: {node: ^14.18.0 || >=16.0.0}
+  '@vitejs/plugin-react@6.0.3':
+    resolution: {integrity: sha512-vmFvco5/QuC2f9Oj+wTk0+9XeDFkHxSamwZKYc7MxYwKICfvUvlMhqKI0VuICPltGqh1neqBKDvO4kes1ya8vg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
-      vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
+      '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0
+      babel-plugin-react-compiler: ^1.0.0
+      vite: ^8.0.0
+    peerDependenciesMeta:
+      '@rolldown/plugin-babel':
+        optional: true
+      babel-plugin-react-compiler:
+        optional: true
 
   '@vitest/expect@4.1.9':
     resolution: {integrity: sha512-vl/rYsUKcBr3SnQn166+XR5ZQcgMx3DQhFWdfli/cWpLnLUmbxZvyrJZotLFUryib+LtArYMSTJ5RbQ57ZqrlA==}
@@ -1209,8 +1288,8 @@ packages:
   es-module-lexer@2.1.0:
     resolution: {integrity: sha512-n27zTYMjYu1aj4MjCWzSP7G9r75utsaoc8m61weK+W8JMBGGQybd43GstCXZ3WNmSFtGT9wi59qQTW6mhTR5LQ==}
 
-  esbuild@0.27.7:
-    resolution: {integrity: sha512-IxpibTjyVnmrIQo5aqNpCgoACA/dTKLTlhMHihVHhdkxKyPO1uBBthumT0rdHmcsk9uMonIWS0m4FljWzILh3w==}
+  esbuild@0.28.1:
+    resolution: {integrity: sha512-HrJrvZv5ayxBzPfwphOoNzkzOIIlifzk0KJrGK2c8R4+LKpMtpYLQeUdjnwjWv/LZlkH2laZk+4w78pi99D4Vw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1301,8 +1380,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  happy-dom@20.10.4:
-    resolution: {integrity: sha512-bKrsQnFNpcjZG0UPsH7UMN7Oyp3AB42LXk2GuiQmu7l4QFxH7lsw5T1eWEtE2+vbIFrTC45sbNSB2pkB8MTfKA==}
+  happy-dom@20.10.6:
+    resolution: {integrity: sha512-6QD0ilzDDt93tX44y8tbmZdAcdTRYDhUP+Asgi6pC8Pp5IA3cvaZGyoVN/EGtlq9ziT65iPuBBn3ASLr6hCgVw==}
     engines: {node: '>=20.0.0'}
 
   html-encoding-sniffer@6.0.0:
@@ -1626,10 +1705,6 @@ packages:
     peerDependencies:
       react: ^19.2.7
 
-  react-refresh@0.17.0:
-    resolution: {integrity: sha512-z6F7K9bV85EfseRCp2bzrpyQ0Gkw1uLoCel9XBVWPg/TjRj94SkJzUTGfOa4bs7iJvBWtQG0Wq7wnI0syw3EBQ==}
-    engines: {node: '>=0.10.0'}
-
   react@19.2.7:
     resolution: {integrity: sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ==}
     engines: {node: '>=0.10.0'}
@@ -1650,8 +1725,8 @@ packages:
     resolution: {integrity: sha512-g6QUff04oZpHs0eG5p83rFLhHeV00ug/Yf9nZM6fLeUrPguBTkTQOdpAWWspMh55TZfVQDPaN3NQJfbVRAxdIw==}
     engines: {iojs: '>=1.0.0', node: '>=0.10.0'}
 
-  ripple@0.3.84:
-    resolution: {integrity: sha512-1Og1pNcDnkwCfK479LBvr5Qy86rrfOys5692HfVe3OjuTGjt/ANt+SnnPA7QtYvmu11djfW14z0aGTosmm4CSg==}
+  ripple@0.3.85:
+    resolution: {integrity: sha512-vnWvvzQg4OozEXzz6ntxeS6mGVSSzsG/VRUC9OPM/zzYb0LdiE+JOtdbcx6rqePgVgdMMi1d/hV9L5t5CtU6nQ==}
 
   rolldown@1.0.3:
     resolution: {integrity: sha512-i00lAJ2ks1BYr7rjNjKC7BcqAS7nVfiT3QX1SI5aY+AFHblCmaUf9OE9dbdzDvW6dJxbi2ZCZiy9v3CcwOiX3g==}
@@ -2107,16 +2182,6 @@ snapshots:
       '@babel/core': 7.29.7
       '@babel/helper-plugin-utils': 7.29.7
 
-  '@babel/plugin-transform-react-jsx-self@7.29.7(@babel/core@7.29.7)':
-    dependencies:
-      '@babel/core': 7.29.7
-      '@babel/helper-plugin-utils': 7.29.7
-
-  '@babel/plugin-transform-react-jsx-source@7.29.7(@babel/core@7.29.7)':
-    dependencies:
-      '@babel/core': 7.29.7
-      '@babel/helper-plugin-utils': 7.29.7
-
   '@babel/runtime@7.29.7': {}
 
   '@babel/template@7.29.7':
@@ -2344,82 +2409,82 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@esbuild/aix-ppc64@0.27.7':
+  '@esbuild/aix-ppc64@0.28.1':
     optional: true
 
-  '@esbuild/android-arm64@0.27.7':
+  '@esbuild/android-arm64@0.28.1':
     optional: true
 
-  '@esbuild/android-arm@0.27.7':
+  '@esbuild/android-arm@0.28.1':
     optional: true
 
-  '@esbuild/android-x64@0.27.7':
+  '@esbuild/android-x64@0.28.1':
     optional: true
 
-  '@esbuild/darwin-arm64@0.27.7':
+  '@esbuild/darwin-arm64@0.28.1':
     optional: true
 
-  '@esbuild/darwin-x64@0.27.7':
+  '@esbuild/darwin-x64@0.28.1':
     optional: true
 
-  '@esbuild/freebsd-arm64@0.27.7':
+  '@esbuild/freebsd-arm64@0.28.1':
     optional: true
 
-  '@esbuild/freebsd-x64@0.27.7':
+  '@esbuild/freebsd-x64@0.28.1':
     optional: true
 
-  '@esbuild/linux-arm64@0.27.7':
+  '@esbuild/linux-arm64@0.28.1':
     optional: true
 
-  '@esbuild/linux-arm@0.27.7':
+  '@esbuild/linux-arm@0.28.1':
     optional: true
 
-  '@esbuild/linux-ia32@0.27.7':
+  '@esbuild/linux-ia32@0.28.1':
     optional: true
 
-  '@esbuild/linux-loong64@0.27.7':
+  '@esbuild/linux-loong64@0.28.1':
     optional: true
 
-  '@esbuild/linux-mips64el@0.27.7':
+  '@esbuild/linux-mips64el@0.28.1':
     optional: true
 
-  '@esbuild/linux-ppc64@0.27.7':
+  '@esbuild/linux-ppc64@0.28.1':
     optional: true
 
-  '@esbuild/linux-riscv64@0.27.7':
+  '@esbuild/linux-riscv64@0.28.1':
     optional: true
 
-  '@esbuild/linux-s390x@0.27.7':
+  '@esbuild/linux-s390x@0.28.1':
     optional: true
 
-  '@esbuild/linux-x64@0.27.7':
+  '@esbuild/linux-x64@0.28.1':
     optional: true
 
-  '@esbuild/netbsd-arm64@0.27.7':
+  '@esbuild/netbsd-arm64@0.28.1':
     optional: true
 
-  '@esbuild/netbsd-x64@0.27.7':
+  '@esbuild/netbsd-x64@0.28.1':
     optional: true
 
-  '@esbuild/openbsd-arm64@0.27.7':
+  '@esbuild/openbsd-arm64@0.28.1':
     optional: true
 
-  '@esbuild/openbsd-x64@0.27.7':
+  '@esbuild/openbsd-x64@0.28.1':
     optional: true
 
-  '@esbuild/openharmony-arm64@0.27.7':
+  '@esbuild/openharmony-arm64@0.28.1':
     optional: true
 
-  '@esbuild/sunos-x64@0.27.7':
+  '@esbuild/sunos-x64@0.28.1':
     optional: true
 
-  '@esbuild/win32-arm64@0.27.7':
+  '@esbuild/win32-arm64@0.28.1':
     optional: true
 
-  '@esbuild/win32-ia32@0.27.7':
+  '@esbuild/win32-ia32@0.28.1':
     optional: true
 
-  '@esbuild/win32-x64@0.27.7':
+  '@esbuild/win32-x64@0.28.1':
     optional: true
 
   '@exodus/bytes@1.15.1(@noble/hashes@2.2.0)':
@@ -2496,12 +2561,12 @@ snapshots:
 
   '@oxc-project/types@0.133.0': {}
 
-  '@ripple-ts/adapter@0.3.84': {}
+  '@ripple-ts/adapter@0.3.85': {}
 
-  '@ripple-ts/vite-plugin@0.3.84':
+  '@ripple-ts/vite-plugin@0.3.85':
     dependencies:
-      '@ripple-ts/adapter': 0.3.84
-      '@tsrx/ripple': 0.1.32
+      '@ripple-ts/adapter': 0.3.85
+      '@tsrx/ripple': 0.1.33
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
@@ -2554,8 +2619,6 @@ snapshots:
   '@rolldown/binding-win32-x64-msvc@1.0.3':
     optional: true
 
-  '@rolldown/pluginutils@1.0.0-beta.27': {}
-
   '@rolldown/pluginutils@1.0.1': {}
 
   '@solidjs/signals@2.0.0-beta.14': {}
@@ -2572,7 +2635,7 @@ snapshots:
     dependencies:
       acorn: 8.17.0
 
-  '@tsrx/core@0.1.29':
+  '@tsrx/core@0.1.33':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
@@ -2587,68 +2650,53 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/core@0.1.32':
+  '@tsrx/prettier-plugin@0.3.85(prettier@3.8.4)':
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
-      '@noble/hashes': 2.2.0
-      '@sveltejs/acorn-typescript': 1.0.10(acorn@8.17.0)
-      '@types/estree': 1.0.9
-      '@types/estree-jsx': 1.0.5
-      acorn: 8.17.0
-      esrap: 2.2.11
-      is-reference: 3.0.3
-      magic-string: 0.30.21
-      zimmerframe: 1.1.4
-    transitivePeerDependencies:
-      - '@typescript-eslint/types'
-
-  '@tsrx/prettier-plugin@0.3.84(prettier@3.8.4)':
-    dependencies:
-      '@tsrx/core': 0.1.32
+      '@tsrx/core': 0.1.33
       prettier: 3.8.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/react@0.2.32(react@19.2.7)':
+  '@tsrx/react@0.2.33(react@19.2.7)':
     dependencies:
-      '@tsrx/core': 0.1.32
+      '@tsrx/core': 0.1.33
       esrap: 2.2.11
       react: 19.2.7
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/ripple@0.1.32':
+  '@tsrx/ripple@0.1.33':
     dependencies:
-      '@tsrx/core': 0.1.32
+      '@tsrx/core': 0.1.33
       esrap: 2.2.11
       is-reference: 3.0.3
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/solid@0.1.32(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)':
+  '@tsrx/solid@0.1.33(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)':
     dependencies:
       '@solidjs/web': 2.0.0-beta.14(solid-js@2.0.0-beta.14)
-      '@tsrx/core': 0.1.32
+      '@tsrx/core': 0.1.33
       esrap: 2.2.11
       solid-js: 2.0.0-beta.14
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/vite-plugin-react@0.0.64(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))':
+  '@tsrx/vite-plugin-react@0.0.65(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))':
     dependencies:
-      '@tsrx/react': 0.2.32(react@19.2.7)
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+      '@tsrx/react': 0.2.33(react@19.2.7)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
     transitivePeerDependencies:
       - '@typescript-eslint/types'
       - react
 
-  '@tsrx/vite-plugin-solid@0.0.62(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))':
+  '@tsrx/vite-plugin-solid@0.0.63(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))':
     dependencies:
-      '@tsrx/solid': 0.1.32(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+      '@tsrx/solid': 0.1.33(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
     transitivePeerDependencies:
       - '@solidjs/web'
       - '@typescript-eslint/types'
@@ -2705,48 +2753,41 @@ snapshots:
     dependencies:
       '@types/node': 24.13.2
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260615.1':
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260616.1':
     optional: true
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260615.1':
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260616.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260615.1':
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260616.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260615.1':
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260616.1':
     optional: true
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260615.1':
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260616.1':
     optional: true
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260615.1':
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260616.1':
     optional: true
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260615.1':
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260616.1':
     optional: true
 
-  '@typescript/native-preview@7.0.0-dev.20260615.1':
+  '@typescript/native-preview@7.0.0-dev.20260616.1':
     optionalDependencies:
-      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260615.1
-      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260615.1
-      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260615.1
-      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260615.1
-      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260615.1
-      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260615.1
-      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260615.1
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260616.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260616.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260616.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260616.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260616.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260616.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260616.1
 
-  '@vitejs/plugin-react@4.7.0(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))':
+  '@vitejs/plugin-react@6.0.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))':
     dependencies:
-      '@babel/core': 7.29.7
-      '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.7)
-      '@babel/plugin-transform-react-jsx-source': 7.29.7(@babel/core@7.29.7)
-      '@rolldown/pluginutils': 1.0.0-beta.27
-      '@types/babel__core': 7.20.5
-      react-refresh: 0.17.0
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
-    transitivePeerDependencies:
-      - supports-color
+      '@rolldown/pluginutils': 1.0.1
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   '@vitest/expect@4.1.9':
     dependencies:
@@ -2757,13 +2798,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.9(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))':
+  '@vitest/mocker@4.1.9(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))':
     dependencies:
       '@vitest/spy': 4.1.9
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   '@vitest/pretty-format@4.1.9':
     dependencies:
@@ -2917,34 +2958,34 @@ snapshots:
 
   es-module-lexer@2.1.0: {}
 
-  esbuild@0.27.7:
+  esbuild@0.28.1:
     optionalDependencies:
-      '@esbuild/aix-ppc64': 0.27.7
-      '@esbuild/android-arm': 0.27.7
-      '@esbuild/android-arm64': 0.27.7
-      '@esbuild/android-x64': 0.27.7
-      '@esbuild/darwin-arm64': 0.27.7
-      '@esbuild/darwin-x64': 0.27.7
-      '@esbuild/freebsd-arm64': 0.27.7
-      '@esbuild/freebsd-x64': 0.27.7
-      '@esbuild/linux-arm': 0.27.7
-      '@esbuild/linux-arm64': 0.27.7
-      '@esbuild/linux-ia32': 0.27.7
-      '@esbuild/linux-loong64': 0.27.7
-      '@esbuild/linux-mips64el': 0.27.7
-      '@esbuild/linux-ppc64': 0.27.7
-      '@esbuild/linux-riscv64': 0.27.7
-      '@esbuild/linux-s390x': 0.27.7
-      '@esbuild/linux-x64': 0.27.7
-      '@esbuild/netbsd-arm64': 0.27.7
-      '@esbuild/netbsd-x64': 0.27.7
-      '@esbuild/openbsd-arm64': 0.27.7
-      '@esbuild/openbsd-x64': 0.27.7
-      '@esbuild/openharmony-arm64': 0.27.7
-      '@esbuild/sunos-x64': 0.27.7
-      '@esbuild/win32-arm64': 0.27.7
-      '@esbuild/win32-ia32': 0.27.7
-      '@esbuild/win32-x64': 0.27.7
+      '@esbuild/aix-ppc64': 0.28.1
+      '@esbuild/android-arm': 0.28.1
+      '@esbuild/android-arm64': 0.28.1
+      '@esbuild/android-x64': 0.28.1
+      '@esbuild/darwin-arm64': 0.28.1
+      '@esbuild/darwin-x64': 0.28.1
+      '@esbuild/freebsd-arm64': 0.28.1
+      '@esbuild/freebsd-x64': 0.28.1
+      '@esbuild/linux-arm': 0.28.1
+      '@esbuild/linux-arm64': 0.28.1
+      '@esbuild/linux-ia32': 0.28.1
+      '@esbuild/linux-loong64': 0.28.1
+      '@esbuild/linux-mips64el': 0.28.1
+      '@esbuild/linux-ppc64': 0.28.1
+      '@esbuild/linux-riscv64': 0.28.1
+      '@esbuild/linux-s390x': 0.28.1
+      '@esbuild/linux-x64': 0.28.1
+      '@esbuild/netbsd-arm64': 0.28.1
+      '@esbuild/netbsd-x64': 0.28.1
+      '@esbuild/openbsd-arm64': 0.28.1
+      '@esbuild/openbsd-x64': 0.28.1
+      '@esbuild/openharmony-arm64': 0.28.1
+      '@esbuild/sunos-x64': 0.28.1
+      '@esbuild/win32-arm64': 0.28.1
+      '@esbuild/win32-ia32': 0.28.1
+      '@esbuild/win32-x64': 0.28.1
 
   escalade@3.2.0: {}
 
@@ -3024,7 +3065,7 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  happy-dom@20.10.4:
+  happy-dom@20.10.6:
     dependencies:
       '@types/node': 24.13.2
       '@types/whatwg-mimetype': 3.0.2
@@ -3289,8 +3330,6 @@ snapshots:
       react: 19.2.7
       scheduler: 0.27.0
 
-  react-refresh@0.17.0: {}
-
   react@19.2.7: {}
 
   read-yaml-file@1.1.0:
@@ -3306,10 +3345,10 @@ snapshots:
 
   reusify@1.1.0: {}
 
-  ripple@0.3.84:
+  ripple@0.3.85:
     dependencies:
-      '@tsrx/core': 0.1.32
-      '@tsrx/ripple': 0.1.32
+      '@tsrx/core': 0.1.33
+      '@tsrx/ripple': 0.1.33
       clsx: 2.1.1
       devalue: 5.8.1
       esm-env: 1.2.2
@@ -3477,7 +3516,7 @@ snapshots:
 
   validate-html-nesting@1.2.4: {}
 
-  vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)):
+  vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)):
     dependencies:
       '@babel/core': 7.29.7
       '@solidjs/web': 2.0.0-beta.14(solid-js@2.0.0-beta.14)
@@ -3486,12 +3525,12 @@ snapshots:
       merge-anything: 5.1.7
       solid-js: 2.0.0-beta.14
       solid-refresh: 0.8.0-next.7(solid-js@2.0.0-beta.14)
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
-      vitefu: 1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+      vitefu: 1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
     transitivePeerDependencies:
       - supports-color
 
-  vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0):
+  vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
@@ -3500,18 +3539,18 @@ snapshots:
       tinyglobby: 0.2.17
     optionalDependencies:
       '@types/node': 24.13.2
-      esbuild: 0.27.7
+      esbuild: 0.28.1
       fsevents: 2.3.3
       terser: 5.48.0
 
-  vitefu@1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)):
+  vitefu@1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)):
     optionalDependencies:
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
-  vitest@4.1.9(@types/node@24.13.2)(happy-dom@20.10.4)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)):
+  vitest@4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)):
     dependencies:
       '@vitest/expect': 4.1.9
-      '@vitest/mocker': 4.1.9(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0))
+      '@vitest/mocker': 4.1.9(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
       '@vitest/pretty-format': 4.1.9
       '@vitest/runner': 4.1.9
       '@vitest/snapshot': 4.1.9
@@ -3528,11 +3567,11 @@ snapshots:
       tinyexec: 1.2.4
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(terser@5.48.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 24.13.2
-      happy-dom: 20.10.4
+      happy-dom: 20.10.6
       jsdom: 29.1.1(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - msw

@@ -34,12 +34,12 @@
     }
   },
   "dependencies": {
-    "@ripple-ts/adapter": "^0.3.84",
+    "@ripple-ts/adapter": "catalog:default",
     "vyre": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0",
-    "type-fest": "^5.6.0",
-    "vite": "^8.0.12"
+    "@types/node": "catalog:default",
+    "type-fest": "catalog:default",
+    "vite": "catalog:default"
   }
 }

@@ -11,6 +11,6 @@
     "vyre": "workspace:*"
   },
   "devDependencies": {
-    "vite": "^8.0.12"
+    "vite": "catalog:default"
   }
 }

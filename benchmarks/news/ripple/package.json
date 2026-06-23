@@ -8,10 +8,10 @@
     "dev": "vite --host --port 5194 --strictPort"
   },
   "dependencies": {
-    "ripple": "^0.3.84"
+    "ripple": "catalog:default"
   },
   "devDependencies": {
-    "@tsrx/ripple": "^0.1.32",
-    "vite": "^8.0.12"
+    "@tsrx/ripple": "catalog:default",
+    "vite": "catalog:default"
   }
 }

@@ -10,11 +10,11 @@
     "preview": "vite preview --port 5186 --strictPort"
   },
   "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react": "catalog:default",
+    "react-dom": "catalog:default"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^8.0.12"
+    "@vitejs/plugin-react": "catalog:default",
+    "vite": "catalog:default"
   }
 }

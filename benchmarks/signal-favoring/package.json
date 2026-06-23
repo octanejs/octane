@@ -9,6 +9,6 @@
     "bench:long": "node run.mjs 40"
   },
   "dependencies": {
-    "playwright": "^1.49.0"
+    "playwright": "catalog:default"
   }
 }

@@ -36,15 +36,15 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@tsrx/core": "0.1.29",
-    "esrap": "^2.2.9"
+    "@tsrx/core": "catalog:default",
+    "esrap": "catalog:default"
   },
   "devDependencies": {
-    "@tsrx/react": "^0.2.32",
-    "esbuild": "^0.27.7",
-    "happy-dom": "^20.9.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "vitest": "^4.1.6"
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "happy-dom": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
   }
 }

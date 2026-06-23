@@ -18,7 +18,7 @@
     "vyre": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
-    "vite": "^8.0.12"
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
   }
 }
