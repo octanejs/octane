@@ -42,7 +42,7 @@ catalogs:
     '@tsrx/prettier-plugin': ^0.3.85
     '@tsrx/ripple': ^0.1.33
     '@tsrx/react': ^0.2.33
-    '@tsrx/solid': ^0.1.33
+    '@tsrx/solid': ^0.1.32
     '@tsrx/vite-plugin-react': ^0.0.65
     '@tsrx/vite-plugin-solid': ^0.0.63
     '@types/node': ^24.3.0
