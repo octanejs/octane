@@ -66,3 +66,4 @@ catalogs:
     vite: ^8.0.16
     vite-plugin-solid: '3.0.0-next.5'
     vitest: ^4.1.9
+    zustand: ^5.0.0

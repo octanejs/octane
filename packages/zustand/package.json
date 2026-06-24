@@ -1,0 +1,40 @@
+{
+  "name": "@octane-ts/zustand",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "zustand bindings for the octane renderer — reuses zustand's framework-agnostic vanilla store and swaps the React binding for octane's useSyncExternalStore.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octane-ts/octane.git",
+    "directory": "packages/zustand"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./vanilla": "./src/vanilla.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "octane-ts": "workspace:*",
+    "zustand": "catalog:default"
+  },
+  "devDependencies": {
+    "vitest": "catalog:default"
+  }
+}
