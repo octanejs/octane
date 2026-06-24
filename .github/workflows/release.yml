@@ -1,4 +1,4 @@
-name: Release
+name: Release PR
 
 on:
   push:
@@ -11,12 +11,13 @@ concurrency:
 permissions: {}
 
 jobs:
-  release:
+  release-pr:
     if: github.repository == 'octane-ts/octane'
     permissions:
       contents: write
+      issues: read
       pull-requests: write
-    name: Release
+    name: Release PR
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
@@ -32,20 +33,20 @@ jobs:
         with:
           node-version: 24.x
           cache: pnpm
-          registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Create release pull request or publish
+      - name: Disallow major and minor bumps in changesets
+        run: pnpm changeset:check
+
+      - name: Create or update release pull request
         id: changesets
         uses: changesets/action@v1
         with:
+          github-token: ${{ github.token }}
           version: pnpm changeset:version
-          publish: pnpm changeset:publish
           commit: Version Packages
           title: Version Packages
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
