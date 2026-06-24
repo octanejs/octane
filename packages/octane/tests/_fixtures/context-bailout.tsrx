@@ -128,3 +128,38 @@ export function AppSiblings(props) @{
 		</Ctx.Provider>
 	</div>
 }
+
+// ---------------------------------------------------------------------------
+// Case D — a context change must descend through @for and @if branches that sit
+// under a BAILED-OUT memo boundary, not just direct componentSlot children. The
+// memo'd ListWrapper bails on stable props; the refresh has to walk its for-loop
+// item blocks AND its @if branch block to reach the consumers inside.
+// ---------------------------------------------------------------------------
+function RowImpl(props) @{
+	const value = use(Ctx);
+	log('Row:' + props.id);
+	<li class={('row-' + props.id) as string}>{value as string}</li>
+}
+const Row = memo(RowImpl);
+
+function ListWrapperImpl(props) @{
+	log('ListWrapper');
+	<ul>
+		@for (const id of props.ids; key id) {
+			<Row id={id} />
+		}
+		@if (props.showExtra) {
+			<li class="extra">{use(Ctx) as string}</li>
+		}
+	</ul>
+}
+const ListWrapper = memo(ListWrapperImpl);
+
+export function AppList(props) @{
+	log('App');
+	<div id="app-list">
+		<Ctx.Provider value={props.value}>
+			<ListWrapper ids={props.ids} showExtra={true} />
+		</Ctx.Provider>
+	</div>
+}

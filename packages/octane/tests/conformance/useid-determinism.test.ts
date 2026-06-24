@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane-ts/compiler';
 import * as RT from '../../src/server/index.js';
+import { hydrate } from '../../src/index.js';
 import { mount } from '../_helpers';
 import { Single, Triple, Wrapper } from '../_fixtures/useid-determinism.tsrx';
 
@@ -103,34 +104,32 @@ describe('useId determinism', () => {
 
 	// Per ReactDOMUseId-test.js:127/140-146 — the WHOLE point of useId is that the
 	// id produced on the server matches the id produced on the client so the two
-	// trees hydrate without mismatch. We render the SAME fixture on the server via
-	// render(), capture the id from the server HTML, then mount the same component
-	// on the client and capture its id; the two must be byte-for-byte equal.
+	// trees hydrate without mismatch. We server-render Single, place its HTML in a
+	// container, then hydrate the SAME component and capture the id the CLIENT
+	// actually computed during the hydration render (via the fixture's onId
+	// callback — reading the adopted attribute alone would just echo the server's
+	// id and prove nothing). The two must be byte-for-byte equal.
 	//
-	// GAP — ReactDOMUseId-test.js:127 (server/client id agreement). Octane's
-	// server useId (runtime.server.ts:333, counter reset to 0 every render()) and
-	// client useId (runtime.ts:1674, monotonic module-global _idCounter that is
-	// never reset) use INDEPENDENT counters. The server id is always ':in-0:' for
-	// the first useId of a render, but the client counter has already been
-	// advanced by the mounts above, so the client id is some later ':in-N:' and
-	// the two do not agree. Root cause: no shared/seeded id namespace between the
-	// server render pass and the client hydrate pass (React threads a tree-path
-	// based id prefix from Fizz into Fiber; Octane has no such handoff).
-	it.fails('server-rendered useId matches client-mounted useId (byte-for-byte)', async () => {
-		// Warm the client's monotonic id counter FIRST so this test is
-		// self-contained — it must not depend on prior tests in the file having
-		// advanced the counter. The divergence is precisely that the client
-		// counter is never reset to align with the server's per-render reset, so
-		// once any useId has been minted on the client the ids can no longer agree.
+	// Fixed in runtime.ts hydrate(): the client `_idCounter` is reset to 0 at the
+	// start of hydration so it lines up with the server's per-render reset.
+	it('server useId is preserved byte-for-byte after hydrate()', async () => {
+		// Warm the client's monotonic id counter FIRST so the test is self-contained
+		// and actually exercises the fix: a hydrate that did NOT reset the counter
+		// would mint a non-zero id here and mismatch the server's ':in-0:'.
 		const warm = mount(Triple);
 		warm.unmount();
 
 		const out = await RT.render(serverMod.Single);
 		const serverId = out.body.match(/data-testid="([^"]+)"/)?.[1];
 
-		const r = mount(Single);
-		const clientId = r.find('#single').getAttribute('data-testid');
-		r.unmount();
+		const container = document.createElement('div');
+		container.innerHTML = out.body;
+		document.body.appendChild(container);
+
+		let clientId: string | undefined;
+		const h = hydrate(Single, container, { onId: (id: string) => (clientId = id) });
+		h.unmount();
+		container.remove();
 
 		expect(serverId).toBeTruthy();
 		expect(clientId).toBe(serverId);
