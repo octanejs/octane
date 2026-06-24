@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
 import {
 	DynamicProvider,
+	CombinedDynamic,
+	BareReader,
+	RemountingProvider,
 	Siblings,
 	TwoContexts,
 	ConditionalUse,
@@ -34,6 +37,54 @@ describe('context — multiple consumers', () => {
 		expect(r.find('.theme').textContent).toBe('dark');
 		expect(r.find('.user').textContent).toBe('alice');
 		expect(r.find('.combined').textContent).toBe('dark/alice');
+		r.unmount();
+	});
+
+	it('a consumer of two contexts reads both live after a re-render', () => {
+		// Multi-entry resolved-provider cache: re-rendering with one Provider
+		// changed must yield the new value for that context AND the unchanged
+		// value for the other.
+		const r = mount(CombinedDynamic);
+		expect(r.find('.combined').textContent).toBe('t0/alice');
+		r.click('#bump');
+		expect(r.find('.combined').textContent).toBe('t1/alice');
+		r.click('#bump');
+		expect(r.find('.combined').textContent).toBe('t0/alice');
+		r.unmount();
+	});
+});
+
+describe('context — provider remount', () => {
+	it('a consumer reads the fresh value when its Provider is torn down and rebuilt', () => {
+		// The Provider's scope is destroyed on `show: false` and a brand-new one
+		// (with a different value) is built on the next `show: true`. The consumer
+		// must read the current value each time — never one cached from a prior
+		// mount. Guards the invariant the cache relies on after dropping its
+		// defensive resolver recheck.
+		const r = mount(RemountingProvider, { show: true, value: 1 });
+		expect(r.find('.count').textContent).toBe('1');
+		r.update(RemountingProvider, { show: false, value: 1 });
+		expect(r.find('.off').textContent).toBe('off');
+		r.update(RemountingProvider, { show: true, value: 2 });
+		expect(r.find('.count').textContent).toBe('2');
+		r.update(RemountingProvider, { show: false, value: 2 });
+		r.update(RemountingProvider, { show: true, value: 3 });
+		expect(r.find('.count').textContent).toBe('3');
+		r.unmount();
+	});
+});
+
+describe('context — no Provider (default)', () => {
+	it('a provider-less consumer keeps reading the default across re-renders', () => {
+		// Exercises the resolved-provider cache's "cached default" path: the first
+		// read records "no provider", and re-renders must keep returning the
+		// context default rather than a stale or wrong value.
+		const r = mount(BareReader, { tick: 0 });
+		expect(r.find('.bare').textContent).toBe('0:0');
+		r.update(BareReader, { tick: 1 });
+		expect(r.find('.bare').textContent).toBe('0:1');
+		r.update(BareReader, { tick: 2 });
+		expect(r.find('.bare').textContent).toBe('0:2');
 		r.unmount();
 	});
 });
