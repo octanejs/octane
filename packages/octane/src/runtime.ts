@@ -64,6 +64,18 @@ export interface Scope {
 	 * ancestor.
 	 */
 	$$ctxValues: Map<Context<any>, any> | null;
+	/**
+	 * Resolved-provider cache for `use(ctx)`. Maps a context to the ancestor
+	 * scope/block whose `$$ctxValues` satisfies it for THIS consumer (or the
+	 * DEFAULT_CTX sentinel when none does). The mapping is invariant across a
+	 * consumer's lifetime — parent chains are fixed at creation, a provider scope
+	 * never drops a context it stamped, and a closer provider can't appear above a
+	 * surviving consumer — so only the provider's VALUE varies, read live from the
+	 * cached scope. Collapses useContextInternal's O(depth) walk to an O(1) read.
+	 * Lazily minted on a consumer's first `use()`, so non-consumer blocks (the
+	 * vast majority) carry just this one null field, not a per-context slot set.
+	 */
+	$$ctxCache: Map<Context<any>, any> | null;
 	// Bindings (b$0, b$1, ...) are stamped directly on the scope by compiled bodies.
 	[key: string]: any;
 }
@@ -341,6 +353,9 @@ function flush(): void {
 	let pendingError: { err: any } | null = null;
 	while (QUEUE.length) {
 		const block = QUEUE.shift()!;
+		// Skip if an ancestor's cascade already re-rendered this block this flush
+		// (renderBlock cleared its `pending`) — avoids a redundant standalone render.
+		if (!block.pending) continue;
 		block.pending = false;
 		if (!block.disposed) {
 			try {
@@ -377,6 +392,8 @@ export function flushSync<T>(fn: () => T): T {
 		let pendingError: { err: any } | null = null;
 		while (QUEUE.length) {
 			const block = QUEUE.shift()!;
+			// See flush(): skip a block an ancestor's cascade already re-rendered.
+			if (!block.pending) continue;
 			block.pending = false;
 			if (!block.disposed) {
 				try {
@@ -679,6 +696,8 @@ class BlockImpl {
 	// version here means THIS block must re-run; if only $$ctxReads changed, the
 	// block can bail its body and refresh just its consuming child blocks.
 	$$ctxDirect: Map<Context<any>, any> | null;
+	// Resolved-provider cache for `use(ctx)` — see Scope.$$ctxCache.
+	$$ctxCache: Map<Context<any>, any> | null;
 	// __thenableIdx is reset every renderBlock so pre-init costs nothing.
 	__thenableIdx: number;
 	// For-block item bookkeeping.
@@ -732,6 +751,7 @@ class BlockImpl {
 		this.$$ctxValues = null;
 		this.$$ctxReads = null;
 		this.$$ctxDirect = null;
+		this.$$ctxCache = null;
 		this.__thenableIdx = 0;
 		this.forSlot = null;
 		this.prevSibling = null;
@@ -763,6 +783,7 @@ class ScopeImpl {
 	_slots: any[] | null;
 	$$ctxValues: Map<Context<any>, any> | null;
 	$$ctxReads: Map<Context<any>, any> | null;
+	$$ctxCache: Map<Context<any>, any> | null;
 	mounted: boolean;
 	// Compiled bodies stamp bindings (b$0, b$1, ...) directly on the scope.
 	[key: string]: any;
@@ -776,6 +797,7 @@ class ScopeImpl {
 		this._slots = null;
 		this.$$ctxValues = null;
 		this.$$ctxReads = null;
+		this.$$ctxCache = null;
 		this.mounted = false;
 	}
 }
@@ -807,6 +829,12 @@ export function renderBlock(block: Block): void {
 	const prevBlock = CURRENT_BLOCK;
 	CURRENT_SCOPE = block;
 	CURRENT_BLOCK = block;
+	// Cascade coalescing: clear the queued flag now. A block dequeued by flush()
+	// gets re-rendered here; a block reached as a descendant of some OTHER queued
+	// block's cascade is also brought up to date here, so flush() can skip its
+	// redundant standalone render (it checks `pending` before rendering). Cleared
+	// at the TOP so a re-entrant setState during this render re-queues correctly.
+	block.pending = false;
 	// Reset the per-render `use(thenable)` call-order counter. Cached entries
 	// in __thenables persist so that earlier use() calls return synchronously
 	// on replay-after-resolve (matches React's thenableState[index] scheme).
@@ -1574,6 +1602,11 @@ export function useContext<T>(context: Context<T>): T {
 	return useContextInternal(context);
 }
 
+// Sentinel cached in a consumer's resolved-provider slots to mean "no provider —
+// use the context's default". Distinct from `undefined` (a cache miss) so a
+// resolved default is an O(1) hit rather than a re-walk to the root every read.
+const DEFAULT_CTX: unique symbol = Symbol('octane.ctx.default');
+
 function useContextInternal<T>(context: Context<T>): T {
 	// Record the context dependency on every enclosing memo() block, with the
 	// version read. The push-cascade re-renders a Provider's subtree top-down;
@@ -1599,18 +1632,46 @@ function useContextInternal<T>(context: Context<T>): T {
 			}
 		}
 	}
-	let s: Scope | null = CURRENT_SCOPE;
+	// Fast path: a prior read from this consumer already resolved the provider.
+	// The (consumer → provider) mapping is invariant for the consumer's lifetime
+	// (see Scope.$$ctxCache), so re-read the live value straight from the cached
+	// scope and skip the ancestor walk entirely.
+	const reader = CURRENT_SCOPE;
+	if (reader !== null && reader.$$ctxCache !== null) {
+		const hit = reader.$$ctxCache.get(context);
+		if (hit !== undefined) {
+			if (hit === DEFAULT_CTX) return context.defaultValue;
+			// The cached resolver is always a live ancestor (resolution walks up;
+			// you can't unmount an ancestor while a descendant renders) and a
+			// provider scope's $$ctxValues retains its context for life (ProviderBody
+			// only `.set`s — never deletes or re-nulls). So the map and key are
+			// guaranteed present; read the live value with no recheck. A structural
+			// change that could move a consumer's provider also re-mounts the
+			// consumer (fresh cache), so a stale resolver can't be observed — see the
+			// "provider remounts under a consumer" regression test.
+			return (hit as Scope).$$ctxValues!.get(context) as T;
+		}
+	}
+
+	let s: Scope | null = reader;
 	while (s !== null) {
 		const m = s.$$ctxValues;
-		if (m !== null && m.has(context)) return m.get(context) as T;
+		if (m !== null && m.has(context)) {
+			if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, s);
+			return m.get(context) as T;
+		}
 		s = s.parent;
 	}
 	let b: Block | null = CURRENT_BLOCK ? CURRENT_BLOCK.parentBlock : null;
 	while (b !== null) {
 		const m = b.$$ctxValues;
-		if (m !== null && m.has(context)) return m.get(context) as T;
+		if (m !== null && m.has(context)) {
+			if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, b);
+			return m.get(context) as T;
+		}
 		b = b.parentBlock;
 	}
+	if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, DEFAULT_CTX);
 	return context.defaultValue;
 }
 
@@ -1887,9 +1948,15 @@ export function sibling(node: Node, n: number = 1): Node | null {
 // ---------------------------------------------------------------------------
 
 export function setText(node: Text, value: any): void {
-	const next =
+	// Unconditional write: the compiler's only emission site guards every call
+	// with `if (_b._prev$ !== _v)`, and `_prev` mirrors the node's current text
+	// (seeded at mount, updated on each write), so `node.data === _prev` always
+	// holds — an internal `node.data !== next` recheck is provably always true.
+	// Skipping it avoids reading `node.data`, whose getter materializes a fresh
+	// JS string from the DOM on every call (a measurable cost + GC pressure on
+	// text-heavy updates where the value always changes).
+	node.data =
 		value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
-	if (node.data !== next) node.data = next;
 }
 
 // Apply a ref attachment. Accepts the three supported shapes:

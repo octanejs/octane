@@ -36,6 +36,18 @@ export function CombinedReader() @{
 	</span>
 }
 
+// Reads a context that has NO Provider anywhere above it: must resolve to the
+// context default on EVERY render. Exercises the resolved-provider cache's
+// "cached default" fast path across re-renders — the consumer's first read
+// records "no provider", and the invariant (no closer Provider can appear above
+// a surviving consumer) means later reads must keep returning the default.
+export function BareReader(props) @{
+	const v = use(CountCtx);
+	<span class="bare">
+		{v + ':' + props.tick as string}
+	</span>
+}
+
 // Provider value updates → consumers re-render.
 export function DynamicProvider() @{
 	const [v, setV] = useState('init');
@@ -45,6 +57,38 @@ export function DynamicProvider() @{
 			<ThemeReader />
 		</ThemeCtx.Provider>
 	</div>
+}
+
+// One consumer reads TWO contexts; bumping the outer Provider re-renders it.
+// Exercises the cache's multi-entry path across re-renders: the changed context
+// must read live (new value) AND the unchanged one must stay correct — a cache
+// that overwrote the wrong entry or returned a stale slot would fail here.
+export function CombinedDynamic() @{
+	const [theme, setTheme] = useState('t0');
+	<div>
+		<button id="bump" onClick={() => setTheme(theme === 't0' ? 't1' : 't0')}>{'bump'}</button>
+		<ThemeCtx.Provider value={theme}>
+			<UserCtx.Provider value="alice">
+				<CombinedReader />
+			</UserCtx.Provider>
+		</ThemeCtx.Provider>
+	</div>
+}
+
+// A Provider wrapped in an @if: toggling `show` tears down the Provider's scope
+// and, on the next show, builds a FRESH one — with a different `value` each time.
+// The consumer inside must always read the current Provider's value, never one
+// cached from a prior mount. This is the "torn-down/replaced provider scope"
+// case that the resolved-provider cache used to guard defensively: locks in that
+// a remount never yields a stale context read.
+export function RemountingProvider(props) @{
+	@if (props.show) {
+		<CountCtx.Provider value={props.value}>
+			<CountReader />
+		</CountCtx.Provider>
+	} @else {
+		<span class="off">{'off'}</span>
+	}
 }
 
 // Multiple sibling consumers all see the same value.

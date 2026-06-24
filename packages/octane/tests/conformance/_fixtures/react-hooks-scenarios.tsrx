@@ -135,6 +135,70 @@ export function MultiSetterBatching() @{
 	</div>
 }
 
+// Cascade coalescing — a parent→mid→leaf chain of stateful blocks. Bumping all
+// three in ONE batched flush must re-render each block EXACTLY ONCE: the parent's
+// render already cascades through mid and leaf, so the scheduler must not also
+// render them standalone from the queue. Without coalescing, mid renders twice
+// and leaf three times (once per overlapping cascade). Per-block counters let the
+// test assert the exact render fan-out. Queue order is ancestor-first (the test
+// bumps parent → mid → leaf), which is the order the coalescing handles.
+let _coParent = 0;
+let _coMid = 0;
+let _coLeaf = 0;
+let _setCoParent: any = null;
+let _setCoMid: any = null;
+let _setCoLeaf: any = null;
+export function resetCoalesceCounts() {
+	_coParent = 0;
+	_coMid = 0;
+	_coLeaf = 0;
+}
+export function getCoalesceCounts() {
+	return { parent: _coParent, mid: _coMid, leaf: _coLeaf };
+}
+export function getSetCoParent() {
+	return _setCoParent;
+}
+export function getSetCoMid() {
+	return _setCoMid;
+}
+export function getSetCoLeaf() {
+	return _setCoLeaf;
+}
+
+function CoalesceLeaf() @{
+	const [v, setV] = useState(0);
+	_setCoLeaf = setV;
+	_coLeaf++;
+	<span id="co-leaf">
+		{v as number}
+	</span>
+}
+
+function CoalesceMid() @{
+	const [v, setV] = useState(0);
+	_setCoMid = setV;
+	_coMid++;
+	<div id="co-mid">
+		<span id="co-m">
+			{v as number}
+		</span>
+		<CoalesceLeaf />
+	</div>
+}
+
+export function CoalesceChain() @{
+	const [v, setV] = useState(0);
+	_setCoParent = setV;
+	_coParent++;
+	<div id="co-parent">
+		<span id="co-p">
+			{v as number}
+		</span>
+		<CoalesceMid />
+	</div>
+}
+
 // Lazy initializer — useState(fn) calls fn ONCE on mount. Subsequent
 // renders MUST not invoke it again, even on state updates.
 let _initCount = 0;
