@@ -1,11 +1,11 @@
 // React-parity act() coverage:
 //   - the scope-depth counter suppresses the "update outside act(...)" warning
-//   - `setIsRippleActEnvironment(true)` enables the warning; default is off
+//   - `setIsOctaneActEnvironment(true)` enables the warning; default is off
 //   - updates inside flushSync are also suppressed (matches React's IS_REACT_ACT_ENVIRONMENT semantics)
 //   - the warning text mirrors React's so port-from-React tests recognise it
 //   - act() always returns a Promise; awaits drain microtasks + passive effects to quiescence
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, flushSync, setIsRippleActEnvironment } from '../src/index.js';
+import { act, flushSync, setIsOctaneActEnvironment } from '../src/index.js';
 import { mount } from './_helpers';
 import Counter, { bump } from './_fixtures/act-warning.tsrx';
 
@@ -15,7 +15,7 @@ describe('act() — React-parity contract', () => {
 		errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 	});
 	afterEach(() => {
-		setIsRippleActEnvironment(false);
+		setIsOctaneActEnvironment(false);
 		errSpy.mockRestore();
 	});
 
@@ -40,7 +40,7 @@ describe('act() — React-parity contract', () => {
 	it('default env flag is off — out-of-act updates emit NO warning', async () => {
 		const r = mount(Counter);
 		// Direct (non-act, non-flushSync) update — warning should NOT fire because
-		// IS_RIPPLE_ACT_ENVIRONMENT is false by default.
+		// IS_OCTANE_ACT_ENVIRONMENT is false by default.
 		bump();
 		flushSync(() => {});
 		expect(errSpy).not.toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe('act() — React-parity contract', () => {
 	});
 
 	it('with env flag on: update outside act() warns with the React-shape message', async () => {
-		setIsRippleActEnvironment(true);
+		setIsOctaneActEnvironment(true);
 		const r = mount(Counter);
 		errSpy.mockClear(); // mount's internal scheduling may have fired the warning
 		bump(); // ← the offending out-of-act update
@@ -61,7 +61,7 @@ describe('act() — React-parity contract', () => {
 	});
 
 	it('with env flag on: update INSIDE act() suppresses the warning', async () => {
-		setIsRippleActEnvironment(true);
+		setIsOctaneActEnvironment(true);
 		const r = mount(Counter);
 		errSpy.mockClear();
 		await act(() => {
@@ -72,7 +72,7 @@ describe('act() — React-parity contract', () => {
 	});
 
 	it('with env flag on: update INSIDE flushSync suppresses the warning', async () => {
-		setIsRippleActEnvironment(true);
+		setIsOctaneActEnvironment(true);
 		const r = mount(Counter);
 		errSpy.mockClear();
 		flushSync(() => {
@@ -83,7 +83,7 @@ describe('act() — React-parity contract', () => {
 	});
 
 	it('actScopeDepth is correctly decremented on exception (warning still suppressed after throw)', async () => {
-		setIsRippleActEnvironment(true);
+		setIsOctaneActEnvironment(true);
 		const r = mount(Counter);
 		errSpy.mockClear();
 		await expect(
@@ -99,7 +99,7 @@ describe('act() — React-parity contract', () => {
 	});
 
 	it('nested act() — inner failure does not unbalance the outer scope', async () => {
-		setIsRippleActEnvironment(true);
+		setIsOctaneActEnvironment(true);
 		const r = mount(Counter);
 		errSpy.mockClear();
 		await act(async () => {

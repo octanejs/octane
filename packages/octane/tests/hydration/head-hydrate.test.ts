@@ -8,7 +8,7 @@ import { Page } from './_fixtures/head.tsrx';
 
 // Hoisted document metadata (React-19 model): inline `<title>`/`<meta>` are
 // routed out of the body, so the remaining single body root takes the
-// single-root path (no <ripple-frag>) and the metadata goes to render().head
+// single-root path (no <octane-frag>) and the metadata goes to render().head
 // (server, via ssrHeadEl) / document.head (client, via headBlock). On hydrate,
 // headBlock ADOPTS the server-rendered element (matched by its `<!--key-->`
 // marker) rather than appending a duplicate, and removes it on unmount.
@@ -40,9 +40,9 @@ afterEach(() => {
 });
 
 describe('hoisted document metadata — compile', () => {
-	it('client: single-root body template (no <ripple-frag>) + headBlock', () => {
+	it('client: single-root body template (no <octane-frag>) + headBlock', () => {
 		const { code } = compile(readFileSync(FIXTURE, 'utf8'), 'head.tsrx', { mode: 'client' });
-		expect(code).not.toContain('ripple-frag');
+		expect(code).not.toContain('octane-frag');
 		expect(code).toContain('headBlock(__s,');
 		expect(code).toMatch(/import \{[^}]*\bheadBlock\b/);
 	});
@@ -69,9 +69,9 @@ describe('hoisted document metadata — SSR', () => {
 		expect(head).toContain('content="A test page"');
 		expect(head).toMatch(/^<!--rnh-/); // leading adoption marker
 		// Body is the single <section> (wrapped in the component block markers),
-		// NOT a <ripple-frag> multi-root.
+		// NOT a <octane-frag> multi-root.
 		expect(body).toContain('<section id="body"');
-		expect(body).not.toContain('ripple-frag');
+		expect(body).not.toContain('octane-frag');
 		// The <style> still routes to CSS.
 		expect(css).toContain('rebeccapurple');
 	});
@@ -101,9 +101,9 @@ describe('hoisted document metadata — hydration', () => {
 		);
 		expect(markerComments.length).toBe(0);
 
-		// Body: single-root <section> ADOPTED (same node), no <ripple-frag>, interactive.
+		// Body: single-root <section> ADOPTED (same node), no <octane-frag>, interactive.
 		expect(container.querySelector('#body')).toBe(section);
-		expect(container.querySelector('ripple-frag')).toBeNull();
+		expect(container.querySelector('octane-frag')).toBeNull();
 		flushSync(() => btn.click());
 		expect(btn.textContent).toBe('n:1');
 

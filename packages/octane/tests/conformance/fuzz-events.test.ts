@@ -19,7 +19,7 @@ import { makeRng, makeRootRng } from './_helpers/fuzz-prng';
 import { mount } from '../_helpers';
 import { FuzzCounter, resetSnapshots, getSnapshots } from './_fixtures/fuzz-events.tsrx';
 
-const NUM_CASES = parseInt(process.env.RIPPLE_FUZZ_EVENT_CASES || '60', 10);
+const NUM_CASES = parseInt(process.env.OCTANE_FUZZ_EVENT_CASES || '60', 10);
 
 type ButtonKind = 'one' | 'two' | 'three' | 'flush';
 

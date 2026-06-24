@@ -27,7 +27,7 @@
 //      that just happens to RENDER right but hides leaked Blocks.
 //
 // REPRO
-// On failure, the harness logs `RIPPLE_FUZZ_SEED=<seed> case=<i>
+// On failure, the harness logs `OCTANE_FUZZ_SEED=<seed> case=<i>
 // trace=<json>` BEFORE re-throwing — set the env var to repro that exact
 // case stream. Seed defaults to 'default' so CI is deterministic.
 
@@ -306,10 +306,10 @@ function runCase(
  * NUM_CASES × actions per case. Sized so the suite finishes well under
  * vitest's default 5s per-test budget on happy-dom: each case is ~50
  * mounts on a small DOM, so ~30 cases × 25 actions ≈ 1500 mounts.
- * Crank these in CI by setting RIPPLE_FUZZ_CASES / RIPPLE_FUZZ_ACTIONS.
+ * Crank these in CI by setting OCTANE_FUZZ_CASES / OCTANE_FUZZ_ACTIONS.
  */
-const NUM_CASES = parseInt(process.env.RIPPLE_FUZZ_CASES || '30', 10);
-const MAX_ACTIONS_PER_CASE = parseInt(process.env.RIPPLE_FUZZ_ACTIONS || '25', 10);
+const NUM_CASES = parseInt(process.env.OCTANE_FUZZ_CASES || '30', 10);
+const MAX_ACTIONS_PER_CASE = parseInt(process.env.OCTANE_FUZZ_ACTIONS || '25', 10);
 
 describe('reconcileKeyed FUZZ — flat list', () => {
 	it(`survives ${NUM_CASES} random mutation streams (FuzzList)`, () => {
@@ -360,7 +360,7 @@ describe('reconcileKeyed FUZZ — K_DISP shortcut boundary', () => {
 					if (got !== want) {
 						// eslint-disable-next-line no-console
 						console.error(
-							`[fuzz-keyed-list:kdisp] FAIL ${label}\n  RIPPLE_FUZZ_SEED=${caseSeed}\n  trace=${JSON.stringify(actions)}\n  domKeys=${got}\n  expected=${want}`,
+							`[fuzz-keyed-list:kdisp] FAIL ${label}\n  OCTANE_FUZZ_SEED=${caseSeed}\n  trace=${JSON.stringify(actions)}\n  domKeys=${got}\n  expected=${want}`,
 						);
 						throw new Error(`[fuzz-keyed-list:kdisp] ${label} (seed=${caseSeed})`);
 					}

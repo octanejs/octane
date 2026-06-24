@@ -11,7 +11,7 @@ export {
 	flushSync,
 	drainPassiveEffects,
 	act,
-	setIsRippleActEnvironment,
+	setIsOctaneActEnvironment,
 	type Root,
 
 	// Hooks

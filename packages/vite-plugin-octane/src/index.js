@@ -1,21 +1,21 @@
 /** @import {Plugin, ResolvedConfig, ViteDevServer, UserConfig} from 'vite' */
-/** @import {RippleConfigOptions, ResolvedRippleConfig, RenderRoute} from '@octane-ts/vite-plugin' */
+/** @import {OctaneConfigOptions, ResolvedOctaneConfig, RenderRoute} from '@octane-ts/vite-plugin' */
 
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { octane } from 'octane-ts/compiler/vite';
+import { octane as octaneCompiler } from 'octane-ts/compiler/vite';
 
 import { createRouter } from './server/router.js';
 import { createContext, runMiddlewareChain } from './server/middleware.js';
 import { handleRenderRoute } from './server/render-route.js';
 import { handleServerRoute } from './server/server-route.js';
 import {
-	getRippleConfigPath,
-	loadRippleConfig,
-	resolveRippleConfig,
-	rippleConfigExists,
+	getOctaneConfigPath,
+	loadOctaneConfig,
+	resolveOctaneConfig,
+	octaneConfigExists,
 } from './load-config.js';
 import {
 	RESOLVED_ADAPTER_BROWSER_STUB_ID,
@@ -31,22 +31,22 @@ import { patch_global_fetch, is_rpc_request, handle_rpc_request } from '@ripple-
 // Re-export route classes + config helpers (public API surface).
 export { RenderRoute, ServerRoute } from './routes.js';
 export {
-	getRippleConfigPath,
-	loadRippleConfig,
-	resolveRippleConfig,
-	rippleConfigExists,
+	getOctaneConfigPath,
+	loadOctaneConfig,
+	resolveOctaneConfig,
+	octaneConfigExists,
 } from './load-config.js';
 
 const VIRTUAL_HYDRATE_ID = 'virtual:octane-hydrate';
 const RESOLVED_VIRTUAL_HYDRATE_ID = '\0virtual:octane-hydrate';
-const RIPPLE_EXTENSIONS = ['.tsrx'];
+const OCTANE_EXTENSIONS = ['.tsrx'];
 
 /**
  * @param {string} file_name
  * @returns {boolean}
  */
-function is_ripple_module_path(file_name) {
-	return RIPPLE_EXTENSIONS.some((extension) => file_name.endsWith(extension));
+function is_octane_module_path(file_name) {
+	return OCTANE_EXTENSIONS.some((extension) => file_name.endsWith(extension));
 }
 
 /** @type {import('@ripple-ts/adapter/rpc').AsyncContext | null} */
@@ -57,7 +57,7 @@ let devAsyncContext = null;
  * AsyncLocalStorage by default, or the adapter's runtime context if provided.
  * Patches global fetch once so relative-URL fetch + RPC work in dev.
  *
- * @param {RippleConfigOptions | null} config
+ * @param {OctaneConfigOptions | null} config
  * @returns {import('@ripple-ts/adapter/rpc').AsyncContext}
  */
 function getDevAsyncContext(config) {
@@ -79,7 +79,7 @@ function getDevAsyncContext(config) {
 }
 
 /**
- * @param {ResolvedRippleConfig | null} config
+ * @param {ResolvedOctaneConfig | null} config
  * @returns {boolean}
  */
 function has_route_config(config) {
@@ -89,7 +89,7 @@ function has_route_config(config) {
 /**
  * The octane metaframework Vite plugin.
  *
- * Returns an ARRAY: `[octane({ hmr }), metaPlugin]`. The first element is
+ * Returns an ARRAY: `[octaneCompiler({ hmr }), metaPlugin]`. The first element is
  * octane-ts/compiler's transform plugin — it owns ALL `.tsrx` compilation, picking
  * client vs server mode per-module from Vite's SSR signal (so the SAME file
  * compiles to a DOM-clone client body for the browser and to an HTML-building
@@ -102,13 +102,13 @@ function has_route_config(config) {
  * @param {{ hmr?: boolean }} [inlineOptions]
  * @returns {Plugin[]}
  */
-export function ripple(inlineOptions = {}) {
+export function octane(inlineOptions = {}) {
 	/** @type {ResolvedConfig} */
 	let config;
 	/** @type {string} */
 	let root;
-	/** @type {ResolvedRippleConfig | null} */
-	let rippleConfig = null;
+	/** @type {ResolvedOctaneConfig | null} */
+	let octaneConfig = null;
 	/** @type {ReturnType<typeof createRouter> | null} */
 	let router = null;
 
@@ -165,7 +165,7 @@ export function ripple(inlineOptions = {}) {
 					config,
 					'client-entry.js',
 					create_client_entry_source({
-						configPath: to_vite_root_import(getRippleConfigPath(root), root),
+						configPath: to_vite_root_import(getOctaneConfigPath(root), root),
 						staticEntries: [],
 					}),
 				);
@@ -188,14 +188,14 @@ export function ripple(inlineOptions = {}) {
 			let lastConfigErrorMtimeMs = 0;
 
 			async function ensureConfigLoaded() {
-				if (rippleConfig && router) return;
+				if (octaneConfig && router) return;
 				if (initPromise) {
 					await initPromise;
 					return;
 				}
 
-				const configPath = getRippleConfigPath(root);
-				if (!rippleConfigExists(root)) return;
+				const configPath = getOctaneConfigPath(root);
+				if (!octaneConfigExists(root)) return;
 
 				if (lastConfigErrorMtimeMs) {
 					try {
@@ -214,12 +214,12 @@ export function ripple(inlineOptions = {}) {
 				}
 
 				initPromise = (async () => {
-					const nextConfig = await loadRippleConfig(root, { vite });
-					rippleConfig = nextConfig;
+					const nextConfig = await loadOctaneConfig(root, { vite });
+					octaneConfig = nextConfig;
 					router = has_route_config(nextConfig) ? createRouter(nextConfig.router.routes) : null;
 					if (router) {
 						console.log(
-							`[@octane-ts/vite-plugin] Loaded ${nextConfig.router.routes.length} routes from ripple.config.ts`,
+							`[@octane-ts/vite-plugin] Loaded ${nextConfig.router.routes.length} routes from octane.config.ts`,
 						);
 					}
 				})()
@@ -240,12 +240,12 @@ export function ripple(inlineOptions = {}) {
 						await ensureConfigLoaded();
 					} catch (error) {
 						vite.ssrFixStacktrace(/** @type {Error} */ (error));
-						console.error('[@octane-ts/vite-plugin] Failed to load ripple.config.ts:', error);
+						console.error('[@octane-ts/vite-plugin] Failed to load octane.config.ts:', error);
 						next();
 						return;
 					}
 
-					if (!router || !rippleConfig) {
+					if (!router || !octaneConfig) {
 						next();
 						return;
 					}
@@ -255,7 +255,7 @@ export function ripple(inlineOptions = {}) {
 
 					// RPC requests for `module server` declarations.
 					if (is_rpc_request(url.pathname)) {
-						await handleRpcRequest(req, res, vite, rippleConfig.server.trustProxy, rippleConfig);
+						await handleRpcRequest(req, res, vite, octaneConfig.server.trustProxy, octaneConfig);
 						return;
 					}
 
@@ -267,15 +267,15 @@ export function ripple(inlineOptions = {}) {
 
 					try {
 						// Reload config so route edits are picked up (dev HMR for routes).
-						const previousRoutes = rippleConfig.router.routes;
-						const freshConfig = await loadRippleConfig(root, { vite });
-						if (freshConfig) rippleConfig = freshConfig;
-						if (JSON.stringify(previousRoutes) !== JSON.stringify(rippleConfig.router.routes)) {
+						const previousRoutes = octaneConfig.router.routes;
+						const freshConfig = await loadOctaneConfig(root, { vite });
+						if (freshConfig) octaneConfig = freshConfig;
+						if (JSON.stringify(previousRoutes) !== JSON.stringify(octaneConfig.router.routes)) {
 							console.log(
-								`[@octane-ts/vite-plugin] Detected route changes. Reloaded ${rippleConfig.router.routes.length} routes`,
+								`[@octane-ts/vite-plugin] Detected route changes. Reloaded ${octaneConfig.router.routes.length} routes`,
 							);
 						}
-						router = createRouter(rippleConfig.router.routes);
+						router = createRouter(octaneConfig.router.routes);
 
 						const freshMatch = router.match(method, url.pathname);
 						if (!freshMatch) {
@@ -285,7 +285,7 @@ export function ripple(inlineOptions = {}) {
 
 						const request = nodeRequestToWebRequest(req);
 						const context = createContext(request, freshMatch.params);
-						const globalMiddlewares = rippleConfig.middlewares;
+						const globalMiddlewares = octaneConfig.middlewares;
 
 						let response;
 						if (freshMatch.route.type === 'render') {
@@ -298,7 +298,7 @@ export function ripple(inlineOptions = {}) {
 										/** @type {RenderRoute} */ (freshMatch.route),
 										context,
 										vite,
-										rippleConfig ?? undefined,
+										octaneConfig ?? undefined,
 									),
 								[],
 							);
@@ -339,7 +339,7 @@ export function ripple(inlineOptions = {}) {
 			async handler({ file, modules, server }) {
 				if (this.environment.name !== 'client') return;
 				if (modules.length > 0 && modules.every((m) => m.isSelfAccepting)) return;
-				if (!is_ripple_module_path(file)) return;
+				if (!is_octane_module_path(file)) return;
 
 				const ssr = server.environments.ssr;
 				if (ssr) {
@@ -355,11 +355,11 @@ export function ripple(inlineOptions = {}) {
 	};
 
 	const hmr = inlineOptions.hmr;
-	return [octane(hmr === undefined ? {} : { hmr }), metaPlugin];
+	return [octaneCompiler(hmr === undefined ? {} : { hmr }), metaPlugin];
 }
 
 // Mainly to enforce types / DX.
-export function defineConfig(/** @type {RippleConfigOptions} */ options) {
+export function defineConfig(/** @type {OctaneConfigOptions} */ options) {
 	return options;
 }
 
@@ -429,7 +429,7 @@ async function sendWebResponse(nodeResponse, webResponse) {
  * @param {import('node:http').ServerResponse} res
  * @param {import('vite').ViteDevServer} vite
  * @param {boolean} trustProxy
- * @param {RippleConfigOptions | null} config
+ * @param {OctaneConfigOptions | null} config
  */
 async function handleRpcRequest(req, res, vite, trustProxy, config) {
 	try {

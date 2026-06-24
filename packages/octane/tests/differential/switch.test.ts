@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/switch.tsrx');
 
-// Cross-runtime pin for @switch / @case / @default lowering. The ripple-
+// Cross-runtime pin for @switch / @case / @default lowering. The octane-
 // next runtime mounts a switchBlock slot whose case selection mirrors
 // React's standard discriminant comparison. PickKind / Cycle / NoDefault
 // are all canonical shapes that compile via @tsrx/react without issue.

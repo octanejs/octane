@@ -2,14 +2,14 @@
 
 ## Files inspected (absolute paths)
 
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/\_fixtures/basic.tsrx
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/basic.test.ts
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/\_fixtures/tsrx-features.tsrx
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/tsrx-features.test.ts
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/\_fixtures/style.tsrx
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/style.test.ts
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/\_fixtures/useref.tsrx
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/useref.test.ts
+- /Users/domgan/Projects/octane/packages/octane/**tests**/\_fixtures/basic.tsrx
+- /Users/domgan/Projects/octane/packages/octane/**tests**/basic.test.ts
+- /Users/domgan/Projects/octane/packages/octane/**tests**/\_fixtures/tsrx-features.tsrx
+- /Users/domgan/Projects/octane/packages/octane/**tests**/tsrx-features.test.ts
+- /Users/domgan/Projects/octane/packages/octane/**tests**/\_fixtures/style.tsrx
+- /Users/domgan/Projects/octane/packages/octane/**tests**/style.test.ts
+- /Users/domgan/Projects/octane/packages/octane/**tests**/\_fixtures/useref.tsrx
+- /Users/domgan/Projects/octane/packages/octane/**tests**/useref.test.ts
 
 ---
 

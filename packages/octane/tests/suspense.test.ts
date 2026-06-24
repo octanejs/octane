@@ -77,7 +77,7 @@ describe('Suspense — catch on rejection', () => {
 	});
 
 	it('catch reset() retries the try body with the latest props', async () => {
-		// RIPPLE-NEW EXTENSION: the `@catch (err, reset)` positional `reset`
+		// OCTANE-NEW EXTENSION: the `@catch (err, reset)` positional `reset`
 		// is an octane-specific syntax. React's <ErrorBoundary> uses
 		// `resetKeys` or an externally-supplied `resetErrorBoundary` callback
 		// for the equivalent flow. Same intent (retry the failed branch with
@@ -372,7 +372,7 @@ describe('Suspense — parallel boundaries (no waterfall)', () => {
 	});
 
 	it('WITHOUT useMemo, sequential use() inside one body waterfalls (documents the gotcha)', async () => {
-		// KNOWN DIVERGENCE FROM REACT: this is a regression-pin for ripple-
+		// KNOWN DIVERGENCE FROM REACT: this is a regression-pin for octane-
 		// next's current sequential-replay strategy — NOT a React-canonical
 		// contract. React's runtime would also waterfall in this pattern (the
 		// first use() must resolve before the body re-runs past it), so the

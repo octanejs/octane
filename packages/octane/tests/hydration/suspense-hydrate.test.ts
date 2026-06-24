@@ -64,7 +64,7 @@ describe('hydrate — Suspense data seeding (SSR Phase 4)', () => {
 		// Server saw `undefined` and the seed encodes it via the sentinel — NOT
 		// `[null]` (which a naive JSON.stringify of `[undefined]` would produce).
 		expect(body).toContain('<div id="undef">is-undefined</div>');
-		expect(body).toContain('__ripple_new_undefined__');
+		expect(body).toContain('__octane_new_undefined__');
 		expect(body).not.toContain('>[null]<');
 
 		container.innerHTML = body;

@@ -4,12 +4,12 @@
  * PHASE 1 STUB. `createHandler` is the runtime entry the generated server
  * bundle calls in production; it is wired in Phase 2 (async render, adapter
  * `serve`, asset preload, RPC). Until then it throws a clear error. The
- * `./production` export path stays resolvable, and `resolveRippleConfig` is
+ * `./production` export path stays resolvable, and `resolveOctaneConfig` is
  * re-exported here because the generated server entry imports it from this
  * module (mirrors @ripple-ts/vite-plugin).
  */
 
-export { resolveRippleConfig } from '../load-config.js';
+export { resolveOctaneConfig } from '../load-config.js';
 
 /**
  * Create the production fetch handler (Phase 2).

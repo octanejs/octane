@@ -122,7 +122,7 @@ describe('differential: anchor-order.tsrx — switchBlock source order', () => {
 });
 
 describe('differential: anchor-order.tsrx — tryBlock source order', () => {
-	// We only diff the ripple-side render here; cross-runtime DOM diff for
+	// We only diff the octane-side render here; cross-runtime DOM diff for
 	// @try is gated on @tsrx/react's @try lowering (see suspense-basics
 	// proposal in the audit). The fixture is still picked up by the
 	// differential rig — if @tsrx/react can't render it, that's a precompile

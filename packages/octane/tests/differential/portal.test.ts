@@ -19,7 +19,7 @@ const FIXTURE = resolve(__dirname, '../_fixtures/portal-events.tsrx');
 
 function makeTargets() {
 	const iTarget = document.createElement('div');
-	iTarget.id = 'ripple-portal-target';
+	iTarget.id = 'octane-portal-target';
 	const rTarget = document.createElement('div');
 	rTarget.id = 'react-portal-target';
 	document.body.appendChild(iTarget);

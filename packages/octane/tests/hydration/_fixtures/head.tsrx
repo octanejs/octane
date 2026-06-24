@@ -1,7 +1,7 @@
 // Hoisted document metadata: `<title>`/`<meta>` rendered inline are NOT body
 // DOM — they hoist to render().head / document.head (React-19 model), leaving a
 // SINGLE body root (<section>) that hydrates via the single-root path (no
-// <ripple-frag>). `<style>` likewise routes to CSS.
+// <octane-frag>). `<style>` likewise routes to CSS.
 export function Page(props: { params: Record<string, string> }) @{
 	const [n, setN] = useState(0);
 	<>

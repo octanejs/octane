@@ -63,10 +63,10 @@ export function write_project_generated_file(viteConfig, name, source) {
 /**
  * Generate the client hydration entry (served at virtual:octane-hydrate).
  *
- * CONFIG-FREE: it does NOT import ripple.config.ts. Importing the config into
+ * CONFIG-FREE: it does NOT import octane.config.ts. Importing the config into
  * the browser would drag the plugin (and the server adapter) — with their
  * `node:fs` imports — into the client graph and throw at module-eval. Instead
- * the server serializes everything needed into #__ripple_data ({ entry,
+ * the server serializes everything needed into #__octane_data ({ entry,
  * exportName, layout, params }), and this entry dynamic-imports the page/layout
  * from there. (A static, build-analyzable import map is a Phase-2 concern.)
  *
@@ -103,15 +103,15 @@ function getComponentExport(module, exportName) {
 
 (async () => {
   try {
-    const el = document.getElementById('__ripple_data');
+    const el = document.getElementById('__octane_data');
     const target = document.getElementById('root');
     if (!el || !target) {
-      console.error('[octane] Unable to hydrate: missing #__ripple_data or #root.');
+      console.error('[octane] Unable to hydrate: missing #__octane_data or #root.');
       return;
     }
     const data = JSON.parse(el.textContent || '{}'); // { entry, exportName, layout, params }
     if (!data.entry) {
-      console.error('[octane] Unable to hydrate: no route entry in #__ripple_data.');
+      console.error('[octane] Unable to hydrate: no route entry in #__octane_data.');
       return;
     }
 

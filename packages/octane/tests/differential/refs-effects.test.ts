@@ -13,7 +13,7 @@ const EFFECT_TIMING_PATH = resolve(__dirname, '../_fixtures/effect-timing.tsrx')
 // useref-multi.tsrx, so the remaining components in useref.tsrx now precompile
 // cleanly via @tsrx/react. The differential tests below all exercise
 // runtime-shape parity for useRef. `DomRefObject` stays skipped — its
-// ripple-side useEffect body reads its deps positionally (an octane-
+// octane-side useEffect body reads its deps positionally (an octane-
 // specific calling convention), which React's useEffect doesn't honour, so
 // the React side throws on read of undefined.
 // ----------------------------------------------------------------------------
@@ -206,7 +206,7 @@ describe('differential: useref.tsrx — useRef lazy-ish initial value', () => {
 // Bodies authored with LEXICAL capture (props.log inside the closure) rather
 // than the octane positional-deps spread shape, so both runtimes drive
 // the same writes into the shared log. octane still supports the
-// positional form for ripple-only fixtures; lexical capture is the
+// positional form for octane-only fixtures; lexical capture is the
 // cross-runtime portable subset.
 // ----------------------------------------------------------------------------
 

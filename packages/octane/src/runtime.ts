@@ -280,14 +280,14 @@ function reapplyFragmentBindings(): void {
 // ─────────────────────────────────────────────────────────────────────────────
 // React-parity act() environment flag.
 //
-// `IS_RIPPLE_ACT_ENVIRONMENT` is the opt-in dev signal that scheduler updates
+// `IS_OCTANE_ACT_ENVIRONMENT` is the opt-in dev signal that scheduler updates
 // happening outside `act(...)` should be reported. Test setups flip it on once
 // (mirrors React's IS_REACT_ACT_ENVIRONMENT). `actScopeDepth` counts how deep
 // we are inside an active `act()` call; non-zero suppresses the warning.
 // `syncFlush` (set by flushSync) also suppresses — code inside flushSync is by
 // definition handling its own scheduling.
 // ─────────────────────────────────────────────────────────────────────────────
-let IS_RIPPLE_ACT_ENVIRONMENT = false;
+let IS_OCTANE_ACT_ENVIRONMENT = false;
 let actScopeDepth = 0;
 
 /**
@@ -296,8 +296,8 @@ let actScopeDepth = 0;
  * React's "An update to X was not wrapped in act(...)" message. Default
  * false so production / non-test code never warns.
  */
-export function setIsRippleActEnvironment(value: boolean): void {
-	IS_RIPPLE_ACT_ENVIRONMENT = value;
+export function setIsOctaneActEnvironment(value: boolean): void {
+	IS_OCTANE_ACT_ENVIRONMENT = value;
 }
 
 export function scheduleRender(block: Block): void {
@@ -305,7 +305,7 @@ export function scheduleRender(block: Block): void {
 	// Test-env warning: a state update happened with no flushSync or act()
 	// scope around it. The test will likely assert on stale DOM and fail
 	// confusingly; surface the cause directly.
-	if (IS_RIPPLE_ACT_ENVIRONMENT && actScopeDepth === 0 && !syncFlush) {
+	if (IS_OCTANE_ACT_ENVIRONMENT && actScopeDepth === 0 && !syncFlush) {
 		// eslint-disable-next-line no-console
 		console.error(
 			'An update to a component was not wrapped in act(...).\n\n' +
@@ -495,8 +495,8 @@ function hasPendingWork(): boolean {
  * and transition retries).
  *
  * While the act() scope is active, scheduleRender's "update outside act(...)"
- * dev warning is suppressed (see `IS_RIPPLE_ACT_ENVIRONMENT` and
- * `setIsRippleActEnvironment`).
+ * dev warning is suppressed (see `IS_OCTANE_ACT_ENVIRONMENT` and
+ * `setIsOctaneActEnvironment`).
  *
  * The double-loop (5 microtask ticks × up to 50 outer iterations) drains
  * cascades like `use(promise)` → status flip → retry → renderBlock that
@@ -3507,7 +3507,7 @@ export function childSlot(
 	const str = coerceChildText(value);
 	if (str === '') {
 		// `null` / `undefined` / `false` / `true` / `''` render NOTHING — not even
-		// an empty text node — matching React/Ripple. The server emits an empty
+		// an empty text node — matching React/Octane. The server emits an empty
 		// `<!--[--><!--]-->` range for these, so the marker pair stays content-less
 		// on both sides. Drop a text node left over from a prior non-empty render.
 		if (state.text !== null) {

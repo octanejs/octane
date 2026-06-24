@@ -130,7 +130,7 @@ describe('differential: tsrx-features.tsrx — component shorthand props', () =>
 });
 
 describe('differential: tsrx-features.tsrx — pure vs impure for-of bodies', () => {
-	// The auto-memo path is an ripple-side optimisation invisible to React, but
+	// The auto-memo path is an octane-side optimisation invisible to React, but
 	// the resulting DOM must be byte-identical regardless of whether bodies
 	// skipped or re-ran. The diff rig confirms the output shape; the auto-memo
 	// behaviour itself is exercised by the unit tests, not here.
@@ -176,11 +176,11 @@ describe('differential: basic.tsrx SVG/MathML namespace inheritance', () => {
 	// with an empty container under jsdom in this code path (React 19 +
 	// `class=` (vs `className`) + SVG/MathML drops the rendered subtree), so
 	// `r.find('#chart')` throws. The rig's innerHTML diff already pins React
-	// parity at the DOM-text level; this assertion proves the ripple-side
+	// parity at the DOM-text level; this assertion proves the octane-side
 	// runtime placed the host nodes in the right namespace, which is the
 	// contract under test. React-side namespaceURI coverage lives in the
 	// non-differential React fixture-browser suite.
-	it('SvgStatic: root + descendants share SVG namespace (ripple-side)', async () => {
+	it('SvgStatic: root + descendants share SVG namespace (octane-side)', async () => {
 		const d = await mountDifferential(BASIC, 'SvgStatic');
 		await d.step('mount', (i) => {
 			expect(i.find('#chart').namespaceURI).toBe(SVG_NS);
@@ -191,7 +191,7 @@ describe('differential: basic.tsrx SVG/MathML namespace inheritance', () => {
 		d.unmount();
 	});
 
-	it('SvgDynamic: dynamic attrs preserved + descendants in SVG namespace (ripple-side)', async () => {
+	it('SvgDynamic: dynamic attrs preserved + descendants in SVG namespace (octane-side)', async () => {
 		const d = await mountDifferential(BASIC, 'SvgDynamic', { klass: 'a', w: 10, fill: 'red' });
 		await d.step('mount', (i) => {
 			expect(i.find('#dyn').namespaceURI).toBe(SVG_NS);
@@ -200,7 +200,7 @@ describe('differential: basic.tsrx SVG/MathML namespace inheritance', () => {
 		d.unmount();
 	});
 
-	it('MathStatic: root + descendants share MathML namespace (ripple-side)', async () => {
+	it('MathStatic: root + descendants share MathML namespace (octane-side)', async () => {
 		const d = await mountDifferential(BASIC, 'MathStatic');
 		await d.step('mount', (i) => {
 			expect(i.find('#eq').namespaceURI).toBe(MATHML_NS);
@@ -211,7 +211,7 @@ describe('differential: basic.tsrx SVG/MathML namespace inheritance', () => {
 		d.unmount();
 	});
 
-	it('MathDynamic: dynamic display/class on MathML root (ripple-side)', async () => {
+	it('MathDynamic: dynamic display/class on MathML root (octane-side)', async () => {
 		const d = await mountDifferential(BASIC, 'MathDynamic', {
 			display: 'inline',
 			klass: 'm',

@@ -4,7 +4,7 @@
 //   - same seed → same case stream forever (CI repro = one env var)
 //   - safe to use across vitest workers (state lives in the closure)
 //
-// The seed is sourced once at module import: `RIPPLE_FUZZ_SEED` env var
+// The seed is sourced once at module import: `OCTANE_FUZZ_SEED` env var
 // if set, otherwise the literal string 'default'. Tests that want a per-
 // case sub-PRNG should call `makeRng(seed)` with a 32-bit int and use
 // the returned next()/pick()/intBetween() helpers.
@@ -76,12 +76,12 @@ export function makeRng(seed: number): FuzzRng {
 }
 
 /**
- * Root RNG for a given suite name. Reads `RIPPLE_FUZZ_SEED` from env if
+ * Root RNG for a given suite name. Reads `OCTANE_FUZZ_SEED` from env if
  * present, falls back to 'default'. Suite name is mixed in so two fuzz
  * files don't trade state when run together.
  */
 export function makeRootRng(suite: string): FuzzRng {
 	const envSeed =
-		(typeof process !== 'undefined' && process.env && process.env.RIPPLE_FUZZ_SEED) || 'default';
+		(typeof process !== 'undefined' && process.env && process.env.OCTANE_FUZZ_SEED) || 'default';
 	return makeRng(hashStringTo32Bit(`${envSeed}::${suite}`));
 }

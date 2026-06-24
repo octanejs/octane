@@ -16,7 +16,7 @@
  *     compile-emission divergence baked into the fixture, NOT a renderer
  *     parity question, so it falls outside the rig's contract. Those
  *     scenarios are covered in the non-differential conformance suite,
- *     where the ripple-side hook signature is the contract under test.
+ *     where the octane-side hook signature is the contract under test.
  */
 import { describe, it } from 'vitest';
 import { mountDifferential } from './_rig.js';

@@ -22,7 +22,7 @@
  *     after a brief normalisation pass.
  */
 import { expect } from 'vitest';
-import { createRoot as rippleCreateRoot, flushSync as rippleFlushSync } from '../../src/index.js';
+import { createRoot as octaneCreateRoot, flushSync as octaneFlushSync } from '../../src/index.js';
 import { existsSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -212,10 +212,10 @@ export interface DiffMount {
 }
 
 export interface DiffPair {
-	ripple: DiffMount;
+	octane: DiffMount;
 	react: DiffMount;
 	/**
-	 * Drive a step on BOTH runtimes (interleaved — ripple first, then
+	 * Drive a step on BOTH runtimes (interleaved — octane first, then
 	 * React). After both complete, normalises and asserts equal innerHTML.
 	 * If the snapshots diverge, the assertion message includes both for
 	 * easy diffing.
@@ -226,7 +226,7 @@ export interface DiffPair {
 }
 
 /**
- * Mount `srcPath`'s components under both runtimes. `rippleEntry` is the
+ * Mount `srcPath`'s components under both runtimes. `octaneEntry` is the
  * export name to mount on the octane side (and the same name will be
  * used for React, since @tsrx/react produces identically-named exports).
  *
@@ -235,32 +235,32 @@ export interface DiffPair {
  */
 export async function mountDifferential(
 	srcPath: string,
-	rippleEntry: string,
+	octaneEntry: string,
 	initialProps?: any,
 ): Promise<DiffPair> {
 	// octane side — import via Vitest's normal pipeline (the
 	// octane() plugin handles compilation).
-	const rippleMod = await import(/* @vite-ignore */ srcPath);
-	const RippleComp = rippleMod[rippleEntry];
-	if (!RippleComp) throw new Error(`octane export "${rippleEntry}" not found in ${srcPath}`);
+	const octaneMod = await import(/* @vite-ignore */ srcPath);
+	const OctaneComp = octaneMod[octaneEntry];
+	if (!OctaneComp) throw new Error(`octane export "${octaneEntry}" not found in ${srcPath}`);
 
 	// React side — compile, write, dynamic-import.
 	const reactMod = await loadReactFixture(srcPath);
-	const ReactComp = reactMod[rippleEntry];
-	if (!ReactComp) throw new Error(`@tsrx/react export "${rippleEntry}" not found in ${srcPath}`);
+	const ReactComp = reactMod[octaneEntry];
+	if (!ReactComp) throw new Error(`@tsrx/react export "${octaneEntry}" not found in ${srcPath}`);
 
 	// Two hidden containers, side-by-side under body.
-	const rippleContainer = document.createElement('div');
-	rippleContainer.setAttribute('data-rt', 'ripple');
+	const octaneContainer = document.createElement('div');
+	octaneContainer.setAttribute('data-rt', 'octane');
 	const reactContainer = document.createElement('div');
 	reactContainer.setAttribute('data-rt', 'react');
-	document.body.appendChild(rippleContainer);
+	document.body.appendChild(octaneContainer);
 	document.body.appendChild(reactContainer);
 
-	// Ripple mount.
-	const rippleRoot = rippleCreateRoot(rippleContainer);
-	rippleRoot.render(RippleComp, initialProps);
-	rippleFlushSync(() => {});
+	// Octane mount.
+	const octaneRoot = octaneCreateRoot(octaneContainer);
+	octaneRoot.render(OctaneComp, initialProps);
+	octaneFlushSync(() => {});
 
 	// React mount.
 	const rRoot: ReactRoot = reactCreateRoot(reactContainer);
@@ -290,7 +290,7 @@ export async function mountDifferential(
 					}
 				}
 				if (!el) {
-					throw new Error(`no element matching ${selector} (${isReact ? 'react' : 'ripple'})`);
+					throw new Error(`no element matching ${selector} (${isReact ? 'react' : 'octane'})`);
 				}
 				if (isReact) {
 					await reactAct(async () => {
@@ -298,7 +298,7 @@ export async function mountDifferential(
 						else el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 					});
 				} else {
-					rippleFlushSync(() => {
+					octaneFlushSync(() => {
 						if (typeof (el as HTMLElement).click === 'function') (el as HTMLElement).click();
 						else el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 					});
@@ -307,7 +307,7 @@ export async function mountDifferential(
 			find(selector) {
 				const el = container.querySelector(selector);
 				if (!el)
-					throw new Error(`no element matching ${selector} (${isReact ? 'react' : 'ripple'})`);
+					throw new Error(`no element matching ${selector} (${isReact ? 'react' : 'octane'})`);
 				return el;
 			},
 			findAll(selector) {
@@ -316,17 +316,17 @@ export async function mountDifferential(
 		};
 	}
 
-	const ripple = mkMount(rippleContainer, false);
+	const octane = mkMount(octaneContainer, false);
 	const react = mkMount(reactContainer, true);
 
 	async function step(
 		name: string,
 		fn: (i: DiffMount, r: DiffMount) => void | Promise<void>,
 	): Promise<void> {
-		await fn(ripple, react);
+		await fn(octane, react);
 		// Drain React commits + effects, give microtasks a chance.
 		await reactAct(async () => {});
-		const i = normaliseHtml(rippleContainer.innerHTML);
+		const i = normaliseHtml(octaneContainer.innerHTML);
 		const r = normaliseHtml(reactContainer.innerHTML);
 		if (i !== r) {
 			throw new Error(
@@ -341,13 +341,13 @@ export async function mountDifferential(
 	}
 
 	function unmount(): void {
-		rippleRoot.unmount();
+		octaneRoot.unmount();
 		reactFlushSync(() => {
 			rRoot.unmount();
 		});
-		rippleContainer.remove();
+		octaneContainer.remove();
 		reactContainer.remove();
 	}
 
-	return { ripple, react, step, unmount };
+	return { octane, react, step, unmount };
 }

@@ -10,7 +10,7 @@ import {
 /**
  * @typedef {import('@octane-ts/vite-plugin').Context} Context
  * @typedef {import('@octane-ts/vite-plugin').RenderRoute} RenderRoute
- * @typedef {import('@octane-ts/vite-plugin').ResolvedRippleConfig} ResolvedRippleConfig
+ * @typedef {import('@octane-ts/vite-plugin').ResolvedOctaneConfig} ResolvedOctaneConfig
  * @typedef {import('vite').ViteDevServer} ViteDevServer
  */
 
@@ -31,10 +31,10 @@ import {
  * @param {RenderRoute} route
  * @param {Context} context
  * @param {ViteDevServer} vite
- * @param {ResolvedRippleConfig} [rippleConfig]
+ * @param {ResolvedOctaneConfig} [octaneConfig]
  * @returns {Promise<Response>}
  */
-export async function handleRenderRoute(route, context, vite, rippleConfig) {
+export async function handleRenderRoute(route, context, vite, octaneConfig) {
 	try {
 		// Initialize so the server can register RPC functions from `module server`
 		// declarations during SSR module loading (renderer-agnostic; harmless when
@@ -91,7 +91,7 @@ export async function handleRenderRoute(route, context, vite, rippleConfig) {
 		const cssContent = css || '';
 
 		// Build head content with hydration data. The client entry is CONFIG-FREE
-		// (importing ripple.config.ts into the browser would drag the plugin + the
+		// (importing octane.config.ts into the browser would drag the plugin + the
 		// server adapter — and their `node:fs` imports — into the client graph and
 		// break at module-eval). So everything the client needs to pick + import
 		// the page/layout is serialized HERE: entry path, export name, layout path,
@@ -100,13 +100,13 @@ export async function handleRenderRoute(route, context, vite, rippleConfig) {
 			entry: entryPath,
 			exportName: get_route_entry_export_name(route.entry) ?? null,
 			layout: route.layout ?? null,
-			routeIndex: getRenderRouteIndex(rippleConfig, route),
+			routeIndex: getRenderRouteIndex(octaneConfig, route),
 			params: context.params,
 		});
 		const headContent = [
 			head,
 			cssContent,
-			`<script id="__ripple_data" type="application/json">${escapeScript(routeData)}</script>`,
+			`<script id="__octane_data" type="application/json">${escapeScript(routeData)}</script>`,
 		]
 			.filter(Boolean)
 			.join('\n');
@@ -145,7 +145,7 @@ export async function handleRenderRoute(route, context, vite, rippleConfig) {
 }
 
 /**
- * @param {ResolvedRippleConfig | undefined} config
+ * @param {ResolvedOctaneConfig | undefined} config
  * @param {RenderRoute} route
  * @returns {number | undefined}
  */

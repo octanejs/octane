@@ -5,7 +5,7 @@ import type { RuntimePrimitives } from '@ripple-ts/adapter';
 // Plugin exports
 // ============================================================================
 
-export interface RipplePluginOptions {
+export interface OctanePluginOptions {
 	/** Override the client HMR default (on in serve mode, off for SSR). */
 	hmr?: boolean;
 }
@@ -15,18 +15,18 @@ export interface RipplePluginOptions {
  * `[octane(), metaPlugin]` — the first compiles `.tsrx`, the second owns
  * config / routing / dev SSR / hydrate.
  */
-export function ripple(options?: RipplePluginOptions): Plugin[];
-export function defineConfig(options: RippleConfigOptions): RippleConfigOptions;
-export function resolveRippleConfig(
-	raw: RippleConfigOptions,
+export function octane(options?: OctanePluginOptions): Plugin[];
+export function defineConfig(options: OctaneConfigOptions): OctaneConfigOptions;
+export function resolveOctaneConfig(
+	raw: OctaneConfigOptions,
 	options?: { requireAdapter?: boolean },
-): ResolvedRippleConfig;
-export function getRippleConfigPath(projectRoot: string): string;
-export function rippleConfigExists(projectRoot: string): boolean;
-export function loadRippleConfig(
+): ResolvedOctaneConfig;
+export function getOctaneConfigPath(projectRoot: string): string;
+export function octaneConfigExists(projectRoot: string): boolean;
+export function loadOctaneConfig(
 	projectRoot: string,
 	options?: { vite?: ViteDevServer; requireAdapter?: boolean },
-): Promise<ResolvedRippleConfig>;
+): Promise<ResolvedOctaneConfig>;
 
 // ============================================================================
 // Route classes
@@ -117,7 +117,7 @@ export interface RootBoundaryOptions {
 	catch?: Component<{ error: unknown; reset: () => void }>;
 }
 
-export interface RippleConfigOptions {
+export interface OctaneConfigOptions {
 	build?: {
 		/** Output directory for the production build. @default 'dist' */
 		outDir?: string;
@@ -156,7 +156,7 @@ export interface RippleConfigOptions {
 /**
  * Resolved configuration with all defaults applied.
  */
-export interface ResolvedRippleConfig {
+export interface ResolvedOctaneConfig {
 	build: {
 		/** @default 'dist' */
 		outDir: string;

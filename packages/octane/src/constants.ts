@@ -42,4 +42,4 @@ export const SUSPENSE_SCRIPT_ATTR = 'data-octane-suspense';
  * reviver decodes it back to `undefined`. Shared so both sides agree, and keyed
  * obscurely enough that real resolved data won't collide.
  */
-export const UNDEFINED_SENTINEL_KEY = '__ripple_new_undefined__';
+export const UNDEFINED_SENTINEL_KEY = '__octane_new_undefined__';

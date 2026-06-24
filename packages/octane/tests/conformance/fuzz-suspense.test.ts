@@ -27,7 +27,7 @@ import { makeRng, makeRootRng, type FuzzRng } from './_helpers/fuzz-prng';
 import { mount, act } from '../_helpers';
 import { S1, S2, SSibling, SNested, SCatchReset } from './_fixtures/fuzz-suspense.tsrx';
 
-const NUM_CASES = parseInt(process.env.RIPPLE_FUZZ_SUSPENSE_CASES || '60', 10);
+const NUM_CASES = parseInt(process.env.OCTANE_FUZZ_SUSPENSE_CASES || '60', 10);
 
 // ─── Promise factories ──────────────────────────────────────────────
 // octane accepts React-19-shaped pre-tagged promises (status set

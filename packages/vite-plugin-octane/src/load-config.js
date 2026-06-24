@@ -1,11 +1,11 @@
 /**
- * Shared utility for loading and resolving ripple.config.ts.
+ * Shared utility for loading and resolving octane.config.ts.
  *
- * `resolveRippleConfig` is the single source of truth for all config
+ * `resolveOctaneConfig` is the single source of truth for all config
  * validation and default values. Every consumer should receive a
- * `ResolvedRippleConfig` rather than applying ad-hoc defaults.
+ * `ResolvedOctaneConfig` rather than applying ad-hoc defaults.
  *
- * `loadRippleConfig` is the single entry point for loading the config
+ * `loadOctaneConfig` is the single entry point for loading the config
  * file.  It accepts an optional Vite dev server — when provided the
  * config is loaded via `ssrLoadModule` (no temp server overhead,
  * HMR-aware). Otherwise a temporary Vite server is spun up, used to
@@ -15,14 +15,14 @@
  * and the generated production server entry.
  */
 
-/** @import { RippleConfigOptions, ResolvedRippleConfig } from '@octane-ts/vite-plugin' */
+/** @import { OctaneConfigOptions, ResolvedOctaneConfig } from '@octane-ts/vite-plugin' */
 
 import path from 'node:path';
 import fs from 'node:fs';
 import { compile } from 'octane-ts/compiler';
 import { DEFAULT_OUTDIR } from './constants.js';
 
-const RIPPLE_EXTENSION_PATTERN = /\.tsrx$/;
+const OCTANE_EXTENSION_PATTERN = /\.tsrx$/;
 
 /**
  * @param {unknown} route
@@ -76,7 +76,7 @@ function validate_root_boundary(rootBoundary) {
 }
 
 /**
- * Validate a raw ripple config and apply all defaults.
+ * Validate a raw octane config and apply all defaults.
  *
  * After this function returns every optional field carries its default
  * value so callers never need to use `??` / `||` fallbacks.
@@ -84,11 +84,11 @@ function validate_root_boundary(rootBoundary) {
  * The function is idempotent — passing an already-resolved config
  * through it again is safe and produces the same result.
  *
- * @param {RippleConfigOptions} raw - The user-provided config (from ripple.config.ts)
+ * @param {OctaneConfigOptions} raw - The user-provided config (from octane.config.ts)
  * @param {{ requireAdapter?: boolean }} [options]
- * @returns {ResolvedRippleConfig}
+ * @returns {ResolvedOctaneConfig}
  */
-export function resolveRippleConfig(raw, options = {}) {
+export function resolveOctaneConfig(raw, options = {}) {
 	const { requireAdapter = false } = options;
 
 	// ------------------------------------------------------------------
@@ -96,21 +96,21 @@ export function resolveRippleConfig(raw, options = {}) {
 	// ------------------------------------------------------------------
 	if (!raw) {
 		throw new Error(
-			'[@octane-ts/vite-plugin] ripple.config.ts must export a default config object.',
+			'[@octane-ts/vite-plugin] octane.config.ts must export a default config object.',
 		);
 	}
 
 	if (requireAdapter) {
 		if (!raw.adapter) {
 			throw new Error(
-				'[@octane-ts/vite-plugin] Production builds require an `adapter` in ripple.config.ts. ' +
+				'[@octane-ts/vite-plugin] Production builds require an `adapter` in octane.config.ts. ' +
 					'Install an adapter package (e.g. @ripple-ts/adapter-node) and set the `adapter` property.',
 			);
 		}
 
 		if (!raw.adapter.runtime) {
 			throw new Error(
-				'[@octane-ts/vite-plugin] The adapter in ripple.config.ts is missing the `runtime` property. ' +
+				'[@octane-ts/vite-plugin] The adapter in octane.config.ts is missing the `runtime` property. ' +
 					'Make sure your adapter exports runtime primitives.',
 			);
 		}
@@ -151,32 +151,32 @@ export function resolveRippleConfig(raw, options = {}) {
 }
 
 /**
- * Return the absolute path to ripple.config.ts for the given project root.
+ * Return the absolute path to octane.config.ts for the given project root.
  *
  * This is the single source of truth for the config file name / location.
  *
  * @param {string} projectRoot - Absolute path to the project root
  * @returns {string}
  */
-export function getRippleConfigPath(projectRoot) {
-	return path.join(projectRoot, 'ripple.config.ts');
+export function getOctaneConfigPath(projectRoot) {
+	return path.join(projectRoot, 'octane.config.ts');
 }
 
 /**
- * Check whether a ripple.config.ts file exists in the given root.
+ * Check whether a octane.config.ts file exists in the given root.
  *
- * Use this before calling `loadRippleConfig` when the absence of a
+ * Use this before calling `loadOctaneConfig` when the absence of a
  * config is a valid state (e.g. the Vite plugin running in SPA mode).
  *
  * @param {string} projectRoot - Absolute path to the project root
  * @returns {boolean}
  */
-export function rippleConfigExists(projectRoot) {
-	return fs.existsSync(getRippleConfigPath(projectRoot));
+export function octaneConfigExists(projectRoot) {
+	return fs.existsSync(getOctaneConfigPath(projectRoot));
 }
 
 /**
- * Load ripple.config.ts, validate, and apply defaults via `resolveRippleConfig`.
+ * Load octane.config.ts, validate, and apply defaults via `resolveOctaneConfig`.
  *
  * When a Vite dev server is provided via `options.vite`, the config is loaded
  * through its `ssrLoadModule` — avoiding the cost of spinning up a temporary
@@ -189,24 +189,24 @@ export function rippleConfigExists(projectRoot) {
  *
  * @param {string} projectRoot - Absolute path to the project root
  * @param {{ vite?: import('vite').ViteDevServer, requireAdapter?: boolean }} [options]
- * @returns {Promise<ResolvedRippleConfig>}
+ * @returns {Promise<ResolvedOctaneConfig>}
  */
-export async function loadRippleConfig(projectRoot, options = {}) {
+export async function loadOctaneConfig(projectRoot, options = {}) {
 	const { vite, requireAdapter } = options;
-	const configPath = getRippleConfigPath(projectRoot);
+	const configPath = getOctaneConfigPath(projectRoot);
 
 	if (!fs.existsSync(configPath)) {
-		throw new Error(`[@octane-ts/vite-plugin] ripple.config.ts not found in ${projectRoot}`);
+		throw new Error(`[@octane-ts/vite-plugin] octane.config.ts not found in ${projectRoot}`);
 	}
 
 	// When a running Vite dev server is available, use it directly.
 	if (vite) {
 		const configModule = await vite.ssrLoadModule(configPath);
-		return resolveRippleConfig(configModule.default, { requireAdapter });
+		return resolveOctaneConfig(configModule.default, { requireAdapter });
 	}
 
 	// Otherwise spin up a temporary Vite server (build / preview).
-	// The temp server only transpiles ripple.config.ts (plain TypeScript) —
+	// The temp server only transpiles octane.config.ts (plain TypeScript) —
 	// no .tsrx compilation plugin is needed beyond config-referenced helpers.
 	const { createServer } = await import('vite');
 
@@ -219,7 +219,7 @@ export async function loadRippleConfig(projectRoot, options = {}) {
 			{
 				name: 'octane-config-tsrx-loader',
 				transform(source, id) {
-					if (!RIPPLE_EXTENSION_PATTERN.test(id)) return null;
+					if (!OCTANE_EXTENSION_PATTERN.test(id)) return null;
 					const filename = id.replace(projectRoot, '');
 					return compile(source, filename, {
 						mode: 'server',
@@ -233,7 +233,7 @@ export async function loadRippleConfig(projectRoot, options = {}) {
 
 	try {
 		const configModule = await tempVite.ssrLoadModule(configPath);
-		return resolveRippleConfig(configModule.default, { requireAdapter });
+		return resolveOctaneConfig(configModule.default, { requireAdapter });
 	} finally {
 		await tempVite.close();
 	}

@@ -2,15 +2,15 @@ import type { RuntimePrimitives } from '@ripple-ts/adapter';
 import type {
 	Route,
 	Middleware,
-	ResolvedRippleConfig,
-	RippleConfigOptions,
+	ResolvedOctaneConfig,
+	OctaneConfigOptions,
 	RootBoundaryOptions,
 } from '@octane-ts/vite-plugin';
 
-export function resolveRippleConfig(
-	raw: RippleConfigOptions,
+export function resolveOctaneConfig(
+	raw: OctaneConfigOptions,
 	options?: { requireAdapter?: boolean },
-): ResolvedRippleConfig;
+): ResolvedOctaneConfig;
 
 export interface ClientAssetEntry {
 	/** Path to the built JS file (relative to client output dir) */

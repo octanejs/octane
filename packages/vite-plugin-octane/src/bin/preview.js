@@ -3,7 +3,7 @@
 /**
  * octane-preview — Start the production SSR server.
  *
- * Loads ripple.config.ts, reads `build.outDir`,
+ * Loads octane.config.ts, reads `build.outDir`,
  * and spawns `node {outDir}/server/entry.js`.
  *
  * NOTE: the server entry it spawns is produced by the Phase 2 production
@@ -13,13 +13,13 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
-import { loadRippleConfig } from '../load-config.js';
+import { loadOctaneConfig } from '../load-config.js';
 import { ENTRY_FILENAME } from '../constants.js';
 
 const projectRoot = process.cwd();
 
 try {
-	const config = await loadRippleConfig(projectRoot);
+	const config = await loadOctaneConfig(projectRoot);
 	const outDir = config.build.outDir;
 	const entryPath = path.join(projectRoot, outDir, 'server', ENTRY_FILENAME);
 

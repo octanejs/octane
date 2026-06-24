@@ -2281,7 +2281,7 @@ function allocHookSymbol(ctx, debugName) {
 // and an `ssrHeadEl(…)` call on the server (serializes into render().head,
 // prefixed with a `<!--key-->` marker the client headBlock adopts on hydration).
 // Lifting them out of the body-root set also collapses the remaining single body
-// element to the single-root path (no `<ripple-frag>`).
+// element to the single-root path (no `<octane-frag>`).
 
 const HOISTABLE_HEAD_TAGS = new Set(['title', 'meta', 'link']);
 
@@ -2764,7 +2764,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	if (jsxNodes.length === 0) return { mount: '', update: '', after: '', head: headEmit };
 
 	// Emit ONE template containing all top-level JSX (wrapping multiple roots in
-	// a synthetic <ripple-frag>).
+	// a synthetic <octane-frag>).
 	// We walk the tree, building HTML and a list of bindings.
 	const elementBindings = []; // ordered list of bindings (per dynamic site)
 	const forCalls = []; // forBlock calls — emitted after the mount/append
@@ -2792,7 +2792,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// Track HTML index across top-level nodes — component-call nodes don't
 	// contribute HTML, so their indices DON'T advance the frag position. Each
 	// HTML-contributing top-level node lives at _root.childNodes[htmlIdx].
-	// `single` mode = exactly one non-component Element root, no <ripple-frag>
+	// `single` mode = exactly one non-component Element root, no <octane-frag>
 	// wrapping. Anything else (multi-root, single Text, single comp call) goes
 	// through the wrapper path; HTML-contributing nodes are at `_root.childNodes[i]`.
 	const single =
@@ -2802,7 +2802,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	for (const node of jsxNodes) {
 		const nodeIsComp = node.type === 'Element' && isComponentTag(node);
 		// Single non-comp Element: path=[] (lives at _root directly).
-		// Otherwise (wrapped in <ripple-frag>): path=[htmlIdx] when HTML-contributing.
+		// Otherwise (wrapped in <octane-frag>): path=[htmlIdx] when HTML-contributing.
 		// Component-call: path=[] (no DOM contributed, host is the wrapper).
 		const nodePath = !single && !nodeIsComp ? [htmlIdx] : [];
 		partsHtml.push(
@@ -2848,12 +2848,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		ctx.runtimeNeeded.add('clone');
 		// Template namespace strategy:
 		//   - HTML single-root: parse the element directly, no flag.
-		//   - HTML multi-root: wrap in <ripple-frag> so template() returns the wrap.
+		//   - HTML multi-root: wrap in <octane-frag> so template() returns the wrap.
 		//   - SVG/MathML single-root: pass ns flag; runtime wraps with <svg>/<math>
 		//     so the HTML5 parser places children in foreign content, then returns
 		//     the inner root.
 		//   - SVG/MathML multi-root: pass ns + frag=1; runtime wraps and returns
-		//     the wrap itself (caller drains its children — no <ripple-frag>).
+		//     the wrap itself (caller drains its children — no <octane-frag>).
 		const isHtmlNs =
 			parentNs === 'html' &&
 			(single
@@ -2862,7 +2862,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const tplNs = isHtmlNs ? 'html' : single ? nsForRootTag(jsxNodes[0], parentNs) : parentNs;
 		const flag = nsFlag(tplNs);
 		const fragArg = !single && flag !== 0 ? 1 : 0;
-		const tplHtml = single || flag !== 0 ? html : `<ripple-frag>${html}</ripple-frag>`;
+		const tplHtml = single || flag !== 0 ? html : `<octane-frag>${html}</octane-frag>`;
 		const tpl = allocTemplate(ctx, tplHtml, flag, fragArg);
 		mountLines.push(`    const _root = clone(${tpl});`);
 		elementVars = new Map();
@@ -3494,7 +3494,7 @@ function emitNodeHtml(
 		compCalls.push(ch);
 		return '<!>';
 	}
-	// Top-level <Fragment ref={…}> — the wrapping <ripple-frag> (multi-root)
+	// Top-level <Fragment ref={…}> — the wrapping <octane-frag> (multi-root)
 	// is the parent in this scope, so the marker pair lives at the supplied
 	// path. Pairing uses ctx._fragRefStack, saved/restored by planJsx so
 	// nested plans never share state.

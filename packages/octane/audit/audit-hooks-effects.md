@@ -2,14 +2,14 @@
 
 Files audited:
 
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/react-conformance.test.ts
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/\_fixtures/react-conformance.tsrx
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/hooks.test.ts
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/\_fixtures/hooks.tsrx
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/effect-timing.test.ts
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/\_fixtures/effect-timing.tsrx
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/callbacks.test.ts
-- /Users/domgan/Projects/ripple/packages/octane/**tests**/\_fixtures/callbacks.tsrx
+- /Users/domgan/Projects/octane/packages/octane/**tests**/react-conformance.test.ts
+- /Users/domgan/Projects/octane/packages/octane/**tests**/\_fixtures/react-conformance.tsrx
+- /Users/domgan/Projects/octane/packages/octane/**tests**/hooks.test.ts
+- /Users/domgan/Projects/octane/packages/octane/**tests**/\_fixtures/hooks.tsrx
+- /Users/domgan/Projects/octane/packages/octane/**tests**/effect-timing.test.ts
+- /Users/domgan/Projects/octane/packages/octane/**tests**/\_fixtures/effect-timing.tsrx
+- /Users/domgan/Projects/octane/packages/octane/**tests**/callbacks.test.ts
+- /Users/domgan/Projects/octane/packages/octane/**tests**/\_fixtures/callbacks.tsrx
 
 | Test file                 | Test name                                                                                                                   | What it asserts                                                                                                                                                                                                                                              | React upstream test file:line(s)                                                                                                                                                                             | Confidence | Notes                                                                                                                                                                                              |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

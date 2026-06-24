@@ -2,8 +2,8 @@
 
 Source files:
 
-- `/Users/domgan/Projects/ripple/packages/octane/__tests__/_fixtures/transitions.tsrx`
-- `/Users/domgan/Projects/ripple/packages/octane/__tests__/transitions.test.ts`
+- `/Users/domgan/Projects/octane/packages/octane/__tests__/_fixtures/transitions.tsrx`
+- `/Users/domgan/Projects/octane/packages/octane/__tests__/transitions.test.ts`
 
 Note on upstream references: React upstream tests are NOT vendored into this repo.
 Line numbers below are taken verbatim from the inline citations in the
@@ -92,7 +92,7 @@ octane-specific contracts rather than React-conformant ones:
    retry is a complete no-op — internally React may run a retry render and bail
    out. The test's comment "the retry's pendingThenable check returns early
    because we cleared it when the urgent render committed" describes an
-   Ripple-internal mechanism, not a React-portable contract.
+   Octane-internal mechanism, not a React-portable contract.
 
 5. **Entangled transition: partial resolution leaves OLD sibling DOM intact**
    (test #7, line 183). After resolving only A, the test asserts `B` STILL shows
