@@ -15,9 +15,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsgo --noEmit -p packages/octane/tsconfig.json && tsgo --noEmit -p packages/vite-plugin-octane/tsconfig.typecheck.json",
-    "changeset": "changeset",
-    "changeset:version": "changeset version",
-    "changeset:publish": "changeset publish",
+    "changeset": "changeset && pnpm changeset:check",
+    "changeset:check": "node scripts/check-changesets.js",
+    "changeset:version": "pnpm changeset:check && changeset version",
+    "changeset:publish": "pnpm changeset:check && changeset publish",
     "prepare": "rulesync generate || true",
     "rules:generate": "rulesync generate",
     "rules:check": "rulesync generate --check"

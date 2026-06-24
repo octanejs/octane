@@ -1,4 +1,4 @@
-name: Release PR
+name: Publish
 
 on:
   push:
@@ -11,13 +11,12 @@ concurrency:
 permissions: {}
 
 jobs:
-  release-pr:
-    if: github.repository == 'octane-ts/octane'
+  publish:
+    if: github.repository == 'octane-ts/octane' && contains(github.event.head_commit.message, 'Version Packages')
     permissions:
       contents: write
-      issues: read
-      pull-requests: write
-    name: Release PR
+      id-token: write
+    name: Publish
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
@@ -32,7 +31,9 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24.x
-          cache: pnpm
+          # Do not enable dependency caching in this workflow. This job has
+          # id-token: write and publishes to npm, so restoring a shared Actions
+          # cache here can turn cache poisoning into a trusted-publish compromise.
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -40,13 +41,13 @@ jobs:
       - name: Disallow major and minor bumps in changesets
         run: pnpm changeset:check
 
-      - name: Create or update release pull request
+      - name: Publish to npm
         id: changesets
         uses: changesets/action@v1
         with:
-          github-token: ${{ github.token }}
-          version: pnpm changeset:version
-          commit: Version Packages
-          title: Version Packages
+          publish: pnpm changeset:publish
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          # npm trusted publishing via OIDC (id-token: write) — no NPM_TOKEN.
+          PNPM_CONFIG_PROVENANCE: true
+          NPM_CONFIG_PROVENANCE: true
