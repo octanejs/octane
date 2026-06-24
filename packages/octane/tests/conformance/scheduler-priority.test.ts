@@ -110,13 +110,14 @@ describe('Scheduler — effect mount order is child-first (React post-order comm
 		r.unmount();
 	});
 
-	it('cleanup on unmount stays child-first', () => {
+	it('cleanup on unmount fires parent-first (React deletion order)', () => {
 		const r = mount(CleanupProbe);
-		// unmountScope recurses into children before running scope.cleanups,
-		// so child cleanup ("inner") runs before parent ("outer"). Pin this
-		// so any future optimisation that flattens the unmount walk fails
-		// loudly here instead of breaking ported React apps silently.
+		// unmountScope fires a scope's own cleanups BEFORE recursing into its
+		// children, so deletion cleanups run parent → child ("outer" before
+		// "inner") — matching React's commitDeletionEffects pre-order walk
+		// (ReactEffectOrdering-test.js:37/:64). This is the REVERSE of mount,
+		// which fires child-first.
 		r.unmount();
-		expect(cleanupOrder).toEqual(['inner', 'outer']);
+		expect(cleanupOrder).toEqual(['outer', 'inner']);
 	});
 });
