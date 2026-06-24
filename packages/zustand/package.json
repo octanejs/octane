@@ -27,7 +27,8 @@
     ".": "./src/index.ts",
     "./vanilla": "./src/vanilla.ts",
     "./shallow": "./src/shallow.ts",
-    "./middleware": "./src/middleware.ts"
+    "./middleware": "./src/middleware.ts",
+    "./traditional": "./src/traditional.ts"
   },
   "scripts": {
     "test": "vitest run"

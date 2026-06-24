@@ -58,4 +58,11 @@ describe('differential: @octane-ts/zustand vs real zustand on React', () => {
 		});
 		d.unmount();
 	});
+
+	// No differential for `/traditional`: its only distinctive behavior is the
+	// equality-fn bail-out, which is NOT observable in innerHTML (output is the same
+	// whether the selection bails or re-renders the same value), and the rendered
+	// VALUE is already covered by the conformance render-count tests. Loading the
+	// React oracle would also drag in `use-sync-external-store` purely for a test
+	// that can't see the thing it would validate.
 });
