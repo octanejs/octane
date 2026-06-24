@@ -13,7 +13,10 @@ packages:
 allowBuilds:
   esbuild: true
   playwright: true
-  tldjs: set this to true or false
+  # tldjs's postinstall is a no-op unless npm_config_tldjs_update_rules=true, and
+  # it ships a bundled rules.json — so its build is not needed (pulled transitively
+  # via rulesync). Explicitly declined to silence the ignored-builds warning.
+  tldjs: false
 
 # Variables
 esrap_common: &esrap_common ^2.2.9
