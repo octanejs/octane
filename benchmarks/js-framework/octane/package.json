@@ -2,7 +2,7 @@
   "name": "octane-jsbench",
   "private": true,
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "js-framework-benchmark fixture for octane - drives 1000-row create/update/swap/select/remove against the production-built renderer for apples-to-apples perf measurement.",
   "scripts": {
     "dev": "vite --host --port 5176 --strictPort",
