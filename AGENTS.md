@@ -1,0 +1,160 @@
+# Additional Conventions Beyond the Built-in Functions
+
+As this project's AI coding tool, you must follow the additional conventions below, in addition to the built-in functions.
+
+# Octane Project Guide for AI Agents
+
+Octane is a fast, TypeScript-first UI framework by Dominic Gannaway — the successor
+to Inferno. It gives you the React programming model (the same hook API, `memo`,
+context, portals, Suspense, transitions) but compiles components ahead of time, so
+most of React's runtime work is already done before the page loads. Components are
+authored in `.tsrx`. Octane is alpha software: the runtime, compiler, and
+SSR/hydration paths all work and have a large test suite, but APIs can still change.
+
+## Start From Current Sources
+
+Use the nearest live source rather than this summary when they disagree — trust the
+code and READMEs:
+
+- `README.md` — project overview, positioning, quick start, and `.tsrx` syntax
+  examples (components, control flow, state/effects, conditional hooks).
+- `packages/octane/src/runtime.ts` — the client runtime (rendering, hooks, the
+  keyed reconciler, scheduler, events, context, Suspense). It is large and heavily
+  commented; the comments are the design spec.
+- `packages/octane/src/runtime.server.ts` + `packages/octane/src/server/index.ts` —
+  SSR (`render()` → `{ head, body, css }`).
+- `packages/octane/src/compiler/` — the TSRX→Octane compiler (exposed as
+  `octane-ts/compiler`, `octane-ts/compiler/vite`, `octane-ts/compiler/volar`).
+- `packages/octane/src/index.ts` / `constants.ts` — the public client API surface.
+- `docs/react-parity-migration-plan.md` — the React-behavior parity analysis, the
+  tiered test-migration plan, and the list of **intentional divergences** from
+  React. Read this before "fixing" something to match React.
+- `vitest.config.js` — the test project and file globs.
+- `package.json` — workspace scripts (`test`, `typecheck`, `format`,
+  `format:check`, `rules:generate`, `changeset`, `bench`).
+
+## RuleSync
+
+This repository uses RuleSync as the single source of truth for shared AI agent
+instructions. Edit `.rulesync/rules/` and regenerate — do **not** hand-edit the
+generated files.
+
+Generated targets:
+
+- `AGENTS.md`
+- `.github/copilot-instructions.md`
+- `CLAUDE.md`
+- `GEMINI.md`
+- `.cursor/rules/project.mdc`
+
+After changing RuleSync content, run:
+
+```bash
+pnpm rules:generate
+```
+
+## Repo Map
+
+This is a pnpm monorepo with two publishable packages:
+
+- `packages/octane/` (npm: `octane-ts`) — the runtime **and** the compiler together.
+  - `src/runtime.ts` — client runtime.
+  - `src/runtime.server.ts`, `src/server/` — server runtime / SSR.
+  - `src/compiler/` — the `.tsrx` compiler (`compile.js`, `vite.js`, `volar.js`).
+  - `tests/` — the test suite (see Validation).
+- `packages/vite-plugin-octane/` (npm: `@octane-ts/vite-plugin`) — the optional
+  metaframework plugin (dev SSR, routing, hydration wiring for full apps).
+
+`benchmarks/`, `playground/`, and `scripts/` hold local examples, perf harnesses,
+and tooling. Route a change to the package that owns the behavior; prefer editing
+the runtime/compiler over patching tests or generated output.
+
+## Authoring `.tsrx`
+
+- A component is a function. Use a setup scope when TypeScript setup sits next to
+  output: `export function Counter() @{ const [n, setN] = useState(0); <button …/> }`.
+  The `@{ … }` scope ends with **exactly one** output node (a JSX element or a
+  fragment `<>…</>`). With no setup you can write `export function X() @{ <jsx/> }`.
+- Dynamic text holes need a cast: `{expr as string}`. A bare `{expr}` is a
+  renderable hole (component / element descriptor / coerced primitive).
+- Events are **native, delegated** DOM events (`onClick`, `onInput`, `onSubmit`),
+  not a synthetic event layer — behavior matches the platform.
+- Template control flow uses directive blocks: `@if (c) { } @else { }`,
+  `@for (const x of xs; key x.id) { } @empty { }`, `@switch (v) { @case (a) { } @default { } }`,
+  and `@try { } @pending { } @catch (e) { }`. Plain JS control flow stays in setup.
+- Refs are passed as props (React-19 style): `ref={cb}`, `ref={obj}`, or multi-ref
+  `ref={[a, b]}`. There is no `forwardRef`.
+
+## Intentional Divergences From React
+
+Octane is React-shaped but deliberately differs in a few places. Do **not** "fix"
+these toward React without checking `docs/react-parity-migration-plan.md`:
+
+- **No rules of hooks.** Hooks are tracked by compiler-assigned call-site slot, so
+  a hook may sit behind a condition, after an early return, or in a loop.
+- **No controlled components / synthetic `onChange`.** `value`/`checked` are plain
+  attributes; inputs are uncontrolled and native. Do not add React's
+  controlled-input value-reassertion model.
+- **Keyed reconciler is LIS-based** (minimal DOM moves), not React's
+  `lastPlacedIndex`. The final DOM is identical; the set of physically-moved nodes
+  can differ. Survivor node identity and final order ARE guaranteed (and tested).
+- **No class components, no Server Components, no StrictMode double-invoke.**
+- Octane otherwise matches React's observable hook/effect/Suspense/transition
+  semantics — including effect ordering (child-first on mount, parent-first cleanup
+  on deletion) and `useId` stability across server/client hydration.
+
+## Validation
+
+Prefer the smallest validation that covers the change.
+
+```bash
+pnpm test                 # full vitest run
+pnpm typecheck            # tsgo --noEmit for both packages
+pnpm format:check         # prettier
+pnpm rules:generate       # regenerate AI rule files after editing .rulesync/
+```
+
+Run a single test file (faster while iterating):
+
+```bash
+./node_modules/.bin/vitest run packages/octane/tests/<file>.test.ts --reporter=verbose
+```
+
+The test suite (`packages/octane/tests/`) is organized as:
+
+- top-level `*.test.ts` — feature/unit tests for runtime + compiler behavior.
+- `conformance/` — ports of `facebook/react` behaviors; each `it` cites the source
+  like `// Per ReactHooksWithNoopRenderer-test.js:1885`. Genuine Octane divergences
+  are pinned with `it.fails(...)` + a `// GAP` note so the suite stays green and the
+  test auto-flips when the runtime is fixed.
+- `differential/` — the gold-standard parity proof: `_rig.ts` runs the SAME `.tsrx`
+  fixture through both Octane and `@tsrx/react`, drives identical events, and
+  asserts byte-equal `innerHTML` after each step. Note it compares only final HTML,
+  so it cannot see DOM move patterns, effect timing, or focus.
+- `hydration/` — server-render → `hydrate()` adoption tests.
+- `_fixtures/` — shared `.tsrx` fixtures; helpers live in `tests/_helpers.ts`
+  (`mount`, `act`, `flushEffects`, `createLog`) and `tests/conformance/_helpers/`.
+
+`scripts/scaffold-react-port.mjs` turns a React test file into a triaged port
+skeleton (in-scope `it.todo`s + out-of-scope reasons).
+
+## Changesets
+
+Add a changeset for user-facing changes to `octane-ts` or `@octane-ts/vite-plugin`.
+Skip changesets for docs-only, test-only, and internal tooling updates. While Octane
+is `0.x` alpha, stay on the `patch` track.
+
+```bash
+pnpm changeset
+```
+
+## Practical Guidance For Agents
+
+- Read the owning source + its tests for exact behavior; `runtime.ts` comments are
+  the spec. Don't rely on a repo-wide summary for subtle reconciler/scheduler rules.
+- When porting React behavior, follow the conformance convention (cite the source
+  line; pin real divergences as `it.fails` with a `// GAP` note) rather than
+  asserting Octane's current behavior as if it were the target.
+- Keep `.tsrx` fixtures minimal and focused on the asserted behavior.
+- Match nearby naming, file layout, and test style; keep documentation updates short
+  and durable.

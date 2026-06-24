@@ -17,7 +17,10 @@
     "typecheck": "tsgo --noEmit -p packages/octane/tsconfig.json && tsgo --noEmit -p packages/vite-plugin-octane/tsconfig.typecheck.json",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "changeset:publish": "changeset publish"
+    "changeset:publish": "changeset publish",
+    "prepare": "rulesync generate || true",
+    "rules:generate": "rulesync generate",
+    "rules:check": "rulesync generate --check"
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:default",
@@ -26,6 +29,7 @@
     "@types/node": "catalog:default",
     "@typescript/native-preview": "7.0.0-dev.20260616.1",
     "prettier": "catalog:default",
+    "rulesync": "catalog:default",
     "typescript": "catalog:default",
     "vitest": "catalog:default",
     "jsdom": "catalog:default",

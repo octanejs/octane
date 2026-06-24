@@ -28,23 +28,50 @@ const OUT_OF_SCOPE_RULES = [
 	[/legacy|legacyhidden|sync mode/, 'legacy / sync mode (Octane is concurrent-root only)'],
 	[/suspenselist|revealorder|\btail\b/, 'SuspenseList (not in Octane)'],
 	[/profiler|actualduration|treebaseduration|onrender/, 'Profiler (not supported)'],
-	[/devtools|component stack|displayname|owner stack|\.stack\b/, 'DevTools / component-stack formatting'],
-	[/getderivedstatefromerror|componentdidcatch/, 'class error-boundary lifecycle (port OUTCOME via @try/@catch)'],
+	[
+		/devtools|component stack|displayname|owner stack|\.stack\b/,
+		'DevTools / component-stack formatting',
+	],
+	[
+		/getderivedstatefromerror|componentdidcatch/,
+		'class error-boundary lifecycle (port OUTCOME via @try/@catch)',
+	],
 	[
 		/getderivedstatefromprops|componentwill|componentdid|shouldcomponentupdate|\bsetstate\b.*callback|replacestate|forceupdate|this\.refs|string ref/,
 		'class lifecycle / API (port OUTCOME via hooks if renderer-level)',
 	],
-	[/\bclass(es)?\b|purecomponent|createclass|\bes6 class\b/, 'class component (Octane is function-components only)'],
-	[/\bwarn(s|ing)?\b|invariant|errors? (if|when|on)|throws? (in dev|when|if)/, 'DEV warning / error-message (Octane warning policy differs)'],
+	[
+		/\bclass(es)?\b|purecomponent|createclass|\bes6 class\b/,
+		'class component (Octane is function-components only)',
+	],
+	[
+		/\bwarn(s|ing)?\b|invariant|errors? (if|when|on)|throws? (in dev|when|if)/,
+		'DEV warning / error-message (Octane warning policy differs)',
+	],
 	[/server component|\brsc\b|flight/, 'Server Components / RSC (not supported)'],
-	[/fizz|renderto(pipeable|readable)stream|streaming|shell hydrat|selective hydrat|progressive/, 'Fizz streaming (Octane SSR is non-streaming)'],
+	[
+		/fizz|renderto(pipeable|readable)stream|streaming|shell hydrat|selective hydrat|progressive/,
+		'Fizz streaming (Octane SSR is non-streaming)',
+	],
 	[/viewtransition|view transition/, 'ViewTransitions (not supported)'],
 	[/float|preinit|preload|hoistable|singleton resource/, 'Float / resource hoisting (out)'],
-	[/cpu[- ]?bound|expectedloadtime|suspensey|avoidthisfallback|suspensecallback/, 'unstable Suspense API (out)'],
-	[/react\.children|children\.(map|foreach|toarray|count|only)/, 'React.Children utility (Octane uses @for)'],
-	[/multiple renderers|multi-renderer|two renderers/, 'multi-renderer internals (single DOM renderer)'],
+	[
+		/cpu[- ]?bound|expectedloadtime|suspensey|avoidthisfallback|suspensecallback/,
+		'unstable Suspense API (out)',
+	],
+	[
+		/react\.children|children\.(map|foreach|toarray|count|only)/,
+		'React.Children utility (Octane uses @for)',
+	],
+	[
+		/multiple renderers|multi-renderer|two renderers/,
+		'multi-renderer internals (single DOM renderer)',
+	],
 	[/shouldyield|mock scheduler|scheduler module/, 'Scheduler-internals test'],
-	[/rules of hooks|hook order|ordered hooks|fewer hooks|more hooks/, 'rules-of-hooks (intentional divergence — Octane tracks by call site)'],
+	[
+		/rules of hooks|hook order|ordered hooks|fewer hooks|more hooks/,
+		'rules-of-hooks (intentional divergence — Octane tracks by call site)',
+	],
 ];
 
 const TITLE_RE =

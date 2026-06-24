@@ -29,7 +29,9 @@ export function UseEffectBoundary(props) @{
 				<BrokenUseEffect log={props.log} />
 			</div>
 		} @catch (err) {
-			<div class="caught">{('Caught an error: ' + err.message + '.') as string}</div>
+			<div class="caught">
+				{'Caught an error: ' + err.message + '.' as string}
+			</div>
 		}
 	</>
 }
@@ -41,7 +43,9 @@ export function UseLayoutEffectBoundary(props) @{
 				<BrokenUseLayoutEffect log={props.log} />
 			</div>
 		} @catch (err) {
-			<div class="caught">{('Caught an error: ' + err.message + '.') as string}</div>
+			<div class="caught">
+				{'Caught an error: ' + err.message + '.' as string}
+			</div>
 		}
 	</>
 }
@@ -60,7 +64,9 @@ function ErrorThrower() @{
 // hook; its " | stateful" text must keep rendering across the catch + re-render.
 function StatefulComponent(props) @{
 	const [n] = useState(0);
-	<span class="stateful">{(' | stateful=' + n) as string}</span>
+	<span class="stateful">
+		{' | stateful=' + n as string}
+	</span>
 }
 
 // Per ReactErrorBoundariesHooks-test.internal.js:50 — App: boundary around the
@@ -70,7 +76,9 @@ export function HookOrderApp() @{
 		@try {
 			<ErrorThrower />
 		} @catch (err) {
-			<p class="handled">{('Handled error: ' + err.message) as string}</p>
+			<p class="handled">
+				{'Handled error: ' + err.message as string}
+			</p>
 		}
 		<StatefulComponent />
 	</>

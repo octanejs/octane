@@ -27,3 +27,7 @@ benchmarks/news/*/src/data.js
 
 # Markdown is hand-authored — Prettier should not reformat docs (prose wrap, tables)
 **/*.md
+
+# RuleSync generated files (source lives in .rulesync/; run `pnpm rules:generate`).
+# The .md outputs are already covered above; .cursor/ holds a .mdc with no Prettier parser.
+.cursor/

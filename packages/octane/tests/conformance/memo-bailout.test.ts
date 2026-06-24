@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount, createLog } from '../_helpers';
-import {
-	BailoutHost,
-	ContextHost,
-	CustomCompareHost,
-} from '../_fixtures/memo-bailout.tsrx';
+import { BailoutHost, ContextHost, CustomCompareHost } from '../_fixtures/memo-bailout.tsrx';
 
 // Ports of memo() bailout heuristics from
 // packages/react-reconciler/src/__tests__/ReactMemo-test.js
