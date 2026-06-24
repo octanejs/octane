@@ -353,6 +353,9 @@ function flush(): void {
 	let pendingError: { err: any } | null = null;
 	while (QUEUE.length) {
 		const block = QUEUE.shift()!;
+		// Skip if an ancestor's cascade already re-rendered this block this flush
+		// (renderBlock cleared its `pending`) — avoids a redundant standalone render.
+		if (!block.pending) continue;
 		block.pending = false;
 		if (!block.disposed) {
 			try {
@@ -389,6 +392,8 @@ export function flushSync<T>(fn: () => T): T {
 		let pendingError: { err: any } | null = null;
 		while (QUEUE.length) {
 			const block = QUEUE.shift()!;
+			// See flush(): skip a block an ancestor's cascade already re-rendered.
+			if (!block.pending) continue;
 			block.pending = false;
 			if (!block.disposed) {
 				try {
@@ -824,6 +829,12 @@ export function renderBlock(block: Block): void {
 	const prevBlock = CURRENT_BLOCK;
 	CURRENT_SCOPE = block;
 	CURRENT_BLOCK = block;
+	// Cascade coalescing: clear the queued flag now. A block dequeued by flush()
+	// gets re-rendered here; a block reached as a descendant of some OTHER queued
+	// block's cascade is also brought up to date here, so flush() can skip its
+	// redundant standalone render (it checks `pending` before rendering). Cleared
+	// at the TOP so a re-entrant setState during this render re-queues correctly.
+	block.pending = false;
 	// Reset the per-render `use(thenable)` call-order counter. Cached entries
 	// in __thenables persist so that earlier use() calls return synchronously
 	// on replay-after-resolve (matches React's thenableState[index] scheme).

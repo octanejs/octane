@@ -41,6 +41,12 @@ import {
 	getSetN,
 	getSetM,
 	getSetObj,
+	CoalesceChain,
+	resetCoalesceCounts,
+	getCoalesceCounts,
+	getSetCoParent,
+	getSetCoMid,
+	getSetCoLeaf,
 } from './_fixtures/react-hooks-scenarios.tsrx';
 
 beforeEach(() => {
@@ -139,6 +145,45 @@ describe('useState — multi-setter batching', () => {
 		expect(r.find('#n').textContent).toBe('42');
 		expect(r.find('#m').textContent).toBe('420');
 		expect(getRenderCount()).toBe(initialRenders + 1);
+		r.unmount();
+	});
+});
+
+describe('scheduler — cascade coalescing', () => {
+	it('batching parent + descendant updates renders each block exactly once', () => {
+		resetCoalesceCounts();
+		const r = mount(CoalesceChain);
+		// Mount renders each of the three blocks once.
+		expect(getCoalesceCounts()).toEqual({ parent: 1, mid: 1, leaf: 1 });
+
+		// One batched flush bumping all three (ancestor-first queue order). The
+		// parent's render cascades through mid and leaf, so each must render
+		// EXACTLY ONCE — not once per overlapping cascade. Without coalescing this
+		// is { parent: 1, mid: 2, leaf: 3 }.
+		resetCoalesceCounts();
+		flushSync(() => {
+			getSetCoParent()(1);
+			getSetCoMid()(1);
+			getSetCoLeaf()(1);
+		});
+		expect(getCoalesceCounts()).toEqual({ parent: 1, mid: 1, leaf: 1 });
+
+		// Values are correct — coalescing must not drop any update.
+		expect(r.find('#co-p').textContent).toBe('1');
+		expect(r.find('#co-m').textContent).toBe('1');
+		expect(r.find('#co-leaf').textContent).toBe('1');
+		r.unmount();
+	});
+
+	it('a deeper descendant update alone still renders once (no spurious skips)', () => {
+		resetCoalesceCounts();
+		const r = mount(CoalesceChain);
+		resetCoalesceCounts();
+		// Only the leaf is dirty — no ancestor is queued, so it must render
+		// (the skip only applies when an ancestor's cascade already covered it).
+		flushSync(() => getSetCoLeaf()(7));
+		expect(getCoalesceCounts()).toEqual({ parent: 0, mid: 0, leaf: 1 });
+		expect(r.find('#co-leaf').textContent).toBe('7');
 		r.unmount();
 	});
 });
