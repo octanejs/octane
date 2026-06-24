@@ -3187,14 +3187,39 @@ export function createPortal(
 const ELEMENT_TAG = Symbol.for('octane.element');
 export interface ElementDescriptor<P = any> {
 	$$kind: typeof ELEMENT_TAG;
-	type: ComponentBody<P>;
+	// A compiled ComponentBody (the fast/common case, e.g. `root.render(<App/>)`)
+	// OR a host tag string (`'li'`) — the latter is produced when host JSX appears
+	// at a VALUE position (a `.map(...)` callback, a function return, an array
+	// literal) and is rendered by the runtime de-opt path (see `renderDeopt`).
+	type: ComponentBody<P> | string;
 	props: P;
+	// React-style `key`, lifted out of props. Consulted by the de-opt list path
+	// when this descriptor is an item of an array child.
+	key: any;
+	// Children passed to `createElement(type, props, ...children)` (host de-opt).
+	// `null` for the component-value form (children flow through the component).
+	children: any;
 }
-export function createElement<P>(type: ComponentBody<P>, props?: P): ElementDescriptor<P> {
-	return { $$kind: ELEMENT_TAG, type, props: (props ?? {}) as P };
+// React-shape `createElement(type, props, ...children)`. Two-arg calls
+// (`createElement(Comp, props)`) stay the component-value form the compiler emits
+// for `{<Comp/>}`. With a string `type` and/or explicit children it produces a
+// host descriptor for the runtime de-opt renderer. `key` is lifted out of props
+// (React semantics — `key` is never a real prop).
+export function createElement<P>(
+	type: ComponentBody<P> | string,
+	props?: P,
+	...children: any[]
+): ElementDescriptor<P> {
+	const p = (props ?? {}) as any;
+	const key = p.key != null ? p.key : null;
+	const kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : p.children;
+	return { $$kind: ELEMENT_TAG, type, props: p as P, key, children: kids ?? null };
 }
 function isElementDescriptor(v: any): v is ElementDescriptor {
 	return v != null && v.$$kind === ELEMENT_TAG;
+}
+function isHostDescriptor(v: any): v is ElementDescriptor & { type: string } {
+	return v != null && v.$$kind === ELEMENT_TAG && typeof v.type === 'string';
 }
 
 // ---------------------------------------------------------------------------
@@ -3415,6 +3440,11 @@ interface ChildSlot {
 	block: Block | null;
 	text: Text | null;
 	currentComp: ComponentBody | null;
+	// Non-null while the slot is rendering an ARRAY value via the de-opt keyed
+	// list path (reuses reconcileKeyed). Torn down when the value stops being an
+	// array. Lets `{items.map(...)}` / `{props.rows}` / any array-of-elements
+	// child render soundly without compile-time pattern matching.
+	forSlot: ForSlot | null;
 }
 
 // `true`/`false`/`null`/`undefined` render as empty (React parity); everything
@@ -3453,6 +3483,124 @@ function clearChildContent(state: ChildSlot): void {
 	state.currentComp = null;
 }
 
+// ---------------------------------------------------------------------------
+// Runtime de-opt renderer — renders dynamically-produced markup that appears at
+// a VALUE position: host JSX returned from a `.map(...)` callback or a function,
+// an array of elements (incl. one passed through props), or a lone host
+// descriptor. The compiled-template path stays the fast path; this is the sound
+// fallback React-shaped code relies on (we can't statically prove `items.map` is
+// a list, and arrays arrive via many non-`.map` paths). Trade-off: host elements
+// are REBUILT on each re-render — node identity / focus are NOT preserved across
+// parent renders (use `@for (...; key ...)` for the keyed fast path). Component
+// descriptors are NOT renderable on this path in v1 (they need a block for hooks
+// + reconciliation); `@for` is the keyed-component path.
+// ---------------------------------------------------------------------------
+
+let _deoptKeyWarned = false;
+function deoptKey(item: any, index: number): any {
+	if (item != null && item.$$kind === ELEMENT_TAG && item.key != null) return item.key;
+	// React parity: unkeyed array children fall back to the index, with a one-time
+	// dev warning. (Suppressed during hydration adoption — markers drive matching.)
+	if (!_deoptKeyWarned && !hydrating) {
+		_deoptKeyWarned = true;
+		console.warn(
+			'Octane: each element in an array child should have a unique "key" prop ' +
+				'(e.g. `items.map((x) => <li key={x.id}>…</li>)`). Falling back to the array ' +
+				'index, which can reconcile incorrectly on reorder — for keyed lists prefer ' +
+				'`@for (...; key ...)`.',
+		);
+	}
+	return index;
+}
+
+// Route a host descriptor's props onto a fresh element, reusing the same helpers
+// the compiler emits (className/style/setAttribute + `$$type` delegated-event
+// slots + deferred ref attach).
+function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
+	if (props == null) return;
+	for (const name in props) {
+		if (name === 'key' || name === 'children') continue;
+		const v = props[name];
+		if (name === 'ref') {
+			if (v != null) queueRefAttach(ownerBlock, () => attachRef(v, el));
+		} else if (name === 'className' || name === 'class') {
+			setClassName(el, v);
+		} else if (name === 'style') {
+			setStyle(el as HTMLElement, v, undefined);
+		} else if (
+			name.length > 2 &&
+			name.charCodeAt(0) === 111 /* o */ &&
+			name.charCodeAt(1) === 110 /* n */ &&
+			name.charCodeAt(2) >= 65 &&
+			name.charCodeAt(2) <= 90 /* on<Upper> → delegated event */
+		) {
+			const type = name.slice(2).toLowerCase();
+			(el as any)['$$' + type] = v;
+			delegateEvents([type]);
+		} else {
+			setAttribute(el, name, v);
+		}
+	}
+}
+
+// Build a DOM Node (or DocumentFragment) for a runtime value: primitive → Text,
+// host descriptor → element (props + recursively-built children), array → a
+// fragment of each. Component descriptors throw (use `@for`).
+function buildDeoptDom(value: any, ownerBlock: Block): Node | null {
+	if (value == null || value === false || value === true || value === '') return null;
+	const t = typeof value;
+	if (t === 'string' || t === 'number' || t === 'bigint') {
+		return document.createTextNode(String(value));
+	}
+	if (Array.isArray(value)) {
+		const frag = document.createDocumentFragment();
+		for (let i = 0; i < value.length; i++) {
+			const n = buildDeoptDom(value[i], ownerBlock);
+			if (n !== null) frag.appendChild(n);
+		}
+		return frag;
+	}
+	if (isHostDescriptor(value)) {
+		const el = document.createElement(value.type);
+		applyDeoptProps(el, value.props, ownerBlock);
+		const kids = buildDeoptDom(value.children, ownerBlock);
+		if (kids !== null) el.appendChild(kids);
+		return el;
+	}
+	if (isElementDescriptor(value)) {
+		throw new Error(
+			'Octane: rendering a component on the de-opt path (host JSX produced by a ' +
+				'`.map`/function/array) is not supported. Use `@for (...; key ...)` to render ' +
+				'a keyed list of components.',
+		);
+	}
+	return null; // unknown object — render nothing (resilient; React would throw).
+}
+
+// `reconcileKeyed` item body for one de-opt array element. Each item rebuilds its
+// DOM from the descriptor every render — host elements carry no state, so a
+// rebuild reproduces React's observable output (it does NOT preserve host node
+// identity across parent re-renders; that's the documented de-opt trade-off).
+function deoptItemBody(scope: Scope, item: any): void {
+	const block = scope.block;
+	// Sweep last render's build (the range between this item's markers).
+	const startM = block.startMarker;
+	const endM = block.endMarker;
+	if (startM != null && endM != null && startM !== endM) {
+		const parent = startM.parentNode;
+		if (parent !== null) {
+			let n: Node | null = startM.nextSibling;
+			while (n !== null && n !== endM) {
+				const next: Node | null = n.nextSibling;
+				parent.removeChild(n);
+				n = next;
+			}
+		}
+	}
+	const node = buildDeoptDom(item, block);
+	if (node !== null) block.parentNode.insertBefore(node, block.endMarker);
+}
+
 export function childSlot(
 	parentScope: Scope,
 	slotKey: string,
@@ -3489,9 +3637,72 @@ export function childSlot(
 			end = document.createComment('');
 			domParent.insertBefore(end, anchor ?? null);
 		}
-		state = { __kind: 'childSlot', start, end, block: null, text: null, currentComp: null };
+		state = {
+			__kind: 'childSlot',
+			start,
+			end,
+			block: null,
+			text: null,
+			currentComp: null,
+			forSlot: null,
+		};
 		parentScope[slotKey] = state;
 		registerSlot(parentScope, state);
+	}
+
+	// Array child → de-opt keyed list (sound: handles `.map()` results, arrays
+	// through props, and any array-valued child uniformly, by RUNTIME type).
+	if (Array.isArray(value)) {
+		if (state.forSlot === null) {
+			clearChildContent(state); // drop any prior block/text content
+			if (state.start === null) {
+				state.start = document.createComment('');
+				domParent.insertBefore(state.start, state.end);
+			}
+			state.forSlot = {
+				__kind: 'forBlockSlot',
+				start: state.start,
+				end: state.end,
+				items: new Map(),
+				head: null,
+				tail: null,
+				size: 0,
+				hasCleanups: true,
+				cachedDeps: null,
+				emptyBlock: null,
+			};
+		}
+		reconcileKeyed(
+			parentBlock,
+			state.forSlot,
+			value,
+			deoptKey,
+			deoptItemBody as any,
+			undefined,
+			false,
+			false,
+		);
+		return;
+	}
+	// Value is NOT an array — if we were in array mode, tear the list down first.
+	if (state.forSlot !== null) {
+		batchClearItems(state.forSlot, state.forSlot.items);
+		state.forSlot.head = null;
+		state.forSlot.tail = null;
+		state.forSlot.size = 0;
+		state.forSlot = null;
+	}
+	// Lone host descriptor at a value position (e.g. host JSX returned directly) →
+	// de-opt build. Rebuilt each render (host has no state).
+	if (isHostDescriptor(value)) {
+		clearChildContent(state);
+		if (state.start === null) {
+			state.start = document.createComment('');
+			domParent.insertBefore(state.start, state.end);
+		}
+		const node = buildDeoptDom(value, parentBlock);
+		if (node !== null) state.start.parentNode!.insertBefore(node, state.end);
+		return;
 	}
 
 	// Classify: function → ComponentBody (empty props, e.g. a `{children}`
@@ -6148,7 +6359,9 @@ export function createRoot(container: Element): Root {
 			// unwrap to (type, props). The `render(body, props)` form passes through.
 			let body: ComponentBody;
 			if (isElementDescriptor(bodyOrElement)) {
-				body = bodyOrElement.type;
+				// At a root, the descriptor is always a component value (`render(<App/>)`),
+				// never a host tag — host descriptors only arise at child positions.
+				body = bodyOrElement.type as ComponentBody;
 				props = bodyOrElement.props;
 			} else {
 				body = bodyOrElement;
@@ -6209,7 +6422,7 @@ export function hydrate(
 ): { unmount(): void } {
 	let body: ComponentBody;
 	if (isElementDescriptor(bodyOrElement)) {
-		body = bodyOrElement.type;
+		body = bodyOrElement.type as ComponentBody;
 		props = bodyOrElement.props;
 	} else {
 		body = bodyOrElement;

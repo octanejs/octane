@@ -2143,38 +2143,56 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 function rewriteJsxValues(node, ctx) {
 	return mapAst(node, (n) => {
 		const t = n && n.type;
+		// Host OR component JSX at a VALUE position (a `.map(...)` callback, a
+		// function return, an array literal, a prop value) lowers to a
+		// `createElement(...)` descriptor. Host tags + children route through the
+		// runtime de-opt renderer; components keep the existing component-value
+		// form. (Component-body OUTPUT JSX never reaches here — it's split out as
+		// `jsxNodes` and handled by planJsx, which gives keyed `@for` lists their
+		// fast path.) `jsxElementToCreateElement` recurses, so mapAst need not.
 		if (t === 'Element' || t === 'JSXElement') {
-			if (!isComponentTag(n)) {
-				const loc = n.loc && n.loc.start;
-				const tag = n.id?.name || n.openingElement?.name?.name || 'element';
-				throw new Error(
-					`Host element <${tag}/> used as a value` +
-						(loc ? ` (line ${loc.line})` : '') +
-						` is not supported. Wrap the markup in a component and render that ` +
-						`(e.g. \`root.render(<App/>)\`).`,
-				);
-			}
-			const kids = n.children || [];
-			if (kids.some((c) => c.type !== 'Comment')) {
-				const loc = n.loc && n.loc.start;
-				throw new Error(
-					`Component element with children used as a value` +
-						(loc ? ` (line ${loc.line})` : '') +
-						` is not supported. Move the children into the component itself.`,
-				);
-			}
 			return jsxElementToCreateElement(n, ctx);
 		}
 		if (t === 'Fragment' || t === 'JSXFragment') {
-			const loc = n.loc && n.loc.start;
-			throw new Error(
-				`Fragment used as a value` +
-					(loc ? ` (line ${loc.line})` : '') +
-					` is not supported. Wrap it in a component and render that.`,
-			);
+			// `<>…</>` at a value position → an array of its lowered children. The
+			// de-opt childSlot flattens nested arrays, matching React's fragment.
+			const els = [];
+			for (const c of n.children || []) {
+				const e = lowerJsxChild(c, ctx);
+				if (e !== null) els.push(e);
+			}
+			return { type: 'ArrayExpression', elements: els };
 		}
 		return null;
 	});
+}
+
+// Lower one JSX child node to a `createElement` argument expression (or null to
+// drop it). Text → string literal (whitespace-only-with-newline indentation is
+// dropped, JSX rule); `{expr}` → the lowered inner expression; nested element →
+// recurse; fragment → array of children.
+function lowerJsxChild(child, ctx) {
+	const t = child && child.type;
+	if (t === 'JSXText' || t === 'Text') {
+		const v = child.value != null ? child.value : child.raw;
+		if (v == null) return null;
+		if (/^\s*$/.test(v) && /[\n\r]/.test(v)) return null;
+		return { type: 'Literal', value: v };
+	}
+	if (t === 'JSXExpressionContainer') {
+		if (!child.expression || child.expression.type === 'JSXEmptyExpression') return null;
+		return rewriteJsxValues(child.expression, ctx);
+	}
+	if (t === 'JSXElement' || t === 'Element') return jsxElementToCreateElement(child, ctx);
+	if (t === 'JSXFragment' || t === 'Fragment') {
+		const els = [];
+		for (const c of child.children || []) {
+			const e = lowerJsxChild(c, ctx);
+			if (e !== null) els.push(e);
+		}
+		return { type: 'ArrayExpression', elements: els };
+	}
+	return null; // Comment / unknown — drop.
 }
 
 // Convert a JSX tag name node to a plain expression node esrap can print.
@@ -2203,7 +2221,11 @@ function jsxNameToExpr(name) {
 function jsxElementToCreateElement(node, ctx) {
 	ctx.runtimeNeeded.add('createElement');
 	const nameNode = node.openingElement?.name || node.id;
-	const compNode = jsxNameToExpr(nameNode);
+	// Host (lowercase) tag → string literal (`'li'`) for the de-opt renderer;
+	// component (capitalized / member / dynamic) → the identifier/member ref.
+	const compNode = isComponentTag(node)
+		? jsxNameToExpr(nameNode)
+		: { type: 'Literal', value: nameNode.name != null ? nameNode.name : String(nameNode) };
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const properties = [];
 	for (const attr of attrs) {
@@ -2213,7 +2235,9 @@ function jsxElementToCreateElement(node, ctx) {
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const attrName = attr.name.name || attr.name;
-		if (attrName === 'key') continue; // meaningless at value position (no slot)
+		// `key` is KEPT in props — `createElement` lifts it into `descriptor.key`,
+		// which the de-opt list path keys on. `ref` also flows through (the de-opt
+		// renderer's applyDeoptProps attaches it).
 		let valNode;
 		if (attr.value == null) {
 			valNode = { type: 'Literal', value: true };
@@ -2235,10 +2259,18 @@ function jsxElementToCreateElement(node, ctx) {
 			computed: false,
 		});
 	}
+	const args = [compNode, { type: 'ObjectExpression', properties }];
+	// Children → trailing `createElement(type, props, ...children)` args, each
+	// lowered recursively (host child → createElement, `{expr}` → expr, text →
+	// string). The runtime collects these into `descriptor.children`.
+	for (const child of node.children || []) {
+		const lowered = lowerJsxChild(child, ctx);
+		if (lowered !== null) args.push(lowered);
+	}
 	return {
 		type: 'CallExpression',
 		callee: { type: 'Identifier', name: 'createElement' },
-		arguments: [compNode, { type: 'ObjectExpression', properties }],
+		arguments: args,
 		optional: false,
 	};
 }
@@ -4124,14 +4156,6 @@ function emitElementHtml(
 					const ic = makeIfCall(asIf, ctx, componentName, inlinedSubs, childNs, cssHash);
 					ic.hostPath = path;
 					ifCalls.push(ic);
-				} else if (isJsxReturningMapCall(expr)) {
-					throw new Error(
-						"`.map()` returning JSX at child position isn't supported in TSRX. " +
-							'Use a for-of loop instead — it gives you keyed reconciliation:\n\n' +
-							'  for (const item of items; key item.id) {\n' +
-							'    <li>{text item.name}</li>\n' +
-							'  }',
-					);
 				} else if (isKnownStringExpression(expr)) {
 					bindings.push({
 						id: bindings.length,
@@ -4149,14 +4173,17 @@ function emitElementHtml(
 					html += '<!>';
 					childIdx++;
 				} else {
-					// Bare `{expr}` (no string cast) → RENDERABLE hole. Uses the TSRX-aware
-					// printer for the value (sub-template arrows etc.), then rides the
-					// childSlot path like the simpler Text branch.
+					// Bare `{expr}` (no string cast) → RENDERABLE hole. Lower any host /
+					// component JSX in the expression to `createElement(...)` first — this
+					// is what makes `{items.map((x) => <li key={x.id}>{x.name}</li>)}`, a
+					// lone `{<li/>}`, and array-of-elements children compile (the runtime
+					// de-opt childSlot renders the result). Then ride the TSRX-aware printer
+					// + childSlot path like the simpler Text branch.
 					const ch = {
 						id: ctx.nextHelperId++,
 						isChild: true,
 						valueExpr: printExprWithTsrx(
-							resolveStyleExpr(expr, cssHash),
+							resolveStyleExpr(rewriteJsxValues(expr, ctx), cssHash),
 							ctx,
 							componentName,
 							inlinedSubs,
