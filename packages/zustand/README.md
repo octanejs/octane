@@ -33,6 +33,7 @@ function BearCounter() @{
 | `@octane-ts/zustand/vanilla` | `createStore` + types | re-exported verbatim from zustand |
 | `@octane-ts/zustand/shallow` | `shallow`, `useShallow` | `shallow` verbatim; `useShallow` octane-bound |
 | `@octane-ts/zustand/middleware` | `persist`, `devtools`, `subscribeWithSelector`, `combine`, `redux`, `createJSONStorage`, … | re-exported verbatim (all framework-agnostic) |
+| `@octane-ts/zustand/traditional` | `createWithEqualityFn`, `useStoreWithEqualityFn` | octane-bound (selector + equality fn) |
 
 ## How it works
 
@@ -69,7 +70,17 @@ function Sliced() @{
   number of renders instead — no loop, no warning. Prefer `useShallow` regardless, for
   the same reason you would in React (avoid the extra renders).
 
-## Not yet ported
+## Equality functions — `traditional`
 
-- `@octane-ts/zustand/traditional` (`createWithEqualityFn` / `useStoreWithEqualityFn`).
-  Use `useShallow` — the v5-recommended replacement for the equality-fn pattern.
+For the equality-fn pattern, `@octane-ts/zustand/traditional` provides
+`createWithEqualityFn` / `useStoreWithEqualityFn`:
+
+```tsx
+import { createWithEqualityFn } from '@octane-ts/zustand/traditional';
+import { shallow } from '@octane-ts/zustand/shallow';
+
+const useStore = createWithEqualityFn((set) => ({ a: 0, b: 0 }), shallow);
+const { a } = useStore((s) => ({ a: s.a })); // bails out via shallow
+```
+
+For most object-slice selections, prefer `useShallow` — the v5-recommended approach.
