@@ -16,12 +16,7 @@
 // the same `useFoo` used twice) stay independent, just like in React.
 import { useSyncExternalStore } from 'octane-ts';
 import { createStore } from 'zustand/vanilla';
-import type {
-	Mutate,
-	StateCreator,
-	StoreApi,
-	StoreMutatorIdentifier,
-} from 'zustand/vanilla';
+import type { Mutate, StateCreator, StoreApi, StoreMutatorIdentifier } from 'zustand/vanilla';
 
 // Re-export the vanilla core so `@octane-ts/zustand` is a drop-in for both the
 // store-only (`createStore`) and binding (`create`) entry points of zustand.
@@ -82,7 +77,8 @@ const createImpl = (<T>(createState: StateCreator<T, [], []>) => {
 	// dependency), so no slot is injected here — the slot is the one the consumer's
 	// `useFoo(...)` call site carries, which is exactly what makes each call-site
 	// independent.
-	const useBoundStore = (...args: unknown[]) => (useStore as (...a: unknown[]) => unknown)(api, ...args);
+	const useBoundStore = (...args: unknown[]) =>
+		(useStore as (...a: unknown[]) => unknown)(api, ...args);
 	Object.assign(useBoundStore, api);
 	return useBoundStore;
 }) as Create;

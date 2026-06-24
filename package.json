@@ -14,7 +14,7 @@
     "bench": "pnpm --filter @benchmarks/news bench",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsgo --noEmit -p packages/octane/tsconfig.json && tsgo --noEmit -p packages/vite-plugin-octane/tsconfig.typecheck.json",
+    "typecheck": "tsgo --noEmit -p packages/octane/tsconfig.json && tsgo --noEmit -p packages/vite-plugin-octane/tsconfig.typecheck.json && tsgo --noEmit -p packages/zustand/tsconfig.json",
     "changeset": "changeset && pnpm changeset:check",
     "changeset:check": "node scripts/check-changesets.js",
     "changeset:version": "pnpm changeset:check && changeset version",

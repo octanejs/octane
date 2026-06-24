@@ -1408,9 +1408,11 @@ export function useImperativeHandle<T>(
  * render to return the current snapshot. When the store calls
  * `onStoreChange`, the component re-renders and `getSnapshot()` runs again.
  *
- * `getServerSnapshot` is accepted for API compatibility but not used —
- * octane has no SSR pipeline today; if/when one lands, this argument
- * is where to plug in the server-side snapshot.
+ * `getServerSnapshot` IS used: on the server it supplies the SSR snapshot, and
+ * during client hydration the first read uses it (see below) so the adopted DOM
+ * matches the server value before the hydrate-then-sync layout effect reconciles
+ * any client/server difference. For a non-SSR build the `hydrating` guard
+ * constant-folds the branch away.
  *
  * Built on top of useState + useEffect. The user's `slot` is the call
  * site's compiler-injected symbol; two derived sub-slots

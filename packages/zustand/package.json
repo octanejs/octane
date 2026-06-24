@@ -25,7 +25,9 @@
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./vanilla": "./src/vanilla.ts"
+    "./vanilla": "./src/vanilla.ts",
+    "./shallow": "./src/shallow.ts",
+    "./middleware": "./src/middleware.ts"
   },
   "scripts": {
     "test": "vitest run"
@@ -35,6 +37,10 @@
     "zustand": "catalog:default"
   },
   "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
     "vitest": "catalog:default"
   }
 }
