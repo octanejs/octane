@@ -88,3 +88,39 @@ export function nextPaint(): Promise<void> {
 	drainPassiveEffects();
 	return Promise.resolve();
 }
+
+/**
+ * Ordered side-effect log — the standard substitute for React reconciler tests
+ * that assert `Scheduler.log([...])` of yields/effects. A fixture pushes labels
+ * from render / effects / cleanups (pass `log.push` down as a prop), and the
+ * test asserts `log.drain()` after each `act()` / `flushSync` boundary.
+ *
+ *   const log = createLog();
+ *   const r = mount(Fixture, { log: log.push });
+ *   await act(() => {});
+ *   expect(log.drain()).toEqual(['mount A', 'mount B']);
+ */
+export interface EffectLog {
+	/** Append an entry. Bind this and hand it to fixtures. */
+	push: (entry: string) => void;
+	/** The live backing array (read-only view of what's accumulated). */
+	entries: readonly string[];
+	/** Return everything logged since the last drain, then clear. */
+	drain: () => string[];
+	/** Discard everything without returning it. */
+	clear: () => void;
+}
+
+export function createLog(): EffectLog {
+	const entries: string[] = [];
+	return {
+		entries,
+		push: (entry: string) => {
+			entries.push(entry);
+		},
+		drain: () => entries.splice(0, entries.length),
+		clear: () => {
+			entries.length = 0;
+		},
+	};
+}
