@@ -669,10 +669,16 @@ class BlockImpl {
 	children: ChildScope[];
 	_slots: any[] | null;
 	$$ctxValues: Map<Context<any>, any> | null;
-	// Contexts this block READ during its last render, with the value seen.
-	// Populated by useContextInternal; consulted by the memo bailout so a context
-	// change forces a re-render even when props are shallow-equal (React parity).
+	// Contexts whose value this block's subtree consumes — stamped on this block
+	// AND its memo ancestors by useContextInternal. The TRANSITIVE signal: a
+	// changed version here means "a consumer somewhere at/below me needs the new
+	// value", so the memo bailout descends rather than skipping.
 	$$ctxReads: Map<Context<any>, any> | null;
+	// Contexts this block's OWN render directly read (its own body, or an inline
+	// lite descendant that shares this block). The DIRECT signal: a changed
+	// version here means THIS block must re-run; if only $$ctxReads changed, the
+	// block can bail its body and refresh just its consuming child blocks.
+	$$ctxDirect: Map<Context<any>, any> | null;
 	// __thenableIdx is reset every renderBlock so pre-init costs nothing.
 	__thenableIdx: number;
 	// For-block item bookkeeping.
@@ -725,6 +731,7 @@ class BlockImpl {
 		this._slots = null;
 		this.$$ctxValues = null;
 		this.$$ctxReads = null;
+		this.$$ctxDirect = null;
 		this.__thenableIdx = 0;
 		this.forSlot = null;
 		this.prevSibling = null;
@@ -808,6 +815,7 @@ export function renderBlock(block: Block): void {
 	// them (its own reads + descendant reads propagated up). Only memo blocks
 	// ever hold a non-null map, so this is a no-op for the common case.
 	if (block.$$ctxReads !== null) block.$$ctxReads.clear();
+	if (block.$$ctxDirect !== null) block.$$ctxDirect.clear();
 	// Capture the render priority. Explicit pendingMode (set by scheduleRender)
 	// wins. Otherwise INHERIT from the outer block — re-entrant renders (try,
 	// if, for, comp slots) called synchronously inside an outer body should
@@ -1579,6 +1587,12 @@ function useContextInternal<T>(context: Context<T>): T {
 	// common no-memo tree pays a single boolean test instead of an ancestor walk
 	// per `use()` call.
 	if (CURRENT_BLOCK !== null && CURRENT_BLOCK.memoInChain) {
+		// DIRECT read: the block whose render this read happened in (its own body,
+		// or an inline lite descendant sharing the block) must re-run when this
+		// context changes — it can't be skipped past.
+		(CURRENT_BLOCK.$$ctxDirect ??= new Map()).set(context, context.$$version);
+		// TRANSITIVE: stamp every memo ancestor so the bailout knows a consumer
+		// lives below it and descends instead of skipping.
 		for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
 			if ((b.body as any)?.__memo === true) {
 				(b.$$ctxReads ??= new Map()).set(context, context.$$version);
@@ -3343,7 +3357,7 @@ export function componentSlot(
 		// `memo(Component)` — skip the body when new props shallow-equal the
 		// committed props. Matches React.memo's contract; the wrapped fn carries
 		// the `__memo: true` marker the wrapper installs.
-		if ((comp as any).__memo === true && !ctxDepsChanged(state.block)) {
+		if ((comp as any).__memo === true) {
 			const compare = (comp as any).__compare as ((prev: any, next: any) => boolean) | undefined;
 			// React.memo's optional comparator: returns true when props are equal
 			// (→ skip the render). Falls back to a shallow Object.is comparison.
@@ -3351,9 +3365,17 @@ export function componentSlot(
 				? compare(state.block.props, props)
 				: shallowEqualProps(state.block.props, props);
 			if (equal) {
-				// Keep the committed props identity — diffing against them next time
-				// is what makes the memo terminate.
-				return;
+				// Props are equal → bail the body, UNLESS this component itself
+				// directly reads a changed context (then it must re-run — fall
+				// through). If only a DESCENDANT consumes a changed context, refresh
+				// just those consumers without re-running this body: React's lazy
+				// propagation, so a bailed-out pure indirection is not re-rendered.
+				if (!ctxDirectChanged(state.block)) {
+					if (ctxDepsChanged(state.block)) refreshContextConsumers(state.block);
+					// Keep the committed props identity — diffing against them next
+					// time is what makes the memo terminate.
+					return;
+				}
 			}
 		}
 		state.block.props = props;
@@ -3550,6 +3572,64 @@ function ctxDepsChanged(block: Block): boolean {
 		if (ctx.$$version !== version) return true;
 	}
 	return false;
+}
+
+// True if this block's OWN render directly read a context whose value has since
+// changed — meaning the block must re-run (vs only a descendant consumer needing
+// a refresh). Distinguishes a memo'd CONSUMER (re-run it) from a memo'd pure
+// INDIRECTION that merely wraps consumers (skip its body, refresh the consumers).
+function ctxDirectChanged(block: Block): boolean {
+	const direct = block.$$ctxDirect;
+	if (direct === null) return false;
+	for (const [ctx, version] of direct) {
+		if (ctx.$$version !== version) return true;
+	}
+	return false;
+}
+
+/**
+ * React-style lazy context propagation. A memo boundary bailed on props but a
+ * context its subtree consumes changed; rather than re-running the boundary's
+ * body (which would re-render the bailed-out indirection — Octane's old
+ * push-cascade), descend into the boundary's already-rendered child blocks and
+ * refresh ONLY the ones that actually consume the changed context. The boundary
+ * itself never re-runs, matching React's `['App','Consumer']` (no 'Indirection').
+ */
+function refreshContextConsumers(block: Block): void {
+	const slots = block._slots;
+	if (slots !== null) {
+		for (let i = 0, n = slots.length; i < n; i++) {
+			const s = slots[i];
+			const k = s.__kind;
+			if (k === 'forBlockSlot') {
+				const items = s.items as Map<any, Block>;
+				for (const item of items.values()) refreshBlockForContext(item);
+				if (s.emptyBlock) refreshBlockForContext(s.emptyBlock);
+			} else if (s.block) {
+				// componentSlotSlot | ifBlockSlot | switchBlockSlot | activityBlockSlot
+				// | trySlotSlot | portalSlotSlot — each holds a single child Block.
+				refreshBlockForContext(s.block);
+			}
+		}
+	}
+}
+
+function refreshBlockForContext(block: Block): void {
+	if (ctxDirectChanged(block)) {
+		// This child directly consumes the changed context (or shares its block
+		// with a lite descendant that does): re-run it. renderBlock re-renders its
+		// own subtree top-down, so nested consumers below it are reached normally.
+		renderBlock(block);
+	} else if ((block.body as any)?.__memo === true) {
+		// A memo'd pure indirection: its $$ctxReads is stamped, so prune to subtrees
+		// that actually hold a changed-context consumer.
+		if (ctxDepsChanged(block)) refreshContextConsumers(block);
+	} else {
+		// A non-memo intermediate (control-flow branch, plain wrapper) isn't stamped
+		// in $$ctxReads, so we can't prune — descend unconditionally to find any
+		// consumer it strands. Bounded by this bailed boundary's subtree.
+		refreshContextConsumers(block);
+	}
 }
 
 function shallowEqualProps(a: any, b: any): boolean {
@@ -6137,6 +6217,16 @@ export function hydrate(
 	registerDelegationTarget(container);
 	const rootBlock = createBlock('root', null, container, null, null, body, props);
 	hydrating = true;
+	// Align useId with the server. The server resets ID_COUNTER to 0 at the start
+	// of every render() (runtime.server.ts), so its ids are :in-0:, :in-1:, … in
+	// depth-first render order. Hydration renders the SAME tree in the SAME order,
+	// so resetting the client counter to 0 here makes the client mint byte-identical
+	// ids — otherwise the monotonic global (advanced by any earlier client render)
+	// would drift and every useId would hydration-mismatch. Subsequent client-only
+	// renders continue monotonically from after the hydrated tree's ids, so no
+	// collision. (Single-root hydration; multi-root pages share the flat-counter
+	// limitation that already exists server-side.)
+	_idCounter = 0;
 	// Adopt server-serialized use(thenable) values, if any: pull them out of the
 	// inline data <script> (and remove it, so it isn't taken for a hydratable
 	// node) and stage them for useThenable to consume in render order.

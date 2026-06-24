@@ -8,6 +8,10 @@ import { useState, useId } from 'octane-ts';
 // actually happened while the id stays put.
 export function Single(props) @{
 	const id = useId();
+	// Report the id the component actually COMPUTED this render — lets a hydration
+	// test capture the CLIENT's id directly (rather than re-reading the adopted
+	// server attribute) to prove server == client.
+	props?.onId?.(id);
 	const [n, setN] = useState(0);
 	<div>
 		<output id="single" data-testid={id}>{id as string}</output>

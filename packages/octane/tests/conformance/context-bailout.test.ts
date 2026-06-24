@@ -4,6 +4,7 @@ import {
 	App,
 	AppIndirect,
 	AppSiblings,
+	AppList,
 	setSink,
 } from '../_fixtures/context-bailout.tsrx';
 
@@ -30,14 +31,12 @@ describe('context propagation: bailout heuristics', () => {
 		expect(r.find('.consumer').textContent).toBe('2');
 		log.length = 0;
 
-		// A genuinely different value DOES reach the consumer, which re-renders
-		// with 3. We assert only the faithful part — the consumer received the new
-		// value — and deliberately do NOT assert the intermediate memo'd
-		// Indirection layers as "correctly" re-rendering: Octane's push-cascade
-		// re-renders them, React's lazy propagation does not. That divergence is
-		// pinned as a gap in the it.fails below rather than baked in here.
+		// A genuinely different value reaches the consumer WITHOUT re-rendering the
+		// two bailed-out memo'd Indirection layers — React's lazy propagation. The
+		// full ordered log is ['App', 'Consumer:3'] (no 'Indirection' entries),
+		// matching ReactNewContext-test.js:214.
 		r.update(App, { value: 3 });
-		expect(log.filter((e) => e.startsWith('Consumer'))).toEqual(['Consumer:3']);
+		expect(log).toEqual(['App', 'Consumer:3']);
 		expect(r.find('.consumer').textContent).toBe('3');
 		r.unmount();
 		setSink(null);
@@ -58,11 +57,11 @@ describe('context propagation: bailout heuristics', () => {
 		expect(log).toEqual(['App']);
 		log.length = 0;
 
-		// Update (no bailout): the changed value reaches BOTH consumers.
+		// Update (no bailout): the changed value reaches BOTH consumers WITHOUT
+		// re-rendering the bailed-out PureIndirection memo boundary — React's lazy
+		// propagation. Full ordered log is ['App', 'Consumer', 'Consumer'].
 		r.update(AppIndirect, { value: 2 });
-		// Both consumers re-run with the new value.
-		const both = log.filter((e) => e === 'Consumer');
-		expect(both).toEqual(['Consumer', 'Consumer']);
+		expect(log).toEqual(['App', 'Consumer', 'Consumer']);
 		expect(r.findAll('.inline, .cached').map((e) => e.textContent)).toEqual([
 			'2',
 			'2',
@@ -71,29 +70,23 @@ describe('context propagation: bailout heuristics', () => {
 		setSink(null);
 	});
 
-	// Per ReactNewContext-test.js:624 — React's lazy context propagation reaches
-	// the consumers WITHOUT re-rendering the intermediate bailed-out memo
-	// component. React asserts ['App', 'Consumer', 'Consumer'] on the changed
-	// value — note the absence of 'PureIndirection'.
-	// GAP — ReactNewContext-test.js:696: Octane's context update is a top-down
-	// push-cascade, so reaching a consumer behind a memo boundary re-renders that
-	// boundary's body too; React propagates straight to the consumer fibers and
-	// leaves the bailed-out memo untouched.
-	it.fails(
-		'a context change reaches consumers without re-rendering the bailed-out memo boundary',
-		() => {
-			const log: string[] = [];
-			setSink((s) => log.push(s));
-			const r = mount(AppIndirect, { value: 1 });
-			log.length = 0;
-			r.update(AppIndirect, { value: 2 });
-			const observed = log.slice();
-			r.unmount();
-			setSink(null);
-			// Desired React behavior: only the consumers re-render, not the memo.
-			expect(observed).toEqual(['App', 'Consumer', 'Consumer']);
-		},
-	);
+	// Per ReactNewContext-test.js:696 — context propagation reaches the consumers
+	// WITHOUT re-rendering the intermediate bailed-out memo component. The log is
+	// ['App', 'Consumer', 'Consumer'] — note the absence of 'PureIndirection'.
+	// Fixed in runtime.ts componentSlot: a memo boundary that bails on props but
+	// whose subtree consumes a changed context now refreshes only the consuming
+	// child blocks (refreshContextConsumers) instead of re-running its body.
+	it('a context change reaches consumers without re-rendering the bailed-out memo boundary', () => {
+		const log: string[] = [];
+		setSink((s) => log.push(s));
+		const r = mount(AppIndirect, { value: 1 });
+		log.length = 0;
+		r.update(AppIndirect, { value: 2 });
+		const observed = log.slice();
+		r.unmount();
+		setSink(null);
+		expect(observed).toEqual(['App', 'Consumer', 'Consumer']);
+	});
 
 	// Per ReactNewContext-test.js:776 — 'does not skip some siblings'
 	// (regression for facebook/react#12686).
@@ -118,6 +111,29 @@ describe('context propagation: bailout heuristics', () => {
 		expect(log).toEqual(['App', 'Consumer']);
 		expect(r.find('.sib').textContent).toBe('2');
 		expect(r.find('.s1').textContent).toBe('static 1');
+		r.unmount();
+		setSink(null);
+	});
+
+	// Per ReactNewContext-test.js:624/:776 — the lazy refresh must reach consumers
+	// nested inside @for items AND an @if branch under a bailed-out memo boundary,
+	// not just direct memo children. Exercises refreshContextConsumers' control-flow
+	// descent (forBlockSlot items + non-memo @if branch block).
+	it('a context change descends through @for and @if under a bailed memo', () => {
+		const log: string[] = [];
+		setSink((s) => log.push(s));
+		// Stable props array ref so ListWrapper bails on the value-only change.
+		const ids = [1, 2];
+		const r = mount(AppList, { value: 1, ids });
+		expect(log).toEqual(['App', 'ListWrapper', 'Row:1', 'Row:2']);
+		log.length = 0;
+
+		r.update(AppList, { value: 2, ids });
+		// ListWrapper bailed (stable props) — NOT re-rendered. Only the consumers
+		// inside the @for and @if refreshed.
+		expect(log).toEqual(['App', 'Row:1', 'Row:2']);
+		expect(r.findAll('li.row-1, li.row-2').map((e) => e.textContent)).toEqual(['2', '2']);
+		expect(r.find('.extra').textContent).toBe('2');
 		r.unmount();
 		setSink(null);
 	});
