@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '../_helpers';
-import {
-	App,
-	AppIndirect,
-	AppSiblings,
-	AppList,
-	setSink,
-} from '../_fixtures/context-bailout.tsrx';
+import { App, AppIndirect, AppSiblings, AppList, setSink } from '../_fixtures/context-bailout.tsrx';
 
 // Ports the context propagation-through-bailout heuristics from
 // react-reconciler/src/__tests__/ReactNewContext-test.js. A module-level render
@@ -62,10 +56,7 @@ describe('context propagation: bailout heuristics', () => {
 		// propagation. Full ordered log is ['App', 'Consumer', 'Consumer'].
 		r.update(AppIndirect, { value: 2 });
 		expect(log).toEqual(['App', 'Consumer', 'Consumer']);
-		expect(r.findAll('.inline, .cached').map((e) => e.textContent)).toEqual([
-			'2',
-			'2',
-		]);
+		expect(r.findAll('.inline, .cached').map((e) => e.textContent)).toEqual(['2', '2']);
 		r.unmount();
 		setSink(null);
 	});

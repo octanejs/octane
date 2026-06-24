@@ -67,7 +67,7 @@ export function CachedMirror(props) @{
 	const [mirror, setMirror] = useState(value);
 	if (value !== mirror) setMirror(value);
 	<span id="mirror">
-		{(value + '|' + mirror) as string}
+		{value + '|' + mirror as string}
 	</span>
 }
 

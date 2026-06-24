@@ -362,9 +362,9 @@ self-verified green and adversarially reviewed for fidelity:
 |---|---|---|
 | `effect-ordering-deletion` | 6 pass | **0 (FIXED)** — was child-first; runtime now fires deletion cleanups parent→child to match React (see "Runtime fix" below). |
 | `memo-bailout` | 3 pass | 0 — Octane matches props-equality bailout, context-defeats-bailout, custom comparator. |
-| `context-bailout` | 3 pass | **1** — a context change re-renders an intermediate **bailed-out memo boundary** (Octane's top-down push-cascade vs React's lazy propagation to consumer fibers). `ReactNewContext:696`. |
+| `context-bailout` | 5 pass | **0 (FIXED)** — context change now reaches consumers via lazy descend without re-rendering the bailed memo boundary (see "Runtime fix" below). |
 | `multichild-remount` | 5 pass | 0 — same-type+key updates in place; type/key change remounts. |
-| `useid-determinism` | 3 pass | **1** — **server `useId` ≠ client `useId`** (independent counters, no handoff); a real hydration would mismatch. `ReactDOMUseId:127`. Genuine bug. |
+| `useid-determinism` | 4 pass | **0 (FIXED)** — client `_idCounter` reset to 0 in `hydrate()` so server≡client (see "Runtime fix" below). |
 | `error-effects` | 4 pass | 0 — `@try`/`@catch` catches errors thrown in `useEffect`/`useLayoutEffect`; hook order preserved after catch. |
 | `sync-store-tearing` | 6 pass | 0 — `useSyncExternalStore` consistency + no-infinite-loop on store-ref change. |
 | `controlled-inputs-extra` | — | removed with the controlled-input revert. |
@@ -381,11 +381,30 @@ paths: full unmount (`unmountScope`) and keyed-list clear (`fireCleanupsOnly` vi
 `batchClearItems`). The previously-divergent `scheduler-priority.test.ts` pin was
 flipped to assert parent-first. **No regressions across the suite.**
 
-**Remaining gaps to triage: 2** — context-through-bailout (push-cascade vs lazy
-propagation) and useId server≡client (real hydration-mismatch bug). The 3
-deletion-order gaps are now fixed; the 6 controlled-input it.fails were removed as
-out-of-scope.
+**All discovered gaps are now fixed.** The 3 deletion-order, 1 context-bailout, and
+1 useId gaps were resolved in the runtime; the 6 controlled-input it.fails were
+removed as out-of-scope.
+
+### Runtime fix — useId server≡client (DONE)
+`hydrate()` resets the client's monotonic `_idCounter` to 0 before rendering, so it
+aligns with the server's per-`render()` reset. Hydration renders the same tree in
+the same depth-first order, so ids now match byte-for-byte (`:in-0:`, `:in-1:`, …).
+Verified by a real server-render → `hydrate()` test that captures the id the CLIENT
+computed (via an `onId` callback) and asserts it equals the server's, after warming
+the counter so the test actually exercises the reset.
+
+### Runtime fix — lazy context propagation through bailed memo (DONE)
+Previously a context change defeated the memo bailout on EVERY memo boundary on the
+path to a consumer (push-cascade), re-rendering bailed-out indirections. Now
+`componentSlot` distinguishes a memo'd **direct consumer** (re-runs — `$$ctxDirect`)
+from a memo'd **pure indirection** (bails its body, then `refreshContextConsumers`
+descends into only the child blocks that actually consume the changed context —
+`$$ctxReads`). Matches React's `['App','Consumer']` (no `Indirection`). The descend
+handles `componentSlot`, `@if`/`@switch`, `@for` items (non-memo branches recurse;
+memo branches prune via `$$ctxReads`), and lite consumers (their block carries
+`$$ctxDirect`, so it re-runs — a safe cascade fallback). No regression across the
+full context suite (context, components-context, hook-fixes memo-through-context,
+suspense-extra, the new Case D for `@for`/`@if` descent).
 
 ### Suite status
-**106 test files, 749 passed + 2 expected-fail** (context-bailout ×1, useId ×1), 0
-regressions. Typecheck clean.
+**106 test files, 752 passed, 0 expected-fail, 0 regressions.** Typecheck clean.

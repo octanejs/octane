@@ -14,8 +14,12 @@ export function Single(props) @{
 	props?.onId?.(id);
 	const [n, setN] = useState(0);
 	<div>
-		<output id="single" data-testid={id}>{id as string}</output>
-		<button id="bump" onClick={() => setN(n + 1)}>{('n=' + n) as string}</button>
+		<output id="single" data-testid={id}>
+			{id as string}
+		</output>
+		<button id="bump" onClick={() => setN(n + 1)}>
+			{'n=' + n as string}
+		</button>
 	</div>
 }
 
@@ -28,10 +32,18 @@ export function Triple(props) @{
 	const c = useId();
 	const [n, setN] = useState(0);
 	<div>
-		<span id="a" data-testid={a}>{a as string}</span>
-		<span id="b" data-testid={b}>{b as string}</span>
-		<span id="c" data-testid={c}>{c as string}</span>
-		<button id="bump3" onClick={() => setN(n + 1)}>{('n=' + n) as string}</button>
+		<span id="a" data-testid={a}>
+			{a as string}
+		</span>
+		<span id="b" data-testid={b}>
+			{b as string}
+		</span>
+		<span id="c" data-testid={c}>
+			{c as string}
+		</span>
+		<button id="bump3" onClick={() => setN(n + 1)}>
+			{'n=' + n as string}
+		</button>
 	</div>
 }
 
@@ -41,7 +53,9 @@ export function Triple(props) @{
 // differ.
 function Inner(props) @{
 	const id = useId();
-	<span id="inner" data-testid={id}>{id as string}</span>
+	<span id="inner" data-testid={id}>
+		{id as string}
+	</span>
 }
 
 export function Wrapper(props) @{
@@ -49,6 +63,8 @@ export function Wrapper(props) @{
 	const [n, setN] = useState(0);
 	<div id="outer" data-testid={id}>
 		<Inner />
-		<button id="bumpw" onClick={() => setN(n + 1)}>{('n=' + n) as string}</button>
+		<button id="bumpw" onClick={() => setN(n + 1)}>
+			{'n=' + n as string}
+		</button>
 	</div>
 }
