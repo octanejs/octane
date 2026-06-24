@@ -348,32 +348,69 @@ export function scheduleRender(block: Block): void {
 	}
 }
 
-function flush(): void {
-	scheduled = false;
+// Block-tree depth (root = 0), by walking the parentBlock chain. Used to drain
+// the render queue ancestors-first so cascade coalescing is order-independent.
+function blockDepth(b: Block): number {
+	let d = 0;
+	for (let p = b.parentBlock; p !== null; p = p.parentBlock) d++;
+	return d;
+}
+
+// Sort a render wave shallow-first (ancestors before descendants). If A is an
+// ancestor of B then depth(A) < depth(B), so A renders first and its cascade can
+// clear B's `pending` (skipping B's redundant standalone render) regardless of
+// the order their setStates were queued. Depths are precomputed so the comparator
+// doesn't re-walk the chain on every compare.
+function sortWaveByDepth(wave: Block[]): Block[] {
+	const depth = new Map<Block, number>();
+	for (let i = 0; i < wave.length; i++) depth.set(wave[i], blockDepth(wave[i]));
+	wave.sort((a, b) => depth.get(a)! - depth.get(b)!);
+	return wave;
+}
+
+// Drain QUEUE. Order ancestors before descendants so a parent's cascade coalesces
+// queued descendants regardless of the order their setStates ran. The flush is
+// synchronous, so we sort and drain the LIVE array in place — no per-flush snapshot
+// allocation, no O(n) shift re-indexing. The sort runs only on batches (>1 block),
+// so the common single-update flush reorders nothing and pays no depth-walk.
+// Returns the first unhandled render error to surface after commit.
+function drainQueue(): { err: any } | null {
 	let pendingError: { err: any } | null = null;
-	while (QUEUE.length) {
-		const block = QUEUE.shift()!;
+	if (QUEUE.length > 1) sortWaveByDepth(QUEUE);
+	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
+	// render) — it appends to QUEUE, and `i < QUEUE.length` is re-evaluated every
+	// step, so those are drained in this same pass. The loop only exits once i has
+	// reached the (possibly grown) end, so the truncation below clears only
+	// fully-processed blocks. Re-entrant additions render in append order rather
+	// than re-sorted, which at worst costs a redundant render in a rare case.
+	for (let i = 0; i < QUEUE.length; i++) {
+		const block = QUEUE[i];
 		// Skip if an ancestor's cascade already re-rendered this block this flush
 		// (renderBlock cleared its `pending`) — avoids a redundant standalone render.
 		if (!block.pending) continue;
 		block.pending = false;
-		if (!block.disposed) {
+		if (block.disposed) continue;
+		try {
+			renderBlock(block);
+		} catch (err) {
 			try {
-				renderBlock(block);
-			} catch (err) {
-				try {
-					handleRenderError(block, err);
-				} catch (unhandled) {
-					// No tryBlock claimed this error. Don't let it abandon the
-					// rest of the queue or skip commitEffects() — that would
-					// strand unrelated roots batched into the same flush and
-					// drop their already-rendered effects. Remember the first
-					// such error and surface it once the flush fully drains.
-					if (pendingError === null) pendingError = { err: unhandled };
-				}
+				handleRenderError(block, err);
+			} catch (unhandled) {
+				// No tryBlock claimed this error. Don't let it abandon the rest of
+				// the queue or skip commit — that would strand unrelated roots
+				// batched into the same flush and drop their already-rendered
+				// effects. Remember the first and surface it once the flush drains.
+				if (pendingError === null) pendingError = { err: unhandled };
 			}
 		}
 	}
+	QUEUE.length = 0;
+	return pendingError;
+}
+
+function flush(): void {
+	scheduled = false;
+	const pendingError = drainQueue();
 	commitEffects();
 	if (pendingError !== null) throw pendingError.err;
 }
@@ -388,28 +425,8 @@ export function flushSync<T>(fn: () => T): T {
 	syncFlush = true;
 	try {
 		const result = fn();
-		// Drain anything scheduled by fn.
-		let pendingError: { err: any } | null = null;
-		while (QUEUE.length) {
-			const block = QUEUE.shift()!;
-			// See flush(): skip a block an ancestor's cascade already re-rendered.
-			if (!block.pending) continue;
-			block.pending = false;
-			if (!block.disposed) {
-				try {
-					renderBlock(block);
-				} catch (err) {
-					try {
-						handleRenderError(block, err);
-					} catch (unhandled) {
-						// See flush(): finish draining and commit effects before
-						// surfacing an unhandled render error, so one failing root
-						// can't strand the rest of this synchronous flush.
-						if (pendingError === null) pendingError = { err: unhandled };
-					}
-				}
-			}
-		}
+		// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
+		const pendingError = drainQueue();
 		commitEffectsSync();
 		if (pendingError !== null) throw pendingError.err;
 		return result;
