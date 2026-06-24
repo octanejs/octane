@@ -983,15 +983,14 @@ export function unmountBlock(block: Block, detachDom: boolean = true): void {
 	// component that suspended/threw before inserting) — nothing to remove.
 }
 
-/** Fire cleanups (depth-first child scopes first) without touching the DOM.
- *  Within each scope, cleanups fire in REVERSE-mount order — last useEffect
- *  declared has its cleanup run first. Matches React's per-fiber finalizer
- *  walk: later effects often depend on resources set up by earlier ones, so
- *  tearing them down in reverse avoids races against shared state.
+/** Fire cleanups (parent scope before children — pre-order) without touching
+ *  the DOM. This is a deletion path (used by batchClearItems when a keyed list
+ *  is cleared), so it follows the same parent → child order as unmountScope, to
+ *  match React's commitDeletionEffects walk. Within each scope, cleanups fire in
+ *  REVERSE-mount order — last useEffect declared has its cleanup run first — so
+ *  later effects can rely on resources from earlier ones during teardown.
  */
 function fireCleanupsOnly(scope: Scope): void {
-	const children = scope.children;
-	for (let i = 0, n = children.length; i < n; i++) fireCleanupsOnly(children[i].scope);
 	const c = scope.cleanups;
 	for (let i = c.length - 1; i >= 0; i--) {
 		try {
@@ -1000,6 +999,8 @@ function fireCleanupsOnly(scope: Scope): void {
 			console.error(err);
 		}
 	}
+	const children = scope.children;
+	for (let i = 0, n = children.length; i < n; i++) fireCleanupsOnly(children[i].scope);
 }
 
 /**
@@ -1020,7 +1021,23 @@ function registerSlot(scope: Scope, slot: any): void {
 }
 
 function unmountScope(scope: Scope, detachDom: boolean = true): void {
-	// Recurse into child scopes first.
+	// Fire THIS scope's cleanups BEFORE recursing into children, so deletion
+	// cleanups run parent → child — matching React's commitDeletionEffects
+	// pre-order walk (ReactEffectOrdering-test.js:37/:64). Within the scope they
+	// still fire in REVERSE-mount order (last useEffect's cleanup first). The DOM
+	// range is still attached here (unmountBlock removes it after this returns),
+	// so a parent layout-effect cleanup can still observe its children's nodes —
+	// exactly as in React, where the parent's destroy runs while the subtree is
+	// still mounted.
+	const c = scope.cleanups;
+	for (let i = c.length - 1; i >= 0; i--) {
+		try {
+			c[i]();
+		} catch (err) {
+			console.error(err);
+		}
+	}
+	// Then recurse into child scopes (parent → child order).
 	const children = scope.children;
 	for (let i = 0, n = children.length; i < n; i++) unmountScope(children[i].scope, detachDom);
 	// Walk slot-stashed child Blocks (ifBlock / forBlock / componentSlot / portal).
@@ -1071,19 +1088,6 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 					unregisterDelegationTarget(val.target);
 				}
 			}
-		}
-	}
-	// Fire cleanups in REVERSE-mount order to match React's per-fiber
-	// finalizer walk — last useEffect declared has its cleanup run first.
-	// React semantics: cleanups before bodies, last-in first-out within a
-	// scope so later effects can rely on resources from earlier ones during
-	// their own cleanup execution.
-	const c = scope.cleanups;
-	for (let i = c.length - 1; i >= 0; i--) {
-		try {
-			c[i]();
-		} catch (err) {
-			console.error(err);
 		}
 	}
 }

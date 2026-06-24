@@ -9,12 +9,9 @@
  *     REVERSE of mount — for BOTH useLayoutEffect (ReactEffectOrdering-test.js:37)
  *     and useEffect / passive (ReactEffectOrdering-test.js:64).
  *
- * GAP: Octane's unmount walk recurses into children BEFORE running a scope's own
- * cleanups, so deletion cleanups fire CHILD-first — the OPPOSITE of React. This
- * is independently pinned (child-first) in scheduler-priority.test.ts:113
- * ("cleanup on unmount stays child-first"). The two deletion-order assertions
- * below therefore encode the DESIRED React behavior (parent-first) and are marked
- * `it.fails` until the runtime flips its unmount order to parent-before-child.
+ * Octane's unmount walk (runtime.ts unmountScope / fireCleanupsOnly) fires each
+ * scope's own cleanups BEFORE recursing into children, so deletion cleanups run
+ * parent → child to match React. (Also pinned in scheduler-priority.test.ts.)
  */
 import { describe, it, expect } from 'vitest';
 import { mount, act, flushEffects, createLog } from '../_helpers';
@@ -60,90 +57,53 @@ describe('effect ordering on deletion (parent → child)', () => {
 
 	// ── Deletion ordering: React fires cleanups parent-first ──────────────────
 
-	it.fails(
-		'layout cleanups on DELETION fire parent → child (React parent-first)',
-		() => {
-			// Per ReactEffectOrdering-test.js:37 —
-			//   'layout unmounts on deletion are fired in parent -> child order'
-			// GAP — ReactEffectOrdering-test.js:37: Octane's unmountScope recurses
-			// into children before running its own scope.cleanups, so cleanups fire
-			// CHILD-first (Grandchild → Child → Parent), the OPPOSITE of React. Same
-			// divergence pinned in scheduler-priority.test.ts:113.
-			const log = createLog();
-			const r = mount(LayoutParent, { log: log.push });
-			log.drain(); // discard mount setups
-			r.unmount();
-			const observed = log.drain();
-			// (no further mounted container to clean up — already unmounted)
-			expect(observed).toEqual([
-				'cleanup layout Parent',
-				'cleanup layout Child',
-				'cleanup layout Grandchild',
-			]);
-		},
-	);
-
-	it.fails(
-		'passive cleanups on DELETION fire parent → child (React parent-first)',
-		async () => {
-			// Per ReactEffectOrdering-test.js:64 —
-			//   'passive unmounts on deletion are fired in parent -> child order'
-			// GAP — ReactEffectOrdering-test.js:64: same child-first unmount walk;
-			// passive cleanups also fire Grandchild → Child → Parent in Octane.
-			const log = createLog();
-			const r = mount(PassiveParent, { log: log.push });
-			await act(async () => {});
-			flushEffects();
-			log.drain(); // discard mount setups
-			r.unmount();
-			flushEffects();
-			const observed = log.drain();
-			expect(observed).toEqual([
-				'cleanup passive Parent',
-				'cleanup passive Child',
-				'cleanup passive Grandchild',
-			]);
-		},
-	);
-
-	it.fails(
-		'layout cleanups via @if-toggle deletion fire parent → child',
-		() => {
-			// Per ReactEffectOrdering-test.js:37 — a reconciler-driven removal
-			// (the @if branch going false) is the same deletion path as a root
-			// unmount and must order cleanups parent → child.
-			// GAP — ReactEffectOrdering-test.js:37: child-first unmount walk applies
-			// to branch deletions too.
-			const log = createLog();
-			const r = mount(LayoutToggleHost, { show: true, log: log.push });
-			log.drain(); // discard mount setups
-			r.update(LayoutToggleHost, { show: false, log: log.push });
-			const observed = log.drain();
-			r.unmount();
-			expect(observed).toEqual([
-				'cleanup layout Parent',
-				'cleanup layout Child',
-				'cleanup layout Grandchild',
-			]);
-		},
-	);
-
-	// ── Observed-order documentation control (always green) ───────────────────
-
-	it('DOCUMENTS Octane current deletion order: cleanups fire child-first', () => {
-		// Pins the ACTUAL Octane behavior so a future runtime change to
-		// parent-first deletion (which would flip the it.fails tests above to
-		// green) is forced to also update THIS assertion — keeping the gap
-		// documentation honest. Mirrors scheduler-priority.test.ts:113.
+	it('layout cleanups on DELETION fire parent → child (React parent-first)', () => {
+		// Per ReactEffectOrdering-test.js:37 —
+		//   'layout unmounts on deletion are fired in parent -> child order'
 		const log = createLog();
 		const r = mount(LayoutParent, { log: log.push });
-		log.drain();
+		log.drain(); // discard mount setups
 		r.unmount();
 		const observed = log.drain();
 		expect(observed).toEqual([
-			'cleanup layout Grandchild',
-			'cleanup layout Child',
 			'cleanup layout Parent',
+			'cleanup layout Child',
+			'cleanup layout Grandchild',
+		]);
+	});
+
+	it('passive cleanups on DELETION fire parent → child (React parent-first)', async () => {
+		// Per ReactEffectOrdering-test.js:64 —
+		//   'passive unmounts on deletion are fired in parent -> child order'
+		const log = createLog();
+		const r = mount(PassiveParent, { log: log.push });
+		await act(async () => {});
+		flushEffects();
+		log.drain(); // discard mount setups
+		r.unmount();
+		flushEffects();
+		const observed = log.drain();
+		expect(observed).toEqual([
+			'cleanup passive Parent',
+			'cleanup passive Child',
+			'cleanup passive Grandchild',
+		]);
+	});
+
+	it('layout cleanups via @if-toggle deletion fire parent → child', () => {
+		// Per ReactEffectOrdering-test.js:37 — a reconciler-driven removal (the
+		// @if branch going false) is the same deletion path as a root unmount and
+		// must order cleanups parent → child.
+		const log = createLog();
+		const r = mount(LayoutToggleHost, { show: true, log: log.push });
+		log.drain(); // discard mount setups
+		r.update(LayoutToggleHost, { show: false, log: log.push });
+		const observed = log.drain();
+		r.unmount();
+		expect(observed).toEqual([
+			'cleanup layout Parent',
+			'cleanup layout Child',
+			'cleanup layout Grandchild',
 		]);
 	});
 });
