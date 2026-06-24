@@ -37,16 +37,16 @@ catalogs:
   default:
     '@changesets/changelog-github': ^0.7.0
     '@changesets/cli': ^2.31.0
-    '@ripple-ts/adapter': ^0.3.85
-    '@ripple-ts/vite-plugin': ^0.3.85
+    '@ripple-ts/adapter': ^0.3.84
+    '@ripple-ts/vite-plugin': ^0.3.84
     '@solidjs/web': '2.0.0-beta.14'
-    '@tsrx/core': ^0.1.33
-    '@tsrx/prettier-plugin': ^0.3.85
-    '@tsrx/ripple': ^0.1.33
-    '@tsrx/react': ^0.2.33
-    '@tsrx/solid': ^0.1.33
-    '@tsrx/vite-plugin-react': ^0.0.65
-    '@tsrx/vite-plugin-solid': ^0.0.63
+    '@tsrx/core': ^0.1.32
+    '@tsrx/prettier-plugin': ^0.3.84
+    '@tsrx/ripple': ^0.1.32
+    '@tsrx/react': ^0.2.32
+    '@tsrx/solid': ^0.1.32
+    '@tsrx/vite-plugin-react': ^0.0.64
+    '@tsrx/vite-plugin-solid': ^0.0.62
     '@types/node': ^24.3.0
     '@vitejs/plugin-react': ^6.0.2
     esbuild: ^0.28.1
