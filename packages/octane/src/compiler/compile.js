@@ -2061,6 +2061,23 @@ function rewriteHookCalls(node, ctx, componentName) {
 					arguments: [...n.arguments, { type: 'Identifier', name: symVar }],
 				};
 			}
+			// Custom / library hook (React's `use[A-Z]` convention) — e.g. a
+			// `useStore` binding from @octane-ts/zustand that WRAPS an Octane base
+			// hook. Inject a per-call-site slot symbol so the wrapper can forward it
+			// to the base hook it composes (every base hook takes an optional trailing
+			// slot). Distinct call sites get distinct slots, so `useStore(a)` and
+			// `useStore(b)` in one component stay independent — and a custom hook
+			// called twice doesn't collide. We do NOT add it to `runtimeNeeded`: it's
+			// a user/library import, not an Octane runtime export. `useContext` is
+			// keyed by context identity (not a per-call-site slot) and `use` has no
+			// uppercase suffix, so both fall through untouched.
+			if (/^use[A-Z]/.test(name) && name !== 'useContext') {
+				const symVar = allocHookSymbol(ctx, `${componentName}.${name}#${ctx.nextHookSymId}`);
+				return {
+					...n,
+					arguments: [...n.arguments, { type: 'Identifier', name: symVar }],
+				};
+			}
 			// SSR Phase 4: give every server-side `use(thenable)` call site a stable
 			// key so render()'s suspense cache matches the same call across re-render
 			// passes (and tells sibling/nested boundaries apart). The client keys
