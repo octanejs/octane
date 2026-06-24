@@ -22,7 +22,11 @@
  *     after a brief normalisation pass.
  */
 import { expect } from 'vitest';
-import { createRoot as octaneCreateRoot, flushSync as octaneFlushSync } from '../../src/index.js';
+import {
+	createRoot as octaneCreateRoot,
+	flushSync as octaneFlushSync,
+	drainPassiveEffects as octaneDrainEffects,
+} from '../../src/index.js';
 import { existsSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,11 +64,15 @@ const reactImportCache = new Map<string, Promise<any>>();
  * would require us to set up jsx-runtime + bare-specifier resolution by
  * hand. Tradeoff: one disk write per fixture.
  */
-function loadReactFixture(srcPath: string): Promise<any> {
-	const cached = reactImportCache.get(srcPath);
+function loadReactFixture(
+	srcPath: string,
+	cacheDir: string = REACT_FIXTURE_CACHE_DIR,
+): Promise<any> {
+	const cacheKey = `${cacheDir}\0${srcPath}`;
+	const cached = reactImportCache.get(cacheKey);
 	if (cached) return cached;
 	const slug = basename(srcPath).replace(/\.tsrx$/, '');
-	const outFile = join(REACT_FIXTURE_CACHE_DIR, `${slug}-${hashString(srcPath)}.js`);
+	const outFile = join(cacheDir, `${slug}-${hashString(srcPath)}.js`);
 	if (!existsSync(outFile)) {
 		return Promise.reject(
 			new Error(
@@ -75,7 +83,7 @@ function loadReactFixture(srcPath: string): Promise<any> {
 		);
 	}
 	const promise = import(/* @vite-ignore */ outFile);
-	reactImportCache.set(srcPath, promise);
+	reactImportCache.set(cacheKey, promise);
 	return promise;
 }
 
@@ -237,6 +245,10 @@ export async function mountDifferential(
 	srcPath: string,
 	octaneEntry: string,
 	initialProps?: any,
+	// Binding packages (e.g. @octane-ts/zustand) reuse this rig but keep their
+	// React-fixture cache inside their OWN package, so the compiled React side
+	// resolves that package's deps (zustand, react, …). Defaults to octane's.
+	cacheDir?: string,
 ): Promise<DiffPair> {
 	// octane side — import via Vitest's normal pipeline (the
 	// octane() plugin handles compilation).
@@ -245,7 +257,7 @@ export async function mountDifferential(
 	if (!OctaneComp) throw new Error(`octane export "${octaneEntry}" not found in ${srcPath}`);
 
 	// React side — compile, write, dynamic-import.
-	const reactMod = await loadReactFixture(srcPath);
+	const reactMod = await loadReactFixture(srcPath, cacheDir);
 	const ReactComp = reactMod[octaneEntry];
 	if (!ReactComp) throw new Error(`@tsrx/react export "${octaneEntry}" not found in ${srcPath}`);
 
@@ -324,6 +336,12 @@ export async function mountDifferential(
 		fn: (i: DiffMount, r: DiffMount) => void | Promise<void>,
 	): Promise<void> {
 		await fn(octane, react);
+		// Settle octane's async work too: a store notify (useSyncExternalStore),
+		// transition, or deferred value schedules its re-render as a passive effect
+		// that flushSync (used inside `click`) doesn't drain. Without this the rig
+		// only sees synchronous (useState) updates. Strictly more draining — inert
+		// for fixtures that were already settled.
+		octaneDrainEffects();
 		// Drain React commits + effects, give microtasks a chance.
 		await reactAct(async () => {});
 		const i = normaliseHtml(octaneContainer.innerHTML);

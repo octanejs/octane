@@ -2053,42 +2053,38 @@ function rewriteHookCalls(node, ctx, componentName) {
 	return mapAst(node, (n) => {
 		if (n.type === 'CallExpression' && n.callee.type === 'Identifier') {
 			const name = n.callee.name;
-			if (HOOK_NAMES.has(name)) {
-				ctx.runtimeNeeded.add(name);
-				const symVar = allocHookSymbol(ctx, `${componentName}.${name}#${ctx.nextHookSymId}`);
+			// Three kinds of call get a trailing per-call-site slot symbol:
+			//  - a built-in base hook (HOOK_NAMES) — also needs its runtime import;
+			//  - a custom / library hook by React's `use[A-Z]` convention — e.g. a
+			//    `useStore` binding from @octane-ts/zustand that WRAPS a base hook and
+			//    FORWARDS the slot to it. `useContext` is keyed by context identity (no
+			//    slot) and `use` has no uppercase suffix, so both are excluded here. We
+			//    do NOT import custom hooks — they're user/library imports;
+			//  - a server-mode `use(thenable)` — a stable suspense-cache key.
+			// Distinct call sites get distinct slots, so `useStore(a)`/`useStore(b)`
+			// (or the same hook twice) stay independent.
+			//
+			// NB: a `use*` NAME is reserved for hooks (React's convention) — a non-hook
+			// function named like one gets a harmless extra trailing argument.
+			const isBuiltin = HOOK_NAMES.has(name);
+			const isCustom = /^use[A-Z]/.test(name) && name !== 'useContext';
+			const isServerUse = name === 'use' && ctx.mode === 'server';
+			if (isBuiltin || isCustom || isServerUse) {
+				if (isBuiltin) ctx.runtimeNeeded.add(name);
+				if (isServerUse) ctx.runtimeNeeded.add('use');
+				const debug = isServerUse
+					? `${componentName}.use#${ctx.nextHookSymId}`
+					: `${componentName}.${name}#${ctx.nextHookSymId}`;
+				const symVar = allocHookSymbol(ctx, debug);
+				// mapAst does NOT recurse into a node we replace, so rewrite this call's
+				// ARGUMENTS ourselves — that's what gives a hook NESTED as an argument
+				// its own slot, e.g. `useStore(api, useShallow(sel))` or a hook in a deps
+				// array. (Allocating the outer slot first keeps its id stable; nested
+				// inner hooks just take the following ids.)
+				const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName));
 				return {
 					...n,
-					arguments: [...n.arguments, { type: 'Identifier', name: symVar }],
-				};
-			}
-			// Custom / library hook (React's `use[A-Z]` convention) — e.g. a
-			// `useStore` binding from @octane-ts/zustand that WRAPS an Octane base
-			// hook. Inject a per-call-site slot symbol so the wrapper can forward it
-			// to the base hook it composes (every base hook takes an optional trailing
-			// slot). Distinct call sites get distinct slots, so `useStore(a)` and
-			// `useStore(b)` in one component stay independent — and a custom hook
-			// called twice doesn't collide. We do NOT add it to `runtimeNeeded`: it's
-			// a user/library import, not an Octane runtime export. `useContext` is
-			// keyed by context identity (not a per-call-site slot) and `use` has no
-			// uppercase suffix, so both fall through untouched.
-			if (/^use[A-Z]/.test(name) && name !== 'useContext') {
-				const symVar = allocHookSymbol(ctx, `${componentName}.${name}#${ctx.nextHookSymId}`);
-				return {
-					...n,
-					arguments: [...n.arguments, { type: 'Identifier', name: symVar }],
-				};
-			}
-			// SSR Phase 4: give every server-side `use(thenable)` call site a stable
-			// key so render()'s suspense cache matches the same call across re-render
-			// passes (and tells sibling/nested boundaries apart). The client keys
-			// use() by per-block call order instead, so this is server-mode only;
-			// the server's use() ignores the key for `use(Context)` reads.
-			if (name === 'use' && ctx.mode === 'server') {
-				ctx.runtimeNeeded.add('use');
-				const symVar = allocHookSymbol(ctx, `${componentName}.use#${ctx.nextHookSymId}`);
-				return {
-					...n,
-					arguments: [...n.arguments, { type: 'Identifier', name: symVar }],
+					arguments: [...args, { type: 'Identifier', name: symVar }],
 				};
 			}
 		}
