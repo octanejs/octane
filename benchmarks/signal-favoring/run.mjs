@@ -70,6 +70,7 @@ function summarize(samples) {
 	return {
 		median: sorted[n >> 1],
 		min: sorted[0],
+		mean,
 		p95: sorted[Math.min(n - 1, Math.floor(n * 0.95))],
 		stddev,
 	};
@@ -126,43 +127,52 @@ async function measureBump(browser, url, idx) {
 	return summarize(samples);
 }
 
-// SWEEP — bump all 10 stateful nodes per sample, in one of two modes:
-//   batched=false → each bump flushes (10 separate commits, "flush on every
-//                   change"); the worst case, no coalescing.
-//   batched=true  → all 10 enqueue, then ONE flush (__sweepBatched); the
-//                   framework's natural microtask coalescing, bounded
-//                   synchronously. The gap between the two is what batching buys.
-// Both end in the same DOM; only the commit count (and so the flush overhead
-// paid) differs. Timed synchronously with gc() before each sample.
-async function measureSweep(browser, url, batched) {
+// SWEEP — bump all 10 stateful nodes per sample. `batchFn` selects the mode:
+//   null                    → each bump flushes (10 separate commits, "flush on
+//                             every change"); the worst case, no coalescing.
+//   '__sweepBatched'        → all 10 enqueue ANCESTOR-first, then ONE flush; the
+//                             framework's natural coalescing, bounded synchronously.
+//   '__sweepBatchedReverse' → the same single flush, but enqueued DESCENDANT-first.
+//                             For a hook framework that coalesces overlapping
+//                             cascades only in queue order, this de-coalesces back
+//                             toward the per-bump cost; an order-independent
+//                             scheduler (and signal frameworks, which don't cascade)
+//                             stays flat. The reverse-vs-forward gap is the metric.
+// All modes end in the same DOM. Timed synchronously with gc() before each sample.
+async function measureSweep(browser, url, batchFn) {
 	const { ctx, page } = await freshPage(browser, url);
 	await page.evaluate(() => window.__mount());
 	await sleep(50);
 	const samples = await page.evaluate(
-		async ({ indices, batched, WARMUP, ITER, YIELD_MS }) => {
+		async ({ indices, batchFn, WARMUP, ITER, YIELD_MS, REPEAT }) => {
 			const gc = window.gc || (() => {});
-			const sweepBatched = window.__sweepBatched;
-			if (batched && typeof sweepBatched !== 'function') throw new Error('missing __sweepBatched');
+			const sweep = batchFn ? window[batchFn] : null;
+			if (batchFn && typeof sweep !== 'function') throw new Error('missing ' + batchFn);
 			const out = [];
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
+				// A single sweep is sub-millisecond, so the OS timer quantizes it to
+				// the ~0.1ms floor. Time REPEAT sweeps and divide — the per-sweep cost
+				// escapes quantization while each sweep still does identical work.
 				const t0 = performance.now();
-				if (batched) {
-					sweepBatched();
-				} else {
-					for (const idx of indices) {
-						const fn = window['__bumpAt' + idx];
-						if (typeof fn !== 'function') throw new Error('missing __bumpAt' + idx);
-						fn();
+				for (let k = 0; k < REPEAT; k++) {
+					if (sweep) {
+						sweep();
+					} else {
+						for (const idx of indices) {
+							const fn = window['__bumpAt' + idx];
+							if (typeof fn !== 'function') throw new Error('missing __bumpAt' + idx);
+							fn();
+						}
 					}
 				}
-				const dt = performance.now() - t0;
+				const dt = (performance.now() - t0) / REPEAT;
 				if (i >= WARMUP) out.push(dt);
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 			}
 			return out;
 		},
-		{ indices: STATEFUL_INDICES, batched, WARMUP, ITER, YIELD_MS },
+		{ indices: STATEFUL_INDICES, batchFn, WARMUP, ITER, YIELD_MS, REPEAT: 25 },
 	);
 	await ctx.close();
 	return summarize(samples);
@@ -209,13 +219,24 @@ async function runTarget(t) {
 	console.error(`  → bump_deep (C91)`);
 	const bump_deep = await measureBump(browser, t.url, 91);
 	console.error(`  → bump_sweep (10 bumps, flush each)`);
-	const bump_sweep = await measureSweep(browser, t.url, false);
-	console.error(`  → bump_sweep_batched (10 bumps, 1 flush)`);
-	const bump_sweep_batched = await measureSweep(browser, t.url, true);
+	const bump_sweep = await measureSweep(browser, t.url, null);
+	console.error(`  → bump_sweep_batched (10 bumps, 1 flush, ancestor-first)`);
+	const bump_sweep_batched = await measureSweep(browser, t.url, '__sweepBatched');
+	console.error(`  → bump_sweep_reverse (10 bumps, 1 flush, descendant-first)`);
+	const bump_sweep_reverse = await measureSweep(browser, t.url, '__sweepBatchedReverse');
 	console.error(`  → unmount`);
 	const unmount = await measureUnmount(browser, t.url);
 	await browser.close();
-	return { mount, bump_shallow, bump_middle, bump_deep, bump_sweep, bump_sweep_batched, unmount };
+	return {
+		mount,
+		bump_shallow,
+		bump_middle,
+		bump_deep,
+		bump_sweep,
+		bump_sweep_batched,
+		bump_sweep_reverse,
+		unmount,
+	};
 }
 
 const OPS = [
@@ -225,6 +246,7 @@ const OPS = [
 	'bump_deep',
 	'bump_sweep',
 	'bump_sweep_batched',
+	'bump_sweep_reverse',
 	'unmount',
 ];
 
@@ -296,6 +318,22 @@ const OPS = [
 			const perOp = r.bump_sweep.median;
 			const ratioStr = perOp === 0 ? '—' : (r.bump_sweep_batched.median / perOp).toFixed(2) + 'x';
 			console.log(`  ${c.padEnd(14)} ${ratioStr}`);
+		}
+
+		// Order-sensitivity: descendant-first vs ancestor-first for the SAME batched
+		// flush. A scheduler that coalesces overlapping cascades only in queue order
+		// pays more when updates arrive deepest-first (>1); one that drains in tree
+		// order — and signal frameworks, which don't cascade — stay ~1.0. This is the
+		// metric the reverse sweep was added to expose. Reported on means (the medians
+		// are at the ~0.1ms timer-quantization floor for these sub-ms ops).
+		console.log(
+			'\norder-sensitivity ratio (bump_sweep_reverse / bump_sweep_batched, ~1.0 = order-independent):',
+		);
+		for (const c of cols) {
+			const r = all[c];
+			const fwd = r.bump_sweep_batched.mean;
+			const ratioStr = !fwd ? '—' : (r.bump_sweep_reverse.mean / fwd).toFixed(2) + 'x';
+			console.log(`  ${c.padEnd(14)} ${ratioStr}  (on means)`);
 		}
 	}
 })().catch((e) => {

@@ -175,6 +175,26 @@ describe('scheduler — cascade coalescing', () => {
 		r.unmount();
 	});
 
+	it('coalesces regardless of setState order (descendant bumped first)', () => {
+		resetCoalesceCounts();
+		const r = mount(CoalesceChain);
+		resetCoalesceCounts();
+		// Queue the updates DESCENDANT-first (leaf → mid → parent). The depth-sorted
+		// drain still renders ancestors first, so the parent's cascade coalesces mid
+		// and leaf — each renders exactly once. Without the depth sort this order
+		// gives { parent: 1, mid: 2, leaf: 3 }.
+		flushSync(() => {
+			getSetCoLeaf()(1);
+			getSetCoMid()(1);
+			getSetCoParent()(1);
+		});
+		expect(getCoalesceCounts()).toEqual({ parent: 1, mid: 1, leaf: 1 });
+		expect(r.find('#co-p').textContent).toBe('1');
+		expect(r.find('#co-m').textContent).toBe('1');
+		expect(r.find('#co-leaf').textContent).toBe('1');
+		r.unmount();
+	});
+
 	it('a deeper descendant update alone still renders once (no spurious skips)', () => {
 		resetCoalesceCounts();
 		const r = mount(CoalesceChain);
