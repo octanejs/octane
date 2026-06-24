@@ -1,9 +1,17 @@
-# octane
+<p align="center">
+  <picture>
+    <!-- white wordmark in dark mode, black wordmark in light mode -->
+    <source media="(prefers-color-scheme: dark)" srcset="./icon.svg">
+    <img alt="Octane" src="./icon-black.svg" width="320">
+  </picture>
+</p>
 
-[![CI](https://github.com/octane-ts/octane/actions/workflows/ci.yml/badge.svg)](https://github.com/octane-ts/octane/actions/workflows/ci.yml)
-[![status: alpha](https://img.shields.io/badge/status-alpha-orange)](#status)
-[![npm version](https://img.shields.io/npm/v/octane-ts?logo=npm)](https://www.npmjs.com/package/octane-ts)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+<p align="center">
+  <a href="https://github.com/octane-ts/octane/actions/workflows/ci.yml"><img src="https://github.com/octane-ts/octane/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="#status"><img src="https://img.shields.io/badge/status-alpha-orange" alt="status: alpha"></a>
+  <a href="https://www.npmjs.com/package/octane-ts"><img src="https://img.shields.io/npm/v/octane-ts?logo=npm" alt="npm version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
+</p>
 
 Octane is a fast, TypeScript-first UI framework. It is the successor to
 [Inferno](https://github.com/infernojs/inferno), the React-like library that set
