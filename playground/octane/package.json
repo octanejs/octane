@@ -1,7 +1,7 @@
 {
   "name": "octane-playground",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "description": "Playground for octane — the template-clone renderer, compiled through octane-ts/compiler.",
   "scripts": {

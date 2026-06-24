@@ -1,6 +1,6 @@
 {
   "name": "octane-ts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "type": "module",
   "description": "Template-clone UI renderer with a React-shape state model, authored in TSRX. Ships the runtime + the TSRX→octane compiler (octane-ts/compiler).",
