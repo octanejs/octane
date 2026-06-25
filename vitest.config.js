@@ -73,6 +73,27 @@ export default defineConfig({
 					],
 				},
 			},
+			{
+				test: {
+					name: 'motion',
+					include: ['packages/motion/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octane-ts\/motion$/,
+							replacement: resolve(import.meta.dirname, 'packages/motion/src/index.ts'),
+						},
+						{
+							find: /^@octane-ts\/motion\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/motion/src') + '/$1.ts',
+						},
+					],
+				},
+			},
 		],
 	},
 });

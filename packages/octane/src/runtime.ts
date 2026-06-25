@@ -3688,6 +3688,85 @@ function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 	}
 }
 
+interface HostComponentSlot {
+	el: Element;
+	anchor: Comment;
+	ref: any;
+}
+
+// Render a host element (`<tag>`) that WRAPS a children render-body, from runtime
+// (non-template) code — e.g. a `motion.div` proxy component that the compiler
+// invokes via componentSlot. The element is created ONCE (keyed by `scope[key]`),
+// its props are re-applied on every render (reactive className / style / events /
+// attributes / ref), and the children body renders INSIDE it via childSlot. The
+// element node is returned so the caller can drive imperative work against it
+// (animations, gesture listeners, measurements). This is the runtime counterpart
+// of the compiled `<tag …>{children}</tag>` host emission.
+export function hostComponent(
+	scope: Scope,
+	key: string,
+	tag: string,
+	props: Record<string, any> | null,
+	childrenBody?: ComponentBody | null,
+	anchor?: Node | null,
+): Element {
+	const block = scope.block;
+	let state = (scope as any)[key] as HostComponentSlot | undefined;
+	if (state === undefined) {
+		const el = document.createElement(tag);
+		// A comment anchor INSIDE the element gives childSlot a stable insertion
+		// point for the children (mirrors the `<!>` placeholder the compiler emits).
+		const childAnchor = document.createComment('');
+		el.appendChild(childAnchor);
+		state = { el, anchor: childAnchor, ref: undefined };
+		(scope as any)[key] = state;
+		block.parentNode.insertBefore(el, anchor ?? block.endMarker);
+		scope.cleanups.push(() => {
+			if (state!.ref != null) attachRef(state!.ref, null);
+		});
+	}
+	const el = state.el;
+	applyHostProps(el, props, scope, state);
+	if (childrenBody != null) {
+		childSlot(scope, key + '$c', el, childrenBody, state.anchor);
+	}
+	return el;
+}
+
+// Like applyDeoptProps but for a PERSISTENT element (re-applied each render): the
+// ref is attached once and only re-attached when it changes (not every render),
+// while className/style/events/attributes are idempotently re-set.
+function applyHostProps(el: Element, props: any, scope: Scope, state: HostComponentSlot): void {
+	if (props == null) return;
+	for (const name in props) {
+		if (name === 'key' || name === 'children') continue;
+		const v = props[name];
+		if (name === 'ref') {
+			if (v !== state.ref) {
+				if (state.ref != null) attachRef(state.ref, null);
+				if (v != null) queueRefAttach(scope, () => attachRef(v, el));
+				state.ref = v;
+			}
+		} else if (name === 'className' || name === 'class') {
+			setClassName(el, v);
+		} else if (name === 'style') {
+			setStyle(el as HTMLElement, v, undefined);
+		} else if (
+			name.length > 2 &&
+			name.charCodeAt(0) === 111 /* o */ &&
+			name.charCodeAt(1) === 110 /* n */ &&
+			name.charCodeAt(2) >= 65 &&
+			name.charCodeAt(2) <= 90 /* on<Upper> → delegated event */
+		) {
+			const type = name.slice(2).toLowerCase();
+			(el as any)['$$' + type] = v;
+			delegateEvents([type]);
+		} else {
+			setAttribute(el, name, v);
+		}
+	}
+}
+
 // Build a DOM Node (or DocumentFragment) for a runtime value: primitive → Text,
 // host descriptor → element (props + recursively-built children), array → a
 // fragment of each. Component descriptors throw (use `@for`).
