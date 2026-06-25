@@ -1586,6 +1586,65 @@ export function createContext<T>(defaultValue: T): Context<T> {
 }
 
 /**
+ * `<Suspense fallback={…}>…</Suspense>` — the JSX component form of
+ * `@try { … } @pending { fallback }`, for authors writing JSX rather than the
+ * template directives (e.g. porting React / react-query code). A thin built-in
+ * over the same `tryBlock` primitive the directives compile to: the children
+ * render as the try body, and `fallback` renders as the pending body whenever a
+ * descendant suspends (via `use(thenable)`).
+ */
+export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBody }> = (
+	scope,
+	props,
+) => {
+	const block = scope.block;
+	const pendingBody: ComponentBody = (s) => {
+		childSlot(s, '_fb', s.block.parentNode, props.fallback, s.block.endMarker);
+	};
+	tryBlock(
+		scope,
+		'_suspense',
+		block.parentNode,
+		props.children,
+		null,
+		pendingBody,
+		block.endMarker,
+	);
+};
+
+/**
+ * `<ErrorBoundary fallback={…}>…</ErrorBoundary>` — the JSX component form of
+ * `@try { … } @catch (e) { fallback }`. `fallback` is either a renderable or a
+ * `(error, reset) => renderable` render prop (react-error-boundary style). When a
+ * descendant throws during render/effects, the boundary swaps to the fallback.
+ */
+export const ErrorBoundary: ComponentBody<{
+	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
+	children: ComponentBody;
+}> = (scope, props) => {
+	const block = scope.block;
+	const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (s, catchProps) => {
+		const fb =
+			typeof props.fallback === 'function'
+				? (props.fallback as (e: unknown, r: () => void) => unknown)(
+						catchProps.err,
+						catchProps.reset,
+					)
+				: props.fallback;
+		childSlot(s, '_fb', s.block.parentNode, fb, s.block.endMarker);
+	};
+	tryBlock(
+		scope,
+		'_errorBoundary',
+		block.parentNode,
+		props.children,
+		catchBody,
+		null,
+		block.endMarker,
+	);
+};
+
+/**
  * React 19's `use()` — accepts either a Context<T> or a thenable (Promise<T>).
  *
  * - `use(context)`: walks the Block tree from CURRENT_BLOCK upward to find a

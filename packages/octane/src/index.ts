@@ -44,6 +44,10 @@ export {
 	useContext,
 	type Context,
 
+	// Suspense / error boundaries as JSX components (alongside the @try directive)
+	Suspense,
+	ErrorBoundary,
+
 	// HMR (compiler-emitted when the Vite plugin's hmr option is on)
 	hmr,
 	HMR,

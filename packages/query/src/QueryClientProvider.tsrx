@@ -1,0 +1,16 @@
+import { useEffect } from 'octane-ts';
+import { QueryClientContext } from './context.ts';
+
+// QueryClientProvider — provides the QueryClient via context and mounts/unmounts
+// it with the component. It's authored in .tsrx because it's a COMPONENT that
+// renders a context Provider with children + a mount effect, which only the
+// octane compiler can emit (the binding's hooks stay plain TS).
+export function QueryClientProvider(props) @{
+	useEffect(() => {
+		props.client.mount();
+		return () => {
+			props.client.unmount();
+		};
+	}, [props.client]);
+	<QueryClientContext.Provider value={props.client}>{props.children}</QueryClientContext.Provider>
+}
