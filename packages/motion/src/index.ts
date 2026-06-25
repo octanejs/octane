@@ -8,7 +8,13 @@
 // effects + rendering path this is meant to exercise.
 import { animate, hover, press, inView } from 'motion';
 import { hostComponent, useLayoutEffect, useState, provideContext } from 'octane-ts';
-import { MotionConfigContext, VariantContext, resolveVariant } from './context';
+import {
+	MotionConfigContext,
+	VariantContext,
+	StaggerContext,
+	resolveVariant,
+	splitVariant,
+} from './context';
 import { isMotionValue, isTransformKey, applyStyleValue } from './useMotionValue';
 import { useContext } from 'octane-ts';
 
@@ -24,6 +30,8 @@ const DRAG = Symbol.for('octane-motion:drag');
 const INVIEW = Symbol.for('octane-motion:inview');
 const MV = Symbol.for('octane-motion:motionvalues');
 const LAYOUT_ID = Symbol.for('octane-motion:layoutid');
+const STAGGER_ORCH = Symbol.for('octane-motion:stagger-orch');
+const STAGGER = Symbol.for('octane-motion:stagger');
 
 // Shared-element registry: a `layoutId` element records its box on unmount; the
 // next element to mount with the same id crossfades (FLIPs) from it. (A basic
@@ -106,33 +114,86 @@ function createMotionComponent(tag: string) {
 	return function MotionComponent(scope: any, props: any): void {
 		const config = useContext(MotionConfigContext);
 		const inherited = useContext(VariantContext);
+		// Read the PARENT's stagger orchestration before providing our own below.
+		const parentStagger = useContext(StaggerContext);
 		const variants = props.variants;
 
 		// Variant labels: an explicit prop wins, else inherit the parent's label.
 		const initialLabel = props.initial !== undefined ? props.initial : inherited.initial;
 		const animateLabel = props.animate !== undefined ? props.animate : inherited.animate;
-		const resolvedInitial = resolveVariant(initialLabel, variants);
-		const resolvedAnimate = resolveVariant(animateLabel, variants);
-		const transition = props.transition ?? config.transition;
+		// A child PARTICIPATES in its parent's stagger when it animates via an inherited
+		// label rather than its own `animate`.
+		const inheritsAnimate = props.animate === undefined && typeof inherited.animate === 'string';
+		const { values: resolvedInitial } = splitVariant(resolveVariant(initialLabel, variants));
+		const { values: resolvedAnimate, transition: animateVariantTransition } = splitVariant(
+			resolveVariant(animateLabel, variants),
+		);
+		const transition = animateVariantTransition ?? props.transition ?? config.transition;
 
-		// Propagate the active labels to descendants (passing through inherited ones),
-		// before rendering children — so nested motion elements inherit them.
+		// Stable holder (also our stagger token) — created before we register/provide.
+		const [latest] = useState(() => ({}) as any, REFS);
+
+		// As a child: register with the parent's orchestration to get a stable index.
+		if (parentStagger && parentStagger.active && inheritsAnimate) {
+			if (!parentStagger.children.includes(latest)) parentStagger.children.push(latest);
+			latest.staggerParent = parentStagger;
+		} else {
+			latest.staggerParent = null;
+		}
+
+		// As a parent: build/refresh OUR orchestration from our (variant) transition and
+		// provide it to children.
+		const [orch] = useState(
+			() =>
+				({
+					active: false,
+					staggerChildren: 0,
+					delayChildren: 0,
+					staggerDirection: 1,
+					children: [],
+				}) as any,
+			STAGGER_ORCH,
+		);
+		const staggerSrc = animateVariantTransition ?? props.transition;
+		orch.staggerChildren = staggerSrc?.staggerChildren ?? 0;
+		orch.delayChildren = staggerSrc?.delayChildren ?? 0;
+		orch.staggerDirection = staggerSrc?.staggerDirection ?? 1;
+		orch.active =
+			orch.staggerChildren > 0 ||
+			orch.delayChildren > 0 ||
+			typeof orch.delayChildren === 'function';
+
+		// Propagate the active labels + stagger orchestration to descendants (passing
+		// through inherited labels), before rendering children.
 		provideContext(scope, VariantContext, {
 			initial: typeof initialLabel === 'string' ? initialLabel : inherited.initial,
 			animate: typeof animateLabel === 'string' ? animateLabel : inherited.animate,
 		});
+		provideContext(scope, StaggerContext, orch);
 
 		const node = hostComponent(scope, '_m', tag, domProps(props), props.children) as HTMLElement;
 
-		// Stable holder threading the LATEST values into the mount-time effect closures.
-		const [latest] = useState(() => ({}) as any, REFS);
+		// Resolve a gesture/exit target to its values + its own (per-variant) transition,
+		// so a variant target carrying a `transition` key honors it (like `animate` does).
+		const rsv = (v: any) => splitVariant(resolveVariant(v, variants));
+		const exitS = rsv(props.exit);
+		const hoverS = rsv(props.whileHover);
+		const tapS = rsv(props.whileTap);
+		const focusS = rsv(props.whileFocus);
+		const inViewS = rsv(props.whileInView);
+
 		latest.node = node;
 		latest.transition = transition;
-		latest.exit = resolveVariant(props.exit, variants);
-		latest.whileHover = resolveVariant(props.whileHover, variants);
-		latest.whileTap = resolveVariant(props.whileTap, variants);
-		latest.whileFocus = resolveVariant(props.whileFocus, variants);
-		latest.whileInView = resolveVariant(props.whileInView, variants);
+		latest.exit = exitS.values;
+		latest.exitTransition = exitS.transition;
+		latest.whileHover = hoverS.values;
+		latest.whileHoverTransition = hoverS.transition;
+		latest.whileTap = tapS.values;
+		latest.whileTapTransition = tapS.transition;
+		latest.whileFocus = focusS.values;
+		latest.whileFocusTransition = focusS.transition;
+		latest.whileInView = inViewS.values;
+		latest.whileInViewTransition = inViewS.transition;
 		latest.base = resolvedAnimate ?? resolvedInitial ?? {};
 		latest.drag = props.drag;
 		latest.dragConstraints = props.dragConstraints;
@@ -150,16 +211,47 @@ function createMotionComponent(tag: string) {
 		);
 
 		// `animate`: animate to the (resolved) target on mount and whenever it changes.
+		// If we're a stagger child, fold in our per-child delay (our index + the sibling
+		// count are both known by now — all children registered during the parent render).
 		useLayoutEffect(
 			() => {
 				if (resolvedAnimate) {
-					const controls = animate(node, resolvedAnimate, transition);
+					let t = transition;
+					const o = latest.staggerParent;
+					if (o && o.active) {
+						const index = o.children.indexOf(latest);
+						const count = o.children.length;
+						let delay: number;
+						if (typeof o.delayChildren === 'function') {
+							// Framer's stagger()/function form: delayChildren(index, total) IS the delay.
+							delay = o.delayChildren(index, count);
+						} else {
+							const offset = o.staggerDirection === 1 ? index : count - 1 - index;
+							delay = (o.delayChildren || 0) + offset * (o.staggerChildren || 0);
+						}
+						if (delay > 0) t = { ...(t || {}), delay: (t?.delay || 0) + delay };
+					}
+					const controls = animate(node, resolvedAnimate, t);
 					if (props.onAnimationComplete) whenDone(controls, () => props.onAnimationComplete());
 					return () => controls.stop();
 				}
 			},
 			[stableKey(resolvedAnimate), stableKey(transition)],
 			ANIMATE,
+		);
+
+		// As a stagger child, deregister from the parent's orchestration on unmount so
+		// indices/counts stay correct for surviving siblings.
+		useLayoutEffect(
+			() => () => {
+				const o = latest.staggerParent;
+				if (o) {
+					const i = o.children.indexOf(latest);
+					if (i >= 0) o.children.splice(i, 1);
+				}
+			},
+			[],
+			STAGGER,
 		);
 
 		// Motion values + static transform shorthands in `style`. MotionValues are
@@ -194,18 +286,21 @@ function createMotionComponent(tag: string) {
 				const cleanups: Array<() => void> = [];
 				const gesture = (
 					bind: (el: Element, onStart: () => () => void) => () => void,
-					pick: () => any,
+					valuesKey: string,
+					transitionKey: string,
 				) =>
 					bind(node, () => {
-						animate(node, pick(), latest.transition);
+						animate(node, latest[valuesKey], latest[transitionKey] ?? latest.transition);
 						return () => {
 							animate(node, latest.base, latest.transition);
 						};
 					});
-				if (props.whileHover) cleanups.push(gesture(hover as any, () => latest.whileHover));
-				if (props.whileTap) cleanups.push(gesture(press as any, () => latest.whileTap));
+				if (props.whileHover)
+					cleanups.push(gesture(hover as any, 'whileHover', 'whileHoverTransition'));
+				if (props.whileTap) cleanups.push(gesture(press as any, 'whileTap', 'whileTapTransition'));
 				if (props.whileFocus) {
-					const onFocus = () => animate(node, latest.whileFocus, latest.transition);
+					const onFocus = () =>
+						animate(node, latest.whileFocus, latest.whileFocusTransition ?? latest.transition);
 					const onBlur = () => animate(node, latest.base, latest.transition);
 					node.addEventListener('focus', onFocus);
 					node.addEventListener('blur', onBlur);
@@ -228,7 +323,7 @@ function createMotionComponent(tag: string) {
 				const stop = inView(
 					node,
 					() => {
-						animate(node, latest.whileInView, latest.transition);
+						animate(node, latest.whileInView, latest.whileInViewTransition ?? latest.transition);
 						return () => {
 							if (!props.viewport?.once) animate(node, latest.base, latest.transition);
 						};
@@ -373,7 +468,7 @@ function createMotionComponent(tag: string) {
 				clone.style.width = `${rect.width}px`;
 				clone.style.height = `${rect.height}px`;
 				parent.appendChild(clone);
-				const controls = animate(clone, exit, latest.transition);
+				const controls = animate(clone, exit, latest.exitTransition ?? latest.transition);
 				whenDone(controls, () => clone.remove());
 			},
 			[],
@@ -418,7 +513,7 @@ export { useScroll } from './useScroll';
 export { useTransform } from './useTransform';
 export { useSpring } from './useSpring';
 export { useMotionValueEvent } from './useMotionValueEvent';
-export { MotionConfigContext, VariantContext } from './context';
+export { MotionConfigContext, VariantContext, StaggerContext } from './context';
 
 // Re-export motion's framework-agnostic helpers (animate, stagger, value types, …).
 export * from 'motion';

@@ -43,7 +43,8 @@ function List(props) @{
   events, …) and `style` MotionValues spread/bound onto the element.
 - `AnimatePresence` — exit animations on removal.
 - `MotionConfig` — global `transition` / `reducedMotion` defaults via context.
-- `variants` — label resolution (`animate="visible"`) + parent→child propagation.
+- `variants` — label resolution (`animate="visible"`) + parent→child propagation +
+  `staggerChildren` / `delayChildren` (number or `stagger()` function) / `staggerDirection`.
 - `useMotionValue()`, `useScroll()`, `useAnimate()` — MotionValues, scroll-linked
   values, and imperative scoped animation.
 - `useTransform()`, `useSpring()`, `useMotionValueEvent()` — MotionValue composition:
@@ -79,6 +80,9 @@ real `<tag>` through `hostComponent`, captures the node, and drives:
 
 The full layout **projection tree** — nested projection, child scale correction, and
 continuous shared-layout during drag (the `layout`/`layoutId` here are single-element
-FLIPs). Also `staggerChildren` / `delayChildren` orchestration, drag momentum/elastic
-physics, reduced-motion enforcement, and `useTransform`'s output-map form
-(`useTransform(mv, [0, 100], { opacity: [0, 1] })`).
+FLIPs). Also drag momentum/elastic physics, reduced-motion enforcement, and
+`useTransform`'s output-map form (`useTransform(mv, [0, 100], { opacity: [0, 1] })`).
+
+Stagger specifics: `when: 'beforeChildren' | 'afterChildren'` parent/child sequencing
+is not implemented, and a child's stagger index is fixed at registration order (a
+keyed reorder does not re-stagger).
