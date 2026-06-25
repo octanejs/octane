@@ -46,6 +46,9 @@ function List(props) @{
 - `variants` — label resolution (`animate="visible"`) + parent→child propagation.
 - `useMotionValue()`, `useScroll()`, `useAnimate()` — MotionValues, scroll-linked
   values, and imperative scoped animation.
+- `useTransform()`, `useSpring()`, `useMotionValueEvent()` — MotionValue composition:
+  derive a value (range-map / transformer / multi-input combiner), spring toward a
+  value or source, and subscribe to a value's events.
 - Motion's framework-agnostic helpers (`animate`, `stagger`, value types, …),
   re-exported.
 
@@ -76,6 +79,6 @@ real `<tag>` through `hostComponent`, captures the node, and drives:
 
 The full layout **projection tree** — nested projection, child scale correction, and
 continuous shared-layout during drag (the `layout`/`layoutId` here are single-element
-FLIPs). Also `staggerChildren` / `delayChildren` orchestration, motion-value
-composition hooks (`useTransform` / `useSpring` / `useMotionValueEvent`), drag
-momentum/elastic physics, and reduced-motion enforcement.
+FLIPs). Also `staggerChildren` / `delayChildren` orchestration, drag momentum/elastic
+physics, reduced-motion enforcement, and `useTransform`'s output-map form
+(`useTransform(mv, [0, 100], { opacity: [0, 1] })`).
