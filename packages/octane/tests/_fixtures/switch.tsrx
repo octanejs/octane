@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // Basic switch: select one of three string-typed cases by props.kind.
 // `@default` is the fall-back when no `@case` matches.

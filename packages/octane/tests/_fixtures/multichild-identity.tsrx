@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // A keyed list driven entirely by props, each row tagged with `data-k` so the
 // identity harness can map node identity by key. Re-render via `update(...)`

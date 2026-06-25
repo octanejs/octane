@@ -1,4 +1,4 @@
-import { useState, useMemo, use } from 'octane-ts';
+import { useState, useMemo, use } from 'octane';
 
 // Regression fixture for the nested-block suspend data-loss bug. A `@try` body
 // holds two hookful child components. The Counter suspends on its OWN re-render

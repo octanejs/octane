@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // ============================================================================
 // MathML attribute breadth + namespace inheritance (Audit Batch 2 — MathML)

@@ -1,5 +1,5 @@
 import { QueriesObserver, QueryObserver, noop, notifyManager } from '@tanstack/query-core';
-import { useState, useMemo, useSyncExternalStore, useCallback, useEffect, use } from 'octane-ts';
+import { useState, useMemo, useSyncExternalStore, useCallback, useEffect, use } from 'octane';
 import { resolveClient } from './context';
 import { useIsRestoring } from './isRestoring';
 import { useQueryErrorResetBoundary } from './errorResetBoundary';

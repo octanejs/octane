@@ -1,5 +1,5 @@
 /**
- * Vite plugin for compiling .tsrx files via octane-ts/compiler compiler.
+ * Vite plugin for compiling .tsrx files via octane/compiler compiler.
  *
  * Per-module target is chosen from Vite's SSR signal: a module compiled for the
  * server environment uses `mode: 'server'` (SSR HTML output), everything else

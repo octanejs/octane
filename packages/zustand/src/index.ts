@@ -14,7 +14,7 @@
 // base hook it composes — which is exactly what `useStore` does below. Because
 // the slot is per-call-site, `useFoo(a)` and `useFoo(b)` in one component (or
 // the same `useFoo` used twice) stay independent, just like in React.
-import { useSyncExternalStore } from 'octane-ts';
+import { useSyncExternalStore } from 'octane';
 import { createStore } from 'zustand/vanilla';
 import type { Mutate, StateCreator, StoreApi, StoreMutatorIdentifier } from 'zustand/vanilla';
 

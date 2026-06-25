@@ -3,7 +3,7 @@
 // element's style, or read it imperatively. Reuses motion's framework-agnostic
 // `scroll`.
 import { motionValue, scroll } from 'motion';
-import { useState, useEffect } from 'octane-ts';
+import { useState, useEffect } from 'octane';
 
 function sub(slot: symbol | undefined, tag: string): symbol | undefined {
 	return slot !== undefined ? Symbol.for((slot.description ?? '') + ':us:' + tag) : undefined;

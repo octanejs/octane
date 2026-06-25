@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // @if + @else demo. Branch-local hooks are a octane feature React
 // doesn't support — useState inside the @if body gets its own scope and

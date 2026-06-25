@@ -1,4 +1,4 @@
-import { useEffect } from 'octane-ts';
+import { useEffect } from 'octane';
 import { QueryClientContext } from './context.ts';
 
 // QueryClientProvider — provides the QueryClient via context and mounts/unmounts

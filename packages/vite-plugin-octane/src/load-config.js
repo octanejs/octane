@@ -19,7 +19,7 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
-import { compile } from 'octane-ts/compiler';
+import { compile } from 'octane/compiler';
 import { DEFAULT_OUTDIR } from './constants.js';
 
 const OCTANE_EXTENSION_PATTERN = /\.tsrx$/;

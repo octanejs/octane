@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'octane-ts';
+import { useState, useEffect } from 'octane';
 
 // React-style guarded component: `if (cond) return;` early-exit followed by
 // hooks. octane supports runtime-conditional hooks (each call site has

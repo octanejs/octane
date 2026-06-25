@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // React 19 callback-ref cleanup. CleanupRef's ref RETURNS a cleanup function;
 // it must run on detach (with the captured node) instead of `ref(null)`.

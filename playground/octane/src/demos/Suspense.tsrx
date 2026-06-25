@@ -1,4 +1,4 @@
-import { useState, use } from 'octane-ts';
+import { useState, use } from 'octane';
 
 // @try / @pending / @catch — octane's TSRX-flavored suspense surface.
 // Clicking "fetch" starts a fake async request that the body await's via

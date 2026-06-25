@@ -1,4 +1,4 @@
-import { createPortal } from 'octane-ts';
+import { createPortal } from 'octane';
 
 // `<tsrx>…</tsrx>` at expression position is gone. The new TSRX equivalent
 // is an arrow returning a `@{ }` block — same semantics: the body is

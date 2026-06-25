@@ -1,5 +1,5 @@
 ---
-"octane-ts": patch
+"octane": patch
 ---
 
 Performance: coalesce overlapping cascades in a batched flush.

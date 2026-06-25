@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'octane-ts';
+import { useRef, useEffect } from 'octane';
 
 // Array-valued ref form: `ref={[a, b]}` attaches BOTH refs to the same
 // element. Matches React's canonical convention (the `react-merge-refs`

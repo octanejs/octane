@@ -1,5 +1,5 @@
 ---
-"octane-ts": patch
+"octane": patch
 ---
 
 Performance: faster context reads and text updates.

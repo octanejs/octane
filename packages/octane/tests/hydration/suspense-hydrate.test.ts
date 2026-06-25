@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane-ts/compiler';
+import { compile } from 'octane/compiler';
 import { hydrate, flushSync } from '../../src/index.js';
-import * as ServerRT from 'octane-ts/server';
+import * as ServerRT from 'octane/server';
 // CLIENT-compiled components (normal .tsrx import path). Importing AsyncCounter
 // (which has an onClick) makes this module register click delegation at load.
 import { AsyncLeaf, AsyncCounter, AsyncUndef } from '../_fixtures/ssr-suspense.tsrx';
@@ -17,7 +17,7 @@ const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/ssr-suspens
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'ssr-suspense.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

@@ -163,7 +163,7 @@ importers:
 
   benchmarks/js-framework/octane:
     dependencies:
-      octane-ts:
+      octane:
         specifier: workspace:*
         version: link:../../../packages/octane
     devDependencies:
@@ -185,7 +185,7 @@ importers:
 
   benchmarks/news/octane:
     dependencies:
-      octane-ts:
+      octane:
         specifier: workspace:*
         version: link:../../../packages/octane
     devDependencies:
@@ -255,7 +255,7 @@ importers:
 
   benchmarks/recursive-context/octane:
     dependencies:
-      octane-ts:
+      octane:
         specifier: workspace:*
         version: link:../../../packages/octane
     devDependencies:
@@ -316,7 +316,7 @@ importers:
 
   benchmarks/signal-favoring/octane:
     dependencies:
-      octane-ts:
+      octane:
         specifier: workspace:*
         version: link:../../../packages/octane
     devDependencies:
@@ -374,7 +374,7 @@ importers:
       motion:
         specifier: catalog:default
         version: 12.40.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      octane-ts:
+      octane:
         specifier: workspace:*
         version: link:../octane
     devDependencies:
@@ -415,7 +415,7 @@ importers:
       '@tanstack/query-core':
         specifier: catalog:default
         version: 5.101.0
-      octane-ts:
+      octane:
         specifier: workspace:*
         version: link:../octane
     devDependencies:
@@ -443,7 +443,7 @@ importers:
       '@ripple-ts/adapter':
         specifier: catalog:default
         version: 0.3.84
-      octane-ts:
+      octane:
         specifier: workspace:*
         version: link:../octane
     devDependencies:
@@ -459,7 +459,7 @@ importers:
 
   packages/zustand:
     dependencies:
-      octane-ts:
+      octane:
         specifier: workspace:*
         version: link:../octane
       zustand:
@@ -484,7 +484,7 @@ importers:
 
   playground/octane:
     dependencies:
-      octane-ts:
+      octane:
         specifier: workspace:*
         version: link:../../packages/octane
     devDependencies:

@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'octane-ts';
+import { createContext, useContext } from 'octane';
 import type { QueryClient } from '@tanstack/query-core';
 
 // The QueryClient context — read by useQuery/useMutation/useQueryClient. Mirrors

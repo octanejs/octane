@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // Style map: a `<style>` element assigned to a `const` becomes a compile-
 // time object whose keys are the source class names and whose values are

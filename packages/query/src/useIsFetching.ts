@@ -1,5 +1,5 @@
 import { notifyManager } from '@tanstack/query-core';
-import { useSyncExternalStore, useCallback } from 'octane-ts';
+import { useSyncExternalStore, useCallback } from 'octane';
 import { resolveClient } from './context';
 import { splitSlot, subSlot } from './internal';
 

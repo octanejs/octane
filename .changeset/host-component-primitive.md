@@ -1,5 +1,5 @@
 ---
-"octane-ts": patch
+"octane": patch
 ---
 
 Add two runtime primitives for plain-TS (non-template) component bindings:

@@ -20,7 +20,7 @@ code and READMEs:
 - `packages/octane/src/runtime.server.ts` + `packages/octane/src/server/index.ts` —
   SSR (`render()` → `{ head, body, css }`).
 - `packages/octane/src/compiler/` — the TSRX→Octane compiler (exposed as
-  `octane-ts/compiler`, `octane-ts/compiler/vite`, `octane-ts/compiler/volar`).
+  `octane/compiler`, `octane/compiler/vite`, `octane/compiler/volar`).
 - `packages/octane/src/index.ts` / `constants.ts` — the public client API surface.
 - `docs/react-parity-migration-plan.md` — the React-behavior parity analysis, the
   tiered test-migration plan, and the list of **intentional divergences** from
@@ -53,7 +53,7 @@ pnpm rules:generate
 
 This is a pnpm monorepo with two publishable packages:
 
-- `packages/octane/` (npm: `octane-ts`) — the runtime **and** the compiler together.
+- `packages/octane/` (npm: `octane`) — the runtime **and** the compiler together.
   - `src/runtime.ts` — client runtime.
   - `src/runtime.server.ts`, `src/server/` — server runtime / SSR.
   - `src/compiler/` — the `.tsrx` compiler (`compile.js`, `vite.js`, `volar.js`).
@@ -136,7 +136,7 @@ skeleton (in-scope `it.todo`s + out-of-scope reasons).
 
 ## Changesets
 
-Add a changeset for user-facing changes to `octane-ts` or `@octane-ts/vite-plugin`.
+Add a changeset for user-facing changes to `octane` or `@octane-ts/vite-plugin`.
 Skip changesets for docs-only, test-only, and internal tooling updates. While Octane
 is `0.x` alpha, stay on the `patch` track.
 

@@ -1,6 +1,6 @@
 /**
  * Hydration marker protocol — the single source of truth shared by the server
- * emit (the `octane-ts/compiler` compiler's server mode) and the client `hydrate`
+ * emit (the `octane/compiler` compiler's server mode) and the client `hydrate`
  * runtime. The server writes these comment markers into the HTML it produces and
  * the client hydration cursor scans for them to align with the server output, so
  * BOTH sides must use byte-identical strings or hydration fails.

@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // Exposes its `setN` via a module-level shim so tests can fire updates from
 // outside the component body — exactly the situation `act()` warns about.

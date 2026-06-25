@@ -1,4 +1,4 @@
-import { useState, createPortal } from 'octane-ts';
+import { useState, createPortal } from 'octane';
 
 // Nested portals: app-root > portal into targetA (div.p1) > portal into targetB
 // (button.deep). A click on the deepest button must bubble through BOTH logical

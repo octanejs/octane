@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
-import { compile } from 'octane-ts/compiler';
+import { compile } from 'octane/compiler';
 import { Picker, Composed, Switchable, Branded } from './_fixtures/style-map.tsrx';
 
 // Style maps: `const styles = <style>...</style>` (or the exported form)

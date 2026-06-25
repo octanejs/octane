@@ -1,4 +1,4 @@
-import { hydrate, flushSync } from 'octane-ts';
+import { hydrate, flushSync } from 'octane';
 import { App } from './App.tsrx';
 
 const container = document.getElementById('app');

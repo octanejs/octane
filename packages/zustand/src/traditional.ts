@@ -15,7 +15,7 @@
 //
 // Note: v5 recommends `useShallow` over this equality-fn pattern for object
 // slices; `traditional` exists for code that still uses it.
-import { useSyncExternalStore, useRef } from 'octane-ts';
+import { useSyncExternalStore, useRef } from 'octane';
 import { createStore } from 'zustand/vanilla';
 import type { StateCreator, StoreApi } from 'zustand/vanilla';
 

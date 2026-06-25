@@ -1,11 +1,4 @@
-import {
-	use,
-	useState,
-	useEffect,
-	useTransition,
-	startTransition,
-	useDeferredValue,
-} from 'octane-ts';
+import { use, useState, useEffect, useTransition, startTransition, useDeferredValue } from 'octane';
 
 // ============================================================================
 // Gap 16 (Transitions): transition that throws synchronously (no suspend)

@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
-import { compile } from 'octane-ts/compiler';
+import { compile } from 'octane/compiler';
 import {
 	SpreadOnElement,
 	SpreadWithExplicit,

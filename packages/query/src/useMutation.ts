@@ -2,7 +2,7 @@
 // @tanstack/react-query: a MutationObserver subscribed via useSyncExternalStore,
 // with a stable `mutate` callback. The single compiler-injected slot is split
 // into distinct sub-slots for each internal base hook.
-import { useState, useCallback, useSyncExternalStore, useEffect } from 'octane-ts';
+import { useState, useCallback, useSyncExternalStore, useEffect } from 'octane';
 import { MutationObserver, noop, notifyManager, shouldThrowError } from '@tanstack/query-core';
 import { resolveClient } from './context';
 

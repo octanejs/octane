@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'octane-ts';
+import { useState, useEffect } from 'octane';
 
 // Inner component that throws on render when `props.bang` is true.
 function ThrowsOnRender(props) @{

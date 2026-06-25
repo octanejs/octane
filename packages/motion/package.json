@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "motion": "catalog:default",
-    "octane-ts": "workspace:*"
+    "octane": "workspace:*"
   },
   "devDependencies": {
     "vitest": "catalog:default"

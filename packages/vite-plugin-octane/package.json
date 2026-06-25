@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@ripple-ts/adapter": "catalog:default",
-    "octane-ts": "workspace:*"
+    "octane": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:default",

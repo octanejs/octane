@@ -1,7 +1,7 @@
 /**
  * octane server runtime (SSR Phase 1).
  *
- * The `octane-ts/compiler` compiler, in `mode: 'server'`, emits component bodies
+ * The `octane/compiler` compiler, in `mode: 'server'`, emits component bodies
  * that build an HTML STRING (instead of cloning a DOM template) by calling the
  * `ssr*` helpers here, and that call these server hook implementations. The
  * server analogue of `createRoot().render()` is `render(Component, props)` →

@@ -1,4 +1,4 @@
-import { createRoot, flushSync } from 'octane-ts';
+import { createRoot, flushSync } from 'octane';
 import App, {
 	bumpAt1,
 	bumpAt11,

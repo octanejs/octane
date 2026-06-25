@@ -1,4 +1,4 @@
-import { createRoot, flushSync } from 'octane-ts';
+import { createRoot, flushSync } from 'octane';
 import App, { bumpRoot, bumpPartial, hideMid, showMid } from './App.tsrx';
 
 const target = document.getElementById('main');

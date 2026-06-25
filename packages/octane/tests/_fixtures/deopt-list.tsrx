@@ -1,4 +1,4 @@
-import { createElement, useState } from 'octane-ts';
+import { createElement, useState } from 'octane';
 
 // Renders an ARRAY of host descriptors at a child position — the runtime de-opt
 // path. Built with createElement directly so it works before the compiler lowers

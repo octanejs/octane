@@ -8,7 +8,7 @@ import {
 	use,
 	createContext,
 	memo,
-} from 'octane-ts';
+} from 'octane';
 
 // ---------------------------------------------------------------------------
 // #1 — effect cleanup lifecycle: old cleanup fires exactly once on dep change

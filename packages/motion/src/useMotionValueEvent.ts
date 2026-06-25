@@ -3,7 +3,7 @@
 // 'animationCancel') for the component's lifetime. Re-subscribes if value/event/
 // callback identity changes; unsubscribes on unmount. Reuses MotionValue's `on`,
 // which returns the unsubscribe fn (and, for 'change', stops idle animations).
-import { useInsertionEffect } from 'octane-ts';
+import { useInsertionEffect } from 'octane';
 
 function sub(slot: symbol | undefined, tag: string): symbol | undefined {
 	return slot !== undefined ? Symbol.for((slot.description ?? '') + ':umve:' + tag) : undefined;

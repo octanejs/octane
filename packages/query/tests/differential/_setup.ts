@@ -3,7 +3,7 @@
  * differential precompile. Compiles every `.tsrx` fixture under
  * `packages/query/tests/_fixtures` through `@tsrx/react` + esbuild and writes the
  * React-runtime JS into THIS package's cache, rewriting `@octane-ts/query` →
- * `@tanstack/react-query` (and `octane-ts` → `react`) so the React side runs the
+ * `@tanstack/react-query` (and `octane` → `react`) so the React side runs the
  * real react-query binding (the byte-for-byte oracle).
  */
 import { compile as compileToReact } from '@tsrx/react';
@@ -50,7 +50,7 @@ function compileOne(srcPath: string): void {
 			/from\s+["']@octane-ts\/query(\/[^"']*)?["']/g,
 			(_m, sub) => `from "@tanstack/react-query${sub || ''}"`,
 		)
-		.replace(/from\s+["']octane-ts["']/g, 'from "react"');
+		.replace(/from\s+["']octane["']/g, 'from "react"');
 	const slug = basename(srcPath).replace(/\.tsrx$/, '');
 	const outFile = join(CACHE_DIR, `${slug}-${hashString(srcPath)}.js`);
 	writeFileSync(outFile, rewritten);

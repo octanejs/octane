@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
-import { octane } from 'octane-ts/compiler/vite';
+import { octane } from 'octane/compiler/vite';
 
 export default defineConfig({
 	plugins: [octane()],
-	optimizeDeps: { exclude: ['octane-ts', 'octane-ts/compiler'] },
+	optimizeDeps: { exclude: ['octane', 'octane/compiler'] },
 	build: { target: 'esnext', minify: false },
 	server: { port: 5185, strictPort: true },
 });

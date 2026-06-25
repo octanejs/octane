@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane-ts/compiler';
+import { compile } from 'octane/compiler';
 import * as RT from '../../src/server/index.js';
 import { hydrate } from '../../src/index.js';
 import { mount } from '../_helpers';
@@ -23,11 +23,11 @@ const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 // Same eval-the-server-compiled-module trick as tests/ssr.test.ts: the vite
 // plugin compiles .tsrx in CLIENT mode for vitest, so to exercise the server
 // runtime we compile the source in server mode here and bind its
-// `octane-ts/server` import to the live runtime module.
+// `octane/server` import to the live runtime module.
 function evalServer(source: string, file: string): Record<string, any> {
 	let { code } = compile(source, file, { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

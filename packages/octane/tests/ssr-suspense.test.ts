@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane-ts/compiler';
-import * as RT from 'octane-ts/server';
+import { compile } from 'octane/compiler';
+import * as RT from 'octane/server';
 
 // SSR Phase 4 — Suspense + data serialization. render() is async: a
 // use(thenable) that hasn't resolved suspends the pass (the @try shows
@@ -15,7 +15,7 @@ const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 function evalServer(source: string, file: string): Record<string, any> {
 	let { code } = compile(source, file, { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // Canonical js-framework-benchmark fixture. The six button IDs (run, runlots,
 // add, update, clear, swaprows) plus the per-row <a> tags in column 2

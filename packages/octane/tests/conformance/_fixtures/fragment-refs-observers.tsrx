@@ -1,4 +1,4 @@
-import { Fragment } from 'octane-ts';
+import { Fragment } from 'octane';
 
 // Three siblings inside the fragment — used by observeUsing /
 // unobserveUsing / getClientRects tests.

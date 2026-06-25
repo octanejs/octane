@@ -1,4 +1,4 @@
-import { use, useState, useEffect, useTransition } from 'octane-ts';
+import { use, useState, useEffect, useTransition } from 'octane';
 
 // Single use() inside @try — the simplest suspense shape.
 export function S1(props) @{

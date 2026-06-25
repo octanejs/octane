@@ -1,4 +1,4 @@
-import { Fragment } from 'octane-ts';
+import { Fragment } from 'octane';
 
 // Two focusable inputs side-by-side — covers basic focus() and focusLast().
 export function TwoInputs(props) @{

@@ -56,10 +56,10 @@ import {
 const OCTANE_PLATFORM = {
 	name: 'octane',
 	imports: {
-		fragment: 'octane-ts',
-		suspense: 'octane-ts',
-		dynamic: 'octane-ts',
-		errorBoundary: 'octane-ts',
+		fragment: 'octane',
+		suspense: 'octane',
+		dynamic: 'octane',
+		errorBoundary: 'octane',
 		forOfIterableHelper: '@tsrx/core/runtime/iterable',
 	},
 	jsx: {

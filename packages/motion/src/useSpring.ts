@@ -6,7 +6,7 @@
 // Bind the returned MotionValue to a `motion.*` element via `style`, or read it
 // imperatively. Returns the SAME stable MotionValue across renders.
 import { motionValue, attachFollow } from 'motion';
-import { useState, useInsertionEffect } from 'octane-ts';
+import { useState, useInsertionEffect } from 'octane';
 import { isMotionValue } from './useMotionValue';
 
 function sub(slot: symbol | undefined, tag: string): symbol | undefined {

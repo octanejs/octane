@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // ---------------------------------------------------------------------------
 // `style` prop — string form (cssText) inlined into the template.

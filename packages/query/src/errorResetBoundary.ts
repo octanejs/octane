@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'octane-ts';
+import { createContext, useContext } from 'octane';
 
 export interface QueryErrorResetBoundaryValue {
 	clearReset: () => void;

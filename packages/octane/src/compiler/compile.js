@@ -1,5 +1,5 @@
 /**
- * octane-ts/compiler compiler — compiles TSRX source into JS that targets
+ * octane/compiler compiler — compiles TSRX source into JS that targets
  * the octane runtime.
  *
  * Architecture (mirrors PLAN-TEMPLATE-RUNTIME.md §6 and §7):
@@ -658,6 +658,22 @@ function isComponentFunction(node) {
 	);
 }
 
+// A plain React-style function whose OUTPUT is JSX: a `BlockStatement` body with a
+// `return <jsx>`. NOT the `@{}` form (that's a JSXCodeBlock). This is "just a
+// function" — there is no component gate at the declaration; the function gets its
+// hooks slotted (via withSlot) and its returned JSX lowered to a descriptor, and
+// whatever USES it (`<Foo/>` / `{expr}`) is what renders it. (Async/generator
+// excluded; a `use*` custom hook that returns JSX is still a hook, not this.)
+function isReturnJsxFunction(node) {
+	if (!node) return false;
+	if (node.type !== 'FunctionDeclaration' && node.type !== 'FunctionExpression') return false;
+	if (node.async || node.generator) return false;
+	if (!node.body || node.body.type !== 'BlockStatement') return false;
+	return (node.body.body || []).some(
+		(s) => s.type === 'ReturnStatement' && s.argument && isJsxNode(s.argument),
+	);
+}
+
 // Arrow-function component shape: `const X = (props) => @{…}` (and the `export`
 // variant). @tsrx/core parses the `@{…}` arrow body as a JSXCodeBlock, but the
 // rest of the compiler keys on FunctionDeclaration. Convert a single-declarator
@@ -848,7 +864,7 @@ export function compile(source, filename, options) {
 	if (mode === 'server') {
 		// Server (SSR) codegen — Phase 1: static markup + dynamic text + attributes
 		// + nested components, emitted as HTML-string-building bodies importing the
-		// server runtime from 'octane-ts/server'. Control flow, portals, Activity
+		// server runtime from 'octane/server'. Control flow, portals, Activity
 		// and component children are rejected (later phases).
 		return compileServer(source, filename, options);
 	}
@@ -872,6 +888,7 @@ export function compile(source, filename, options) {
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
 		nextHookSymId: 0,
+		nextFragId: 0,
 		nextTemplateId: 0,
 		nextHelperId: 0,
 		// Same-module component eligibility for componentSlotLite (Design (c)
@@ -1084,7 +1101,23 @@ export function compile(source, filename, options) {
 			body += compiled + '\n\n';
 			bodyLine += countNewlines(compiled + '\n\n');
 			if (hmrEnabled) hmrComponents.push({ name: c.id.name, exportKind: 'named' });
-		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane-ts') {
+		} else if (isReturnJsxFunction(node)) {
+			// `function Foo() { …hooks…; return <jsx>; }` — a plain return-JSX function.
+			ctx._setupMaps = null;
+			const chunk = compileReturnJsxFunction(node, ctx, {}) + '\n\n';
+			body += chunk;
+			bodyLine += countNewlines(chunk);
+		} else if (node.type === 'ExportNamedDeclaration' && isReturnJsxFunction(node.declaration)) {
+			ctx._setupMaps = null;
+			const chunk = compileReturnJsxFunction(node.declaration, ctx, { export: true }) + '\n\n';
+			body += chunk;
+			bodyLine += countNewlines(chunk);
+		} else if (node.type === 'ExportDefaultDeclaration' && isReturnJsxFunction(node.declaration)) {
+			ctx._setupMaps = null;
+			const chunk = compileReturnJsxFunction(node.declaration, ctx, { default: true }) + '\n\n';
+			body += chunk;
+			bodyLine += countNewlines(chunk);
+		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
 			// Preserve ALL user-imported names from octane (Portal, createContext,
 			// use, custom helpers, etc.) — merged into the single prelude import.
 			for (const sp of node.specifiers || []) {
@@ -1178,7 +1211,7 @@ export function compile(source, filename, options) {
 	// we re-emit the prelude bits with the now-complete `runtimeNeeded` set.
 	const finalRuntimeImport =
 		ctx.runtimeNeeded.size > 0
-			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'octane-ts';\n\n`
+			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'octane';\n\n`
 			: '';
 
 	// Everything before `body` in the output — shifts every body segment's
@@ -1236,6 +1269,7 @@ function compileServer(source, filename, options) {
 		cssInjections: [],
 		currentComponentLocals: null,
 		nextHookSymId: 0,
+		nextFragId: 0,
 		nextHelperId: 0,
 		componentInfo: new Map(),
 		mapSource: source,
@@ -1251,8 +1285,8 @@ function compileServer(source, filename, options) {
 			body += compileServerComponent({ ...node.declaration, default: true }, ctx) + '\n\n';
 		} else if (node.type === 'ExportNamedDeclaration' && isComponentFunction(node.declaration)) {
 			body += compileServerComponent({ ...node.declaration, export: true }, ctx) + '\n\n';
-		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane-ts') {
-			// User imports from 'octane-ts' resolve to the server runtime instead.
+		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
+			// User imports from 'octane' resolve to the server runtime instead.
 			for (const sp of node.specifiers || []) {
 				const name = sp.imported?.name || sp.local?.name;
 				if (name) ctx.runtimeNeeded.add(name);
@@ -1268,7 +1302,7 @@ function compileServer(source, filename, options) {
 
 	const runtimeImport =
 		ctx.runtimeNeeded.size > 0
-			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'octane-ts/server';\n\n`
+			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'octane/server';\n\n`
 			: '';
 	const helpers = ctx.hoistedHelpers.length ? ctx.hoistedHelpers.join('\n') + '\n\n' : '';
 	const code = runtimeImport + helpers + body;
@@ -2042,7 +2076,11 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// (out-of-band; re-applied each render for reactivity, removed on unmount).
 	if (plan.head) lines.push(plan.head);
 
-	return `function ${name}(__s${paramsClause}, __extra) {\n  const __block = __s.block;\n${lines.join('\n')}\n}`;
+	// PROPS-FIRST convention: `(…userProps, __s, __extra)`. The scope is the 2nd arg
+	// (a placeholder leads when there are no user params), so a plain function
+	// `App(props)` binds `props`, while compiled bodies still read `__s` by name.
+	const sig = params ? `${params}, __s, __extra` : `__props, __s, __extra`;
+	return `function ${name}(${sig}) {\n  const __block = __s.block;\n${lines.join('\n')}\n}`;
 }
 
 // ===========================================================================
@@ -2090,6 +2128,215 @@ function rewriteHookCalls(node, ctx, componentName) {
 		}
 		return null;
 	});
+}
+
+// Like rewriteHookCalls, but wraps each BASE hook call in `withSlot(sym, hook,
+// ...args)` — passing the hook + args directly (no per-render closure), so the
+// call-site symbol is pushed on the path stack and the base hook keys off the
+// combined path. Custom (`use*`) hook calls keep the trailing-arg form for now, so
+// existing hand-written bindings (which extract the trailing slot) keep working.
+// Used by the return-JSX function path; the `@{}` path still uses rewriteHookCalls.
+function rewriteHookCallsWithSlot(node, ctx, componentName) {
+	return mapAst(node, (n) => {
+		if (n.type === 'CallExpression' && n.callee.type === 'Identifier') {
+			const name = n.callee.name;
+			const isBuiltin = HOOK_NAMES.has(name);
+			const isCustom = /^use[A-Z]/.test(name) && name !== 'useContext';
+			if (isBuiltin || isCustom) {
+				const symVar = allocHookSymbol(ctx, `${componentName}.${name}#${ctx.nextHookSymId}`);
+				// Recurse into args (nested hooks get their own slots) — mapAst won't.
+				const args = n.arguments.map((a) => rewriteHookCallsWithSlot(a, ctx, componentName));
+				if (isBuiltin) {
+					ctx.runtimeNeeded.add(name);
+					ctx.runtimeNeeded.add('withSlot');
+					return {
+						type: 'CallExpression',
+						callee: { type: 'Identifier', name: 'withSlot' },
+						arguments: [
+							{ type: 'Identifier', name: symVar },
+							{ type: 'Identifier', name },
+							...args,
+						],
+						optional: false,
+					};
+				}
+				// Custom hook → trailing-arg (binding forwards it).
+				return { ...n, arguments: [...args, { type: 'Identifier', name: symVar }] };
+			}
+		}
+		return null;
+	});
+}
+
+// Compile a plain return-JSX function "as just a function": slot its hooks (withSlot)
+// and lower its returned JSX to a `createElement(...)` descriptor. The function stays
+// callable/return-based; `renderBlock` renders whatever it returns (reconciled by
+// descriptor type identity). No component gate, no signature rewrite to (scope,props).
+function compileReturnJsxFunction(node, ctx, options) {
+	const name = node.id.name;
+	const newStatements = (node.body.body || []).map((s) => {
+		const h = rewriteHookCallsWithSlot(s, ctx, name);
+		// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
+		// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
+		if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
+			return { ...h, argument: lowerReturnJsx(h.argument, ctx) };
+		}
+		return rewriteJsxValues(h, ctx);
+	});
+	const fn = {
+		type: 'FunctionDeclaration',
+		id: node.id,
+		params: node.params,
+		async: false,
+		generator: false,
+		body: { type: 'BlockStatement', body: newStatements },
+	};
+	const code = printNode(fn);
+	if (options && options.default) return `${code}\nexport default ${name};`;
+	if (options && options.export) return `export ${code}`;
+	return code;
+}
+
+// Lower a JSX value at return position. A HOST element becomes a compiled-fragment
+// descriptor (`createElement(_frag$N, holeProps)`) so it rides childSlot's reconcile
+// path; a component element / fragment / directive keeps the existing value-lowering
+// (components already reconcile by identity).
+function lowerReturnJsx(node, ctx) {
+	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
+		return lowerHostFragment(node, ctx);
+	}
+	return rewriteJsxValues(node, ctx);
+}
+
+function memberProps(hn) {
+	return {
+		type: 'MemberExpression',
+		object: { type: 'Identifier', name: 'props' },
+		property: { type: 'Identifier', name: hn },
+		computed: false,
+		optional: false,
+	};
+}
+function objectProp(hn, valNode) {
+	return {
+		type: 'Property',
+		key: { type: 'Identifier', name: hn },
+		value: valNode,
+		kind: 'init',
+		method: false,
+		shorthand: false,
+		computed: false,
+	};
+}
+
+// Walk a host element, replacing each DYNAMIC part (an attribute/child expression)
+// with `props.hN` and collecting `{ hN: <originalExpr> }` into `holeProps`. Static
+// structure (tag, literal attrs, text, nested host elements) stays in the template;
+// nested component children become renderable holes. The result is a self-contained
+// fragment whose only inputs are its props — compilable as an ordinary renderer.
+function extractFragment(node, ctx, holeProps) {
+	const attrs = node.attributes || node.openingElement?.attributes || [];
+	const newAttrs = [];
+	for (const attr of attrs) {
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') {
+			newAttrs.push(attr); // spread — leave (TODO)
+			continue;
+		}
+		const v = attr.value;
+		const inner = v && v.type === 'JSXExpressionContainer' ? v.expression : v;
+		// Dynamic attr = an expression value that isn't a static literal/string.
+		const isStatic =
+			v == null ||
+			!inner ||
+			inner.type === 'Literal' ||
+			inner.type === 'StringLiteral' ||
+			inner.type === 'JSXText' ||
+			inner.type === 'Text';
+		if (isStatic) {
+			newAttrs.push(attr);
+		} else {
+			const hn = `h${holeProps.length}`;
+			holeProps.push(objectProp(hn, rewriteJsxValues(inner, ctx)));
+			newAttrs.push({
+				...attr,
+				value:
+					v.type === 'JSXExpressionContainer'
+						? { type: 'JSXExpressionContainer', expression: memberProps(hn) }
+						: memberProps(hn),
+			});
+		}
+	}
+	const newChildren = [];
+	for (const child of node.children || []) {
+		const t = child && child.type;
+		if (t === 'JSXText' || t === 'Text') {
+			newChildren.push(child);
+		} else if (t === 'JSXExpressionContainer') {
+			const expr = child.expression;
+			const hn = `h${holeProps.length}`;
+			if (expr && expr.type === 'TSAsExpression') {
+				// Preserve the `as T` cast in the renderer (it marks a dynamic TEXT hole).
+				holeProps.push(objectProp(hn, rewriteJsxValues(expr.expression, ctx)));
+				newChildren.push({
+					type: 'JSXExpressionContainer',
+					expression: {
+						type: 'TSAsExpression',
+						expression: memberProps(hn),
+						typeAnnotation: expr.typeAnnotation,
+					},
+				});
+			} else {
+				holeProps.push(objectProp(hn, rewriteJsxValues(expr, ctx)));
+				newChildren.push({ type: 'JSXExpressionContainer', expression: memberProps(hn) });
+			}
+		} else if (t === 'Element' || t === 'JSXElement') {
+			if (isComponentTag(child)) {
+				const hn = `h${holeProps.length}`;
+				holeProps.push(objectProp(hn, jsxElementToCreateElement(child, ctx)));
+				newChildren.push({ type: 'JSXExpressionContainer', expression: memberProps(hn) });
+			} else {
+				newChildren.push(extractFragment(child, ctx, holeProps));
+			}
+		} else {
+			newChildren.push(child);
+		}
+	}
+	const out = { ...node, attributes: newAttrs, children: newChildren };
+	// The emission normalizes from `openingElement.attributes`, so update it too.
+	if (node.openingElement) {
+		out.openingElement = { ...node.openingElement, attributes: newAttrs };
+	}
+	return out;
+}
+
+// A host JSX element → a hoisted compiled renderer + `createElement(_frag$N, {...})`.
+function lowerHostFragment(node, ctx) {
+	const holeProps = [];
+	const rendererEl = extractFragment(node, ctx, holeProps);
+	const fragName = `_frag$${ctx.nextFragId++}`;
+	const synthFn = {
+		type: 'FunctionDeclaration',
+		id: { type: 'Identifier', name: fragName },
+		params: [{ type: 'Identifier', name: 'props' }],
+		async: false,
+		generator: false,
+		body: { type: 'JSXCodeBlock', body: [], render: rendererEl },
+	};
+	ctx.hoistedHelpers.push(compileFunctionBody(synthFn, ctx, fragName));
+	// A host fragment is a SINGLE root element, so it can mount markerless (the
+	// element self-delimits) — matching `@{}`'s inline render exactly (no extra
+	// comment markers), which is required for byte-equal DOM when folding `@{}`.
+	ctx.hoistedHelpers.push(`${fragName}.$$singleRoot = true;`);
+	ctx.runtimeNeeded.add('createElement');
+	return {
+		type: 'CallExpression',
+		callee: { type: 'Identifier', name: 'createElement' },
+		arguments: [
+			{ type: 'Identifier', name: fragName },
+			{ type: 'ObjectExpression', properties: holeProps },
+		],
+		optional: false,
+	};
 }
 
 /**

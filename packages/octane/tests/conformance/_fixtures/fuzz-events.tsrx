@@ -1,4 +1,4 @@
-import { useState, flushSync } from 'octane-ts';
+import { useState, flushSync } from 'octane';
 
 // Counter exposing several state-mutation handler patterns. The fuzz
 // harness dispatches MouseEvent('click') at one of these buttons in a

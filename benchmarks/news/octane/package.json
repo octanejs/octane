@@ -8,7 +8,7 @@
     "dev": "vite --host --port 5191 --strictPort"
   },
   "dependencies": {
-    "octane-ts": "workspace:*"
+    "octane": "workspace:*"
   },
   "devDependencies": {
     "vite": "catalog:default"

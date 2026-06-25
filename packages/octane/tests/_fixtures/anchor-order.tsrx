@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // Source-order regression fixtures for the four control-flow block types
 // (@for, @if, @switch, @try). Each fixture places a block before AND/OR

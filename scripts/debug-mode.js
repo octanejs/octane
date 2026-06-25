@@ -8,15 +8,15 @@ import { createRequire } from 'node:module';
 // scripts/, because the playground's `octane` dependency is linked into its own
 // local node_modules.
 const require = createRequire(path.join(process.cwd(), 'package.json'));
-const package_name = process.argv[3] ?? 'octane-ts/compiler';
+const package_name = process.argv[3] ?? 'octane/compiler';
 const pkg = require(package_name);
 const { compile } = pkg;
 const compile_to_volar_mappings = pkg.compile_to_volar_mappings ?? pkg.compileToVolarMappings;
 const FILE_EXTENSIONS = ['.tsrx'];
 
-// octane-ts/compiler (and @tsrx/ripple) accept a { mode } option and emit a distinct
+// octane/compiler (and @tsrx/ripple) accept a { mode } option and emit a distinct
 // server build; other targets compile client-only.
-const supportsServer = package_name === 'octane-ts/compiler' || package_name === '@tsrx/ripple';
+const supportsServer = package_name === 'octane/compiler' || package_name === '@tsrx/ripple';
 
 let mode_type = process.argv[2] || 'client';
 

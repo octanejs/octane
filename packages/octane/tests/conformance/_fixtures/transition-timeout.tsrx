@@ -1,4 +1,4 @@
-import { use, useState, useTransition } from 'octane-ts';
+import { use, useState, useTransition } from 'octane';
 
 // ============================================================================
 // Suspense Gap #6: transition-timeout fallback

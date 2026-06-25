@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { octane } from 'octane-ts/compiler/vite';
+import { octane } from 'octane/compiler/vite';
 
 export default defineConfig({
 	plugins: [octane()],
@@ -18,8 +18,8 @@ export default defineConfig({
 
 	optimizeDeps: {
 		// `octane` is workspace:* and points `main` at raw TS sources, and also
-		// provides the compiler at `octane-ts/compiler`. Pre-bundling would snapshot
+		// provides the compiler at `octane/compiler`. Pre-bundling would snapshot
 		// stale output and require `vite --force` on every workspace edit.
-		exclude: ['octane-ts'],
+		exclude: ['octane'],
 	},
 });

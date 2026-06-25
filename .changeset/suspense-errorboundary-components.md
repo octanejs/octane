@@ -1,5 +1,5 @@
 ---
-"octane-ts": patch
+"octane": patch
 ---
 
 Add `<Suspense>` and `<ErrorBoundary>` components — JSX forms of the `@try`/`@pending` and `@try`/`@catch` directives, for authors writing JSX rather than the template control-flow (e.g. porting React / TanStack Query code).

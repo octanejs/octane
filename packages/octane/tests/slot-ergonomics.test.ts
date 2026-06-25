@@ -17,7 +17,7 @@ import {
 } from '../src/index.js';
 
 // The `slot: symbol` argument on every hook is COMPILER-INJECTED.
-// octane-ts/compiler appends a `Symbol.for(stableId)` to every hook call so
+// octane/compiler appends a `Symbol.for(stableId)` to every hook call so
 // each call site has a stable identity within its scope and across HMR.
 // Public TypeScript signature is now `slot?: symbol` so authors writing
 // `useState(0)` in their editor don't see a confusing "Expected 2 args"
@@ -28,7 +28,7 @@ import {
 describe('slot ergonomics — public signature hides the compiler-injected slot', () => {
 	it('useState without a slot throws a clear, actionable error', () => {
 		expect(() => useState(0)).toThrow(/useState was called without a slot symbol/);
-		expect(() => useState(0)).toThrow(/octane-ts\/compiler\/vite/);
+		expect(() => useState(0)).toThrow(/octane\/compiler\/vite/);
 		expect(() => useState(0)).toThrow(/Symbol\.for/);
 	});
 

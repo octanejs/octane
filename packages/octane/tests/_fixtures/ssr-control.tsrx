@@ -1,4 +1,4 @@
-import { createContext, use, createPortal } from 'octane-ts';
+import { createContext, use, createPortal } from 'octane';
 
 // @if / @else
 export function IfElse(props) @{

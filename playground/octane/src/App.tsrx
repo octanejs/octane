@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 import { Counter } from './demos/Counter.tsrx';
 import { KeyedList } from './demos/KeyedList.tsrx';
 import { Conditional } from './demos/Conditional.tsrx';

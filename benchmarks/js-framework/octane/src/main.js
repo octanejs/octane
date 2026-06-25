@@ -1,4 +1,4 @@
-import { createRoot } from 'octane-ts';
+import { createRoot } from 'octane';
 import Main from './Main.tsrx';
 
 const target = document.getElementById('main');

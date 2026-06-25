@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { octane } from 'octane-ts/compiler/vite';
+import { octane } from 'octane/compiler/vite';
 
 // Mirrors the inferno-next bench's terser flags so build output is comparable
 // byte-for-byte across renderers: aggressive multi-pass compress with
@@ -10,7 +10,7 @@ export default defineConfig({
 	optimizeDeps: {
 		// Both workspace packages export raw .ts source; pre-bundling would
 		// snapshot stale output for every edit.
-		exclude: ['octane-ts', 'octane-ts/compiler'],
+		exclude: ['octane', 'octane/compiler'],
 	},
 	build: {
 		target: 'esnext',

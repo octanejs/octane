@@ -7,7 +7,7 @@
 // drives animation/gesture/layout/drag from layout effects — exactly the refs +
 // effects + rendering path this is meant to exercise.
 import { animate, hover, press, inView } from 'motion';
-import { hostComponent, useLayoutEffect, useState, provideContext } from 'octane-ts';
+import { hostComponent, useLayoutEffect, useState, provideContext } from 'octane';
 import {
 	MotionConfigContext,
 	VariantContext,
@@ -16,7 +16,7 @@ import {
 	splitVariant,
 } from './context';
 import { isMotionValue, isTransformKey, applyStyleValue } from './useMotionValue';
-import { useContext } from 'octane-ts';
+import { useContext } from 'octane';
 
 // A plain-TS component gets its OWN block per instance (componentSlot), so fixed
 // slot symbols don't collide across instances — and these are distinct within one.
@@ -111,7 +111,7 @@ function clamp(v: number, min: number, max: number): number {
 }
 
 function createMotionComponent(tag: string) {
-	return function MotionComponent(scope: any, props: any): void {
+	return function MotionComponent(props: any, scope: any): void {
 		const config = useContext(MotionConfigContext);
 		const inherited = useContext(VariantContext);
 		// Read the PARENT's stagger orchestration before providing our own below.
@@ -492,19 +492,19 @@ export const motion: any = new Proxy(
 // AnimatePresence — renders its children; each `motion.*` with an `exit` prop
 // self-animates its own removal (see the exit cleanup above), so this is a thin
 // passthrough that exists for drop-in compatibility with Framer Motion's API.
-export function AnimatePresence(scope: any, props: any): void {
-	if (typeof props.children === 'function') props.children(scope);
+export function AnimatePresence(props: any, scope: any): void {
+	if (typeof props.children === 'function') props.children(undefined, scope);
 }
 
 // MotionConfig — provides global defaults (transition, reduced motion) to every
 // motion element below it. A plain-TS component: stamps the config context, then
 // renders children.
-export function MotionConfig(scope: any, props: any): void {
+export function MotionConfig(props: any, scope: any): void {
 	provideContext(scope, MotionConfigContext, {
 		transition: props.transition,
 		reducedMotion: props.reducedMotion,
 	});
-	if (typeof props.children === 'function') props.children(scope);
+	if (typeof props.children === 'function') props.children(undefined, scope);
 }
 
 export { useAnimate } from './useAnimate';
