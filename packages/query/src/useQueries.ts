@@ -1,6 +1,8 @@
 import { QueriesObserver, QueryObserver, noop, notifyManager } from '@tanstack/query-core';
 import { useState, useMemo, useSyncExternalStore, useCallback, useEffect, use } from 'octane-ts';
 import { resolveClient } from './context';
+import { useIsRestoring } from './isRestoring';
+import { useQueryErrorResetBoundary } from './errorResetBoundary';
 import {
 	ensurePreventErrorBoundaryRetry,
 	ensureSuspenseTimers,
@@ -13,6 +15,8 @@ import {
 export function useQueries(options: any, ...rest: any[]): any {
 	const [user, slot] = splitSlot(rest);
 	const client = resolveClient(user[0]);
+	const isRestoring = useIsRestoring();
+	const errorResetBoundary = useQueryErrorResetBoundary();
 	const { queries, ...restOptions } = options;
 	const qs = (tag: string) => subSlot(slot, 'qs:' + tag);
 
@@ -20,19 +24,27 @@ export function useQueries(options: any, ...rest: any[]): any {
 		() =>
 			queries.map((opts: any) => {
 				const defaulted = client.defaultQueryOptions(opts);
-				defaulted._optimisticResults = 'optimistic';
+				defaulted._optimisticResults = isRestoring ? 'isRestoring' : 'optimistic';
 				return defaulted;
 			}),
-		[queries, client],
+		[queries, client, isRestoring],
 		qs('memo'),
 	);
 	defaultedQueries.forEach((queryOptions: any) => {
 		ensureSuspenseTimers(queryOptions);
 		ensurePreventErrorBoundaryRetry(
 			queryOptions,
+			errorResetBoundary,
 			client.getQueryCache().get(queryOptions.queryHash),
 		);
 	});
+	useEffect(
+		() => {
+			errorResetBoundary.clearReset();
+		},
+		[errorResetBoundary],
+		qs('clr'),
+	);
 
 	const [observer] = useState(
 		() => new QueriesObserver(client, defaultedQueries, restOptions),
@@ -44,12 +56,12 @@ export function useQueries(options: any, ...rest: any[]): any {
 		restOptions.combine,
 	);
 
-	const subscribed = restOptions.subscribed !== false;
+	const shouldSubscribe = !isRestoring && restOptions.subscribed !== false;
 	useSyncExternalStore(
 		useCallback(
 			(onStoreChange: () => void) =>
-				subscribed ? observer.subscribe(notifyManager.batchCalls(onStoreChange)) : noop,
-			[observer, subscribed],
+				shouldSubscribe ? observer.subscribe(notifyManager.batchCalls(onStoreChange)) : noop,
+			[observer, shouldSubscribe],
 			qs('cb'),
 		),
 		() => observer.getCurrentResult(),
@@ -87,12 +99,13 @@ export function useQueries(options: any, ...rest: any[]): any {
 		const query = defaultedQueries[index];
 		return (
 			query &&
-			getHasError(
+			getHasError({
 				result,
-				query.throwOnError,
-				client.getQueryCache().get(query.queryHash),
-				query.suspense,
-			)
+				errorResetBoundary,
+				throwOnError: query.throwOnError,
+				query: client.getQueryCache().get(query.queryHash),
+				suspense: query.suspense,
+			})
 		);
 	});
 	if (firstError?.error) {

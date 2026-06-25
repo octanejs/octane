@@ -36,25 +36,45 @@ export function ensureSuspenseTimers(defaultedOptions: any): void {
 }
 
 // prevent-error-boundary-retry: when a query opts into throwing, don't retry on
-// mount so an already-errored cached query re-throws immediately. octane ships no
-// QueryErrorResetBoundary, so `isReset()` is treated as always-false.
-export function ensurePreventErrorBoundaryRetry(options: any, query: any): void {
+// mount so an already-errored cached query re-throws immediately — UNLESS the
+// reset boundary has been reset, in which case a retry is expected.
+export function ensurePreventErrorBoundaryRetry(
+	options: any,
+	errorResetBoundary: { isReset: () => boolean },
+	query: any,
+): void {
 	const throwOnError =
 		query?.state.error && typeof options.throwOnError === 'function'
 			? shouldThrowError(options.throwOnError, [query.state.error, query])
 			: options.throwOnError;
 	if (options.suspense || throwOnError) {
-		options.retryOnMount = false;
+		if (!errorResetBoundary.isReset()) {
+			options.retryOnMount = false;
+		}
 	}
 }
 
 export const shouldSuspend = (defaultedOptions: any, result: any): boolean =>
 	defaultedOptions?.suspense && result.isPending;
 
-// react-query's getHasError, minus the reset-boundary term (no boundary shipped).
-export function getHasError(result: any, throwOnError: any, query: any, suspense: any): boolean {
+// react-query's getHasError: only throw if the query errored, the boundary isn't
+// reset, the query isn't refetching, and the options opt into throwing.
+export function getHasError({
+	result,
+	errorResetBoundary,
+	throwOnError,
+	query,
+	suspense,
+}: {
+	result: any;
+	errorResetBoundary: { isReset: () => boolean };
+	throwOnError: any;
+	query: any;
+	suspense: any;
+}): boolean {
 	return (
 		result.isError &&
+		!errorResetBoundary.isReset() &&
 		!result.isFetching &&
 		query &&
 		((suspense && result.data === undefined) ||

@@ -38,9 +38,14 @@ function App() @{
 - Mutations: `useMutation`, `useMutationState`
 - Status: `useIsFetching`, `useIsMutating`
 - Components / context: `QueryClientProvider`, `useQueryClient`, `QueryClientContext`,
-  `HydrationBoundary`
+  `HydrationBoundary`, `IsRestoringProvider`, `useIsRestoring`,
+  `QueryErrorResetBoundary`, `useQueryErrorResetBoundary`
 - everything from `@tanstack/query-core` (`QueryClient`, `QueryCache`, observers,
   `dehydrate`/`hydrate`, …), re-exported verbatim.
+
+The whole `@tanstack/react-query` surface is bound. The separate companion packages
+(`@tanstack/react-query-persist-client`, `@tanstack/react-query-devtools`) are not
+included.
 
 ## How it works
 
@@ -67,8 +72,10 @@ import { Suspense, ErrorBoundary } from 'octane-ts';
 </ErrorBoundary>
 ```
 
-## Not yet ported
+## Persistence & error resets
 
-The persistence/restore helpers (`IsRestoringProvider` / `useIsRestoring`) and the
-`QueryErrorResetBoundary` reset context — octane has no restore phase, and error
-resets are handled by `@catch` / `<ErrorBoundary>`. Contributions welcome.
+`IsRestoringProvider` / `useIsRestoring` gate fetching while a persisted client is
+restored, and `QueryErrorResetBoundary` / `useQueryErrorResetBoundary` coordinate
+error-boundary retries with `@catch` / `<ErrorBoundary>` — call the boundary's
+`reset()` alongside `useQueryErrorResetBoundary().reset()` so a `throwOnError` query
+refetches instead of immediately re-throwing.
