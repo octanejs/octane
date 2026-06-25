@@ -78,8 +78,12 @@ the runtime/compiler over patching tests or generated output.
   output: `export function Counter() @{ const [n, setN] = useState(0); <button …/> }`.
   The `@{ … }` scope ends with **exactly one** output node (a JSX element or a
   fragment `<>…</>`). With no setup you can write `export function X() @{ <jsx/> }`.
-- Dynamic text holes need a cast: `{expr as string}`. A bare `{expr}` is a
-  renderable hole (component / element descriptor / coerced primitive).
+- Dynamic text holes use a cast: `{expr as string}`. The cast is **optional when
+  the expression is provably a string** — a string/template literal, a
+  `+`-concatenation involving a string (e.g. `{'Count: ' + count}`), or a local
+  `const`/param the compiler tracks back to a string; it's required otherwise. A
+  bare `{expr}` that isn't provably a string is a renderable hole (component /
+  element descriptor / coerced primitive).
 - Events are **native, delegated** DOM events (`onClick`, `onInput`, `onSubmit`),
   not a synthetic event layer — behavior matches the platform.
 - Template control flow uses directive blocks: `@if (c) { } @else { }`,
@@ -134,7 +138,7 @@ The test suite (`packages/octane/tests/`) is organized as:
   fixture through both Octane and `@tsrx/react`, drives identical events, and
   asserts byte-equal `innerHTML` after each step. Note it compares only final HTML,
   so it cannot see DOM move patterns, effect timing, or focus.
-- `hydration/` — server-render → `hydrate()` adoption tests.
+- `hydration/` — server-render → `hydrateRoot()` adoption tests.
 - `_fixtures/` — shared `.tsrx` fixtures; helpers live in `tests/_helpers.ts`
   (`mount`, `act`, `flushEffects`, `createLog`) and `tests/conformance/_helpers/`.
 

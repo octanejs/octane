@@ -3,7 +3,7 @@
  *
  * octane's server ABI: a component body is `(scope, props, extra) => string`.
  * `render(Component, props)` invokes the ROOT directly as `Component(rootScope,
- * props, undefined)` and does NOT wrap it in block markers — and `hydrate()`
+ * props, undefined)` and does NOT wrap it in block markers — and `hydrateRoot()`
  * adopts the container's FIRST CHILD as the root's own node. So the wrapper must
  * call the top-level component DIRECTLY (wrapping it in `ssrComponent` would add
  * an extra `<!--[-->…<!--]-->` layer that `clone()` then mis-adopts on hydrate).

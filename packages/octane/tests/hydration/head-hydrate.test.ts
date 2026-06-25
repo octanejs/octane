@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrate, flushSync, delegateEvents } from '../../src/index.js';
+import { hydrateRoot, flushSync, delegateEvents } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { Page } from './_fixtures/head.tsrx';
 
 // Hoisted document metadata (React-19 model): inline `<title>`/`<meta>` are
 // routed out of the body, so the remaining single body root takes the
 // single-root path (no <octane-frag>) and the metadata goes to render().head
-// (server, via ssrHeadEl) / document.head (client, via headBlock). On hydrate,
+// (server, via ssrHeadEl) / document.head (client, via headBlock). On hydrateRoot,
 // headBlock ADOPTS the server-rendered element (matched by its `<!--key-->`
 // marker) rather than appending a duplicate, and removes it on unmount.
 
@@ -89,7 +89,7 @@ describe('hoisted document metadata — hydration', () => {
 		const section = container.querySelector('#body') as HTMLElement;
 		const btn = container.querySelector('#bump') as HTMLButtonElement;
 
-		const root = hydrate(Page, container, { params: {} });
+		const root = hydrateRoot(container, Page, { params: {} });
 		flushSync(() => {});
 
 		// Head: title + meta ADOPTED (no duplication), adoption markers removed.

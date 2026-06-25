@@ -1963,11 +1963,11 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 // DOM, because text lives INSIDE elements and so doesn't shift element siblings.
 //
 // Dead-code-elimination contract (mirrors Ripple/Svelte): `hydrating` is set
-// `true` ONLY inside the `hydrate()` entry. An app that never imports `hydrate`
+// `true` ONLY inside the `hydrateRoot()` entry. An app that never imports `hydrateRoot`
 // lets the bundler tree-shake it, after which `hydrating` is provably always
 // `false`, so it constant-folds and EVERY `if (hydrating)` branch below (in the
 // hot-path clone/htext) is dropped — client-only builds pay zero hydration cost.
-// Do NOT assign `hydrating = true` anywhere except `hydrate()`, or this breaks.
+// Do NOT assign `hydrating = true` anywhere except `hydrateRoot()`, or this breaks.
 // ---------------------------------------------------------------------------
 let hydrating = false;
 // The HYDRATION CURSOR (ported from Ripple's `hydrate_node`). While hydrating,
@@ -1981,9 +1981,9 @@ let hydrating = false;
 // (`_root.firstChild.nextSibling…`) still resolves bindings correctly.
 let hydrateNode: Node | null = null;
 // Server-resolved `use(thenable)` values (SSR Phase 4), parsed from the inline
-// `<script data-octane-suspense>` in `hydrate()` and consumed in render
+// `<script data-octane-suspense>` in `hydrateRoot()` and consumed in render
 // order by `useThenable` so a hydrating boundary returns synchronously. Both are
-// touched ONLY under `if (hydrating)` and assigned ONLY in `hydrate()`, so they
+// touched ONLY under `if (hydrating)` and assigned ONLY in `hydrateRoot()`, so they
 // constant-fold away with the rest of the hydration path in client-only builds.
 let hydrationSeeds: unknown[] | null = null;
 let hydrationSeedCursor = 0;
@@ -6683,13 +6683,22 @@ export interface Root {
 	unmount(): void;
 }
 
-export function createRoot(container: Element): Root {
-	let rootBlock: Block | null = null;
-	let currentBody: ComponentBody | null = null;
-	// Register the container as an event-delegation target up front. Listeners
-	// for all currently-known delegated events attach now; any new event types
-	// registered later (via `delegateEvents`) will back-attach automatically.
-	registerDelegationTarget(container);
+// Shared Root factory behind both `createRoot` and `hydrateRoot`. The
+// `rootBlock`/`currentBody` parameters are the live state captured by the
+// returned closures: `createRoot` starts them `null` (the block is created
+// lazily on the first `.render()`), while `hydrateRoot` passes in the
+// already-hydrated block + its body so the FIRST post-hydration `.render()`
+// with the SAME component hits the same-body fast path (props update) and never
+// wipes the adopted server DOM. This factory NEVER touches the hydration-only
+// state (`hydrating`/`hydrateNode`/`hydrationSeeds`/`_idCounter`) — that runs
+// once, inside `hydrateRoot`. Keeping `hydrating` out of here preserves the DCE
+// contract (it is assigned only in the hydrate entry, so client-only builds fold
+// every `if (hydrating)` branch out).
+function makeRoot(
+	container: Element,
+	rootBlock: Block | null,
+	currentBody: ComponentBody | null,
+): Root {
 	return {
 		render(bodyOrElement: ComponentBody | ElementDescriptor, props?: any) {
 			// React-style `render(<App foo={x}/>)` arrives as an element descriptor:
@@ -6703,6 +6712,9 @@ export function createRoot(container: Element): Root {
 			} else {
 				body = bodyOrElement;
 			}
+			// Same component as the live root (incl. a just-hydrated root): update
+			// props in place and schedule. This is a NORMAL client render — `hydrating`
+			// is already false, so renderBlock reuses the adopted DOM, not rebuilds it.
 			if (rootBlock && currentBody === body) {
 				rootBlock.props = props;
 				scheduleRender(rootBlock);
@@ -6740,23 +6752,37 @@ export function createRoot(container: Element): Root {
 	};
 }
 
+export function createRoot(container: Element): Root {
+	// Register the container as an event-delegation target up front. Listeners
+	// for all currently-known delegated events attach now; any new event types
+	// registered later (via `delegateEvents`) will back-attach automatically.
+	registerDelegationTarget(container);
+	// Lazy root: the block is created on the first `.render()` call.
+	return makeRoot(container, null, null);
+}
+
 /**
- * Hydrate a server-rendered container (SSR Phase 2). Instead of clearing the
- * container and cloning fresh DOM, the compiled mount ADOPTS the existing
- * server DOM: `clone()` returns the server root, `htext()` adopts server text
- * nodes, and event handlers / update bindings are stamped on the adopted nodes
- * (`hydrating` flag, see clone/htext). The seeded prev-values make the first
- * update a no-op when the client matches the server (no mismatch re-render).
+ * Hydrate a server-rendered container and return a live {@link Root} — the
+ * React-18 `hydrateRoot(container, element)` shape (container FIRST). Instead of
+ * clearing the container and cloning fresh DOM, the compiled mount ADOPTS the
+ * existing server DOM: `clone()` returns the server root, `htext()` adopts
+ * server text nodes, and event handlers / update bindings are stamped on the
+ * adopted nodes (`hydrating` flag, see clone/htext). The seeded prev-values make
+ * the first update a no-op when the client matches the server (no mismatch
+ * re-render).
  *
- * Phase 2 scope: a single-root leaf component — element structure, attributes,
- * single-text-children, events, refs, innerHTML. Nested components, adjacent /
- * mixed text holes and control flow arrive in a later phase.
+ * Hydration runs ONCE, here on creation. The returned root's `.render(...)` is a
+ * normal (non-hydrating) client render against the block mounted here: the same
+ * component updates props in place on the adopted DOM, a different component
+ * tears down and remounts.
  */
-export function hydrate(
-	bodyOrElement: ComponentBody | ElementDescriptor,
+export function hydrateRoot(container: Element, element: ElementDescriptor): Root;
+export function hydrateRoot(container: Element, body: ComponentBody, props?: any): Root;
+export function hydrateRoot(
 	container: Element,
+	bodyOrElement: ComponentBody | ElementDescriptor,
 	props?: any,
-): { unmount(): void } {
+): Root {
 	let body: ComponentBody;
 	if (isElementDescriptor(bodyOrElement)) {
 		body = bodyOrElement.type as ComponentBody;
@@ -6813,11 +6839,9 @@ export function hydrate(
 		scheduled = true;
 		queueMicrotask(flush);
 	}
-	return {
-		unmount() {
-			unmountBlock(rootBlock, /*detachDom*/ false);
-			container.textContent = '';
-			unregisterDelegationTarget(container);
-		},
-	};
+	// Hand the already-hydrated block + its body to the shared factory: from here
+	// the root behaves exactly like a `createRoot` root — a `.render()` with the
+	// same component updates props on the adopted DOM (same-body fast path), a
+	// different component tears down and remounts.
+	return makeRoot(container, rootBlock, body);
 }

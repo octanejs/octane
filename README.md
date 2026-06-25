@@ -106,10 +106,10 @@ export async function renderApp() {
 
 ```ts
 // entry-client.ts
-import { hydrate } from 'octane';
+import { hydrateRoot } from 'octane';
 import { App } from './App.tsrx';
 
-hydrate(App, document.getElementById('app')!);
+hydrateRoot(document.getElementById('app')!, App);
 ```
 
 ## Core syntax
@@ -127,13 +127,19 @@ export function Counter() @{
   const [count, setCount] = useState(0);
 
   <button onClick={() => setCount(count + 1)}>
-    {'Count: ' + count as string}
+    {'Count: ' + count}
   </button>
 }
 ```
 
-Dynamic text holes are written `{expr as string}`. Events are ordinary JSX event
-props like `onClick` and `onInput`, backed by native, delegated DOM events.
+A dynamic text hole is written `{expr as string}` — the cast marks the hole as
+text rather than a renderable child. The cast is **optional when the compiler can
+already see the value is a string**: a string or template literal, a
+`+`-concatenation involving a string (so the `'Count: ' + count` holes above need
+no cast), or a local `const`/param the compiler tracks back to a string. It's
+still required when the type isn't visible syntactically — typically a bare member
+access (`{item.title as string}`). Events are ordinary JSX event props like
+`onClick` and `onInput`, backed by native, delegated DOM events.
 
 ### State and effects
 
@@ -148,7 +154,7 @@ export function Timer() @{
     return () => clearInterval(id);
   }, []);
 
-  <p>{'Elapsed: ' + seconds as string}</p>
+  <p>{'Elapsed: ' + seconds}</p>
 }
 ```
 
@@ -170,7 +176,7 @@ export function Panel(props) @{
     console.log('n changed:', n);
   }, [n]);
 
-  <button onClick={() => setN(n + 1)}>{'count: ' + n as string}</button>
+  <button onClick={() => setN(n + 1)}>{'count: ' + n}</button>
 }
 ```
 
@@ -194,7 +200,7 @@ export function Feed(props) @{
 ```tsrx
 export function Greeting(props) @{
   @if (props.name) {
-    <p>{'Hello, ' + props.name as string}</p>
+    <p>{'Hello, ' + props.name}</p>
   } @else {
     <p>Hello, stranger</p>
   }

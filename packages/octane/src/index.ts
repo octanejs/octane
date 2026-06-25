@@ -7,7 +7,7 @@ export const version: string = pkg.version;
 export {
 	// Public API
 	createRoot,
-	hydrate,
+	hydrateRoot,
 	flushSync,
 	drainPassiveEffects,
 	act,

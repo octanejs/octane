@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrate, flushSync, drainPassiveEffects } from '../../src/index.js';
+import { hydrateRoot, flushSync, drainPassiveEffects } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 // CLIENT-compiled variants (the normal .tsrx import path, client mode). The
 // onClick handler in Counter makes this module call delegateEvents(['click']) at
@@ -10,7 +10,7 @@ import * as ServerRT from 'octane/server';
 import { StaticText, Attrs, Mixed, Counter, StoreView } from './_fixtures/leaf.tsrx';
 
 // SSR Phase 2 — client hydration. Server-render a fixture to HTML, put it in a
-// container, hydrate with the CLIENT component, and assert (1) the DOM is NOT
+// container, hydrateRoot with the CLIENT component, and assert (1) the DOM is NOT
 // rebuilt (innerHTML unchanged → no mismatch) and (2) interactivity works.
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/leaf.tsrx');
@@ -36,18 +36,18 @@ beforeEach(() => {
 });
 afterEach(() => container.remove());
 
-// Server-render `name` with `props`, place it in the container, hydrate with the
+// Server-render `name` with `props`, place it in the container, hydrateRoot with the
 // client `clientComp`, and return the before/after innerHTML for mismatch checks.
 async function setup(name: string, clientComp: any, props?: any) {
 	const { body } = await ServerRT.render(server[name], props);
 	container.innerHTML = body;
 	const before = container.innerHTML;
-	const root = hydrate(clientComp, container, props);
+	const root = hydrateRoot(container, clientComp, props);
 	flushSync(() => {}); // drain any (there should be none) scheduled work
 	return { body, before, after: container.innerHTML, root };
 }
 
-describe('hydrate — no mismatch (DOM adopted, not rebuilt)', () => {
+describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 	it('static text', async () => {
 		const { body, before, after } = await setup('StaticText', StaticText);
 		expect(body).toBe('<div class="greet">Hello, world</div>');
@@ -74,11 +74,11 @@ describe('hydrate — no mismatch (DOM adopted, not rebuilt)', () => {
 	});
 });
 
-describe('hydrate — interactivity', () => {
+describe('hydrateRoot — interactivity', () => {
 	it('attaches event handlers to adopted nodes and updates on click', async () => {
 		const { before, after } = await setup('Counter', Counter, { start: 5 });
 		expect(before).toBe('<button id="btn">5</button>'); // server initial
-		expect(after).toBe(before); // no mismatch on hydrate
+		expect(after).toBe(before); // no mismatch on hydrateRoot
 
 		const btn = container.querySelector('#btn') as HTMLButtonElement;
 		const node = btn.firstChild; // adopted text node — must survive the update
@@ -97,7 +97,7 @@ describe('hydrate — interactivity', () => {
 	});
 });
 
-describe('hydrate — useSyncExternalStore', () => {
+describe('hydrateRoot — useSyncExternalStore', () => {
 	it('reads getServerSnapshot during hydration, then syncs to getSnapshot', async () => {
 		const store = {
 			subscribe: () => () => {},
@@ -110,7 +110,7 @@ describe('hydrate — useSyncExternalStore', () => {
 
 		container.innerHTML = body;
 		const before = container.innerHTML;
-		const root = hydrate(StoreView, container, { store });
+		const root = hydrateRoot(container, StoreView, { store });
 		// First hydrated read matches the server snapshot → no mismatch.
 		expect(container.innerHTML).toBe(before);
 		expect((container.querySelector('#sv') as HTMLElement).textContent).toBe('server');

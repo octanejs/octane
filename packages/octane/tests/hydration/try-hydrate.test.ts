@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrate, flushSync } from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { Boundary } from './_fixtures/tryboundary.tsrx';
 
@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 afterEach(() => container.remove());
 
-describe('hydrate — @try success arm (SSR Phase 6 / M4)', () => {
+describe('hydrateRoot — @try success arm (SSR Phase 6 / M4)', () => {
 	it('adopts the resolved success arm (use seeded) and it is interactive', async () => {
 		const { body } = await ServerRT.render(server.Boundary, { promise: Promise.resolve('hi') });
 		// Server resolved use() → success arm in a block range + a seed <script>.
@@ -41,7 +41,7 @@ describe('hydrate — @try success arm (SSR Phase 6 / M4)', () => {
 		container.innerHTML = body;
 		const btn = container.querySelector('#ok') as HTMLButtonElement;
 
-		const root = hydrate(Boundary, container, { promise: Promise.resolve('hi') });
+		const root = hydrateRoot(container, Boundary, { promise: Promise.resolve('hi') });
 		flushSync(() => {});
 
 		// The success-arm button was ADOPTED (no re-suspend, no rebuild).

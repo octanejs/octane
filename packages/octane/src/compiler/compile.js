@@ -887,6 +887,7 @@ export function compile(source, filename, options) {
 		delegatedEvents: new Set(), // event names seen in JSX — auto-emits delegateEvents(...)
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
+		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
 		nextHookSymId: 0,
 		nextFragId: 0,
 		nextTemplateId: 0,
@@ -1268,6 +1269,7 @@ function compileServer(source, filename, options) {
 		hoistedHelpers: [],
 		cssInjections: [],
 		currentComponentLocals: null,
+		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
 		nextHookSymId: 0,
 		nextFragId: 0,
 		nextHelperId: 0,
@@ -1331,12 +1333,15 @@ function compileServerComponent(node, ctx) {
 	const cssEntries = ctx.cssInjections.slice(beforeCss);
 
 	const prevLocals = ctx.currentComponentLocals;
+	const prevKnownStr = ctx.knownStringLocals;
 	ctx.currentComponentLocals = collectComponentLocals(node);
+	ctx.knownStringLocals = collectKnownStringLocals(node);
 	let fn;
 	try {
 		fn = ssrCompileBody(node, ctx, name, cssHash, cssEntries);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
+		ctx.knownStringLocals = prevKnownStr;
 	}
 
 	if (isDefault) return `const ${name} = ${fn};\nexport default ${name};`;
@@ -1421,7 +1426,7 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			// primitive to text) — mirrors Ripple's `{expr}` vs `{expr as string}`.
 			// rewriteHookCalls: a `use(thenable)` in this hole bypasses the setup
 			// rewrite, so key it here too (else it collides with sibling/nested use()).
-			if (isKnownStringExpression(expr)) {
+			if (isKnownStringExpression(expr, ctx.knownStringLocals)) {
 				ctx.runtimeNeeded.add('ssrText');
 				return `ssrText(${printExpr(resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash))})`;
 			}
@@ -1927,7 +1932,9 @@ function compileComponent(node, ctx, options) {
 	// can reach it; restore on exit so sibling components don't see this one's
 	// locals.
 	const prevLocals = ctx.currentComponentLocals;
+	const prevKnownStr = ctx.knownStringLocals;
 	ctx.currentComponentLocals = collectComponentLocals(node);
+	ctx.knownStringLocals = collectKnownStringLocals(node);
 	let fn;
 	try {
 		// autoCallback: only top-level component bodies opt in. Item bodies and
@@ -1937,6 +1944,7 @@ function compileComponent(node, ctx, options) {
 		fn = compileFunctionBody(node, ctx, name, 'html', cssHash, { autoCallback: true });
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
+		ctx.knownStringLocals = prevKnownStr;
 	}
 
 	// HMR-wrap exported components inline so the binding stays a `const` (no
@@ -2936,12 +2944,20 @@ function staticTextLiteral(node) {
 	return null;
 }
 
-function isKnownStringExpression(node) {
+function isKnownStringExpression(node, locals) {
 	if (node == null || typeof node !== 'object') return false;
 	if (node.type === 'Literal' || node.type === 'StringLiteral') {
 		return typeof node.value === 'string';
 	}
 	if (node.type === 'TemplateLiteral') return true;
+	// An identifier the compiler has tracked back to a string in this component's
+	// scope: a `const` bound to a provably-string expression, a `const x: string`,
+	// or a `string`-typed param — see collectKnownStringLocals. `locals` is
+	// component-scoped and has render-shadowed names removed, so a
+	// `@for (const x …)` loop var never inherits an outer string `const x`. When
+	// `locals` is absent (callers that don't track locals), identifiers are not
+	// assumed string — the conservative pre-existing behaviour.
+	if (node.type === 'Identifier') return locals != null && locals.has(node.name);
 	if (
 		node.type === 'TSAsExpression' ||
 		node.type === 'TSTypeAssertion' ||
@@ -2955,16 +2971,105 @@ function isKnownStringExpression(node) {
 		) {
 			return true;
 		}
-		return isKnownStringExpression(node.expression);
+		return isKnownStringExpression(node.expression, locals);
 	}
 	if (node.type === 'TSNonNullExpression' || node.type === 'TSInstantiationExpression') {
-		return isKnownStringExpression(node.expression);
+		return isKnownStringExpression(node.expression, locals);
 	}
 	// `a + b` is a string if EITHER operand is a string (JS coerces the other).
 	if (node.type === 'BinaryExpression' && node.operator === '+') {
-		return isKnownStringExpression(node.left) || isKnownStringExpression(node.right);
+		return (
+			isKnownStringExpression(node.left, locals) || isKnownStringExpression(node.right, locals)
+		);
 	}
 	return false;
+}
+
+// Annotation check: does a TS type annotation resolve to `string`? Accepts both a
+// bare type node and a `TSTypeAnnotation` wrapper (`x: string`).
+function isStringTypeAnnotation(ann) {
+	if (!ann) return false;
+	const t = ann.type === 'TSTypeAnnotation' && ann.typeAnnotation ? ann.typeAnnotation : ann;
+	return !!(
+		t &&
+		(t.type === 'TSStringKeyword' ||
+			(t.type === 'TSTypeReference' && t.typeName && t.typeName.name === 'string'))
+	);
+}
+
+// Collect names bound INSIDE a render subtree (loop vars, catch params, nested
+// function params, nested declarations). Used to drop component-scope known-string
+// `const`s that a render scope shadows (e.g. a `@for (const x …)` loop var with the
+// same name) so the inner `{x}` is never misclassified as that outer string. Reuses
+// `collectBindings` for destructuring patterns; over-collecting is safe (it only
+// makes the known-string set smaller).
+function collectRenderBoundNames(node, out) {
+	if (node == null || typeof node !== 'object') return;
+	if (Array.isArray(node)) {
+		for (const n of node) collectRenderBoundNames(n, out);
+		return;
+	}
+	switch (node.type) {
+		case 'ForOfStatement':
+		case 'ForInStatement': {
+			const left = node.left;
+			if (left && left.type === 'VariableDeclaration') {
+				for (const d of left.declarations || []) collectBindings(d.id, out);
+			} else if (left) {
+				collectBindings(left, out);
+			}
+			break;
+		}
+		case 'CatchClause':
+			if (node.param) collectBindings(node.param, out);
+			break;
+		case 'ArrowFunctionExpression':
+		case 'FunctionExpression':
+		case 'FunctionDeclaration':
+			for (const p of node.params || []) collectBindings(p, out);
+			break;
+		case 'VariableDeclarator':
+			if (node.id) collectBindings(node.id, out);
+			break;
+	}
+	for (const key in node) {
+		if (key === 'type') continue;
+		const v = node[key];
+		if (v && typeof v === 'object') collectRenderBoundNames(v, out);
+	}
+}
+
+// Component-scope set of local names the compiler can prove hold a string: a
+// `string`-typed param, or a setup `const` whose initializer is a provably-string
+// expression (concat/template/literal — possibly chaining earlier such consts) or
+// that carries a `: string` annotation. Names a render scope re-binds are removed
+// (shadow guard). Populated identically on the client and server compile paths so
+// text-vs-renderable hole classification — and therefore SSR markup — stays in
+// lockstep for hydration. Only the standard JSXCodeBlock component shape is
+// analysed; anything else yields an empty set (no identifier tracking, no change).
+function collectKnownStringLocals(componentNode) {
+	if (!componentNode.body || componentNode.body.type !== 'JSXCodeBlock') return new Set();
+	const known = new Set();
+	for (const p of componentNode.params || []) {
+		if (p.type === 'Identifier' && isStringTypeAnnotation(p.typeAnnotation)) known.add(p.name);
+	}
+	for (const stmt of componentNode.body.body || []) {
+		if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') continue;
+		for (const d of stmt.declarations || []) {
+			if (!d.id || d.id.type !== 'Identifier') continue;
+			if (isStringTypeAnnotation(d.id.typeAnnotation)) {
+				known.add(d.id.name);
+			} else if (d.init && isKnownStringExpression(d.init, known)) {
+				known.add(d.id.name);
+			}
+		}
+	}
+	if (known.size && componentNode.body.render) {
+		const rebound = new Set();
+		collectRenderBoundNames(componentNode.body.render, rebound);
+		for (const n of rebound) known.delete(n);
+	}
+	return known;
 }
 
 // Walk an AST, replacing every TS-only wrapper node (TSAsExpression,
@@ -3766,7 +3871,7 @@ function emitNodeHtml(
 	cssHash = null,
 ) {
 	if (node.type === 'Text') {
-		if (isKnownStringExpression(node.expression)) {
+		if (isKnownStringExpression(node.expression, ctx.knownStringLocals)) {
 			bindings.push({
 				id: bindings.length,
 				kind: 'text',
@@ -4137,7 +4242,7 @@ function emitElementHtml(
 			// adopts it for free. (Sole child → no sibling childIndex / text-node
 			// merge concerns; mirrors the server `Literal` fast path.)
 			html += escapeHtml(staticLit);
-		} else if (isKnownStringExpression(txtChild.expression)) {
+		} else if (isKnownStringExpression(txtChild.expression, ctx.knownStringLocals)) {
 			bindings.push({
 				id: bindings.length,
 				kind: 'textOnlyChild',
@@ -4229,7 +4334,7 @@ function emitElementHtml(
 					html += escapeHtml(staticLit);
 					prevBakedText = true;
 					childIdx++;
-				} else if (isKnownStringExpression(child.expression)) {
+				} else if (isKnownStringExpression(child.expression, ctx.knownStringLocals)) {
 					bindings.push({
 						id: bindings.length,
 						kind: 'text',
@@ -4416,7 +4521,7 @@ function emitElementHtml(
 					const ic = makeIfCall(asIf, ctx, componentName, inlinedSubs, childNs, cssHash);
 					ic.hostPath = path;
 					ifCalls.push(ic);
-				} else if (isKnownStringExpression(expr)) {
+				} else if (isKnownStringExpression(expr, ctx.knownStringLocals)) {
 					bindings.push({
 						id: bindings.length,
 						kind: 'text',

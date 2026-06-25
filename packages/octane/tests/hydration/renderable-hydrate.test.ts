@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { createRoot, hydrate, flushSync, createElement, delegateEvents } from '../../src/index.js';
+import {
+	createRoot,
+	hydrateRoot,
+	flushSync,
+	createElement,
+	delegateEvents,
+} from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { Inner, Counter, Hole, Layout, FragLayout } from './_fixtures/renderable.tsrx';
 
@@ -139,7 +145,7 @@ describe('renderable holes — hydration', () => {
 		expect(body).toContain('hello');
 		container.innerHTML = body;
 		const div = container.querySelector('#h') as HTMLElement;
-		const root = hydrate(Hole, container, { value: 'hello' });
+		const root = hydrateRoot(container, Hole, { value: 'hello' });
 		flushSync(() => {});
 		expect(container.querySelector('#h')).toBe(div); // adopted host
 		expect(div.textContent).toBe('hello');
@@ -152,7 +158,7 @@ describe('renderable holes — hydration', () => {
 		container.innerHTML = body;
 		const main = container.querySelector('#layout') as HTMLElement;
 		const btn = container.querySelector('#counter') as HTMLButtonElement;
-		const root = hydrate(Layout, container, { children: Counter });
+		const root = hydrateRoot(container, Layout, { children: Counter });
 		flushSync(() => {});
 		// The server nodes were ADOPTED, not rebuilt.
 		expect(container.querySelector('#layout')).toBe(main);
@@ -166,13 +172,13 @@ describe('renderable holes — hydration', () => {
 	// A component whose only body root is `{children}` (the website Layout shape,
 	// `<>{children}<style/></>`) hydrates via childSlot's cursor-adopt branch: the
 	// frag template contributes no body DOM, so the sole childSlot adopts the
-	// server's range off the hydrate cursor.
+	// server's range off the hydrateRoot cursor.
 	it('adopts a component child through a fragment layout whose only root is {children}', async () => {
 		const { body } = await ServerRT.render(server.FragLayout, { children: server.Counter });
 		expect(body).toContain('count:0');
 		container.innerHTML = body;
 		const btn = container.querySelector('#counter') as HTMLButtonElement;
-		const root = hydrate(FragLayout, container, { children: Counter });
+		const root = hydrateRoot(container, FragLayout, { children: Counter });
 		flushSync(() => {});
 		expect(container.querySelector('#counter')).toBe(btn); // adopted, not rebuilt
 		flushSync(() => btn.click());
@@ -184,7 +190,7 @@ describe('renderable holes — hydration', () => {
 		const { body } = await ServerRT.render(server.Hole, { value: null });
 		container.innerHTML = body;
 		const div = container.querySelector('#h') as HTMLElement;
-		const root = hydrate(Hole, container, { value: null });
+		const root = hydrateRoot(container, Hole, { value: null });
 		flushSync(() => {});
 		expect(container.querySelector('#h')).toBe(div);
 		expect(div.textContent).toBe('');

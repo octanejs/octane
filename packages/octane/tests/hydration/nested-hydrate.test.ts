@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrate, flushSync } from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 // CLIENT-compiled component (the onClick makes this module register click delegation).
 import { Panel } from './_fixtures/nested.tsrx';
@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 afterEach(() => container.remove());
 
-describe('hydrate — nested component (SSR Phase 6 / M1)', () => {
+describe('hydrateRoot — nested component (SSR Phase 6 / M1)', () => {
 	it('adopts the server DOM (no rebuild) and the nested component is interactive', async () => {
 		const { body } = await ServerRT.render(server.Panel, { title: 'Headlines', label: 'Story' });
 		// The nested <Item> output is wrapped in a hydration block range.
@@ -49,7 +49,7 @@ describe('hydrate — nested component (SSR Phase 6 / M1)', () => {
 		const li = container.querySelector('li.item') as HTMLElement;
 		const btn = container.querySelector('button.bump') as HTMLButtonElement;
 
-		const root = hydrate(Panel, container, { title: 'Headlines', label: 'Story' });
+		const root = hydrateRoot(container, Panel, { title: 'Headlines', label: 'Story' });
 		flushSync(() => {});
 
 		// No rebuild: same DOM string + same adopted element instances.

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrate, flushSync } from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { TextAfterComp, TextBetweenComps, TextAfterIf } from './_fixtures/text-sibling.tsrx';
 
@@ -32,12 +32,12 @@ beforeEach(() => {
 });
 afterEach(() => container.remove());
 
-describe('hydrate — text hole among sibling holes', () => {
+describe('hydrateRoot — text hole among sibling holes', () => {
 	it('text after a component: adopts the server text, keeps the component', async () => {
 		const { body } = await ServerRT.render(server.TextAfterComp, { label: 'LBL' });
 		container.innerHTML = body;
 		const inner = container.querySelector('#inner') as HTMLElement;
-		const root = hydrate(TextAfterComp, container, { label: 'LBL' });
+		const root = hydrateRoot(container, TextAfterComp, { label: 'LBL' });
 		flushSync(() => {});
 		// The component's content survived (NOT clobbered) and the text is present.
 		expect(container.querySelector('#inner')).toBe(inner);
@@ -49,7 +49,7 @@ describe('hydrate — text hole among sibling holes', () => {
 	it('text between two components: both components intact + text present', async () => {
 		const { body } = await ServerRT.render(server.TextBetweenComps, { label: 'MID' });
 		container.innerHTML = body;
-		const root = hydrate(TextBetweenComps, container, { label: 'MID' });
+		const root = hydrateRoot(container, TextBetweenComps, { label: 'MID' });
 		flushSync(() => {});
 		expect(container.querySelectorAll('#host2 #inner').length).toBe(2);
 		expect(container.querySelector('#host2')!.textContent).toContain('MID');
@@ -60,7 +60,7 @@ describe('hydrate — text hole among sibling holes', () => {
 		const { body } = await ServerRT.render(server.TextAfterIf, { on: true, label: 'AFTER' });
 		container.innerHTML = body;
 		const onSpan = container.querySelector('.on') as HTMLElement;
-		const root = hydrate(TextAfterIf, container, { on: true, label: 'AFTER' });
+		const root = hydrateRoot(container, TextAfterIf, { on: true, label: 'AFTER' });
 		flushSync(() => {});
 		expect(container.querySelector('.on')).toBe(onSpan); // branch adopted
 		expect(container.querySelector('.on')!.textContent).toBe('on');

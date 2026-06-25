@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrate, flushSync } from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { FeedOrEmpty, WithEmpty } from './_fixtures/emptyfor.tsrx';
 
@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 afterEach(() => container.remove());
 
-describe('hydrate — empty @for (SSR Phase 6, Bugbot fixes)', () => {
+describe('hydrateRoot — empty @for (SSR Phase 6, Bugbot fixes)', () => {
 	it('zero items + no @empty: trailing component after the empty @for still adopts', async () => {
 		const { body } = await ServerRT.render(server.FeedOrEmpty, { items: [] });
 		container.innerHTML = body;
@@ -40,7 +40,7 @@ describe('hydrate — empty @for (SSR Phase 6, Bugbot fixes)', () => {
 		const tail = container.querySelector('#tail') as HTMLButtonElement;
 		expect(tail).not.toBeNull();
 
-		const root = hydrate(FeedOrEmpty, container, { items: [] });
+		const root = hydrateRoot(container, FeedOrEmpty, { items: [] });
 		flushSync(() => {});
 
 		// The trailing component adopted (same button) despite the empty @for before it.
@@ -56,7 +56,7 @@ describe('hydrate — empty @for (SSR Phase 6, Bugbot fixes)', () => {
 		const empty = container.querySelector('li.empty') as HTMLElement;
 		expect(empty.textContent).toBe('No items yet');
 
-		const root = hydrate(WithEmpty, container, { items: [] });
+		const root = hydrateRoot(container, WithEmpty, { items: [] });
 		flushSync(() => {});
 
 		expect(container.querySelectorAll('li.empty').length).toBe(1); // not duplicated
@@ -75,7 +75,7 @@ describe('hydrate — empty @for (SSR Phase 6, Bugbot fixes)', () => {
 		const rows = [...container.querySelectorAll('p.row')];
 		const tail = container.querySelector('#tail') as HTMLButtonElement;
 
-		const root = hydrate(FeedOrEmpty, container, { items });
+		const root = hydrateRoot(container, FeedOrEmpty, { items });
 		flushSync(() => {});
 
 		expect([...container.querySelectorAll('p.row')]).toEqual(rows);

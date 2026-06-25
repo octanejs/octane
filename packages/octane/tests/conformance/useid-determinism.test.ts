@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from '../../src/server/index.js';
-import { hydrate } from '../../src/index.js';
+import { hydrateRoot } from '../../src/index.js';
 import { mount } from '../_helpers';
 import { Single, Triple, Wrapper } from '../_fixtures/useid-determinism.tsrx';
 
@@ -104,17 +104,17 @@ describe('useId determinism', () => {
 
 	// Per ReactDOMUseId-test.js:127/140-146 — the WHOLE point of useId is that the
 	// id produced on the server matches the id produced on the client so the two
-	// trees hydrate without mismatch. We server-render Single, place its HTML in a
-	// container, then hydrate the SAME component and capture the id the CLIENT
+	// trees hydrateRoot without mismatch. We server-render Single, place its HTML in a
+	// container, then hydrateRoot the SAME component and capture the id the CLIENT
 	// actually computed during the hydration render (via the fixture's onId
 	// callback — reading the adopted attribute alone would just echo the server's
 	// id and prove nothing). The two must be byte-for-byte equal.
 	//
-	// Fixed in runtime.ts hydrate(): the client `_idCounter` is reset to 0 at the
+	// Fixed in runtime.ts hydrateRoot(): the client `_idCounter` is reset to 0 at the
 	// start of hydration so it lines up with the server's per-render reset.
-	it('server useId is preserved byte-for-byte after hydrate()', async () => {
+	it('server useId is preserved byte-for-byte after hydrateRoot()', async () => {
 		// Warm the client's monotonic id counter FIRST so the test is self-contained
-		// and actually exercises the fix: a hydrate that did NOT reset the counter
+		// and actually exercises the fix: a hydrateRoot that did NOT reset the counter
 		// would mint a non-zero id here and mismatch the server's ':in-0:'.
 		const warm = mount(Triple);
 		warm.unmount();
@@ -127,7 +127,7 @@ describe('useId determinism', () => {
 		document.body.appendChild(container);
 
 		let clientId: string | undefined;
-		const h = hydrate(Single, container, { onId: (id: string) => (clientId = id) });
+		const h = hydrateRoot(container, Single, { onId: (id: string) => (clientId = id) });
 		h.unmount();
 		container.remove();
 
