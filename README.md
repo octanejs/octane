@@ -116,9 +116,13 @@ hydrateRoot(document.getElementById('app')!, App);
 
 ### Components
 
-A component is a function. Return a single JSX root directly, or open a `@{ ... }`
-setup scope when TypeScript setup (hooks, locals) needs to sit next to the output.
-The scope ends with one output node, either a JSX element or a fragment.
+A component is any function you use at a `<Foo/>` site — there's no separate
+"component" declaration. A function renders whatever it returns: a JSX root, a
+primitive (coerced to text), `null`, or an array. `@{ … }` is simply shorthand
+for returning JSX — `function f() @{ … }` desugars to `function f() { … return
+<jsx> }` — so hooks and locals can sit next to the output (the `@{ … }` scope ends
+with one output node, a JSX element or a fragment). Both forms compile
+identically, and any function can use either.
 
 ```tsrx
 import { useState } from 'octane';
@@ -129,6 +133,21 @@ export function Counter() @{
   <button onClick={() => setCount(count + 1)}>
     {'Count: ' + count}
   </button>
+}
+```
+
+The same component written with an explicit `return` is identical — and a
+function is free to return a non-JSX value, which is coerced like any renderable:
+
+```tsrx
+export function Counter() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>;
+}
+
+function Label(props) {
+  if (props.hidden) return null; // renders nothing
+  return props.text; // a string renders as text
 }
 ```
 

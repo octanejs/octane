@@ -67,10 +67,14 @@ the runtime/compiler over patching tests or generated output.
 
 ## Authoring `.tsrx`
 
-- A component is a function. Use a setup scope when TypeScript setup sits next to
-  output: `export function Counter() @{ const [n, setN] = useState(0); <button …/> }`.
-  The `@{ … }` scope ends with **exactly one** output node (a JSX element or a
-  fragment `<>…</>`). With no setup you can write `export function X() @{ <jsx/> }`.
+- A component is any function used at a `<F/>` site — NOT a special declaration. It
+  renders whatever it returns: a JSX root, a primitive (coerced to text), `null`, or
+  an array (a function may early-return non-JSX too). `@{ … }` is shorthand for
+  returning JSX — `function f() @{ … }` desugars to `function f() { … return <jsx> }`
+  — so setup (hooks, locals) can sit next to the output; the `@{ … }` scope ends with
+  **exactly one** output node (a JSX element or fragment `<>…</>`). Both forms compile
+  identically and any function can use either (`export function X() @{ <jsx/> }`,
+  `function getX() { return <jsx/> }`).
 - Dynamic text holes use a cast: `{expr as string}`. The cast is **optional when
   the expression is provably a string** — a string/template literal, a
   `+`-concatenation involving a string (e.g. `{'Count: ' + count}`), or a local

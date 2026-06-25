@@ -188,12 +188,16 @@ function collectBindings(pattern, out) {
 function collectComponentLocals(componentNode) {
 	const locals = new Set();
 	for (const p of componentNode.params || []) collectBindings(p, locals);
-	// New shape: body is a JSXCodeBlock with `.body` as the statement list.
+	// `@{}` shape: body is a JSXCodeBlock with `.body` as the statement list.
+	// return-JSX shape: body is a BlockStatement (`{ … return <jsx> }`), also `.body`.
 	// Legacy/synthetic shape: body IS the statement list directly.
+	const b = componentNode.body;
 	const stmts =
-		componentNode.body && componentNode.body.type === 'JSXCodeBlock'
-			? componentNode.body.body || []
-			: componentNode.body || [];
+		b && (b.type === 'JSXCodeBlock' || b.type === 'BlockStatement')
+			? b.body || []
+			: Array.isArray(b)
+				? b
+				: [];
 	for (const stmt of stmts) {
 		if (stmt.type === 'VariableDeclaration') {
 			for (const d of stmt.declarations || []) collectBindings(d.id, locals);
@@ -1287,6 +1291,15 @@ function compileServer(source, filename, options) {
 			body += compileServerComponent({ ...node.declaration, default: true }, ctx) + '\n\n';
 		} else if (node.type === 'ExportNamedDeclaration' && isComponentFunction(node.declaration)) {
 			body += compileServerComponent({ ...node.declaration, export: true }, ctx) + '\n\n';
+		} else if (isReturnJsxFunction(node)) {
+			// A `function C() { return <jsx> }` form (no `@{}`). SSR it through the same
+			// component path as `@{}` so its host element + directives emit server markup
+			// (the client folds it; the two must agree for hydration).
+			body += compileServerComponent(node, ctx) + '\n\n';
+		} else if (node.type === 'ExportNamedDeclaration' && isReturnJsxFunction(node.declaration)) {
+			body += compileServerComponent({ ...node.declaration, export: true }, ctx) + '\n\n';
+		} else if (node.type === 'ExportDefaultDeclaration' && isReturnJsxFunction(node.declaration)) {
+			body += compileServerComponent({ ...node.declaration, default: true }, ctx) + '\n\n';
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
 			// User imports from 'octane' resolve to the server runtime instead.
 			for (const sp of node.specifiers || []) {
@@ -1351,7 +1364,6 @@ function compileServerComponent(node, ctx) {
 
 function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html') {
 	const params = node.params.map((p) => printNode(p)).join(', ');
-	const paramsClause = params ? `, ${params}` : '';
 
 	let statements;
 	let jsxNodes;
@@ -1359,11 +1371,21 @@ function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html')
 		statements = node.body.body || [];
 		jsxNodes = node.body.render ? [node.body.render] : [];
 	} else {
-		const bodyRewritten = rewriteEarlyExits(node.body);
+		// `node.body` may be a BlockStatement (`function f() { … return <jsx> }`, the
+		// desugared `@{}` form) or, for legacy/synthetic callers, the statement array
+		// itself. rewriteEarlyExits wants the array.
+		const bodyStmts =
+			node.body && node.body.type === 'BlockStatement' ? node.body.body || [] : node.body || [];
+		const bodyRewritten = rewriteEarlyExits(bodyStmts);
 		statements = [];
 		jsxNodes = [];
 		for (const child of bodyRewritten) {
-			if (isJsxNode(child)) {
+			if (child.type === 'ReturnStatement' && child.argument && isJsxNode(child.argument)) {
+				// return-JSX form: the returned host element (+ its directive children) is
+				// the render output — route it to jsxNodes so it flows through ssrEmitNode
+				// (byte-identical SSR to the `@{}` form), not printed as `return <jsx>`.
+				jsxNodes.push(child.argument);
+			} else if (isJsxNode(child)) {
 				if (child.type === 'Element' && elementTagName(child) === 'style') continue;
 				jsxNodes.push(child);
 			} else statements.push(child);
@@ -1398,7 +1420,11 @@ function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html')
 		? inlinedSubs.map((s) => '  ' + s.replace(/\n/g, '\n  ')).join('\n') + '\n'
 		: '';
 	const setupBlock = setupCode ? setupCode + '\n' : '';
-	return `function ${name}(__s${paramsClause}, __extra) {\n${cssLines}${headLines}${setupBlock}${subsBlock}  return ${htmlExpr};\n}`;
+	// PROPS-FIRST ABI (matches the client): `(…userParams, __s, __extra)`. A leading
+	// `__props` placeholder stands in when there are no user params, so a verbatim
+	// `function Foo(props)` and a compiled component both bind props from arg 0.
+	const sig = params ? `${params}, __s, __extra` : `__props, __s, __extra`;
+	return `function ${name}(${sig}) {\n${cssLines}${headLines}${setupBlock}${subsBlock}  return ${htmlExpr};\n}`;
 }
 
 // Serialize a list of normalized JSX nodes to a JS expression that evaluates to
@@ -1662,14 +1688,14 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
 		const elseSub = ssrCompileSub(elseStmts, ctx, '__selse', [], cssHash, parentNs);
 		inlinedSubs.push(elseSub.fn + ';');
-		elseCall = `${elseSub.fnName}(__s)`;
+		elseCall = `${elseSub.fnName}(undefined, __s)`;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	// Nested ranges: the OUTER ssrBlock is the if-slot; the INNER one wraps the
 	// taken branch's content. The client adopts BOTH on hydration (slot = outer,
 	// branch = inner) so no comment markers are inserted — byte-for-byte, exactly
 	// like @for. The not-taken arm emits no inner range (just `''`).
-	const thenInner = `ssrBlock(${thenSub.fnName}(__s))`;
+	const thenInner = `ssrBlock(${thenSub.fnName}(undefined, __s))`;
 	const elseInner = node.alternate ? `ssrBlock(${elseCall})` : "''";
 	return `ssrBlock((${testExpr}) ? ${thenInner} : ${elseInner})`;
 }
@@ -1687,12 +1713,12 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		const emptyStmts = node.empty.type === 'BlockStatement' ? node.empty.body : [node.empty];
 		const emptySub = ssrCompileSub(emptyStmts, ctx, '__sempty', [], cssHash, parentNs);
 		inlinedSubs.push(emptySub.fn + ';');
-		emptyCall = `${emptySub.fnName}(__s)`;
+		emptyCall = `${emptySub.fnName}(undefined, __s)`;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	const mapper = node.index
-		? `(__it, __i) => ssrBlock(${itemSub.fnName}(__s, __it, __i))`
-		: `(__it) => ssrBlock(${itemSub.fnName}(__s, __it))`;
+		? `(__it, __i) => ssrBlock(${itemSub.fnName}(__it, __i, __s))`
+		: `(__it) => ssrBlock(${itemSub.fnName}(__it, __s))`;
 	// Eager: render every item now and join. No keyed reconciliation server-side;
 	// each item gets its own block marker for a future hydrate to match.
 	return `ssrBlock((() => { const __items = Array.from((${itemsExpr}) ?? []); return __items.length === 0 ? ${emptyCall} : __items.map(${mapper}).join(''); })())`;
@@ -1708,8 +1734,8 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		inlinedSubs.push(sub.fn + ';');
 		// Inner ssrBlock wraps the matched case's content (see ssrEmitIf) so the
 		// client adopts it as the branch range during hydration (no inserted markers).
-		if (c.test == null) defaultCall = `ssrBlock(${sub.fnName}(__s))`;
-		else arms.push(`__d === (${printExpr(c.test)}) ? ssrBlock(${sub.fnName}(__s))`);
+		if (c.test == null) defaultCall = `ssrBlock(${sub.fnName}(undefined, __s))`;
+		else arms.push(`__d === (${printExpr(c.test)}) ? ssrBlock(${sub.fnName}(undefined, __s))`);
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	// First case matching by strict-equality wins (no JS fall-through); else default.
@@ -1727,7 +1753,7 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
 		const pendSub = ssrCompileSub(node.pending.body, ctx, '__spend', [], cssHash, parentNs);
 		inlinedSubs.push(pendSub.fn + ';');
-		pendingCall = `ssrBlock(${pendSub.fnName}(__s))`;
+		pendingCall = `ssrBlock(${pendSub.fnName}(undefined, __s))`;
 	}
 	let catchExpr = 'throw __e'; // no @catch → rethrow non-suspense errors
 	if (node.handler) {
@@ -1742,14 +1768,14 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		);
 		inlinedSubs.push(catchSub.fn + ';');
 		catchExpr = node.handler.param
-			? `return ssrBlock(${catchSub.fnName}(__s, __e))`
-			: `return ssrBlock(${catchSub.fnName}(__s))`;
+			? `return ssrBlock(${catchSub.fnName}(__e, __s))`
+			: `return ssrBlock(${catchSub.fnName}(undefined, __s))`;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	ctx.runtimeNeeded.add('ssrIsSuspense');
 	// SSR @try: render the try body; a `use(thenable)` suspension renders the
 	// @pending fallback; any other thrown error renders @catch (or rethrows).
-	return `ssrBlock((() => { try { return ssrBlock(${trySub.fnName}(__s)); } catch (__e) { if (ssrIsSuspense(__e)) return ${pendingCall}; ${catchExpr}; } })())`;
+	return `ssrBlock((() => { try { return ssrBlock(${trySub.fnName}(undefined, __s)); } catch (__e) { if (ssrIsSuspense(__e)) return ${pendingCall}; ${catchExpr}; } })())`;
 }
 
 // `{createPortal(...)}` (and other JSX-bearing expression holes) at child
@@ -4635,6 +4661,7 @@ function makeIfCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', cs
 	return {
 		id: ctx.nextHelperId++,
 		condExpr,
+		condTest: node.test, // raw test AST — the fold threads it as a `props.hN` hole
 		thenHelper: thenHelperName,
 		elseHelper: elseHelperName,
 		hostPath: null,

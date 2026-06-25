@@ -35,7 +35,7 @@ interface SSRScope {
 	$$ctxValues: Map<unknown, unknown> | null;
 }
 
-type ServerComponent = (scope: SSRScope, props: any, extra?: any) => string;
+type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
 
 let CURRENT_SCOPE: SSRScope | null = null;
 let ID_COUNTER = 0;
@@ -209,7 +209,7 @@ export function ssrComponent(parent: SSRScope, comp: ServerComponent, props: any
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
 		// become the slot's start/end markers, exactly like control-flow blocks).
-		return BLOCK_OPEN + (comp(scope, props ?? {}, undefined) ?? '') + BLOCK_CLOSE;
+		return BLOCK_OPEN + (comp(props ?? {}, scope, undefined) ?? '') + BLOCK_CLOSE;
 	} finally {
 		CURRENT_SCOPE = prev;
 	}
@@ -225,15 +225,15 @@ export interface Context<T> {
 	$$kind: typeof CONTEXT_TAG;
 	defaultValue: T;
 	$$version: number;
-	Provider: (scope: SSRScope, props: { value: T; children?: any }) => string;
+	Provider: (props: { value: T; children?: any }, scope: SSRScope) => string;
 }
 
 export function createContext<T>(defaultValue: T): Context<T> {
 	const ctx = { $$kind: CONTEXT_TAG, defaultValue, $$version: 0 } as Context<T>;
-	ctx.Provider = function ProviderBody(scope, props) {
+	ctx.Provider = function ProviderBody(props, scope) {
 		if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
 		scope.$$ctxValues.set(ctx, props.value);
-		return typeof props.children === 'function' ? (props.children(scope) ?? '') : '';
+		return typeof props.children === 'function' ? (props.children(undefined, scope) ?? '') : '';
 	};
 	return ctx;
 }
@@ -512,7 +512,7 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 		CURRENT_SCOPE = root;
 		let body = '';
 		try {
-			body = component(root, props ?? {}, undefined) ?? '';
+			body = component(props ?? {}, root, undefined) ?? '';
 		} catch (err) {
 			// A suspension with no enclosing @try unwinds to here; its thenable is
 			// already in `suspended`, so fall through to the await + retry. Any other
