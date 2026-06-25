@@ -32,7 +32,6 @@ import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as React from 'react';
 import { createRoot as reactCreateRoot, type Root as ReactRoot } from 'react-dom/client';
-import { flushSync as reactFlushSync } from 'react-dom';
 import { act as reactAct } from 'react';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -360,7 +359,13 @@ export async function mountDifferential(
 
 	function unmount(): void {
 		octaneRoot.unmount();
-		reactFlushSync(() => {
+		// Wrap React's teardown in act() — like mount and every click. With
+		// IS_REACT_ACT_ENVIRONMENT set, `root.unmount()` schedules an update on the
+		// HostRoot fiber (React calls it "Root"), and any React update outside act()
+		// logs "An update to Root inside a test was not wrapped in act(...)". The
+		// synchronous act() form fully flushes the unmount before returning, so the
+		// many sync `d.unmount()` call sites need no await.
+		reactAct(() => {
 			rRoot.unmount();
 		});
 		octaneContainer.remove();
