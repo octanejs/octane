@@ -3710,6 +3710,9 @@ interface HostComponentSlot {
 	el: Element;
 	anchor: Comment;
 	ref: any;
+	// Stable delegating children body + its current target (see hostComponent).
+	body?: ComponentBody;
+	latest?: ComponentBody | null;
 }
 
 // Render a host element (`<tag>`) that WRAPS a children render-body, from runtime
@@ -3746,7 +3749,16 @@ export function hostComponent(
 	const el = state.el;
 	applyHostProps(el, props, scope, state);
 	if (childrenBody != null) {
-		childSlot(scope, key + '$c', el, childrenBody, state.anchor);
+		// The compiled children render-body is a FRESH closure every parent render, but
+		// it is the SAME positional children slot. childSlot keys block-reuse on body
+		// identity, so handing it the raw closure would re-mount (and DOM-duplicate) the
+		// children — a `@for`/`@if` block especially — on every re-render. Pass a STABLE
+		// delegating body whose target we update each render, so childSlot reconciles.
+		state.latest = childrenBody;
+		if (state.body === undefined) {
+			state.body = ((...args: any[]) => (state!.latest as any)(...args)) as ComponentBody;
+		}
+		childSlot(scope, key + '$c', el, state.body, state.anchor);
 	}
 	return el;
 }
