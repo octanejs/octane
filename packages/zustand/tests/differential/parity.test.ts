@@ -1,7 +1,7 @@
 /**
  * Differential parity: the SAME `.tsrx` fixture runs through @octane-ts/zustand
  * (octane) AND real zustand (React) — the setup rewrites `@octane-ts/zustand` →
- * `zustand` and `octane-ts` → `react` for the React side. octane's
+ * `zustand` and `octane` → `react` for the React side. octane's
  * `mountDifferential` mounts both, drives identical clicks, and asserts
  * byte-identical innerHTML after each step. This is the gold-standard proof that
  * the binding behaves like zustand's React binding — not just "passes my tests".

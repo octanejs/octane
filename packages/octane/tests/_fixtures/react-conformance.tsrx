@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect } from 'octane-ts';
+import { useState, useEffect, useLayoutEffect } from 'octane';
 
 // ---------------------------------------------------------------------------
 // 1. setter identity stable — the setter returned by useState is

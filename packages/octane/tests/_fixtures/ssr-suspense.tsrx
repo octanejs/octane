@@ -1,4 +1,4 @@
-import { use, useState } from 'octane-ts';
+import { use, useState } from 'octane';
 
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
 // use(promise) and renders the resolved value (not the @pending fallback); the

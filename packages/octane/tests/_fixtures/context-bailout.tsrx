@@ -1,4 +1,4 @@
-import { useState, createContext, use, memo } from 'octane-ts';
+import { useState, createContext, use, memo } from 'octane';
 
 // A module-level render log, mirroring React's `Scheduler.log` global. Tests
 // install a sink before mounting and drain it after each commit. Using a

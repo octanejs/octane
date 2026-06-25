@@ -7,7 +7,7 @@
 
 ## 1. The honest reframe
 
-"Just rename `react` → `octane-ts` and it renders" is **false** for Octane, and the
+"Just rename `react` → `octane` and it renders" is **false** for Octane, and the
 reason is architectural: **Octane is a compiler framework, not a runtime VDOM.**
 
 - `createElement(type, props)` returns only a flat `{ $$kind, type, props }`
@@ -88,7 +88,7 @@ fidelity.)*
 - **Binding-alias resolution** in `_setup.ts` / the Vite plugin: a library specifier
   appearing literally in a `.tsrx` resolves to the **Octane** binding on the Octane
   side and the **React** binding on the React side (mirrors the existing
-  `octane-ts → react` rewrite).
+  `octane → react` rewrite).
 - A reusable **no-op `useDebugValue` shim** module imported by every binding.
 - A **render-count conformance pattern** (`createLog` + effect counter, or a counter
   prop projected to DOM text) for the bail-out behaviors the `innerHTML` rig can't see.

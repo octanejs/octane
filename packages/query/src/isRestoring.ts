@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'octane-ts';
+import { createContext, useContext } from 'octane';
 
 // IsRestoring — true while a persisted client is being restored from storage. While
 // restoring, queries read the cache but don't subscribe/fetch (they wait for the

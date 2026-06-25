@@ -1,4 +1,4 @@
-import { Fragment, useLayoutEffect, useEffect } from 'octane-ts';
+import { Fragment, useLayoutEffect, useEffect } from 'octane';
 
 // Stage 1 — basic fragment ref attach. React parity: rendering
 // `<Fragment ref={r}>` populates `r.current` with a FragmentInstance.

@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // SSR Phase 6 (M3) — @if / @switch hydration. The server wraps the TAKEN branch
 // in a `<!--[-->…<!--]-->` range; the client adopts it as the slot, brackets the

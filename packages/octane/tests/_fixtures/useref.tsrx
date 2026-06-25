@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useImperativeHandle } from 'octane-ts';
+import { useState, useRef, useEffect, useImperativeHandle } from 'octane';
 
 // Initial value only runs once — mutations persist across re-renders without
 // re-triggering them.

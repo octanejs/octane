@@ -1,4 +1,4 @@
-import { Suspense } from 'octane-ts';
+import { Suspense } from 'octane';
 import {
 	QueryClientProvider,
 	HydrationBoundary,

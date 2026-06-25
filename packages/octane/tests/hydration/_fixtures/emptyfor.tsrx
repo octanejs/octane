@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // Empty @for, NO @empty arm, FOLLOWED by a component. The cursor must advance
 // past the empty @for's `<!--[-->…<!--]-->` range so the trailing component

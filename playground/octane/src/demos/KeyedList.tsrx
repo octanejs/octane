@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'octane-ts';
+import { useState, useCallback } from 'octane';
 
 // Keyed @for reconciliation — proves rows survive reorders / prepends.
 // Exercises the source-order anchor work: rows render BETWEEN the input

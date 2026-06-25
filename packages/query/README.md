@@ -63,7 +63,7 @@ its error. Catch them with either octane form — the `<Suspense>` / `<ErrorBoun
 components or the `@try { } @pending { } @catch { }` directive:
 
 ```tsx
-import { Suspense, ErrorBoundary } from 'octane-ts';
+import { Suspense, ErrorBoundary } from 'octane';
 
 <ErrorBoundary fallback={(err) => <Oops error={err} />}>
   <Suspense fallback={<Spinner />}>

@@ -7,7 +7,7 @@
 // output MotionValue self-subscribes to its inputs (updates are frame-scheduled); we
 // create it once and `destroy()` it on unmount, which tears those subscriptions down.
 import { transformValue, mapValue } from 'motion';
-import { useState, useEffect } from 'octane-ts';
+import { useState, useEffect } from 'octane';
 
 function sub(slot: symbol | undefined, tag: string): symbol | undefined {
 	return slot !== undefined ? Symbol.for((slot.description ?? '') + ':ut:' + tag) : undefined;

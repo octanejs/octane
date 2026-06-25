@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // Simple early-return: render nothing when condition holds.
 // Old syntax: `if (props.hide) return;` before the JSX.

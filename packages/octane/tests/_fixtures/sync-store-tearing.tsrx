@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useCallback, useState, useMemo } from 'octane-ts';
+import { useSyncExternalStore, useCallback, useState, useMemo } from 'octane';
 
 // ---------------------------------------------------------------------------
 // External store factory. A mutable cell + a Set of listeners. `set` mutates

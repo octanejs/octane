@@ -1,4 +1,4 @@
-import { ErrorBoundary } from 'octane-ts';
+import { ErrorBoundary } from 'octane';
 import {
 	QueryClientProvider,
 	QueryErrorResetBoundary,

@@ -1,4 +1,4 @@
-import { Suspense } from 'octane-ts';
+import { Suspense } from 'octane';
 import { QueryClientProvider, useQuery } from '@octane-ts/query';
 
 // A suspense query: throws its in-flight promise (→ @pending) and, on error,

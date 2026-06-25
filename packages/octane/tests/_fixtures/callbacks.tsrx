@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useEffectEvent, useRef } from 'octane-ts';
+import { useState, useCallback, useEffect, useEffectEvent, useRef } from 'octane';
 
 // useCallback — same identity per deps; new identity when deps change.
 // We expose the callback identity via a passed-in observer.

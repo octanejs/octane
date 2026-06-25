@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // ============================================================================
 // SVG attribute breadth + namespace decision (Audit Batch 2)

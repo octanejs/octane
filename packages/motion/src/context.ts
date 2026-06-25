@@ -1,5 +1,5 @@
 // Contexts shared across motion components.
-import { createContext, useContext } from 'octane-ts';
+import { createContext, useContext } from 'octane';
 
 // MotionConfig — global defaults (transition, reduced motion) inherited by every
 // motion element below a `<MotionConfig>`.

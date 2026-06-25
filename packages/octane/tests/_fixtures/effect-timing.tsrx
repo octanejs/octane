@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useInsertionEffect } from 'octane-ts';
+import { useEffect, useLayoutEffect, useInsertionEffect } from 'octane';
 
 // Three-phase ordering: insertion fires sync-before-layout-before-paint;
 // passive fires after paint. Cleanups of each phase fire before that phase's

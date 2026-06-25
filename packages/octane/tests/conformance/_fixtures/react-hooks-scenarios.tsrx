@@ -1,4 +1,4 @@
-import { useState, useReducer, useEffect } from 'octane-ts';
+import { useState, useReducer, useEffect } from 'octane';
 
 // Render counter — every component below increments this so tests can
 // assert "rendered exactly N times". The mutable lives outside the

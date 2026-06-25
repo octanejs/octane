@@ -26,7 +26,7 @@ const isStateful = (i) => i % 10 === 1;
 // octane (.tsrx, React-shape hooks)
 // ----------------------------------------------------------------------------
 function genRippleNew() {
-	let out = `import { useState } from 'octane-ts';\n\n`;
+	let out = `import { useState } from 'octane';\n\n`;
 	out += `// 100 uniquely-named components in a chain. Stateful counters at C${STATEFUL_INDICES.join(', C')}.\n`;
 	out += `// hook-frameworks cascade re-renders down the chain on each bump.\n\n`;
 	// Module-level setters + bump exports
@@ -159,7 +159,7 @@ const bumpExports = STATEFUL_INDICES.map(
 ).join('\n');
 
 function genRippleNewMain() {
-	let out = `import { createRoot, flushSync } from 'octane-ts';\n`;
+	let out = `import { createRoot, flushSync } from 'octane';\n`;
 	out += `import App, { ${bumpImports} } from './App.tsrx';\n\n`;
 	out += `const target = document.getElementById('main');\n`;
 	out += `let root = null;\n\n`;

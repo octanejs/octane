@@ -1,4 +1,4 @@
-import { useState, useMemo, useId, useRef, useEffect } from 'octane-ts';
+import { useState, useMemo, useId, useRef, useEffect } from 'octane';
 
 // Dynamic object style + camelCase keys + a dynamic class.
 export function Styled(props) @{

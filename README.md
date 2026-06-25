@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/octane-ts/octane/actions/workflows/ci.yml"><img src="https://github.com/octane-ts/octane/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="#status"><img src="https://img.shields.io/badge/status-alpha-orange" alt="status: alpha"></a>
-  <a href="https://www.npmjs.com/package/octane-ts"><img src="https://img.shields.io/npm/v/octane-ts?logo=npm" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/octane"><img src="https://img.shields.io/npm/v/octane?logo=npm" alt="npm version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
 
@@ -62,7 +62,7 @@ not ready for production yet.
 ### Install
 
 ```bash
-pnpm add octane-ts @octane-ts/vite-plugin
+pnpm add octane @octane-ts/vite-plugin
 ```
 
 Add the plugin to your Vite config:
@@ -70,7 +70,7 @@ Add the plugin to your Vite config:
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite';
-import { octane } from 'octane-ts/compiler/vite';
+import { octane } from 'octane/compiler/vite';
 
 export default defineConfig({
   plugins: [octane()],
@@ -84,7 +84,7 @@ a plain SPA you only need the `octane()` compiler plugin shown above.
 
 ```ts
 // main.ts
-import { createRoot } from 'octane-ts';
+import { createRoot } from 'octane';
 import { App } from './App.tsrx';
 
 const root = createRoot(document.getElementById('root')!);
@@ -95,7 +95,7 @@ root.render(App, { title: 'Hello world!' });
 
 ```ts
 // entry-server.ts
-import { render } from 'octane-ts/server';
+import { render } from 'octane/server';
 import { App } from './App.tsrx';
 
 export async function renderApp() {
@@ -106,7 +106,7 @@ export async function renderApp() {
 
 ```ts
 // entry-client.ts
-import { hydrate } from 'octane-ts';
+import { hydrate } from 'octane';
 import { App } from './App.tsrx';
 
 hydrate(App, document.getElementById('app')!);
@@ -121,7 +121,7 @@ setup scope when TypeScript setup (hooks, locals) needs to sit next to the outpu
 The scope ends with one output node, either a JSX element or a fragment.
 
 ```tsrx
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 export function Counter() @{
   const [count, setCount] = useState(0);
@@ -138,7 +138,7 @@ props like `onClick` and `onInput`, backed by native, delegated DOM events.
 ### State and effects
 
 ```tsrx
-import { useState, useEffect } from 'octane-ts';
+import { useState, useEffect } from 'octane';
 
 export function Timer() @{
   const [seconds, setSeconds] = useState(0);
@@ -157,7 +157,7 @@ export function Timer() @{
 Unlike React, a hook can sit behind a guard or after an early `return`:
 
 ```tsrx
-import { useState, useEffect } from 'octane-ts';
+import { useState, useEffect } from 'octane';
 
 export function Panel(props) @{
   const [n, setN] = useState(0);
@@ -207,8 +207,8 @@ This is a pnpm monorepo with two publishable packages:
 
 - [`octane`](./packages/octane) is the runtime and the compiler together. It covers
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
-  and the compiler itself, which is exposed at `octane-ts/compiler` (and
-  `octane-ts/compiler/vite` for the build transform).
+  and the compiler itself, which is exposed at `octane/compiler` (and
+  `octane/compiler/vite` for the build transform).
 - [`@octane-ts/vite-plugin`](./packages/vite-plugin-octane) is the optional metaframework
   plugin, with dev SSR, routing, and hydration wiring for full apps.
 

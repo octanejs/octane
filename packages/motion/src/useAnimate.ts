@@ -3,7 +3,7 @@
 // `animate('selector', …)` (resolved within the scope). Reuses motion's
 // `createScopedAnimate`; the binding just provides a stable scope object + cleanup.
 import { createScopedAnimate } from 'motion';
-import { useState, useEffect } from 'octane-ts';
+import { useState, useEffect } from 'octane';
 
 function sub(slot: symbol | undefined, tag: string): symbol | undefined {
 	return slot !== undefined ? Symbol.for((slot.description ?? '') + ':ua:' + tag) : undefined;

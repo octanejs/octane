@@ -8,7 +8,7 @@
 // without the unstable-selector re-render churn:
 //
 //   const { a, b } = useBearStore(useShallow((s) => ({ a: s.a, b: s.b })));
-import { useRef } from 'octane-ts';
+import { useRef } from 'octane';
 import { shallow } from 'zustand/vanilla/shallow';
 
 export { shallow } from 'zustand/vanilla/shallow';

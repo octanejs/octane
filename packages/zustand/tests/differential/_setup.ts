@@ -6,7 +6,7 @@
  * SHARED differential cache that octane's `_rig.ts` reads from — so the zustand
  * differential tests reuse octane's `mountDifferential` unchanged.
  *
- * The one zustand-specific step: besides rewriting `octane-ts` → `react`, we
+ * The one zustand-specific step: besides rewriting `octane` → `react`, we
  * rewrite `@octane-ts/zustand` → `zustand`, so the React side of each fixture
  * runs the REAL zustand React binding (the byte-for-byte oracle). The public
  * API matches 1:1 (`create`, `useStore`, `createStore`), so a flat import
@@ -56,17 +56,17 @@ function compileOne(srcPath: string): void {
 	} catch {
 		return;
 	}
-	// octane-ts → react (hook/component names match 1:1) and @octane-ts/zustand →
+	// octane → react (hook/component names match 1:1) and @octane-ts/zustand →
 	// zustand (create/useStore/createStore match 1:1). Order matters only in that
 	// both are independent specifiers.
 	let rewritten = transformed.code
 		// `@octane-ts/zustand` and its subpaths (/shallow, /middleware, /vanilla) →
-		// the matching real-zustand specifier; `octane-ts` → react.
+		// the matching real-zustand specifier; `octane` → react.
 		.replace(
 			/from\s+["']@octane-ts\/zustand(\/[^"']*)?["']/g,
 			(_m, sub) => `from "zustand${sub || ''}"`,
 		)
-		.replace(/from\s+["']octane-ts["']/g, 'from "react"');
+		.replace(/from\s+["']octane["']/g, 'from "react"');
 	const slug = basename(srcPath).replace(/\.tsrx$/, '');
 	const outFile = join(CACHE_DIR, `${slug}-${hashString(srcPath)}.js`);
 	writeFileSync(outFile, rewritten);

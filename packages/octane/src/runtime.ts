@@ -23,7 +23,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-export type ComponentBody<P = any, E = any> = (scope: Scope, props: P, extra: E) => void;
+export type ComponentBody<P = any, E = any> = (props: P, scope: Scope, extra: E) => void;
 export type EffectFn = () => void | (() => void);
 export type Cleanup = () => void;
 
@@ -868,7 +868,45 @@ export function renderBlock(block: Block): void {
 	block.currentRenderMode = block.pendingMode ?? prevBlock?.currentRenderMode ?? 'urgent';
 	block.pendingMode = null;
 	try {
-		block.body(block, block.props, block.extra);
+		const out = (block.body as (p: any, s: Scope, e: any) => unknown)(
+			block.props,
+			block,
+			block.extra,
+		);
+		// Return-based (React-style) body: it RETURNED a renderable instead of
+		// imperatively rendering into `scope`. Mount the return via childSlot, which
+		// reconciles by descriptor `type` identity across re-renders — same renderer →
+		// patch its holes in place, different → swap. Because each compiled JSX fragment
+		// lowers to a descriptor whose `type` is a compiled renderer (not a host-string),
+		// this stays on the reconcile path, NOT buildDeoptDom's rebuild — no VDOM diff.
+		// Void bodies (the compiled `@{}` form, and all current components) return
+		// `undefined` and skip this entirely.
+		if (out !== undefined) {
+			// A single-root fragment descriptor (its renderer is `$$singleRoot`) mounts
+			// MARKERLESS via componentSlot's singleRoot path — the element self-delimits,
+			// so the DOM is byte-identical to `@{}`'s inline render (no extra markers).
+			// Anything else (multi-root, arrays, strings, conditionals) → childSlot.
+			if (
+				out !== null &&
+				(out as any).$$kind === ELEMENT_TAG &&
+				typeof (out as any).type === 'function' &&
+				(out as any).type.$$singleRoot === true
+			) {
+				const d = out as ElementDescriptor;
+				componentSlot(
+					block,
+					'__ret',
+					block.parentNode,
+					d.type as ComponentBody,
+					d.props,
+					block.endMarker,
+					d.key ?? undefined,
+					true,
+				);
+			} else {
+				childSlot(block, '__ret', block.parentNode, out, block.endMarker);
+			}
+		}
 		if (!block.mounted) block.mounted = true;
 	} finally {
 		CURRENT_SCOPE = prevScope;
@@ -898,7 +936,7 @@ export function withScope<P>(parent: Scope, key: symbol, body: ComponentBody<P>,
 	const prevScope = CURRENT_SCOPE;
 	CURRENT_SCOPE = scope;
 	try {
-		body(scope, props, undefined);
+		body(props, scope, undefined);
 		if (!scope.mounted) scope.mounted = true;
 	} finally {
 		CURRENT_SCOPE = prevScope;
@@ -907,7 +945,7 @@ export function withScope<P>(parent: Scope, key: symbol, body: ComponentBody<P>,
 
 /**
  * Lite component slot: allocates ONLY a per-call-site Scope — no Block, no
- * Comment markers, no CompSlot wrapper. Emitted by octane-ts/compiler at call
+ * Comment markers, no CompSlot wrapper. Emitted by octane/compiler at call
  * sites whose callee is a same-module FunctionDeclaration that:
  *   - calls no hooks (lexical free-identifier check)
  *   - has no `use(...)`, no @try, no `children` param
@@ -998,7 +1036,7 @@ export function componentSlotLite<P>(
 	const prevScope = CURRENT_SCOPE;
 	CURRENT_SCOPE = scope;
 	try {
-		comp(scope, props, undefined);
+		comp(props, scope, undefined);
 		if (!scope.mounted) scope.mounted = true;
 	} finally {
 		CURRENT_SCOPE = prevScope;
@@ -1065,7 +1103,7 @@ function fireCleanupsOnly(scope: Scope): void {
  *
  * Invariant: every slot whose teardown requires recursing into a child Block
  * MUST be registered here. The runtime currently has exactly six creation
- * sites; the octane-ts/compiler compiler never creates slot objects directly.
+ * sites; the octane/compiler compiler never creates slot objects directly.
  */
 function registerSlot(scope: Scope, slot: any): void {
 	const slots = scope._slots;
@@ -1148,7 +1186,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 // ---------------------------------------------------------------------------
 // Hooks — keyed by compile-time Symbol per call site
 //
-// The `slot` argument is COMPILER-INJECTED. octane-ts/compiler appends a
+// The `slot` argument is COMPILER-INJECTED. octane/compiler appends a
 // `Symbol.for(stableId)` to every hook call; the symbol is what gives the
 // hook its per-call-site identity within a scope (and its cross-module
 // identity for HMR state preservation). The public signature marks `slot`
@@ -1162,9 +1200,36 @@ function missingSlot(name: string): never {
 	throw new Error(
 		`${name} was called without a slot symbol. The octane compiler injects ` +
 			`per-call-site slot symbols; ensure your project loads this runtime ` +
-			`through the Vite plugin (octane-ts/compiler/vite). To call hooks by hand, ` +
+			`through the Vite plugin (octane/compiler/vite). To call hooks by hand, ` +
 			`pass a stable symbol, e.g. useState(0, Symbol.for('my-stable-id')).`,
 	);
+}
+
+// withSlot — establishes hook call-site identity via a per-render PATH STACK, so a
+// hook reached THROUGH a custom-hook wrapper combines the wrapper's call-site symbol
+// with its own. The compiler emits each hook call as `withSlot(sym, hook, ...args)`
+// — passing the hook + args directly (no per-render closure to allocate). The base
+// hook reads the combined path as its slot when no explicit `slot` arg is given (the
+// trailing-arg form stays supported for the existing `@{}` emission, so this is
+// additive). Two calls to the same custom hook push DIFFERENT call-site symbols →
+// different paths → independent state; a hook in a loop repeats one call-site symbol,
+// which the compiler rejects.
+const slotStack: symbol[] = [];
+export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T {
+	slotStack.push(sym);
+	try {
+		return fn(...args);
+	} finally {
+		slotStack.pop();
+	}
+}
+function currentPathSlot(): symbol | undefined {
+	const n = slotStack.length;
+	if (n === 0) return undefined;
+	if (n === 1) return slotStack[0]; // top-level hook: single symbol, no combination
+	let key = slotStack[0].description!;
+	for (let i = 1; i < n; i++) key += '|' + slotStack[i].description;
+	return Symbol.for(key);
 }
 
 interface StateSlot<T> {
@@ -1176,6 +1241,7 @@ export function useState<T>(
 	initial: T | (() => T),
 	slot?: symbol,
 ): [T, (next: T | ((prev: T) => T)) => void] {
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot('useState');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -1214,6 +1280,7 @@ export function useReducer<S, A, I = S>(
 	} else {
 		init = initOrSlot;
 	}
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot('useReducer');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -1316,6 +1383,7 @@ function resolveEffectArgs(
 		slot = deps;
 		deps = undefined;
 	}
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot(name);
 	return [deps as any[] | undefined, slot];
 }
@@ -1341,6 +1409,7 @@ export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[], slot?: 
 		slot = deps as unknown as symbol;
 		deps = undefined;
 	}
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot('useMemo');
 	const scope = CURRENT_SCOPE!;
 	const prev = scope.hooks?.get(slot) as { deps: any[] | undefined; value: T } | undefined;
@@ -1364,11 +1433,13 @@ export function useCallback<F extends (...args: any[]) => any>(
 	// `useCallback(fn, slot)`. useMemo reinterprets the same way, so forward both
 	// args verbatim and let it sort out the omitted-deps case. Guard here (rather
 	// than letting useMemo throw) so the diagnostic names useCallback, not useMemo.
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined && typeof deps !== 'symbol') missingSlot('useCallback');
 	return useMemo(() => fn, deps as any[] | undefined, slot);
 }
 
 export function useRef<T>(initial: T, slot?: symbol): { current: T } {
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot('useRef');
 	const scope = CURRENT_SCOPE!;
 	let s = scope.hooks?.get(slot) as { current: T } | undefined;
@@ -1446,7 +1517,8 @@ export function useSyncExternalStore<T>(
 	// LAST argument, so we detect the user-vs-compiler args by counting from
 	// the end. One trailing Symbol → user passed no getServerSnapshot; one
 	// trailing Symbol preceded by another arg → user passed getServerSnapshot.
-	const slot = rest[rest.length - 1] as symbol | undefined;
+	let slot = rest[rest.length - 1] as symbol | undefined;
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined || typeof slot !== 'symbol') missingSlot('useSyncExternalStore');
 	const getServerSnapshot = rest.length >= 2 ? (rest[0] as () => T) : undefined;
 	const desc = slot.description ?? '';
@@ -1520,6 +1592,7 @@ export function useSyncExternalStore<T>(
 }
 
 export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: symbol): F {
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot('useEffectEvent');
 	const scope = CURRENT_SCOPE!;
 	let s = scope.hooks?.get(slot) as { current: F; stable: F } | undefined;
@@ -1560,7 +1633,7 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	const ctx = { $$kind: CONTEXT_TAG, defaultValue, $$version: 0 } as Context<T>;
 	// A Provider is a built-in component that stamps the value on its Block
 	// and renders its `children` body inside its scope.
-	ctx.Provider = function ProviderBody(scope, props) {
+	ctx.Provider = function ProviderBody(props, scope) {
 		// Stash on the scope (not block) so siblings of the Provider don't see it.
 		// $$ctxValues is pre-initialised to null on every Scope/Block so this
 		// assignment is a hidden-class-stable update (not a late stamp).
@@ -1579,7 +1652,7 @@ export function createContext<T>(defaultValue: T): Context<T> {
 		scope.$$ctxValues.set(ctx, props.value);
 		// Children is the compiled render-body for the JSX between the Provider tags.
 		if (typeof props.children === 'function') {
-			props.children(scope);
+			props.children(undefined, scope);
 		}
 	};
 	return ctx;
@@ -1612,11 +1685,11 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
  * descendant suspends (via `use(thenable)`).
  */
 export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBody }> = (
-	scope,
 	props,
+	scope,
 ) => {
 	const block = scope.block;
-	const pendingBody: ComponentBody = (s) => {
+	const pendingBody: ComponentBody = (_p, s) => {
 		childSlot(s, '_fb', s.block.parentNode, props.fallback, s.block.endMarker);
 	};
 	tryBlock(
@@ -1639,9 +1712,9 @@ export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBo
 export const ErrorBoundary: ComponentBody<{
 	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
 	children: ComponentBody;
-}> = (scope, props) => {
+}> = (props, scope) => {
 	const block = scope.block;
-	const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (s, catchProps) => {
+	const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (catchProps, s) => {
 		const fb =
 			typeof props.fallback === 'function'
 				? (props.fallback as (e: unknown, r: () => void) => unknown)(
@@ -1847,6 +1920,7 @@ function useThenable<T>(thenable: TrackedThenable<T>): T {
 // Monotonic counter — produces stable cross-render IDs.
 let _idCounter = 0;
 export function useId(slot?: symbol): string {
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot('useId');
 	const scope = CURRENT_SCOPE!;
 	let s = scope.hooks?.get(slot) as { id: string } | undefined;
@@ -2108,7 +2182,7 @@ export function attachRef(ref: any, el: Element | FragmentInstance | null): void
 // detaches the ref and destroys the instance on unmount.
 //
 // `Fragment` is exported as a sentinel symbol so user code can write
-// `import { Fragment } from 'octane-ts'` for parity with React. The
+// `import { Fragment } from 'octane'` for parity with React. The
 // compiler matches on the JSX identifier 'Fragment' at the source-name
 // level, so the import is currently only for TS validity — but reserving
 // the symbol identity now keeps the door open for component-prop-name
@@ -2120,7 +2194,7 @@ export const Fragment: unique symbol = Symbol.for('octane.Fragment');
 /**
  * React-19 `<Activity mode="hidden"|"visible">` sentinel. The compiler matches
  * the `Activity` tag by NAME (so this export is only needed so user imports
- * `import { Activity } from 'octane-ts'` resolve); the runtime work happens in
+ * `import { Activity } from 'octane'` resolve); the runtime work happens in
  * `activityBlock`.
  */
 export const Activity: unique symbol = Symbol.for('octane.Activity');
@@ -3835,7 +3909,7 @@ function buildDeoptDom(value: any, ownerBlock: Block): Node | null {
 // DOM from the descriptor every render — host elements carry no state, so a
 // rebuild reproduces React's observable output (it does NOT preserve host node
 // identity across parent re-renders; that's the documented de-opt trade-off).
-function deoptItemBody(scope: Scope, item: any): void {
+function deoptItemBody(item: any, scope: Scope): void {
 	const block = scope.block;
 	// Sweep last render's build (the range between this item's markers).
 	const startM = block.startMarker;
@@ -4128,8 +4202,10 @@ export function memo<P>(
 	component: ComponentBody<P>,
 	arePropsEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean,
 ): ComponentBody<P> {
-	function memoWrapper(scope: Scope, props: P, extra: any): void {
-		component(scope, props, extra);
+	function memoWrapper(props: P, scope: Scope, extra: any): unknown {
+		// Propagate the wrapped body's return so a folded (return-based) component
+		// memo()'d here still hands its descriptor back to renderBlock to mount.
+		return component(props, scope, extra);
 	}
 	(memoWrapper as any).__memo = true;
 	if (arePropsEqual) (memoWrapper as any).__compare = arePropsEqual;
@@ -4196,11 +4272,13 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			}
 		},
 	};
-	function wrapper(scope: Scope, props: P, extra: any): void {
+	function wrapper(props: P, scope: Scope, extra: any): unknown {
 		const block = scope.block;
 		// Register on first call; cleared lazily during update() if disposed.
 		meta.liveBlocks.add(block);
-		meta.fn(scope, props as any, extra);
+		// Propagate the wrapped body's return — a return-based (folded) component
+		// hands back a renderable descriptor that renderBlock must still mount.
+		return meta.fn(props as any, scope, extra);
 	}
 	(wrapper as HmrWrapper)[HMR] = meta;
 	return wrapper as ComponentBody<P>;
@@ -4727,6 +4805,7 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 export function useTransition(
 	slot?: symbol,
 ): [boolean, (fn: () => void | Promise<unknown>) => void] {
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot('useTransition');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -4782,6 +4861,7 @@ export function useActionState<S>(
 	// `permalink` is optional, the compiler appends the slot last. Disambiguate:
 	// a trailing symbol in the 3rd position means no permalink was passed.
 	if (typeof permalinkOrSlot === 'symbol') slot = permalinkOrSlot;
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot('useActionState');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -4886,6 +4966,7 @@ interface FormStatusSlot {
 }
 
 export function useFormStatus(slot?: symbol): FormStatus {
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot('useFormStatus');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -4957,6 +5038,7 @@ export function useOptimistic<S, V = S>(
 	let updateFn: ((state: S, value: V) => S) | undefined;
 	if (typeof updateFnOrSlot === 'symbol') slot = updateFnOrSlot;
 	else updateFn = updateFnOrSlot;
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined) missingSlot('useOptimistic');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -5029,7 +5111,8 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 	// user-vs-compiler args by counting from the end. One trailing Symbol →
 	// user passed no initialValue; one trailing Symbol preceded by another
 	// arg → user passed initialValue. Same hook-slot semantics either way.
-	const slot = rest[rest.length - 1] as symbol | undefined;
+	let slot = rest[rest.length - 1] as symbol | undefined;
+	if (slot === undefined) slot = currentPathSlot();
 	if (slot === undefined || typeof slot !== 'symbol') missingSlot('useDeferredValue');
 	const initialValue = rest.length >= 2 ? (rest[0] as T) : undefined;
 	const hasInitial = rest.length >= 2;
@@ -5716,7 +5799,7 @@ export function forBlock<T, E = undefined>(
 	domParent: Node,
 	items: ArrayLike<T>,
 	getKey: (item: T, index: number) => any,
-	itemBody: (scope: Scope, item: T, extra: E) => void,
+	itemBody: (item: T, scope: Scope, extra: E) => void,
 	extra?: E,
 	flags?: number,
 	deps?: any[],
@@ -5898,7 +5981,7 @@ function reconcileKeyed<T, E>(
 	state: ForSlot,
 	items: ArrayLike<T>,
 	getKey: (item: T, index: number) => any,
-	itemBody: (scope: Scope, item: T, extra: E) => void,
+	itemBody: (item: T, scope: Scope, extra: E) => void,
 	extra: E,
 	pure: boolean,
 	singleRoot: boolean,
@@ -5970,7 +6053,7 @@ function reconcileKeyed<T, E>(
 			if (lite) {
 				// depEligible body — no hooks, no comps, no control flow.
 				// Skip renderBlock's activeBlock plumbing; call body directly.
-				(itemBody as any)(block, newItem, extra);
+				(itemBody as any)(newItem, block, extra);
 			} else {
 				renderBlock(block);
 			}
@@ -6000,7 +6083,7 @@ function reconcileKeyed<T, E>(
 			block.body = itemBody as ComponentBody;
 			block.itemIndex = newEnd;
 			if (lite) {
-				(itemBody as any)(block, newItem, extra);
+				(itemBody as any)(newItem, block, extra);
 			} else {
 				renderBlock(block);
 			}
@@ -6170,7 +6253,7 @@ function reconcileKeyed<T, E>(
 				block.body = itemBody as ComponentBody;
 				block.itemIndex = newIdx;
 				if (lite) {
-					(itemBody as any)(block, newItem, extra);
+					(itemBody as any)(newItem, block, extra);
 				} else {
 					renderBlock(block);
 				}
@@ -6439,7 +6522,7 @@ function mountItem<T, E>(
 	anchor: Node,
 	item: T,
 	index: number,
-	body: (s: Scope, item: T, extra: E) => void,
+	body: (item: T, s: Scope, extra: E) => void,
 	extra: E,
 	forSlot: ForSlot,
 	singleRoot: boolean,

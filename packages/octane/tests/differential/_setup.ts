@@ -56,7 +56,7 @@ function compileOne(srcPath: string): void {
 	} catch {
 		return;
 	}
-	// @tsrx/react preserves the user's authored `from 'octane-ts'` imports
+	// @tsrx/react preserves the user's authored `from 'octane'` imports
 	// verbatim (it expects the user to author against the platform they're
 	// targeting). For our differential fixtures — which ARE authored against
 	// octane — we rewrite the imports to React-side equivalents so the
@@ -73,7 +73,7 @@ function compileOne(srcPath: string): void {
 	// createPortal out of the rewritten react import, (b) import the real one
 	// from react-dom under an internal alias, (c) shim a `createPortal` const
 	// that unwraps the thunk if present and forwards to the real impl.
-	let rewritten = transformed.code.replace(/from\s+["']octane-ts["']/g, 'from "react"');
+	let rewritten = transformed.code.replace(/from\s+["']octane["']/g, 'from "react"');
 	if (/\bcreatePortal\b/.test(rewritten)) {
 		rewritten = rewritten.replace(
 			/(import\s*\{[^}]*?)\bcreatePortal\b\s*,?\s*([^}]*\}\s*from\s+"react";?)/,

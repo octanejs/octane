@@ -1,4 +1,4 @@
-import { useLayoutEffect, useEffect } from 'octane-ts';
+import { useLayoutEffect, useEffect } from 'octane';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Parent → Child → Grandchild tree. Each level registers a useLayoutEffect

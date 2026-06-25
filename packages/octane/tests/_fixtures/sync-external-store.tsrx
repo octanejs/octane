@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useCallback } from 'octane-ts';
+import { useSyncExternalStore, useCallback } from 'octane';
 
 // Smallest practical store: a mutable counter with a Set of listeners.
 // Identical-by-reference subscribe / getSnapshot keep the useEffect deps

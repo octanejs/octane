@@ -1,4 +1,4 @@
-import { render } from 'octane-ts/server';
+import { render } from 'octane/server';
 import { App } from './App.tsrx';
 
 // SSR entry. The harness loads this via ssrLoadModule and times renderApp().

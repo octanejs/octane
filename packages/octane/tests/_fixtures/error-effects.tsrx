@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'octane-ts';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'octane';
 
 // ── Effect-throw fixtures ────────────────────────────────────────────────
 // Per ReactErrorBoundaries-test.internal.js:407 — BrokenUseEffect: renders its

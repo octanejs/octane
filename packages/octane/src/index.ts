@@ -16,6 +16,7 @@ export {
 
 	// Hooks
 	useState,
+	withSlot,
 	useReducer,
 	useEffect,
 	useLayoutEffect,

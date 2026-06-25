@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'octane-ts';
+import { useState, useEffect } from 'octane';
 
 // ---------------------------------------------------------------------------
 // SPREAD attributes — `<div {...obj}>` routes each key through the right

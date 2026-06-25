@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane-ts/compiler';
+import { compile } from 'octane/compiler';
 import { hydrate, flushSync, drainPassiveEffects } from '../../src/index.js';
-import * as ServerRT from 'octane-ts/server';
+import * as ServerRT from 'octane/server';
 // CLIENT-compiled variants (the normal .tsrx import path, client mode). The
 // onClick handler in Counter makes this module call delegateEvents(['click']) at
 // load, so click delegation is registered for hydrated containers.
@@ -20,7 +20,7 @@ const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/l
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'leaf.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

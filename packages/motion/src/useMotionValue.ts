@@ -3,7 +3,7 @@
 // element subscribes and updates without re-rendering (see the style-binding effect
 // in index.ts).
 import { motionValue } from 'motion';
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 export function useMotionValue<T>(initial: T, ...args: any[]): any {
 	const tail = args[args.length - 1];

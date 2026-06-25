@@ -7,7 +7,7 @@ import {
 	useMemo,
 	useCallback,
 	useRef,
-} from 'octane-ts';
+} from 'octane';
 
 // Lazy initial value
 export function LazyInit() @{

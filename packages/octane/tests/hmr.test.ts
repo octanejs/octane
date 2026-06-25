@@ -9,7 +9,7 @@ import { mount } from './_helpers';
  * calling `Foo[HMR].update(NewFoo)` manually, which is what the compiler-
  * emitted accept block does at dev time.
  *
- * The component bodies here use the same `(scope, props, extra)` signature
+ * The component bodies here use the same `(props, scope, extra)` signature
  * the octane compiler emits. They follow the standard
  * "clear-range-then-insert" pattern that compiled bodies use on re-render.
  */
@@ -34,7 +34,7 @@ function clearBlockRange(scope: Scope): void {
 
 describe('hmr — runtime wrapper', () => {
 	it('renders the initial component body', () => {
-		const Foo = hmr(((scope: Scope, _props: any, _extra: any) => {
+		const Foo = hmr(((_props: any, scope: Scope, _extra: any) => {
 			clearBlockRange(scope);
 			const root = document.createElement('span');
 			root.className = 'leaf';
@@ -55,14 +55,14 @@ describe('hmr — runtime wrapper', () => {
 	});
 
 	it('update() swaps the body of live blocks + re-renders', () => {
-		const v1: ComponentBody<any> = ((scope: Scope, _props: any, _extra: any) => {
+		const v1: ComponentBody<any> = ((_props: any, scope: Scope, _extra: any) => {
 			clearBlockRange(scope);
 			const root = document.createElement('span');
 			root.className = 'leaf v1';
 			root.textContent = 'A';
 			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
 		}) as ComponentBody<any>;
-		const v2: ComponentBody<any> = ((scope: Scope, _props: any, _extra: any) => {
+		const v2: ComponentBody<any> = ((_props: any, scope: Scope, _extra: any) => {
 			clearBlockRange(scope);
 			const root = document.createElement('span');
 			root.className = 'leaf v2';
@@ -91,7 +91,7 @@ describe('hmr — runtime wrapper', () => {
 		// Both bodies use the SAME hook symbol (simulating the compiler's
 		// `Symbol.for('octane:file.tsrx:Foo.useState#0')`-stable emit).
 		const HOOK_SYM = Symbol.for('octane:hmr.test.ts:Counter.useState#0');
-		const v1: ComponentBody<any> = ((scope: Scope, _props: any, _extra: any) => {
+		const v1: ComponentBody<any> = ((_props: any, scope: Scope, _extra: any) => {
 			const [n] = useState(0, HOOK_SYM as any);
 			clearBlockRange(scope);
 			const root = document.createElement('span');
@@ -99,7 +99,7 @@ describe('hmr — runtime wrapper', () => {
 			root.textContent = 'v1:' + n;
 			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
 		}) as ComponentBody<any>;
-		const v2: ComponentBody<any> = ((scope: Scope, _props: any, _extra: any) => {
+		const v2: ComponentBody<any> = ((_props: any, scope: Scope, _extra: any) => {
 			const [n, setN] = useState(0, HOOK_SYM as any);
 			clearBlockRange(scope);
 			const root = document.createElement('button');
@@ -137,9 +137,9 @@ describe('hmr — runtime wrapper', () => {
 	});
 
 	it('compiler emits Symbol.for(...) for hook slots and an import.meta.hot.accept block', async () => {
-		const { compile } = await import('octane-ts/compiler');
+		const { compile } = await import('octane/compiler');
 		const src =
-			"import { useState } from 'octane-ts';\n" +
+			"import { useState } from 'octane';\n" +
 			'export function Foo() @{\n' +
 			'  const [n, setN] = useState(0);\n' +
 			'  <button onClick={() => setN(n + 1)}>{n as string}</button>\n' +
@@ -155,7 +155,7 @@ describe('hmr — runtime wrapper', () => {
 	});
 
 	it('hmr option off → no wrapping, no accept block', async () => {
-		const { compile } = await import('octane-ts/compiler');
+		const { compile } = await import('octane/compiler');
 		const src = "export function Foo() @{ <span>{'hi'}</span> }\n";
 		const { code } = compile(src, 'file.tsrx'); // no { hmr: true }
 		expect(code).not.toMatch(/hmr\(/);

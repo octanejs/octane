@@ -7,11 +7,11 @@ import {
 	HYDRATION_START,
 	HYDRATION_END,
 	EMPTY_COMMENT,
-} from 'octane-ts/constants';
-import { render } from 'octane-ts/server';
+} from 'octane/constants';
+import { render } from 'octane/server';
 
 describe('SSR scaffold (phase 0)', () => {
-	it('exposes the hydration marker constants via octane-ts/constants', () => {
+	it('exposes the hydration marker constants via octane/constants', () => {
 		expect(HYDRATION_START).toBe('[');
 		expect(HYDRATION_END).toBe(']');
 		expect(BLOCK_OPEN).toBe('<!--[-->');
@@ -19,7 +19,7 @@ describe('SSR scaffold (phase 0)', () => {
 		expect(EMPTY_COMMENT).toBe('<!---->');
 	});
 
-	it('octane-ts/server render() renders a component to { head, body, css }', async () => {
+	it('octane/server render() renders a component to { head, body, css }', async () => {
 		// Phase 1: render is implemented (a server component is a function → HTML).
 		// Phase 4: render() is async (it awaits any suspended use(thenable)).
 		const out = await render(((_s: any) => '<p>hi</p>') as any);

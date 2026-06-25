@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane-ts/compiler';
+import { compile } from 'octane/compiler';
 import { injectStyle } from '../src/index.js';
-import * as RT from 'octane-ts/server';
+import * as RT from 'octane/server';
 
 // SSR Phase 3 — control flow (@if/@for/@switch/@try) + component children +
 // portals emitted to HTML strings with block markers, plus scoped-CSS de-dup.
@@ -13,7 +13,7 @@ const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 function evalServer(source: string, file: string): Record<string, any> {
 	let { code } = compile(source, file, { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

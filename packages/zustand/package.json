@@ -34,7 +34,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "octane-ts": "workspace:*",
+    "octane": "workspace:*",
     "zustand": "catalog:default"
   },
   "devDependencies": {

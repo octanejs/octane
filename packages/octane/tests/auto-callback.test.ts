@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compile } from 'octane-ts/compiler';
+import { compile } from 'octane/compiler';
 
 // Pin the auto-callback transform: when a top-level `const fn = () => …`
 // arrow inside a component body only closes over compile-time-stable
@@ -20,7 +20,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
 		// Updater form: arrow closes ONLY over `setCount`, not the value `count`.
 		// The value would be unstable per the bailout rule (test below).
 		const code = c(`
-      import { useState } from 'octane-ts';
+      import { useState } from 'octane';
       export function Counter() @{
         const [count, setCount] = useState(0);
         const reset = () => setCount(0);
@@ -29,7 +29,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
     `);
 		expect(code).toMatch(/const\s+reset\s*=\s*useCallback\s*\(/);
 		expect(code).toMatch(/useCallback\s*\([\s\S]*?,\s*\[\s*setCount\s*\]/);
-		expect(code).toMatch(/import\s*\{[^}]*useCallback[^}]*\}\s*from\s*['"]octane-ts['"]/);
+		expect(code).toMatch(/import\s*\{[^}]*useCallback[^}]*\}\s*from\s*['"]octane['"]/);
 	});
 
 	it('arrow that closes only over a prop is NOT rewrapped', () => {
@@ -45,7 +45,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
 
 	it('transitive stability: arrow b calling stable arrow a is also wrapped', () => {
 		const code = c(`
-      import { useState } from 'octane-ts';
+      import { useState } from 'octane';
       export function T() @{
         const [, setX] = useState(0);
         const a = () => setX(1);
@@ -59,7 +59,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
 
 	it('useRef return is stable; .current accesses do NOT add deps', () => {
 		const code = c(`
-      import { useRef } from 'octane-ts';
+      import { useRef } from 'octane';
       export function R() @{
         const r = useRef(null);
         const focus = () => r.current.focus();
@@ -71,7 +71,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
 
 	it('idempotency: user-authored useCallback is not re-wrapped', () => {
 		const code = c(`
-      import { useState, useCallback } from 'octane-ts';
+      import { useState, useCallback } from 'octane';
       export function I() @{
         const [, setX] = useState(0);
         const cb = useCallback(() => setX(1), [setX]);
@@ -83,7 +83,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
 
 	it('useState VALUE (first tuple element) is NOT stable; closure over it bails', () => {
 		const code = c(`
-      import { useState } from 'octane-ts';
+      import { useState } from 'octane';
       export function V() @{
         const [count, setCount] = useState(0);
         const read = () => count;
@@ -95,7 +95,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
 
 	it('destructured useRef return is NOT stable (only Identifier-bound stays)', () => {
 		const code = c(`
-      import { useRef } from 'octane-ts';
+      import { useRef } from 'octane';
       export function D() @{
         const { current: r } = useRef({ x: 1 });
         const fn = () => r;
@@ -107,7 +107,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
 
 	it("module-level identifier doesn't block rewrite and is not added to deps", () => {
 		const code = c(`
-      import { useState } from 'octane-ts';
+      import { useState } from 'octane';
       const ZERO = 0;
       export function M() @{
         const [, setX] = useState(0);
@@ -121,7 +121,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
 
 	it('inner @for body arrows are NOT auto-wrapped (rewrite gated to top level)', () => {
 		const code = c(`
-      import { useState } from 'octane-ts';
+      import { useState } from 'octane';
       export function L(props) @{
         const [, setX] = useState(0);
         <ul>
@@ -138,7 +138,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
 
 	it('mixed stable + unstable closure (prop reference inside arrow) bails', () => {
 		const code = c(`
-      import { useState } from 'octane-ts';
+      import { useState } from 'octane';
       export function Mix(props) @{
         const [, setX] = useState(0);
         const fn = (e) => { setX(1); return props.label + e.type; };

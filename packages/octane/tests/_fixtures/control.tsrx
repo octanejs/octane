@@ -1,4 +1,4 @@
-import { useState, useId } from 'octane-ts';
+import { useState, useId } from 'octane';
 
 export function Toggle() @{
 	const [on, setOn] = useState(false);

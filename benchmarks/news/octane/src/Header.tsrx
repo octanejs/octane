@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 
 // A FULL component (has a hook → not a hookless "lite" slot) so it hydrates via
 // the nested-component path (M1). The theme toggle gives a visible interactivity

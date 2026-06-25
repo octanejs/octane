@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { octane as octaneCompiler } from 'octane-ts/compiler/vite';
+import { octane as octaneCompiler } from 'octane/compiler/vite';
 
 import { createRouter } from './server/router.js';
 import { createContext, runMiddlewareChain } from './server/middleware.js';
@@ -90,7 +90,7 @@ function has_route_config(config) {
  * The octane metaframework Vite plugin.
  *
  * Returns an ARRAY: `[octaneCompiler({ hmr }), metaPlugin]`. The first element is
- * octane-ts/compiler's transform plugin — it owns ALL `.tsrx` compilation, picking
+ * octane/compiler's transform plugin — it owns ALL `.tsrx` compilation, picking
  * client vs server mode per-module from Vite's SSR signal (so the SAME file
  * compiles to a DOM-clone client body for the browser and to an HTML-building
  * server body when pulled via `ssrLoadModule`). The metaPlugin owns config,
@@ -130,8 +130,8 @@ export function octane(inlineOptions = {}) {
 						// be esbuild-prebundled — the octane transform owns `.tsrx` compilation.
 						...new Set([
 							...exclude,
-							'octane-ts',
-							'octane-ts/compiler',
+							'octane',
+							'octane/compiler',
 							'@octane-ts/query',
 							...SERVER_ONLY_ADAPTER_IDS,
 						]),
@@ -140,7 +140,7 @@ export function octane(inlineOptions = {}) {
 				// Workspace packages with TS source must be transformed by Vite's SSR
 				// pipeline (not require()'d raw) so ssrLoadModule gets transpiled code.
 				ssr: {
-					noExternal: ['octane-ts', 'octane-ts/compiler', '@octane-ts/query'],
+					noExternal: ['octane', 'octane/compiler', '@octane-ts/query'],
 				},
 			};
 		},
@@ -457,7 +457,7 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 				return server[funcName];
 			},
 			async executeServerFunction(fn, body) {
-				const { executeServerFunction } = await vite.ssrLoadModule('octane-ts/server');
+				const { executeServerFunction } = await vite.ssrLoadModule('octane/server');
 				return executeServerFunction(fn, body);
 			},
 			asyncContext,

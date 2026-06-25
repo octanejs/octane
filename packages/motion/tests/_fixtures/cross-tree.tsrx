@@ -1,5 +1,5 @@
 import { useMotionValue, useMotionValueEvent } from '@octane-ts/motion';
-import { useEffect } from 'octane-ts';
+import { useEffect } from 'octane';
 
 function Setter(props) @{
 	useEffect(() => {

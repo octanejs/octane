@@ -1,5 +1,5 @@
 ---
-"octane-ts": patch
+"octane": patch
 ---
 
 Compiler: support custom hooks and library bindings.

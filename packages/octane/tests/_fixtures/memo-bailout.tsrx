@@ -1,4 +1,4 @@
-import { useState, createContext, use, memo } from 'octane-ts';
+import { useState, createContext, use, memo } from 'octane';
 
 // ---------------------------------------------------------------------------
 // memo() bailout heuristics — ports of ReactMemo-test.js cases :66, :101, :298.

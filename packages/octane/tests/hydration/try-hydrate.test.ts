@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane-ts/compiler';
+import { compile } from 'octane/compiler';
 import { hydrate, flushSync } from '../../src/index.js';
-import * as ServerRT from 'octane-ts/server';
+import * as ServerRT from 'octane/server';
 import { Boundary } from './_fixtures/tryboundary.tsrx';
 
 // SSR Phase 6 (M4) — @try hydration. The server resolves use(promise) and renders
@@ -15,7 +15,7 @@ const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/t
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'tryboundary.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane-ts\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		'const {$1} = __rt;',
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

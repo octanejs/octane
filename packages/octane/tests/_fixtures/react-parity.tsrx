@@ -1,4 +1,4 @@
-import { createRoot, createContext, useState, useContext } from 'octane-ts';
+import { createRoot, createContext, useState, useContext } from 'octane';
 
 // --- Root render (React-style `root.render(<App/>)`) -----------------------
 // App renders props.label every render (so prop updates are observable) and

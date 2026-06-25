@@ -1,4 +1,4 @@
-import { useState } from 'octane-ts';
+import { useState } from 'octane';
 import { QueryErrorResetBoundaryContext, createValue } from './errorResetBoundary.ts';
 
 // QueryErrorResetBoundary — provides a fresh reset coordinator to its subtree.

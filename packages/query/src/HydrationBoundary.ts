@@ -10,7 +10,7 @@ import { resolveClient } from './context';
 // in the cache are applied, so a re-render never clobbers fresher client data. (The
 // react-query binding defers this to useMemo/useEffect for concurrent rendering;
 // octane renders synchronously, so running it in the body is sufficient.)
-export function HydrationBoundary(scope: any, props: any): void {
+export function HydrationBoundary(props: any, scope: any): void {
 	const client = resolveClient(props.queryClient);
 	const state = props.state;
 	if (state && typeof state === 'object') {
@@ -27,6 +27,6 @@ export function HydrationBoundary(scope: any, props: any): void {
 		}
 	}
 	if (typeof props.children === 'function') {
-		props.children(scope);
+		props.children(undefined, scope);
 	}
 }

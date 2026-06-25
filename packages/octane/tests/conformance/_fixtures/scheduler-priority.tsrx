@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect, useEffect } from 'octane-ts';
+import { useState, useLayoutEffect, useEffect } from 'octane';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Discrete-event sync-commit probe

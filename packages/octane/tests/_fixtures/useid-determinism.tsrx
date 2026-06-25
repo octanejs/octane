@@ -1,4 +1,4 @@
-import { useState, useId } from 'octane-ts';
+import { useState, useId } from 'octane';
 
 // A single useId rendered into BOTH a data-testid attribute and the text body,
 // so a test can read the id from either the attribute or the DOM text — and so

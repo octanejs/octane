@@ -46,7 +46,7 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		// Load the octane server runtime. The wrappers call components directly
 		// (no ssrComponent injection — the root must NOT be marker-wrapped), so
 		// only `render` is needed here.
-		const { render } = await vite.ssrLoadModule('octane-ts/server');
+		const { render } = await vite.ssrLoadModule('octane/server');
 
 		// Load the page component (compiled in server mode by octane()).
 		const entryPath = get_route_entry_path(route.entry);

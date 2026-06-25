@@ -1,4 +1,4 @@
-import { useState, createContext, use, createPortal } from 'octane-ts';
+import { useState, createContext, use, createPortal } from 'octane';
 
 export const Theme = createContext('light');
 

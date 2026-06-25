@@ -4,7 +4,7 @@
 // changes through useEffect. The single compiler-injected slot is split into
 // distinct sub-slots for each internal base hook, the same way the zustand
 // `traditional` binding does.
-import { useState, useCallback, useSyncExternalStore, useEffect, use } from 'octane-ts';
+import { useState, useCallback, useSyncExternalStore, useEffect, use } from 'octane';
 import { noop, notifyManager } from '@tanstack/query-core';
 import { resolveClient } from './context';
 import { useIsRestoring } from './isRestoring';

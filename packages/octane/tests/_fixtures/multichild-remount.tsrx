@@ -1,4 +1,4 @@
-import { useEffect } from 'octane-ts';
+import { useEffect } from 'octane';
 
 // Remount-vs-reuse triad fixtures — ports facebook/react ReactMultiChild-test.js
 // reconciliation cases. Each leaf carries a `data-k` so the identity harness can

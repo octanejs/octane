@@ -1,4 +1,4 @@
-import { Suspense, ErrorBoundary, use } from 'octane-ts';
+import { Suspense, ErrorBoundary, use } from 'octane';
 
 export function Suspender(props) @{
 	const v = use(props.promise);

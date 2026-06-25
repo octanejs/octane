@@ -1,4 +1,4 @@
-import { use, useState, useReducer, useMemo, useRef, useEffect, createContext } from 'octane-ts';
+import { use, useState, useReducer, useMemo, useRef, useEffect, createContext } from 'octane';
 
 // ============================================================================
 // Gap 2 (Suspense): `use()` accepts non-promise values
