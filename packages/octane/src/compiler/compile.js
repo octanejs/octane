@@ -2340,7 +2340,20 @@ function extractFragment(node, ctx, holeProps) {
 				});
 			} else {
 				holeProps.push(objectProp(hn, rewriteJsxValues(expr, ctx)));
-				newChildren.push({ type: 'JSXExpressionContainer', expression: memberProps(hn) });
+				// A hole the compiler proved is a string (concat / template / tracked
+				// local) is a TEXT hole — but the renderer only sees `props.hN`, which it
+				// can't prove. Re-assert it with an `as string` cast so the renderer keeps
+				// the text-binding classification (htext, markerless) instead of falling to
+				// a renderable childSlot, preserving byte-equality with the inline form.
+				const member = memberProps(hn);
+				const rendered = isKnownStringExpression(expr, ctx.knownStringLocals)
+					? {
+							type: 'TSAsExpression',
+							expression: member,
+							typeAnnotation: { type: 'TSStringKeyword' },
+						}
+					: member;
+				newChildren.push({ type: 'JSXExpressionContainer', expression: rendered });
 			}
 		} else if (t === 'Element' || t === 'JSXElement') {
 			if (isComponentTag(child)) {
@@ -2451,6 +2464,91 @@ function extractFragment(node, ctx, holeProps) {
 				kind: 'for',
 				recordIndex: fc.directiveCalls.forCalls.length - 1,
 			});
+		} else if ((t === 'SwitchStatement' || t === 'JSXSwitchExpression') && ctx._foldCtx) {
+			// FOLD a `@switch`: case/default bodies compiled component-side (closure);
+			// thread the discriminant + the cases array (built component-side as
+			// `[[test, caseFn], …]`, since it interleaves component-scope tests with the
+			// closure helper fns) + the default fn as `props.hN` holes.
+			const fc = ctx._foldCtx;
+			const swNode =
+				t === 'JSXSwitchExpression'
+					? { type: 'SwitchStatement', discriminant: child.discriminant, cases: child.cases || [] }
+					: child;
+			const rec = makeSwitchCall(
+				swNode,
+				ctx,
+				fc.componentName,
+				fc.compInlinedSubs,
+				fc.parentNs,
+				fc.cssHash,
+			);
+			const discHole = `h${holeProps.length}`;
+			holeProps.push(objectProp(discHole, rewriteJsxValues(rec.discNode, ctx)));
+			rec.discExpr = `props.${discHole}`;
+			const casesHole = `h${holeProps.length}`;
+			holeProps.push(
+				objectProp(casesHole, {
+					type: 'ArrayExpression',
+					elements: rec.caseRecords.map((cr) => ({
+						type: 'ArrayExpression',
+						elements: [rewriteJsxValues(cr.testNode, ctx), { type: 'Identifier', name: cr.helper }],
+					})),
+				}),
+			);
+			rec.casesArrayExpr = `props.${casesHole}`;
+			if (rec.defaultHelper && rec.defaultHelper !== 'null') {
+				const defHole = `h${holeProps.length}`;
+				holeProps.push(objectProp(defHole, { type: 'Identifier', name: rec.defaultHelper }));
+				rec.defaultHelper = `props.${defHole}`;
+			}
+			fc.directiveCalls.switchCalls.push(rec);
+			newChildren.push({
+				type: 'FoldedDirective',
+				kind: 'switch',
+				recordIndex: fc.directiveCalls.switchCalls.length - 1,
+			});
+		} else if ((t === 'TryStatement' || t === 'JSXTryExpression') && ctx._foldCtx) {
+			// FOLD a `@try`: simplest — no control expression. The try/catch/pending
+			// bodies are compiled component-side (closure; catch's `err`/`reset` come
+			// from its own param), and the three helper fns thread as `props.hN` holes.
+			const fc = ctx._foldCtx;
+			const tryNode =
+				t === 'JSXTryExpression'
+					? {
+							type: 'TryStatement',
+							block: child.block,
+							handler: child.handler || null,
+							finalizer: child.finalizer || null,
+							pending: child.pending || null,
+						}
+					: child;
+			const rec = makeTryCall(
+				tryNode,
+				ctx,
+				fc.componentName,
+				fc.compInlinedSubs,
+				fc.parentNs,
+				fc.cssHash,
+			);
+			const tryHole = `h${holeProps.length}`;
+			holeProps.push(objectProp(tryHole, { type: 'Identifier', name: rec.tryHelper }));
+			rec.tryHelper = `props.${tryHole}`;
+			if (rec.catchHelper && rec.catchHelper !== 'null') {
+				const catchHole = `h${holeProps.length}`;
+				holeProps.push(objectProp(catchHole, { type: 'Identifier', name: rec.catchHelper }));
+				rec.catchHelper = `props.${catchHole}`;
+			}
+			if (rec.pendingHelper && rec.pendingHelper !== 'null') {
+				const pendHole = `h${holeProps.length}`;
+				holeProps.push(objectProp(pendHole, { type: 'Identifier', name: rec.pendingHelper }));
+				rec.pendingHelper = `props.${pendHole}`;
+			}
+			fc.directiveCalls.tryCalls.push(rec);
+			newChildren.push({
+				type: 'FoldedDirective',
+				kind: 'try',
+				recordIndex: fc.directiveCalls.tryCalls.length - 1,
+			});
 		} else {
 			newChildren.push(child);
 		}
@@ -2475,7 +2573,7 @@ function lowerHostFragment(
 	cssHash = null,
 ) {
 	const holeProps = [];
-	const directiveCalls = { ifCalls: [], forCalls: [] };
+	const directiveCalls = { ifCalls: [], forCalls: [], switchCalls: [], tryCalls: [] };
 	// extractFragment reads `ctx._foldCtx` for any directive child it folds (and to
 	// route helper defs into the component). Save/restore so it never leaks.
 	const prevFold = ctx._foldCtx;
@@ -4615,6 +4713,20 @@ function emitElementHtml(
 					forCalls.push(fcRec);
 					html += '<!>';
 					childIdx++;
+				} else if (child.kind === 'switch') {
+					const sc = dc.switchCalls[child.recordIndex];
+					sc.hostPath = path;
+					sc.anchorPath = [...path, childIdx];
+					ctx._switchCalls.push(sc);
+					html += '<!>';
+					childIdx++;
+				} else if (child.kind === 'try') {
+					const tc = dc.tryCalls[child.recordIndex];
+					tc.hostPath = path;
+					tc.anchorPath = [...path, childIdx];
+					tryCalls.push(tc);
+					html += '<!>';
+					childIdx++;
 				}
 			} else if (child.type === 'ActivityStatement') {
 				const ac = makeActivityCall(child, ctx, componentName, inlinedSubs, childNs, cssHash);
@@ -5166,7 +5278,7 @@ function makeSwitchCall(node, ctx, componentName, inlinedSubs, parentNs = 'html'
 		if (isDefault) {
 			defaultHelper = helperName;
 		} else {
-			caseRecords.push({ testExpr: printExpr(c.test), helper: helperName });
+			caseRecords.push({ testExpr: printExpr(c.test), testNode: c.test, helper: helperName });
 		}
 	}
 	const casesArrayExpr =
@@ -5174,7 +5286,9 @@ function makeSwitchCall(node, ctx, componentName, inlinedSubs, parentNs = 'html'
 	return {
 		id: ctx.nextHelperId++,
 		discExpr,
+		discNode: node.discriminant, // AST — the fold threads it as a `props.hN` hole
 		casesArrayExpr,
+		caseRecords, // { testNode, helper } per case — the fold builds the cases hole
 		defaultHelper,
 		hostPath: null,
 	};
