@@ -1586,6 +1586,24 @@ export function createContext<T>(defaultValue: T): Context<T> {
 }
 
 /**
+ * Programmatically provide a context value for a scope's descendants — the same
+ * stamping `<Context.Provider value={…}>` performs, exposed for plain-TS
+ * (non-template) components that render children and want to provide context to
+ * them without authoring a `.tsrx` Provider wrapper. Call it during the component's
+ * render, before rendering `children` into the same `scope`. (Used by runtime
+ * component bindings — e.g. `@octane-ts/motion`'s `MotionConfig` and variant
+ * propagation.)
+ */
+export function provideContext<T>(scope: Scope, context: Context<T>, value: T): void {
+	if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
+	// Bump the version only when an existing value actually changes (see Provider).
+	if (scope.$$ctxValues.has(context) && !Object.is(scope.$$ctxValues.get(context), value)) {
+		context.$$version++;
+	}
+	scope.$$ctxValues.set(context, value);
+}
+
+/**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX component form of
  * `@try { … } @pending { fallback }`, for authors writing JSX rather than the
  * template directives (e.g. porting React / react-query code). A thin built-in
