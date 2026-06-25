@@ -2086,7 +2086,14 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		.join('\n');
 	if (collectSetupMaps) ctx._setupMaps = setupMaps;
 
+	// A folded fragment renderer carries pre-built directive records; expose them so
+	// emitElementHtml resolves each `FoldedDirective` placeholder (instead of calling
+	// makeIfCall again, which would re-compile the branch bodies + re-allocate ids).
+	const prevFDC = ctx._foldedDirectiveCalls;
+	if (node.body && node.body.foldedDirectives)
+		ctx._foldedDirectiveCalls = node.body.foldedDirectives;
 	const plan = planJsx(jsxNodes, ctx, name, inlinedSubs, parentNs, cssHash);
+	ctx._foldedDirectiveCalls = prevFDC;
 
 	const lines = [];
 	// Closure-dep snapshot prologue (raw JS string). Used by impure for-of item
@@ -2208,12 +2215,17 @@ function rewriteHookCallsWithSlot(node, ctx, componentName) {
 // descriptor type identity). No component gate, no signature rewrite to (scope,props).
 function compileReturnJsxFunction(node, ctx, options) {
 	const name = node.id.name;
+	// A folded directive's branch helper functions (`__then$N`/`__else$N`) are
+	// collected here so they're emitted INSIDE this component function — preserving
+	// their closure over setup locals/props — and only their values + the control
+	// expression are threaded into the renderer as `props.hN` holes.
+	const compInlinedSubs = [];
 	const newStatements = (node.body.body || []).map((s) => {
 		const h = rewriteHookCallsWithSlot(s, ctx, name);
 		// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
 		// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
 		if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
-			return { ...h, argument: lowerReturnJsx(h.argument, ctx) };
+			return { ...h, argument: lowerReturnJsx(h.argument, ctx, name, compInlinedSubs) };
 		}
 		return rewriteJsxValues(h, ctx);
 	});
@@ -2225,7 +2237,14 @@ function compileReturnJsxFunction(node, ctx, options) {
 		generator: false,
 		body: { type: 'BlockStatement', body: newStatements },
 	};
-	const code = printNode(fn);
+	let code = printNode(fn);
+	if (compInlinedSubs.length) {
+		// Helpers are hoisted function declarations → position-independent; splice them
+		// in right after the function's opening `{` so they're in the component scope.
+		const i = code.indexOf('{');
+		const subs = compInlinedSubs.map((s) => '  ' + s.replace(/\n/g, '\n  ')).join('\n');
+		code = code.slice(0, i + 1) + '\n' + subs + code.slice(i + 1);
+	}
 	if (options && options.default) return `${code}\nexport default ${name};`;
 	if (options && options.export) return `export ${code}`;
 	return code;
@@ -2235,9 +2254,9 @@ function compileReturnJsxFunction(node, ctx, options) {
 // descriptor (`createElement(_frag$N, holeProps)`) so it rides childSlot's reconcile
 // path; a component element / fragment / directive keeps the existing value-lowering
 // (components already reconcile by identity).
-function lowerReturnJsx(node, ctx) {
+function lowerReturnJsx(node, ctx, componentName, compInlinedSubs) {
 	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
-		return lowerHostFragment(node, ctx);
+		return lowerHostFragment(node, ctx, componentName, compInlinedSubs, 'html', null);
 	}
 	return rewriteJsxValues(node, ctx);
 }
@@ -2331,6 +2350,52 @@ function extractFragment(node, ctx, holeProps) {
 			} else {
 				newChildren.push(extractFragment(child, ctx, holeProps));
 			}
+		} else if ((t === 'IfStatement' || t === 'JSXIfExpression') && ctx._foldCtx) {
+			// FOLD a directive: lower its branch bodies on the COMPONENT side (so the
+			// `__then$N`/`__else$N` helpers keep their closure over setup locals/props),
+			// and thread the condition + the branch-helper FUNCTIONS out as `props.hN`
+			// holes. The renderer keeps only the host template + the ifBlock call
+			// skeleton, reading cond/then/else from props. (makeIfCall pushes the helper
+			// definitions into the component's inlinedSubs.) The raw `@if` parses to a
+			// JSXIfExpression — normalize to the IfStatement shape makeIfCall expects
+			// (same as normalizeChildren does on the inline path).
+			const fc = ctx._foldCtx;
+			const ifNode =
+				t === 'JSXIfExpression'
+					? {
+							type: 'IfStatement',
+							test: child.test,
+							consequent: child.consequent,
+							alternate: child.alternate || null,
+						}
+					: child;
+			const ic = makeIfCall(
+				ifNode,
+				ctx,
+				fc.componentName,
+				fc.compInlinedSubs,
+				fc.parentNs,
+				fc.cssHash,
+			);
+			const condHole = `h${holeProps.length}`;
+			holeProps.push(objectProp(condHole, rewriteJsxValues(ic.condTest, ctx)));
+			const thenHole = `h${holeProps.length}`;
+			holeProps.push(objectProp(thenHole, { type: 'Identifier', name: ic.thenHelper }));
+			let elseHoleName = null;
+			if (ic.elseHelper) {
+				elseHoleName = `h${holeProps.length}`;
+				holeProps.push(objectProp(elseHoleName, { type: 'Identifier', name: ic.elseHelper }));
+			}
+			// Renderer-side, the call reads everything from `props.hN`.
+			ic.condExpr = `props.${condHole}`;
+			ic.thenHelper = `props.${thenHole}`;
+			ic.elseHelper = elseHoleName ? `props.${elseHoleName}` : null;
+			fc.directiveCalls.ifCalls.push(ic);
+			newChildren.push({
+				type: 'FoldedDirective',
+				kind: 'if',
+				recordIndex: fc.directiveCalls.ifCalls.length - 1,
+			});
 		} else {
 			newChildren.push(child);
 		}
@@ -2344,9 +2409,27 @@ function extractFragment(node, ctx, holeProps) {
 }
 
 // A host JSX element → a hoisted compiled renderer + `createElement(_frag$N, {...})`.
-function lowerHostFragment(node, ctx) {
+// `compInlinedSubs` is the COMPONENT's inlinedSubs: a folded directive's branch
+// helper functions are emitted there (closure preserved), not in the renderer.
+function lowerHostFragment(
+	node,
+	ctx,
+	componentName,
+	compInlinedSubs,
+	parentNs = 'html',
+	cssHash = null,
+) {
 	const holeProps = [];
+	const directiveCalls = { ifCalls: [] };
+	// extractFragment reads `ctx._foldCtx` for any directive child it folds (and to
+	// route helper defs into the component). Save/restore so it never leaks.
+	const prevFold = ctx._foldCtx;
+	ctx._foldCtx =
+		compInlinedSubs !== undefined
+			? { componentName, compInlinedSubs, directiveCalls, parentNs, cssHash }
+			: null;
 	const rendererEl = extractFragment(node, ctx, holeProps);
+	ctx._foldCtx = prevFold;
 	const fragName = `_frag$${ctx.nextFragId++}`;
 	const synthFn = {
 		type: 'FunctionDeclaration',
@@ -2354,9 +2437,11 @@ function lowerHostFragment(node, ctx) {
 		params: [{ type: 'Identifier', name: 'props' }],
 		async: false,
 		generator: false,
-		body: { type: 'JSXCodeBlock', body: [], render: rendererEl },
+		// `foldedDirectives` carries the pre-built directive records to the renderer's
+		// compileFunctionBody → emitElementHtml (via ctx._foldedDirectiveCalls).
+		body: { type: 'JSXCodeBlock', body: [], render: rendererEl, foldedDirectives: directiveCalls },
 	};
-	ctx.hoistedHelpers.push(compileFunctionBody(synthFn, ctx, fragName));
+	ctx.hoistedHelpers.push(compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash));
 	// A host fragment is a SINGLE root element, so it can mount markerless (the
 	// element self-delimits) — matching `@{}`'s inline render exactly (no extra
 	// comment markers), which is required for byte-equal DOM when folding `@{}`.
@@ -4455,6 +4540,20 @@ function emitElementHtml(
 				ifCalls.push(ifCall);
 				html += '<!>';
 				childIdx++;
+			} else if (child.type === 'FoldedDirective') {
+				// A directive folded by extractFragment: its branch helpers were already
+				// compiled component-side and its control/helpers rewritten to `props.hN`.
+				// Use the PRE-BUILT record (don't re-run makeIfCall); just assign the
+				// renderer's host/anchor template paths and slot it like a normal @if.
+				const dc = ctx._foldedDirectiveCalls;
+				if (child.kind === 'if') {
+					const ic = dc.ifCalls[child.recordIndex];
+					ic.hostPath = path;
+					ic.anchorPath = [...path, childIdx];
+					ifCalls.push(ic);
+					html += '<!>';
+					childIdx++;
+				}
 			} else if (child.type === 'ActivityStatement') {
 				const ac = makeActivityCall(child, ctx, componentName, inlinedSubs, childNs, cssHash);
 				ac.hostPath = path;
