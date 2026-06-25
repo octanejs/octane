@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrate, flushSync } from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { Toggle, Pick } from './_fixtures/control.tsrx';
 
@@ -31,14 +31,14 @@ beforeEach(() => {
 });
 afterEach(() => container.remove());
 
-describe('hydrate — @if (SSR Phase 6 / M3)', () => {
+describe('hydrateRoot — @if (SSR Phase 6 / M3)', () => {
 	it('adopts the taken branch (same element) and it stays interactive', async () => {
 		const { body } = await ServerRT.render(server.Toggle, { on: true });
 		expect(body).toContain('<button id="hit" class="on">on:0</button>');
 
 		container.innerHTML = body;
 		const btn = container.querySelector('#hit') as HTMLButtonElement;
-		const root = hydrate(Toggle, container, { on: true });
+		const root = hydrateRoot(container, Toggle, { on: true });
 		flushSync(() => {});
 
 		// The server branch element was ADOPTED (same instance), not rebuilt.
@@ -49,25 +49,51 @@ describe('hydrate — @if (SSR Phase 6 / M3)', () => {
 		root.unmount();
 	});
 
+	it('returned root.render() after hydration updates in place (keeps adopted DOM + state)', async () => {
+		// React-18 hydrateRoot returns a live Root: a subsequent .render() with the
+		// SAME component is a normal client update against the ALREADY-hydrated block
+		// (makeRoot's same-body fast path), NOT a re-hydration or a teardown+rebuild.
+		// If the fast path were broken (e.g. currentBody not threaded into makeRoot),
+		// this render would wipe the container and mount a fresh node — losing both
+		// the adopted node identity and the client-driven count state. Asserting both
+		// survive is the discriminator.
+		const { body } = await ServerRT.render(server.Toggle, { on: true });
+		container.innerHTML = body;
+		const btn = container.querySelector('#hit') as HTMLButtonElement;
+		const root = hydrateRoot(container, Toggle, { on: true });
+		flushSync(() => {});
+		flushSync(() => btn.click());
+		expect(btn.textContent).toBe('on:1'); // client state on the adopted node
+
+		root.render(Toggle, { on: true }); // same component → in-place update
+		flushSync(() => {});
+		expect(container.querySelector('#hit')).toBe(btn); // same node, not rebuilt
+		expect(btn.textContent).toBe('on:1'); // state preserved across the re-render
+
+		flushSync(() => btn.click()); // still interactive afterward
+		expect(btn.textContent).toBe('on:2');
+		root.unmount();
+	});
+
 	it('adopts the @else branch when the condition is false', async () => {
 		const { body } = await ServerRT.render(server.Toggle, { on: false });
 		expect(body).toContain('<span class="off">off</span>');
 		container.innerHTML = body;
 		const off = container.querySelector('.off') as HTMLElement;
-		const root = hydrate(Toggle, container, { on: false });
+		const root = hydrateRoot(container, Toggle, { on: false });
 		flushSync(() => {});
 		expect(container.querySelector('.off')).toBe(off); // adopted
 		root.unmount();
 	});
 });
 
-describe('hydrate — @switch (SSR Phase 6 / M3)', () => {
+describe('hydrateRoot — @switch (SSR Phase 6 / M3)', () => {
 	it('adopts the matched case branch', async () => {
 		const { body } = await ServerRT.render(server.Pick, { k: 'b' });
 		expect(body).toContain('<span class="b">BBB</span>');
 		container.innerHTML = body;
 		const span = container.querySelector('.b') as HTMLElement;
-		const root = hydrate(Pick, container, { k: 'b' });
+		const root = hydrateRoot(container, Pick, { k: 'b' });
 		flushSync(() => {});
 		expect(container.querySelector('.b')).toBe(span); // adopted, not rebuilt
 		expect((container.querySelector('.b') as HTMLElement).textContent).toBe('BBB');

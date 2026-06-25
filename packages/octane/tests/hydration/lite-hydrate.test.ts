@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrate, flushSync } from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { Shell } from './_fixtures/lite.tsrx';
 
-// SSR Phase 6 — hookless "lite" nested components hydrate: componentSlotLite
+// SSR Phase 6 — hookless "lite" nested components hydrateRoot: componentSlotLite
 // adopts the server's `<!--[-->…<!--]-->` range instead of inlining fresh DOM.
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/lite.tsrx');
@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 afterEach(() => container.remove());
 
-describe('hydrate — hookless lite components (SSR Phase 6)', () => {
+describe('hydrateRoot — hookless lite components (SSR Phase 6)', () => {
 	it('adopts each lite component (same elements), incl. the block-skipped 2nd one', async () => {
 		const { body } = await ServerRT.render(server.Shell, { title: 'T', a: 'Alpha', b: 'Beta' });
 		expect(body).toBe(
@@ -44,7 +44,7 @@ describe('hydrate — hookless lite components (SSR Phase 6)', () => {
 		const badges = [...container.querySelectorAll('span.badge')];
 		expect(badges.length).toBe(2);
 
-		const root = hydrate(Shell, container, { title: 'T', a: 'Alpha', b: 'Beta' });
+		const root = hydrateRoot(container, Shell, { title: 'T', a: 'Alpha', b: 'Beta' });
 		flushSync(() => {});
 
 		// Both lite components were ADOPTED (same element instances, right order).

@@ -364,7 +364,7 @@ self-verified green and adversarially reviewed for fidelity:
 | `memo-bailout` | 3 pass | 0 — Octane matches props-equality bailout, context-defeats-bailout, custom comparator. |
 | `context-bailout` | 5 pass | **0 (FIXED)** — context change now reaches consumers via lazy descend without re-rendering the bailed memo boundary (see "Runtime fix" below). |
 | `multichild-remount` | 5 pass | 0 — same-type+key updates in place; type/key change remounts. |
-| `useid-determinism` | 4 pass | **0 (FIXED)** — client `_idCounter` reset to 0 in `hydrate()` so server≡client (see "Runtime fix" below). |
+| `useid-determinism` | 4 pass | **0 (FIXED)** — client `_idCounter` reset to 0 in `hydrateRoot()` so server≡client (see "Runtime fix" below). |
 | `error-effects` | 4 pass | 0 — `@try`/`@catch` catches errors thrown in `useEffect`/`useLayoutEffect`; hook order preserved after catch. |
 | `sync-store-tearing` | 6 pass | 0 — `useSyncExternalStore` consistency + no-infinite-loop on store-ref change. |
 | `controlled-inputs-extra` | — | removed with the controlled-input revert. |
@@ -386,10 +386,10 @@ flipped to assert parent-first. **No regressions across the suite.**
 removed as out-of-scope.
 
 ### Runtime fix — useId server≡client (DONE)
-`hydrate()` resets the client's monotonic `_idCounter` to 0 before rendering, so it
+`hydrateRoot()` resets the client's monotonic `_idCounter` to 0 before rendering, so it
 aligns with the server's per-`render()` reset. Hydration renders the same tree in
 the same depth-first order, so ids now match byte-for-byte (`:in-0:`, `:in-1:`, …).
-Verified by a real server-render → `hydrate()` test that captures the id the CLIENT
+Verified by a real server-render → `hydrateRoot()` test that captures the id the CLIENT
 computed (via an `onId` callback) and asserts it equals the server's, after warming
 the counter so the test actually exercises the reset.
 

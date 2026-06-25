@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrate, flushSync } from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 // CLIENT-compiled components (normal .tsrx import path). Importing AsyncCounter
 // (which has an onClick) makes this module register click delegation at load.
@@ -33,7 +33,7 @@ beforeEach(() => {
 });
 afterEach(() => container.remove());
 
-describe('hydrate — Suspense data seeding (SSR Phase 4)', () => {
+describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 	it('seeds the server value so use(promise) returns synchronously (no re-suspend, no rebuild)', async () => {
 		const { body } = await ServerRT.render(server.AsyncLeaf, { promise: Promise.resolve('hello') });
 		expect(body).toBe(
@@ -45,7 +45,7 @@ describe('hydrate — Suspense data seeding (SSR Phase 4)', () => {
 		const div = container.querySelector('#leaf') as HTMLElement;
 		const textNode = div.firstChild; // the server text node — must be adopted
 
-		const root = hydrate(AsyncLeaf, container, { promise: Promise.resolve('hello') });
+		const root = hydrateRoot(container, AsyncLeaf, { promise: Promise.resolve('hello') });
 		flushSync(() => {}); // drain (there should be no re-suspend / scheduled work)
 
 		// Boundary did not re-suspend or rebuild: same element + text node adopted.
@@ -69,7 +69,7 @@ describe('hydrate — Suspense data seeding (SSR Phase 4)', () => {
 
 		container.innerHTML = body;
 		const div = container.querySelector('#undef') as HTMLElement;
-		const root = hydrate(AsyncUndef, container, { promise: Promise.resolve(undefined) });
+		const root = hydrateRoot(container, AsyncUndef, { promise: Promise.resolve(undefined) });
 		flushSync(() => {});
 
 		// The seeded value hydrated as `undefined` (not `null`): same discriminant,
@@ -89,7 +89,7 @@ describe('hydrate — Suspense data seeding (SSR Phase 4)', () => {
 		container.innerHTML = body;
 		const div = container.querySelector('#leaf') as HTMLElement;
 
-		const root = hydrate(AsyncLeaf, container, { promise: Promise.resolve('client-value') });
+		const root = hydrateRoot(container, AsyncLeaf, { promise: Promise.resolve('client-value') });
 		flushSync(() => {});
 
 		expect(div.textContent).toBe('server-value');
@@ -107,9 +107,9 @@ describe('hydrate — Suspense data seeding (SSR Phase 4)', () => {
 
 		container.innerHTML = body;
 		const before = container.querySelector('#ac')!.outerHTML;
-		const root = hydrate(AsyncCounter, container, { promise: Promise.resolve('Hi') });
+		const root = hydrateRoot(container, AsyncCounter, { promise: Promise.resolve('Hi') });
 		flushSync(() => {});
-		// No mismatch: the #ac subtree is unchanged after hydrate.
+		// No mismatch: the #ac subtree is unchanged after hydrateRoot.
 		expect(container.querySelector('#ac')!.outerHTML).toBe(before);
 
 		// Click → re-render. The counter updates AND the seeded use() does not

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrate, flushSync } from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { List } from './_fixtures/forlist.tsrx';
 
@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 afterEach(() => container.remove());
 
-describe('hydrate — @for list (SSR Phase 6 / M2)', () => {
+describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
 	it('adopts the server-rendered items (no rebuild) and per-item handlers work', async () => {
 		const items = [
 			{ id: 1, name: 'Alpha' },
@@ -51,7 +51,7 @@ describe('hydrate — @for list (SSR Phase 6 / M2)', () => {
 			'Gamma',
 		]);
 
-		const root = hydrate(List, container, { items, onPick });
+		const root = hydrateRoot(container, List, { items, onPick });
 		flushSync(() => {});
 
 		// No rebuild: same DOM + same adopted <li> instances.

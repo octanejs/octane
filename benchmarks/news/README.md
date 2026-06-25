@@ -30,7 +30,7 @@ rebuild (`#app.innerHTML` unchanged) and that the page is interactive afterward
 All apps are authored in the SAME `.tsrx` source shape and render the same
 dataset, so the comparison is pure framework cost:
 
-- **octane** — `octane/compiler` (single runtime, `render()` + `hydrate()`).
+- **octane** — `octane/compiler` (single runtime, `render()` + `hydrateRoot()`).
 - **ripple** (original) — `@tsrx/ripple` + `ripple` (`ripple/server` `render()` →
   `{ head, body, css }` + `ripple` `hydrate()`). State via `track`. There's no
   transform-only Ripple vite plugin (the published one is the metaframework), so

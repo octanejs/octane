@@ -27,7 +27,7 @@ export const EMPTY_COMMENT = '<!---->';
 /**
  * Marker attribute on the inline `<script type="application/json">` that the
  * server emits to carry the JSON-serialized `use(thenable)` values it resolved
- * during render (SSR Phase 4 — Suspense). The client `hydrate()` finds this
+ * during render (SSR Phase 4 — Suspense). The client `hydrateRoot()` finds this
  * script by attribute, parses it, and seeds the values back into `use()` (in
  * render order) so a hydrating boundary returns synchronously instead of
  * re-suspending. Shared so server emit and client read stay byte-identical.
