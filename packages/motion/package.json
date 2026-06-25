@@ -1,0 +1,39 @@
+{
+  "name": "@octane-ts/motion",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "Framer Motion bindings for the octane renderer — reuses motion-dom's animation engine, swaps the React components for octane host components.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octane-ts/octane.git",
+    "directory": "packages/motion"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "motion": "catalog:default",
+    "octane-ts": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "catalog:default"
+  }
+}
