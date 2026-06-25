@@ -2,18 +2,13 @@
 // octane's hooks. Mirrors @tanstack/react-query's useBaseQuery: it creates a
 // query Observer, subscribes to it via useSyncExternalStore, and pushes option
 // changes through useEffect. The single compiler-injected slot is split into
-// distinct sub-slots for each internal base hook (observer state, subscribe
-// callback, the store hook, the options effect), the same way the zustand
+// distinct sub-slots for each internal base hook, the same way the zustand
 // `traditional` binding does.
-//
-// octane has no QueryErrorResetBoundary / IsRestoring providers, so the
-// reset-boundary and restore machinery collapses to its no-boundary defaults
-// (`isReset()` is always false, `isRestoring` is always false) — but the parts
-// that affect a plain query (the suspense timer clamp, the prevent-retry-on-mount
-// for throwOnError/suspense, and the `subscribed` option) ARE ported.
 import { useState, useCallback, useSyncExternalStore, useEffect, use } from 'octane-ts';
 import { noop, notifyManager } from '@tanstack/query-core';
 import { resolveClient } from './context';
+import { useIsRestoring } from './isRestoring';
+import { useQueryErrorResetBoundary } from './errorResetBoundary';
 import {
 	ensurePreventErrorBoundaryRetry,
 	ensureSuspenseTimers,
@@ -27,36 +22,49 @@ export function useBaseQuery(
 	queryClient: any,
 	slot: symbol | undefined,
 ): any {
+	const oq = (tag: string) => subSlot(slot, 'oq:' + tag);
 	const client = resolveClient(queryClient);
+	const isRestoring = useIsRestoring();
+	const errorResetBoundary = useQueryErrorResetBoundary();
 	const defaultedOptions = client.defaultQueryOptions(options);
 
-	// `subscribed: false` makes a passive query — read the cache but don't subscribe
-	// or compute optimistic results (so it never drives re-renders).
+	// `subscribed: false` makes a passive query (read the cache, never subscribe).
+	// While restoring a persisted client, queries also stay passive.
 	const subscribed = options.subscribed !== false;
-	defaultedOptions._optimisticResults = subscribed ? 'optimistic' : undefined;
+	defaultedOptions._optimisticResults = isRestoring
+		? 'isRestoring'
+		: subscribed
+			? 'optimistic'
+			: undefined;
 
 	ensureSuspenseTimers(defaultedOptions);
 
 	const query = client.getQueryCache().get(defaultedOptions.queryHash);
-	ensurePreventErrorBoundaryRetry(defaultedOptions, query);
+	ensurePreventErrorBoundaryRetry(defaultedOptions, errorResetBoundary, query);
+	// Clear the reset boundary on mount (so a fresh mount can throw again).
+	useEffect(
+		() => {
+			errorResetBoundary.clearReset();
+		},
+		[errorResetBoundary],
+		oq('clr'),
+	);
 
-	const oq = (tag: string) => subSlot(slot, 'oq:' + tag);
 	const [observer] = useState(() => new Observer(client, defaultedOptions), oq('obs'));
 
 	const result = observer.getOptimisticResult(defaultedOptions);
 
+	const shouldSubscribe = !isRestoring && subscribed;
 	useSyncExternalStore(
 		useCallback(
 			(onStoreChange: () => void) => {
-				const unsubscribe = subscribed
+				const unsubscribe = shouldSubscribe
 					? observer.subscribe(notifyManager.batchCalls(onStoreChange))
 					: noop;
-				// Update result in case the store changed between the optimistic read and
-				// the subscription (react-query does the same).
 				observer.updateResult();
 				return unsubscribe;
 			},
-			[observer, subscribed],
+			[observer, shouldSubscribe],
 			oq('cb'),
 		),
 		() => observer.getCurrentResult(),
@@ -72,20 +80,26 @@ export function useBaseQuery(
 		oq('eff'),
 	);
 
-	// Suspense: suspend on the in-flight promise so the nearest @try/@pending shows
-	// the fallback. octane suspends via `use(thenable)` (which throws the internal
-	// SuspenseException the tryBlock recognises) — NOT a raw `throw promise`, which
-	// it wouldn't catch. The `.catch(noop)` makes the suspended promise RESOLVE even
-	// on error (mirroring react-query), so the replay surfaces an error through the
-	// error-boundary throw below rather than rejecting the suspended thenable. On
-	// replay the query is no longer pending, so this branch is skipped.
+	// Suspense: suspend on the in-flight promise via `use(thenable)` (octane's
+	// suspend primitive — NOT a raw `throw promise`). `.catch(noop)` makes it
+	// resolve even on error, so the replay surfaces the error through the
+	// error-boundary throw below. On replay the query isn't pending, so this is
+	// skipped.
 	if (defaultedOptions.suspense && result.isPending) {
 		use(observer.fetchOptimistic(defaultedOptions).catch(noop));
 	}
 
 	// Error boundary: throw so the nearest @try/@catch (or <ErrorBoundary>) handles
 	// it, when the query errored and the options opt into throwing.
-	if (getHasError(result, defaultedOptions.throwOnError, query, defaultedOptions.suspense)) {
+	if (
+		getHasError({
+			result,
+			errorResetBoundary,
+			throwOnError: defaultedOptions.throwOnError,
+			query,
+			suspense: defaultedOptions.suspense,
+		})
+	) {
 		throw result.error;
 	}
 

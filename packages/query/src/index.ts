@@ -17,3 +17,6 @@ export { useMutationState, useIsMutating } from './useMutationState';
 export { useQueryClient, QueryClientContext } from './context';
 export { QueryClientProvider } from './QueryClientProvider.tsrx';
 export { HydrationBoundary } from './HydrationBoundary';
+export { IsRestoringProvider, IsRestoringContext, useIsRestoring } from './isRestoring';
+export { QueryErrorResetBoundary } from './QueryErrorResetBoundary.tsrx';
+export { QueryErrorResetBoundaryContext, useQueryErrorResetBoundary } from './errorResetBoundary';
