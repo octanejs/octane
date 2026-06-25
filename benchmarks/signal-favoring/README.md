@@ -48,7 +48,7 @@ Generator-driven so the chain length, stateful spacing, and per-component shape
 stay consistent across frameworks. Edit `gen.mjs` and re-run `node gen.mjs` to
 regenerate all four App fixtures.
 
-## Six measurements
+## Measurements
 
 - **MOUNT** — initial render of all 100 components.
 - **BUMP_SHALLOW** — `__bumpAt1()`. Hook frameworks cascade through 99 components;
@@ -58,14 +58,31 @@ regenerate all four App fixtures.
   components.
 - **BUMP_DEEP** — `__bumpAt91()`. Hook frameworks cascade through ~10 components.
   As the depth gets closer to the leaf, the cost converges with signal frameworks.
-- **BUMP_SWEEP** — bump every stateful component in lockstep. Single rAF gate at
-  the end, so paint cost is amortised across all 10 bumps.
+- **BUMP_SWEEP** — bump every stateful component, flushing after EACH bump (10
+  separate commits). The no-coalescing worst case.
+- **BUMP_SWEEP_BATCHED** — the same 10 bumps in ONE flush, queued ANCESTOR-first
+  (`__bumpAt1 … __bumpAt91`). A framework that coalesces overlapping cascades
+  renders each component once instead of once-per-bump.
+- **BUMP_SWEEP_REVERSE** — the same single batched flush, queued DESCENDANT-first
+  (`__bumpAt91 … __bumpAt1`). Exposes whether coalescing depends on the order
+  updates were queued in: a scheduler that drains in tree order (and signal
+  frameworks, which don't cascade) is unaffected; one that coalesces only in queue
+  order de-coalesces back toward the per-bump cost.
 - **UNMOUNT** — full teardown via the framework's unmount API.
 
-The harness also prints a derived **cascade ratio** per target:
-`bump_shallow / bump_deep`. Hook frameworks should land around 10× (99 vs 10
-cascading renders); signal frameworks should land near 1× (both updates do the
-same one-text-node work).
+A single sweep is sub-millisecond, so each sweep op is timed as a tight loop of
+25 sweeps divided back down — the per-sweep cost escapes the OS timer's ~0.1ms
+quantization floor.
+
+The harness also prints three derived ratios per target:
+
+- **cascade ratio** — `bump_shallow / bump_deep`. Hook frameworks land around 10×
+  (99 vs 10 cascading renders); signal frameworks near 1×.
+- **coalescing ratio** — `bump_sweep_batched / bump_sweep`. How much one flush
+  saves over ten; further below 1× = bigger batching win.
+- **order-sensitivity ratio** — `bump_sweep_reverse / bump_sweep_batched` (on
+  means). ~1× means coalescing is independent of update order; >1× means
+  descendant-first batches cost more than ancestor-first ones.
 
 ## Quick start
 
@@ -96,6 +113,8 @@ Each adapter installs these globals on `window`:
 | ---------------- | -------------------------------------------------------------------------------- |
 | `__mount()`      | calls the framework's mount API (deferred — index.html does NOT auto-mount)      |
 | `__bumpAt<N>()`  | for N in 1, 11, 21, ..., 91: bumps the counter inside `CN`                       |
+| `__sweepBatched()` | bumps all 10 counters ANCESTOR-first (C1→C91) inside one synchronous flush      |
+| `__sweepBatchedReverse()` | bumps all 10 DESCENDANT-first (C91→C1) inside one synchronous flush      |
 | `__unmount()`    | tears down via the framework's unmount API                                       |
 | `__reset()`      | `__unmount()` + clear `target.children` — for between-iteration cleanup          |
 | `__ready = true` | last line of `main.{js,jsx}`; harness gates on `page.waitForFunction("__ready")` |
