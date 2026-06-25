@@ -48,6 +48,31 @@ export default defineConfig({
 					],
 				},
 			},
+			{
+				test: {
+					name: 'query',
+					include: ['packages/query/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					// Differential precompile for query fixtures: rewrites
+					// `@octane-ts/query` → `@tanstack/react-query` so the React side runs
+					// real react-query.
+					globalSetup: ['packages/query/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octane-ts\/query$/,
+							replacement: resolve(import.meta.dirname, 'packages/query/src/index.ts'),
+						},
+						{
+							find: /^@octane-ts\/query\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/query/src') + '/$1.ts',
+						},
+					],
+				},
+			},
 		],
 	},
 });

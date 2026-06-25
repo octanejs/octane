@@ -40,6 +40,8 @@ catalogs:
     '@ripple-ts/adapter': ^0.3.84
     '@ripple-ts/vite-plugin': ^0.3.84
     '@solidjs/web': '2.0.0-beta.14'
+    '@tanstack/query-core': ^5.0.0
+    '@tanstack/react-query': ^5.0.0
     '@tsrx/core': ^0.1.32
     '@tsrx/prettier-plugin': ^0.3.84
     '@tsrx/ripple': ^0.1.32

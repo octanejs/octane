@@ -21,6 +21,12 @@ catalogs:
     '@solidjs/web':
       specifier: 2.0.0-beta.14
       version: 2.0.0-beta.14
+    '@tanstack/query-core':
+      specifier: ^5.0.0
+      version: 5.101.0
+    '@tanstack/react-query':
+      specifier: ^5.0.0
+      version: 5.101.0
     '@tsrx/core':
       specifier: ^0.1.32
       version: 0.1.32
@@ -378,6 +384,34 @@ importers:
       happy-dom:
         specifier: catalog:default
         version: 20.10.6
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
+
+  packages/query:
+    dependencies:
+      '@tanstack/query-core':
+        specifier: catalog:default
+        version: 5.101.0
+      octane-ts:
+        specifier: workspace:*
+        version: link:../octane
+    devDependencies:
+      '@tanstack/react-query':
+        specifier: catalog:default
+        version: 5.101.0(react@19.2.7)
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.32(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
       react:
         specifier: catalog:default
         version: 19.2.7
@@ -1079,6 +1113,14 @@ packages:
     resolution: {integrity: sha512-4WfKk68eTih+MiJD4fSbxN7E8kVBmTMPWHUPYjvl2N0rMs53YLTT8/YjKU5Dtnz5LqDjl7LEw4U7lXR2W3J5WA==}
     peerDependencies:
       acorn: ^8.9.0
+
+  '@tanstack/query-core@5.101.0':
+    resolution: {integrity: sha512-cQetA74EB+seWySv1TTKr828TnP0u39m6LykwDXIo84SNortpDkp30TMEjkqtYCNP9c40uT/iwl6MLiufEt0Ow==}
+
+  '@tanstack/react-query@5.101.0':
+    resolution: {integrity: sha512-rLlJXSpkqfizLWgkR5+eLeIk0MvTx/meEIR7LRjxic+qxiQP8zVjq7BqQkiCMNLQBlLfuOLqqr6KO5GtrDlmSg==}
+    peerDependencies:
+      react: ^18 || ^19
 
   '@tokenizer/inflate@0.4.1':
     resolution: {integrity: sha512-2mAv+8pkG6GIZiF1kNg1jAjh27IDxEPKwdGul3snfztFerfPGI1LjDezZp3i7BElXompqEtPmoPx6c2wgtWsOA==}
@@ -3589,6 +3631,13 @@ snapshots:
   '@sveltejs/acorn-typescript@1.0.10(acorn@8.17.0)':
     dependencies:
       acorn: 8.17.0
+
+  '@tanstack/query-core@5.101.0': {}
+
+  '@tanstack/react-query@5.101.0(react@19.2.7)':
+    dependencies:
+      '@tanstack/query-core': 5.101.0
+      react: 19.2.7
 
   '@tokenizer/inflate@0.4.1':
     dependencies:

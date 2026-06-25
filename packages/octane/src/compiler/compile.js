@@ -4437,7 +4437,10 @@ function makeCompCall(
 			continue;
 		}
 		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
-		inner = resolveStyleExpr(inner, cssHash);
+		// Lower any JSX in the prop value to createElement(...) — e.g.
+		// `<Suspense fallback={<span/>}>` or a render-prop returning JSX — so esrap
+		// emits a real descriptor instead of raw (unprintable) JSX.
+		inner = resolveStyleExpr(rewriteJsxValues(inner, ctx), cssHash);
 		if (inner.type === 'Literal') {
 			propParts.push(`${JSON.stringify(attrName)}: ${JSON.stringify(inner.value)}`);
 		} else {
