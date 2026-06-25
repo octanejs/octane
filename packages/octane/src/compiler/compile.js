@@ -2396,6 +2396,61 @@ function extractFragment(node, ctx, holeProps) {
 				kind: 'if',
 				recordIndex: fc.directiveCalls.ifCalls.length - 1,
 			});
+		} else if ((t === 'ForOfStatement' || t === 'JSXForExpression') && ctx._foldCtx) {
+			// FOLD a `@for`: the item/empty bodies are compiled component-side (closure);
+			// `items`, the item-body fn, the empty-body fn, and (for the dep-pure path)
+			// each dep value thread as `props.hN` holes. The key fn is already module-
+			// hoisted (no closure), so it stays a bare reference; `extra`/`flags` are
+			// constants. Normalize the raw JSXForExpression to the ForOfStatement shape
+			// makeForCall expects (same as normalizeChildren).
+			const fc = ctx._foldCtx;
+			const forNode =
+				t === 'JSXForExpression'
+					? {
+							type: 'ForOfStatement',
+							left: child.left,
+							right: child.right,
+							body: child.body,
+							await: !!child.await,
+							key: child.key || null,
+							index: child.index || null,
+							empty: child.empty || null,
+						}
+					: child;
+			const rec = makeForCall(
+				forNode,
+				ctx,
+				fc.componentName,
+				fc.compInlinedSubs,
+				fc.parentNs,
+				fc.cssHash,
+			);
+			const itemsHole = `h${holeProps.length}`;
+			holeProps.push(objectProp(itemsHole, rewriteJsxValues(forNode.right, ctx)));
+			const bodyHole = `h${holeProps.length}`;
+			holeProps.push(objectProp(bodyHole, { type: 'Identifier', name: rec.bodyHelper }));
+			rec.itemsExpr = `props.${itemsHole}`;
+			rec.bodyHelper = `props.${bodyHole}`;
+			if (rec.emptyHelper && rec.emptyHelper !== 'null') {
+				const emptyHole = `h${holeProps.length}`;
+				holeProps.push(objectProp(emptyHole, { type: 'Identifier', name: rec.emptyHelper }));
+				rec.emptyHelper = `props.${emptyHole}`;
+			}
+			if (rec.depEligible && rec.depNames.length) {
+				// Thread each dep value as its own hole so the reconciler's deps-equality
+				// check sees the component-scope values, not undefined renderer locals.
+				rec.depNames = rec.depNames.map((dn) => {
+					const depHole = `h${holeProps.length}`;
+					holeProps.push(objectProp(depHole, { type: 'Identifier', name: dn }));
+					return `props.${depHole}`;
+				});
+			}
+			fc.directiveCalls.forCalls.push(rec);
+			newChildren.push({
+				type: 'FoldedDirective',
+				kind: 'for',
+				recordIndex: fc.directiveCalls.forCalls.length - 1,
+			});
 		} else {
 			newChildren.push(child);
 		}
@@ -2420,7 +2475,7 @@ function lowerHostFragment(
 	cssHash = null,
 ) {
 	const holeProps = [];
-	const directiveCalls = { ifCalls: [] };
+	const directiveCalls = { ifCalls: [], forCalls: [] };
 	// extractFragment reads `ctx._foldCtx` for any directive child it folds (and to
 	// route helper defs into the component). Save/restore so it never leaks.
 	const prevFold = ctx._foldCtx;
@@ -4551,6 +4606,13 @@ function emitElementHtml(
 					ic.hostPath = path;
 					ic.anchorPath = [...path, childIdx];
 					ifCalls.push(ic);
+					html += '<!>';
+					childIdx++;
+				} else if (child.kind === 'for') {
+					const fcRec = dc.forCalls[child.recordIndex];
+					fcRec.hostPath = path;
+					fcRec.anchorPath = [...path, childIdx];
+					forCalls.push(fcRec);
 					html += '<!>';
 					childIdx++;
 				}
