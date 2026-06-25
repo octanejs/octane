@@ -1,12 +1,16 @@
 // @octane-ts/motion — Framer Motion for the octane renderer.
 //
-// Reuses motion's framework-agnostic animation engine (`animate`) and gesture
-// primitives (`hover`, `press`) and reimplements the `motion.*` components on
-// octane. Each `motion.tag` renders a real host `<tag>` (via octane's
-// `hostComponent` primitive), captures its node, and drives animations from layout
-// effects — exactly the refs + effects + rendering path this is meant to exercise.
-import { animate, hover, press } from 'motion';
-import { hostComponent, useLayoutEffect, useState } from 'octane-ts';
+// Reuses motion's framework-agnostic animation engine (`animate`), gesture
+// primitives (`hover`, `press`, `inView`), MotionValues, and scoped animation, and
+// reimplements the `motion.*` components on octane. Each `motion.tag` renders a real
+// host `<tag>` (via octane's `hostComponent` primitive), captures its node, and
+// drives animation/gesture/layout/drag from layout effects — exactly the refs +
+// effects + rendering path this is meant to exercise.
+import { animate, hover, press, inView } from 'motion';
+import { hostComponent, useLayoutEffect, useState, provideContext } from 'octane-ts';
+import { MotionConfigContext, VariantContext, resolveVariant } from './context';
+import { isMotionValue, isTransformKey, applyStyleValue } from './useMotionValue';
+import { useContext } from 'octane-ts';
 
 // A plain-TS component gets its OWN block per instance (componentSlot), so fixed
 // slot symbols don't collide across instances — and these are distinct within one.
@@ -16,7 +20,27 @@ const ANIMATE = Symbol.for('octane-motion:animate');
 const GESTURE = Symbol.for('octane-motion:gesture');
 const EXIT = Symbol.for('octane-motion:exit');
 const LAYOUT = Symbol.for('octane-motion:layout');
+const DRAG = Symbol.for('octane-motion:drag');
+const INVIEW = Symbol.for('octane-motion:inview');
+const MV = Symbol.for('octane-motion:motionvalues');
+const LAYOUT_ID = Symbol.for('octane-motion:layoutid');
 
+// Shared-element registry: a `layoutId` element records its box on unmount; the
+// next element to mount with the same id crossfades (FLIPs) from it. (A basic
+// shared-layout "magic move"; the full projection tree is out of scope.)
+interface Box {
+	left: number;
+	top: number;
+	width: number;
+	height: number;
+}
+const layoutCells = new Map<string, Box>();
+const boxOf = (n: HTMLElement): Box => {
+	const r = n.getBoundingClientRect();
+	return { left: r.left, top: r.top, width: r.width, height: r.height };
+};
+
+// Props consumed by motion (everything else is spread onto the host element).
 const MOTION_PROPS = new Set([
 	'initial',
 	'animate',
@@ -24,22 +48,48 @@ const MOTION_PROPS = new Set([
 	'whileHover',
 	'whileTap',
 	'whileFocus',
+	'whileInView',
+	'viewport',
 	'exit',
 	'layout',
+	'layoutId',
 	'variants',
+	'drag',
+	'dragConstraints',
+	'dragElastic',
+	'dragMomentum',
+	'onDrag',
+	'onDragStart',
+	'onDragEnd',
+	'onAnimationComplete',
 	'children',
 ]);
 
 function domProps(props: any): Record<string, any> {
 	const out: Record<string, any> = {};
-	for (const k in props) if (!MOTION_PROPS.has(k)) out[k] = props[k];
+	for (const k in props) {
+		if (MOTION_PROPS.has(k)) continue;
+		if (k === 'style' && props.style && typeof props.style === 'object') {
+			// Motion values + transform shorthands (x/y/scale/…) are applied by the
+			// motion-value effect, not written to the DOM as raw style.
+			const s: Record<string, any> = {};
+			for (const sk in props.style) {
+				const v = props.style[sk];
+				if (isMotionValue(v) || isTransformKey(sk)) continue;
+				s[sk] = v;
+			}
+			out.style = s;
+		} else {
+			out[k] = props[k];
+		}
+	}
 	return out;
 }
 
 // Cheap structural key so a layout effect re-runs only when the target actually
 // changes (inline objects are a new reference every render).
 function stableKey(v: any): string {
-	return v == null ? '' : JSON.stringify(v);
+	return v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v);
 }
 
 function whenDone(controls: any, done: () => void): void {
@@ -48,63 +98,121 @@ function whenDone(controls: any, done: () => void): void {
 	else done();
 }
 
+function clamp(v: number, min: number, max: number): number {
+	return v < min ? min : v > max ? max : v;
+}
+
 function createMotionComponent(tag: string) {
 	return function MotionComponent(scope: any, props: any): void {
+		const config = useContext(MotionConfigContext);
+		const inherited = useContext(VariantContext);
+		const variants = props.variants;
+
+		// Variant labels: an explicit prop wins, else inherit the parent's label.
+		const initialLabel = props.initial !== undefined ? props.initial : inherited.initial;
+		const animateLabel = props.animate !== undefined ? props.animate : inherited.animate;
+		const resolvedInitial = resolveVariant(initialLabel, variants);
+		const resolvedAnimate = resolveVariant(animateLabel, variants);
+		const transition = props.transition ?? config.transition;
+
+		// Propagate the active labels to descendants (passing through inherited ones),
+		// before rendering children — so nested motion elements inherit them.
+		provideContext(scope, VariantContext, {
+			initial: typeof initialLabel === 'string' ? initialLabel : inherited.initial,
+			animate: typeof animateLabel === 'string' ? animateLabel : inherited.animate,
+		});
+
 		const node = hostComponent(scope, '_m', tag, domProps(props), props.children) as HTMLElement;
 
-		// The exit cleanup is registered once (mount-time closure), but needs the
-		// LATEST node/exit/transition — thread them through a stable holder.
+		// Stable holder threading the LATEST values into the mount-time effect closures.
 		const [latest] = useState(() => ({}) as any, REFS);
 		latest.node = node;
-		latest.exit = props.exit;
-		latest.transition = props.transition;
+		latest.transition = transition;
+		latest.exit = resolveVariant(props.exit, variants);
+		latest.whileHover = resolveVariant(props.whileHover, variants);
+		latest.whileTap = resolveVariant(props.whileTap, variants);
+		latest.whileFocus = resolveVariant(props.whileFocus, variants);
+		latest.whileInView = resolveVariant(props.whileInView, variants);
+		latest.base = resolvedAnimate ?? resolvedInitial ?? {};
+		latest.drag = props.drag;
+		latest.dragConstraints = props.dragConstraints;
+		latest.onDrag = props.onDrag;
+		latest.onDragStart = props.onDragStart;
+		latest.onDragEnd = props.onDragEnd;
 
 		// `initial`: apply instantly on mount (before the animate effect runs).
 		useLayoutEffect(
 			() => {
-				if (props.initial) animate(node, props.initial, { duration: 0 });
+				if (resolvedInitial) animate(node, resolvedInitial, { duration: 0 });
 			},
 			[],
 			ENTER,
 		);
 
-		// `animate`: animate to the target on mount and whenever it changes.
+		// `animate`: animate to the (resolved) target on mount and whenever it changes.
 		useLayoutEffect(
 			() => {
-				if (props.animate) {
-					const controls = animate(node, props.animate, props.transition);
+				if (resolvedAnimate) {
+					const controls = animate(node, resolvedAnimate, transition);
+					if (props.onAnimationComplete) whenDone(controls, () => props.onAnimationComplete());
 					return () => controls.stop();
 				}
 			},
-			[stableKey(props.animate), stableKey(props.transition)],
+			[stableKey(resolvedAnimate), stableKey(transition)],
 			ANIMATE,
 		);
 
-		// Gestures: `whileHover` / `whileTap` animate to the gesture target on start
-		// and back to the resting (`animate`/`initial`) state on end.
+		// Motion values + static transform shorthands in `style`. MotionValues are
+		// subscribed (and update the element without a re-render); shorthands apply once.
 		useLayoutEffect(
 			() => {
-				const base = props.animate ?? props.initial ?? {};
+				const style = props.style;
+				if (!style || typeof style !== 'object') return;
+				const transformState: Record<string, any> = {};
 				const cleanups: Array<() => void> = [];
-				if (props.whileHover) {
-					cleanups.push(
-						hover(node, () => {
-							animate(node, props.whileHover, props.transition);
-							return () => {
-								animate(node, base, props.transition);
-							};
-						}),
-					);
+				for (const key in style) {
+					const v = style[key];
+					if (isMotionValue(v)) {
+						const apply = (val: any) => applyStyleValue(node, key, val, transformState);
+						apply(v.get());
+						cleanups.push(v.on('change', apply));
+					} else if (isTransformKey(key)) {
+						applyStyleValue(node, key, v, transformState);
+					}
 				}
-				if (props.whileTap) {
-					cleanups.push(
-						press(node, () => {
-							animate(node, props.whileTap, props.transition);
-							return () => {
-								animate(node, base, props.transition);
-							};
-						}),
-					);
+				return () => cleanups.forEach((c) => c());
+			},
+			[],
+			MV,
+		);
+
+		// Gestures: `whileHover` / `whileTap` / `whileFocus` animate to the gesture
+		// target on start and back to the resting state on end. Targets/transition are
+		// read from `latest`, so prop changes take effect without re-binding.
+		useLayoutEffect(
+			() => {
+				const cleanups: Array<() => void> = [];
+				const gesture = (
+					bind: (el: Element, onStart: () => () => void) => () => void,
+					pick: () => any,
+				) =>
+					bind(node, () => {
+						animate(node, pick(), latest.transition);
+						return () => {
+							animate(node, latest.base, latest.transition);
+						};
+					});
+				if (props.whileHover) cleanups.push(gesture(hover as any, () => latest.whileHover));
+				if (props.whileTap) cleanups.push(gesture(press as any, () => latest.whileTap));
+				if (props.whileFocus) {
+					const onFocus = () => animate(node, latest.whileFocus, latest.transition);
+					const onBlur = () => animate(node, latest.base, latest.transition);
+					node.addEventListener('focus', onFocus);
+					node.addEventListener('blur', onBlur);
+					cleanups.push(() => {
+						node.removeEventListener('focus', onFocus);
+						node.removeEventListener('blur', onBlur);
+					});
 				}
 				return () => cleanups.forEach((c) => c());
 			},
@@ -112,12 +220,87 @@ function createMotionComponent(tag: string) {
 			GESTURE,
 		);
 
+		// `whileInView`: animate when the element enters the viewport, and back out
+		// when it leaves (unless `viewport.once`). Reuses motion's `inView`.
+		useLayoutEffect(
+			() => {
+				if (!props.whileInView) return;
+				const stop = inView(
+					node,
+					() => {
+						animate(node, latest.whileInView, latest.transition);
+						return () => {
+							if (!props.viewport?.once) animate(node, latest.base, latest.transition);
+						};
+					},
+					props.viewport,
+				);
+				return () => stop();
+			},
+			[],
+			INVIEW,
+		);
+
+		// `drag`: pointer-drag the element, updating its transform. Supports axis lock
+		// (`drag="x"`/`"y"`) and `dragConstraints` (a box of left/right/top/bottom px).
+		useLayoutEffect(
+			() => {
+				if (!props.drag) return;
+				let active = false;
+				let startX = 0;
+				let startY = 0;
+				let originX = 0;
+				let originY = 0;
+				latest.dragX ??= 0;
+				latest.dragY ??= 0;
+				const onDown = (e: any) => {
+					active = true;
+					startX = e.clientX;
+					startY = e.clientY;
+					originX = latest.dragX;
+					originY = latest.dragY;
+					latest.onDragStart?.(e, { point: { x: e.clientX, y: e.clientY } });
+				};
+				const onMove = (e: any) => {
+					if (!active) return;
+					let x = latest.drag === 'y' ? originX : originX + (e.clientX - startX);
+					let y = latest.drag === 'x' ? originY : originY + (e.clientY - startY);
+					const c = latest.dragConstraints;
+					if (c) {
+						x = clamp(x, c.left ?? -Infinity, c.right ?? Infinity);
+						y = clamp(y, c.top ?? -Infinity, c.bottom ?? Infinity);
+					}
+					latest.dragX = x;
+					latest.dragY = y;
+					node.style.transform = `translateX(${x}px) translateY(${y}px)`;
+					latest.onDrag?.(e, {
+						offset: { x: x - originX, y: y - originY },
+						point: { x: e.clientX, y: e.clientY },
+					});
+				};
+				const onUp = (e: any) => {
+					if (!active) return;
+					active = false;
+					latest.onDragEnd?.(e, { point: { x: e.clientX, y: e.clientY } });
+				};
+				node.addEventListener('pointerdown', onDown);
+				window.addEventListener('pointermove', onMove);
+				window.addEventListener('pointerup', onUp);
+				return () => {
+					node.removeEventListener('pointerdown', onDown);
+					window.removeEventListener('pointermove', onMove);
+					window.removeEventListener('pointerup', onUp);
+				};
+			},
+			[],
+			DRAG,
+		);
+
 		// `layout`: animate layout changes with FLIP. Each commit, measure the box
 		// (transform reset so it's the LAYOUT box, not the transformed one); if it
 		// moved/resized vs the previous commit, apply the inverse transform instantly
-		// then animate it back to identity — so the element appears to glide from its
-		// old box to its new one. (A single-element FLIP; the full projection tree —
-		// nested/shared layout, scale correction — is out of scope.)
+		// then animate it back to identity. (A single-element FLIP; the full projection
+		// tree — nested/shared layout, scale correction — is out of scope.)
 		useLayoutEffect(
 			() => {
 				if (!props.layout) return;
@@ -134,13 +317,42 @@ function createMotionComponent(tag: string) {
 				const sy = box.height ? prev.height / box.height : 1;
 				if (dx || dy || sx !== 1 || sy !== 1) {
 					node.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
-					animate(node, { transform: 'translate(0px, 0px) scale(1, 1)' }, props.transition);
+					animate(node, { transform: 'translate(0px, 0px) scale(1, 1)' }, transition);
 				} else {
 					node.style.transform = prevTransform;
 				}
 			},
 			undefined,
 			LAYOUT,
+		);
+
+		// `layoutId`: shared-element crossfade. On mount, if a same-id element recently
+		// unmounted, FLIP from its recorded box to ours; on unmount, record our box for
+		// the next same-id element (the cleanup runs while still in the DOM).
+		useLayoutEffect(
+			() => {
+				const id = props.layoutId;
+				if (!id) return;
+				const prev = layoutCells.get(id);
+				if (prev) {
+					layoutCells.delete(id);
+					node.style.transform = '';
+					const box = boxOf(node);
+					const dx = prev.left - box.left;
+					const dy = prev.top - box.top;
+					const sx = box.width ? prev.width / box.width : 1;
+					const sy = box.height ? prev.height / box.height : 1;
+					if (dx || dy || sx !== 1 || sy !== 1) {
+						node.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+						animate(node, { transform: 'translate(0px, 0px) scale(1, 1)' }, latest.transition);
+					}
+				}
+				return () => {
+					if (node.isConnected) layoutCells.set(id, boxOf(node));
+				};
+			},
+			[],
+			LAYOUT_ID,
 		);
 
 		// Exit: this effect's CLEANUP runs on unmount, while the node is still in the
@@ -154,10 +366,6 @@ function createMotionComponent(tag: string) {
 				if (!exit || !n || !n.isConnected || n.parentNode == null) return;
 				const parent = n.parentNode as HTMLElement;
 				const clone = n.cloneNode(true) as HTMLElement;
-				// Position the clone where the original sits, then append it at the END
-				// of the parent — outside every range octane is about to remove (the
-				// motion block AND any enclosing @if / list branch) — so it survives
-				// the unmount and can animate out on its own.
 				const rect = n.getBoundingClientRect();
 				clone.style.position = 'absolute';
 				clone.style.top = `${n.offsetTop}px`;
@@ -193,7 +401,21 @@ export function AnimatePresence(scope: any, props: any): void {
 	if (typeof props.children === 'function') props.children(scope);
 }
 
+// MotionConfig — provides global defaults (transition, reduced motion) to every
+// motion element below it. A plain-TS component: stamps the config context, then
+// renders children.
+export function MotionConfig(scope: any, props: any): void {
+	provideContext(scope, MotionConfigContext, {
+		transition: props.transition,
+		reducedMotion: props.reducedMotion,
+	});
+	if (typeof props.children === 'function') props.children(scope);
+}
+
 export { useAnimate } from './useAnimate';
+export { useMotionValue } from './useMotionValue';
+export { useScroll } from './useScroll';
+export { MotionConfigContext, VariantContext } from './context';
 
 // Re-export motion's framework-agnostic helpers (animate, stagger, value types, …).
 export * from 'motion';

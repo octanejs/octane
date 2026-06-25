@@ -40,6 +40,7 @@ export {
 
 	// Context
 	createContext,
+	provideContext,
 	use,
 	useContext,
 	type Context,

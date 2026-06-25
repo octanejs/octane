@@ -38,31 +38,44 @@ function List(props) @{
 ## What's bound
 
 - `motion.<tag>` — `initial`, `animate`, `transition`, `whileHover`, `whileTap`,
-  `exit`, plus any DOM props (className, style, events, …) spread onto the element.
+  `whileFocus`, `whileInView` (+ `viewport`), `exit`, `drag` (+ `dragConstraints`,
+  `onDrag*`), `layout`, `layoutId`, `variants`, plus any DOM props (className, style,
+  events, …) and `style` MotionValues spread/bound onto the element.
 - `AnimatePresence` — exit animations on removal.
-- `layout` — FLIP layout animations (single-element; see caveat below).
-- `useAnimate()` — imperative, scoped animations: `[scope, animate]`.
+- `MotionConfig` — global `transition` / `reducedMotion` defaults via context.
+- `variants` — label resolution (`animate="visible"`) + parent→child propagation.
+- `useMotionValue()`, `useScroll()`, `useAnimate()` — MotionValues, scroll-linked
+  values, and imperative scoped animation.
 - Motion's framework-agnostic helpers (`animate`, `stagger`, value types, …),
   re-exported.
 
 ## How it works
 
-octane has no public way for a runtime-proxy component to render a host element
-wrapping children, so this package added one to the runtime — `hostComponent`.
-`motion.<tag>` renders a real `<tag>` through it, captures the node, and drives:
+octane had no public way for a runtime-proxy component to render a host element
+wrapping children, nor to provide context from plain-TS — so this package added two
+runtime primitives: `hostComponent` and `provideContext`. `motion.<tag>` renders a
+real `<tag>` through `hostComponent`, captures the node, and drives:
 
-- **Animations** from layout effects calling motion's `animate()`.
-- **Gestures** via motion's `hover()` / `press()` on the node.
+- **Animations** from layout effects calling motion's `animate()`; **gestures** via
+  `hover()` / `press()` / `inView()`; **MotionValues** (from `useMotionValue` /
+  `useScroll`) by subscribing in `style` and writing the element directly.
+- **`MotionConfig` + `variants`** through `provideContext`: a plain-TS component
+  stamps context for its children (config defaults, active variant labels).
+- **`drag`** with pointer events (axis lock + `dragConstraints`).
 - **Exit** without any deferred-deletion machinery: octane fires cleanups *before*
-  detaching the DOM, so a leaving element's unmount cleanup clones it (positioned in
-  place, appended outside the range octane is about to remove), animates the exit on
-  the clone, and removes the clone when it finishes.
-- **`layout`** via FLIP: each commit it measures the element's box (transform reset),
-  and if it moved/resized vs the previous commit applies the inverse transform then
-  animates it back to identity. `useAnimate` reuses motion's `createScopedAnimate`.
+  detaching the DOM, so a leaving element's unmount cleanup clones it (outside the
+  range octane is about to remove), animates the exit on the clone, and removes it
+  when it finishes.
+- **`layout` / `layoutId`** via FLIP: measure the box, and if it moved/resized —
+  vs the previous commit (`layout`) or a same-id element that just unmounted
+  (`layoutId`) — apply the inverse transform then animate it back to identity. The
+  same cleanup-before-detach ordering lets a leaving `layoutId` element record its
+  box for the next one.
 
 ## Not yet ported
 
-`drag`, `variants` propagation, `MotionConfig`, `useMotionValue`, scroll-linked
-animations, and the full layout **projection** tree — nested/shared-element layout
-and scale correction (the `layout` here is a single-element FLIP).
+The full layout **projection tree** — nested projection, child scale correction, and
+continuous shared-layout during drag (the `layout`/`layoutId` here are single-element
+FLIPs). Also `staggerChildren` / `delayChildren` orchestration, motion-value
+composition hooks (`useTransform` / `useSpring` / `useMotionValueEvent`), drag
+momentum/elastic physics, and reduced-motion enforcement.
