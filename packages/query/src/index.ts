@@ -8,5 +8,12 @@ export * from '@tanstack/query-core';
 
 export { useQuery } from './useQuery';
 export { useMutation } from './useMutation';
+export { useInfiniteQuery } from './useInfiniteQuery';
+export { useSuspenseQuery, useSuspenseInfiniteQuery } from './useSuspenseQuery';
+export { usePrefetchQuery, usePrefetchInfiniteQuery } from './usePrefetch';
+export { useQueries } from './useQueries';
+export { useIsFetching } from './useIsFetching';
+export { useMutationState, useIsMutating } from './useMutationState';
 export { useQueryClient, QueryClientContext } from './context';
 export { QueryClientProvider } from './QueryClientProvider.tsrx';
+export { HydrationBoundary } from './HydrationBoundary';

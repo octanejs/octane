@@ -32,10 +32,15 @@ function App() @{
 
 ## What's bound
 
-- `QueryClientProvider`, `useQueryClient`, `QueryClientContext`
-- `useQuery`, `useMutation`
-- everything from `@tanstack/query-core` (`QueryClient`, `QueryCache`, observers, …),
-  re-exported verbatim.
+- Queries: `useQuery`, `useInfiniteQuery`, `useSuspenseQuery`,
+  `useSuspenseInfiniteQuery`, `useQueries`, `usePrefetchQuery`,
+  `usePrefetchInfiniteQuery`
+- Mutations: `useMutation`, `useMutationState`
+- Status: `useIsFetching`, `useIsMutating`
+- Components / context: `QueryClientProvider`, `useQueryClient`, `QueryClientContext`,
+  `HydrationBoundary`
+- everything from `@tanstack/query-core` (`QueryClient`, `QueryCache`, observers,
+  `dehydrate`/`hydrate`, …), re-exported verbatim.
 
 ## How it works
 
@@ -64,6 +69,6 @@ import { Suspense, ErrorBoundary } from 'octane-ts';
 
 ## Not yet ported
 
-`useInfiniteQuery`, `useQueries`, `useSuspenseQuery`/`useSuspenseInfiniteQuery`,
-`useIsFetching`/`useIsMutating`, `useMutationState`, and the persistence/streaming
-helpers (`IsRestoring`, hydration). Contributions welcome.
+The persistence/restore helpers (`IsRestoringProvider` / `useIsRestoring`) and the
+`QueryErrorResetBoundary` reset context — octane has no restore phase, and error
+resets are handled by `@catch` / `<ErrorBoundary>`. Contributions welcome.

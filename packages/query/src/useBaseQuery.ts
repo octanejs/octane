@@ -12,28 +12,14 @@
 // that affect a plain query (the suspense timer clamp, the prevent-retry-on-mount
 // for throwOnError/suspense, and the `subscribed` option) ARE ported.
 import { useState, useCallback, useSyncExternalStore, useEffect, use } from 'octane-ts';
-import { noop, notifyManager, shouldThrowError } from '@tanstack/query-core';
+import { noop, notifyManager } from '@tanstack/query-core';
 import { resolveClient } from './context';
-
-function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	return slot !== undefined ? Symbol.for((slot.description ?? '') + ':oq:' + tag) : undefined;
-}
-
-// react-query's ensureSuspenseTimers: a suspense query gets a >=1s staleTime/gcTime
-// floor so it can't immediately refetch and re-trigger the @pending fallback in a
-// loop.
-function ensureSuspenseTimers(defaultedOptions: any): void {
-	if (defaultedOptions.suspense) {
-		const MIN = 1000;
-		const clamp = (value: any) => (value === 'static' ? value : Math.max(value ?? MIN, MIN));
-		const orig = defaultedOptions.staleTime;
-		defaultedOptions.staleTime =
-			typeof orig === 'function' ? (...args: any[]) => clamp(orig(...args)) : clamp(orig);
-		if (typeof defaultedOptions.gcTime === 'number') {
-			defaultedOptions.gcTime = Math.max(defaultedOptions.gcTime, MIN);
-		}
-	}
-}
+import {
+	ensurePreventErrorBoundaryRetry,
+	ensureSuspenseTimers,
+	getHasError,
+	subSlot,
+} from './internal';
 
 export function useBaseQuery(
 	options: any,
@@ -52,18 +38,10 @@ export function useBaseQuery(
 	ensureSuspenseTimers(defaultedOptions);
 
 	const query = client.getQueryCache().get(defaultedOptions.queryHash);
-	// prevent-error-boundary-retry: when the query opts into throwing, don't
-	// retry-on-mount, so an already-errored cached query re-throws immediately
-	// (octane ships no reset boundary, so isReset() is treated as false).
-	const computedThrowOnError =
-		query?.state.error && typeof defaultedOptions.throwOnError === 'function'
-			? shouldThrowError(defaultedOptions.throwOnError, [query.state.error, query])
-			: defaultedOptions.throwOnError;
-	if (defaultedOptions.suspense || computedThrowOnError) {
-		defaultedOptions.retryOnMount = false;
-	}
+	ensurePreventErrorBoundaryRetry(defaultedOptions, query);
 
-	const [observer] = useState(() => new Observer(client, defaultedOptions), subSlot(slot, 'obs'));
+	const oq = (tag: string) => subSlot(slot, 'oq:' + tag);
+	const [observer] = useState(() => new Observer(client, defaultedOptions), oq('obs'));
 
 	const result = observer.getOptimisticResult(defaultedOptions);
 
@@ -79,11 +57,11 @@ export function useBaseQuery(
 				return unsubscribe;
 			},
 			[observer, subscribed],
-			subSlot(slot, 'cb'),
+			oq('cb'),
 		),
 		() => observer.getCurrentResult(),
 		() => observer.getCurrentResult(),
-		subSlot(slot, 'uses'),
+		oq('uses'),
 	);
 
 	useEffect(
@@ -91,7 +69,7 @@ export function useBaseQuery(
 			observer.setOptions(defaultedOptions);
 		},
 		[defaultedOptions, observer],
-		subSlot(slot, 'eff'),
+		oq('eff'),
 	);
 
 	// Suspense: suspend on the in-flight promise so the nearest @try/@pending shows
@@ -105,15 +83,9 @@ export function useBaseQuery(
 		use(observer.fetchOptimistic(defaultedOptions).catch(noop));
 	}
 
-	// Error boundary: throw so the nearest @try/@catch handles it, when the query
-	// errored and the options opt into throwing (throwOnError / suspense).
-	if (
-		result.isError &&
-		!result.isFetching &&
-		query &&
-		((defaultedOptions.suspense && result.data === undefined) ||
-			shouldThrowError(defaultedOptions.throwOnError, [result.error, query]))
-	) {
+	// Error boundary: throw so the nearest @try/@catch (or <ErrorBoundary>) handles
+	// it, when the query errored and the options opt into throwing.
+	if (getHasError(result, defaultedOptions.throwOnError, query, defaultedOptions.suspense)) {
 		throw result.error;
 	}
 
