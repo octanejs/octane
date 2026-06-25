@@ -415,6 +415,9 @@ export function MotionConfig(scope: any, props: any): void {
 export { useAnimate } from './useAnimate';
 export { useMotionValue } from './useMotionValue';
 export { useScroll } from './useScroll';
+export { useTransform } from './useTransform';
+export { useSpring } from './useSpring';
+export { useMotionValueEvent } from './useMotionValueEvent';
 export { MotionConfigContext, VariantContext } from './context';
 
 // Re-export motion's framework-agnostic helpers (animate, stagger, value types, …).
