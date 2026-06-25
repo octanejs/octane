@@ -13,7 +13,8 @@ React binding on octane's `useSyncExternalStore`. Entry points:
 - `@octane-ts/zustand/middleware` — `persist`, `devtools`, `subscribeWithSelector`,
   `combine`, `redux`, … re-exported verbatim (all framework-agnostic).
 - `@octane-ts/zustand/traditional` — `createWithEqualityFn`, `useStoreWithEqualityFn`,
-  octane-bound (`useSyncExternalStoreWithSelector` reimplemented on octane's hooks).
+  built on octane's `useSyncExternalStore` with a ref-cached equality bail-out (no
+  `use-sync-external-store` shim — octane renders synchronously, so it isn't needed).
 
 Most zustand code works by changing the import. Verified byte-for-byte against real
 zustand on React via the differential rig.

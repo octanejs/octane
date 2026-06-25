@@ -1,17 +1,21 @@
 // `@octane-ts/zustand/traditional` — zustand's equality-function binding.
 //
 // `createWithEqualityFn` / `useStoreWithEqualityFn` let a selector pair with a
-// custom equality function (e.g. `shallow`). zustand builds them on React's
-// `useSyncExternalStoreWithSelector` shim, which composes FOUR base hooks
-// (useRef + useMemo + useSyncExternalStore + useEffect). octane has no such shim,
-// so it's reimplemented here on octane's base hooks — the canonical algorithm,
-// verbatim, with each internal hook given a distinct slot DERIVED from the single
-// compiler-injected slot the wrapper receives (sub-slots that won't collide with
-// useSyncExternalStore's own `:uses:*` derivations).
+// custom equality function (e.g. `shallow`). zustand builds these on React's
+// `use-sync-external-store/shim/with-selector` — a polyfill whose extra machinery
+// (a closure-memoizer in useMemo + a useEffect commit) exists for React's
+// CONCURRENT rendering, where a render can be produced and then thrown away.
+//
+// octane renders synchronously (a render always commits), so none of that is
+// needed: we build directly on octane's REAL `useSyncExternalStore`. A ref caches
+// the last-returned selection and `getSnapshot` returns that SAME reference while
+// the equality fn says the selection is unchanged — so useSyncExternalStore's own
+// Object.is check bails out the re-render. One extra base hook (the ref), with its
+// slot derived from the wrapper's forwarded slot.
 //
 // Note: v5 recommends `useShallow` over this equality-fn pattern for object
 // slices; `traditional` exists for code that still uses it.
-import { useSyncExternalStore, useRef, useMemo, useEffect } from 'octane-ts';
+import { useSyncExternalStore, useRef } from 'octane-ts';
 import { createStore } from 'zustand/vanilla';
 import type { StateCreator, StoreApi } from 'zustand/vanilla';
 
@@ -29,82 +33,7 @@ function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
 
 interface SelectionCell<U> {
 	hasValue: boolean;
-	value: U | null;
-}
-
-// React's `useSyncExternalStoreWithSelector`, reimplemented on octane's hooks.
-function useSyncExternalStoreWithSelector<T, U>(
-	subscribe: (onStoreChange: () => void) => () => void,
-	getSnapshot: () => T,
-	getServerSnapshot: (() => T) | undefined,
-	selector: (state: T) => U,
-	isEqual: ((a: U, b: U) => boolean) | undefined,
-	slot: symbol | undefined,
-): U {
-	const instRef = useRef<SelectionCell<U> | null>(null, subSlot(slot, 'inst'));
-	let inst: SelectionCell<U>;
-	if (instRef.current === null) {
-		inst = { hasValue: false, value: null };
-		instRef.current = inst;
-	} else {
-		inst = instRef.current;
-	}
-
-	const [getSelection, getServerSelection] = useMemo(
-		() => {
-			// Closure-local memo state (intentionally NOT a ref — it must be local to
-			// this memoized getSnapshot so distinct copies don't share it).
-			let hasMemo = false;
-			let memoizedSnapshot: T;
-			let memoizedSelection: U;
-			const memoizedSelector = (nextSnapshot: T): U => {
-				if (!hasMemo) {
-					hasMemo = true;
-					memoizedSnapshot = nextSnapshot;
-					const nextSelection = selector(nextSnapshot);
-					if (isEqual !== undefined && inst.hasValue) {
-						const currentSelection = inst.value as U;
-						if (isEqual(currentSelection, nextSelection)) {
-							memoizedSelection = currentSelection;
-							return currentSelection;
-						}
-					}
-					memoizedSelection = nextSelection;
-					return nextSelection;
-				}
-				const prevSnapshot = memoizedSnapshot;
-				const prevSelection = memoizedSelection;
-				if (Object.is(prevSnapshot, nextSnapshot)) return prevSelection;
-				const nextSelection = selector(nextSnapshot);
-				if (isEqual !== undefined && isEqual(prevSelection, nextSelection)) {
-					memoizedSnapshot = nextSnapshot;
-					return prevSelection;
-				}
-				memoizedSnapshot = nextSnapshot;
-				memoizedSelection = nextSelection;
-				return nextSelection;
-			};
-			const getSnapshotWithSelector = () => memoizedSelector(getSnapshot());
-			const getServerSnapshotWithSelector =
-				getServerSnapshot === undefined ? undefined : () => memoizedSelector(getServerSnapshot());
-			return [getSnapshotWithSelector, getServerSnapshotWithSelector] as const;
-		},
-		[getSnapshot, getServerSnapshot, selector, isEqual],
-		subSlot(slot, 'memo'),
-	);
-
-	const value = useSyncExternalStore(subscribe, getSelection, getServerSelection, slot);
-
-	useEffect(
-		() => {
-			inst.hasValue = true;
-			inst.value = value;
-		},
-		[value],
-		subSlot(slot, 'effect'),
-	);
-
-	return value;
+	value: U | undefined;
 }
 
 export function useStoreWithEqualityFn<S extends ReadonlyStoreApi<unknown>>(
@@ -135,12 +64,29 @@ export function useStoreWithEqualityFn<TState, StateSlice>(
 		typeof userArgs[1] === 'function'
 			? (userArgs[1] as (a: StateSlice, b: StateSlice) => boolean)
 			: undefined;
-	return useSyncExternalStoreWithSelector(
+
+	const cache = useRef<SelectionCell<StateSlice>>(
+		{ hasValue: false, value: undefined },
+		subSlot(slot, 'sel'),
+	);
+	// Returns the cached reference while the selection is "equal" → octane's
+	// useSyncExternalStore sees an Object.is-equal snapshot and bails out.
+	const select = (state: TState): StateSlice => {
+		const next = selector(state);
+		const c = cache.current;
+		if (c.hasValue) {
+			const prev = c.value as StateSlice;
+			if (equalityFn ? equalityFn(prev, next) : Object.is(prev, next)) return prev;
+		}
+		c.hasValue = true;
+		c.value = next;
+		return next;
+	};
+
+	return useSyncExternalStore(
 		api.subscribe,
-		api.getState,
-		api.getInitialState,
-		selector,
-		equalityFn,
+		() => select(api.getState()),
+		() => select(api.getInitialState()),
 		slot,
 	);
 }
