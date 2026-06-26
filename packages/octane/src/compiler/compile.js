@@ -1646,11 +1646,25 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 			);
 		}
 	}
-	// Children → a server `children` render-fn (returns an HTML string). The
-	// component decides whether/where to render them by calling props.children(scope)
-	// — e.g. a context Provider does exactly that. Mirrors the client convention
-	// where children compile to a render fn passed as the `children` prop.
-	if ((node.children || []).length > 0) {
+	// React-style render-prop child: pass the function through RAW so the consuming
+	// component can call it with data (`props.children(data)`) and ssrChild renders
+	// the result — mirrors the client `makeCompCall` path. A render-prop whose body
+	// is just an expression (e.g. `(d) => d.label`) renders fine server-side. One
+	// that returns JSX needs the value-position `createElement(...)` descriptor
+	// path, which SSR Phase 1 doesn't cover yet (same boundary as `{xs.map(...)}`) —
+	// surface the standard ssrUnsupported error instead of emitting an unresolvable
+	// `createElement` import.
+	const renderPropChild = soleRenderPropChild(node.children || []);
+	if (renderPropChild) {
+		if (arrowBodyHasJsx(renderPropChild)) {
+			return ssrUnsupported('render-prop children that return JSX');
+		}
+		propParts.push(`"children": (${printExprWithTsrx(renderPropChild, ctx, name, inlinedSubs)})`);
+	} else if ((node.children || []).length > 0) {
+		// Children → a server `children` render-fn (returns an HTML string). The
+		// component decides whether/where to render them by calling props.children(scope)
+		// — e.g. a context Provider does exactly that. Mirrors the client convention
+		// where children compile to a render fn passed as the `children` prop.
 		const sub = ssrCompileSub(node.children, ctx, '__schildren', [], cssHash, 'html');
 		inlinedSubs.push(sub.fn + ';');
 		propParts.push(`"children": ${sub.fnName}`);
@@ -5057,6 +5071,50 @@ function tagExpr(node) {
 	return name.name;
 }
 
+// React-style render-prop detection: if a component's children are exactly one
+// `{fn}` expression hole whose expression is a function (arrow or function
+// expression) — `<Comp>{(data) => <jsx/>}</Comp>` — return that function node so
+// the caller can pass it RAW as the `children` prop (callable with arbitrary
+// args). Whitespace-only JSXText around the hole is tolerated. Returns null for
+// anything else (multiple children, static JSX, a non-function hole), which then
+// rides the normal `__children$N` render-function wrapping. An arrow whose body
+// is a `JSXCodeBlock` (`(data) => @{…}`) is EXCLUDED — that octane render-prop
+// form has its own hoisting path (rewriteTsrxBlocks) and a different calling
+// convention; this detection is only for the React bare-JSX-body arrow.
+function soleRenderPropChild(children) {
+	if (!children || children.length === 0) return null;
+	let sole = null;
+	for (const c of children) {
+		if (!c) continue;
+		if (c.type === 'JSXText' && /^\s*$/.test(c.value)) continue; // indentation
+		if (sole) return null; // more than one meaningful child
+		sole = c;
+	}
+	if (!sole || sole.type !== 'JSXExpressionContainer') return null;
+	const e = sole.expression;
+	if (!e) return null;
+	if (e.type !== 'ArrowFunctionExpression' && e.type !== 'FunctionExpression') return null;
+	if (e.body && e.body.type === 'JSXCodeBlock') return null; // `@{…}` form — leave alone
+	return e;
+}
+
+// Does a render-prop function's body contain JSX that would need value-position
+// `createElement(...)` lowering? Used server-side to gate render-props returning
+// JSX (unsupported in SSR Phase 1, same boundary as `{xs.map(x => <jsx/>)}`).
+// Walks the body so a JSX element/fragment anywhere — direct, parenthesised, or
+// inside a block-statement `return` — is detected.
+function arrowBodyHasJsx(fnNode) {
+	let found = false;
+	mapAst(fnNode.body, (n) => {
+		const t = n && n.type;
+		if (t === 'Element' || t === 'JSXElement' || t === 'Fragment' || t === 'JSXFragment') {
+			found = true;
+		}
+		return null; // observe only — never rewrite
+	});
+	return found;
+}
+
 // Build a "renderable child" call entry for a bare `{expr}` text hole (no
 // string cast). Mirrors Ripple/React: a component / element-descriptor /
 // children render-fn RENDERS, a primitive coerces to text, and
@@ -5064,11 +5122,19 @@ function tagExpr(node) {
 // (host + `<!>` anchor resolution, hole-aware child/sibling hydration walk) but
 // emits `childSlot(...)` instead of `componentSlot(...)`. The caller sets
 // `.hostPath` / `.anchorPath` exactly like a component call.
+//
+// `rewriteJsxValues` lowers any JSX inside the expression to `createElement(...)`
+// — same as the `TSRXExpression` renderable-hole path (emitElementHtml). This
+// covers a React-style render-prop arrow whose body is bare JSX
+// (`(data) => <span/>`): the arrow is preserved (passed as a callable
+// `children` prop the consuming component invokes), while its `<span/>` body
+// becomes a printable descriptor. Without it, the raw JSX leaks into the
+// emitted `childSlot(...)` call as unparseable source.
 function makeChildCall(expr, ctx, cssHash) {
 	return {
 		id: ctx.nextHelperId++,
 		isChild: true,
-		valueExpr: printExpr(resolveStyleExpr(expr, cssHash)),
+		valueExpr: printExpr(resolveStyleExpr(rewriteJsxValues(expr, ctx), cssHash)),
 	};
 }
 
@@ -5132,11 +5198,25 @@ function makeCompCall(
 		}
 	}
 
-	// Compile children as a render function: (scope) => { renders JSX into scope }.
-	// The function is inlined inside the parent component body so its closures
-	// capture the parent's locals (props, state, etc.).
+	// React-style render-prop child: `<Comp>{(data) => <jsx/>}</Comp>` — the sole
+	// child is a function the consuming component CALLS with arbitrary args
+	// (`props.children(data)`), rendering whatever descriptor it returns. Pass the
+	// function through RAW (lowering any JSX in its body to `createElement(...)`)
+	// instead of wrapping it in a scope-receiving `__children$N` renderer — the
+	// wrapper takes `(__props, __s, __extra)`, so calling it with the consumer's
+	// data would mis-bind `__s` and explode. `rewriteJsxValues` keeps the arrow an
+	// arrow while making its body printable. Whitespace-only JSXText around the
+	// arrow is ignored so source indentation doesn't defeat the detection.
 	const children = node.children || [];
-	if (children.length > 0) {
+	const renderPropChild = soleRenderPropChild(children);
+	if (renderPropChild) {
+		propParts.push(
+			`"children": (${printExprWithTsrx(rewriteJsxValues(renderPropChild, ctx), ctx, componentName, inlinedSubs)})`,
+		);
+	} else if (children.length > 0) {
+		// Compile children as a render function: (scope) => { renders JSX into scope }.
+		// The function is inlined inside the parent component body so its closures
+		// capture the parent's locals (props, state, etc.).
 		const childrenHelperName = `__children$${ctx.nextHelperId++}`;
 		const fakeBody = {
 			type: 'Component',
