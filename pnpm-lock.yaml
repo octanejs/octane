@@ -9,6 +9,9 @@ catalogs:
     '@babel/core':
       specifier: 7.29.7
       version: 7.29.7
+    '@changesets/changelog-git':
+      specifier: ^0.2.1
+      version: 0.2.1
     '@changesets/changelog-github':
       specifier: ^0.7.0
       version: 0.7.0
@@ -145,6 +148,9 @@ importers:
 
   .:
     devDependencies:
+      '@changesets/changelog-git':
+        specifier: catalog:default
+        version: 0.2.1
       '@changesets/changelog-github':
         specifier: catalog:default
         version: 0.7.0
