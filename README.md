@@ -26,8 +26,9 @@ under the hood: Octane compiles your components ahead of time, so a lot of the w
 React does at runtime is already done before the page loads. Hooks are tracked by
 call site rather than call order, which is what lets you call them conditionally.
 
-Components are written in `.tsrx`, a format that lets your TypeScript setup live
-right next to the markup it feeds.
+Components can be written in stanadard `.tsx`/`.jsx` but opting for  `.tsrx` provides
+better performance guarantees, espeically around collections. TSRX is the spiritual successor
+to JSX, and allows for far better composability and fututre optimizations.
 
 Created by [Dominic Gannaway](https://github.com/trueadm), who also created
 Inferno and has worked on React, Lexical, Ripple, and Svelte.
