@@ -2714,6 +2714,16 @@ function attrNamespace(name: string): string | null {
 }
 
 export function setAttribute(el: Element, name: string, value: any): void {
+	// `innerHTML` is a PROPERTY, not an attribute. The compiler's `innerHTML={expr}`
+	// fast path sets `el.innerHTML` directly, but when the element also carries a
+	// spread (`<div {...props} innerHTML={x}/>`) that fast path can't be used and the
+	// binding is routed here as an "attribute" — so assign the property. A literal
+	// `setAttribute('innerHTML', …)` would only add a dead lowercased `innerhtml`
+	// attribute and leave the element empty.
+	if (name === 'innerHTML') {
+		el.innerHTML = value == null || value === false ? '' : String(value);
+		return;
+	}
 	const ns = attrNamespace(name);
 	if (value == null || value === false) {
 		if (ns) {
