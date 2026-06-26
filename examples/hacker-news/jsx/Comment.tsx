@@ -2,9 +2,9 @@ import * as stylex from '@octane-ts/stylex';
 import { Link } from '@octane-ts/router';
 import { useSuspenseQuery } from '@octane-ts/query';
 import { Suspense } from 'octane';
-import { itemQuery } from '../shared/queries.ts';
-import { styles } from '../shared/styles.ts';
-import { relativeTime } from '../shared/format.ts';
+import { itemQuery } from '../shared/queries.js';
+import { styles } from '../shared/styles.js';
+import { relativeTime } from '../shared/format.js';
 
 const MAX_DEPTH = 6;
 

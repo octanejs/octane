@@ -3,7 +3,7 @@
 // imported once for the whole app.
 import 'virtual:stylex.css';
 import { createRoot } from 'octane';
-import { App } from './App.tsx';
+import { App } from './App.js';
 
 const container = document.getElementById('app');
 if (!container) throw new Error('Missing #app root in index.html');

@@ -2,18 +2,38 @@
 // shared router via routes.ts; the router's <Match> renders a route's
 // pendingComponent while that route's useSuspenseQuery is loading.
 import * as stylex from '@octane-ts/stylex';
-import { styles } from '../shared/styles.ts';
+import { styles } from '../shared/styles.js';
+
+// A single placeholder story row (wide title bar + thin meta bar, gently
+// pulsing). Used as each row's Suspense fallback in StoriesPage and stacked to
+// build the route-level pending skeletons below.
+export function RowSkeleton() @{
+	<div data-testid="row-skeleton" {...stylex.props(styles.skeletonRow)}>
+		<div {...stylex.props(styles.skeletonTitle)} />
+		<div {...stylex.props(styles.skeletonMeta)} />
+	</div>
+}
+
+function SkeletonList({ rows }: { rows: number }) @{
+	const items = Array.from({ length: rows }, (_, i) => i);
+
+	<div data-testid="pending">
+		@for (const i of items; key i) {
+			<RowSkeleton />
+		}
+	</div>
+}
 
 export function StoriesPending() @{
-	<div data-testid="pending" {...stylex.props(styles.skeleton)}>{'Loading stories…'}</div>
+	<SkeletonList rows={8} />
 }
 
 export function ItemPending() @{
-	<div data-testid="pending" {...stylex.props(styles.skeleton)}>{'Loading item…'}</div>
+	<SkeletonList rows={5} />
 }
 
 export function UserPending() @{
-	<div data-testid="pending" {...stylex.props(styles.skeleton)}>{'Loading user…'}</div>
+	<SkeletonList rows={3} />
 }
 
 export function ErrorFallback({ error }: { error: unknown }) @{

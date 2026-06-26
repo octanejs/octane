@@ -12,6 +12,14 @@ const MUTED = '#828282';
 const LINK = '#000000';
 const PANEL = '#ffffff';
 const BORDER = '#e4e4dc';
+const SKELETON = '#e0e0d8';
+
+// Subtle pulse for skeleton placeholders while a row's item loads.
+const pulse = stylex.keyframes({
+	'0%': { opacity: 0.6 },
+	'50%': { opacity: 1 },
+	'100%': { opacity: 0.6 },
+});
 
 export const styles = stylex.create({
 	app: {
@@ -29,22 +37,50 @@ export const styles = stylex.create({
 	header: {
 		display: 'flex',
 		alignItems: 'center',
-		columnGap: 8,
+		columnGap: 6,
+		rowGap: 2,
+		flexWrap: 'wrap',
 		backgroundColor: ORANGE,
-		paddingTop: 6,
+		paddingTop: 4,
 		paddingRight: 8,
-		paddingBottom: 6,
+		paddingBottom: 4,
 		paddingLeft: 8,
 	},
-	logo: {
-		fontWeight: 700,
+	// The white-bordered "Y" box, classic HN logo treatment.
+	logoBox: {
+		display: 'inline-flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+		width: 16,
+		height: 16,
+		borderWidth: 1,
+		borderStyle: 'solid',
+		borderColor: PANEL,
 		color: PANEL,
+		fontWeight: 700,
+		fontSize: 13,
+		lineHeight: 1,
 		textDecoration: 'none',
 	},
-	headerLink: {
-		color: PANEL,
+	// Bold "Hacker News" home link.
+	logo: {
+		fontWeight: 700,
+		color: '#000000',
 		textDecoration: 'none',
-		fontSize: 12,
+		fontSize: 13,
+		marginRight: 4,
+	},
+	// The new | past | comments | ... nav links.
+	headerLink: {
+		color: '#000000',
+		textDecoration: 'none',
+		fontSize: 13,
+	},
+	// The "|" separators between nav links.
+	headerSep: {
+		color: '#000000',
+		fontSize: 13,
+		opacity: 0.6,
 	},
 	main: {
 		paddingTop: 8,
@@ -150,10 +186,35 @@ export const styles = stylex.create({
 		opacity: 0.9,
 		transformOrigin: 'left',
 	},
-	skeleton: {
-		color: MUTED,
-		paddingTop: 12,
-		paddingBottom: 12,
-		fontStyle: 'italic',
+	// A single placeholder story row: a wide title bar + a thin meta bar, with a
+	// subtle pulse. Used as each row's Suspense fallback and (stacked) as the
+	// route-level pending skeleton.
+	skeletonRow: {
+		paddingTop: 6,
+		paddingBottom: 6,
+		animationName: pulse,
+		animationDuration: '1.2s',
+		animationIterationCount: 'infinite',
+		animationTimingFunction: 'ease-in-out',
+	},
+	skeletonTitle: {
+		height: 12,
+		width: '60%',
+		backgroundColor: SKELETON,
+		borderTopLeftRadius: 2,
+		borderTopRightRadius: 2,
+		borderBottomLeftRadius: 2,
+		borderBottomRightRadius: 2,
+		marginBottom: 6,
+	},
+	skeletonMeta: {
+		height: 8,
+		width: '35%',
+		backgroundColor: SKELETON,
+		borderTopLeftRadius: 2,
+		borderTopRightRadius: 2,
+		borderBottomLeftRadius: 2,
+		borderBottomRightRadius: 2,
+		marginLeft: 34,
 	},
 });

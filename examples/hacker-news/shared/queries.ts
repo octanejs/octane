@@ -3,8 +3,8 @@
 // options object — `queryKey` + `queryFn` — that a component passes to
 // `useSuspenseQuery` (from '@octane-ts/query'), which suspends while the query
 // loads and returns `{ data }`.
-import { topStories, item, user } from './api.ts';
-import type { Story, Comment, User } from './types.ts';
+import { topStories, item, user } from './api.js';
+import type { Story, Comment, User } from './types.js';
 
 export const topStoriesQuery = () => ({
 	queryKey: ['topstories'] as const,

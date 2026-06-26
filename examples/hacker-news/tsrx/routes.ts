@@ -1,6 +1,6 @@
 // TSRX (.tsrx) route wiring: feed the shared route-structure factory the
 // TSRX view components (+ per-route Suspense skeletons).
-import { createAppRouter } from '../shared/routes.ts';
+import { createAppRouter } from '../shared/routes.js';
 import { RootLayout } from './RootLayout.tsrx';
 import { StoriesPage } from './StoriesPage.tsrx';
 import { ItemPage } from './ItemPage.tsrx';
