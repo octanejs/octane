@@ -41,21 +41,19 @@ not ready for production yet.
 
 ## Highlights
 
-- The React API you already know: `useState`, `useReducer`, `useEffect`,
-  `useLayoutEffect`, `useMemo`, `useCallback`, `useRef`, `useId`,
-  `useImperativeHandle`, `useTransition`, `useDeferredValue`,
-  `useSyncExternalStore`, `useActionState`, `useFormStatus`, and `useOptimistic`,
-  plus `createContext`, `useContext`, `memo`, portals, `Suspense`, and
-  `startTransition`. Class components and server components are left out on
-  purpose.
+- The React API you already know: `useState`, `useEffect`, `useMemo`, `useRef`, `useId`,
+  `useTransition`, `useDeferredValue` etc.
+- Support for JSX/TSX and TSRX, with extended performance benefits from using TSRX.
 - No rules of hooks. The compiler gives every hook call site a stable identity,
-  so order never matters. A hook can sit inside a condition, after an early
-  return, or in a loop.
-- Performance was the whole reason Inferno existed, and Octane keeps it. The
-  compiler does most of the work ahead of time, so the runtime stays small.
+  so order never matters.
+- No virtual DOM, no signals, components re-render like React but with minimal overhead.
+- Fully async support, including transitions, deferred values and support for `<Activity>`.
+- Support for ref array composition `<div ref={[ref1, ref2]} />`.
 - Real DOM events through delegation, rather than a synthetic event layer, so
   event behavior matches the platform.
-- One authoring format, `.tsrx`, with full TypeScript support and editor tooling.
+- Full server-side rendering support and hydration.
+- Class components and server components are not supported.
+- `<ErrorBoundary>` provided for handling of errors, or using `@try` via TSRX.
 
 ## Quick start
 
@@ -124,7 +122,7 @@ for returning JSX — `function f() @{ … }` desugars to `function f() { … re
 with one output node, a JSX element or a fragment). Both forms compile
 identically, and any function can use either.
 
-```tsrx
+```jsx
 import { useState } from 'octane';
 
 export function Counter() @{
@@ -139,7 +137,7 @@ export function Counter() @{
 The same component written with an explicit `return` is identical — and a
 function is free to return a non-JSX value, which is coerced like any renderable:
 
-```tsrx
+```jsx
 export function Counter() {
   const [count, setCount] = useState(0);
   return <button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>;
@@ -151,18 +149,9 @@ function Label(props) {
 }
 ```
 
-A dynamic text hole is written `{expr as string}` — the cast marks the hole as
-text rather than a renderable child. The cast is **optional when the compiler can
-already see the value is a string**: a string or template literal, a
-`+`-concatenation involving a string (so the `'Count: ' + count` holes above need
-no cast), or a local `const`/param the compiler tracks back to a string. It's
-still required when the type isn't visible syntactically — typically a bare member
-access (`{item.title as string}`). Events are ordinary JSX event props like
-`onClick` and `onInput`, backed by native, delegated DOM events.
-
 ### State and effects
 
-```tsrx
+```jsx
 import { useState, useEffect } from 'octane';
 
 export function Timer() @{
@@ -181,7 +170,7 @@ export function Timer() @{
 
 Unlike React, a hook can sit behind a guard or after an early `return`:
 
-```tsrx
+```jsx
 import { useState, useEffect } from 'octane';
 
 export function Panel(props) @{
@@ -204,7 +193,7 @@ export function Panel(props) @{
 Rendered control flow uses directive-prefixed blocks: `@if`, `@for`, `@switch`,
 and `@try`. Plain JavaScript control flow stays in setup code.
 
-```tsrx
+```jsx
 export function Feed(props) @{
   <ul>
     @for (const item of props.items; key item.id) {
@@ -216,7 +205,7 @@ export function Feed(props) @{
 }
 ```
 
-```tsrx
+```jsx
 export function Greeting(props) @{
   @if (props.name) {
     <p>{'Hello, ' + props.name}</p>
