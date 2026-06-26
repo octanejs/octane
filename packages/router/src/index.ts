@@ -35,8 +35,12 @@ export { routerContext, getRouterContext, matchContext, useRouter } from './cont
 export { useStore } from './useStore';
 export { useRouterState } from './useRouterState';
 export { useLocation, useParams, useSearch, useLoaderData, useMatches, useNavigate } from './hooks';
+export { useAwaited } from './useAwaited';
+export { lazyRouteComponent } from './lazyRouteComponent';
 
 export { RouterProvider } from './RouterProvider.tsrx';
 export { Outlet } from './Outlet.tsrx';
 export { Link } from './Link.tsrx';
 export { Navigate } from './Navigate.tsrx';
+export { Await } from './Await.tsrx';
+export { ScrollRestoration } from './ScrollRestoration.tsrx';

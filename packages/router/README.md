@@ -59,13 +59,27 @@ re-renders only the matches that changed.
 
 Included: `createRouter`, `createRootRoute`, `createRoute`, `RouterProvider`,
 `Outlet`, `Link`, `Navigate`, `useRouter`, `useRouterState`, `useLocation`,
-`useParams`, `useSearch`, `useLoaderData`, `useMatches`, `useNavigate`, plus the full
+`useParams`, `useSearch`, `useLoaderData`, `useMatches`, `useNavigate`,
+**`ScrollRestoration`**, **`Await`/`useAwaited` + `defer` (streaming deferred data)**,
+and **`lazyRouteComponent` (lazy/code-split route components)**, plus the full
 `@tanstack/router-core` re-export (`redirect`, `notFound`, history, search helpers,
 types).
 
+```tsx
+// streaming a deferred loader value
+<Await promise={data.slow} fallback={'loading…'}>
+  {(value) => <pre>{JSON.stringify(value) as string}</pre>}
+</Await>
+
+// scroll restoration: either the component or createRouter({ scrollRestoration: true })
+<ScrollRestoration />
+
+// code-split a route's component
+createRoute({ path: 'item/$id', component: lazyRouteComponent(() => import('./Item')) })
+```
+
 Deferred: file-based routing + the codegen plugin, devtools, search-param
-validation/middleware, `useBlocker`, `ScrollRestoration`, `Await`/`defer`/streaming,
-lazy routes, SSR head/scripts.
+validation/middleware, `useBlocker`, SSR head/scripts.
 
 ## Divergences from `@tanstack/react-router`
 
