@@ -17,7 +17,11 @@ export default defineConfig({
 					globalSetup: ['packages/octane/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
+				plugins: [
+					octane({
+						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+					}),
+				],
 			},
 			{
 				test: {
@@ -29,7 +33,11 @@ export default defineConfig({
 					globalSetup: ['packages/zustand/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
+				plugins: [
+					octane({
+						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+					}),
+				],
 				// `@octane-ts/zustand` is the package under test; alias the public name
 				// (and its subpaths) to source so fixtures import it exactly as a consumer
 				// would (and the differential React side rewrites the same specifiers to
@@ -59,7 +67,11 @@ export default defineConfig({
 					globalSetup: ['packages/query/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
+				plugins: [
+					octane({
+						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+					}),
+				],
 				resolve: {
 					alias: [
 						{
@@ -80,7 +92,11 @@ export default defineConfig({
 					environment: 'jsdom',
 					globals: false,
 				},
-				plugins: [octane()],
+				plugins: [
+					octane({
+						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+					}),
+				],
 				resolve: {
 					alias: [
 						{
