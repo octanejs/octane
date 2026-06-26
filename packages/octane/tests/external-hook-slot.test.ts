@@ -1,0 +1,136 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { mount } from './_helpers';
+import { slotHooks } from '../src/compiler/slot-hooks.js';
+import { octane } from '../src/compiler/vite.js';
+import { TsrxSingle, TsrxReuse, TsrxNested } from './_fixtures/external-hook-callers.tsrx';
+import { TsxApp, TsxReuse } from './_fixtures/external-hook-tsx.tsx';
+
+// Cross-file "hooks everywhere": a custom hook in a plain .ts module gets its base
+// hooks slotted by the surgical pass; a .tsrx OR .tsx caller wraps the call in
+// withSlot. The combination makes the .ts hook work — single use, reuse with
+// independent state, and nested composition — across the module boundary.
+
+describe('.ts custom hook consumed from .tsrx', () => {
+	it('single use works (base hooks slotted in the .ts module)', () => {
+		const r = mount(TsrxSingle as any);
+		expect(r.find('.s').textContent).toBe('0/n');
+		r.click('.s');
+		expect(r.find('.s').textContent).toBe('1/y'); // both base hooks in the .ts hook advanced
+		r.unmount();
+	});
+
+	it('reused twice keeps independent state', () => {
+		const r = mount(TsrxReuse as any);
+		expect([r.find('.a').textContent, r.find('.b').textContent]).toEqual(['0', '100']);
+		r.click('.a');
+		expect([r.find('.a').textContent, r.find('.b').textContent]).toEqual(['1', '100']);
+		r.click('.b');
+		expect([r.find('.a').textContent, r.find('.b').textContent]).toEqual(['1', '101']);
+		r.unmount();
+	});
+
+	it('a .ts hook composing another .ts hook (nested) works', () => {
+		const r = mount(TsrxNested as any);
+		expect(r.find('.n').textContent).toBe('x:5');
+		r.click('.n');
+		expect(r.find('.n').textContent).toBe('x:6');
+		r.unmount();
+	});
+});
+
+describe('.ts custom hook consumed from .tsx', () => {
+	it('a .tsx component composes its own base hook + the .ts hook', () => {
+		const r = mount(TsxApp as any, { base: 10 });
+		expect([r.find('.local').textContent, r.find('.ext').textContent]).toEqual(['10', '0']);
+		r.click('.local');
+		r.click('.ext');
+		expect([r.find('.local').textContent, r.find('.ext').textContent]).toEqual(['11', '1']);
+		r.unmount();
+	});
+
+	it('the .ts hook reused twice in one .tsx component stays independent', () => {
+		const r = mount(TsxReuse as any);
+		expect([r.find('.xa').textContent, r.find('.xb').textContent]).toEqual(['0', '100']);
+		r.click('.xa');
+		expect([r.find('.xa').textContent, r.find('.xb').textContent]).toEqual(['1', '100']);
+		r.unmount();
+	});
+});
+
+describe('slotHooks surgical pass', () => {
+	const SRC = readFileSync(
+		join(process.cwd(), 'packages/octane/tests/_fixtures/external-hook.ts'),
+		'utf8',
+	);
+
+	it('slots base hooks and leaves all other bytes (incl. un-printable TS) verbatim', () => {
+		const out = slotHooks(SRC, 'external-hook.ts');
+		expect(out).not.toBeNull();
+		const code = out!.code;
+		// base hook calls got a trailing slot
+		expect(code).toMatch(/useState<number>\(start, _h\$\d+\)/);
+		expect(code).toMatch(/useState<boolean>\(false, _h\$\d+\)/);
+		// the un-printable TS is preserved byte-for-byte
+		expect(code).toContain('[key: string]: number;');
+		expect(code).toContain('export type Pair<A, B> = { a: A; b: B };');
+		expect(code).toContain('export const widen = <T>(x: T): T => x;');
+		// custom-hook calls are NOT wrapped here (the .tsrx/.tsx caller does that)
+		expect(code).not.toContain('withSlot(');
+		// purely additive: stripping the injected slots restores the original source
+		const stripped = code
+			.replace(/^const _h\$\d+ = Symbol\.for\("[^"]*"\);\n/gm, '')
+			.replace(/, _h\$\d+(?=[),])/g, '');
+		expect(stripped).toBe(SRC);
+	});
+
+	it('returns null (untouched) for modules with no octane base hook', () => {
+		expect(slotHooks(`const x = 1; export { x };`, 'a.ts')).toBeNull(); // no octane import
+		expect(
+			slotHooks(
+				`import { createContext } from 'octane';\nexport const c = createContext(0);`,
+				'b.ts',
+			),
+		).toBeNull();
+		expect(
+			slotHooks(`import { useState } from 'octane';\nexport const ZERO = 0;`, 'c.ts'),
+		).toBeNull(); // imported but never called
+	});
+});
+
+describe('vite plugin gate routing', () => {
+	const plugin = octane({ exclude: ['/packages/zustand/src/'] });
+	// the transform doesn't need a real plugin `this` for the client paths
+	const run = (code: string, id: string) => (plugin.transform as any).call({}, code, id);
+	const HOOK = `import { useState } from 'octane';\nexport const f = () => useState(0);`;
+
+	it('.ts with an octane hook → surgical slot pass', () => {
+		expect(run(HOOK, '/app/h.ts')?.code).toMatch(/useState\(0, _h\$\d+\)/);
+	});
+
+	it('.js with an octane hook → surgical slot pass', () => {
+		expect(run(HOOK, '/app/h.js')?.code).toMatch(/useState\(0, _h\$\d+\)/);
+	});
+
+	it('.tsx → full compiler (JSX lowered, hook slotted)', () => {
+		const tsx = run(
+			`import { useState } from 'octane';\nexport function C() { const [n] = useState(0); return <b>{n as string}</b>; }`,
+			'/app/c.tsx',
+		);
+		expect(tsx?.code).toMatch(/_h\$\d+/); // hook slotted
+		expect(tsx?.code).toMatch(/_frag\$|template\(/); // JSX lowered (slot-pass never emits these)
+	});
+
+	it('skips node_modules (.ts AND .tsx), the exclude option, and .d.ts', () => {
+		expect(run(HOOK, '/x/node_modules/pkg/h.ts')).toBeNull();
+		expect(run(`export function C() { return <b/>; }`, '/x/node_modules/pkg/c.tsx')).toBeNull();
+		expect(run(HOOK, '/packages/zustand/src/index.ts')).toBeNull();
+		expect(run(`import { useState } from 'octane';`, '/app/types.d.ts')).toBeNull();
+	});
+
+	it('honors the // octane-no-slot opt-out and skips non-octane files', () => {
+		expect(run(`// octane-no-slot\n${HOOK}`, '/app/binding.ts')).toBeNull();
+		expect(run(`export const x = 1;`, '/app/plain.ts')).toBeNull();
+	});
+});

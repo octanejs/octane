@@ -51,7 +51,7 @@ const VOID_ELEMENTS = new Set([
 	'wbr',
 ]);
 
-const HOOK_NAMES = new Set([
+export const HOOK_NAMES = new Set([
 	'useState',
 	'useReducer',
 	'useEffect',
