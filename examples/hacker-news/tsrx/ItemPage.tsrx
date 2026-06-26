@@ -1,7 +1,6 @@
 import * as stylex from '@octanejs/stylex';
 import { useParams, Link } from '@octanejs/router';
 import { useSuspenseQuery } from '@octanejs/query';
-import { Suspense } from 'octane';
 import { itemQuery } from '../shared/queries.js';
 import { styles } from '../shared/styles.js';
 import { relativeTime, hostname, pluralize } from '../shared/format.js';
@@ -53,9 +52,11 @@ export function ItemPage() @{
 		</div>
 		<div data-testid="comments">
 			@for (const kid of kids; key kid) {
-				<Suspense fallback={<div {...stylex.props(styles.comment)}>{'…'}</div>}>
+				@try {
 					<Comment id={kid} depth={0} />
-				</Suspense>
+				} @pending {
+					<div {...stylex.props(styles.comment)}>{'…'}</div>
+				}
 			}
 		</div>
 	</div>

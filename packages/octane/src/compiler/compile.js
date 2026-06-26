@@ -1463,7 +1463,12 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 				return `ssrText(${printExpr(resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash))})`;
 			}
 			ctx.runtimeNeeded.add('ssrChild');
-			return `ssrChild(${printExpr(resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash))}, __s)`;
+			// rewriteJsxValues lowers any JSX embedded in the expression (e.g.
+			// `{cond && <div/>}`, a ternary, a `.map(x => <Row/>)`) to printable
+			// createElement(...) descriptors — exactly like ssrEmitTsrxExpression and
+			// the client makeChildCall. Without it the raw JSX leaks into the emitted
+			// ssrChild(...) call as unparseable source.
+			return `ssrChild(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx), cssHash))}, __s)`;
 		}
 		case 'Element':
 			if (isComponentTag(node)) return ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash);
@@ -1637,7 +1642,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 			continue;
 		}
 		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
-		inner = resolveStyleExpr(inner, cssHash);
+		// Lower any JSX in the prop value to createElement(...) — e.g.
+		// `fallback={<span/>}` or `fallback={(e) => <ErrorFallback/>}` — so esrap
+		// emits a real descriptor instead of raw (unprintable) JSX. Mirrors the
+		// client makeCompCall path; the renderPropChild branch below does the same.
+		inner = resolveStyleExpr(rewriteJsxValues(inner, ctx), cssHash);
 		if (inner.type === 'Literal') {
 			propParts.push(`${JSON.stringify(attrName)}: ${JSON.stringify(inner.value)}`);
 		} else {
@@ -3757,7 +3766,17 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	}
 
 	// After (forBlock + ifBlock calls run on every render — they reconcile).
-	const afterLines = [];
+	//
+	// Each call is tagged with its source `id` (assigned in source order during the
+	// AST walk) and SORTED by it before joining. APPENDED children — fragment
+	// children, or a control-flow-only body, all anchored at `__block.endMarker` —
+	// are inserted in call-emission order, so grouping them by type (for→if→comp)
+	// would reverse source order vs the server's source-order ssrEmit and desync
+	// hydration. Sorting by source id restores DOM order. Positional children carry
+	// their own `<!>` anchor, so their relative call order is irrelevant — sorting is
+	// a harmless no-op for them.
+	const afterCalls = [];
+	const pushAfter = (id, line) => afterCalls.push({ id, line });
 	for (const fc of forCalls) {
 		ctx.runtimeNeeded.add('forBlock');
 		// flags: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item markers),
@@ -3782,7 +3801,8 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				: '';
 		const emptyPart = hasEmpty ? `, ${fc.emptyHelper}` : hasAnchor ? ', null' : '';
 		const anchorPart = hasAnchor ? `, __s.${bindingsName}._forAnchor$${fc.id}` : '';
-		afterLines.push(
+		pushAfter(
+			fc.id,
 			`  forBlock(__s, ${JSON.stringify('_for$' + fc.id)}, __s.${bindingsName}._for$${fc.id}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}, ${fc.extraExpr}${flagsPart}${depsPart}${emptyPart}${anchorPart});`,
 		);
 	}
@@ -3799,14 +3819,16 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		else if (ic.elVar && !ic.elVar.startsWith('_el')) anchorArg = ', __block.endMarker';
 		if (ic.activity) {
 			ctx.runtimeNeeded.add('activityBlock');
-			afterLines.push(
+			pushAfter(
+				ic.id,
 				`  activityBlock(__s, ${JSON.stringify('_activity$' + ic.id)}, __s.${bindingsName}._ifHost$${ic.id}, (${ic.modeExpr}), ${ic.thenHelper}${anchorArg});`,
 			);
 			continue;
 		}
 		ctx.runtimeNeeded.add('ifBlock');
 		const elseArg = ic.elseHelper || 'null';
-		afterLines.push(
+		pushAfter(
+			ic.id,
 			`  ifBlock(__s, ${JSON.stringify('_if$' + ic.id)}, __s.${bindingsName}._ifHost$${ic.id}, (${ic.condExpr}), ${ic.thenHelper}, ${elseArg}${anchorArg});`,
 		);
 	}
@@ -3824,7 +3846,8 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				const isInsideHost = cc.elVar.startsWith('_el');
 				anchorArg = isInsideHost ? '' : ', __block.endMarker';
 			}
-			afterLines.push(
+			pushAfter(
+				cc.id,
 				`  childSlot(__s, ${JSON.stringify('_child$' + cc.id)}, __s.${bindingsName}._compHost$${cc.id}, ${cc.valueExpr}${anchorArg});`,
 			);
 			continue;
@@ -3846,7 +3869,8 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			} else if (!cc.elVar.startsWith('_el')) {
 				anchorArg = ', __block.endMarker';
 			}
-			afterLines.push(
+			pushAfter(
+				cc.id,
 				`  componentSlotLite(__s, ${JSON.stringify('_comp$' + cc.id)}, __s.${bindingsName}._compHost$${cc.id}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg});`,
 			);
 			continue;
@@ -3885,13 +3909,15 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			if (anchorArg === '') anchorArg = ', undefined';
 			singleRootArg = ', undefined, true';
 		}
-		afterLines.push(
+		pushAfter(
+			cc.id,
 			`  componentSlot(__s, ${JSON.stringify('_comp$' + cc.id)}, __s.${bindingsName}._compHost$${cc.id}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg});`,
 		);
 	}
 	for (const pc of ctx._portalCalls) {
 		ctx.runtimeNeeded.add('portal');
-		afterLines.push(
+		pushAfter(
+			pc.id,
 			`  portal(__s, ${JSON.stringify('_portal$' + pc.id)}, ${pc.targetExpr}, ${pc.bodyExpr}, ${pc.propsExpr}, __s.${bindingsName}._portalHost$${pc.id});`,
 		);
 	}
@@ -3905,7 +3931,8 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		//     `tc.anchorVar` — pass that so tryBlock inserts BEFORE it.
 		//   - Otherwise omit (runtime treats undefined === appendChild).
 		const tryAnchorArg = tc.anchorVar ? `, __s.${bindingsName}._tryAnchor$${tc.id}` : '';
-		afterLines.push(
+		pushAfter(
+			tc.id,
 			`  tryBlock(__s, ${JSON.stringify('_try$' + tc.id)}, __s.${bindingsName}._tryHost$${tc.id}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg});`,
 		);
 	}
@@ -3917,7 +3944,8 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		//     anchor node so switchBlock inserts BEFORE it.
 		//   - Otherwise omit the arg; the runtime defaults to appendChild.
 		const anchorArg = sc.anchorVar ? `, __s.${bindingsName}._switchAnchor$${sc.id}` : '';
-		afterLines.push(
+		pushAfter(
+			sc.id,
 			`  switchBlock(__s, ${JSON.stringify('_switch$' + sc.id)}, __s.${bindingsName}._switchHost$${sc.id}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg});`,
 		);
 	}
@@ -3933,7 +3961,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		bindingsName,
 		mount: mountLines.join('\n'),
 		update: updateLines.join('\n'),
-		after: afterLines.join('\n'),
+		after: afterCalls
+			.map((c, i) => ({ ...c, i }))
+			.sort((a, b) => a.id - b.id || a.i - b.i)
+			.map((c) => c.line)
+			.join('\n'),
 		head: headEmit,
 	};
 }

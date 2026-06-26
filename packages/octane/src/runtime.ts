@@ -1011,13 +1011,16 @@ export function componentSlotLite<P>(
 			// `insertBefore(content, endMarker)` is a no-op (content already there).
 			endMarker = matchingClose(anchor as Node);
 			hydrateNode = (anchor as Node).nextSibling;
-		} else if (hydrating && anchor == null) {
+		} else if (hydrating && !isBlockOpen(anchor ?? null)) {
 			// Anchor-less (appended) component — the compiler dropped the `<!>`
-			// placeholder because every child of `host` is a component. The server
-			// still wrapped each in a `<!--[-->…<!--]-->` range. The FIRST appended
-			// child finds the cursor parked AFTER the just-cloned (empty) host, so
-			// descend to host.firstChild; later siblings already have the cursor on
-			// their own open marker (its parentNode is host).
+			// placeholder because every child of `host` is a component — OR the anchor
+			// is a non-open marker because this lite component is the SOLE hole of a
+			// control-flow arm (a `@try { <Comp/> }` body), so its anchor is the arm's
+			// end marker. In both cases the server still wrapped the output in a
+			// `<!--[-->…<!--]-->` range and mountTry/renderBlock parked the cursor on
+			// the `<!--[-->`. The FIRST appended child finds the cursor parked AFTER the
+			// just-cloned (empty) host, so descend to host.firstChild; later siblings
+			// (and the sole-hole case) already have the cursor on the open marker.
 			let open: Node | null = hydrateNode;
 			if (open === null || open.parentNode !== host) open = host.firstChild;
 			if (open !== null && isBlockOpen(open)) {
@@ -2102,6 +2105,42 @@ export function htextSwap(posNode: Node | null, text: string): Text {
 /** True if `node` is a server block-open marker `<!--[-->`. */
 function isBlockOpen(node: Node | null): node is Comment {
 	return node !== null && node.nodeType === 8 && (node as Comment).data === HYDRATION_START;
+}
+
+/**
+ * Resolve the server `<!--[-->` a control-flow slot (try / if / for / switch /
+ * component) should ADOPT during hydration.
+ *
+ * Two shapes reach here:
+ *  - `anchor` IS the open marker — the slot sat at a `<!>` placeholder among
+ *    siblings, so the compiler passes the open directly. Return it.
+ *  - `anchor` is null or a NON-open marker — the slot is the SOLE hole of its
+ *    enclosing scope (an appended-only child, or the only thing a control-flow
+ *    arm / component's children render), so its anchor is that scope's END
+ *    marker. In that case mountTry/ifBlock/renderBlock parked the cursor
+ *    (`hydrateNode`) on the slot's own `<!--[-->`. Adopt from the parked cursor
+ *    (falling back to `domParent.firstChild` for the first appended child, whose
+ *    cursor still sits after the just-cloned empty host).
+ *
+ * Returns the open marker to adopt, or null when there's nothing to adopt (a
+ * genuine fresh client mount, e.g. the server rendered the slot empty).
+ */
+function resolveHydrationOpen(anchor: Node | null | undefined, domParent: Node): Comment | null {
+	if (!hydrating) return null;
+	if (isBlockOpen(anchor ?? null)) return anchor as Comment;
+	let c: Node | null = hydrateNode;
+	if (c === null || c.parentNode !== domParent) c = domParent.firstChild;
+	return c !== null && isBlockOpen(c) ? (c as Comment) : null;
+}
+
+function dbgIdx(n: any): number {
+	return n && n.parentNode ? [...n.parentNode.childNodes].indexOf(n) : -1;
+}
+function htrace(label: string, extra?: string): void {
+	if (!(globalThis as any).__DBG || !hydrating) return;
+	((globalThis as any).__htrace ??= []).push(
+		`${label} cur=${dbgIdx(hydrateNode)}/${(hydrateNode as any)?.data ?? (hydrateNode as any)?.nodeName ?? 'null'}${extra ? ' ' + extra : ''}`,
+	);
 }
 
 /** From a block-open `<!--[-->`, the matching `<!--]-->` (depth-tracked). */
@@ -3567,17 +3606,23 @@ export function componentSlot(
 		let start: Comment | null;
 		let end: Comment | null;
 		// Resolve the server's `<!--[-->` to adopt: directly when anchored, or — for
-		// an appended (anchor-less, all-component-children) child — by descending
-		// into the host's child stream (host.firstChild for the first such child;
-		// the cursor is already parked on the open marker for later siblings).
+		// an appended (anchor-less, all-component-children) child, OR a sole-hole
+		// child whose anchor is its body's end marker (a `@try { <Comp/> }` arm) —
+		// by consulting the parked cursor (host.firstChild for the first appended
+		// child; the cursor is already on the open marker otherwise).
 		let open: Node | null = null;
 		if (hydrating && isBlockOpen(anchor ?? null)) {
 			open = anchor as Node;
-		} else if (hydrating && anchor == null) {
+		} else if (hydrating && !isBlockOpen(anchor ?? null)) {
+			// The anchor is null (appended child) or a non-open marker (the slot is the
+			// sole hole of a control-flow arm, so its anchor is the arm's end marker).
+			// In both cases mountTry/renderBlock parked the cursor on the server range's
+			// `<!--[-->`; adopt from it, the same way childSlot's cursor branch does.
 			let c: Node | null = hydrateNode;
 			if (c === null || c.parentNode !== domParent) c = domParent.firstChild;
 			if (c !== null && isBlockOpen(c)) open = c;
 		}
+		htrace('[comp ' + String(comp).replace(/\s+/g, ' ').replace(/const __block = scope.block;|const block = s\w+\.block;/, '').slice(30, 150) + ']', 'open=' + dbgIdx(open));
 		if (open !== null) {
 			// Adopt the server range: its comments become our markers, cursor → content.
 			start = open as Comment;
@@ -3698,6 +3743,15 @@ export function componentSlot(
 		state.block.props = props;
 		renderBlock(state.block);
 	}
+	// Hydration: advance the cursor PAST this component's adopted range so the next
+	// sibling adopts from the right node. The body itself doesn't reliably leave the
+	// cursor at the end — an EMPTY component (`<></>`, e.g. the router's
+	// <Transitioner/>) renders nothing, so without this the cursor stays parked on
+	// the component's own `<!--]-->` and the following sibling desyncs. Mirrors
+	// forBlock's `hydrateNode = state.end.nextSibling`. (singleRoot is client-only —
+	// during hydration the server always wraps the output, so state.end is set.)
+	if (hydrating && state.end !== null) hydrateNode = state.end.nextSibling;
+	htrace('   ↳[comp ' + ((comp as any)?.name ?? '?') + ' DONE]', 'singleRoot=' + state.singleRoot + ' end=' + dbgIdx(state.end));
 }
 
 // ---------------------------------------------------------------------------
@@ -4125,7 +4179,13 @@ export function childSlot(
 			return;
 		}
 		// New component (first render, or identity swap from text / another comp).
-		clearChildContent(state);
+		// While hydrating the FIRST render adopts the server content between our
+		// adopted markers (the cursor sits on it), so DON'T sweep it — clearing would
+		// delete the very DOM the component is about to adopt and strand the cursor
+		// (a detached node), desyncing every sibling/descendant below. Mirrors the
+		// array path's `if (!hydrating) clearChildContent` guard above. (A post-
+		// hydration identity swap runs with hydrating=false and clears normally.)
+		if (!hydrating) clearChildContent(state);
 		state.currentComp = comp;
 		if (state.start === null) {
 			// First component in this slot — mint the lower-bound marker now so
@@ -4133,9 +4193,14 @@ export function childSlot(
 			state.start = document.createComment('');
 			domParent.insertBefore(state.start, state.end);
 		}
+		htrace('[childSlot ' + ((comp as any)?.name ?? '?') + ']', 'start=' + dbgIdx(state.start) + ' end=' + dbgIdx(state.end));
 		const b = createBlock('dynamic', parentBlock, domParent, state.start, state.end, comp, props);
 		state.block = b;
 		renderBlock(b);
+		// Advance the cursor past this child's adopted range so a following sibling
+		// hole adopts the right node (mirrors componentSlot's post-render advance).
+		if (hydrating && state.end !== null) hydrateNode = state.end.nextSibling;
+		htrace('[childSlot ' + ((comp as any)?.name ?? '?') + ' DONE]', 'end=' + dbgIdx(state.end));
 		return;
 	}
 
@@ -4444,13 +4509,18 @@ export function tryBlock(
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
-		if (hydrating && isBlockOpen(anchor ?? null)) {
-			// Hydration: the server (Phase 4) awaited use() and wrapped the resolved
-			// SUCCESS arm (or @catch arm) in a `<!--[-->…<!--]-->` range. Adopt it as
-			// the slot; mountTry brackets the content and the seeded use() values
-			// (hydrationSeeds) let the try body render its success arm synchronously.
-			start = anchor as Comment;
-			end = matchingClose(anchor as Node);
+		// Hydration: the server (Phase 4) awaited use() and wrapped the resolved
+		// SUCCESS arm (or @catch arm) in a `<!--[-->…<!--]-->` range. Adopt it as the
+		// slot; mountTry brackets the content and the seeded use() values let the try
+		// body render its success arm synchronously. `resolveHydrationOpen` also covers
+		// the SOLE-hole case (a @try that is the only thing a component/arm renders —
+		// the router `Match` shape `<ctx.Provider> @try {…}`), where the anchor is the
+		// enclosing scope's end marker and the cursor is parked on the @try's open.
+		const open = resolveHydrationOpen(anchor ?? null, domParent);
+		htrace('[try]', 'open=' + dbgIdx(open));
+		if (open !== null) {
+			start = open;
+			end = matchingClose(open);
 		} else {
 			start = document.createComment('try');
 			end = document.createComment('/try');
@@ -5470,11 +5540,16 @@ export function ifBlock(
 	if (state === undefined) {
 		let start: Comment | null = null;
 		let end: Node | null = null;
-		if (hydrating && isBlockOpen(anchor ?? null)) {
-			// Hydration: adopt the server's `<!--[-->…<!--]-->` slot range. Client
-			// mounts defer marker creation entirely (self-mark or mint on demand).
-			start = anchor as Comment;
-			end = matchingClose(anchor as Node);
+		// Hydration: adopt the server's `<!--[-->…<!--]-->` slot range (client mounts
+		// defer marker creation entirely). `resolveHydrationOpen` also covers the
+		// SOLE-hole case — a @if that is the only thing an enclosing arm/component
+		// renders (e.g. `@try { @if (…) {…} }`, the router Match shape) — where the
+		// anchor is the arm's END marker and the cursor is parked on the @if's open.
+		const open = resolveHydrationOpen(anchor ?? null, domParent);
+		htrace('[if]', 'open=' + dbgIdx(open));
+		if (open !== null) {
+			start = open;
+			end = matchingClose(open);
 		}
 		state = { __kind: 'ifBlockSlot', anchor: anchor ?? null, start, end, branch: -1, block: null };
 		parentScope[slotKey] = state;
@@ -5967,6 +6042,15 @@ export function forBlock<T, E = undefined>(
 			// empty→fill mount below adopts each item via mountItem.
 			start = anchor as Comment;
 			end = matchingClose(anchor as Node);
+			hydrateNode = start.nextSibling;
+		} else if (hydrating && isBlockOpen(hydrateNode)) {
+			// Hydration (sole hole, no `<!>` anchor): the @for is the only root of its
+			// owning body (e.g. a `@try { @for }` arm or a component whose body is a
+			// bare @for), so the compiler emitted no anchor — but mountTry/renderBlock
+			// parked the CURSOR on the server's `<!--[-->`. Adopt from the cursor, the
+			// same way childSlot does for a sole renderable hole.
+			start = hydrateNode as Comment;
+			end = matchingClose(hydrateNode as Node);
 			hydrateNode = start.nextSibling;
 		} else {
 			start = document.createComment('for');

@@ -1,6 +1,5 @@
 import * as stylex from '@octanejs/stylex';
 import { Outlet, Link, useRouterState } from '@octanejs/router';
-import { ErrorBoundary } from 'octane';
 import { styles } from '../shared/styles.js';
 import { ErrorFallback } from './Pending.tsrx';
 
@@ -43,9 +42,11 @@ export function RootLayout() @{
 			>{'jobs'}</Link>
 		</header>
 		<main {...stylex.props(styles.main)}>
-			<ErrorBoundary fallback={(error) => <ErrorFallback error={error} />}>
+			@try {
 				<Outlet />
-			</ErrorBoundary>
+			} @catch (error) {
+				<ErrorFallback error={error} />
+			}
 		</main>
 	</div>
 }

@@ -324,9 +324,11 @@ test('the feed nav links swap the feed, its content, and the active highlight', 
 	const newLink = header.locator('a[href="/newest"]');
 	const askLink = header.locator('a[href="/ask"]');
 
-	// new -> /newest: URL, distinct new-feed content, and active marking.
+	// new -> /newest: URL, distinct new-feed content, and active marking. The
+	// feed routes validate `?page=N`, so the router normalizes the URL to carry
+	// the default `?page=1` — accept it (with or without the query).
 	await newLink.click();
-	await expect(page).toHaveURL(/\/newest$/);
+	await expect(page).toHaveURL(/\/newest(\?page=1)?$/);
 	await expect(storiesPage).toHaveAttribute('data-feed', 'new');
 	await expect(page.getByTestId('story-row')).toHaveCount(NEW_IDS.length);
 	await expect(page.getByText(NEW_LEAD_TITLE)).toBeVisible();
@@ -344,7 +346,7 @@ test('the feed nav links swap the feed, its content, and the active highlight', 
 
 	// ask -> /ask: URL, distinct ask-feed content, active swaps to ask.
 	await askLink.click();
-	await expect(page).toHaveURL(/\/ask$/);
+	await expect(page).toHaveURL(/\/ask(\?page=1)?$/);
 	await expect(storiesPage).toHaveAttribute('data-feed', 'ask');
 	await expect(page.getByTestId('story-row')).toHaveCount(ASK_IDS.length);
 	await expect(page.getByText(ASK_LEAD_TITLE)).toBeVisible();

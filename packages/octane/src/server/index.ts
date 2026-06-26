@@ -34,6 +34,12 @@ export {
 	useFormStatus,
 	useOptimistic,
 	memo,
+	withSlot,
+	startTransition,
+
+	// Suspense / error boundaries as JSX components (alongside the @try directive)
+	Suspense,
+	ErrorBoundary,
 
 	// Context
 	createContext,
