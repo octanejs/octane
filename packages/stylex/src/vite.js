@@ -23,12 +23,10 @@
 // stable PLACEHOLDER rule and `generateBundle` — which runs after ALL transforms are
 // done — swaps that placeholder for the now-complete sheet. Either way the shipped
 // stylesheet contains every rule.
-import {
-	transformStylex,
-	generateStylexCSS,
-	DEFAULT_IMPORT_SOURCES,
-	type StylexRule,
-} from './transform';
+//
+// Authored in `.js` (like octane's `compiler/vite.js`) so the plugin loads when a
+// consuming app's `vite.config.ts` pulls it in through Node's ESM loader.
+import { transformStylex, generateStylexCSS, DEFAULT_IMPORT_SOURCES } from './transform.js';
 
 const VIRTUAL_CSS_ID = 'virtual:stylex.css';
 const RESOLVED_VIRTUAL_CSS_ID = '\0' + VIRTUAL_CSS_ID;
@@ -40,34 +38,28 @@ const RESOLVED_VIRTUAL_CSS_ID = '\0' + VIRTUAL_CSS_ID;
 const PLACEHOLDER_RULE = '.__stylex_sheet__{--stylex-sheet:1}';
 const PLACEHOLDER_RE = /\.__stylex_sheet__\s*\{[^}]*\}/g;
 
-export interface StylexPluginOptions {
-	/** Which files to scan for StyleX (default: `.tsrx`/`.tsx`/`.jsx`/`.ts`/`.js`). */
-	include?: RegExp;
-	/** Import specifiers treated as StyleX (default: `@octane-ts/stylex` + `@stylexjs/stylex`). */
-	importSources?: Array<string | { from: string; as: string }>;
-	/** Force dev/prod compilation (default: dev when Vite is serving). */
-	dev?: boolean;
-	/** Wrap output in `@layer` rules instead of the `:not(#\#)` specificity hack. */
-	useCSSLayers?: boolean;
-	/** StyleX cross-file token (`.stylex.ts`) resolution. */
-	unstable_moduleResolution?: Record<string, unknown>;
-	/** Escape hatch for other `@stylexjs/babel-plugin` options. */
-	stylexOptions?: Record<string, unknown>;
-}
-
-export function stylex(options: StylexPluginOptions = {}): unknown {
+/**
+ * @param {object} [options]
+ * @param {RegExp} [options.include] Files to scan (default: `.tsrx`/`.tsx`/`.jsx`/`.ts`/`.js`).
+ * @param {Array<string | { from: string, as: string }>} [options.importSources] StyleX import specifiers.
+ * @param {boolean} [options.dev] Force dev/prod compilation (default: dev when Vite is serving).
+ * @param {boolean} [options.useCSSLayers] Use `@layer` rules instead of the `:not(#\#)` specificity hack.
+ * @param {Record<string, unknown>} [options.unstable_moduleResolution] StyleX cross-file token resolution.
+ * @param {Record<string, unknown>} [options.stylexOptions] Escape hatch for other `@stylexjs/babel-plugin` options.
+ */
+export function stylex(options = {}) {
 	const include = options.include ?? /\.(tsrx|tsx|jsx|ts|js)(\?|$)/;
 	const importSources = options.importSources ?? DEFAULT_IMPORT_SOURCES;
 	const useCSSLayers = options.useCSSLayers ?? false;
 	// Per-module rule sets, so re-transforming one file (HMR) replaces only its rules.
-	const rulesByFile = new Map<string, StylexRule[]>();
+	const rulesByFile = new Map();
 	let isDev = false;
 	let isBuild = false;
 	let root = process.cwd();
-	let server: any;
+	let server;
 
-	const aggregate = (): string => {
-		const all: StylexRule[] = [];
+	const aggregate = () => {
+		const all = [];
 		for (const rules of rulesByFile.values()) for (const r of rules) all.push(r);
 		return generateStylexCSS(all, useCSSLayers);
 	};
@@ -77,20 +69,20 @@ export function stylex(options: StylexPluginOptions = {}): unknown {
 		// Run after octane's `.tsrx` -> JS transform, where `stylex.*` calls survive.
 		enforce: 'post',
 
-		configResolved(config: any) {
+		configResolved(config) {
 			isDev = options.dev ?? config.command === 'serve';
 			isBuild = config.command === 'build';
 			if (config.root) root = config.root;
 		},
-		configureServer(s: any) {
+		configureServer(s) {
 			server = s;
 		},
 
-		resolveId(id: string) {
+		resolveId(id) {
 			if (id === VIRTUAL_CSS_ID) return RESOLVED_VIRTUAL_CSS_ID;
 			return null;
 		},
-		load(id: string) {
+		load(id) {
 			if (id !== RESOLVED_VIRTUAL_CSS_ID) return null;
 			// In a build the graph may not be fully transformed yet — emit a placeholder
 			// that `generateBundle` replaces with the complete sheet. In serve, the live
@@ -98,7 +90,7 @@ export function stylex(options: StylexPluginOptions = {}): unknown {
 			return isBuild ? PLACEHOLDER_RULE : aggregate();
 		},
 
-		transform(code: string, id: string) {
+		transform(code, id) {
 			const file = id.split('?')[0];
 			if (!include.test(file) || file.includes('/node_modules/')) return null;
 			// Cheap gate: skip files that can't reference StyleX at all.
@@ -134,14 +126,14 @@ export function stylex(options: StylexPluginOptions = {}): unknown {
 				}
 			}
 
-			return { code: out, map: map as any };
+			return { code: out, map };
 		},
 
 		// After every module is transformed, the aggregate is complete — swap the
 		// placeholder for the real sheet wherever it landed (a CSS asset normally, or a
 		// JS chunk if the CSS was inlined). `enforce: 'post'` runs this after Vite has
 		// emitted its CSS asset.
-		generateBundle(_options: any, bundle: Record<string, any>) {
+		generateBundle(_options, bundle) {
 			if (!isBuild) return;
 			const css = aggregate();
 			for (const fileName in bundle) {
@@ -162,14 +154,14 @@ export function stylex(options: StylexPluginOptions = {}): unknown {
 	};
 }
 
-function keyOf(rules: StylexRule[] | undefined): string {
+function keyOf(rules) {
 	return rules ? rules.map((r) => r[0]).join('|') : '';
 }
 
 // Escape a CSS string so it can be spliced inside an existing JS string literal
 // (covers the rarer case of Vite inlining the sheet into a JS chunk). Backslash must
 // be escaped first; quotes/backticks cover the literal styles esbuild emits.
-function jsStringEscape(css: string): string {
+function jsStringEscape(css) {
 	return css
 		.replace(/\\/g, '\\\\')
 		.replace(/'/g, "\\'")
