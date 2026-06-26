@@ -1,4 +1,4 @@
-import { motion } from '@octane-ts/motion';
+import { motion } from '@octanejs/motion';
 
 const item = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 export function StaggerList(props) @{

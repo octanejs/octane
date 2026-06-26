@@ -1,12 +1,12 @@
 /**
- * @octane-ts/zustand conformance — the binding (`create` + `useStore`) layered on
+ * @octanejs/zustand conformance — the binding (`create` + `useStore`) layered on
  * octane's `useSyncExternalStore`, exercised against the REAL zustand vanilla
  * store. Mirrors the observable behaviors of zustand's React binding: selectors
  * subscribe, the snapshot bails out on Object.is-equal slices, multiple
  * selectors / stores stay independent, and unmount unsubscribes.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createStore } from '@octane-ts/zustand';
+import { createStore } from '@octanejs/zustand';
 import { mount, nextPaint } from '../_helpers';
 import {
 	useCounter,

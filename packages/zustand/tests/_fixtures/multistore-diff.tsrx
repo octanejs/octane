@@ -1,4 +1,4 @@
-import { create } from '@octane-ts/zustand';
+import { create } from '@octanejs/zustand';
 
 // Two independent stores in one component — proves the per-call-site slot keeps
 // distinct stores (and the same hook used twice) independent, byte-for-byte with

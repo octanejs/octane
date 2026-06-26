@@ -7,7 +7,7 @@
  * differential tests reuse octane's `mountDifferential` unchanged.
  *
  * The one zustand-specific step: besides rewriting `octane` → `react`, we
- * rewrite `@octane-ts/zustand` → `zustand`, so the React side of each fixture
+ * rewrite `@octanejs/zustand` → `zustand`, so the React side of each fixture
  * runs the REAL zustand React binding (the byte-for-byte oracle). The public
  * API matches 1:1 (`create`, `useStore`, `createStore`), so a flat import
  * rewrite is all it takes.
@@ -56,14 +56,14 @@ function compileOne(srcPath: string): void {
 	} catch {
 		return;
 	}
-	// octane → react (hook/component names match 1:1) and @octane-ts/zustand →
+	// octane → react (hook/component names match 1:1) and @octanejs/zustand →
 	// zustand (create/useStore/createStore match 1:1). Order matters only in that
 	// both are independent specifiers.
 	let rewritten = transformed.code
-		// `@octane-ts/zustand` and its subpaths (/shallow, /middleware, /vanilla) →
+		// `@octanejs/zustand` and its subpaths (/shallow, /middleware, /vanilla) →
 		// the matching real-zustand specifier; `octane` → react.
 		.replace(
-			/from\s+["']@octane-ts\/zustand(\/[^"']*)?["']/g,
+			/from\s+["']@octanejs\/zustand(\/[^"']*)?["']/g,
 			(_m, sub) => `from "zustand${sub || ''}"`,
 		)
 		.replace(/from\s+["']octane["']/g, 'from "react"');

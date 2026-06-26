@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider, useQuery } from '@octane-ts/query';
+import { QueryClient, QueryClientProvider, useQuery } from '@octanejs/query';
 
 // Each side (octane / react) gets its OWN module-level client from its own
 // QueryClient class. `initialData` + infinite staleTime means the query is

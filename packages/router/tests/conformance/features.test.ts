@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
-import { RouterProvider } from '@octane-ts/router';
+import { RouterProvider } from '@octanejs/router';
 import { makeLazyRouter, makeAwaitRouter, makeScrollRouter } from '../_fixtures/features.tsrx';
 
 async function flush() {
@@ -10,7 +10,7 @@ async function flush() {
 	}
 }
 
-describe('@octane-ts/router — lazy routes / Await / scroll restoration', () => {
+describe('@octanejs/router — lazy routes / Await / scroll restoration', () => {
 	it('lazyRouteComponent: a route component is loaded lazily, then rendered', async () => {
 		const router = makeLazyRouter();
 		await router.load();

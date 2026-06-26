@@ -8,9 +8,9 @@ import {
 } from '../routes.js';
 
 /**
- * @typedef {import('@octane-ts/vite-plugin').Context} Context
- * @typedef {import('@octane-ts/vite-plugin').RenderRoute} RenderRoute
- * @typedef {import('@octane-ts/vite-plugin').ResolvedOctaneConfig} ResolvedOctaneConfig
+ * @typedef {import('@octanejs/vite-plugin').Context} Context
+ * @typedef {import('@octanejs/vite-plugin').RenderRoute} RenderRoute
+ * @typedef {import('@octanejs/vite-plugin').ResolvedOctaneConfig} ResolvedOctaneConfig
  * @typedef {import('vite').ViteDevServer} ViteDevServer
  */
 

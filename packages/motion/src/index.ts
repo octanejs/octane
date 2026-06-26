@@ -1,4 +1,4 @@
-// @octane-ts/motion — Framer Motion for the octane renderer.
+// @octanejs/motion — Framer Motion for the octane renderer.
 //
 // Reuses motion's framework-agnostic animation engine (`animate`), gesture
 // primitives (`hover`, `press`, `inView`), MotionValues, and scoped animation, and

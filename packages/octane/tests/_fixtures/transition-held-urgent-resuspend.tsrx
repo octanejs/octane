@@ -5,7 +5,7 @@ import { use, useTransition, useSyncExternalStore } from 'octane';
 // prior content even when its still-committed content RE-SUSPENDS at URGENT
 // (async / external-store) priority.
 //
-// This models @octane-ts/query's useSuspenseQuery: a transition changes the
+// This models @octanejs/query's useSuspenseQuery: a transition changes the
 // query key (transition-priority re-render → boundary holds), then the query
 // observer notifies ASYNCHRONOUSLY on a macrotask AFTER octane's transition
 // window has closed, so the resulting re-render (which re-suspends on the new

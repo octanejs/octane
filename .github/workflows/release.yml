@@ -12,7 +12,7 @@ permissions: {}
 
 jobs:
   release-pr:
-    if: github.repository == 'octane-ts/octane'
+    if: github.repository == 'octanejs/octane'
     permissions:
       contents: write
       issues: read

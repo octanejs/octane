@@ -5,8 +5,8 @@ import {
 	Outlet,
 	Link,
 	useParams,
-} from '@octane-ts/router';
-import { createMemoryHistory } from '@octane-ts/router';
+} from '@octanejs/router';
+import { createMemoryHistory } from '@octanejs/router';
 
 // A layout route (no path component of its own) renders chrome + an <Outlet/> for
 // the matched child — exercising the match-context chain.

@@ -1,6 +1,6 @@
-# @octane-ts/query
+# @octanejs/query
 
-[TanStack Query](https://tanstack.com/query) for the [octane](https://github.com/octane-ts/octane) renderer.
+[TanStack Query](https://tanstack.com/query) for the [octane](https://github.com/octanejs/octane) renderer.
 
 TanStack Query separates a framework-agnostic core (`@tanstack/query-core` — the
 `QueryClient`, observers, and caches) from a React binding (`@tanstack/react-query`)
@@ -12,7 +12,7 @@ reimplements only the binding on octane's hooks. The public surface matches
 // before
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 // after
-import { QueryClient, QueryClientProvider, useQuery } from '@octane-ts/query';
+import { QueryClient, QueryClientProvider, useQuery } from '@octanejs/query';
 
 const client = new QueryClient();
 

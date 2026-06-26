@@ -1,4 +1,4 @@
-import * as stylex from '@octane-ts/stylex';
+import * as stylex from '@octanejs/stylex';
 
 const styles = stylex.create({
 	root: { padding: 16, color: 'tomato' },

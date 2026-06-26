@@ -1,5 +1,5 @@
-import { createWithEqualityFn } from '@octane-ts/zustand/traditional';
-import { shallow } from '@octane-ts/zustand/shallow';
+import { createWithEqualityFn } from '@octanejs/zustand/traditional';
+import { shallow } from '@octanejs/zustand/shallow';
 
 // createWithEqualityFn with `shallow` as the DEFAULT equality function.
 export const useEq = createWithEqualityFn(

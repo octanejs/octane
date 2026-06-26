@@ -1,6 +1,6 @@
-# @octane-ts/motion
+# @octanejs/motion
 
-[Framer Motion](https://motion.dev) for the [octane](https://github.com/octane-ts/octane) renderer.
+[Framer Motion](https://motion.dev) for the [octane](https://github.com/octanejs/octane) renderer.
 
 Motion separates a framework-agnostic animation engine (`animate`) and gesture
 primitives (`hover`, `press`) from its React components (`motion.div`,
@@ -11,7 +11,7 @@ reimplements the components on octane.
 // before
 import { motion, AnimatePresence } from 'motion/react';
 // after
-import { motion, AnimatePresence } from '@octane-ts/motion';
+import { motion, AnimatePresence } from '@octanejs/motion';
 
 function Card() @{
   <motion.div

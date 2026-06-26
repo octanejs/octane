@@ -1,4 +1,4 @@
-import { motion, useMotionValue } from '@octane-ts/motion';
+import { motion, useMotionValue } from '@octanejs/motion';
 
 export function MVBox(props) @{
 	const x = useMotionValue(0);

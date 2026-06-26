@@ -15,7 +15,7 @@
  * and the generated production server entry.
  */
 
-/** @import { OctaneConfigOptions, ResolvedOctaneConfig } from '@octane-ts/vite-plugin' */
+/** @import { OctaneConfigOptions, ResolvedOctaneConfig } from '@octanejs/vite-plugin' */
 
 import path from 'node:path';
 import fs from 'node:fs';
@@ -46,11 +46,11 @@ function validate_render_route(route) {
 			typeof render_route.entry[1] === 'string');
 
 	if (!has_entry) {
-		throw new Error('[@octane-ts/vite-plugin] RenderRoute requires a string/tuple `entry`.');
+		throw new Error('[@octanejs/vite-plugin] RenderRoute requires a string/tuple `entry`.');
 	}
 
 	if (render_route.layout !== undefined && typeof render_route.layout !== 'string') {
-		throw new Error('[@octane-ts/vite-plugin] RenderRoute `layout` must be a string path.');
+		throw new Error('[@octanejs/vite-plugin] RenderRoute `layout` must be a string path.');
 	}
 }
 
@@ -63,15 +63,15 @@ function validate_root_boundary(rootBoundary) {
 		return;
 	}
 	if (!rootBoundary || typeof rootBoundary !== 'object') {
-		throw new Error('[@octane-ts/vite-plugin] rootBoundary must be an object when provided.');
+		throw new Error('[@octanejs/vite-plugin] rootBoundary must be an object when provided.');
 	}
 
 	const boundary = /** @type {{ pending?: unknown, catch?: unknown }} */ (rootBoundary);
 	if (boundary.pending !== undefined && typeof boundary.pending !== 'function') {
-		throw new Error('[@octane-ts/vite-plugin] rootBoundary.pending must be a component function.');
+		throw new Error('[@octanejs/vite-plugin] rootBoundary.pending must be a component function.');
 	}
 	if (boundary.catch !== undefined && typeof boundary.catch !== 'function') {
-		throw new Error('[@octane-ts/vite-plugin] rootBoundary.catch must be a component function.');
+		throw new Error('[@octanejs/vite-plugin] rootBoundary.catch must be a component function.');
 	}
 }
 
@@ -96,28 +96,28 @@ export function resolveOctaneConfig(raw, options = {}) {
 	// ------------------------------------------------------------------
 	if (!raw) {
 		throw new Error(
-			'[@octane-ts/vite-plugin] octane.config.ts must export a default config object.',
+			'[@octanejs/vite-plugin] octane.config.ts must export a default config object.',
 		);
 	}
 
 	if (requireAdapter) {
 		if (!raw.adapter) {
 			throw new Error(
-				'[@octane-ts/vite-plugin] Production builds require an `adapter` in octane.config.ts. ' +
+				'[@octanejs/vite-plugin] Production builds require an `adapter` in octane.config.ts. ' +
 					'Install an adapter package (e.g. @ripple-ts/adapter-node) and set the `adapter` property.',
 			);
 		}
 
 		if (!raw.adapter.runtime) {
 			throw new Error(
-				'[@octane-ts/vite-plugin] The adapter in octane.config.ts is missing the `runtime` property. ' +
+				'[@octanejs/vite-plugin] The adapter in octane.config.ts is missing the `runtime` property. ' +
 					'Make sure your adapter exports runtime primitives.',
 			);
 		}
 	}
 
 	if (raw.router?.routes !== undefined && !Array.isArray(raw.router.routes)) {
-		throw new Error('[@octane-ts/vite-plugin] router.routes must be an array.');
+		throw new Error('[@octanejs/vite-plugin] router.routes must be an array.');
 	}
 
 	for (const route of raw.router?.routes ?? []) {
@@ -196,7 +196,7 @@ export async function loadOctaneConfig(projectRoot, options = {}) {
 	const configPath = getOctaneConfigPath(projectRoot);
 
 	if (!fs.existsSync(configPath)) {
-		throw new Error(`[@octane-ts/vite-plugin] octane.config.ts not found in ${projectRoot}`);
+		throw new Error(`[@octanejs/vite-plugin] octane.config.ts not found in ${projectRoot}`);
 	}
 
 	// When a running Vite dev server is available, use it directly.

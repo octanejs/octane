@@ -1,4 +1,4 @@
-import { motion, useScroll } from '@octane-ts/motion';
+import { motion, useScroll } from '@octanejs/motion';
 
 export function ScrollBox(props) @{
 	const { scrollYProgress } = useScroll();

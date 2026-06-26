@@ -1,5 +1,5 @@
 ---
-"@octane-ts/motion": patch
+"@octanejs/motion": patch
 ---
 
 Initial release: Framer Motion bindings for octane.

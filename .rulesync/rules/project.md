@@ -65,7 +65,7 @@ This is a pnpm monorepo with two publishable packages:
   - `src/runtime.server.ts`, `src/server/` — server runtime / SSR.
   - `src/compiler/` — the `.tsrx` compiler (`compile.js`, `vite.js`, `volar.js`).
   - `tests/` — the test suite (see Validation).
-- `packages/vite-plugin-octane/` (npm: `@octane-ts/vite-plugin`) — the optional
+- `packages/vite-plugin-octane/` (npm: `@octanejs/vite-plugin`) — the optional
   metaframework plugin (dev SSR, routing, hydration wiring for full apps).
 
 `benchmarks/`, `playground/`, and `scripts/` hold local examples, perf harnesses,
@@ -151,7 +151,7 @@ skeleton (in-scope `it.todo`s + out-of-scope reasons).
 
 ## Changesets
 
-Add a changeset for user-facing changes to `octane` or `@octane-ts/vite-plugin`.
+Add a changeset for user-facing changes to `octane` or `@octanejs/vite-plugin`.
 Skip changesets for docs-only, test-only, and internal tooling updates. While Octane
 is `0.x` alpha, stay on the `patch` track.
 

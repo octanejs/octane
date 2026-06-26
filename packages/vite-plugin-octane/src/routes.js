@@ -1,8 +1,8 @@
 /**
- * @typedef {import('@octane-ts/vite-plugin').Context} Context
- * @typedef {import('@octane-ts/vite-plugin').Middleware} Middleware
- * @typedef {import('@octane-ts/vite-plugin').RenderRouteOptions} RenderRouteOptions
- * @typedef {import('@octane-ts/vite-plugin').ServerRouteOptions} ServerRouteOptions
+ * @typedef {import('@octanejs/vite-plugin').Context} Context
+ * @typedef {import('@octanejs/vite-plugin').Middleware} Middleware
+ * @typedef {import('@octanejs/vite-plugin').RenderRouteOptions} RenderRouteOptions
+ * @typedef {import('@octanejs/vite-plugin').ServerRouteOptions} ServerRouteOptions
  */
 
 /**

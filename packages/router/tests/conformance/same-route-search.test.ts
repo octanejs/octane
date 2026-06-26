@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
-import { RouterProvider } from '@octane-ts/router';
+import { RouterProvider } from '@octanejs/router';
 import {
 	makeSameRouteSearchRouter,
 	deferredFor,
@@ -17,7 +17,7 @@ async function flush() {
 	}
 }
 
-describe('@octane-ts/router — same-route search-param navigation (concurrent hold)', () => {
+describe('@octanejs/router — same-route search-param navigation (concurrent hold)', () => {
 	// The Octane router drives navigation state commits through octane's
 	// startTransition (Transitioner.tsrx). Cross-route navigation already holds the
 	// previous view while the next route suspends. This test covers the SAME-route

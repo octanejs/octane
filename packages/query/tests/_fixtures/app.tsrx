@@ -1,4 +1,4 @@
-import { QueryClientProvider, useQuery, useMutation, useQueryClient } from '@octane-ts/query';
+import { QueryClientProvider, useQuery, useMutation, useQueryClient } from '@octanejs/query';
 
 // Reads a query through the CONTEXT client (no explicit client arg).
 export function Reader(props: { queryFn: () => Promise<string> }) @{

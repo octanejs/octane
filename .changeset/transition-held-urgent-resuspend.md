@@ -10,7 +10,7 @@ tree is ready.
 
 Previously the hold only fired while the re-suspending render was at transition
 priority. But a held boundary's content can re-suspend at urgent priority — e.g.
-`@octane-ts/query`'s `useSuspenseQuery` observer notifies on a `setTimeout(0)`
+`@octanejs/query`'s `useSuspenseQuery` observer notifies on a `setTimeout(0)`
 macrotask, AFTER octane's transition window has closed, so the re-render (and its
 re-suspend on the new in-flight fetch) is urgent. `handleSuspense` then took the
 softDetach + fallback path and the fallback flashed. It now continues the hold

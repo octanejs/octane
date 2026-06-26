@@ -1,4 +1,4 @@
-import { useAnimate } from '@octane-ts/motion';
+import { useAnimate } from '@octanejs/motion';
 
 export function AnimateBox(props) @{
 	const [scope, animate] = useAnimate();

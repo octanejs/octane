@@ -1,4 +1,4 @@
-import { create, useStore } from '@octane-ts/zustand';
+import { create, useStore } from '@octanejs/zustand';
 
 // A store with two independent slices (`count`, `other`) plus actions. Module
 // scope mirrors how zustand stores are normally declared; tests reset it in

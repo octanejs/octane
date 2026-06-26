@@ -1,6 +1,6 @@
-import * as stylex from '@octane-ts/stylex';
-import { useParams } from '@octane-ts/router';
-import { useSuspenseQuery } from '@octane-ts/query';
+import * as stylex from '@octanejs/stylex';
+import { useParams } from '@octanejs/router';
+import { useSuspenseQuery } from '@octanejs/query';
 import { userQuery } from '../shared/queries.js';
 import { styles } from '../shared/styles.js';
 import { relativeTime } from '../shared/format.js';

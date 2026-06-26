@@ -1,7 +1,7 @@
 /**
- * @typedef {import('@octane-ts/vite-plugin').Context} Context
- * @typedef {import('@octane-ts/vite-plugin').Middleware} Middleware
- * @typedef {import('@octane-ts/vite-plugin').NextFunction} NextFunction
+ * @typedef {import('@octanejs/vite-plugin').Context} Context
+ * @typedef {import('@octanejs/vite-plugin').Middleware} Middleware
+ * @typedef {import('@octanejs/vite-plugin').NextFunction} NextFunction
  */
 
 /**

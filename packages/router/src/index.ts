@@ -1,8 +1,8 @@
-// @octane-ts/router — TanStack Router for the octane renderer.
+// @octanejs/router — TanStack Router for the octane renderer.
 //
 // TanStack Router splits a framework-agnostic core (`@tanstack/router-core`: the
 // Router/route-tree/matching/history/reactive-store) from a thin React binding
-// (`@tanstack/react-router`). Mirroring @octane-ts/query, this package re-exports
+// (`@tanstack/react-router`). Mirroring @octanejs/query, this package re-exports
 // the core VERBATIM and reimplements only the React binding on octane's hooks. The
 // load-bearing seam is router-core's reactive store: `createRouter` supplies the
 // CLIENT store factory (`createAtom`/`batch` from `@tanstack/store`), whose atoms

@@ -1,10 +1,10 @@
-# @octane-ts/router
+# @octanejs/router
 
-[TanStack Router](https://tanstack.com/router) for the [octane](https://github.com/octane-ts/octane) renderer.
+[TanStack Router](https://tanstack.com/router) for the [octane](https://github.com/octanejs/octane) renderer.
 
 TanStack Router splits a framework-agnostic core (`@tanstack/router-core` — the
 router, route tree, matching, history, and the reactive store) from a thin React
-binding (`@tanstack/react-router`). Mirroring `@octane-ts/query`, this package
+binding (`@tanstack/react-router`). Mirroring `@octanejs/query`, this package
 re-exports the core **verbatim** and reimplements only the binding on octane's hooks.
 The public surface matches `@tanstack/react-router`, so most router code works by
 changing the import.
@@ -18,7 +18,7 @@ import {
   Outlet,
   Link,
   useParams,
-} from '@octane-ts/router';
+} from '@octanejs/router';
 import { createRoot } from 'octane';
 
 const rootRoute = createRootRoute({ component: RootLayout });

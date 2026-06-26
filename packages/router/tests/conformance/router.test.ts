@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
-import { RouterProvider } from '@octane-ts/router';
+import { RouterProvider } from '@octanejs/router';
 import { makeRouter } from '../_fixtures/basic.tsrx';
 
 // router-core resolves matches asynchronously (load/navigate return promises) and
@@ -13,7 +13,7 @@ async function flush() {
 	}
 }
 
-describe('@octane-ts/router core seam', () => {
+describe('@octanejs/router core seam', () => {
 	it('renders the matched route through the layout Outlet', async () => {
 		const router = makeRouter('/');
 		await router.load();

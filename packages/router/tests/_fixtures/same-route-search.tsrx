@@ -6,7 +6,7 @@ import {
 	useSearch,
 	useRouterState,
 	createMemoryHistory,
-} from '@octane-ts/router';
+} from '@octanejs/router';
 import { use } from 'octane';
 
 // A layout that just renders an <Outlet/> for the active route.

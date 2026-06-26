@@ -1,5 +1,5 @@
-import { createRouter, createRootRoute, createRoute, Outlet, Link } from '@octane-ts/router';
-import { createMemoryHistory } from '@octane-ts/router';
+import { createRouter, createRootRoute, createRoute, Outlet, Link } from '@octanejs/router';
+import { createMemoryHistory } from '@octanejs/router';
 
 // A layout whose nav renders a <Link> carrying arbitrary pass-through props
 // (data-*/aria-*/title/id) alongside the routing props — asserting they land on

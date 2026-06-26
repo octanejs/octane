@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { octane } from 'octane/compiler/vite';
-import { stylex } from '@octane-ts/stylex/vite';
+import { stylex } from '@octanejs/stylex/vite';
 
 export default defineConfig({
 	// index.html lives here; ../shared is imported across the dir boundary.
@@ -21,7 +21,7 @@ export default defineConfig({
 	optimizeDeps: {
 		// All workspace:* pointing at raw TS sources — pre-bundling would snapshot
 		// stale output and demand `vite --force` on every workspace edit.
-		exclude: ['octane', '@octane-ts/router', '@octane-ts/stylex', '@octane-ts/query'],
+		exclude: ['octane', '@octanejs/router', '@octanejs/stylex', '@octanejs/query'],
 	},
 
 	build: {

@@ -1,5 +1,5 @@
 import { useState, useTransition } from 'octane';
-import { QueryClientProvider, useSuspenseQuery } from '@octane-ts/query';
+import { QueryClientProvider, useSuspenseQuery } from '@octanejs/query';
 
 // ---------------------------------------------------------------------------
 // React useTransition + Suspense parity for useSuspenseQuery.

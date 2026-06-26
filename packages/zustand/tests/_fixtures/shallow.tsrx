@@ -1,5 +1,5 @@
-import { create } from '@octane-ts/zustand';
-import { useShallow } from '@octane-ts/zustand/shallow';
+import { create } from '@octanejs/zustand';
+import { useShallow } from '@octanejs/zustand/shallow';
 
 export const useObj = create(
 	(set) => ({

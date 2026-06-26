@@ -1,5 +1,5 @@
-import { create } from '@octane-ts/zustand';
-import { combine } from '@octane-ts/zustand/middleware';
+import { create } from '@octanejs/zustand';
+import { combine } from '@octanejs/zustand/middleware';
 
 // `combine` middleware: split initial state from actions. Proves a zustand
 // middleware (re-exported verbatim) composes with octane's `create`/`useStore`.

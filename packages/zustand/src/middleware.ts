@@ -1,4 +1,4 @@
-// `@octane-ts/zustand/middleware` — re-exported verbatim from zustand.
+// `@octanejs/zustand/middleware` — re-exported verbatim from zustand.
 //
 // Every zustand middleware (persist, devtools, subscribeWithSelector, combine,
 // redux, createJSONStorage, …) is a framework-agnostic store enhancer of the form

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
-import { RouterProvider } from '@octane-ts/router';
+import { RouterProvider } from '@octanejs/router';
 import { makeRouter } from '../_fixtures/link-passthrough.tsrx';
 
 // router-core resolves matches asynchronously — flush a few cycles + paints (same
@@ -12,7 +12,7 @@ async function flush() {
 	}
 }
 
-describe('@octane-ts/router <Link> arbitrary prop pass-through', () => {
+describe('@octanejs/router <Link> arbitrary prop pass-through', () => {
 	it('forwards data-*/aria-*/title/id onto the <a> while keeping href + active state', async () => {
 		const router = makeRouter('/');
 		await router.load();

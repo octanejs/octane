@@ -23,7 +23,7 @@ describe('production vite build', () => {
 				// Resolve the workspace package to source so the build matches the test setup.
 				alias: [
 					{
-						find: /^@octane-ts\/stylex$/,
+						find: /^@octanejs\/stylex$/,
 						replacement: resolve(here, '../../src/index.ts'),
 					},
 				],

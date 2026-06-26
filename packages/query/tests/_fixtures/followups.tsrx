@@ -10,7 +10,7 @@ import {
 	usePrefetchQuery,
 	useMutation,
 	useQuery,
-} from '@octane-ts/query';
+} from '@octanejs/query';
 
 export function Infinite(props: { client: unknown }) @{
 	const q = useInfiniteQuery(

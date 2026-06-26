@@ -1,4 +1,4 @@
-import { motion } from '@octane-ts/motion';
+import { motion } from '@octanejs/motion';
 
 export function DragBox(props) @{
 	<motion.div

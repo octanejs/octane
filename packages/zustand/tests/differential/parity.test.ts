@@ -1,6 +1,6 @@
 /**
- * Differential parity: the SAME `.tsrx` fixture runs through @octane-ts/zustand
- * (octane) AND real zustand (React) — the setup rewrites `@octane-ts/zustand` →
+ * Differential parity: the SAME `.tsrx` fixture runs through @octanejs/zustand
+ * (octane) AND real zustand (React) — the setup rewrites `@octanejs/zustand` →
  * `zustand` and `octane` → `react` for the React side. octane's
  * `mountDifferential` mounts both, drives identical clicks, and asserts
  * byte-identical innerHTML after each step. This is the gold-standard proof that
@@ -16,7 +16,7 @@ const MULTISTORE = resolve(__dirname, '../_fixtures/multistore-diff.tsrx');
 // _setup.ts) so the React side resolves zustand from here.
 const CACHE = resolve(__dirname, '.react-cache');
 
-describe('differential: @octane-ts/zustand vs real zustand on React', () => {
+describe('differential: @octanejs/zustand vs real zustand on React', () => {
 	it('Counter: independent slices + derived selector + action, byte-identical', async () => {
 		const d = await mountDifferential(COUNTER, 'Counter', undefined, CACHE);
 		await d.step('mount', () => {});

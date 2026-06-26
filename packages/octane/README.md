@@ -11,7 +11,7 @@ hooks, so you can call hooks conditionally. This package ships both the runtime
 and the compiler, with the compiler exposed at `octane/compiler`.
 
 For the full story, see the
-[main README](https://github.com/octane-ts/octane#readme).
+[main README](https://github.com/octanejs/octane#readme).
 
 Octane is alpha software. It is ready to try, but not yet ready for production.
 

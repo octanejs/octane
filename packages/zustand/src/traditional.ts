@@ -1,4 +1,4 @@
-// `@octane-ts/zustand/traditional` — zustand's equality-function binding.
+// `@octanejs/zustand/traditional` — zustand's equality-function binding.
 //
 // `createWithEqualityFn` / `useStoreWithEqualityFn` let a selector pair with a
 // custom equality function (e.g. `shallow`). zustand builds these on React's

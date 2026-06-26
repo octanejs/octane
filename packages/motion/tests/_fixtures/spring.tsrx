@@ -1,4 +1,4 @@
-import { motion, useSpring } from '@octane-ts/motion';
+import { motion, useSpring } from '@octanejs/motion';
 
 export function SpringBox(props) @{
 	const x = useSpring(props.source ?? 0, { stiffness: 300 });

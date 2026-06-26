@@ -5,7 +5,7 @@ import {
 	useQueryErrorResetBoundary,
 	IsRestoringProvider,
 	useQuery,
-} from '@octane-ts/query';
+} from '@octanejs/query';
 
 // --- IsRestoring: a restoring subtree reads cache but doesn't subscribe/fetch ---
 function RestoreReader(props: { queryFn: () => Promise<string> }) @{

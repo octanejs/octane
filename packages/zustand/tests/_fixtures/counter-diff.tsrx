@@ -1,7 +1,7 @@
-import { create } from '@octane-ts/zustand';
+import { create } from '@octanejs/zustand';
 
 // Self-contained stateful fixture for the differential rig: the SAME source runs
-// on octane (via @octane-ts/zustand) AND on React (the setup rewrites the import
+// on octane (via @octanejs/zustand) AND on React (the setup rewrites the import
 // to real `zustand`), and the rig asserts byte-identical innerHTML after each
 // click. Exercises independent slices, a derived selector, and an action.
 const useStore = create(
