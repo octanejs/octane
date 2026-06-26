@@ -1232,6 +1232,21 @@ function currentPathSlot(): symbol | undefined {
 	return Symbol.for(key);
 }
 
+// Resolve a base hook's effective slot by COMBINING its own per-call-site symbol
+// (the compiler-injected trailing arg, when present) with the call-site PATH STACK
+// (the symbols withSlot pushes for each enclosing custom-hook call). At the top
+// level the stack is empty, so the hook's own slot is used unchanged — no behavior
+// change for ordinary component hooks. Inside a withSlot-wrapped custom hook, the
+// wrapper's call-site symbol is folded in, so the SAME custom hook used at two call
+// sites (or reused) keeps its inner hooks independent. A base hook with no slot of
+// its own (a hand-written or library-binding base hook) falls back to the path.
+function resolveSlot(slot: symbol | undefined): symbol | undefined {
+	const path = currentPathSlot();
+	if (path === undefined) return slot;
+	if (slot === undefined) return path;
+	return Symbol.for(path.description + '|' + slot.description);
+}
+
 interface StateSlot<T> {
 	value: T;
 	setter: (next: T | ((prev: T) => T)) => void;
@@ -1241,7 +1256,7 @@ export function useState<T>(
 	initial: T | (() => T),
 	slot?: symbol,
 ): [T, (next: T | ((prev: T) => T)) => void] {
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useState');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -1280,7 +1295,7 @@ export function useReducer<S, A, I = S>(
 	} else {
 		init = initOrSlot;
 	}
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useReducer');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -1383,7 +1398,7 @@ function resolveEffectArgs(
 		slot = deps;
 		deps = undefined;
 	}
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot(name);
 	return [deps as any[] | undefined, slot];
 }
@@ -1409,7 +1424,7 @@ export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[], slot?: 
 		slot = deps as unknown as symbol;
 		deps = undefined;
 	}
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useMemo');
 	const scope = CURRENT_SCOPE!;
 	const prev = scope.hooks?.get(slot) as { deps: any[] | undefined; value: T } | undefined;
@@ -1433,13 +1448,13 @@ export function useCallback<F extends (...args: any[]) => any>(
 	// `useCallback(fn, slot)`. useMemo reinterprets the same way, so forward both
 	// args verbatim and let it sort out the omitted-deps case. Guard here (rather
 	// than letting useMemo throw) so the diagnostic names useCallback, not useMemo.
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined && typeof deps !== 'symbol') missingSlot('useCallback');
 	return useMemo(() => fn, deps as any[] | undefined, slot);
 }
 
 export function useRef<T>(initial: T, slot?: symbol): { current: T } {
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useRef');
 	const scope = CURRENT_SCOPE!;
 	let s = scope.hooks?.get(slot) as { current: T } | undefined;
@@ -1518,7 +1533,7 @@ export function useSyncExternalStore<T>(
 	// the end. One trailing Symbol → user passed no getServerSnapshot; one
 	// trailing Symbol preceded by another arg → user passed getServerSnapshot.
 	let slot = rest[rest.length - 1] as symbol | undefined;
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined || typeof slot !== 'symbol') missingSlot('useSyncExternalStore');
 	const getServerSnapshot = rest.length >= 2 ? (rest[0] as () => T) : undefined;
 	const desc = slot.description ?? '';
@@ -1592,7 +1607,7 @@ export function useSyncExternalStore<T>(
 }
 
 export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: symbol): F {
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useEffectEvent');
 	const scope = CURRENT_SCOPE!;
 	let s = scope.hooks?.get(slot) as { current: F; stable: F } | undefined;
@@ -1920,7 +1935,7 @@ function useThenable<T>(thenable: TrackedThenable<T>): T {
 // Monotonic counter — produces stable cross-render IDs.
 let _idCounter = 0;
 export function useId(slot?: symbol): string {
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useId');
 	const scope = CURRENT_SCOPE!;
 	let s = scope.hooks?.get(slot) as { id: string } | undefined;
@@ -4805,7 +4820,7 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 export function useTransition(
 	slot?: symbol,
 ): [boolean, (fn: () => void | Promise<unknown>) => void] {
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useTransition');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -4861,7 +4876,7 @@ export function useActionState<S>(
 	// `permalink` is optional, the compiler appends the slot last. Disambiguate:
 	// a trailing symbol in the 3rd position means no permalink was passed.
 	if (typeof permalinkOrSlot === 'symbol') slot = permalinkOrSlot;
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useActionState');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -4966,7 +4981,7 @@ interface FormStatusSlot {
 }
 
 export function useFormStatus(slot?: symbol): FormStatus {
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useFormStatus');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -5038,7 +5053,7 @@ export function useOptimistic<S, V = S>(
 	let updateFn: ((state: S, value: V) => S) | undefined;
 	if (typeof updateFnOrSlot === 'symbol') slot = updateFnOrSlot;
 	else updateFn = updateFnOrSlot;
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useOptimistic');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
@@ -5112,7 +5127,7 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 	// user passed no initialValue; one trailing Symbol preceded by another
 	// arg → user passed initialValue. Same hook-slot semantics either way.
 	let slot = rest[rest.length - 1] as symbol | undefined;
-	if (slot === undefined) slot = currentPathSlot();
+	slot = resolveSlot(slot);
 	if (slot === undefined || typeof slot !== 'symbol') missingSlot('useDeferredValue');
 	const initialValue = rest.length >= 2 ? (rest[0] as T) : undefined;
 	const hasInitial = rest.length >= 2;

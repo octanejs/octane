@@ -1139,11 +1139,17 @@ export function compile(source, filename, options) {
 			if (node.type === 'ExportNamedDeclaration' && node.declaration) {
 				applyStyleMap(node.declaration, ctx);
 			}
+			// HOOKS EVERYWHERE: a plain function (a custom hook, a helper) can hold
+			// octane hooks too — slot them the same way components do, so their base
+			// hooks get a per-call-site symbol (and custom-hook calls inside get one to
+			// forward). Harmless for non-hook code (only `use*` calls are touched).
+			const fnName = node.id?.name || node.declaration?.id?.name || 'module';
+			const hooked = rewriteHookCalls(node, ctx, fnName);
 			// Lower any JSX component value (e.g. `root.render(<App/>)` or
 			// `const el = <App/>`) to createElement(...) before printing — esrap
 			// can't print raw JSX, and this is what makes root.render(<App/>) match
 			// React's shape.
-			const lowered = rewriteJsxValues(node, ctx);
+			const lowered = rewriteJsxValues(hooked, ctx);
 			// Top-level passthrough (imports, plain consts/functions): print with
 			// esrap's real map — col 0, no re-indent, single line offset.
 			const base = bodyLine;
@@ -2161,6 +2167,28 @@ function rewriteHookCalls(node, ctx, componentName) {
 				// array. (Allocating the outer slot first keeps its id stable; nested
 				// inner hooks just take the following ids.)
 				const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName));
+				// NB: base hooks are ALSO `use[A-Z]`, so the wrap is for custom hooks ONLY
+				// (`isCustom && !isBuiltin`) — base hooks keep the plain trailing-slot form.
+				if (isCustom && !isBuiltin) {
+					// A CUSTOM hook is wrapped in `withSlot(sym, hook, ...args, sym)`: the
+					// withSlot pushes a call-site symbol on the path stack so the hook's
+					// inner BASE hooks combine it (→ the same custom hook reused at two
+					// sites keeps independent state — base hooks are "owned by octane" and
+					// need no wrapper). The TRAILING `sym` is retained so existing library
+					// bindings that extract the slot from their last argument keep working.
+					ctx.runtimeNeeded.add('withSlot');
+					return {
+						type: 'CallExpression',
+						callee: { type: 'Identifier', name: 'withSlot' },
+						arguments: [
+							{ type: 'Identifier', name: symVar },
+							n.callee,
+							...args,
+							{ type: 'Identifier', name: symVar },
+						],
+						optional: false,
+					};
+				}
 				return {
 					...n,
 					arguments: [...args, { type: 'Identifier', name: symVar }],
@@ -2221,7 +2249,9 @@ function compileReturnJsxFunction(node, ctx, options) {
 	// expression are threaded into the renderer as `props.hN` holes.
 	const compInlinedSubs = [];
 	const newStatements = (node.body.body || []).map((s) => {
-		const h = rewriteHookCallsWithSlot(s, ctx, name);
+		// Same hook handling as the `@{}` path: base hooks take a trailing slot symbol,
+		// custom hooks are wrapped in withSlot (unified across both component forms).
+		const h = rewriteHookCalls(s, ctx, name);
 		// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
 		// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
 		if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
