@@ -1,8 +1,8 @@
 import * as stylex from '@octane-ts/stylex';
 import { Link } from '@octane-ts/router';
-import { styles } from '../shared/styles.ts';
-import { relativeTime, hostname, pluralize } from '../shared/format.ts';
-import type { Story } from '../shared/types.ts';
+import { styles } from '../shared/styles.js';
+import { relativeTime, hostname, pluralize } from '../shared/format.js';
+import type { Story } from '../shared/types.js';
 
 export function StoryRow({ rank, story }: { rank: number; story: Story }) {
 	const host = hostname(story.url);

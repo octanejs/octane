@@ -1,6 +1,6 @@
 // Hacker News Firebase API client. No key, browser-CORS friendly.
 // https://github.com/HackerNews/API
-import type { Story, Comment, User } from './types.ts';
+import type { Story, Comment, User } from './types.js';
 
 const BASE = 'https://hacker-news.firebaseio.com/v0';
 

@@ -1,9 +1,9 @@
 import * as stylex from '@octane-ts/stylex';
 import { useParams } from '@octane-ts/router';
 import { useSuspenseQuery } from '@octane-ts/query';
-import { userQuery } from '../shared/queries.ts';
-import { styles } from '../shared/styles.ts';
-import { relativeTime } from '../shared/format.ts';
+import { userQuery } from '../shared/queries.js';
+import { styles } from '../shared/styles.js';
+import { relativeTime } from '../shared/format.js';
 
 export function UserPage() @{
 	const { id } = useParams({ strict: false });

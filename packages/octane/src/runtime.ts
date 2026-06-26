@@ -3465,6 +3465,20 @@ export function createElement<P>(
 	const p = (props ?? {}) as any;
 	const key = p.key != null ? p.key : null;
 	const kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : p.children;
+	// React-shape contract: positional children ARE `props.children`. A COMPONENT
+	// descriptor reaches its body through componentSlot, which forwards `props`
+	// only (not `descriptor.children`) — so a component that reads `{props.children}`
+	// (rendered via childSlot) needs them mirrored into props. This is what lets a
+	// React-style `.tsx` parent (`<Provider>…</Provider>` → `createElement(Provider,
+	// {}, …)`) pass children into a `.tsrx` `{props.children}` consumer, matching the
+	// `.tsrx`→`.tsrx` path (which threads a `children` render-fn prop). Host
+	// descriptors keep using `descriptor.children` via buildDeoptDom — and
+	// applyDeoptProps already skips `props.children` — so this is scoped to the
+	// component case. Only set when positional children were given and props didn't
+	// already carry an explicit `children`, so a fresh emit isn't clobbered.
+	if (typeof type === 'function' && children.length > 0 && p.children === undefined) {
+		p.children = kids;
+	}
 	return { $$kind: ELEMENT_TAG, type, props: p as P, key, children: kids ?? null };
 }
 function isElementDescriptor(v: any): v is ElementDescriptor {
@@ -3926,6 +3940,18 @@ function buildDeoptDom(value: any, ownerBlock: Block): Node | null {
 // identity across parent re-renders; that's the documented de-opt trade-off).
 function deoptItemBody(item: any, scope: Scope): void {
 	const block = scope.block;
+	// A COMPONENT descriptor in the array (e.g. a `.tsx` parent passing MULTIPLE
+	// children — `[<Comp/>, <span/>]` — to a `.tsrx` `{props.children}` consumer)
+	// needs a real Block for hooks/reconciliation, which buildDeoptDom can't give
+	// it. Delegate to a nested childSlot on this item's own scope: it owns a marker
+	// pair inside the item's range and mounts the component as a proper child Block.
+	// (Host descriptors / primitives stay on the rebuild path below.) The two paths
+	// don't mix in one item — keyed reconciliation gives each array element its own
+	// stable item scope, so `_item` either always holds a component or never does.
+	if (item != null && item.$$kind === ELEMENT_TAG && typeof item.type === 'function') {
+		childSlot(scope, '_item', block.parentNode, item, block.endMarker);
+		return;
+	}
 	// Sweep last render's build (the range between this item's markers).
 	const startM = block.startMarker;
 	const endM = block.endMarker;

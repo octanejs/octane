@@ -2,8 +2,8 @@
 // as .tsx so main.ts can stay a plain entry that just renders <App/>.
 import { QueryClientProvider } from '@octane-ts/query';
 import { RouterProvider } from '@octane-ts/router';
-import { queryClient } from './queryClient.ts';
-import { router } from './routes.ts';
+import { queryClient } from './queryClient.js';
+import { router } from './routes.js';
 
 export function App() {
 	return (

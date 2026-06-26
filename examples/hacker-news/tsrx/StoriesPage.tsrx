@@ -1,9 +1,8 @@
-import * as stylex from '@octane-ts/stylex';
 import { useSuspenseQuery } from '@octane-ts/query';
-import { topStoriesQuery } from '../shared/queries.ts';
-import { styles } from '../shared/styles.ts';
+import { topStoriesQuery } from '../shared/queries.js';
 import { Suspense } from 'octane';
 import { StoryItem } from './StoryItem.tsrx';
+import { RowSkeleton } from './Pending.tsrx';
 
 const PAGE_SIZE = 25;
 
@@ -19,11 +18,7 @@ export function StoriesPage() @{
 		@for (const id of ids; index i; key id) {
 			// Each row fetches its own item and suspends independently, so a slow
 			// story doesn't block the whole list.
-			<Suspense
-				fallback={<div {...stylex.props(styles.row)}>
-					{i + 1 + '. …' as string}
-				</div>}
-			>
+			<Suspense fallback={<RowSkeleton />}>
 				<StoryItem id={id} rank={i + 1} />
 			</Suspense>
 		}

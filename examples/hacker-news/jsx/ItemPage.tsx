@@ -2,10 +2,10 @@ import * as stylex from '@octane-ts/stylex';
 import { useParams, Link } from '@octane-ts/router';
 import { useSuspenseQuery } from '@octane-ts/query';
 import { Suspense } from 'octane';
-import { itemQuery } from '../shared/queries.ts';
-import { styles } from '../shared/styles.ts';
-import { relativeTime, hostname, pluralize } from '../shared/format.ts';
-import { Comment } from './Comment.tsx';
+import { itemQuery } from '../shared/queries.js';
+import { styles } from '../shared/styles.js';
+import { relativeTime, hostname, pluralize } from '../shared/format.js';
+import { Comment } from './Comment.js';
 
 export function ItemPage() {
 	const { id } = useParams({ strict: false });
