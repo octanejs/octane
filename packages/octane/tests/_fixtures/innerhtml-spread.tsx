@@ -1,4 +1,4 @@
+const ATTRS = { title: 't', 'data-spread': 'yes' };
 export function HtmlSpread(props: { html: string }) {
-	const attrs = { class: 'wrap', title: 't' };
-	return <div {...attrs} data-testid="rich" innerHTML={props.html} />;
+	return <div {...ATTRS} data-testid="rich" innerHTML={props.html} />;
 }
