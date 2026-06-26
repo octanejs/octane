@@ -4,9 +4,11 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>Hacker News — octane (JSX-style)</title>
+		<!--ssr-head-->
 	</head>
 	<body>
-		<div id="app"></div>
-		<script type="module" src="/main.ts"></script>
+		<div id="app"><!--ssr-body--></div>
+		<!--ssr-data-->
+		<script type="module" src="/entry-client.tsx"></script>
 	</body>
 </html>

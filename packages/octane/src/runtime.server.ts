@@ -367,6 +367,68 @@ export function ssrComponent(parent: SSRScope, comp: ServerComponent, props: any
 	}
 }
 
+// A component's children reach the server body as a render FUNCTION (the
+// compiler's `__schildren$N`, invoked `(arg, scope) => html` — see ProviderBody),
+// but a value-position `.tsx` parent may instead pass a `createElement`
+// DESCRIPTOR. Normalize either shape to its HTML string — the server analogue of
+// the client `childrenAsBody`, so the JSX `<Suspense>`/`<ErrorBoundary>` built-ins
+// render their children whichever dialect authored the parent.
+function ssrChildrenHtml(children: unknown, scope: SSRScope): string {
+	if (typeof children === 'function') return (children as any)(undefined, scope) ?? '';
+	return ssrChild(children, scope);
+}
+
+/**
+ * `<Suspense fallback={…}>…</Suspense>` — the JSX built-in mirror of the
+ * `@try { … } @pending { fallback }` directive, for authors writing JSX (e.g.
+ * porting React). Emits the SAME nested-block shape the compiler's `ssrEmitTry`
+ * produces for the directive: an outer try-slot `ssrBlock` around the active
+ * branch's inner `ssrBlock`, so the client's `<Suspense>` (componentSlot →
+ * tryBlock) adopts it byte-for-byte. A descendant `use(thenable)` that hasn't
+ * resolved throws `SSR_SUSPENSE` → the `fallback` renders for this pass and
+ * render()'s loop awaits + re-renders; a real error rethrows to an outer boundary.
+ */
+export function Suspense(props: { fallback?: unknown; children?: unknown }, scope: SSRScope): string {
+	return ssrBlock(
+		(() => {
+			try {
+				return ssrBlock(ssrChildrenHtml(props.children, scope));
+			} catch (e) {
+				if (ssrIsSuspense(e)) return ssrBlock(ssrChild(props.fallback, scope));
+				throw e;
+			}
+		})(),
+	);
+}
+
+/**
+ * `<ErrorBoundary fallback={…}>…</ErrorBoundary>` — the JSX built-in mirror of
+ * `@try { … } @catch (e) { fallback }`. `fallback` is a renderable or a
+ * `(error, reset) => renderable` render prop (react-error-boundary style). A real
+ * error during render swaps to the fallback; a suspension rethrows so an outer
+ * `<Suspense>`/`@pending` handles it (matches the client, whose ErrorBoundary
+ * passes `pending = null` to tryBlock). `reset` is a server no-op (no re-render).
+ */
+export function ErrorBoundary(
+	props: { fallback?: unknown; children?: unknown },
+	scope: SSRScope,
+): string {
+	return ssrBlock(
+		(() => {
+			try {
+				return ssrBlock(ssrChildrenHtml(props.children, scope));
+			} catch (e) {
+				if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
+				const fb =
+					typeof props.fallback === 'function'
+						? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
+						: props.fallback;
+				return ssrBlock(ssrChild(fb, scope));
+			}
+		})(),
+	);
+}
+
 // ---------------------------------------------------------------------------
 // Context
 // ---------------------------------------------------------------------------
@@ -533,6 +595,26 @@ export function useOptimistic<S, V = S>(state: S): [S, (value: V) => void] {
 
 export function memo<P>(component: P): P {
 	return component;
+}
+
+// Custom-hook wrapper. The compiler emits each hook call reached THROUGH a custom
+// hook as `withSlot(sym, hook, ...args)` (see runtime.ts) in BOTH modes, so the
+// server build of a `.tsrx` that defines/uses custom hooks must resolve `withSlot`
+// from here. On the server there is no per-call-site slot tracking (a render is a
+// single synchronous pass with no re-render), so we just invoke the wrapped hook
+// with its args, dropping the call-site symbol. Signature-compatible with the
+// client so the same lowered call resolves to either per build.
+export function withSlot<T>(_sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T {
+	return fn(...args);
+}
+
+// startTransition — on the client this bumps a priority flag and schedules
+// transition-priority renders; on the server there is no scheduler and a render
+// is synchronous, so run the callback inline (matching the server no-op transition
+// hooks: `useTransition` returns `[false, NOOP]`). An async callback's returned
+// promise is ignored — SSR captures the synchronous pass only.
+export function startTransition(fn: () => void | Promise<unknown>): void {
+	fn();
 }
 
 // ---------------------------------------------------------------------------
