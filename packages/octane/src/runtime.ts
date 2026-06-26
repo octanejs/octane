@@ -1692,6 +1692,22 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 }
 
 /**
+ * The children reaching `<Suspense>` / `<ErrorBoundary>` are rendered as the try
+ * BODY — `renderBlock` invokes it as `block.body(props, scope, extra)`. The `.tsrx`
+ * `{props.children}` lowering passes a render FUNCTION (callable as-is), but a
+ * React-style `.tsx` parent lowers element children (`<S><Child/></S>`) to a
+ * `createElement` DESCRIPTOR — a plain renderable, not a function. Normalize either
+ * shape to a callable body so the try-block primitive works whichever dialect (or
+ * value-position `.map`) authored the parent.
+ */
+function childrenAsBody(children: unknown): ComponentBody {
+	if (typeof children === 'function') return children as ComponentBody;
+	return (_p, s) => {
+		childSlot(s, '_children', s.block.parentNode, children, s.block.endMarker);
+	};
+}
+
+/**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX component form of
  * `@try { … } @pending { fallback }`, for authors writing JSX rather than the
  * template directives (e.g. porting React / react-query code). A thin built-in
@@ -1711,7 +1727,7 @@ export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBo
 		scope,
 		'_suspense',
 		block.parentNode,
-		props.children,
+		childrenAsBody(props.children),
 		null,
 		pendingBody,
 		block.endMarker,
@@ -1743,7 +1759,7 @@ export const ErrorBoundary: ComponentBody<{
 		scope,
 		'_errorBoundary',
 		block.parentNode,
-		props.children,
+		childrenAsBody(props.children),
 		catchBody,
 		null,
 		block.endMarker,
