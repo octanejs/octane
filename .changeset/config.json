@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.1.2/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "octane-ts/octane" }],
+  "changelog": ["./changelog.cjs", { "repo": "octane-ts/octane" }],
   "commit": false,
   "access": "public",
   "baseBranch": "main",
