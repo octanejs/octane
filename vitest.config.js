@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
+import { stylex } from './packages/stylex/src/vite.ts';
 
 export default defineConfig({
 	test: {
@@ -106,6 +107,40 @@ export default defineConfig({
 						{
 							find: /^@octane-ts\/motion\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/motion/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'stylex',
+					include: ['packages/stylex/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				// octane() compiles the `.tsrx` fixtures; stylex() (enforce:'post') then
+				// runs the StyleX compiler over that output, replacing stylex.* calls with
+				// atomic class names. `dev:false` keeps class names deterministic for tests.
+				plugins: [
+					octane({
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/query/src/',
+							'/packages/motion/src/',
+							'/packages/stylex/src/',
+						],
+					}),
+					stylex({ dev: false }),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octane-ts\/stylex$/,
+							replacement: resolve(import.meta.dirname, 'packages/stylex/src/index.ts'),
+						},
+						{
+							find: /^@octane-ts\/stylex\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/stylex/src') + '/$1.ts',
 						},
 					],
 				},

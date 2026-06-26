@@ -1,0 +1,44 @@
+{
+  "name": "@octane-ts/stylex",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "StyleX bindings for the octane renderer — reuses StyleX's framework-agnostic compiler core and routes the generated atomic CSS through octane's stylesheet channel (client dedupe + SSR render().css).",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octane-ts/octane.git",
+    "directory": "packages/stylex"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./src/vite.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@babel/core": "catalog:default",
+    "@stylexjs/babel-plugin": "catalog:default",
+    "@stylexjs/stylex": "catalog:default",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/babel__core": "catalog:default",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
