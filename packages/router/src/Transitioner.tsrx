@@ -5,14 +5,14 @@
 // `startTransition` makes navigation concurrent: when the next route suspends (a
 // `useSuspenseQuery`/loader), octane keeps the CURRENT page on screen until the
 // data resolves instead of flashing a fallback.
-import { useEffect, useLayoutEffect, useRef } from 'octane';
+import { useEffect, useLayoutEffect, useRef, startTransition } from 'octane';
 import { useRouter } from './context.ts';
 
 export function Transitioner() @{
 	const router = useRouter();
 	const mounted = useRef(false);
 
-	router.startTransition = (fn) => fn();
+	router.startTransition = (fn) => startTransition(fn);
 
 	useEffect(() => {
 		const unsub = router.history.subscribe(() => router.load());

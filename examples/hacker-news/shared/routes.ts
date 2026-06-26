@@ -21,6 +21,23 @@ export function feedForPath(pathname: string): Feed {
 	return match ? match.feed : 'top';
 }
 
+/** The shape of a feed route's search params: a 1-based page number. */
+export interface FeedSearch {
+	page: number;
+}
+
+// Coerce `?page=N` into a clamped 1-based integer; anything missing/invalid is
+// page 1. Passed as `validateSearch` to every feed route so `useSearch` returns a
+// typed number and the URL is normalized.
+export function validateFeedSearch(search: Record<string, unknown>): FeedSearch {
+	const raw = Number(search.page);
+	const page = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 1;
+	return { page };
+}
+
+/** Stories per page — matches HN / solid-hackernews. */
+export const PAGE_SIZE = 30;
+
 export interface AppComponents {
 	RootLayout: any;
 	StoriesPage: any;
@@ -57,6 +74,8 @@ export function createAppRouter(components: AppComponents) {
 		path: '/',
 		component: StoriesPage,
 		pendingComponent: StoriesPending,
+		// `?page=N` → typed 1-based page number (default 1). Drives pagination.
+		validateSearch: validateFeedSearch,
 	});
 
 	// Sibling feed routes — same StoriesPage, which reads its feed from the
@@ -67,6 +86,7 @@ export function createAppRouter(components: AppComponents) {
 			path,
 			component: StoriesPage,
 			pendingComponent: StoriesPending,
+			validateSearch: validateFeedSearch,
 		}),
 	);
 
