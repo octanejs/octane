@@ -1,4 +1,11 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
+
+// The example root (one level up from this e2e/ dir). The webServer commands use
+// paths relative to it (`jsx/vite.config.ts`), and `vite` is resolved from the
+// example's local node_modules — so pin each server's cwd here regardless of
+// where Playwright is launched from.
+const exampleRoot = fileURLToPath(new URL('..', import.meta.url));
 
 // One Hacker News reader, built twice — the React-style `.tsx` app (port 5191)
 // and the TSRX app (port 5192) — over a shared octane core. The SAME spec
@@ -42,12 +49,14 @@ export default defineConfig({
 		{
 			command: './node_modules/.bin/vite --config jsx/vite.config.ts --port 5191 --strictPort',
 			url: 'http://localhost:5191',
+			cwd: exampleRoot,
 			reuseExistingServer: !process.env.CI,
 			timeout: 60_000,
 		},
 		{
 			command: './node_modules/.bin/vite --config tsrx/vite.config.ts --port 5192 --strictPort',
 			url: 'http://localhost:5192',
+			cwd: exampleRoot,
 			reuseExistingServer: !process.env.CI,
 			timeout: 60_000,
 		},

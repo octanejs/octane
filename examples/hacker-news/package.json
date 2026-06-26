@@ -9,7 +9,7 @@
     "dev:tsrx": "vite --config tsrx/vite.config.ts",
     "build:jsx": "vite build --config jsx/vite.config.ts",
     "build:tsrx": "vite build --config tsrx/vite.config.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "octane": "workspace:*",

@@ -28,6 +28,10 @@ export const styles = stylex.create({
 		color: LINK,
 		backgroundColor: BG,
 		minHeight: '100vh',
+		// Column layout so `main` can grow to fill the viewport — otherwise the
+		// beige page background shows below a short content panel during loading.
+		display: 'flex',
+		flexDirection: 'column',
 		marginTop: 0,
 		marginRight: 'auto',
 		marginBottom: 0,
@@ -83,6 +87,9 @@ export const styles = stylex.create({
 		opacity: 0.6,
 	},
 	main: {
+		// Fill the height left by the header so the white content panel reaches the
+		// bottom on short/loading pages (no exposed beige strip under the list).
+		flexGrow: 1,
 		paddingTop: 8,
 		paddingRight: 8,
 		paddingBottom: 24,
@@ -206,6 +213,9 @@ export const styles = stylex.create({
 		borderBottomLeftRadius: 2,
 		borderBottomRightRadius: 2,
 		marginBottom: 6,
+		// Align with the real title column (past the 28px rank + 6px gap), matching
+		// `skeletonMeta` — so bars sit where the loaded title/meta will render.
+		marginLeft: 34,
 	},
 	skeletonMeta: {
 		height: 8,
