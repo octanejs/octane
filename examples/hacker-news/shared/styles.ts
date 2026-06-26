@@ -36,7 +36,9 @@ export const styles = stylex.create({
 		marginRight: 'auto',
 		marginBottom: 0,
 		marginLeft: 'auto',
-		maxWidth: 960,
+		// Match Hacker News' content width: 85% of the viewport, centered — no fixed
+		// pixel cap, so it stays wide on large screens like the real site.
+		width: '85%',
 	},
 	header: {
 		display: 'flex',

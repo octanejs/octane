@@ -17,6 +17,24 @@ export function Link(props) @{
 	});
 	const isActive = location.pathname === next.pathname;
 
+	// Forward every prop that isn't one of ours onto the <a> (React-router parity):
+	// data-*, aria-*, title, id, role, style, onMouseEnter, etc. The routing props
+	// (to/params/search/hash/replace/target/ref/class/className/children) drive href +
+	// active state and are consumed here, so they're stripped out of the pass-through.
+	const {
+		to: _to,
+		params: _params,
+		search: _search,
+		hash: _hash,
+		replace: _replace,
+		target: _target,
+		ref: _ref,
+		class: _class,
+		className: _className,
+		children: _children,
+		...rest
+	} = props;
+
 	const onClick = (e) => {
 		if (
 			e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey ||
@@ -35,6 +53,7 @@ export function Link(props) @{
 	};
 
 	<a
+		{...rest}
 		href={next.href}
 		ref={props.ref}
 		onClick={onClick}
