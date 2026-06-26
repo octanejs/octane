@@ -4648,8 +4648,29 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 	// previous screen stays mounted until the new tree is fully ready. We also
 	// hold the transition counter open until the suspended render resumes, so
 	// `useTransition`'s isPending stays true the whole time.
+	//
+	// The hold fires for the boundary's OWN body re-suspend AND for a DESCENDANT
+	// re-suspend (a child component that re-rendered on its own — its own
+	// scheduleRender — and suspended during a transition). `handleSuspense` is
+	// only invoked for suspends routed to THIS boundary's `__suspenseHandler`
+	// (the nearest enclosing tryBlock), so `sourceBlock` is always this
+	// boundary's body OR a descendant within its subtree — we don't need to test
+	// which. What we DO require is that the resolved try content is currently
+	// committed AND intact:
+	//   - branch === 1: the try body (not @pending / @catch) is the visible arm.
+	//   - savedDom === null: that DOM is live in the document, not already
+	//     detached by a prior softDetach.
+	// Both together guarantee the prior committed DOM is on screen and untouched.
+	// For `use(thenable)` / `useSuspenseQuery` the suspend is thrown during the
+	// descendant's setup BEFORE it patches any of its own JSX (the body aborts
+	// before its childSlot/componentSlot commit), so no committed DOM was
+	// mid-mutated — holding it as-is is correct. attachResume re-renders the held
+	// tryBlock on resolve, which re-renders the descendant by key with its hook
+	// state intact (same preserved-state contract the softDetach path documents
+	// below). A NON-transition descendant re-suspend skips this branch and falls
+	// through to softDetach + @pending, unchanged.
 	const isTransition = sourceBlock.currentRenderMode === 'transition';
-	if (isTransition && state.hasResolved && sourceBlock === state.tryBlock) {
+	if (isTransition && state.hasResolved && state.branch === 1 && state.savedDom === null) {
 		if (!state.transitionHeld) {
 			state.transitionHeld = true;
 			tickTransitionCount(+1);
@@ -4689,6 +4710,18 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 	// tryBlock, which reconciles descendants by key with their state intact —
 	// React's committed-state-preserved-while-suspended contract.
 	softDetachTryBlock(state);
+	// A re-suspend while ALREADY pending (branch === 2, a @pending body mounted)
+	// must REPLACE the prior pending body, not stack a second one. The existing
+	// pending block lives in `state.block` (it is never the tryBlock once we've
+	// soft-detached); unmount it so its DOM is removed exactly once before we
+	// mount the fresh @pending body below. Without this, two consecutive
+	// suspends on the same boundary (e.g. two sequential useSuspenseQuery calls)
+	// leave both fallbacks — and ultimately the resolved content alongside a
+	// stuck fallback — in the DOM at once. The tryBlock is preserved separately
+	// (softDetach saves its DOM in `savedDom`), so this never touches it.
+	if (state.block && state.block !== state.tryBlock) {
+		unmountBlock(state.block);
+	}
 	state.block = null;
 	state.branch = 2;
 
