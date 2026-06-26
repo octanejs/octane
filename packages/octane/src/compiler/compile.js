@@ -2341,8 +2341,19 @@ function extractFragment(node, ctx, holeProps) {
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const newAttrs = [];
 	for (const attr of attrs) {
+		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
+			// `{...expr}` — the spread expression is a DYNAMIC input too. Thread it out
+			// as an `hN` hole (exactly like an attribute value) so any prop/local it
+			// references is forwarded into the fragment via `createElement(_frag, {hN})`.
+			// Leaving the raw `props.x`/local in place would dangle: the wrapper only
+			// passes the holes it collected here, and a captured local isn't in scope.
+			const hn = `h${holeProps.length}`;
+			holeProps.push(objectProp(hn, rewriteJsxValues(attr.argument, ctx)));
+			newAttrs.push({ ...attr, argument: memberProps(hn) });
+			continue;
+		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') {
-			newAttrs.push(attr); // spread — leave (TODO)
+			newAttrs.push(attr); // non-spread non-attribute — leave (TODO)
 			continue;
 		}
 		const v = attr.value;
@@ -2376,6 +2387,9 @@ function extractFragment(node, ctx, holeProps) {
 			newChildren.push(child);
 		} else if (t === 'JSXExpressionContainer') {
 			const expr = child.expression;
+			// `{/* … */}` is a `JSXEmptyExpression` container — a JSX comment, which
+			// renders to nothing (React drops it). Skip it so it never becomes a hole.
+			if (!expr || expr.type === 'JSXEmptyExpression') continue;
 			const hn = `h${holeProps.length}`;
 			if (expr && expr.type === 'TSAsExpression') {
 				// Preserve the `as T` cast in the renderer (it marks a dynamic TEXT hole).
@@ -3028,6 +3042,10 @@ function normalizeChildren(nodes) {
 				expression: { type: 'Literal', value: n.value, raw: JSON.stringify(n.value) },
 			});
 		} else if (n.type === 'JSXExpressionContainer') {
+			// A JSX comment — `{/* … */}` — parses as a container wrapping a
+			// `JSXEmptyExpression`. It produces NO child (React drops it); emitting it
+			// as a hole would yield malformed code (`h0: ,`). Drop it.
+			if (!n.expression || n.expression.type === 'JSXEmptyExpression') continue;
 			// TS-only wrappers (`as string`, `!`, `satisfies T`) on the expression
 			// get stripped centrally in printNode at print time — no need to
 			// pre-strip here. Pass the raw expression through; downstream emission
