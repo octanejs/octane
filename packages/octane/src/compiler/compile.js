@@ -1649,17 +1649,15 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 	// React-style render-prop child: pass the function through RAW so the consuming
 	// component can call it with data (`props.children(data)`) and ssrChild renders
 	// the result — mirrors the client `makeCompCall` path. A render-prop whose body
-	// is just an expression (e.g. `(d) => d.label`) renders fine server-side. One
-	// that returns JSX needs the value-position `createElement(...)` descriptor
-	// path, which SSR Phase 1 doesn't cover yet (same boundary as `{xs.map(...)}`) —
-	// surface the standard ssrUnsupported error instead of emitting an unresolvable
-	// `createElement` import.
+	// is just an expression (e.g. `(d) => d.label`) renders fine server-side; one
+	// that returns JSX has its body lowered to value-position `createElement(...)`
+	// descriptors (via rewriteJsxValues, exactly like the client) so the arrow stays
+	// callable and ssrChild renders whatever descriptor it returns.
 	const renderPropChild = soleRenderPropChild(node.children || []);
 	if (renderPropChild) {
-		if (arrowBodyHasJsx(renderPropChild)) {
-			return ssrUnsupported('render-prop children that return JSX');
-		}
-		propParts.push(`"children": (${printExprWithTsrx(renderPropChild, ctx, name, inlinedSubs)})`);
+		propParts.push(
+			`"children": (${printExprWithTsrx(rewriteJsxValues(renderPropChild, ctx), ctx, name, inlinedSubs)})`,
+		);
 	} else if ((node.children || []).length > 0) {
 		// Children → a server `children` render-fn (returns an HTML string). The
 		// component decides whether/where to render them by calling props.children(scope)
@@ -1800,8 +1798,12 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 
 // `{createPortal(...)}` (and other JSX-bearing expression holes) at child
 // position arrive as TSRXExpression. A portal leaves a site marker on the
-// server (its body renders into a foreign target on the client). Other rich
-// holes (JSX ternaries / sub-templates) remain unsupported for now.
+// server (its body renders into a foreign target on the client). Every other
+// rich hole — `{xs.map(x => <li/>)}`, a JSX ternary, an array of elements — is a
+// VALUE-position JSX hole: lower its JSX to `createElement(...)` descriptors (via
+// rewriteJsxValues, exactly like the client's makeChildCall) and route through
+// ssrChild, which renders the resulting host/component descriptors (array → one
+// hydration block per item, host → `<tag>…</tag>`, primitive → text).
 function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash) {
 	const expr = node.expression;
 	if (
@@ -1814,7 +1816,11 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash) {
 		ctx.runtimeNeeded.add('ssrPortal');
 		return 'ssrPortal()';
 	}
-	return ssrUnsupported('JSX-bearing expression holes (JSX ternaries / sub-templates)');
+	ctx.runtimeNeeded.add('ssrChild');
+	// rewriteHookCalls first (key any `use(thenable)` in the hole — it bypasses the
+	// setup rewrite), then rewriteJsxValues (lower nested JSX to createElement).
+	const lowered = rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx);
+	return `ssrChild(${printExpr(resolveStyleExpr(lowered, cssHash))}, __s)`;
 }
 
 // ===========================================================================
@@ -5096,23 +5102,6 @@ function soleRenderPropChild(children) {
 	if (e.type !== 'ArrowFunctionExpression' && e.type !== 'FunctionExpression') return null;
 	if (e.body && e.body.type === 'JSXCodeBlock') return null; // `@{…}` form — leave alone
 	return e;
-}
-
-// Does a render-prop function's body contain JSX that would need value-position
-// `createElement(...)` lowering? Used server-side to gate render-props returning
-// JSX (unsupported in SSR Phase 1, same boundary as `{xs.map(x => <jsx/>)}`).
-// Walks the body so a JSX element/fragment anywhere — direct, parenthesised, or
-// inside a block-statement `return` — is detected.
-function arrowBodyHasJsx(fnNode) {
-	let found = false;
-	mapAst(fnNode.body, (n) => {
-		const t = n && n.type;
-		if (t === 'Element' || t === 'JSXElement' || t === 'Fragment' || t === 'JSXFragment') {
-			found = true;
-		}
-		return null; // observe only — never rewrite
-	});
-	return found;
 }
 
 // Build a "renderable child" call entry for a bare `{expr}` text hole (no

@@ -3997,7 +3997,12 @@ export function childSlot(
 	// through props, and any array-valued child uniformly, by RUNTIME type).
 	if (Array.isArray(value)) {
 		if (state.forSlot === null) {
-			clearChildContent(state); // drop any prior block/text content
+			// Drop any prior block/text content — EXCEPT while hydrating, where the
+			// server emitted one `<!--[-->…<!--]-->` range per item between our adopted
+			// markers and `reconcileKeyed`/`mountItem` ADOPT those ranges off the
+			// cursor. Sweeping here would delete the very item DOM (and break the
+			// hydrateNode chain) the de-opt list is about to adopt.
+			if (!hydrating) clearChildContent(state);
 			if (state.start === null) {
 				state.start = document.createComment('');
 				domParent.insertBefore(state.start, state.end);
