@@ -1,0 +1,25 @@
+{
+  "name": "hacker-news-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Hacker News reader built twice — React-style .tsx and TSRX — over a shared octane core, proving octane's JSX backwards-compatibility.",
+  "scripts": {
+    "dev:jsx": "vite --config jsx/vite.config.ts",
+    "dev:tsrx": "vite --config tsrx/vite.config.ts",
+    "build:jsx": "vite build --config jsx/vite.config.ts",
+    "build:tsrx": "vite build --config tsrx/vite.config.ts",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "octane": "workspace:*",
+    "@octane-ts/query": "workspace:*",
+    "@octane-ts/router": "workspace:*",
+    "@octane-ts/stylex": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

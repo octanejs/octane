@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
-import { stylex } from './packages/stylex/src/vite.ts';
+import { stylex } from './packages/stylex/src/vite.js';
 
 export default defineConfig({
 	test: {
