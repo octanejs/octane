@@ -88,6 +88,36 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'router',
+					include: ['packages/router/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [
+					octane({
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/query/src/',
+							'/packages/motion/src/',
+							'/packages/router/src/',
+						],
+					}),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octane-ts\/router$/,
+							replacement: resolve(import.meta.dirname, 'packages/router/src/index.ts'),
+						},
+						{
+							find: /^@octane-ts\/router\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/router/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'motion',
 					include: ['packages/motion/tests/**/*.test.ts'],
 					environment: 'jsdom',
