@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:default",
+    "@changesets/changelog-git": "catalog:default",
     "@changesets/cli": "catalog:default",
     "@tsrx/prettier-plugin": "catalog:default",
     "@types/node": "catalog:default",
