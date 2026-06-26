@@ -80,6 +80,13 @@ export const styles = stylex.create({
 		textDecoration: 'none',
 		fontSize: 13,
 	},
+	// The nav link for the CURRENT feed — bold + underlined.
+	headerLinkActive: {
+		color: '#000000',
+		textDecoration: 'underline',
+		fontSize: 13,
+		fontWeight: 700,
+	},
 	// The "|" separators between nav links.
 	headerSep: {
 		color: '#000000',
@@ -87,14 +94,15 @@ export const styles = stylex.create({
 		opacity: 0.6,
 	},
 	main: {
-		// Fill the height left by the header so the white content panel reaches the
-		// bottom on short/loading pages (no exposed beige strip under the list).
+		// Fill the height left by the header so the HN-beige content reaches the
+		// bottom on short/loading pages (no seam below the list).
 		flexGrow: 1,
 		paddingTop: 8,
 		paddingRight: 8,
 		paddingBottom: 24,
 		paddingLeft: 8,
-		backgroundColor: PANEL,
+		// The classic Hacker News content background (the same warm beige as the page).
+		backgroundColor: BG,
 	},
 	row: {
 		display: 'flex',

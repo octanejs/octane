@@ -2,6 +2,24 @@
 // components (the only thing that differs between the .tsx and .tsrx versions);
 // the route tree, paths, and params are identical.
 import { createRouter, createRootRoute, createRoute } from '@octane-ts/router';
+import type { Feed } from './api.js';
+
+// The internal feed routes, paired with their HN feed. Home ('/') is the top
+// feed; the rest are siblings that render the SAME StoriesPage. A StoriesPage
+// derives its feed from the active pathname via `feedForPath` below.
+export const FEED_ROUTES: { path: string; feed: Feed }[] = [
+	{ path: '/', feed: 'top' },
+	{ path: '/newest', feed: 'new' },
+	{ path: '/ask', feed: 'ask' },
+	{ path: '/show', feed: 'show' },
+	{ path: '/jobs', feed: 'jobs' },
+];
+
+/** Map an active pathname to its feed; unknown paths fall back to 'top'. */
+export function feedForPath(pathname: string): Feed {
+	const match = FEED_ROUTES.find((r) => r.path === pathname);
+	return match ? match.feed : 'top';
+}
 
 export interface AppComponents {
 	RootLayout: any;
@@ -41,6 +59,17 @@ export function createAppRouter(components: AppComponents) {
 		pendingComponent: StoriesPending,
 	});
 
+	// Sibling feed routes — same StoriesPage, which reads its feed from the
+	// active pathname (see `feedForPath`). Paths mirror FEED_ROUTES (minus '/').
+	const feedRoutes = ['newest', 'ask', 'show', 'jobs'].map((path) =>
+		createRoute({
+			getParentRoute: () => rootRoute,
+			path,
+			component: StoriesPage,
+			pendingComponent: StoriesPending,
+		}),
+	);
+
 	const itemRoute = createRoute({
 		getParentRoute: () => rootRoute,
 		path: 'item/$id',
@@ -56,6 +85,6 @@ export function createAppRouter(components: AppComponents) {
 	});
 
 	return createRouter({
-		routeTree: rootRoute.addChildren([indexRoute, itemRoute, userRoute]),
+		routeTree: rootRoute.addChildren([indexRoute, ...feedRoutes, itemRoute, userRoute]),
 	});
 }

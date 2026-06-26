@@ -24,9 +24,28 @@ apps.
   is its own Suspense unit, so a slow item never blocks the list.
 - **[@octane-ts/stylex](../../packages/stylex)** — compiled atomic CSS.
 
-Routes: `/` (top stories), `/item/$id` (a story + its comment tree), `/user/$id`
-(a profile). Data comes from the public HN Firebase API
-(`https://hacker-news.firebaseio.com/v0/...`).
+Routes: `/` (top stories), `/newest` / `/ask` / `/show` / `/jobs` (the other HN
+feeds), `/item/$id` (a story + its comment tree), `/user/$id` (a profile). Data
+comes from the public HN Firebase API (`https://hacker-news.firebaseio.com/v0/...`).
+
+## Feeds
+
+The orange header nav works. The four feed words map to **real internal feed
+routes** that all render the same `StoriesPage` over a different HN feed endpoint:
+
+| nav    | route      | HN feed endpoint                 |
+| ------ | ---------- | -------------------------------- |
+| (logo) | `/`        | `/v0/topstories.json`            |
+| new    | `/newest`  | `/v0/newstories.json`            |
+| ask    | `/ask`     | `/v0/askstories.json`            |
+| show   | `/show`    | `/v0/showstories.json`           |
+| jobs   | `/jobs`    | `/v0/jobstories.json`            |
+
+`StoriesPage` derives its feed from the active pathname (`feedForPath`) and reads
+`storiesQuery(feed)`, so a single page component serves every feed route. The
+nav link for the current feed is highlighted (bold + underlined) by comparing the
+active pathname to each link's target; the router `<Link>` also sets
+`aria-current="page"` / `data-status="active"` on the exact match.
 
 ## Run it
 
@@ -130,18 +149,22 @@ skeleton is exercised), then asserts the same things in both apps:
 - `/` renders the stubbed stories (`[data-testid="story-row"]` count, a known
   title, an external story link with the stubbed `href`);
 - the pending skeleton (`[data-testid="pending"]`) shows, then resolves to rows;
-- clicking a story's comments link navigates to `/item/<id>`, the header + the
-  comments render, and browser Back returns to the list;
+- clicking a story's comments link navigates to `/item/<id>`, the header renders,
+  the comments render **including their `innerHTML` bodies** (the body text and
+  inline `<i>` markup), and browser Back returns to the list;
 - clicking an author navigates to `/user/<id>` and the karma renders;
-- the header nav links are present.
+- the header nav links are present, and the feed links (new / ask / show / jobs)
+  swap the feed, its content, and the active-link highlight;
+- each feed endpoint is stubbed with a distinct id list, so clicking a feed link
+  is verified to actually change the rendered list, not just the URL.
 
 The same assertions passing under **both** projects is the `.tsx` ≡ `.tsrx`
 parity result.
 
 ```
-10 passed
-  [jsx]  5 passed
-  [tsrx] 5 passed
+12 passed
+  [jsx]  6 passed
+  [tsrx] 6 passed
 ```
 
 ### Notes on selectors
@@ -153,12 +176,11 @@ addresses links by **role / `href`** (e.g. `a[href="/item/101"]`,
 (`story-row`, `stories-page`, `item-page`, `comment`, `user-page`, `pending`) —
 all identical across the two apps. No view changes were needed to test either.
 
-### Known gap
+The header's feed links (new / ask / show / jobs) are router `<Link>`s too, so
+they likewise render plain `<a href>` (and drop `data-testid`); the spec addresses
+them by `href` (`a[href="/newest"]`) and reads the active state from the
+`aria-current="page"` / `data-status="active"` attributes the `Link` sets.
 
 Comment bodies, a story's `text`, and a user's `about` are bound with
-`innerHTML={…}`. In this example that currently renders as a literal lowercased
-`innerhtml="…"` **attribute** rather than setting the element's inner HTML, so
-those rich-text bodies show up empty (identically in both apps). The e2e suite
-therefore asserts on comment **structure** (count + author link) instead of
-comment body text. This is an octane `innerHTML`-binding issue, not a `.tsx`-vs-
-`.tsrx` difference.
+`innerHTML={…}` and render as real inner HTML — the spec asserts on a comment's
+body text and its inline `<i>` markup, identically in both apps.
