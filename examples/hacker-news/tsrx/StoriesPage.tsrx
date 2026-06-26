@@ -1,6 +1,6 @@
-import { useSuspenseQuery } from '@octane-ts/query';
-import { useRouterState, useSearch, Link } from '@octane-ts/router';
-import * as stylex from '@octane-ts/stylex';
+import { useSuspenseQuery } from '@octanejs/query';
+import { useRouterState, useSearch, Link } from '@octanejs/router';
+import * as stylex from '@octanejs/stylex';
 import { storiesQuery, pageItemsQuery } from '../shared/queries.js';
 import { feedForPath, PAGE_SIZE } from '../shared/routes.js';
 import { styles } from '../shared/styles.js';

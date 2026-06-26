@@ -5,8 +5,8 @@ import {
 	Outlet,
 	lazyRouteComponent,
 	Await,
-} from '@octane-ts/router';
-import { createMemoryHistory } from '@octane-ts/router';
+} from '@octanejs/router';
+import { createMemoryHistory } from '@octanejs/router';
 import { useState } from 'octane';
 
 function RootLayout() @{

@@ -1,10 +1,10 @@
 // Shared StyleX style maps — compiled to atomic CSS at build time by the
-// @octane-ts/stylex vite plugin. Spread with `{...stylex.props(styles.x)}` in
+// @octanejs/stylex vite plugin. Spread with `{...stylex.props(styles.x)}` in
 // BOTH the .tsx and .tsrx components (octane maps className -> class).
 //
 // StyleX restricts shorthands: use LONGHANDS (backgroundColor, paddingTop,
 // borderBottomWidth, …) — never `background`, `padding: '4px 8px'`, `border`.
-import * as stylex from '@octane-ts/stylex';
+import * as stylex from '@octanejs/stylex';
 
 const ORANGE = '#ff6600';
 const BG = '#f6f6ef';

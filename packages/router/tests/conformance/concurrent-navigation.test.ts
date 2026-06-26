@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
-import { RouterProvider } from '@octane-ts/router';
+import { RouterProvider } from '@octanejs/router';
 import { makeConcurrentRouter, createDeferred } from '../_fixtures/concurrent-navigation.tsrx';
 
 // router-core resolves matches asynchronously and store notifications drive
@@ -13,7 +13,7 @@ async function flush() {
 	}
 }
 
-describe('@octane-ts/router — concurrent navigation (startTransition)', () => {
+describe('@octanejs/router — concurrent navigation (startTransition)', () => {
 	// The router drives navigation state commits through octane's startTransition
 	// (Transitioner.tsrx: `router.startTransition = (fn) => startTransition(fn)`).
 	// The intent: when the next route suspends, octane holds the

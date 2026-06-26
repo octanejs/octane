@@ -1,4 +1,4 @@
-// @octane-ts/zustand — zustand for the octane renderer.
+// @octanejs/zustand — zustand for the octane renderer.
 //
 // zustand cleanly separates a framework-agnostic vanilla store (`createStore`)
 // from a tiny React binding (`create` + `useStore`) layered on
@@ -6,7 +6,7 @@
 // pure JS — re-exported verbatim from `zustand/vanilla`) and reimplements only
 // the binding on top of octane's `useSyncExternalStore`. The public surface
 // (`create`, `useStore`, `createStore`) matches zustand 1:1, so existing zustand
-// code works by changing the import from `zustand` to `@octane-ts/zustand`.
+// code works by changing the import from `zustand` to `@octanejs/zustand`.
 //
 // The one octane-specific detail is hook slots: octane keys hooks by a
 // compiler-injected per-call-site Symbol, appended as the LAST argument of every
@@ -18,7 +18,7 @@ import { useSyncExternalStore } from 'octane';
 import { createStore } from 'zustand/vanilla';
 import type { Mutate, StateCreator, StoreApi, StoreMutatorIdentifier } from 'zustand/vanilla';
 
-// Re-export the vanilla core so `@octane-ts/zustand` is a drop-in for both the
+// Re-export the vanilla core so `@octanejs/zustand` is a drop-in for both the
 // store-only (`createStore`) and binding (`create`) entry points of zustand.
 export { createStore } from 'zustand/vanilla';
 export type * from 'zustand/vanilla';

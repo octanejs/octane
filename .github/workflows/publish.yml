@@ -12,7 +12,7 @@ permissions: {}
 
 jobs:
   publish:
-    if: github.repository == 'octane-ts/octane' && contains(github.event.head_commit.message, 'Version Packages')
+    if: github.repository == 'octanejs/octane' && contains(github.event.head_commit.message, 'Version Packages')
     permissions:
       contents: write
       id-token: write

@@ -1,5 +1,5 @@
-import * as stylex from '@octane-ts/stylex';
-import { Outlet, Link, useRouterState } from '@octane-ts/router';
+import * as stylex from '@octanejs/stylex';
+import { Outlet, Link, useRouterState } from '@octanejs/router';
 import { ErrorBoundary } from 'octane';
 import { styles } from '../shared/styles.js';
 import { ErrorFallback } from './Pending.tsrx';

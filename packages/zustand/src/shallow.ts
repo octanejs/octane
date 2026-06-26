@@ -1,4 +1,4 @@
-// `@octane-ts/zustand/shallow` — the zustand selector-equality helpers.
+// `@octanejs/zustand/shallow` — the zustand selector-equality helpers.
 //
 // `shallow` is a pure comparator (no hooks) and is re-exported verbatim from
 // zustand. `useShallow` IS a hook (zustand builds it on React.useRef), so it gets

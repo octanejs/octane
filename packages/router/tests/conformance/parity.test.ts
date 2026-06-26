@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
-import { RouterProvider } from '@octane-ts/router';
+import { RouterProvider } from '@octanejs/router';
 import { makeRouter as makeTsrx } from '../_fixtures/basic.tsrx';
 import { makeRouter as makeTsx } from '../_fixtures/basic-react.tsx';
 

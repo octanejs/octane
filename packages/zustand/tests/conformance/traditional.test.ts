@@ -1,13 +1,13 @@
 /**
- * `@octane-ts/zustand/traditional` — createWithEqualityFn / useStoreWithEqualityFn.
+ * `@octanejs/zustand/traditional` — createWithEqualityFn / useStoreWithEqualityFn.
  * The equality function bails out the selection (no re-render) when the selected
  * slice is "equal" by the provided comparator — here `shallow`. This exercises the
  * multi-base-hook wrapper (useRef + useMemo + useSyncExternalStore + useEffect)
  * driven by a single forwarded slot + derived sub-slots.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createWithEqualityFn, useStoreWithEqualityFn } from '@octane-ts/zustand/traditional';
-import { shallow } from '@octane-ts/zustand/shallow';
+import { createWithEqualityFn, useStoreWithEqualityFn } from '@octanejs/zustand/traditional';
+import { shallow } from '@octanejs/zustand/shallow';
 import { mount, nextPaint } from '../_helpers';
 import { useEq, EqDefault, EqPerCall } from '../_fixtures/traditional.tsrx';
 

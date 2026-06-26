@@ -404,13 +404,13 @@ importers:
 
   examples/hacker-news:
     dependencies:
-      '@octane-ts/query':
+      '@octanejs/query':
         specifier: workspace:*
         version: link:../../packages/query
-      '@octane-ts/router':
+      '@octanejs/router':
         specifier: workspace:*
         version: link:../../packages/router
-      '@octane-ts/stylex':
+      '@octanejs/stylex':
         specifier: workspace:*
         version: link:../../packages/stylex
       octane:

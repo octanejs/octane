@@ -5,7 +5,7 @@
  * ErrorBoundary.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { QueryClient } from '@octane-ts/query';
+import { QueryClient } from '@octanejs/query';
 import { mount, nextPaint } from '../_helpers';
 import { SuspenseApp, SuspenseComponentApp } from '../_fixtures/suspense.tsrx';
 

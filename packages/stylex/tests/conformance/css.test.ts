@@ -4,7 +4,7 @@ import { transformStylex, generateStylexCSS } from '../../src/transform';
 // The StyleX compiler pass in isolation — deterministic, no Vite. Proves create/
 // props/keyframes/defineVars are compiled and the extracted atomic CSS is correct.
 
-const SX = `import * as stylex from '@octane-ts/stylex';`;
+const SX = `import * as stylex from '@octanejs/stylex';`;
 
 describe('transformStylex + generateStylexCSS', () => {
 	it('create -> atomic classes; props compiled away; CSS extracted', () => {

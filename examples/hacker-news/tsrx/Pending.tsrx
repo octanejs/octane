@@ -1,7 +1,7 @@
 // Per-route Suspense fallbacks (skeletons) + the error fallback. Wired into the
 // shared router via routes.ts; the router's <Match> renders a route's
 // pendingComponent while that route's useSuspenseQuery is loading.
-import * as stylex from '@octane-ts/stylex';
+import * as stylex from '@octanejs/stylex';
 import { styles } from '../shared/styles.js';
 import { PAGE_SIZE } from '../shared/routes.js';
 

@@ -1,5 +1,5 @@
 ---
-'@octane-ts/router': patch
+'@octanejs/router': patch
 ---
 
 Navigation is now concurrent: the router drives its navigation state commits

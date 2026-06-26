@@ -4,7 +4,7 @@
  * query-core observers/caches.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { QueryClient, dehydrate } from '@octane-ts/query';
+import { QueryClient, dehydrate } from '@octanejs/query';
 import { mount, nextPaint } from '../_helpers';
 import {
 	Infinite,

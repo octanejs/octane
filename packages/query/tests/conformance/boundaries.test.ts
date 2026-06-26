@@ -4,7 +4,7 @@
  * error-boundary reset coordinator.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { QueryClient } from '@octane-ts/query';
+import { QueryClient } from '@octanejs/query';
 import { mount, nextPaint } from '../_helpers';
 import { RestoringApp, ResetApp } from '../_fixtures/boundaries.tsrx';
 

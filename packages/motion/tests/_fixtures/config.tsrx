@@ -1,4 +1,4 @@
-import { motion, MotionConfig } from '@octane-ts/motion';
+import { motion, MotionConfig } from '@octanejs/motion';
 
 export function ConfigTree() @{
 	<MotionConfig transition={{ duration: 0.5 }}>

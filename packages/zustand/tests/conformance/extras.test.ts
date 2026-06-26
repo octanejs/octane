@@ -4,9 +4,9 @@
  * divergence from React. Driven by the review of the port (find → verify).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createStore } from '@octane-ts/zustand';
-import { subscribeWithSelector } from '@octane-ts/zustand/middleware';
-import { shallow } from '@octane-ts/zustand/shallow';
+import { createStore } from '@octanejs/zustand';
+import { subscribeWithSelector } from '@octanejs/zustand/middleware';
+import { shallow } from '@octanejs/zustand/shallow';
 import { mount, nextPaint } from '../_helpers';
 import { useObj, RawObject, ShallowObject } from '../_fixtures/shallow.tsrx';
 import { useCombined, CombinedView } from '../_fixtures/middleware.tsrx';

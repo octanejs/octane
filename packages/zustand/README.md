@@ -1,6 +1,6 @@
-# @octane-ts/zustand
+# @octanejs/zustand
 
-[zustand](https://github.com/pmndrs/zustand) for the [octane](https://github.com/octane-ts/octane) renderer.
+[zustand](https://github.com/pmndrs/zustand) for the [octane](https://github.com/octanejs/octane) renderer.
 
 zustand separates a framework-agnostic **vanilla store** (`createStore`) from a tiny
 **React binding** (`create` + `useStore`) built on `useSyncExternalStore`. This package
@@ -12,7 +12,7 @@ surface matches zustand 1:1 — most zustand code works by changing the import.
 // before
 import { create } from 'zustand';
 // after
-import { create } from '@octane-ts/zustand';
+import { create } from '@octanejs/zustand';
 
 const useBearStore = create((set) => ({
   bears: 0,
@@ -29,11 +29,11 @@ function BearCounter() @{
 
 | import | what you get | notes |
 | --- | --- | --- |
-| `@octane-ts/zustand` | `create`, `useStore`, `createStore` | the React binding, octane-bound |
-| `@octane-ts/zustand/vanilla` | `createStore` + types | re-exported verbatim from zustand |
-| `@octane-ts/zustand/shallow` | `shallow`, `useShallow` | `shallow` verbatim; `useShallow` octane-bound |
-| `@octane-ts/zustand/middleware` | `persist`, `devtools`, `subscribeWithSelector`, `combine`, `redux`, `createJSONStorage`, … | re-exported verbatim (all framework-agnostic) |
-| `@octane-ts/zustand/traditional` | `createWithEqualityFn`, `useStoreWithEqualityFn` | octane-bound (selector + equality fn) |
+| `@octanejs/zustand` | `create`, `useStore`, `createStore` | the React binding, octane-bound |
+| `@octanejs/zustand/vanilla` | `createStore` + types | re-exported verbatim from zustand |
+| `@octanejs/zustand/shallow` | `shallow`, `useShallow` | `shallow` verbatim; `useShallow` octane-bound |
+| `@octanejs/zustand/middleware` | `persist`, `devtools`, `subscribeWithSelector`, `combine`, `redux`, `createJSONStorage`, … | re-exported verbatim (all framework-agnostic) |
+| `@octanejs/zustand/traditional` | `createWithEqualityFn`, `useStoreWithEqualityFn` | octane-bound (selector + equality fn) |
 
 ## How it works
 
@@ -54,7 +54,7 @@ compares Object.is-equal, so it re-renders on every store change. Wrap it with
 `useShallow` to compare by shallow equality:
 
 ```tsx
-import { useShallow } from '@octane-ts/zustand/shallow';
+import { useShallow } from '@octanejs/zustand/shallow';
 
 function Sliced() @{
   const { a, b } = useBearStore(useShallow((s) => ({ a: s.a, b: s.b })));
@@ -72,12 +72,12 @@ function Sliced() @{
 
 ## Equality functions — `traditional`
 
-For the equality-fn pattern, `@octane-ts/zustand/traditional` provides
+For the equality-fn pattern, `@octanejs/zustand/traditional` provides
 `createWithEqualityFn` / `useStoreWithEqualityFn`:
 
 ```tsx
-import { createWithEqualityFn } from '@octane-ts/zustand/traditional';
-import { shallow } from '@octane-ts/zustand/shallow';
+import { createWithEqualityFn } from '@octanejs/zustand/traditional';
+import { shallow } from '@octanejs/zustand/shallow';
 
 const useStore = createWithEqualityFn((set) => ({ a: 0, b: 0 }), shallow);
 const { a } = useStore((s) => ({ a: s.a })); // bails out via shallow

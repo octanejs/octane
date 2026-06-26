@@ -4,7 +4,7 @@
  * provider mounting/unmounting the client.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { QueryClient } from '@octane-ts/query';
+import { QueryClient } from '@octanejs/query';
 import { mount, nextPaint } from '../_helpers';
 import { KeyedApp } from '../_fixtures/extra.tsrx';
 import { App } from '../_fixtures/app.tsrx';

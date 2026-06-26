@@ -1,4 +1,4 @@
-// @octane-ts/query — TanStack Query for the octane renderer.
+// @octanejs/query — TanStack Query for the octane renderer.
 //
 // Reuses @tanstack/query-core verbatim (QueryClient, observers, caches — all
 // framework-agnostic) and reimplements the React binding on octane's hooks. The

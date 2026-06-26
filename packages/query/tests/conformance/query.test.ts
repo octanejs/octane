@@ -1,11 +1,11 @@
 /**
- * @octane-ts/query conformance — useQuery / useMutation / QueryClientProvider /
+ * @octanejs/query conformance — useQuery / useMutation / QueryClientProvider /
  * useQueryClient on octane, driving the REAL @tanstack/query-core (observers +
  * caches reused verbatim). Exercises the async query lifecycle (pending →
  * success / error), context client resolution, and the mutation lifecycle.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { QueryClient } from '@octane-ts/query';
+import { QueryClient } from '@octanejs/query';
 import { mount, nextPaint } from '../_helpers';
 import { App, ProbeApp, MutApp } from '../_fixtures/app.tsrx';
 

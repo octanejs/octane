@@ -1,9 +1,9 @@
-// @octane-ts/stylex/vite — the build-time StyleX integration for octane apps.
+// @octanejs/stylex/vite — the build-time StyleX integration for octane apps.
 //
 // Add it AFTER `octane()` in your Vite config and import the generated sheet once:
 //
 //   import { octane } from 'octane/compiler/vite';
-//   import { stylex } from '@octane-ts/stylex/vite';
+//   import { stylex } from '@octanejs/stylex/vite';
 //   export default { plugins: [octane(), stylex()] };
 //
 //   // app entry:
@@ -65,7 +65,7 @@ export function stylex(options = {}) {
 	};
 
 	return {
-		name: '@octane-ts/stylex',
+		name: '@octanejs/stylex',
 		// Run after octane's `.tsrx` -> JS transform, where `stylex.*` calls survive.
 		enforce: 'post',
 

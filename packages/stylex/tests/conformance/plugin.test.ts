@@ -4,7 +4,7 @@ import { stylex } from '../../src/vite';
 // The Vite plugin object's hooks, driven directly (no full Vite run): transform
 // collects rules, the virtual module aggregates them.
 
-const SX = `import * as s from '@octane-ts/stylex';`;
+const SX = `import * as s from '@octanejs/stylex';`;
 
 // Serve mode: `load` returns the live aggregate (what dev + HMR rely on).
 function makePlugin() {
@@ -20,7 +20,7 @@ function makeBuildPlugin() {
 	return plugin;
 }
 
-describe('@octane-ts/stylex/vite plugin', () => {
+describe('@octanejs/stylex/vite plugin', () => {
 	it('transforms a stylex module and aggregates into virtual:stylex.css', () => {
 		const plugin = makePlugin();
 		const out = plugin.transform(

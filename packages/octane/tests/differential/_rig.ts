@@ -244,7 +244,7 @@ export async function mountDifferential(
 	srcPath: string,
 	octaneEntry: string,
 	initialProps?: any,
-	// Binding packages (e.g. @octane-ts/zustand) reuse this rig but keep their
+	// Binding packages (e.g. @octanejs/zustand) reuse this rig but keep their
 	// React-fixture cache inside their OWN package, so the compiled React side
 	// resolves that package's deps (zustand, react, …). Defaults to octane's.
 	cacheDir?: string,

@@ -1,4 +1,4 @@
-import { useQuery } from '@octane-ts/query';
+import { useQuery } from '@octanejs/query';
 
 export function Todo(props) @{
 	const q = useQuery({ queryKey: ['todo'], queryFn: props.queryFn, retry: false }, props.client);

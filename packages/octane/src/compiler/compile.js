@@ -2161,7 +2161,7 @@ function rewriteHookCalls(node, ctx, componentName) {
 			// Three kinds of call get a trailing per-call-site slot symbol:
 			//  - a built-in base hook (HOOK_NAMES) — also needs its runtime import;
 			//  - a custom / library hook by React's `use[A-Z]` convention — e.g. a
-			//    `useStore` binding from @octane-ts/zustand that WRAPS a base hook and
+			//    `useStore` binding from @octanejs/zustand that WRAPS a base hook and
 			//    FORWARDS the slot to it. `useContext` is keyed by context identity (no
 			//    slot) and `use` has no uppercase suffix, so both are excluded here. We
 			//    do NOT import custom hooks — they're user/library imports;

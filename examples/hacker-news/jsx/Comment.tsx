@@ -1,6 +1,6 @@
-import * as stylex from '@octane-ts/stylex';
-import { Link } from '@octane-ts/router';
-import { useSuspenseQuery } from '@octane-ts/query';
+import * as stylex from '@octanejs/stylex';
+import { Link } from '@octanejs/router';
+import { useSuspenseQuery } from '@octanejs/query';
 import { Suspense } from 'octane';
 import { itemQuery } from '../shared/queries.js';
 import { styles } from '../shared/styles.js';

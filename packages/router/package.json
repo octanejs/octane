@@ -1,5 +1,5 @@
 {
-  "name": "@octane-ts/router",
+  "name": "@octanejs/router",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/octane-ts/octane.git",
+    "url": "git+https://github.com/octanejs/octane.git",
     "directory": "packages/router"
   },
   "main": "src/index.ts",

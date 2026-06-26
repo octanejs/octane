@@ -1,5 +1,5 @@
 ---
-'@octane-ts/router': patch
+'@octanejs/router': patch
 ---
 
 `<Link>` now forwards arbitrary props (`data-*`, `aria-*`, `title`, `id`, `role`,

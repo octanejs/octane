@@ -1,7 +1,7 @@
 // Shared route STRUCTURE. Both apps call createAppRouter with their own view
 // components (the only thing that differs between the .tsx and .tsrx versions);
 // the route tree, paths, and params are identical.
-import { createRouter, createRootRoute, createRoute } from '@octane-ts/router';
+import { createRouter, createRootRoute, createRoute } from '@octanejs/router';
 import type { Feed } from './api.js';
 
 // The internal feed routes, paired with their HN feed. Home ('/') is the top

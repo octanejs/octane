@@ -1679,7 +1679,7 @@ export function createContext<T>(defaultValue: T): Context<T> {
  * (non-template) components that render children and want to provide context to
  * them without authoring a `.tsrx` Provider wrapper. Call it during the component's
  * render, before rendering `children` into the same `scope`. (Used by runtime
- * component bindings — e.g. `@octane-ts/motion`'s `MotionConfig` and variant
+ * component bindings — e.g. `@octanejs/motion`'s `MotionConfig` and variant
  * propagation.)
  */
 export function provideContext<T>(scope: Scope, context: Context<T>, value: T): void {

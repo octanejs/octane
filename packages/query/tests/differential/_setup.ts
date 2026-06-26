@@ -2,7 +2,7 @@
  * Vitest globalSetup for the `query` project — the query analogue of octane's
  * differential precompile. Compiles every `.tsrx` fixture under
  * `packages/query/tests/_fixtures` through `@tsrx/react` + esbuild and writes the
- * React-runtime JS into THIS package's cache, rewriting `@octane-ts/query` →
+ * React-runtime JS into THIS package's cache, rewriting `@octanejs/query` →
  * `@tanstack/react-query` (and `octane` → `react`) so the React side runs the
  * real react-query binding (the byte-for-byte oracle).
  */
@@ -47,7 +47,7 @@ function compileOne(srcPath: string): void {
 	}
 	const rewritten = transformed.code
 		.replace(
-			/from\s+["']@octane-ts\/query(\/[^"']*)?["']/g,
+			/from\s+["']@octanejs\/query(\/[^"']*)?["']/g,
 			(_m, sub) => `from "@tanstack/react-query${sub || ''}"`,
 		)
 		.replace(/from\s+["']octane["']/g, 'from "react"');

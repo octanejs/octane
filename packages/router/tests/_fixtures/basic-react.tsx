@@ -8,8 +8,8 @@ import {
 	Outlet,
 	Link,
 	useParams,
-} from '@octane-ts/router';
-import { createMemoryHistory } from '@octane-ts/router';
+} from '@octanejs/router';
+import { createMemoryHistory } from '@octanejs/router';
 
 function RootLayout() {
 	return (

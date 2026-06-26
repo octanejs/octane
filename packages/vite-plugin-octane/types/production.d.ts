@@ -5,7 +5,7 @@ import type {
 	ResolvedOctaneConfig,
 	OctaneConfigOptions,
 	RootBoundaryOptions,
-} from '@octane-ts/vite-plugin';
+} from '@octanejs/vite-plugin';
 
 export function resolveOctaneConfig(
 	raw: OctaneConfigOptions,

@@ -1,5 +1,5 @@
 /** @import {Plugin, ResolvedConfig, ViteDevServer, UserConfig} from 'vite' */
-/** @import {OctaneConfigOptions, ResolvedOctaneConfig, RenderRoute} from '@octane-ts/vite-plugin' */
+/** @import {OctaneConfigOptions, ResolvedOctaneConfig, RenderRoute} from '@octanejs/vite-plugin' */
 
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
@@ -114,7 +114,7 @@ export function octane(inlineOptions = {}) {
 
 	/** @type {Plugin} */
 	const metaPlugin = {
-		name: '@octane-ts/vite-plugin',
+		name: '@octanejs/vite-plugin',
 
 		/**
 		 * @param {UserConfig} userConfig
@@ -126,13 +126,13 @@ export function octane(inlineOptions = {}) {
 				appType: 'custom',
 				optimizeDeps: {
 					exclude: [
-						// `@octane-ts/query` ships a `.tsrx` provider component, so it must NOT
+						// `@octanejs/query` ships a `.tsrx` provider component, so it must NOT
 						// be esbuild-prebundled — the octane transform owns `.tsrx` compilation.
 						...new Set([
 							...exclude,
 							'octane',
 							'octane/compiler',
-							'@octane-ts/query',
+							'@octanejs/query',
 							...SERVER_ONLY_ADAPTER_IDS,
 						]),
 					],
@@ -140,7 +140,7 @@ export function octane(inlineOptions = {}) {
 				// Workspace packages with TS source must be transformed by Vite's SSR
 				// pipeline (not require()'d raw) so ssrLoadModule gets transpiled code.
 				ssr: {
-					noExternal: ['octane', 'octane/compiler', '@octane-ts/query'],
+					noExternal: ['octane', 'octane/compiler', '@octanejs/query'],
 				},
 			};
 		},
@@ -227,7 +227,7 @@ export function octane(inlineOptions = {}) {
 					router = has_route_config(nextConfig) ? createRouter(nextConfig.router.routes) : null;
 					if (router) {
 						console.log(
-							`[@octane-ts/vite-plugin] Loaded ${nextConfig.router.routes.length} routes from octane.config.ts`,
+							`[@octanejs/vite-plugin] Loaded ${nextConfig.router.routes.length} routes from octane.config.ts`,
 						);
 					}
 				})()
@@ -248,7 +248,7 @@ export function octane(inlineOptions = {}) {
 						await ensureConfigLoaded();
 					} catch (error) {
 						vite.ssrFixStacktrace(/** @type {Error} */ (error));
-						console.error('[@octane-ts/vite-plugin] Failed to load octane.config.ts:', error);
+						console.error('[@octanejs/vite-plugin] Failed to load octane.config.ts:', error);
 						next();
 						return;
 					}
@@ -280,7 +280,7 @@ export function octane(inlineOptions = {}) {
 						if (freshConfig) octaneConfig = freshConfig;
 						if (JSON.stringify(previousRoutes) !== JSON.stringify(octaneConfig.router.routes)) {
 							console.log(
-								`[@octane-ts/vite-plugin] Detected route changes. Reloaded ${octaneConfig.router.routes.length} routes`,
+								`[@octanejs/vite-plugin] Detected route changes. Reloaded ${octaneConfig.router.routes.length} routes`,
 							);
 						}
 						router = createRouter(octaneConfig.router.routes);
@@ -316,7 +316,7 @@ export function octane(inlineOptions = {}) {
 
 						await sendWebResponse(res, response);
 					} catch (error) {
-						console.error('[@octane-ts/vite-plugin] Request error:', error);
+						console.error('[@octanejs/vite-plugin] Request error:', error);
 						vite.ssrFixStacktrace(/** @type {Error} */ (error));
 						res.statusCode = 500;
 						res.setHeader('Content-Type', 'text/html');
@@ -327,7 +327,7 @@ export function octane(inlineOptions = {}) {
 						);
 					}
 				})().catch((err) => {
-					console.error('[@octane-ts/vite-plugin] Unhandled middleware error:', err);
+					console.error('[@octanejs/vite-plugin] Unhandled middleware error:', err);
 					if (!res.headersSent) {
 						res.statusCode = 500;
 						res.end('Internal Server Error');
@@ -466,7 +466,7 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 
 		await sendWebResponse(res, response);
 	} catch (error) {
-		console.error('[@octane-ts/vite-plugin] RPC error:', error);
+		console.error('[@octanejs/vite-plugin] RPC error:', error);
 		res.statusCode = 500;
 		res.setHeader('Content-Type', 'application/json');
 		res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'RPC failed' }));

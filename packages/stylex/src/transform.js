@@ -17,7 +17,7 @@ import stylexBabelPlugin from '@stylexjs/babel-plugin';
 // rules across files; the priority is baked into the selector by `processStylexRules`,
 // so cascade order is independent of injection order.
 
-export const DEFAULT_IMPORT_SOURCES = ['@octane-ts/stylex', '@stylexjs/stylex'];
+export const DEFAULT_IMPORT_SOURCES = ['@octanejs/stylex', '@stylexjs/stylex'];
 
 export function transformStylex(code, opts) {
 	const res = babel.transformSync(code, {

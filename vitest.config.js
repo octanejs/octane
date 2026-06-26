@@ -30,7 +30,7 @@ export default defineConfig({
 					include: ['packages/zustand/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					// Same differential precompile, but for zustand fixtures: also rewrites
-					// `@octane-ts/zustand` → `zustand` so the React side runs real zustand.
+					// `@octanejs/zustand` → `zustand` so the React side runs real zustand.
 					globalSetup: ['packages/zustand/tests/differential/_setup.ts'],
 					globals: false,
 				},
@@ -39,19 +39,19 @@ export default defineConfig({
 						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
 					}),
 				],
-				// `@octane-ts/zustand` is the package under test; alias the public name
+				// `@octanejs/zustand` is the package under test; alias the public name
 				// (and its subpaths) to source so fixtures import it exactly as a consumer
 				// would (and the differential React side rewrites the same specifiers to
-				// `zustand`). Regex aliases so `@octane-ts/zustand/shallow` → src/shallow.ts
+				// `zustand`). Regex aliases so `@octanejs/zustand/shallow` → src/shallow.ts
 				// without the bare entry's file path swallowing the subpath.
 				resolve: {
 					alias: [
 						{
-							find: /^@octane-ts\/zustand$/,
+							find: /^@octanejs\/zustand$/,
 							replacement: resolve(import.meta.dirname, 'packages/zustand/src/index.ts'),
 						},
 						{
-							find: /^@octane-ts\/zustand\/(.*)$/,
+							find: /^@octanejs\/zustand\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/zustand/src') + '/$1.ts',
 						},
 					],
@@ -63,7 +63,7 @@ export default defineConfig({
 					include: ['packages/query/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					// Differential precompile for query fixtures: rewrites
-					// `@octane-ts/query` → `@tanstack/react-query` so the React side runs
+					// `@octanejs/query` → `@tanstack/react-query` so the React side runs
 					// real react-query.
 					globalSetup: ['packages/query/tests/differential/_setup.ts'],
 					globals: false,
@@ -76,11 +76,11 @@ export default defineConfig({
 				resolve: {
 					alias: [
 						{
-							find: /^@octane-ts\/query$/,
+							find: /^@octanejs\/query$/,
 							replacement: resolve(import.meta.dirname, 'packages/query/src/index.ts'),
 						},
 						{
-							find: /^@octane-ts\/query\/(.*)$/,
+							find: /^@octanejs\/query\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/query/src') + '/$1.ts',
 						},
 					],
@@ -106,11 +106,11 @@ export default defineConfig({
 				resolve: {
 					alias: [
 						{
-							find: /^@octane-ts\/router$/,
+							find: /^@octanejs\/router$/,
 							replacement: resolve(import.meta.dirname, 'packages/router/src/index.ts'),
 						},
 						{
-							find: /^@octane-ts\/router\/(.*)$/,
+							find: /^@octanejs\/router\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/router/src') + '/$1.ts',
 						},
 					],
@@ -131,11 +131,11 @@ export default defineConfig({
 				resolve: {
 					alias: [
 						{
-							find: /^@octane-ts\/motion$/,
+							find: /^@octanejs\/motion$/,
 							replacement: resolve(import.meta.dirname, 'packages/motion/src/index.ts'),
 						},
 						{
-							find: /^@octane-ts\/motion\/(.*)$/,
+							find: /^@octanejs\/motion\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/motion/src') + '/$1.ts',
 						},
 					],
@@ -165,11 +165,11 @@ export default defineConfig({
 				resolve: {
 					alias: [
 						{
-							find: /^@octane-ts\/stylex$/,
+							find: /^@octanejs\/stylex$/,
 							replacement: resolve(import.meta.dirname, 'packages/stylex/src/index.ts'),
 						},
 						{
-							find: /^@octane-ts\/stylex\/(.*)$/,
+							find: /^@octanejs\/stylex\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/stylex/src') + '/$1.ts',
 						},
 					],

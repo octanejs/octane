@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/octane-ts/octane/actions/workflows/ci.yml"><img src="https://github.com/octane-ts/octane/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/octanejs/octane/actions/workflows/ci.yml"><img src="https://github.com/octanejs/octane/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="#status"><img src="https://img.shields.io/badge/status-alpha-orange" alt="status: alpha"></a>
   <a href="https://www.npmjs.com/package/octane"><img src="https://img.shields.io/npm/v/octane?logo=npm" alt="npm version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
@@ -57,7 +57,7 @@ Octane is currently in alpha development.
 ### Install
 
 ```bash
-pnpm add octane @octane-ts/vite-plugin
+pnpm add octane @octanejs/vite-plugin
 ```
 
 Add the plugin to your Vite config:
@@ -72,7 +72,7 @@ export default defineConfig({
 });
 ```
 
-`@octane-ts/vite-plugin` is the optional metaframework (dev SSR, routing, hydrate). For
+`@octanejs/vite-plugin` is the optional metaframework (dev SSR, routing, hydrate). For
 a plain SPA you only need the `octane()` compiler plugin shown above.
 
 ### Mount
@@ -220,7 +220,7 @@ This is a pnpm monorepo with two publishable packages:
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
   and the compiler itself, which is exposed at `octane/compiler` (and
   `octane/compiler/vite` for the build transform).
-- [`@octane-ts/vite-plugin`](./packages/vite-plugin-octane) is the optional metaframework
+- [`@octanejs/vite-plugin`](./packages/vite-plugin-octane) is the optional metaframework
   plugin, with dev SSR, routing, and hydration wiring for full apps.
 
 ## Development

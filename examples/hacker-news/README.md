@@ -16,13 +16,13 @@ apps.
 
 ## Stack
 
-- **[@octane-ts/router](../../packages/router)** — `Link` / `Outlet` /
+- **[@octanejs/router](../../packages/router)** — `Link` / `Outlet` /
   `useParams`; concurrent navigation driven by transitions.
-- **[@octane-ts/query](../../packages/query)** — `useSuspenseQuery` over plain
+- **[@octanejs/query](../../packages/query)** — `useSuspenseQuery` over plain
   query-option factories.
 - **[octane](../../packages/octane) Suspense** — each story row and each comment
   is its own Suspense unit, so a slow item never blocks the list.
-- **[@octane-ts/stylex](../../packages/stylex)** — compiled atomic CSS.
+- **[@octanejs/stylex](../../packages/stylex)** — compiled atomic CSS.
 
 Routes: `/` (top stories), `/newest` / `/ask` / `/show` / `/jobs` (the other HN
 feeds), `/item/$id` (a story + its comment tree), `/user/$id` (a profile). Data
@@ -66,7 +66,7 @@ shared/        # IDENTICAL for both apps — the entire "core"
   api.ts       #   HN Firebase client: topStories(), item(id), user(id)
   types.ts     #   API shapes
   format.ts    #   relativeTime / hostname / pluralize
-  queries.ts   #   @octane-ts/query option factories
+  queries.ts   #   @octanejs/query option factories
   styles.ts    #   StyleX styles
   routes.ts    #   createAppRouter(views) — the route tree / paths / params
 

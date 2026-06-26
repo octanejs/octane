@@ -13,9 +13,9 @@
   },
   "dependencies": {
     "octane": "workspace:*",
-    "@octane-ts/query": "workspace:*",
-    "@octane-ts/router": "workspace:*",
-    "@octane-ts/stylex": "workspace:*"
+    "@octanejs/query": "workspace:*",
+    "@octanejs/router": "workspace:*",
+    "@octanejs/stylex": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "catalog:default",

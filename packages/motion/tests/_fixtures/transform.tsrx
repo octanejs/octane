@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useTransform } from '@octane-ts/motion';
+import { motion, useMotionValue, useTransform } from '@octanejs/motion';
 
 export function TransformBox(props) @{
 	const x = useMotionValue(50);

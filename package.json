@@ -7,7 +7,7 @@
   "packageManager": "pnpm@11.1.1",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/octane-ts/octane.git"
+    "url": "git+https://github.com/octanejs/octane.git"
   },
   "scripts": {
     "test": "vitest run",

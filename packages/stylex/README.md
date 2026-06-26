@@ -1,6 +1,6 @@
-# @octane-ts/stylex
+# @octanejs/stylex
 
-[StyleX](https://stylexjs.com) for the [octane](https://github.com/octane-ts/octane) renderer.
+[StyleX](https://stylexjs.com) for the [octane](https://github.com/octanejs/octane) renderer.
 
 StyleX is a **build-time** CSS-in-JS system: a compiler turns `stylex.create({...})`
 into atomic class names and extracts the CSS, and `stylex.props(...)` merges those at
@@ -8,11 +8,11 @@ runtime into the props you spread onto an element. So — unlike the zustand/mot
 _runtime_ bindings — the octane integration is the **compiler pass**, shipped in two
 parts:
 
-- **`@octane-ts/stylex`** — the authoring surface you import in components. It
+- **`@octanejs/stylex`** — the authoring surface you import in components. It
   re-exports `@stylexjs/stylex` (so the runtime `props`/`attrs` and all the types
   work) and is registered as a StyleX _import source_ so the compiler finds your
   `stylex.*` call sites.
-- **`@octane-ts/stylex/vite`** — the Vite plugin that runs the StyleX compiler over
+- **`@octanejs/stylex/vite`** — the Vite plugin that runs the StyleX compiler over
   octane's compiled `.tsrx` output and emits one static atomic stylesheet
   (`virtual:stylex.css`). **Zero StyleX runtime ships in your bundle.**
 
@@ -23,7 +23,7 @@ Add the plugin **after** `octane()` and import the generated sheet once:
 ```ts
 // vite.config.ts
 import { octane } from 'octane/compiler/vite';
-import { stylex } from '@octane-ts/stylex/vite';
+import { stylex } from '@octanejs/stylex/vite';
 
 export default {
   plugins: [octane(), stylex()],
@@ -38,7 +38,7 @@ import 'virtual:stylex.css';
 ## Usage
 
 ```tsx
-import * as stylex from '@octane-ts/stylex';
+import * as stylex from '@octanejs/stylex';
 
 const styles = stylex.create({
   root: { padding: 16, color: 'tomato' },
@@ -74,7 +74,7 @@ contains every rule regardless of module/transform order.
 `stylex(options)`:
 
 - `include` — files to scan (default: `.tsrx`/`.tsx`/`.jsx`/`.ts`/`.js`).
-- `importSources` — specifiers treated as StyleX (default: `@octane-ts/stylex` +
+- `importSources` — specifiers treated as StyleX (default: `@octanejs/stylex` +
   `@stylexjs/stylex`).
 - `dev` — force dev/prod compilation (default: dev while Vite is serving).
 - `useCSSLayers` — emit `@layer` rules instead of the `:not(#\#)` specificity hack.

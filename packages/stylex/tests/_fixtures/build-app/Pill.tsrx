@@ -1,4 +1,4 @@
-import * as stylex from '@octane-ts/stylex';
+import * as stylex from '@octanejs/stylex';
 
 const styles = stylex.create({
 	pill: { borderRadius: 999, backgroundColor: 'navy' },

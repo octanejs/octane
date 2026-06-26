@@ -1,5 +1,5 @@
 ---
-"@octane-ts/router": patch
+"@octanejs/router": patch
 ---
 
 Same-route search-param navigations (e.g. `?page=1` → `?page=2`) now commit

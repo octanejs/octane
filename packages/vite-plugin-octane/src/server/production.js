@@ -20,7 +20,7 @@ export { resolveOctaneConfig } from '../load-config.js';
  */
 export function createHandler(_manifest, _deps) {
 	throw new Error(
-		'[@octane-ts/vite-plugin] Production build (createHandler) is Phase 2 — not yet implemented. ' +
+		'[@octanejs/vite-plugin] Production build (createHandler) is Phase 2 — not yet implemented. ' +
 			'Dev SSR works via `vite dev`.',
 	);
 }

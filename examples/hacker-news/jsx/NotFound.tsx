@@ -1,5 +1,5 @@
-import * as stylex from '@octane-ts/stylex';
-import { Link } from '@octane-ts/router';
+import * as stylex from '@octanejs/stylex';
+import { Link } from '@octanejs/router';
 import { styles } from '../shared/styles.js';
 
 export function NotFound() {

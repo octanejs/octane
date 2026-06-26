@@ -17,4 +17,4 @@ Nested hook calls now resolve too: a hook used as an **argument** to another hoo
 so the inner hook was left without one.
 
 This is what lets hook-based libraries be bound to octane by reimplementing only their
-thin React binding on octane's base hooks (see the new `@octane-ts/zustand`).
+thin React binding on octane's base hooks (see the new `@octanejs/zustand`).

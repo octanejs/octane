@@ -1,4 +1,4 @@
-import { QueryClientProvider, useQuery } from '@octane-ts/query';
+import { QueryClientProvider, useQuery } from '@octanejs/query';
 
 // queryKey derived from a prop — changing the prop swaps the query (exercises
 // observer.setOptions → query change → refetch → re-render).

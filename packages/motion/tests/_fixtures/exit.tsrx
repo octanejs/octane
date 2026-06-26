@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from '@octane-ts/motion';
+import { motion, AnimatePresence } from '@octanejs/motion';
 
 export function Toggle(props) @{
 	<AnimatePresence>
