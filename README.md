@@ -30,7 +30,7 @@ Components are written in `.tsrx`, a format that lets your TypeScript setup live
 right next to the markup it feeds.
 
 Created by [Dominic Gannaway](https://github.com/trueadm), who also created
-Inferno and has worked on React, Lexical, and Svelte.
+Inferno and has worked on React, Lexical, Ripple, and Svelte.
 
 ## Status
 
