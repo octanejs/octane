@@ -3,7 +3,7 @@
   "version": "0.1.1",
   "license": "MIT",
   "type": "module",
-  "description": "Template-clone UI renderer with a React-shape state model, authored in TSRX. Ships the runtime + the TSRX→octane compiler (octane/compiler).",
+  "description": "A fast, TypeScript-first UI framework and the successor to Inferno: the React API you already know, a compiler that keeps the runtime small and fast, and hooks without the rules of hooks.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
