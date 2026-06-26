@@ -73,6 +73,57 @@ const NOOP = (): void => {};
 // so `ssrChild` can render a `<Comp/>`-as-value descriptor server-side too.
 const ELEMENT_TAG = Symbol.for('octane.element');
 
+// Void (self-closing) HTML elements — no end tag, no children. Mirrors the
+// compiler's VOID_ELEMENTS so a host descriptor serialized by `ssrChild`
+// matches the static-markup emission of `ssrEmitElement`.
+const VOID_ELEMENTS = new Set([
+	'area',
+	'base',
+	'br',
+	'col',
+	'embed',
+	'hr',
+	'img',
+	'input',
+	'link',
+	'meta',
+	'param',
+	'source',
+	'track',
+	'wbr',
+]);
+
+interface ElementDescriptor {
+	$$kind: typeof ELEMENT_TAG;
+	// A server ComponentBody (component-value form, e.g. `{<Comp/>}`) OR a host tag
+	// string (`'li'`), produced when host JSX appears at a VALUE position (a
+	// `.map(...)` callback, a render-prop arrow body, an array literal).
+	type: ServerComponent | string;
+	props: any;
+	// React-style `key`, lifted out of props (consulted by the client's de-opt list
+	// path on hydration; the server only renders it into markup).
+	key: any;
+	// `createElement(type, props, ...children)` children for the host form; `null`
+	// for the component-value form (children flow through the component's props).
+	children: any;
+}
+
+// Server `createElement(type, props, ...children)` — produces the SAME descriptor
+// shape as the client runtime's `createElement` (see runtime.ts). The compiler
+// lowers VALUE-position JSX (a `.map` callback, a render-prop arrow body, an array
+// literal) to this call in BOTH modes, so the same lowered call resolves to the
+// client-or-server `createElement` per build, and `ssrChild` renders the result.
+export function createElement(
+	type: ServerComponent | string,
+	props?: any,
+	...children: any[]
+): ElementDescriptor {
+	const p = (props ?? {}) as any;
+	const key = p.key != null ? p.key : null;
+	const kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : p.children;
+	return { $$kind: ELEMENT_TAG, type, props: p, key, children: kids ?? null };
+}
+
 // ---------------------------------------------------------------------------
 // Escaping
 // ---------------------------------------------------------------------------
@@ -110,13 +161,114 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 	// an empty hole still occupies one logical node, keeping sibling cursor
 	// alignment intact. `ssrComponent` already wraps its output in block markers.
 	if (v == null || v === false || v === true) return ssrBlock('');
+	// An ARRAY child (e.g. `{xs.map(x => <li/>)}`) → the client's childSlot routes
+	// it to the de-opt keyed list, whose hydration ADOPTS one `<!--[-->…<!--]-->`
+	// range PER ITEM (see mountItem's hydrating branch). So wrap each item in its
+	// own block, then the whole list in the outer childSlot block. A nested array
+	// (fragment-of-arrays) flattens into more sibling item blocks — matching the
+	// client's recursive de-opt build.
+	if (Array.isArray(v)) {
+		let out = '';
+		for (let i = 0; i < v.length; i++) out += ssrChildItem(v[i], scope);
+		return ssrBlock(out);
+	}
 	// A component-body / children render function, or `<Comp/>` used as a value.
 	if (typeof v === 'function') return ssrComponent(scope, v as ServerComponent, {});
 	if (typeof v === 'object' && (v as any).$$kind === ELEMENT_TAG) {
-		const d = v as { type: ServerComponent; props: any };
-		return ssrComponent(scope, d.type, d.props);
+		const d = v as ElementDescriptor;
+		// HOST descriptor (`createElement('span', …)`, from value-position JSX) →
+		// serialize the element directly; its content REPLACES the childSlot range
+		// the client adopts (de-opt host children are rebuilt, not adopted in place,
+		// so only the outer marker pair must line up). COMPONENT descriptor →
+		// ssrComponent, passing `children` through (don't drop them).
+		if (typeof d.type === 'string')
+			return ssrBlock(ssrHostElement(d.type, d.props, d.children, scope));
+		return ssrComponent(scope, d.type, { ...d.props, children: d.children ?? d.props?.children });
 	}
 	return ssrBlock(escapeHtml(v));
+}
+
+// One item of an array child: each is its own `<!--[-->…<!--]-->` block (the unit
+// the client de-opt list adopts on hydration). A nested array flattens into more
+// sibling item blocks (React fragment-of-arrays); everything else reuses ssrChild's
+// per-value serialization (host element, component, primitive, or empty).
+function ssrChildItem(v: unknown, scope: SSRScope): string {
+	if (Array.isArray(v)) {
+		let out = '';
+		for (let i = 0; i < v.length; i++) out += ssrChildItem(v[i], scope);
+		return out;
+	}
+	if (v == null || v === false || v === true) return ssrBlock('');
+	if (typeof v === 'object' && (v as any).$$kind === ELEMENT_TAG) {
+		const d = v as ElementDescriptor;
+		if (typeof d.type === 'string')
+			return ssrBlock(ssrHostElement(d.type, d.props, d.children, scope));
+		return ssrComponent(scope, d.type, { ...d.props, children: d.children ?? d.props?.children });
+	}
+	if (typeof v === 'function') return ssrComponent(scope, v as ServerComponent, {});
+	return ssrBlock(escapeHtml(v));
+}
+
+// Serialize a HOST element descriptor (`createElement('span', props, ...children)`)
+// to `<tag …attrs…>…children…</tag>`, void-element aware. Mirrors the static
+// emission of the compiler's `ssrEmitElement`: `className`→`class`, `style` objects
+// flattened, spread-unsafe / event / ref / key / children props skipped, and
+// children recursed via ssrChild (array → blocks, element/component → render,
+// primitive → escaped text). innerHTML, if present, is raw (unescaped) content.
+function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope): string {
+	let attrs = '';
+	let innerHTML: unknown = undefined;
+	if (props != null) {
+		for (const k in props) {
+			if (k === 'key' || k === 'ref' || k === 'children') continue;
+			// onX events have no server semantics (no DOM); drop them.
+			if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') continue;
+			const val = props[k];
+			if (k === 'innerHTML') {
+				innerHTML = val;
+				continue;
+			}
+			if (k === 'style') attrs += ssrStyle(val);
+			else if (k === 'className' || k === 'class') attrs += ssrAttr('class', val);
+			else if (VALID_ATTR_NAME.test(k)) attrs += ssrAttr(k, val);
+		}
+	}
+	const hasChildren =
+		children != null && children !== false && children !== true && children !== '';
+	if (VOID_ELEMENTS.has(tag) && !hasChildren && innerHTML === undefined) {
+		return '<' + tag + attrs + '/>';
+	}
+	let inner = '';
+	if (innerHTML !== undefined) {
+		inner = innerHTML == null ? '' : String(innerHTML);
+	} else if (hasChildren) {
+		inner = ssrDescriptorContent(children, scope);
+	}
+	return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
+}
+
+// Serialize the CONTENT inside a host descriptor (a `createElement(...)` child
+// subtree) as PLAIN markup — NO childSlot block markers. Mirrors the client's
+// `buildDeoptDom`, which builds the descriptor's children as raw DOM nodes inside
+// the element (the de-opt host path REBUILDS on hydration, so the inside carries no
+// adopt markers). This keeps the serialized `<span>text</span>` byte-identical to a
+// fresh client mount. Arrays flatten, nested host descriptors recurse, components
+// still render through `ssrComponent` (block-wrapped — a component IS a hydration
+// boundary even inside de-opt markup), primitives coerce to escaped text.
+function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
+	if (v == null || v === false || v === true || v === '') return '';
+	if (Array.isArray(v)) {
+		let out = '';
+		for (let i = 0; i < v.length; i++) out += ssrDescriptorContent(v[i], scope);
+		return out;
+	}
+	if (typeof v === 'object' && (v as any).$$kind === ELEMENT_TAG) {
+		const d = v as ElementDescriptor;
+		if (typeof d.type === 'string') return ssrHostElement(d.type, d.props, d.children, scope);
+		return ssrComponent(scope, d.type, { ...d.props, children: d.children ?? d.props?.children });
+	}
+	if (typeof v === 'function') return ssrComponent(scope, v as ServerComponent, {});
+	return escapeHtml(v);
 }
 
 /**

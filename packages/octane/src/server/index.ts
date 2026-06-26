@@ -44,6 +44,7 @@ export {
 	type FormStatus,
 
 	// Compiler-emitted codegen helpers
+	createElement,
 	escapeHtml,
 	escapeAttr,
 	ssrText,
