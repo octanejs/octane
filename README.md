@@ -34,10 +34,7 @@ Inferno and has worked on React, Lexical, and Svelte.
 
 ## Status
 
-Octane is alpha software. The runtime, compiler, and SSR/hydration paths all work
-and have a large test suite behind them, but the API can still change and some
-features are still landing. It is a good time to try it and report back. It is
-not ready for production yet.
+Octane is currently in alpha development.
 
 ## Highlights
 
