@@ -3,10 +3,11 @@
 // pendingComponent while that route's useSuspenseQuery is loading.
 import * as stylex from '@octane-ts/stylex';
 import { styles } from '../shared/styles.js';
+import { PAGE_SIZE } from '../shared/routes.js';
 
 // A single placeholder story row (wide title bar + thin meta bar, gently
-// pulsing). Used as each row's Suspense fallback in StoriesPage and stacked to
-// build the route-level pending skeletons below.
+// pulsing). Stacked to build the route-level pending skeleton — one per row of a
+// full page, so it maps to the rows that will load in.
 export function RowSkeleton() {
 	return (
 		<div data-testid="row-skeleton" {...stylex.props(styles.skeletonRow)}>
@@ -27,7 +28,7 @@ function SkeletonList({ rows }: { rows: number }) {
 }
 
 export function StoriesPending() {
-	return <SkeletonList rows={8} />;
+	return <SkeletonList rows={PAGE_SIZE} />;
 }
 
 export function ItemPending() {
