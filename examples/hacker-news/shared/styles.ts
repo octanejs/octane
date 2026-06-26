@@ -193,6 +193,39 @@ export const styles = stylex.create({
 		paddingTop: 12,
 		paddingBottom: 12,
 	},
+	// The prev | page N | more pager beneath the list.
+	pager: {
+		display: 'flex',
+		alignItems: 'baseline',
+		columnGap: 12,
+		marginTop: 12,
+		paddingTop: 10,
+		paddingLeft: 34,
+		borderTopWidth: 1,
+		borderTopStyle: 'solid',
+		borderTopColor: BORDER,
+		fontSize: 13,
+	},
+	pagerLink: {
+		color: LINK,
+		textDecoration: 'none',
+		fontWeight: 700,
+	},
+	// A disabled (non-navigable) pager edge — e.g. `‹ prev` on page 1.
+	pagerDisabled: {
+		color: MUTED,
+		opacity: 0.5,
+	},
+	pagerPage: {
+		color: MUTED,
+	},
+	// Subtle dim of the list while a navigation (page change) is in flight — a
+	// 'pending' cue layered on top of the top progress bar.
+	listPending: {
+		opacity: 0.6,
+		transitionProperty: 'opacity',
+		transitionDuration: '0.15s',
+	},
 	progress: {
 		position: 'fixed',
 		top: 0,
