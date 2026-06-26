@@ -10,9 +10,25 @@ async function getJSON<T>(path: string): Promise<T> {
 	return (await res.json()) as T;
 }
 
-/** Up to ~500 top-story ids, ranked. */
+/** The story feeds HN exposes as `/v0/<feed>.json` -> an array of ids. */
+export type Feed = 'top' | 'new' | 'ask' | 'show' | 'jobs';
+
+const FEED_ENDPOINT: Record<Feed, string> = {
+	top: 'topstories',
+	new: 'newstories',
+	ask: 'askstories',
+	show: 'showstories',
+	jobs: 'jobstories',
+};
+
+/** Up to ~200-500 story ids for a feed, ranked. */
+export function stories(feed: Feed): Promise<number[]> {
+	return getJSON<number[]>(FEED_ENDPOINT[feed]);
+}
+
+/** Up to ~500 top-story ids, ranked. (Convenience wrapper over `stories`.) */
 export function topStories(): Promise<number[]> {
-	return getJSON<number[]>('topstories');
+	return stories('top');
 }
 
 /** A single item — story OR comment (same endpoint, different shape). */

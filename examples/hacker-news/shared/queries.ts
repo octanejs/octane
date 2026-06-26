@@ -3,13 +3,17 @@
 // options object — `queryKey` + `queryFn` — that a component passes to
 // `useSuspenseQuery` (from '@octane-ts/query'), which suspends while the query
 // loads and returns `{ data }`.
-import { topStories, item, user } from './api.js';
+import { stories, item, user } from './api.js';
+import type { Feed } from './api.js';
 import type { Story, Comment, User } from './types.js';
 
-export const topStoriesQuery = () => ({
-	queryKey: ['topstories'] as const,
-	queryFn: (): Promise<number[]> => topStories(),
+export const storiesQuery = (feed: Feed) => ({
+	queryKey: ['stories', feed] as const,
+	queryFn: (): Promise<number[]> => stories(feed),
 });
+
+/** Convenience alias for the home feed. */
+export const topStoriesQuery = () => storiesQuery('top');
 
 export const itemQuery = (id: number) => ({
 	queryKey: ['item', id] as const,
@@ -21,4 +25,4 @@ export const userQuery = (id: string) => ({
 	queryFn: (): Promise<User> => user(id),
 });
 
-export type { Story, Comment, User };
+export type { Story, Comment, User, Feed };
