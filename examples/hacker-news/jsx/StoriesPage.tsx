@@ -13,9 +13,6 @@ export function StoriesPage() {
 	const feed = feedForPath(pathname);
 	// The validated 1-based page from `?page=N` (defaults to 1).
 	const page = useSearch({ select: (s) => s.page ?? 1 });
-	// Dim the list slightly while a navigation (e.g. a page change) is in flight —
-	// a subtle 'pending' cue on top of the top progress bar.
-	const isLoading = useRouterState({ select: (s) => s.isLoading });
 
 	// The id list, cached per feed (won't re-suspend on a page change).
 	const { data: ids } = useSuspenseQuery(storiesQuery(feed));
@@ -32,12 +29,7 @@ export function StoriesPage() {
 	const hasMore = start + PAGE_SIZE < ids.length;
 
 	return (
-		<div
-			data-testid="stories-page"
-			data-feed={feed}
-			data-page={page}
-			{...stylex.props(isLoading && styles.listPending)}
-		>
+		<div data-testid="stories-page" data-feed={feed} data-page={page}>
 			{items.map((story, i) => (
 				<StoryRow key={story.id} rank={start + i + 1} story={story} />
 			))}
