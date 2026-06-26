@@ -4669,8 +4669,37 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 	// state intact (same preserved-state contract the softDetach path documents
 	// below). A NON-transition descendant re-suspend skips this branch and falls
 	// through to softDetach + @pending, unchanged.
+	// A transition-priority suspend STARTS a hold. But once a hold is in effect,
+	// React keeps showing the prior content until the NEW tree is ready — it does
+	// not flash the fallback if that still-committed content re-suspends again,
+	// even when the re-suspending render arrives at URGENT priority. This is the
+	// real-world `useSuspenseQuery` shape: a transition changes the query key
+	// (transition render → hold begins), then the query observer notifies
+	// ASYNCHRONOUSLY on a later macrotask — AFTER octane's transition window
+	// (TRANSITION_DEPTH / ASYNC_TRANSITION_COUNT) has closed — so the re-render
+	// that re-suspends on the new in-flight fetch is URGENT. React holds; we must
+	// too. We therefore CONTINUE the hold when `state.transitionHeld` is already
+	// set, regardless of the current render's priority.
+	//
+	// This stays safe for a NON-held urgent suspend: the hold (whether started by
+	// a transition OR continued here) still REQUIRES `hasResolved && branch === 1
+	// && savedDom === null`, i.e. the boundary's own committed try content is live
+	// and intact on screen. A FRESH urgent render that suspends with no prior
+	// content (branch !== 1, or not yet resolved) and `transitionHeld === false`
+	// falls through to softDetach + @pending and shows the fallback — React parity
+	// for urgent suspense. The held DOM is untouched because `use()` /
+	// `useSuspenseQuery` throw during setup BEFORE the descendant patches any of
+	// its JSX, so the committed nodes are not mid-mutated. attachResume tracks the
+	// new thenable and re-renders the held tryBlock at transition priority on
+	// resolve; the existing fallback timeout remains the safety valve for a
+	// never-resolving boundary.
 	const isTransition = sourceBlock.currentRenderMode === 'transition';
-	if (isTransition && state.hasResolved && state.branch === 1 && state.savedDom === null) {
+	if (
+		(isTransition || state.transitionHeld) &&
+		state.hasResolved &&
+		state.branch === 1 &&
+		state.savedDom === null
+	) {
 		if (!state.transitionHeld) {
 			state.transitionHeld = true;
 			tickTransitionCount(+1);
@@ -4681,12 +4710,24 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 		// window because the transition is still in progress, semantically. On
 		// retry resolve, the timeout is cleared and the saved tryBlock is
 		// re-attached. Infinity → fallback never fires (legacy hold-forever).
+		//
+		// If the held content re-suspends on a DIFFERENT thenable (e.g. the
+		// transition changed the value to 2, holding on d2; then an urgent update
+		// changed it to 3, re-suspending on d3), the still-pending timeout is
+		// watching the OLD thenable — at fire time its `pendingThenable === thenable`
+		// guard would be stale and it would no-op, leaving the boundary held with
+		// no safety valve. Re-arm the timeout for the NEW thenable so the
+		// "eventually show fallback" budget tracks the content actually in flight.
 		if (
 			state.pendingBody !== null &&
-			state.transitionTimeoutId === null &&
 			TRANSITION_FALLBACK_TIMEOUT_MS !== Infinity &&
-			TRANSITION_FALLBACK_TIMEOUT_MS >= 0
+			TRANSITION_FALLBACK_TIMEOUT_MS >= 0 &&
+			(state.transitionTimeoutId === null || state.pendingThenable !== thenable)
 		) {
+			if (state.transitionTimeoutId !== null) {
+				clearTimeout(state.transitionTimeoutId);
+				state.transitionTimeoutId = null;
+			}
 			state.transitionTimeoutId = setTimeout(() => {
 				state.transitionTimeoutId = null;
 				// Only swap if we're still in the same suspended-transition state
