@@ -2,21 +2,24 @@
 "octane": patch
 ---
 
-Speed up text-heavy keyed-list updates (the `.tsx` `{expr}` value-hole path).
+Make React-style `.tsx` `{expr}` value-hole updates as fast as a `.tsrx`
+`{… as string}` text binding.
 
-- A renderable `{expr}` value hole now compiles to a small `textSlot` wrapper
-  instead of calling `childSlot` directly. `childSlot` is a large function (it
-  classifies arrays / host descriptors / element descriptors / components) that
-  V8 won't inline, so paying that call per cell dominated update-heavy keyed
-  lists. `textSlot` handles the common case inline — a primitive value into a
-  slot already in text mode — and delegates to the full `childSlot` only for
-  objects/functions, the first render, or a slot holding non-text content.
-  Behaviour is identical (it's a transparent fast-path).
+- A renderable `{expr}` child in a template body now compiles to an INLINE
+  text-hole fast path: the text node + last value are cached on the binding bag
+  (`_chv`/`_chp`), and on update — when the value is an unchanged-skippable
+  primitive already backed by a text node — it does a direct `setText`, exactly
+  like the `.tsrx` text-binding hot path. Objects/functions (component / element /
+  array), the first render, and mode switches go through a `textHole` slow path
+  that delegates to the full `childSlot`. Previously every value hole called
+  `childSlot` per render — a large function V8 won't inline, with a slot-state
+  indirection — which dominated update-heavy keyed lists. (A control-flow-only
+  `noTemplate` body, which has no bag, uses a small `textSlot` wrapper instead.)
 - Text-node writes use `node.nodeValue` instead of `node.data` (a `Node`-level
   accessor vs `CharacterData` one prototype hop deeper) across `setText`,
-  `textSlot`, `childSlot`, and the de-opt reconciler — measurably faster on the
-  hot text-update path (this also speeds the `.tsrx` `{… as string}` `setText`
-  path).
+  `childSlot`, the inline text-hole, and the de-opt reconciler — faster on the hot
+  text-update path (also speeds the `.tsrx` `setText` path).
 
-On the dbmon update benchmark (1000-row table), `.tsx` `tick` dropped ~10% and
-partial updates more; no API change.
+No API or behavioural change. On the dbmon update benchmark (1000-row table) this
+closed the `.tsx` gap to `.tsrx`: full-table `tick` ~2.1ms → ~1.5ms and partial
+`tick` ~0.9ms → ~0.5ms (both now matching the `.tsrx` column).

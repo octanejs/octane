@@ -4594,6 +4594,30 @@ export function textSlot(
 	state.text = tn;
 }
 
+// Slow path for the compiler's INLINE text-hole codegen. The compiled `.tsx`
+// `{expr}` value hole caches its text node on the binding bag and, on update,
+// does `setText(node, _v)` directly when `_v` is a primitive and a node already
+// exists — matching the `.tsrx` `{… as string}` text-binding hot path exactly.
+// It only calls here when that inline fast path doesn't apply: `_v` is an
+// object/function (component / element / array), or there's no cached node yet
+// (first render, hydration, or a prior non-text render). We hand off to the full
+// `childSlot` for classification + slot-state management, then return the text
+// node it settled on (or null when it now holds a Block / array / host node) so
+// the caller can cache it for the next fast update.
+export function textHole(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	value: unknown,
+	anchor?: Node | null,
+): Text | null {
+	childSlot(parentScope, slotKey, domParent, value, anchor);
+	const state = parentScope.slots[slotKey] as ChildSlot;
+	return state.block === null && state.forSlot === null && state.hostNode === null
+		? state.text
+		: null;
+}
+
 // True if any context the block read last render has since changed value
 // (its Provider bumped the version). When so, a memo bailout must NOT skip —
 // the block (or a consumer in its subtree) needs the new context value.
