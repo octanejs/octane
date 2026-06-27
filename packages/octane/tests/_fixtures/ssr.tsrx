@@ -19,9 +19,14 @@ export function Spread(props) @{
 	<div {...props.attrs} class="base">{'x'}</div>
 }
 
-// innerHTML (raw, unescaped).
+// dangerouslySetInnerHTML (raw, unescaped).
 export function Raw(props) @{
-	<div innerHTML={props.html} />
+	<div dangerouslySetInnerHTML={{ __html: props.html }} />
+}
+
+// dangerouslySetInnerHTML carried THROUGH a spread — raw content on the server too.
+export function RawSpread(props) @{
+	<div {...props.attrs} class="base" />
 }
 
 // Hooks must render their initial value on the server (state initial, memo once,

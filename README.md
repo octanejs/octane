@@ -47,6 +47,8 @@ Octane is currently in alpha development.
 - No virtual DOM, no signals, components re-render like React but with minimal overhead.
 - Fully async support, including transitions, deferred values and support for `<Activity>`.
 - Support for ref array composition `<div ref={[ref1, ref2]} />`.
+- Raw HTML via React's `<div dangerouslySetInnerHTML={{ __html: markup }} />`
+  (works with spreads; SSR-rendered and hydrated).
 - Real DOM events through delegation, rather than a synthetic event layer, so
   event behavior matches the platform.
 - Full server-side rendering support and hydration.

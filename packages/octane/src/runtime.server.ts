@@ -214,7 +214,8 @@ function ssrChildItem(v: unknown, scope: SSRScope): string {
 // emission of the compiler's `ssrEmitElement`: `className`→`class`, `style` objects
 // flattened, spread-unsafe / event / ref / key / children props skipped, and
 // children recursed via ssrChild (array → blocks, element/component → render,
-// primitive → escaped text). innerHTML, if present, is raw (unescaped) content.
+// primitive → escaped text). `dangerouslySetInnerHTML={{__html}}`, if present, is
+// raw (unescaped) content.
 function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope): string {
 	let attrs = '';
 	let innerHTML: unknown = undefined;
@@ -224,8 +225,8 @@ function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope)
 			// onX events have no server semantics (no DOM); drop them.
 			if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') continue;
 			const val = props[k];
-			if (k === 'innerHTML') {
-				innerHTML = val;
+			if (k === 'dangerouslySetInnerHTML') {
+				innerHTML = val == null || val.__html == null ? '' : val.__html;
 				continue;
 			}
 			if (k === 'style') attrs += ssrStyle(val);
@@ -342,7 +343,7 @@ export function ssrSpread(obj: unknown): string {
 	if (obj == null || typeof obj !== 'object') return '';
 	let out = '';
 	for (const k in obj as Record<string, unknown>) {
-		if (k === 'ref' || k === 'key' || k === 'children' || k === 'innerHTML') continue;
+		if (k === 'ref' || k === 'key' || k === 'children' || k === 'dangerouslySetInnerHTML') continue;
 		if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') continue; // onX
 		const v = (obj as Record<string, unknown>)[k];
 		if (k === 'style') out += ssrStyle(v);
@@ -350,6 +351,19 @@ export function ssrSpread(obj: unknown): string {
 		else if (VALID_ATTR_NAME.test(k)) out += ssrAttr(k, v); // skip injection-unsafe names
 	}
 	return out;
+}
+
+// Pick the effective `dangerouslySetInnerHTML` content from a set of source
+// objects given in SOURCE ORDER (explicit `dangerouslySetInnerHTML={…}` attrs and
+// spread `.dangerouslySetInnerHTML` values). The LAST present object wins (matching
+// the client's last-write-wins ordering); a present-but-null `__html` renders ''.
+// Returns undefined when no source is present, so the caller falls back to children.
+export function ssrInnerHtml(sources: unknown[]): string | undefined {
+	for (let i = sources.length - 1; i >= 0; i--) {
+		const s = sources[i] as { __html?: unknown } | null | undefined;
+		if (s != null) return s.__html == null ? '' : String(s.__html);
+	}
+	return undefined;
 }
 
 /** Render a child component into the string: fresh scope, server body → HTML. */

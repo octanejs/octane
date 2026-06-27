@@ -58,6 +58,7 @@ export {
 	ssrAttr,
 	ssrStyle,
 	ssrSpread,
+	ssrInnerHtml,
 	ssrComponent,
 	ssrBlock,
 	ssrPortal,

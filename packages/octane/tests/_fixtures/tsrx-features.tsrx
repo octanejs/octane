@@ -92,13 +92,13 @@ export function TernaryFragmentChild(props) @{
 }
 
 // ---------------------------------------------------------------------------
-// `innerHTML={…}` attribute — replaces the old `{html expr}` child-position
-// intrinsic. When this is the only "child" path on a host, the compiler emits
-// the innerHTML-assignment fast path.
+// React-style `dangerouslySetInnerHTML={{__html}}`. When this is the only
+// "child" path on a host, the compiler emits the innerHTML-assignment fast path
+// on the extracted `__html` expression.
 // ---------------------------------------------------------------------------
 
 export function HtmlOnlyChild(props) @{
-	<div id="html-host" innerHTML={props.markup} />
+	<div id="html-host" dangerouslySetInnerHTML={{ __html: props.markup }} />
 }
 
 // ---------------------------------------------------------------------------
