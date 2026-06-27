@@ -8,7 +8,7 @@ import { hydrateRoot, flushSync } from '../src/index.js';
 import { ConcatCount, Labelled } from './_fixtures/known-string.tsrx';
 
 // A dynamic text hole `{expr}` is classified as TEXT (an `htext` binding) vs a
-// RENDERABLE child (`childSlot`) by `isKnownStringExpression` in the compiler.
+// RENDERABLE child (`textSlot`) by `isKnownStringExpression` in the compiler.
 // The explicit `{expr as string}` cast forces TEXT, but it is UNNECESSARY when
 // the compiler can already prove the value is a string — a string literal, a
 // template literal, or a `+`-concatenation involving a string. These tests pin
@@ -23,10 +23,10 @@ function classify(holeOrSetup: string, hole?: string): 'text' | 'renderable' | s
 		export function C(props) @{ const [n, setN] = useState(0); ${setup} <p>${theHole}</p> }`;
 	const code = compile(src, 'ks.tsrx').code;
 	const isText = /htext\(/.test(code);
-	const isChild = /childSlot\(/.test(code);
+	const isChild = /textSlot\(/.test(code);
 	if (isText && !isChild) return 'text';
 	if (isChild && !isText) return 'renderable';
-	return `ambiguous(htext=${isText},childSlot=${isChild})`;
+	return `ambiguous(htext=${isText},textSlot=${isChild})`;
 }
 
 describe('text holes — `as string` cast is optional when provably a string', () => {
@@ -105,12 +105,12 @@ describe('text holes — bare identifier tracked back to a string (no cast)', ()
 		const code = compile(src, 'shadow.tsrx').code;
 		// The inner {item} is the loop var, so it must be a renderable child, not a
 		// text binding stamped from the outer `const item` string.
-		expect(/childSlot\(/.test(code)).toBe(true);
+		expect(/textSlot\(/.test(code)).toBe(true);
 	});
 
 	it('`string`-typed param → text', () => {
 		const code = compile(`export function C(name: string) @{ <p>{name}</p> }`, 'param.tsrx').code;
-		expect(/htext\(/.test(code) && !/childSlot\(/.test(code)).toBe(true);
+		expect(/htext\(/.test(code) && !/textSlot\(/.test(code)).toBe(true);
 	});
 });
 

@@ -81,6 +81,7 @@ export {
 	componentSlot,
 	componentSlotLite,
 	childSlot,
+	textSlot,
 	hostComponent,
 	Fragment,
 	FragmentInstance,

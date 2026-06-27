@@ -2110,7 +2110,7 @@ export function htextSwap(posNode: Node | null, text: string): Text {
 	if (hydrating) {
 		if (posNode !== null && posNode.nodeType === 3) {
 			// Adopt the server text node.
-			if ((posNode as Text).data !== text) (posNode as Text).data = text;
+			if ((posNode as Text).nodeValue !== text) (posNode as Text).nodeValue = text;
 			return posNode as Text;
 		}
 		// Server emitted no text node here (empty value, or it merged with an
@@ -2223,12 +2223,15 @@ export function sibling(node: Node, n: number = 1): Node | null {
 export function setText(node: Text, value: any): void {
 	// Unconditional write: the compiler's only emission site guards every call
 	// with `if (_b._prev$ !== _v)`, and `_prev` mirrors the node's current text
-	// (seeded at mount, updated on each write), so `node.data === _prev` always
-	// holds — an internal `node.data !== next` recheck is provably always true.
-	// Skipping it avoids reading `node.data`, whose getter materializes a fresh
-	// JS string from the DOM on every call (a measurable cost + GC pressure on
-	// text-heavy updates where the value always changes).
-	node.data =
+	// (seeded at mount, updated on each write), so the node's text always equals
+	// `_prev` — an internal recheck is provably always true. Skipping it avoids a
+	// text-getter read, which materializes a fresh JS string from the DOM on every
+	// call (a measurable cost + GC pressure on text-heavy updates).
+	//
+	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
+	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
+	// for the hot text-update path.
+	node.nodeValue =
 		value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
 }
 
@@ -4147,7 +4150,7 @@ function reconcileDeoptNode(prev: Node | null, value: any, ownerBlock: Block): N
 	if (t === 'string' || t === 'number' || t === 'bigint') {
 		const s = String(value);
 		if (prev !== null && prev.nodeType === 3 /* Text */) {
-			if ((prev as Text).data !== s) (prev as Text).data = s;
+			if ((prev as Text).nodeValue !== s) (prev as Text).nodeValue = s;
 			return prev;
 		}
 		return document.createTextNode(s);
@@ -4526,7 +4529,7 @@ export function childSlot(
 		return;
 	}
 	if (state.text !== null) {
-		if (state.text.data !== str) state.text.data = str;
+		if (state.text.nodeValue !== str) state.text.nodeValue = str;
 		return;
 	}
 	if (hydrating) {
@@ -4536,10 +4539,56 @@ export function childSlot(
 		if (n !== null && n !== state.end && n.nodeType === 3) {
 			state.text = n as Text;
 			hydrateNode = n.nextSibling;
-			if ((n as Text).data !== str) (n as Text).data = str;
+			if ((n as Text).nodeValue !== str) (n as Text).nodeValue = str;
 			return;
 		}
 	}
+	const tn = document.createTextNode(str);
+	domParent.insertBefore(tn, state.end);
+	state.text = tn;
+}
+
+// A `{expr}` value-hole slot whose value is USUALLY a primitive (text) — what the
+// compiler emits for `.tsx` element children. `childSlot` is a large function that
+// V8 won't inline, so calling it per cell on every render dominated update-heavy
+// keyed lists (a dbmon-style table cell was ~50% of tick time). This thin,
+// inlinable wrapper handles the dominant case — a primitive into a slot already in
+// text/empty mode — with the same work as `setText`, and delegates to the full
+// `childSlot` only for objects/functions (component / element / array values), a
+// not-yet-initialized slot (first render), or a slot currently holding non-text
+// content. Behaviour is identical to calling `childSlot` directly.
+export function textSlot(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	value: unknown,
+	anchor?: Node | null,
+): void {
+	const vt = typeof value;
+	if (vt === 'object' || vt === 'function') {
+		childSlot(parentScope, slotKey, domParent, value, anchor);
+		return;
+	}
+	const state = parentScope.slots[slotKey] as ChildSlot | undefined;
+	if (
+		state === undefined ||
+		state.block !== null ||
+		state.forSlot !== null ||
+		state.hostNode !== null
+	) {
+		// First render (state init + hydration adoption) or a mode switch out of
+		// non-text content — let the full classifier handle it.
+		childSlot(parentScope, slotKey, domParent, value, anchor);
+		return;
+	}
+	// Hot path: primitive into a text/empty slot (markerless single Text node).
+	const str =
+		vt === 'string' ? (value as string) : vt === 'boolean' || value == null ? '' : String(value);
+	if (state.text !== null) {
+		if (state.text.nodeValue !== str) state.text.nodeValue = str;
+		return;
+	}
+	if (str === '') return;
 	const tn = document.createTextNode(str);
 	domParent.insertBefore(tn, state.end);
 	state.text = tn;
@@ -5996,18 +6045,18 @@ function hideActivityRange(state: ActivitySlot): void {
 			el.style.display = 'none';
 		} else if (node.nodeType === 3) {
 			const t = node as Text;
-			if (!state.savedText.has(t)) state.savedText.set(t, t.data);
-			if (t.data !== '') t.data = '';
+			if (!state.savedText.has(t)) state.savedText.set(t, t.nodeValue ?? '');
+			if (t.nodeValue !== '') t.nodeValue = '';
 		}
 		node = node.nextSibling;
 	}
 }
 
-/** Restore the inline `display` / text `data` we saved on hide. */
+/** Restore the inline `display` / text content we saved on hide. */
 function showActivityRange(state: ActivitySlot): void {
 	for (const [el, display] of state.savedDisplay) el.style.display = display;
 	state.savedDisplay.clear();
-	for (const [t, data] of state.savedText) t.data = data;
+	for (const [t, data] of state.savedText) t.nodeValue = data;
 	state.savedText.clear();
 }
 
