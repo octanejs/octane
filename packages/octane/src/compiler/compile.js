@@ -2167,7 +2167,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	if (inlinedSubs.length > 0)
 		lines.push(inlinedSubs.map((s) => '  ' + s.replace(/\n/g, '\n  ')).join('\n'));
 	if (plan.bindingsName) {
-		lines.push(`  let _b = __s.${plan.bindingsName};`);
+		lines.push(`  let _b = __s.slots[0];`);
 		lines.push(`  if (_b === undefined) {`);
 		lines.push(plan.mount);
 		lines.push(`  } else {`);
@@ -3597,7 +3597,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 
 	const bindingsName = `b$${ctx.nextHelperId++}`;
 	const mountLines = [];
-	// Initialize `_b` as a LOCAL only — commit to `__s.${bindingsName}` at the
+	// Initialize `_b` as a LOCAL only — commit to `__s.slots[0]` at the
 	// VERY END of the mount path. If anything thrown mid-mount (e.g. a `use()`
 	// call suspending or a child render throwing), the scope's binding bag
 	// stays `undefined` and the next attempt re-enters the mount branch from
@@ -3783,8 +3783,8 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// Commit the binding bag to the scope LAST — see the matching comment at
 	// the `_b = {}` initialization above. Reaching here means every binding
 	// and the DOM range have been successfully constructed, so future
-	// renders can safely take the update branch keyed on `__s.${bindingsName}`.
-	mountLines.push(`    __s.${bindingsName} = _b;`);
+	// renders can safely take the update branch keyed on `__s.slots[0]`.
+	mountLines.push(`    __s.slots[0] = _b;`);
 
 	// Update.
 	const updateLines = [];
@@ -3804,8 +3804,15 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// a harmless no-op for them.
 	const afterCalls = [];
 	const pushAfter = (id, line) => afterCalls.push({ id, line });
+	// Dense per-body slot index. Slot 0 is this body's binding bag (`__s.slots[0]`);
+	// each control-flow / component / child construct gets the next index, so a scope
+	// stores its slots in a packed array instead of dynamic `scope['_for$N']` keys
+	// (which kept the scope hidden-class polymorphic). Assigned in emit order; the
+	// value is a stable per-call-site handle (it need not match runtime call order).
+	let nextSlotIndex = 1;
 	for (const fc of forCalls) {
 		ctx.runtimeNeeded.add('forBlock');
+		const slotIndex = nextSlotIndex++;
 		// flags: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item markers),
 		//        bit 2 = depEligible (runtime compares deps array, upgrades to pure
 		//        for survivors when deps unchanged this render).
@@ -3827,13 +3834,14 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				? ', undefined'
 				: '';
 		const emptyPart = hasEmpty ? `, ${fc.emptyHelper}` : hasAnchor ? ', null' : '';
-		const anchorPart = hasAnchor ? `, __s.${bindingsName}._forAnchor$${fc.id}` : '';
+		const anchorPart = hasAnchor ? `, __s.slots[0]._forAnchor$${fc.id}` : '';
 		pushAfter(
 			fc.id,
-			`  forBlock(__s, ${JSON.stringify('_for$' + fc.id)}, __s.${bindingsName}._for$${fc.id}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}, ${fc.extraExpr}${flagsPart}${depsPart}${emptyPart}${anchorPart});`,
+			`  forBlock(__s, ${slotIndex}, __s.slots[0]._for$${fc.id}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}, ${fc.extraExpr}${flagsPart}${depsPart}${emptyPart}${anchorPart});`,
 		);
 	}
 	for (const ic of ifCalls) {
+		const slotIndex = nextSlotIndex++;
 		// Anchor selection mirrors componentSlot: with `<!>`-anchored source-order
 		// siblings, pass the captured anchor var so the start/end markers land
 		// BEFORE it (preserving order). When the host is the body's own parentNode
@@ -3842,13 +3850,13 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// range. Otherwise (host is a real template element) omit it (append into
 		// the element).
 		let anchorArg = '';
-		if (ic.anchorVar) anchorArg = `, __s.${bindingsName}._ifAnchor$${ic.id}`;
+		if (ic.anchorVar) anchorArg = `, __s.slots[0]._ifAnchor$${ic.id}`;
 		else if (ic.elVar && !ic.elVar.startsWith('_el')) anchorArg = ', __block.endMarker';
 		if (ic.activity) {
 			ctx.runtimeNeeded.add('activityBlock');
 			pushAfter(
 				ic.id,
-				`  activityBlock(__s, ${JSON.stringify('_activity$' + ic.id)}, __s.${bindingsName}._ifHost$${ic.id}, (${ic.modeExpr}), ${ic.thenHelper}${anchorArg});`,
+				`  activityBlock(__s, ${slotIndex}, __s.slots[0]._ifHost$${ic.id}, (${ic.modeExpr}), ${ic.thenHelper}${anchorArg});`,
 			);
 			continue;
 		}
@@ -3856,10 +3864,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const elseArg = ic.elseHelper || 'null';
 		pushAfter(
 			ic.id,
-			`  ifBlock(__s, ${JSON.stringify('_if$' + ic.id)}, __s.${bindingsName}._ifHost$${ic.id}, (${ic.condExpr}), ${ic.thenHelper}, ${elseArg}${anchorArg});`,
+			`  ifBlock(__s, ${slotIndex}, __s.slots[0]._ifHost$${ic.id}, (${ic.condExpr}), ${ic.thenHelper}, ${elseArg}${anchorArg});`,
 		);
 	}
 	for (const cc of compCalls) {
+		const slotIndex = nextSlotIndex++;
 		// Renderable `{expr}` hole — dispatch the value at runtime (component /
 		// element → block; primitive → text; nullish/boolean/'' → nothing). Shares
 		// the host/`<!>`-anchor resolution + hole-aware hydration walk with real
@@ -3868,14 +3877,14 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			ctx.runtimeNeeded.add('childSlot');
 			let anchorArg;
 			if (cc.anchorVar) {
-				anchorArg = `, __s.${bindingsName}._compAnchor$${cc.id}`;
+				anchorArg = `, __s.slots[0]._compAnchor$${cc.id}`;
 			} else {
 				const isInsideHost = cc.elVar.startsWith('_el');
 				anchorArg = isInsideHost ? '' : ', __block.endMarker';
 			}
 			pushAfter(
 				cc.id,
-				`  childSlot(__s, ${JSON.stringify('_child$' + cc.id)}, __s.${bindingsName}._compHost$${cc.id}, ${cc.valueExpr}${anchorArg});`,
+				`  childSlot(__s, ${slotIndex}, __s.slots[0]._compHost$${cc.id}, ${cc.valueExpr}${anchorArg});`,
 			);
 			continue;
 		}
@@ -3892,13 +3901,13 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			// block's own parentNode (so the lite range stays inside the block).
 			let anchorArg = '';
 			if (cc.anchorVar) {
-				anchorArg = `, __s.${bindingsName}._compAnchor$${cc.id}`;
+				anchorArg = `, __s.slots[0]._compAnchor$${cc.id}`;
 			} else if (!cc.elVar.startsWith('_el')) {
 				anchorArg = ', __block.endMarker';
 			}
 			pushAfter(
 				cc.id,
-				`  componentSlotLite(__s, ${JSON.stringify('_comp$' + cc.id)}, __s.${bindingsName}._compHost$${cc.id}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg});`,
+				`  componentSlotLite(__s, ${slotIndex}, __s.slots[0]._compHost$${cc.id}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg});`,
 			);
 			continue;
 		}
@@ -3915,7 +3924,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		//     the slot can safely append (insertBefore ignores foreign anchors).
 		let anchorArg;
 		if (cc.anchorVar) {
-			anchorArg = `, __s.${bindingsName}._compAnchor$${cc.id}`;
+			anchorArg = `, __s.slots[0]._compAnchor$${cc.id}`;
 		} else {
 			const isInsideHost = cc.elVar.startsWith('_el');
 			anchorArg = isInsideHost ? '' : ', __block.endMarker';
@@ -3938,42 +3947,45 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		}
 		pushAfter(
 			cc.id,
-			`  componentSlot(__s, ${JSON.stringify('_comp$' + cc.id)}, __s.${bindingsName}._compHost$${cc.id}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg});`,
+			`  componentSlot(__s, ${slotIndex}, __s.slots[0]._compHost$${cc.id}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg});`,
 		);
 	}
 	for (const pc of ctx._portalCalls) {
+		const slotIndex = nextSlotIndex++;
 		ctx.runtimeNeeded.add('portal');
 		pushAfter(
 			pc.id,
-			`  portal(__s, ${JSON.stringify('_portal$' + pc.id)}, ${pc.targetExpr}, ${pc.bodyExpr}, ${pc.propsExpr}, __s.${bindingsName}._portalHost$${pc.id});`,
+			`  portal(__s, ${slotIndex}, ${pc.targetExpr}, ${pc.bodyExpr}, ${pc.propsExpr}, __s.slots[0]._portalHost$${pc.id});`,
 		);
 	}
 	// Restore the outer plan's portal-call list — pairs with the save above.
 	ctx._portalCalls = _prevPortalCalls;
 	for (const tc of tryCalls) {
+		const slotIndex = nextSlotIndex++;
 		ctx.runtimeNeeded.add('tryBlock');
 		// Anchor selection mirrors componentSlot:
 		//   - In mixed children with source-order siblings, we emitted a `<!>`
 		//     placeholder at the @try's index and stored its el var on
 		//     `tc.anchorVar` — pass that so tryBlock inserts BEFORE it.
 		//   - Otherwise omit (runtime treats undefined === appendChild).
-		const tryAnchorArg = tc.anchorVar ? `, __s.${bindingsName}._tryAnchor$${tc.id}` : '';
+		const tryAnchorArg = tc.anchorVar ? `, __s.slots[0]._tryAnchor$${tc.id}` : '';
 		pushAfter(
 			tc.id,
-			`  tryBlock(__s, ${JSON.stringify('_try$' + tc.id)}, __s.${bindingsName}._tryHost$${tc.id}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg});`,
+			`  tryBlock(__s, ${slotIndex}, __s.slots[0]._tryHost$${tc.id}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg});`,
 		);
 	}
 	for (const sc of ctx._switchCalls) {
+		const slotIndex = nextSlotIndex++;
 		ctx.runtimeNeeded.add('switchBlock');
 		// Anchor selection mirrors componentSlot:
 		//   - When the @switch had source-order siblings (mixed-children loop
 		//     emitted a `<!>` placeholder at its index), pass the stashed
 		//     anchor node so switchBlock inserts BEFORE it.
 		//   - Otherwise omit the arg; the runtime defaults to appendChild.
-		const anchorArg = sc.anchorVar ? `, __s.${bindingsName}._switchAnchor$${sc.id}` : '';
+		const anchorArg = sc.anchorVar ? `, __s.slots[0]._switchAnchor$${sc.id}` : '';
 		pushAfter(
 			sc.id,
-			`  switchBlock(__s, ${JSON.stringify('_switch$' + sc.id)}, __s.${bindingsName}._switchHost$${sc.id}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg});`,
+			`  switchBlock(__s, ${slotIndex}, __s.slots[0]._switchHost$${sc.id}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg});`,
 		);
 	}
 	// Restore the outer plan's switch-call list — pairs with the save above.
