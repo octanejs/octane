@@ -1,11 +1,15 @@
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
 import { flushSync } from '../src/index.js';
 import { mount } from './_helpers';
 import {
 	ProviderApp,
 	ReconcileApp,
+	InputApp,
+	InputListApp,
 	bumpCount,
 	reRenderParent,
+	reRenderField,
+	reRenderList,
 } from './_fixtures/jsx-context-children.tsx';
 
 // JSX backwards-compat: a React-style `.tsx` `<Ctx.Provider value>` with element

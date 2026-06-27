@@ -76,3 +76,45 @@ export function ReconcileApp() {
 	_forceParent = force;
 	return <Host show={true} />;
 }
+
+// --- pure-host DOM-state preservation across a re-render (the de-opt reconciler) ---
+
+let _forceField: ((u: (n: number) => number) => void) | null = null;
+let _forceList: ((u: (n: number) => number) => void) | null = null;
+
+export function reRenderField() {
+	if (_forceField) _forceField((n) => n + 1);
+}
+export function reRenderList() {
+	if (_forceList) _forceList((n) => n + 1);
+}
+
+// Control-flow return → de-opt host VALUE path: a pure-host <input> (no component
+// children). Its DOM node — and any DOM-resident state (value/focus) — must survive
+// a parent re-render (reused, not rebuilt).
+function Field(props: { show: boolean }) {
+	if (props.show) {
+		return <input className="field" type="text" />;
+	}
+	return <span className="nofield">no</span>;
+}
+
+export function InputApp() {
+	const [, force] = useState(0);
+	_forceField = force;
+	return <Field show={true} />;
+}
+
+// A `.map()` of pure-host <input>s (de-opt ARRAY path → deoptItemBody). Each input
+// node must be reused across a parent re-render so typed values survive.
+export function InputListApp() {
+	const [, force] = useState(0);
+	_forceList = force;
+	return (
+		<div className="list">
+			{[0, 1, 2].map((i) => (
+				<input className="li" data-idx={i as number} key={i as number} />
+			))}
+		</div>
+	);
+}

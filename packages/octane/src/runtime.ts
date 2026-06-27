@@ -126,6 +126,13 @@ export interface Block extends Scope {
 	memoInChain: boolean;
 	pending: boolean;
 	disposed: boolean;
+	/**
+	 * The single pure-host DOM node this Block manages on the de-opt path, REUSED
+	 * across re-renders so DOM-resident state survives (no rebuild). Set by
+	 * `deoptItemBody` (a `.map()` item that is a host element) and by `hostElementBody`
+	 * (the host-element-with-component-children renderer). Null for every other Block.
+	 */
+	deoptNode: Node | null;
 	/** Set on item Blocks: pointer to the enclosing for-block's slot. */
 	forSlot: ForSlot | null;
 	/** Item position within the enclosing for-block. 0 for non-item blocks. */
@@ -717,6 +724,9 @@ class BlockImpl {
 	$$ctxCache: Map<Context<any>, any> | null;
 	// __thenableIdx is reset every renderBlock so pre-init costs nothing.
 	__thenableIdx: number;
+	// De-opt host node managed by this Block (deoptItemBody / hostElementBody), reused
+	// across renders. Null for all other blocks; declared so the shape stays monomorphic.
+	deoptNode: Node | null;
 	// For-block item bookkeeping.
 	forSlot: ForSlot | null;
 	prevSibling: Block | null;
@@ -770,6 +780,7 @@ class BlockImpl {
 		this.$$ctxDirect = null;
 		this.$$ctxCache = null;
 		this.__thenableIdx = 0;
+		this.deoptNode = null;
 		this.forSlot = null;
 		this.prevSibling = null;
 		this.nextSibling = null;
@@ -3539,6 +3550,11 @@ export function createElement<P>(
 	const p = (props ?? {}) as any;
 	const key = p.key != null ? p.key : null;
 	const kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : p.children;
+	// Multiple positional children → a fresh array of FIXED siblings (never reordered).
+	// Tag it so the de-opt list keys them by index without the missing-key warning that
+	// is meant for `.map()` results. (A single child is passed through as-is — a lone
+	// `.map()` array stays untagged and keeps the warning.)
+	if (children.length > 1) POSITIONAL_CHILDREN.add(children);
 	// React-shape contract: positional children ARE `props.children`. A COMPONENT
 	// descriptor reaches its body through componentSlot, which forwards `props`
 	// only (not `descriptor.children`) — so a component that reads `{props.children}`
@@ -3798,6 +3814,10 @@ interface ChildSlot {
 	// array. Lets `{items.map(...)}` / `{props.rows}` / any array-of-elements
 	// child render soundly without compile-time pattern matching.
 	forSlot: ForSlot | null;
+	// The single pure-host (no component descendants) DOM node currently rendered at
+	// this slot, REUSED across re-renders by the de-opt reconciler so DOM-resident
+	// state survives. Null when the slot holds a component/text/array instead.
+	hostNode: Node | null;
 }
 
 // `true`/`false`/`null`/`undefined` render as empty (React parity); everything
@@ -3831,9 +3851,16 @@ function clearChildContent(state: ChildSlot): void {
 	} else if (state.text !== null) {
 		// Client text path: a single tracked Text node, no start marker to sweep.
 		state.text.remove();
+	} else if (state.hostNode !== null) {
+		// Pure-host de-opt node with no start marker (rare) — remove it directly.
+		(state.hostNode as ChildNode).remove?.();
 	}
 	state.text = null;
 	state.currentComp = null;
+	// The marker sweep above (or the direct removes) detached any pure-host node, so
+	// drop the stale reference — a later pure-host render must rebuild, not "reuse" a
+	// detached element.
+	state.hostNode = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -3842,11 +3869,14 @@ function clearChildContent(state: ChildSlot): void {
 // an array of elements (incl. one passed through props), or a lone host
 // descriptor. The compiled-template path stays the fast path; this is the sound
 // fallback React-shaped code relies on (we can't statically prove `items.map` is
-// a list, and arrays arrive via many non-`.map` paths). Trade-off: host elements
-// are REBUILT on each re-render — node identity / focus are NOT preserved across
-// parent renders (use `@for (...; key ...)` for the keyed fast path). Component
-// descriptors are NOT renderable on this path in v1 (they need a block for hooks
-// + reconciliation); `@for` is the keyed-component path.
+// a list, and arrays arrive via many non-`.map` paths).
+//
+// Host elements are RECONCILED in place across re-renders (reconcileDeoptNode):
+// same-tag elements are reused — props patched, children matched by key/position —
+// so DOM-resident state (input value, focus, selection, scroll, media) survives.
+// `@for (...; key ...)` remains the compiled fast path. Component descriptors in
+// this path are rendered via real Blocks (hostElementBody / the childSlot component
+// path) so their hooks/state reconcile too.
 // ---------------------------------------------------------------------------
 
 let _deoptKeyWarned = false;
@@ -3866,32 +3896,88 @@ function deoptKey(item: any, index: number): any {
 	return index;
 }
 
-// Route a host descriptor's props onto a fresh element, reusing the same helpers
-// the compiler emits (className/style/setAttribute + `$$type` delegated-event
-// slots + deferred ref attach).
+// `createElement(tag, props, a, b, …)` collapses MULTIPLE positional children into a
+// fresh array. Those are FIXED siblings (they never reorder), so the de-opt list keys
+// them by index SILENTLY — unlike a `.map()` result, where a missing key is a real
+// reorder hazard worth warning about. createElement tags its positional arrays in
+// this set so childSlot can pick the silent key function.
+const POSITIONAL_CHILDREN = new WeakSet<object>();
+
+// Index key WITHOUT the missing-key warning — used for positional children arrays.
+function deoptKeyPositional(item: any, index: number): any {
+	return item != null && item.$$kind === ELEMENT_TAG && item.key != null ? item.key : index;
+}
+
+// Whether a prop name is an `on<Upper>` delegated-event handler (e.g. `onClick`).
+function isDelegatedEventName(name: string): boolean {
+	return (
+		name.length > 2 &&
+		name.charCodeAt(0) === 111 /* o */ &&
+		name.charCodeAt(1) === 110 /* n */ &&
+		name.charCodeAt(2) >= 65 &&
+		name.charCodeAt(2) <= 90 /* on<Upper> */
+	);
+}
+
+// Apply ONE host prop, reusing the same helpers the compiler emits (className/style/
+// setAttribute + `$$type` delegated-event slots + deferred ref attach).
+function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): void {
+	if (name === 'ref') {
+		if (v != null) queueRefAttach(ownerBlock, () => attachRef(v, el));
+	} else if (name === 'className' || name === 'class') {
+		setClassName(el, v);
+	} else if (name === 'style') {
+		setStyle(el as HTMLElement, v, undefined);
+	} else if (isDelegatedEventName(name)) {
+		const type = name.slice(2).toLowerCase();
+		(el as any)['$$' + type] = v;
+		delegateEvents([type]);
+	} else {
+		setAttribute(el, name, v);
+	}
+}
+
+// Remove a host prop that was present last render and is gone this render (reconcile
+// path). The node is being REUSED (not unmounted), so a removed `ref` is left to the
+// unmount path rather than detached here.
+function removeDeoptProp(el: Element, name: string): void {
+	if (name === 'ref') {
+		/* reused node — ref detach is the unmount path's job */
+	} else if (name === 'className' || name === 'class') {
+		setClassName(el, '');
+	} else if (name === 'style') {
+		el.removeAttribute('style');
+	} else if (isDelegatedEventName(name)) {
+		(el as any)['$$' + name.slice(2).toLowerCase()] = undefined;
+	} else {
+		el.removeAttribute(name);
+	}
+}
+
+// Route a host descriptor's props onto a FRESH element (first build).
 function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 	if (props == null) return;
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
-		const v = props[name];
-		if (name === 'ref') {
-			if (v != null) queueRefAttach(ownerBlock, () => attachRef(v, el));
-		} else if (name === 'className' || name === 'class') {
-			setClassName(el, v);
-		} else if (name === 'style') {
-			setStyle(el as HTMLElement, v, undefined);
-		} else if (
-			name.length > 2 &&
-			name.charCodeAt(0) === 111 /* o */ &&
-			name.charCodeAt(1) === 110 /* n */ &&
-			name.charCodeAt(2) >= 65 &&
-			name.charCodeAt(2) <= 90 /* on<Upper> → delegated event */
-		) {
-			const type = name.slice(2).toLowerCase();
-			(el as any)['$$' + type] = v;
-			delegateEvents([type]);
-		} else {
-			setAttribute(el, name, v);
+		applyDeoptProp(el, name, props[name], ownerBlock);
+	}
+}
+
+// Diff prev → next props on a REUSED element (the reconcile path): remove props that
+// disappeared, set new/changed ones. Unchanged props are skipped, so an unchanged
+// `ref` is not re-attached and an unchanged handler is not re-bound.
+function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock: Block): void {
+	if (prevProps != null) {
+		for (const name in prevProps) {
+			if (name === 'key' || name === 'children') continue;
+			if (nextProps == null || !(name in nextProps)) removeDeoptProp(el, name);
+		}
+	}
+	if (nextProps != null) {
+		for (const name in nextProps) {
+			if (name === 'key' || name === 'children') continue;
+			const nv = nextProps[name];
+			if (prevProps == null || prevProps[name] !== nv) applyDeoptProp(el, name, nv, ownerBlock);
 		}
 	}
 }
@@ -3987,38 +4073,120 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 	}
 }
 
-// Build a DOM Node (or DocumentFragment) for a runtime value: primitive → Text,
-// host descriptor → element (props + recursively-built children), array → a
-// fragment of each. Component descriptors throw (use `@for`).
-function buildDeoptDom(value: any, ownerBlock: Block): Node | null {
+// Maps each host element built by the de-opt reconciler to the descriptor that
+// produced it, so a later render can diff props (patchDeoptProps) and match children
+// by key against the live DOM — WITHOUT rebuilding, which would destroy DOM-resident
+// state (input value, focus, selection, scroll, media). A WeakMap keeps this off the
+// DOM node itself (no host-object pollution) and fully typed.
+const DEOPT_DESC = new WeakMap<Node, ElementDescriptor>();
+
+// Flatten a descriptor's `children` (a single value, or a possibly-nested array —
+// `createElement` collapses positional children and `.map()` results into arrays)
+// into a flat list of renderable values, dropping empties (null/undefined/false/
+// true/'') which render nothing.
+function flattenDeoptChildren(out: any[], v: any): void {
+	if (v == null || v === false || v === true || v === '') return;
+	if (Array.isArray(v)) {
+		for (let i = 0; i < v.length; i++) flattenDeoptChildren(out, v[i]);
+		return;
+	}
+	out.push(v);
+}
+
+// Reconcile a runtime value into a DOM node, REUSING `prev` when it's compatible
+// (same Text node, or same-tag element) so DOM-resident state survives a re-render.
+// `prev` is the node currently occupying this position — pass the existing node to
+// reuse/adopt it, or null to build fresh (first client mount). Pure host/text only:
+// component descendants are handled by the Block path (hostElementBody/componentSlot),
+// never here. Returns the node to occupy this position (reused or freshly built), or
+// null for an empty value.
+function reconcileDeoptNode(prev: Node | null, value: any, ownerBlock: Block): Node | null {
 	if (value == null || value === false || value === true || value === '') return null;
 	const t = typeof value;
 	if (t === 'string' || t === 'number' || t === 'bigint') {
-		return document.createTextNode(String(value));
-	}
-	if (Array.isArray(value)) {
-		const frag = document.createDocumentFragment();
-		for (let i = 0; i < value.length; i++) {
-			const n = buildDeoptDom(value[i], ownerBlock);
-			if (n !== null) frag.appendChild(n);
+		const s = String(value);
+		if (prev !== null && prev.nodeType === 3 /* Text */) {
+			if ((prev as Text).data !== s) (prev as Text).data = s;
+			return prev;
 		}
-		return frag;
+		return document.createTextNode(s);
 	}
 	if (isHostDescriptor(value)) {
-		const el = document.createElement(value.type);
-		applyDeoptProps(el, value.props, ownerBlock);
-		const kids = buildDeoptDom(value.children, ownerBlock);
-		if (kids !== null) el.appendChild(kids);
+		let el: Element;
+		if (prev !== null && prev.nodeType === 1 && (prev as Element).localName === value.type) {
+			// REUSE the existing element — patch props in place instead of rebuilding.
+			el = prev as Element;
+			patchDeoptProps(el, DEOPT_DESC.get(el)?.props ?? null, value.props, ownerBlock);
+		} else {
+			el = document.createElement(value.type);
+			applyDeoptProps(el, value.props, ownerBlock);
+		}
+		DEOPT_DESC.set(el, value);
+		reconcileDeoptChildren(el, value.children, ownerBlock);
 		return el;
 	}
+	// A component descriptor must not reach here — the de-opt callers gate on
+	// descNeedsBlocks() and route component-bearing subtrees through Blocks.
 	if (isElementDescriptor(value)) {
 		throw new Error(
-			'Octane: rendering a component on the de-opt path (host JSX produced by a ' +
-				'`.map`/function/array) is not supported. Use `@for (...; key ...)` to render ' +
-				'a keyed list of components.',
+			'Octane: internal — a component descriptor reached the de-opt host reconciler ' +
+				'(should have been routed through a Block via hostElementBody/componentSlot).',
 		);
 	}
 	return null; // unknown object — render nothing (resilient; React would throw).
+}
+
+// Reconcile a host element's children in place, reusing existing child nodes: keyed
+// children match by `key`, unkeyed children match positionally (React-shape). Nodes
+// not reused are removed; survivors are reordered to match the descriptor. No markers
+// are introduced — the element fully owns its children, so this is raw-DOM reuse.
+function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): void {
+	const next: any[] = [];
+	flattenDeoptChildren(next, children);
+	const existing = el.childNodes;
+	// Partition current children: keyed (by stamped descriptor key) vs the rest
+	// (unkeyed elements + text/adopted nodes), which are reused in document order.
+	let byKey: Map<any, Node> | null = null;
+	const unkeyed: Node[] = [];
+	for (let i = 0; i < existing.length; i++) {
+		const n = existing[i];
+		const k = DEOPT_DESC.get(n)?.key;
+		if (k != null) {
+			if (byKey === null) byKey = new Map();
+			byKey.set(k, n);
+		} else {
+			unkeyed.push(n);
+		}
+	}
+	let up = 0;
+	const result: Node[] = [];
+	for (let i = 0; i < next.length; i++) {
+		const child = next[i];
+		const key =
+			child != null && child.$$kind === ELEMENT_TAG && child.key != null ? child.key : null;
+		let prev: Node | null = null;
+		if (key != null) {
+			if (byKey !== null) {
+				prev = byKey.get(key) ?? null;
+				if (prev !== null) byKey.delete(key);
+			}
+		} else {
+			prev = up < unkeyed.length ? unkeyed[up++] : null;
+		}
+		const node = reconcileDeoptNode(prev, child, ownerBlock);
+		if (node !== null) result.push(node);
+	}
+	// Remove existing children not reused.
+	const keep = result.length > 0 ? new Set<Node>(result) : null;
+	for (let i = existing.length - 1; i >= 0; i--) {
+		const n = existing[i];
+		if (keep === null || !keep.has(n)) el.removeChild(n);
+	}
+	// Order survivors/new nodes to match the descriptor.
+	for (let i = 0; i < result.length; i++) {
+		const want = result[i];
+		if (existing[i] !== want) el.insertBefore(want, existing[i] ?? null);
+	}
 }
 
 // `reconcileKeyed` item body for one de-opt array element. Each item rebuilds its
@@ -4040,22 +4208,27 @@ function deoptItemBody(item: any, scope: Scope): void {
 		childSlot(scope, '_item', block.parentNode, item, block.endMarker);
 		return;
 	}
-	// Sweep last render's build (the range between this item's markers).
+	// Pure host/text item → reconcile in place, REUSING the item's existing node so
+	// DOM-resident state (input value, focus, …) survives a re-render. On the first
+	// render the candidate is the server node during hydration (adopt it) or null on
+	// a fresh client mount (build it).
 	const startM = block.startMarker;
 	const endM = block.endMarker;
-	if (startM != null && endM != null && startM !== endM) {
-		const parent = startM.parentNode;
-		if (parent !== null) {
-			let n: Node | null = startM.nextSibling;
-			while (n !== null && n !== endM) {
-				const next: Node | null = n.nextSibling;
-				parent.removeChild(n);
-				n = next;
-			}
-		}
+	let prev = (scope as any).__deoptNode as Node | null | undefined;
+	if (prev === undefined) {
+		prev = hydrating && startM != null ? startM.nextSibling : null;
+		if (prev === endM) prev = null; // empty item range → nothing to adopt
 	}
-	const node = buildDeoptDom(item, block);
-	if (node !== null) block.parentNode.insertBefore(node, block.endMarker);
+	const node = reconcileDeoptNode(prev ?? null, item, block);
+	if (node !== (prev ?? null)) {
+		// Built a fresh node (first mount, or a tag/type change) — drop the old one
+		// and insert the new node into the item's range.
+		if (prev != null && prev !== node && prev.parentNode === block.parentNode) {
+			block.parentNode.removeChild(prev);
+		}
+		if (node !== null) block.parentNode.insertBefore(node, endM);
+	}
+	(scope as any).__deoptNode = node;
 }
 
 // True when `value` (a descriptor, an array, or a primitive) contains a COMPONENT
@@ -4153,6 +4326,7 @@ export function childSlot(
 			text: null,
 			currentComp: null,
 			forSlot: null,
+			hostNode: null,
 		};
 		parentScope[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -4189,7 +4363,7 @@ export function childSlot(
 			parentBlock,
 			state.forSlot,
 			value,
-			deoptKey,
+			POSITIONAL_CHILDREN.has(value as object) ? deoptKeyPositional : deoptKey,
 			deoptItemBody as any,
 			undefined,
 			false,
@@ -4217,13 +4391,29 @@ export function childSlot(
 	let props: any = {};
 	if (isHostDescriptor(value)) {
 		if (!descNeedsBlocks(value)) {
-			clearChildContent(state);
+			// Pure host/text → reconcile in place, REUSING the existing node so DOM
+			// state survives a re-render. Switching in from a component/text first
+			// tears that down (also nulls a stale hostNode).
+			if (state.block !== null || state.text !== null) clearChildContent(state);
 			if (state.start === null) {
 				state.start = document.createComment('');
 				domParent.insertBefore(state.start, state.end);
 			}
-			const node = buildDeoptDom(value, parentBlock);
-			if (node !== null) state.start.parentNode!.insertBefore(node, state.end);
+			// First render: adopt the server node during hydration, else reuse the
+			// prior built node, else build fresh.
+			let prev = state.hostNode;
+			if (prev === null && hydrating) {
+				prev = state.start.nextSibling;
+				if (prev === state.end) prev = null;
+			}
+			const node = reconcileDeoptNode(prev, value, parentBlock);
+			if (node !== prev) {
+				if (prev != null && prev !== node && prev.parentNode !== null) {
+					prev.parentNode.removeChild(prev);
+				}
+				if (node !== null) state.start.parentNode!.insertBefore(node, state.end);
+			}
+			state.hostNode = node;
 			return;
 		}
 		comp = hostElementBody as unknown as ComponentBody;
@@ -4267,7 +4457,8 @@ export function childSlot(
 	}
 
 	// Text / empty.
-	if (state.block !== null) clearChildContent(state); // swapped away from a component
+	// Swapped away from a component OR a pure-host de-opt node → tear it down first.
+	if (state.block !== null || state.hostNode !== null) clearChildContent(state);
 	const str = coerceChildText(value);
 	if (str === '') {
 		// `null` / `undefined` / `false` / `true` / `''` render NOTHING — not even
