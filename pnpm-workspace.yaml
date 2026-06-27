@@ -8,6 +8,8 @@ packages:
   - benchmarks/recursive-context/*
   - benchmarks/signal-favoring
   - benchmarks/signal-favoring/*
+  - benchmarks/dbmon
+  - benchmarks/dbmon/*
   - playground/*
   - examples/*
 
