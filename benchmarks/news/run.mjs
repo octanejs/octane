@@ -28,11 +28,17 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TARGET_PORTS = { octane: 5191, solid: 5192, react: 5193, ripple: 5194 };
+const TARGET_PORTS = {
+	'octane-tsrx': 5191,
+	'octane-jsx': 5195,
+	solid: 5192,
+	react: 5193,
+	ripple: 5194,
+};
 const args = process.argv.slice(2);
 const noBuild = args.includes('--no-build');
 const positional = args.filter((a) => !a.startsWith('--'));
-let target = 'octane';
+let target = 'octane-tsrx';
 let iterArg = positional[0];
 if (positional[0] && Object.prototype.hasOwnProperty.call(TARGET_PORTS, positional[0])) {
 	target = positional[0];

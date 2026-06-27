@@ -1,7 +1,7 @@
 # News SSR + hydration benchmark
 
-A large "news site" document (header + a `@for` feed of article cards, lorem
-ipsum) that measures, per target (**octane**, **ripple**, **Solid 2.0**,
+A large "news site" document (header + a feed of article cards, lorem ipsum) that
+measures, per target (**octane-tsrx**, **octane-jsx**, **ripple**, **Solid 2.0**,
 **React 19**):
 
 - **SSR render time** — the built `renderApp()` → HTML string, in Node, warm.
@@ -27,10 +27,14 @@ It also asserts **correctness**: that hydration _adopts_ the server DOM with no
 rebuild (`#app.innerHTML` unchanged) and that the page is interactive afterward
 (the header theme toggle flips).
 
-All apps are authored in the SAME `.tsrx` source shape and render the same
-dataset, so the comparison is pure framework cost:
+All apps render the same dataset, so the comparison is pure framework cost. The
+non-octane targets share the `.tsrx` source shape; octane is authored twice (the
+two dialects over one core):
 
-- **octane** — `octane/compiler` (single runtime, `render()` + `hydrateRoot()`).
+- **octane-tsrx** — `octane/compiler` over `.tsrx` directive syntax (single
+  runtime, `render()` + `hydrateRoot()`); the `@for` feed adopts each item range.
+- **octane-jsx** — the SAME app authored in React-style `.tsx` (`.map(...key)`
+  feed), compiled by the same `octane/compiler` — the JSX backwards-compat path.
 - **ripple** (original) — `@tsrx/ripple` + `ripple` (`ripple/server` `render()` →
   `{ head, body, css }` + `ripple` `hydrate()`). State via `track`. There's no
   transform-only Ripple vite plugin (the published one is the metaframework), so
@@ -52,27 +56,31 @@ hydration was extended beyond single leaf templates.
 
 ```bash
 pnpm install
-node benchmarks/news/gen.mjs 50          # regenerate the dataset into every target (default 50)
-node benchmarks/news/run.mjs octane  # builds (prod) + benches; `run.mjs 20` also works
-node benchmarks/news/run.mjs ripple 20   # original Ripple, 20 iterations (+5 warmup)
-node benchmarks/news/run.mjs solid 20    # Solid 2.0
-node benchmarks/news/run.mjs react 20    # React 19
+node benchmarks/news/gen.mjs 50              # regenerate the dataset into every target (default 50)
+node benchmarks/news/run.mjs octane-tsrx     # builds (prod) + benches; `run.mjs 20` also works
+node benchmarks/news/run.mjs octane-jsx 20   # same app authored in React-style .tsx (JSX)
+node benchmarks/news/run.mjs ripple 20       # original Ripple, 20 iterations (+5 warmup)
+node benchmarks/news/run.mjs solid 20        # Solid 2.0
+node benchmarks/news/run.mjs react 20        # React 19
 node benchmarks/news/run.mjs react 20 --no-build   # reuse the existing dist/ (skip rebuild)
 ```
 
 `run.mjs [target] [iterations] [--no-build]` — `target` ∈
-`{octane, ripple, solid, react}` (default `octane`; a bare number is
-treated as iterations for back-compat). Each run rebuilds the target's production
-client + SSR bundles unless `--no-build` is passed. Build output goes to
-`<target>/dist/` (git-ignored).
+`{octane-tsrx, octane-jsx, ripple, solid, react}` (default `octane-tsrx`; a bare
+number is treated as iterations for back-compat). Each run rebuilds the target's
+production client + SSR bundles unless `--no-build` is passed. Build output goes to
+`<target>/dist/` (git-ignored). `octane-tsrx` and `octane-jsx` are the same app
+over the same octane core authored in the two dialects (`.tsrx` directive syntax
+vs React-style `.tsx`); running both is a like-for-like read on the JSX
+backwards-compat path's SSR + hydration cost.
 
 ## Layout
 
 | File                           | Role                                                                                                                                 |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `gen.mjs`                      | Generates `<target>/src/data.js` for every target (deterministic lorem-ipsum).                                                       |
-| `<target>/src/App.tsrx`        | Header component + `@for` feed of article cards + footer.                                                                            |
-| `<target>/src/Header.tsrx`     | A stateful component (octane/React `useState`, Solid `createSignal`, Ripple `track`) with a theme toggle.                        |
+| `<target>/src/App.{tsrx,tsx}`  | Header component + feed of article cards + footer (`@for` in `.tsrx`; `.map(...key)` in the JSX `.tsx`).                              |
+| `<target>/src/Header.{tsrx,tsx}` | A stateful component (octane/React `useState`, Solid `createSignal`, Ripple `track`) with a theme toggle.                          |
 | `<target>/src/entry-server.ts` | `renderApp()` → `{ head, body, css }`.                                                                                               |
 | `<target>/src/entry-client.ts` | Deferred `window.__hydrate()`.                                                                                                       |
 | `run.mjs`                      | `vite build` (client + SSR, prod) → static-serves the built artifacts + Playwright; measures SSR + hydration; prints median/min/p95. |

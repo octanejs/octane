@@ -1,9 +1,9 @@
 {
-  "name": "octane-signal-bench",
+  "name": "octane-tsrx-signal-bench",
   "private": true,
   "type": "module",
   "version": "0.0.1",
-  "description": "signal-favoring bench fixture for octane - 100-component chain with stateful counters every 10 levels.",
+  "description": "signal-favoring bench fixture for octane authored in .tsrx - 100-component chain with stateful counters every 10 levels.",
   "scripts": {
     "dev": "vite --host --port 5190 --strictPort",
     "build": "vite build",

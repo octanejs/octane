@@ -23,7 +23,8 @@
 // often small enough that the choice doesn't dominate real-world apps.
 //
 // Usage:
-//   pnpm --filter octane-signal-bench dev   # :5190
+//   pnpm --filter octane-tsrx-signal-bench dev  # :5190 (.tsrx)
+//   pnpm --filter octane-jsx-signal-bench dev   # :5194 (.tsx / JSX)
 //   pnpm --filter solid-signal-bench dev        # :5191
 //   pnpm --filter react-signal-bench dev        # :5192
 //   pnpm --filter ripple-signal-bench dev       # :5193
@@ -38,7 +39,8 @@ const STATEFUL_INDICES = [1, 11, 21, 31, 41, 51, 61, 71, 81, 91];
 const TARGETS = process.env.TARGETS
 	? JSON.parse(process.env.TARGETS)
 	: [
-			{ name: 'octane', url: 'http://localhost:5190/' },
+			{ name: 'octane-tsrx', url: 'http://localhost:5190/' },
+			{ name: 'octane-jsx', url: 'http://localhost:5194/' },
 			{ name: 'solid', url: 'http://localhost:5191/' },
 			{ name: 'react', url: 'http://localhost:5192/' },
 			{ name: 'ripple', url: 'http://localhost:5193/' },

@@ -11,7 +11,8 @@ parent chain.
 
 ```
 benchmarks/recursive-context/
-├── octane/        # Vite app, dev :5185
+├── octane-tsrx/       # Vite app, dev :5185 — octane authored in .tsrx
+├── octane-jsx/        # Vite app, dev :5188 — same app authored in React-style .tsx
 ├── solid/             # Vite app, dev :5187 (Solid 2.0 beta)
 ├── react/             # Vite app, dev :5186 (React 19)
 ├── ripple/            # Vite app, dev :5184
@@ -19,6 +20,12 @@ benchmarks/recursive-context/
 ├── package.json       # umbrella: `pnpm bench`
 └── README.md
 ```
+
+The octane app is authored twice over the same octane core — `.tsrx` (directive
+syntax: `@if/@else`, `class`) and React-style `.tsx` (JS control flow, `className`).
+Both compile to working blocks over the same runtime, so the two octane columns
+are a like-for-like read on the JSX backwards-compat path's cost for this
+recursive-tree + Context workload.
 
 ## Shape
 
@@ -67,7 +74,8 @@ updates), **structural change** (toggle a subtree on/off vs mutate a value), and
 pnpm install
 
 # 2. Start each adapter's dev server (separate terminals):
-pnpm --filter octane-recursive-bench dev    # :5185
+pnpm --filter octane-tsrx-recursive-bench dev   # :5185
+pnpm --filter octane-jsx-recursive-bench dev    # :5188
 pnpm --filter solid-recursive-bench dev         # :5187
 pnpm --filter react-recursive-bench dev         # :5186
 pnpm --filter ripple-recursive-bench dev        # :5184
@@ -82,7 +90,7 @@ Output is a side-by-side table of median / min / p95 millis per op, followed by 
 pairwise ratio block, e.g.:
 
 ```
-octane / ripple ratio (median; <1 means octane faster):
+octane-tsrx / ripple ratio (median; <1 means octane-tsrx faster):
   mount             0.71x  ++ faster
   update_root       0.59x  ++ faster
   update_partial    0.84x  ++ faster

@@ -1,9 +1,9 @@
 {
-  "name": "octane-recursive-bench",
+  "name": "octane-tsrx-recursive-bench",
   "private": true,
   "type": "module",
   "version": "0.0.1",
-  "description": "recursive-context bench fixture for octane - exposes window.__mount/__update/__unmount/__reset for the Playwright harness.",
+  "description": "recursive-context bench fixture for octane authored in .tsrx - exposes window.__mount/__update/__unmount/__reset for the Playwright harness.",
   "scripts": {
     "dev": "vite --host --port 5185 --strictPort",
     "build": "vite build",

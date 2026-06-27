@@ -56,6 +56,41 @@ function genRippleNew() {
 }
 
 // ----------------------------------------------------------------------------
+// octane JSX twin (React-style .tsx, same React-shape hooks)
+// ----------------------------------------------------------------------------
+// The same chain authored in React-style `.tsx` instead of `.tsrx`: `@{ … }`
+// bodies become `return <jsx>`, `class` → `className`, and `{v as number}` →
+// `{v}`. Octane's compiler lowers both dialects to the same runtime, so this is
+// the JSX backwards-compat twin of genRippleNew() above.
+function genOctaneJsx() {
+	let out = `import { useState } from 'octane';\n\n`;
+	out += `// 100 uniquely-named components in a chain. Stateful counters at C${STATEFUL_INDICES.join(', C')}.\n`;
+	out += `// React-style .tsx twin of ../../octane-tsrx/src/App.tsrx — hook frameworks cascade\n`;
+	out += `// re-renders down the chain on each bump.\n\n`;
+	for (const i of STATEFUL_INDICES) out += `let _set${i} = null;\n`;
+	out += '\n';
+	for (const i of STATEFUL_INDICES) {
+		out += `export function bumpAt${i}() { if (_set${i}) _set${i}((v) => v + 1); }\n`;
+	}
+	out += '\n';
+	for (let i = N; i >= 1; i--) {
+		if (i === N) {
+			out += `function C${i}() { return <span className="leaf">${i}</span>; }\n`;
+		} else if (isStateful(i)) {
+			out += `function C${i}() {\n`;
+			out += `  const [v, set] = useState(0);\n`;
+			out += `  _set${i} = set;\n`;
+			out += `  return <div className="c">${i}:{v} <C${i + 1} /></div>;\n`;
+			out += `}\n`;
+		} else {
+			out += `function C${i}() { return <div className="c">${i} <C${i + 1} /></div>; }\n`;
+		}
+	}
+	out += '\nexport default function App() { return <C1 />; }\n';
+	return out;
+}
+
+// ----------------------------------------------------------------------------
 // ripple (existing framework, signal-based via track)
 // ----------------------------------------------------------------------------
 function genRipple() {
@@ -178,6 +213,26 @@ function genRippleNewMain() {
 	return out;
 }
 
+function genOctaneJsxMain() {
+	let out = `import { createRoot, flushSync } from 'octane';\n`;
+	out += `import App, { ${bumpImports} } from './App.tsx';\n\n`;
+	out += `const target = document.getElementById('main');\n`;
+	out += `let root = null;\n\n`;
+	out += `// index.html does NOT auto-mount — harness wraps each call in performance.now().\n`;
+	out += `window.__mount = () => {\n`;
+	out += `  root = createRoot(target);\n`;
+	out += `  root.render(App, {});\n`;
+	out += `};\n`;
+	out += `window.__unmount = () => { if (root) { root.unmount(); root = null; } };\n`;
+	out += `window.__reset = () => {\n`;
+	out += `  if (root) { root.unmount(); root = null; }\n`;
+	out += `  while (target.firstChild) target.removeChild(target.firstChild);\n`;
+	out += `};\n`;
+	out += bumpExports.replace(/__WRAP__/g, 'flushSync') + '\n';
+	out += `window.__ready = true;\n`;
+	return out;
+}
+
 function genRippleMain() {
 	let out = `import { mount, flushSync } from 'ripple';\n`;
 	out += `import App, { ${bumpImports} } from './App.tsrx';\n\n`;
@@ -238,8 +293,10 @@ function genSolidMain() {
 // ----------------------------------------------------------------------------
 
 const targets = [
-	{ rel: 'octane/src/App.tsrx', content: genRippleNew() },
-	{ rel: 'octane/src/main.js', content: genRippleNewMain() },
+	{ rel: 'octane-tsrx/src/App.tsrx', content: genRippleNew() },
+	{ rel: 'octane-tsrx/src/main.js', content: genRippleNewMain() },
+	{ rel: 'octane-jsx/src/App.tsx', content: genOctaneJsx() },
+	{ rel: 'octane-jsx/src/main.js', content: genOctaneJsxMain() },
 	{ rel: 'ripple/src/App.tsrx', content: genRipple() },
 	{ rel: 'ripple/src/main.js', content: genRippleMain() },
 	{ rel: 'react/src/App.jsx', content: genReact() },

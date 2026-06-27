@@ -18,15 +18,21 @@ the cascade actually costs** in absolute terms. Often less than you'd expect.
 
 ```
 benchmarks/signal-favoring/
-├── octane/        # Vite app, dev :5190
+├── octane-tsrx/       # Vite app, dev :5190 — octane authored in .tsrx
+├── octane-jsx/        # Vite app, dev :5194 — same app authored in React-style .tsx
 ├── solid/             # Vite app, dev :5191 (Solid 2.0 beta)
 ├── react/             # Vite app, dev :5192 (React 19)
 ├── ripple/            # Vite app, dev :5193
-├── gen.mjs            # Source generator for all 4 App fixtures
+├── gen.mjs            # Source generator for the App fixtures (scaffold; see note below)
 ├── run.mjs            # Playwright harness — drives all adapters
 ├── package.json       # umbrella: `pnpm bench`
 └── README.md
 ```
+
+The octane app is authored twice — `.tsrx` (directive `@{ … }`, `class`,
+`{v as number}`) and React-style `.tsx` (`return <jsx>`, `className`, `{v}`) — over
+the same octane core, so the two octane columns read the JSX backwards-compat
+path's cost for this hook-cascade workload.
 
 ## Shape
 
@@ -37,16 +43,23 @@ total).
 
 Each stateful component owns its own counter via the framework's native primitive:
 
-| framework      | primitive                | what a `setN(v+1)` triggers                                            |
-| -------------- | ------------------------ | ---------------------------------------------------------------------- |
-| **octane** | `useState` (React-shape) | re-render of `CN`, cascade through `CN+1 .. C100`                      |
-| **react**      | `useState`               | re-render of `CN`, cascade through `CN+1 .. C100`                      |
+| framework        | primitive                | what a `setN(v+1)` triggers                                            |
+| ---------------- | ------------------------ | ---------------------------------------------------------------------- |
+| **octane-tsrx**  | `useState` (React-shape) | re-render of `CN`, cascade through `CN+1 .. C100`                      |
+| **octane-jsx**   | `useState` (React-shape) | re-render of `CN`, cascade through `CN+1 .. C100`                      |
+| **react**        | `useState`               | re-render of `CN`, cascade through `CN+1 .. C100`                      |
 | **solid**      | `createSignal`           | re-evaluate the `{v()}` text expression in `CN`; descendants untouched |
 | **ripple**     | `track()`                | re-evaluate the `{v}` text expression in `CN`; descendants untouched   |
 
 Generator-driven so the chain length, stateful spacing, and per-component shape
 stay consistent across frameworks. Edit `gen.mjs` and re-run `node gen.mjs` to
-regenerate all four App fixtures.
+regenerate the App fixtures (octane-tsrx, octane-jsx, ripple, react, solid).
+
+> **Note:** `gen.mjs` scaffolds each target's `App.*` and `main.*`, but the
+> `main.*` files are then hand-finished with the `__sweepBatched` /
+> `__sweepBatchedReverse` globals the harness drives (and each framework's flush
+> wrapper differs). So after `node gen.mjs` re-add those (and run `pnpm format`)
+> before benching — or just edit the `App.*` shape and leave the mains alone.
 
 ## Measurements
 
@@ -94,7 +107,8 @@ pnpm install
 node benchmarks/signal-favoring/gen.mjs
 
 # 3. Start each adapter's dev server (separate terminals):
-pnpm --filter octane-signal-bench dev    # :5190
+pnpm --filter octane-tsrx-signal-bench dev   # :5190
+pnpm --filter octane-jsx-signal-bench dev    # :5194
 pnpm --filter solid-signal-bench dev         # :5191
 pnpm --filter react-signal-bench dev         # :5192
 pnpm --filter ripple-signal-bench dev        # :5193
