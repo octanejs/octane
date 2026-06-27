@@ -21,7 +21,8 @@ export function Comment({ id, depth }: { id: number; depth: number }) @{
 	// loop's top level, which the SSR compiler supports. Kids are capped to
 	// COMMENT_KIDS_LIMIT so the render matches the server's bounded prefetch (an
 	// unprefetched comment would suspend mid-SSR and stall) — identical in both apps.
-	const childIds = depth < MAX_DEPTH ? (data.kids ?? []).slice(0, COMMENT_KIDS_LIMIT) : [];
+	const childIds =
+		depth < MAX_DEPTH ? (data.kids ?? []).slice(0, COMMENT_KIDS_LIMIT) : [];
 
 	<div data-testid="comment" {...stylex.props(styles.comment)}>
 		<div {...stylex.props(styles.commentMeta)}>
