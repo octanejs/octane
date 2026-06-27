@@ -3611,7 +3611,8 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// scratch instead of mistakenly hitting the update branch with a half-
 	// populated bag (which would crash setText / setAttribute on undefined
 	// slot references).
-	mountLines.push(`    _b = {};`);
+	// Control-flow-only bodies carry no bag, so skip its allocation/commit entirely.
+	if (!noTemplate) mountLines.push(`    _b = {};`);
 
 	let elementVars;
 	let ensureVar;
@@ -3659,24 +3660,37 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			ctx.runtimeNeeded.add('sibling');
 		}
 		ensureVar = (path) => {
-			// Top-level position in a multi-root template — the synthetic frag we
-			// cloned gets drained on mount, so empty-path callers (top-level
-			// control-flow / component slots) need to point at the live parent.
-			if (path.length === 0 && !single) {
-				return '__block.parentNode';
-			}
+			// Base: empty path → the template root. Single-root cloned the element
+			// directly (`_root`); multi-root cloned a frag that's drained on mount, so
+			// top-level callers point at the live parent.
+			if (path.length === 0) return single ? '_root' : '__block.parentNode';
 			const key = path.join(',');
-			if (elementVars.has(key)) return elementVars.get(key);
+			const cached = elementVars.get(key);
+			if (cached !== undefined) return cached;
+			// Materialize the ANCESTOR first (cached + reused across siblings), then take
+			// ONE navigation step from it — instead of re-walking the whole path from
+			// `_root` for every element. Siblings sharing a deep prefix (e.g. a row of
+			// buttons) thus share the prefix's vars/steps instead of repeating them.
+			//
+			// The chain bottoms out at `_root` (the cloned root / not-yet-drained frag),
+			// NOT at `ensureVar([])`: for a multi-root template `[]` resolves to
+			// __block.parentNode (the POST-drain slot host), which is the wrong base for
+			// navigating elements that still live inside `_root` at mount time.
+			const parentVar = path.length === 1 ? '_root' : ensureVar(path.slice(0, -1));
+			const last = [path[path.length - 1]];
 			const v = `_el${varCounter++}`;
 			elementVars.set(key, v);
-			const walk = hasHoles ? walkExprH('_root', path) : walkExpr('_root', path);
-			mountLines.push(`    const ${v} = ${walk};`);
+			const step = hasHoles ? walkExprH(parentVar, last) : walkExpr(parentVar, last);
+			mountLines.push(`    const ${v} = ${step};`);
 			return v;
 		};
 	} else {
-		// No template — host is __block.parentNode. Stash it once.
-		mountLines.push(`    _b._compHost = __block.parentNode;`);
-		ensureVar = () => `_b._compHost`;
+		// No template (control-flow / component-only body): every host is
+		// __block.parentNode — recomputable every render — so this body needs NO
+		// binding bag at all. Hosts resolve directly; the bag alloc/commit and the
+		// `let _b … if (undefined) … else {}` wrapper are skipped (see `noTemplate`
+		// guards below + `bindingsName: null` in the plan).
+		ensureVar = () => `__block.parentNode`;
 	}
 
 	// Emit per-binding mount code.
@@ -3720,7 +3734,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	for (const fc of forCalls) {
 		const elVar = ensureVar(fc.hostPath);
 		fc.elVar = elVar;
-		mountLines.push(`    _b._for$${fc.id} = ${elVar};`);
+		if (!noTemplate) mountLines.push(`    _b._for$${fc.id} = ${elVar};`);
 		if (fc.anchorPath) {
 			const anchorVar = ensureVar(fc.anchorPath);
 			fc.anchorVar = anchorVar;
@@ -3730,7 +3744,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	for (const ic of ifCalls) {
 		const elVar = ensureVar(ic.hostPath);
 		ic.elVar = elVar;
-		mountLines.push(`    _b._ifHost$${ic.id} = ${elVar};`);
+		if (!noTemplate) mountLines.push(`    _b._ifHost$${ic.id} = ${elVar};`);
 		if (ic.anchorPath) {
 			const anchorVar = ensureVar(ic.anchorPath);
 			ic.anchorVar = anchorVar;
@@ -3740,7 +3754,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	for (const cc of compCalls) {
 		const elVar = ensureVar(cc.hostPath);
 		cc.elVar = elVar;
-		mountLines.push(`    _b._compHost$${cc.id} = ${elVar};`);
+		if (!noTemplate) mountLines.push(`    _b._compHost$${cc.id} = ${elVar};`);
 		if (cc.anchorPath) {
 			const anchorVar = ensureVar(cc.anchorPath);
 			cc.anchorVar = anchorVar;
@@ -3751,7 +3765,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	for (const tc of tryCalls) {
 		const elVar = ensureVar(tc.hostPath);
 		tc.elVar = elVar;
-		mountLines.push(`    _b._tryHost$${tc.id} = ${elVar};`);
+		if (!noTemplate) mountLines.push(`    _b._tryHost$${tc.id} = ${elVar};`);
 		if (tc.anchorPath) {
 			const anchorVar = ensureVar(tc.anchorPath);
 			tc.anchorVar = anchorVar;
@@ -3762,7 +3776,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	for (const sc of ctx._switchCalls) {
 		const elVar = ensureVar(sc.hostPath);
 		sc.elVar = elVar;
-		mountLines.push(`    _b._switchHost$${sc.id} = ${elVar};`);
+		if (!noTemplate) mountLines.push(`    _b._switchHost$${sc.id} = ${elVar};`);
 		if (sc.anchorPath) {
 			const anchorVar = ensureVar(sc.anchorPath);
 			sc.anchorVar = anchorVar;
@@ -3775,7 +3789,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	for (const pc of ctx._portalCalls) {
 		const elVar = ensureVar(pc.hostPath || []);
 		pc.elVar = elVar;
-		mountLines.push(`    _b._portalHost$${pc.id} = ${elVar};`);
+		if (!noTemplate) mountLines.push(`    _b._portalHost$${pc.id} = ${elVar};`);
 	}
 
 	if (!noTemplate) {
@@ -3791,7 +3805,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// the `_b = {}` initialization above. Reaching here means every binding
 	// and the DOM range have been successfully constructed, so future
 	// renders can safely take the update branch keyed on `__s.slots[0]`.
-	mountLines.push(`    __s.slots[0] = _b;`);
+	if (!noTemplate) mountLines.push(`    __s.slots[0] = _b;`);
 
 	// Update.
 	const updateLines = [];
@@ -3825,13 +3839,23 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		...ctx._switchCalls,
 	];
 	allConstructs.sort((a, b) => a.id - b.id);
-	for (let i = 0; i < allConstructs.length; i++) allConstructs[i].slotIndex = i + 1;
+	// Slot 0 is the binding bag for template bodies; control-flow-only (noTemplate)
+	// bodies have no bag, so their constructs start at slot 0.
+	const slotBase = noTemplate ? 0 : 1;
+	for (let i = 0; i < allConstructs.length; i++) allConstructs[i].slotIndex = i + slotBase;
 	// Hoisted head elements take the slots AFTER the constructs (and `plan.head` runs
 	// after `plan.after`), so the scope's `slots` array fills 0,1,…,N,N+1,… packed.
-	const headEmit = emitHeadClient(headNodes, ctx, allConstructs.length + 1);
+	const headEmit = emitHeadClient(headNodes, ctx, allConstructs.length + slotBase);
+	// Is a construct's host a real in-template element (append / insert INTO it) vs
+	// the block's own parentNode (insert BEFORE __block.endMarker so the slot's range
+	// stays inside the block)? In-template hosts are the navigated `_el…` vars and the
+	// single-root template root `_root` itself.
+	const isElHost = (v) => v === '_root' || v.startsWith('_el');
 	for (const fc of forCalls) {
 		ctx.runtimeNeeded.add('forBlock');
 		const slotIndex = fc.slotIndex;
+		// Control-flow-only bodies have no bag: the host is __block.parentNode directly.
+		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._for$' + fc.id;
 		// flags: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item markers),
 		//        bit 2 = depEligible (runtime compares deps array, upgrades to pure
 		//        for survivors when deps unchanged this render).
@@ -3856,11 +3880,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const anchorPart = hasAnchor ? `, __s.slots[0]._forAnchor$${fc.id}` : '';
 		pushAfter(
 			fc.id,
-			`  forBlock(__s, ${slotIndex}, __s.slots[0]._for$${fc.id}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}, ${fc.extraExpr}${flagsPart}${depsPart}${emptyPart}${anchorPart});`,
+			`  forBlock(__s, ${slotIndex}, ${hostExpr}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}, ${fc.extraExpr}${flagsPart}${depsPart}${emptyPart}${anchorPart});`,
 		);
 	}
 	for (const ic of ifCalls) {
 		const slotIndex = ic.slotIndex;
+		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._ifHost$' + ic.id;
 		// Anchor selection mirrors componentSlot: with `<!>`-anchored source-order
 		// siblings, pass the captured anchor var so the start/end markers land
 		// BEFORE it (preserving order). When the host is the body's own parentNode
@@ -3870,12 +3895,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// the element).
 		let anchorArg = '';
 		if (ic.anchorVar) anchorArg = `, __s.slots[0]._ifAnchor$${ic.id}`;
-		else if (ic.elVar && !ic.elVar.startsWith('_el')) anchorArg = ', __block.endMarker';
+		else if (ic.elVar && !isElHost(ic.elVar)) anchorArg = ', __block.endMarker';
 		if (ic.activity) {
 			ctx.runtimeNeeded.add('activityBlock');
 			pushAfter(
 				ic.id,
-				`  activityBlock(__s, ${slotIndex}, __s.slots[0]._ifHost$${ic.id}, (${ic.modeExpr}), ${ic.thenHelper}${anchorArg});`,
+				`  activityBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.modeExpr}), ${ic.thenHelper}${anchorArg});`,
 			);
 			continue;
 		}
@@ -3883,11 +3908,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const elseArg = ic.elseHelper || 'null';
 		pushAfter(
 			ic.id,
-			`  ifBlock(__s, ${slotIndex}, __s.slots[0]._ifHost$${ic.id}, (${ic.condExpr}), ${ic.thenHelper}, ${elseArg}${anchorArg});`,
+			`  ifBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.condExpr}), ${ic.thenHelper}, ${elseArg}${anchorArg});`,
 		);
 	}
 	for (const cc of compCalls) {
 		const slotIndex = cc.slotIndex;
+		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._compHost$' + cc.id;
 		// Renderable `{expr}` hole — dispatch the value at runtime (component /
 		// element → block; primitive → text; nullish/boolean/'' → nothing). Shares
 		// the host/`<!>`-anchor resolution + hole-aware hydration walk with real
@@ -3898,13 +3924,9 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			if (cc.anchorVar) {
 				anchorArg = `, __s.slots[0]._compAnchor$${cc.id}`;
 			} else {
-				const isInsideHost = cc.elVar.startsWith('_el');
-				anchorArg = isInsideHost ? '' : ', __block.endMarker';
+				anchorArg = isElHost(cc.elVar) ? '' : ', __block.endMarker';
 			}
-			pushAfter(
-				cc.id,
-				`  childSlot(__s, ${slotIndex}, __s.slots[0]._compHost$${cc.id}, ${cc.valueExpr}${anchorArg});`,
-			);
+			pushAfter(cc.id, `  childSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg});`);
 			continue;
 		}
 		// Design (c) lite path: hookless same-module callees with no key/spread/
@@ -3921,12 +3943,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			let anchorArg = '';
 			if (cc.anchorVar) {
 				anchorArg = `, __s.slots[0]._compAnchor$${cc.id}`;
-			} else if (!cc.elVar.startsWith('_el')) {
+			} else if (!isElHost(cc.elVar)) {
 				anchorArg = ', __block.endMarker';
 			}
 			pushAfter(
 				cc.id,
-				`  componentSlotLite(__s, ${slotIndex}, __s.slots[0]._compHost$${cc.id}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg});`,
+				`  componentSlotLite(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg});`,
 			);
 			continue;
 		}
@@ -3945,8 +3967,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		if (cc.anchorVar) {
 			anchorArg = `, __s.slots[0]._compAnchor$${cc.id}`;
 		} else {
-			const isInsideHost = cc.elVar.startsWith('_el');
-			anchorArg = isInsideHost ? '' : ', __block.endMarker';
+			anchorArg = isElHost(cc.elVar) ? '' : ', __block.endMarker';
 		}
 		// key arg is positional AFTER anchor in componentSlot's signature. When a
 		// key is present but anchor isn't, supply `undefined` for the anchor slot
@@ -3966,21 +3987,23 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		}
 		pushAfter(
 			cc.id,
-			`  componentSlot(__s, ${slotIndex}, __s.slots[0]._compHost$${cc.id}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg});`,
+			`  componentSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg});`,
 		);
 	}
 	for (const pc of ctx._portalCalls) {
 		const slotIndex = pc.slotIndex;
+		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._portalHost$' + pc.id;
 		ctx.runtimeNeeded.add('portal');
 		pushAfter(
 			pc.id,
-			`  portal(__s, ${slotIndex}, ${pc.targetExpr}, ${pc.bodyExpr}, ${pc.propsExpr}, __s.slots[0]._portalHost$${pc.id});`,
+			`  portal(__s, ${slotIndex}, ${pc.targetExpr}, ${pc.bodyExpr}, ${pc.propsExpr}, ${hostExpr});`,
 		);
 	}
 	// Restore the outer plan's portal-call list — pairs with the save above.
 	ctx._portalCalls = _prevPortalCalls;
 	for (const tc of tryCalls) {
 		const slotIndex = tc.slotIndex;
+		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._tryHost$' + tc.id;
 		ctx.runtimeNeeded.add('tryBlock');
 		// Anchor selection mirrors componentSlot:
 		//   - In mixed children with source-order siblings, we emitted a `<!>`
@@ -3990,11 +4013,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const tryAnchorArg = tc.anchorVar ? `, __s.slots[0]._tryAnchor$${tc.id}` : '';
 		pushAfter(
 			tc.id,
-			`  tryBlock(__s, ${slotIndex}, __s.slots[0]._tryHost$${tc.id}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg});`,
+			`  tryBlock(__s, ${slotIndex}, ${hostExpr}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg});`,
 		);
 	}
 	for (const sc of ctx._switchCalls) {
 		const slotIndex = sc.slotIndex;
+		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._switchHost$' + sc.id;
 		ctx.runtimeNeeded.add('switchBlock');
 		// Anchor selection mirrors componentSlot:
 		//   - When the @switch had source-order siblings (mixed-children loop
@@ -4004,7 +4028,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const anchorArg = sc.anchorVar ? `, __s.slots[0]._switchAnchor$${sc.id}` : '';
 		pushAfter(
 			sc.id,
-			`  switchBlock(__s, ${slotIndex}, __s.slots[0]._switchHost$${sc.id}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg});`,
+			`  switchBlock(__s, ${slotIndex}, ${hostExpr}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg});`,
 		);
 	}
 	// Restore the outer plan's switch-call list — pairs with the save above.
@@ -4016,7 +4040,9 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	ctx._fragRefStack = _prevFragRefStack;
 
 	return {
-		bindingsName,
+		// Control-flow-only bodies carry no bag → no `let _b … if (undefined) … else {}`
+		// wrapper in the assembled body (the slot calls use __block.parentNode directly).
+		bindingsName: noTemplate ? null : bindingsName,
 		mount: mountLines.join('\n'),
 		update: updateLines.join('\n'),
 		after: afterCalls
