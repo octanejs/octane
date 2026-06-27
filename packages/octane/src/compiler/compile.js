@@ -660,6 +660,31 @@ function mapCallToForOf(expr) {
 	};
 }
 
+// Extract the `__html` expression from a React `dangerouslySetInnerHTML` value.
+// For the canonical inline object `{{__html: expr}}` it's `expr`; for anything
+// else (a variable holding the `{__html}` object) it's a `.__html` member access
+// evaluated at runtime. Returns null when there's no value.
+function dangerHtmlExpr(node) {
+	if (!node) return null;
+	if (node.type === 'ObjectExpression') {
+		const prop = (node.properties || []).find(
+			(p) =>
+				(p.type === 'Property' || p.type === 'ObjectProperty') &&
+				!p.computed &&
+				p.key &&
+				(p.key.name === '__html' || p.key.value === '__html'),
+		);
+		if (prop) return prop.value;
+	}
+	return {
+		type: 'MemberExpression',
+		object: node,
+		property: { type: 'Identifier', name: '__html' },
+		computed: false,
+		optional: false,
+	};
+}
+
 // Recognise the dynamic form `{style (expr)}` — TSRX parses that as a
 // `CallExpression(style, [expr])` because parenthesised expressions don't take
 // the special Style path. We bridge here so both forms behave the same.
@@ -1582,14 +1607,35 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
 	);
-	let innerHtmlExpr = null;
+	// Spreads are bound to temps (so their value is evaluated ONCE even though we
+	// read it both for ssrSpread and for a possible `.dangerouslySetInnerHTML`).
+	// `htmlSources` are the raw-HTML source exprs in source order (explicit
+	// `dangerouslySetInnerHTML={…}` objects + spread `.dangerouslySetInnerHTML`).
+	const spreadTemps = [];
+	const htmlSources = [];
+	// Wrap the assembled string in an IIFE that binds the spread temps when any
+	// exist (so the temp names resolve); otherwise return the bare concatenation.
+	const finalize = () => {
+		const body = parts.join(' + ');
+		if (spreadTemps.length === 0) return body;
+		const decls = spreadTemps.map((t) => `const ${t.tempName} = (${t.argExpr});`).join(' ');
+		return `(() => { ${decls} return ${body}; })()`;
+	};
 
 	for (let attrI = 0; attrI < attrs.length; attrI++) {
 		const attr = attrs[attrI];
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 			flush();
 			ctx.runtimeNeeded.add('ssrSpread');
-			parts.push(`ssrSpread(${printExprWithTsrx(attr.argument, ctx, name, inlinedSubs)})`);
+			const tmp = `__sp${spreadTemps.length}`;
+			spreadTemps.push({
+				tempName: tmp,
+				argExpr: printExprWithTsrx(attr.argument, ctx, name, inlinedSubs),
+			});
+			parts.push(`ssrSpread(${tmp})`);
+			// The spread may carry `dangerouslySetInnerHTML` — record it as a raw-HTML
+			// source (at this source position) so it participates in last-wins ordering.
+			htmlSources.push(`(${tmp} != null ? ${tmp}.dangerouslySetInnerHTML : void 0)`);
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
@@ -1615,9 +1661,12 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		const val = attr.value;
 		const isAfterSpread = firstSpreadIdx !== -1 && attrI > firstSpreadIdx;
 
-		if (attrName === 'innerHTML' && val) {
-			const inner2 = val.type === 'JSXExpressionContainer' ? val.expression : val;
-			innerHtmlExpr = printExpr(rewriteHookCalls(inner2, ctx, name));
+		if (attrName === 'dangerouslySetInnerHTML' && val) {
+			// React-style raw HTML: record the `{__html}` object as a raw-HTML source
+			// (in source order); ssrInnerHtml reads `.__html` and emits it as the
+			// element's (unescaped) inner content.
+			const obj = val.type === 'JSXExpressionContainer' ? val.expression : val;
+			htmlSources.push(printExpr(rewriteHookCalls(obj, ctx, name)));
 			continue;
 		}
 
@@ -1666,31 +1715,31 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	if (VOID_ELEMENTS.has(tag) && (node.children || []).length === 0) {
 		lit += '/>';
 		flush();
-		return parts.join(' + ');
+		return finalize();
 	}
 
 	lit += '>';
-	if (innerHtmlExpr !== null) {
-		// innerHTML — raw (unescaped) content, no other children.
+	const childrenExpr = ssrEmitNodes(
+		normalizeChildren(node.children || []),
+		ctx,
+		name,
+		inlinedSubs,
+		childNs,
+		cssHash,
+	);
+	if (htmlSources.length > 0) {
+		// Raw HTML (explicit and/or spread-supplied) wins over children when present
+		// at runtime (last source wins); otherwise the children render.
+		ctx.runtimeNeeded.add('ssrInnerHtml');
 		flush();
-		parts.push(`(${innerHtmlExpr} == null ? '' : String(${innerHtmlExpr}))`);
-	} else {
-		const childrenExpr = ssrEmitNodes(
-			normalizeChildren(node.children || []),
-			ctx,
-			name,
-			inlinedSubs,
-			childNs,
-			cssHash,
-		);
-		if (childrenExpr !== "''") {
-			flush();
-			parts.push(childrenExpr);
-		}
+		parts.push(`(ssrInnerHtml([${htmlSources.join(', ')}]) ?? (${childrenExpr}))`);
+	} else if (childrenExpr !== "''") {
+		flush();
+		parts.push(childrenExpr);
 	}
 	lit += `</${tag}>`;
 	flush();
-	return parts.join(' + ');
+	return finalize();
 }
 
 function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
@@ -4620,31 +4669,29 @@ function emitElementHtml(
 			});
 			continue;
 		}
-		// Attribute-level `innerHTML={expr}` (new TSRX) — replaces the removed
-		// `{html expr}` child intrinsic. When the element has no other children
-		// (and no spread that could clobber it), take the existing htmlOnlyChild
-		// fast path. Otherwise fall back to a regular `attr` binding via the
-		// property assignment path.
-		if (attrName === 'innerHTML' && val) {
-			const inner2 = val.type === 'JSXExpressionContainer' ? val.expression : val;
+		// React-style raw HTML: `dangerouslySetInnerHTML={{ __html: expr }}`. When the
+		// element has no other children (and no spread that could clobber it), take the
+		// `htmlOnlyChild` fast path on the extracted `__html` expression. Otherwise pass
+		// the `{__html}` object through a regular attr binding; the runtime's
+		// `dangerouslySetInnerHTML` property path reads `.__html` and sets innerHTML.
+		if (attrName === 'dangerouslySetInnerHTML' && val) {
+			const obj = val.type === 'JSXExpressionContainer' ? val.expression : val;
 			const noChildren =
 				(node.children || []).length === 0 || normalizeChildren(node.children || []).length === 0;
 			if (noChildren && !isAfterSpread) {
 				bindings.push({
 					id: bindings.length,
 					kind: 'htmlOnlyChild',
-					expr: printExpr(inner2),
+					expr: printExpr(dangerHtmlExpr(obj)),
 					path,
 				});
 				continue;
 			}
-			// Element has other children too — emit as plain attr (setAttribute will
-			// route through the property fallback at runtime).
 			bindings.push({
 				id: bindings.length,
 				kind: 'attr',
-				name: 'innerHTML',
-				expr: printExprWithTsrx(inner2, ctx, componentName, inlinedSubs),
+				name: 'dangerouslySetInnerHTML',
+				expr: printExprWithTsrx(obj, ctx, componentName, inlinedSubs),
 				path,
 				ns: hostNs,
 			});

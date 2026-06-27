@@ -2786,14 +2786,15 @@ function attrNamespace(name: string): string | null {
 }
 
 export function setAttribute(el: Element, name: string, value: any): void {
-	// `innerHTML` is a PROPERTY, not an attribute. The compiler's `innerHTML={expr}`
-	// fast path sets `el.innerHTML` directly, but when the element also carries a
-	// spread (`<div {...props} innerHTML={x}/>`) that fast path can't be used and the
-	// binding is routed here as an "attribute" — so assign the property. A literal
-	// `setAttribute('innerHTML', …)` would only add a dead lowercased `innerhtml`
-	// attribute and leave the element empty.
-	if (name === 'innerHTML') {
-		el.innerHTML = value == null || value === false ? '' : String(value);
+	// React-style `dangerouslySetInnerHTML={{__html}}` is a PROPERTY write, not an
+	// attribute. The compiler's fast path sets `el.innerHTML` directly, but when the
+	// element also carries a spread (`<div {...props} dangerouslySetInnerHTML={x}/>`,
+	// or the prop arrives via the spread itself) the binding is routed here — so read
+	// `.__html` off the value object and assign the property. A literal
+	// `setAttribute('dangerouslySetInnerHTML', …)` would only add a dead attribute.
+	if (name === 'dangerouslySetInnerHTML') {
+		const html = value == null ? null : value.__html;
+		el.innerHTML = html == null || html === false ? '' : String(html);
 		return;
 	}
 	const ns = attrNamespace(name);
@@ -2967,6 +2968,8 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 				el.removeAttribute('class');
 			} else if (k === 'style') {
 				setStyle(el as HTMLElement, null, prev[k]);
+			} else if (k === 'dangerouslySetInnerHTML') {
+				el.innerHTML = '';
 			} else {
 				el.removeAttribute(k);
 			}
@@ -3965,6 +3968,8 @@ function removeDeoptProp(el: Element, name: string): void {
 		setClassName(el, '');
 	} else if (name === 'style') {
 		el.removeAttribute('style');
+	} else if (name === 'dangerouslySetInnerHTML') {
+		el.innerHTML = '';
 	} else if (isDelegatedEventName(name)) {
 		(el as any)['$$' + name.slice(2).toLowerCase()] = undefined;
 	} else {

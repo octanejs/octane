@@ -74,6 +74,16 @@ describe('SSR Phase 1 — ssr fixture (style / spread / innerHTML / components /
 		expect(await RT.render(ssr.Raw, { html: '<b>bold</b>' })).toMatchSnapshot('Raw');
 	});
 
+	it('emits dangerouslySetInnerHTML raw when carried through a spread', async () => {
+		const { body } = await RT.render(ssr.RawSpread, {
+			attrs: { id: 'r', dangerouslySetInnerHTML: { __html: '<b>via spread</b>' } },
+		});
+		expect(body).toContain('id="r"'); // other spread attrs still serialized
+		expect(body).toContain('class="base"');
+		expect(body).toContain('<b>via spread</b>'); // raw HTML rendered as content
+		expect(body).not.toContain('dangerouslysetinnerhtml'); // not a dead attribute
+	});
+
 	it('renders nested component composition', async () => {
 		expect(await RT.render(ssr.Card, { title: 'T', tag: 'new' })).toMatchSnapshot('Card');
 	});
