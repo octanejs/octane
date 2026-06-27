@@ -64,6 +64,8 @@ export interface Scope {
 	 * ancestor.
 	 */
 	$$ctxValues: Map<Context<any>, any> | null;
+	/** Context dependencies recorded during this scope's render (memo invalidation). */
+	$$ctxReads: Map<Context<any>, any> | null;
 	/**
 	 * Resolved-provider cache for `use(ctx)`. Maps a context to the ancestor
 	 * scope/block whose `$$ctxValues` satisfies it for THIS consumer (or the
@@ -76,15 +78,19 @@ export interface Scope {
 	 * vast majority) carry just this one null field, not a per-context slot set.
 	 */
 	$$ctxCache: Map<Context<any>, any> | null;
-	// Bindings (b$0, b$1, ...) are stamped directly on the scope by compiled bodies.
-	[key: string]: any;
+	// Per-scope dense slot array. Holds, by COMPILE-TIME index, this scope's binding
+	// bag (slot 0) and every control-flow / component / child slot state — plus the
+	// runtime-internal slots (`__ret`, `__kids`, `_item`, `_children`, `_fb`). Indexing
+	// (vs. the old `scope[`_for$N`]` dynamic string keys) keeps the Scope object shape
+	// MONOMORPHIC: bindings no longer mutate the scope's hidden class per component.
+	slots: any[];
 }
 
 interface ChildScope {
-	// withScope uses Symbol per call-site; componentSlotLite uses a stable
-	// string `_comp$N` (cheaper to mint at compile time, identity-equality
-	// is identical to symbols for the linear-scan lookup).
-	key: symbol | string;
+	// withScope uses Symbol per call-site; componentSlotLite uses its numeric slot
+	// index (identity-equality is identical to symbols/strings for the linear-scan
+	// lookup, and the key is only an identity tag — unmount walks `children` directly).
+	key: symbol | string | number;
 	scope: Scope;
 }
 
@@ -165,6 +171,10 @@ export interface Block extends Scope {
 	 * flag is cleared and a re-render re-fires the effects.
 	 */
 	inactive: boolean;
+	/** Direct (own) context reads this render — drives memo invalidation alongside $$ctxReads. */
+	$$ctxDirect: Map<Context<any>, any> | null;
+	/** Per-render `use(thenable)` call-order counter; reset at the top of renderBlock. */
+	__thenableIdx: number;
 }
 
 interface EffectSlot {
@@ -727,6 +737,9 @@ class BlockImpl {
 	// De-opt host node managed by this Block (deoptItemBody / hostElementBody), reused
 	// across renders. Null for all other blocks; declared so the shape stays monomorphic.
 	deoptNode: Node | null;
+	// Per-scope dense slot array (binding bag + control-flow/component/child slots),
+	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
+	slots: any[];
 	// For-block item bookkeeping.
 	forSlot: ForSlot | null;
 	prevSibling: Block | null;
@@ -737,9 +750,6 @@ class BlockImpl {
 	block: Block;
 	// Metadata.
 	kind: BlockKind;
-	// Dynamic bindings (b$N, _for$N, etc.) are stamped on the instance by
-	// compiled bodies. V8 sees them as transitions on the shared shape.
-	[key: string]: any;
 
 	constructor(
 		kind: BlockKind,
@@ -781,6 +791,7 @@ class BlockImpl {
 		this.$$ctxCache = null;
 		this.__thenableIdx = 0;
 		this.deoptNode = null;
+		this.slots = [];
 		this.forSlot = null;
 		this.prevSibling = null;
 		this.nextSibling = null;
@@ -813,8 +824,9 @@ class ScopeImpl {
 	$$ctxReads: Map<Context<any>, any> | null;
 	$$ctxCache: Map<Context<any>, any> | null;
 	mounted: boolean;
-	// Compiled bodies stamp bindings (b$0, b$1, ...) directly on the scope.
-	[key: string]: any;
+	// Per-scope dense slot array (binding bag + control-flow/component/child slots),
+	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
+	slots: any[];
 
 	constructor(parent: Scope, block: Block) {
 		this.block = block;
@@ -823,6 +835,7 @@ class ScopeImpl {
 		this.cleanups = [];
 		this.children = [];
 		this._slots = null;
+		this.slots = [];
 		this.$$ctxValues = null;
 		this.$$ctxReads = null;
 		this.$$ctxCache = null;
@@ -906,7 +919,7 @@ export function renderBlock(block: Block): void {
 				const d = out as ElementDescriptor;
 				componentSlot(
 					block,
-					'__ret',
+					0,
 					block.parentNode,
 					d.type as ComponentBody,
 					d.props,
@@ -915,7 +928,7 @@ export function renderBlock(block: Block): void {
 					true,
 				);
 			} else {
-				childSlot(block, '__ret', block.parentNode, out, block.endMarker);
+				childSlot(block, 0, block.parentNode, out, block.endMarker);
 			}
 		}
 		if (!block.mounted) block.mounted = true;
@@ -999,13 +1012,13 @@ class LiteBlockImpl {
 
 export function componentSlotLite<P>(
 	parentScope: Scope,
-	slotKey: string,
+	slotKey: number,
 	host: Node,
 	comp: ComponentBody<P>,
 	props: P,
 	anchor?: Node,
 ): void {
-	let scope = parentScope[slotKey] as Scope | undefined;
+	let scope = parentScope.slots[slotKey] as Scope | undefined;
 	if (scope === undefined) {
 		scope = new ScopeImpl(parentScope, parentScope.block);
 		// Lite scope's `block` exposes the host/anchor as the body's DOM context
@@ -1040,7 +1053,7 @@ export function componentSlotLite<P>(
 			}
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
-		parentScope[slotKey] = scope;
+		parentScope.slots[slotKey] = scope;
 		// Register on parent.children so unmountScope(parent) walks into us.
 		parentScope.children.push({ key: slotKey, scope });
 	} else {
@@ -1736,7 +1749,7 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 function childrenAsBody(children: unknown): ComponentBody {
 	if (typeof children === 'function') return children as ComponentBody;
 	return (_p, s) => {
-		childSlot(s, '_children', s.block.parentNode, children, s.block.endMarker);
+		childSlot(s, 0, s.block.parentNode, children, s.block.endMarker);
 	};
 }
 
@@ -1754,11 +1767,11 @@ export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBo
 ) => {
 	const block = scope.block;
 	const pendingBody: ComponentBody = (_p, s) => {
-		childSlot(s, '_fb', s.block.parentNode, props.fallback, s.block.endMarker);
+		childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
 	};
 	tryBlock(
 		scope,
-		'_suspense',
+		0,
 		block.parentNode,
 		childrenAsBody(props.children),
 		null,
@@ -1786,11 +1799,11 @@ export const ErrorBoundary: ComponentBody<{
 						catchProps.reset,
 					)
 				: props.fallback;
-		childSlot(s, '_fb', s.block.parentNode, fb, s.block.endMarker);
+		childSlot(s, 1, s.block.parentNode, fb, s.block.endMarker);
 	};
 	tryBlock(
 		scope,
-		'_errorBoundary',
+		0,
 		block.parentNode,
 		childrenAsBody(props.children),
 		catchBody,
@@ -3443,14 +3456,14 @@ interface PortalSlot {
  */
 export function portal(
 	parentScope: Scope,
-	slotKey: string,
+	slotKey: number,
 	target: Element,
 	body: ComponentBody,
 	props: any,
 	host?: Node,
 ): void {
 	const parentBlock = parentScope.block;
-	let state = parentScope[slotKey] as PortalSlot | undefined;
+	let state = parentScope.slots[slotKey] as PortalSlot | undefined;
 	if (state === undefined) {
 		const start = document.createComment('portal');
 		const end = document.createComment('/portal');
@@ -3458,7 +3471,7 @@ export function portal(
 		target.appendChild(end);
 		const block = createBlock('portal', parentBlock, target, start, end, body, props);
 		state = { __kind: 'portalSlotSlot', block, target, start, end };
-		parentScope[slotKey] = state;
+		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 		// Portal target hosts handlers stamped via the same `el.$$click = …`
 		// mechanism as the main tree, so it needs the delegated event listeners
@@ -3617,7 +3630,7 @@ const NO_KEY: unique symbol = Symbol('NO_KEY');
  */
 export function componentSlot(
 	parentScope: Scope,
-	slotKey: string,
+	slotKey: number,
 	domParent: Node,
 	comp: ComponentBody,
 	props: any,
@@ -3626,7 +3639,7 @@ export function componentSlot(
 	singleRoot?: boolean,
 ): void {
 	const parentBlock = parentScope.block;
-	let state = parentScope[slotKey] as CompSlot | undefined;
+	let state = parentScope.slots[slotKey] as CompSlot | undefined;
 	if (state === undefined) {
 		let start: Comment | null;
 		let end: Comment | null;
@@ -3676,7 +3689,7 @@ export function componentSlot(
 			currentComp: null,
 			prevKey: NO_KEY,
 		};
-		parentScope[slotKey] = state;
+		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
 	// Key-driven remount: when the compiler emitted a key arg AND its value
@@ -3989,6 +4002,9 @@ interface HostComponentSlot {
 	// Stable delegating children body + its current target (see hostComponent).
 	body?: ComponentBody;
 	latest?: ComponentBody | null;
+	// Dedicated sub-scope holding the children's childSlot (slot 0), so the children
+	// reconcile/unmount via the Block tree without stamping a derived key on `scope`.
+	childScope?: Scope;
 }
 
 // Render a host element (`<tag>`) that WRAPS a children render-body, from runtime
@@ -4017,6 +4033,11 @@ export function hostComponent(
 		el.appendChild(childAnchor);
 		state = { el, anchor: childAnchor, ref: undefined };
 		(scope as any)[key] = state;
+		// Children render into a dedicated sub-scope (registered on `scope.children` so
+		// unmountScope walks into it), keeping the children's slot off `scope` itself.
+		const childScope = new ScopeImpl(scope, block);
+		state.childScope = childScope;
+		scope.children.push({ key, scope: childScope });
 		block.parentNode.insertBefore(el, anchor ?? block.endMarker);
 		scope.cleanups.push(() => {
 			if (state!.ref != null) attachRef(state!.ref, null);
@@ -4034,7 +4055,7 @@ export function hostComponent(
 		if (state.body === undefined) {
 			state.body = ((...args: any[]) => (state!.latest as any)(...args)) as ComponentBody;
 		}
-		childSlot(scope, key + '$c', el, state.body, state.anchor);
+		childSlot(state.childScope!, 0, el, state.body, state.anchor);
 	}
 	return el;
 }
@@ -4225,7 +4246,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 	// mix in one item — keyed reconciliation gives each array element its own stable
 	// item scope, so `_item` either always holds Blocks or never does.
 	if (descNeedsBlocks(item)) {
-		childSlot(scope, '_item', block.parentNode, item, block.endMarker);
+		childSlot(scope, 0, block.parentNode, item, block.endMarker);
 		return;
 	}
 	// Pure host/text item → reconcile in place, REUSING the item's existing node so
@@ -4302,18 +4323,18 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	// One childSlot renders all children INTO the element (append; no anchor): it
 	// reconciles a single child (component/host/text) or an array (keyed list) and
 	// recurses into nested host-with-components subtrees uniformly.
-	childSlot(block, '__kids', el, d.children, null);
+	childSlot(block, 0, el, d.children, null);
 }
 
 export function childSlot(
 	parentScope: Scope,
-	slotKey: string,
+	slotKey: number,
 	domParent: Node,
 	value: unknown,
 	anchor?: Node | null,
 ): void {
 	const parentBlock = parentScope.block;
-	let state = parentScope[slotKey] as ChildSlot | undefined;
+	let state = parentScope.slots[slotKey] as ChildSlot | undefined;
 	if (state === undefined) {
 		let start: Comment | null;
 		let end: Comment;
@@ -4351,7 +4372,7 @@ export function childSlot(
 			forSlot: null,
 			hostNode: null,
 		};
-		parentScope[slotKey] = state;
+		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
 
@@ -4773,7 +4794,7 @@ interface TrySlot {
 
 export function tryBlock(
 	parentScope: Scope,
-	slotKey: string,
+	slotKey: number,
 	domParent: Node,
 	tryBody: ComponentBody,
 	catchBody: ComponentBody | null,
@@ -4781,7 +4802,7 @@ export function tryBlock(
 	anchor?: Node | null,
 ): void {
 	const parentBlock = parentScope.block;
-	let state = parentScope[slotKey] as TrySlot | undefined;
+	let state = parentScope.slots[slotKey] as TrySlot | undefined;
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
@@ -4824,7 +4845,7 @@ export function tryBlock(
 			domParent,
 			parentBlock,
 		};
-		parentScope[slotKey] = newState;
+		parentScope.slots[slotKey] = newState;
 		registerSlot(parentScope, newState);
 		state = newState;
 	} else {
@@ -5803,7 +5824,7 @@ interface IfSlot {
 
 export function ifBlock(
 	parentScope: Scope,
-	slotKey: string,
+	slotKey: number,
 	domParent: Node,
 	cond: boolean,
 	thenBody: ComponentBody | null,
@@ -5811,7 +5832,7 @@ export function ifBlock(
 	anchor?: Node | null,
 ): void {
 	const parentBlock = parentScope.block;
-	let state = parentScope[slotKey] as IfSlot | undefined;
+	let state = parentScope.slots[slotKey] as IfSlot | undefined;
 	if (state === undefined) {
 		let start: Comment | null = null;
 		let end: Node | null = null;
@@ -5826,7 +5847,7 @@ export function ifBlock(
 			end = matchingClose(open);
 		}
 		state = { __kind: 'ifBlockSlot', anchor: anchor ?? null, start, end, branch: -1, block: null };
-		parentScope[slotKey] = state;
+		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
 	const next: 0 | 1 = cond ? 1 : 0;
@@ -5982,7 +6003,7 @@ function showActivityRange(state: ActivitySlot): void {
 
 export function activityBlock(
 	parentScope: Scope,
-	slotKey: string,
+	slotKey: number,
 	domParent: Node,
 	mode: 'visible' | 'hidden' | string,
 	body: ComponentBody,
@@ -5990,7 +6011,7 @@ export function activityBlock(
 ): void {
 	const parentBlock = parentScope.block;
 	const wantHidden = mode === 'hidden';
-	let state = parentScope[slotKey] as ActivitySlot | undefined;
+	let state = parentScope.slots[slotKey] as ActivitySlot | undefined;
 
 	if (state === undefined) {
 		const bStart = document.createComment('activity');
@@ -6005,7 +6026,7 @@ export function activityBlock(
 			savedDisplay: new Map(),
 			savedText: new Map(),
 		};
-		parentScope[slotKey] = state;
+		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 		if (wantHidden) {
 			// Mount while hidden: render children (creates state + DOM) but no
@@ -6136,7 +6157,7 @@ interface SwitchSlot {
 
 export function switchBlock(
 	parentScope: Scope,
-	slotKey: string,
+	slotKey: number,
 	domParent: Node,
 	discriminant: any,
 	cases: ReadonlyArray<readonly [test: any, body: ComponentBody]>,
@@ -6144,7 +6165,7 @@ export function switchBlock(
 	anchor?: Node | null,
 ): void {
 	const parentBlock = parentScope.block;
-	let state = parentScope[slotKey] as SwitchSlot | undefined;
+	let state = parentScope.slots[slotKey] as SwitchSlot | undefined;
 	if (state === undefined) {
 		let start: Comment | null = null;
 		let end: Node | null = null;
@@ -6163,7 +6184,7 @@ export function switchBlock(
 			caseIdx: -1,
 			block: null,
 		};
-		parentScope[slotKey] = state;
+		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
 	// Pick the first matching case, or fall back to default.
@@ -6290,7 +6311,7 @@ interface ForSlot {
 
 export function forBlock<T, E = undefined>(
 	parentScope: Scope,
-	slotKey: string,
+	slotKey: number,
 	domParent: Node,
 	items: ArrayLike<T>,
 	getKey: (item: T, index: number) => any,
@@ -6305,7 +6326,7 @@ export function forBlock<T, E = undefined>(
 	// Comment markers), bit 2 = depEligible (compare `deps` to cachedDeps and
 	// promote body to PURE when unchanged). Packed into one numeric literal.
 	const parentBlock = parentScope.block;
-	let state = parentScope[slotKey] as ForSlot | undefined;
+	let state = parentScope.slots[slotKey] as ForSlot | undefined;
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
@@ -6348,7 +6369,7 @@ export function forBlock<T, E = undefined>(
 			cachedDeps: null,
 			emptyBlock: null,
 		};
-		parentScope[slotKey] = state;
+		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
 	// `@empty` arm: when `items.length === 0` and the compiler emitted an
