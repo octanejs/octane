@@ -9,9 +9,9 @@
 //    we createRoot().render() a fresh tree — the original client-only behavior.
 import 'virtual:stylex.css';
 import { createRoot, hydrateRoot } from 'octane';
-import { QueryClient, QueryClientProvider, hydrate } from '@octanejs/query';
-import { RouterProvider } from '@octanejs/router';
+import { QueryClient, hydrate } from '@octanejs/query';
 import { makeRouter } from './routes.js';
+import { App } from './App.tsrx';
 
 const container = document.getElementById('app');
 if (!container) throw new Error('Missing #app root in index.html');
@@ -24,11 +24,12 @@ const state = dataEl ? JSON.parse(dataEl.textContent || 'null') : null;
 const router = makeRouter(); // browser history + reactive stores (defaults)
 const queryClient = new QueryClient();
 
-const tree = (
-	<QueryClientProvider client={queryClient}>
-		<RouterProvider router={router} />
-	</QueryClientProvider>
-);
+// Hydrate the SAME tree the server rendered: `<App>` (the server entry calls
+// render(App, …)). Rendering the inner `<QueryClientProvider><RouterProvider/>`
+// directly would drop App's wrapper component, leaving the client tree one layer
+// shallower than the server's — a structural mismatch that desyncs the hydration
+// cursor (every descendant adopts the wrong server node).
+const tree = <App router={router} queryClient={queryClient} />;
 
 if (dataEl) {
 	// Seed the query cache from the server's dehydrated state up front (an explicit

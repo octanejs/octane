@@ -41,6 +41,13 @@ const vite = await createViteServer({
 	server: { middlewareMode: true, hmr: { port: PORT + 100 } },
 });
 
+// The StyleX plugin instance (exposes `api.getCss()` — the aggregated atomic sheet).
+// In dev, `virtual:stylex.css` is served as JS that injects styles only AFTER the
+// client runs, so the server HTML would paint UNSTYLED first (FOUC). We inline the
+// sheet into the SSR <head> instead. The aggregate is complete once the route's
+// modules have been transformed — i.e. after render() pulls them in.
+const stylexPlugin = vite.config.plugins.find((p) => p.name === '@octanejs/stylex');
+
 const server = createHttp((req, res) => {
 	vite.middlewares(req, res, async () => {
 		const url = req.url || '/';
@@ -54,9 +61,14 @@ const server = createHttp((req, res) => {
 			const { render } = await vite.ssrLoadModule('/entry-server.tsx');
 			const { head, body, css, state } = await render(url);
 
+			// 2b. Inline the StyleX atomic sheet so the first paint is styled (no FOUC).
+			//     Read AFTER render() so the route's modules are transformed + collected.
+			const stylexCss = stylexPlugin?.api?.getCss?.() ?? '';
+			const stylexTag = stylexCss ? `<style data-stylex-ssr>${stylexCss}</style>` : '';
+
 			// 3. Splice the SSR output into the shell and send.
 			const html = template
-				.replace('<!--ssr-head-->', (head || '') + (css || ''))
+				.replace('<!--ssr-head-->', (head || '') + (css || '') + stylexTag)
 				.replace('<!--ssr-body-->', body || '')
 				.replace('<!--ssr-data-->', serializeState(state));
 

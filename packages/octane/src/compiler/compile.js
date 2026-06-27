@@ -1410,7 +1410,17 @@ function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html')
 	const normalized = normalizeChildren(jsxNodes);
 	const headNodes = normalized.filter((n) => n.type === 'HeadHoist');
 	const bodyNodes = normalized.filter((n) => n.type !== 'HeadHoist');
+	// A `return <jsx>` body (a React-style `.tsx` component) is VALUE position: the
+	// client lowers it to `createElement(...)` descriptors, so a component's children
+	// are DESCRIPTORS (one hydration block). A `@{}` body (JSXCodeBlock) is TEMPLATE
+	// position: the client uses componentSlot + a `__children` render-fn (an extra
+	// block). The server must match per form — flag value position so ssrEmitComponent
+	// emits descriptor children for `.tsx`, keeping the server/client block counts
+	// identical (a mismatch desyncs the hydration cursor). Restored after this body.
+	const prevValuePos = ctx._tsxValuePos;
+	ctx._tsxValuePos = !(node.body && node.body.type === 'JSXCodeBlock');
 	const htmlExpr = ssrEmitNodes(bodyNodes, ctx, name, inlinedSubs, parentNs, cssHash);
+	ctx._tsxValuePos = prevValuePos;
 
 	let cssLines = '';
 	if (cssEntries && cssEntries.length) {
@@ -1668,13 +1678,30 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 			`"children": (${printExprWithTsrx(rewriteJsxValues(renderPropChild, ctx), ctx, name, inlinedSubs)})`,
 		);
 	} else if ((node.children || []).length > 0) {
-		// Children → a server `children` render-fn (returns an HTML string). The
-		// component decides whether/where to render them by calling props.children(scope)
-		// — e.g. a context Provider does exactly that. Mirrors the client convention
-		// where children compile to a render fn passed as the `children` prop.
-		const sub = ssrCompileSub(node.children, ctx, '__schildren', [], cssHash, 'html');
-		inlinedSubs.push(sub.fn + ';');
-		propParts.push(`"children": ${sub.fnName}`);
+		if (ctx._tsxValuePos) {
+			// VALUE position (a React-style `.tsx` `return <jsx>` body): pass children as
+			// createElement DESCRIPTOR(s), exactly like the client's createElement. The
+			// component renders `{props.children}` → ssrChild(descriptor) → ONE block,
+			// matching the client's childSlot(descriptor). A `__children` render-fn would
+			// instead add a wrapping block (ssrChild wraps the fn), making the server one
+			// block deeper than the client and desyncing the hydration cursor.
+			const kids = (node.children || []).map((c) => lowerJsxChild(c, ctx)).filter((e) => e != null);
+			if (kids.length > 0) {
+				const childrenExpr =
+					kids.length === 1 ? kids[0] : { type: 'ArrayExpression', elements: kids };
+				propParts.push(
+					`"children": (${printExprWithTsrx(resolveStyleExpr(childrenExpr, cssHash), ctx, name, inlinedSubs)})`,
+				);
+			}
+		} else {
+			// TEMPLATE position (a `@{}` body): children → a server `children` render-fn
+			// (returns an HTML string). The component decides whether/where to render
+			// them by calling props.children(scope) — e.g. a context Provider does exactly
+			// that. Mirrors the client `@{}` convention (componentSlot + a render fn).
+			const sub = ssrCompileSub(node.children, ctx, '__schildren', [], cssHash, 'html');
+			inlinedSubs.push(sub.fn + ';');
+			propParts.push(`"children": ${sub.fnName}`);
+		}
 	}
 	ctx.runtimeNeeded.add('ssrComponent');
 	return `ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} })`;
