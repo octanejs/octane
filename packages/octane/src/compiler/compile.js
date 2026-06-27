@@ -3893,6 +3893,14 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			cc.anchorVar = anchorVar;
 			mountLines.push(`    _b._compAnchor$${cc.id} = ${anchorVar};`);
 		}
+		// A renderable `{expr}` child in a TEMPLATE body (has a bag) uses the inline
+		// text-hole fast path — cache its text node (`_chv`) + last value (`_chp`) on
+		// the bag so updates do a direct `setText` like a `.tsrx` text binding. Init
+		// in the mount branch so the bag shape stays monomorphic.
+		if (cc.isChild && !noTemplate) {
+			mountLines.push(`    _b._chv$${cc.id} = null;`);
+			mountLines.push(`    _b._chp$${cc.id} = undefined;`);
+		}
 	}
 	// tryBlock targets.
 	for (const tc of tryCalls) {
@@ -4050,19 +4058,38 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// Renderable `{expr}` hole — dispatch the value at runtime (component /
 		// element → block; primitive → text; nullish/boolean/'' → nothing). Shares
 		// the host/`<!>`-anchor resolution + hole-aware hydration walk with real
-		// component calls; only the emitted runtime call differs. Emit the small
-		// `textSlot` wrapper (fast inline path for the common primitive/text value;
-		// delegates to the full `childSlot` for objects / first render) — identical
-		// behaviour, far cheaper for update-heavy text holes like a table cell.
+		// component calls; only the emitted runtime call differs.
 		if (cc.isChild) {
-			ctx.runtimeNeeded.add('textSlot');
-			let anchorArg;
-			if (cc.anchorVar) {
-				anchorArg = `, __s.slots[0]._compAnchor$${cc.id}`;
-			} else {
-				anchorArg = isElHost(cc.elVar) ? '' : ', __block.endMarker';
+			// Anchor expression (no leading comma): a `<!>` source-order placeholder,
+			// the block end-marker, or none (append into an in-template element host).
+			const anchorExpr = cc.anchorVar
+				? `__s.slots[0]._compAnchor$${cc.id}`
+				: isElHost(cc.elVar)
+					? 'null'
+					: '__block.endMarker';
+			if (noTemplate) {
+				// No bag to cache on → the small `textSlot` wrapper (fast inline for a
+				// primitive into a text slot; delegates to `childSlot` otherwise).
+				ctx.runtimeNeeded.add('textSlot');
+				const anchorArg = anchorExpr === 'null' ? '' : `, ${anchorExpr}`;
+				pushAfter(
+					cc.id,
+					`  textSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg});`,
+				);
+				continue;
 			}
-			pushAfter(cc.id, `  textSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg});`);
+			// Template body: INLINE the text-hole hot path. Cache the text node
+			// (`_chv`) + last value (`_chp`) on the bag and, when the value is an
+			// unchanged-skippable primitive already backed by a text node, do a direct
+			// `setText` — exactly like a `.tsrx` `{… as string}` text binding. Objects /
+			// functions (component / element / array), the first render, and mode
+			// switches go through `textHole` → the full `childSlot`.
+			ctx.runtimeNeeded.add('setText');
+			ctx.runtimeNeeded.add('textHole');
+			pushAfter(
+				cc.id,
+				`  { const _v = (${cc.valueExpr}); if (_b._chp$${cc.id} !== _v) { _b._chp$${cc.id} = _v; const _t = _b._chv$${cc.id}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') setText(_t, _v); else _b._chv$${cc.id} = textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}); } }`,
+			);
 			continue;
 		}
 		// Design (c) lite path: hookless same-module callees with no key/spread/

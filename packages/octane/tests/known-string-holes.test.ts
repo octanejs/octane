@@ -22,11 +22,14 @@ function classify(holeOrSetup: string, hole?: string): 'text' | 'renderable' | s
 	const src = `import { useState } from 'octane';
 		export function C(props) @{ const [n, setN] = useState(0); ${setup} <p>${theHole}</p> }`;
 	const code = compile(src, 'ks.tsrx').code;
+	// A text hole mounts via `htext`; a renderable `{expr}` hole goes through the
+	// inline text-hole path (`textHole`, template bodies) or the `textSlot` wrapper
+	// (noTemplate bodies).
 	const isText = /htext\(/.test(code);
-	const isChild = /textSlot\(/.test(code);
+	const isChild = /textHole\(|textSlot\(/.test(code);
 	if (isText && !isChild) return 'text';
 	if (isChild && !isText) return 'renderable';
-	return `ambiguous(htext=${isText},textSlot=${isChild})`;
+	return `ambiguous(htext=${isText},renderable=${isChild})`;
 }
 
 describe('text holes — `as string` cast is optional when provably a string', () => {
@@ -103,14 +106,15 @@ describe('text holes — bare identifier tracked back to a string (no cast)', ()
 				<ul>@for (const item of props.items; key item) { <li>{item}</li> } </ul>
 			}`;
 		const code = compile(src, 'shadow.tsrx').code;
-		// The inner {item} is the loop var, so it must be a renderable child, not a
-		// text binding stamped from the outer `const item` string.
-		expect(/textSlot\(/.test(code)).toBe(true);
+		// The inner {item} is the loop var, so it must be a renderable child (inline
+		// text-hole / textSlot), not a text binding stamped from the outer `const
+		// item` string.
+		expect(/textHole\(|textSlot\(/.test(code)).toBe(true);
 	});
 
 	it('`string`-typed param → text', () => {
 		const code = compile(`export function C(name: string) @{ <p>{name}</p> }`, 'param.tsrx').code;
-		expect(/htext\(/.test(code) && !/textSlot\(/.test(code)).toBe(true);
+		expect(/htext\(/.test(code) && !/textHole\(|textSlot\(/.test(code)).toBe(true);
 	});
 });
 
