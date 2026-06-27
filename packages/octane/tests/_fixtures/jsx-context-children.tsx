@@ -105,8 +105,8 @@ export function InputApp() {
 	return <Field show={true} />;
 }
 
-// A `.map()` of pure-host <input>s (de-opt ARRAY path → deoptItemBody). Each input
-// node must be reused across a parent re-render so typed values survive.
+// A `.map()` of pure-host <input>s (lowers to the keyed forBlock fast path). Each
+// input node must be reused across a parent re-render so typed values survive.
 export function InputListApp() {
 	const [, force] = useState(0);
 	_forceList = force;

@@ -137,22 +137,24 @@ describe('TSRX features — ternary with fragment branches', () => {
 });
 
 // ---------------------------------------------------------------------------
-// P1: .map() at child position lowers host JSX to `createElement(...)` — the
-// runtime de-opt renderer reconciles the resulting array (keyed by element key,
-// index fallback). `@for (...; key ...)` remains the optimized fast path.
+// `.map(item => <jsx key/>)` at child position lowers to the SAME keyed
+// `forBlock` fast path as `@for (...; key ...)`: a compiled per-item body run
+// over the raw items array — NOT a per-row `createElement(...)` descriptor
+// reconciled by the de-opt childSlot path. (Applies equally to React-style
+// `.tsx` `.map`, where it's the idiomatic keyed list.)
 // ---------------------------------------------------------------------------
 
-describe('TSRX features — `.map()` host JSX lowers to the de-opt renderer', () => {
-	it('lowers `{items.map(x => <li key={x.id}>…</li>)}` to createElement(host) + childSlot', () => {
+describe('TSRX features — `.map()` host JSX lowers to the forBlock fast path', () => {
+	it('lowers `{items.map(x => <li key={x.id}>…</li>)}` to forBlock + a compiled item body', () => {
 		const src =
 			'export function A(p) @{ <ul>{p.items.map(x => <li key={x.id}>{x.label as string}</li>)}</ul> }';
 		const out = compile(src, 'a.tsrx');
 		expect(out.errors ?? []).toHaveLength(0);
-		// Host tag lowered to a createElement('li', …) call; rendered via childSlot.
-		expect(out.code).toMatch(/createElement\(\s*['"]li['"]/);
-		expect(out.code).toContain('childSlot');
-		// `key` is preserved in props (createElement lifts it for keyed reconcile).
-		expect(out.code).toMatch(/key:\s*x\.id/);
+		// Keyed forBlock over the raw items array — no per-row descriptor / childSlot.
+		expect(out.code).toContain('forBlock');
+		expect(out.code).not.toMatch(/createElement\(\s*['"]li['"]/);
+		// `key={x.id}` becomes the hoisted key fn `(x) => x.id`.
+		expect(out.code).toMatch(/=>\s*x\.id/);
 	});
 
 	it('leaves non-JSX `.map()` alone (string concatenation, etc.)', () => {
