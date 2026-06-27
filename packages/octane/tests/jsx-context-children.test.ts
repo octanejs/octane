@@ -38,3 +38,45 @@ it('.tsx host element with component children reconciles (child state survives p
 	expect(r.find('.count').textContent).toBe('1');
 	r.unmount();
 });
+
+it('.tsx pure-host de-opt node is REUSED across a re-render (DOM state survives)', () => {
+	const r = mount(InputApp as any);
+	const input = r.find('.field') as HTMLInputElement;
+	// Simulate DOM-resident state a rebuild would destroy: a typed value + a class.
+	input.value = 'typed';
+	input.classList.add('marked');
+	// Re-render the parent. The de-opt path must REUSE the <input> node, not rebuild.
+	flushSync(() => reRenderField());
+	const input2 = r.find('.field') as HTMLInputElement;
+	expect(input2).toBe(input); // same node — not recreated
+	expect(input2.value).toBe('typed'); // DOM-resident state survived
+	expect(input2.classList.contains('marked')).toBe(true);
+	r.unmount();
+});
+
+it('.tsx pure-host de-opt LIST items are reused across a re-render (per-item DOM state survives)', () => {
+	const r = mount(InputListApp as any);
+	const inputs = r.findAll('.li') as HTMLInputElement[];
+	expect(inputs.length).toBe(3);
+	inputs.forEach((el, i) => (el.value = 'v' + i));
+	flushSync(() => reRenderList());
+	const inputs2 = r.findAll('.li') as HTMLInputElement[];
+	expect(inputs2.length).toBe(3);
+	inputs2.forEach((el, i) => {
+		expect(el).toBe(inputs[i]); // same node per item (deoptItemBody reuse)
+		expect(el.value).toBe('v' + i); // typed value survived
+	});
+	r.unmount();
+});
+
+it('positional component children do NOT emit the de-opt "missing key" warning', () => {
+	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+	try {
+		const r = mount(ProviderApp as any); // renders <div><CtxLeaf/><CtxLeaf/></div>
+		const keyWarnings = warn.mock.calls.filter((c) => String(c[0]).includes('unique "key"'));
+		expect(keyWarnings.length).toBe(0);
+		r.unmount();
+	} finally {
+		warn.mockRestore();
+	}
+});

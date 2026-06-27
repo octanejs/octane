@@ -889,7 +889,7 @@ export function renderBlock(block: Block): void {
 		// reconciles by descriptor `type` identity across re-renders — same renderer →
 		// patch its holes in place, different → swap. Because each compiled JSX fragment
 		// lowers to a descriptor whose `type` is a compiled renderer (not a host-string),
-		// this stays on the reconcile path, NOT buildDeoptDom's rebuild — no VDOM diff.
+		// this stays on the block reconcile path, NOT the de-opt host path — no VDOM diff.
 		// Void bodies (the compiled `@{}` form, and all current components) return
 		// `undefined` and skip this entirely.
 		if (out !== undefined) {
@@ -3562,7 +3562,7 @@ export function createElement<P>(
 	// React-style `.tsx` parent (`<Provider>…</Provider>` → `createElement(Provider,
 	// {}, …)`) pass children into a `.tsrx` `{props.children}` consumer, matching the
 	// `.tsrx`→`.tsrx` path (which threads a `children` render-fn prop). Host
-	// descriptors keep using `descriptor.children` via buildDeoptDom — and
+	// descriptors keep using `descriptor.children` via the de-opt reconciler — and
 	// applyDeoptProps already skips `props.children` — so this is scoped to the
 	// component case. Only set when positional children were given and props didn't
 	// already carry an explicit `children`, so a fresh emit isn't clobbered.
@@ -4073,12 +4073,22 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 	}
 }
 
-// Maps each host element built by the de-opt reconciler to the descriptor that
-// produced it, so a later render can diff props (patchDeoptProps) and match children
-// by key against the live DOM — WITHOUT rebuilding, which would destroy DOM-resident
-// state (input value, focus, selection, scroll, media). A WeakMap keeps this off the
-// DOM node itself (no host-object pollution) and fully typed.
-const DEOPT_DESC = new WeakMap<Node, ElementDescriptor>();
+// The descriptor that last produced a de-opt host element is stashed on the element
+// as a typed expando, so a re-render can diff props (patchDeoptProps) and match
+// children by key against the live DOM — WITHOUT rebuilding, which would destroy
+// DOM-resident state (input value, focus, selection, scroll, media). A direct
+// property (not a WeakMap) keeps the per-child lookup in reconcileDeoptChildren cheap;
+// `DeoptStamped` types it so there's no `any`. Absent on text/adopted server nodes.
+const DEOPT_DESC: unique symbol = Symbol('octane.deoptDesc');
+interface DeoptStamped {
+	[DEOPT_DESC]?: ElementDescriptor;
+}
+function getDeoptDesc(n: Node): ElementDescriptor | undefined {
+	return (n as Node & DeoptStamped)[DEOPT_DESC];
+}
+function setDeoptDesc(el: Element, d: ElementDescriptor): void {
+	(el as Element & DeoptStamped)[DEOPT_DESC] = d;
+}
 
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
 // `createElement` collapses positional children and `.map()` results into arrays)
@@ -4116,12 +4126,12 @@ function reconcileDeoptNode(prev: Node | null, value: any, ownerBlock: Block): N
 		if (prev !== null && prev.nodeType === 1 && (prev as Element).localName === value.type) {
 			// REUSE the existing element — patch props in place instead of rebuilding.
 			el = prev as Element;
-			patchDeoptProps(el, DEOPT_DESC.get(el)?.props ?? null, value.props, ownerBlock);
+			patchDeoptProps(el, getDeoptDesc(el)?.props ?? null, value.props, ownerBlock);
 		} else {
 			el = document.createElement(value.type);
 			applyDeoptProps(el, value.props, ownerBlock);
 		}
-		DEOPT_DESC.set(el, value);
+		setDeoptDesc(el, value);
 		reconcileDeoptChildren(el, value.children, ownerBlock);
 		return el;
 	}
@@ -4144,13 +4154,23 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	const next: any[] = [];
 	flattenDeoptChildren(next, children);
 	const existing = el.childNodes;
+	// Fresh element (first build / fresh client mount) — nothing to reconcile against,
+	// so just build + append each child. Skips the keyed-match Map / Set / reorder
+	// bookkeeping below, which is the hot path for large initial mounts.
+	if (existing.length === 0) {
+		for (let i = 0; i < next.length; i++) {
+			const node = reconcileDeoptNode(null, next[i], ownerBlock);
+			if (node !== null) el.appendChild(node);
+		}
+		return;
+	}
 	// Partition current children: keyed (by stamped descriptor key) vs the rest
 	// (unkeyed elements + text/adopted nodes), which are reused in document order.
 	let byKey: Map<any, Node> | null = null;
 	const unkeyed: Node[] = [];
 	for (let i = 0; i < existing.length; i++) {
 		const n = existing[i];
-		const k = DEOPT_DESC.get(n)?.key;
+		const k = getDeoptDesc(n)?.key;
 		if (k != null) {
 			if (byKey === null) byKey = new Map();
 			byKey.set(k, n);
@@ -4197,7 +4217,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 	const block = scope.block;
 	// An item whose subtree contains a COMPONENT descriptor (a bare `<Comp/>`, or a
 	// host element with component children like `<li><Comp/></li>`) needs real Blocks
-	// for hooks/reconciliation, which buildDeoptDom can't give it. Delegate to a
+	// for hooks/reconciliation, which the raw host reconciler can't give it. Delegate to a
 	// nested childSlot on this item's own scope: it owns a marker pair inside the
 	// item's range and mounts the subtree as proper, reconciled child Blocks (the
 	// host-with-components case lands on childSlot's reconciling host path). Pure
@@ -4209,18 +4229,18 @@ function deoptItemBody(item: any, scope: Scope): void {
 		return;
 	}
 	// Pure host/text item → reconcile in place, REUSING the item's existing node so
-	// DOM-resident state (input value, focus, …) survives a re-render. On the first
-	// render the candidate is the server node during hydration (adopt it) or null on
-	// a fresh client mount (build it).
-	const startM = block.startMarker;
+	// DOM-resident state (input value, focus, …) survives a re-render. The reuse
+	// candidate is the node from last render (block.deoptNode); on the very first
+	// render under hydration it's instead the server node in the item range (adopt it).
 	const endM = block.endMarker;
-	let prev = (scope as any).__deoptNode as Node | null | undefined;
-	if (prev === undefined) {
-		prev = hydrating && startM != null ? startM.nextSibling : null;
+	let prev = block.deoptNode;
+	if (prev === null && hydrating) {
+		const startM = block.startMarker;
+		prev = startM != null ? startM.nextSibling : null;
 		if (prev === endM) prev = null; // empty item range → nothing to adopt
 	}
-	const node = reconcileDeoptNode(prev ?? null, item, block);
-	if (node !== (prev ?? null)) {
+	const node = reconcileDeoptNode(prev, item, block);
+	if (node !== prev) {
 		// Built a fresh node (first mount, or a tag/type change) — drop the old one
 		// and insert the new node into the item's range.
 		if (prev != null && prev !== node && prev.parentNode === block.parentNode) {
@@ -4228,12 +4248,12 @@ function deoptItemBody(item: any, scope: Scope): void {
 		}
 		if (node !== null) block.parentNode.insertBefore(node, endM);
 	}
-	(scope as any).__deoptNode = node;
+	block.deoptNode = node;
 }
 
 // True when `value` (a descriptor, an array, or a primitive) contains a COMPONENT
-// descriptor anywhere in its tree. Such a subtree can't be a raw `buildDeoptDom`
-// rebuild — its components need reconcilable, unmountable Blocks — so the de-opt
+// descriptor anywhere in its tree. Such a subtree can't be a raw host reconcile —
+// its components need reconcilable, unmountable Blocks — so the de-opt
 // paths (childSlot, deoptItemBody) route it through `hostElementBody`/componentSlot
 // instead. Pure host/text subtrees return false and keep the cheap rebuild path.
 function descNeedsBlocks(value: any): boolean {
@@ -4255,27 +4275,30 @@ function descNeedsBlocks(value: any): boolean {
 // Stable render body for a HOST element produced via `createElement` (the de-opt
 // path) whose subtree contains COMPONENT descriptors — e.g. a `.tsx` component that
 // returns `<div className="n"><Node/><Node/></div>` from inside control flow (so the
-// compiler emitted `createElement`, not a static template). It can't be a raw
-// `buildDeoptDom` rebuild because its component children need reconcilable Blocks.
+// compiler emitted `createElement`, not a static template). It can't be a raw host
+// reconcile because its component children need reconcilable Blocks.
 //
 // childSlot routes such a descriptor through the component path with THIS body as the
 // (stable-identity) renderer, so it gets a real child Block that reconciles by body
 // identity across renders and unmounts via the Block tree. The body builds/reuses its
-// element (stashed on its own Block), patches props each render, and mounts its
-// children through childSlot — giving each component child a proper Block. Element
-// identity is preserved across re-renders (unlike the pure-host rebuild path), and
-// nested host-with-components children recurse back through childSlot's host path.
+// element (kept on its Block's typed `deoptNode` field), diffs props each render, and
+// mounts its children through childSlot — giving each component child a proper Block.
+// Element identity is preserved across re-renders, and nested host-with-components
+// children recurse back through childSlot's host path.
 function hostElementBody(d: ElementDescriptor, block: Block): void {
-	let el = block['__hostEl'] as Element | undefined;
-	if (el === undefined || block['__hostTag'] !== d.type) {
+	let el = block.deoptNode as Element | null;
+	if (el === null || el.localName !== d.type) {
 		// First render, or the host tag changed at this slot — (re)create the element.
-		if (el !== undefined) el.remove();
+		if (el !== null) (el as ChildNode).remove();
 		el = document.createElement(d.type as string);
-		block['__hostEl'] = el;
-		block['__hostTag'] = d.type;
+		block.deoptNode = el;
 		block.parentNode.insertBefore(el, block.endMarker);
+		applyDeoptProps(el, d.props, block);
+	} else {
+		// REUSE the existing element — diff props in place (no rebuild).
+		patchDeoptProps(el, getDeoptDesc(el)?.props ?? null, d.props, block);
 	}
-	applyDeoptProps(el, d.props, block);
+	setDeoptDesc(el, d);
 	// One childSlot renders all children INTO the element (append; no anchor): it
 	// reconciles a single child (component/host/text) or an array (keyed list) and
 	// recurses into nested host-with-components subtrees uniformly.
