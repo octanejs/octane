@@ -4086,9 +4086,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			// switches go through `textHole` → the full `childSlot`.
 			ctx.runtimeNeeded.add('setText');
 			ctx.runtimeNeeded.add('textHole');
+			// When the slot has its OWN `<!>` placeholder, tell textHole/childSlot to
+			// reuse it as the end marker (no second comment minted) — `ownEnd`.
+			const ownEndArg = cc.anchorVar ? ', true' : '';
 			pushAfter(
 				cc.id,
-				`  { const _v = (${cc.valueExpr}); if (_b._chp$${cc.id} !== _v) { _b._chp$${cc.id} = _v; const _t = _b._chv$${cc.id}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') setText(_t, _v); else _b._chv$${cc.id} = textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}); } }`,
+				`  { const _v = (${cc.valueExpr}); if (_b._chp$${cc.id} !== _v) { _b._chp$${cc.id} = _v; const _t = _b._chv$${cc.id}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') setText(_t, _v); else _b._chv$${cc.id} = textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}); } }`,
 			);
 			continue;
 		}

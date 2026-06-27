@@ -19,7 +19,12 @@ Make React-style `.tsx` `{expr}` value-hole updates as fast as a `.tsrx`
   accessor vs `CharacterData` one prototype hop deeper) across `setText`,
   `childSlot`, the inline text-hole, and the de-opt reconciler — faster on the hot
   text-update path (also speeds the `.tsrx` `setText` path).
+- A value hole now reuses its own `<!>` source-order placeholder as the slot's end
+  marker instead of minting a second comment (`childSlot`/`textSlot`/`textHole`
+  gained an `ownEnd` flag) — one fewer comment node + one fewer `insertBefore` per
+  `{expr}` hole on mount, so a `.tsx` keyed table builds and remounts faster.
 
 No API or behavioural change. On the dbmon update benchmark (1000-row table) this
 closed the `.tsx` gap to `.tsrx`: full-table `tick` ~2.1ms → ~1.5ms and partial
-`tick` ~0.9ms → ~0.5ms (both now matching the `.tsrx` column).
+`tick` ~0.9ms → ~0.5ms (both matching `.tsrx`), and the marker reduction cut mount
+~5.9ms → ~5.2ms and remount ~5.2ms → ~4.5ms.

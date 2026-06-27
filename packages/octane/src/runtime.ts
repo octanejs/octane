@@ -4345,6 +4345,11 @@ export function childSlot(
 	domParent: Node,
 	value: unknown,
 	anchor?: Node | null,
+	// When set, `anchor` is the slot's OWN dedicated `<!>` placeholder (emitted by
+	// the compiler at the slot's source-order position) — reuse it as the end
+	// marker instead of minting a second comment. Content still inserts before it.
+	// Only valid for a placeholder exclusive to this slot, NOT a shared end-marker.
+	ownEnd?: boolean,
 ): void {
 	const parentBlock = parentScope.block;
 	let state = parentScope.slots[slotKey] as ChildSlot | undefined;
@@ -4367,6 +4372,12 @@ export function childSlot(
 			start = hydrateNode as Comment;
 			end = matchingClose(hydrateNode as Node);
 			hydrateNode = start.nextSibling;
+		} else if (ownEnd && anchor != null) {
+			// Client mount, dedicated placeholder: reuse the slot's own `<!>` as the end
+			// marker — content inserts before it just the same. Saves a comment + an
+			// insertBefore per `{expr}` hole (no separate end marker minted).
+			start = null;
+			end = anchor as Comment;
 		} else {
 			// Client mount: a SINGLE end anchor. A text/empty hole tracks its own
 			// `Text` node (no start needed); the component path lazily mints a start
@@ -4563,10 +4574,11 @@ export function textSlot(
 	domParent: Node,
 	value: unknown,
 	anchor?: Node | null,
+	ownEnd?: boolean,
 ): void {
 	const vt = typeof value;
 	if (vt === 'object' || vt === 'function') {
-		childSlot(parentScope, slotKey, domParent, value, anchor);
+		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd);
 		return;
 	}
 	const state = parentScope.slots[slotKey] as ChildSlot | undefined;
@@ -4578,7 +4590,7 @@ export function textSlot(
 	) {
 		// First render (state init + hydration adoption) or a mode switch out of
 		// non-text content — let the full classifier handle it.
-		childSlot(parentScope, slotKey, domParent, value, anchor);
+		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd);
 		return;
 	}
 	// Hot path: primitive into a text/empty slot (markerless single Text node).
@@ -4610,8 +4622,9 @@ export function textHole(
 	domParent: Node,
 	value: unknown,
 	anchor?: Node | null,
+	ownEnd?: boolean,
 ): Text | null {
-	childSlot(parentScope, slotKey, domParent, value, anchor);
+	childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd);
 	const state = parentScope.slots[slotKey] as ChildSlot;
 	return state.block === null && state.forSlot === null && state.hostNode === null
 		? state.text
