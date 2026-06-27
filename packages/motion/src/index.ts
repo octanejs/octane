@@ -171,7 +171,8 @@ function createMotionComponent(tag: string) {
 		});
 		provideContext(scope, StaggerContext, orch);
 
-		const node = hostComponent(scope, '_m', tag, domProps(props), props.children) as HTMLElement;
+		// Slot 0 of this component's own block (one hostComponent per motion instance).
+		const node = hostComponent(scope, 0, tag, domProps(props), props.children) as HTMLElement;
 
 		// Resolve a gesture/exit target to its values + its own (per-variant) transition,
 		// so a variant target carrying a `transition` key honors it (like `animate` does).

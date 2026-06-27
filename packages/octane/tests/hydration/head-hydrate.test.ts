@@ -54,8 +54,9 @@ describe('hoisted document metadata — compile', () => {
 		const { code: serverCode } = compile(readFileSync(FIXTURE, 'utf8'), 'head.tsrx', {
 			mode: 'server',
 		});
-		// The first head element is the <title>; its key must match across modes.
-		const key = clientCode.match(/headBlock\(__s, "(rnh-[a-z0-9]+)"/)?.[1];
+		// The first head element is the <title>; its content key (3rd arg, after the
+		// scope slot index) must match the server `ssrHeadEl` key across modes.
+		const key = clientCode.match(/headBlock\(__s, \d+, "(rnh-[a-z0-9]+)"/)?.[1];
 		expect(key).toBeTruthy();
 		expect(serverCode).toContain(`ssrHeadEl("${key}"`);
 	});
