@@ -1,0 +1,14 @@
+{
+  "name": "@benchmarks/dbmon",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "dbmon (dbmonster-style) update-stress bench. A table of DB_COUNT rows whose cell text + threshold class churn every tick; harness measures mount / tick / tick_partial / remount / sort / unmount across octane-tsrx, octane-jsx and react.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:long": "node run.mjs 50"
+  },
+  "dependencies": {
+    "playwright": "catalog:default"
+  }
+}
