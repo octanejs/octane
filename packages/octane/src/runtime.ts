@@ -1150,6 +1150,18 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				for (let r = it.next(); !r.done; r = it.next()) unmountBlock(r.value, detachDom);
 				// An @empty branch (if any) hangs off the same slot.
 				if (val.emptyBlock) unmountBlock(val.emptyBlock, detachDom);
+			} else if (k === 'childSlot') {
+				// A `{expr}` value slot holds EITHER a component Block (a component /
+				// host-with-components value) OR a `forSlot` keyed list (an array value,
+				// e.g. `{items.map(...)}`). Tear down whichever is live so the subtree's
+				// cleanups fire on unmount (the array branch was previously unhandled).
+				if (val.block) unmountBlock(val.block, detachDom);
+				if (val.forSlot) {
+					const items = val.forSlot.items as Map<any, Block>;
+					const it = items.values();
+					for (let r = it.next(); !r.done; r = it.next()) unmountBlock(r.value, detachDom);
+					if (val.forSlot.emptyBlock) unmountBlock(val.forSlot.emptyBlock, detachDom);
+				}
 			} else {
 				// componentSlotSlot | portalSlotSlot | trySlotSlot
 				// Portal DOM lives in a FOREIGN target — the root-level batched clear
@@ -1668,9 +1680,16 @@ export function createContext<T>(defaultValue: T): Context<T> {
 			ctx.$$version++;
 		}
 		scope.$$ctxValues.set(ctx, props.value);
-		// Children is the compiled render-body for the JSX between the Provider tags.
-		if (typeof props.children === 'function') {
-			props.children(undefined, scope);
+		// Children between the Provider tags reach us in one of two shapes:
+		//   - a compiled render-body FUNCTION — the `.tsrx` `{props.children}` lowering;
+		//   - an element descriptor / renderable — a React-style `.tsx` parent, where
+		//     `<Ctx.Provider>…</Ctx.Provider>` lowers to `createElement(Ctx.Provider,
+		//     { value }, …children)` and `createElement` mirrors the positional children
+		//     into `props.children` (a descriptor, an array, or text — never a function).
+		// `childrenAsBody` normalizes either shape to a callable body, so both dialects
+		// render their children inside the Provider's scope (and thus under its context).
+		if (props.children != null) {
+			childrenAsBody(props.children)(undefined, scope, undefined);
 		}
 	};
 	return ctx;
@@ -4008,15 +4027,16 @@ function buildDeoptDom(value: any, ownerBlock: Block): Node | null {
 // identity across parent re-renders; that's the documented de-opt trade-off).
 function deoptItemBody(item: any, scope: Scope): void {
 	const block = scope.block;
-	// A COMPONENT descriptor in the array (e.g. a `.tsx` parent passing MULTIPLE
-	// children — `[<Comp/>, <span/>]` — to a `.tsrx` `{props.children}` consumer)
-	// needs a real Block for hooks/reconciliation, which buildDeoptDom can't give
-	// it. Delegate to a nested childSlot on this item's own scope: it owns a marker
-	// pair inside the item's range and mounts the component as a proper child Block.
-	// (Host descriptors / primitives stay on the rebuild path below.) The two paths
-	// don't mix in one item — keyed reconciliation gives each array element its own
-	// stable item scope, so `_item` either always holds a component or never does.
-	if (item != null && item.$$kind === ELEMENT_TAG && typeof item.type === 'function') {
+	// An item whose subtree contains a COMPONENT descriptor (a bare `<Comp/>`, or a
+	// host element with component children like `<li><Comp/></li>`) needs real Blocks
+	// for hooks/reconciliation, which buildDeoptDom can't give it. Delegate to a
+	// nested childSlot on this item's own scope: it owns a marker pair inside the
+	// item's range and mounts the subtree as proper, reconciled child Blocks (the
+	// host-with-components case lands on childSlot's reconciling host path). Pure
+	// host/primitive items stay on the cheap rebuild path below. The two paths don't
+	// mix in one item — keyed reconciliation gives each array element its own stable
+	// item scope, so `_item` either always holds Blocks or never does.
+	if (descNeedsBlocks(item)) {
 		childSlot(scope, '_item', block.parentNode, item, block.endMarker);
 		return;
 	}
@@ -4036,6 +4056,57 @@ function deoptItemBody(item: any, scope: Scope): void {
 	}
 	const node = buildDeoptDom(item, block);
 	if (node !== null) block.parentNode.insertBefore(node, block.endMarker);
+}
+
+// True when `value` (a descriptor, an array, or a primitive) contains a COMPONENT
+// descriptor anywhere in its tree. Such a subtree can't be a raw `buildDeoptDom`
+// rebuild — its components need reconcilable, unmountable Blocks — so the de-opt
+// paths (childSlot, deoptItemBody) route it through `hostElementBody`/componentSlot
+// instead. Pure host/text subtrees return false and keep the cheap rebuild path.
+function descNeedsBlocks(value: any): boolean {
+	if (value == null || typeof value !== 'object') return false;
+	if (Array.isArray(value)) {
+		for (let i = 0; i < value.length; i++) {
+			if (descNeedsBlocks(value[i])) return true;
+		}
+		return false;
+	}
+	if (value.$$kind === ELEMENT_TAG) {
+		// A component descriptor (function `type`) always needs a Block; a host
+		// descriptor needs one only if its own children do (recurse).
+		return typeof value.type === 'function' || descNeedsBlocks(value.children);
+	}
+	return false;
+}
+
+// Stable render body for a HOST element produced via `createElement` (the de-opt
+// path) whose subtree contains COMPONENT descriptors — e.g. a `.tsx` component that
+// returns `<div className="n"><Node/><Node/></div>` from inside control flow (so the
+// compiler emitted `createElement`, not a static template). It can't be a raw
+// `buildDeoptDom` rebuild because its component children need reconcilable Blocks.
+//
+// childSlot routes such a descriptor through the component path with THIS body as the
+// (stable-identity) renderer, so it gets a real child Block that reconciles by body
+// identity across renders and unmounts via the Block tree. The body builds/reuses its
+// element (stashed on its own Block), patches props each render, and mounts its
+// children through childSlot — giving each component child a proper Block. Element
+// identity is preserved across re-renders (unlike the pure-host rebuild path), and
+// nested host-with-components children recurse back through childSlot's host path.
+function hostElementBody(d: ElementDescriptor, block: Block): void {
+	let el = block['__hostEl'] as Element | undefined;
+	if (el === undefined || block['__hostTag'] !== d.type) {
+		// First render, or the host tag changed at this slot — (re)create the element.
+		if (el !== undefined) el.remove();
+		el = document.createElement(d.type as string);
+		block['__hostEl'] = el;
+		block['__hostTag'] = d.type;
+		block.parentNode.insertBefore(el, block.endMarker);
+	}
+	applyDeoptProps(el, d.props, block);
+	// One childSlot renders all children INTO the element (append; no anchor): it
+	// reconciles a single child (component/host/text) or an array (keyed list) and
+	// recurses into nested host-with-components subtrees uniformly.
+	childSlot(block, '__kids', el, d.children, null);
 }
 
 export function childSlot(
@@ -4134,25 +4205,30 @@ export function childSlot(
 		state.forSlot.size = 0;
 		state.forSlot = null;
 	}
-	// Lone host descriptor at a value position (e.g. host JSX returned directly) →
-	// de-opt build. Rebuilt each render (host has no state).
-	if (isHostDescriptor(value)) {
-		clearChildContent(state);
-		if (state.start === null) {
-			state.start = document.createComment('');
-			domParent.insertBefore(state.start, state.end);
-		}
-		const node = buildDeoptDom(value, parentBlock);
-		if (node !== null) state.start.parentNode!.insertBefore(node, state.end);
-		return;
-	}
-
-	// Classify: function → ComponentBody (empty props, e.g. a `{children}`
-	// render-fn); ElementDescriptor → its `type` + carried props; anything else
-	// → text/empty.
+	// Classify the value. A host descriptor whose subtree contains component
+	// descendants can't be a raw rebuild (its components need reconcilable Blocks) →
+	// route it through the component path below with the stable `hostElementBody`
+	// renderer, which keeps the element across renders and mounts its component
+	// children as proper Blocks. A pure-host descriptor (host/text only) stays on the
+	// cheap de-opt rebuild — host carries no state, so it's rebuilt each render. A
+	// function is a `{children}`-style render body; a component descriptor carries its
+	// `type` + props; anything else is text/empty.
 	let comp: ComponentBody | null = null;
 	let props: any = {};
-	if (typeof value === 'function') {
+	if (isHostDescriptor(value)) {
+		if (!descNeedsBlocks(value)) {
+			clearChildContent(state);
+			if (state.start === null) {
+				state.start = document.createComment('');
+				domParent.insertBefore(state.start, state.end);
+			}
+			const node = buildDeoptDom(value, parentBlock);
+			if (node !== null) state.start.parentNode!.insertBefore(node, state.end);
+			return;
+		}
+		comp = hostElementBody as unknown as ComponentBody;
+		props = value;
+	} else if (typeof value === 'function') {
 		comp = value as ComponentBody;
 	} else if (isElementDescriptor(value)) {
 		comp = value.type as ComponentBody;
