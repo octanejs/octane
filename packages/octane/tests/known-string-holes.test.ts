@@ -26,7 +26,7 @@ function classify(holeOrSetup: string, hole?: string): 'text' | 'renderable' | s
 	// inline text-hole path (`textHole`, template bodies) or the `textSlot` wrapper
 	// (noTemplate bodies).
 	const isText = /htext\(/.test(code);
-	const isChild = /textHole\(|textSlot\(/.test(code);
+	const isChild = /childTextHole\(|textHole\(|textSlot\(/.test(code);
 	if (isText && !isChild) return 'text';
 	if (isChild && !isText) return 'renderable';
 	return `ambiguous(htext=${isText},renderable=${isChild})`;
@@ -109,12 +109,12 @@ describe('text holes — bare identifier tracked back to a string (no cast)', ()
 		// The inner {item} is the loop var, so it must be a renderable child (inline
 		// text-hole / textSlot), not a text binding stamped from the outer `const
 		// item` string.
-		expect(/textHole\(|textSlot\(/.test(code)).toBe(true);
+		expect(/childTextHole\(|textHole\(|textSlot\(/.test(code)).toBe(true);
 	});
 
 	it('`string`-typed param → text', () => {
 		const code = compile(`export function C(name: string) @{ <p>{name}</p> }`, 'param.tsrx').code;
-		expect(/htext\(/.test(code) && !/textHole\(|textSlot\(/.test(code)).toBe(true);
+		expect(/htext\(/.test(code) && !/childTextHole\(|textHole\(|textSlot\(/.test(code)).toBe(true);
 	});
 });
 

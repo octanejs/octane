@@ -4631,6 +4631,65 @@ export function textHole(
 		: null;
 }
 
+// Slow path for an ONLY-CHILD `{expr}` value hole (the value hole is the sole
+// content of `domParent`). When the value is a primitive this is FULLY markerless
+// and stateless — a single Text node appended to the host, exactly like a `.tsrx`
+// only-child `htext`/`setText` text binding (no `<!>` placeholder, no childSlot
+// state, no end marker). Only when the value is an object/function (component /
+// element / array) does it fall back to the full `childSlot`, which lazily mints
+// the markers + slot state it needs (the host's sole-child invariant means it can
+// safely append). The compiler's inline fast path handles the steady-state
+// primitive update (`setText` on the cached node); this runs on first render,
+// empty↔non-empty, and a primitive↔object mode switch. Returns the text node to
+// cache (or null when in object/empty mode).
+export function childTextHole(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	value: unknown,
+	cachedNode: Text | null,
+): Text | null {
+	const vt = typeof value;
+	const state = parentScope.slots[slotKey] as ChildSlot | undefined;
+	if (state === undefined && vt !== 'object' && vt !== 'function') {
+		// Markerless pure-text mode.
+		const str =
+			value == null || value === false || value === true
+				? ''
+				: vt === 'string'
+					? (value as string)
+					: String(value);
+		if (str === '') {
+			if (cachedNode !== null) cachedNode.remove();
+			return null;
+		}
+		if (cachedNode !== null) {
+			if (cachedNode.nodeValue !== str) cachedNode.nodeValue = str;
+			return cachedNode;
+		}
+		if (hydrating) {
+			// Adopt the server's markerless text (the host's sole child).
+			const f = domParent.firstChild;
+			if (f !== null && f.nodeType === 3) {
+				if ((f as Text).nodeValue !== str) (f as Text).nodeValue = str;
+				return f as Text;
+			}
+		}
+		const tn = document.createTextNode(str);
+		domParent.appendChild(tn);
+		return tn;
+	}
+	// Object/function value (or already in slot mode): hand off to childSlot, which
+	// owns the markers + state. On a pure-text → object switch, drop the markerless
+	// text node first. While hydrating, point the cursor at the host's first child
+	// (the server's `<!--[-->`) so childSlot adopts the range.
+	if (state === undefined && cachedNode !== null) cachedNode.remove();
+	if (hydrating && state === undefined) hydrateNode = domParent.firstChild;
+	childSlot(parentScope, slotKey, domParent, value, null);
+	const s = parentScope.slots[slotKey] as ChildSlot;
+	return s.block === null && s.forSlot === null && s.hostNode === null ? s.text : null;
+}
+
 // True if any context the block read last render has since changed value
 // (its Provider bumped the version). When so, a memo bailout must NOT skip —
 // the block (or a consumer in its subtree) needs the new context value.

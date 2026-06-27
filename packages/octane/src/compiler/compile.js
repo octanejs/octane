@@ -1719,14 +1719,27 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	}
 
 	lit += '>';
-	const childrenExpr = ssrEmitNodes(
-		normalizeChildren(node.children || []),
-		ctx,
-		name,
-		inlinedSubs,
-		childNs,
-		cssHash,
-	);
+	const normChildren = normalizeChildren(node.children || []);
+	// Only-child renderable `{expr}` → markerless `ssrChildText` (mirrors the client's
+	// markerless `childTextHole` mount: a primitive is the host's bare text, an object
+	// still gets a `<!--[-->…<!--]-->` block). Must match the client's only-child
+	// markerless condition exactly so both sides agree for hydration: a single `Text`
+	// child that is neither a static literal (baked into HTML) nor a known string
+	// (emitted via `ssrText`).
+	const onlyChild0 =
+		normChildren.length === 1 && normChildren[0].type === 'Text' ? normChildren[0] : null;
+	let childrenExpr;
+	if (
+		htmlSources.length === 0 &&
+		onlyChild0 !== null &&
+		staticTextLiteral(onlyChild0.expression) === null &&
+		!isKnownStringExpression(onlyChild0.expression, ctx.knownStringLocals)
+	) {
+		ctx.runtimeNeeded.add('ssrChildText');
+		childrenExpr = `ssrChildText(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx), cssHash))}, __s)`;
+	} else {
+		childrenExpr = ssrEmitNodes(normChildren, ctx, name, inlinedSubs, childNs, cssHash);
+	}
 	if (htmlSources.length > 0) {
 		// Raw HTML (explicit and/or spread-supplied) wins over children when present
 		// at runtime (last source wins); otherwise the children render.
@@ -4060,6 +4073,19 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// the host/`<!>`-anchor resolution + hole-aware hydration walk with real
 		// component calls; only the emitted runtime call differs.
 		if (cc.isChild) {
+			// MARKERLESS only-child renderable: append a primitive as a single Text
+			// node (no `<!>`, no slot state), `setText` it inline on update — exactly
+			// like a `.tsrx` only-child text binding — and fall back to `childTextHole`
+			// (→ childSlot, lazy markers) only for objects / first render / mode switch.
+			if (cc.onlyChildText && !noTemplate) {
+				ctx.runtimeNeeded.add('setText');
+				ctx.runtimeNeeded.add('childTextHole');
+				pushAfter(
+					cc.id,
+					`  { const _v = (${cc.valueExpr}); if (_b._chp$${cc.id} !== _v) { _b._chp$${cc.id} = _v; const _t = _b._chv$${cc.id}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') setText(_t, _v); else _b._chv$${cc.id} = childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); } }`,
+				);
+				continue;
+			}
 			// Anchor expression (no leading comma): a `<!>` source-order placeholder,
 			// the block end-marker, or none (append into an in-template element host).
 			const anchorExpr = cc.anchorVar
@@ -4864,15 +4890,18 @@ function emitElementHtml(
 			});
 			// The element stays empty in the template — runtime appends a Text node.
 		} else {
-			// Bare `{expr}` (no string cast) → RENDERABLE hole: render a component /
-			// element / children-fn, coerce a primitive to text, render nothing for
-			// nullish/boolean. A `<!>` anchor at child index 0 lets childSlot adopt
-			// the server's `<!--[-->…<!--]-->` range on hydration.
+			// Bare `{expr}` (no string cast) → RENDERABLE hole. As the host's SOLE
+			// child it lowers MARKERLESS: a primitive value is appended as a single
+			// Text node (like `htext`), with NO `<!>` placeholder + no slot state —
+			// matching the `.tsrx` only-child text path. Only an object/function value
+			// (component / element / array) lazily mints markers via childSlot. The
+			// runtime `childTextHole` owns that branch; the server emits `ssrChildText`
+			// (markerless text for a primitive, a `<!--[-->…<!--]-->` block otherwise),
+			// so hydration adopts either shape.
 			const ch = makeChildCall(txtChild.expression, ctx, cssHash);
 			ch.hostPath = path;
-			ch.anchorPath = [...path, 0];
+			ch.onlyChildText = true;
 			compCalls.push(ch);
-			html += '<!>';
 		}
 	} else if (children.length === 1 && children[0].type === 'Html') {
 		// `{html expr}` as the only child — set the element's innerHTML directly.
