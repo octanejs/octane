@@ -3050,11 +3050,15 @@ function headElementArgs(node, index) {
 
 // Build the CLIENT `headBlock(__s, …)` statements for a component's hoisted head
 // elements (one per `HeadHoist`). Returns '' when there are none.
-/** @param {any[]} headNodes @param {any} ctx @returns {string} */
-function emitHeadClient(headNodes, ctx) {
+/** @param {any[]} headNodes @param {any} ctx @param {number} slotBase @returns {string} */
+function emitHeadClient(headNodes, ctx, slotBase) {
 	if (!headNodes.length) return '';
 	ctx.runtimeNeeded.add('headBlock');
-	return headNodes.map((h, i) => `  headBlock(__s, ${headElementArgs(h, i)});`).join('\n');
+	// Each hoisted head element gets a dense scope slot (after the body's constructs);
+	// the content `key` stays as a later arg for SSR-adoption matching.
+	return headNodes
+		.map((h, i) => `  headBlock(__s, ${slotBase + i}, ${headElementArgs(h, i)});`)
+		.join('\n');
 }
 
 // Build the SERVER `ssrHeadEl(…)` statements for a component's hoisted head
@@ -3525,8 +3529,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// `<style>`) is what collapses a `<title> + <style> + <div>` page to single-root.
 	const headNodes = allNodes.filter((n) => n.type === 'HeadHoist');
 	const jsxNodes = allNodes.filter((n) => n.type !== 'HeadHoist');
-	const headEmit = emitHeadClient(headNodes, ctx);
-	if (jsxNodes.length === 0) return { mount: '', update: '', after: '', head: headEmit };
+	// Head-only body: no body template, hence no binding bag — the hoisted head
+	// elements take slots 0..M-1 (packed). The body case allocates head slots AFTER
+	// its constructs (see `headEmit` below), keeping every scope's `slots` packed.
+	if (jsxNodes.length === 0)
+		return { mount: '', update: '', after: '', head: emitHeadClient(headNodes, ctx, 0) };
 
 	// Emit ONE template containing all top-level JSX (wrapping multiple roots in
 	// a synthetic <octane-frag>).
@@ -3804,15 +3811,27 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// a harmless no-op for them.
 	const afterCalls = [];
 	const pushAfter = (id, line) => afterCalls.push({ id, line });
-	// Dense per-body slot index. Slot 0 is this body's binding bag (`__s.slots[0]`);
-	// each control-flow / component / child construct gets the next index, so a scope
-	// stores its slots in a packed array instead of dynamic `scope['_for$N']` keys
-	// (which kept the scope hidden-class polymorphic). Assigned in emit order; the
-	// value is a stable per-call-site handle (it need not match runtime call order).
-	let nextSlotIndex = 1;
+	// Dense per-body slot indices. Slot 0 is this body's binding bag (`__s.slots[0]`);
+	// each control-flow / component / child construct gets index 1..N. The runtime
+	// runs the slot calls in `afterCalls` SORTED by source id, so we assign indices in
+	// that same id order — the scope's `slots` array is then written 0,1,2,… and stays
+	// PACKED (a holey array, written out of order, would be a slower elements-kind).
+	const allConstructs = [
+		...forCalls,
+		...ifCalls,
+		...compCalls,
+		...ctx._portalCalls,
+		...tryCalls,
+		...ctx._switchCalls,
+	];
+	allConstructs.sort((a, b) => a.id - b.id);
+	for (let i = 0; i < allConstructs.length; i++) allConstructs[i].slotIndex = i + 1;
+	// Hoisted head elements take the slots AFTER the constructs (and `plan.head` runs
+	// after `plan.after`), so the scope's `slots` array fills 0,1,…,N,N+1,… packed.
+	const headEmit = emitHeadClient(headNodes, ctx, allConstructs.length + 1);
 	for (const fc of forCalls) {
 		ctx.runtimeNeeded.add('forBlock');
-		const slotIndex = nextSlotIndex++;
+		const slotIndex = fc.slotIndex;
 		// flags: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item markers),
 		//        bit 2 = depEligible (runtime compares deps array, upgrades to pure
 		//        for survivors when deps unchanged this render).
@@ -3841,7 +3860,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		);
 	}
 	for (const ic of ifCalls) {
-		const slotIndex = nextSlotIndex++;
+		const slotIndex = ic.slotIndex;
 		// Anchor selection mirrors componentSlot: with `<!>`-anchored source-order
 		// siblings, pass the captured anchor var so the start/end markers land
 		// BEFORE it (preserving order). When the host is the body's own parentNode
@@ -3868,7 +3887,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		);
 	}
 	for (const cc of compCalls) {
-		const slotIndex = nextSlotIndex++;
+		const slotIndex = cc.slotIndex;
 		// Renderable `{expr}` hole — dispatch the value at runtime (component /
 		// element → block; primitive → text; nullish/boolean/'' → nothing). Shares
 		// the host/`<!>`-anchor resolution + hole-aware hydration walk with real
@@ -3951,7 +3970,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		);
 	}
 	for (const pc of ctx._portalCalls) {
-		const slotIndex = nextSlotIndex++;
+		const slotIndex = pc.slotIndex;
 		ctx.runtimeNeeded.add('portal');
 		pushAfter(
 			pc.id,
@@ -3961,7 +3980,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// Restore the outer plan's portal-call list — pairs with the save above.
 	ctx._portalCalls = _prevPortalCalls;
 	for (const tc of tryCalls) {
-		const slotIndex = nextSlotIndex++;
+		const slotIndex = tc.slotIndex;
 		ctx.runtimeNeeded.add('tryBlock');
 		// Anchor selection mirrors componentSlot:
 		//   - In mixed children with source-order siblings, we emitted a `<!>`
@@ -3975,7 +3994,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		);
 	}
 	for (const sc of ctx._switchCalls) {
-		const slotIndex = nextSlotIndex++;
+		const slotIndex = sc.slotIndex;
 		ctx.runtimeNeeded.add('switchBlock');
 		// Anchor selection mirrors componentSlot:
 		//   - When the @switch had source-order siblings (mixed-children loop

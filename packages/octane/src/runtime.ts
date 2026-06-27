@@ -3021,10 +3021,11 @@ const _injectedStyles = new Set<string>();
 // ---------------------------------------------------------------------------
 // Hoisted document metadata (React-19-shape) — `<title>`, `<meta>`, `<link>`
 // rendered ANYWHERE in a component are lifted to <document.head> by the compiler
-// emitting one `headBlock(scope, key, tag, attrs, text)` call per element
+// emitting one `headBlock(scope, slot, key, tag, attrs, text)` call per element
 // (instead of placing it in the body template). Because octane re-invokes a
 // component body on every render, this call recurs each render: the element is
-// created/adopted ONCE (keyed per call-site via `scope[key]`), its attributes
+// created/adopted ONCE (held in `scope.slots[slot]`; `key` is the content hash for
+// SSR adoption), its attributes
 // and text are re-applied each render (so `<title>{state}</title>` is reactive),
 // and it is removed from <head> when the owning scope unmounts (so a route swap
 // replaces the page's metadata). On a hydrated page the server wrote
@@ -3055,13 +3056,17 @@ function adoptServerHeadEl(key: string): Element | null {
 
 export function headBlock(
 	scope: Scope,
+	slot: number,
 	key: string,
 	tag: string,
 	attrs: Record<string, any> | null,
 	text: unknown,
 ): void {
 	if (typeof document === 'undefined') return;
-	let state = (scope as any)[key] as HeadSlot | undefined;
+	// State lives in the dense `slots` array (like every other slot) so the scope
+	// shape stays monomorphic; `key` is only the content hash used to adopt the
+	// matching server-rendered head element on hydration.
+	let state = scope.slots[slot] as HeadSlot | undefined;
 	if (state === undefined) {
 		let el = adoptServerHeadEl(key);
 		if (el === null) {
@@ -3069,12 +3074,12 @@ export function headBlock(
 			document.head.appendChild(el);
 		}
 		state = { el };
-		(scope as any)[key] = state;
+		scope.slots[slot] = state;
 		// Removed once, on the owning scope's unmount (NOT between re-renders) —
 		// scope.cleanups fire only on teardown, mirroring the spread-ref cleanup.
 		scope.cleanups.push(() => {
 			state!.el.remove();
-			(scope as any)[key] = undefined;
+			scope.slots[slot] = undefined;
 		});
 	}
 	const el = state.el;
@@ -4009,7 +4014,7 @@ interface HostComponentSlot {
 
 // Render a host element (`<tag>`) that WRAPS a children render-body, from runtime
 // (non-template) code — e.g. a `motion.div` proxy component that the compiler
-// invokes via componentSlot. The element is created ONCE (keyed by `scope[key]`),
+// invokes via componentSlot. The element is created ONCE (held in `scope.slots[slot]`),
 // its props are re-applied on every render (reactive className / style / events /
 // attributes / ref), and the children body renders INSIDE it via childSlot. The
 // element node is returned so the caller can drive imperative work against it
@@ -4017,14 +4022,14 @@ interface HostComponentSlot {
 // of the compiled `<tag …>{children}</tag>` host emission.
 export function hostComponent(
 	scope: Scope,
-	key: string,
+	slot: number,
 	tag: string,
 	props: Record<string, any> | null,
 	childrenBody?: ComponentBody | null,
 	anchor?: Node | null,
 ): Element {
 	const block = scope.block;
-	let state = (scope as any)[key] as HostComponentSlot | undefined;
+	let state = scope.slots[slot] as HostComponentSlot | undefined;
 	if (state === undefined) {
 		const el = document.createElement(tag);
 		// A comment anchor INSIDE the element gives childSlot a stable insertion
@@ -4032,12 +4037,12 @@ export function hostComponent(
 		const childAnchor = document.createComment('');
 		el.appendChild(childAnchor);
 		state = { el, anchor: childAnchor, ref: undefined };
-		(scope as any)[key] = state;
+		scope.slots[slot] = state;
 		// Children render into a dedicated sub-scope (registered on `scope.children` so
 		// unmountScope walks into it), keeping the children's slot off `scope` itself.
 		const childScope = new ScopeImpl(scope, block);
 		state.childScope = childScope;
-		scope.children.push({ key, scope: childScope });
+		scope.children.push({ key: slot, scope: childScope });
 		block.parentNode.insertBefore(el, anchor ?? block.endMarker);
 		scope.cleanups.push(() => {
 			if (state!.ref != null) attachRef(state!.ref, null);
