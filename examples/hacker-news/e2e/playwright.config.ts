@@ -42,20 +42,20 @@ export default defineConfig({
 		},
 	],
 
-	// Boot three servers:
+	// Boot four servers:
 	//
 	//  - :5191 / :5192 — plain `vite` (CLIENT-ONLY): the index.html entry hydrates
 	//    only when the server pre-rendered (no #__octane_data here), so it falls
 	//    back to createRoot(). The mocked nav/feed/pagination specs run here, where
 	//    `page.route()` deterministically stubs the HN Firebase API client-side.
-	//  - :5194 — the dev SSR server for the TSRX app (`node server.mjs tsrx`): each
-	//    request is server-rendered with the route's data resolved (prefetched into
-	//    the QueryClient) + dehydrated, then hydrated. ssr.spec.ts hits it to prove
-	//    the rows arrive IN the server HTML. Its fetches happen in Node (Playwright
-	//    can't stub them), so ssr.spec.ts uses LIVE data and asserts presence (≥1
-	//    row), not exact stubbed counts. (The .tsx app's SSR is blocked upstream —
-	//    see README "SSR & hydration" — so only the TSRX SSR server is booted and
-	//    ssr.spec.ts runs for the tsrx project only.)
+	//  - :5193 (jsx) / :5194 (tsrx) — the dev SSR servers (`node server.mjs <app>`):
+	//    each request is server-rendered with the route's data resolved (prefetched
+	//    into the QueryClient) + dehydrated, then hydrated. ssr.spec.ts hits these to
+	//    prove the rows arrive IN the server HTML and hydrate cleanly. Their fetches
+	//    happen in Node (Playwright can't stub them), so ssr.spec.ts uses LIVE data
+	//    and asserts presence (≥1 row), not exact stubbed counts. BOTH apps SSR — the
+	//    React-style `.tsx` and the TSRX app over the same octane core — so ssr.spec.ts
+	//    runs once per project (the SSR base is the project port + 2).
 	//
 	// `reuseExistingServer` lets a hand-started server be reused locally; CI boots
 	// fresh. `url` is polled until it responds, so a slow first compile is fine.
@@ -73,6 +73,13 @@ export default defineConfig({
 			cwd: exampleRoot,
 			reuseExistingServer: !process.env.CI,
 			timeout: 60_000,
+		},
+		{
+			command: 'PORT=5193 node server.mjs jsx',
+			url: 'http://localhost:5193',
+			cwd: exampleRoot,
+			reuseExistingServer: !process.env.CI,
+			timeout: 90_000,
 		},
 		{
 			command: 'PORT=5194 node server.mjs tsrx',

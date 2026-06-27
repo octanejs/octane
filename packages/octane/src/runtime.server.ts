@@ -388,7 +388,10 @@ function ssrChildrenHtml(children: unknown, scope: SSRScope): string {
  * resolved throws `SSR_SUSPENSE` → the `fallback` renders for this pass and
  * render()'s loop awaits + re-renders; a real error rethrows to an outer boundary.
  */
-export function Suspense(props: { fallback?: unknown; children?: unknown }, scope: SSRScope): string {
+export function Suspense(
+	props: { fallback?: unknown; children?: unknown },
+	scope: SSRScope,
+): string {
 	return ssrBlock(
 		(() => {
 			try {

@@ -69,6 +69,16 @@ export function stylex(options = {}) {
 		// Run after octane's `.tsrx` -> JS transform, where `stylex.*` calls survive.
 		enforce: 'post',
 
+		// Exposed for SSR: a dev SSR server can inline the collected sheet into the
+		// server-rendered `<head>` so the first paint is styled (no flash of unstyled
+		// content) — in dev, `virtual:stylex.css` is served as JS that only injects
+		// styles AFTER the client runs. Call after the route's modules have been
+		// transformed (e.g. after `render()`), when the aggregate is complete for the
+		// current route. A production build instead extracts the sheet to a `<link>`.
+		api: {
+			getCss: () => aggregate(),
+		},
+
 		configResolved(config) {
 			isDev = options.dev ?? config.command === 'serve';
 			isBuild = config.command === 'build';

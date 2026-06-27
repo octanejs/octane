@@ -50,14 +50,50 @@ active pathname to each link's target; the router `<Link>` also sets
 ## Run it
 
 ```bash
-pnpm dev:jsx     # the React-style .tsx app  -> http://localhost:5173 (or next free port)
-pnpm dev:tsrx    # the .tsrx app
-pnpm e2e         # the Playwright nav-parity suite (boots both apps, fully offline)
+pnpm dev:jsx     # the React-style .tsx app, CLIENT-only  -> http://localhost:5173
+pnpm dev:tsrx    # the .tsrx app, CLIENT-only
+node server.mjs jsx     # the .tsx app, SSR + hydrate  -> http://localhost:5170
+node server.mjs tsrx    # the .tsrx app, SSR + hydrate  (PORT=… to override)
+pnpm e2e         # the Playwright suite (boots both apps client + SSR)
 ```
 
 `pnpm e2e` boots each app's Vite dev server itself (jsx on `:5191`, tsrx on
-`:5192`) and stubs the HN API, so it needs no network and no servers running up
-front. If you already have a dev server up locally on those ports it is reused.
+`:5192`) and stubs the HN API, so the nav-parity suite needs no network and no
+servers running up front. It also boots the two SSR servers (`:5193` jsx, `:5194`
+tsrx) for `ssr.spec.ts`. If you already have a server up locally on those ports it
+is reused.
+
+## SSR & hydration
+
+Both apps server-render and hydrate — the React-style `.tsx` app and the `.tsrx`
+app, over the same octane core. `server.mjs` is one dev SSR server for both (Vite
+in middleware mode); per request it:
+
+1. builds a fresh server router (memory history at the request URL, `isServer`)
+   and `router.load()`s it — the route loaders prefetch that route's queries into
+   a per-request `QueryClient` (so render reads a warm cache, no in-render fetch);
+2. `await render(<App router queryClient/>)` from `octane/server` — octane's async
+   render resolves the route's `useSuspenseQuery` data into the HTML (bounded by
+   the suspense timeout), returning `{ head, body, css }`;
+3. `dehydrate(queryClient)` and inlines it as `#__octane_data`;
+4. splices `head`/`css`/`body`/data into `index.html` and sends it.
+
+The client (`entry-client.tsx`) reads `#__octane_data`, seeds the query cache
+(`hydrate`), waits for the router matches to commit, then `hydrateRoot(container,
+<App router queryClient/>)` — adopting the server DOM with no refetch and no
+`@pending` flash. **The client hydrates the SAME `<App>` tree the server rendered**
+— rendering the inner `<QueryClientProvider><RouterProvider/>` directly would drop
+a component layer and desync the hydration cursor.
+
+The StyleX atomic sheet is inlined into the SSR `<head>` (via the plugin's
+`api.getCss()`) so the **first paint is styled** — in dev, `virtual:stylex.css` is
+served as JS that injects styles only after the client runs, which would otherwise
+flash unstyled content.
+
+With JavaScript disabled the page is still a complete, server-rendered, **styled**
+story list (that's what `ssr.spec.ts` asserts). Limitations: no streaming (the whole
+document is buffered, Suspense resolved before the first byte), and `<head>`/`<title>`
+are set by the shell, not per route.
 
 ## Shared core vs. view-only split
 

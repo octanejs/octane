@@ -2133,16 +2133,6 @@ function resolveHydrationOpen(anchor: Node | null | undefined, domParent: Node):
 	return c !== null && isBlockOpen(c) ? (c as Comment) : null;
 }
 
-function dbgIdx(n: any): number {
-	return n && n.parentNode ? [...n.parentNode.childNodes].indexOf(n) : -1;
-}
-function htrace(label: string, extra?: string): void {
-	if (!(globalThis as any).__DBG || !hydrating) return;
-	((globalThis as any).__htrace ??= []).push(
-		`${label} cur=${dbgIdx(hydrateNode)}/${(hydrateNode as any)?.data ?? (hydrateNode as any)?.nodeName ?? 'null'}${extra ? ' ' + extra : ''}`,
-	);
-}
-
 /** From a block-open `<!--[-->`, the matching `<!--]-->` (depth-tracked). */
 function matchingClose(open: Node): Comment {
 	let depth = 0;
@@ -3622,7 +3612,6 @@ export function componentSlot(
 			if (c === null || c.parentNode !== domParent) c = domParent.firstChild;
 			if (c !== null && isBlockOpen(c)) open = c;
 		}
-		htrace('[comp ' + String(comp).replace(/\s+/g, ' ').replace(/const __block = scope.block;|const block = s\w+\.block;/, '').slice(30, 150) + ']', 'open=' + dbgIdx(open));
 		if (open !== null) {
 			// Adopt the server range: its comments become our markers, cursor → content.
 			start = open as Comment;
@@ -3751,7 +3740,6 @@ export function componentSlot(
 	// forBlock's `hydrateNode = state.end.nextSibling`. (singleRoot is client-only —
 	// during hydration the server always wraps the output, so state.end is set.)
 	if (hydrating && state.end !== null) hydrateNode = state.end.nextSibling;
-	htrace('   ↳[comp ' + ((comp as any)?.name ?? '?') + ' DONE]', 'singleRoot=' + state.singleRoot + ' end=' + dbgIdx(state.end));
 }
 
 // ---------------------------------------------------------------------------
@@ -4193,14 +4181,12 @@ export function childSlot(
 			state.start = document.createComment('');
 			domParent.insertBefore(state.start, state.end);
 		}
-		htrace('[childSlot ' + ((comp as any)?.name ?? '?') + ']', 'start=' + dbgIdx(state.start) + ' end=' + dbgIdx(state.end));
 		const b = createBlock('dynamic', parentBlock, domParent, state.start, state.end, comp, props);
 		state.block = b;
 		renderBlock(b);
 		// Advance the cursor past this child's adopted range so a following sibling
 		// hole adopts the right node (mirrors componentSlot's post-render advance).
 		if (hydrating && state.end !== null) hydrateNode = state.end.nextSibling;
-		htrace('[childSlot ' + ((comp as any)?.name ?? '?') + ' DONE]', 'end=' + dbgIdx(state.end));
 		return;
 	}
 
@@ -4517,7 +4503,6 @@ export function tryBlock(
 		// the router `Match` shape `<ctx.Provider> @try {…}`), where the anchor is the
 		// enclosing scope's end marker and the cursor is parked on the @try's open.
 		const open = resolveHydrationOpen(anchor ?? null, domParent);
-		htrace('[try]', 'open=' + dbgIdx(open));
 		if (open !== null) {
 			start = open;
 			end = matchingClose(open);
@@ -5546,7 +5531,6 @@ export function ifBlock(
 		// renders (e.g. `@try { @if (…) {…} }`, the router Match shape) — where the
 		// anchor is the arm's END marker and the cursor is parked on the @if's open.
 		const open = resolveHydrationOpen(anchor ?? null, domParent);
-		htrace('[if]', 'open=' + dbgIdx(open));
 		if (open !== null) {
 			start = open;
 			end = matchingClose(open);

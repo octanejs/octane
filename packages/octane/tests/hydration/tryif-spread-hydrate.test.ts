@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync, createElement } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
-import { MatchSpread, MatchesLike, Wrap, RPLike } from './_fixtures/tryif-spread.tsrx';
+import { MatchSpread, Wrap, RPLike } from './_fixtures/tryif-spread.tsrx';
 
 // Regression for the router `Match` shape around a non-suspending LAYOUT route whose
 // root element carries a spread: ... > @try > @if { <SpreadRoot/> } > header with
@@ -17,7 +17,10 @@ const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/t
 
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'tryif-spread.tsrx', { mode: 'server' });
-	code = code.replace(/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g, 'const {$1} = __rt;');
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
+		'const {$1} = __rt;',
+	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
 	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
@@ -35,11 +38,7 @@ afterEach(() => container.remove());
 const attrs = { class: 'app', 'data-testid': 'app' };
 const props = { show: true, label: 'Hello', attrs };
 
-function assertCleanHydration(
-	serverBody: string,
-	clientComp: any,
-	clientProps: any,
-): void {
+function assertCleanHydration(serverBody: string, clientComp: any, clientProps: any): void {
 	container.innerHTML = serverBody;
 	const header = container.querySelector('header') as HTMLElement;
 	expect(header).not.toBeNull();
@@ -49,21 +48,11 @@ function assertCleanHydration(
 	// A desynced cursor surfaces as a `tryBlock with no catch arm received error: …
 	// setAttribute is not a function` console.error from a descendant boundary —
 	// even when the final DOM recovers (the row count would double on a re-render).
-	(globalThis as any).__DBG = true;
-	(globalThis as any).__htrace = [];
 	const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 	const root = hydrateRoot(container, clientComp, clientProps);
 	flushSync(() => {});
 	const errors = errSpy.mock.calls.map((c) => String(c[0]));
 	errSpy.mockRestore();
-	try {
-		const { writeFileSync } = require('node:fs');
-		writeFileSync(
-			'/private/tmp/claude-501/-Users-domgan-Projects-octane/f07496aa-d082-46d4-86bf-7ad01aaf870b/scratchpad/unit-htrace.txt',
-			((globalThis as any).__htrace || []).join('\n'),
-		);
-	} catch {}
-	(globalThis as any).__DBG = false;
 	expect(errors).toEqual([]);
 
 	expect(container.querySelectorAll('header').length).toBe(1); // adopted, not doubled
@@ -89,31 +78,24 @@ describe('hydrateRoot — router Match shape: @try > @if > component with a spre
 		// Mirrors the real entry: <QCP><RouterProvider/></QCP> where RouterProvider
 		// renders <Matches/> (a fragment component) inline. Wrap = QCP (descriptor
 		// children → childSlot); RPLike = RouterProvider (renders MatchesLike inline).
+		// Server + client render the IDENTICAL tree (as hydration requires): two
+		// context providers whose children are createElement DESCRIPTORS (the `.tsx`
+		// `<QCP><RouterProvider/></QCP>` shape) → childSlot → RPLike, which renders the
+		// fragment-returning <MatchesLike/> inline. This is the deep nesting that
+		// desynced the cursor before the runtime fixes (childSlot must not clear the
+		// adopted DOM; componentSlot must advance the cursor past an empty component).
+		const tree = (re: any, comps: { Wrap: any; RPLike: any }) =>
+			re.createElement(comps.Wrap, {
+				value: 'a',
+				children: re.createElement(comps.RPLike, props),
+			});
 		const serverTree = (_p: any, scope: any) =>
 			(ServerRT as any).ssrChild(
-				ServerRT.createElement(server.Wrap, {
-					value: 'a',
-					children: ServerRT.createElement(server.Wrap, {
-						value: 'b',
-						children: ServerRT.createElement(server.RPLike, props),
-					}),
-				}),
+				tree(ServerRT, { Wrap: server.Wrap, RPLike: server.RPLike }),
 				scope,
 			);
-		const clientTree = () =>
-			createElement(Wrap, {
-				value: 'a',
-				children: createElement(Wrap, {
-					value: 'b',
-					children: createElement(RPLike, props),
-				}),
-			});
+		const clientTree = () => tree({ createElement }, { Wrap, RPLike });
 		const { body } = await ServerRT.render(serverTree, {});
-		const { writeFileSync } = await import('node:fs');
-		writeFileSync(
-			'/private/tmp/claude-501/-Users-domgan-Projects-octane/f07496aa-d082-46d4-86bf-7ad01aaf870b/scratchpad/unit-srv-body.txt',
-			body.replace(/<!--\[-->/g, '[').replace(/<!--\]-->/g, ']').replace(/ (data|class)[^=]*="[^"]*"/g, ''),
-		);
 		assertCleanHydration(body, clientTree, {});
 	});
 });

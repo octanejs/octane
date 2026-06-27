@@ -25,7 +25,9 @@ function SpreadRoot(props) @{
 }
 
 function FallbackOutlet() @{
-	<div class="outlet">{'outlet' as string}</div>
+	<div class="outlet">
+		{'outlet' as string}
+	</div>
 }
 
 // A sibling so the outer @if is NOT a sole hole — mirrors <Transitioner/> next to
@@ -77,9 +79,7 @@ export function MatchesLike(props) @{
 export function Wrap(props) @{
 	// A hook like QueryClientProvider's useEffect.
 	useEffect(() => {}, []);
-	<ctx.Provider value={props.value}>
-		{props.children}
-	</ctx.Provider>
+	<ctx.Provider value={props.value}>{props.children}</ctx.Provider>
 }
 
 // Mirrors RouterProvider EXACTLY: a context provider that renders the
