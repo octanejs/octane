@@ -15,6 +15,12 @@ pnpm-workspace.yaml
 # Generated bench datasets (written by benchmarks/news/gen.mjs)
 benchmarks/news/*/src/data.js
 
+# js-framework octane-jsx row template is authored with INLINE <td> children on
+# purpose: the @tsrx/core parser trips on a whitespace-only text node between a
+# <td> and its child element inside a `<tbody>{items.map((row) => <tr>…)}`, which
+# Prettier's multi-line attribute/child wrap would reintroduce. Keep it as-is.
+benchmarks/js-framework/octane-jsx/src/Main.tsx
+
 # Dependencies
 **/node_modules/
 

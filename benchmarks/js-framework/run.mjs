@@ -5,13 +5,22 @@
 // (~10ms/click).
 //
 // Usage:
-//   pnpm --filter octane-jsbench dev     # keep server on 5176
+//   pnpm --filter octane-tsrx-jsbench dev   # .tsrx variant on 5176
+//   pnpm --filter octane-jsx-jsbench dev    # .tsx (JSX) variant on 5177
 //   node benchmarks/js-framework/run.mjs [iterations]   # default 8
+//
+// By default this drives BOTH octane authoring dialects and reports the
+// jsx/tsrx ratio. They are NOT expected to be equal: `.tsrx` `@for (...; key)`
+// compiles to octane's keyed FAST path (forBlock — targeted per-row updates),
+// while React-style `.tsx` `items.map(... key=)` compiles to the keyed DE-OPT
+// list path (reconcileKeyed — correct + keyed, but each row rebuilds its host
+// DOM per parent re-render). The ratio quantifies that gap on the re-render ops
+// (update / select / swap / remove). Run only one by passing a TARGETS env.
 //
 // To compare against an inferno-next baseline (or any other target whose
 // bench app exposes the same DOM contract), keep its dev server running
 // and pass a TARGETS env var:
-//   TARGETS='[{"name":"octane","url":"http://localhost:5176/","ready":"#run"},
+//   TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5176/","ready":"#run"},
 //             {"name":"inferno-next","url":"http://localhost:5175/","ready":"#run"}]' \
 //     node run.mjs
 
@@ -23,7 +32,10 @@ const ROW_COUNT_LARGE = 10000; // matches the canonical suite's runlots / clear 
 
 const TARGETS = process.env.TARGETS
 	? JSON.parse(process.env.TARGETS)
-	: [{ name: 'octane', url: 'http://localhost:5176/', ready: '#run' }];
+	: [
+			{ name: 'octane-tsrx', url: 'http://localhost:5176/', ready: '#run' },
+			{ name: 'octane-jsx', url: 'http://localhost:5177/', ready: '#run' },
+		];
 
 const OPS = [
 	{ name: 'run', pre: 'empty', click: '#run' },

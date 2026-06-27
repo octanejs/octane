@@ -30,7 +30,8 @@ const YIELD_MS = 5; // breathe between samples: let paint settle, don't block th
 const TARGETS = process.env.TARGETS
 	? JSON.parse(process.env.TARGETS)
 	: [
-			{ name: 'octane', url: 'http://localhost:5185/' },
+			{ name: 'octane-tsrx', url: 'http://localhost:5185/' },
+			{ name: 'octane-jsx', url: 'http://localhost:5188/' },
 			{ name: 'solid', url: 'http://localhost:5187/' },
 			{ name: 'react', url: 'http://localhost:5186/' },
 			{ name: 'ripple', url: 'http://localhost:5184/' },

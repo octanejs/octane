@@ -194,7 +194,20 @@ importers:
         specifier: catalog:default
         version: 1.61.0
 
-  benchmarks/js-framework/octane:
+  benchmarks/js-framework/octane-jsx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/js-framework/octane-tsrx:
     dependencies:
       octane:
         specifier: workspace:*
@@ -216,7 +229,17 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
-  benchmarks/news/octane:
+  benchmarks/news/octane-jsx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/news/octane-tsrx:
     dependencies:
       octane:
         specifier: workspace:*
@@ -286,7 +309,17 @@ importers:
         specifier: catalog:default
         version: 1.61.0
 
-  benchmarks/recursive-context/octane:
+  benchmarks/recursive-context/octane-jsx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/recursive-context/octane-tsrx:
     dependencies:
       octane:
         specifier: workspace:*
@@ -347,7 +380,17 @@ importers:
         specifier: catalog:default
         version: 1.61.0
 
-  benchmarks/signal-favoring/octane:
+  benchmarks/signal-favoring/octane-jsx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/signal-favoring/octane-tsrx:
     dependencies:
       octane:
         specifier: workspace:*

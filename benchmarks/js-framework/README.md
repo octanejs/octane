@@ -13,12 +13,31 @@ auto-callback transform and stable event-bundle optimization pay off.
 
 ```
 benchmarks/js-framework/
-├── octane/         # Vite app, dev server on :5176
+├── octane-tsrx/    # Vite app, dev server on :5176 — octane authored in .tsrx
+├── octane-jsx/     # Vite app, dev server on :5177 — same app authored in React-style .tsx
 ├── run.mjs             # Playwright harness — drives each target N iterations
 ├── package.json        # umbrella; depends on playwright
 ├── results/            # output / scratch
 └── README.md           # this file
 ```
+
+The octane app is authored **twice** over the same octane core — once in `.tsrx`
+(directive syntax) and once in React-style `.tsx` (JSX). Both emit the same DOM
+and expose the same six-button + table contract, but they exercise **different
+list-reconciliation paths**, which is the interesting part of comparing them:
+
+- **`octane-tsrx`** — `@for (const row of items; key row.id)` compiles to octane's
+  keyed **fast path** (`forBlock`): targeted per-row updates, host node identity
+  preserved across re-renders.
+- **`octane-jsx`** — `items.map((row) => <tr key={row.id}>…)` compiles to the keyed
+  **de-opt list path** (`reconcileKeyed`): still keyed (reorders/swap are correct),
+  but each row rebuilds its host DOM on every parent re-render and node identity is
+  not preserved. This is octane's React-JSX backwards-compat path.
+
+So the harness's jsx/tsrx ratio is **not** expected to be ~1.0 on the re-render
+ops (`update`, `select`, `swap`, `remove`) — it quantifies the cost of the
+`.map` de-opt path vs the compiled `@for` fast path. `run` / `runlots` / `clear`
+(pure mount/unmount, no keyed re-render) should be much closer.
 
 ## Quick start
 
@@ -26,14 +45,18 @@ benchmarks/js-framework/
 # 1. From the repo root, install + sync workspaces:
 pnpm install
 
-# 2. Start the octane bench dev server (terminal A):
-pnpm --filter octane-jsbench dev
+# 2. Start BOTH octane bench dev servers (separate terminals):
+pnpm --filter octane-tsrx-jsbench dev   # :5176
+pnpm --filter octane-jsx-jsbench dev    # :5177
 
-# 3. Run the harness (terminal B):
-pnpm --filter ripple-js-framework-benchmarks bench
+# 3. Run the harness (another terminal). By default it drives both dialects and
+#    prints the jsx/tsrx ratio (~equal = parity):
+pnpm --filter octane-js-framework-benchmarks bench
 # or for a longer sample (16 iterations × all 8 ops):
-pnpm --filter ripple-js-framework-benchmarks bench:long
+pnpm --filter octane-js-framework-benchmarks bench:long
 ```
+
+To drive just one dialect, pass a `TARGETS` env (see `run.mjs`).
 
 Output is a table of median + min millis per operation: `run`, `replace`,
 `update`, `select`, `swap`, `remove`, `clear`. The harness uses
@@ -65,8 +88,8 @@ inferno-next / octane ratio (median; <1 means inferno-next faster):
 
 ## What this fixture exercises
 
-The `Main.tsrx` source is intentionally tuned to the surface that octane's
-compiler optimizes:
+The `Main.tsrx` / `Main.tsx` source is intentionally tuned to the surface that
+octane's compiler optimizes (both dialects compile to the same output):
 
 - **Auto-callback transform**: top-level handlers (`run`, `runLots`, `add`,
   `clear`, `update`, `swap`) only close over `setItems` / `setSelected` (stable
@@ -88,7 +111,7 @@ compiler optimizes:
   code size and `optimize` flags are NOT what you'd ship — useful for iteration,
   not for absolute scoring.
 - For "publishable" numbers, build first
-  (`pnpm --filter octane-jsbench build`), then
-  `pnpm --filter octane-jsbench preview` to serve the production output, then
-  run the harness against that.
+  (`pnpm --filter octane-tsrx-jsbench build`, likewise `octane-jsx-jsbench`),
+  then `pnpm --filter octane-tsrx-jsbench preview` to serve the production output,
+  then run the harness against that.
 - Chromium is the default browser; results on Firefox / WebKit differ.
