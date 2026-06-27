@@ -601,6 +601,65 @@ function isJsxReturningMapCall(node) {
 	return false;
 }
 
+/**
+ * Convert a `{xs.map((item[, index]) => <jsx key={K}>…)}` JSX child into a
+ * synthetic `@for` (ForOfStatement) so it lowers to the SAME `forBlock` keyed
+ * fast path as `@for` — a compiled per-item body + the raw items array — instead
+ * of eagerly building a `createElement` descriptor per row on every render and
+ * reconciling that array through `childSlot`/`reconcileKeyed`. The result flows
+ * straight into the existing ForOfStatement fold path (makeForCall + items/body
+ * holes), so the JSX `.map` and the directive `@for` produce identical output.
+ *
+ * Returns null for shapes we don't lower — a named/ref callback, a block-body
+ * arrow (`{ … return <jsx> }`), a fragment/non-element return, more than two
+ * params, or a non-identifier index — so the caller keeps the childSlot path.
+ */
+function mapCallToForOf(expr) {
+	if (!isJsxReturningMapCall(expr)) return null;
+	const arrow = expr.arguments[0];
+	const params = arrow.params || [];
+	// `(item)` and `(item, index)` map to a for-of header; the rarely-used
+	// `array`/thisArg params (or a destructured index) don't, so bail to childSlot.
+	if (params.length < 1 || params.length > 2) return null;
+	if (params[1] && params[1].type !== 'Identifier') return null;
+	// Only an EXPRESSION-body arrow returning a single JSX ELEMENT (host or
+	// component). Block bodies and fragment roots keep the childSlot path.
+	const body = arrow.body;
+	if (!body || (body.type !== 'JSXElement' && body.type !== 'Element')) return null;
+	// Pull a `key={…}` attribute off the returned element → the for-of header key,
+	// and drop it from the element (it's not a DOM attribute). makeForCall then
+	// keys via the header, falling back to `item.id ?? item` when there's no key.
+	const attrsOf = (el) => el.openingElement?.attributes || el.attributes || [];
+	const nameOf = (a) => a?.name?.name || a?.name;
+	let keyExpr = null;
+	let bodyEl = body;
+	const keyAttr = attrsOf(body).find((a) => nameOf(a) === 'key');
+	if (keyAttr) {
+		keyExpr =
+			keyAttr.value && keyAttr.value.type === 'JSXExpressionContainer'
+				? keyAttr.value.expression
+				: keyAttr.value;
+		const kept = attrsOf(body).filter((a) => nameOf(a) !== 'key');
+		bodyEl = body.openingElement
+			? { ...body, openingElement: { ...body.openingElement, attributes: kept } }
+			: { ...body, attributes: kept };
+	}
+	return {
+		type: 'ForOfStatement',
+		left: {
+			type: 'VariableDeclaration',
+			kind: 'const',
+			declarations: [{ type: 'VariableDeclarator', id: params[0], init: null }],
+		},
+		right: expr.callee.object,
+		body: { type: 'BlockStatement', body: [bodyEl] },
+		await: false,
+		key: keyExpr,
+		index: params[1] || null,
+		empty: null,
+	};
+}
+
 // Recognise the dynamic form `{style (expr)}` — TSRX parses that as a
 // `CallExpression(style, [expr])` because parenthesised expressions don't take
 // the special Style path. We bridge here so both forms behave the same.
@@ -2417,7 +2476,18 @@ function extractFragment(node, ctx, holeProps) {
 		}
 	}
 	const newChildren = [];
-	for (const child of node.children || []) {
+	// Lower `{xs.map(item => <jsx key/>)}` children to a synthetic `@for`
+	// (ForOfStatement) up front so they take the directive fold path below
+	// (forBlock) instead of becoming a childSlot descriptor-array hole. Only when
+	// we have a fold context (always true on the .tsx host-fragment path).
+	const fragChildren = ctx._foldCtx
+		? (node.children || []).map((child) =>
+				child && child.type === 'JSXExpressionContainer'
+					? mapCallToForOf(child.expression) || child
+					: child,
+			)
+		: node.children || [];
+	for (const child of fragChildren) {
 		const t = child && child.type;
 		if (t === 'JSXText' || t === 'Text') {
 			newChildren.push(child);
@@ -3086,6 +3156,20 @@ function normalizeChildren(nodes) {
 			// `JSXEmptyExpression`. It produces NO child (React drops it); emitting it
 			// as a hole would yield malformed code (`h0: ,`). Drop it.
 			if (!n.expression || n.expression.type === 'JSXEmptyExpression') continue;
+			// `{xs.map(item => <jsx key/>)}` → lower to a synthetic `@for` so it takes
+			// the keyed forBlock (client) / ssrBlock (server) fast path — a compiled
+			// per-item body over the raw items array — instead of building a
+			// `createElement` descriptor per row each render and reconciling that array
+			// through childSlot. Both consumers (emitElementHtml's ForOfStatement branch,
+			// ssrEmitNode's ForOfStatement case) already handle this node, so client and
+			// server stay in lockstep (required for hydration). The client .tsx
+			// host-fragment path does the same conversion in extractFragment (which
+			// hoists the items array as a hole before this runs).
+			const mapForNode = mapCallToForOf(n.expression);
+			if (mapForNode) {
+				out.push(mapForNode);
+				continue;
+			}
 			// TS-only wrappers (`as string`, `!`, `satisfies T`) on the expression
 			// get stripped centrally in printNode at print time — no need to
 			// pre-strip here. Pass the raw expression through; downstream emission
