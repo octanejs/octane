@@ -4050,16 +4050,19 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// Renderable `{expr}` hole — dispatch the value at runtime (component /
 		// element → block; primitive → text; nullish/boolean/'' → nothing). Shares
 		// the host/`<!>`-anchor resolution + hole-aware hydration walk with real
-		// component calls; only the emitted runtime call differs.
+		// component calls; only the emitted runtime call differs. Emit the small
+		// `textSlot` wrapper (fast inline path for the common primitive/text value;
+		// delegates to the full `childSlot` for objects / first render) — identical
+		// behaviour, far cheaper for update-heavy text holes like a table cell.
 		if (cc.isChild) {
-			ctx.runtimeNeeded.add('childSlot');
+			ctx.runtimeNeeded.add('textSlot');
 			let anchorArg;
 			if (cc.anchorVar) {
 				anchorArg = `, __s.slots[0]._compAnchor$${cc.id}`;
 			} else {
 				anchorArg = isElHost(cc.elVar) ? '' : ', __block.endMarker';
 			}
-			pushAfter(cc.id, `  childSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg});`);
+			pushAfter(cc.id, `  textSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg});`);
 			continue;
 		}
 		// Design (c) lite path: hookless same-module callees with no key/spread/
