@@ -83,6 +83,7 @@ export {
 	childSlot,
 	textSlot,
 	textHole,
+	childTextHole,
 	hostComponent,
 	Fragment,
 	FragmentInstance,

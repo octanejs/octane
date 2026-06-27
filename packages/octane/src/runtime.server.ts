@@ -188,6 +188,18 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 	return ssrBlock(escapeHtml(v));
 }
 
+// An ONLY-CHILD `{expr}` value hole (the host's sole content). A primitive
+// serializes MARKERLESS — the host's bare text, which the client's `childTextHole`
+// adopts as a plain Text node (no `<!--[-->…<!--]-->`, matching its markerless
+// mount). An object/array/component still needs the block range (childSlot adopts
+// it); empty renders nothing (the host is sole-child, so there's no sibling cursor
+// to keep aligned).
+export function ssrChildText(v: unknown, scope: SSRScope): string {
+	if (v == null || v === false || v === true) return '';
+	if (typeof v === 'object' || typeof v === 'function') return ssrChild(v, scope);
+	return escapeHtml(v);
+}
+
 // One item of an array child: each is its own `<!--[-->…<!--]-->` block (the unit
 // the client de-opt list adopts on hydration). A nested array flattens into more
 // sibling item blocks (React fragment-of-arrays); everything else reuses ssrChild's

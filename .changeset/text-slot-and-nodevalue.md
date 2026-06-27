@@ -19,12 +19,18 @@ Make React-style `.tsx` `{expr}` value-hole updates as fast as a `.tsrx`
   accessor vs `CharacterData` one prototype hop deeper) across `setText`,
   `childSlot`, the inline text-hole, and the de-opt reconciler — faster on the hot
   text-update path (also speeds the `.tsrx` `setText` path).
-- A value hole now reuses its own `<!>` source-order placeholder as the slot's end
-  marker instead of minting a second comment (`childSlot`/`textSlot`/`textHole`
-  gained an `ownEnd` flag) — one fewer comment node + one fewer `insertBefore` per
-  `{expr}` hole on mount, so a `.tsx` keyed table builds and remounts faster.
+- An ONLY-CHILD `{expr}` value hole (the host's sole content) now lowers FULLY
+  MARKERLESS, exactly like a `.tsrx` `{… as string}` text hole: a primitive value
+  is a single Text node appended to the host — no `<!>` placeholder, no slot state,
+  no end marker — and only an object/function (component / element / array) lazily
+  mints markers via `childSlot`. New runtime `childTextHole` + server `ssrChildText`
+  (a primitive serializes as the host's bare text; an object keeps its
+  `<!--[-->…<!--]-->` block) so hydration adopts either shape. (Sibling-position
+  value holes keep a single placeholder via the `ownEnd` reuse above.) This removes
+  the per-cell hole-aware `child`/`sibling` navigation + `insertBefore` that the
+  marker forced.
 
 No API or behavioural change. On the dbmon update benchmark (1000-row table) this
-closed the `.tsx` gap to `.tsrx`: full-table `tick` ~2.1ms → ~1.5ms and partial
-`tick` ~0.9ms → ~0.5ms (both matching `.tsrx`), and the marker reduction cut mount
-~5.9ms → ~5.2ms and remount ~5.2ms → ~4.5ms.
+brings `.tsx` to PARITY with `.tsrx` on every op (and byte-identical markerless
+DOM): full-table `tick` ~2.1ms → ~1.4ms, partial `tick` ~0.9ms → ~0.5ms,
+mount ~5.9ms → ~4.4ms, remount ~5.2ms → ~3.9ms.

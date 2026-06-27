@@ -55,6 +55,7 @@ export {
 	escapeAttr,
 	ssrText,
 	ssrChild,
+	ssrChildText,
 	ssrAttr,
 	ssrStyle,
 	ssrSpread,
