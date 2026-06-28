@@ -43,6 +43,9 @@ catalogs:
     '@changesets/changelog-git': ^0.2.1
     '@changesets/cli': ^2.31.0
     '@floating-ui/dom': ^1.7.0
+    '@floating-ui/react': 0.27.19
+    '@floating-ui/utils': ^0.2.11
+    'tabbable': ^6.5.0
     '@lexical/code': 0.46.0
     '@lexical/devtools-core': 0.46.0
     '@lexical/dragon': 0.46.0

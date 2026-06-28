@@ -2836,6 +2836,11 @@ export function mountFragmentRef(
 const XLINK_NS = 'http://www.w3.org/1999/xlink';
 const XML_NS = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS_NS = 'http://www.w3.org/2000/xmlns/';
+// Element namespaces for the de-opt reconciler (the compiled template path uses
+// `template(html, ns)` instead). HTML_NS is what document.createElement produces in
+// an HTML document, so it's the reuse-check baseline for non-SVG elements.
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
 function attrNamespace(name: string): string | null {
 	// Bare `xmlns` is the xmlns namespace itself (rare in practice).
@@ -2882,6 +2887,17 @@ export function setClassName(el: Element, value: string | null | undefined): voi
 	// SVGElement.className is a read-only SVGAnimatedString and assignment
 	// is a no-op in real browsers.
 	(el as any).className = value == null ? '' : value;
+}
+
+// SVG-safe class setter for the de-opt path, which (unlike the compiled template)
+// can hit an SVGElement whose `className` is a read-only SVGAnimatedString. Routes
+// SVG through setAttribute('class', …) and keeps HTML on the fast `setClassName`.
+function setDeoptClass(el: Element, value: string | null | undefined): void {
+	if (el.namespaceURI === SVG_NS) {
+		el.setAttribute('class', value == null ? '' : String(value));
+	} else {
+		setClassName(el, value);
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -3199,6 +3215,14 @@ const _delegated = new Set<string>();
 // one unmounts. createRoot containers have refcount 1 for their lifetime.
 const _delegationTargets = new Map<Node, number>();
 
+// Non-bubbling events (focus, blur) must be delegated in the CAPTURE phase so the
+// single root listener still sees them — the dispatcher then walks from
+// `event.target` upward, which reproduces React's bubbling `onFocus`/`onBlur`.
+// (All other events keep the cheaper bubbling-phase delegation.) The flag must
+// match between add/removeEventListener, so it is derived from the name both times.
+const CAPTURE_DELEGATED = /* @__PURE__ */ new Set(['focus', 'blur']);
+const delegatedCapture = (name: string): boolean => CAPTURE_DELEGATED.has(name);
+
 export function delegateEvents(eventNames: string[]): void {
 	for (let i = 0; i < eventNames.length; i++) {
 		const name = eventNames[i];
@@ -3208,7 +3232,7 @@ export function delegateEvents(eventNames: string[]): void {
 		// back-attach the listener to every active target so handlers stamped on
 		// their DOM via `el.$$click = …` still receive events.
 		for (const target of _delegationTargets.keys()) {
-			target.addEventListener(name, dispatchDelegated);
+			target.addEventListener(name, dispatchDelegated, delegatedCapture(name));
 		}
 	}
 }
@@ -3224,7 +3248,7 @@ function registerDelegationTarget(target: Node): void {
 	_delegationTargets.set(target, prev + 1);
 	if (prev === 0) {
 		for (const name of _delegated) {
-			target.addEventListener(name, dispatchDelegated);
+			target.addEventListener(name, dispatchDelegated, delegatedCapture(name));
 		}
 	}
 }
@@ -3238,7 +3262,7 @@ function unregisterDelegationTarget(target: Node): void {
 	if (prev === 1) {
 		_delegationTargets.delete(target);
 		for (const name of _delegated) {
-			target.removeEventListener(name, dispatchDelegated);
+			target.removeEventListener(name, dispatchDelegated, delegatedCapture(name));
 		}
 	} else {
 		_delegationTargets.set(target, prev - 1);
@@ -4084,7 +4108,7 @@ function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): v
 	if (name === 'ref') {
 		if (v != null) queueRefAttach(ownerBlock, () => attachRef(v, el));
 	} else if (name === 'className' || name === 'class') {
-		setClassName(el, v);
+		setDeoptClass(el, v);
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, v, undefined);
 	} else if (isDelegatedEventName(name)) {
@@ -4103,7 +4127,7 @@ function removeDeoptProp(el: Element, name: string): void {
 	if (name === 'ref') {
 		/* reused node — ref detach is the unmount path's job */
 	} else if (name === 'className' || name === 'class') {
-		setClassName(el, '');
+		setDeoptClass(el, '');
 	} else if (name === 'style') {
 		el.removeAttribute('style');
 	} else if (name === 'dangerouslySetInnerHTML') {
@@ -4223,7 +4247,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 				state.ref = v;
 			}
 		} else if (name === 'className' || name === 'class') {
-			setClassName(el, v);
+			setDeoptClass(el, v);
 		} else if (name === 'style') {
 			setStyle(el as HTMLElement, v, undefined);
 		} else if (
@@ -4279,7 +4303,12 @@ function flattenDeoptChildren(out: any[], v: any): void {
 // component descendants are handled by the Block path (hostElementBody/componentSlot),
 // never here. Returns the node to occupy this position (reused or freshly built), or
 // null for an empty value.
-function reconcileDeoptNode(prev: Node | null, value: any, ownerBlock: Block): Node | null {
+function reconcileDeoptNode(
+	prev: Node | null,
+	value: any,
+	ownerBlock: Block,
+	ns?: string,
+): Node | null {
 	if (value == null || value === false || value === true || value === '') return null;
 	const t = typeof value;
 	if (t === 'string' || t === 'number' || t === 'bigint') {
@@ -4291,17 +4320,31 @@ function reconcileDeoptNode(prev: Node | null, value: any, ownerBlock: Block): N
 		return document.createTextNode(s);
 	}
 	if (isHostDescriptor(value)) {
+		// `<svg>` opens the SVG namespace; descendants inherit it (a `foreignObject`
+		// switches ITS children back to HTML — see childNs below). Without this the
+		// de-opt path's document.createElement would mis-namespace SVG content (e.g.
+		// `<svg>`/`<path>` returned from a component via createElement).
+		const elNs = value.type === 'svg' ? SVG_NS : ns;
 		let el: Element;
-		if (prev !== null && prev.nodeType === 1 && (prev as Element).localName === value.type) {
+		if (
+			prev !== null &&
+			prev.nodeType === 1 &&
+			(prev as Element).localName === value.type &&
+			(prev as Element).namespaceURI === (elNs ?? HTML_NS)
+		) {
 			// REUSE the existing element — patch props in place instead of rebuilding.
 			el = prev as Element;
 			patchDeoptProps(el, getDeoptDesc(el)?.props ?? null, value.props, ownerBlock);
 		} else {
-			el = document.createElement(value.type);
+			el =
+				elNs !== undefined
+					? document.createElementNS(elNs, value.type)
+					: document.createElement(value.type);
 			applyDeoptProps(el, value.props, ownerBlock);
 		}
 		setDeoptDesc(el, value);
-		reconcileDeoptChildren(el, value.children, ownerBlock);
+		const childNs = elNs === SVG_NS && value.type !== 'foreignObject' ? SVG_NS : undefined;
+		reconcileDeoptChildren(el, value.children, ownerBlock, childNs);
 		return el;
 	}
 	// A component descriptor must not reach here — the de-opt callers gate on
@@ -4319,7 +4362,12 @@ function reconcileDeoptNode(prev: Node | null, value: any, ownerBlock: Block): N
 // children match by `key`, unkeyed children match positionally (React-shape). Nodes
 // not reused are removed; survivors are reordered to match the descriptor. No markers
 // are introduced — the element fully owns its children, so this is raw-DOM reuse.
-function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): void {
+function reconcileDeoptChildren(
+	el: Element,
+	children: any,
+	ownerBlock: Block,
+	childNs?: string,
+): void {
 	const next: any[] = [];
 	flattenDeoptChildren(next, children);
 	const existing = el.childNodes;
@@ -4328,7 +4376,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// bookkeeping below, which is the hot path for large initial mounts.
 	if (existing.length === 0) {
 		for (let i = 0; i < next.length; i++) {
-			const node = reconcileDeoptNode(null, next[i], ownerBlock);
+			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
 			if (node !== null) el.appendChild(node);
 		}
 		return;
@@ -4362,7 +4410,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		} else {
 			prev = up < unkeyed.length ? unkeyed[up++] : null;
 		}
-		const node = reconcileDeoptNode(prev, child, ownerBlock);
+		const node = reconcileDeoptNode(prev, child, ownerBlock, childNs);
 		if (node !== null) result.push(node);
 	}
 	// Remove existing children not reused.
@@ -4460,10 +4508,17 @@ function descNeedsBlocks(value: any): boolean {
 // children recurse back through childSlot's host path.
 function hostElementBody(d: ElementDescriptor, block: Block): void {
 	let el = block.deoptNode as Element | null;
-	if (el === null || el.localName !== d.type) {
+	// A root `<svg>` opens the SVG namespace. (Component children inside an SVG are an
+	// uncommon case; they mount via childSlot below, which does not yet thread the SVG
+	// namespace — the pure-host SVG path through reconcileDeoptChildren does.)
+	const elNs = d.type === 'svg' ? SVG_NS : undefined;
+	if (el === null || el.localName !== d.type || (elNs !== undefined && el.namespaceURI !== elNs)) {
 		// First render, or the host tag changed at this slot — (re)create the element.
 		if (el !== null) (el as ChildNode).remove();
-		el = document.createElement(d.type as string);
+		el =
+			elNs !== undefined
+				? document.createElementNS(elNs, d.type as string)
+				: document.createElement(d.type as string);
 		block.deoptNode = el;
 		block.parentNode.insertBefore(el, block.endMarker);
 		applyDeoptProps(el, d.props, block);
