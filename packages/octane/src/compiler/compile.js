@@ -2289,11 +2289,22 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		lines.push(inlinedSubs.map((s) => '  ' + s.replace(/\n/g, '\n  ')).join('\n'));
 	if (plan.bindingsName) {
 		lines.push(`  let _b = __s.slots[0];`);
-		lines.push(`  if (_b === undefined) {`);
-		lines.push(plan.mount);
-		lines.push(`  } else {`);
-		lines.push(plan.update);
-		lines.push(`  }`);
+		// Deferred property-write diffs (plan.everyRender) run on BOTH mount and
+		// re-render, so they live after the if/else; the mount branch only clones +
+		// stores refs, and `else` carries the re-render-only diffs (text / refs).
+		// When there are none, drop the empty `else`.
+		if (plan.update) {
+			lines.push(`  if (_b === undefined) {`);
+			lines.push(plan.mount);
+			lines.push(`  } else {`);
+			lines.push(plan.update);
+			lines.push(`  }`);
+		} else {
+			lines.push(`  if (_b === undefined) {`);
+			lines.push(plan.mount);
+			lines.push(`  }`);
+		}
+		if (plan.everyRender) lines.push(plan.everyRender);
 	}
 	if (plan.after) lines.push(plan.after);
 	// Hoisted `<title>`/`<meta>`/`<link>` → headBlock into document.head
@@ -3867,6 +3878,21 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		ensureVar = () => `__block.parentNode`;
 	}
 
+	// Decide which property-write bindings DEFER their mount write to the
+	// every-render diff. We skip any element that also carries a spread: a spread
+	// can write any key, so its mount-apply must keep its source-order position
+	// relative to explicit props (and its commit-phase ref timing needs the mount
+	// scope) — those elements keep the old mount-writes + else-only diff. On every
+	// other element the property-write group has disjoint targets, so deferring is
+	// order-independent and byte-identical.
+	const spreadPaths = new Set();
+	for (const b of elementBindings) {
+		if (b.kind === 'spread') spreadPaths.add(b.path.join(','));
+	}
+	for (const b of elementBindings) {
+		b.deferred = DEFERRABLE_MOUNT_KINDS.has(b.kind) && !spreadPaths.has(b.path.join(','));
+	}
+
 	// Emit per-binding mount code.
 	for (const b of elementBindings) {
 		// A sibling-position `{x as string}` text hole resolves to its POSITION node
@@ -3989,10 +4015,17 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// renders can safely take the update branch keyed on `__s.slots[0]`.
 	if (!noTemplate) mountLines.push(`    __s.slots[0] = _b;`);
 
-	// Update.
+	// Update. Deferred property-writes run their diff EVERY render (it does the
+	// mount-time write too); everything else diffs only on re-render (the `else`
+	// branch). The deferred group has disjoint targets, so splitting it out doesn't
+	// change observable order.
 	const updateLines = [];
+	const everyRenderLines = [];
 	for (const b of elementBindings) {
-		updateLines.push(emitBindingUpdate(b));
+		const code = emitBindingUpdate(b);
+		if (!code) continue;
+		if (b.deferred) everyRenderLines.push(code);
+		else updateLines.push(code);
 	}
 
 	// After (forBlock + ifBlock calls run on every render — they reconcile).
@@ -4265,6 +4298,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		bindingsName: noTemplate ? null : bindingsName,
 		mount: mountLines.join('\n'),
 		update: updateLines.join('\n'),
+		everyRender: everyRenderLines.join('\n'),
 		after: afterCalls
 			.map((c, i) => ({ ...c, i }))
 			.sort((a, b) => a.id - b.id || a.i - b.i)
@@ -4276,7 +4310,27 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 
 // All `expr` strings get wrapped in `(…)` so ternaries / comma exprs / etc.
 // don't break operator precedence in the comparisons or assignments.
+// Property-write binding kinds whose mount can be DEFERRED to the every-render
+// diff (when the element carries no spread — see planJsx). The mount then only
+// stores the element ref + seeds the diff field(s); the diff does the write.
+// Scoped to the pure value-setters: events keep their mount-time wiring (the
+// event-bundle "stable bundle" hoisting is a separate, guarded optimization).
+const DEFERRABLE_MOUNT_KINDS = new Set(['attr', 'class', 'style', 'formAction', 'htmlOnlyChild']);
+
+// Mount for a DEFERRED property-write binding: store the element ref + seed the
+// diff field to `undefined`. The every-render diff then performs the actual
+// write — including on the first render, since the `undefined` seed makes its
+// `_prev !== _v` guard fire, and `setAttribute(el, name, undefined)` /
+// `setClassName(el, undefined)` no-op on a freshly-cloned element (so the output
+// is byte-identical to the old unconditional mount write).
+function emitDeferredMount(b, elVar) {
+	// `style` diffs on `_sty`; attr / class / formAction / htmlOnlyChild on `_prev`.
+	const field = b.kind === 'style' ? `_sty$${b.id}` : `_prev$${b.id}`;
+	return `    { _b._el$${b.id} = ${elVar}; _b.${field} = undefined; }`;
+}
+
 function emitBindingMount(b, elVar) {
+	if (b.deferred) return emitDeferredMount(b, elVar);
 	const E = `(${b.expr})`;
 	switch (b.kind) {
 		case 'textOnlyChild': {
