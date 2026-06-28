@@ -14,6 +14,7 @@ import { MarkdownShortcutPlugin } from '@octanejs/lexical/LexicalMarkdownShortcu
 import { HorizontalRulePlugin } from '@octanejs/lexical/LexicalHorizontalRulePlugin';
 import { AutoFocusPlugin } from '@octanejs/lexical/LexicalAutoFocusPlugin';
 import { ToolbarPlugin } from './ToolbarPlugin.tsrx';
+import { ComponentPickerPlugin } from './ComponentPickerPlugin.tsrx';
 import { theme } from './theme';
 import { EDITOR_NODES } from './nodes';
 
@@ -63,6 +64,7 @@ export function App() @{
 					<HorizontalRulePlugin />
 					<MarkdownShortcutPlugin />
 					<AutoFocusPlugin />
+					<ComponentPickerPlugin />
 				</div>
 			</div>
 		</LexicalComposer>

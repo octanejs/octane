@@ -910,12 +910,26 @@ export function renderBlock(block: Block): void {
 			// MARKERLESS via componentSlot's singleRoot path — the element self-delimits,
 			// so the DOM is byte-identical to `@{}`'s inline render (no extra markers).
 			// Anything else (multi-root, arrays, strings, conditionals) → childSlot.
-			if (
+			const useSingleRoot =
 				out !== null &&
 				(out as any).$$kind === ELEMENT_TAG &&
 				typeof (out as any).type === 'function' &&
-				(out as any).type.$$singleRoot === true
+				(out as any).type.$$singleRoot === true;
+			// The return slot (index 0) holds EITHER a componentSlotSlot (singleRoot
+			// path) or a childSlot. A re-render can flip which applies: a body that
+			// returns `<SingleRootComp/>` one render and `null` / a portal / an array
+			// the next (a placeholder toggling on/off, a menu opening/closing). The two
+			// shapes are incompatible, so tear the old one down before the other path
+			// reads it as its own kind (else e.g. childSlot would touch a
+			// componentSlotSlot and crash).
+			const existingRet = block.slots[0] as any;
+			if (
+				existingRet !== undefined &&
+				existingRet.__kind !== (useSingleRoot ? 'componentSlotSlot' : 'childSlot')
 			) {
+				disposeReturnSlot(block, existingRet);
+			}
+			if (useSingleRoot) {
 				const d = out as ElementDescriptor;
 				componentSlot(
 					block,
@@ -936,6 +950,42 @@ export function renderBlock(block: Block): void {
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
 	}
+}
+
+// Tear down a block's return slot (slot 0) when renderBlock's return value flips
+// between the singleRoot componentSlot shape and the general childSlot shape. Fires
+// the content's cleanups, removes its DOM + the slot's own markers, and drops the
+// registry entry so the newly-chosen path rebuilds (and unmountScope won't
+// double-process a now-stale slot of the wrong kind).
+function disposeReturnSlot(block: Block, state: any): void {
+	if (state.__kind === 'childSlot') {
+		if (state.portal) {
+			teardownPortalState(state.portal);
+			state.portal = null;
+		}
+		if (state.forSlot) {
+			const items = state.forSlot.items as Map<any, Block>;
+			const it = items.values();
+			for (let r = it.next(); !r.done; r = it.next()) unmountBlock(r.value, true);
+			if (state.forSlot.emptyBlock) unmountBlock(state.forSlot.emptyBlock, true);
+			state.forSlot = null;
+		}
+		// Fires the content's cleanups and sweeps the nodes between the markers.
+		clearChildContent(state);
+		(state.start as ChildNode | null)?.remove();
+		(state.end as ChildNode | null)?.remove();
+	} else {
+		// componentSlotSlot — unmountBlock removes its DOM (incl. any owned markers).
+		if (state.block) unmountBlock(state.block, true);
+		(state.start as ChildNode | null)?.remove?.();
+		(state.end as ChildNode | null)?.remove?.();
+	}
+	const reg = block._slots;
+	if (reg !== null) {
+		const i = reg.indexOf(state);
+		if (i !== -1) reg.splice(i, 1);
+	}
+	block.slots[0] = undefined as any;
 }
 
 /**
@@ -1186,6 +1236,9 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 					for (let r = it.next(); !r.done; r = it.next()) unmountBlock(r.value, detachDom);
 					if (val.forSlot.emptyBlock) unmountBlock(val.forSlot.emptyBlock, detachDom);
 				}
+				// A `{createPortal(...)}` value hole — its content lives in a foreign
+				// target, so (like portalSlotSlot) it must always self-detach.
+				if (val.portal) teardownPortalState(val.portal);
 			} else {
 				// componentSlotSlot | portalSlotSlot | trySlotSlot
 				// Portal DOM lives in a FOREIGN target — the root-level batched clear
@@ -3481,45 +3534,114 @@ export function portal(
 	props: any,
 	host?: Node,
 ): void {
-	const parentBlock = parentScope.block;
-	let state = parentScope.slots[slotKey] as PortalSlot | undefined;
-	if (state === undefined) {
+	const prev = parentScope.slots[slotKey] as PortalSlot | undefined;
+	const state = renderPortalState(
+		prev ?? null,
+		parentScope.block,
+		target,
+		body,
+		props,
+		// `host` (passed by the compiler) is the JSX element that contains the
+		// createPortal call — the natural "logical parent" for event bubbling. When
+		// the portal is at top level the compiler passes the block's parentNode.
+		host || parentScope.block.parentNode,
+	);
+	// Register on first creation (or after a target-change rebuild) so the slot is
+	// torn down with its parent scope.
+	if (prev !== state) {
+		parentScope.slots[slotKey] = state;
+		registerSlot(parentScope, state);
+	}
+}
+
+/**
+ * Mount-or-update a portal's content into `target` (a foreign element), tracked by
+ * a `PortalSlot`. Shared by `portal()` (the compiler fast path for
+ * `<el>{createPortal(...)}</el>`) and `childSlot` (the VALUE path — a
+ * `createPortal(...)` returned from a component, sitting in a ternary, a fragment
+ * root, a render function, etc.). `host` is the logical parent used for event
+ * bubbling out of the portal.
+ */
+function renderPortalState(
+	prev: PortalSlot | null,
+	parentBlock: Block,
+	target: Element,
+	rawBody: ComponentBody | unknown,
+	rawProps: any,
+	host: Node,
+): PortalSlot {
+	const norm = normalizePortalBody(rawBody, rawProps);
+	let state = prev;
+	if (state === null || state.target !== target) {
+		// First mount, or the portal moved to a different target → (re)build.
+		if (state !== null) teardownPortalState(state);
 		const start = document.createComment('portal');
 		const end = document.createComment('/portal');
 		target.appendChild(start);
 		target.appendChild(end);
-		const block = createBlock('portal', parentBlock, target, start, end, body, props);
+		// The portal owns its start/end markers (default exclusiveMarkers=false), so
+		// unmountBlock removes them WITH the content — toggling a portal on/off never
+		// leaves orphan `<!--portal-->` comments in a persistent target (e.g.
+		// document.body across menu open/close cycles).
+		const block = createBlock('portal', parentBlock, target, start, end, norm.body, norm.props);
 		state = { __kind: 'portalSlotSlot', block, target, start, end };
-		parentScope.slots[slotKey] = state;
-		registerSlot(parentScope, state);
 		// Portal target hosts handlers stamped via the same `el.$$click = …`
-		// mechanism as the main tree, so it needs the delegated event listeners
-		// too. Refcounted: a target hosting two portals attaches once, detaches
-		// when the last portal unmounts (see unmountBlock).
+		// mechanism as the main tree, so it needs the delegated event listeners too.
+		// Refcounted: a target hosting two portals attaches once, detaches when the
+		// last portal unmounts.
 		registerDelegationTarget(target);
 		renderBlock(block);
 	} else {
-		state.block!.body = body;
-		state.block!.props = props;
+		state.block!.body = norm.body;
+		state.block!.props = norm.props;
 		renderBlock(state.block!);
 	}
-	// Stamp `$$portalParent` on every direct child the portal placed between
-	// its start/end markers. The dispatcher reads this when bubbling up: on
-	// reaching a stamped node it jumps to the logical parent's DOM context
-	// instead of continuing into the portal target's natural ancestors. This
-	// mirrors React's per-fiber portal walk so a click inside a modal bubbles
-	// up through the React tree, not just the document.body subtree.
-	//
-	// `host` (passed by the compiler) is the JSX element that contains the
-	// createPortal call — the natural "logical parent" for event bubbling.
-	// When the portal is at top level (no enclosing element) the compiler
-	// passes the enclosing block's parentNode instead.
-	const logicalParent = host || parentBlock.parentNode;
+	// Stamp `$$portalParent` on every direct child the portal placed between its
+	// start/end markers. The dispatcher reads this when bubbling up: on reaching a
+	// stamped node it jumps to the logical parent's DOM context instead of
+	// continuing into the portal target's natural ancestors — mirroring React's
+	// per-fiber portal walk so a click inside a modal bubbles up the logical tree.
 	let n: ChildNode | null = state.start!.nextSibling;
 	while (n !== null && n !== state.end) {
-		(n as any).$$portalParent = logicalParent;
+		(n as any).$$portalParent = host;
 		n = n.nextSibling;
 	}
+	return state;
+}
+
+// Tear a portal down: fire its body's cleanups, remove its DOM (incl. the owned
+// markers) from the target, and release the target's delegated listeners. Idempotent
+// — safe to call twice (childSlot teardown + a later scope-unmount sweep).
+function teardownPortalState(state: PortalSlot): void {
+	if (state.block) {
+		unmountBlock(state.block, true);
+		state.block = null;
+	}
+	if (state.target) {
+		unregisterDelegationTarget(state.target);
+		state.target = null;
+	}
+}
+
+// A portal body may be a ComponentBody (the octane contract + the compiler fast
+// path), an inline component element `createPortal(<Comp .../>, …)` (lowered to an
+// ElementDescriptor at value position), or any other renderable (host/array/text).
+// Normalize to a ComponentBody + props the portal Block can render directly.
+function normalizePortalBody(rawBody: any, rawProps: any): { body: ComponentBody; props: any } {
+	if (typeof rawBody === 'function') {
+		return { body: rawBody as ComponentBody, props: rawProps };
+	}
+	if (rawBody != null && rawBody.$$kind === ELEMENT_TAG && typeof rawBody.type === 'function') {
+		return { body: rawBody.type as ComponentBody, props: rawBody.props };
+	}
+	// Host element / array / primitive / component-descriptor → render via childSlot
+	// inside the portal Block (genericPortalBody has stable identity, so the portal
+	// reconciles its content across re-renders rather than rebuilding).
+	return { body: genericPortalBody as unknown as ComponentBody, props: rawBody };
+}
+
+function genericPortalBody(value: any, scope: Block): void {
+	childSlot(scope, 0, scope.parentNode, value, scope.endMarker);
 }
 
 /**
@@ -3850,6 +3972,11 @@ interface ChildSlot {
 	// this slot, REUSED across re-renders by the de-opt reconciler so DOM-resident
 	// state survives. Null when the slot holds a component/text/array instead.
 	hostNode: Node | null;
+	// Non-null while the slot's value is a `createPortal(...)` descriptor — its
+	// content lives in a foreign target, so the slot's own markers stay empty. Torn
+	// down when the value stops being a portal. Lets a portal render at any value
+	// position (component return, ternary, fragment root, render-fn result).
+	portal: PortalSlot | null;
 }
 
 // `true`/`false`/`null`/`undefined` render as empty (React parity); everything
@@ -4311,6 +4438,10 @@ function descNeedsBlocks(value: any): boolean {
 		// descriptor needs one only if its own children do (recurse).
 		return typeof value.type === 'function' || descNeedsBlocks(value.children);
 	}
+	// A portal descriptor renders into a foreign target via its own Block, so an
+	// array containing one (e.g. `useDecorators()` returning an array of portals)
+	// must route through childSlot, not the raw host reconciler.
+	if (value.$$kind === PORTAL_TAG) return true;
 	return false;
 }
 
@@ -4403,9 +4534,44 @@ export function childSlot(
 			currentComp: null,
 			forSlot: null,
 			hostNode: null,
+			portal: null,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
+	}
+
+	// Portal descriptor → render its body into a foreign target; the slot's own
+	// markers stay empty (content lives in `target`). Switching in from any other
+	// content tears that down first; a non-portal value below tears the portal down.
+	const portalDesc =
+		value != null && (value as any).$$kind === PORTAL_TAG
+			? (value as unknown as PortalDescriptor)
+			: null;
+	if (portalDesc === null && state.portal != null) {
+		teardownPortalState(state.portal);
+		state.portal = null;
+	}
+	if (portalDesc !== null) {
+		if (state.forSlot !== null) {
+			batchClearItems(state.forSlot, state.forSlot.items);
+			state.forSlot.head = null;
+			state.forSlot.tail = null;
+			state.forSlot.size = 0;
+			state.forSlot = null;
+		}
+		if (state.block !== null || state.text !== null || state.hostNode !== null) {
+			clearChildContent(state);
+		}
+		state.portal = renderPortalState(
+			state.portal,
+			parentBlock,
+			portalDesc.target,
+			portalDesc.body,
+			portalDesc.props,
+			// The DOM element containing this hole is the portal's logical parent.
+			domParent,
+		);
+		return;
 	}
 
 	// Array child → de-opt keyed list (sound: handles `.map()` results, arrays

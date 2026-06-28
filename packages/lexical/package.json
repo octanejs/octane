@@ -47,11 +47,16 @@
     "./LexicalEditorRefPlugin": "./src/LexicalEditorRefPlugin.tsrx",
     "./LexicalHorizontalRulePlugin": "./src/LexicalHorizontalRulePlugin.tsrx",
     "./LexicalHorizontalRuleNode": "./src/LexicalHorizontalRuleNode.tsrx",
+    "./LexicalTypeaheadMenuPlugin": "./src/LexicalTypeaheadMenuPlugin.tsrx",
+    "./LexicalNodeMenuPlugin": "./src/LexicalNodeMenuPlugin.tsrx",
+    "./LexicalClickableLinkPlugin": "./src/LexicalClickableLinkPlugin.tsrx",
+    "./LexicalSelectionAlwaysOnDisplay": "./src/LexicalSelectionAlwaysOnDisplay.tsrx",
     "./useLexicalEditable": "./src/useLexicalEditable.ts",
     "./useLexicalSubscription": "./src/useLexicalSubscription.ts",
     "./useLexicalNodeSelection": "./src/useLexicalNodeSelection.ts",
     "./useLexicalTextEntity": "./src/useLexicalTextEntity.ts",
-    "./useLexicalIsTextContentEmpty": "./src/useLexicalIsTextContentEmpty.ts"
+    "./useLexicalIsTextContentEmpty": "./src/useLexicalIsTextContentEmpty.ts",
+    "./useLexicalSlotRef": "./src/useLexicalSlotRef.ts"
   },
   "scripts": {
     "test": "vitest run"

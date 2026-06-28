@@ -22,8 +22,14 @@ Landed:
   portal).
 - **Hooks**: `useLexicalNodeSelection`, `useLexicalTextEntity`,
   `useLexicalIsTextContentEmpty`.
+- **Menus / typeahead (P4)**: `LexicalTypeaheadMenuPlugin`, `LexicalNodeMenuPlugin`,
+  `useBasicTypeaheadTriggerMatch`, `useDynamicPositioning`, the `LexicalMenu`
+  renderer, `MenuOption`, plus `ClickableLinkPlugin`, `SelectionAlwaysOnDisplay`,
+  and `useLexicalSlotRef`. A custom `menuRenderFn` returns a portal, exactly like
+  `@lexical/react`.
 
 Verified byte-identical to real `@lexical/react` via differential tests (the same
 fixture mounted on both, identical DOM after edits — basic text + a bullet list),
-plus behavioral unit tests. Menus/typeahead, collaboration, and the extension host
-land incrementally toward full parity.
+plus behavioral unit tests, plus an end-to-end slash-command typeahead in the
+`examples/lexical-playground` app driven in a real browser. Collaboration (yjs) and
+the extension host land incrementally toward full parity.

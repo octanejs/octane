@@ -1,13 +1,13 @@
 // Ported from @lexical/react/src/shared/useDecorators.tsx (the LegacyDecorators
 // path used by Rich/PlainTextPlugin). React's `useDecorators` hook is realized as
 // a `Decorators` COMPONENT here: each <Decorators/> usage is its own octane scope,
-// so its useState/useEffect/useMemo get per-instance identity automatically (no
-// sub-slot forwarding needed, unlike the plain-`.ts` hooks).
+// so its useState/useEffect/useMemo get per-instance identity automatically.
 //
-// Each decorator node is rendered into the DOM element Lexical created for it, via
-// a portal. octane's createPortal takes (body, target, props) — a ComponentBody +
-// props — so the ErrorBoundary/Suspense wrapper is `DecoratorPortalBody`, built
-// with createElement (no JSX-as-value needed for the dynamic ErrorBoundary tag).
+// Each decorator node renders into the DOM element Lexical created for it, via a
+// portal. octane's createPortal lowers to portal() only as a DIRECT child of a host
+// element (a createPortal VALUE is inert), so each portal lives inside its own
+// `DecoratorPortal` (a display:contents wrapper — the content escapes into the
+// node's element).
 import {
 	useState,
 	useEffect,
@@ -24,6 +24,10 @@ function DecoratorPortalBody(props) {
 		onError: props.onError,
 		children: createElement(Suspense, { fallback: null, children: props.decorator }),
 	});
+}
+
+function DecoratorPortal(props) {
+	return createPortal(DecoratorPortalBody, props.element, props.bodyProps);
 }
 
 export function Decorators(props) {
@@ -47,25 +51,38 @@ export function Decorators(props) {
 		setDecorators(editor.getDecorators());
 	}, [editor]);
 
-	// Decorators as octane portals.
-	const portals = useMemo(() => {
+	// Resolve each decorator node's DOM element + its decorator content.
+	const entries = useMemo(() => {
 		const out = [];
 		const decoratorKeys = Object.keys(decorators);
 		for (let i = 0; i < decoratorKeys.length; i++) {
 			const nodeKey = decoratorKeys[i];
 			const element = editor.getElementByKey(nodeKey);
 			if (element !== null) {
-				out.push(
-					createPortal(DecoratorPortalBody, element, {
-						ErrorBoundary,
-						onError: (e) => editor._onError(e),
-						decorator: decorators[nodeKey],
-					}),
-				);
+				out.push({ nodeKey, element, decorator: decorators[nodeKey] });
 			}
 		}
 		return out;
-	}, [ErrorBoundary, decorators, editor]);
+	}, [decorators, editor]);
 
-	return portals;
+	// Render nothing when there are no decorators (matches @lexical/react). Each
+	// decorator is a portal into its node's element — a keyed list of DecoratorPortal
+	// components, each returning a createPortal VALUE (octane renders portals at any
+	// position, so no wrapper element is needed).
+	if (entries.length === 0) {
+		return null;
+	}
+	return <>
+		{entries.map(
+			(entry) => <DecoratorPortal
+				key={entry.nodeKey}
+				element={entry.element}
+				bodyProps={{
+					ErrorBoundary,
+					onError: (e) => editor._onError(e),
+					decorator: entry.decorator,
+				}}
+			/>,
+		)}
+	</>;
 }
