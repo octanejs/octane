@@ -11,6 +11,7 @@ import {
 	clearTimeoutIfSet,
 	contains,
 	createAttribute,
+	getDelay,
 	getDocument,
 	isMouseLikePointerType,
 	useEffectEvent,
@@ -20,22 +21,6 @@ import {
 
 const safePolygonIdentifier = createAttribute('safe-polygon');
 
-function getDelay(value: any, prop: string, pointerType?: any): any {
-	if (pointerType && !isMouseLikePointerType(pointerType)) {
-		return 0;
-	}
-	if (typeof value === 'number') {
-		return value;
-	}
-	if (typeof value === 'function') {
-		const result = value();
-		if (typeof result === 'number') {
-			return result;
-		}
-		return result?.[prop];
-	}
-	return value?.[prop];
-}
 function getRestMs(value: any): any {
 	if (typeof value === 'function') {
 		return value();

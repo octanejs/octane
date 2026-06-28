@@ -64,3 +64,12 @@ export { FloatingList, useListItem, FloatingListContext } from './FloatingList';
 export { FloatingArrow } from './FloatingArrow';
 export { Composite, CompositeItem, CompositeContext } from './Composite';
 export { FloatingFocusManager, VisuallyHiddenDismiss } from './FloatingFocusManager';
+
+// Transitions + delay group (phase 4).
+export { useTransitionStatus, useTransitionStyles } from './transitions';
+export {
+	FloatingDelayGroup,
+	useDelayGroup,
+	useDelayGroupContext,
+	FloatingDelayGroupContext,
+} from './delayGroup';

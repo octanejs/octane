@@ -13,7 +13,7 @@ import { compile } from 'octane/compiler';
 // (~lines 1580-1656). Slot shape:
 //
 //   mount:  _b._fn$N = (callee); _b._a$N$0 = (arg0); _b._a$N$1 = (arg1);
-//           el.$$click = { fn: _b._fn$N, args: [_b._a$N$0, _b._a$N$1] };
+//           el["$$click"] = { fn: _b._fn$N, args: [_b._a$N$0, _b._a$N$1] };
 //   update: const _fn = (callee); const _a0 = (arg0); const _a1 = (arg1);
 //           if (_b._fn$N !== _fn || _b._a$N$0 !== _a0 || …) { …reassign… }
 
@@ -28,7 +28,7 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
     `);
 		// Mount: _fn slot present, NO _a slot.
 		expect(code).toMatch(/_b\._fn\$\d+\s*=\s*\(doSomething\)/);
-		expect(code).toMatch(/\.\$\$click\s*=\s*\{\s*fn:\s*_b\._fn\$\d+,\s*args:\s*\[\s*\]\s*\}/);
+		expect(code).toMatch(/\["\$\$click"\]\s*=\s*\{\s*fn:\s*_b\._fn\$\d+,\s*args:\s*\[\s*\]\s*\}/);
 		// Update: fn-only compare; no _a slot churn.
 		expect(code).toMatch(/const\s+_fn\s*=\s*\(doSomething\)/);
 		expect(code).not.toMatch(/_b\._a\$\d+\$0/);
@@ -65,7 +65,7 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
     `);
 		expect(code).toMatch(/_b\._a\$\d+\$0\s*=\s*\(item\)/);
 		expect(code).toMatch(
-			/\.\$\$click\s*=\s*\{\s*fn:\s*_b\._fn\$\d+,\s*args:\s*\[\s*_b\._a\$\d+\$0\s*\]\s*\}/,
+			/\["\$\$click"\]\s*=\s*\{\s*fn:\s*_b\._fn\$\d+,\s*args:\s*\[\s*_b\._a\$\d+\$0\s*\]\s*\}/,
 		);
 	});
 
@@ -76,7 +76,7 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
       }
     `);
 		expect(code).not.toMatch(/_b\._fn\$\d+/);
-		expect(code).toMatch(/\.\$\$click\s*=\s*\([\s\S]*?=>/);
+		expect(code).toMatch(/\["\$\$click"\]\s*=\s*\([\s\S]*?=>/);
 	});
 
 	it('bailout: non-arrow handler reference falls through to plain event binding', () => {
@@ -86,7 +86,7 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
       }
     `);
 		expect(code).not.toMatch(/_b\._fn\$\d+/);
-		expect(code).toMatch(/\.\$\$click\s*=\s*\(props\.handler\)/);
+		expect(code).toMatch(/\["\$\$click"\]\s*=\s*\(props\.handler\)/);
 	});
 
 	it('bailout: spread arg in body call falls through', () => {

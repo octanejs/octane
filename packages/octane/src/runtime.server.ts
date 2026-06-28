@@ -387,7 +387,16 @@ export function ssrComponent(parent: SSRScope, comp: ServerComponent, props: any
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
 		// become the slot's start/end markers, exactly like control-flow blocks).
-		return BLOCK_OPEN + (comp(props ?? {}, scope, undefined) ?? '') + BLOCK_CLOSE;
+		//
+		// The compiled body normally returns its HTML string, but a component that
+		// early-returns non-template JSX (the de-opt path — e.g. a `.tsx` `if (…)
+		// return <div/>`) returns a `createElement` DESCRIPTOR / array / primitive
+		// instead, mirroring the client where such a return flows through the block's
+		// childSlot. Normalize it the same way (ssrChild = the server childSlot), or it
+		// would stringify to `[object Object]`.
+		const out = comp(props ?? {}, scope, undefined);
+		const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, scope);
+		return BLOCK_OPEN + inner + BLOCK_CLOSE;
 	} finally {
 		CURRENT_SCOPE = prev;
 	}
@@ -476,7 +485,16 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	ctx.Provider = function ProviderBody(props, scope) {
 		if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
 		scope.$$ctxValues.set(ctx, props.value);
-		return typeof props.children === 'function' ? (props.children(undefined, scope) ?? '') : '';
+		const children = props.children;
+		if (children == null) return '';
+		// `.tsrx` threads children as a render function (call it directly). `.tsx`
+		// `<Ctx.Provider>…</Ctx.Provider>` lowers to `createElement(Provider, {}, …)`,
+		// so children arrive as a descriptor / array / primitive — render whichever
+		// shape through the generic child serializer (the same path every other
+		// descriptor child uses), or direct-JSX provider SSR would drop its content.
+		return typeof children === 'function'
+			? (children(undefined, scope) ?? '')
+			: ssrChild(children, scope);
 	};
 	return ctx;
 }

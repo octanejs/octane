@@ -72,6 +72,7 @@ export {
 	injectStyle,
 	headBlock,
 	delegateEvents,
+	delegateCaptureEvents,
 	forBlock,
 	ifBlock,
 	tryBlock,

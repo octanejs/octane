@@ -972,7 +972,8 @@ export function compile(source, filename, options) {
 		runtimeNeeded: new Set(),
 		hoistedTemplates: [], // { name, html }
 		hoistedHelpers: [], // raw JS strings (sub-components, hook Symbols, key fns)
-		delegatedEvents: new Set(), // event names seen in JSX — auto-emits delegateEvents(...)
+		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
+		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
 		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
@@ -1244,18 +1245,26 @@ export function compile(source, filename, options) {
 		}
 	}
 
-	// Auto-emit delegateEvents([...]) once at module scope for every event seen.
+	// Auto-emit delegateEvents([...]) / delegateCaptureEvents([...]) once at module
+	// scope for every (bubble / capture) event seen.
 	if (ctx.delegatedEvents.size > 0) {
 		ctx.runtimeNeeded.add('delegateEvents');
+	}
+	if (ctx.capturedEvents.size > 0) {
+		ctx.runtimeNeeded.add('delegateCaptureEvents');
 	}
 
 	// Build prelude. NOTE: `runtimeImport` is built BELOW (after the HMR block
 	// possibly registers more runtime needs); we postpone that so the final
 	// import list includes `hmr` / `HMR` when needed.
 	const delegateCall =
-		ctx.delegatedEvents.size > 0
-			? `delegateEvents(${JSON.stringify([...ctx.delegatedEvents].sort())});\n\n`
-			: '';
+		(ctx.delegatedEvents.size > 0
+			? `delegateEvents(${JSON.stringify([...ctx.delegatedEvents].sort())});\n`
+			: '') +
+		(ctx.capturedEvents.size > 0
+			? `delegateCaptureEvents(${JSON.stringify([...ctx.capturedEvents].sort())});\n`
+			: '') +
+		(ctx.delegatedEvents.size > 0 || ctx.capturedEvents.size > 0 ? '\n' : '');
 	const styleInjections = ctx.cssInjections
 		.map((i) => `injectStyle(${JSON.stringify(i.hash)}, ${JSON.stringify(i.css)});`)
 		.join('\n');
@@ -4413,7 +4422,7 @@ function emitBindingMount(b, elVar) {
 		}
 		case 'event': {
 			return `    _b._el$${b.id} = ${elVar};
-    ${elVar}.$$${b.eventName} = (${b.expr});`;
+    ${elVar}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
 		}
 		case 'formAction': {
 			// <form action={fn}> / <button formAction={fn}>: wire the submit handler
@@ -4435,7 +4444,7 @@ function emitBindingMount(b, elVar) {
       _b._el$${b.id} = ${elVar};
       _b._fn$${b.id} = (${b.fnExpr});
       ${argInit}
-      ${elVar}.$$${b.eventName} = { fn: _b._fn$${b.id}, args: [${argSlots.join(', ')}] };
+      ${elVar}[${JSON.stringify(b.slotKey)}] = { fn: _b._fn$${b.id}, args: [${argSlots.join(', ')}] };
     }`;
 		}
 		case 'ref': {
@@ -4504,7 +4513,7 @@ function emitBindingUpdate(b) {
 			return `    { const _v = ${E}; if (_b._sp$${b.id} !== _v) { setSpread(_b._el$${b.id}, _v, _b._sp$${b.id}); _b._sp$${b.id} = _v; } }`;
 		}
 		case 'event': {
-			return `    _b._el$${b.id}.$$${b.eventName} = (${b.expr});`;
+			return `    _b._el$${b.id}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
 		}
 		case 'formAction': {
 			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { setFormAction(_b._el$${b.id}, ${JSON.stringify(b.name)}, _v, _b._prev$${b.id}); _b._prev$${b.id} = _v; } }`;
@@ -4524,7 +4533,7 @@ function emitBindingUpdate(b) {
 			const writes = [`_b._fn$${b.id} = ${fnVar};`]
 				.concat(b.argExprs.map((_e, i) => `_b._a$${b.id}$${i} = ${argVars[i]};`))
 				.concat([
-					`_b._el$${b.id}.$$${b.eventName} = { fn: ${fnVar}, args: [${argVars.join(', ')}] };`,
+					`_b._el$${b.id}[${JSON.stringify(b.slotKey)}] = { fn: ${fnVar}, args: [${argVars.join(', ')}] };`,
 				])
 				.join(' ');
 			return `    { ${reads} if (${cmps}) { ${writes} } }`;
@@ -4913,8 +4922,25 @@ function emitElementHtml(
 		// come after a spread, since those need to win over the spread at runtime.)
 		const expr = printExprWithTsrx(inner, ctx, componentName, inlinedSubs);
 		if (attrName.length > 2 && attrName.startsWith('on') && /^[A-Z]/.test(attrName[2])) {
-			const eventName = attrName.slice(2).toLowerCase();
-			ctx.delegatedEvents.add(eventName);
+			// React-shape: a trailing `Capture` selects the capture phase (fired
+			// root→target before bubble handlers), stamped under `$$capture:<type>`.
+			// The real events gotpointercapture / lostpointercapture literally end in
+			// "capture", so they're excluded from the suffix rule.
+			let rest = attrName.slice(2);
+			let capture = false;
+			if (
+				rest.length > 7 &&
+				rest.endsWith('Capture') &&
+				attrName !== 'onGotPointerCapture' &&
+				attrName !== 'onLostPointerCapture'
+			) {
+				capture = true;
+				rest = rest.slice(0, -7);
+			}
+			const eventName = rest.toLowerCase();
+			const slotKey = capture ? `$$capture:${eventName}` : `$$${eventName}`;
+			if (capture) ctx.capturedEvents.add(eventName);
+			else ctx.delegatedEvents.add(eventName);
 			// Hot-path optimisation: `() => fn(arg, …)` arrows with zero params get
 			// compiled to a `{ fn, args }` bundle so the runtime can identity-diff
 			// fn + each arg and skip the property reassignment when nothing
@@ -4927,6 +4953,7 @@ function emitElementHtml(
 					kind: 'event-bundle',
 					path,
 					eventName,
+					slotKey,
 					ns: hostNs,
 					fnExpr: printExprWithTsrx(bundleInfo.callee, ctx, componentName, inlinedSubs),
 					argExprs: bundleInfo.args.map((a) =>
@@ -4934,7 +4961,15 @@ function emitElementHtml(
 					),
 				});
 			} else {
-				bindings.push({ id: bindings.length, kind: 'event', expr, path, eventName, ns: hostNs });
+				bindings.push({
+					id: bindings.length,
+					kind: 'event',
+					expr,
+					path,
+					eventName,
+					slotKey,
+					ns: hostNs,
+				});
 			}
 		} else if (attrName === 'class' || attrName === 'className') {
 			bindings.push({ id: bindings.length, kind: 'class', expr, path, ns: hostNs });
