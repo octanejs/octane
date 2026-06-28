@@ -211,6 +211,31 @@ export function isMouseLikePointerType(pointerType: any, strict?: boolean): bool
 	return values.includes(pointerType);
 }
 
+export function getDelay(value: any, prop: string, pointerType?: any): any {
+	if (pointerType && !isMouseLikePointerType(pointerType)) {
+		return 0;
+	}
+	if (typeof value === 'number') {
+		return value;
+	}
+	if (typeof value === 'function') {
+		const result = value();
+		if (typeof result === 'number') {
+			return result;
+		}
+		return result?.[prop];
+	}
+	return value?.[prop];
+}
+
+// JS style key (`backgroundColor`) → CSS property (`background-color`).
+export function camelCaseToKebabCase(str: string): string {
+	return str.replace(/[A-Z]+(?![a-z])|[A-Z]/g, ($, ofs) => (ofs ? '-' : '') + $.toLowerCase());
+}
+export function execWithArgsOrReturn(valueOrFn: any, args: any): any {
+	return typeof valueOrFn === 'function' ? valueOrFn(args) : valueOrFn;
+}
+
 // Fork of `fast-deep-equal` (from @floating-ui/react-dom) — compares functions by
 // source. Used by the positioning core.
 export function deepEqual(a: any, b: any): boolean {

@@ -42,6 +42,9 @@ support; `FloatingFocusManager`'s trap (markOthers aria-hide/inert + return-focu
 guards) works on octane's capture-phase focus delegation. Validated with tests for the
 portal, overlay, arrow, modal focus trap, and Composite roving-tabindex navigation.
 
-Remaining: the transition hooks (`useTransitionStatus`/`useTransitionStyles`) +
-`FloatingDelayGroup`, then rewiring `@octanejs/lexical`'s `NodeContextMenuPlugin` onto
-this package.
+Phase 4 (transitions + delay group) is complete: `useTransitionStatus` /
+`useTransitionStyles` (placement-aware CSS-transition state/styles, using octane's
+`flushSync`) and `FloatingDelayGroup` / `useDelayGroup` / `useDelayGroupContext`.
+Validated with a fade-tooltip transition test.
+
+Remaining: rewiring `@octanejs/lexical`'s `NodeContextMenuPlugin` onto this package.

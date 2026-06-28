@@ -445,6 +445,17 @@ export function flushSync<T>(fn: () => T): T {
 		// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
 		const pendingError = drainQueue();
 		commitEffectsSync();
+		// A sync-committed effect (e.g. a layout effect calling setState) can schedule
+		// MORE renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without
+		// arming a microtask — so without this, those renders would be stranded until an
+		// unrelated update happened to flush them (e.g. useTransitionStatus's rAF +
+		// flushSync, where the layout effect's setState never committed). Hand them to
+		// the normal async scheduler rather than re-draining synchronously, which would
+		// risk an unbounded loop for genuinely cascading effects.
+		if (QUEUE.length > 0 && !scheduled) {
+			scheduled = true;
+			queueMicrotask(flush);
+		}
 		if (pendingError !== null) throw pendingError.err;
 		return result;
 	} finally {
@@ -3022,6 +3033,34 @@ function isEventKey(k: string): boolean {
 	);
 }
 
+// DOM-stamp prefix for capture-phase delegated handlers (`onXxxCapture`). Bubble
+// handlers stamp `$$<type>`; capture handlers stamp `$$capture:<type>` so the two
+// phases stay independent on the same element + event type.
+const CAPTURE_PREFIX = '$$capture:';
+
+// Parse an `on<Name>` / `on<Name>Capture` handler prop into its delegated event
+// `type`, DOM-stamp `key`, and phase. React-shape: a trailing `Capture` selects the
+// capture phase (fired root→target before bubble handlers). The real events
+// `gotpointercapture` / `lostpointercapture` literally end in "capture", so they're
+// excluded from the suffix rule (`onGotPointerCapture` is the bubble handler for
+// `gotpointercapture`; `onGotPointerCaptureCapture` is its capture handler).
+function eventSlot(name: string): { type: string; key: string; capture: boolean } | null {
+	if (!isEventKey(name)) return null;
+	let rest = name.slice(2);
+	let capture = false;
+	if (
+		rest.length > 7 &&
+		rest.endsWith('Capture') &&
+		name !== 'onGotPointerCapture' &&
+		name !== 'onLostPointerCapture'
+	) {
+		capture = true;
+		rest = rest.slice(0, rest.length - 7);
+	}
+	const type = rest.toLowerCase();
+	return { type, key: capture ? CAPTURE_PREFIX + type : '$$' + type, capture };
+}
+
 export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope): void {
 	// `mountScope` is passed only on the mount call (not on updates). When present
 	// a spread-supplied ref attach is DEFERRED to commit so a callback ref sees a
@@ -3042,8 +3081,9 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 				continue;
 			}
 			if (value && k in value) continue;
-			if (isEventKey(k)) {
-				(el as any)['$$' + k.slice(2).toLowerCase()] = null;
+			const removedEv = eventSlot(k);
+			if (removedEv) {
+				(el as any)[removedEv.key] = null;
 			} else if (k === 'class' || k === 'className') {
 				el.removeAttribute('class');
 			} else if (k === 'style') {
@@ -3080,13 +3120,18 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 			setStyle(el as HTMLElement, v, pv);
 			continue;
 		}
-		if (isEventKey(k)) {
+		const ev = eventSlot(k);
+		if (ev) {
 			if (v === pv) continue;
-			const evName = k.slice(2).toLowerCase();
 			// Lazy-delegate any event we haven't seen — the compiler can't predict
-			// event names that arrive dynamically through spread.
-			if (!_delegated.has(evName)) delegateEvents([evName]);
-			(el as any)['$$' + evName] = v;
+			// event names that arrive dynamically through spread. Capture-phase
+			// handlers (`onXxxCapture`) register their own capture-phase listener.
+			if (ev.capture) {
+				if (!_delegatedCapture.has(ev.type)) delegateCaptureEvents([ev.type]);
+			} else if (!_delegated.has(ev.type)) {
+				delegateEvents([ev.type]);
+			}
+			(el as any)[ev.key] = v;
 			continue;
 		}
 		if (v === pv) continue;
@@ -3215,6 +3260,12 @@ const _delegated = new Set<string>();
 // one unmounts. createRoot containers have refcount 1 for their lifetime.
 const _delegationTargets = new Map<Node, number>();
 
+// Event names with capture-phase handlers (`onXxxCapture`). These get a SEPARATE
+// capture-phase listener (`dispatchDelegatedCapture`) on every delegation target,
+// independent of the bubble-phase `_delegated` set — an event type can have both
+// (`onClick` + `onClickCapture`).
+const _delegatedCapture = new Set<string>();
+
 // Non-bubbling events (focus, blur) must be delegated in the CAPTURE phase so the
 // single root listener still sees them — the dispatcher then walks from
 // `event.target` upward, which reproduces React's bubbling `onFocus`/`onBlur`.
@@ -3237,6 +3288,22 @@ export function delegateEvents(eventNames: string[]): void {
 	}
 }
 
+// Register capture-phase delegated events (for `onXxxCapture` handlers). Attaches a
+// capture-phase `dispatchDelegatedCapture` listener to every active target, which
+// fires the matching `$$capture:<type>` slots root→target (capture order). Compiled
+// modules call this at load for the capture handlers they contain; the spread path
+// lazy-registers dynamically-supplied ones.
+export function delegateCaptureEvents(eventNames: string[]): void {
+	for (let i = 0; i < eventNames.length; i++) {
+		const name = eventNames[i];
+		if (_delegatedCapture.has(name)) continue;
+		_delegatedCapture.add(name);
+		for (const target of _delegationTargets.keys()) {
+			target.addEventListener(name, dispatchDelegatedCapture, true);
+		}
+	}
+}
+
 /**
  * Register `target` (a createRoot container or a portal target DOM node) as
  * an event-delegation root. Idempotent w.r.t. each call: first registration
@@ -3249,6 +3316,9 @@ function registerDelegationTarget(target: Node): void {
 	if (prev === 0) {
 		for (const name of _delegated) {
 			target.addEventListener(name, dispatchDelegated, delegatedCapture(name));
+		}
+		for (const name of _delegatedCapture) {
+			target.addEventListener(name, dispatchDelegatedCapture, true);
 		}
 	}
 }
@@ -3263,6 +3333,9 @@ function unregisterDelegationTarget(target: Node): void {
 		_delegationTargets.delete(target);
 		for (const name of _delegated) {
 			target.removeEventListener(name, dispatchDelegated, delegatedCapture(name));
+		}
+		for (const name of _delegatedCapture) {
+			target.removeEventListener(name, dispatchDelegatedCapture, true);
 		}
 	} else {
 		_delegationTargets.set(target, prev - 1);
@@ -3345,34 +3418,63 @@ const DISCRETE_EVENTS = new Set<string>([
  */
 let _dispatchDepth = 0;
 
+// Stamps marking a native event whose delegated walk has already run, per phase. A
+// single native event can reach more than one delegation listener when targets nest —
+// a portal target inside a root, nested roots, or overlapping portal targets. Each
+// listener walks the full logical tree, so without this guard the shared portion of
+// the chain would fire its handlers once per nested listener. Capture and bubble are
+// independent phases, so each carries its own stamp.
+const DELEGATED_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched');
+const CAPTURE_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched.capture');
+
+// Invoke one event slot — a bare handler `fn(event)` or a `{ fn, args }` bundle
+// (the compiler's stable-arrow optimisation) as `fn(...args, event)`.
+function fireEventSlot(slot: HandlerBundle | ((e: Event) => any), event: Event): void {
+	if (typeof slot === 'function') {
+		slot(event);
+		return;
+	}
+	const a = slot.args;
+	switch (a.length) {
+		case 0:
+			slot.fn(event);
+			break;
+		case 1:
+			slot.fn(a[0], event);
+			break;
+		case 2:
+			slot.fn(a[0], a[1], event);
+			break;
+		default:
+			slot.fn.apply(null, a.concat(event));
+	}
+}
+
+// React parity: discrete events (click, keydown, input, …) must commit before the
+// browser regains control — otherwise fast double-clicks, focus-after-reveal,
+// e.preventDefault+setState+measure patterns and controlled-input value reads all see
+// stale state. Only the OUTERMOST dispatch flushes — nested synthetic dispatches
+// inherit the outer commit window. Non-discrete events keep microtask-batched
+// semantics so they don't thrash the scheduler.
+function maybeFlushDiscrete(type: string): void {
+	if (DISCRETE_EVENTS.has(type) && _dispatchDepth === 0 && hasPendingWork()) {
+		flushSync(noop);
+	}
+}
+
 function dispatchDelegated(event: Event): void {
+	// Only the first delegation listener to receive this event walks it (its walk
+	// already covers every logical ancestor across roots/portals); the rest no-op.
+	if ((event as any)[DELEGATED_DISPATCHED] === true) return;
+	(event as any)[DELEGATED_DISPATCHED] = true;
 	const key = '$$' + event.type;
-	const isDiscrete = DISCRETE_EVENTS.has(event.type);
 	_dispatchDepth++;
 	let node = event.target as any;
 	try {
 		while (node !== null && node !== undefined) {
 			const slot = node[key] as EventSlot;
 			if (slot) {
-				if (typeof slot === 'function') {
-					slot(event);
-				} else {
-					// bundle: fn(...args, event)
-					const a = slot.args;
-					switch (a.length) {
-						case 0:
-							slot.fn(event);
-							break;
-						case 1:
-							slot.fn(a[0], event);
-							break;
-						case 2:
-							slot.fn(a[0], a[1], event);
-							break;
-						default:
-							slot.fn.apply(null, a.concat(event));
-					}
-				}
+				fireEventSlot(slot, event);
 				if (event.cancelBubble) return;
 			}
 			// Portal-aware ascent: when crossing a portal root, jump to the rendering Block's DOM parent.
@@ -3384,16 +3486,36 @@ function dispatchDelegated(event: Event): void {
 		}
 	} finally {
 		_dispatchDepth--;
-		// React parity: discrete events (click, keydown, input, …) must commit
-		// before the browser regains control — otherwise fast double-clicks,
-		// focus-after-reveal, e.preventDefault+setState+measure patterns and
-		// controlled-input value reads all see stale state. Only the OUTERMOST
-		// dispatch flushes — nested synthetic dispatches inherit the outer
-		// commit window. Non-discrete events (scroll, mousemove, …) keep
-		// microtask-batched semantics so they don't thrash the scheduler.
-		if (isDiscrete && _dispatchDepth === 0 && hasPendingWork()) {
-			flushSync(noop);
+		maybeFlushDiscrete(event.type);
+	}
+}
+
+// Capture-phase counterpart of dispatchDelegated for `onXxxCapture` handlers. Builds
+// the logical target→root path (with portal jumps), then fires the `$$capture:<type>`
+// slots ROOT→TARGET — React's capture order. Cross-phase `stopPropagation` is handled
+// by the browser (this listener and the bubble listener are separate native
+// listeners, so a stopped event never reaches the bubble phase).
+function dispatchDelegatedCapture(event: Event): void {
+	if ((event as any)[CAPTURE_DISPATCHED] === true) return;
+	(event as any)[CAPTURE_DISPATCHED] = true;
+	const key = CAPTURE_PREFIX + event.type;
+	const path: any[] = [];
+	for (let node = event.target as any; node !== null && node !== undefined; ) {
+		path.push(node);
+		node = node.$$portalParent ? node.$$portalParent : node.parentNode;
+	}
+	_dispatchDepth++;
+	try {
+		for (let i = path.length - 1; i >= 0; i--) {
+			const slot = path[i][key] as EventSlot;
+			if (slot) {
+				fireEventSlot(slot, event);
+				if (event.cancelBubble) return;
+			}
 		}
+	} finally {
+		_dispatchDepth--;
+		maybeFlushDiscrete(event.type);
 	}
 }
 
@@ -3725,27 +3847,42 @@ export function createElement<P>(
 	props?: P,
 	...children: any[]
 ): ElementDescriptor<P> {
-	const p = (props ?? {}) as any;
-	const key = p.key != null ? p.key : null;
-	const kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : p.children;
+	const src = (props ?? null) as any;
+	const key = src != null && src.key != null ? src.key : null;
+	const hasPositional = children.length > 0;
+	const kids = hasPositional ? (children.length === 1 ? children[0] : children) : src?.children;
 	// Multiple positional children → a fresh array of FIXED siblings (never reordered).
 	// Tag it so the de-opt list keys them by index without the missing-key warning that
 	// is meant for `.map()` results. (A single child is passed through as-is — a lone
 	// `.map()` array stays untagged and keeps the warning.)
 	if (children.length > 1) POSITIONAL_CHILDREN.add(children);
+	// Build the descriptor's props WITHOUT mutating the caller's object, with `key`
+	// lifted OUT of props (React semantics — `key` is never a real prop).
+	//
 	// React-shape contract: positional children ARE `props.children`. A COMPONENT
-	// descriptor reaches its body through componentSlot, which forwards `props`
-	// only (not `descriptor.children`) — so a component that reads `{props.children}`
-	// (rendered via childSlot) needs them mirrored into props. This is what lets a
-	// React-style `.tsx` parent (`<Provider>…</Provider>` → `createElement(Provider,
-	// {}, …)`) pass children into a `.tsrx` `{props.children}` consumer, matching the
-	// `.tsrx`→`.tsrx` path (which threads a `children` render-fn prop). Host
-	// descriptors keep using `descriptor.children` via the de-opt reconciler — and
-	// applyDeoptProps already skips `props.children` — so this is scoped to the
-	// component case. Only set when positional children were given and props didn't
-	// already carry an explicit `children`, so a fresh emit isn't clobbered.
-	if (typeof type === 'function' && children.length > 0 && p.children === undefined) {
-		p.children = kids;
+	// descriptor reaches its body through componentSlot, which forwards `props` only
+	// (not `descriptor.children`) — so a component that reads `{props.children}`
+	// (rendered via childSlot) needs them mirrored into props. This lets a React-style
+	// `.tsx` parent (`<Provider>…</Provider>` → `createElement(Provider, {}, …)`) pass
+	// children into a `.tsrx` `{props.children}` consumer, matching the `.tsrx`→`.tsrx`
+	// path (which threads a `children` render-fn prop). Host descriptors keep using
+	// `descriptor.children` via the de-opt reconciler — and applyDeoptProps already
+	// skips `props.children` — so this is scoped to the component case. Only fold in
+	// children when positional ones were given and props didn't already carry an
+	// explicit `children`, so a fresh emit isn't clobbered.
+	//
+	// We copy-on-write: a fresh props object is allocated only when there's a `key` to
+	// strip or children to fold in, so the compiler's hot 2-arg `createElement(Comp,
+	// props)` path (no key, no positional children) stays allocation-free and never
+	// touches the caller's object.
+	const stripKey = src != null && 'key' in src;
+	const addChildren =
+		typeof type === 'function' && hasPositional && (src == null || src.children === undefined);
+	let p: any = src ?? {};
+	if (stripKey || addChildren) {
+		p = src != null ? { ...src } : {};
+		if (stripKey) delete p.key;
+		if (addChildren) p.children = kids;
 	}
 	return { $$kind: ELEMENT_TAG, type, props: p as P, key, children: kids ?? null };
 }
@@ -4112,9 +4249,10 @@ function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): v
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, v, undefined);
 	} else if (isDelegatedEventName(name)) {
-		const type = name.slice(2).toLowerCase();
-		(el as any)['$$' + type] = v;
-		delegateEvents([type]);
+		const ev = eventSlot(name)!;
+		(el as any)[ev.key] = v;
+		if (ev.capture) delegateCaptureEvents([ev.type]);
+		else delegateEvents([ev.type]);
 	} else {
 		setAttribute(el, name, v);
 	}
@@ -4133,7 +4271,7 @@ function removeDeoptProp(el: Element, name: string): void {
 	} else if (name === 'dangerouslySetInnerHTML') {
 		el.innerHTML = '';
 	} else if (isDelegatedEventName(name)) {
-		(el as any)['$$' + name.slice(2).toLowerCase()] = undefined;
+		(el as any)[eventSlot(name)!.key] = undefined;
 	} else {
 		el.removeAttribute(name);
 	}

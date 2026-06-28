@@ -105,3 +105,27 @@ describe('@octanejs/floating-ui — Composite', () => {
 		r.unmount();
 	});
 });
+
+import { FadeTooltip } from './_fixtures/fade.tsx';
+
+describe('@octanejs/floating-ui — transitions', () => {
+	it('useTransitionStyles mounts on open and applies open transition styles', async () => {
+		const r = mount(FadeTooltip);
+		expect(r.container.querySelector('.tip')).toBe(null); // not mounted while closed
+
+		(r.container.querySelector('.trigger') as HTMLElement).click();
+		// The 'open' status is reached via requestAnimationFrame (jsdom drives rAF on a
+		// real timer), so poll until the open transition styles land.
+		let tip = r.container.querySelector('.tip') as HTMLElement;
+		for (let i = 0; i < 30 && (!tip || tip.style.transitionDuration !== '200ms'); i++) {
+			await new Promise((res) => setTimeout(res, 16));
+			tip = r.container.querySelector('.tip') as HTMLElement;
+		}
+
+		expect(tip).not.toBe(null); // isMounted true
+		// status reached 'open' → open transition applied.
+		expect(tip.style.transitionDuration).toBe('200ms');
+		expect(tip.style.transitionProperty).toBe('opacity');
+		r.unmount();
+	});
+});

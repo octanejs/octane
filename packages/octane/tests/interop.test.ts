@@ -42,3 +42,34 @@ it('.tsrx parent still passes children through the same Provider (reverse case)'
 	expect(r.find('.inner').textContent).toBe('hi');
 	r.unmount();
 });
+
+import { createElement } from '../src/index';
+
+function Comp() {
+	return null;
+}
+
+it('createElement lifts `key` out of props (React semantics — key is never a prop)', () => {
+	const el = createElement(Comp, { key: 'k1', foo: 1 } as any);
+	expect(el.key).toBe('k1');
+	expect('key' in (el.props as any)).toBe(false);
+	expect((el.props as any).foo).toBe(1);
+});
+
+it('createElement does NOT mutate the caller-supplied props object', () => {
+	const caller = { foo: 1 } as any;
+	const el = createElement(Comp, caller, 'child');
+	// children folded into the descriptor's props for the component path…
+	expect((el.props as any).children).toBe('child');
+	// …but the caller's object is untouched.
+	expect(caller).toEqual({ foo: 1 });
+	expect('children' in caller).toBe(false);
+	expect(el.props).not.toBe(caller);
+});
+
+it('createElement keeps the hot 2-arg path allocation-free (props passed through)', () => {
+	const caller = { foo: 1 } as any; // no key, no positional children
+	const el = createElement(Comp, caller);
+	expect(el.props).toBe(caller); // same reference — no copy
+	expect(el.key).toBe(null);
+});
