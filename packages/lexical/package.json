@@ -1,0 +1,90 @@
+{
+  "name": "@octanejs/lexical",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "Lexical bindings for the octane renderer — reuses the framework-agnostic @lexical/* core and reimplements the @lexical/react layer on octane's hooks.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/lexical"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./LexicalComposerContext": "./src/LexicalComposerContext.ts",
+    "./LexicalComposer": "./src/LexicalComposer.tsrx",
+    "./LexicalContentEditable": "./src/LexicalContentEditable.tsrx",
+    "./LexicalRichTextPlugin": "./src/LexicalRichTextPlugin.tsrx",
+    "./LexicalPlainTextPlugin": "./src/LexicalPlainTextPlugin.tsrx",
+    "./LexicalErrorBoundary": "./src/LexicalErrorBoundary.tsrx",
+    "./LexicalHistoryPlugin": "./src/LexicalHistoryPlugin.tsrx",
+    "./LexicalOnChangePlugin": "./src/LexicalOnChangePlugin.tsrx",
+    "./LexicalAutoFocusPlugin": "./src/LexicalAutoFocusPlugin.tsrx",
+    "./LexicalClearEditorPlugin": "./src/LexicalClearEditorPlugin.tsrx",
+    "./LexicalListPlugin": "./src/LexicalListPlugin.tsrx",
+    "./LexicalCheckListPlugin": "./src/LexicalCheckListPlugin.tsrx",
+    "./LexicalLinkPlugin": "./src/LexicalLinkPlugin.tsrx",
+    "./LexicalAutoLinkPlugin": "./src/LexicalAutoLinkPlugin.tsrx",
+    "./LexicalHashtagPlugin": "./src/LexicalHashtagPlugin.tsrx",
+    "./LexicalTabIndentationPlugin": "./src/LexicalTabIndentationPlugin.tsrx",
+    "./LexicalMarkdownShortcutPlugin": "./src/LexicalMarkdownShortcutPlugin.tsrx",
+    "./LexicalTablePlugin": "./src/LexicalTablePlugin.tsrx",
+    "./LexicalNodeEventPlugin": "./src/LexicalNodeEventPlugin.tsrx",
+    "./LexicalEditorRefPlugin": "./src/LexicalEditorRefPlugin.tsrx",
+    "./LexicalHorizontalRulePlugin": "./src/LexicalHorizontalRulePlugin.tsrx",
+    "./LexicalHorizontalRuleNode": "./src/LexicalHorizontalRuleNode.tsrx",
+    "./useLexicalEditable": "./src/useLexicalEditable.ts",
+    "./useLexicalSubscription": "./src/useLexicalSubscription.ts",
+    "./useLexicalNodeSelection": "./src/useLexicalNodeSelection.ts",
+    "./useLexicalTextEntity": "./src/useLexicalTextEntity.ts",
+    "./useLexicalIsTextContentEmpty": "./src/useLexicalIsTextContentEmpty.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "catalog:default",
+    "@lexical/devtools-core": "catalog:default",
+    "@lexical/dragon": "catalog:default",
+    "@lexical/extension": "catalog:default",
+    "@lexical/hashtag": "catalog:default",
+    "@lexical/history": "catalog:default",
+    "@lexical/internal": "catalog:default",
+    "@lexical/link": "catalog:default",
+    "@lexical/list": "catalog:default",
+    "@lexical/mark": "catalog:default",
+    "@lexical/markdown": "catalog:default",
+    "@lexical/overflow": "catalog:default",
+    "@lexical/plain-text": "catalog:default",
+    "@lexical/rich-text": "catalog:default",
+    "@lexical/table": "catalog:default",
+    "@lexical/text": "catalog:default",
+    "@lexical/utils": "catalog:default",
+    "@lexical/yjs": "catalog:default",
+    "lexical": "catalog:default",
+    "octane": "workspace:*",
+    "yjs": "catalog:default"
+  },
+  "devDependencies": {
+    "@lexical/react": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
