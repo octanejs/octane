@@ -1,0 +1,27 @@
+{
+  "name": "lexical-playground-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A Lexical rich-text editor playground built on octane via @octanejs/lexical — the octane counterpart of facebook/lexical's lexical-playground, proving the binding works end-to-end in a real app.",
+  "scripts": {
+    "dev": "vite --host --port 5210 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5210 --strictPort"
+  },
+  "dependencies": {
+    "@lexical/code": "catalog:default",
+    "@lexical/hashtag": "catalog:default",
+    "@lexical/link": "catalog:default",
+    "@lexical/list": "catalog:default",
+    "@lexical/rich-text": "catalog:default",
+    "@lexical/selection": "catalog:default",
+    "@lexical/table": "catalog:default",
+    "@octanejs/lexical": "workspace:*",
+    "lexical": "catalog:default",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default"
+  }
+}

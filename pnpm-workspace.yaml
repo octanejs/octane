@@ -43,6 +43,7 @@ catalogs:
     '@changesets/changelog-git': ^0.2.1
     '@changesets/cli': ^2.31.0
     '@floating-ui/dom': ^1.7.0
+    '@lexical/code': 0.46.0
     '@lexical/devtools-core': 0.46.0
     '@lexical/dragon': 0.46.0
     '@lexical/extension': 0.46.0
@@ -57,6 +58,7 @@ catalogs:
     '@lexical/plain-text': 0.46.0
     '@lexical/react': 0.46.0
     '@lexical/rich-text': 0.46.0
+    '@lexical/selection': 0.46.0
     '@lexical/table': 0.46.0
     '@lexical/text': 0.46.0
     '@lexical/utils': 0.46.0
