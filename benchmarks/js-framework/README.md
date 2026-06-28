@@ -15,6 +15,8 @@ auto-callback transform and stable event-bundle optimization pay off.
 benchmarks/js-framework/
 ├── octane-tsrx/    # Vite app, dev server on :5176 — octane authored in .tsrx
 ├── octane-jsx/     # Vite app, dev server on :5177 — same app authored in React-style .tsx
+├── react/          # Vite app, dev server on :5175 — canonical keyed react-hooks
+├── ripple/         # Vite app, dev server on :5178 — keyed ripple (ported to current syntax)
 ├── run.mjs             # Playwright harness — drives each target N iterations
 ├── package.json        # umbrella; depends on playwright
 ├── results/            # output / scratch
@@ -23,21 +25,26 @@ benchmarks/js-framework/
 
 The octane app is authored **twice** over the same octane core — once in `.tsrx`
 (directive syntax) and once in React-style `.tsx` (JSX). Both emit the same DOM
-and expose the same six-button + table contract, but they exercise **different
-list-reconciliation paths**, which is the interesting part of comparing them:
+and expose the same six-button + table contract:
 
 - **`octane-tsrx`** — `@for (const row of items; key row.id)` compiles to octane's
-  keyed **fast path** (`forBlock`): targeted per-row updates, host node identity
-  preserved across re-renders.
-- **`octane-jsx`** — `items.map((row) => <tr key={row.id}>…)` compiles to the keyed
-  **de-opt list path** (`reconcileKeyed`): still keyed (reorders/swap are correct),
-  but each row rebuilds its host DOM on every parent re-render and node identity is
-  not preserved. This is octane's React-JSX backwards-compat path.
+  keyed `forBlock` fast path: a compiled per-item body, targeted per-row updates,
+  host node identity preserved across re-renders.
+- **`octane-jsx`** — `items.map((row) => <tr key={row.id}>…)` now lowers to the
+  **same** `forBlock` fast path (the compiler recognizes a keyed JSX `.map` and
+  compiles it like `@for`), so the jsx/tsrx ratio is ~1.0 — the React-JSX
+  backwards-compat path carries no list-reconciliation penalty here.
+- **`react`** — the canonical [keyed react-hooks][rh] implementation, the
+  reference VDOM baseline. `dispatch` is wrapped in `flushSync` so React commits
+  inside the discrete click (the harness times only the synchronous click; React
+  18 otherwise schedules the commit afterward — see the note in its `main.jsx`).
+- **`ripple`** — the [keyed ripple][rp] implementation, ported to current ripple
+  syntax (`function … @{}`, `@for (…; key)`, `{expr}`). A fine-grained foil: each
+  row's `label` is a `Tracked<string>`, so `update` mutates labels in place. Its
+  handlers are wrapped in `flushSync` for the same sync-commit reason as react.
 
-So the harness's jsx/tsrx ratio is **not** expected to be ~1.0 on the re-render
-ops (`update`, `select`, `swap`, `remove`) — it quantifies the cost of the
-`.map` de-opt path vs the compiled `@for` fast path. `run` / `runlots` / `clear`
-(pure mount/unmount, no keyed re-render) should be much closer.
+[rh]: https://github.com/krausest/js-framework-benchmark/tree/master/frameworks/keyed/react-hooks
+[rp]: https://github.com/krausest/js-framework-benchmark/tree/master/frameworks/keyed/ripple
 
 ## Quick start
 
@@ -45,12 +52,15 @@ ops (`update`, `select`, `swap`, `remove`) — it quantifies the cost of the
 # 1. From the repo root, install + sync workspaces:
 pnpm install
 
-# 2. Start BOTH octane bench dev servers (separate terminals):
+# 2. Start the bench dev servers (separate terminals); for production numbers use
+#    `build` + `preview` instead of `dev`:
 pnpm --filter octane-tsrx-jsbench dev   # :5176
 pnpm --filter octane-jsx-jsbench dev    # :5177
+pnpm --filter react-jsbench dev         # :5175
+pnpm --filter ripple-jsbench dev        # :5178
 
-# 3. Run the harness (another terminal). By default it drives both dialects and
-#    prints the jsx/tsrx ratio (~equal = parity):
+# 3. Run the harness (another terminal). By default it drives octane-tsrx,
+#    octane-jsx and react, with octane-tsrx as the ratio baseline:
 pnpm --filter octane-js-framework-benchmarks bench
 # or for a longer sample (16 iterations × all 8 ops):
 pnpm --filter octane-js-framework-benchmarks bench:long

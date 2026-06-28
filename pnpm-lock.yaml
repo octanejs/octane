@@ -291,6 +291,41 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
+  benchmarks/js-framework/react:
+    dependencies:
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: catalog:default
+        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/js-framework/ripple:
+    dependencies:
+      ripple:
+        specifier: catalog:default
+        version: 0.3.86
+    devDependencies:
+      '@ripple-ts/vite-plugin':
+        specifier: catalog:default
+        version: 0.3.86
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
   benchmarks/news:
     dependencies:
       playwright:
