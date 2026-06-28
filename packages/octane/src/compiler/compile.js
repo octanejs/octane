@@ -3813,20 +3813,48 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			const key = path.join(',');
 			const cached = elementVars.get(key);
 			if (cached !== undefined) return cached;
-			// Materialize the ANCESTOR first (cached + reused across siblings), then take
-			// ONE navigation step from it — instead of re-walking the whole path from
-			// `_root` for every element. Siblings sharing a deep prefix (e.g. a row of
-			// buttons) thus share the prefix's vars/steps instead of repeating them.
-			//
-			// The chain bottoms out at `_root` (the cloned root / not-yet-drained frag),
-			// NOT at `ensureVar([])`: for a multi-root template `[]` resolves to
-			// __block.parentNode (the POST-drain slot host), which is the wrong base for
-			// navigating elements that still live inside `_root` at mount time.
-			const parentVar = path.length === 1 ? '_root' : ensureVar(path.slice(0, -1));
-			const last = [path[path.length - 1]];
+			const k = path[path.length - 1];
+			const prefix = path.slice(0, -1);
+			// Prefer chaining off the nearest ALREADY-MATERIALIZED preceding sibling at
+			// this level — one `.nextSibling` run across from it — over re-walking
+			// `.firstChild.nextSibling×k` from the parent for every sibling. A row of k
+			// bound cells (e.g. dbmon's `<td>`s) otherwise costs 1+2+…+k navigation steps
+			// (O(k²) in both code size and mount-time DOM walking); chaining makes it
+			// _el0→_el1→…, one step each (O(k)). Falls back to the parent walk when no
+			// earlier sibling at this level is materialized yet.
+			let sibVar;
+			let sibSteps = 0;
+			for (let j = k - 1; j >= 0; j--) {
+				const c = elementVars.get([...prefix, j].join(','));
+				if (c !== undefined) {
+					sibVar = c;
+					sibSteps = k - j;
+					break;
+				}
+			}
+			let step;
+			if (sibVar !== undefined) {
+				// `sibling(node, n)` skips n logical siblings (hole-aware, like walkExprH);
+				// raw `.nextSibling` for hole-free templates. sibVar already resolves to the
+				// (k−sibSteps)-th child, so n steps across lands on the k-th.
+				if (hasHoles) {
+					step = `sibling(${sibVar}, ${sibSteps})`;
+				} else {
+					step = sibVar;
+					for (let i = 0; i < sibSteps; i++) step += '.nextSibling';
+				}
+			} else {
+				// Materialize the ANCESTOR first (cached + reused across siblings), then take
+				// ONE navigation step from it — instead of re-walking the whole path from
+				// `_root`. The chain bottoms out at `_root` (the cloned root / not-yet-drained
+				// frag), NOT at `ensureVar([])`: for a multi-root template `[]` resolves to
+				// __block.parentNode (the POST-drain slot host), which is the wrong base for
+				// navigating elements that still live inside `_root` at mount time.
+				const parentVar = prefix.length === 0 ? '_root' : ensureVar(prefix);
+				step = hasHoles ? walkExprH(parentVar, [k]) : walkExpr(parentVar, [k]);
+			}
 			const v = `_el${varCounter++}`;
 			elementVars.set(key, v);
-			const step = hasHoles ? walkExprH(parentVar, last) : walkExpr(parentVar, last);
 			mountLines.push(`    const ${v} = ${step};`);
 			return v;
 		};
@@ -4252,19 +4280,14 @@ function emitBindingMount(b, elVar) {
 	const E = `(${b.expr})`;
 	switch (b.kind) {
 		case 'textOnlyChild': {
-			// When the binding's expression is statically string-typed
-			// (`knownString`), the runtime can skip the `String(_v)` coercion —
-			// `_v` is already a string. Saves a global function call on every
-			// mount AND every update. Falsy-check still applied so `null` /
-			// `undefined` / `false` render as empty rather than literal text.
-			const coerce = b.knownString ? '_v' : 'String(_v)';
-			// `htext` creates + appends the text node on a fresh mount (identical to
-			// the old inline path), but ADOPTS the server text node when hydrating.
-			// Seeding `_prev` to the client value makes the first update a no-op when
-			// it matches the server text (no hydration mismatch re-render).
+			// `htext` creates + appends the text node on a fresh mount, ADOPTS the
+			// server text node when hydrating, and coerces the value itself — so the
+			// mount is a bare `htext(el, _v)`. Seeding `_prev` to the client value
+			// makes the first update a no-op when it matches the server text (no
+			// hydration mismatch re-render).
 			return `    {
       const _v = ${E};
-      _b._txt$${b.id} = htext(${elVar}, _v == null || _v === false ? '' : ${coerce});
+      _b._txt$${b.id} = htext(${elVar}, _v);
       _b._prev$${b.id} = _v;
     }`;
 		}
@@ -4284,10 +4307,10 @@ function emitBindingMount(b, elVar) {
 			// position-preserving — works for single AND multi-root, since the path
 			// walk starts from `_root`/the cloned fragment). While hydrating it's the
 			// SERVER's text node at that logical position, which htextSwap ADOPTS.
-			const coerce = b.knownString ? '_v' : 'String(_v)';
+			// htextSwap coerces the value itself, so the mount is a bare call.
 			return `    {
       const _v = ${E};
-      _b._txt$${b.id} = htextSwap(${elVar}, _v == null || _v === false ? '' : ${coerce});
+      _b._txt$${b.id} = htextSwap(${elVar}, _v);
       _b._prev$${b.id} = _v;
     }`;
 		}

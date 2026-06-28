@@ -2082,12 +2082,17 @@ export function clone<T extends Node>(node: T): T {
  * compiler seeds alongside this makes the first update a no-op when the client
  * value matches the server text (avoiding a mismatch re-render).
  */
-export function htext(el: Node, text: string): Text {
+export function htext(el: Node, value: unknown): Text {
 	if (hydrating) {
 		const first = el.firstChild;
 		if (first !== null && first.nodeType === 3) return first as Text;
 		// Server rendered an empty hole (value was ''/null) — create + adopt.
 	}
+	// Coerce here (mirrors setText) rather than at every call site — keeps the
+	// per-text-hole mount codegen to a bare `htext(el, _v)`. Mount-once, so folding
+	// the coercion in costs nothing on the hot update path.
+	const text =
+		value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
 	const t = document.createTextNode(text);
 	el.appendChild(t);
 	return t;
@@ -2106,7 +2111,10 @@ export function htext(el: Node, text: string): Text {
  * later sibling walks are unaffected). This is the sibling-position analog of
  * `htext` (which handles the only-child fast path).
  */
-export function htextSwap(posNode: Node | null, text: string): Text {
+export function htextSwap(posNode: Node | null, value: unknown): Text {
+	// Coerce here (see htext) so the call site stays a bare `htextSwap(pos, _v)`.
+	const text =
+		value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
 	if (hydrating) {
 		if (posNode !== null && posNode.nodeType === 3) {
 			// Adopt the server text node.
