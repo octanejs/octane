@@ -255,9 +255,49 @@ function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope)
 	if (innerHTML !== undefined) {
 		inner = innerHTML == null ? '' : String(innerHTML);
 	} else if (hasChildren) {
-		inner = ssrDescriptorContent(children, scope);
+		// A de-opt host whose children contain COMPONENTS renders those children on the
+		// client through `hostElementBody` → `childSlot` (a Block path that ADOPTS markers
+		// on hydration), so they must carry the full childSlot/block marker structure —
+		// emit them via `ssrChild` (the server analogue of childSlot). Pure host/text
+		// children are rebuilt by the client de-opt reconciler, so they stay as plain
+		// marker-less markup via `ssrDescriptorContent`.
+		inner = serverDescNeedsBlocks(children)
+			? ssrDeoptBlockChildren(children, scope)
+			: ssrDescriptorContent(children, scope);
 	}
 	return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
+}
+
+// Serialize a de-opt host's component-bearing children the way the client's
+// `hostElementBody` → `childSlot` adopts them. A SINGLE child is one childSlot block
+// (`ssrChild`). An ARRAY routes through the de-opt keyed list (`childSlot` → `forSlot`
+// → `deoptItemBody`): an OUTER childSlot block wraps one ITEM block per element, and
+// each item block in turn wraps the element's own content block — so a component item
+// is `<!--[-->`(item)`<!--[-->`…`<!--]-->`(component)`<!--]-->`. Without the extra item
+// wrapper the client mints fresh markers (hydration mismatch).
+function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
+	if (Array.isArray(children)) {
+		let out = '';
+		for (let i = 0; i < children.length; i++) out += ssrBlock(ssrChild(children[i], scope));
+		return ssrBlock(out);
+	}
+	return ssrChild(children, scope);
+}
+
+// Server mirror of the client's `descNeedsBlocks`: true when a descriptor subtree
+// contains a COMPONENT anywhere (so its de-opt host parent must serialize children
+// through the block-bearing `ssrChild` path rather than plain markup).
+function serverDescNeedsBlocks(v: unknown): boolean {
+	if (v == null || typeof v !== 'object') return false;
+	if (Array.isArray(v)) {
+		for (let i = 0; i < v.length; i++) if (serverDescNeedsBlocks(v[i])) return true;
+		return false;
+	}
+	const d = v as ElementDescriptor;
+	if (d.$$kind === ELEMENT_TAG) {
+		return typeof d.type === 'function' || serverDescNeedsBlocks(d.children);
+	}
+	return false;
 }
 
 // Serialize the CONTENT inside a host descriptor (a `createElement(...)` child
