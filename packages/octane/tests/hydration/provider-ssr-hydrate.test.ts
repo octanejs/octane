@@ -49,21 +49,24 @@ describe('hydration — .tsx <Context.Provider> descriptor children', () => {
 		root.unmount();
 	});
 
-	// GAP: a de-opt HOST element whose children are COMPONENTS routes those children
-	// through the Block path (hostElementBody / the de-opt keyed list) on the client,
-	// whose hydration marker structure the server's ssrHostElement does not yet mirror —
-	// so hydrating a `<div><Comp/><Comp/></div>` de-opt host throws a DOM NotFoundError.
-	// SSR OUTPUT is correct (see jsx-context-children-ssr.test.ts); only hydration of
-	// this specific subtree is unsupported. Auto-flips green when the server emits the
-	// hostElementBody-compatible child markers.
-	it.fails('GAP: de-opt host with component-list children does not yet hydrate', async () => {
+	// A de-opt HOST element whose children are COMPONENTS (`<div><Comp/><Comp/></div>`
+	// returned via the de-opt path) renders those children on the client through
+	// `hostElementBody` → `childSlot` → the de-opt keyed list, which ADOPTS markers on
+	// hydration. The client now adopts the server host node (instead of building fresh),
+	// and the server emits the matching childSlot/forSlot/component block nesting
+	// (`ssrDeoptBlockChildren`) — so this round-trips byte-for-byte.
+	it('hydrates a de-opt host with a component-list child without mismatch', async () => {
 		const dserver = serverModule('packages/octane/tests/_fixtures/jsx-context-children.tsx');
 		const { body } = await ServerRT.render(dserver.ProviderApp, {});
 		container.innerHTML = body;
 		const before = container.innerHTML;
 		const root = hydrateRoot(container, ProviderApp as any, {});
 		flushSync(() => {});
-		expect(container.innerHTML).toBe(before);
+		expect(container.innerHTML).toBe(before); // adopted, not rebuilt
+		expect(container.querySelectorAll('.leaf').length).toBe(2);
+		for (const el of container.querySelectorAll('.leaf')) {
+			expect(el.textContent).toBe('provided');
+		}
 		root.unmount();
 	});
 });

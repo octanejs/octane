@@ -4650,6 +4650,30 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	// uncommon case; they mount via childSlot below, which does not yet thread the SVG
 	// namespace — the pure-host SVG path through reconcileDeoptChildren does.)
 	const elNs = d.type === 'svg' ? SVG_NS : undefined;
+	// Hydration first render: ADOPT the server-rendered host element sitting at the
+	// cursor instead of building a fresh one (which would orphan the server node and
+	// desync the marker walk). Then point the cursor at its first child so the childSlot
+	// below adopts the server-rendered children (which carry full childSlot markers when
+	// they contain components — see the server's ssrHostElement). Pure-host children
+	// have no inner markers, so childSlot's reconciling-host path rebuilds them in place.
+	if (
+		el === null &&
+		hydrating &&
+		hydrateNode !== null &&
+		hydrateNode.nodeType === 1 &&
+		(hydrateNode as Element).localName === d.type &&
+		(elNs === undefined || (hydrateNode as Element).namespaceURI === elNs)
+	) {
+		el = hydrateNode as Element;
+		block.deoptNode = el;
+		applyDeoptProps(el, d.props, block);
+		setDeoptDesc(el, d);
+		const savedCursor = hydrateNode.nextSibling;
+		hydrateNode = el.firstChild;
+		childSlot(block, 0, el, d.children, null);
+		hydrateNode = savedCursor;
+		return;
+	}
 	if (el === null || el.localName !== d.type || (elNs !== undefined && el.namespaceURI !== elNs)) {
 		// First render, or the host tag changed at this slot — (re)create the element.
 		if (el !== null) (el as ChildNode).remove();
