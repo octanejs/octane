@@ -4608,6 +4608,29 @@ function emitNodeHtml(
 		compCalls.push(ch);
 		return '<!>';
 	}
+	// `{createPortal(...)}` / a JSX-bearing ternary / a `.map()` etc. at a top-level
+	// or fragment-root position (no enclosing host element). The element-child loop
+	// lowers `{createPortal(...)}` to a `portal()` fast path because it HAS a host to
+	// stamp; here there's none, so route the value through the de-opt childSlot hole
+	// (the TSRX-aware printer preserves the createPortal call → the runtime renders
+	// the PortalDescriptor; any inner JSX lowers to createElement). Without this a
+	// top-level rich hole compiled to nothing.
+	if (node.type === 'TSRXExpression') {
+		const ch = {
+			id: ctx.nextHelperId++,
+			isChild: true,
+			valueExpr: printExprWithTsrx(
+				resolveStyleExpr(rewriteJsxValues(node.expression, ctx), cssHash),
+				ctx,
+				componentName,
+				inlinedSubs,
+			),
+			hostPath: path.slice(0, -1),
+			anchorPath: path,
+		};
+		compCalls.push(ch);
+		return '<!>';
+	}
 	// Top-level <Fragment ref={…}> — the wrapping <octane-frag> (multi-root)
 	// is the parent in this scope, so the marker pair lives at the supplied
 	// path. Pairing uses ctx._fragRefStack, saved/restored by planJsx so

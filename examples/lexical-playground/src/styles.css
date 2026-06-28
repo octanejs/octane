@@ -274,3 +274,34 @@ body {
 	outline: 2px solid #3d87f5;
 	user-select: none;
 }
+
+/* Typeahead / component-picker menu (P4) */
+.typeahead-popover {
+	background: #fff;
+	box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15);
+	border-radius: 8px;
+	margin-top: 4px;
+}
+.typeahead-popover ul {
+	padding: 4px;
+	list-style: none;
+	margin: 0;
+	max-height: 220px;
+	overflow-y: auto;
+	min-width: 180px;
+}
+.typeahead-popover ul li {
+	margin: 0;
+	padding: 6px 10px;
+	border-radius: 6px;
+	cursor: pointer;
+	font-size: 14px;
+	display: flex;
+	align-items: center;
+}
+.typeahead-popover ul li.selected {
+	background: #eef3ff;
+}
+.typeahead-popover ul li:hover {
+	background: #f1f1f1;
+}

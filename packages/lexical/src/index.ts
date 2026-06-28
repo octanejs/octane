@@ -59,3 +59,21 @@ export { $isHorizontalRuleNode, INSERT_HORIZONTAL_RULE_COMMAND } from '@lexical/
 export { useLexicalNodeSelection } from './useLexicalNodeSelection';
 export { useLexicalTextEntity } from './useLexicalTextEntity';
 export { useLexicalIsTextContentEmpty } from './useLexicalIsTextContentEmpty';
+
+// --- Phase 4: menus + utilities ---
+export { LexicalTypeaheadMenuPlugin } from './LexicalTypeaheadMenuPlugin.tsrx';
+export { LexicalNodeMenuPlugin } from './LexicalNodeMenuPlugin.tsrx';
+export { useBasicTypeaheadTriggerMatch, PUNCTUATION } from './typeaheadShared';
+export { MenuOption, SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND } from './shared/menuShared';
+export type {
+	MenuRef,
+	MenuRenderFn,
+	MenuResolution,
+	MenuTextMatch,
+	TriggerFn,
+} from './shared/menuShared';
+export { useDynamicPositioning } from './shared/useDynamicPositioning';
+export { useMenuAnchorRef } from './shared/useMenuAnchorRef';
+export { ClickableLinkPlugin } from './LexicalClickableLinkPlugin.tsrx';
+export { SelectionAlwaysOnDisplay } from './LexicalSelectionAlwaysOnDisplay.tsrx';
+export { useLexicalSlotRef } from './useLexicalSlotRef';
