@@ -143,6 +143,43 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'lexical',
+					include: ['packages/lexical/tests/**/*.test.ts', 'packages/lexical/tests/**/*.test.tsx'],
+					environment: 'jsdom',
+					// Precompiles `.tsrx` fixtures → real @lexical/react for the differential
+					// oracle (rewrites `@octanejs/lexical/X` → `@lexical/react/X`).
+					globalSetup: ['packages/lexical/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [
+					octane({
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/query/src/',
+							'/packages/motion/src/',
+							'/packages/lexical/src/',
+						],
+					}),
+				],
+				resolve: {
+					// `.tsrx` is added so extensionless subpath imports
+					// (`@octanejs/lexical/LexicalComposer`) resolve to a `.tsrx` component
+					// OR a `.ts` hook — mirroring @lexical/react's per-subpath module layout.
+					extensions: ['.tsrx', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.json'],
+					alias: [
+						{
+							find: /^@octanejs\/lexical$/,
+							replacement: resolve(import.meta.dirname, 'packages/lexical/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/lexical\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/lexical/src') + '/$1',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'stylex',
 					include: ['packages/stylex/tests/**/*.test.ts'],
 					environment: 'jsdom',

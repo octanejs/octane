@@ -42,6 +42,25 @@ catalogs:
     '@changesets/changelog-github': ^0.7.0
     '@changesets/changelog-git': ^0.2.1
     '@changesets/cli': ^2.31.0
+    '@floating-ui/dom': ^1.7.0
+    '@lexical/devtools-core': 0.46.0
+    '@lexical/dragon': 0.46.0
+    '@lexical/extension': 0.46.0
+    '@lexical/hashtag': 0.46.0
+    '@lexical/history': 0.46.0
+    '@lexical/internal': 0.46.0
+    '@lexical/link': 0.46.0
+    '@lexical/list': 0.46.0
+    '@lexical/mark': 0.46.0
+    '@lexical/markdown': 0.46.0
+    '@lexical/overflow': 0.46.0
+    '@lexical/plain-text': 0.46.0
+    '@lexical/react': 0.46.0
+    '@lexical/rich-text': 0.46.0
+    '@lexical/table': 0.46.0
+    '@lexical/text': 0.46.0
+    '@lexical/utils': 0.46.0
+    '@lexical/yjs': 0.46.0
     '@playwright/test': ^1.61.0
     '@ripple-ts/adapter': ^0.3.86
     '@ripple-ts/vite-plugin': ^0.3.86
@@ -68,6 +87,7 @@ catalogs:
     esrap: *esrap_common
     happy-dom: ^20.10.6
     jsdom: ^29.0.2
+    lexical: 0.46.0
     motion: ^12.0.0
     motion-dom: ^12.0.0
     playwright: ^1.61.0
@@ -83,4 +103,5 @@ catalogs:
     vite: ^8.0.16
     vite-plugin-solid: '3.0.0-next.5'
     vitest: ^4.1.9
+    yjs: ^13.6.0
     zustand: ^5.0.0
