@@ -77,3 +77,23 @@ export { useMenuAnchorRef } from './shared/useMenuAnchorRef';
 export { ClickableLinkPlugin } from './LexicalClickableLinkPlugin.tsrx';
 export { SelectionAlwaysOnDisplay } from './LexicalSelectionAlwaysOnDisplay.tsrx';
 export { useLexicalSlotRef } from './useLexicalSlotRef';
+
+// --- Phase 4: nested editor + decorator-block building blocks ---
+export { LexicalNestedComposer } from './LexicalNestedComposer.tsrx';
+export { DecoratorBlockNode, $isDecoratorBlockNode } from './LexicalDecoratorBlockNode';
+export type { SerializedDecoratorBlockNode } from './LexicalDecoratorBlockNode';
+export { BlockWithAlignableContents } from './LexicalBlockWithAlignableContents.tsrx';
+export { CollaborationContext, useCollaborationContext } from './LexicalCollaborationContext';
+export type { CollaborationContextType } from './LexicalCollaborationContext';
+export { CharacterLimitPlugin } from './LexicalCharacterLimitPlugin.tsrx';
+export { useCharacterLimit } from './shared/useCharacterLimit';
+export { TableOfContentsPlugin } from './LexicalTableOfContentsPlugin.tsrx';
+export { LexicalAutoEmbedPlugin } from './LexicalAutoEmbedPlugin.tsrx';
+export { URL_MATCHER, INSERT_EMBED_COMMAND, AutoEmbedOption } from './autoEmbedShared';
+export type { EmbedConfig, EmbedMatchResult } from './autoEmbedShared';
+export { DraggableBlockPlugin_EXPERIMENTAL } from './LexicalDraggableBlockPlugin.tsrx';
+export {
+	NodeContextMenuPlugin,
+	NodeContextMenuOption,
+	NodeContextMenuSeparator,
+} from './LexicalNodeContextMenuPlugin.tsrx';

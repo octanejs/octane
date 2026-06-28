@@ -212,6 +212,42 @@ export default defineConfig({
 					],
 				},
 			},
+			{
+				test: {
+					name: 'floating-ui',
+					include: [
+						'packages/floating-ui/tests/**/*.test.ts',
+						'packages/floating-ui/tests/**/*.test.tsx',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				// floating-ui's `.ts` hooks forward the caller's slot via subSlot, so they
+				// must be EXCLUDED from the auto-slotting pass (the `.tsx` fixtures that call
+				// them are full-compiled and inject the trailing slot).
+				plugins: [
+					octane({
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/query/src/',
+							'/packages/motion/src/',
+							'/packages/floating-ui/src/',
+						],
+					}),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/floating-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/floating-ui\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src') + '/$1.ts',
+						},
+					],
+				},
+			},
 		],
 	},
 });

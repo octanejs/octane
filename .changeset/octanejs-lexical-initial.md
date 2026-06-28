@@ -27,6 +27,15 @@ Landed:
   renderer, `MenuOption`, plus `ClickableLinkPlugin`, `SelectionAlwaysOnDisplay`,
   and `useLexicalSlotRef`. A custom `menuRenderFn` returns a portal, exactly like
   `@lexical/react`.
+- **Advanced P4**: `LexicalNestedComposer`, `DecoratorBlockNode` /
+  `$isDecoratorBlockNode`, `BlockWithAlignableContents`, `CollaborationContext` /
+  `useCollaborationContext`, `CharacterLimitPlugin` / `useCharacterLimit`,
+  `TableOfContentsPlugin`, `LexicalAutoEmbedPlugin` (`AutoEmbedOption`,
+  `INSERT_EMBED_COMMAND`, `URL_MATCHER`), `DraggableBlockPlugin_EXPERIMENTAL`, and
+  `NodeContextMenuPlugin` (`NodeContextMenuOption` / `NodeContextMenuSeparator`).
+  `NodeContextMenuPlugin` is re-implemented on `@floating-ui/dom` (the React version
+  uses React-only `@floating-ui/react`). `TreeView` is not ported — it renders
+  `@lexical/devtools-core`'s React component.
 
 Verified byte-identical to real `@lexical/react` via differential tests (the same
 fixture mounted on both, identical DOM after edits — basic text + a bullet list),

@@ -56,7 +56,16 @@
     "./useLexicalNodeSelection": "./src/useLexicalNodeSelection.ts",
     "./useLexicalTextEntity": "./src/useLexicalTextEntity.ts",
     "./useLexicalIsTextContentEmpty": "./src/useLexicalIsTextContentEmpty.ts",
-    "./useLexicalSlotRef": "./src/useLexicalSlotRef.ts"
+    "./useLexicalSlotRef": "./src/useLexicalSlotRef.ts",
+    "./LexicalNestedComposer": "./src/LexicalNestedComposer.tsrx",
+    "./LexicalDecoratorBlockNode": "./src/LexicalDecoratorBlockNode.ts",
+    "./LexicalBlockWithAlignableContents": "./src/LexicalBlockWithAlignableContents.tsrx",
+    "./LexicalCollaborationContext": "./src/LexicalCollaborationContext.ts",
+    "./LexicalCharacterLimitPlugin": "./src/LexicalCharacterLimitPlugin.tsrx",
+    "./LexicalTableOfContentsPlugin": "./src/LexicalTableOfContentsPlugin.tsrx",
+    "./LexicalAutoEmbedPlugin": "./src/LexicalAutoEmbedPlugin.tsrx",
+    "./LexicalDraggableBlockPlugin": "./src/LexicalDraggableBlockPlugin.tsrx",
+    "./LexicalNodeContextMenuPlugin": "./src/LexicalNodeContextMenuPlugin.tsrx"
   },
   "scripts": {
     "test": "vitest run"

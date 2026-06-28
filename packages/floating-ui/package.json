@@ -1,0 +1,44 @@
+{
+  "name": "@octanejs/floating-ui",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "Floating UI bindings for the octane renderer — a port of @floating-ui/react (positioning + interactions + focus management) on top of the framework-agnostic @floating-ui/dom.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/floating-ui"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "catalog:default",
+    "@floating-ui/utils": "catalog:default",
+    "octane": "workspace:*",
+    "tabbable": "catalog:default"
+  },
+  "devDependencies": {
+    "@floating-ui/react": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
