@@ -406,5 +406,47 @@ memo branches prune via `$$ctxReads`), and lite consumers (their block carries
 full context suite (context, components-context, hook-fixes memo-through-context,
 suspense-extra, the new Case D for `@for`/`@if` descent).
 
+### Tier 5 — transition REPLACE-suspend hold + off-screen rendering (DONE)
+A transition that SWAPS in a new subtree which suspends now keeps the prior content on
+screen (React's transition+Suspense contract). octane previously held only for an
+IN-PLACE re-suspend; a component/branch REPLACE that suspended on mount tore the old
+content down first → blank. **Runtime fix:** per-swap **off-screen (WIP-model)**
+rendering — `renderOffscreen`/`commitOffscreen`/`disposeWip` + a `WIP_CAPTURE` effect/
+ref buffer, wired into all four swap sites (`componentSlot`, `childSlot`, `ifBlock`,
+`switchBlock`). On a transition swap the new subtree renders off-screen (effects
+captured); completes → atomic commit + tear down old; suspends → discard partial +
+re-throw so the enclosing `@try`'s EXISTING transition hold keeps the old content live
+and resumes. Urgent + hydration keep the legacy path. This closed the `@octanejs/router`
+concurrent-navigation gap (its `it.fails` flipped to passing). Validated by differential
+(React-oracle) tests for childSlot + ifBlock + nested-Suspense, and direct tests for
+switchBlock + componentSlot(router) + portal-in-WIP. Documented scope: per-swap, not a
+global double-buffered tree (SUSPENSE_DIVERGENCE.md #4). **Still open in Tier 5:**
+effects-semantics, reveal-throttle, async-actions, Activity ports + the fidelity audit.
+
+**Tier 5 port — findings so far (in progress):**
+- **Rig limitation discovered:** `@tsrx/react` compiles octane's `@pending` arm to a
+  FUNCTION-valued `fallback` prop (`fallback={() => el}`), which React does not render —
+  so the differential rig's React side shows EMPTY for any `@pending` fallback state.
+  The rig therefore CANNOT oracle suspense fallback states (only held-content / resolved
+  states — which is why the transition-swap differentials, comparing HELD content, are
+  valid). Suspense-fallback parity must stay hand-ported (octane-direct).
+- **Gap found AND FIXED — effect lifecycle under suspense:**
+  `conformance/suspense-effects-semantics.test.ts` (per
+  `ReactSuspenseEffectsSemantics-test.js:611`). Porting it surfaced that octane
+  PRESERVED a re-suspended boundary's effects (softDetach keeps hooks) where React
+  DESTROYS layout/passive effects on hide + recreates on reveal. **Runtime fix:** the
+  suspend-hide paths (`handleSuspense` softDetach + `swapToPendingFallback`) now run the
+  hidden subtree's effect cleanups via `deactivateScope` (which also clears deps), and
+  `attachResume`'s retry now COMMITS the resume's effects (`commitEffects`) so the
+  recreated layout effects drain (without it the scheduler stayed non-quiescent — a
+  latent resume-doesn't-commit-layout-effects bug this surfaced). State is still
+  preserved across suspend. Passing `it` (no pin); 86 suspense/transition/activity
+  tests green, 0 regressions.
+- A React v19.2.7 reference clone (test sources) is used for faithful porting.
+- **Still to port:** the rest of effects-semantics (refs, nested boundaries,
+  double-destroy), reveal-throttle, `ReactAsyncActions`, `Activity`; plus the fidelity
+  re-audit of existing suspense ports.
+
 ### Suite status
-**106 test files, 752 passed, 0 expected-fail, 0 regressions.** Typecheck clean.
+**204 test files, 1074 passed, 0 expected-fail, 0 regressions** (after the off-screen
+transition fix). Typecheck + format clean. (Earlier checkpoint: 106 files / 752.)

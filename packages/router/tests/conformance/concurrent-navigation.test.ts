@@ -20,13 +20,12 @@ describe('@octanejs/router — concurrent navigation (startTransition)', () => {
 	// currently-committed UI on screen until the new route's data resolves —
 	// instead of flashing the new route's pending fallback.
 	//
-	// What this test PROVES today (the parts that hold in the unit harness):
+	// What this test proves:
 	//   - navigating to a suspending route advances the router location
 	//     immediately, and does NOT flash that route's pendingComponent;
 	//   - once the data resolves the new route swaps in and the old one is gone.
-	//
-	// What it does NOT yet hold in this harness — see the `it.fails` GAP below:
-	//   - keeping the OLD route's content on screen during the suspend window.
+	// (Keeping the OLD route on screen during the suspend window is proved by the
+	// next test — octane's off-screen WIP swap holds it.)
 	it('advances the location and suppresses the pending fallback while suspended, then swaps', async () => {
 		const deferred = createDeferred<string>();
 		const router = makeConcurrentRouter('/', deferred);
@@ -65,20 +64,16 @@ describe('@octanejs/router — concurrent navigation (startTransition)', () => {
 		r.unmount();
 	});
 
-	// GAP: in a real browser, navigating from '/' to a feed whose data is slow keeps
-	// the CURRENT page on screen (no skeleton flash) until the new page resolves.
-	// In this unit harness that hold does NOT happen when the matched ROUTE changes:
-	// router-core commits the new match id into `router.stores.matchesId` eagerly
-	// (the old match id is replaced in the store BEFORE the new route's data
-	// resolves), so the <Outlet/> re-renders <Match matchId={newId}/> with a fresh
-	// id and octane unmounts the old <Match/> immediately. During the suspend window
-	// the boundary is therefore blank (the pending fallback is correctly suppressed,
-	// but the previous route's content is NOT retained). The browser-observed hold in
-	// the HN example is a SAME-route, search-param-only change (the <Match/> instance
-	// is preserved and its own Suspense holds), which is a different code path than a
-	// route swap. Pinned so the suite stays green and auto-flips if/when octane learns
-	// to retain the old <Match/> subtree across a transition-driven route swap.
-	it.fails('GAP: holds the OLD route content on screen while the next route suspends', async () => {
+	// Navigating from '/' to a slow route keeps the CURRENT page on screen until the new
+	// page resolves — React's transition-holds-prior-content contract. octane now matches
+	// it via off-screen (WIP-model) rendering: a transition swap to a fresh-suspending
+	// subtree (here the route's `<Comp/>` componentSlot swaps Home→Slow inside the Match's
+	// `@try`) is rendered OFF-SCREEN; when it suspends the new partial is discarded and the
+	// suspend is re-thrown so the enclosing tryBlock holds the OLD content live, resuming +
+	// committing atomically once the data resolves. (Was an octane-runtime GAP — the swap
+	// used to clear the old content before the new one suspended; see the off-screen
+	// renderOffscreen/commitOffscreen path in runtime.ts.)
+	it('holds the OLD route content on screen while the next route suspends', async () => {
 		const deferred = createDeferred<string>();
 		const router = makeConcurrentRouter('/', deferred);
 		await router.load();
@@ -89,8 +84,8 @@ describe('@octanejs/router — concurrent navigation (startTransition)', () => {
 		await router.navigate({ to: '/slow' });
 		await flush();
 
-		// Location advanced, but the old '/' UI should still be mounted while
-		// '/slow' is suspended. Today it is NOT — this assertion fails.
+		// Location advanced, and the old '/' UI stays mounted while '/slow' is
+		// suspended (octane's off-screen WIP swap holds the prior content).
 		expect(router.state.location.pathname).toBe('/slow');
 		expect(r.findAll('.home').length).toBe(1);
 

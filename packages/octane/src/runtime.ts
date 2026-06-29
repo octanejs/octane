@@ -293,6 +293,31 @@ let passiveScheduled = false;
 // layout effect runs — matching React's commit-phase ref attachment.
 const refAttachQueue: { fn: () => void; depth: number; block: Block | null }[] = [];
 
+// Off-screen (WIP) effect capture. While a transition swaps in a NEW subtree that
+// may suspend, that subtree is rendered "off-screen" (its DOM kept out of the slot's
+// committed range until it completes — see renderOffscreen). Its effects and ref
+// attaches must NOT fire at the normal commit: the nodes aren't committed yet, and if
+// the WIP suspends they belong to content that never lands. While `WIP_CAPTURE` is set,
+// enqueueEffect/queueRefAttach redirect into it instead of the live queues; on commit
+// the captured entries are spliced back so the normal pipeline drains them (child-first,
+// after the new nodes are connected). The off-screen render is synchronous and
+// single-threaded, so every effect enqueued while the buffer is set belongs to the WIP.
+interface OffscreenCapture {
+	effects: [PendingEffect[], PendingEffect[], PendingEffect[]];
+	refs: { fn: () => void; depth: number; block: Block | null }[];
+}
+let WIP_CAPTURE: OffscreenCapture | null = null;
+
+// A subtree rendered off-screen by `renderOffscreen` (its DOM sits between owned
+// `start`/`end` markers, outside the committed slot range, with its effects captured).
+interface OffscreenWip {
+	block: Block;
+	start: Comment;
+	end: Comment;
+	capture: OffscreenCapture;
+	domParent: Node;
+}
+
 // FragmentInstances that currently hold event listeners and/or observers. After
 // each commit we re-apply their stored bindings to their CURRENT children, so a
 // child that mounts into a fragment later picks up the listeners/observers added
@@ -481,7 +506,11 @@ export function queueRefAttach(scope: Scope, fn: () => void): void {
 		depth++;
 		b = b.parentBlock;
 	}
-	refAttachQueue.push({ fn, depth, block: scope.block });
+	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push({
+		fn,
+		depth,
+		block: scope.block,
+	});
 }
 
 /** Drain queued mount ref attaches child-first (deepest depth → shallowest). */
@@ -1484,7 +1513,8 @@ function enqueueEffect(slot: symbol, fn: EffectFn, deps: any[] | undefined, phas
 		depth++;
 		b = b.parentBlock;
 	}
-	effectQueues[phase].push({ scope, slot, fn, args: deps, depth });
+	const entry = { scope, slot, fn, args: deps, depth };
+	(WIP_CAPTURE !== null ? WIP_CAPTURE.effects[phase] : effectQueues[phase]).push(entry);
 }
 
 // ABI: the compiler appends the hook slot as the LAST argument. When the user
@@ -4005,6 +4035,21 @@ export function componentSlot(
 	}
 	state.prevKey = key === undefined ? NO_KEY : key;
 	if (comp !== state.currentComp) {
+		// Off-screen probe (React WIP model): a TRANSITION swap to a DIFFERENT component
+		// that may suspend → render it off-screen first WITHOUT tearing down the old. If
+		// it suspends, re-throw so the enclosing tryBlock holds the old component on screen
+		// + resumes (the resume re-renders the boundary, re-driving this swap). If it
+		// completes, discard the probe and fall through to the normal swap below. Reuses
+		// componentSlot's marker logic; urgent + hydration keep the legacy path.
+		if (state.block !== null && !hydrating && parentBlock.currentRenderMode === 'transition') {
+			const probeAfter = state.end ?? state.anchor;
+			if (probeAfter !== null) {
+				const r = renderOffscreen(parentBlock, domParent, probeAfter, comp, props);
+				disposeWip(r.wip);
+				if (r.error) throw r.error;
+				if (r.suspended) throw new SuspenseException(r.suspended);
+			}
+		}
 		if (state.block) {
 			if (state.singleRoot) {
 				// Self-marked block — unmountBlock removes exactly the root element
@@ -4149,6 +4194,77 @@ function coerceChildText(v: unknown): string {
 
 // Remove the slot's current content (Block or Text) while preserving its marker
 // pair, so a mode switch (or component-identity swap) rebuilds in place.
+// ---------------------------------------------------------------------------
+// Off-screen (WIP-model) rendering — React's "render the new tree off the current
+// one, commit atomically" applied per-swap. When a TRANSITION render replaces
+// committed content with a NEW subtree that may suspend, we render the new subtree
+// with its own markers placed OUTSIDE the committed slot range (so the old content
+// is untouched and stays on screen), capturing its effects. If it completes we move
+// it into place + tear down the old (atomic commit). If it suspends we discard the
+// partial and route to the enclosing tryBlock, whose EXISTING transition hold keeps
+// the old content live (branch===1, savedDom===null) and resumes on settle. Urgent
+// (non-transition) + hydration renders keep the legacy clear-then-render path.
+// ---------------------------------------------------------------------------
+
+// Render `body(props)` off-screen: fresh `start`/`end` markers inserted right AFTER
+// `afterNode` (so OUTSIDE a slot range that ends at `afterNode`), in `domParent`, with
+// effects/refs captured (WIP_CAPTURE) so they don't fire until commit. `parentBlock`
+// is the LIVE parent so suspends route up the real tryBlock chain and context resolves
+// against live providers — only the DOM marker position is off to the side.
+function renderOffscreen(
+	parentBlock: Block,
+	domParent: Node,
+	afterNode: Node,
+	body: ComponentBody,
+	props: any,
+): { wip: OffscreenWip; suspended: any; error: any } {
+	const start = document.createComment('wip');
+	const end = document.createComment('/wip');
+	const ref = afterNode.nextSibling;
+	domParent.insertBefore(start, ref);
+	domParent.insertBefore(end, ref);
+	const capture: OffscreenCapture = { effects: [[], [], []], refs: [] };
+	const prev = WIP_CAPTURE;
+	WIP_CAPTURE = capture;
+	const block = createBlock('dynamic', parentBlock, domParent, start, end, body, props);
+	let suspended: any = null;
+	let error: any = null;
+	try {
+		renderBlock(block);
+	} catch (err) {
+		if (isSuspenseException(err)) suspended = (err as SuspenseException).thenable;
+		else error = err;
+	} finally {
+		WIP_CAPTURE = prev;
+	}
+	return { wip: { block, start, end, capture, domParent }, suspended, error };
+}
+
+// Commit a COMPLETED off-screen WIP: move its node range into final position (before
+// `beforeNode`) and splice its captured effects/refs back into the live queues so the
+// surrounding commit drains them (child-first, now that the nodes are connected).
+function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
+	const parent = wip.domParent;
+	let n: Node | null = wip.start;
+	while (n !== null) {
+		const next: Node | null = n.nextSibling;
+		parent.insertBefore(n, beforeNode);
+		if (n === wip.end) break;
+		n = next;
+	}
+	for (let p = 0 as Phase; p < 3; p++) {
+		const src = wip.capture.effects[p];
+		for (let i = 0; i < src.length; i++) effectQueues[p].push(src[i]);
+	}
+	for (let i = 0; i < wip.capture.refs.length; i++) refAttachQueue.push(wip.capture.refs[i]);
+}
+
+// Discard an off-screen WIP (suspended or superseded): remove its node range + fire any
+// partial cleanups. Captured effects/refs are dropped (they never ran).
+function disposeWip(wip: OffscreenWip): void {
+	unmountBlock(wip.block, true);
+}
+
 function clearChildContent(state: ChildSlot): void {
 	if (state.block !== null) {
 		// Fire the subtree's cleanups but DON'T let unmountBlock strip the DOM —
@@ -4889,6 +5005,32 @@ export function childSlot(
 			// Same component identity → update in place (matches componentSlot).
 			state.block.props = props;
 			renderBlock(state.block);
+			return;
+		}
+		// Off-screen transition swap (React WIP model): a TRANSITION render replacing
+		// committed content with a DIFFERENT component that may suspend → render the new
+		// one off-screen and HOLD the old until it's ready, instead of clearing the old
+		// before the new suspends (which would blank the boundary). Only when there's
+		// committed old content to hold; urgent + hydration keep the legacy path below.
+		if (state.block !== null && !hydrating && parentBlock.currentRenderMode === 'transition') {
+			const r = renderOffscreen(parentBlock, domParent, state.end!, comp, props);
+			if (r.suspended || r.error) {
+				// Discard the partial; the OLD content was never touched, so it stays live.
+				// Re-throw so the enclosing tryBlock's existing catch holds the old content
+				// (transition). Re-throwing (vs swallowing the suspend + returning) is what
+				// keeps the try body's success path from immediately RELEASING the hold; the
+				// resume re-renders the try body, which re-drives this swap to completion.
+				disposeWip(r.wip);
+				if (r.error) throw r.error;
+				throw new SuspenseException(r.suspended);
+			}
+			// Completed → commit: tear down old (sweeps state.start..state.end; the WIP sits
+			// OUTSIDE that range so it's untouched), then move the WIP into the slot range.
+			// Synchronous, so there is no painted blank between the two.
+			clearChildContent(state);
+			commitOffscreen(r.wip, state.end!);
+			state.block = r.wip.block;
+			state.currentComp = comp;
 			return;
 		}
 		// New component (first render, or identity swap from text / another comp).
@@ -5663,6 +5805,14 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 	// tryBlock, which reconciles descendants by key with their state intact —
 	// React's committed-state-preserved-while-suspended contract.
 	softDetachTryBlock(state);
+	// React parity: while the boundary shows its fallback, the hidden subtree's effects
+	// are DESTROYED (cleanups run) and RECREATED on reveal — a suspended subtree has no
+	// active effects. softDetach preserves the blocks (so useState/useMemo/useRef state
+	// survives), and deactivateScope recursively fires the subtree's effect cleanups +
+	// clears their deps so the resume re-render re-enqueues + re-fires them. (The
+	// transition HOLD path keeps content visible and does NOT come here, so its effects
+	// correctly stay live.) Per ReactSuspenseEffectsSemantics-test.js.
+	if (state.tryBlock) deactivateScope(state.tryBlock);
 	// A re-suspend while ALREADY pending (branch === 2, a @pending body mounted)
 	// must REPLACE the prior pending body, not stack a second one. The existing
 	// pending block lives in `state.block` (it is never the tryBlock once we've
@@ -5722,6 +5872,10 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 function swapToPendingFallback(state: TrySlot): void {
 	if (!state.pendingBody || state.branch !== 1 || !state.tryBlock) return;
 	softDetachTryBlock(state);
+	// The transition hold ran past its fallback timeout → the held content is now hidden
+	// behind the @pending fallback, so destroy its effects (recreated on resume), same as
+	// the urgent re-suspend path above. See ReactSuspenseEffectsSemantics-test.js.
+	deactivateScope(state.tryBlock);
 	state.block = null;
 	state.branch = 2;
 	const bStart = document.createComment('pend-b');
@@ -5792,6 +5946,12 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 				try {
 					renderBlock(state.tryBlock);
 					state.hasResolved = true;
+					// Commit the resume's effects (the retry runs in a thenable microtask, outside the
+					// normal flush): the INSERTION/LAYOUT effects the revealed subtree just enqueued —
+					// e.g. layout effects RECREATED after a suspend destroyed them
+					// (ReactSuspenseEffectsSemantics) — must drain here, or the scheduler stays
+					// non-quiescent (stuck LAYOUT queue).
+					commitEffects();
 				} catch (err) {
 					if (isSuspenseException(err)) handleSuspense(state, err.thenable, state.tryBlock!);
 					else switchToCatch(state, err);
@@ -6399,6 +6559,27 @@ export function ifBlock(
 	const next: 0 | 1 = cond ? 1 : 0;
 	const body = next ? thenBody : elseBody;
 	if (next !== state.branch) {
+		// Off-screen probe (React WIP model): on a TRANSITION swap to a new branch that
+		// may suspend, render it off-screen FIRST without tearing down the old branch. If
+		// it suspends, route to the enclosing tryBlock so its transition hold keeps the
+		// old branch on screen and resumes — the resume re-renders the try body, which
+		// re-drives this swap. If it completes, discard the probe and fall through to the
+		// normal in-place path below (now non-suspending). Reuses ifBlock's marker logic.
+		if (
+			state.block !== null &&
+			body !== null &&
+			!hydrating &&
+			parentBlock.currentRenderMode === 'transition'
+		) {
+			const probeAfter = state.end ?? state.anchor;
+			if (probeAfter !== null) {
+				const r = renderOffscreen(parentBlock, domParent, probeAfter, body, undefined);
+				disposeWip(r.wip);
+				if (r.error) throw r.error;
+				if (r.suspended) throw new SuspenseException(r.suspended);
+				// completed → fall through to render the new branch in place.
+			}
+		}
 		// Position for the new branch: just after the current branch's trailing node,
 		// or the slot anchor on first mount. Captured BEFORE teardown (a self-marked
 		// branch's trailing node is removed by it).
@@ -6744,6 +6925,24 @@ export function switchBlock(
 		}
 	}
 	if (nextIdx !== state.caseIdx) {
+		// Off-screen probe (React WIP model) — same as ifBlock: on a TRANSITION swap to a
+		// new case that may suspend, render it off-screen first; if it suspends, re-throw
+		// so the enclosing tryBlock holds the old case + resumes; if it completes, fall
+		// through to render in place. Reuses switchBlock's marker logic below.
+		if (
+			state.block !== null &&
+			body !== null &&
+			!hydrating &&
+			parentBlock.currentRenderMode === 'transition'
+		) {
+			const probeAfter = state.end ?? state.anchor;
+			if (probeAfter !== null) {
+				const r = renderOffscreen(parentBlock, domParent, probeAfter, body, undefined);
+				disposeWip(r.wip);
+				if (r.error) throw r.error;
+				if (r.suspended) throw new SuspenseException(r.suspended);
+			}
+		}
 		// Position for the new case (after the current trailing node, or the slot
 		// anchor on first mount), captured BEFORE teardown. Same dynamic self-marking
 		// scheme as ifBlock: single-element case → self-mark; multi-node / empty →
