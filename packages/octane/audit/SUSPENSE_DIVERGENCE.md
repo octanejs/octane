@@ -125,6 +125,62 @@ future release, revisit — it could layer on the existing commit coordinator as
 
 ---
 
+## 6. Async-action transition entanglement (intermediate commits)
+
+**Where it shows up:** `ReactAsyncActions-test.js:352` ("urgent updates are not blocked
+during an async action"). A `startTransition(() => setX(1))` nested INSIDE an in-flight
+`startTransition(async () => …)` keeps `X` on its OLD value until the async action's
+promise settles, then commits with the rest of the action.
+
+**React behavior:** an async action is one atomic transition — every transition-priority
+update made while it is in flight is entangled and deferred, committing together when the
+action settles. Urgent updates made meanwhile are NOT blocked (they commit immediately).
+
+**octane behavior:** octane matches the urgent half (an urgent update during a pending
+async action commits immediately) and keeps `isPending` true for the action's whole life
+(`ASYNC_TRANSITION_COUNT`). What it does NOT do is HOLD intermediate transition-priority
+updates: a regular `setX` inside the action commits eagerly (verified: `A` goes to `A1`
+immediately, where React shows `A0` until settle). The dominant async-action pattern —
+`useOptimistic` — is unaffected and matches React (optimistic value shows during the
+action, rebases on passthrough changes, converges on settle; see
+`conformance/async-actions.test.ts`); only a *non-optimistic* intermediate transition
+update differs.
+
+**Surface impact:** Low. The optimistic path (the designed way to show in-flight state)
+matches React; this only affects a plain `setState` made mid-action expecting to be held.
+
+**Closure plan:** Holding regular transition commits while `ASYNC_TRANSITION_COUNT > 0`
+(flushing them on settle) while still letting `useOptimistic` renders show requires
+distinguishing optimistic from regular transition renders in the scheduler — fragile next
+to the working optimistic flow. Deferred; revisit alongside the broader scheduler work.
+
+---
+
+## 7. `useInsertionEffect` is toggled by `<Activity>` hide/show
+
+**Where it shows up:** `Activity-test.js:1428` ("insertion effects are not disconnected
+when the visibility changes").
+
+**React behavior:** hiding an `<Activity>` destroys its layout + passive effects but NOT
+its insertion effects (they stay connected); an update WHILE hidden still fires insertion
+effects (the subtree is pre-rendered). Insertion effects are for injecting styles, which
+should persist while a tab is merely hidden.
+
+**octane behavior:** octane's hide path (`deactivateScope`) runs ALL effect cleanups
+uniformly — including insertion effects (verified: `useInsertionEffect`'s cleanup fires on
+hide, re-fires on reveal) — and the `inactive` gate skips re-enqueues uniformly, so an
+update while hidden does not fire insertion effects either. octane's `EffectSlot` does not
+record its phase, so the hide path cannot single insertion effects out.
+
+**Surface impact:** Very low. `useInsertionEffect` is rare (CSS-in-JS style injection) and
+`<Activity>` rarer still; the worst case is styles re-injected on tab show.
+
+**Closure plan:** tag each `EffectSlot` with its phase and have `deactivateScope` (and the
+`inactive` enqueue gate) treat `INSERTION` specially — skip cleanup on hide, allow enqueue
+while hidden. Small but touches the effect-slot shape; deferred until there's a real need.
+
+---
+
 ## What we DO match React on (for the record)
 
 The list above is the complete known set of Suspense-related divergences. Every
@@ -152,6 +208,14 @@ React on, including:
 - Entangled-transition atomic commit: one `startTransition` that fans out to multiple
   suspending boundaries holds every prior screen until all are data-ready, then reveals
   them together — never a half-updated screen (global commit coordinator; Divergence #1/#4).
+- `useOptimistic` rebasing: the optimistic value folds the pending queue onto the CURRENT
+  passthrough each render, so a passthrough change mid-action rebases the pending update;
+  custom reducers and repeated updates in one action work too (`ReactAsyncActions-test.js`
+  :685/:887/:1141, `conformance/async-actions.test.ts`).
+- `<Activity>`: revealing an outer boundary does NOT mount a still-hidden inner one
+  (`Activity-test.js:1362`); layout/passive effects mount child-first and tear down
+  parent-first on hide (`Activity-test.js`); state + DOM preserved across hide/show — all
+  in `activity.test.ts`. (Insertion-effect handling is the lone exception, Divergence #7.)
 - Transition prior-DOM preservation during suspense (IN-PLACE re-suspend).
 - Transition REPLACE-suspend hold: swapping in a different component/branch that
   suspends on mount keeps the prior content on screen (per-swap off-screen WIP — see
