@@ -180,8 +180,9 @@ describe('useTransition — urgent preempts', () => {
 
 describe('Transitions — multiple-suspend edge cases', () => {
 	it('entangles sibling boundaries: holds ALL prior content until every sibling resolves, then reveals together', async () => {
-		// Port of ReactTransition-test.js:190 "multiple transitions update
-		// different queues, they entangle". A single startTransition causes two
+		// Port of ReactTransition-test.js:456 "when multiple transitions update
+		// overlapping queues, all the transitions across all the queues are
+		// entangled". A single startTransition causes two
 		// sibling try-blocks to suspend; isPending stays true until both promises
 		// resolve, AND — per React's atomic-commit contract — BOTH siblings keep
 		// their old content until BOTH resolve, then reveal together. The user
@@ -237,7 +238,7 @@ describe('Transitions — multiple-suspend edge cases', () => {
 	});
 
 	it('isPending stays true across replay when a second use() suspends in the same body', async () => {
-		// Port of ReactUse-test.js:1446 "does not get stuck in pending state
+		// Port of ReactUse-test.js:2118 "does not get stuck in pending state
 		// after `use` suspends". The body has TWO use() calls; the first
 		// resolves and triggers replay, the second then suspends. isPending
 		// must remain true through both suspensions, and the DOM must stay
@@ -283,7 +284,7 @@ describe('Transitions — multiple-suspend edge cases', () => {
 	});
 
 	it('nested startTransition — BOTH useTransition hooks see isPending=true', async () => {
-		// Port of ReactTransition-test.js:923 "tracks two pending flags for
+		// Port of ReactTransition-test.js:944 "tracks two pending flags for
 		// nested startTransition". Both flags must be true while the inner
 		// transition is processing, both flip to false on commit.
 		const r = mount(NestedTransitions, { target: 42 });
@@ -306,7 +307,7 @@ describe('Transitions — multiple-suspend edge cases', () => {
 	});
 
 	it('urgent setState during a suspended transition discards the transition (no clobber on resolve)', async () => {
-		// Port of ReactUse-test.js:1631 "updates while component is suspended
+		// Port of ReactUse-test.js:1794 "updates while component is suspended
 		// should not be mistaken for render phase updates". When a transition
 		// suspends on promise B and an urgent setter swaps to promise C, the
 		// transition is superseded: isPending drops, C commits, and when B
@@ -358,7 +359,7 @@ describe('Transitions — multiple-suspend edge cases', () => {
 	});
 
 	it('useDeferredValue does NOT defer when called during a transition render', async () => {
-		// Port of ReactDeferredValue-test.js:108 "does not defer during a
+		// Port of ReactDeferredValue-test.js:171 "does not defer during a
 		// transition". When the source render is already transition-priority,
 		// useDeferredValue should commit the new value in the SAME pass
 		// (Original and Deferred both update together).

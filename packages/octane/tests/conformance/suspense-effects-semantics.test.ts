@@ -33,7 +33,7 @@ describe('conformance: Suspense effect semantics (re-suspend destroys + recreate
 		// Update adds a suspending child → the boundary re-suspends (fallback shown).
 		await act(() => go());
 		expect(r.findAll('.fallback').length).toBe(1);
-		expect(log.drain()).toEqual(['Before destroy layout']); // React destroys; octane does NOT (gap)
+		expect(log.drain()).toEqual(['Before destroy layout']); // destroyed on hide, like React
 
 		// Resolve → content revealed, layout effect recreated.
 		await act(() => d.resolve('x'));

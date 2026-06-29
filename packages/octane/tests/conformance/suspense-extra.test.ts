@@ -32,7 +32,7 @@ function deferred<T>(): Deferred<T> {
 // ============================================================================
 describe('Suspense — use() non-promise overload', () => {
 	it('use(Context) inside a @try body returns the current value synchronously', () => {
-		// Mirrors ReactUse-test.js "use(Context) reads the current value" — the
+		// Mirrors ReactUse-test.js:465 "basic use(context)" — the
 		// Context overload must work from within a Suspense boundary too, since
 		// there's no conceptual reason a try body would behave differently.
 		const r = mount(UseContextInTryBody);
@@ -101,9 +101,9 @@ describe('Suspense — sync throw and rejected promise both route to @catch iden
 // ============================================================================
 describe('Suspense — unmounting a suspended boundary mid-pending', () => {
 	it('clicking toggle while pending tears down the boundary cleanly', async () => {
-		// Mirrors ReactSuspense-test.internal.js "unmounts a suspended component
-		// before it resolves" — re-render that removes the suspended subtree
-		// must cancel any pending replay, and a late resolve must be a no-op.
+		// Mirrors ReactSuspense-test.internal.js:935 "suspends in a class that has
+		// componentWillUnmount and is then deleted" — a re-render that removes the
+		// suspended subtree must cancel any pending replay; a late resolve is a no-op.
 		const d = deferred<string>();
 		const r = mount(ToggleableSuspense, { promise: d.promise });
 		expect(r.find('.fallback').textContent).toBe('pending');
@@ -166,8 +166,8 @@ describe('Suspense — every hook above use() preserves state across replay', ()
 // ============================================================================
 describe('Suspense — hooks below the suspending use() are NOT registered while pending', () => {
 	it('useEffect / useRef declared after use() do not fire during the pending window', async () => {
-		// Mirrors ReactUse-test.js "hooks after use() are not called when it
-		// suspends" — replay throws OUT of use(); the body's tail never runs.
+		// Follows from React's use() replay model (ReactUse-test.js): a suspended
+		// use() throws OUT of the body, so hooks after it never register that attempt.
 		const d = deferred<string>();
 		const log: string[] = [];
 		const refs: any[] = [];
@@ -197,7 +197,7 @@ describe('Suspense — hooks below the suspending use() are NOT registered while
 // ============================================================================
 describe('Suspense — use() inside @if branches', () => {
 	it('selects the right promise per branch and suspends on the live one', async () => {
-		// Mirrors ReactUse-test.js "use() inside a conditional branch" — `use()`
+		// React's use() is uniquely allowed CONDITIONALLY, unlike other hooks (ReactUse-test.js); `use()`
 		// is unique among hook-likes in that it IS allowed conditionally. The
 		// suspended use() propagates to the surrounding @try boundary.
 		const dA = deferred<string>();
@@ -231,7 +231,7 @@ describe('Suspense — use() inside @if branches', () => {
 // ============================================================================
 describe('Suspense — same promise read twice', () => {
 	it('reads identical value via per-fiber thenable cache; suspends once', async () => {
-		// Mirrors ReactUse-test.js "use() the same promise multiple times" — the
+		// Mirrors ReactUse-test.js:310 "use(promise) in multiple components" — the
 		// cache keys by promise identity, so the second use() reads sync after
 		// the first one resolves.
 		const d = deferred<{ tag: string }>();

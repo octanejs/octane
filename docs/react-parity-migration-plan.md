@@ -494,9 +494,16 @@ effects-semantics, reveal-throttle, async-actions, Activity ports + the fidelity
   eagerly instead of being held until the action settles) and `useInsertionEffect` toggling
   under `<Activity>` (#7). Both are rare edges where a fix risks the working optimistic flow
   / touches the effect-slot shape; deferred.
-- **Remaining:** the fidelity re-audit of existing suspense ports (low priority — the
-  divergence registry is current and every other suspense/transition/activity test pins a
-  matched contract).
+- **Fidelity re-audit — DONE.** Every existing suspense/transition/activity/actions test
+  (~80 across 16 files) was cross-referenced against the React v19.2.7 clone (4 parallel
+  read-only audits). Result: NO "cheating" — no test encodes octane-current behavior as
+  React parity, and no assertion is softened where React asserts order/exact output. The
+  only fixes were citation hygiene: 5 stale line numbers in `transitions.test.ts` (pointed
+  at blank/log lines after React-version drift), 6 imprecise cites in `suspense-extra.test.ts`
+  (paraphrased titles → real `ReactUse`/`ReactSuspense` tests or honest rewordings), and one
+  stale "// gap" comment in `suspense-effects-semantics.test.ts` (the gap was since fixed).
+  Behaviors were unchanged (comment/citation-only edits). octane-specific regression
+  fixtures (`nested-suspend`, `consecutive-suspend`) are honestly labeled as such.
 
 ### Suite status
 **204 test files, 1074 passed, 0 expected-fail, 0 regressions** (after the off-screen
