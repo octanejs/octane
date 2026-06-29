@@ -721,9 +721,6 @@ importers:
 
   packages/lexical:
     dependencies:
-      '@floating-ui/dom':
-        specifier: catalog:default
-        version: 1.7.6
       '@lexical/devtools-core':
         specifier: catalog:default
         version: 0.46.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
@@ -775,6 +772,9 @@ importers:
       '@lexical/yjs':
         specifier: catalog:default
         version: 0.46.0(typescript@5.9.3)(yjs@13.6.31)
+      '@octanejs/floating-ui':
+        specifier: workspace:*
+        version: link:../floating-ui
       lexical:
         specifier: catalog:default
         version: 0.46.0(typescript@5.9.3)

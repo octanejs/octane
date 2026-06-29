@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { useState, useCallback } from 'octane';
 
 // TypeScript the FULL compiler's printer (esrap) cannot emit — an index signature
 // and a generic type alias. The surgical `.ts` hook pass must leave ALL of this
@@ -29,4 +29,13 @@ export function useExternalCounter(start: number) {
 export function useLabelled(start: number, label: string) {
 	const c = useExternalCounter(start);
 	return { text: label + ':' + c.n, inc: c.inc };
+}
+
+// Exercises useCallback inside a `.ts` custom hook (withSlot path context): a NO-DEPS form
+// must recompute every render (so it closes over the CURRENT value), and a WITH-DEPS form
+// must memoize. The trailing-slot ABI must not leak the slot Symbol into useMemo's deps.
+export function useLabelCallbacks(label: string) {
+	const noDeps = useCallback(() => 'nd:' + label);
+	const withDeps = useCallback(() => 'wd:' + label, [label]);
+	return { noDeps, withDeps };
 }

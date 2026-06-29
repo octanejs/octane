@@ -283,12 +283,18 @@ P4 and P5 are independent of P0–P3 and can run in parallel by a second contrib
    - This divergence must be written up in the user-facing docs (a "differences from
      React" note: Octane minimizes DOM moves on reorder, so which nodes are physically
      re-inserted can differ; final DOM is identical).
-2. **Hydration — RESOLVED: full mismatch detect + recover.** Build React's mismatch
-   model into the runtime: detect server/client divergence during hydration, warn,
-   and recover by client-rendering the affected subtree; implement shallow
-   `suppressHydrationWarning`. Port the full diff matrix
-   (`ReactDOMHydrationDiff` + `ReactDOMServerIntegrationReconnecting`). **P5 grows** to
-   include this runtime work, not just determinism tests.
+2. **Hydration mismatch detect + recover — PLANNED, NOT YET IMPLEMENTED.** (The word
+   "RESOLVED" here was a stale label for the DECISION, not the status — it wrongly read as
+   done and contradicted the Tier 4 note above. Corrected.) **Current runtime status:**
+   `hydrateRoot` adopts the server DOM and renders, but there is NO mismatch
+   detection/warning, NO recovery (client-render the affected subtree), and NO
+   `suppressHydrationWarning` — exactly as the Tier 4 table states ("no mismatch detection
+   in the runtime"). The DECISION stands: build React's mismatch model — detect
+   server/client divergence during hydration, warn, recover by client-rendering the
+   affected subtree, and implement shallow `suppressHydrationWarning`, porting the diff
+   matrix (`ReactDOMHydrationDiff` + `ReactDOMServerIntegrationReconnecting`). This is open
+   P5 runtime work (substantial — adoption happens across many sites: hostElementBody,
+   childSlot, ifBlock/switchBlock/forBlock, text holes, mountTry).
 3. **Default transition indicator / `useMemoCache`** — still to confirm existence in
    Octane; skip their files if absent (low priority, does not block P0/P4).
 

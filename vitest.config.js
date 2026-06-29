@@ -158,6 +158,10 @@ export default defineConfig({
 							'/packages/query/src/',
 							'/packages/motion/src/',
 							'/packages/lexical/src/',
+							// @octanejs/floating-ui's hooks forward the caller's slot via subSlot;
+							// like its own project, they must skip the auto-slotting pass when a
+							// lexical .tsrx (e.g. LexicalNodeContextMenuPlugin) imports them.
+							'/packages/floating-ui/src/',
 						],
 					}),
 				],
@@ -174,6 +178,14 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/lexical\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/lexical/src') + '/$1',
+						},
+						{
+							find: /^@octanejs\/floating-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/floating-ui\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src') + '/$1.ts',
 						},
 					],
 				},
