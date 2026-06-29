@@ -9,28 +9,25 @@ Last reviewed against React 19 contracts.
 
 ---
 
-## 1. Entangled-transition partial-commit
+## 1. Entangled-transition partial-commit — ✅ CLOSED
 
 **Where it shows up:** [transitions.test.ts](__tests__/transitions.test.ts) —
-`'entangles sibling boundaries: isPending stays true until ALL siblings resolve'`
+`'entangles sibling boundaries: holds ALL prior content until every sibling resolves,
+then reveals together'`; [conformance/entangled-commit.test.ts](__tests__/conformance/entangled-commit.test.ts).
 
 **React behavior:** When a single `startTransition(fn)` causes multiple sibling
-Suspense boundaries to suspend, React holds the prior DOM of EVERY sibling until
-ALL their promises resolve. The user never sees a half-updated screen
+Suspense boundaries to suspend, React holds the prior DOM of EVERY sibling until ALL
+their promises resolve, then reveals them together — never a half-updated screen
 mid-transition.
 
-**octane behavior:** We eagerly commit each sibling as its individual promise
-resolves. `isPending` correctly stays true until both resolve (we match React on
-the counter contract and on prior-DOM-preservation per-sibling). What we diverge
-on is the per-sibling commit timing inside the transition window.
-
-**Surface impact:** Low. The user sees content appear earlier than React would
-render it — generally fine for non-coordinated siblings, mildly surprising when
-siblings are visually entangled.
-
-**Closure plan:** Tracking entangled siblings as a coordinated group requires
-plumbing transition identity through every tryBlock that participates. ~200 lines
-runtime work, no API surface change. Filed as a follow-up.
+**octane now matches** via global commit coordination (`HELD_TRANSITIONS` /
+`STAGED_REVEALS` in runtime.ts): a boundary holding prior content for an in-flight
+transition does NOT reveal when its own promise resolves — it stages and waits until
+EVERY held boundary in the transition is data-ready (`STAGED_REVEALS.size ===
+HELD_TRANSITIONS.size`), then `flushStagedReveals` commits them all in one batch. The
+hold (and thus `isPending`) stays up until that batch. Abandoning a held boundary
+(urgent supersede / error / unmount) drops it from the group so the rest aren't
+stranded. This also closes #4's observable cross-boundary-reveal gap.
 
 ---
 
@@ -71,11 +68,12 @@ future optimization can't accidentally change it without a deliberate decision.
 
 ---
 
-## 4. Per-swap off-screen rendering (not a global double-buffered WIP tree)
+## 4. Per-swap off-screen rendering — observable cross-boundary gap ✅ CLOSED
 
 **Where it shows up:**
 [differential/transition-swap-suspend.test.ts](__tests__/differential/transition-swap-suspend.test.ts),
 [differential/transition-swap-child.test.ts](__tests__/differential/transition-swap-child.test.ts),
+[conformance/entangled-commit.test.ts](__tests__/conformance/entangled-commit.test.ts),
 and `@octanejs/router`'s concurrent-navigation hold.
 
 **React behavior:** A transition renders the ENTIRE work-in-progress tree off the
@@ -83,58 +81,47 @@ current one and commits it atomically. If one transition fans out to several
 independent suspending regions, React holds ALL their prior content and reveals them
 together.
 
-**octane behavior:** octane renders in place, so the transition replace-suspend hold
-is implemented **per swap site** (`componentSlot`/`childSlot`/`ifBlock`/`switchBlock`):
-the new subtree is rendered off-screen (effects captured), committed atomically on
-completion, or — on suspend — discarded with the suspend re-thrown so the enclosing
-`@try` holds the OLD subtree live and resumes on settle. For the single-boundary case
-(route/tab/query-key changes — the dominant shape) this matches React's observable
-behavior exactly: no blank flash, `isPending` true once, fallback only after the
-timeout, effects fire only after the new subtree connects. What it does NOT give is
-cross-boundary all-or-nothing commit: a transition that suspends in one region while a
-sibling region completes will reveal the sibling immediately rather than waiting for
-both. This is the same family as Divergence #1 (per-boundary, not coordinated commit).
+**octane behavior:** octane renders **per swap site** (`componentSlot`/`childSlot`/
+`ifBlock`/`switchBlock`): the new subtree renders off-screen (effects captured),
+commits atomically on completion, or — on suspend — is discarded with the suspend
+re-thrown so the enclosing `@try` holds the OLD subtree live and resumes on settle.
+The IMPLEMENTATION is still per-swap off-screen (not one global double-buffered tree),
+but the OBSERVABLE cross-boundary gap is now closed: a transition that fans out to
+several suspending regions no longer reveals them piecewise — the global commit
+coordinator (Divergence #1) holds every region's prior content and reveals them
+together once all are data-ready (`entangled-commit.test.ts` exercises two off-screen
+if-block swaps in one transition revealing together, effects firing in one batch).
 
-**Surface impact:** Low. Only observable when one transition updates multiple
-independent suspending regions at once.
-
-**Closure plan:** A true global WIP tree (interruptible, double-buffered, coordinated
-commit + fallback throttling) is a much larger runtime effort, scoped out for now
-alongside the other advanced-scheduling items in the parity plan §2/Tier 5–6.
+**Remaining note:** the coordinator is data-ready-based, not a fully interruptible
+time-sliced global WIP. Time-based cross-boundary fallback throttling is the separate
+Divergence #5.
 
 ---
 
-## 5. Reveal throttling (`FALLBACK_THROTTLE_MS`) — cross-boundary only
+## 5. Reveal throttling (`FALLBACK_THROTTLE_MS`) — NOT a default-React divergence
 
-**Where it shows up:** `ReactSuspense-test.internal.js:267` ("throttles fallback
-committing globally"), `ReactSuspenseWithNoopRenderer-test.js:1778/:1857`,
-`ReactFiberWorkLoop.js` (`FALLBACK_THROTTLE_MS = 300`, `globalMostRecentFallbackTime`).
+**Status:** Investigated and dismissed — octane already matches React's DEFAULT behavior;
+the throttle is non-default. (Earlier this was provisionally filed as a divergence using
+the WRONG oracle — the `-test.internal.js` suite, which runs with internal flags.)
 
-**React behavior:** React keeps a GLOBAL clock of when a fallback was last shown. When a
-commit would reveal content that still exposes a DIFFERENT (e.g. nested) fallback, and
-the previous fallback appeared < 300ms ago, React delays that commit — holding the prior
-fallback so loading states don't flicker/stagger. (The single-boundary
-fallback→content retry throttle is separately gated behind `alwaysThrottleRetries`, OFF
-by default.)
+**The evidence:** the public, default-flags test `ReactUse-test.js:1096` ("load multiple
+nested Suspense boundaries") — outer `(Loading A...)`, resolve A while inner B suspends —
+asserts `toMatchRenderedOutput('A(Loading B...)')`. React reveals A and shows the inner
+fallback IMMEDIATELY; it does NOT hold the outer fallback. octane does exactly the same
+(`conformance`/`suspense.test.ts` "inner Suspense reveals AFTER outer resolves", ported
+from that test, passes). The throttling behavior (`ReactSuspense-test.internal.js:267`
+"throttles fallback committing globally") lives in the internal suite, and the related
+retry-throttle assertions are gated behind `gate('alwaysThrottleRetries')` — a feature
+flag that is OFF by default (`ReactSuspenseWithNoopRenderer-test.js:1778` spells this out:
+"Old behavior, gated until this rolls out at Meta"). `FALLBACK_THROTTLE_MS` only forces a
+delay when `alwaysThrottleRetries || exitStatus === RootSuspended`
+(`ReactFiberWorkLoop.js:1426`), which does not fire for the default nested-reveal path.
 
-**octane behavior:** octane MATCHES React's DEFAULT for a single boundary — content
-reveals immediately when its promise resolves (verified: `Loading` → `A1`, no artificial
-delay). What octane does NOT do is the CROSS-boundary throttle: in a nested
-`@try { <A/> @try { <B/> } @pending {…inner…} } @pending {…outer…}`, resolving `A` while
-`B` is still pending reveals `A` + the inner fallback immediately (octane shows
-`A1LoadingMore`), whereas React holds the outer `Loading` until `B` resolves or the 300ms
-window elapses.
-
-**Surface impact:** Low. Only observable with nested boundaries whose inner content
-suspends right as the outer reveals — the user may see one extra intermediate loading
-state that React would have coalesced.
-
-**Closure plan:** This is the same family as Divergence #1 (entangled-transition
-partial-commit) and #4 (per-swap, not global-WIP, off-screen rendering). React can defer
-the WHOLE commit against a global clock; octane commits per-boundary IN PLACE, so there
-is no global commit to hold back — matching it needs the global, coordinated, double-
-buffered commit (#4's "true global WIP tree") plus a shared fallback clock. Scoped out
-with the rest of the advanced-scheduling work (parity plan §2 / Tier 5–6).
+**Conclusion:** implementing the cross-boundary fallback throttle would make octane DIVERGE
+from default React (and break the correctly-ported `ReactUse:1096` test). It is therefore
+intentionally NOT implemented. If React flips `alwaysThrottleRetries` on by default in a
+future release, revisit — it could layer on the existing commit coordinator as a shared
+`FALLBACK_THROTTLE_MS` timer.
 
 ---
 
@@ -162,6 +149,9 @@ React on, including:
 - Sibling boundaries on a shared promise commit in the same frame.
 - Unmounting a suspended boundary mid-pending cancels the retry cleanly (no late
   commits).
+- Entangled-transition atomic commit: one `startTransition` that fans out to multiple
+  suspending boundaries holds every prior screen until all are data-ready, then reveals
+  them together — never a half-updated screen (global commit coordinator; Divergence #1/#4).
 - Transition prior-DOM preservation during suspense (IN-PLACE re-suspend).
 - Transition REPLACE-suspend hold: swapping in a different component/branch that
   suspends on mount keeps the prior content on screen (per-swap off-screen WIP — see
@@ -188,8 +178,10 @@ React on, including:
 - Urgent-supersedes-transition discard.
 - Transition-fallback timeout (`setTransitionFallbackTimeout`, default 5s —
   matches React).
-- Single-boundary reveal timing: content reveals immediately when its promise resolves,
-  matching React's DEFAULT (the per-boundary retry throttle is React-flag-gated off; the
-  cross-boundary reveal throttle is Divergence #5).
+- Reveal timing matches React's DEFAULT: content reveals immediately when its promise
+  resolves, including the nested case — revealing an outer boundary shows resolved content
+  AND the inner boundary's fallback in the same commit (`ReactUse-test.js:1096`
+  `'A(Loading B...)'`). React's cross-boundary fallback throttle is `alwaysThrottleRetries`-
+  gated (OFF by default), so octane intentionally does not throttle (see dismissed #5).
 
 A divergence not listed here is a bug. File it.
