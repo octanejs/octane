@@ -71,6 +71,39 @@ future optimization can't accidentally change it without a deliberate decision.
 
 ---
 
+## 4. Per-swap off-screen rendering (not a global double-buffered WIP tree)
+
+**Where it shows up:**
+[differential/transition-swap-suspend.test.ts](__tests__/differential/transition-swap-suspend.test.ts),
+[differential/transition-swap-child.test.ts](__tests__/differential/transition-swap-child.test.ts),
+and `@octanejs/router`'s concurrent-navigation hold.
+
+**React behavior:** A transition renders the ENTIRE work-in-progress tree off the
+current one and commits it atomically. If one transition fans out to several
+independent suspending regions, React holds ALL their prior content and reveals them
+together.
+
+**octane behavior:** octane renders in place, so the transition replace-suspend hold
+is implemented **per swap site** (`componentSlot`/`childSlot`/`ifBlock`/`switchBlock`):
+the new subtree is rendered off-screen (effects captured), committed atomically on
+completion, or — on suspend — discarded with the suspend re-thrown so the enclosing
+`@try` holds the OLD subtree live and resumes on settle. For the single-boundary case
+(route/tab/query-key changes — the dominant shape) this matches React's observable
+behavior exactly: no blank flash, `isPending` true once, fallback only after the
+timeout, effects fire only after the new subtree connects. What it does NOT give is
+cross-boundary all-or-nothing commit: a transition that suspends in one region while a
+sibling region completes will reveal the sibling immediately rather than waiting for
+both. This is the same family as Divergence #1 (per-boundary, not coordinated commit).
+
+**Surface impact:** Low. Only observable when one transition updates multiple
+independent suspending regions at once.
+
+**Closure plan:** A true global WIP tree (interruptible, double-buffered, coordinated
+commit + fallback throttling) is a much larger runtime effort, scoped out for now
+alongside the other advanced-scheduling items in the parity plan §2/Tier 5–6.
+
+---
+
 ## What we DO match React on (for the record)
 
 The list above is the complete known set of Suspense-related divergences. Every
@@ -95,7 +128,14 @@ React on, including:
 - Sibling boundaries on a shared promise commit in the same frame.
 - Unmounting a suspended boundary mid-pending cancels the retry cleanly (no late
   commits).
-- Transition prior-DOM preservation during suspense.
+- Transition prior-DOM preservation during suspense (IN-PLACE re-suspend).
+- Transition REPLACE-suspend hold: swapping in a different component/branch that
+  suspends on mount keeps the prior content on screen (per-swap off-screen WIP — see
+  Divergence #4 for the single- vs multi-boundary scope).
+- Effect lifecycle under suspense: a re-suspended boundary's committed layout/passive
+  effects are DESTROYED while it shows the fallback and RECREATED on reveal (state is
+  still preserved) — `ReactSuspenseEffectsSemantics-test.js:611`,
+  `conformance/suspense-effects-semantics.test.ts`.
 - `useDeferredValue` identity stability.
 - `useDeferredValue(value, initialValue)` React-19 overload.
 - `useTransition` rising/falling `isPending` edges.
