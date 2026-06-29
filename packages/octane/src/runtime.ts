@@ -1629,11 +1629,19 @@ export function useCallback<F extends (...args: any[]) => any>(
 	slot?: symbol,
 ): F {
 	// Trailing-symbol ABI (see resolveEffectArgs): `useCallback(fn)` arrives as
-	// `useCallback(fn, slot)`. useMemo reinterprets the same way, so forward both
-	// args verbatim and let it sort out the omitted-deps case. Guard here (rather
-	// than letting useMemo throw) so the diagnostic names useCallback, not useMemo.
-	slot = resolveSlot(slot);
-	if (slot === undefined && typeof deps !== 'symbol') missingSlot('useCallback');
+	// `useCallback(fn, slot)`. Reinterpret the omitted-deps case HERE so the slot Symbol
+	// can't leak into useMemo's `deps` array (it would in a custom-hook context, where
+	// resolveSlot turns the otherwise-undefined slot into the path prefix, defeating
+	// useMemo's own reinterpret guard). Forward the RAW slot — useMemo does the single
+	// resolveSlot; resolving here too and passing the result would double-combine the
+	// custom-hook path prefix into the wrong slot.
+	if (slot === undefined && typeof deps === 'symbol') {
+		slot = deps as unknown as symbol;
+		deps = undefined;
+	}
+	// Guard here (rather than letting useMemo throw) so the diagnostic names useCallback.
+	// resolveSlot is a read-only peek at the path stack, so this doesn't disturb useMemo's.
+	if (resolveSlot(slot) === undefined) missingSlot('useCallback');
 	return useMemo(() => fn, deps as any[] | undefined, slot);
 }
 
@@ -1668,13 +1676,20 @@ export function useImperativeHandle<T>(
 		if (typeof ref === 'function') (ref as any)(value);
 		else if (ref != null) (ref as { current: T | null }).current = value;
 	};
+	// Re-run when the deps OR the ref IDENTITY changes. React manages ref attachment
+	// independently of deps — a swapped ref must detach the old (cleanup → setRef(null) on
+	// the PREVIOUS ref) and populate the new one, even when deps are stable (e.g. `[]`).
+	// Appending `ref` makes a ref change a dep change, so the prior run's cleanup (closed
+	// over the old ref) fires before the new run sets the new ref. No-deps (`undefined` →
+	// run every render) already re-attaches each render, so it's left as-is.
+	const effectDeps = deps === undefined ? undefined : [...deps, ref];
 	enqueueEffect(
 		slot,
 		() => {
 			setRef(factory());
 			return () => setRef(null);
 		},
-		deps,
+		effectDeps,
 		LAYOUT,
 	);
 }
@@ -4220,6 +4235,11 @@ interface ChildSlot {
 	block: Block | null;
 	text: Text | null;
 	currentComp: ComponentBody | null;
+	// True when `currentComp` is a bare render-FUNCTION child (a `.tsrx` `{children}`
+	// body, whose identity changes every render) rather than a stable component
+	// reference. Lets the reconcile swap the block body in place by SLOT instead of
+	// re-mounting on every identity change (which loops when effects re-render).
+	currentIsBodyFn: boolean;
 	// Non-null while the slot is rendering an ARRAY value via the de-opt keyed
 	// list path (reuses reconcileKeyed). Torn down when the value stops being an
 	// array. Lets `{items.map(...)}` / `{props.rows}` / any array-of-elements
@@ -4779,6 +4799,13 @@ function deoptItemBody(item: any, scope: Scope): void {
 // paths (childSlot, deoptItemBody) route it through `hostElementBody`/componentSlot
 // instead. Pure host/text subtrees return false and keep the cheap rebuild path.
 function descNeedsBlocks(value: any): boolean {
+	// A render-FUNCTION child (the `.tsrx` lowering of `<Host>{children}</Host>` passes
+	// `props.children` as a component body, not a descriptor) needs a Block: childSlot
+	// renders a function value as a component. Without this a `.tsrx` consumer's children
+	// reaching a `.ts` component's host element via createElement (e.g. FloatingOverlay's
+	// `createElement('div', {children})`) would hit the raw reconciler, which renders a
+	// function child as nothing.
+	if (typeof value === 'function') return true;
 	if (value == null || typeof value !== 'object') return false;
 	if (Array.isArray(value)) {
 		for (let i = 0; i < value.length; i++) {
@@ -4916,6 +4943,7 @@ export function childSlot(
 			block: null,
 			text: null,
 			currentComp: null,
+			currentIsBodyFn: false,
 			forSlot: null,
 			hostNode: null,
 			portal: null,
@@ -5015,6 +5043,7 @@ export function childSlot(
 	// `type` + props; anything else is text/empty.
 	let comp: ComponentBody | null = null;
 	let props: any = {};
+	let isBodyFn = false;
 	if (isHostDescriptor(value)) {
 		if (!descNeedsBlocks(value)) {
 			// Pure host/text → reconcile in place, REUSING the existing node so DOM
@@ -5046,12 +5075,26 @@ export function childSlot(
 		props = value;
 	} else if (typeof value === 'function') {
 		comp = value as ComponentBody;
+		isBodyFn = true;
 	} else if (isElementDescriptor(value)) {
 		comp = value.type as ComponentBody;
 		props = value.props;
 	}
 
 	if (comp !== null) {
+		// A bare render-FUNCTION child (a `.tsrx` `{children}` body forwarded onto a `.ts`
+		// component's host element via createElement) is re-created every render, so its
+		// identity always differs — but it is the SAME slot child. Reconcile by SLOT like
+		// componentSlot: swap the block's body in place and re-render, instead of
+		// re-mounting on every identity change (which, once effects re-render the tree,
+		// loops unboundedly). Component switches arrive as DESCRIPTORS (comp = value.type),
+		// never as a bare function, so this never short-circuits a real component swap.
+		if (isBodyFn && state.block !== null && state.currentIsBodyFn) {
+			state.block.body = comp;
+			renderBlock(state.block);
+			state.currentComp = comp;
+			return;
+		}
 		if (state.block !== null && comp === state.currentComp) {
 			// Same component identity → update in place (matches componentSlot).
 			state.block.props = props;
@@ -5093,6 +5136,7 @@ export function childSlot(
 		// hydration identity swap runs with hydrating=false and clears normally.)
 		if (!hydrating) clearChildContent(state);
 		state.currentComp = comp;
+		state.currentIsBodyFn = isBodyFn;
 		if (state.start === null) {
 			// First component in this slot — mint the lower-bound marker now so
 			// clearChildContent can sweep a (possibly multi-node) component body.
@@ -6508,7 +6552,7 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 			// computation settles in the background.
 			s = { current: initialValue as T, next: value, scheduled: false, block };
 			ensureHooks(scope).set(slot, s);
-			if ((initialValue as T) !== value) {
+			if (!Object.is(initialValue as T, value)) {
 				s.scheduled = true;
 				queueMicrotask(() => {
 					if (!s!.scheduled || s!.block.disposed) return;
@@ -6524,7 +6568,7 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 		return value;
 	}
 	s.next = value;
-	if (s.current === value) return s.current;
+	if (Object.is(s.current, value)) return s.current;
 	// If the CURRENT render is already at transition priority, don't defer —
 	// commit the new value immediately. Matches React's `useDeferredValue does
 	// not defer during a transition` semantics — both Original and Deferred
@@ -6537,7 +6581,7 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 		s.scheduled = true;
 		queueMicrotask(() => {
 			s!.scheduled = false;
-			if (s!.block.disposed || s!.current === s!.next) return;
+			if (s!.block.disposed || Object.is(s!.current, s!.next)) return;
 			s!.current = s!.next;
 			// Re-render at transition priority — matches React's contract that the
 			// deferred-value commit can be interrupted by urgent updates and won't

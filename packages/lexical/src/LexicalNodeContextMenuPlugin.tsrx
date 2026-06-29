@@ -1,15 +1,29 @@
-// Ported from @lexical/react/src/LexicalNodeContextMenuPlugin.tsx. The React
-// version is built entirely on @floating-ui/REACT (useFloating, useInteractions,
-// useListNavigation, useTypeahead, FloatingPortal/Overlay/FocusManager), which is
-// React-only. octane has @floating-ui/DOM (the agnostic core), so this is a
-// re-implementation on that: computePosition+autoUpdate for placement, a keydown
-// handler for arrow/enter/escape + type-ahead, and an outside-click dismiss, with
-// the floating menu rendered via octane's createPortal. Public API (the option /
-// separator classes + the plugin props) matches @lexical/react.
-import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
+// Ported 1:1 from @lexical/react/src/LexicalNodeContextMenuPlugin.tsx (0.46.0). The
+// React version is built entirely on @floating-ui/REACT — useFloating, useRole,
+// useDismiss, useListNavigation, useTypeahead, useInteractions, and the
+// FloatingPortal/FloatingOverlay/FloatingFocusManager components. octane now has the
+// faithful binding (@octanejs/floating-ui), so this mirrors the original directly
+// instead of re-implementing positioning/keyboard/dismiss by hand. octane adaptations:
+// no forwardRef (refs are props), and the per-item `getItemProps()` is spread onto the
+// host <button>/<hr> (octane applies ref / on* / tabindex / role from a prop spread).
+import {
+	useFloating,
+	useRole,
+	useDismiss,
+	useListNavigation,
+	useTypeahead,
+	useInteractions,
+	offset,
+	flip,
+	shift,
+	autoUpdate,
+	FloatingPortal,
+	FloatingOverlay,
+	FloatingFocusManager,
+} from '@octanejs/floating-ui';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { $getNearestNodeFromDOMNode, $getRoot } from 'lexical';
-import { createPortal, useEffect, useRef, useState } from 'octane';
+import { useEffect, useRef, useState } from 'octane';
 
 class MenuOption {
 	key: string;
@@ -60,38 +74,33 @@ export class NodeContextMenuSeparator extends MenuOption {
 	}
 }
 
-function ContextMenuBody(props) @{
+// The floating menu container + its items. Mirrors the React render's inner <div>:
+// the resolved floating props are spread onto it, and each item spreads its own
+// getItemProps() onto a <button> (or <hr> for a separator).
+function ContextMenuList(props) @{
 	<div
 		class={props.className}
-		ref={props.floatingRef}
+		ref={props.setFloating}
+		style={props.floatingStyles}
 		role="menu"
-		style="position: fixed; top: 0; left: 0"
+		{...props.floatingProps}
 	>
-		@for (const item of props.renderItems; key item.key) {
+		@for (const item of props.items; key item.key) {
 			@if (item.type === 'item') {
-				<button
-					class={item.className}
-					role="menuitem"
-					disabled={item.disabled}
-					tabindex={-1}
-					ref={item.setRef}
-					onClick={item.onClick}
-					onMouseUp={item.onClick}
-					onMouseEnter={item.onMouseEnter}
-				>
+				<button {...item.itemProps} class={item.className} role="menuitem" disabled={item.disabled}>
 					{item.icon}
 					<span>
 						{item.label as string}
 					</span>
 				</button>
 			} @else {
-				<hr class={item.className} />
+				<hr {...item.itemProps} class={item.className} />
 			}
 		}
 	</div>
 }
 
-export function NodeContextMenuPlugin(props) {
+export function NodeContextMenuPlugin(props) @{
 	const items = props.items;
 	const className = props.className;
 	const itemClassName = props.itemClassName;
@@ -102,16 +111,48 @@ export function NodeContextMenuPlugin(props) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [renderItems, setRenderItems] = useState([]);
 
-	const floatingRef = useRef(null);
-	const positionRef = useRef(null);
 	const listItemsRef = useRef([]);
+	const listContentRef = useRef([]);
+
+	const f = useFloating({
+		middleware: [
+			offset({ alignmentAxis: 4, mainAxis: 5 }),
+			flip({ fallbackPlacements: ['left-start'] }),
+			shift({ padding: 10 }),
+		],
+		onOpenChange: setIsOpen,
+		open: isOpen,
+		placement: 'right-start',
+		strategy: 'fixed',
+		whileElementsMounted: autoUpdate,
+	});
+
+	const role = useRole(f.context, { role: 'menu' });
+	const dismiss = useDismiss(f.context);
+	const listNavigation = useListNavigation(f.context, {
+		activeIndex,
+		listRef: listItemsRef,
+		onNavigate: setActiveIndex,
+	});
+	const typeahead = useTypeahead(f.context, {
+		activeIndex,
+		enabled: isOpen,
+		listRef: listContentRef,
+		onMatch: setActiveIndex,
+	});
+	const { getFloatingProps, getItemProps } = useInteractions([
+		role,
+		dismiss,
+		listNavigation,
+		typeahead,
+	]);
 
 	// Build the menu model on right-click and open the menu at the cursor.
 	useEffect(() => {
 		function onContextMenu(e) {
 			e.preventDefault();
 
-			positionRef.current = {
+			f.refs.setPositionReference({
 				getBoundingClientRect() {
 					return {
 						bottom: e.clientY,
@@ -124,14 +165,14 @@ export function NodeContextMenuPlugin(props) {
 						y: e.clientY,
 					};
 				},
-			};
+			});
 
 			let visibleItems = [];
 			if (items) {
 				editor.read(() => {
 					const node = $getNearestNodeFromDOMNode(e.target) ?? $getRoot();
 					if (node) {
-						visibleItems = items.filter((option) => option.$showOn ? option.$showOn(node) : true);
+						visibleItems = items.filter((option) => (option.$showOn ? option.$showOn(node) : true));
 					}
 				});
 			}
@@ -150,14 +191,14 @@ export function NodeContextMenuPlugin(props) {
 					icon: option.icon,
 					key: option.key,
 					label: option.title,
-					select: () => editor.update(() => option.$onSelect()),
+					onSelect: () => editor.update(() => option.$onSelect()),
 					title: option.title,
 					type: option.type,
 				};
 			});
 
+			listContentRef.current = renderableItems.map((item) => item.key);
 			setRenderItems(renderableItems);
-			setActiveIndex(null);
 			setIsOpen(true);
 		}
 
@@ -169,152 +210,43 @@ export function NodeContextMenuPlugin(props) {
 		});
 	}, [items, itemClassName, separatorClassName, editor]);
 
-	// Position the floating menu + wire keyboard navigation + outside-click dismiss
-	// while it is open. Re-runs when the rendered items change.
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-		const floatingEl = floatingRef.current;
-		const reference = positionRef.current;
-		if (floatingEl === null || reference === null) {
-			return;
-		}
-
-		const selectableIndexes = renderItems.map(
-			(item, i) => (item.type === 'item' && !item.disabled ? i : -1),
-		).filter((i) => i >= 0);
-
-		const focusIndex = (idx) => {
-			setActiveIndex(idx);
-			const el = listItemsRef.current[idx];
-			if (el) {
-				el.focus();
-			}
-		};
-
-		const move = (delta) => {
-			if (selectableIndexes.length === 0) {
-				return;
-			}
-			const current = selectableIndexes.indexOf(activeIndex);
-			let next;
-			if (current === -1) {
-				next = delta > 0 ? 0 : selectableIndexes.length - 1;
-			} else {
-				next = (current + delta + selectableIndexes.length) % selectableIndexes.length;
-			}
-			focusIndex(selectableIndexes[next]);
-		};
-
-		const close = () => {
-			setIsOpen(false);
-			editor.focus();
-		};
-
-		let typeahead = '';
-		let typeaheadTimer = null;
-
-		const onKeyDown = (event) => {
-			if (event.key === 'ArrowDown') {
-				event.preventDefault();
-				move(1);
-			} else if (event.key === 'ArrowUp') {
-				event.preventDefault();
-				move(-1);
-			} else if (event.key === 'Enter' || event.key === ' ') {
-				if (activeIndex !== null && renderItems[activeIndex] && renderItems[activeIndex].select) {
-					event.preventDefault();
-					renderItems[activeIndex].select();
-					close();
-				}
-			} else if (event.key === 'Escape') {
-				event.preventDefault();
-				close();
-			} else if (event.key.length === 1) {
-				// Type-ahead: jump to the first selectable item whose label matches.
-				typeahead += event.key.toLowerCase();
-				if (typeaheadTimer !== null) {
-					clearTimeout(typeaheadTimer);
-				}
-				typeaheadTimer = setTimeout(() => {
-					typeahead = '';
-				}, 500);
-				const match = selectableIndexes.find(
-					(i) => (renderItems[i].label || '').toLowerCase().startsWith(typeahead),
-				);
-				if (match !== undefined) {
-					focusIndex(match);
-				}
-			}
-		};
-
-		const onPointerDown = (event) => {
-			if (!floatingEl.contains(event.target)) {
-				close();
-			}
-		};
-
-		const update = () => {
-			computePosition(reference, floatingEl, {
-				strategy: 'fixed',
-				placement: 'right-start',
-				middleware: [
-					offset({ alignmentAxis: 4, mainAxis: 5 }),
-					flip({ fallbackPlacements: ['left-start'] }),
-					shift({ padding: 10 }),
-				],
-			}).then(({ x, y }) => {
-				floatingEl.style.left = `${x}px`;
-				floatingEl.style.top = `${y}px`;
-			});
-		};
-
-		const cleanupAutoUpdate = autoUpdate(reference, floatingEl, update);
-		document.addEventListener('keydown', onKeyDown);
-		document.addEventListener('pointerdown', onPointerDown, true);
-		// Focus the menu so keyboard navigation works immediately.
-		floatingEl.focus({ preventScroll: true });
-
-		return () => {
-			cleanupAutoUpdate();
-			document.removeEventListener('keydown', onKeyDown);
-			document.removeEventListener('pointerdown', onPointerDown, true);
-			if (typeaheadTimer !== null) {
-				clearTimeout(typeaheadTimer);
-			}
-		};
-	}, [isOpen, renderItems, activeIndex, editor]);
-
-	if (!isOpen) {
-		return null;
-	}
-
-	// Attach per-item refs + handlers, then portal the menu.
+	// Attach per-item refs + handlers via getItemProps, mirroring the React render.
+	// (Computed every render; `renderItems` is empty while closed, so this is a no-op
+	// until the menu opens.)
 	listItemsRef.current = [];
 	const itemsForRender = renderItems.map((item, index) => {
-		if (item.type !== 'item') {
-			return item;
-		}
+		const onSelect = () => {
+			if (item.onSelect) {
+				item.onSelect();
+			}
+			setIsOpen(false);
+		};
 		return {
 			...item,
-			setRef: (node) => {
-				listItemsRef.current[index] = node;
-			},
-			onClick: () => {
-				if (item.select) {
-					item.select();
-				}
-				setIsOpen(false);
-				editor.focus();
-			},
-			onMouseEnter: () => setActiveIndex(index),
+			itemProps: getItemProps({
+				onClick: onSelect,
+				onMouseUp: onSelect,
+				ref: (node) => {
+					listItemsRef.current[index] = node;
+				},
+				tabIndex: activeIndex === index ? 0 : -1,
+			}),
 		};
 	});
 
-	return createPortal(ContextMenuBody, document.body, {
-		className,
-		floatingRef,
-		renderItems: itemsForRender,
-	});
+	@if (isOpen) {
+		<FloatingPortal>
+			<FloatingOverlay lockScroll={true}>
+				<FloatingFocusManager context={f.context} initialFocus={f.refs.floating}>
+					<ContextMenuList
+						className={className}
+						setFloating={f.refs.setFloating}
+						floatingStyles={f.floatingStyles}
+						floatingProps={getFloatingProps()}
+						items={itemsForRender}
+					/>
+				</FloatingFocusManager>
+			</FloatingOverlay>
+		</FloatingPortal>
+	}
 }

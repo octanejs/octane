@@ -71,7 +71,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@floating-ui/dom": "catalog:default",
     "@lexical/devtools-core": "catalog:default",
     "@lexical/dragon": "catalog:default",
     "@lexical/extension": "catalog:default",
@@ -89,6 +88,7 @@
     "@lexical/text": "catalog:default",
     "@lexical/utils": "catalog:default",
     "@lexical/yjs": "catalog:default",
+    "@octanejs/floating-ui": "workspace:*",
     "lexical": "catalog:default",
     "octane": "workspace:*",
     "yjs": "catalog:default"
