@@ -468,12 +468,23 @@ effects-semantics, reveal-throttle, async-actions, Activity ports + the fidelity
   shares the same `seq` counter + comparator, so refs attach child-first / in tree order
   too. Full suite green, zero regressions; the nested-boundary effect test now asserts
   real order (workaround removed). Pinned by `conformance/effect-order.test.ts`.
-- **One architectural gap remains (not pinned as `it.fails` — it is a documented
-  divergence):** global commit coordination. Divergences #1 (entangled siblings), #4
-  (per-swap vs global-WIP off-screen), and #5 (cross-boundary reveal throttle) all reduce
-  to the same thing — React can defer/coordinate a SINGLE global commit against a shared
-  clock; octane commits per-boundary in place. Closing all three at once is the
-  global-WIP-tree effort, deliberately scoped out for now.
+- **Global commit coordination — DONE for #1 + #4 (`conformance/entangled-commit.test.ts`,
+  flipped `transitions.test.ts` entangled test):** a single `startTransition` that fans
+  out to multiple suspending boundaries now holds EVERY prior screen until all are
+  data-ready, then reveals them together (React's atomic-commit contract). Implemented as
+  a data-ready barrier in runtime.ts: `HELD_TRANSITIONS` tracks boundaries holding prior
+  content; each stages its reveal as its data resolves; when `STAGED_REVEALS.size ===
+  HELD_TRANSITIONS.size` the batch flushes in one commit. `commitResume` was extracted
+  from `attachResume`'s retry; abandon paths (urgent supersede / error / unmount) drop a
+  boundary from the group so the rest aren't stranded. Divergences #1 and #4 closed; full
+  suite green, zero regressions.
+- **#5 reveal throttling — investigated and DISMISSED (octane matches default React).**
+  The provisional divergence used the wrong oracle (the `-test.internal.js` suite). The
+  public default-flags test `ReactUse-test.js:1096` reveals `A(Loading B...)` immediately
+  on a nested reveal — exactly octane's behavior — and the throttle assertions are gated
+  behind `alwaysThrottleRetries` (OFF by default). Implementing the throttle would DIVERGE
+  from default React (and break the correctly-ported `ReactUse:1096` test), so it's
+  intentionally not done. SUSPENSE_DIVERGENCE.md #5 reclassified from "open" to "dismissed".
 - **Reveal throttling — assessed; documented as a divergence (NOT a clean fix).**
   Investigated `FALLBACK_THROTTLE_MS = 300` / `globalMostRecentFallbackTime`. octane
   already matches React's DEFAULT for a single boundary (immediate reveal on resolve;

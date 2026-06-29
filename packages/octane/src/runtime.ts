@@ -269,6 +269,25 @@ let ASYNC_TRANSITION_COUNT = 0;
 let TRANSITION_PENDING_COUNT = 0;
 const TRANSITION_LISTENERS = new Set<() => void>();
 
+// ── Global commit coordination (entangled transitions) ──────────────────────
+// React commits a transition's whole tree atomically: when one startTransition
+// fans out to several Suspense boundaries that all suspend, the prior content of
+// EVERY boundary stays on screen until ALL their data is ready, then they reveal
+// together — the user never sees a half-updated screen mid-transition. octane
+// commits per-boundary, so without coordination boundary A would reveal the moment
+// its own promise resolves while sibling B is still pending.
+//
+// `HELD_TRANSITIONS` is the set of boundaries currently holding prior content for an
+// in-flight transition (transitionHeld === true). `STAGED_REVEALS` is the subset
+// whose data has resolved but whose reveal is DEFERRED waiting for the rest. When
+// `STAGED_REVEALS.size === HELD_TRANSITIONS.size` every held boundary is data-ready,
+// so we flush them all in one batch (`flushStagedReveals`). Abandoning a held
+// boundary (urgent supersede / error / unmount) removes it and re-checks, so the
+// remaining group isn't stranded waiting on a boundary that will never resolve.
+const HELD_TRANSITIONS = new Set<TrySlot>();
+const STAGED_REVEALS = new Set<TrySlot>();
+let flushingStagedReveals = false;
+
 function tickTransitionCount(delta: number): void {
 	TRANSITION_PENDING_COUNT += delta;
 	if (TRANSITION_PENDING_COUNT < 0) TRANSITION_PENDING_COUNT = 0;
@@ -1340,6 +1359,9 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 						val.tryBlock.disposed = true;
 						val.pendingThenable = null;
 					}
+					// Unmounted while holding for a transition — leave the entangled group
+					// so staged siblings aren't left waiting on a boundary that's now gone.
+					abandonHeldTransition(val);
 					// Cancel any in-flight transition-fallback timeout so the callback
 					// can't fire after the slot's owning scope is gone.
 					if (val.transitionTimeoutId !== null) {
@@ -5725,6 +5747,9 @@ function releaseHeldTransition(state: TrySlot): void {
 		state.transitionHeld = false;
 		tickTransitionCount(-1);
 	}
+	// This boundary stopped holding without a normal reveal (urgent supersede): drop it
+	// from the entangled group so siblings staged behind it aren't left waiting.
+	abandonHeldTransition(state);
 	// Drop the fallback timeout too — an urgent setState clobbered the
 	// transition, so the prior DOM is being replaced eagerly and a timeout-
 	// driven @pending swap would race with the urgent commit.
@@ -5796,6 +5821,9 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 			state.transitionHeld = true;
 			tickTransitionCount(+1);
 		}
+		// Join the entangled-transition group so its reveal is coordinated with any
+		// sibling boundaries suspended in the same transition (commit-barrier above).
+		enterHeldTransition(state);
 		// Schedule a fallback swap so the user isn't stuck forever staring at
 		// stale content when the transition's promise takes too long. The
 		// counter stays held — `isPending` remains true through the fallback
@@ -5968,6 +5996,109 @@ function swapToPendingFallback(state: TrySlot): void {
  * settles. Dedupes by `pendingThenable` so two suspends on the same promise
  * don't queue two retries.
  */
+// Commit a resolved boundary's reveal: reattach its held/detached DOM, re-render the
+// try body, re-attach host refs, and drain its effects. Runs in a thenable microtask
+// (outside the normal flush) OR from the entangled-batch flush. Releases the transition
+// hold; a re-suspend during the re-render re-acquires it via handleSuspense.
+function commitResume(state: TrySlot): void {
+	const wasHeld = state.transitionHeld;
+	if (wasHeld) state.transitionHeld = false;
+	// Leave the coordination sets — this boundary is committing now (a re-suspend
+	// during the re-render re-adds it via handleSuspense → enterHeldTransition).
+	HELD_TRANSITIONS.delete(state);
+	STAGED_REVEALS.delete(state);
+	try {
+		if (state.tryBlock && !state.tryBlock.disposed) {
+			if (state.savedDom) {
+				if (state.block && state.block !== state.tryBlock) {
+					unmountBlock(state.block);
+					state.block = null;
+				}
+				reattachTryBlock(state);
+			}
+			state.block = state.tryBlock;
+			state.branch = 1;
+			state.tryBlock.body = state.tryBody;
+			// Preserve transition priority on the retry render — the retry is a
+			// continuation of the same transition, so a re-suspend on a different
+			// promise should also keep the prior DOM (and isPending stays true).
+			if (wasHeld) state.tryBlock.pendingMode = 'transition';
+			// Reveal: clear the hidden-subtree inactive flag (set on hide) so its effects
+			// re-enqueue + re-fire (recreate) during this resume render.
+			state.tryBlock.inactive = false;
+			try {
+				renderBlock(state.tryBlock);
+				state.hasResolved = true;
+				// Reveal: re-attach the host refs detached on hide (same preserved nodes),
+				// before commitEffects fires the recreated layout effects (which may read
+				// them). The re-render above leaves them detached — the stored ref value is
+				// unchanged, so a component's own attach path no-ops on it.
+				if (state.detachedRefs !== null) {
+					const refs = state.detachedRefs;
+					state.detachedRefs = null;
+					for (let i = 0; i < refs.length; i++) attachRef(refs[i].ref, refs[i].el);
+				}
+			} catch (err) {
+				if (isSuspenseException(err)) handleSuspense(state, err.thenable, state.tryBlock!);
+				else switchToCatch(state, err);
+			}
+		} else {
+			mountTry(state);
+		}
+		// Commit the resume's effects on BOTH paths (the retry runs in a thenable
+		// microtask, outside the normal flush): a full reveal RECREATES the destroyed
+		// layout effects (ReactSuspenseEffectsSemantics); a re-suspend (one of several
+		// promises resolved, another still pending) enqueued effects for the now-hidden
+		// subtree that drainPhase must SKIP (inactive) and CLEAR — without draining here
+		// the LAYOUT queue stays non-empty and the scheduler never goes quiescent.
+		commitEffects();
+	} finally {
+		if (wasHeld) tickTransitionCount(-1);
+	}
+}
+
+/** Register a boundary as holding prior content for an in-flight transition. */
+function enterHeldTransition(state: TrySlot): void {
+	HELD_TRANSITIONS.add(state);
+	STAGED_REVEALS.delete(state); // a re-suspend means it is no longer data-ready
+}
+
+/**
+ * Remove a boundary from the coordination sets when it stops holding WITHOUT a normal
+ * reveal — urgent supersede, error, or unmount. If the remaining held boundaries are
+ * now all data-ready, commit them (don't strand them waiting on a boundary that left).
+ */
+function abandonHeldTransition(state: TrySlot): void {
+	if (!HELD_TRANSITIONS.has(state)) return;
+	HELD_TRANSITIONS.delete(state);
+	STAGED_REVEALS.delete(state);
+	flushStagedRevealsIfReady();
+}
+
+/** Commit all staged reveals together once every held boundary is data-ready. */
+function flushStagedRevealsIfReady(): void {
+	if (STAGED_REVEALS.size > 0 && STAGED_REVEALS.size === HELD_TRANSITIONS.size) {
+		flushStagedReveals();
+	}
+}
+
+function flushStagedReveals(): void {
+	if (flushingStagedReveals) return; // re-entrancy guard (a reveal may abandon a sibling)
+	flushingStagedReveals = true;
+	try {
+		const batch = [...STAGED_REVEALS];
+		STAGED_REVEALS.clear();
+		for (const s of batch) {
+			// A prior reveal in this batch may have torn down a later one (a boundary that
+			// renders a sibling boundary). Skip any that were disposed meanwhile.
+			if (s.tryBlock !== null && s.tryBlock.disposed) continue;
+			commitResume(s);
+		}
+	} finally {
+		flushingStagedReveals = false;
+	}
+}
+
 function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 	if (state.pendingThenable === thenable) return;
 	state.pendingThenable = thenable;
@@ -5981,59 +6112,18 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 			clearTimeout(state.transitionTimeoutId);
 			state.transitionTimeoutId = null;
 		}
-		// Release any transition counter we held open during the suspension. If
-		// the retry re-suspends within the same transition, handleSuspense will
-		// re-acquire the hold — net count unchanged, no isPending flicker.
-		const wasHeld = state.transitionHeld;
-		if (wasHeld) state.transitionHeld = false;
-		try {
-			if (state.tryBlock && !state.tryBlock.disposed) {
-				if (state.savedDom) {
-					if (state.block && state.block !== state.tryBlock) {
-						unmountBlock(state.block);
-						state.block = null;
-					}
-					reattachTryBlock(state);
-				}
-				state.block = state.tryBlock;
-				state.branch = 1;
-				state.tryBlock.body = state.tryBody;
-				// Preserve transition priority on the retry render — the retry is a
-				// continuation of the same transition, so a re-suspend on a different
-				// promise should also keep the prior DOM (and isPending stays true).
-				if (wasHeld) state.tryBlock.pendingMode = 'transition';
-				// Reveal: clear the hidden-subtree inactive flag (set on hide) so its effects
-				// re-enqueue + re-fire (recreate) during this resume render.
-				state.tryBlock.inactive = false;
-				try {
-					renderBlock(state.tryBlock);
-					state.hasResolved = true;
-					// Reveal: re-attach the host refs detached on hide (same preserved nodes),
-					// before commitEffects fires the recreated layout effects (which may read
-					// them). The re-render above leaves them detached — the stored ref value is
-					// unchanged, so a component's own attach path no-ops on it.
-					if (state.detachedRefs !== null) {
-						const refs = state.detachedRefs;
-						state.detachedRefs = null;
-						for (let i = 0; i < refs.length; i++) attachRef(refs[i].ref, refs[i].el);
-					}
-				} catch (err) {
-					if (isSuspenseException(err)) handleSuspense(state, err.thenable, state.tryBlock!);
-					else switchToCatch(state, err);
-				}
-			} else {
-				mountTry(state);
-			}
-			// Commit the resume's effects on BOTH paths (the retry runs in a thenable
-			// microtask, outside the normal flush): a full reveal RECREATES the destroyed
-			// layout effects (ReactSuspenseEffectsSemantics); a re-suspend (one of several
-			// promises resolved, another still pending) enqueued effects for the now-hidden
-			// subtree that drainPhase must SKIP (inactive) and CLEAR — without draining here
-			// the LAYOUT queue stays non-empty and the scheduler never goes quiescent.
-			commitEffects();
-		} finally {
-			if (wasHeld) tickTransitionCount(-1);
+		// Entangled-transition commit barrier: a boundary holding prior content for an
+		// in-flight transition does NOT reveal the moment its own data resolves — it
+		// waits until EVERY held boundary in the transition is data-ready, then they all
+		// reveal together (React's atomic-commit contract). The boundary stays held (its
+		// counter stays up, so isPending stays true) until the batch flush.
+		if (HELD_TRANSITIONS.has(state)) {
+			STAGED_REVEALS.add(state);
+			if (STAGED_REVEALS.size < HELD_TRANSITIONS.size) return; // others still pending
+			flushStagedReveals();
+			return;
 		}
+		commitResume(state);
 	};
 	thenable.then(retry, retry);
 }
@@ -6504,6 +6594,8 @@ function switchToCatch(state: TrySlot, err: any): void {
 		state.transitionHeld = false;
 		tickTransitionCount(-1);
 	}
+	// Errored out of the held group — drop it so staged siblings aren't stranded.
+	abandonHeldTransition(state);
 	// No catch arm — bubble to the next enclosing tryBlock (or surface).
 	if (state.catchBody === null) {
 		const parent = findTryHandler(state.parentBlock);

@@ -179,21 +179,16 @@ describe('useTransition — urgent preempts', () => {
 // ---------------------------------------------------------------------------
 
 describe('Transitions — multiple-suspend edge cases', () => {
-	it('entangles sibling boundaries: isPending stays true until ALL siblings resolve', async () => {
+	it('entangles sibling boundaries: holds ALL prior content until every sibling resolves, then reveals together', async () => {
 		// Port of ReactTransition-test.js:190 "multiple transitions update
 		// different queues, they entangle". A single startTransition causes two
-		// sibling try-blocks to suspend; isPending must remain true until both
-		// promises resolve.
-		//
-		// KNOWN DIVERGENCE FROM REACT: octane EAGERLY COMMITS each
-		// sibling as its individual promise resolves (assertion at line 181
-		// checks A:a2 while B is still pending). React's contract is "full
-		// wait" — both siblings keep their old content until BOTH resolve, so
-		// the user never sees a half-updated screen mid-transition. We match
-		// React on isPending (stays true until both resolve), on prior-DOM
-		// preservation (no fallback flash), and on the entanglement of the
-		// counter; we diverge on the per-sibling commit timing. See
-		// SUSPENSE_DIVERGENCE.md for context.
+		// sibling try-blocks to suspend; isPending stays true until both promises
+		// resolve, AND — per React's atomic-commit contract — BOTH siblings keep
+		// their old content until BOTH resolve, then reveal together. The user
+		// never sees a half-updated screen mid-transition. octane matches this via
+		// the entangled-commit barrier (HELD_TRANSITIONS / STAGED_REVEALS): a held
+		// boundary whose data resolves first DEFERS its reveal until the whole
+		// group is data-ready. (Was SUSPENSE_DIVERGENCE.md #1 — now closed.)
 		const da1 = deferred<string>(),
 			db1 = deferred<string>();
 		const da2 = deferred<string>(),
@@ -221,18 +216,21 @@ describe('Transitions — multiple-suspend edge cases', () => {
 		expect(r.findAll('.ent-a-load')).toHaveLength(0);
 		expect(r.findAll('.ent-b-load')).toHaveLength(0);
 
-		// Resolve A only: A updates, B still pending, isPending still 1.
+		// Resolve A only: A's reveal is DEFERRED (held in the entangled group). BOTH
+		// siblings still show their OLD content; isPending still 1.
 		await act(() => {
 			da2.resolve('a2');
 		});
-		expect(r.find('.ent-a').textContent).toBe('A:a2');
-		expect(r.find('.ent-b').textContent).toBe('B:b1'); // STILL old
+		expect(r.find('.ent-a').textContent).toBe('A:a1'); // HELD until B is ready too
+		expect(r.find('.ent-b').textContent).toBe('B:b1');
 		expect(r.find('#pending').textContent).toBe('1');
 
-		// Resolve B: B updates, isPending finally drops.
+		// Resolve B: now the whole group is data-ready → A and B reveal TOGETHER,
+		// isPending drops.
 		await act(() => {
 			db2.resolve('b2');
 		});
+		expect(r.find('.ent-a').textContent).toBe('A:a2');
 		expect(r.find('.ent-b').textContent).toBe('B:b2');
 		expect(r.find('#pending').textContent).toBe('0');
 		r.unmount();
