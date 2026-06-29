@@ -485,19 +485,18 @@ effects-semantics, reveal-throttle, async-actions, Activity ports + the fidelity
   behind `alwaysThrottleRetries` (OFF by default). Implementing the throttle would DIVERGE
   from default React (and break the correctly-ported `ReactUse:1096` test), so it's
   intentionally not done. SUSPENSE_DIVERGENCE.md #5 reclassified from "open" to "dismissed".
-- **Reveal throttling — assessed; documented as a divergence (NOT a clean fix).**
-  Investigated `FALLBACK_THROTTLE_MS = 300` / `globalMostRecentFallbackTime`. octane
-  already matches React's DEFAULT for a single boundary (immediate reveal on resolve;
-  verified by probe). The only gap is the CROSS-boundary throttle (holding the outer
-  fallback while a freshly-revealed inner boundary suspends), which is React's global,
-  coordinated commit delay — the same family as divergences #1/#4. octane commits
-  per-boundary in place, so there is no global commit to hold back; matching it requires
-  the global-WIP commit work, not a scoped change. Captured as SUSPENSE_DIVERGENCE.md #5.
-  (The per-boundary fallback→content retry throttle is React-flag-gated, off by default —
-  octane correctly does not do it.)
-- **Still to port:** `ReactAsyncActions` + `Activity` deeper cases (existing octane
-  features — `actions.test.ts`/`activity.test.ts` already cover the basics), the
-  ordering/throttle fixes above, and the fidelity re-audit of existing suspense ports.
+- **`ReactAsyncActions` + `Activity` deeper cases — ported.** `useOptimistic` rebasing
+  (passthrough change mid-action), custom reducers, and repeated updates in one action all
+  match React (`conformance/async-actions.test.ts`). `<Activity>` reveal-outer-without-inner
+  and child-first-mount / parent-first-hide cleanup order match React (`activity.test.ts`).
+  Two narrow divergences surfaced and were documented (not pinned): async-action
+  transition entanglement (#6 — a non-optimistic intermediate transition update commits
+  eagerly instead of being held until the action settles) and `useInsertionEffect` toggling
+  under `<Activity>` (#7). Both are rare edges where a fix risks the working optimistic flow
+  / touches the effect-slot shape; deferred.
+- **Remaining:** the fidelity re-audit of existing suspense ports (low priority — the
+  divergence registry is current and every other suspense/transition/activity test pins a
+  matched contract).
 
 ### Suite status
 **204 test files, 1074 passed, 0 expected-fail, 0 regressions** (after the off-screen

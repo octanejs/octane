@@ -177,3 +177,49 @@ describe('<Activity> — bare text child', () => {
 		r.unmount();
 	});
 });
+
+import { NestedRevealActivity } from './_fixtures/activity.tsrx';
+
+describe('<Activity> — nested reveal (conformance)', () => {
+	// Per Activity-test.js:1362 "reveal an outer Activity boundary without revealing an
+	// inner one". Both hidden → reveal the outer while the inner stays hidden → only the
+	// outer subtree's effects mount; the still-hidden inner's do not.
+	it('revealing the outer Activity does not mount a still-hidden inner one', () => {
+		const log: string[] = [];
+		const opts = { outer: 'hidden', inner: 'hidden', log: (s: string) => log.push(s) };
+		const r = mount(NestedRevealActivity, opts);
+		flushEffects();
+		expect(log).toEqual([]); // both hidden → no effects mounted
+
+		// Reveal outer; inner stays hidden.
+		r.update(NestedRevealActivity, { ...opts, outer: 'visible' });
+		flushEffects();
+		expect(log).toEqual(['Mount Outer']); // ONLY the outer; inner is still hidden
+
+		// Now reveal the inner too.
+		r.update(NestedRevealActivity, { outer: 'visible', inner: 'visible', log: opts.log });
+		flushEffects();
+		expect(log).toEqual(['Mount Outer', 'Mount Inner']);
+		r.unmount();
+	});
+});
+
+import { OrderActivity } from './_fixtures/activity.tsrx';
+
+describe('<Activity> — effect cleanup order on hide (conformance)', () => {
+	// Per Activity-test.js "passive effects are unmounted on hide in the same order as
+	// during a deletion: parent before child" (and child-first on mount/reveal).
+	it('mounts child-first and tears down parent-first on hide', () => {
+		const log: string[] = [];
+		const opts = { mode: 'visible', log: (s: string) => log.push(s) };
+		const r = mount(OrderActivity, opts);
+		flushEffects();
+		expect(log).toEqual(['mount child', 'mount parent']); // child-first on mount
+		log.length = 0;
+
+		r.update(OrderActivity, { ...opts, mode: 'hidden' });
+		flushEffects();
+		expect(log).toEqual(['unmount parent', 'unmount child']); // parent-first on hide
+		r.unmount();
+	});
+});
