@@ -104,6 +104,40 @@ alongside the other advanced-scheduling items in the parity plan §2/Tier 5–6.
 
 ---
 
+## 5. Reveal throttling (`FALLBACK_THROTTLE_MS`) — cross-boundary only
+
+**Where it shows up:** `ReactSuspense-test.internal.js:267` ("throttles fallback
+committing globally"), `ReactSuspenseWithNoopRenderer-test.js:1778/:1857`,
+`ReactFiberWorkLoop.js` (`FALLBACK_THROTTLE_MS = 300`, `globalMostRecentFallbackTime`).
+
+**React behavior:** React keeps a GLOBAL clock of when a fallback was last shown. When a
+commit would reveal content that still exposes a DIFFERENT (e.g. nested) fallback, and
+the previous fallback appeared < 300ms ago, React delays that commit — holding the prior
+fallback so loading states don't flicker/stagger. (The single-boundary
+fallback→content retry throttle is separately gated behind `alwaysThrottleRetries`, OFF
+by default.)
+
+**octane behavior:** octane MATCHES React's DEFAULT for a single boundary — content
+reveals immediately when its promise resolves (verified: `Loading` → `A1`, no artificial
+delay). What octane does NOT do is the CROSS-boundary throttle: in a nested
+`@try { <A/> @try { <B/> } @pending {…inner…} } @pending {…outer…}`, resolving `A` while
+`B` is still pending reveals `A` + the inner fallback immediately (octane shows
+`A1LoadingMore`), whereas React holds the outer `Loading` until `B` resolves or the 300ms
+window elapses.
+
+**Surface impact:** Low. Only observable with nested boundaries whose inner content
+suspends right as the outer reveals — the user may see one extra intermediate loading
+state that React would have coalesced.
+
+**Closure plan:** This is the same family as Divergence #1 (entangled-transition
+partial-commit) and #4 (per-swap, not global-WIP, off-screen rendering). React can defer
+the WHOLE commit against a global clock; octane commits per-boundary IN PLACE, so there
+is no global commit to hold back — matching it needs the global, coordinated, double-
+buffered commit (#4's "true global WIP tree") plus a shared fallback clock. Scoped out
+with the rest of the advanced-scheduling work (parity plan §2 / Tier 5–6).
+
+---
+
 ## What we DO match React on (for the record)
 
 The list above is the complete known set of Suspense-related divergences. Every
@@ -134,8 +168,18 @@ React on, including:
   Divergence #4 for the single- vs multi-boundary scope).
 - Effect lifecycle under suspense: a re-suspended boundary's committed layout/passive
   effects are DESTROYED while it shows the fallback and RECREATED on reveal (state is
-  still preserved) — `ReactSuspenseEffectsSemantics-test.js:611`,
+  still preserved); they are destroyed exactly ONCE when the boundary suspends in
+  multiple places (a partial resolve that stays suspended does not re-destroy/recreate),
+  and a nested inner-boundary re-suspend destroys only the inner subtree's effects —
+  `ReactSuspenseEffectsSemantics-test.js:611/:2438/:1138`,
   `conformance/suspense-effects-semantics.test.ts`.
+- Host refs under suspense: a suspended boundary's host refs are DETACHED on hide
+  (object refs → null, callback refs called with null) and re-attached on reveal — React
+  cycles refs like layout effects even though the DOM node is preserved. Covers the
+  compiled template host-ref path and de-opt host slots;
+  `ReactSuspenseEffectsSemantics-test.js:2877`, `conformance/suspense-refs.test.ts`.
+  (NOTE — narrow limitation: refs attached purely through closures — prop spread, the
+  de-opt prop path, fragment refs — are not yet cycled across a suspend.)
 - `useDeferredValue` identity stability.
 - `useDeferredValue(value, initialValue)` React-19 overload.
 - `useTransition` rising/falling `isPending` edges.
@@ -144,5 +188,8 @@ React on, including:
 - Urgent-supersedes-transition discard.
 - Transition-fallback timeout (`setTransitionFallbackTimeout`, default 5s —
   matches React).
+- Single-boundary reveal timing: content reveals immediately when its promise resolves,
+  matching React's DEFAULT (the per-boundary retry throttle is React-flag-gated off; the
+  cross-boundary reveal throttle is Divergence #5).
 
 A divergence not listed here is a bug. File it.
