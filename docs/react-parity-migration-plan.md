@@ -442,10 +442,51 @@ effects-semantics, reveal-throttle, async-actions, Activity ports + the fidelity
   latent resume-doesn't-commit-layout-effects bug this surfaced). State is still
   preserved across suspend. Passing `it` (no pin); 86 suspense/transition/activity
   tests green, 0 regressions.
+- **effects-semantics ported (3 cases, passing):** re-suspend destroy/recreate
+  (`:611`), destroy-ONCE across multiple suspend points incl. partial resolve (`:2438`),
+  and nested-boundary isolation (`:1138`). The multi-place case surfaced + fixed a
+  second latent bug: a re-suspend DURING a resume left the now-hidden subtree's enqueued
+  layout effects stuck (scheduler never quiesced) — fixed by marking the hidden tryBlock
+  `inactive` (so `drainPhase` skips them) and committing effects on BOTH retry paths.
 - A React v19.2.7 reference clone (test sources) is used for faithful porting.
-- **Still to port:** the rest of effects-semantics (refs, nested boundaries,
-  double-destroy), reveal-throttle, `ReactAsyncActions`, `Activity`; plus the fidelity
-  re-audit of existing suspense ports.
+- **Refs under suspense — FIXED + ported (`:2877`, `conformance/suspense-refs.test.ts`):**
+  a suspended boundary's host refs are now detached on hide (object refs → null, callback
+  refs called with null) and re-attached on reveal, matching React's "refs cycle like
+  layout effects" contract even though octane preserves the DOM node. `detachSubtreeRefs`
+  runs only on the suspense-hide path (not `<Activity>`, which keeps refs); reveal
+  re-attaches the captured `{ref, el}` pairs before layout effects fire. Covers the
+  compiled template host-ref path + de-opt host slots; refs attached purely through
+  closures (spread / de-opt prop path / fragment refs) are a documented narrow limitation.
+- A React v19.2.7 reference clone (test sources) is used for faithful porting.
+- **Effect ordering — FIXED + ported (`conformance/effect-order.test.ts`):** all three
+  effect phases now drain in React's true POST-ORDER (descendant-before-ancestor via the
+  block tree; disjoint subtrees in enqueue/tree order) instead of a global deepest-first
+  depth sort. The old sort mis-ordered a shallow node in an earlier sibling subtree
+  against a deeper node in a later one; post-order matches React's commit walk. Each
+  `PendingEffect` carries a monotonic enqueue `seq` (DFS pre-order); `comparePostOrder`
+  turns `seq` + the `parentBlock` chain into post-order. The deferred ref-attach queue
+  shares the same `seq` counter + comparator, so refs attach child-first / in tree order
+  too. Full suite green, zero regressions; the nested-boundary effect test now asserts
+  real order (workaround removed). Pinned by `conformance/effect-order.test.ts`.
+- **One architectural gap remains (not pinned as `it.fails` — it is a documented
+  divergence):** global commit coordination. Divergences #1 (entangled siblings), #4
+  (per-swap vs global-WIP off-screen), and #5 (cross-boundary reveal throttle) all reduce
+  to the same thing — React can defer/coordinate a SINGLE global commit against a shared
+  clock; octane commits per-boundary in place. Closing all three at once is the
+  global-WIP-tree effort, deliberately scoped out for now.
+- **Reveal throttling — assessed; documented as a divergence (NOT a clean fix).**
+  Investigated `FALLBACK_THROTTLE_MS = 300` / `globalMostRecentFallbackTime`. octane
+  already matches React's DEFAULT for a single boundary (immediate reveal on resolve;
+  verified by probe). The only gap is the CROSS-boundary throttle (holding the outer
+  fallback while a freshly-revealed inner boundary suspends), which is React's global,
+  coordinated commit delay — the same family as divergences #1/#4. octane commits
+  per-boundary in place, so there is no global commit to hold back; matching it requires
+  the global-WIP commit work, not a scoped change. Captured as SUSPENSE_DIVERGENCE.md #5.
+  (The per-boundary fallback→content retry throttle is React-flag-gated, off by default —
+  octane correctly does not do it.)
+- **Still to port:** `ReactAsyncActions` + `Activity` deeper cases (existing octane
+  features — `actions.test.ts`/`activity.test.ts` already cover the basics), the
+  ordering/throttle fixes above, and the fidelity re-audit of existing suspense ports.
 
 ### Suite status
 **204 test files, 1074 passed, 0 expected-fail, 0 regressions** (after the off-screen

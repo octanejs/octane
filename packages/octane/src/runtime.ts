@@ -206,13 +206,18 @@ interface PendingEffect {
 	 */
 	args: any[] | undefined;
 	/**
-	 * Scope-tree depth captured at enqueue. Used by drainPhase to fire effects
-	 * CHILD-FIRST (post-order) on mount/update — matching React's commit-phase
-	 * walk. Without it, parent-first ordering breaks any parent layout-effect
-	 * that reads refs/measurements established by child layout-effects (react-
-	 * aria FocusScope, react-redux subscribers, react-spring measurements …).
+	 * Monotonic enqueue sequence (DFS pre-order, since rendering is top-down). Used
+	 * by drainPhase to reconstruct React's exact commit order: TRUE post-order —
+	 * descendant-before-ancestor (via the parentBlock chain), and disjoint subtrees
+	 * in enqueue order. A plain depth sort fires deepest-first GLOBALLY, which gets
+	 * the parent/child relationship right but mis-orders a shallow node in an earlier
+	 * sibling subtree against a deeper node in a later one; React walks the tree, so
+	 * sibling order wins over raw depth. Without correct order, a parent layout
+	 * effect that reads refs/measurements from child layout effects (react-aria
+	 * FocusScope, react-redux subscribers, react-spring measurements …) sees stale
+	 * state.
 	 */
-	depth: number;
+	seq: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -283,6 +288,10 @@ type Phase = 0 | 1 | 2;
 
 const effectQueues: [PendingEffect[], PendingEffect[], PendingEffect[]] = [[], [], []];
 let passiveScheduled = false;
+// Monotonic enqueue counter — tags each PendingEffect AND deferred ref attach with its
+// DFS pre-order position so the commit drains them in React's post-order (see
+// PendingEffect.seq / comparePostOrder). Shared so refs and effects sequence consistently.
+let commitSeq = 0;
 
 // Deferred ref attaches (React-19 timing parity). On mount the whole subtree is
 // built and inserted before its DOM is connected to the document, so attaching a
@@ -291,7 +300,13 @@ let passiveScheduled = false;
 // during commit, AFTER all renders/DOM insertion and BEFORE layout effects, so
 // callback refs see a connected node and ref.current is populated by the time a
 // layout effect runs — matching React's commit-phase ref attachment.
-const refAttachQueue: { fn: () => void; depth: number; block: Block | null }[] = [];
+interface RefAttach {
+	fn: () => void;
+	/** Enqueue sequence (DFS pre-order) — see commitSeq / comparePostOrder. */
+	seq: number;
+	block: Block | null;
+}
+const refAttachQueue: RefAttach[] = [];
 
 // Off-screen (WIP) effect capture. While a transition swaps in a NEW subtree that
 // may suspend, that subtree is rendered "off-screen" (its DOM kept out of the slot's
@@ -304,7 +319,7 @@ const refAttachQueue: { fn: () => void; depth: number; block: Block | null }[] =
 // single-threaded, so every effect enqueued while the buffer is set belongs to the WIP.
 interface OffscreenCapture {
 	effects: [PendingEffect[], PendingEffect[], PendingEffect[]];
-	refs: { fn: () => void; depth: number; block: Block | null }[];
+	refs: RefAttach[];
 }
 let WIP_CAPTURE: OffscreenCapture | null = null;
 
@@ -500,25 +515,19 @@ export function flushSync<T>(fn: () => T): T {
  * (the element is already connected by then).
  */
 export function queueRefAttach(scope: Scope, fn: () => void): void {
-	let depth = 0;
-	let b: Block | null = scope.block.parentBlock;
-	while (b !== null) {
-		depth++;
-		b = b.parentBlock;
-	}
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push({
 		fn,
-		depth,
+		seq: commitSeq++,
 		block: scope.block,
 	});
 }
 
-/** Drain queued mount ref attaches child-first (deepest depth → shallowest). */
+/** Drain queued mount ref attaches in React's post-order (descendant-before-ancestor). */
 function drainRefAttaches(): void {
 	if (refAttachQueue.length === 0) return;
 	const q = refAttachQueue.splice(0);
-	// Descending depth = child-before-parent; stable sort keeps sibling order.
-	q.sort((a, b) => b.depth - a.depth);
+	// Post-order, same as effects (refs attach child-first, siblings in tree order).
+	q.sort((a, b) => comparePostOrder(a.block, a.seq, b.block, b.seq));
 	for (const r of q) {
 		// Skip attaches whose owning subtree was unmounted earlier in THIS flush
 		// (e.g. a try boundary caught a mount-time throw and ran unmountBlock +
@@ -626,14 +635,44 @@ function commitEffectsSync(): void {
 	}
 }
 
+/** True if `anc` is a STRICT ancestor of `node` in the Block tree. */
+function blockIsAncestorOf(anc: Block, node: Block): boolean {
+	for (let b: Block | null = node.parentBlock; b !== null; b = b.parentBlock) {
+		if (b === anc) return true;
+	}
+	return false;
+}
+
+// React's commit order is a post-order tree walk: a node's descendants fire before it,
+// and disjoint subtrees fire in tree order. We reconstruct that from the flat queues:
+// descendant-before-ancestor via the parentBlock chain; everything else (disjoint
+// subtrees, and multiple entries on the SAME block) falls back to enqueue order, which
+// IS tree order because rendering is top-down DFS pre-order. This is correct where a
+// plain depth sort was not — a shallow node in an earlier sibling subtree must fire
+// before a deeper node in a LATER sibling subtree, which depth alone gets backwards.
+// Shared by the effect queues AND the deferred ref-attach queue so both commit in order.
+function comparePostOrder(
+	aBlock: Block | null,
+	aSeq: number,
+	bBlock: Block | null,
+	bSeq: number,
+): number {
+	if (aBlock !== bBlock && aBlock !== null && bBlock !== null) {
+		if (blockIsAncestorOf(aBlock, bBlock)) return 1; // a is ancestor of b → a fires AFTER b
+		if (blockIsAncestorOf(bBlock, aBlock)) return -1; // b is ancestor of a → a fires BEFORE b
+	}
+	return aSeq - bSeq;
+}
+function compareEffectPostOrder(a: PendingEffect, b: PendingEffect): number {
+	return comparePostOrder(a.scope.block, a.seq, b.scope.block, b.seq);
+}
+
 function drainPhase(phase: Phase): void {
 	const q = effectQueues[phase];
 	if (q.length === 0) return;
-	// React parity: walk child-first (post-order). Each effect was tagged with
-	// its scope-tree depth at enqueue. Sort descending so deeper scopes fire
-	// before shallower ones; Array.sort is stable so sibling registration
-	// order is preserved within a depth bucket.
-	q.sort((a, b) => b.depth - a.depth);
+	// React parity: fire in post-order (child-before-parent, siblings in tree order).
+	// Stable sort preserves enqueue order for entries the comparator treats as equal.
+	q.sort(compareEffectPostOrder);
 	// Cleanups first (in registration order), then bodies. React's contract.
 	// Skip entries whose subtree was hidden by <Activity> after they were queued
 	// but before this drain: deactivateScope already fired their cleanups, and the
@@ -1501,19 +1540,9 @@ function enqueueEffect(slot: symbol, fn: EffectFn, deps: any[] | undefined, phas
 	} else {
 		prev.deps = deps;
 	}
-	// Compute Block-tree depth for child-first drain. We walk parentBlock (not
-	// scope.parent) because a full componentSlot Block sets scope.parent = null
-	// by design — only LiteBlockImpl scopes carry a scope.parent. parentBlock
-	// is the universal upward link that mirrors React's fiber tree the same way
-	// for hookful components, @if branches, and lite components alike. Walks
-	// once per enqueue; typical depths < 20 and effects are rare on the hot path.
-	let depth = 0;
-	let b: Block | null = scope.block.parentBlock;
-	while (b !== null) {
-		depth++;
-		b = b.parentBlock;
-	}
-	const entry = { scope, slot, fn, args: deps, depth };
+	// Tag with the enqueue sequence (DFS pre-order). drainPhase turns this + the
+	// parentBlock chain into React's post-order commit order — see PendingEffect.seq.
+	const entry = { scope, slot, fn, args: deps, seq: commitSeq++ };
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.effects[phase] : effectQueues[phase]).push(entry);
 }
 
@@ -5476,6 +5505,14 @@ interface TrySlot {
 	 * scope teardown so we don't leak callbacks past the slot's lifetime.
 	 */
 	transitionTimeoutId: any | null;
+	/**
+	 * Host refs detached when this boundary suspended (object refs set to null,
+	 * callback refs invoked with null). React treats ref attachment like a layout
+	 * effect — destroyed on hide, recreated on reveal — even though the DOM node is
+	 * preserved. Captured on the FIRST hide (a re-suspend during a partial resolve
+	 * doesn't re-detach), re-attached + cleared on reveal. null = nothing detached.
+	 */
+	detachedRefs: { ref: any; el: any }[] | null;
 	domParent: Node;
 	parentBlock: Block;
 }
@@ -5530,6 +5567,7 @@ export function tryBlock(
 			pendingThenable: null,
 			transitionHeld: false,
 			transitionTimeoutId: null,
+			detachedRefs: null,
 			domParent,
 			parentBlock,
 		};
@@ -5812,7 +5850,23 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 	// clears their deps so the resume re-render re-enqueues + re-fires them. (The
 	// transition HOLD path keeps content visible and does NOT come here, so its effects
 	// correctly stay live.) Per ReactSuspenseEffectsSemantics-test.js.
-	if (state.tryBlock) deactivateScope(state.tryBlock);
+	if (state.tryBlock) {
+		deactivateScope(state.tryBlock);
+		// Detach the hidden subtree's host refs (object → null, callbacks called with null),
+		// recreated on reveal — React cycles refs across a suspend like layout effects. Only
+		// on the FIRST hide; a re-suspend during a partial resolve must not re-detach.
+		if (state.detachedRefs === null) {
+			state.detachedRefs = [];
+			detachSubtreeRefs(state.tryBlock, state.detachedRefs);
+		}
+		// Mark the hidden subtree inactive (the <Activity> mechanism) so drainPhase SKIPS
+		// any effects the just-aborted (re-)suspending render enqueued for it — otherwise a
+		// boundary that re-suspends DURING a resume (e.g. one of several promises resolves
+		// but another is still pending) leaves stale layout effects in the queue, and the
+		// scheduler never goes quiescent. Cleared on reveal (attachResume) so effects
+		// re-fire. inactive also prevents any further enqueues while hidden.
+		state.tryBlock.inactive = true;
+	}
 	// A re-suspend while ALREADY pending (branch === 2, a @pending body mounted)
 	// must REPLACE the prior pending body, not stack a second one. The existing
 	// pending block lives in `state.block` (it is never the tryBlock once we've
@@ -5876,6 +5930,11 @@ function swapToPendingFallback(state: TrySlot): void {
 	// behind the @pending fallback, so destroy its effects (recreated on resume), same as
 	// the urgent re-suspend path above. See ReactSuspenseEffectsSemantics-test.js.
 	deactivateScope(state.tryBlock);
+	if (state.detachedRefs === null) {
+		state.detachedRefs = [];
+		detachSubtreeRefs(state.tryBlock, state.detachedRefs);
+	}
+	state.tryBlock.inactive = true;
 	state.block = null;
 	state.branch = 2;
 	const bStart = document.createComment('pend-b');
@@ -5943,15 +6002,21 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 				// continuation of the same transition, so a re-suspend on a different
 				// promise should also keep the prior DOM (and isPending stays true).
 				if (wasHeld) state.tryBlock.pendingMode = 'transition';
+				// Reveal: clear the hidden-subtree inactive flag (set on hide) so its effects
+				// re-enqueue + re-fire (recreate) during this resume render.
+				state.tryBlock.inactive = false;
 				try {
 					renderBlock(state.tryBlock);
 					state.hasResolved = true;
-					// Commit the resume's effects (the retry runs in a thenable microtask, outside the
-					// normal flush): the INSERTION/LAYOUT effects the revealed subtree just enqueued —
-					// e.g. layout effects RECREATED after a suspend destroyed them
-					// (ReactSuspenseEffectsSemantics) — must drain here, or the scheduler stays
-					// non-quiescent (stuck LAYOUT queue).
-					commitEffects();
+					// Reveal: re-attach the host refs detached on hide (same preserved nodes),
+					// before commitEffects fires the recreated layout effects (which may read
+					// them). The re-render above leaves them detached — the stored ref value is
+					// unchanged, so a component's own attach path no-ops on it.
+					if (state.detachedRefs !== null) {
+						const refs = state.detachedRefs;
+						state.detachedRefs = null;
+						for (let i = 0; i < refs.length; i++) attachRef(refs[i].ref, refs[i].el);
+					}
 				} catch (err) {
 					if (isSuspenseException(err)) handleSuspense(state, err.thenable, state.tryBlock!);
 					else switchToCatch(state, err);
@@ -5959,6 +6024,13 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 			} else {
 				mountTry(state);
 			}
+			// Commit the resume's effects on BOTH paths (the retry runs in a thenable
+			// microtask, outside the normal flush): a full reveal RECREATES the destroyed
+			// layout effects (ReactSuspenseEffectsSemantics); a re-suspend (one of several
+			// promises resolved, another still pending) enqueued effects for the now-hidden
+			// subtree that drainPhase must SKIP (inactive) and CLEAR — without draining here
+			// the LAYOUT queue stays non-empty and the scheduler never goes quiescent.
+			commitEffects();
 		} finally {
 			if (wasHeld) tickTransitionCount(-1);
 		}
@@ -6808,6 +6880,55 @@ export function activityBlock(
  * the blocks all stay alive. Refs are intentionally LEFT attached to the
  * preserved (hidden) DOM — they point at valid, still-present nodes.
  */
+// Detach every host ref in a subtree (object refs → null, callback refs called with
+// null), collecting {ref, el} for later re-attach. Used ONLY by the suspense-hide path
+// (NOT by <Activity>, which intentionally keeps refs) so React's "refs cycle null→node
+// across a suspend, like layout effects" contract holds even though octane preserves the
+// DOM node. The compiler stores host refs as `slot._ref$N` paired with `slot._el$N` in a
+// component's local `scope.slots`; de-opt host slots store `state.ref` + the node. We
+// walk component-local slots for refs and recurse through children + control-flow slots
+// the same way deactivateScope does.
+function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
+	const slots = scope.slots;
+	for (let i = 0, n = slots.length; i < n; i++) {
+		const s = slots[i];
+		if (s === null || typeof s !== 'object') continue;
+		// De-opt host element slot (value-position `<tag>` / motion-style): { el, anchor, ref }.
+		if (s.ref != null && s.anchor !== undefined && s.el instanceof Element) {
+			out.push({ ref: s.ref, el: s.el });
+			attachRef(s.ref, null);
+		}
+		for (const k in s) {
+			// `_ref$N` (compiled template host ref). charCodeAt: '_'=95, 'r'=114.
+			if (k.charCodeAt(0) === 95 && k.charCodeAt(1) === 114 && k.charCodeAt(4) === 36) {
+				const ref = s[k];
+				if (ref == null) continue;
+				const el = s['_el$' + k.slice(5)];
+				out.push({ ref, el });
+				attachRef(ref, null);
+			}
+		}
+	}
+	const children = scope.children;
+	for (let i = 0, n = children.length; i < n; i++) detachSubtreeRefs(children[i].scope, out);
+	const cf = scope._slots;
+	if (cf !== null) {
+		for (let i = 0, n = cf.length; i < n; i++) {
+			const val = cf[i];
+			if (val.__kind === 'forBlockSlot') {
+				const it = (val.items as Map<any, Block>).values();
+				for (let r = it.next(); !r.done; r = it.next()) detachSubtreeRefs(r.value, out);
+				if (val.emptyBlock) detachSubtreeRefs(val.emptyBlock, out);
+			} else if (val.block) {
+				detachSubtreeRefs(val.block, out);
+				if (val.__kind === 'trySlotSlot' && val.tryBlock && val.tryBlock !== val.block) {
+					detachSubtreeRefs(val.tryBlock, out);
+				}
+			}
+		}
+	}
+}
+
 function deactivateScope(scope: Scope): void {
 	const hooks = scope.hooks;
 	if (hooks) {
