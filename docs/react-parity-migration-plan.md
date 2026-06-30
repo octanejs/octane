@@ -305,10 +305,9 @@ P4 and P5 are independent of P0–P3 and can run in parallel by a second contrib
      warnings + LOC are dev-only, strictly gated so prod output is byte-identical.
 
    Remaining (open, lower priority): the full React diff-matrix ports
-   (`ReactDOMHydrationDiff` + `ReactDOMServerIntegrationReconnecting`), and two documented
-   low-frequency edges (a client that empties a server-rendered list via `@empty`;
-   same-root-tag-but-different-nested-structure branches). The original "RESOLVED" label was
-   a stale tag for the DECISION; the feature is now actually built.
+   (`ReactDOMHydrationDiff` + `ReactDOMServerIntegrationReconnecting`). The original
+   "RESOLVED" label was a stale tag for the DECISION; the feature is now actually built —
+   including the `@for`↔`@empty` toggle and same-root-but-different-nested-structure branches.
 3. **Default transition indicator / `useMemoCache`** — still to confirm existence in
    Octane; skip their files if absent (low priority, does not block P0/P4).
 
