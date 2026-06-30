@@ -199,12 +199,19 @@ function warnHydrationStructuralMismatch(
 }
 
 /**
- * Does the adopted server node match the template root's shape? Compares nodeType, element
- * tag, AND the template's STATIC attributes. Static attrs are baked into the template (both
- * client + server emit them from the same JSX), so a differing/absent one means the server
- * rendered a DIFFERENT branch — even when the root tag is the same (e.g. `@switch` cases that
- * are all `<span>` but with a different `class`). DYNAMIC attrs are NOT in the template, so
- * they aren't checked here — a value divergence on those is handled by `setAttribute` (P2).
+ * Does the adopted server node match the template's shape? Compares nodeType, element tag,
+ * and the template's STATIC attributes (baked into the template by both client + server from
+ * the same JSX, so a differing/absent one means a DIFFERENT branch — e.g. `@switch` cases all
+ * `<span>` but with a different `class`). DYNAMIC attrs are NOT in the template, so they
+ * aren't checked here — a value divergence on those is handled by `setAttribute` (P2).
+ *
+ * It then recurses into the NESTED STATIC element structure, catching same-root branches that
+ * differ only in nested static markup (`<div><span/></div>` vs `<div><p/></div>`). The recursion
+ * BAILS (treats as a match) the moment a comment (a `<!>` hole placeholder / `<!--[-->` marker)
+ * or a text↔element shift appears: template holes don't align 1:1 with server content (a text
+ * hole is 0-or-1 node; a control-flow hole is a marker range), so anything hole-bearing can't
+ * be compared positionally and is left to the per-site recovery. This makes the check safe
+ * (never false-flags a hole-bearing template) while still catching pure-static divergences.
  */
 function hydrationNodeMatches(server: Node, template: Node): boolean {
 	if (server.nodeType !== template.nodeType) return false;
@@ -217,7 +224,16 @@ function hydrationNodeMatches(server: Node, template: Node): boolean {
 		const a = tAttrs[i];
 		if (s.getAttribute(a.name) !== a.value) return false;
 	}
-	return true;
+	let sc = s.firstChild;
+	let tc = t.firstChild;
+	while (sc !== null && tc !== null) {
+		if (sc.nodeType === 8 || tc.nodeType === 8) return true; // hole / marker — stop comparing
+		if (sc.nodeType !== tc.nodeType) return true; // text↔element shift — ambiguous, stop
+		if (tc.nodeType === 1 && !hydrationNodeMatches(sc, tc)) return false;
+		sc = sc.nextSibling;
+		tc = tc.nextSibling;
+	}
+	return true; // any leftover could be holes — assume a match
 }
 
 /** Remove the server nodes from `start` to `end` (inclusive). Used to discard a divergent range. */
@@ -7637,7 +7653,27 @@ export function forBlock<T, E = undefined>(
 		} else {
 			const bStart = document.createComment('empty');
 			const bEnd = document.createComment('/empty');
-			if (hydrating) {
+			// When the SERVER rendered a populated list but the client is empty now, the
+			// content inside the @for range is item blocks (`<!--[-->`), not the @empty body
+			// — a STRUCTURAL mismatch. Discard the server items and build @empty fresh with
+			// hydration suspended (so it client-mounts instead of mis-adopting an item).
+			let suspendForEmpty = false;
+			if (hydrating && isBlockOpen(state.start.nextSibling)) {
+				warnHydrationStructuralMismatch(
+					(domParent as any).__oct_loc,
+					'an empty list (@empty)',
+					'a populated list',
+				);
+				let n: Node | null = state.start.nextSibling;
+				while (n !== null && n !== state.end) {
+					const next: Node | null = n.nextSibling;
+					(n as ChildNode).remove();
+					n = next;
+				}
+				domParent.insertBefore(bStart, state.end);
+				domParent.insertBefore(bEnd, state.end);
+				suspendForEmpty = true;
+			} else if (hydrating) {
 				// The server rendered the @empty content directly inside the adopted
 				// `<!--[-->…<!--]-->` range — bracket it (don't insert at the end +
 				// re-mount, which would move the adopted content) and point the cursor
@@ -7659,7 +7695,10 @@ export function forBlock<T, E = undefined>(
 				undefined,
 			);
 			state.emptyBlock = b;
+			const savedHydrating = hydrating;
+			if (suspendForEmpty) hydrating = false;
 			renderBlock(b);
+			hydrating = savedHydrating;
 		}
 		// Advance the cursor past the whole @for so the next sibling's clone()
 		// doesn't read a position left inside this consumed range.
@@ -7672,6 +7711,29 @@ export function forBlock<T, E = undefined>(
 	if (state.emptyBlock) {
 		unmountBlock(state.emptyBlock);
 		state.emptyBlock = null;
+	}
+	// Hydrating + the SERVER rendered the @empty body (the node right after `start` is NOT an
+	// item's `<!--[-->`) but the client now has items — a STRUCTURAL mismatch. Discard the
+	// stale @empty DOM and point the cursor at `end` so the reconcile client-mounts the items
+	// into a clean range (mountItem's no-marker guard handles the build).
+	if (
+		hydrating &&
+		state.start.nextSibling !== null &&
+		state.start.nextSibling !== state.end &&
+		!isBlockOpen(state.start.nextSibling)
+	) {
+		warnHydrationStructuralMismatch(
+			(domParent as any).__oct_loc,
+			'a populated list',
+			'an empty list (@empty)',
+		);
+		let n: Node | null = state.start.nextSibling;
+		while (n !== null && n !== state.end) {
+			const next: Node | null = n.nextSibling;
+			(n as ChildNode).remove();
+			n = next;
+		}
+		hydrateNode = state.end;
 	}
 	const f = flags || 0;
 	let pure = (f & 1) !== 0;

@@ -12,8 +12,9 @@ mismatch could crash). Now:
 - **`suppressHydrationWarning`:** React shallow semantics — keeps the server value and
   suppresses the warning for that element. It is never serialized to the server HTML.
 - **Structural mismatch:** a swapped `@if`/`@switch` branch (including same-tag branches
-  that differ only by a static attribute), a changed tag, a host↔component swap, or an
-  over-long `@for` is detected and the affected subtree is rebuilt on the client (the stale
+  that differ only by a static attribute or by nested static markup), a changed tag, a
+  host↔component swap, or a changed `@for` length (longer, shorter, or toggled to/from the
+  `@empty` arm) is detected and the affected subtree is rebuilt on the client (the stale
   server nodes are discarded and the hydration cursor stays aligned, so following siblings
   still adopt correctly).
 - **Dev DX:** mismatch warnings include a Svelte-5-style source location

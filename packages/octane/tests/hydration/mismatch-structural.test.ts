@@ -16,6 +16,11 @@ const CONTROL = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/c
 const FORLIST = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/forlist.tsrx');
 const STRUCTURAL = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/structural.tsrx');
 const SWAP = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/swap.tsrx');
+const EMPTYFOR = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/emptyfor.tsrx');
+const NESTEDSWAP = join(
+	process.cwd(),
+	'packages/octane/tests/hydration/_fixtures/nested-swap.tsrx',
+);
 
 function serverModule(fixture: string, file: string): Record<string, any> {
 	let { code } = compile(readFileSync(fixture, 'utf8'), file, { mode: 'server' });
@@ -141,6 +146,24 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		expect(warns().length).toBeGreaterThanOrEqual(1);
 	});
 
+	it('same-root, different NESTED static structure: server <span>, client <p> → rebuilds', async () => {
+		const srv = serverModule(NESTEDSWAP, 'nested-swap.tsrx');
+		const cli = devClientModule(NESTEDSWAP, 'nested-swap.tsrx');
+		const { body } = await ServerRT.render(srv.NestedStatic, { x: true });
+		expect(body).toContain('<span class="s1">');
+		container.innerHTML = body;
+
+		// Both branches are `<section class="box">` — only the nested static markup differs.
+		hydrateRoot(container, cli.NestedStatic, { x: false });
+		flushSync(() => {});
+
+		const section = container.querySelector('section.box')!;
+		expect(section.querySelector('p.p1')).not.toBeNull(); // nested structure rebuilt
+		expect(section.querySelector('span.s1')).toBeNull(); // stale nested markup discarded
+		expect(section.textContent).toContain('two');
+		expect(warns().length).toBeGreaterThanOrEqual(1);
+	});
+
 	it('no warning + adopted unchanged when the branch matches', async () => {
 		const { body } = await ServerRT.render(server.Toggle, { on: true });
 		container.innerHTML = body;
@@ -215,5 +238,47 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		expect(btns.length).toBe(2);
 		flushSync(() => btns[1].click());
 		expect(picked).toEqual([2]);
+	});
+
+	it('@empty: server rendered items, client is empty → items discarded, @empty shown', async () => {
+		const srv = serverModule(EMPTYFOR, 'emptyfor.tsrx');
+		const cli = devClientModule(EMPTYFOR, 'emptyfor.tsrx');
+		const { body } = await ServerRT.render(srv.WithEmpty, {
+			items: [
+				{ id: 1, name: 'a' },
+				{ id: 2, name: 'b' },
+			],
+		});
+		expect(body).toContain('<li class="row">');
+		container.innerHTML = body;
+
+		hydrateRoot(container, cli.WithEmpty, { items: [] });
+		flushSync(() => {});
+
+		const ul = container.querySelector('#we')!;
+		expect(ul.querySelector('li.empty')).not.toBeNull(); // @empty branch built
+		expect(ul.querySelectorAll('li.row').length).toBe(0); // server items discarded
+		expect(ul.textContent).toContain('No items yet');
+	});
+
+	it('@empty: server rendered @empty, client has items → @empty discarded, items shown', async () => {
+		const srv = serverModule(EMPTYFOR, 'emptyfor.tsrx');
+		const cli = devClientModule(EMPTYFOR, 'emptyfor.tsrx');
+		const { body } = await ServerRT.render(srv.WithEmpty, { items: [] });
+		expect(body).toContain('<li class="empty">');
+		container.innerHTML = body;
+
+		hydrateRoot(container, cli.WithEmpty, {
+			items: [
+				{ id: 1, name: 'a' },
+				{ id: 2, name: 'b' },
+			],
+		});
+		flushSync(() => {});
+
+		const ul = container.querySelector('#we')!;
+		expect(ul.querySelectorAll('li.row').length).toBe(2); // items built
+		expect(ul.querySelector('li.empty')).toBeNull(); // server @empty discarded
+		expect(ul.textContent).not.toContain('No items yet');
 	});
 });
