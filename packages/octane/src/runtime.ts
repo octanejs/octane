@@ -84,6 +84,15 @@ export interface Scope {
 	// (vs. the old `scope[`_for$N`]` dynamic string keys) keeps the Scope object shape
 	// MONOMORPHIC: bindings no longer mutate the scope's hidden class per component.
 	slots: any[];
+	/**
+	 * DEV ONLY (set by `dev`-compiled bodies; `undefined` in production): a structured
+	 * hydration source-location table — `{ slotIndex: [line, column] }` — plus `locFile`,
+	 * the module's source file name. Read by hydration-mismatch warnings (`siteLoc`) to
+	 * report `App.tsrx:42:5`, and reusable by a future Chrome-DevTools element→source layer.
+	 * Absent (never allocated) in prod, so the Scope shape stays monomorphic there.
+	 */
+	locs?: Record<number, [number, number]>;
+	locFile?: string;
 }
 
 interface ChildScope {
@@ -102,6 +111,123 @@ interface ChildScope {
  */
 function ensureHooks(scope: Scope): Map<symbol, any> {
 	return scope.hooks ?? (scope.hooks = new Map());
+}
+
+/**
+ * DEV ONLY: format the source location of a slot (`childSlot`/`componentSlot`/control-flow/
+ * text-hole, keyed by its slot index) as `App.tsrx:42:5`, for hydration-mismatch warnings.
+ * Returns `''` when no dev LOC table is present (prod, or a slot without a recorded
+ * position) so callers degrade gracefully. The structured table (`scope.locs`) stays
+ * available for a future DevTools element→source layer. Used by the P2/P3 mismatch paths.
+ */
+function siteLoc(scope: Scope, slotKey: number): string {
+	const locs = scope.locs;
+	if (locs === undefined) return '';
+	const lc = locs[slotKey];
+	if (lc === undefined) return '';
+	return `${scope.locFile ?? '<unknown>'}:${lc[0]}:${lc[1]}`;
+}
+
+// ---------------------------------------------------------------------------
+// Hydration VALUE-mismatch reporting (P2). When the server-rendered text/attribute
+// at a dynamic site differs from the client's computed value, the runtime PATCHES the
+// DOM to the client value (React-recoverable; runs in dev AND prod) and, in dev, warns
+// with a source location. `suppressHydrationWarning` on the owning element (React's
+// shallow semantics) suppresses BOTH: the warning is skipped and the SERVER value is
+// kept (the documented escape hatch for intentional server/client differences).
+// ---------------------------------------------------------------------------
+
+/**
+ * Has the owning element opted out of hydration-mismatch handling? The compiler stamps a
+ * non-enumerable-ish `__oct_suppress` JS property (NOT a DOM attribute — it isn't
+ * serialized) on elements written as `<el suppressHydrationWarning>`. Read in dev AND prod
+ * because suppression changes the recovery (keep the server value), not just the warning.
+ */
+function isHydrationSuppressed(el: Node | null): boolean {
+	return el !== null && (el as any).__oct_suppress === true;
+}
+
+/**
+ * DEV-only hydration-mismatch warning. Gated on `loc` being non-empty — the dev source
+ * location (`el.__oct_loc` / `siteLoc(...)`) only exists in `dev`-compiled output, so in
+ * production `loc` is empty and this no-ops (the patch/recovery already ran regardless).
+ */
+function warnHydrationValueMismatch(
+	loc: string | undefined,
+	what: string,
+	serverVal: unknown,
+	clientVal: unknown,
+): void {
+	if (!loc) return;
+	console.error(
+		`Octane hydration mismatch at ${loc}: server rendered ${what} ` +
+			`${JSON.stringify(serverVal)} but the client rendered ${JSON.stringify(clientVal)}. ` +
+			`The client value was used. If this difference is intentional (e.g. a timestamp or ` +
+			`random id), add suppressHydrationWarning to the element.`,
+	);
+}
+
+/** DEV-only human-readable description of the server node at the cursor (for warnings). */
+function describeHydrationNode(node: Node | null): string {
+	if (node === null) return 'nothing';
+	if (node.nodeType === 1) return `<${(node as Element).localName}>`;
+	if (node.nodeType === 3) return `text ${JSON.stringify((node as Text).nodeValue)}`;
+	if (node.nodeType === 8) {
+		const d = (node as Comment).data;
+		if (d === HYDRATION_START) return 'a control-flow block';
+		if (d === HYDRATION_END) return 'the end of the parent block (fewer nodes than expected)';
+		return 'a comment';
+	}
+	return 'a node';
+}
+
+/**
+ * DEV-only STRUCTURAL hydration-mismatch warning (wrong tag / swapped branch / list shape /
+ * component-vs-host). Gated on `loc` truthiness so it no-ops in production — the recovery at
+ * the call site runs in dev AND prod regardless.
+ */
+function warnHydrationStructuralMismatch(
+	loc: string | undefined,
+	expected: string,
+	actual: string,
+): void {
+	if (!loc) return;
+	console.error(
+		`Octane hydration mismatch at ${loc}: the client expected ${expected} but the server ` +
+			`rendered ${actual}. The mismatched subtree was rebuilt on the client.`,
+	);
+}
+
+/**
+ * Does the adopted server node match the template root's shape? Compares nodeType, element
+ * tag, AND the template's STATIC attributes. Static attrs are baked into the template (both
+ * client + server emit them from the same JSX), so a differing/absent one means the server
+ * rendered a DIFFERENT branch — even when the root tag is the same (e.g. `@switch` cases that
+ * are all `<span>` but with a different `class`). DYNAMIC attrs are NOT in the template, so
+ * they aren't checked here — a value divergence on those is handled by `setAttribute` (P2).
+ */
+function hydrationNodeMatches(server: Node, template: Node): boolean {
+	if (server.nodeType !== template.nodeType) return false;
+	if (server.nodeType !== 1) return true;
+	const s = server as Element;
+	const t = template as Element;
+	if (s.localName !== t.localName) return false;
+	const tAttrs = t.attributes;
+	for (let i = 0; i < tAttrs.length; i++) {
+		const a = tAttrs[i];
+		if (s.getAttribute(a.name) !== a.value) return false;
+	}
+	return true;
+}
+
+/** Remove the server nodes from `start` to `end` (inclusive). Used to discard a divergent range. */
+function removeHydrationRange(start: Node, end: Node): void {
+	let n: Node | null = start;
+	while (n !== null) {
+		const next: Node | null = n === end ? null : n.nextSibling;
+		(n as ChildNode).remove();
+		n = next;
+	}
 }
 
 export type BlockKind = 'root' | 'control-flow' | 'dynamic' | 'portal';
@@ -2225,8 +2351,31 @@ let hydrateNode: Node | null = null;
 let hydrationSeeds: unknown[] | null = null;
 let hydrationSeedCursor = 0;
 
-export function clone<T extends Node>(node: T): T {
+export function clone<T extends Node>(node: T, loc?: string): T {
 	if (hydrating && hydrateNode !== null) {
+		// STRUCTURAL CHECK: the server node at the cursor must match this template root's
+		// shape (a swapped @if/@switch branch or a changed tag breaks this). On a mismatch,
+		// REBUILD the subtree on the client — discard the divergent server node/range, fall
+		// back to a fresh clone (whose markerless template routes nested slots to client
+		// mount), and advance the cursor past the discarded range so siblings stay aligned.
+		// `loc` is emitted only in dev, so the warning is dev-only; the rebuild runs always.
+		if (loc !== undefined && !hydrationNodeMatches(hydrateNode, node)) {
+			warnHydrationStructuralMismatch(
+				loc,
+				describeHydrationNode(node),
+				describeHydrationNode(hydrateNode),
+			);
+			const stale = hydrateNode;
+			if (isBlockOpen(stale)) {
+				const close = matchingClose(stale);
+				hydrateNode = close.nextSibling;
+				removeHydrationRange(stale, close);
+			} else {
+				hydrateNode = stale.nextSibling;
+				(stale as ChildNode).remove();
+			}
+			return node.cloneNode(true) as T;
+		}
 		// Adopt the server node at the cursor as this template's root. The cursor
 		// stays put so a hole-template's subsequent child()/sibling() walk descends
 		// into it; for a hole-free leaf the raw path-walk takes over from here.
@@ -2243,16 +2392,25 @@ export function clone<T extends Node>(node: T): T {
  * value matches the server text (avoiding a mismatch re-render).
  */
 export function htext(el: Node, value: unknown): Text {
-	if (hydrating) {
-		const first = el.firstChild;
-		if (first !== null && first.nodeType === 3) return first as Text;
-		// Server rendered an empty hole (value was ''/null) — create + adopt.
-	}
 	// Coerce here (mirrors setText) rather than at every call site — keeps the
 	// per-text-hole mount codegen to a bare `htext(el, _v)`. Mount-once, so folding
 	// the coercion in costs nothing on the hot update path.
 	const text =
 		value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+	if (hydrating) {
+		const first = el.firstChild;
+		if (first !== null && first.nodeType === 3) {
+			// Adopt the server text node. On a VALUE mismatch, patch to the client value
+			// (React-recoverable) unless the element opted out — then keep the server value.
+			const server = (first as Text).nodeValue;
+			if (server !== text && !isHydrationSuppressed(el)) {
+				warnHydrationValueMismatch((el as any).__oct_loc, 'text', server, text);
+				(first as Text).nodeValue = text;
+			}
+			return first as Text;
+		}
+		// Server rendered an empty hole (value was ''/null) — create + adopt.
+	}
 	const t = document.createTextNode(text);
 	el.appendChild(t);
 	return t;
@@ -2277,8 +2435,16 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 		value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
 	if (hydrating) {
 		if (posNode !== null && posNode.nodeType === 3) {
-			// Adopt the server text node.
-			if ((posNode as Text).nodeValue !== text) (posNode as Text).nodeValue = text;
+			// Adopt the server text node. On a VALUE mismatch, patch to the client value
+			// unless the owning element opted out (then keep the server value, React-style).
+			const server = (posNode as Text).nodeValue;
+			if (server !== text) {
+				const host = posNode.parentNode;
+				if (!isHydrationSuppressed(host)) {
+					warnHydrationValueMismatch(host && (host as any).__oct_loc, 'text', server, text);
+					(posNode as Text).nodeValue = text;
+				}
+			}
 			return posNode as Text;
 		}
 		// Server emitted no text node here (empty value, or it merged with an
@@ -2972,6 +3138,28 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		const html = value == null ? null : value.__html;
 		el.innerHTML = html == null || html === false ? '' : String(html);
 		return;
+	}
+	// Hydration VALUE-mismatch handling. The normal write below already PATCHES the adopted
+	// element to the client value (so prod recovers for free); here we only (dev) warn on a
+	// server/client divergence and (dev+prod) honor `suppressHydrationWarning` by keeping the
+	// server attribute. The server-attr read is skipped entirely when neither applies — so a
+	// non-suppressed prod hydration adds no `getAttribute` cost. Guarded by `hydrating`, so
+	// steady-state re-renders are untouched.
+	if (hydrating) {
+		const suppress = isHydrationSuppressed(el);
+		const loc = (el as any).__oct_loc;
+		if (suppress || loc !== undefined) {
+			const clientAttr =
+				value == null || value === false ? null : value === true ? '' : String(value);
+			const nsd = attrNamespace(name);
+			const serverAttr = nsd
+				? el.getAttributeNS(nsd, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
+				: el.getAttribute(name);
+			if (serverAttr !== clientAttr) {
+				if (suppress) return; // keep the server attribute (React semantics)
+				warnHydrationValueMismatch(loc, `attribute \`${name}\``, serverAttr, clientAttr);
+			}
+		}
 	}
 	const ns = attrNamespace(name);
 	if (value == null || value === false) {
@@ -4469,6 +4657,12 @@ function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 	if (props == null) return;
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
+		// `suppressHydrationWarning`: a JS flag (read by the hydration-mismatch paths), never
+		// a DOM attribute.
+		if (name === 'suppressHydrationWarning') {
+			(el as any).__oct_suppress = props[name] !== false;
+			continue;
+		}
 		applyDeoptProp(el, name, props[name], ownerBlock);
 	}
 }
@@ -4479,13 +4673,17 @@ function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock: Block): void {
 	if (prevProps != null) {
 		for (const name in prevProps) {
-			if (name === 'key' || name === 'children') continue;
+			if (name === 'key' || name === 'children' || name === 'suppressHydrationWarning') continue;
 			if (nextProps == null || !(name in nextProps)) removeDeoptProp(el, name);
 		}
 	}
 	if (nextProps != null) {
 		for (const name in nextProps) {
 			if (name === 'key' || name === 'children') continue;
+			if (name === 'suppressHydrationWarning') {
+				(el as any).__oct_suppress = nextProps[name] !== false;
+				continue;
+			}
 			const nv = nextProps[name];
 			if (prevProps == null || prevProps[name] !== nv) applyDeoptProp(el, name, nv, ownerBlock);
 		}
@@ -4565,6 +4763,10 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
 		const v = props[name];
+		if (name === 'suppressHydrationWarning') {
+			(el as any).__oct_suppress = v !== false;
+			continue;
+		}
 		if (name === 'ref') {
 			if (v !== state.ref) {
 				if (state.ref != null) attachRef(state.ref, null);
@@ -4866,6 +5068,40 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		hydrateNode = el.firstChild;
 		childSlot(block, 0, el, d.children, null);
 		hydrateNode = savedCursor;
+		return;
+	}
+	if (el === null && hydrating && hydrateNode !== null) {
+		// STRUCTURAL mismatch: the server rendered something other than this host element at
+		// the cursor (different tag, a component's `<!--[-->…<!--]-->` range, text, …). Warn,
+		// discard the divergent server node/range, advance the cursor, then build the correct
+		// element fresh with hydration SUSPENDED for its subtree (so children client-mount
+		// rather than mis-adopt). Recovery runs in dev + prod; the warning is dev-only.
+		warnHydrationStructuralMismatch(
+			(hydrateNode.parentNode as any)?.__oct_loc,
+			`<${d.type}>`,
+			describeHydrationNode(hydrateNode),
+		);
+		const stale = hydrateNode;
+		if (isBlockOpen(stale)) {
+			const close = matchingClose(stale);
+			hydrateNode = close.nextSibling;
+			removeHydrationRange(stale, close);
+		} else {
+			hydrateNode = stale.nextSibling;
+			(stale as ChildNode).remove();
+		}
+		el =
+			elNs !== undefined
+				? document.createElementNS(elNs, d.type as string)
+				: document.createElement(d.type as string);
+		block.deoptNode = el;
+		block.parentNode.insertBefore(el, block.endMarker);
+		applyDeoptProps(el, d.props, block);
+		setDeoptDesc(el, d);
+		const saved = hydrating;
+		hydrating = false;
+		childSlot(block, 0, el, d.children, null);
+		hydrating = saved;
 		return;
 	}
 	if (el === null || el.localName !== d.type || (elNs !== undefined && el.namespaceURI !== elNs)) {
@@ -5296,10 +5532,19 @@ export function childTextHole(
 			return cachedNode;
 		}
 		if (hydrating) {
-			// Adopt the server's markerless text (the host's sole child).
+			// Adopt the server's markerless text (the host's sole child). On a VALUE
+			// mismatch, patch to the client value (unless the host opted out) and, in dev,
+			// warn with the text hole's own source location (a tracked construct slot).
 			const f = domParent.firstChild;
 			if (f !== null && f.nodeType === 3) {
-				if ((f as Text).nodeValue !== str) (f as Text).nodeValue = str;
+				const server = (f as Text).nodeValue;
+				if (server !== str && !isHydrationSuppressed(domParent)) {
+					// LOC: this hole's tracked construct slot (the precise `{expr}` position);
+					// fall back to the host element's stamp only as defense-in-depth.
+					const loc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
+					warnHydrationValueMismatch(loc, 'text', server, str);
+					(f as Text).nodeValue = str;
+				}
 				return f as Text;
 			}
 		}
@@ -7465,7 +7710,26 @@ export function forBlock<T, E = undefined>(
 	// clone() starts after this block — covers the zero-item, no-@empty case where
 	// reconcileKeyed mounts nothing and the cursor would otherwise stay on the
 	// inner close marker.
-	if (hydrating) hydrateNode = state.end.nextSibling;
+	if (hydrating) {
+		discardLeftoverHydrationItems(state.end);
+		hydrateNode = state.end.nextSibling;
+	}
+}
+
+/**
+ * STRUCTURAL recovery for an @for where the SERVER rendered MORE items than the client now
+ * renders: after reconcile adopts the client's items, the cursor sits on the first unconsumed
+ * server item's marker (or at `end`). Discard everything between the cursor and `end` so the
+ * extra server rows don't linger. Same-parent guarded; stops AT `end` (never past it).
+ */
+function discardLeftoverHydrationItems(end: Node): void {
+	let n: Node | null = hydrateNode;
+	if (n === null || n === end || n.parentNode !== end.parentNode) return;
+	while (n !== null && n !== end) {
+		const next: Node | null = n.nextSibling;
+		(n as ChildNode).remove();
+		n = next;
+	}
 }
 
 function depsEqual(a: any[], b: any[]): boolean {
@@ -8061,6 +8325,35 @@ function mountItem<T, E>(
 		// cursor at its content for the body's clone(), then advance past it to the
 		// next item's marker. (Hydrated items thus carry markers — the singleRoot
 		// no-marker path is a client-mount-only optimization.)
+		if (!isBlockOpen(hydrateNode)) {
+			// STRUCTURAL list mismatch: the client renders more items than the server did,
+			// so the cursor isn't on an item's open marker (it's at the @for's end marker or
+			// other content). Without this guard `matchingClose` would walk off the end and
+			// crash. Recover by building THIS item fresh — suspend hydration for the item's
+			// whole subtree (via a re-entrant call) so it client-mounts instead of adopting.
+			warnHydrationStructuralMismatch(
+				(parentNode as any).__oct_loc,
+				'another list item',
+				describeHydrationNode(hydrateNode),
+			);
+			const saved = hydrating;
+			hydrating = false;
+			try {
+				return mountItem(
+					parentBlock,
+					parentNode,
+					anchor,
+					item,
+					index,
+					body,
+					extra,
+					forSlot,
+					singleRoot,
+				);
+			} finally {
+				hydrating = saved;
+			}
+		}
 		const itemStart = hydrateNode as Comment;
 		const itemEnd = matchingClose(itemStart as Node);
 		hydrateNode = itemStart.nextSibling;

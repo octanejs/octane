@@ -51,6 +51,9 @@ export function octane(options = {}) {
 				const out = compile(code, id, {
 					hmr: !ssr && !!hmrEnabled,
 					mode: ssr ? 'server' : 'client',
+					// Dev-only hydration source-LOC metadata — same serve+client gate as HMR.
+					// Off in SSR + prod builds, so production output is byte-identical.
+					dev: !ssr && !!hmrEnabled,
 				});
 				return { code: out.code, map: out.map };
 			}

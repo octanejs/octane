@@ -931,10 +931,26 @@ function buildSourceMap(source, sourceName, segments) {
 }
 
 /**
+ * Dev-only source location for a construct, as a `[line, column]` pair (1-based line,
+ * 0-based column — matches the AST). Returns `undefined` when not in dev OR the node has
+ * no position, so PROD constructs are unchanged (the LOC emit is fully gated downstream).
+ * @param {{ dev?: boolean }} ctx
+ * @param {any} node — an AST node (or anything with `.loc.start`)
+ * @returns {[number, number] | undefined}
+ */
+function devLoc(ctx, node) {
+	if (!ctx.dev) return undefined;
+	const l = node && node.loc && node.loc.start;
+	return l ? [l.line, l.column | 0] : undefined;
+}
+
+/**
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean, mode?: 'client' | 'server' }} [options] —
+ * @param {{ hmr?: boolean, mode?: 'client' | 'server', dev?: boolean }} [options] —
+ *   `dev: true` emits dev-only hydration source-location metadata (per-component
+ *   `__s.locs`/`__s.locFile`); strictly gated so production output is byte-identical.
  *   `hmr: true` wraps each exported component in `hmr(Component)` and emits an
  *   `import.meta.hot.accept(...)` block that delegates updates to the runtime
  *   HMR wrapper. Dev tooling (e.g. the Vite plugin) should pass `hmr: true` in
@@ -965,10 +981,16 @@ export function compile(source, filename, options) {
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	normalizeArrowComponents(ast);
 	const hmrEnabled = !!(options && options.hmr);
+	// Dev mode: emit dev-only hydration source-location metadata (a per-component
+	// `__s.locs` table of structured {line,column} keyed by slot index + the module file
+	// name), used by hydration-mismatch warnings and reusable by a future Chrome-DevTools
+	// element→source layer. Strictly dev-gated so PROD output is byte-identical (zero cost).
+	const devEnabled = !!(options && options.dev);
 
 	const ctx = {
 		filename,
 		mode,
+		dev: devEnabled,
 		runtimeNeeded: new Set(),
 		hoistedTemplates: [], // { name, html }
 		hoistedHelpers: [], // raw JS strings (sub-components, hook Symbols, key fns)
@@ -1660,6 +1682,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			rawAttrName = attr.name.name || attr.name;
 		}
 		if (rawAttrName === 'key') continue;
+		// `suppressHydrationWarning` is a client-only hydration hint — never serialize it.
+		if (rawAttrName === 'suppressHydrationWarning') continue;
 		// Events and refs have no server semantics — dropped.
 		if (rawAttrName === 'ref') continue;
 		if (rawAttrName.length > 2 && rawAttrName.startsWith('on') && /^[A-Z]/.test(rawAttrName[2]))
@@ -2296,6 +2320,15 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	if (statementCode) lines.push(statementCode);
 	if (inlinedSubs.length > 0)
 		lines.push(inlinedSubs.map((s) => '  ' + s.replace(/\n/g, '\n  ')).join('\n'));
+	// DEV ONLY: stash this component's hydration source-location table on the scope
+	// before any slot calls run (so a mismatch in this render can read it). Set once per
+	// scope instance. Emitted only when `dev` AND the body has located constructs, so prod
+	// output is byte-identical.
+	if (ctx.dev && plan.locs) {
+		lines.push(
+			`  if (__s.locs === undefined) { __s.locs = ${plan.locs}; __s.locFile = ${JSON.stringify(ctx.mapSourceName)}; }`,
+		);
+	}
 	if (plan.bindingsName) {
 		lines.push(`  let _b = __s.slots[0];`);
 		// Deferred property-write diffs (plan.everyRender) run on BOTH mount and
@@ -2488,13 +2521,17 @@ function lowerReturnJsx(node, ctx, componentName, compInlinedSubs) {
 	return rewriteJsxValues(node, ctx);
 }
 
-function memberProps(hn) {
+function memberProps(hn, src) {
 	return {
 		type: 'MemberExpression',
 		object: { type: 'Identifier', name: 'props' },
 		property: { type: 'Identifier', name: hn },
 		computed: false,
 		optional: false,
+		// Carry the ORIGINAL expression's source position onto the synthetic `props.hN`
+		// node so the extracted fragment keeps it (dev hydration LOC / DevTools). Without
+		// this, fragment extraction would silently drop the upstream position.
+		loc: src && src.loc,
 	};
 }
 function objectProp(hn, valNode) {
@@ -2526,7 +2563,7 @@ function extractFragment(node, ctx, holeProps) {
 			// passes the holes it collected here, and a captured local isn't in scope.
 			const hn = `h${holeProps.length}`;
 			holeProps.push(objectProp(hn, rewriteJsxValues(attr.argument, ctx)));
-			newAttrs.push({ ...attr, argument: memberProps(hn) });
+			newAttrs.push({ ...attr, argument: memberProps(hn, attr.argument) });
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') {
@@ -2552,8 +2589,8 @@ function extractFragment(node, ctx, holeProps) {
 				...attr,
 				value:
 					v.type === 'JSXExpressionContainer'
-						? { type: 'JSXExpressionContainer', expression: memberProps(hn) }
-						: memberProps(hn),
+						? { type: 'JSXExpressionContainer', expression: memberProps(hn, inner) }
+						: memberProps(hn, inner),
 			});
 		}
 	}
@@ -2586,7 +2623,7 @@ function extractFragment(node, ctx, holeProps) {
 					type: 'JSXExpressionContainer',
 					expression: {
 						type: 'TSAsExpression',
-						expression: memberProps(hn),
+						expression: memberProps(hn, expr.expression),
 						typeAnnotation: expr.typeAnnotation,
 					},
 				});
@@ -2597,7 +2634,7 @@ function extractFragment(node, ctx, holeProps) {
 				// can't prove. Re-assert it with an `as string` cast so the renderer keeps
 				// the text-binding classification (htext, markerless) instead of falling to
 				// a renderable childSlot, preserving byte-equality with the inline form.
-				const member = memberProps(hn);
+				const member = memberProps(hn, expr);
 				const rendered = isKnownStringExpression(expr, ctx.knownStringLocals)
 					? {
 							type: 'TSAsExpression',
@@ -2611,7 +2648,7 @@ function extractFragment(node, ctx, holeProps) {
 			if (isComponentTag(child)) {
 				const hn = `h${holeProps.length}`;
 				holeProps.push(objectProp(hn, jsxElementToCreateElement(child, ctx)));
-				newChildren.push({ type: 'JSXExpressionContainer', expression: memberProps(hn) });
+				newChildren.push({ type: 'JSXExpressionContainer', expression: memberProps(hn, child) });
 			} else {
 				newChildren.push(extractFragment(child, ctx, holeProps));
 			}
@@ -2632,6 +2669,7 @@ function extractFragment(node, ctx, holeProps) {
 							test: child.test,
 							consequent: child.consequent,
 							alternate: child.alternate || null,
+							loc: child.loc, // preserve position for dev hydration LOC
 						}
 					: child;
 			const ic = makeIfCall(
@@ -2680,6 +2718,7 @@ function extractFragment(node, ctx, holeProps) {
 							key: child.key || null,
 							index: child.index || null,
 							empty: child.empty || null,
+							loc: child.loc, // preserve position for dev hydration LOC
 						}
 					: child;
 			const rec = makeForCall(
@@ -2724,7 +2763,12 @@ function extractFragment(node, ctx, holeProps) {
 			const fc = ctx._foldCtx;
 			const swNode =
 				t === 'JSXSwitchExpression'
-					? { type: 'SwitchStatement', discriminant: child.discriminant, cases: child.cases || [] }
+					? {
+							type: 'SwitchStatement',
+							discriminant: child.discriminant,
+							cases: child.cases || [],
+							loc: child.loc, // preserve position for dev hydration LOC
+						}
 					: child;
 			const rec = makeSwitchCall(
 				swNode,
@@ -2772,6 +2816,7 @@ function extractFragment(node, ctx, holeProps) {
 							handler: child.handler || null,
 							finalizer: child.finalizer || null,
 							pending: child.pending || null,
+							loc: child.loc, // preserve position for dev hydration LOC
 						}
 					: child;
 			const rec = makeTryCall(
@@ -3345,6 +3390,7 @@ function normalizeChildren(nodes) {
 				openingElement: n.openingElement,
 				children: n.children || [],
 				selfClosing: n.openingElement.selfClosing,
+				loc: n.loc, // preserve element position for dev hydration LOC (component slots)
 			});
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
 			out.push(...normalizeChildren(n.children || []));
@@ -3358,6 +3404,7 @@ function normalizeChildren(nodes) {
 			// `alternate` are already BlockStatements per the new AST.
 			out.push({
 				type: 'IfStatement',
+				loc: n.loc, // preserve template directive position for dev hydration LOC
 				test: n.test,
 				consequent: n.consequent,
 				alternate: n.alternate || null,
@@ -3369,6 +3416,7 @@ function normalizeChildren(nodes) {
 			// ForOfStatement to plan keyed reconciliation.
 			out.push({
 				type: 'ForOfStatement',
+				loc: n.loc, // preserve template directive position for dev hydration LOC
 				left: n.left,
 				right: n.right,
 				body: n.body,
@@ -3383,6 +3431,7 @@ function normalizeChildren(nodes) {
 			// as the Suspense fallback branch).
 			out.push({
 				type: 'TryStatement',
+				loc: n.loc, // preserve template directive position for dev hydration LOC
 				block: n.block,
 				handler: n.handler || null,
 				finalizer: n.finalizer || null,
@@ -3393,6 +3442,7 @@ function normalizeChildren(nodes) {
 			// synthetic SwitchStatement for makeSwitchCall to consume.
 			out.push({
 				type: 'SwitchStatement',
+				loc: n.loc, // preserve template directive position for dev hydration LOC
 				discriminant: n.discriminant,
 				cases: n.cases || [],
 			});
@@ -3688,6 +3738,16 @@ function stripTsOnlyWrappers(node) {
 }
 
 function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html', cssHash = null) {
+	// DEV ONLY: per-element source-location map for THIS body (path-key → [line, col]),
+	// populated at the top of emitElementHtml and read in the binding mount loop to emit
+	// `<el>.__oct_loc = "file:line:col"` for bound elements — the location side-channel for
+	// hydration-mismatch warnings on param-less value sites (htext/htextSwap/setAttribute,
+	// which only have the element in hand) AND a future Chrome-DevTools element→source layer.
+	// Save/restore around this call so a NESTED planJsx (makeIfCall/makeForCall compiling a
+	// branch body during this body's emitElementHtml) can't clobber the outer body's map.
+	// `null` outside dev → zero work, prod output byte-identical.
+	const _prevElemLocs = ctx._elemLocs;
+	ctx._elemLocs = ctx.dev ? new Map() : null;
 	const allNodes = normalizeChildren(jsxNodesRaw);
 	// Partition hoisted `<title>`/`<meta>`/`<link>` out of the BODY-root set:
 	// `jsxNodes` (the body) drives single/multi-root + the template, while head
@@ -3698,8 +3758,10 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// Head-only body: no body template, hence no binding bag — the hoisted head
 	// elements take slots 0..M-1 (packed). The body case allocates head slots AFTER
 	// its constructs (see `headEmit` below), keeping every scope's `slots` packed.
-	if (jsxNodes.length === 0)
+	if (jsxNodes.length === 0) {
+		ctx._elemLocs = _prevElemLocs;
 		return { mount: '', update: '', after: '', head: emitHeadClient(headNodes, ctx, 0) };
+	}
 
 	// Emit ONE template containing all top-level JSX (wrapping multiple roots in
 	// a synthetic <octane-frag>).
@@ -3803,7 +3865,15 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const fragArg = !single && flag !== 0 ? 1 : 0;
 		const tplHtml = single || flag !== 0 ? html : `<octane-frag>${html}</octane-frag>`;
 		const tpl = allocTemplate(ctx, tplHtml, flag, fragArg);
-		mountLines.push(`    const _root = clone(${tpl});`);
+		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
+		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root
+		// only (a multi-root <octane-frag> wrapper has no source position); prod omits it.
+		let cloneLoc = '';
+		if (ctx.dev && single) {
+			const lc = devLoc(ctx, jsxNodes[0]);
+			if (lc) cloneLoc = `, ${JSON.stringify(`${ctx.mapSourceName}:${lc[0]}:${lc[1]}`)}`;
+		}
+		mountLines.push(`    const _root = clone(${tpl}${cloneLoc});`);
 		elementVars = new Map();
 		let varCounter = 0;
 		// Does this template contain a control-flow / component / portal hole? If so
@@ -3902,6 +3972,23 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		b.deferred = DEFERRABLE_MOUNT_KINDS.has(b.kind) && !spreadPaths.has(b.path.join(','));
 	}
 
+	// DEV ONLY: dedup set so each bound host element is stamped with `__oct_loc` ONCE,
+	// even when it carries several bindings. `null` outside dev → no stamping, prod
+	// output byte-identical.
+	const _locStamped = ctx.dev ? new Set() : null;
+	// DEV: stamp `<hostVar>.__oct_loc = "file:line:col"` ONCE per host element, so the
+	// hydration-mismatch paths (htext/setAttribute on the element; childTextHole/mountItem on
+	// the host) can report a source location. Prefers the host element's own position, falling
+	// back to a construct's. `null`/absent loc → no stamp; prod is byte-identical.
+	const stampHostLoc = (hostVar, pathArr, fallbackLoc) => {
+		if (!_locStamped || _locStamped.has(hostVar)) return;
+		const lc = (ctx._elemLocs && ctx._elemLocs.get(JSON.stringify(pathArr))) || fallbackLoc;
+		if (!lc) return;
+		_locStamped.add(hostVar);
+		mountLines.push(
+			`    ${hostVar}.__oct_loc = ${JSON.stringify(`${ctx.mapSourceName}:${lc[0]}:${lc[1]}`)};`,
+		);
+	};
 	// Emit per-binding mount code.
 	for (const b of elementBindings) {
 		// A sibling-position `{x as string}` text hole resolves to its POSITION node
@@ -3911,6 +3998,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// earlier sibling's `<!--[-->…<!--]-->` range). Everything else resolves to
 		// its host element.
 		const elVar = b.kind === 'text' ? ensureVar([...b.path, b.childIndex]) : ensureVar(b.path);
+		// DEV: stamp the HOST element (`b.path`, not the text-position node) with its source
+		// location, BEFORE the binding's mount runs — so a hydration value mismatch in
+		// htext/htextSwap/setAttribute (which only have the element) can report `file:line:col`.
+		if (_locStamped && b.kind !== 'text') stampHostLoc(elVar, b.path, undefined);
+		else if (_locStamped) stampHostLoc(ensureVar(b.path), b.path, undefined);
 		if (b.kind === 'text' || b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('setText');
 		if (b.kind === 'text') ctx.runtimeNeeded.add('htextSwap');
 		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
@@ -3944,6 +4036,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const elVar = ensureVar(fc.hostPath);
 		fc.elVar = elVar;
 		if (!noTemplate) mountLines.push(`    _b._for$${fc.id} = ${elVar};`);
+		if (!noTemplate) stampHostLoc(elVar, fc.hostPath, fc.loc);
 		if (fc.anchorPath) {
 			const anchorVar = ensureVar(fc.anchorPath);
 			fc.anchorVar = anchorVar;
@@ -3954,6 +4047,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const elVar = ensureVar(ic.hostPath);
 		ic.elVar = elVar;
 		if (!noTemplate) mountLines.push(`    _b._ifHost$${ic.id} = ${elVar};`);
+		if (!noTemplate) stampHostLoc(elVar, ic.hostPath, ic.loc);
 		if (ic.anchorPath) {
 			const anchorVar = ensureVar(ic.anchorPath);
 			ic.anchorVar = anchorVar;
@@ -3964,6 +4058,9 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const elVar = ensureVar(cc.hostPath);
 		cc.elVar = elVar;
 		if (!noTemplate) mountLines.push(`    _b._compHost$${cc.id} = ${elVar};`);
+		// DEV: stamp the child/component host element so a hydration mismatch in childTextHole
+		// (which has the host, not a template binding) can report `file:line:col`.
+		if (!noTemplate) stampHostLoc(elVar, cc.hostPath, cc.loc);
 		if (cc.anchorPath) {
 			const anchorVar = ensureVar(cc.anchorPath);
 			cc.anchorVar = anchorVar;
@@ -3983,6 +4080,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const elVar = ensureVar(tc.hostPath);
 		tc.elVar = elVar;
 		if (!noTemplate) mountLines.push(`    _b._tryHost$${tc.id} = ${elVar};`);
+		if (!noTemplate) stampHostLoc(elVar, tc.hostPath, tc.loc);
 		if (tc.anchorPath) {
 			const anchorVar = ensureVar(tc.anchorPath);
 			tc.anchorVar = anchorVar;
@@ -3994,6 +4092,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const elVar = ensureVar(sc.hostPath);
 		sc.elVar = elVar;
 		if (!noTemplate) mountLines.push(`    _b._switchHost$${sc.id} = ${elVar};`);
+		if (!noTemplate) stampHostLoc(elVar, sc.hostPath, sc.loc);
 		if (sc.anchorPath) {
 			const anchorVar = ensureVar(sc.anchorPath);
 			sc.anchorVar = anchorVar;
@@ -4300,6 +4399,8 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		throw new Error('Unclosed <Fragment ref={…}> — FragmentStart without matching FragmentEnd');
 	}
 	ctx._fragRefStack = _prevFragRefStack;
+	// Restore the outer plan's per-element LOC map — pairs with the save at planJsx top.
+	ctx._elemLocs = _prevElemLocs;
 
 	return {
 		// Control-flow-only bodies carry no bag → no `let _b … if (undefined) … else {}`
@@ -4314,7 +4415,20 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			.map((c) => c.line)
 			.join('\n'),
 		head: headEmit,
+		// DEV ONLY (`''` in prod → no body emission, byte-identical output): a structured
+		// `{ slotIndex: [line, column] }` literal for hydration-mismatch warnings + a future
+		// DevTools element→source layer. Keyed by the slot index the runtime already uses.
+		locs: ctx.dev ? buildLocsLiteral(allConstructs) : '',
 	};
+}
+
+/** Build the dev `__s.locs` object literal from constructs carrying a `.loc` (else ''). */
+function buildLocsLiteral(constructs) {
+	const entries = [];
+	for (const c of constructs) {
+		if (c.loc) entries.push(`${c.slotIndex}: [${c.loc[0]}, ${c.loc[1]}]`);
+	}
+	return entries.length ? `{ ${entries.join(', ')} }` : '';
 }
 
 // All `expr` strings get wrapped in `(…)` so ternaries / comma exprs / etc.
@@ -4340,6 +4454,9 @@ function emitDeferredMount(b, elVar) {
 
 function emitBindingMount(b, elVar) {
 	if (b.deferred) return emitDeferredMount(b, elVar);
+	// `suppressHydrationWarning`: stamp a JS flag (NOT a DOM attribute) the runtime reads to
+	// keep the server value + skip the warning on a hydration mismatch for this element.
+	if (b.kind === 'suppress') return `    ${elVar}.__oct_suppress = true;`;
 	const E = `(${b.expr})`;
 	switch (b.kind) {
 		case 'textOnlyChild': {
@@ -4627,6 +4744,7 @@ function emitNodeHtml(
 	if (node.type === 'TSRXExpression') {
 		const ch = {
 			id: ctx.nextHelperId++,
+			loc: devLoc(ctx, node),
 			isChild: true,
 			valueExpr: printExprWithTsrx(
 				resolveStyleExpr(rewriteJsxValues(node.expression, ctx), cssHash),
@@ -4726,6 +4844,10 @@ function emitElementHtml(
 	parentNs = 'html',
 	cssHash = null,
 ) {
+	// DEV: record this element's source position keyed by its template path, so the binding
+	// mount loop can stamp `<el>.__oct_loc` on bound elements (hydration-mismatch warnings on
+	// param-less value sites + a future DevTools layer). Keyed identically to `binding.path`.
+	if (ctx._elemLocs) ctx._elemLocs.set(JSON.stringify(path), devLoc(ctx, node));
 	// If the tag is a component (uppercase ident or MemberExpression), don't emit
 	// HTML — register a componentSlot call instead. Components don't change
 	// template namespace context; their bodies are compiled separately.
@@ -4802,6 +4924,17 @@ function emitElementHtml(
 		//     teardown+remount, wrap the element in a 1-line fn component and
 		//     put `key=` on that — the component slot will honour the key.
 		if (rawAttrName === 'key') continue;
+		// `suppressHydrationWarning` (React shallow semantics): NEVER a DOM attribute (not
+		// serialized client or server) — stamp a JS flag the runtime's hydration-mismatch
+		// paths read, so a server/client divergence on this element keeps the server value
+		// and skips the warning. Bare or `={true}`/`={expr}` opts in; only `={false}` doesn't.
+		if (rawAttrName === 'suppressHydrationWarning') {
+			const v = attr.value;
+			const inner = v && v.type === 'JSXExpressionContainer' ? v.expression : v;
+			const isFalse = inner && inner.type === 'Literal' && inner.value === false;
+			if (!isFalse) bindings.push({ id: bindings.length, kind: 'suppress', path });
+			continue;
+		}
 		// `className` is React-shape JSX; emit `class` in HTML so the browser
 		// actually applies it (and dynamic bindings also know which kind to pick).
 		const attrName = rawAttrName === 'className' ? 'class' : rawAttrName;
@@ -5328,6 +5461,7 @@ function emitElementHtml(
 						test: expr.test,
 						consequent: wrapAsBlockStmt(expr.consequent),
 						alternate: wrapAsBlockStmt(expr.alternate),
+						loc: expr.loc, // carry source position for dev hydration-mismatch LOC
 					};
 					const ic = makeIfCall(asIf, ctx, componentName, inlinedSubs, childNs, cssHash);
 					ic.hostPath = path;
@@ -5357,6 +5491,7 @@ function emitElementHtml(
 					// + childSlot path like the simpler Text branch.
 					const ch = {
 						id: ctx.nextHelperId++,
+						loc: devLoc(ctx, expr),
 						isChild: true,
 						valueExpr: printExprWithTsrx(
 							resolveStyleExpr(rewriteJsxValues(expr, ctx), cssHash),
@@ -5398,6 +5533,7 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs) {
 	const propsExpr = propsArg ? printExpr(propsArg) : 'undefined';
 	return {
 		id: ctx.nextHelperId++,
+		loc: devLoc(ctx, callNode),
 		bodyExpr,
 		targetExpr,
 		propsExpr,
@@ -5445,6 +5581,7 @@ function makeIfCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', cs
 
 	return {
 		id: ctx.nextHelperId++,
+		loc: devLoc(ctx, node),
 		condExpr,
 		condTest: node.test, // raw test AST — the fold threads it as a `props.hN` hole
 		thenHelper: thenHelperName,
@@ -5478,6 +5615,7 @@ function makeActivityCall(
 	inlinedSubs.push(bodyFn + ';');
 	return {
 		id: ctx.nextHelperId++,
+		loc: devLoc(ctx, node),
 		activity: true,
 		modeExpr,
 		thenHelper: bodyHelperName,
@@ -5584,6 +5722,7 @@ function soleRenderPropChild(children) {
 function makeChildCall(expr, ctx, cssHash) {
 	return {
 		id: ctx.nextHelperId++,
+		loc: devLoc(ctx, expr),
 		isChild: true,
 		valueExpr: printExpr(resolveStyleExpr(rewriteJsxValues(expr, ctx), cssHash)),
 	};
@@ -5711,7 +5850,16 @@ function makeCompCall(
 		}
 	}
 
-	return { id, compExpr, propsExpr, hostPath: null, keyExpr, liteEligible, singleRoot };
+	return {
+		id,
+		compExpr,
+		propsExpr,
+		hostPath: null,
+		keyExpr,
+		liteEligible,
+		singleRoot,
+		loc: devLoc(ctx, node),
+	};
 }
 
 // ===========================================================================
@@ -5803,6 +5951,7 @@ function makeTryCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', c
 	}
 	return {
 		id: ctx.nextHelperId++,
+		loc: devLoc(ctx, node),
 		tryHelper: tryHelperName,
 		catchHelper: catchHelperName,
 		pendingHelper: pendingHelperName,
@@ -5846,6 +5995,7 @@ function makeSwitchCall(node, ctx, componentName, inlinedSubs, parentNs = 'html'
 		'[' + caseRecords.map((r) => `[(${r.testExpr}), ${r.helper}]`).join(', ') + ']';
 	return {
 		id: ctx.nextHelperId++,
+		loc: devLoc(ctx, node),
 		discExpr,
 		discNode: node.discriminant, // AST — the fold threads it as a `props.hN` hole
 		casesArrayExpr,
@@ -6062,6 +6212,7 @@ function makeForCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', c
 
 	return {
 		id: ctx.nextHelperId++,
+		loc: devLoc(ctx, node),
 		itemsExpr,
 		keyHelper,
 		bodyHelper: itemHelperName,

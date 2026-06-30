@@ -17,7 +17,11 @@ delegateEvents(['click']);
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/head.tsrx');
 function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'head.tsrx', { mode: 'server' });
+	// Compile with the SAME (absolute) module id the client gets from the Vite plugin, so the
+	// CSS scope hash (which includes the filename) matches both sides — exactly as in a real
+	// app where client + server compile the same path. (A short name here desynced the hash,
+	// which the structural-mismatch static-attribute check would then flag + rebuild.)
+	let { code } = compile(readFileSync(FIXTURE, 'utf8'), FIXTURE, { mode: 'server' });
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		'const {$1} = __rt;',
