@@ -165,8 +165,14 @@ propagation heuristics are unpinned:
 
 ### Tier 4 — SSR / hydration determinism
 
-Octane SSR + hydration adoption work, but the *determinism* and *recovery* heuristics
-are untested, and there is **no mismatch detection** in the runtime.
+Octane SSR + hydration adoption work. **Mismatch detection + recovery is now implemented**
+(2026-06-30): on a server/client divergence the runtime patches VALUE mismatches (text/attr)
+to the client value, rebuilds STRUCTURAL mismatches (swapped `@if`/`@switch` branch, changed
+tag, host↔component swap, over-long `@for`), supports shallow `suppressHydrationWarning`, and
+emits dev-only warnings with Svelte-5-style source locations (`file:line:col`). Recovery runs
+in dev + prod; warnings + LOC are dev-only and strictly gated so prod output is byte-identical.
+The remaining Tier-4 gaps are the *determinism* heuristics below (useId agreement assertions,
+don't-blow-away-input, serialization matrix) and the full React diff-matrix ports.
 
 | React file | Gap | Severity |
 |---|---|---|
@@ -261,7 +267,7 @@ For each React `it(...)` we port:
 | **P2** | **Tier 1** hook heuristics + **Tier 7** error-in-effect / hook-order-after-catch / throw-during-reconcile. | P0 helpers | Medium |
 | **P3** | **Tier 2** context propagation through bailouts. | P1 (bailout semantics) | Medium |
 | **P4** | **Tier 3** controlled inputs + DOM attribute/event delegation matrix. Likely surfaces real runtime fixes. | — (independent) | Large |
-| **P5** | **Tier 4** SSR/hydration determinism (useId server≡client, don't-blow-away-input, mismatch detection + recovery, no-effects/refs-on-server, serialization). | — | Medium–Large (runtime: add mismatch detection) |
+| **P5** | **Tier 4** SSR/hydration determinism. ~~mismatch detection + recovery~~ **DONE (2026-06-30)** — detect/patch/rebuild + `suppressHydrationWarning` + dev source-LOC. Remaining: useId server≡client assertions, don't-blow-away-input, no-effects/refs-on-server, serialization matrix. | — | Medium |
 | **P6** | **Tier 5** Suspense/transition/activity timing + **Tier 6** lanes/interleaved. | P0 log helper | Medium |
 
 P4 and P5 are independent of P0–P3 and can run in parallel by a second contributor.
@@ -283,18 +289,26 @@ P4 and P5 are independent of P0–P3 and can run in parallel by a second contrib
    - This divergence must be written up in the user-facing docs (a "differences from
      React" note: Octane minimizes DOM moves on reorder, so which nodes are physically
      re-inserted can differ; final DOM is identical).
-2. **Hydration mismatch detect + recover — PLANNED, NOT YET IMPLEMENTED.** (The word
-   "RESOLVED" here was a stale label for the DECISION, not the status — it wrongly read as
-   done and contradicted the Tier 4 note above. Corrected.) **Current runtime status:**
-   `hydrateRoot` adopts the server DOM and renders, but there is NO mismatch
-   detection/warning, NO recovery (client-render the affected subtree), and NO
-   `suppressHydrationWarning` — exactly as the Tier 4 table states ("no mismatch detection
-   in the runtime"). The DECISION stands: build React's mismatch model — detect
-   server/client divergence during hydration, warn, recover by client-rendering the
-   affected subtree, and implement shallow `suppressHydrationWarning`, porting the diff
-   matrix (`ReactDOMHydrationDiff` + `ReactDOMServerIntegrationReconnecting`). This is open
-   P5 runtime work (substantial — adoption happens across many sites: hostElementBody,
-   childSlot, ifBlock/switchBlock/forBlock, text holes, mountTry).
+2. **Hydration mismatch detect + recover — IMPLEMENTED (2026-06-30).** `hydrateRoot` now
+   detects server/client divergence during hydration and recovers:
+   - **VALUE (text / attribute):** patched to the client value (`htext`/`htextSwap`/
+     `childTextHole`/`setAttribute`); `suppressHydrationWarning` (React shallow semantics)
+     keeps the server value + suppresses the warning, and is never serialized by SSR.
+   - **STRUCTURAL:** `clone()` compares the adopted server node vs the template (nodeType +
+     tag + static attributes) and rebuilds the subtree on a mismatch — discard the divergent
+     server range, fresh-clone, advance the cursor. Covers swapped `@if`/`@switch` branches
+     (including same-tag, via static attrs), changed tags, host↔component swaps. `mountItem`
+     guards the cursor (was a list-grow crash); `hostElementBody` + `forBlock` discard
+     leftover server nodes.
+   - **Dev DX:** warnings carry Svelte-5-style source locations (`file:line:col`) via a
+     dev-only `__s.locs` table + per-element `__oct_loc` stamps. Recovery runs in dev + prod;
+     warnings + LOC are dev-only, strictly gated so prod output is byte-identical.
+
+   Remaining (open, lower priority): the full React diff-matrix ports
+   (`ReactDOMHydrationDiff` + `ReactDOMServerIntegrationReconnecting`), and two documented
+   low-frequency edges (a client that empties a server-rendered list via `@empty`;
+   same-root-tag-but-different-nested-structure branches). The original "RESOLVED" label was
+   a stale tag for the DECISION; the feature is now actually built.
 3. **Default transition indicator / `useMemoCache`** — still to confirm existence in
    Octane; skip their files if absent (low priority, does not block P0/P4).
 
