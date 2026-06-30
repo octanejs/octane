@@ -234,6 +234,8 @@ function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope)
 	if (props != null) {
 		for (const k in props) {
 			if (k === 'key' || k === 'ref' || k === 'children') continue;
+			// Client-only hydration hint — never serialize it as a DOM attribute.
+			if (k === 'suppressHydrationWarning') continue;
 			// onX events have no server semantics (no DOM); drop them.
 			if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') continue;
 			const val = props[k];
@@ -396,6 +398,7 @@ export function ssrSpread(obj: unknown): string {
 	let out = '';
 	for (const k in obj as Record<string, unknown>) {
 		if (k === 'ref' || k === 'key' || k === 'children' || k === 'dangerouslySetInnerHTML') continue;
+		if (k === 'suppressHydrationWarning') continue; // client-only hydration hint
 		if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') continue; // onX
 		const v = (obj as Record<string, unknown>)[k];
 		if (k === 'style') out += ssrStyle(v);
