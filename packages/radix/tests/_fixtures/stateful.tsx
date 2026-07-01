@@ -28,6 +28,27 @@ export function AccordionSingle() {
 	);
 }
 
+// The scenario createContextScope exists for: a USER's standalone Collapsible provider
+// sits BETWEEN Accordion.Item (whose internal Collapsible is accordion-scoped) and the
+// Accordion.Trigger/Content. With plain shared context, the user's (closed) Collapsible
+// would hijack the Accordion's trigger; with scopes each reads its own context instances.
+export function ScopeIsolation() {
+	return (
+		<Accordion.Root type="single" collapsible defaultValue="a">
+			<Accordion.Item value="a">
+				<Accordion.Header>
+					<Collapsible.Root defaultOpen={false}>
+						<Accordion.Trigger data-testid="acc-trigger">{'A'}</Accordion.Trigger>
+						<Collapsible.Trigger data-testid="user-trigger">{'user'}</Collapsible.Trigger>
+						<Collapsible.Content data-testid="user-content">{'user-panel'}</Collapsible.Content>
+					</Collapsible.Root>
+				</Accordion.Header>
+				<Accordion.Content data-testid="acc-content">{'acc-panel'}</Accordion.Content>
+			</Accordion.Item>
+		</Accordion.Root>
+	);
+}
+
 export function AccordionMultiple() {
 	return (
 		<Accordion.Root type="multiple" defaultValue={['a']}>

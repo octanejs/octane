@@ -44,15 +44,18 @@ children-position `<Trigger asChild><button/></Trigger>`.
 - Composition foundation — `Slot`, `Slottable`, `Primitive.<tag>` (`asChild`), `mergeProps`
   (event chaining, `style` merge, clsx-style `class` composition), `composeRefs` /
   `useComposedRefs`, `composeEventHandlers`.
-- State foundation — `useControllableState` (controlled/uncontrolled) and `Presence`
-  (keeps a child mounted through its CSS exit animation).
-- Components — `Separator`, `Label`, `Collapsible`, `Accordion` (single + multiple).
+- State foundation — `useControllableState` (controlled/uncontrolled), `Presence` (keeps a
+  child mounted through its CSS exit animation), and the full **`createContextScope`**
+  (`createScope` + `composeContextScopes`) so composed primitives can't collide.
+- Components — `Separator`, `Label`, `Collapsible` (`Presence`-wrapped content with the
+  `--radix-collapsible-content-height/-width` CSS vars), `Accordion` (single + multiple;
+  `createAccordionScope` composes `createCollapsibleScope`, `__scope*` threaded through
+  every part — scope isolation is covered by a dedicated test).
 
-Deferred follow-ups (documented in
-[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): `createContextScope`
-scope-isolation (Collapsible/Accordion use plain octane context for now); `Collapsible`'s
-`--radix-collapsible-content-height` CSS-var measurement + `Presence`-based exit-animation
-defer; and Accordion's arrow-key roving focus (a separate reusable primitive).
+Deferred follow-up (documented in
+[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): Accordion's
+arrow-key roving focus (`RovingFocusGroup` — a separate reusable primitive, also needed by
+Tabs / Toolbar / RadioGroup).
 
 Next: the overlay family (Dialog / Popover / Tooltip / DropdownMenu) on top of
 `@octanejs/floating-ui`, plus a differential-vs-real-`@radix-ui` harness.

@@ -9,6 +9,7 @@ export { Slot, Slottable } from './Slot';
 export { Primitive } from './Primitive';
 export { composeRefs, useComposedRefs } from './compose-refs';
 export { composeEventHandlers } from './compose-event-handlers';
+export { createContextScope } from './context';
 export { useControllableState } from './useControllableState';
 export { Presence } from './Presence';
 

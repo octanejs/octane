@@ -649,14 +649,35 @@ export function flushSync<T>(fn: () => T): T {
 		commitEffectsSync();
 		// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
 		// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
-		// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY, so
-		// loop render → layout effects until the queue settles (bounded to avoid an unbounded
-		// loop for a genuinely cascading effect; the tail — if any — still spills to the async
-		// scheduler below, matching the prior fallback).
-		for (let guard = 0; QUEUE.length > 0 && guard < LAYOUT_CASCADE_LIMIT; guard++) {
-			const err = drainQueue();
-			if (err !== null && pendingError === null) pendingError = err;
-			commitEffectsSync();
+		// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
+		// needed so derived layout state (e.g. a presence/exit-animation gate) is committed
+		// before flushSync returns. But octane also deliberately FORGIVES non-convergent
+		// cascades (an unstable `useSyncExternalStore` getSnapshot re-scheduling its component
+		// from every layout pass — React throws "maximum update depth"/"getSnapshot should be
+		// cached"; octane must neither hang nor burst-render). Discriminate by CONVERGENCE:
+		// keep draining while each pass schedules only blocks not yet seen in this flushSync
+		// (a finite cascade propagating through the tree — it exhausts quickly since
+		// Object.is-equal setStates bail); the moment a block re-schedules ITSELF a second
+		// time, the cascade is non-convergent — stop and hand the remainder to the async
+		// scheduler, which advances it lazily (one render per microtask), exactly the
+		// pre-existing behavior divergent stores rely on. LAYOUT_CASCADE_LIMIT backstops
+		// pathological wide-but-finite chains.
+		if (QUEUE.length > 0) {
+			const seen = new Set<Block>(QUEUE);
+			let defer = false;
+			for (let guard = 0; QUEUE.length > 0 && !defer && guard < LAYOUT_CASCADE_LIMIT; guard++) {
+				const err = drainQueue();
+				if (err !== null && pendingError === null) pendingError = err;
+				commitEffectsSync();
+				for (let i = 0; i < QUEUE.length; i++) {
+					const b = QUEUE[i];
+					if (seen.has(b)) {
+						defer = true;
+						break;
+					}
+					seen.add(b);
+				}
+			}
 		}
 		if (QUEUE.length > 0 && !scheduled) {
 			scheduled = true;
@@ -669,9 +690,8 @@ export function flushSync<T>(fn: () => T): T {
 	}
 }
 
-// Bound on synchronous render→layout-effect→render cascades inside flushSync. Matches
-// React's "maximum update depth" backstop; a cascade that hasn't settled by here spills
-// to the async scheduler rather than hanging.
+// Backstop bound on synchronous render→layout-effect→render passes inside flushSync (the
+// convergence check above is the primary brake; this catches wide-but-finite chains).
 const LAYOUT_CASCADE_LIMIT = 50;
 
 // ---------------------------------------------------------------------------
