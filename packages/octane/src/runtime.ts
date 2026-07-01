@@ -4752,6 +4752,9 @@ interface HostComponentSlot {
 	el: Element;
 	anchor: Comment;
 	ref: any;
+	// The props applied last render — diffed against the next render so props/events that
+	// DISAPPEARED get removed (not left stale on the reused element).
+	props?: any;
 	// Stable delegating children body + its current target (see hostComponent).
 	body?: ComponentBody;
 	latest?: ComponentBody | null;
@@ -4817,6 +4820,39 @@ export function hostComponent(
 // ref is attached once and only re-attached when it changes (not every render),
 // while className/style/events/attributes are idempotently re-set.
 function applyHostProps(el: Element, props: any, scope: Scope, state: HostComponentSlot): void {
+	const prev = state.props;
+	// REMOVE props/events present last render but gone now (parity with setSpread /
+	// patchDeoptProps) — a reused element must not keep stale props/listeners.
+	if (prev != null) {
+		for (const k in prev) {
+			if (k === 'key' || k === 'children') continue;
+			if (props != null && k in props) continue;
+			if (k === 'ref') {
+				if (prev.ref != null) {
+					attachRef(prev.ref, null);
+					if (state.ref === prev.ref) state.ref = undefined;
+				}
+				continue;
+			}
+			if (k === 'suppressHydrationWarning') {
+				(el as any).__oct_suppress = false;
+				continue;
+			}
+			const removedEv = eventSlot(k);
+			if (removedEv) {
+				(el as any)[removedEv.key] = null;
+			} else if (k === 'className' || k === 'class') {
+				el.removeAttribute('class');
+			} else if (k === 'style') {
+				setStyle(el as HTMLElement, null, prev[k]);
+			} else if (k === 'dangerouslySetInnerHTML') {
+				el.innerHTML = '';
+			} else {
+				el.removeAttribute(k);
+			}
+		}
+	}
+	state.props = props;
 	if (props == null) return;
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
@@ -4834,19 +4870,22 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 		} else if (name === 'className' || name === 'class') {
 			setDeoptClass(el, v);
 		} else if (name === 'style') {
-			setStyle(el as HTMLElement, v, undefined);
-		} else if (
-			name.length > 2 &&
-			name.charCodeAt(0) === 111 /* o */ &&
-			name.charCodeAt(1) === 110 /* n */ &&
-			name.charCodeAt(2) >= 65 &&
-			name.charCodeAt(2) <= 90 /* on<Upper> → delegated event */
-		) {
-			const type = name.slice(2).toLowerCase();
-			(el as any)['$$' + type] = v;
-			delegateEvents([type]);
+			setStyle(el as HTMLElement, v, prev != null ? prev.style : undefined);
 		} else {
-			setAttribute(el, name, v);
+			// Use `eventSlot` (NOT a hand-rolled `on<Upper>` parse) so capture-phase handlers
+			// resolve to the CAPTURE key + register a capture-phase listener — `onClickCapture`
+			// was previously mis-delegated as a bubbling `clickcapture` event.
+			const ev = eventSlot(name);
+			if (ev) {
+				if (ev.capture) {
+					if (!_delegatedCapture.has(ev.type)) delegateCaptureEvents([ev.type]);
+				} else if (!_delegated.has(ev.type)) {
+					delegateEvents([ev.type]);
+				}
+				(el as any)[ev.key] = v;
+			} else {
+				setAttribute(el, name, v);
+			}
 		}
 	}
 }
