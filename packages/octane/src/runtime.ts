@@ -3432,6 +3432,14 @@ const CAPTURE_PREFIX = '$$capture:';
 // `gotpointercapture` / `lostpointercapture` literally end in "capture", so they're
 // excluded from the suffix rule (`onGotPointerCapture` is the bubble handler for
 // `gotpointercapture`; `onGotPointerCaptureCapture` is its capture handler).
+function jsxEventName(rest: string): string {
+	// JSX-compatible `onDoubleClick` maps to the native DOM `dblclick` event.
+	// Keep this centralized so direct compiler bindings and spread/de-opt bindings stamp
+	// the same slot key and register the same delegated event.
+	if (rest === 'DoubleClick') return 'dblclick';
+	return rest.toLowerCase();
+}
+
 function eventSlot(name: string): { type: string; key: string; capture: boolean } | null {
 	if (!isEventKey(name)) return null;
 	let rest = name.slice(2);
@@ -3445,7 +3453,7 @@ function eventSlot(name: string): { type: string; key: string; capture: boolean 
 		capture = true;
 		rest = rest.slice(0, rest.length - 7);
 	}
-	const type = rest.toLowerCase();
+	const type = jsxEventName(rest);
 	return { type, key: capture ? CAPTURE_PREFIX + type : '$$' + type, capture };
 }
 
@@ -4252,22 +4260,17 @@ export function createElement<P>(
 	// React-shape contract: positional children ARE `props.children`. A COMPONENT
 	// descriptor reaches its body through componentSlot, which forwards `props` only
 	// (not `descriptor.children`) — so a component that reads `{props.children}`
-	// (rendered via childSlot) needs them mirrored into props. This lets a React-style
-	// `.tsx` parent (`<Provider>…</Provider>` → `createElement(Provider, {}, …)`) pass
-	// children into a `.tsrx` `{props.children}` consumer, matching the `.tsrx`→`.tsrx`
-	// path (which threads a `children` render-fn prop). Host descriptors keep using
-	// `descriptor.children` via the de-opt reconciler — and applyDeoptProps already
-	// skips `props.children` — so this is scoped to the component case. Only fold in
-	// children when positional ones were given and props didn't already carry an
-	// explicit `children`, so a fresh emit isn't clobbered.
+	// (rendered via childSlot) needs them mirrored into props. Host descriptors also
+	// expose children through `props.children`, matching React element shape and making
+	// clone/render-prop patterns in React ecosystem bindings preserve host children.
+	// Positional children override an explicit `props.children`, matching React.
 	//
 	// We copy-on-write: a fresh props object is allocated only when there's a `key` to
-	// strip or children to fold in, so the compiler's hot 2-arg `createElement(Comp,
-	// props)` path (no key, no positional children) stays allocation-free and never
-	// touches the caller's object.
+	// strip or positional children to fold in, so the compiler's hot 2-arg
+	// `createElement(Comp, props)` path stays allocation-free and never touches the
+	// caller's object.
 	const stripKey = src != null && 'key' in src;
-	const addChildren =
-		typeof type === 'function' && hasPositional && (src == null || src.children === undefined);
+	const addChildren = hasPositional;
 	let p: any = src ?? {};
 	if (stripKey || addChildren) {
 		p = src != null ? { ...src } : {};
