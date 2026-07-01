@@ -25,8 +25,18 @@ Everything in `@octanejs/lexical` Phases 1–3, in a real app:
 Try: type Markdown (`# `, `- `, `> `, `---`, `` ` ``), `#hashtags`, toggle formats
 and block types from the toolbar, undo/redo.
 
-## Not yet ported (needs later phases)
+## Not yet wired here
 
-The full playground's mentions/emoji typeahead, draggable blocks, tables UI, image
-& equation nodes, comments, and collaboration require `@octanejs/lexical` Phases
-4–6. This example grows as those land.
+The full playground has more surface than this example currently exercises. Two
+distinct reasons:
+
+- **Ported, just not wired in yet** — the binding plugins exist in `@octanejs/lexical`
+  (`LexicalTypeaheadMenuPlugin`, `LexicalDraggableBlockPlugin`, `LexicalTablePlugin`,
+  the node-menu / context-menu family). Mentions/emoji typeahead, draggable blocks, and
+  the tables UI can be built on top of them here.
+- **Playground-specific custom nodes** — image & equation nodes, comments, etc. are the
+  playground's own `DecoratorNode`s, not `@lexical/react` modules; they'd be ported as
+  app code.
+
+Real-time collaboration is the one feature still blocked on a binding module
+(`LexicalCollaborationPlugin`). This example grows as these land.
