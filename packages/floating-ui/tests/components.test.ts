@@ -81,6 +81,7 @@ describe('@octanejs/floating-ui — FloatingFocusManager (modal)', () => {
 });
 
 import { Toolbar } from './_fixtures/toolbar.tsx';
+import { CompositeRenderPropApp } from './_fixtures/composite-render.tsx';
 
 describe('@octanejs/floating-ui — Composite', () => {
 	it('renders items with a single tab stop (roving tabindex) + arrow navigation', async () => {
@@ -102,6 +103,16 @@ describe('@octanejs/floating-ui — Composite', () => {
 		for (let i = 0; i < 4; i++) await tick();
 		expect(items[1].getAttribute('tabindex')).toBe('0');
 		expect(items[0].getAttribute('tabindex')).toBe('-1');
+		r.unmount();
+	});
+
+	it('preserves host children when cloning an element passed to the render prop', async () => {
+		const r = mount(CompositeRenderPropApp);
+		const tick = () => new Promise((res) => setTimeout(res, 0));
+		for (let i = 0; i < 6; i++) await tick();
+		const button = r.container.querySelector('.rendered-button') as HTMLElement;
+		expect(button).not.toBe(null);
+		expect(button.textContent).toBe('Save');
 		r.unmount();
 	});
 });
