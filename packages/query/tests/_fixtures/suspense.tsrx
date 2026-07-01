@@ -1,5 +1,5 @@
 import { Suspense } from 'octane';
-import { QueryClientProvider, useQuery } from '@octanejs/query';
+import { QueryClientProvider, useQuery, useSuspenseQueries } from '@octanejs/query';
 
 // A suspense query: throws its in-flight promise (→ @pending) and, on error,
 // throws the error (→ @catch).
@@ -30,6 +30,30 @@ export function SuspenseComponentApp(props: { client: unknown; queryFn: () => Pr
 	<QueryClientProvider client={props.client}>
 		<Suspense fallback={<span id="fallback">loading</span>}>
 			<SuspendingReader queryFn={props.queryFn} />
+		</Suspense>
+	</QueryClientProvider>
+}
+
+function SuspenseQueriesReader(props: { a: () => Promise<string>; b: () => Promise<string> }) @{
+	const results = useSuspenseQueries({
+		queries: [
+			{ queryKey: ['sq', 'a'], queryFn: props.a },
+			{ queryKey: ['sq', 'b'], queryFn: props.b },
+		],
+	});
+	<span id="data">
+		{'data:' + results[0].data + '/' + results[1].data as string}
+	</span>
+}
+
+export function SuspenseQueriesApp(props: {
+	client: unknown;
+	a: () => Promise<string>;
+	b: () => Promise<string>;
+}) @{
+	<QueryClientProvider client={props.client}>
+		<Suspense fallback={<span id="fallback">loading</span>}>
+			<SuspenseQueriesReader a={props.a} b={props.b} />
 		</Suspense>
 	</QueryClientProvider>
 }

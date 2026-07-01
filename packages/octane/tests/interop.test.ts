@@ -68,6 +68,17 @@ it('SERVER createElement lifts `key` out of props too (SSR ≡ client — no pro
 	expect(caller.key).toBe('k2');
 });
 
+it('SERVER createElement mirrors and overrides props.children like the client', async () => {
+	const { createElement: serverCreateElement } = await import('octane/server');
+	const host = serverCreateElement('button', { type: 'button' } as any, 'Save');
+	expect((host.props as any).children).toBe('Save');
+	expect(host.children).toBe('Save');
+
+	const comp = serverCreateElement(Comp as any, { children: 'old' }, 'new');
+	expect((comp.props as any).children).toBe('new');
+	expect(comp.children).toBe('new');
+});
+
 it('createElement does NOT mutate the caller-supplied props object', () => {
 	const caller = { foo: 1 } as any;
 	const el = createElement(Comp, caller, 'child');
@@ -84,4 +95,16 @@ it('createElement keeps the hot 2-arg path allocation-free (props passed through
 	const el = createElement(Comp, caller);
 	expect(el.props).toBe(caller); // same reference — no copy
 	expect(el.key).toBe(null);
+});
+
+it('createElement mirrors positional children into host props.children', () => {
+	const el = createElement('button', { type: 'button' } as any, 'Save');
+	expect((el.props as any).children).toBe('Save');
+	expect(el.children).toBe('Save');
+});
+
+it('createElement positional children override explicit props.children', () => {
+	const el = createElement(Comp, { children: 'old' } as any, 'new');
+	expect((el.props as any).children).toBe('new');
+	expect(el.children).toBe('new');
 });
