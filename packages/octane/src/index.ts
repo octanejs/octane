@@ -64,6 +64,8 @@ export {
 	setText,
 	setAttribute,
 	setClassName,
+	setClassAttr,
+	normalizeClass,
 	setStyle,
 	setSpread,
 	setFormAction,

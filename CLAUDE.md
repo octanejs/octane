@@ -107,6 +107,10 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
 - **Keyed reconciler is LIS-based** (minimal DOM moves), not React's
   `lastPlacedIndex`. The final DOM is identical; the set of physically-moved nodes
   can differ. Survivor node identity and final order ARE guaranteed (and tested).
+- **`class` / `className` compose clsx-style.** Strings, numbers, arrays, objects,
+  and nesting all compose into a class string (falsy drops out), at every apply site
+  (client, spread, SVG, scoped `<style>`, SSR) via `normalizeClass`. React coerces an
+  array `className` to `"a,b"`; Octane yields `"a b"`. A plain string is the fast path.
 - **No class components, no Server Components, no StrictMode double-invoke.**
 - Octane otherwise matches React's observable hook/effect/Suspense/transition
   semantics — including effect ordering (child-first on mount, parent-first cleanup

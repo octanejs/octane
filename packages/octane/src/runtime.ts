@@ -3199,7 +3199,42 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	else el.setAttribute(name, v);
 }
 
-export function setClassName(el: Element, value: string | null | undefined): void {
+// Compose a `class` / `className` value into a class string, clsx-style. Strings
+// pass straight through (the hot path — a single `typeof`); finite numbers stringify
+// (falsy `0` contributes nothing); arrays recurse and join truthy parts with a space;
+// plain objects contribute the keys whose values are truthy; `null` / `undefined` /
+// `false` / `true` contribute nothing. This mirrors the `clsx` / `classnames` packages
+// so `class={['a', cond && 'b', { c: isC }]}` works like the React ecosystem expects.
+// The identical function lives in runtime.server.ts so SSR and the client compose
+// byte-equal class strings (hydration parity).
+export function normalizeClass(value: unknown): string {
+	if (typeof value === 'string') return value;
+	if (typeof value !== 'object') {
+		// number → its decimal form; `0` (and any other falsy primitive) drops out.
+		return typeof value === 'number' && value ? '' + value : '';
+	}
+	if (value === null) return '';
+	let str = '';
+	if (Array.isArray(value)) {
+		for (let i = 0; i < value.length; i++) {
+			const item = value[i];
+			if (item) {
+				const inner = normalizeClass(item);
+				if (inner) str = str ? str + ' ' + inner : inner;
+			}
+		}
+	} else {
+		for (const k in value as Record<string, unknown>) {
+			if ((value as Record<string, unknown>)[k]) str = str ? str + ' ' + k : k;
+		}
+	}
+	return str;
+}
+
+export function setClassName(el: Element, value: unknown): void {
+	// clsx-compose first so arrays / objects become a class string (and the hydration
+	// compare below sees the value we actually write).
+	const cls = normalizeClass(value);
 	// Hydration VALUE-mismatch detection for `class` (parity with `setAttribute`): the write
 	// below patches to the client value; here we (dev) warn on a server/client divergence and
 	// honor `suppressHydrationWarning` (keep the server class). Skipped unless dev or suppressed
@@ -3208,27 +3243,36 @@ export function setClassName(el: Element, value: string | null | undefined): voi
 		const suppress = isHydrationSuppressed(el);
 		const loc = (el as any).__oct_loc;
 		if (suppress || loc !== undefined) {
-			const client = value == null ? '' : String(value);
 			const serverClass = el.getAttribute('class') ?? '';
-			if (serverClass !== client) {
+			if (serverClass !== cls) {
 				if (suppress) return; // keep the server class
-				warnHydrationValueMismatch(loc, 'attribute `class`', serverClass, client);
+				warnHydrationValueMismatch(loc, 'attribute `class`', serverClass, cls);
 			}
 		}
 	}
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
-	// setAttribute(el, 'class', ...) directly — never routes here — because
-	// SVGElement.className is a read-only SVGAnimatedString and assignment
+	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
+	// because SVGElement.className is a read-only SVGAnimatedString and assignment
 	// is a no-op in real browsers.
-	(el as any).className = value == null ? '' : value;
+	(el as any).className = cls;
 }
 
-// SVG-safe class setter for the de-opt path, which (unlike the compiled template)
-// can hit an SVGElement whose `className` is a read-only SVGAnimatedString. Routes
-// SVG through setAttribute('class', …) and keeps HTML on the fast `setClassName`.
-function setDeoptClass(el: Element, value: string | null | undefined): void {
+// SVG/MathML class setter for compiled TEMPLATE bindings, where `className` is a
+// read-only SVGAnimatedString so the fast `setClassName` can't be used. clsx-composes
+// the value; a nullish/false value REMOVES the attribute (parity with the generic
+// setAttribute this binding routed through before clsx composition existed).
+export function setClassAttr(el: Element, value: unknown): void {
+	if (value == null || value === false) el.removeAttribute('class');
+	else el.setAttribute('class', normalizeClass(value));
+}
+
+// SVG-safe class setter for the de-opt / hostComponent paths, which (unlike the
+// compiled template) can hit an SVGElement whose `className` is a read-only
+// SVGAnimatedString. Routes SVG through setAttribute('class', …) and keeps HTML on the
+// fast `setClassName`; both clsx-compose the value.
+function setDeoptClass(el: Element, value: unknown): void {
 	if (el.namespaceURI === SVG_NS) {
-		el.setAttribute('class', value == null ? '' : String(value));
+		el.setAttribute('class', normalizeClass(value));
 	} else {
 		setClassName(el, value);
 	}
@@ -3455,7 +3499,7 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 		if (k === 'class' || k === 'className') {
 			if (v === pv) continue;
 			if (v == null || v === false) el.removeAttribute('class');
-			else el.setAttribute('class', v === true ? '' : String(v));
+			else el.setAttribute('class', normalizeClass(v));
 			continue;
 		}
 		if (k === 'style') {

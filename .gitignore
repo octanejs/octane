@@ -6,3 +6,7 @@ build
 coverage
 .vite
 *.log
+
+# Differential-parity build artifact: the `@tsrx/react`-compiled fixture output the
+# differential test rigs regenerate under each package's tests on every run.
+.react-cache/

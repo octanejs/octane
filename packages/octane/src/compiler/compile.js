@@ -2078,6 +2078,70 @@ function applyStyleMap(stmt, ctx) {
 	}
 }
 
+// Wrap every DYNAMIC `class` / `className` expression in a `normalizeClass(...)` call
+// BEFORE the scoped-CSS hash is appended. `@tsrx/core`'s annotate_with_hash bakes the
+// hash onto a dynamic class via a template literal — `` `${expr} <hash>` `` — which would
+// stringify an array/object clsx value the wrong way (`['a','b']` → "a,b", `{}` →
+// "[object Object]"). Normalizing first makes the interpolated slot a plain string, so
+// the hash concat stays correct AND clsx composition works in scoped components. (It also
+// turns a bare `class={undefined}` in a scoped component from "undefined <hash>" into just
+// "<hash>".) Unscoped components need no wrap — the runtime `setClassName` / `ssrAttr`
+// normalize the raw value directly. String literals are left alone so they keep folding
+// into the static template. Stops at nested component function boundaries (their class
+// exprs belong to a different scope), mirroring annotate_with_hash's own traversal.
+function wrapScopedClassExprs(node, ctx) {
+	if (!node || typeof node !== 'object') return;
+	if (Array.isArray(node)) {
+		for (const item of node) wrapScopedClassExprs(item, ctx);
+		return;
+	}
+	if (
+		(node.type === 'FunctionDeclaration' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'ArrowFunctionExpression') &&
+		node.metadata?.tsrx_dynamic_wrapper !== true
+	) {
+		return;
+	}
+	if (node.type === 'JSXElement') {
+		const attrs = node.openingElement?.attributes;
+		if (Array.isArray(attrs)) {
+			for (const attr of attrs) {
+				if (
+					attr?.type === 'JSXAttribute' &&
+					attr.name?.type === 'JSXIdentifier' &&
+					(attr.name.name === 'class' || attr.name.name === 'className') &&
+					attr.value?.type === 'JSXExpressionContainer'
+				) {
+					const expr = attr.value.expression;
+					// Skip string literals (fold statically) and `{style …}` directives
+					// (resolveStyleExpr owns those). Everything else is a runtime value.
+					if (
+						expr &&
+						!(expr.type === 'Literal' && typeof expr.value === 'string') &&
+						expr.type !== 'Style' &&
+						!isStyleCall(expr)
+					) {
+						attr.value.expression = {
+							type: 'CallExpression',
+							callee: { type: 'Identifier', name: 'normalizeClass' },
+							arguments: [expr],
+							optional: false,
+						};
+						ctx.runtimeNeeded.add('normalizeClass');
+					}
+				}
+			}
+		}
+	}
+	for (const key of Object.keys(node)) {
+		if (key === 'loc' || key === 'start' || key === 'end' || key === 'parent') continue;
+		if (key === 'metadata' || key === 'css') continue;
+		const v = node[key];
+		if (v && typeof v === 'object') wrapScopedClassExprs(v, ctx);
+	}
+}
+
 function applyCssScoping(componentNode, ctx) {
 	if (!componentNode.body || componentNode.body.type !== 'JSXCodeBlock') return null;
 	let cssHash = null;
@@ -2116,6 +2180,9 @@ function applyCssScoping(componentNode, ctx) {
 	// strip JSXStyleElement nodes (annotateWithHash returns null for them when
 	// preserve_style_elements=false, so we filter nulls out of children).
 	if (componentNode.body.render) {
+		// Normalize dynamic class exprs BEFORE the hash is appended (see helper), so
+		// clsx array/object values compose correctly alongside the scope hash.
+		wrapScopedClassExprs(componentNode.body.render, ctx);
 		componentNode.body.render = annotateWithHash(
 			componentNode.body.render,
 			cssHash,
@@ -4016,8 +4083,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
 		if (b.kind === 'attr') ctx.runtimeNeeded.add('setAttribute');
 		if (b.kind === 'class') {
-			if (b.ns && b.ns !== 'html') ctx.runtimeNeeded.add('setAttribute');
-			else ctx.runtimeNeeded.add('setClassName');
+			if (b.ns && b.ns !== 'html') {
+				// SVG/MathML `className` is read-only — use setClassAttr, which sets the
+				// attribute + clsx-composes (setClassName handles composition on HTML).
+				ctx.runtimeNeeded.add('setClassAttr');
+			} else ctx.runtimeNeeded.add('setClassName');
 		}
 		if (b.kind === 'style') ctx.runtimeNeeded.add('setStyle');
 		if (b.kind === 'formAction') ctx.runtimeNeeded.add('setFormAction');
@@ -4519,9 +4589,7 @@ function emitBindingMount(b, elVar) {
 			// On SVG/MathML hosts the `className` property is read-only — fall back
 			// to setAttribute. Compile-time choice, zero runtime branching.
 			const setter =
-				b.ns && b.ns !== 'html'
-					? `setAttribute(${elVar}, "class", _v)`
-					: `setClassName(${elVar}, _v)`;
+				b.ns && b.ns !== 'html' ? `setClassAttr(${elVar}, _v)` : `setClassName(${elVar}, _v)`;
 			return `    {
       const _v = ${E};
       ${setter};
@@ -4626,7 +4694,7 @@ function emitBindingUpdate(b) {
 		case 'class': {
 			const setter =
 				b.ns && b.ns !== 'html'
-					? `setAttribute(_b._el$${b.id}, "class", _v)`
+					? `setClassAttr(_b._el$${b.id}, _v)`
 					: `setClassName(_b._el$${b.id}, _v)`;
 			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { ${setter}; _b._prev$${b.id} = _v; } }`;
 		}
