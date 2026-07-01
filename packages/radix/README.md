@@ -39,12 +39,20 @@ children-position `<Trigger asChild><button/></Trigger>`.
 
 ## Status
 
-**Phase 0 (foundation) + first proof components.** Landed:
+**Phase 0 (foundation) + Phase 1 (first stateful components).** Landed:
 
 - Composition foundation — `Slot`, `Slottable`, `Primitive.<tag>` (`asChild`), `mergeProps`
   (event chaining, `style` merge, clsx-style `class` composition), `composeRefs` /
   `useComposedRefs`, `composeEventHandlers`.
-- Components — `Separator`, `Label`.
+- State foundation — `useControllableState` (controlled/uncontrolled) and `Presence`
+  (keeps a child mounted through its CSS exit animation).
+- Components — `Separator`, `Label`, `Collapsible`, `Accordion` (single + multiple).
 
-Next: `useControllableState` + `Presence` + `createContextScope`, then `Accordion` and the
-overlay family (Dialog / Popover / Tooltip / DropdownMenu) on top of `@octanejs/floating-ui`.
+Deferred follow-ups (documented in
+[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): `createContextScope`
+scope-isolation (Collapsible/Accordion use plain octane context for now); `Collapsible`'s
+`--radix-collapsible-content-height` CSS-var measurement + `Presence`-based exit-animation
+defer; and Accordion's arrow-key roving focus (a separate reusable primitive).
+
+Next: the overlay family (Dialog / Popover / Tooltip / DropdownMenu) on top of
+`@octanejs/floating-ui`, plus a differential-vs-real-`@radix-ui` harness.

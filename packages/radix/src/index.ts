@@ -9,7 +9,11 @@ export { Slot, Slottable } from './Slot';
 export { Primitive } from './Primitive';
 export { composeRefs, useComposedRefs } from './compose-refs';
 export { composeEventHandlers } from './compose-event-handlers';
+export { useControllableState } from './useControllableState';
+export { Presence } from './Presence';
 
-// Components (namespaced, e.g. `<Separator.Root/>`).
+// Components (namespaced, e.g. `<Separator.Root/>`, `<Accordion.Root/>`).
 export * as Separator from './Separator';
 export * as Label from './Label';
+export * as Collapsible from './Collapsible';
+export * as Accordion from './Accordion';

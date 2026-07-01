@@ -3174,7 +3174,15 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		const loc = (el as any).__oct_loc;
 		if (suppress || loc !== undefined) {
 			const clientAttr =
-				value == null || value === false ? null : value === true ? '' : String(value);
+				name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')
+					? value == null
+						? null
+						: String(value)
+					: value == null || value === false
+						? null
+						: value === true
+							? ''
+							: String(value);
 			const nsd = attrNamespace(name);
 			const serverAttr = nsd
 				? el.getAttributeNS(nsd, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
@@ -3184,6 +3192,13 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				warnHydrationValueMismatch(loc, `attribute \`${name}\``, serverAttr, clientAttr);
 			}
 		}
+	}
+	// `aria-*` attributes are ENUMERATED (React parity): `false` renders as "false"
+	// (NOT removed) and `true` as "true" (NOT ""); only null/undefined removes them.
+	if (name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')) {
+		if (value == null) el.removeAttribute(name);
+		else el.setAttribute(name, String(value));
+		return;
 	}
 	const ns = attrNamespace(name);
 	if (value == null || value === false) {
