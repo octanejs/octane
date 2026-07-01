@@ -178,7 +178,7 @@ don't-blow-away-input, serialization matrix) and the full React diff-matrix port
 |---|---|---|
 | `ReactDOMUseId-test.js` (17) | **useId server ≡ client byte-stability** — stable under wrapper indirection (`:168`), multiple-ids-per-component (`:331`), `identifierPrefix` (`:894`), reveal-order-independent. Octane has `useId` on both sides (`runtime.ts:1674`, `runtime.server.ts:333`) but **nothing asserts they agree**. | **High** |
 | `ReactDOMServerIntegrationUserInteraction-test.js` (14) | **Hydration must not blow away user input** typed before hydration completes — input/range/checkbox/textarea/select, controlled + uncontrolled, incl. cascading/late hydration. | **High** |
-| `ReactDOMHydrationDiff-test.js` (37) + `ReactDOMServerIntegrationReconnecting-test.js` (50) | The **mismatch detection matrix**: (client-extra vs server-extra) × (element vs text) × position; number↔string-of-same-number reconnects clean; whitespace differences DO error; empty-component vs node vs empty-text distinguishable. Requires building mismatch detection in the runtime. | Medium |
+| ~~`ReactDOMHydrationDiff-test.js` (37) + `ReactDOMServerIntegrationReconnecting-test.js` (50)~~ **DONE (2026-07-01)** — ported as `tests/conformance/hydration-mismatch.test.ts` (24 outcome-level cases). Surfaced + fixed 5 runtime bugs (clone close-marker, ifBlock/switchBlock empty-branch cursor + leftover discard, setStyle + setClassName detection). Divergences documented: octane patches attrs to client (React keeps server), warns+rebuilds in place (React throws+re-renders boundary), and function components carry hydration markers (so component-form ≠ bare-element-form). | ~~Medium~~ |
 | `ReactDOMServerIntegrationHooks-test.js` (`:606`), `…Refs-test.js` (`:41`), `ReactDOMFizzForm-test.js` (`:442,:531,:549`) | **Effects and ref callbacks do NOT run on server**; hooks render initial values; useFormStatus not-pending / useActionState+useOptimistic return initial on server. (Octane tests "effects don't run on server" partially in `ssr.test.ts`; extend to refs + form hooks.) | Medium |
 | `ReactDOMServerIntegrationElements/Attributes/Input/Select/Textarea/Fragment-test.js` | **Serialization heuristics**: text-node/whitespace separators so hydration can split adjacent text; nullish/zero/false child coercion; boolean/reserved-attribute rules; `value`→attribute (input) vs value→children (textarea) vs selected-option (select); fragment flattening. Each `itRenders` is simultaneously server-output + hydration-adopt + mismatch-recovery. | Medium |
 | `ReactDOMForm-test.js` (47) + `ReactDOMFizzForm-test.js` (16) | useActionState dispatch-order + error-cancel (`:1099,:1328`); useFormStatus activation rule (pending only in transition/preventDefault path `:2078,:2146,:2217`); uncontrolled inputs auto-reset after action (`:1521`); function-action replay-after-hydration. (Octane `actions.test.ts` covers the basics; deepen.) | Medium |
@@ -304,10 +304,16 @@ P4 and P5 are independent of P0–P3 and can run in parallel by a second contrib
      dev-only `__s.locs` table + per-element `__oct_loc` stamps. Recovery runs in dev + prod;
      warnings + LOC are dev-only, strictly gated so prod output is byte-identical.
 
-   Remaining (open, lower priority): the full React diff-matrix ports
-   (`ReactDOMHydrationDiff` + `ReactDOMServerIntegrationReconnecting`). The original
-   "RESOLVED" label was a stale tag for the DECISION; the feature is now actually built —
-   including the `@for`↔`@empty` toggle and same-root-but-different-nested-structure branches.
+   The React diff-matrix (`ReactDOMHydrationDiff` + `ReactDOMServerIntegrationReconnecting`)
+   is now PORTED as `tests/conformance/hydration-mismatch.test.ts` (24 outcome-level cases),
+   which surfaced + fixed 5 more runtime bugs (clone close-marker; ifBlock/switchBlock
+   empty-branch cursor + leftover discard; setStyle + setClassName mismatch detection). The
+   original "RESOLVED" label was a stale tag for the DECISION; the feature is now actually
+   built — including the `@for`↔`@empty` toggle and same-root-but-different-nested-structure
+   branches. Documented intentional divergences: octane patches attribute mismatches to the
+   client value (React keeps the server value); it warns + rebuilds in place rather than
+   throwing + re-rendering the boundary; and function components carry hydration markers, so a
+   component-form does not silently reconnect to a bare-element-form of the same markup.
 3. **Default transition indicator / `useMemoCache`** — still to confirm existence in
    Octane; skip their files if absent (low priority, does not block P0/P4).
 

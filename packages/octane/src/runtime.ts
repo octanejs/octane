@@ -2382,6 +2382,13 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 				describeHydrationNode(hydrateNode),
 			);
 			const stale = hydrateNode;
+			if (stale.nodeType === 8 && (stale as Comment).data === HYDRATION_END) {
+				// The server rendered NOTHING at this slot (the cursor sits on the ENCLOSING
+				// block's close marker — e.g. a client-only `@if` branch the server left empty).
+				// Build fresh but consume nothing: don't remove the close marker (it delimits the
+				// parent range) and don't advance, so the enclosing block finishes correctly.
+				return node.cloneNode(true) as T;
+			}
 			if (isBlockOpen(stale)) {
 				const close = matchingClose(stale);
 				hydrateNode = close.nextSibling;
@@ -3193,6 +3200,22 @@ export function setAttribute(el: Element, name: string, value: any): void {
 }
 
 export function setClassName(el: Element, value: string | null | undefined): void {
+	// Hydration VALUE-mismatch detection for `class` (parity with `setAttribute`): the write
+	// below patches to the client value; here we (dev) warn on a server/client divergence and
+	// honor `suppressHydrationWarning` (keep the server class). Skipped unless dev or suppressed
+	// so a non-suppressed prod hydration adds no cost. Guarded by `hydrating`.
+	if (hydrating) {
+		const suppress = isHydrationSuppressed(el);
+		const loc = (el as any).__oct_loc;
+		if (suppress || loc !== undefined) {
+			const client = value == null ? '' : String(value);
+			const serverClass = el.getAttribute('class') ?? '';
+			if (serverClass !== client) {
+				if (suppress) return; // keep the server class
+				warnHydrationValueMismatch(loc, 'attribute `class`', serverClass, client);
+			}
+		}
+	}
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', ...) directly — never routes here — because
 	// SVGElement.className is a read-only SVGAnimatedString and assignment
@@ -3222,7 +3245,26 @@ const IMPORTANT_SUFFIX = '!important';
 
 export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): void {
 	const style = (el as HTMLElement).style;
+	// Hydration VALUE-mismatch detection for `style`: apply the client value (patches for
+	// free, as with attributes) then, in dev, warn if it actually changed the adopted server
+	// style. The before/after `cssText` compare needs no manual serialization and no-ops when
+	// the styles match. `suppressHydrationWarning` keeps the server style + suppresses.
+	if (hydrating) {
+		const before = style.cssText;
+		if (isHydrationSuppressed(el)) {
+			// Keep the server style — skip the client apply entirely.
+			return;
+		}
+		applyStyleValue(style, value, prev);
+		if (style.cssText !== before) {
+			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, style.cssText);
+		}
+		return;
+	}
+	applyStyleValue(style, value, prev);
+}
 
+function applyStyleValue(style: CSSStyleDeclaration, value: any, prev: any): void {
 	if (value == null || value === false || value === '') {
 		if (prev != null && prev !== false && prev !== '') style.cssText = '';
 		return;
@@ -7075,6 +7117,12 @@ export function ifBlock(
 					bStart = state.start;
 					bEnd = state.end as Node;
 					borrowed = true;
+					// Hydrating with no inner branch markers = the SERVER rendered this branch
+					// EMPTY (the client now renders content, or vice-versa). Park the cursor on
+					// the slot's first node (the close marker when empty) so the branch body's
+					// clone() sees "nothing here" and client-builds, instead of reading a stale
+					// cursor.
+					if (hydrating) hydrateNode = state.start.nextSibling;
 				}
 				const b = createBlock(
 					'control-flow',
@@ -7088,6 +7136,22 @@ export function ifBlock(
 				if (borrowed) b.exclusiveMarkers = true;
 				state.block = b;
 				renderBlock(b);
+			} else if (hydrating && state.start.nextSibling !== state.end) {
+				// EMPTY client branch, but the server rendered content in this slot (e.g. an
+				// `@else` with content on the server, empty `@if` on the client). Discard the
+				// stale server range so the empty branch leaves a clean range + siblings stay
+				// aligned (structural mismatch).
+				warnHydrationStructuralMismatch(
+					siteLoc(parentScope, slotKey),
+					'an empty branch',
+					describeHydrationNode(state.start.nextSibling),
+				);
+				let n: Node | null = state.start.nextSibling;
+				while (n !== null && n !== state.end) {
+					const next: Node | null = n.nextSibling;
+					(n as ChildNode).remove();
+					n = next;
+				}
 			}
 		} else if (firstMount && body) {
 			// First client mount — pick the boundary by what the branch renders.
@@ -7486,6 +7550,12 @@ export function switchBlock(
 					bStart = state.start;
 					bEnd = state.end as Node;
 					borrowed = true;
+					// Hydrating with no inner branch markers = the SERVER rendered this branch
+					// EMPTY (the client now renders content, or vice-versa). Park the cursor on
+					// the slot's first node (the close marker when empty) so the branch body's
+					// clone() sees "nothing here" and client-builds, instead of reading a stale
+					// cursor.
+					if (hydrating) hydrateNode = state.start.nextSibling;
 				}
 				const b = createBlock(
 					'control-flow',
@@ -7499,6 +7569,22 @@ export function switchBlock(
 				if (borrowed) b.exclusiveMarkers = true;
 				state.block = b;
 				renderBlock(b);
+			} else if (hydrating && state.start.nextSibling !== state.end) {
+				// EMPTY client branch, but the server rendered content in this slot (e.g. an
+				// `@else` with content on the server, empty `@if` on the client). Discard the
+				// stale server range so the empty branch leaves a clean range + siblings stay
+				// aligned (structural mismatch).
+				warnHydrationStructuralMismatch(
+					siteLoc(parentScope, slotKey),
+					'an empty branch',
+					describeHydrationNode(state.start.nextSibling),
+				);
+				let n: Node | null = state.start.nextSibling;
+				while (n !== null && n !== state.end) {
+					const next: Node | null = n.nextSibling;
+					(n as ChildNode).remove();
+					n = next;
+				}
 			}
 		} else if (firstMount && body) {
 			// First client mount — self-mark a single-element case, else mint markers.
