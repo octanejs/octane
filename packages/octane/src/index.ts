@@ -106,4 +106,4 @@ export {
 	type ComponentBody,
 	type Scope,
 	type Block,
-} from './runtime';
+} from './runtime.js';

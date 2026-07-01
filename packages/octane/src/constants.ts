@@ -8,8 +8,9 @@
  * Values follow the Svelte/Ripple convention (`[` open, `]` close) so the
  * protocol is familiar and the marker comments are compact.
  *
- * Nothing emits these yet — SSR codegen and the hydrate runtime are built in
- * later phases of the SSR plan. This module is the shared home they'll import.
+ * The server emit (runtime.server `ssrBlock` and friends) writes these markers
+ * around every dynamic site, and the client `hydrateRoot` cursor scans for them
+ * to align with the server output. This module is the shared home both import.
  */
 
 /** Single-character payload of a block-open comment. */

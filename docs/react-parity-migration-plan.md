@@ -172,13 +172,14 @@ to the client value, rebuilds STRUCTURAL mismatches (swapped `@if`/`@switch` bra
 tag, host↔component swap, over-long `@for`), supports shallow `suppressHydrationWarning`, and
 emits dev-only warnings with Svelte-5-style source locations (`file:line:col`). Recovery runs
 in dev + prod; warnings + LOC are dev-only and strictly gated so prod output is byte-identical.
-The remaining Tier-4 gaps are the *determinism* heuristics below (useId agreement assertions,
-don't-blow-away-input, serialization matrix) and the full React diff-matrix ports.
+The remaining Tier-4 gaps are the *determinism* heuristics below — the serialization matrix
+and the deeper SSR hook/ref/form ports. useId server≡client agreement, don't-blow-away-input,
+and the React diff-matrix ports are now done (see below).
 
 | React file | Gap | Severity |
 |---|---|---|
-| `ReactDOMUseId-test.js` (17) | **useId server ≡ client byte-stability** — stable under wrapper indirection (`:168`), multiple-ids-per-component (`:331`), `identifierPrefix` (`:894`), reveal-order-independent. Octane has `useId` on both sides (`runtime.ts:1674`, `runtime.server.ts:333`) but **nothing asserts they agree**. | **High** |
-| `ReactDOMServerIntegrationUserInteraction-test.js` (14) | **Hydration must not blow away user input** typed before hydration completes — input/range/checkbox/textarea/select, controlled + uncontrolled, incl. cascading/late hydration. | **High** |
+| ~~`ReactDOMUseId-test.js` (17)~~ **DONE (2026-06-30)** — `tests/conformance/useid-determinism.test.ts` asserts client stability (across re-renders, wrapper indirection, multiple ids per component) AND **server ≡ client byte-equality after `hydrateRoot()`**. Fixed in `hydrateRoot()`: the client `_idCounter` resets to 0 at the start of hydration so it lines up with the server's per-render reset. | ~~High~~ |
+| ~~`ReactDOMServerIntegrationUserInteraction-test.js` (14)~~ **DONE (2026-07-01)** — `tests/conformance/user-input-hydration.test.ts` (6 cases): input/range/checkbox/textarea/select, controlled + uncontrolled, keep the user's typed value across hydration (octane only ever writes ATTRIBUTES, never the dirty `.value`/`.checked` property) with no spurious mismatch warning. | ~~High~~ |
 | ~~`ReactDOMHydrationDiff-test.js` (37) + `ReactDOMServerIntegrationReconnecting-test.js` (50)~~ **DONE (2026-07-01)** — ported as `tests/conformance/hydration-mismatch.test.ts` (24 outcome-level cases). Surfaced + fixed 5 runtime bugs (clone close-marker, ifBlock/switchBlock empty-branch cursor + leftover discard, setStyle + setClassName detection). Divergences documented: octane patches attrs to client (React keeps server), warns+rebuilds in place (React throws+re-renders boundary), and function components carry hydration markers (so component-form ≠ bare-element-form). | ~~Medium~~ |
 | `ReactDOMServerIntegrationHooks-test.js` (`:606`), `…Refs-test.js` (`:41`), `ReactDOMFizzForm-test.js` (`:442,:531,:549`) | **Effects and ref callbacks do NOT run on server**; hooks render initial values; useFormStatus not-pending / useActionState+useOptimistic return initial on server. (Octane tests "effects don't run on server" partially in `ssr.test.ts`; extend to refs + form hooks.) | Medium |
 | `ReactDOMServerIntegrationElements/Attributes/Input/Select/Textarea/Fragment-test.js` | **Serialization heuristics**: text-node/whitespace separators so hydration can split adjacent text; nullish/zero/false child coercion; boolean/reserved-attribute rules; `value`→attribute (input) vs value→children (textarea) vs selected-option (select); fragment flattening. Each `itRenders` is simultaneously server-output + hydration-adopt + mismatch-recovery. | Medium |

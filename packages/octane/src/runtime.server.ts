@@ -1,5 +1,5 @@
 /**
- * octane server runtime (SSR Phase 1).
+ * octane server runtime (SSR).
  *
  * The `octane/compiler` compiler, in `mode: 'server'`, emits component bodies
  * that build an HTML STRING (instead of cloning a DOM template) by calling the
@@ -7,13 +7,14 @@
  * server analogue of `createRoot().render()` is `render(Component, props)` →
  * `{ head, body, css }`.
  *
- * Phase 1 scope: static markup, dynamic text holes, attributes (incl. class /
- * style / spread), nested components, scoped CSS collection, and the leaf hooks
- * (state returns its initial value, effects no-op, memo runs once, ids are
- * deterministic). Events and refs are dropped (no DOM on the server). Control
- * flow (@if/@for/@switch/@try), portals, Activity and fragment refs are rejected
- * by the compiler in server mode until later phases. No hydration markers are
- * emitted yet — that arrives with the client hydrate runtime.
+ * Scope: static markup, dynamic text holes, attributes (incl. class / style /
+ * spread), control flow (@if/@for/@switch/@try), nested components, scoped CSS
+ * collection, Suspense, and the leaf hooks (state returns its initial value,
+ * effects no-op, memo runs once, ids are deterministic). Every dynamic site is
+ * wrapped in the hydration markers (`constants.ts`) the client `hydrateRoot`
+ * cursor adopts. Events and refs are dropped (no DOM on the server); `<Activity>`
+ * and fragment refs (`<Fragment ref={…}>`) are rejected by the compiler in
+ * server mode.
  */
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ import {
 	EMPTY_COMMENT,
 	SUSPENSE_SCRIPT_ATTR,
 	UNDEFINED_SENTINEL_KEY,
-} from './constants';
+} from './constants.js';
 
 interface SSRScope {
 	parent: SSRScope | null;

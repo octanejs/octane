@@ -4,11 +4,10 @@
 // (b) stable through wrapper-component indirection, (c) distinct for multiple
 // useId() calls in one component, and — the headline invariant of the file —
 // (d) byte-for-byte identical between the SERVER render and the CLIENT render so
-// hydration lines up. Octane reproduces (a)/(b)/(c) on the client, but its
-// server and client useId counters are independent module globals (the server
-// resets to 0 every render(); the client counter is monotonic and never reset),
-// so server == client does NOT hold once any other useId component has mounted.
-// That last case is pinned as the high-value gap (it.fails).
+// hydration lines up. Octane reproduces all four: (a)/(b)/(c) on the client, and
+// (d) because `hydrateRoot()` resets the client `_idCounter` to 0 at the start of
+// hydration so it lines up with the server's per-render reset (the server resets
+// to 0 every render(); the client counter is otherwise monotonic).
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
