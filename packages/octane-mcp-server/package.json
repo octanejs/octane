@@ -1,0 +1,17 @@
+{
+  "name": "@octanejs/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local MCP server exposing Octane repository automation for coding agents.",
+  "bin": {
+    "octane-mcp-server": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.21.0",
+    "zod": "^4.4.3"
+  }
+}
