@@ -4597,6 +4597,7 @@ function clearChildContent(state: ChildSlot): void {
 			let n: Node | null = state.start.nextSibling;
 			while (n !== null && n !== state.end) {
 				const next: Node | null = n.nextSibling;
+				detachDeoptRef(n);
 				parent.removeChild(n);
 				n = next;
 			}
@@ -4605,7 +4606,9 @@ function clearChildContent(state: ChildSlot): void {
 		// Client text path: a single tracked Text node, no start marker to sweep.
 		state.text.remove();
 	} else if (state.hostNode !== null) {
-		// Pure-host de-opt node with no start marker (rare) — remove it directly.
+		// Pure-host de-opt node with no start marker (rare) — remove it directly, detaching
+		// its ref first so a `ref={obj}` doesn't dangle at the removed element.
+		detachDeoptRef(state.hostNode);
 		(state.hostNode as ChildNode).remove?.();
 	}
 	state.text = null;
@@ -4729,6 +4732,13 @@ function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 // disappeared, set new/changed ones. Unchanged props are skipped, so an unchanged
 // `ref` is not re-attached and an unchanged handler is not re-bound.
 function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock: Block): void {
+	// ref lifecycle on a REUSED node: detach the previous ref if it was removed or its identity
+	// changed (the apply loop below re-attaches a changed one via applyDeoptProp). Without this a
+	// removed/swapped `ref={obj}` keeps pointing at this element. `removeDeoptProp` intentionally
+	// no-ops `ref`, so this is the sole detach point for the reconcile path.
+	const prevRef = prevProps != null ? prevProps.ref : undefined;
+	const nextRef = nextProps != null ? nextProps.ref : undefined;
+	if (prevRef != null && prevRef !== nextRef) attachRef(prevRef, null);
 	if (prevProps != null) {
 		for (const name in prevProps) {
 			if (name === 'key' || name === 'children' || name === 'suppressHydrationWarning') continue;
@@ -4907,6 +4917,14 @@ function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 	(el as Element & DeoptStamped)[DEOPT_DESC] = d;
 }
 
+// Detach a de-opt host node's object/callback ref when the node is being REMOVED — so a
+// `ref={obj}` (or callback ref) doesn't keep pointing at a node that's no longer in the DOM.
+// No-op for nodes without a de-opt descriptor or without a ref (adopted/text/plain nodes).
+function detachDeoptRef(node: Node): void {
+	const ref = getDeoptDesc(node)?.props?.ref;
+	if (ref != null) attachRef(ref, null);
+}
+
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
 // `createElement` collapses positional children and `.map()` results into arrays)
 // into a flat list of renderable values, dropping empties (null/undefined/false/
@@ -5041,7 +5059,10 @@ function reconcileDeoptChildren(
 	const keep = result.length > 0 ? new Set<Node>(result) : null;
 	for (let i = existing.length - 1; i >= 0; i--) {
 		const n = existing[i];
-		if (keep === null || !keep.has(n)) el.removeChild(n);
+		if (keep === null || !keep.has(n)) {
+			detachDeoptRef(n);
+			el.removeChild(n);
+		}
 	}
 	// Order survivors/new nodes to match the descriptor.
 	for (let i = 0; i < result.length; i++) {
@@ -5085,6 +5106,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		// Built a fresh node (first mount, or a tag/type change) — drop the old one
 		// and insert the new node into the item's range.
 		if (prev != null && prev !== node && prev.parentNode === block.parentNode) {
+			detachDeoptRef(prev);
 			block.parentNode.removeChild(prev);
 		}
 		if (node !== null) block.parentNode.insertBefore(node, endM);
@@ -5397,6 +5419,7 @@ export function childSlot(
 			const node = reconcileDeoptNode(prev, value, parentBlock);
 			if (node !== prev) {
 				if (prev != null && prev !== node && prev.parentNode !== null) {
+					detachDeoptRef(prev);
 					prev.parentNode.removeChild(prev);
 				}
 				if (node !== null) state.start.parentNode!.insertBefore(node, state.end);
