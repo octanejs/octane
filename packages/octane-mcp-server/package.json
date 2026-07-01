@@ -1,0 +1,40 @@
+{
+  "name": "@octanejs/mcp-server",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "MCP server exposing Octane repository automation for coding agents.",
+  "license": "MIT",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/octane-mcp-server"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "bin": {
+    "octane-mcp-server": "src/index.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "cd ../.. && vitest run --project octane-mcp-server"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.21.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "vitest": "catalog:default"
+  }
+}
