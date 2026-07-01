@@ -56,6 +56,18 @@ it('createElement lifts `key` out of props (React semantics — key is never a p
 	expect((el.props as any).foo).toBe(1);
 });
 
+it('SERVER createElement lifts `key` out of props too (SSR ≡ client — no props.key divergence)', async () => {
+	const { createElement: serverCreateElement } = await import('octane/server');
+	const el = serverCreateElement(Comp as any, { key: 'k1', foo: 1 });
+	expect(el.key).toBe('k1');
+	expect('key' in (el.props as any)).toBe(false); // previously leaked on the server
+	expect((el.props as any).foo).toBe(1);
+	// …and it does NOT mutate the caller's object.
+	const caller = { key: 'k2', bar: 2 } as any;
+	serverCreateElement(Comp as any, caller);
+	expect(caller.key).toBe('k2');
+});
+
 it('createElement does NOT mutate the caller-supplied props object', () => {
 	const caller = { foo: 1 } as any;
 	const el = createElement(Comp, caller, 'child');

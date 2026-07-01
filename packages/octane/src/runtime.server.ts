@@ -118,9 +118,19 @@ export function createElement(
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
-	const p = (props ?? {}) as any;
-	const key = p.key != null ? p.key : null;
-	const kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : p.children;
+	const src = (props ?? null) as any;
+	const key = src != null && src.key != null ? src.key : null;
+	const kids =
+		children.length > 0 ? (children.length === 1 ? children[0] : children) : src?.children;
+	// Lift `key` OUT of props (React semantics — key is never a real prop), copy-on-write, so
+	// the SSR descriptor matches the CLIENT `createElement` (runtime.ts). Otherwise `ssrChild`
+	// spreads `{ ...d.props }` into the component with `key` still present, and a `.tsx`
+	// component that reads `props.key` sees a value on the server but `undefined` on the client.
+	let p = src ?? {};
+	if (src != null && 'key' in src) {
+		p = { ...src };
+		delete p.key;
+	}
 	return { $$kind: ELEMENT_TAG, type, props: p, key, children: kids ?? null };
 }
 
