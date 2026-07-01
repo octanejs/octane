@@ -3989,6 +3989,14 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			`    ${hostVar}.__oct_loc = ${JSON.stringify(`${ctx.mapSourceName}:${lc[0]}:${lc[1]}`)};`,
 		);
 	};
+	// A sibling-position `{x as string}` text hole mounts with `htextSwap`, which REPLACES the
+	// `<!>` placeholder with a text node — DETACHING that placeholder. Any later element walk
+	// based on it (`sibling(_elN, k)` — the next text hole OR a component/control-flow anchor at
+	// a later child index) would then navigate from a detached node and get `null`. So collect
+	// these text mounts and flush them AFTER every walk has been emitted, so all navigation
+	// happens on the intact template. (Regression: StoryRow's `.meta` interleaves text holes
+	// with `<Link>` components.)
+	const deferredTextMounts = [];
 	// Emit per-binding mount code.
 	for (const b of elementBindings) {
 		// A sibling-position `{x as string}` text hole resolves to its POSITION node
@@ -4030,7 +4038,9 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			// emit branch to pick up.
 			b.endElVar = ensureVar(b.endPath);
 		}
-		mountLines.push(emitBindingMount(b, elVar));
+		// `htextSwap` (sibling text hole) detaches its `<!>`; defer it past all walks (see above).
+		if (b.kind === 'text') deferredTextMounts.push(emitBindingMount(b, elVar));
+		else mountLines.push(emitBindingMount(b, elVar));
 	}
 	for (const fc of forCalls) {
 		const elVar = ensureVar(fc.hostPath);
@@ -4107,6 +4117,9 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		pc.elVar = elVar;
 		if (!noTemplate) mountLines.push(`    _b._portalHost$${pc.id} = ${elVar};`);
 	}
+	// Flush the deferred sibling-text-hole mounts now that every element walk is emitted —
+	// `htextSwap` can safely detach its `<!>` placeholder without breaking later navigation.
+	for (const line of deferredTextMounts) mountLines.push(line);
 
 	if (!noTemplate) {
 		if (single) {
