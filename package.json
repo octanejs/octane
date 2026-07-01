@@ -11,6 +11,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "build": "pnpm --filter octane build",
     "bench": "pnpm --filter @benchmarks/news bench",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

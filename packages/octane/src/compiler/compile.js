@@ -956,8 +956,9 @@ function devLoc(ctx, node) {
  *   HMR wrapper. Dev tooling (e.g. the Vite plugin) should pass `hmr: true` in
  *   serve mode and leave it off for production builds.
  *   `mode` selects the codegen target: `'client'` (default) emits the
- *   template-clone DOM runtime; `'server'` emits HTML-string SSR output (not
- *   implemented yet — see the SSR plan).
+ *   template-clone DOM runtime; `'server'` emits HTML-string SSR output (static
+ *   chunks interleaved with `ssr*` helpers) carrying the hydration markers the
+ *   client `hydrateRoot` adopts.
  * @returns {{ code: string, map: any }}
  */
 export function compile(source, filename, options) {
@@ -966,10 +967,10 @@ export function compile(source, filename, options) {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
 	}
 	if (mode === 'server') {
-		// Server (SSR) codegen — Phase 1: static markup + dynamic text + attributes
-		// + nested components, emitted as HTML-string-building bodies importing the
-		// server runtime from 'octane/server'. Control flow, portals, Activity
-		// and component children are rejected (later phases).
+		// Server (SSR) codegen: static markup + dynamic holes + control flow +
+		// nested components + scoped CSS, emitted as HTML-string-building bodies
+		// (with hydration markers) importing the server runtime from 'octane/server'.
+		// Only `<Activity>` and fragment refs are rejected.
 		return compileServer(source, filename, options);
 	}
 	const ast = parseModule(source, filename);
@@ -1358,24 +1359,25 @@ export function compile(source, filename, options) {
 }
 
 // ===========================================================================
-// Server (SSR) codegen — Phase 1
+// Server (SSR) codegen
 //
 // A parallel, self-contained codegen path. Each component compiles to a
 // function `(__s, props, __extra) => string` that BUILDS an HTML string by
 // interleaving static chunks with `ssr*` runtime helpers for the dynamic holes
-// (text/attrs/style/spread) and `ssrComponent` for nested components. The
+// (text/attrs/style/spread), `ssrComponent` for nested components, and the
+// control-flow emitters (@if/@for/@switch/@try) — wrapping every dynamic site in
+// the hydration markers (`constants.ts`) the client `hydrateRoot` adopts. The
 // client path (template/clone + bindings) is left completely untouched.
 //
-// Out of Phase 1 scope (rejected with a clear diagnostic): control flow
-// (@if/@for/@switch/@try), portals, Activity, fragment refs, component children,
-// and JSX-bearing expression holes. They land in later SSR phases.
+// Still rejected with a clear diagnostic (see ssrUnsupported): `<Activity>` and
+// fragment refs (`<Fragment ref={…}>`).
 // ===========================================================================
 
 function ssrUnsupported(what) {
 	throw new Error(
-		`octane server render (SSR Phase 1) does not support ${what} yet. ` +
-			`Phase 1 covers static markup, dynamic text, attributes and nested ` +
-			`components; control flow, portals and component children come later.`,
+		`octane server render does not support ${what}. Server mode covers static ` +
+			`markup, dynamic text/attributes/style/spread, control flow ` +
+			`(@if/@for/@switch/@try), nested components and scoped CSS.`,
 	);
 }
 
@@ -1442,8 +1444,8 @@ function compileServer(source, filename, options) {
 			: '';
 	const helpers = ctx.hoistedHelpers.length ? ctx.hoistedHelpers.join('\n') + '\n\n' : '';
 	const code = runtimeImport + helpers + body;
-	// Phase 1: minimal (valid, empty-mapping) source map. SSR source maps are a
-	// later refinement; the client path keeps its real per-token maps.
+	// Minimal (valid, empty-mapping) source map. SSR source maps are a later
+	// refinement; the client path keeps its real per-token maps.
 	return { code, map: buildSourceMap(source, ctx.mapSourceName, []) };
 }
 

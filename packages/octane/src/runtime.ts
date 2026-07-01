@@ -17,7 +17,7 @@ import {
 	HYDRATION_START,
 	HYDRATION_END,
 	UNDEFINED_SENTINEL_KEY,
-} from './constants';
+} from './constants.js';
 
 // ---------------------------------------------------------------------------
 // Types

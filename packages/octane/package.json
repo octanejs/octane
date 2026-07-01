@@ -8,9 +8,6 @@
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git",
@@ -20,7 +17,7 @@
   "module": "src/index.ts",
   "types": "src/index.ts",
   "files": [
-    "src",
+    "dist",
     "README.md"
   ],
   "exports": {
@@ -31,7 +28,32 @@
     "./compiler/vite": "./src/compiler/vite.js",
     "./compiler/volar": "./src/compiler/volar.js"
   },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./server": {
+        "types": "./dist/server/index.d.ts",
+        "default": "./dist/server/index.js"
+      },
+      "./constants": {
+        "types": "./dist/constants.d.ts",
+        "default": "./dist/constants.js"
+      },
+      "./compiler": "./dist/compiler/index.js",
+      "./compiler/vite": "./dist/compiler/vite.js",
+      "./compiler/volar": "./dist/compiler/volar.js"
+    }
+  },
   "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepack": "node scripts/build.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

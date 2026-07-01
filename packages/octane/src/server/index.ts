@@ -1,5 +1,5 @@
 /**
- * `octane/server` — server-rendering entry (SSR Phase 1).
+ * `octane/server` — server-rendering entry.
  *
  * Re-exports the server runtime. The `octane/compiler` compiler, in
  * `mode: 'server'`, emits component modules that `import { … } from
@@ -66,4 +66,4 @@ export {
 	ssrPortal,
 	injectStyle,
 	ssrHeadEl,
-} from '../runtime.server';
+} from '../runtime.server.js';
