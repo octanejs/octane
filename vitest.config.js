@@ -260,6 +260,14 @@ export default defineConfig({
 					],
 				},
 			},
+			{
+				test: {
+					name: 'octane-mcp-server',
+					include: ['packages/octane-mcp-server/src/**/*.test.js'],
+					environment: 'node',
+					globals: false,
+				},
+			},
 		],
 	},
 });
