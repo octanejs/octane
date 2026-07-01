@@ -1,123 +1,346 @@
 #!/usr/bin/env node
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { z } from 'zod';
+import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 
-const repoRoot = resolve(process.env.OCTANE_REPO_ROOT || process.cwd());
+const __filename = fileURLToPath(import.meta.url);
 
-const SKILLS = {
-  'react-library-port': '.ai/skills/react-library-port.md',
-  'bug-hunter': '.ai/skills/bug-hunter.md',
-  'create-a-pr': '.ai/skills/create-a-pr.md',
-  'handle-issue': '.ai/skills/handle-issue.md',
-  'octane-core-extend': '.ai/skills/octane-core-extend.md',
-  triage: '.ai/skills/triage.md',
-  'performance-audit': '.ai/skills/performance-audit.md',
+export const SKILLS = {
+	'bug-hunter': '.ai/skills/bug-hunter.md',
+	'create-a-pr': '.ai/skills/create-a-pr.md',
+	'handle-issue': '.ai/skills/handle-issue.md',
+	'octane-core-extend': '.ai/skills/octane-core-extend.md',
+	'performance-audit': '.ai/skills/performance-audit.md',
+	'react-library-port': '.ai/skills/react-library-port.md',
+	triage: '.ai/skills/triage.md',
 };
 
-function text(content) {
-  return { content: [{ type: 'text', text: content }] };
+const BENCHMARKS = {
+	dbmon: '@benchmarks/dbmon',
+	'js-framework': 'octane-js-framework-benchmarks',
+	news: '@benchmarks/news',
+	'recursive-context': '@benchmarks/recursive-context',
+	'signal-favoring': '@benchmarks/signal-favoring',
+};
+
+const DEFAULT_TIMEOUT_MS = 120_000;
+
+export function text(content) {
+	return { content: [{ type: 'text', text: content }] };
 }
 
-function areaForPath(path) {
-  if (path.startsWith('packages/octane/src/compiler/')) return 'compiler';
-  if (path.startsWith('packages/octane/src/runtime') || path === 'packages/octane/src/index.ts') return 'core-runtime';
-  if (path.startsWith('packages/octane/src/server/') || path.includes('runtime.server')) return 'ssr';
-  if (path.startsWith('packages/octane/tests/')) return 'core-tests';
-  if (path.startsWith('packages/vite-plugin-octane/')) return 'vite-plugin';
-  if (/^packages\/(zustand|query|motion|stylex|router|lexical|floating-ui)\//.test(path)) return 'ecosystem-binding';
-  if (path.startsWith('benchmarks/')) return 'benchmark';
-  if (path.startsWith('docs/') || path.endsWith('.md')) return 'docs';
-  if (path.startsWith('.ai/') || path.startsWith('.codex/') || path.startsWith('.claude/')) return 'agent-instructions';
-  if (path.startsWith('.rulesync/')) return 'rulesync-source';
-  return 'repo-tooling';
+export function areaForPath(path) {
+	if (path.startsWith('packages/octane/src/compiler/')) return 'compiler';
+	if (path.startsWith('packages/octane/src/server/') || path.includes('runtime.server'))
+		return 'ssr';
+	if (path.startsWith('packages/octane/src/runtime') || path === 'packages/octane/src/index.ts') {
+		return 'core-runtime';
+	}
+	if (path.startsWith('packages/octane/tests/')) return 'core-tests';
+	if (path.startsWith('packages/vite-plugin-octane/')) return 'vite-plugin';
+	if (/^packages\/(zustand|query|motion|stylex|router|lexical|floating-ui)\//.test(path)) {
+		return 'ecosystem-binding';
+	}
+	if (path.startsWith('benchmarks/')) return 'benchmark';
+	if (path.startsWith('.rulesync/')) return 'rulesync-source';
+	if (path.startsWith('.ai/') || path.startsWith('.codex/') || path.startsWith('.claude/')) {
+		return 'agent-instructions';
+	}
+	if (path.startsWith('docs/') || path.endsWith('.md')) return 'docs';
+	return 'repo-tooling';
 }
 
-function validationFor(paths, taskKind) {
-  const areas = new Set(paths.map(areaForPath));
-  const commands = new Set();
+export function validationFor(paths, taskKind) {
+	const areas = new Set(paths.map(areaForPath));
+	const commands = new Set();
 
-  if (areas.has('rulesync-source')) commands.add('pnpm rules:generate');
-  if (areas.has('core-runtime') || areas.has('compiler') || areas.has('ssr') || areas.has('core-tests')) {
-    commands.add('./node_modules/.bin/vitest run packages/octane/tests --project octane');
-  }
-  if (areas.has('ecosystem-binding')) {
-    for (const path of paths) {
-      const match = path.match(/^packages\/([^/]+)\//);
-      if (match) commands.add(`./node_modules/.bin/vitest run packages/${match[1]}/tests --project ${match[1]}`);
-    }
-  }
-  if (areas.has('vite-plugin')) commands.add('pnpm typecheck');
-  if (areas.has('benchmark') || taskKind === 'performance') commands.add('pnpm bench');
-  if (taskKind === 'api' || taskKind === 'core' || taskKind === 'package') commands.add('pnpm typecheck');
-  commands.add('pnpm format:check');
+	if (areas.has('rulesync-source')) commands.add('pnpm rules:generate');
+	if (
+		areas.has('core-runtime') ||
+		areas.has('compiler') ||
+		areas.has('ssr') ||
+		areas.has('core-tests')
+	) {
+		commands.add('./node_modules/.bin/vitest run packages/octane/tests --project octane');
+	}
+	if (areas.has('ecosystem-binding')) {
+		for (const path of paths) {
+			const match = path.match(/^packages\/([^/]+)\//);
+			if (match)
+				commands.add(
+					`./node_modules/.bin/vitest run packages/${match[1]}/tests --project ${match[1]}`,
+				);
+		}
+	}
+	if (areas.has('vite-plugin')) commands.add('pnpm typecheck');
+	if (areas.has('benchmark') || taskKind === 'performance') commands.add('pnpm bench');
+	if (taskKind === 'api' || taskKind === 'core' || taskKind === 'package')
+		commands.add('pnpm typecheck');
+	commands.add('pnpm format:check');
 
-  return [...commands];
+	return [...commands];
 }
 
-const server = new McpServer({ name: 'octane', version: '0.0.0' });
+export function runCommand(command, args, options = {}) {
+	const cwd = options.cwd ?? process.cwd();
+	const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-server.registerTool(
-  'octane_project_map',
-  {
-    title: 'Octane project map',
-    description: 'Return Octane repository map, source ownership, validation commands, and skill paths.',
-    inputSchema: {},
-  },
-  async () => {
-    const projectMap = await readFile(resolve(repoRoot, '.ai/project-map.md'), 'utf8');
-    return text(projectMap);
-  },
-);
+	return new Promise((resolvePromise) => {
+		const child = spawn(command, args, {
+			cwd,
+			env: { ...process.env, ...options.env },
+			stdio: ['ignore', 'pipe', 'pipe'],
+		});
+		let stdout = '';
+		let stderr = '';
+		let settled = false;
+		const timer = setTimeout(() => {
+			if (settled) return;
+			settled = true;
+			child.kill('SIGTERM');
+			resolvePromise({
+				code: null,
+				signal: 'SIGTERM',
+				stdout,
+				stderr: `${stderr}\nCommand timed out after ${timeoutMs}ms`,
+			});
+		}, timeoutMs);
 
-server.registerTool(
-  'octane_skill',
-  {
-    title: 'Octane skill',
-    description: 'Return a repository-local Octane agent skill by name.',
-    inputSchema: {
-      name: z.enum(Object.keys(SKILLS)),
-    },
-  },
-  async ({ name }) => {
-    const body = await readFile(resolve(repoRoot, SKILLS[name]), 'utf8');
-    return text(body);
-  },
-);
+		child.stdout.on('data', (chunk) => {
+			stdout += chunk;
+		});
+		child.stderr.on('data', (chunk) => {
+			stderr += chunk;
+		});
+		child.on('error', (error) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			resolvePromise({ code: null, signal: null, stdout, stderr: `${stderr}\n${error.message}` });
+		});
+		child.on('close', (code, signal) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			resolvePromise({ code, signal, stdout, stderr });
+		});
+	});
+}
 
-server.registerTool(
-  'octane_triage_paths',
-  {
-    title: 'Triage Octane paths',
-    description: 'Classify changed paths by Octane repo area.',
-    inputSchema: {
-      paths: z.array(z.string()).describe('Repository-relative paths'),
-    },
-  },
-  async ({ paths }) => {
-    const rows = paths.map((path) => ({ path, area: areaForPath(path) }));
-    return text(JSON.stringify({ repoRoot, paths: rows }, null, 2));
-  },
-);
+function commandResult(result) {
+	return text(JSON.stringify(result, null, 2));
+}
 
-server.registerTool(
-  'octane_validate_plan',
-  {
-    title: 'Octane validation plan',
-    description: 'Recommend validation commands for changed paths and task kind.',
-    inputSchema: {
-      paths: z.array(z.string()).default([]).describe('Repository-relative changed paths'),
-      taskKind: z
-        .enum(['bug', 'feature', 'docs', 'test', 'performance', 'core', 'compiler', 'package', 'api', 'unknown'])
-        .default('unknown'),
-    },
-  },
-  async ({ paths, taskKind }) => {
-    return text(JSON.stringify({ repoRoot, taskKind, commands: validationFor(paths, taskKind) }, null, 2));
-  },
-);
+export async function scaffoldReactPort(repoRoot, input) {
+	const args = ['scripts/scaffold-react-port.mjs', input.reactTestFile];
+	if (input.outFile) args.push('--out', input.outFile);
+	const result = await runCommand(process.execPath, args, {
+		cwd: repoRoot,
+		timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+	});
+	return { command: [process.execPath, ...args], ...result };
+}
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+export async function runBenchmark(repoRoot, input) {
+	const args =
+		input.benchmark === 'all'
+			? ['bench']
+			: ['--filter', BENCHMARKS[input.benchmark], 'run', 'bench'];
+	const result = await runCommand('pnpm', args, {
+		cwd: repoRoot,
+		timeoutMs: input.timeoutMs ?? 300_000,
+	});
+	return { command: ['pnpm', ...args], benchmark: input.benchmark, ...result };
+}
+
+export async function issueContext(repoRoot, input) {
+	const fields =
+		'number,title,body,author,labels,state,comments,assignees,milestone,url,createdAt,updatedAt';
+	const result = await runCommand('gh', ['issue', 'view', String(input.issue), '--json', fields], {
+		cwd: repoRoot,
+		timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+	});
+	if (result.code !== 0)
+		return { command: ['gh', 'issue', 'view', String(input.issue), '--json', fields], ...result };
+
+	let issue;
+	try {
+		issue = JSON.parse(result.stdout);
+	} catch (error) {
+		return {
+			command: ['gh', 'issue', 'view', String(input.issue), '--json', fields],
+			parseError: error.message,
+			...result,
+		};
+	}
+
+	const body = `${issue.title}\n${issue.body ?? ''}`.toLowerCase();
+	const labels = issue.labels?.map((label) => label.name) ?? [];
+	const suggestedArea =
+		body.includes('compiler') || body.includes('tsrx')
+			? 'compiler'
+			: body.includes('hydration')
+				? 'hydration'
+				: body.includes('ssr')
+					? 'ssr'
+					: body.includes('performance') || body.includes('perf')
+						? 'performance'
+						: 'triage-needed';
+	return {
+		command: ['gh', 'issue', 'view', String(input.issue), '--json', fields],
+		issue,
+		triage: {
+			suggestedArea,
+			labels,
+			state: issue.state,
+			url: issue.url,
+		},
+	};
+}
+
+export function createServer(options = {}) {
+	const repoRoot = resolve(options.repoRoot || process.env.OCTANE_REPO_ROOT || process.cwd());
+	const server = new McpServer({ name: 'octane', version: '0.1.0' });
+
+	server.registerTool(
+		'octane_project_map',
+		{
+			title: 'Octane project map',
+			description:
+				'Return Octane repository map, source ownership, validation commands, and skill paths.',
+			inputSchema: {},
+		},
+		async () => {
+			const projectMap = await readFile(resolve(repoRoot, '.ai/project-map.md'), 'utf8');
+			return text(projectMap);
+		},
+	);
+
+	server.registerTool(
+		'octane_skill',
+		{
+			title: 'Octane skill',
+			description: 'Return a repository-local Octane agent skill by name.',
+			inputSchema: {
+				name: z.enum(Object.keys(SKILLS)),
+			},
+		},
+		async ({ name }) => {
+			const body = await readFile(resolve(repoRoot, SKILLS[name]), 'utf8');
+			return text(body);
+		},
+	);
+
+	server.registerTool(
+		'octane_triage_paths',
+		{
+			title: 'Triage Octane paths',
+			description: 'Classify changed paths by Octane repo area.',
+			inputSchema: {
+				paths: z.array(z.string()).describe('Repository-relative paths'),
+			},
+		},
+		async ({ paths }) => {
+			const rows = paths.map((path) => ({ path, area: areaForPath(path) }));
+			return text(JSON.stringify({ repoRoot, paths: rows }, null, 2));
+		},
+	);
+
+	server.registerTool(
+		'octane_validate_plan',
+		{
+			title: 'Octane validation plan',
+			description: 'Recommend validation commands for changed paths and task kind.',
+			inputSchema: {
+				paths: z.array(z.string()).default([]).describe('Repository-relative changed paths'),
+				taskKind: z
+					.enum([
+						'bug',
+						'feature',
+						'docs',
+						'test',
+						'performance',
+						'core',
+						'compiler',
+						'package',
+						'api',
+						'unknown',
+					])
+					.default('unknown'),
+			},
+		},
+		async ({ paths, taskKind }) => {
+			return text(
+				JSON.stringify({ repoRoot, taskKind, commands: validationFor(paths, taskKind) }, null, 2),
+			);
+		},
+	);
+
+	server.registerTool(
+		'octane_scaffold_react_port',
+		{
+			title: 'Scaffold React test port',
+			description: 'Run scripts/scaffold-react-port.mjs for a React upstream test file.',
+			inputSchema: {
+				reactTestFile: z
+					.string()
+					.describe('Path to the upstream React test file, relative to repo root or absolute.'),
+				outFile: z
+					.string()
+					.optional()
+					.describe('Optional output file for the generated Vitest skeleton.'),
+				timeoutMs: z.number().int().positive().optional(),
+			},
+		},
+		async (input) => commandResult(await scaffoldReactPort(repoRoot, input)),
+	);
+
+	server.registerTool(
+		'octane_benchmark',
+		{
+			title: 'Run Octane benchmark',
+			description:
+				'Run one of the known Octane benchmark workspaces, or all benchmarks via pnpm bench.',
+			inputSchema: {
+				benchmark: z.enum(['all', ...Object.keys(BENCHMARKS)]).default('all'),
+				timeoutMs: z.number().int().positive().optional(),
+			},
+		},
+		async (input) => commandResult(await runBenchmark(repoRoot, input)),
+	);
+
+	server.registerTool(
+		'octane_issue_context',
+		{
+			title: 'Fetch Octane issue context',
+			description:
+				'Fetch a GitHub issue with gh and return structured context plus lightweight triage hints.',
+			inputSchema: {
+				issue: z
+					.union([z.number().int().positive(), z.string()])
+					.describe('Issue number or URL accepted by gh issue view.'),
+				timeoutMs: z.number().int().positive().optional(),
+			},
+		},
+		async (input) => commandResult(await issueContext(repoRoot, input)),
+	);
+
+	return server;
+}
+
+export async function main() {
+	const server = createServer();
+	const transport = new StdioServerTransport();
+	await server.connect(transport);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === __filename) {
+	main().catch((error) => {
+		console.error(error);
+		process.exit(1);
+	});
+}
