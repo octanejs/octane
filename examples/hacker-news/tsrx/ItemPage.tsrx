@@ -45,7 +45,7 @@ export function ItemPage() @{
 			{' ' + relativeTime(item.time)}
 		</div>
 		@if (item.text) {
-			<div {...stylex.props(styles.storyText)} innerHTML={item.text} />
+			<div {...stylex.props(styles.storyText)} dangerouslySetInnerHTML={{ __html: item.text }} />
 		}
 		<div {...stylex.props(styles.meta)}>
 			{comments + ' ' + pluralize(comments, 'comment')}

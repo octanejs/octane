@@ -40,7 +40,9 @@ export function ItemPage() {
 				</Link>
 				{' ' + relativeTime(item.time)}
 			</div>
-			{item.text && <div {...stylex.props(styles.storyText)} innerHTML={item.text} />}
+			{item.text && (
+				<div {...stylex.props(styles.storyText)} dangerouslySetInnerHTML={{ __html: item.text }} />
+			)}
 			<div {...stylex.props(styles.meta)}>{comments + ' ' + pluralize(comments, 'comment')}</div>
 			<div data-testid="comments">
 				{kids.map((kid) => (

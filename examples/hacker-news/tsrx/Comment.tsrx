@@ -36,7 +36,10 @@ export function Comment({ id, depth }: { id: number; depth: number }) @{
 			</Link>
 			{' ' + relativeTime(data.time)}
 		</div>
-		<div {...stylex.props(styles.commentText)} innerHTML={data.text ?? ''} />
+		<div
+			{...stylex.props(styles.commentText)}
+			dangerouslySetInnerHTML={{ __html: data.text ?? '' }}
+		/>
 		@for (const kid of childIds; key kid) {
 			@try {
 				<Comment id={kid} depth={depth + 1} />
