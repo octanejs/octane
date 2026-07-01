@@ -29,7 +29,10 @@ export function Comment({ id, depth }: { id: number; depth: number }) {
 				</Link>
 				{' ' + relativeTime(data.time)}
 			</div>
-			<div {...stylex.props(styles.commentText)} innerHTML={data.text ?? ''} />
+			<div
+				{...stylex.props(styles.commentText)}
+				dangerouslySetInnerHTML={{ __html: data.text ?? '' }}
+			/>
 			{depth < MAX_DEPTH &&
 				kids.map((kid) => (
 					<Suspense key={kid} fallback={<div {...stylex.props(styles.comment)}>…</div>}>
