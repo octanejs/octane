@@ -15,7 +15,7 @@ import {
 
 import { composeEventHandlers } from './compose-event-handlers';
 import { useComposedRefs } from './compose-refs';
-import { createCollapsibleContext } from './context';
+import { createContextScope } from './context';
 import { S, subSlot } from './internal';
 import { Presence } from './Presence';
 import { Primitive } from './Primitive';
@@ -28,6 +28,9 @@ interface CollapsibleContextValue {
 	onOpenToggle: () => void;
 }
 
+// Scoped context — `createCollapsibleScope` lets a composing primitive (Accordion) thread
+// its own Collapsible scope so the two don't collide.
+export const [createCollapsibleContext, createCollapsibleScope] = createContextScope('Collapsible');
 const [CollapsibleProvider, useCollapsibleContext] =
 	createCollapsibleContext<CollapsibleContextValue>('Collapsible');
 
@@ -37,16 +40,28 @@ function getState(open?: boolean): 'open' | 'closed' {
 
 export function Root(props: any): any {
 	const slot = S('Collapsible.Root');
-	const { open: openProp, defaultOpen, disabled, onOpenChange, ...rest } = props ?? {};
+	const {
+		__scopeCollapsible,
+		open: openProp,
+		defaultOpen,
+		disabled,
+		onOpenChange,
+		...rest
+	} = props ?? {};
 
 	const [open, setOpen] = useControllableState<boolean>(
 		{ prop: openProp, defaultProp: defaultOpen ?? false, onChange: onOpenChange },
 		subSlot(slot, 'open'),
 	);
 	const contentId = useId(subSlot(slot, 'id'));
-	const onOpenToggle = useCallback(() => setOpen((prev) => !prev), [setOpen], subSlot(slot, 'toggle'));
+	const onOpenToggle = useCallback(
+		() => setOpen((prev) => !prev),
+		[setOpen],
+		subSlot(slot, 'toggle'),
+	);
 
 	return createElement(CollapsibleProvider, {
+		scope: __scopeCollapsible,
 		contentId,
 		disabled,
 		open,
@@ -60,7 +75,8 @@ export function Root(props: any): any {
 }
 
 export function Trigger(props: any): any {
-	const context = useCollapsibleContext('CollapsibleTrigger');
+	const { __scopeCollapsible, ...rest } = props ?? {};
+	const context = useCollapsibleContext('CollapsibleTrigger', __scopeCollapsible);
 	return createElement(Primitive.button, {
 		type: 'button',
 		'aria-controls': context.contentId,
@@ -68,25 +84,32 @@ export function Trigger(props: any): any {
 		'data-state': getState(context.open),
 		'data-disabled': context.disabled ? '' : undefined,
 		disabled: context.disabled,
-		...props,
-		onClick: composeEventHandlers(props?.onClick, context.onOpenToggle),
+		...rest,
+		onClick: composeEventHandlers(rest.onClick, context.onOpenToggle),
 	});
 }
 
 export function Content(props: any): any {
-	const { forceMount, ...contentProps } = props ?? {};
-	const context = useCollapsibleContext('CollapsibleContent');
+	const { __scopeCollapsible, forceMount, ...contentProps } = props ?? {};
+	const context = useCollapsibleContext('CollapsibleContent', __scopeCollapsible);
 	return createElement(Presence, {
 		present: forceMount || context.open,
 		children: ({ present }: { present: boolean }) =>
-			createElement(ContentImpl, { ...contentProps, present }),
+			createElement(ContentImpl, { ...contentProps, __scopeCollapsible, present }),
 	});
 }
 
 function ContentImpl(props: any): any {
 	const slot = S('Collapsible.ContentImpl');
-	const { present, children, ref: forwardedRef, style, ...contentProps } = props;
-	const context = useCollapsibleContext('CollapsibleContent');
+	const {
+		__scopeCollapsible,
+		present,
+		children,
+		ref: forwardedRef,
+		style,
+		...contentProps
+	} = props;
+	const context = useCollapsibleContext('CollapsibleContent', __scopeCollapsible);
 
 	const [isPresent, setIsPresent] = useState<boolean>(present, subSlot(slot, 'present'));
 	const rRef = useRef<HTMLElement | null>(null, subSlot(slot, 'ref'));

@@ -645,15 +645,19 @@ export function flushSync<T>(fn: () => T): T {
 	try {
 		const result = fn();
 		// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
-		const pendingError = drainQueue();
+		let pendingError = drainQueue();
 		commitEffectsSync();
-		// A sync-committed effect (e.g. a layout effect calling setState) can schedule
-		// MORE renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without
-		// arming a microtask — so without this, those renders would be stranded until an
-		// unrelated update happened to flush them (e.g. useTransitionStatus's rAF +
-		// flushSync, where the layout effect's setState never committed). Hand them to
-		// the normal async scheduler rather than re-draining synchronously, which would
-		// risk an unbounded loop for genuinely cascading effects.
+		// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
+		// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
+		// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY, so
+		// loop render → layout effects until the queue settles (bounded to avoid an unbounded
+		// loop for a genuinely cascading effect; the tail — if any — still spills to the async
+		// scheduler below, matching the prior fallback).
+		for (let guard = 0; QUEUE.length > 0 && guard < LAYOUT_CASCADE_LIMIT; guard++) {
+			const err = drainQueue();
+			if (err !== null && pendingError === null) pendingError = err;
+			commitEffectsSync();
+		}
 		if (QUEUE.length > 0 && !scheduled) {
 			scheduled = true;
 			queueMicrotask(flush);
@@ -664,6 +668,11 @@ export function flushSync<T>(fn: () => T): T {
 		syncFlush = prevSync;
 	}
 }
+
+// Bound on synchronous render→layout-effect→render cascades inside flushSync. Matches
+// React's "maximum update depth" backstop; a cascade that hasn't settled by here spills
+// to the async scheduler rather than hanging.
+const LAYOUT_CASCADE_LIMIT = 50;
 
 // ---------------------------------------------------------------------------
 // Effect commit pipeline (insertion → layout → passive)
