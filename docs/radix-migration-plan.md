@@ -5,18 +5,30 @@
 > `@octanejs/floating-ui` port. Radix won on fit × value × effort.
 >
 > **Progress (2026-07-01):** `@octanejs/radix` — **Phase 0 foundation + Phase 1 stateful
-> components** landed. Foundation: `Slot`/`Slottable`, `Primitive.<tag>` (`asChild`),
-> `mergeProps`, `composeRefs`/`useComposedRefs`, `composeEventHandlers`, `useControllableState`,
-> `Presence`. Components: `Separator`, `Label`, `Collapsible`, `Accordion` (single + multiple).
-> Unit-tested (mount, 10 tests). This surfaced + fixed an **octane parity bug**: `aria-*`
-> attributes are enumerated, so `aria-expanded={false}` now renders `"false"` (not removed) —
-> fixed in `setAttribute`/`ssrAttr`.
+> components** landed, at full fidelity. Foundation: `Slot`/`Slottable`, `Primitive.<tag>`
+> (`asChild`), `mergeProps`, `composeRefs`/`useComposedRefs`, `composeEventHandlers`,
+> `useControllableState`, `Presence`, and the full **`createContextScope`**
+> (`createContext` + `createScope` + `composeContextScopes`, slot-threaded). Components:
+> `Separator`, `Label`, `Collapsible` (Presence-wrapped `ContentImpl` with the
+> `--radix-collapsible-content-height/-width` measurement + exit-animation defer), and
+> `Accordion` (single + multiple) — `createAccordionScope` composes `createCollapsibleScope`
+> and every part threads `__scope*`, with a dedicated scope-isolation test (a user
+> Collapsible between `Item` and `Trigger` cannot hijack the Accordion). 11 tests.
 >
-> **Deferred:** `createContextScope` scope-isolation (using plain octane context for now);
-> `Collapsible.Content`'s CSS-var height + `Presence`-based exit-animation defer (the double-
-> state `ContentImpl` didn't settle in octane's effect model — Content gates on `open` for
-> now; `Presence` itself is validated standalone); Accordion arrow-key roving focus
-> (RovingFocusGroup — a separate reusable primitive); `Portal` (Phase 3); and a
+> Porting at full fidelity surfaced + fixed **two octane parity bugs** (the point of the
+> exercise): (1) `aria-*` attributes are enumerated — `aria-expanded={false}` now renders
+> `"false"` (not removed), fixed in `setAttribute`/`ssrAttr`; (2) **`flushSync` didn't drain
+> `useLayoutEffect` → `setState` cascades synchronously** (deferred them to a microtask, so
+> Presence-style derived state was observed mid-cascade) — `flushSync` now loops
+> render → layout-effects with **convergence detection**: it drains while each pass schedules
+> only not-yet-seen blocks, and defers to the async scheduler the moment a block re-schedules
+> itself. That second part preserves octane's deliberate unstable-`getSnapshot` forgiveness
+> (React throws "maximum update depth"; octane advances such cascades lazily) — pinned by
+> zustand's `extras.test.ts` fresh-object-selector test, which the first (unconditional-loop)
+> version of this fix broke by spinning it forever.
+>
+> **Still deferred:** Accordion arrow-key roving focus (RovingFocusGroup — a separate
+> reusable primitive, also needed by Tabs/Toolbar/RadioGroup); `Portal` (Phase 3); and a
 > differential-vs-real-`@radix-ui` harness (needs `@radix-ui/*` in the catalog).
 
 ## 1. Recommendation

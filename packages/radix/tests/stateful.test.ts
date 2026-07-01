@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '../../octane/tests/_helpers';
-import { CollapsibleApp, AccordionSingle, AccordionMultiple } from './_fixtures/stateful.tsx';
+import {
+	CollapsibleApp,
+	AccordionSingle,
+	AccordionMultiple,
+	ScopeIsolation,
+} from './_fixtures/stateful.tsx';
 
 // @octanejs/radix — the stateful foundation (useControllableState) via Collapsible and
 // Accordion. Matching Radix, content stays MOUNTED but `hidden` when closed; we assert the
@@ -102,6 +107,37 @@ describe('@octanejs/radix — Accordion (type="multiple")', () => {
 		r.click('[data-testid="t-a"]');
 		expect(openContent(ca())).toBe(false);
 		expect(openContent(cb())).toBe(true);
+		r.unmount();
+	});
+});
+
+describe('@octanejs/radix — createContextScope isolation', () => {
+	it('a user Collapsible between Item and Trigger does not hijack the Accordion', () => {
+		const r = mount(ScopeIsolation);
+		const accTrigger = () => r.find('[data-testid="acc-trigger"]');
+		const userTrigger = () => r.find('[data-testid="user-trigger"]');
+		const accContent = () => r.container.querySelector('[data-testid="acc-content"]');
+		const userContent = () => r.container.querySelector('[data-testid="user-content"]');
+
+		// The Accordion item is open (defaultValue="a") even though the NEAREST unscoped
+		// Collapsible provider is closed — Accordion.Trigger reads its SCOPED context.
+		expect(accTrigger().getAttribute('aria-expanded')).toBe('true');
+		expect(openContent(accContent())).toBe(true);
+		// The user's Collapsible is closed + independent.
+		expect(userTrigger().getAttribute('aria-expanded')).toBe('false');
+		expect(openContent(userContent())).toBe(false);
+
+		// Toggling the user's Collapsible touches ONLY its own content.
+		r.click('[data-testid="user-trigger"]');
+		expect(openContent(userContent())).toBe(true);
+		expect(openContent(accContent())).toBe(true); // accordion untouched
+		expect(accTrigger().getAttribute('aria-expanded')).toBe('true');
+
+		// Toggling the Accordion trigger touches ONLY the accordion content.
+		r.click('[data-testid="acc-trigger"]');
+		expect(openContent(accContent())).toBe(false);
+		expect(openContent(userContent())).toBe(true); // user's stays open
+		expect(userTrigger().getAttribute('aria-expanded')).toBe('true');
 		r.unmount();
 	});
 });
