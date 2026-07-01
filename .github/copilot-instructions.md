@@ -51,7 +51,9 @@ pnpm rules:generate
 
 ## Repo Map
 
-This is a pnpm monorepo with two publishable packages:
+This is a pnpm monorepo with nine publishable packages — the core `octane`
+runtime+compiler, the `@octanejs/vite-plugin` metaframework, and seven `@octanejs/*`
+framework bindings:
 
 - `packages/octane/` (npm: `octane`) — the runtime **and** the compiler together.
   - `src/runtime.ts` — client runtime.
@@ -60,6 +62,9 @@ This is a pnpm monorepo with two publishable packages:
   - `tests/` — the test suite (see Validation).
 - `packages/vite-plugin-octane/` (npm: `@octanejs/vite-plugin`) — the optional
   metaframework plugin (dev SSR, routing, hydration wiring for full apps).
+- `packages/{zustand,query,motion,stylex,router,lexical,floating-ui}/` (npm:
+  `@octanejs/*`) — framework bindings, each a faithful octane port of a React library
+  (state, data-fetching, animation, styling, routing, editor, positioning).
 
 `benchmarks/`, `playground/`, and `scripts/` hold local examples, perf harnesses,
 and tooling. Route a change to the package that owns the behavior; prefer editing

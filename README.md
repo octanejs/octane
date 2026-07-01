@@ -217,7 +217,8 @@ export function Greeting(props) @{
 
 ## Packages
 
-This is a pnpm monorepo with two publishable packages:
+This is a pnpm monorepo with nine publishable packages — the core runtime+compiler, the
+metaframework plugin, and seven framework bindings:
 
 - [`octane`](./packages/octane) is the runtime and the compiler together. It covers
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
@@ -225,6 +226,11 @@ This is a pnpm monorepo with two publishable packages:
   `octane/compiler/vite` for the build transform).
 - [`@octanejs/vite-plugin`](./packages/vite-plugin-octane) is the optional metaframework
   plugin, with dev SSR, routing, and hydration wiring for full apps.
+- The `@octanejs/*` framework bindings — each a faithful octane port of a React library:
+  [`zustand`](./packages/zustand), [`query`](./packages/query),
+  [`motion`](./packages/motion), [`stylex`](./packages/stylex),
+  [`router`](./packages/router), [`lexical`](./packages/lexical), and
+  [`floating-ui`](./packages/floating-ui).
 
 ## Development
 

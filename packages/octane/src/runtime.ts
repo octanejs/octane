@@ -4133,12 +4133,14 @@ function genericPortalBody(value: any, scope: Block): void {
 }
 
 /**
- * ReactDOM-shape `createPortal(children, target, props?)`. The compiler
- * recognises `{createPortal(...)}` at JSX child position and lowers it to a
- * direct `portal(...)` runtime call — no descriptor allocation on the hot
- * path. This function exists so the call shape matches ReactDOM exactly and
- * so non-JSX call sites (storing in a variable, passing through props, etc.)
- * still produce something the runtime can dispatch on.
+ * `createPortal(children, target, props?)`. The first two arguments mirror ReactDOM's
+ * `createPortal(children, container)`; the OPTIONAL THIRD argument is Octane-specific
+ * `props` for the portal wrapper — NOT ReactDOM's `key`. That third slot is an
+ * intentional divergence from React (Octane has no `key`-as-third-arg portal form). The
+ * compiler recognises `{createPortal(...)}` at JSX child position and lowers it to a
+ * direct `portal(...)` runtime call — no descriptor allocation on the hot path. This
+ * function exists so non-JSX call sites (storing in a variable, passing through props,
+ * etc.) still produce something the runtime can dispatch on.
  */
 const PORTAL_TAG = Symbol.for('octane.portal');
 export interface PortalDescriptor {
