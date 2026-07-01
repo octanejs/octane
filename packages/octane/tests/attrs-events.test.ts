@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
-import { Classed, WithAttrs, Clicker, FnSetter } from './_fixtures/attrs-events.tsrx';
+import {
+	Classed,
+	WithAttrs,
+	Clicker,
+	DoubleClicker,
+	FnSetter,
+	SpreadDoubleClicker,
+} from './_fixtures/attrs-events.tsrx';
 
 describe('attributes', () => {
 	it('binds dynamic class', () => {
@@ -34,6 +41,20 @@ describe('events + useState', () => {
 		const r = mount(FnSetter);
 		r.click('button');
 		expect(r.find('button').textContent).toBe('3'); // 3 functional setters in one click
+		r.unmount();
+	});
+
+	it('maps onDoubleClick to the native dblclick event', () => {
+		const r = mount(DoubleClicker);
+		r.find('button').dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+		expect(r.find('button').textContent).toBe('1');
+		r.unmount();
+	});
+
+	it('maps spread onDoubleClick to the native dblclick event', () => {
+		const r = mount(SpreadDoubleClicker);
+		r.find('button').dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+		expect(r.find('button').textContent).toBe('1');
 		r.unmount();
 	});
 });

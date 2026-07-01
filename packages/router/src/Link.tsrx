@@ -2,9 +2,17 @@
 // left-click to `router.navigate` (letting modified clicks / non-_self targets fall
 // through to the browser), and reflects active state as `data-status="active"` +
 // `aria-current="page"`. Ref is a prop (octane's model — no forwardRef). v1 skips
-// intent-preloading and `activeProps` className merging.
+// intent-preloading.
 import { useRouterState } from './useRouterState.ts';
 import { useRouter } from './context.ts';
+
+function callProp(value, event) {
+	if (typeof value === 'function') value(event);
+}
+
+function resolvePropBag(value) {
+	return typeof value === 'function' ? value() : value ?? {};
+}
 
 export function Link(props) @{
 	const router = useRouter();
@@ -15,12 +23,21 @@ export function Link(props) @{
 		search: props.search,
 		hash: props.hash,
 	});
-	const isActive = location.pathname === next.pathname;
+	const activeOptions = props.activeOptions ?? {};
+	const pathnameActive =
+		activeOptions.exact === false
+			? location.pathname.startsWith(next.pathname)
+			: location.pathname === next.pathname;
+	const searchActive =
+		activeOptions.includeSearch === false || location.searchStr === next.searchStr;
+	const hashActive = activeOptions.includeHash === false || location.hash === next.hash;
+	const isActive = pathnameActive && searchActive && hashActive;
+	const activeBag = resolvePropBag(isActive ? props.activeProps : props.inactiveProps);
 
 	// Forward every prop that isn't one of ours onto the <a> (React-router parity):
 	// data-*, aria-*, title, id, role, style, onMouseEnter, etc. The routing props
-	// (to/params/search/hash/replace/target/ref/class/className/children) drive href +
-	// active state and are consumed here, so they're stripped out of the pass-through.
+	// drive href + active state and are consumed here, so they're stripped out of the
+	// pass-through.
 	const {
 		to: _to,
 		params: _params,
@@ -32,12 +49,23 @@ export function Link(props) @{
 		class: _class,
 		className: _className,
 		children: _children,
+		onClick: _onClick,
+		activeProps: _activeProps,
+		inactiveProps: _inactiveProps,
+		activeOptions: _activeOptions,
+		disabled: _disabled,
+		reloadDocument: _reloadDocument,
 		...rest
 	} = props;
 
 	const onClick = (e) => {
+		callProp(activeBag.onClick, e);
+		callProp(props.onClick, e);
 		if (
-			e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey ||
+			e.defaultPrevented || props.disabled || props.reloadDocument || e.button !== 0 || e.metaKey ||
+				e.ctrlKey ||
+				e.shiftKey ||
+				e.altKey ||
 				props.target && props.target !== '_self'
 		) {
 			return;
@@ -54,11 +82,13 @@ export function Link(props) @{
 
 	<a
 		{...rest}
+		{...activeBag}
 		href={next.href}
 		ref={props.ref}
 		onClick={onClick}
 		target={props.target}
-		class={props.class ?? props.className as string}
+		aria-disabled={props.disabled ? 'true' : activeBag['aria-disabled']}
+		class={[props.class ?? props.className, activeBag.class, activeBag.className]}
 		data-status={isActive ? 'active' : undefined}
 		aria-current={isActive ? 'page' : undefined}
 	>{props.children}</a>
