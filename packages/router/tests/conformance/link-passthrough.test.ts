@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
 import { RouterProvider } from '@octanejs/router';
-import { makeRouter } from '../_fixtures/link-passthrough.tsrx';
+import {
+	makeRouter,
+	resetUserClickCount,
+	userClickCount,
+} from '../_fixtures/link-passthrough.tsrx';
 
 // router-core resolves matches asynchronously — flush a few cycles + paints (same
 // shape as router.test.ts).
@@ -32,13 +36,41 @@ describe('@octanejs/router <Link> arbitrary prop pass-through', () => {
 		expect(a.getAttribute('data-status')).toBe('active');
 		expect(a.getAttribute('aria-current')).toBe('page');
 
+		const activeLinkBefore = r.find('.nav-active') as HTMLAnchorElement;
+		expect(activeLinkBefore.className).toContain('nav-active');
+		expect(activeLinkBefore.className).toContain('is-inactive');
+
+		// User onClick handlers are composed before navigation.
+		resetUserClickCount();
+		r.click('.nav-click');
+		await flush();
+		expect(userClickCount).toBe(1);
+		expect(router.state.location.pathname).toBe('/about');
+
 		// Routing still works: a click navigates and flips active state.
-		r.click('.nav-about');
+		expect(r.findAll('.about').length).toBe(1);
+		expect(r.find('.nav-home').getAttribute('data-status')).toBe(null);
+		const activeLinkAfter = r.find('.nav-active') as HTMLAnchorElement;
+		expect(activeLinkAfter.className).toContain('is-active');
+		expect(activeLinkAfter.getAttribute('data-extra')).toBe('active-extra');
+		r.unmount();
+	});
+
+	it('does not intercept reloadDocument or disabled links', async () => {
+		const router = makeRouter('/');
+		await router.load();
+		const r = mount(RouterProvider as any, { router });
 		await flush();
 
-		expect(r.findAll('.about').length).toBe(1);
-		expect(router.state.location.pathname).toBe('/about');
-		expect(r.find('.nav-home').getAttribute('data-status')).toBe(null);
+		r.click('.nav-reload');
+		await flush();
+		expect(router.state.location.pathname).toBe('/');
+
+		const disabled = r.find('.nav-disabled') as HTMLAnchorElement;
+		expect(disabled.getAttribute('aria-disabled')).toBe('true');
+		r.click('.nav-disabled');
+		await flush();
+		expect(router.state.location.pathname).toBe('/');
 		r.unmount();
 	});
 });

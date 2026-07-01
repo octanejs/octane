@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { QueryClient } from '@octanejs/query';
 import { mount, nextPaint } from '../_helpers';
-import { SuspenseApp, SuspenseComponentApp } from '../_fixtures/suspense.tsrx';
+import { SuspenseApp, SuspenseComponentApp, SuspenseQueriesApp } from '../_fixtures/suspense.tsrx';
 
 let client: QueryClient;
 beforeEach(() => {
@@ -57,6 +57,21 @@ describe('suspense query', () => {
 		resolveFn('ready');
 		await flush();
 		expect(r.find('#data').textContent).toBe('data:ready');
+		r.unmount();
+	});
+
+	it('supports useSuspenseQueries for multiple suspense queries', async () => {
+		let resolveA: (v: string) => void = () => {};
+		let resolveB: (v: string) => void = () => {};
+		const a = () => new Promise<string>((res) => (resolveA = res));
+		const b = () => new Promise<string>((res) => (resolveB = res));
+		const r = mount(SuspenseQueriesApp, { client, a, b });
+		expect(r.find('#fallback').textContent).toBe('loading');
+		await flush();
+		resolveA('A');
+		resolveB('B');
+		await flush();
+		expect(r.find('#data').textContent).toBe('data:A/B');
 		r.unmount();
 	});
 });

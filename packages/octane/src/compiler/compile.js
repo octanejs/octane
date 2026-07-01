@@ -5151,7 +5151,7 @@ function emitElementHtml(
 				capture = true;
 				rest = rest.slice(0, -7);
 			}
-			const eventName = rest.toLowerCase();
+			const eventName = rest === 'DoubleClick' ? 'dblclick' : rest.toLowerCase();
 			const slotKey = capture ? `$$capture:${eventName}` : `$$${eventName}`;
 			if (capture) ctx.capturedEvents.add(eventName);
 			else ctx.delegatedEvents.add(eventName);
