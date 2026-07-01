@@ -28,6 +28,7 @@ import {
 	EMPTY_COMMENT,
 	SUSPENSE_SCRIPT_ATTR,
 	UNDEFINED_SENTINEL_KEY,
+	cssStyleValue,
 } from './constants.js';
 
 interface SSRScope {
@@ -400,7 +401,8 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 	for (const k in obj) {
 		const val = obj[k];
 		if (val == null || val === false) continue;
-		out += hyphenate(k) + ':' + val + ';';
+		// React parity: numeric values get `px` (except 0 / unitless / custom props).
+		out += hyphenate(k) + ':' + cssStyleValue(k, val) + ';';
 	}
 	return out;
 }

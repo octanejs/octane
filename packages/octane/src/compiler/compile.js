@@ -133,13 +133,103 @@ function objectExprIsStaticLiteral(obj) {
 	return true;
 }
 
+// camelCase / vendor-prefixed style key → kebab-case. Mirrors the runtime
+// `styleName` (runtime.ts) / `hyphenate` (runtime.server.ts) so a STATIC baked
+// object style produces the same CSS a dynamic one would.
+function hyphenateStyleName(name) {
+	if (name.charCodeAt(0) === 45 /* - */) return name; // --custom / -webkit-…
+	let out = '';
+	let changed = false;
+	for (let i = 0; i < name.length; i++) {
+		const c = name.charCodeAt(i);
+		if (c >= 65 && c <= 90) {
+			out += '-' + String.fromCharCode(c + 32);
+			changed = true;
+		} else out += name[i];
+	}
+	if (!changed) return name;
+	if (out.charCodeAt(0) === 109 && out.charCodeAt(1) === 115 && out.charCodeAt(2) === 45)
+		out = '-' + out;
+	return out;
+}
+
+// React's unitless-property set — keep in sync with `constants.ts`
+// (UNITLESS_STYLE_PROPS). Canonical form: lowercased, dashes stripped.
+const UNITLESS_STYLE_PROPS = new Set();
+for (const base of [
+	'animationIterationCount',
+	'aspectRatio',
+	'borderImageOutset',
+	'borderImageSlice',
+	'borderImageWidth',
+	'boxFlex',
+	'boxFlexGroup',
+	'boxOrdinalGroup',
+	'columnCount',
+	'columns',
+	'flex',
+	'flexGrow',
+	'flexPositive',
+	'flexShrink',
+	'flexNegative',
+	'flexOrder',
+	'gridArea',
+	'gridRow',
+	'gridRowEnd',
+	'gridRowSpan',
+	'gridRowStart',
+	'gridColumn',
+	'gridColumnEnd',
+	'gridColumnSpan',
+	'gridColumnStart',
+	'fontWeight',
+	'lineClamp',
+	'lineHeight',
+	'opacity',
+	'order',
+	'orphans',
+	'tabSize',
+	'widows',
+	'zIndex',
+	'zoom',
+	'fillOpacity',
+	'floodOpacity',
+	'stopOpacity',
+	'strokeDasharray',
+	'strokeDashoffset',
+	'strokeMiterlimit',
+	'strokeOpacity',
+	'strokeWidth',
+]) {
+	const c = base.toLowerCase();
+	UNITLESS_STYLE_PROPS.add(c);
+	UNITLESS_STYLE_PROPS.add('webkit' + c);
+	UNITLESS_STYLE_PROPS.add('ms' + c);
+	UNITLESS_STYLE_PROPS.add('moz' + c);
+	UNITLESS_STYLE_PROPS.add('o' + c);
+}
+
+// React parity: a bare number gets `px` unless it's 0, a custom prop, or unitless.
+function cssStyleValueStatic(name, value) {
+	if (
+		typeof value === 'number' &&
+		value !== 0 &&
+		name.charCodeAt(0) !== 45 &&
+		!UNITLESS_STYLE_PROPS.has(name.replaceAll('-', '').toLowerCase())
+	) {
+		return value + 'px';
+	}
+	return '' + value;
+}
+
 function staticObjectToCssString(obj) {
 	const parts = [];
 	for (const p of obj.properties || []) {
 		const name = p.key.type === 'Identifier' ? p.key.name : p.key.value;
 		const value = p.value.value;
 		if (value == null || value === false || value === '') continue;
-		parts.push(`${name}: ${value === true ? '' : value}`);
+		const cssValue = value === true ? '' : cssStyleValueStatic(name, value);
+		parts.push(`${hyphenateStyleName(name)}: ${cssValue}`);
 	}
 	return parts.join('; ');
 }

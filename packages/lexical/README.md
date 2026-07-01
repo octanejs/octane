@@ -28,15 +28,35 @@ Pinned to **Lexical 0.46.0**.
 
 ## Status
 
-Built incrementally to full `@lexical/react` parity. See the project plan for the
-phased roadmap (foundation → core editor → plugins → menus → collaboration →
-extension host). Parity is verified two ways: **differential** tests (the same
-`.tsrx` fixture run on octane *and* the real `@lexical/react`, asserting
-byte-identical DOM) plus ports of Lexical's own unit tests onto octane's harness.
+Near-complete `@lexical/react` parity — **35 of 39 modules ported** (Lexical 0.46.0).
+Parity is verified two ways: **differential** tests (the same `.tsrx` fixture run on
+octane *and* the real `@lexical/react`, asserting byte-identical DOM) plus ports of
+Lexical's own unit tests onto octane's harness.
 
-Currently landed:
+Landed: the composer + context (`LexicalComposer`, `LexicalComposerContext`,
+`LexicalNestedComposer`), the editable surface (`LexicalContentEditable`,
+`LexicalErrorBoundary`), the text bindings (`LexicalPlainTextPlugin`,
+`LexicalRichTextPlugin`), and the full plugin/menu set — history, list + check-list,
+link + clickable-link, hashtag, tab-indentation, markdown shortcuts, horizontal-rule,
+table, table-of-contents, auto-focus / -link / -embed, clear-editor, character-limit,
+draggable-block, node-event, on-change, selection-always-on-display, and the
+typeahead / node-menu / node-context-menu family — plus the `useLexical*` hooks and
+`LexicalCollaborationContext`.
 
-- `LexicalComposerContext`, `createLexicalComposerContext`, `useLexicalComposerContext`
+The 4 not-yet-ported modules are each deferred for a specific reason, not merely
+undone:
+
+- `LexicalCollaborationPlugin` — real-time Yjs collaboration. A genuine binding-layer
+  port (it wraps the framework-agnostic `@lexical/yjs`), deferred until there's a
+  two-peer Yjs harness to verify sync: the differential DOM-parity suite the other
+  modules rely on can't meaningfully exercise live collaboration.
+- `LexicalExtensionComposer` + `LexicalExtensionEditorComposer` — the newer
+  extension-builder composer API. Thin wrappers over a separate React-only subsystem
+  (`@lexical/react/ReactExtension` + `ReactProviderExtension`); the classic
+  `LexicalComposer` path here is fully supported.
+- `LexicalTreeView` — the debug tree viewer. A thin wrapper over
+  `@lexical/devtools-core`'s `TreeView`, which is itself a React component (React is
+  its peer dependency) — porting it means porting that separate devtools UI.
 
 ## How it works
 

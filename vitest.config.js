@@ -262,6 +262,39 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'radix',
+					include: ['packages/radix/tests/**/*.test.ts', 'packages/radix/tests/**/*.test.tsx'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				// radix's `.ts` foundation forwards the caller's slot via subSlot, so it must
+				// be EXCLUDED from the auto-slotting pass (the `.tsx` fixtures that call it are
+				// full-compiled and inject the trailing slot).
+				plugins: [
+					octane({
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/query/src/',
+							'/packages/motion/src/',
+							'/packages/radix/src/',
+						],
+					}),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/radix$/,
+							replacement: resolve(import.meta.dirname, 'packages/radix/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/radix\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/radix/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'octane-mcp-server',
 					include: ['packages/octane-mcp-server/src/**/*.test.js'],
 					environment: 'node',

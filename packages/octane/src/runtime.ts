@@ -17,6 +17,7 @@ import {
 	HYDRATION_START,
 	HYDRATION_END,
 	UNDEFINED_SENTINEL_KEY,
+	cssStyleValue,
 } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -3385,7 +3386,8 @@ function styleName(name: string): string {
 
 function applyStyleProperty(style: CSSStyleDeclaration, name: string, value: any): void {
 	const prop = styleName(name);
-	const s = typeof value === 'number' ? String(value) : (value as string);
+	// React parity: a bare number gets `px` unless it's 0, a custom prop, or unitless.
+	const s = cssStyleValue(name, value);
 	// CodeQL flagged the prior `/\s*!important\s*$/` test+replace combo as
 	// polynomial-regex-on-uncontrolled-input. Same job in linear time using
 	// built-in trimEnd() + endsWith() — no regex, no backtracking risk.
@@ -4280,6 +4282,121 @@ function isElementDescriptor(v: any): v is ElementDescriptor {
 function isHostDescriptor(v: any): v is ElementDescriptor & { type: string } {
 	return v != null && v.$$kind === ELEMENT_TAG && typeof v.type === 'string';
 }
+
+// ---------------------------------------------------------------------------
+// React-compatible `isValidElement` / `cloneElement` / `Children`.
+//
+// These operate on octane's element descriptors (`createElement` / JSX-at-value)
+// and children VALUES, mirroring React's public API so libraries that inspect or
+// re-project children — a Radix-style `Slot`/`asChild`, `Children.only`, etc. —
+// port unchanged. Children traversal flattens nested arrays and treats
+// `null`/`undefined`/booleans as empty (visited as `null`, matching React's
+// `traverseAllChildren`); `toArray`/`map` drop the empties from their results.
+// ---------------------------------------------------------------------------
+
+/** True if `v` is an element from `createElement` / JSX-at-value (React's `isValidElement`). */
+export function isValidElement(v: any): v is ElementDescriptor {
+	return isElementDescriptor(v);
+}
+
+/**
+ * `cloneElement(element, config?, ...children)` — a new descriptor with `element`'s
+ * props shallow-merged under `config` (config wins), `key` overridden by `config.key`,
+ * and children replaced by any passed positionally (else the original children are kept).
+ * `ref` is a normal prop here (octane is ref-as-prop), so it merges like any other.
+ */
+export function cloneElement<P>(
+	element: ElementDescriptor<P>,
+	config?: any,
+	...children: any[]
+): ElementDescriptor<P> {
+	if (!isElementDescriptor(element)) {
+		throw new Error(
+			'cloneElement: the first argument must be an element (from createElement / JSX).',
+		);
+	}
+	const props: any = { ...(element.props as any) };
+	let key = element.key;
+	if (config != null) {
+		if (config.key !== undefined && config.key !== null) key = config.key;
+		for (const name in config) {
+			if (name === 'key') continue;
+			if (Object.prototype.hasOwnProperty.call(config, name)) props[name] = config[name];
+		}
+	}
+	const n = children.length;
+	let kids: any;
+	if (n === 1) {
+		kids = children[0];
+	} else if (n > 1) {
+		POSITIONAL_CHILDREN.add(children);
+		kids = children;
+	} else {
+		// No new children: reuse `config.children` (now merged into props) or the original.
+		kids = 'children' in props ? props.children : element.children;
+	}
+	// Components read `props.children`; host descriptors carry children on the descriptor
+	// and never fold them into props (the de-opt reconciler owns them) — mirror createElement.
+	if (typeof element.type === 'function') props.children = kids;
+	else if ('children' in props) delete props.children;
+	return { $$kind: ELEMENT_TAG, type: element.type, props, key, children: kids ?? null };
+}
+
+// Visit each leaf of `children` (flattening arrays), passing empties through as `null`.
+// A top-level nullish `children` visits nothing (React returns 0). Returns the visit count.
+function traverseChildren(children: any, fn: (child: any, index: number) => void): number {
+	if (children == null) return 0;
+	let index = 0;
+	const walk = (node: any): void => {
+		if (Array.isArray(node)) {
+			for (let i = 0; i < node.length; i++) walk(node[i]);
+			return;
+		}
+		fn(node == null || typeof node === 'boolean' ? null : node, index++);
+	};
+	walk(children);
+	return index;
+}
+
+export const Children = {
+	/** Iterate children, flattening arrays; empties are visited as `null` (React parity). */
+	forEach(children: any, fn: (child: any, index: number) => void): void {
+		traverseChildren(children, fn);
+	},
+	/** Map children to a flat array; empty inputs are visited, empty results are dropped. */
+	map<T>(children: any, fn: (child: any, index: number) => T): T[] | null | undefined {
+		if (children == null) return children as null | undefined;
+		const out: T[] = [];
+		traverseChildren(children, (child, i) => {
+			const mapped = fn(child, i);
+			if (Array.isArray(mapped)) {
+				for (const m of mapped) if (m != null && typeof m !== 'boolean') out.push(m as T);
+			} else if (mapped != null && typeof mapped !== 'boolean') {
+				out.push(mapped);
+			}
+		});
+		return out;
+	},
+	/** Number of children `map`/`forEach` would visit (empties included, like React). */
+	count(children: any): number {
+		return traverseChildren(children, () => {});
+	},
+	/** Flatten children into an array, dropping `null`/`undefined`/boolean entries. */
+	toArray(children: any): any[] {
+		const out: any[] = [];
+		traverseChildren(children, (child) => {
+			if (child != null) out.push(child);
+		});
+		return out;
+	},
+	/** Assert `children` is a single element and return it (`React.Children.only`). */
+	only<T>(children: T): T {
+		if (!isElementDescriptor(children)) {
+			throw new Error('Children.only expected to receive a single element child.');
+		}
+		return children;
+	},
+};
 
 // ---------------------------------------------------------------------------
 // Component slot — JSX `<Foo>` / `<ctx.Provider>` invocation as a Block
