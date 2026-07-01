@@ -215,6 +215,37 @@ export function Greeting(props) @{
 }
 ```
 
+### Class composition
+
+`class` (and its alias `className`) accepts more than a string. Octane composes the
+value the same way the `clsx` / `classnames` libraries do — from strings, numbers,
+arrays, objects, and any nesting of those — so you can build a class list inline
+without a helper. Falsy parts (`false`, `0`, `null`, `undefined`, `''`) drop out;
+object keys are kept when their value is truthy.
+
+```jsx
+export function Button(props) @{
+  <button
+    class={[
+      'btn',
+      props.size,                       // 'btn lg'
+      { active: props.active, disabled: props.disabled },
+      props.extra,                      // string | array | object | falsy
+    ]}
+  >
+    {props.label as string}
+  </button>
+}
+```
+
+Composition is native to the runtime (no dependency) and works everywhere a class
+does: dynamic bindings, `{...spread}` props, SVG elements, scoped-`<style>` components
+(the scope hash is appended after your classes), and server rendering (the SSR output
+and client render compose byte-identically, so hydration never mismatches).
+
+> Unlike React — which coerces `className={['a', 'b']}` to the string `"a,b"` — this is
+> a deliberate Octane convenience. A plain string still takes the fast path.
+
 ## Packages
 
 This is a pnpm monorepo with nine publishable packages — the core runtime+compiler, the

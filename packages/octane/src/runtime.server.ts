@@ -355,7 +355,40 @@ export function ssrPortal(): string {
 }
 
 /** A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit. */
+// Compose a `class` / `className` value into a class string, clsx-style — the exact
+// twin of runtime.ts `normalizeClass` so SSR and the client produce byte-equal class
+// strings (hydration parity). See that copy for the semantics.
+export function normalizeClass(value: unknown): string {
+	if (typeof value === 'string') return value;
+	if (typeof value !== 'object') {
+		return typeof value === 'number' && value ? '' + value : '';
+	}
+	if (value === null) return '';
+	let str = '';
+	if (Array.isArray(value)) {
+		for (let i = 0; i < value.length; i++) {
+			const item = value[i];
+			if (item) {
+				const inner = normalizeClass(item);
+				if (inner) str = str ? str + ' ' + inner : inner;
+			}
+		}
+	} else {
+		for (const k in value as Record<string, unknown>) {
+			if ((value as Record<string, unknown>)[k]) str = str ? str + ' ' + k : k;
+		}
+	}
+	return str;
+}
+
 export function ssrAttr(name: string, v: unknown): string {
+	// `class` / `className` clsx-compose so arrays / objects serialise the same string
+	// the client writes (a nullish/false class still drops out; a truthy-but-empty
+	// compose emits `class=""`, matching `el.className = ''`).
+	if (name === 'class') {
+		if (v == null || v === false) return '';
+		return ' class="' + escapeAttr(normalizeClass(v)) + '"';
+	}
 	if (v == null || v === false) return '';
 	if (v === true) return ' ' + name;
 	return ' ' + name + '="' + escapeAttr(v) + '"';

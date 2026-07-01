@@ -57,6 +57,7 @@ export {
 	ssrChild,
 	ssrChildText,
 	ssrAttr,
+	normalizeClass,
 	ssrStyle,
 	ssrSpread,
 	ssrInnerHtml,
