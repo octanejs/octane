@@ -393,6 +393,12 @@ export function ssrAttr(name: string, v: unknown): string {
 		if (v == null || v === false) return '';
 		return ' class="' + escapeAttr(normalizeClass(v)) + '"';
 	}
+	// `aria-*` attributes are ENUMERATED (React parity): `false` serialises as "false"
+	// and `true` as "true"; only null/undefined drops them.
+	if (name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')) {
+		if (v == null) return '';
+		return ' ' + name + '="' + escapeAttr(String(v)) + '"';
+	}
 	if (v == null || v === false) return '';
 	if (v === true) return ' ' + name;
 	return ' ' + name + '="' + escapeAttr(v) + '"';
