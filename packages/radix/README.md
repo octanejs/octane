@@ -45,17 +45,31 @@ children-position `<Trigger asChild><button/></Trigger>`.
   (event chaining, `style` merge, clsx-style `class` composition), `composeRefs` /
   `useComposedRefs`, `composeEventHandlers`.
 - State foundation — `useControllableState` (controlled/uncontrolled), `Presence` (keeps a
-  child mounted through its CSS exit animation), and the full **`createContextScope`**
-  (`createScope` + `composeContextScopes`) so composed primitives can't collide.
+  child mounted through its CSS exit animation), the full **`createContextScope`**
+  (`createScope` + `composeContextScopes`) so composed primitives can't collide,
+  `createCollection` (the Collection primitive: `data-radix-collection-item` stamping +
+  DOM-ordered item registry), and the `radix-`-prefixed `useId`.
 - Components — `Separator`, `Label`, `Collapsible` (`Presence`-wrapped content with the
   `--radix-collapsible-content-height/-width` CSS vars), `Accordion` (single + multiple;
   `createAccordionScope` composes `createCollapsibleScope`, `__scope*` threaded through
-  every part — scope isolation is covered by a dedicated test).
+  every part, **full Home/End/Arrow keyboard navigation** via the Collection), and
+  **`Dialog`** (modal + non-modal: `Portal`/`Presence` mounting, `FocusScope` trap/loop +
+  autofocus, `DismissableLayer` Escape/outside-press/outside-focus, `aria-hidden`
+  hideOthers, body scroll lock, focus guards), **`AlertDialog`**, **`Toggle`**,
+  **`ToggleGroup`** (single/multiple), and **`Tabs`** (automatic/manual activation,
+  arrow-key navigation) — the latter three on the full **`RovingFocusGroup`** port.
+- Overlay infra — `Portal`, `DismissableLayer`, `FocusScope`, `useFocusGuards`,
+  `useScrollLock` (a focused `react-remove-scroll` replacement — see `scroll-lock.ts`),
+  with the framework-agnostic `aria-hidden` package reused as-is.
 
-Deferred follow-up (documented in
-[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): Accordion's
-arrow-key roving focus (`RovingFocusGroup` — a separate reusable primitive, also needed by
-Tabs / Toolbar / RadioGroup).
+**Verified against real Radix**: the differential suite
+(`tests/differential/parity.test.ts`) runs the SAME fixture through `@octanejs/radix` and
+the real `radix-ui` package on React, asserting byte-identical DOM after every interaction
+step.
 
-Next: the overlay family (Dialog / Popover / Tooltip / DropdownMenu) on top of
-`@octanejs/floating-ui`, plus a differential-vs-real-`@radix-ui` harness.
+Deferred (documented in
+[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)):
+`RovingFocusGroup` (Tabs / Toolbar / ToggleGroup / RadioGroup).
+
+Next: the Popper overlays (Tooltip / HoverCard / Popover / DropdownMenu) on top of
+`@octanejs/floating-ui`, plus Toolbar / RadioGroup on the RovingFocus substrate.

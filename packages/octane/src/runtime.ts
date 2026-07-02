@@ -3914,6 +3914,8 @@ function dispatchDelegated(event: Event): void {
 		while (node !== null && node !== undefined) {
 			const slot = node[key] as EventSlot;
 			if (slot) {
+				// React parity: the handler's element is the currentTarget.
+				setCurrentTarget(event, node);
 				fireEventSlot(slot, event);
 				if (event.cancelBubble) return;
 			}
@@ -3925,6 +3927,7 @@ function dispatchDelegated(event: Event): void {
 			}
 		}
 	} finally {
+		clearCurrentTarget(event);
 		_dispatchDepth--;
 		maybeFlushDiscrete(event.type);
 	}
@@ -3949,17 +3952,37 @@ function dispatchDelegatedCapture(event: Event): void {
 		for (let i = path.length - 1; i >= 0; i--) {
 			const slot = path[i][key] as EventSlot;
 			if (slot) {
+				// React parity: the handler's element is the currentTarget.
+				setCurrentTarget(event, path[i]);
 				fireEventSlot(slot, event);
 				if (event.cancelBubble) return;
 			}
 		}
 	} finally {
+		clearCurrentTarget(event);
 		_dispatchDepth--;
 		maybeFlushDiscrete(event.type);
 	}
 }
 
 function noop(): void {}
+
+// React parity for DELEGATED dispatch: handlers must see `event.currentTarget` as the
+// element whose handler is firing (React's synthetic system guarantees this; ubiquitous
+// in ported code — `event.target === event.currentTarget` guards, `currentTarget`-relative
+// measurement/indexOf). Native `currentTarget` is the listener's attach node (our
+// delegation ROOT), so shadow it with a configurable own property during each handler and
+// remove the shadow after the walk (restoring native semantics).
+function setCurrentTarget(event: Event, node: EventTarget | null): void {
+	Object.defineProperty(event, 'currentTarget', {
+		configurable: true,
+		get: () => node,
+	});
+}
+function clearCurrentTarget(event: Event): void {
+	// Deleting the own property re-exposes Event.prototype's native getter.
+	delete (event as any).currentTarget;
+}
 
 // ---------------------------------------------------------------------------
 // React 19 Actions — <form action={fn}>, useActionState, useFormStatus,
@@ -4243,12 +4266,15 @@ function genericPortalBody(value: any, scope: Block): void {
 const PORTAL_TAG = Symbol.for('octane.portal');
 export interface PortalDescriptor {
 	$$kind: typeof PORTAL_TAG;
-	body: ComponentBody;
+	// The RAW renderable handed to createPortal — a ComponentBody, an ElementDescriptor,
+	// or any other renderable (host/array/text). normalizePortalBody resolves it to a
+	// ComponentBody + props when the portal Block renders.
+	body: ComponentBody | ElementDescriptor | unknown;
 	target: Element;
 	props: any;
 }
 export function createPortal(
-	body: ComponentBody,
+	body: ComponentBody | ElementDescriptor | unknown,
 	target: Element,
 	props: any = undefined,
 ): PortalDescriptor {

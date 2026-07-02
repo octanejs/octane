@@ -1,8 +1,9 @@
-// Ported from @radix-ui/react-presence. Keeps a child mounted through its CSS exit
-// animation: when `present` flips to false it stays mounted until `animationend`/
-// `transitionend` (or unmounts immediately if there's no running animation). Pure DOM +
-// octane hooks — no React internals. In environments without CSS animations (jsdom) it
-// collapses to a plain present↔mounted conditional.
+// Ported from @radix-ui/react-presence (source:
+// .radix-primitives/packages/react/presence/src/presence.tsx). Keeps a child mounted
+// through its CSS exit animation: when `present` flips to false it stays mounted until
+// `animationend`/`animationcancel` (or unmounts immediately if no animation is running).
+// Pure DOM + octane hooks — in environments without CSS animations (jsdom) it collapses
+// to a plain present↔mounted conditional.
 import {
 	Children,
 	cloneElement,
@@ -14,7 +15,6 @@ import {
 	useState,
 } from 'octane';
 
-import { useComposedRefs } from './compose-refs';
 import { S, subSlot } from './internal';
 
 type MachineState = 'mounted' | 'unmountSuspended' | 'unmounted';
@@ -33,7 +33,7 @@ function usePresence(
 	present: boolean,
 	slot: symbol,
 ): { isPresent: boolean; ref: (el: any) => void } {
-	const [node, setNode] = useState<any>(null, subSlot(slot, 'node'));
+	const [node, setNode] = useState<HTMLElement | null>(null, subSlot(slot, 'node'));
 	const stylesRef = useRef<CSSStyleDeclaration | null>(null, subSlot(slot, 'styles'));
 	const prevPresentRef = useRef(present, subSlot(slot, 'prevPresent'));
 	const prevAnimationNameRef = useRef<string>('none', subSlot(slot, 'prevAnim'));
@@ -63,14 +63,21 @@ function usePresence(
 		() => {
 			const styles = stylesRef.current;
 			const wasPresent = prevPresentRef.current;
-			if (wasPresent !== present) {
+			const hasPresentChanged = wasPresent !== present;
+			if (hasPresentChanged) {
 				const prevAnimationName = prevAnimationNameRef.current;
 				const currentAnimationName = getAnimationName(styles);
 				if (present) {
 					send('MOUNT');
 				} else if (currentAnimationName === 'none' || styles?.display === 'none') {
+					// If there is no exit animation or the element is hidden, animations won't
+					// run so we unmount instantly.
 					send('UNMOUNT');
 				} else {
+					// When `present` changes to `false`, we check changes to animation-name to
+					// determine whether an animation has started (computed styles, because there
+					// is no `animationrun` event and `animationstart` fires after
+					// `animation-delay` has expired — too late).
 					const isAnimating = prevAnimationName !== currentAnimationName;
 					send(wasPresent && isAnimating ? 'ANIMATION_OUT' : 'UNMOUNT');
 				}
@@ -85,16 +92,40 @@ function usePresence(
 		() => {
 			if (node) {
 				let timeoutId: any;
-				const ownerWindow = node.ownerDocument?.defaultView ?? window;
-				const handleAnimationEnd = (event: AnimationEvent) => {
+				const ownerWindow = node.ownerDocument.defaultView ?? window;
+				// Triggering an ANIMATION_OUT during an ANIMATION_IN fires `animationcancel`
+				// for ANIMATION_IN after entering `unmountSuspended` — only honor the
+				// currently-active animation.
+				const handleAnimationEnd = (event: AnimationEvent): void => {
 					const currentAnimationName = getAnimationName(stylesRef.current);
-					const isCurrentAnimation = currentAnimationName.includes(event.animationName);
+					// event.animationName is unescaped CSS syntax; escape to compare with the
+					// computed animation-name.
+					const escaped =
+						typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+							? CSS.escape(event.animationName)
+							: event.animationName;
+					const isCurrentAnimation = currentAnimationName.includes(escaped);
 					if (event.target === node && isCurrentAnimation) {
 						send('ANIMATION_END');
+						// Force the last keyframe's styles while the (kept-mounted) node waits
+						// for the state to commit, removing a flash of pre-animation content.
+						if (!prevPresentRef.current) {
+							const currentFillMode = node.style.animationFillMode;
+							node.style.animationFillMode = 'forwards';
+							// Reset after the node had time to unmount (for cases where the
+							// consumer chooses not to unmount). Sooner than setTimeout (e.g.
+							// rAF) still flashes.
+							timeoutId = ownerWindow.setTimeout(() => {
+								if (node.style.animationFillMode === 'forwards') {
+									node.style.animationFillMode = currentFillMode;
+								}
+							});
+						}
 					}
 				};
-				const handleAnimationStart = (event: AnimationEvent) => {
+				const handleAnimationStart = (event: AnimationEvent): void => {
 					if (event.target === node) {
+						// An animation started: record its name as the previous animation.
 						prevAnimationNameRef.current = getAnimationName(stylesRef.current);
 					}
 				};
@@ -108,6 +139,8 @@ function usePresence(
 					node.removeEventListener('animationend', handleAnimationEnd);
 				};
 			} else {
+				// Transition to unmounted if the node is removed prematurely (not during
+				// cleanup — the node may change but still exist).
 				send('ANIMATION_END');
 			}
 		},
@@ -118,8 +151,8 @@ function usePresence(
 	return {
 		isPresent: state === 'mounted' || state === 'unmountSuspended',
 		ref: useCallback(
-			(el: any) => {
-				if (el) stylesRef.current = getComputedStyle(el);
+			(el: HTMLElement | null) => {
+				stylesRef.current = el ? getComputedStyle(el) : null;
 				setNode(el);
 			},
 			[],
@@ -129,9 +162,51 @@ function usePresence(
 }
 
 /**
- * `<Presence present>{child}</Presence>` — renders `child` while present or exit-animating.
- * `children` may be a single element or a render function `({ present }) => element`
- * (forceMount: it always renders and forwards `present`).
+ * Compose refs with a callback whose identity NEVER changes, even when the composed refs
+ * do (the latest refs are read at attach/detach time). Radix added this for the exact
+ * loop class we also hit: a per-render composed-ref identity makes the renderer
+ * detach/re-attach every commit, and since Presence's own ref calls `setNode`, an
+ * unstable consumer ref would loop forever (radix-ui/primitives#3664).
+ */
+function useStableComposedRefs(
+	refs: any[],
+	slot: symbol,
+): (node: HTMLElement | null) => void | (() => void) {
+	const refsRef = useRef(refs, subSlot(slot, 'refsRef'));
+	refsRef.current = refs;
+	return useCallback(
+		(node: HTMLElement | null) => {
+			const currentRefs = refsRef.current;
+			let hasCleanup = false;
+			const cleanups = currentRefs.map((ref) => {
+				const cleanup = setRefValue(ref, node);
+				if (!hasCleanup && typeof cleanup === 'function') hasCleanup = true;
+				return cleanup;
+			});
+			if (hasCleanup) {
+				return () => {
+					for (let i = 0; i < cleanups.length; i++) {
+						const cleanup = cleanups[i];
+						if (typeof cleanup === 'function') cleanup();
+						else setRefValue(currentRefs[i], null);
+					}
+				};
+			}
+		},
+		[],
+		subSlot(slot, 'cb'),
+	);
+}
+
+function setRefValue(ref: any, value: HTMLElement | null): void | (() => void) {
+	if (typeof ref === 'function') return ref(value);
+	if (ref !== null && ref !== undefined) ref.current = value;
+}
+
+/**
+ * `<Presence present>{child}</Presence>` — renders `child` while present or
+ * exit-animating. `children` may be a single element or a render function
+ * `({ present }) => element` (forceMount: it always renders and forwards `present`).
  */
 export function Presence(props: any): any {
 	const { present, children } = props;
@@ -140,11 +215,11 @@ export function Presence(props: any): any {
 	const forceMount = typeof children === 'function';
 	const child = forceMount ? children({ present: presence.isPresent }) : Children.only(children);
 	const childRef = isValidElement(child) ? (child as any).props?.ref : undefined;
-	// A MEMOIZED composed ref — a fresh one each render would make octane re-attach it,
-	// re-running usePresence's setNode → an infinite render loop.
-	const ref = useComposedRefs(presence.ref, childRef, subSlot(slot, 'ref'));
+	const ref = useStableComposedRefs([presence.ref, childRef], slot);
 	if (forceMount || presence.isPresent) {
 		return isValidElement(child) ? cloneElement(child as any, { ref }) : child;
 	}
 	return null;
 }
+
+export { Presence as Root };

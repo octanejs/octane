@@ -107,11 +107,42 @@ function hashString(s: string): string {
  *     we collapse to put both runtimes on equal footing.
  */
 function normaliseHtml(html: string): string {
-	return sortAttributes(
-		collapseInterTagWhitespace(stripComments(html))
-			.replace(' data-reactroot="', ' ')
-			.replace(' data-reactroot=""', '')
-			.trim(),
+	return canonicaliseGeneratedIds(
+		sortAttributes(
+			collapseInterTagWhitespace(stripComments(html))
+				.replace(' data-reactroot="', ' ')
+				.replace(' data-reactroot=""', '')
+				// An EMPTY inline style attribute is residue from imperatively setting
+				// then clearing `el.style` properties (e.g. Radix's measure-then-restore
+				// dance). React leaves `style=""` behind while octane's style writer ends
+				// with the attribute absent — semantically identical DOM, so strip it.
+				.replaceAll(' style=""', '')
+				.trim(),
+		),
+	);
+}
+
+/**
+ * Canonicalise `useId`-generated tokens so id VALUES don't fail the byte-compare while id
+ * REFERENCES still must line up. React's useId emits `:r0:` / `«r0»`-style tokens and
+ * octane's emits `:in-0:` — both are documented-opaque, so comparing them literally would
+ * fail every fixture that renders an id (e.g. Radix's `aria-controls`/`aria-labelledby`
+ * wiring). Each distinct token maps to a sequential placeholder in order of first
+ * appearance; a mismatch in WHERE ids appear, how many there are, or which attribute
+ * references which id still diverges the normalised strings.
+ */
+function canonicaliseGeneratedIds(html: string): string {
+	const map = new Map<string, string>();
+	return html.replace(
+		/«[^»]{1,24}»|:r[0-9a-z]*:|:R[0-9a-zA-Z]*:|:in-[0-9a-z]+:|_r_[0-9a-z]+_/g,
+		(token) => {
+			let placeholder = map.get(token);
+			if (placeholder === undefined) {
+				placeholder = `⟦id${map.size}⟧`;
+				map.set(token, placeholder);
+			}
+			return placeholder;
+		},
 	);
 }
 

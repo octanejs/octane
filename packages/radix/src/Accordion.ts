@@ -8,14 +8,20 @@
 // DEFERRED: arrow-key roving focus between triggers (Radix wraps triggers in
 // RovingFocusGroup). Expand/collapse + ARIA + data-state are complete; the roving-focus
 // primitive is a separate, reusable follow-up (also used by Tabs/Toolbar/RadioGroup).
-import { createElement, useCallback, useId } from 'octane';
+import { createElement, useCallback } from 'octane';
 
 import * as Collapsible from './Collapsible';
 import { createCollapsibleScope } from './Collapsible';
+import { createCollection } from './collection';
+import { composeEventHandlers } from './compose-event-handlers';
 import { createContextScope } from './context';
 import { S, subSlot } from './internal';
 import { Primitive } from './Primitive';
 import { useControllableState } from './useControllableState';
+import { useId } from './useId';
+
+const ACCORDION_KEYS = ['Home', 'End', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'];
+const [Collection, useCollection] = createCollection('Accordion');
 
 interface ValueContextValue {
 	value: string[];
@@ -61,6 +67,7 @@ export function Root(props: any): any {
 		onValueChange,
 		collapsible = false,
 		disabled,
+		dir,
 		orientation = 'vertical',
 		...rest
 	} = props ?? {};
@@ -97,18 +104,93 @@ export function Root(props: any): any {
 		subSlot(slot, 'close'),
 	);
 
-	return createElement(AccordionValueProvider, {
+	return createElement(Collection.Provider, {
 		scope: __scopeAccordion,
-		value: valueArray,
-		onItemOpen,
-		onItemClose,
-		children: createElement(AccordionImplProvider, {
+		children: createElement(AccordionValueProvider, {
 			scope: __scopeAccordion,
-			disabled,
-			orientation,
-			collapsible,
-			isMultiple,
-			children: createElement(Primitive.div, { 'data-orientation': orientation, ...rest }),
+			value: valueArray,
+			onItemOpen,
+			onItemClose,
+			children: createElement(AccordionImplProvider, {
+				scope: __scopeAccordion,
+				disabled,
+				orientation,
+				collapsible,
+				isMultiple,
+				children: createElement(AccordionImpl, {
+					__scopeAccordion,
+					disabled,
+					dir,
+					orientation,
+					...rest,
+				}),
+			}),
+		}),
+	});
+}
+
+// The keyboard-navigable root element (Radix's AccordionImpl): Home/End jump, arrow keys
+// move between triggers per orientation/direction, wrapping — driven by the Collection.
+function AccordionImpl(props: any): any {
+	const slot = S('Accordion.Impl');
+	const { __scopeAccordion, disabled, dir, orientation, ...accordionProps } = props;
+	const getItems = useCollection(__scopeAccordion, subSlot(slot, 'items'));
+	const isDirectionLTR = (dir ?? 'ltr') === 'ltr';
+
+	const handleKeyDown = composeEventHandlers(accordionProps.onKeyDown, (event: KeyboardEvent) => {
+		if (!ACCORDION_KEYS.includes(event.key)) return;
+		const target = event.target as HTMLElement;
+		const triggerCollection = getItems().filter((item: any) => !item.ref.current?.disabled);
+		const triggerIndex = triggerCollection.findIndex((item: any) => item.ref.current === target);
+		const triggerCount = triggerCollection.length;
+		if (triggerIndex === -1) return;
+		event.preventDefault();
+		let nextIndex = triggerIndex;
+		const homeIndex = 0;
+		const endIndex = triggerCount - 1;
+		const moveNext = (): void => {
+			nextIndex = triggerIndex + 1;
+			if (nextIndex > endIndex) nextIndex = homeIndex;
+		};
+		const movePrev = (): void => {
+			nextIndex = triggerIndex - 1;
+			if (nextIndex < homeIndex) nextIndex = endIndex;
+		};
+		switch (event.key) {
+			case 'Home':
+				nextIndex = homeIndex;
+				break;
+			case 'End':
+				nextIndex = endIndex;
+				break;
+			case 'ArrowRight':
+				if (orientation === 'horizontal') {
+					if (isDirectionLTR) moveNext();
+					else movePrev();
+				}
+				break;
+			case 'ArrowDown':
+				if (orientation === 'vertical') moveNext();
+				break;
+			case 'ArrowLeft':
+				if (orientation === 'horizontal') {
+					if (isDirectionLTR) movePrev();
+					else moveNext();
+				}
+				break;
+			case 'ArrowUp':
+				if (orientation === 'vertical') movePrev();
+				break;
+		}
+		triggerCollection[nextIndex % triggerCount].ref.current?.focus();
+	});
+
+	return createElement(Collection.Slot, {
+		scope: __scopeAccordion,
+		children: createElement(Primitive.div, {
+			...accordionProps,
+			'data-orientation': orientation,
+			onKeyDown: disabled ? undefined : handleKeyDown,
 		}),
 	});
 }
@@ -163,12 +245,17 @@ export function Trigger(props: any): any {
 	const collapsibleScope = useCollapsibleScope(__scopeAccordion, subSlot(slot, 'cscope'));
 	// A `type="single"` non-collapsible open item can't be closed → aria-disabled.
 	const ariaDisabled = (item.open && !impl.isMultiple && !impl.collapsible) || undefined;
-	return createElement(Collapsible.Trigger, {
-		'aria-disabled': ariaDisabled,
-		'data-orientation': impl.orientation,
-		id: item.triggerId,
-		...collapsibleScope,
-		...rest,
+	// Registered in the Collection (stamps `data-radix-collection-item` + a ref onto the
+	// underlying button) so the root's keyboard nav can enumerate triggers in DOM order.
+	return createElement(Collection.ItemSlot, {
+		scope: __scopeAccordion,
+		children: createElement(Collapsible.Trigger, {
+			'aria-disabled': ariaDisabled,
+			'data-orientation': impl.orientation,
+			id: item.triggerId,
+			...collapsibleScope,
+			...rest,
+		}),
 	});
 }
 

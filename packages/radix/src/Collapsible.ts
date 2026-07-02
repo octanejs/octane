@@ -3,15 +3,7 @@
 // Content stays mounted through its exit animation via `Presence` and exposes the
 // `--radix-collapsible-content-height/-width` CSS vars for animating. `.ts` components via
 // createElement; ref-as-prop.
-import {
-	createElement,
-	useCallback,
-	useEffect,
-	useId,
-	useLayoutEffect,
-	useRef,
-	useState,
-} from 'octane';
+import { createElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'octane';
 
 import { composeEventHandlers } from './compose-event-handlers';
 import { useComposedRefs } from './compose-refs';
@@ -20,6 +12,7 @@ import { S, subSlot } from './internal';
 import { Presence } from './Presence';
 import { Primitive } from './Primitive';
 import { useControllableState } from './useControllableState';
+import { useId } from './useId';
 
 interface CollapsibleContextValue {
 	contentId: string;
@@ -79,7 +72,8 @@ export function Trigger(props: any): any {
 	const context = useCollapsibleContext('CollapsibleTrigger', __scopeCollapsible);
 	return createElement(Primitive.button, {
 		type: 'button',
-		'aria-controls': context.contentId,
+		// Radix parity: only reference the content while it's expanded.
+		'aria-controls': context.open ? context.contentId : undefined,
 		'aria-expanded': context.open || false,
 		'data-state': getState(context.open),
 		'data-disabled': context.disabled ? '' : undefined,

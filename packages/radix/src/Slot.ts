@@ -1,16 +1,22 @@
-// Ported from @radix-ui/react-slot. `Slot` merges its own props onto a single element
-// child and renders that child in place — the engine behind `asChild`. React's
-// `forwardRef` + `Children`/`cloneElement`/`composeRefs` map onto octane's ref-as-prop +
-// the runtime's `Children`/`cloneElement`/`isValidElement`.
+// Ported from @radix-ui/react-slot (the MODERN version). `Slot` merges its own props onto
+// a single element child and renders that child in place — the engine behind `asChild`.
+// React's `forwardRef` + `Children`/`cloneElement` map onto octane's ref-as-prop + the
+// runtime's `Children`/`cloneElement`/`isValidElement`.
+//
+// CRITICAL (learned the hard way, mirroring Radix's own history): the composed ref MUST be
+// memoized (`useComposedRefs`), not built fresh per render — a fresh identity makes the
+// renderer detach(null)+re-attach the child's ref every render, and refs that are state
+// setters (DismissableLayer/FocusScope/Presence `setNode`) then re-render → fresh ref →
+// an infinite loop. Radix's legacy inline `composeRefs` slot had this exact churn.
 //
 // IMPORTANT (octane): these operate on element DESCRIPTORS. In `.tsrx`, prop-position JSX
 // (`el={<button/>}`), `createElement`, and `.map()` returns are descriptors, but
-// children-position JSX compiles to a render function. So an octane `asChild` consumer
-// passes the child element through a prop / value position rather than React's
-// children-position `<Trigger asChild><button/></Trigger>` (see docs/radix-migration-plan.md).
-import { Children, cloneElement, createElement, isValidElement, normalizeClass } from 'octane';
+// children-position JSX compiles to a render function — so `asChild` consumers pass the
+// child element through a prop / value position (see docs/radix-migration-plan.md).
+import { Children, cloneElement, isValidElement, normalizeClass } from 'octane';
 
-import { composeRefs } from './compose-refs';
+import { useComposedRefs } from './compose-refs';
+import { S, subSlot } from './internal';
 
 /** A marker whose child element `Slot` projects while keeping its sibling children. */
 export function Slottable(props: { children?: any }): any {
@@ -49,43 +55,45 @@ function mergeProps(slotProps: any, childProps: any): any {
 	return { ...slotProps, ...overrideProps };
 }
 
-function SlotClone(props: any): any {
-	const { children, ...slotProps } = props;
-	if (isValidElement(children)) {
-		const childProps: any = (children as any).props ?? {};
-		const merged = mergeProps(slotProps, childProps);
-		// Compose refs (octane ref-as-prop): the Slot's `ref` + the child's own `ref`.
-		const slotRef = slotProps.ref;
-		const childRef = childProps.ref;
-		merged.ref = slotRef !== undefined ? composeRefs(slotRef, childRef) : childRef;
-		return cloneElement(children as any, merged);
-	}
-	// 0 children → nothing; >1 → Children.only throws (like Radix).
-	return Children.count(children) > 1 ? Children.only(children) : null;
-}
-
 export function Slot(props: any): any {
-	const { children, ...slotProps } = props;
+	const slot = S('Slot');
+	const { children, ...slotProps } = props ?? {};
+
+	// Resolve the element to project onto. With a `<Slottable>` marker among the children,
+	// its child is the projection target and the siblings become the new children.
 	const childrenArray = Children.toArray(children);
 	const slottable = childrenArray.find(isSlottable);
-
+	let targetChild: any = children;
+	let newChildren: any = null;
+	let hasSlottable = false;
 	if (slottable) {
-		// The element to render is the child of the <Slottable>; its siblings render around it.
+		hasSlottable = true;
 		const newElement = (slottable as any).props.children;
-		const newChildren = Children.map(children, (child: any) => {
+		newChildren = Children.map(children, (child: any) => {
 			if (child === slottable) {
 				if (Children.count(newElement) > 1) return Children.only(null as any);
 				return isValidElement(newElement) ? (newElement as any).props.children : null;
 			}
 			return child;
 		});
-		return SlotClone({
-			...slotProps,
-			children: isValidElement(newElement)
-				? cloneElement(newElement as any, undefined, newChildren)
-				: null,
-		});
+		targetChild = isValidElement(newElement)
+			? cloneElement(newElement as any, undefined, newChildren)
+			: null;
 	}
 
-	return SlotClone({ ...slotProps, children });
+	const childIsElement = isValidElement(targetChild);
+	const childRef = childIsElement ? (targetChild as any).props?.ref : undefined;
+	const slotRef = slotProps.ref;
+	// MEMOIZED composed ref — see the header note. (octane allows conditional hooks, but
+	// this one runs unconditionally anyway.)
+	const composedRef = useComposedRefs(slotRef, childRef, subSlot(slot, 'refs'));
+
+	if (childIsElement) {
+		const merged = mergeProps(slotProps, (targetChild as any).props ?? {});
+		merged.ref = slotRef !== undefined ? composedRef : childRef;
+		if (hasSlottable) merged.children = newChildren;
+		return cloneElement(targetChild as any, merged);
+	}
+	// 0 children → nothing; >1 → Children.only throws (like Radix).
+	return Children.count(targetChild) > 1 ? Children.only(targetChild) : null;
 }
