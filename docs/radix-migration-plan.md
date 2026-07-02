@@ -169,10 +169,55 @@
 > (SSR already implemented raw-HTML-wins). Surfaced by ScrollArea's injected viewport
 > `<style>`. Regression: danger-html.test.ts de-opt case.
 >
+> **Phase-4 form batch landed (2026-07-02):** `Checkbox` (indeterminate, form reset),
+> `Switch`, `Radio`+`RadioGroup` (roving focus checks-on-arrow via a real `.click()`),
+> `Slider` (multi-thumb, sorted values, keyboard steps + Home/End/Shift-skip, pointer
+> capture machinery), and `Form` (native Constraint Validation: per-field ValidityState
+> capture on `invalid`/`change`, custom sync/async matchers over FormData with
+> `setCustomValidity`, message ids into `aria-describedby`), + `use-previous.ts`. The
+> hidden-native-input "bubble input" machinery ports surprisingly cleanly onto octane —
+> the modern source is already IMPERATIVE (uncontrolled `defaultChecked` + native
+> property setter + dispatched events). Documented octane adaptations: React's synthetic
+> `isPropagationStopped()` → native `event.cancelBubble`; `defaultChecked`/`defaultValue`
+> → the native `checked`/`value` ATTRIBUTES (HTML default-state semantics); an extra
+> native `change` dispatched alongside the source's `click` (React forms observe checkbox
+> clicks via synthetic onChange, octane's `<form onChange>` is the native event); Form's
+> reset-on-edit handler is `onInput` in octane (React's `onChange` IS the input event —
+> as native `onChange` it fired on the same event as the validate-on-change listener and
+> stomped the fresh validity). Verified: 13 unit tests (FormData/reset/keyboard/validation)
+> AND — because form controls are container-visible — **differential parity: FormControls
+> across 5 click steps and Slider across keyboard steps, byte-identical vs real Radix**
+> (real Radix's unguarded `useSize` needs a no-op ResizeObserver stub in jsdom).
+>
+> **FOUR more octane bugs found + fixed (#7–#10, all with regression tests + changesets):**
+> (7) **`onInvalid` never fired** — `invalid` doesn't bubble; now capture-delegated WITH
+> the focus/blur ancestor walk (React's onInvalid propagates: a form observes its
+> controls' invalid events). Plus the `htmlFor` → `for` React-parity alias (compiler
+> static templates, runtime dynamic/de-opt paths, SSR) — was a dead `htmlfor` attribute.
+> (8) **Effect drains weren't re-entrancy-safe** — an effect dispatching a DISCRETE event
+> (the bubble input's `click`) flushed from the handler and re-entered `drainPhase` over
+> the same live queue, re-running executed entries; with a re-dispatching effect this
+> recursed unboundedly (checkbox in `<form onChange>` → hundreds of change events + stack
+> overflow). Drains now snapshot their batch up-front (React nulls
+> rootWithPendingPassiveEffects first — same idea) (effect-dispatch.test.ts).
+> (9) **Event-bundle optimization broke `this` for member callees** —
+> `onClick={() => props.log.push(x)}` compiled to `{fn: props.log.push, args}` and the
+> dispatcher's bare `fn(...)` ran the method with `this === undefined` (threw
+> mid-dispatch). The old test only pinned the CODEGEN, never ran it. Bundling now
+> requires a plain identifier callee (the hot path it was built for).
+> (10) **De-opt patch path never removed dropped style keys** — `patchDeoptProps` reused
+> the fresh-element applier whose style arm passes prev=undefined into setStyle, so a
+> declaration absent from the next render's style object stayed on the reused element
+> (Slider's thumb kept its pre-measurement `display: none` forever; caught by the
+> differential). The patch path now threads the real previous style
+> (deopt-style-patch.test.ts).
+>
 > **Still deferred:** `Menubar` (the least-clean menu consumer — shared roving focus
-> across triggers + open-on-hover-when-any-open interplay); `RadioGroup` + the Phase-4
-> form batch (Checkbox/Switch/Slider share the 682-line BubbleInput machinery);
-> `Select`/`NavigationMenu` last per plan; `Toast` in Phase 5.
+> across triggers + open-on-hover-when-any-open interplay); `OneTimePasswordField` (974
+> lines) + `PasswordToggleField` (505) — the most input-heavy primitives (selection
+> management, paste, per-char focus juggling; need `use-effect-event`/`use-is-hydrated`
+> helper ports) — deserving a focused pass; `Select`/`NavigationMenu` last per plan;
+> `Toast` in Phase 5.
 
 ## 1. Recommendation
 

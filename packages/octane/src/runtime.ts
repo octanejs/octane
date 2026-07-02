@@ -878,8 +878,18 @@ function compareEffectPostOrder(a: PendingEffect, b: PendingEffect): number {
 }
 
 function drainPhase(phase: Phase): void {
-	const q = effectQueues[phase];
-	if (q.length === 0) return;
+	const pending = effectQueues[phase];
+	if (pending.length === 0) return;
+	// Take ownership of the current batch UP-FRONT (React's flushPassiveEffects nulls
+	// rootWithPendingPassiveEffects before running any effect): an effect body may
+	// synchronously dispatch a DISCRETE event (e.g. Radix's form bubble inputs
+	// dispatching `click`) whose handler flushes and re-enters drainPhase. A live-array
+	// walk would let that re-entrant call re-run entries the outer walk already
+	// executed — double-firing effects, unboundedly when the effect re-dispatches.
+	// With a snapshot, the re-entrant call sees only effects enqueued DURING this
+	// drain (nested-update work, which it runs like React's nested passive flush);
+	// anything enqueued later re-arms via the normal commit scheduling.
+	const q = pending.splice(0);
 	// React parity: fire in post-order (child-before-parent, siblings in tree order).
 	// Stable sort preserves enqueue order for entries the comparator treats as equal.
 	q.sort(compareEffectPostOrder);
@@ -938,7 +948,6 @@ function drainPhase(phase: Phase): void {
 			}
 		}
 	}
-	q.length = 0;
 }
 
 // `schedulePostPaint` — fires after the next paint (React's scheduler trick).
@@ -3211,6 +3220,8 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		el.innerHTML = html == null || html === false ? '' : String(html);
 		return;
 	}
+	// React-parity alias, mirroring class/className: `htmlFor` writes the native `for`.
+	if (name === 'htmlFor') name = 'for';
 	// Hydration VALUE-mismatch handling. The normal write below already PATCHES the adopted
 	// element to the client value (so prod recovers for free); here we only (dev) warn on a
 	// server/client divergence and (dev+prod) honor `suppressHydrationWarning` by keeping the
@@ -3734,6 +3745,10 @@ const _delegatedCapture = new Set<string>();
 const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
 	'focus',
 	'blur',
+	// `invalid` doesn't bubble either, but React's onInvalid propagates (a form's
+	// onInvalid observes its controls' invalid events) — so it gets the focus/blur
+	// walking treatment, NOT the enter/leave target-only one.
+	'invalid',
 	'pointerenter',
 	'pointerleave',
 	'mouseenter',
@@ -5041,7 +5056,17 @@ function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock
 				continue;
 			}
 			const nv = nextProps[name];
-			if (prevProps == null || prevProps[name] !== nv) applyDeoptProp(el, name, nv, ownerBlock);
+			if (prevProps == null || prevProps[name] !== nv) {
+				// `applyDeoptProp` is the FRESH-element helper — its style arm passes
+				// prev=undefined, which on a REUSED element leaves declarations dropped
+				// from the style object stale (applyStyleValue can only remove keys it
+				// can diff against). Thread the real previous style here.
+				if (name === 'style') {
+					setStyle(el as HTMLElement, nv, prevProps != null ? prevProps.style : undefined);
+				} else {
+					applyDeoptProp(el, name, nv, ownerBlock);
+				}
+			}
 		}
 	}
 }

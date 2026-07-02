@@ -132,13 +132,17 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
 		expect(norm(concise)).toBe(norm(block));
 	});
 
-	it('member-expression callee is preserved verbatim in the _fn slot', () => {
+	it('member-expression callee is NOT bundled (receiver would be lost)', () => {
+		// Regression: `_fn$ = (props.obj.method)` extracted the method bare, so the
+		// dispatcher's `fn(...)` invocation ran it with `this === undefined`
+		// (`() => props.log.push(x)` threw mid-dispatch). Member callees keep the
+		// plain closure handler; only plain-identifier callees bundle.
 		const code = c(`
       export function App(props) @{
         <button onClick={() => props.obj.method(props.x)}>{'go'}</button>
       }
     `);
-		expect(code).toMatch(/_b\._fn\$\d+\s*=\s*\(props\.obj\.method\)/);
-		expect(code).toMatch(/_b\._a\$\d+\$0\s*=\s*\(props\.x\)/);
+		expect(code).not.toMatch(/_b\._fn\$\d+\s*=\s*\(props\.obj\.method\)/);
+		expect(code).toMatch(/\$\$click.*=/); // still an event handler, as a closure
 	});
 });

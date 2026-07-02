@@ -39,7 +39,7 @@ children-position `<Trigger asChild><button/></Trigger>`.
 
 ## Status
 
-**Phases 0–2 + the Phase-3 overlay family.** Landed:
+**Phases 0–3 + the Phase-4 form batch.** Landed:
 
 - Composition foundation — `Slot`, `Slottable`, `Primitive.<tag>` (`asChild`), `mergeProps`
   (event chaining, `style` merge, clsx-style `class` composition), `composeRefs` /
@@ -67,6 +67,14 @@ children-position `<Trigger asChild><button/></Trigger>`.
   visibility strategies (`hover` / `scroll` state machine / `auto` overflow
   measurement / `always`), thumb drag + wheel scroll geometry, corner, and the
   scroll-linked-effect-avoiding rAF thumb loop.
+- **The form batch** — **`Checkbox`** (indeterminate), **`Switch`**,
+  **`RadioGroup`** (roving-focus arrow keys check items), **`Slider`**
+  (multi-thumb, keyboard + pointer-capture sliding), and **`Form`** (native
+  Constraint Validation: built-in + custom sync/async matchers, messages wired
+  into `aria-describedby`). Each control renders Radix's hidden native "bubble
+  input" inside forms, so FormData, form reset, and `<form onChange>` reflect
+  state natively (see the per-file headers for the documented octane
+  adaptations around the uncontrolled-input model).
 - Overlay infra — `Portal`, `DismissableLayer`, `FocusScope`, `useFocusGuards`,
   `useScrollLock` (a focused `react-remove-scroll` replacement — see `scroll-lock.ts`),
   with the framework-agnostic `aria-hidden` package reused as-is.
@@ -79,7 +87,6 @@ unit suites. Ports come from the pinned radix-ui/primitives source checkout
 (`.radix-primitives/`); every file header cites its source path.
 
 Deferred (documented in
-[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): `Menubar`; the
-form batch (`Checkbox` / `Switch` / `RadioGroup` / `Slider` — shared BubbleInput
-machinery, re-authored for octane's native/uncontrolled input model); then `Select` /
-`NavigationMenu`, and `Toast` in Phase 5.
+[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): `Menubar`;
+`OneTimePasswordField` / `PasswordToggleField` (the most input-heavy primitives —
+a focused follow-up); then `Select` / `NavigationMenu`, and `Toast` in Phase 5.
