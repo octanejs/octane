@@ -386,6 +386,8 @@ export function normalizeClass(value: unknown): string {
 }
 
 export function ssrAttr(name: string, v: unknown): string {
+	// React-parity alias, mirroring class/className: `htmlFor` serialises as `for`.
+	if (name === 'htmlFor') name = 'for';
 	// `class` / `className` clsx-compose so arrays / objects serialise the same string
 	// the client writes (a nullish/false class still drops out; a truthy-but-empty
 	// compose emits `class=""`, matching `el.className = ''`).

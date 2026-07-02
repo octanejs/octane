@@ -6,7 +6,7 @@
  * useId tokens canonicalised — see the rig). This is the gold-standard proof that the
  * binding behaves like Radix's React primitives — not just "passes my tests".
  */
-import { describe, it } from 'vitest';
+import { describe, it, beforeAll, afterAll } from 'vitest';
 import { resolve } from 'node:path';
 import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
 
@@ -22,6 +22,26 @@ const CACHE = resolve(__dirname, '.react-cache');
 // the two sides in different guard states (a test-environment artifact, not a renderer
 // divergence).
 const settleRaf = (): Promise<void> => new Promise((res) => setTimeout(res, 40));
+
+// Real Radix's useSize constructs ResizeObserver unguarded (jsdom has none) — the form
+// controls' bubble inputs and the slider thumb hit it on the React side. A no-op stub
+// keeps sizes at the initial report, identical on both sides.
+beforeAll(() => {
+	if (!('ResizeObserver' in globalThis)) {
+		(globalThis as any).ResizeObserver = class {
+			observe(): void {}
+			unobserve(): void {}
+			disconnect(): void {}
+		};
+		(globalThis as any).__stubbedRO = true;
+	}
+});
+afterAll(() => {
+	if ((globalThis as any).__stubbedRO) {
+		delete (globalThis as any).ResizeObserver;
+		delete (globalThis as any).__stubbedRO;
+	}
+});
 
 describe('differential: @octanejs/radix vs real Radix on React', () => {
 	it('Separator: horizontal / vertical / decorative, byte-identical', async () => {
@@ -176,6 +196,60 @@ describe('differential: @octanejs/radix vs real Radix on React', () => {
 		await d.step('press B (only A on)', async (i, r) => {
 			await i.click('#ti-b');
 			await r.click('#ti-b');
+		});
+		d.unmount();
+	});
+
+	it('FormControls: checkbox/switch/radio-group + bubble inputs across clicks, byte-identical', async () => {
+		const d = await mountDifferential(FIXTURE, 'FormControls', undefined, CACHE);
+		await d.step('mount', async () => {
+			await settleRaf();
+		});
+		await d.step('check the checkbox', async (i, r) => {
+			await i.click('#cb');
+			await r.click('#cb');
+			await settleRaf();
+		});
+		await d.step('toggle the switch', async (i, r) => {
+			await i.click('#sw');
+			await r.click('#sw');
+			await settleRaf();
+		});
+		await d.step('select vanilla', async (i, r) => {
+			await i.click('#rg-a');
+			await r.click('#rg-a');
+			await settleRaf();
+		});
+		await d.step('select chocolate (vanilla unchecks)', async (i, r) => {
+			await i.click('#rg-b');
+			await r.click('#rg-b');
+			await settleRaf();
+		});
+		d.unmount();
+	});
+
+	it('Slider: aria/range/thumb bytes across keyboard steps, byte-identical', async () => {
+		const d = await mountDifferential(FIXTURE, 'SliderDiff', undefined, CACHE);
+		await d.step('mount', async () => {
+			await settleRaf();
+		});
+		const arrowRight = (root: HTMLElement): void => {
+			const all = root.getElementsByTagName('*');
+			let el: Element | null = null;
+			for (let i = 0; i < all.length; i++) {
+				if (all[i].getAttribute('role') === 'slider') {
+					el = all[i];
+					break;
+				}
+			}
+			el!.dispatchEvent(
+				new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }),
+			);
+		};
+		await d.step('ArrowRight (30 → 40)', async (i, r) => {
+			arrowRight(i.container);
+			arrowRight(r.container);
+			await settleRaf();
 		});
 		d.unmount();
 	});

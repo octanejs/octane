@@ -12,6 +12,10 @@ import {
 	Avatar,
 	Progress,
 	Toolbar,
+	Checkbox,
+	Switch,
+	RadioGroup,
+	Slider,
 } from '@octanejs/radix';
 
 // Self-contained fixtures for the differential rig: the SAME source runs on octane (via
@@ -202,4 +206,49 @@ export function ToolbarApp() @{
 			</ToolbarToggleGroup>
 		</ToolbarRoot>
 	</div>
+}
+
+const CheckboxRoot = Checkbox.Root;
+const CheckboxIndicator = Checkbox.Indicator;
+const SwitchRoot = Switch.Root;
+const SwitchThumb = Switch.Thumb;
+const RadioGroupRoot = RadioGroup.Root;
+const RadioGroupItem = RadioGroup.Item;
+const RadioGroupIndicator = RadioGroup.Indicator;
+const SliderRoot = Slider.Root;
+const SliderTrack = Slider.Track;
+const SliderRange = Slider.Range;
+const SliderThumb = Slider.Thumb;
+
+// Form controls INSIDE a real <form> so the hidden bubble inputs render on both sides.
+export function FormControls() @{
+	<form>
+		<CheckboxRoot id="cb" name="notify">
+			<CheckboxIndicator id="cb-i">x</CheckboxIndicator>
+		</CheckboxRoot>
+		<SwitchRoot id="sw" name="airplane">
+			<SwitchThumb id="sw-t" />
+		</SwitchRoot>
+		<RadioGroupRoot id="rg" name="flavor">
+			<RadioGroupItem id="rg-a" value="vanilla">
+				<RadioGroupIndicator id="rg-a-i" />
+			</RadioGroupItem>
+			<RadioGroupItem id="rg-b" value="chocolate">
+				<RadioGroupIndicator id="rg-b-i" />
+			</RadioGroupItem>
+		</RadioGroupRoot>
+	</form>
+}
+
+const SLIDER_DEFAULTS = [30];
+
+export function SliderDiff() @{
+	<form>
+		<SliderRoot id="sl" name="volume" min={0} max={100} step={10} defaultValue={SLIDER_DEFAULTS}>
+			<SliderTrack id="sl-t">
+				<SliderRange id="sl-r" />
+			</SliderTrack>
+			<SliderThumb id="sl-th" />
+		</SliderRoot>
+	</form>
 }

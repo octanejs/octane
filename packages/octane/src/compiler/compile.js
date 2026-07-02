@@ -618,10 +618,11 @@ function containsComponentCallOrControlFlow(stmts) {
  *
  * Conservative: we ONLY match arrows with NO params (so the user definitely
  * isn't reading the event arg), and the body must be a single CallExpression
- * (no statements, no side effects beyond the call). Members/index expressions
- * as the callee are fine — JS will resolve `this` correctly when the bundle
- * is invoked because the dispatcher uses `slot.fn.apply(null, ...)` only for
- * the variadic case; small-arity calls invoke the fn directly.
+ * (no statements, no side effects beyond the call). The callee must be a PLAIN
+ * IDENTIFIER: extracting a member callee (`obj.method`) into the bundle's `fn`
+ * slot loses its receiver — the dispatcher invokes `fn(...)` bare, so `this`
+ * would be undefined inside the method (`() => props.log.push(x)` threw). Member
+ * callees keep the ordinary closure handler instead.
  */
 function detectStableEventBundle(node) {
 	if (!node || node.type !== 'ArrowFunctionExpression') return null;
@@ -637,6 +638,8 @@ function detectStableEventBundle(node) {
 		else return null;
 	}
 	if (!body || body.type !== 'CallExpression') return null;
+	// Identifier callees only — see the receiver-loss note above.
+	if (!body.callee || body.callee.type !== 'Identifier') return null;
 	// Bail if any arg is a spread — bundle args are positional only.
 	if (body.arguments.some((a) => a.type === 'SpreadElement')) return null;
 	return { callee: body.callee, args: body.arguments };
@@ -1782,7 +1785,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			continue;
 		// Function form/button actions are events too; a static string `action`
 		// falls through to the normal attribute path below.
-		const attrName = rawAttrName === 'className' ? 'class' : rawAttrName;
+		// `className`/`htmlFor` are React-shape JSX; emit the native names.
+		const attrName =
+			rawAttrName === 'className' ? 'class' : rawAttrName === 'htmlFor' ? 'for' : rawAttrName;
 		const val = attr.value;
 		const isAfterSpread = firstSpreadIdx !== -1 && attrI > firstSpreadIdx;
 
@@ -5108,9 +5113,11 @@ function emitElementHtml(
 			if (!isFalse) bindings.push({ id: bindings.length, kind: 'suppress', path });
 			continue;
 		}
-		// `className` is React-shape JSX; emit `class` in HTML so the browser
-		// actually applies it (and dynamic bindings also know which kind to pick).
-		const attrName = rawAttrName === 'className' ? 'class' : rawAttrName;
+		// `className`/`htmlFor` are React-shape JSX; emit the native `class`/`for` in
+		// HTML so the browser actually applies them (and dynamic bindings also know
+		// which kind to pick).
+		const attrName =
+			rawAttrName === 'className' ? 'class' : rawAttrName === 'htmlFor' ? 'for' : rawAttrName;
 
 		const val = attr.value;
 		// If this attr comes AFTER a spread, we MUST emit as a binding (later wins).
