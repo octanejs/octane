@@ -64,6 +64,12 @@ export function Slot(props: any): any {
 	const childrenArray = Children.toArray(children);
 	const slottable = childrenArray.find(isSlottable);
 	let targetChild: any = children;
+	// octane convention: children are often passed as an ARRAY prop (that's how a .tsrx
+	// caller provides enumerable children — see Dialog.Portal). React's Children.only
+	// rejects arrays outright; here a single-element array unwraps to its element.
+	if (!slottable && Array.isArray(children) && childrenArray.length === 1) {
+		targetChild = childrenArray[0];
+	}
 	let newChildren: any = null;
 	let hasSlottable = false;
 	if (slottable) {

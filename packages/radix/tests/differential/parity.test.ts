@@ -157,6 +157,29 @@ describe('differential: @octanejs/radix vs real Radix on React', () => {
 		d.unmount();
 	});
 
+	it('QuickWins: AspectRatio + VisuallyHidden + Avatar + Progress, byte-identical', async () => {
+		const d = await mountDifferential(FIXTURE, 'QuickWins', undefined, CACHE);
+		// jsdom never loads images, so both sides settle on the fallback.
+		await d.step('mount', async () => {
+			await settleRaf();
+		});
+		d.unmount();
+	});
+
+	it('Toolbar: buttons/link/separator/toggle-group, byte-identical incl. toggling', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToolbarApp', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('press A (both on)', async (i, r) => {
+			await i.click('#ti-a');
+			await r.click('#ti-a');
+		});
+		await d.step('press B (only A on)', async (i, r) => {
+			await i.click('#ti-b');
+			await r.click('#ti-b');
+		});
+		d.unmount();
+	});
+
 	it('Accordion (multiple): items open independently, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'AccordionMultiple', undefined, CACHE);
 		await d.step('mount (a open)', () => {});

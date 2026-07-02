@@ -7,6 +7,11 @@ import {
 	Toggle,
 	ToggleGroup,
 	Tabs,
+	AspectRatio,
+	VisuallyHidden,
+	Avatar,
+	Progress,
+	Toolbar,
 } from '@octanejs/radix';
 
 // Self-contained fixtures for the differential rig: the SAME source runs on octane (via
@@ -150,4 +155,51 @@ export function TabsApp() @{
 		<TabsContent value="one">panel-one</TabsContent>
 		<TabsContent value="two">panel-two</TabsContent>
 	</TabsRoot>
+}
+
+const AspectRatioRoot = AspectRatio.Root;
+// Hoisted: the TSRX attribute parser mis-lexes `/` inside `ratio={WIDESCREEN}`.
+const WIDESCREEN = 16 / 9;
+const VisuallyHiddenRoot = VisuallyHidden.Root;
+const AvatarRoot = Avatar.Root;
+const AvatarImage = Avatar.Image;
+const AvatarFallback = Avatar.Fallback;
+const ProgressRoot = Progress.Root;
+const ProgressIndicator = Progress.Indicator;
+const ToolbarRoot = Toolbar.Root;
+const ToolbarButton = Toolbar.Button;
+const ToolbarLink = Toolbar.Link;
+const ToolbarSeparator = Toolbar.Separator;
+const ToolbarToggleGroup = Toolbar.ToggleGroup;
+const ToolbarToggleItem = Toolbar.ToggleItem;
+
+export function QuickWins() @{
+	<div>
+		<AspectRatioRoot ratio={WIDESCREEN}>
+			<div id="ar-content">content</div>
+		</AspectRatioRoot>
+		<VisuallyHiddenRoot id="vh">hidden text</VisuallyHiddenRoot>
+		<AvatarRoot id="av">
+			<AvatarImage src="https://example.com/x.png" alt="" />
+			<AvatarFallback id="av-fb">AB</AvatarFallback>
+		</AvatarRoot>
+		<ProgressRoot id="pg" value={30}>
+			<ProgressIndicator id="pg-i" />
+		</ProgressRoot>
+		<ProgressRoot id="pg2" />
+	</div>
+}
+
+export function ToolbarApp() @{
+	<div>
+		<ToolbarRoot id="tb">
+			<ToolbarButton id="b1">One</ToolbarButton>
+			<ToolbarSeparator id="sep" />
+			<ToolbarLink id="lnk" href="#">Link</ToolbarLink>
+			<ToolbarToggleGroup type="multiple" defaultValue={['b']}>
+				<ToolbarToggleItem id="ti-a" value="a">A</ToolbarToggleItem>
+				<ToolbarToggleItem id="ti-b" value="b">B</ToolbarToggleItem>
+			</ToolbarToggleGroup>
+		</ToolbarRoot>
+	</div>
 }

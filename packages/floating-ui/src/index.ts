@@ -27,6 +27,10 @@ export {
 // positioning core and returns the interaction `context`.
 export { useFloating, useFloatingRootContext, createPubSub } from './context';
 export { arrow } from './useFloating';
+// The bare positioning core (the @floating-ui/react-dom `useFloating` shape, no
+// interaction context) — consumed by bindings that only position (e.g. @octanejs/radix's
+// Popper). Call as `usePositionFloating([options, slot])`.
+export { usePositionFloating } from './useFloating';
 export { useMergeRefs } from './useMergeRefs';
 export { useId } from './useId';
 export {

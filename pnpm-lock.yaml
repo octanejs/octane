@@ -894,6 +894,9 @@ importers:
 
   packages/radix:
     dependencies:
+      '@octanejs/floating-ui':
+        specifier: workspace:*
+        version: link:../floating-ui
       aria-hidden:
         specifier: catalog:default
         version: 1.2.6
