@@ -265,6 +265,9 @@ export default defineConfig({
 					name: 'radix',
 					include: ['packages/radix/tests/**/*.test.ts', 'packages/radix/tests/**/*.test.tsx'],
 					environment: 'jsdom',
+					// Differential precompile for radix fixtures: rewrites `@octanejs/radix` →
+					// `radix-ui` so the React side runs the real Radix primitives.
+					globalSetup: ['packages/radix/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				// radix's `.ts` foundation forwards the caller's slot via subSlot, so it must

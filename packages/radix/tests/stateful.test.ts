@@ -20,18 +20,20 @@ describe('@octanejs/radix — Collapsible', () => {
 		const trigger = r.find('[data-testid="trigger"]');
 		const content = () => r.container.querySelector('[data-testid="content"]')!;
 
-		// Closed initially — content mounted but hidden + empty.
+		// Closed initially — content mounted but hidden + empty; no aria-controls while
+		// collapsed (Radix parity: the trigger only references the content when expanded).
 		expect(trigger.getAttribute('aria-expanded')).toBe('false');
 		expect(trigger.getAttribute('data-state')).toBe('closed');
+		expect(trigger.getAttribute('aria-controls')).toBe(null);
 		expect(openContent(content())).toBe(false);
 		expect(content().getAttribute('data-state')).toBe('closed');
-		expect(content().getAttribute('id')).toBe(trigger.getAttribute('aria-controls'));
 		expect(content().textContent).toBe('');
 
 		// Open.
 		r.click('[data-testid="trigger"]');
 		expect(trigger.getAttribute('aria-expanded')).toBe('true');
 		expect(trigger.getAttribute('data-state')).toBe('open');
+		expect(content().getAttribute('id')).toBe(trigger.getAttribute('aria-controls'));
 		expect(openContent(content())).toBe(true);
 		expect(content().getAttribute('data-state')).toBe('open');
 		expect(content().textContent).toBe('panel');

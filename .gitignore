@@ -10,3 +10,7 @@ coverage
 # Differential-parity build artifact: the `@tsrx/react`-compiled fixture output the
 # differential test rigs regenerate under each package's tests on every run.
 .react-cache/
+
+# Pinned radix-ui/primitives checkout — the porting source-of-truth for @octanejs/radix
+# (see docs/radix-migration-plan.md; clone is re-created on demand, never committed).
+.radix-primitives/

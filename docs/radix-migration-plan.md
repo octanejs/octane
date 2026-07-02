@@ -27,9 +27,81 @@
 > zustand's `extras.test.ts` fresh-object-selector test, which the first (unconditional-loop)
 > version of this fix broke by spinning it forever.
 >
-> **Still deferred:** Accordion arrow-key roving focus (RovingFocusGroup — a separate
-> reusable primitive, also needed by Tabs/Toolbar/RadioGroup); `Portal` (Phase 3); and a
-> differential-vs-real-`@radix-ui` harness (needs `@radix-ui/*` in the catalog).
+> **Differential harness LIVE (2026-07-01):** `radix-ui@1.6.1` (the unified real-Radix
+> package — same namespace shape as `@octanejs/radix`) is in the catalog; the SAME `.tsrx`
+> fixture now runs through `@octanejs/radix` (octane) AND real Radix (React) with
+> byte-identical-DOM assertions (`packages/radix/tests/differential/`, setup rewrites
+> `@octanejs/radix` → `radix-ui`). The shared rig gained `useId`-token canonicalisation
+> (octane `:in-N:` vs React `_r_N_`/`«rN»`/`:rN:` → positional placeholders, so id
+> REFERENCES still must line up) and empty-`style=""`-residue stripping. **5 parity tests
+> green** (Separator, Label, Collapsible open/close, Accordion single + multiple). The
+> harness immediately caught + we fixed three fidelity gaps: `aria-controls` must be absent
+> while collapsed; ids must be `radix-` prefixed (ported `@radix-ui/react-id` → `useId.ts`);
+> and triggers must carry `data-radix-collection-item` — which drove a full port of
+> `@radix-ui/react-collection` (`collection.ts`) and, with it, **Accordion's real keyboard
+> navigation** (Home/End/Arrow with orientation + direction, the Collection-driven
+> `handleKeyDown` — Radix's Accordion never used RovingFocusGroup).
+>
+> **Phase 3 begun (2026-07-02) — the Dialog chain landed at full fidelity.** New infra
+> ports: `Portal` (react-portal → octane `createPortal`; octane's `createPortal` body TYPE
+> widened to any renderable — the runtime always normalized it), `DismissableLayer`
+> (Escape / pointer-down-outside with the deferred-click pairing / focus-outside + layer
+> stack + body pointer-events + branches + dismissable surfaces), `FocusScope` (trap/loop,
+> mount/unmount autofocus events, scope stack), `focus-guards`, `useScrollLock` (the
+> focused `react-remove-scroll` replacement — divergence documented in scroll-lock.ts),
+> and the framework-agnostic `aria-hidden` package reused as-is (hideOthers). `Dialog`
+> itself: Root/Trigger/Portal/Overlay/Content(Modal+NonModal)/Title/Description/Close.
+> Verified: 6 unit tests (portal'd ARIA wiring, focus trap + guards + hideOthers + scroll
+> lock, Escape, deferred outside-click, close + trigger refocus) and a differential
+> parity test vs real Radix (non-modal; modal traps would fight across the two mounts
+> sharing one document — a non-modal dialog dismissing on outside focusin is BY DESIGN,
+> so the fixture prevents `onFocusOutside` identically on both sides).
+>
+> This phase surfaced + fixed a CRITICAL binding bug mirroring Radix's own history: the
+> legacy Slot pattern built the composed ref FRESH each render → the renderer
+> detach(null)/re-attach cycle re-rendered every state-setter-ref consumer
+> (DismissableLayer/FocusScope/Presence `setNode`) → infinite loop. Ported the MODERN
+> react-slot instead (memoized `useComposedRefs`), and `Primitive` now renders `Slot` as
+> a component (own hook scope) rather than calling it inline. Also: octane's `useEffect`
+> with NO deps (run-every-render) is exercised by Collection's ItemSlot registration.
+>
+> **AlertDialog + RovingFocusGroup + Toggle/ToggleGroup/Tabs (2026-07-02).** AlertDialog
+> is the faithful thin-over-Dialog port (always modal, `role=alertdialog`, outside
+> interactions never dismiss, Cancel autofocused). **RovingFocusGroup** landed in full
+> (single tab stop, entry-focus custom event, arrow/Home/End/PageUp/PageDown intents with
+> orientation + RTL awareness, loop, focusable-count fallback) — and with it
+> **Toggle**, **ToggleGroup** (single→radiogroup semantics / multiple), and **Tabs**
+> (automatic/manual activation on mousedown/keyboard/focus, Presence-mounted panels).
+> Verified: 5 new differential parity tests vs real Radix (Toggle on/off, ToggleGroup
+> single + multiple incl. roving tabindex bytes, Tabs mousedown activation — jsdom's
+> `.click()` emits no mousedown, so the fixture dispatches a real one) and 6 unit tests
+> (AlertDialog modal specifics; Tabs arrow/Home/End keyboard nav + roving tab stops).
+>
+> **Third octane parity bug found + fixed**: octane's DELEGATED dispatch left
+> `event.currentTarget` as the delegation root — React guarantees each handler sees its
+> OWN element. RovingFocusGroup's `event.target === event.currentTarget` guard (ubiquitous
+> in ported React code) exposed it. Both bubble + capture walks now shadow `currentTarget`
+> per-handler and restore native semantics after dispatch (`tests/current-target.test.ts`).
+>
+> **Source-of-truth switch (2026-07-02):** ports now come from the REAL radix-ui/primitives
+> TypeScript source on GitHub, not the compiled npm dists. A pinned checkout lives at
+> `.radix-primitives/` (gitignored; commit `baa70937` — the "New release (#3984)" bump that
+> published exactly the installed `radix-ui@1.6.1` / `react-dialog@1.1.18` set; re-clone
+> with `git clone https://github.com/radix-ui/primitives .radix-primitives && git -C
+> .radix-primitives checkout baa70937`). Auditing the existing ports against source found +
+> fixed three fidelity gaps the dist path missed: `useControllableState` (onChange ref
+> synced via `useInsertionEffect`; restructured as source's `useUncontrolledState`),
+> `Presence` (source's `useStableComposedRefs` — identity NEVER changes, Radix's own fix
+> for the ref-loop class we hit, radix-ui/primitives#3664; the `animationFillMode:
+> 'forwards'` exit-flash prevention; `CSS.escape` in the animation-name compare; stylesRef
+> nulled on detach), and `Label` (the form-control press guard returns BEFORE the user's
+> `onMouseDown` — previously composed after). The only env-gated dev code in any ported
+> package is `useControllableState`'s controlled↔uncontrolled switch warning — skipped per
+> repo policy (port functional outcomes, not React's dev-warning surface). New-port
+> convention: file headers cite the source path under `.radix-primitives/packages/react/`.
+>
+> **Still deferred:** the Popper overlays (Tooltip/HoverCard/Popover/DropdownMenu on
+> `@octanejs/floating-ui`); Toolbar/RadioGroup (RovingFocus consumers, now unblocked).
 
 ## 1. Recommendation
 

@@ -30,9 +30,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "aria-hidden": "catalog:default",
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "radix-ui": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "vitest": "catalog:default"
