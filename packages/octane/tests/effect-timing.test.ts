@@ -5,6 +5,7 @@ import {
 	LayoutReadsDom,
 	PassiveDeferred,
 	ManyPassiveEffects,
+	PassiveBeforeCascadeRender,
 } from './_fixtures/effect-timing.tsrx';
 
 describe('effect timing', () => {
@@ -73,6 +74,28 @@ describe('effect timing', () => {
 		expect(log).toEqual(['layout']);
 		await nextPaint();
 		expect(log).toEqual(['layout', 'passive']);
+		r.unmount();
+	});
+
+	it('pending passive effects flush BEFORE a layout-cascade render mounts new children', async () => {
+		// React parity (flushPassiveEffects-at-render-start): when a layout effect
+		// schedules a follow-up render (Presence-style reveal), the PREVIOUS
+		// commit's passive effects flush before that render begins. So a parent's
+		// open-announcement dispatch fires while the revealed child does not exist
+		// yet — the child's own listener must not hear it. Regression: octane's
+		// flushSync convergence loop used to merge both commits' passives into one
+		// child-first drain, so the child received the announcement of its own
+		// mount (real-world: Radix Tooltip self-closed on open).
+		const log: string[] = [];
+		const r = mount(PassiveBeforeCascadeRender, { log });
+		await nextPaint();
+		expect(log).toEqual([]);
+		r.click('#open');
+		await nextPaint();
+		// dispatch (commit #1 passive) before attach (commit #2 passive), and the
+		// listener never observes its own open announcement.
+		expect(log).toEqual(['dispatch', 'attach']);
+		expect(r.find('#listener').textContent).toBe('on');
 		r.unmount();
 	});
 

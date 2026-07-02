@@ -39,7 +39,7 @@ children-position `<Trigger asChild><button/></Trigger>`.
 
 ## Status
 
-**Phase 0 (foundation) + Phase 1 (first stateful components).** Landed:
+**Phases 0–2 + the Phase-3 overlay family.** Landed:
 
 - Composition foundation — `Slot`, `Slottable`, `Primitive.<tag>` (`asChild`), `mergeProps`
   (event chaining, `style` merge, clsx-style `class` composition), `composeRefs` /
@@ -48,16 +48,25 @@ children-position `<Trigger asChild><button/></Trigger>`.
   child mounted through its CSS exit animation), the full **`createContextScope`**
   (`createScope` + `composeContextScopes`) so composed primitives can't collide,
   `createCollection` (the Collection primitive: `data-radix-collection-item` stamping +
-  DOM-ordered item registry), and the `radix-`-prefixed `useId`.
-- Components — `Separator`, `Label`, `Collapsible` (`Presence`-wrapped content with the
-  `--radix-collapsible-content-height/-width` CSS vars), `Accordion` (single + multiple;
-  `createAccordionScope` composes `createCollapsibleScope`, `__scope*` threaded through
-  every part, **full Home/End/Arrow keyboard navigation** via the Collection), and
-  **`Dialog`** (modal + non-modal: `Portal`/`Presence` mounting, `FocusScope` trap/loop +
-  autofocus, `DismissableLayer` Escape/outside-press/outside-focus, `aria-hidden`
-  hideOthers, body scroll lock, focus guards), **`AlertDialog`**, **`Toggle`**,
-  **`ToggleGroup`** (single/multiple), and **`Tabs`** (automatic/manual activation,
-  arrow-key navigation) — the latter three on the full **`RovingFocusGroup`** port.
+  DOM-ordered item registry), the `radix-`-prefixed `useId`, `useCallbackRef`,
+  `Direction` (`useDirection`/`Provider`), and `useSize`.
+- Components — `Separator`, `Label`, `Collapsible`, `Accordion` (single + multiple, full
+  keyboard nav), **`Dialog`** (modal + non-modal), **`AlertDialog`**, **`Toggle`**,
+  **`ToggleGroup`**, **`Tabs`**, **`Toolbar`** (roving focus + embedded ToggleGroup),
+  `AspectRatio`, `VisuallyHidden`, `Avatar` (image loading state machine), `Progress`,
+  `Arrow` — the roving-focus family on the full **`RovingFocusGroup`** port.
+- **The Popper overlay family** — **`Popper`** (anchor/content/arrow on
+  `@octanejs/floating-ui`'s positioning core: offset/shift/flip/size/arrow/hide +
+  transform-origin middleware, `--radix-popper-*` CSS vars, virtual anchors),
+  **`Tooltip`** (provider delays, skip-delay, grace-area convex hull, hidden a11y copy),
+  **`Popover`** (modal + non-modal, custom Anchor), **`HoverCard`** (open/close delays,
+  selection containment), the shared **`Menu`** primitive (typeahead, checkbox/radio
+  items + indicators, submenus with pointer-grace polygons), **`DropdownMenu`**, and
+  **`ContextMenu`** (right-click / long-press virtual anchor).
+- **`ScrollArea`** — custom scrollbars over a native scroll viewport: all four
+  visibility strategies (`hover` / `scroll` state machine / `auto` overflow
+  measurement / `always`), thumb drag + wheel scroll geometry, corner, and the
+  scroll-linked-effect-avoiding rAF thumb loop.
 - Overlay infra — `Portal`, `DismissableLayer`, `FocusScope`, `useFocusGuards`,
   `useScrollLock` (a focused `react-remove-scroll` replacement — see `scroll-lock.ts`),
   with the framework-agnostic `aria-hidden` package reused as-is.
@@ -65,11 +74,12 @@ children-position `<Trigger asChild><button/></Trigger>`.
 **Verified against real Radix**: the differential suite
 (`tests/differential/parity.test.ts`) runs the SAME fixture through `@octanejs/radix` and
 the real `radix-ui` package on React, asserting byte-identical DOM after every interaction
-step.
+step; portal'd overlays (which the rig can't see) carry dedicated focus/keyboard/dismiss
+unit suites. Ports come from the pinned radix-ui/primitives source checkout
+(`.radix-primitives/`); every file header cites its source path.
 
 Deferred (documented in
-[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)):
-`RovingFocusGroup` (Tabs / Toolbar / ToggleGroup / RadioGroup).
-
-Next: the Popper overlays (Tooltip / HoverCard / Popover / DropdownMenu) on top of
-`@octanejs/floating-ui`, plus Toolbar / RadioGroup on the RovingFocus substrate.
+[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): `Menubar`; the
+form batch (`Checkbox` / `Switch` / `RadioGroup` / `Slider` — shared BubbleInput
+machinery, re-authored for octane's native/uncontrolled input model); then `Select` /
+`NavigationMenu`, and `Toast` in Phase 5.

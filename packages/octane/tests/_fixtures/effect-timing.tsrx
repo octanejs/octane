@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useInsertionEffect } from 'octane';
+import { useEffect, useLayoutEffect, useInsertionEffect, useState } from 'octane';
 
 // Three-phase ordering: insertion fires sync-before-layout-before-paint;
 // passive fires after paint. Cleanups of each phase fire before that phase's
@@ -41,6 +41,56 @@ export function PassiveDeferred(props) @{
 		props.log.push('passive');
 	}, [props.tick, props.log]);
 	<span>{'z'}</span>
+}
+
+// React parity: pending PASSIVE effects flush BEFORE the next render pass begins
+// (React's flushPassiveEffects-at-render-start). The Presence/Tooltip shape:
+//   commit #1 — `open` flips true; Gate renders but its child is NOT mounted yet
+//     (the reveal waits on Gate's layout effect flipping local state, à la Radix
+//     Presence). The parent queues a PASSIVE effect that dispatches a document
+//     CustomEvent announcing the open.
+//   commit #2 — triggered by Gate's layout effect. Before this render starts,
+//     commit #1's passive effects must flush: the dispatch fires while the child
+//     does not exist, so the child's own listener (attached in its passive
+//     effect) must NOT observe the announcement of its own mount.
+// Without the rule, both passives land in one drain and run child-first —
+// the child hears its own open announcement (Radix Tooltip self-closed).
+const OPEN_EVENT = 'octane-test-open';
+
+function Listener(props) @{
+	useEffect((log) => {
+		log.push('attach');
+		const onOpen = () => log.push('received');
+		document.addEventListener(OPEN_EVENT, onOpen);
+		return () => document.removeEventListener(OPEN_EVENT, onOpen);
+	}, [props.log]);
+	<span id="listener">{'on'}</span>
+}
+
+// Presence-style gate: renders children only after a layout effect flips state.
+function Gate(props) {
+	const [mounted, setMounted] = useState(false);
+	useLayoutEffect(() => {
+		setMounted(true);
+	}, []);
+	if (!mounted) return null;
+	return <Listener log={props.log} />;
+}
+
+export function PassiveBeforeCascadeRender(props) @{
+	const [open, setOpen] = useState(false);
+	useEffect((log, isOpen) => {
+		if (isOpen) {
+			log.push('dispatch');
+			document.dispatchEvent(new CustomEvent(OPEN_EVENT));
+		}
+	}, [props.log, open]);
+	<div>
+		<button id="open" onClick={() => setOpen(true)}>{'open'}</button>
+		@if (open) {
+			<Gate log={props.log} />
+		}
+	</div>
 }
 
 // Multiple useEffects within the SAME phase — used to verify that cleanups

@@ -20,5 +20,6 @@ non-convergent cascades (an unstable `useSyncExternalStore` `getSnapshot` return
 object every call re-schedules its component from every layout pass — React throws
 "Maximum update depth exceeded" / warns "The result of getSnapshot should be cached";
 octane neither hangs nor burst-renders). A count backstop (50) additionally bounds
-pathological wide-but-finite chains. Passive (`useEffect`) effects are unaffected
-(still post-paint).
+pathological wide-but-finite chains. Passive (`useEffect`) effects stay post-paint,
+except that pending passives flush before each new render wave (see the
+passive-before-render changeset).

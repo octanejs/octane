@@ -1,7 +1,13 @@
 import { it, expect } from 'vitest';
 import { flushSync } from '../src/index.js';
 import { mount } from './_helpers';
-import { DangerHtml, BareInnerHtml, SpreadDanger, setHtml } from './_fixtures/danger-html.tsx';
+import {
+	DangerHtml,
+	BareInnerHtml,
+	SpreadDanger,
+	DeoptDanger,
+	setHtml,
+} from './_fixtures/danger-html.tsx';
 
 // React-parity raw HTML: `dangerouslySetInnerHTML={{__html}}` is the supported
 // surface; bare `innerHTML` is no longer special-cased.
@@ -34,5 +40,20 @@ it('a spread carrying dangerouslySetInnerHTML sets raw HTML', () => {
 	expect(el.getAttribute('title')).toBe('t'); // other spread attrs applied
 	expect(el.querySelector('span.z')?.textContent).toBe('via spread');
 	expect(el.hasAttribute('dangerouslysetinnerhtml')).toBe(false); // not a dead attr
+	r.unmount();
+});
+
+it('de-opt host path (createElement return) applies raw HTML and keeps it across re-renders', () => {
+	// Regression: hostElementBody set innerHTML via applyDeoptProps, then unconditionally
+	// ran child reconciliation with (empty) children — wiping the raw HTML. children and
+	// dangerouslySetInnerHTML are mutually exclusive (React contract); the raw HTML owns
+	// the element's content.
+	const r = mount(DeoptDanger as any, { html: '.a{color:red}' });
+	const el = r.find('#dd') as HTMLElement;
+	expect(el.tagName).toBe('STYLE');
+	expect(el.textContent).toBe('.a{color:red}');
+	// Update flows through patchDeoptProps + the same skip.
+	flushSync(() => setHtml('.b{color:blue}'));
+	expect(el.textContent).toBe('.b{color:blue}');
 	r.unmount();
 });

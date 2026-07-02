@@ -100,8 +100,79 @@
 > repo policy (port functional outcomes, not React's dev-warning surface). New-port
 > convention: file headers cite the source path under `.radix-primitives/packages/react/`.
 >
-> **Still deferred:** the Popper overlays (Tooltip/HoverCard/Popover/DropdownMenu on
-> `@octanejs/floating-ui`); Toolbar/RadioGroup (RovingFocus consumers, now unblocked).
+> **Quick-wins batch (2026-07-02):** `AspectRatio`, `VisuallyHidden` (exported
+> `VISUALLY_HIDDEN_STYLES`), `Avatar` (image-probe loading state machine +
+> delayMs Fallback), `Progress`, and `Toolbar` (RovingFocusGroup root + embedded
+> non-roving ToggleGroup + flipped Separator + space-clicks-Link), plus `use-size.ts`
+> (ResizeObserver, jsdom-guarded) and the standalone `Arrow`. All differential-verified:
+> **12 parity tests green vs real Radix**. (TSRX parser note: `ratio={16 / 9}` mis-lexes
+> `/` in attribute position — hoist to a const.)
+>
+> **Phase 3 Popper overlays landed (2026-07-02):** `Popper` itself ports onto
+> `@octanejs/floating-ui` via its newly-exported bare positioning core
+> (`usePositionFloating`) — anchor (virtualRef support, commit-phase callback ref per
+> radix#3858), content (fixed strategy, offset/shift/flip/size/arrow/hide +
+> transformOrigin middleware, `--radix-popper-*` CSS vars, `data-radix-popper-content-wrapper`
+> pre-positioned wrapper), arrow (OPPOSITE_SIDE span). On top of it, at full fidelity:
+> **`Tooltip`** (Provider delay/skip-delay refs, TOOLTIP_OPEN document event, grace-area
+> convex hull, VisuallyHidden a11y copy), **`Popover`** (modal via hideOthers+scroll lock /
+> non-modal outside-interaction bookkeeping, custom Anchor), **`HoverCard`**
+> (open/close delays, selection containment, tabbables removed from tab order), the big
+> shared **`Menu`** primitive (FocusScope + DismissableLayer + RovingFocusGroup +
+> Collection over Popper.Content; typeahead with wrap-around `getNextMatch`;
+> checkbox/radio items + Presence indicators; `Sub`/`SubTrigger`/`SubContent` with the
+> pointer-grace polygon), and its consumers **`DropdownMenu`** and **`ContextMenu`**
+> (virtual anchor pinned to the right-click/long-press point). Helper ports:
+> `direction.ts`, `use-callback-ref.ts`. `Slot` gained the single-element-ARRAY unwrap
+> (octane's children-as-array-prop convention; React's `Children.only` shape). Verified:
+> tooltip 3, popover 4, hovercard 3, dropdown-menu 6 (incl. the submenu keyboard chain:
+> ArrowRight opens / ArrowLeft closes + refocuses trigger / select closes the whole tree),
+> context-menu 2 — **radix project 53/53 green**.
+>
+> **Fourth + fifth octane parity bugs found + fixed (the point of the exercise):**
+> (4) **Pending passive effects didn't flush before the next render pass.** React runs
+> `flushPassiveEffects` at the start of `performWorkOnRoot`/`commitRoot`; octane deferred
+> all passives to post-paint unconditionally, so a layout-effect-driven cascade (Presence
+> reveal) merged two commits' passives into ONE child-first drain — a freshly-mounted
+> child's listener-attach effect ran BEFORE the parent's open-announcement dispatch, so
+> Radix Tooltip heard its own TOOLTIP_OPEN and self-closed. Both `flush()` and
+> `flushSync`'s convergence loop now drain pending passives before each render wave
+> (`drainPassivesBeforeRender`). Regression test: `effect-timing.test.ts` (fails
+> `['attach','dispatch','received']` without the fix; `['dispatch','attach']` with).
+> NOTE: this corrected `activity.test.ts`'s "skips a passive queued before hide" — that
+> assertion pinned the pre-fix incidental ordering; per React's mechanics the queued
+> passive mounts against the still-visible tree and the hide then disconnects it (test
+> rewritten to assert mount→disconnect→re-mount-on-reveal).
+> (5) **The enter/leave event family never fired.** `onPointerEnter`/`onPointerLeave`/
+> `onMouseEnter`/`onMouseLeave` don't bubble, so bubble-phase root delegation never saw
+> them. Now capture-delegated (the focus/blur treatment) but dispatched to the TARGET
+> ONLY — the browser sends each entered/left element its own event, so the focus/blur
+> ancestor walk would double-fire ancestors (matches React: enter/leave don't bubble).
+> Surfaced by HoverCard's pointer-enter; regression: `enter-leave-events.test.ts`.
+>
+> **ScrollArea (2026-07-02):** full port (scroll-area.tsx + use-state-machine.ts) —
+> viewport with hidden-native-scrollbar injected `<style>` + `display: table` content
+> wrapper, all four visibility strategies (`hover` enter/leave + hide delay, `scroll`
+> state machine, `auto` overflow measurement, `always`), thumb geometry (linearScale /
+> getThumbSize / drag + wheel scroll math verbatim), the unlinked-rAF thumb-position
+> loop, and Corner. `@radix-ui/number`'s clamp inlined. ResizeObserver jsdom-guarded;
+> tests stub a minimal RO + viewport sizes to drive REAL measurement (hover reveals
+> scrollbar + thumb at ratio 1/3, hides after delay; scroll machine
+> hidden→scrolling→idle→hidden on real scroll events). 6 tests.
+>
+> **SIXTH octane parity bug found + fixed:** `dangerouslySetInnerHTML` on the DE-OPT
+> host path (`createElement`-built elements) rendered EMPTY — applyDeoptProps wrote
+> `el.innerHTML`, then the unconditional child reconciliation ran with (empty) children
+> and wiped it. React contract: children and dangerouslySetInnerHTML are mutually
+> exclusive — hostElementBody (all three branches, incl. hydration adopt/mismatch) and
+> the value-position host reconciler now skip child processing when the prop is present
+> (SSR already implemented raw-HTML-wins). Surfaced by ScrollArea's injected viewport
+> `<style>`. Regression: danger-html.test.ts de-opt case.
+>
+> **Still deferred:** `Menubar` (the least-clean menu consumer — shared roving focus
+> across triggers + open-on-hover-when-any-open interplay); `RadioGroup` + the Phase-4
+> form batch (Checkbox/Switch/Slider share the 682-line BubbleInput machinery);
+> `Select`/`NavigationMenu` last per plan; `Toast` in Phase 5.
 
 ## 1. Recommendation
 

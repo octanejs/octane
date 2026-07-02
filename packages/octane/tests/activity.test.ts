@@ -91,25 +91,40 @@ describe('<Activity> — toggling visibility', () => {
 		t.r.unmount();
 	});
 
-	it('skips a passive effect that was queued before the Activity hid', () => {
-		// Regression: enqueueEffect skips registration while inactive and
-		// deactivateScope fires stored cleanups, but a PendingEffect already
-		// sitting in the passive queue (mount drains insertion+layout sync, defers
-		// passive) must ALSO be skipped if its subtree hides before the queue
-		// drains — otherwise the effect mounts into a hidden subtree.
+	it('flushes a passive effect queued before the Activity hid, then disconnects it', () => {
+		// React parity: pending passive effects flush BEFORE the next render begins
+		// (flushPassiveEffects at the start of performWorkOnRoot/commitRoot). A
+		// passive queued by a VISIBLE commit therefore mounts against the
+		// still-visible tree even if the very next update hides the Activity — and
+		// the hide then disconnects it (cleanup). The body never runs while the
+		// subtree is hidden: the drain happens before the hide render, and
+		// deactivateScope tears it straight back down.
 		const log: string[] = [];
 		const opts = { mode: 'visible', log: (s: string) => log.push(s), expose: () => {} };
 		const r = mount(ActivityHost, opts);
 		// Layout fired synchronously during mount; passive is queued, not yet run.
-		expect(log).toContain('mount layout');
-		expect(log).not.toContain('mount passive');
+		expect(log).toEqual(['render', 'mount layout']);
 
-		// Hide BEFORE the passive queue drains, then drain it.
+		// Hide BEFORE the passive queue drains. The queued passive mounts (visible
+		// tree) as part of processing the hide, then the hide disconnects both
+		// effects. (The extra 'render' is octane's eager hidden prerender.)
 		r.update(ActivityHost, { ...opts, mode: 'hidden' });
 		flushEffects();
+		expect(log).toEqual([
+			'render',
+			'mount layout',
+			'mount passive',
+			'render',
+			'unmount layout',
+			'unmount passive',
+		]);
 
-		// The queued passive body must NOT have run into the now-hidden subtree.
-		expect(log).not.toContain('mount passive');
+		// On reveal the effects re-mount — the hide/flush interleaving above must
+		// not leave the slot wedged.
+		log.length = 0;
+		r.update(ActivityHost, { ...opts, mode: 'visible' });
+		flushEffects();
+		expect(log).toEqual(['render', 'mount layout', 'mount passive']);
 		r.unmount();
 	});
 

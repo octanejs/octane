@@ -272,7 +272,8 @@ export default defineConfig({
 				},
 				// radix's `.ts` foundation forwards the caller's slot via subSlot, so it must
 				// be EXCLUDED from the auto-slotting pass (the `.tsx` fixtures that call it are
-				// full-compiled and inject the trailing slot).
+				// full-compiled and inject the trailing slot) — as must @octanejs/floating-ui,
+				// which radix's Popper builds on.
 				plugins: [
 					octane({
 						exclude: [
@@ -280,6 +281,7 @@ export default defineConfig({
 							'/packages/query/src/',
 							'/packages/motion/src/',
 							'/packages/radix/src/',
+							'/packages/floating-ui/src/',
 						],
 					}),
 				],
@@ -292,6 +294,10 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/radix\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/radix/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/floating-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
 						},
 					],
 				},

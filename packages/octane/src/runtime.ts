@@ -629,9 +629,24 @@ function drainQueue(): { err: any } | null {
 
 function flush(): void {
 	scheduled = false;
+	// React parity: pending PASSIVE effects from an earlier commit flush BEFORE the next
+	// render begins (React's flushPassiveEffects-at-render-start). Without this, a
+	// cascade that mounts new children (e.g. a layout-effect-driven Presence reveal)
+	// merges the earlier commit's passive effects (e.g. an event dispatch) into the same
+	// drain as the new children's listener-attach effects — re-ordering them child-first
+	// and letting a child observe an event announcing its own mount.
+	if (QUEUE.length > 0) drainPassivesBeforeRender();
 	const pendingError = drainQueue();
 	commitEffects();
 	if (pendingError !== null) throw pendingError.err;
+}
+
+/** Drain pending passive effects ahead of a render pass (see flush()). */
+function drainPassivesBeforeRender(): void {
+	if (effectQueues[PASSIVE].length > 0) {
+		passiveScheduled = false;
+		drainPhase(PASSIVE);
+	}
 }
 
 /**
@@ -645,6 +660,7 @@ export function flushSync<T>(fn: () => T): T {
 	try {
 		const result = fn();
 		// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
+		if (QUEUE.length > 0) drainPassivesBeforeRender();
 		let pendingError = drainQueue();
 		commitEffectsSync();
 		// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
@@ -666,6 +682,9 @@ export function flushSync<T>(fn: () => T): T {
 			const seen = new Set<Block>(QUEUE);
 			let defer = false;
 			for (let guard = 0; QUEUE.length > 0 && !defer && guard < LAYOUT_CASCADE_LIMIT; guard++) {
+				// Each convergence iteration is a new render pass — flush pending passives
+				// first (React's rule; see flush()).
+				drainPassivesBeforeRender();
 				const err = drainQueue();
 				if (err !== null && pendingError === null) pendingError = err;
 				commitEffectsSync();
@@ -3706,13 +3725,34 @@ const _delegationTargets = new Map<Node, number>();
 // (`onClick` + `onClickCapture`).
 const _delegatedCapture = new Set<string>();
 
-// Non-bubbling events (focus, blur) must be delegated in the CAPTURE phase so the
-// single root listener still sees them — the dispatcher then walks from
-// `event.target` upward, which reproduces React's bubbling `onFocus`/`onBlur`.
-// (All other events keep the cheaper bubbling-phase delegation.) The flag must
-// match between add/removeEventListener, so it is derived from the name both times.
-const CAPTURE_DELEGATED = /* @__PURE__ */ new Set(['focus', 'blur']);
+// Non-bubbling events must be delegated in the CAPTURE phase so the single root
+// listener still sees them (the capture phase reaches the root even when the event
+// doesn't bubble). For focus/blur the dispatcher then walks from `event.target`
+// upward, which reproduces React's bubbling `onFocus`/`onBlur`. (All other events
+// keep the cheaper bubbling-phase delegation.) The flag must match between
+// add/removeEventListener, so it is derived from the name both times.
+const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
+	'focus',
+	'blur',
+	'pointerenter',
+	'pointerleave',
+	'mouseenter',
+	'mouseleave',
+]);
 const delegatedCapture = (name: string): boolean => CAPTURE_DELEGATED.has(name);
+
+// The enter/leave family is dispatched PER ELEMENT by the browser — each
+// entered/left element receives its OWN non-bubbling event — so the delegated
+// dispatcher must fire ONLY the target's handler. Ascending the ancestor chain
+// (the focus/blur treatment) would double-fire ancestors, which receive their own
+// enter/leave events natively. Matches React, where the enter/leave events do not
+// bubble either.
+const TARGET_ONLY_DELEGATED = /* @__PURE__ */ new Set([
+	'pointerenter',
+	'pointerleave',
+	'mouseenter',
+	'mouseleave',
+]);
 
 export function delegateEvents(eventNames: string[]): void {
 	for (let i = 0; i < eventNames.length; i++) {
@@ -3908,6 +3948,7 @@ function dispatchDelegated(event: Event): void {
 	if ((event as any)[DELEGATED_DISPATCHED] === true) return;
 	(event as any)[DELEGATED_DISPATCHED] = true;
 	const key = '$$' + event.type;
+	const targetOnly = TARGET_ONLY_DELEGATED.has(event.type);
 	_dispatchDepth++;
 	let node = event.target as any;
 	try {
@@ -3919,6 +3960,8 @@ function dispatchDelegated(event: Event): void {
 				fireEventSlot(slot, event);
 				if (event.cancelBubble) return;
 			}
+			// Enter/leave events fire on the target only (see TARGET_ONLY_DELEGATED).
+			if (targetOnly) return;
 			// Portal-aware ascent: when crossing a portal root, jump to the rendering Block's DOM parent.
 			if (node.$$portalParent) {
 				node = node.$$portalParent;
@@ -4949,6 +4992,15 @@ function removeDeoptProp(el: Element, name: string): void {
 	}
 }
 
+// React contract: `dangerouslySetInnerHTML` and `children` are mutually exclusive —
+// the raw HTML owns the element's content. When present, the de-opt paths must SKIP
+// child reconciliation entirely: applyDeoptProps/patchDeoptProps already wrote
+// `el.innerHTML`, and running childSlot/reconcileDeoptChildren with (empty) children
+// would wipe it. (SSR already implements raw-HTML-wins; see runtime.server.ts.)
+function hasDangerHTML(props: any): boolean {
+	return props != null && props.dangerouslySetInnerHTML != null;
+}
+
 // Route a host descriptor's props onto a FRESH element (first build).
 function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 	if (props == null) return;
@@ -5221,8 +5273,10 @@ function reconcileDeoptNode(
 			applyDeoptProps(el, value.props, ownerBlock);
 		}
 		setDeoptDesc(el, value);
-		const childNs = elNs === SVG_NS && value.type !== 'foreignObject' ? SVG_NS : undefined;
-		reconcileDeoptChildren(el, value.children, ownerBlock, childNs);
+		if (!hasDangerHTML(value.props)) {
+			const childNs = elNs === SVG_NS && value.type !== 'foreignObject' ? SVG_NS : undefined;
+			reconcileDeoptChildren(el, value.children, ownerBlock, childNs);
+		}
 		return el;
 	}
 	// A component descriptor must not reach here — the de-opt callers gate on
@@ -5420,8 +5474,10 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		applyDeoptProps(el, d.props, block);
 		setDeoptDesc(el, d);
 		const savedCursor = hydrateNode.nextSibling;
-		hydrateNode = el.firstChild;
-		childSlot(block, 0, el, d.children, null);
+		if (!hasDangerHTML(d.props)) {
+			hydrateNode = el.firstChild;
+			childSlot(block, 0, el, d.children, null);
+		}
 		hydrateNode = savedCursor;
 		return;
 	}
@@ -5453,10 +5509,12 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		block.parentNode.insertBefore(el, block.endMarker);
 		applyDeoptProps(el, d.props, block);
 		setDeoptDesc(el, d);
-		const saved = hydrating;
-		hydrating = false;
-		childSlot(block, 0, el, d.children, null);
-		hydrating = saved;
+		if (!hasDangerHTML(d.props)) {
+			const saved = hydrating;
+			hydrating = false;
+			childSlot(block, 0, el, d.children, null);
+			hydrating = saved;
+		}
 		return;
 	}
 	if (el === null || el.localName !== d.type || (elNs !== undefined && el.namespaceURI !== elNs)) {
@@ -5476,8 +5534,9 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	setDeoptDesc(el, d);
 	// One childSlot renders all children INTO the element (append; no anchor): it
 	// reconciles a single child (component/host/text) or an array (keyed list) and
-	// recurses into nested host-with-components subtrees uniformly.
-	childSlot(block, 0, el, d.children, null);
+	// recurses into nested host-with-components subtrees uniformly. Skipped when
+	// dangerouslySetInnerHTML owns the content (see hasDangerHTML).
+	if (!hasDangerHTML(d.props)) childSlot(block, 0, el, d.children, null);
 }
 
 export function childSlot(
