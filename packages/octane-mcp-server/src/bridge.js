@@ -104,15 +104,15 @@ export const REACT_API_MAP = {
 	findDOMNode: { status: 'unsupported', note: 'Removed in React 19 too. Use refs.' },
 	renderToString: {
 		status: 'rewrite',
-		note: 'Import renderToString from octane/server; it is async and returns { head, body, css }.',
+		note: 'Use render() from octane/server; it is async and returns { head, body, css }.',
 	},
 	renderToPipeableStream: {
 		status: 'unsupported',
-		note: 'No streaming SSR yet. Use renderToString from octane/server.',
+		note: 'No streaming SSR yet. Use render() from octane/server.',
 	},
 	renderToReadableStream: {
 		status: 'unsupported',
-		note: 'No streaming SSR yet. Use renderToString from octane/server.',
+		note: 'No streaming SSR yet. Use render() from octane/server.',
 	},
 	onChange: {
 		status: 'rewrite',

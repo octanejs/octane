@@ -4,9 +4,8 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 
-// The public server entry: renderToString(component, props, options) with the
-// deprecated `render` alias, CSP nonce stamping, AbortSignal, and the
-// per-render suspense deadline override.
+// render(component, props, options) — the RenderOptions surface: CSP nonce
+// stamping, AbortSignal, and the per-render suspense deadline override.
 
 const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 
@@ -27,21 +26,9 @@ const suspense = evalServer(
 );
 const ssr = evalServer(readFileSync(join(FIXTURES, 'ssr.tsrx'), 'utf8'), 'ssr.tsrx');
 
-describe('renderToString — public API', () => {
-	it('render is a deprecated alias of renderToString', () => {
-		expect(RT.render).toBe(RT.renderToString);
-	});
-
-	it('renders the same result under both names', async () => {
-		const a = await RT.renderToString(suspense.AsyncLeaf, { promise: Promise.resolve('x') });
-		const b = await RT.render(suspense.AsyncLeaf, { promise: Promise.resolve('x') });
-		expect(a).toEqual(b);
-	});
-});
-
-describe('renderToString — nonce option', () => {
+describe('render — nonce option', () => {
 	it('stamps the nonce on the suspense seed script', async () => {
-		const out = await RT.renderToString(
+		const out = await RT.render(
 			suspense.AsyncLeaf,
 			{ promise: Promise.resolve('hello') },
 			{ nonce: 'abc123' },
@@ -52,28 +39,28 @@ describe('renderToString — nonce option', () => {
 	});
 
 	it('stamps the nonce on scoped style tags', async () => {
-		const out = await RT.renderToString(ssr.Scoped, undefined, { nonce: 'abc123' });
+		const out = await RT.render(ssr.Scoped, undefined, { nonce: 'abc123' });
 		expect(out.css).toMatch(/^<style data-octane="tsrx-[0-9a-f]+" nonce="abc123">/);
 	});
 
 	it('escapes a hostile nonce', async () => {
-		const out = await RT.renderToString(ssr.Scoped, undefined, { nonce: '"><script>' });
+		const out = await RT.render(ssr.Scoped, undefined, { nonce: '"><script>' });
 		expect(out.css).not.toContain('"><script>');
 	});
 
 	it('emits no nonce attribute when the option is absent', async () => {
-		const out = await RT.renderToString(suspense.AsyncLeaf, { promise: Promise.resolve('hello') });
+		const out = await RT.render(suspense.AsyncLeaf, { promise: Promise.resolve('hello') });
 		expect(out.body).not.toContain('nonce');
-		expect((await RT.renderToString(ssr.Scoped)).css).not.toContain('nonce');
+		expect((await RT.render(ssr.Scoped)).css).not.toContain('nonce');
 	});
 });
 
-describe('renderToString — signal option', () => {
+describe('render — signal option', () => {
 	it('rejects immediately when the signal is already aborted', async () => {
 		const controller = new AbortController();
 		controller.abort(new Error('request gone'));
 		await expect(
-			RT.renderToString(
+			RT.render(
 				suspense.AsyncLeaf,
 				{ promise: new Promise(() => {}) },
 				{ signal: controller.signal },
@@ -83,7 +70,7 @@ describe('renderToString — signal option', () => {
 
 	it('rejects a suspended render when aborted mid-wait', async () => {
 		const controller = new AbortController();
-		const pending = RT.renderToString(
+		const pending = RT.render(
 			suspense.AsyncLeaf,
 			{ promise: new Promise(() => {}) },
 			{ signal: controller.signal },
@@ -93,10 +80,10 @@ describe('renderToString — signal option', () => {
 	});
 });
 
-describe('renderToString — timeoutMs option', () => {
+describe('render — timeoutMs option', () => {
 	it('overrides the global suspense deadline for one render', async () => {
 		await expect(
-			RT.renderToString(suspense.AsyncLeaf, { promise: new Promise(() => {}) }, { timeoutMs: 20 }),
+			RT.render(suspense.AsyncLeaf, { promise: new Promise(() => {}) }, { timeoutMs: 20 }),
 		).rejects.toThrow('did not settle within 20ms');
 	});
 });

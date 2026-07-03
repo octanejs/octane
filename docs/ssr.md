@@ -7,11 +7,11 @@ public API, how the pieces fit, and what is intentionally not built yet.
 
 ```ts
 // entry-server.ts
-import { renderToString } from 'octane/server';
+import { render } from 'octane/server';
 import { App } from './App.tsrx';
 
 export async function renderApp() {
-	const { head, body, css } = await renderToString(App, { title: 'Hi' });
+	const { head, body, css } = await render(App, { title: 'Hi' });
 	return `<!doctype html>
 <html>
 <head>${head}${css}</head>
@@ -34,7 +34,7 @@ module loading through Vite picks the server transform automatically).
 
 ## API
 
-### `renderToString(component, props?, options?) => Promise<RenderResult>`
+### `render(component, props?, options?) => Promise<RenderResult>`
 
 `RenderResult`:
 
@@ -57,8 +57,6 @@ module loading through Vite picks the server transform automatically).
 - `timeoutMs?: number` — per-render override of the suspense settle deadline;
   `0` disables it.
 
-`render` is a deprecated alias of `renderToString`.
-
 ### `setSsrSuspenseTimeout(ms)` / `getSsrSuspenseTimeout()`
 
 Global default for the suspense settle deadline (10s initially). A
@@ -71,7 +69,7 @@ of hanging the request.
   helper calls for dynamic holes, wrapped in `<!--[-->`/`<!--]-->` hydration
   markers that the client cursor walks during `hydrateRoot`.
 - Suspense uses whole-tree retry: an unresolved `use(thenable)` renders the
-  nearest `@pending`/fallback, `renderToString` awaits everything that
+  nearest `@pending`/fallback, `render()` awaits everything that
   suspended, then re-renders from scratch with the resolved values cached.
   Resolved values are serialized into the seed script so hydration does not
   re-fetch or re-suspend.
@@ -87,10 +85,10 @@ of hanging the request.
 
 `@octanejs/vite-plugin` gives file-based routing plus dev-server SSR: it
 matches a route from `octane.config.ts`, loads the page module through Vite's
-SSR pipeline, calls `renderToString`, splices the result into `index.html` at
+SSR pipeline, calls `render()`, splices the result into `index.html` at
 `<!--ssr-head-->` / `<!--ssr-body-->`, and injects the hydration entry. For a
 custom server (see `examples/hacker-news`), write your own `entry-server.ts`
-around `renderToString` and serialize any app data (for example a dehydrated
+around `render()` and serialize any app data (for example a dehydrated
 query-client cache) into your own inline script.
 
 ## Not built yet

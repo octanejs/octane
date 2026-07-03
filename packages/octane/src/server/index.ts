@@ -1,12 +1,11 @@
 /**
  * `octane/server` — server-rendering entry.
  *
- * Public API: `renderToString(Component, props?, options?)`, the server
- * analogue of `createRoot().render()`. It resolves to `{ head, body, css }`:
- * hoisted head elements, the rendered body (plus the suspense seed script when
- * anything suspended), and the deduped scoped-style tags. Options cover an
- * AbortSignal, a CSP nonce for the inline tags, and a per-render suspense
- * deadline. `render` is a deprecated alias.
+ * Public API: `render(Component, props?, options?)`, the server analogue of
+ * `createRoot().render()`. It resolves to `{ head, body, css }`: hoisted head
+ * elements, the rendered body (plus the suspense seed script when anything
+ * suspended), and the deduped scoped-style tags. Options cover an AbortSignal,
+ * a CSP nonce for the inline tags, and a per-render suspense deadline.
  *
  * Everything below the "compiler-emitted" divider is NOT for hand-written
  * code: the `octane/compiler` in `mode: 'server'` emits component modules that
@@ -17,7 +16,6 @@
 
 export {
 	// Entry
-	renderToString,
 	render,
 	type RenderResult,
 	type RenderOptions,

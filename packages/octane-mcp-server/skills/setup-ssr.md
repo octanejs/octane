@@ -5,9 +5,9 @@ Use this when adding server-side rendering to an Octane app.
 ## The API
 
 ```ts
-import { renderToString } from 'octane/server';
+import { render } from 'octane/server';
 
-const { head, body, css } = await renderToString(App, props, {
+const { head, body, css } = await render(App, props, {
 	signal: request.signal,
 	nonce: cspNonce,
 	timeoutMs: 5000,
@@ -23,7 +23,6 @@ const { head, body, css } = await renderToString(App, props, {
   stamps CSP nonces on the emitted inline tags, `timeoutMs` bounds how long a
   `use(thenable)` may take to settle (global default via
   `setSsrSuspenseTimeout`).
-- `render` is a deprecated alias of `renderToString`.
 
 On the client:
 
@@ -43,14 +42,14 @@ hydration-stable; the client adopts server DOM instead of rebuilding it.
    Production server output is not generated yet; for production SSR today use
    path 2.
 2. **Custom server**: write `entry-server.ts` exporting a function that calls
-   `renderToString` and splices the result into your HTML template, and
+   `render()` and splices the result into your HTML template, and
    `entry-client.ts` calling `hydrateRoot`. Serialize app data (for example a
    dehydrated query-client cache) into your own inline JSON script and read it
    before hydrating.
 
 ## Data and Suspense on the server
 
-`use(promise)` suspends a pass; `renderToString` awaits it and re-renders, so
+`use(promise)` suspends a pass; `render()` awaits it and re-renders, so
 `@try { } @pending { }` boundaries resolve to their success arm in the emitted
 HTML. Resolved values serialize into the seed script and hydration consumes
 them without re-fetching. For query-style data, prefetch into a cache before
@@ -61,7 +60,7 @@ rendering and dehydrate it yourself.
 - Effects never run on the server; state hooks return initial values;
   `useSyncExternalStore` uses `getServerSnapshot`.
 - Server components must be compiled by the Octane compiler in server mode;
-  you cannot feed client-compiled output to `renderToString`.
+  you cannot feed client-compiled output to `render()`.
 - Output is buffered, not streamed: send it as one response.
 - Render errors reject the promise unless an `ErrorBoundary`/`@catch` inside
   the tree handles them; map rejections to HTTP status codes in your server.

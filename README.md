@@ -93,11 +93,11 @@ root.render(App, { title: 'Hello world!' });
 
 ```ts
 // entry-server.ts
-import { renderToString } from 'octane/server';
+import { render } from 'octane/server';
 import { App } from './App.tsrx';
 
 export async function renderApp() {
-  const { head, body, css } = await renderToString(App);
+  const { head, body, css } = await render(App);
   return { head, body, css };
 }
 ```

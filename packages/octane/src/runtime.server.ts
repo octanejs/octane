@@ -899,12 +899,12 @@ function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
  * the boundary once.
  *
  * Async because of Suspense: a `use(thenable)` that hasn't resolved suspends
- * the pass; renderToString awaits it and re-renders, so the @try ends up
+ * the pass; render() awaits it and re-renders, so the @try ends up
  * showing its resolved success arm (or @catch on rejection). Each resolved
  * value is appended to `body` as an inline data `<script>` for the client to
  * seed.
  */
-export async function renderToString(
+export async function render(
 	component: ServerComponent,
 	props?: any,
 	options?: RenderOptions,
@@ -1026,6 +1026,3 @@ export async function renderToString(
 		}
 	}
 }
-
-/** @deprecated Use renderToString — same function, clearer name. */
-export const render = renderToString;
