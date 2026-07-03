@@ -11,7 +11,8 @@ const mvSlotCache = new Map<symbol, symbol>();
 function mvSlot(slot: symbol | undefined): symbol | undefined {
 	if (slot === undefined) return undefined;
 	let sym = mvSlotCache.get(slot);
-	if (sym === undefined) mvSlotCache.set(slot, (sym = Symbol.for((slot.description ?? '') + ':mv')));
+	if (sym === undefined)
+		mvSlotCache.set(slot, (sym = Symbol.for((slot.description ?? '') + ':mv')));
 	return sym;
 }
 

@@ -44,10 +44,30 @@
 import { chromium } from 'playwright';
 
 const DEFAULT_PAIRS = [
-	{ kind: 'jsf', name: 'octane-tsrx-naive vs octane-tsrx', tuned: 'http://localhost:5176/', naive: 'http://localhost:5213/' },
-	{ kind: 'jsf', name: 'octane-jsx-naive vs octane-jsx', tuned: 'http://localhost:5177/', naive: 'http://localhost:5214/' },
-	{ kind: 'jsf', name: 'octane-ts vs octane-tsrx', tuned: 'http://localhost:5176/', naive: 'http://localhost:5215/' },
-	{ kind: 'dbmon', name: 'dbmon octane-deopt vs octane-tsrx', tuned: 'http://localhost:5196/', naive: 'http://localhost:5209/' },
+	{
+		kind: 'jsf',
+		name: 'octane-tsrx-naive vs octane-tsrx',
+		tuned: 'http://localhost:5176/',
+		naive: 'http://localhost:5213/',
+	},
+	{
+		kind: 'jsf',
+		name: 'octane-jsx-naive vs octane-jsx',
+		tuned: 'http://localhost:5177/',
+		naive: 'http://localhost:5214/',
+	},
+	{
+		kind: 'jsf',
+		name: 'octane-ts vs octane-tsrx',
+		tuned: 'http://localhost:5176/',
+		naive: 'http://localhost:5215/',
+	},
+	{
+		kind: 'dbmon',
+		name: 'dbmon octane-deopt vs octane-tsrx',
+		tuned: 'http://localhost:5196/',
+		naive: 'http://localhost:5209/',
+	},
 ];
 
 function parsePairs(argv) {
@@ -63,7 +83,12 @@ function parsePairs(argv) {
 			console.error(`unknown pair kind "${kind}" (expected jsf | dbmon)`);
 			process.exit(2);
 		}
-		pairs.push({ kind, name: `${kind} ${argv[i + 2]} vs ${argv[i + 1]}`, tuned: argv[i + 1], naive: argv[i + 2] });
+		pairs.push({
+			kind,
+			name: `${kind} ${argv[i + 2]} vs ${argv[i + 1]}`,
+			tuned: argv[i + 1],
+			naive: argv[i + 2],
+		});
 	}
 	return pairs;
 }
@@ -98,7 +123,9 @@ const snapshot = (page, { firstN = 10, full = false } = {}) =>
 			let deoptStamped = 0;
 			let styledCells = 0;
 			for (const tr of trs) {
-				if (Object.getOwnPropertySymbols(tr).some((s) => String(s.description) === 'octane.deoptDesc'))
+				if (
+					Object.getOwnPropertySymbols(tr).some((s) => String(s.description) === 'octane.deoptDesc')
+				)
 					deoptStamped++;
 				if (tr.querySelector('td[style]')) styledCells++;
 			}
@@ -114,8 +141,13 @@ const snapshot = (page, { firstN = 10, full = false } = {}) =>
 				comments,
 				deoptStamped,
 				styledCells,
-				ids: trs.map((tr) => (tr.firstElementChild ? tr.firstElementChild.textContent.trim() : '')).join(','),
-				firstRows: trs.slice(0, firstN).map((tr) => norm(tr.outerHTML)).join('\n'),
+				ids: trs
+					.map((tr) => (tr.firstElementChild ? tr.firstElementChild.textContent.trim() : ''))
+					.join(','),
+				firstRows: trs
+					.slice(0, firstN)
+					.map((tr) => norm(tr.outerHTML))
+					.join('\n'),
 				fullRows: full ? norm(tbody.innerHTML) : null,
 			};
 		},
@@ -135,9 +167,13 @@ function assertDeoptSignature(fail, tuned, naive) {
 	// The tuned twin must look compiled: no de-opt descriptor stamps, and at most
 	// the list's own marker pair (+ a possible `<!>` template anchor) in <tbody>.
 	if (tuned.deoptStamped !== 0)
-		fail(`tuned twin has ${tuned.deoptStamped} de-opt-stamped rows (expected 0 — is TUNED url actually the compiled fixture?)`);
+		fail(
+			`tuned twin has ${tuned.deoptStamped} de-opt-stamped rows (expected 0 — is TUNED url actually the compiled fixture?)`,
+		);
 	if (tuned.comments > 4)
-		fail(`tuned twin has ${tuned.comments} comment nodes in <tbody> (expected <= 4 for the marker-free fast path)`);
+		fail(
+			`tuned twin has ${tuned.comments} comment nodes in <tbody> (expected <= 4 for the marker-free fast path)`,
+		);
 	const symbolSig = naive.rows > 0 && naive.deoptStamped === naive.rows;
 	const commentSig = naive.rows > 0 && naive.comments >= naive.rows;
 	if (!symbolSig && !commentSig)
@@ -156,7 +192,8 @@ function assertEqualRows(fail, step, tuned, naive, { full = false } = {}) {
 		fail(
 			`${step}: normalized row HTML differs.\n--- tuned ---\n${tuned.firstRows}\n--- naive ---\n${naive.firstRows}`,
 		);
-	if (full && tuned.fullRows !== naive.fullRows) fail(`${step}: full normalized <tbody> HTML differs`);
+	if (full && tuned.fullRows !== naive.fullRows)
+		fail(`${step}: full normalized <tbody> HTML differs`);
 }
 
 // ── Pair drivers ────────────────────────────────────────────────────────────
@@ -183,8 +220,11 @@ async function runJsfPair(browser, pair, fail) {
 	// The naive fixture's inline-style cell must actually be there (the style
 	// attr is normalized OUT of the byte compare, so assert it separately).
 	if (naive.styledCells !== naive.rows)
-		fail(`naive inline-style cell missing: ${naive.styledCells}/${naive.rows} rows carry td[style]`);
-	if (tuned.styledCells !== 0) fail(`tuned twin unexpectedly has ${tuned.styledCells} td[style] cells`);
+		fail(
+			`naive inline-style cell missing: ${naive.styledCells}/${naive.rows} rows carry td[style]`,
+		);
+	if (tuned.styledCells !== 0)
+		fail(`tuned twin unexpectedly has ${tuned.styledCells} td[style] cells`);
 	assertEqualRows(fail, 'after #run', tuned, naive);
 
 	// Select row 5 — drives the naive member-callee `actions.select` path.
@@ -192,7 +232,8 @@ async function runJsfPair(browser, pair, fail) {
 	await settle();
 	[tuned, naive] = await both((p) => snapshot(p));
 	assertEqualRows(fail, 'after select(row 5)', tuned, naive);
-	if (!naive.firstRows.includes('danger')) fail('after select(row 5): naive row 5 did not gain the danger class');
+	if (!naive.firstRows.includes('danger'))
+		fail('after select(row 5): naive row 5 did not gain the danger class');
 
 	// Update every 10th row (no RNG involved), then swap rows 2/999.
 	await both((p) => clickSel(p, '#update'));
@@ -258,12 +299,17 @@ for (const pair of pairs) {
 	console.log(`    tuned: ${pair.tuned}   naive: ${pair.naive}`);
 	let sig = null;
 	try {
-		sig = pair.kind === 'dbmon' ? await runDbmonPair(browser, pair, fail) : await runJsfPair(browser, pair, fail);
+		sig =
+			pair.kind === 'dbmon'
+				? await runDbmonPair(browser, pair, fail)
+				: await runJsfPair(browser, pair, fail);
 	} catch (err) {
 		fail(`crashed: ${err && err.message ? err.message : err}`);
 	}
 	if (failures.length === 0) {
-		console.log(`    PASS — de-opt signature: ${sig}; rows byte-identical (minus comments) at every step`);
+		console.log(
+			`    PASS — de-opt signature: ${sig}; rows byte-identical (minus comments) at every step`,
+		);
 	} else {
 		failed = true;
 		for (const f of failures) console.log(`    FAIL — ${f}`);

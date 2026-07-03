@@ -73,7 +73,14 @@ export function RefRows() @{
 function PortalRow({ item, target }: { item: Item; target: Element }) @{
 	<li>
 		{item.label}
-		{createPortal(() => @{ <span class="tip">{'tip-' + item.label}</span> }, target)}
+		{createPortal(
+			() => @{
+				<span class="tip">
+					{'tip-' + item.label}
+				</span>
+			},
+			target,
+		)}
 	</li>
 }
 

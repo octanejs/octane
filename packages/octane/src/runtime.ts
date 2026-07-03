@@ -4564,8 +4564,18 @@ export function createElement<P>(
 	const addChildren = hasPositional;
 	let p: any = src ?? {};
 	if (stripKey || addChildren) {
-		p = src != null ? { ...src } : {};
-		if (stripKey) delete p.key;
+		// Manual copy-minus-key, NOT `{...src}` + `delete p.key`: deleting a
+		// property drops the object into V8 dictionary mode (no enum cache),
+		// which makes every later for-in/spread over these props slow — memo's
+		// shallowEqualProps measurably regressed on value-position rows with it.
+		p = {};
+		if (src != null) {
+			// hasOwn guard: spread copies OWN enumerable keys only; for-in would
+			// also pick up inherited enumerables.
+			for (const k in src) {
+				if (k !== 'key' && hasOwnProp.call(src, k)) p[k] = (src as any)[k];
+			}
+		}
 		if (addChildren) p.children = kids;
 	}
 	return { $$kind: ELEMENT_TAG, type, props: p as P, key, children: kids ?? null };
@@ -4804,13 +4814,45 @@ export function componentSlot(
 	}
 	state.prevKey = key === undefined ? NO_KEY : key;
 	if (comp !== state.currentComp) {
-		// Off-screen probe (React WIP model): a TRANSITION swap to a DIFFERENT component
+		// Off-screen swap (React WIP model): a TRANSITION swap to a DIFFERENT component
 		// that may suspend → render it off-screen first WITHOUT tearing down the old. If
-		// it suspends, re-throw so the enclosing tryBlock holds the old component on screen
-		// + resumes (the resume re-renders the boundary, re-driving this swap). If it
-		// completes, discard the probe and fall through to the normal swap below. Reuses
-		// componentSlot's marker logic; urgent + hydration keep the legacy path.
+		// it suspends, dispose + re-throw so the enclosing tryBlock holds the old component
+		// on screen + resumes (the resume re-renders the boundary, re-driving this swap).
+		// Urgent + hydration keep the legacy path.
 		if (state.block !== null && !hydrating && parentBlock.currentRenderMode === 'transition') {
+			if (!state.singleRoot && state.end !== null) {
+				// COMMIT the WIP (no double render): the off-screen block already owns a
+				// `<!--wip-->`/`<!--/wip-->` pair, which is EXACTLY componentSlot's non-
+				// singleRoot regime (the slot's start/end ARE the block's owned markers,
+				// exclusiveMarkers=false). On completion we adopt that pair as the slot's
+				// markers and rename it in place. The wip pair was inserted right after
+				// `state.end`, so once the old range (start..end inclusive) is unmounted the
+				// pair sits exactly where the old range was — no DOM move needed. We rename
+				// the comments rather than replacing them: descendant slots inside the WIP
+				// (e.g. a return-slot childSlot) may anchor on `wip.end`, so it must survive.
+				const r = renderOffscreen(parentBlock, domParent, state.end, comp, props);
+				if (r.suspended || r.error) {
+					disposeWip(r.wip);
+					if (r.error) throw r.error;
+					throw new SuspenseException(r.suspended);
+				}
+				r.wip.start.data = 'comp';
+				r.wip.end.data = '/comp';
+				// Old block owns state.start/state.end (exclusiveMarkers=false) → removed
+				// inclusive of its markers, leaving the (renamed) wip pair in position.
+				unmountBlock(state.block);
+				state.start = r.wip.start;
+				state.end = r.wip.end;
+				state.block = r.wip.block;
+				state.currentComp = comp;
+				spliceWipCapture(r.wip);
+				return;
+			}
+			// singleRoot slots keep the PROBE + discard double render: they self-mark with
+			// a single root element (no comment markers), so committing a comment-marked
+			// WIP block would change the DOM shape and break the self-marking cascade an
+			// enclosing @if relies on. Probe off-screen to surface a suspend/error, discard,
+			// then fall through to the legacy singleRoot swap below.
 			const probeAfter = state.end ?? state.anchor;
 			if (probeAfter !== null) {
 				const r = renderOffscreen(parentBlock, domParent, probeAfter, comp, props);
@@ -4968,6 +5010,10 @@ function renderOffscreen(
 	afterNode: Node,
 	body: ComponentBody,
 	props: any,
+	// Block kind for the off-screen block. Only 'root' is behaviorally special, so
+	// this is DOM-shape fidelity (branch commits pass 'control-flow' to mirror their
+	// in-place blocks), not correctness — 'dynamic' works for every non-root caller.
+	kind: BlockKind = 'dynamic',
 ): { wip: OffscreenWip; suspended: any; error: any } {
 	const start = document.createComment('wip');
 	const end = document.createComment('/wip');
@@ -4977,7 +5023,7 @@ function renderOffscreen(
 	const capture: OffscreenCapture = { effects: [[], [], []], refs: [], stores: [] };
 	const prev = WIP_CAPTURE;
 	WIP_CAPTURE = capture;
-	const block = createBlock('dynamic', parentBlock, domParent, start, end, body, props);
+	const block = createBlock(kind, parentBlock, domParent, start, end, body, props);
 	let suspended: any = null;
 	let error: any = null;
 	try {
@@ -4989,6 +5035,22 @@ function renderOffscreen(
 		WIP_CAPTURE = prev;
 	}
 	return { wip: { block, start, end, capture, domParent }, suspended, error };
+}
+
+// Splice a COMPLETED off-screen WIP's captured effects/refs/store-syncs back into the
+// live queues so the surrounding commit drains them (child-first, now that the WIP's
+// nodes are connected). Shared by every commit site — commitOffscreen (childSlot, which
+// also DOM-moves the range) and the componentSlot / renderBranchSlot commit branches
+// (which adopt the WIP's markers in place, so no DOM move is needed).
+function spliceWipCapture(wip: OffscreenWip): void {
+	for (let p = 0 as Phase; p < 3; p++) {
+		const src = wip.capture.effects[p];
+		for (let i = 0; i < src.length; i++) effectQueues[p].push(src[i]);
+	}
+	for (let i = 0; i < wip.capture.refs.length; i++) refAttachQueue.push(wip.capture.refs[i]);
+	// Store-syncs enqueued off-screen now belong to committed DOM — hand them to the
+	// live queue so the surrounding commit's drainStoreSyncs reconciles them.
+	for (let i = 0; i < wip.capture.stores.length; i++) storeSyncQueue.push(wip.capture.stores[i]);
 }
 
 // Commit a COMPLETED off-screen WIP: move its node range into final position (before
@@ -5003,14 +5065,7 @@ function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
 		if (n === wip.end) break;
 		n = next;
 	}
-	for (let p = 0 as Phase; p < 3; p++) {
-		const src = wip.capture.effects[p];
-		for (let i = 0; i < src.length; i++) effectQueues[p].push(src[i]);
-	}
-	for (let i = 0; i < wip.capture.refs.length; i++) refAttachQueue.push(wip.capture.refs[i]);
-	// Store-syncs enqueued off-screen now belong to committed DOM — hand them to the
-	// live queue so the surrounding commit's drainStoreSyncs reconciles them.
-	for (let i = 0; i < wip.capture.stores.length; i++) storeSyncQueue.push(wip.capture.stores[i]);
+	spliceWipCapture(wip);
 }
 
 // Discard an off-screen WIP (suspended or superseded): remove its node range + fire any
@@ -5982,6 +6037,7 @@ export function childSlot(
 			commitOffscreen(r.wip, state.end);
 			state.block = r.wip.block;
 			state.currentComp = comp;
+			state.currentIsBodyFn = isBodyFn;
 			return;
 		}
 		// New component (first render, or identity swap from text / another comp).
@@ -7672,9 +7728,10 @@ interface BranchSlot {
 
 /**
  * The shared branch-swap core. When `next` differs from the mounted branch:
- * probe off-screen (transitions), tear the old branch down, and mount `body`
- * with the dynamic self-marking scheme; when it's the same branch, re-render
- * in place so hook state / event bindings survive. `marker` is the comment
+ * under a transition, render `body` off-screen and COMMIT it in place (adopting
+ * the WIP markers — see below); otherwise tear the old branch down and mount
+ * `body` with the dynamic self-marking scheme. When it's the same branch,
+ * re-render in place so hook state / event bindings survive. `marker` is the comment
  * label minted for the slot's boundary — `<!--if-->…<!--/if-->` /
  * `<!--switch-->…<!--/switch-->`, following the file-wide open/`/`close
  * convention (try//try, comp//comp, activity//activity, for//for).
@@ -7690,25 +7747,64 @@ function renderBranchSlot(
 ): void {
 	const parentBlock = parentScope.block;
 	if (next !== state.branch) {
-		// Off-screen probe (React WIP model): on a TRANSITION swap to a new branch that
-		// may suspend, render it off-screen FIRST without tearing down the old branch. If
-		// it suspends, route to the enclosing tryBlock so its transition hold keeps the
-		// old branch on screen and resumes — the resume re-renders the try body, which
-		// re-drives this swap. If it completes, discard the probe and fall through to the
-		// normal in-place path below (now non-suspending). Reuses the slot's marker logic.
+		// Off-screen swap (React WIP model): on a TRANSITION swap to a new branch that may
+		// suspend, render it off-screen FIRST without tearing down the old branch. If it
+		// suspends, dispose + route to the enclosing tryBlock so its transition hold keeps
+		// the old branch on screen and resumes — the resume re-renders the try body, which
+		// re-drives this swap. On completion we COMMIT the WIP (no double render): the off-
+		// screen block owns a `<!--wip-->`/`<!--/wip-->` pair which we adopt as the slot's
+		// durable markers (renamed in place — descendant slots may anchor on `wip.end`, so
+		// it must survive) and mark exclusiveMarkers=true so the NEXT swap's marker path
+		// finds them still attached after its own unmountBlock. Urgent + hydration, and a
+		// swap TO an empty branch (body === null), keep the legacy in-place path below.
 		if (
 			state.block !== null &&
 			body !== null &&
 			!hydrating &&
 			parentBlock.currentRenderMode === 'transition'
 		) {
-			const probeAfter = state.end ?? state.anchor;
-			if (probeAfter !== null) {
-				const r = renderOffscreen(parentBlock, domParent, probeAfter, body, undefined);
-				disposeWip(r.wip);
-				if (r.error) throw r.error;
-				if (r.suspended) throw new SuspenseException(r.suspended);
-				// completed → fall through to render the new branch in place.
+			// Commit path requires the marker regime (state.end !== null): renderOffscreen
+			// inserts the wip pair AFTER its reference node, which matches "right after the
+			// old end marker" — but in the anchor regime the legacy path mounts BEFORE the
+			// anchor, so committing there would land the branch on the wrong side of the
+			// anchor's trailing static siblings. Anchor-regime swaps keep the legacy
+			// in-place path below.
+			if (state.end !== null) {
+				const r = renderOffscreen(
+					parentBlock,
+					domParent,
+					state.end,
+					body,
+					undefined,
+					'control-flow',
+				);
+				if (r.suspended || r.error) {
+					disposeWip(r.wip);
+					if (r.error) throw r.error;
+					throw new SuspenseException(r.suspended);
+				}
+				r.wip.start.data = marker;
+				r.wip.end.data = '/' + marker;
+				// Tear down the old branch. A borrowed-marker branch (exclusiveMarkers=true)
+				// keeps oldStart/oldEnd; a self-marked branch removes its element. The wip
+				// pair was inserted after `probeAfter` (state.end/anchor) and stays put.
+				const oldStart = state.start;
+				const oldEnd = state.end;
+				unmountBlock(state.block);
+				// Orphaned old slot markers (borrowed regime) — nothing references them once
+				// the old block is dead; remove so only the adopted wip pair bounds the slot.
+				if (oldStart !== null) {
+					oldStart.remove();
+					(oldEnd as ChildNode | null)?.remove();
+				}
+				state.start = r.wip.start;
+				state.end = r.wip.end;
+				state.block = r.wip.block;
+				state.branch = next;
+				// Adopted pair is now the slot's durable boundary (see NEXT-swap note above).
+				r.wip.block.exclusiveMarkers = true;
+				spliceWipCapture(r.wip);
+				return;
 			}
 		}
 		// Position for the new branch: just after the current branch's trailing node,

@@ -49,7 +49,9 @@ export function InlineModal(props) @{
 	<section class="inline-anchor">
 		<button id="bump" onClick={() => setN(n + 1)}>{'bump'}</button>
 		{createPortal(
-			<div class="inline-modal">{'count:' + n}</div>,
+			<div class="inline-modal">
+				{'count:' + n}
+			</div>,
 			props.target,
 		)}
 	</section>

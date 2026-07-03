@@ -386,9 +386,7 @@ function writeBenchJson(payload) {
 		...(failures.length ? { failed: failures.join(' | ') } : {}),
 		targets: TARGETS.map((t) => ({
 			name: t.name,
-			ops: Object.fromEntries(
-				Object.entries(all[t.name].results).filter(([, v]) => v != null),
-			),
+			ops: Object.fromEntries(Object.entries(all[t.name].results).filter(([, v]) => v != null)),
 			meta: gateMeta(all[t.name].gateFails),
 		})),
 	});
