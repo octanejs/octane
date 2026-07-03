@@ -31,12 +31,12 @@ const m = evalServer(
 
 describe('SSR — .tsx <Context.Provider> with descriptor children', () => {
 	it('renders the provider element children and flows context through them', async () => {
-		const { body } = await RT.render(m.ProviderApp, {});
+		const { html } = await RT.renderToString(m.ProviderApp, {});
 		// The descriptor children render (not dropped).
-		expect(body).toContain('class="wrap"');
-		expect((body.match(/class="leaf"/g) || []).length).toBe(2);
+		expect(html).toContain('class="wrap"');
+		expect((html.match(/class="leaf"/g) || []).length).toBe(2);
 		// Context value flows to the leaves through the provider.
-		expect(body).toContain('provided');
-		expect(body).not.toContain('default');
+		expect(html).toContain('provided');
+		expect(html).not.toContain('default');
 	});
 });

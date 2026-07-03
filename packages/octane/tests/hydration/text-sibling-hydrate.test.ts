@@ -34,8 +34,8 @@ afterEach(() => container.remove());
 
 describe('hydrateRoot — text hole among sibling holes', () => {
 	it('text after a component: adopts the server text, keeps the component', async () => {
-		const { body } = await ServerRT.render(server.TextAfterComp, { label: 'LBL' });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.TextAfterComp, { label: 'LBL' });
+		container.innerHTML = html;
 		const inner = container.querySelector('#inner') as HTMLElement;
 		const root = hydrateRoot(container, TextAfterComp, { label: 'LBL' });
 		flushSync(() => {});
@@ -47,8 +47,8 @@ describe('hydrateRoot — text hole among sibling holes', () => {
 	});
 
 	it('text between two components: both components intact + text present', async () => {
-		const { body } = await ServerRT.render(server.TextBetweenComps, { label: 'MID' });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.TextBetweenComps, { label: 'MID' });
+		container.innerHTML = html;
 		const root = hydrateRoot(container, TextBetweenComps, { label: 'MID' });
 		flushSync(() => {});
 		expect(container.querySelectorAll('#host2 #inner').length).toBe(2);
@@ -57,8 +57,11 @@ describe('hydrateRoot — text hole among sibling holes', () => {
 	});
 
 	it('text after a taken @if branch: adopts the branch + the text', async () => {
-		const { body } = await ServerRT.render(server.TextAfterIf, { on: true, label: 'AFTER' });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.TextAfterIf, {
+			on: true,
+			label: 'AFTER',
+		});
+		container.innerHTML = html;
 		const onSpan = container.querySelector('.on') as HTMLElement;
 		const root = hydrateRoot(container, TextAfterIf, { on: true, label: 'AFTER' });
 		flushSync(() => {});

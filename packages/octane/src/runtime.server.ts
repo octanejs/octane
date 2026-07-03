@@ -4,8 +4,9 @@
  * The `octane/compiler` compiler, in `mode: 'server'`, emits component bodies
  * that build an HTML STRING (instead of cloning a DOM template) by calling the
  * `ssr*` helpers here, and that call these server hook implementations. The
- * server analogue of `createRoot().render()` is `render(Component, props)` →
- * `{ head, body, css }`.
+ * server analogues of `createRoot().render()` are `renderToString` /
+ * `renderToStaticMarkup` (`octane/server`) and `prerender` (`octane/static`),
+ * each returning `{ html, css }` (hoisted head folded into `html`).
  *
  * Scope: static markup, dynamic text holes, attributes (incl. class / style /
  * spread), control flow (@if/@for/@switch/@try), nested components, scoped CSS
@@ -47,10 +48,17 @@ type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
 let CURRENT_SCOPE: SSRScope | null = null;
 let ID_COUNTER = 0;
 let CSS: Map<string, string> | null = null;
-// Accumulates top-level `<head>` content during the active render pass (a
-// mutable container, mirroring CSS's mutable Map, so a per-pass local capture
-// keeps accumulating via `HEAD.html +=` even though strings are immutable).
-// Returned as RenderResult.head; the metaframework injects it at <!--ssr-head-->.
+// Emit hydration block markers (`<!--[-->…<!--]-->`) and head-adoption markers?
+// True for hydratable output (renderToString / prerender / streaming); flipped
+// false for the whole of a `renderToStaticMarkup` render, which produces clean,
+// non-hydratable HTML (emails / static pages). Set only around a synchronous
+// pass, so no concurrency save/restore is needed.
+let MARKERS = true;
+// Accumulates hoisted `<head>` content (`<title>`/`<meta>`/`<link>`) during the
+// active render pass (a mutable container, mirroring CSS's mutable Map, so a
+// per-pass local capture keeps accumulating via `HEAD.html +=` even though
+// strings are immutable). Folded into the result `html` by `spliceHead` (into
+// `<head>` when present, else prepended).
 let HEAD: { html: string } | null = null;
 
 // Suspense (SSR Phase 4). A render pass that reaches an unresolved `use(thenable)`
@@ -433,7 +441,7 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
  * protocol (shared constants in ./constants).
  */
 export function ssrBlock(content: string): string {
-	return BLOCK_OPEN + content + BLOCK_CLOSE;
+	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : content;
 }
 
 /**
@@ -568,7 +576,8 @@ function renderComponentFramed(
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
 		// become the slot's start/end markers, exactly like control-flow blocks).
-		return BLOCK_OPEN + inner + BLOCK_CLOSE;
+		// `renderToStaticMarkup` sets MARKERS=false — no hydration, so no markers.
+		return MARKERS ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
 	} finally {
 		CURRENT_SCOPE = prevScope;
 		FRAME = prevFrame;
@@ -900,7 +909,9 @@ export function ssrHeadEl(
 	text: unknown,
 ): void {
 	if (HEAD === null) return;
-	let s = '<!--' + key + '--><' + tag;
+	// The `<!--key-->` prefix is the client headBlock's adoption marker; static
+	// markup is non-hydratable, so it's omitted there.
+	let s = (MARKERS ? '<!--' + key + '-->' : '') + '<' + tag;
 	if (attrs !== null) {
 		for (const k in attrs) {
 			const v = attrs[k];
@@ -920,10 +931,44 @@ export function ssrHeadEl(
 // Entry point
 // ---------------------------------------------------------------------------
 
+/**
+ * The result of a buffered server render (`renderToString` / `renderToStaticMarkup`
+ * / `prerender`).
+ *
+ * - `html` — the rendered markup. Hoisted document metadata (`<title>`/`<meta>`/
+ *   `<link>`, collected via `ssrHeadEl`) is folded IN: spliced before `</head>`
+ *   when the render produced a document, otherwise prepended. (React folds head
+ *   resources into the document too, so there is no separate `head` channel.)
+ * - `css` — the scoped stylesheets of the components that rendered, as
+ *   ready-to-place `<style data-octane="hash">…</style>` tags (one per hash,
+ *   deduped). Kept as its own field because octane has scoped CSS that React core
+ *   does not; the client's `injectStyle` matches the `data-octane` hash and skips
+ *   re-injecting on hydration, so the styles cross the boundary once. (Streaming
+ *   has no `css` field — scoped `<style>` flushes inline with the content that
+ *   uses it, as React does.)
+ */
 export interface RenderResult {
-	head: string;
-	body: string;
+	html: string;
 	css: string;
+}
+
+/** Options accepted by the buffered render entry points (React-shaped subset). */
+export interface RenderOptions {
+	/** Prefix for `useId`-generated ids (React parity; reserved — not yet used). */
+	identifierPrefix?: string;
+	/** Called with any error thrown during the render (before it propagates). */
+	onError?: (error: unknown) => void;
+}
+
+// Insert the hoisted head markup into `body`: before `</head>` when the render
+// produced a document (React-19 resource-hoisting shape), otherwise prepend it so
+// the caller/metaframework can place `html` in a document whose `<head>` then
+// contains the metadata. Empty head → body unchanged.
+function spliceHead(body: string, head: string): string {
+	if (head === '') return body;
+	const headClose = body.indexOf('</head>');
+	if (headClose !== -1) return body.slice(0, headClose) + head + body.slice(headClose);
+	return head + body;
 }
 
 /** Guard against a `use(thenable)` that never resolves wedging the render loop. */
@@ -1181,7 +1226,15 @@ async function settleSuspended(suspended: SuspendedList, resolved: ResolvedMap):
 	}
 }
 
-export async function render(component: ServerComponent, props?: any): Promise<RenderResult> {
+// The await-everything render core. Runs full canonical passes interleaved with
+// cheap discovery rounds until nothing suspends, then returns the final pass —
+// so every `use(thenable)` is resolved and the @try success arms are rendered.
+// Shared by `prerender` (React's static API) and the deprecated `render`.
+async function runBuffered(
+	component: ServerComponent,
+	props: any,
+	options: RenderOptions | undefined,
+): Promise<FullPassResult> {
 	// The suspense cache persists across this render's passes; it is render-local
 	// (never a module global) so concurrent renders can't share it.
 	const resolved: ResolvedMap = new Map();
@@ -1189,12 +1242,14 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 	for (;;) {
 		// A full canonical pass. If nothing suspended, this IS the answer — the
 		// no-suspense fast path returns here after exactly one pass.
-		const pass = runFullFramedPass(component, props, resolved);
-		if (pass.suspended.length === 0) {
-			let body = pass.body;
-			if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial);
-			return { head: pass.head, body, css: pass.css };
+		let pass: FullPassResult;
+		try {
+			pass = runFullFramedPass(component, props, resolved);
+		} catch (err) {
+			options?.onError?.(err);
+			throw err;
 		}
+		if (pass.suspended.length === 0) return pass;
 		// Between full passes, greedily discover deeper waterfall levels with cheap
 		// SUBTREE re-runs (skipping the static bulk) so the NEXT full pass jumps
 		// straight to canonical. A root-level boundary (job.frame.parent === null)
@@ -1205,11 +1260,13 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 			// MAX bounds the TOTAL awaits (full-pass- and round-driven) so a
 			// never-resolving or nondeterministic use() can't wedge the loop.
 			if (++attempt > MAX_SUSPENSE_PASSES) {
-				throw new Error(
+				const err = new Error(
 					'octane SSR: exceeded ' +
 						MAX_SUSPENSE_PASSES +
 						' suspense passes — a use(thenable) never resolved.',
 				);
+				options?.onError?.(err);
+				throw err;
 			}
 			await settleSuspended(pending, resolved);
 			if (jobs.length === 0 || !jobs.every((j) => j.frame.parent !== null)) break;
@@ -1222,4 +1279,74 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 		// still suspends (a nondeterministic render whose keys shift), it simply
 		// makes progress via more full passes, bounded by MAX_SUSPENSE_PASSES.
 	}
+}
+
+/** Turn a completed pass into the `{ html, css }` result (head folded in, seeds appended). */
+function passToResult(pass: FullPassResult): RenderResult {
+	let body = pass.body;
+	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial);
+	return { html: spliceHead(body, pass.head), css: pass.css };
+}
+
+/**
+ * React `react-dom/static` `prerender` — await ALL data (Suspense boundaries
+ * resolve to their success arm), then return the complete `{ html, css }`. Use
+ * for SSG / any place that wants fully-resolved HTML with no client fallback.
+ * This is the buffered, await-everything behaviour of the old `render()`.
+ */
+export async function prerender(
+	component: ServerComponent,
+	props?: any,
+	options?: RenderOptions,
+): Promise<RenderResult> {
+	return passToResult(await runBuffered(component, props, options));
+}
+
+/**
+ * React `react-dom/server` `renderToString` — a SINGLE synchronous pass, no
+ * awaiting. A Suspense boundary that suspends renders its fallback (the inline
+ * `@try`/`@pending` arm); a bare `use(thenable)` with no enclosing boundary ends
+ * the render early (its partial output is returned). Synchronously-resolved
+ * `use()` in the shell still seeds. Use `prerender` when you need the data awaited.
+ */
+export function renderToString(
+	component: ServerComponent,
+	props?: any,
+	options?: RenderOptions,
+): RenderResult {
+	const resolved: ResolvedMap = new Map();
+	let pass: FullPassResult;
+	try {
+		pass = runFullFramedPass(component, props, resolved);
+	} catch (err) {
+		options?.onError?.(err);
+		throw err;
+	}
+	return passToResult(pass);
+}
+
+/**
+ * React `react-dom/server` `renderToStaticMarkup` — a single synchronous pass
+ * producing clean, NON-hydratable HTML: no `<!--[-->`/`<!--]-->` block markers,
+ * no head-adoption markers, no suspense seed script. For static pages / email.
+ */
+export function renderToStaticMarkup(
+	component: ServerComponent,
+	props?: any,
+	options?: RenderOptions,
+): RenderResult {
+	const resolved: ResolvedMap = new Map();
+	const prevMarkers = MARKERS;
+	MARKERS = false;
+	let pass: FullPassResult;
+	try {
+		pass = runFullFramedPass(component, props, resolved);
+	} catch (err) {
+		options?.onError?.(err);
+		throw err;
+	} finally {
+		MARKERS = prevMarkers;
+	}
+	// No seeds (non-hydratable). Head is folded in without adoption markers.
+	return { html: spliceHead(pass.body, pass.head), css: pass.css };
 }

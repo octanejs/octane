@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { prerender } from 'octane/static';
 import { Boundary } from './_fixtures/tryboundary.tsrx';
 
 // SSR Phase 6 (M4) — @try hydration. The server resolves use(promise) and renders
@@ -33,12 +34,12 @@ afterEach(() => container.remove());
 
 describe('hydrateRoot — @try success arm (SSR Phase 6 / M4)', () => {
 	it('adopts the resolved success arm (use seeded) and it is interactive', async () => {
-		const { body } = await ServerRT.render(server.Boundary, { promise: Promise.resolve('hi') });
+		const { html } = await prerender(server.Boundary, { promise: Promise.resolve('hi') });
 		// Server resolved use() → success arm in a block range + a seed <script>.
-		expect(body).toContain('<button id="ok" class="ok">hi:0</button>');
-		expect(body).toContain('data-octane-suspense>["hi"]</script>');
+		expect(html).toContain('<button id="ok" class="ok">hi:0</button>');
+		expect(html).toContain('data-octane-suspense>["hi"]</script>');
 
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const btn = container.querySelector('#ok') as HTMLButtonElement;
 
 		const root = hydrateRoot(container, Boundary, { promise: Promise.resolve('hi') });

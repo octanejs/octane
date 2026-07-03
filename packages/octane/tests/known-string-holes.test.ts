@@ -147,12 +147,12 @@ function serverModule(): Record<string, any> {
 describe('tracked-identifier hole hydrates (server + client classify identically)', () => {
 	it('adopts the server text node for a tracked `{label}` hole and stays interactive', async () => {
 		const server = serverModule();
-		const { body } = await ServerRT.render(server.Labelled, {});
-		expect(body).toContain('<button>n=0</button>'); // server emitted it as TEXT
+		const { html } = await ServerRT.renderToString(server.Labelled, {});
+		expect(html).toContain('<button>n=0</button>'); // server emitted it as TEXT
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const btn = container.querySelector('button') as HTMLButtonElement;
 		const root = hydrateRoot(container, Labelled);
 		flushSync(() => {});

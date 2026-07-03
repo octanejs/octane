@@ -23,6 +23,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server/index.ts",
+    "./static": "./src/static/index.ts",
     "./constants": "./src/constants.ts",
     "./compiler": "./src/compiler/index.js",
     "./compiler/vite": "./src/compiler/vite.js",
@@ -41,6 +42,10 @@
       "./server": {
         "types": "./dist/server/index.d.ts",
         "default": "./dist/server/index.js"
+      },
+      "./static": {
+        "types": "./dist/static/index.d.ts",
+        "default": "./dist/static/index.js"
       },
       "./constants": {
         "types": "./dist/constants.d.ts",

@@ -91,16 +91,33 @@ root.render(App, { title: 'Hello world!' });
 
 ### Server render and hydrate
 
+octane's SSR entry points mirror React's. `octane/server` is the request-time
+renderer (`react-dom/server`); `octane/static` is the static-generation renderer
+(`react-dom/static`). All buffered renders return `{ html, css }` — hoisted
+`<title>`/`<meta>`/`<link>` are folded into `html` (as in React 19), and `css` is
+the deduped scoped `<style>` tags (octane has scoped CSS; the client's
+`injectStyle` matches them on hydration so they cross the boundary once).
+
 ```ts
 // entry-server.ts
-import { render } from 'octane/server';
+import { renderToString } from 'octane/server'; // sync; fallbacks for suspended boundaries
+import { prerender } from 'octane/static'; // async; awaits all Suspense data
 import { App } from './App.tsrx';
 
 export async function renderApp() {
-  const { head, body, css } = await render(App);
-  return { head, body, css };
+  const { html, css } = await prerender(App); // { html, css }
+  return { html, css };
 }
 ```
+
+| API | Module | Await | Suspense boundary that suspends |
+| --- | --- | --- | --- |
+| `renderToString(el, props?, opts?)` | `octane/server` | no (sync) | renders its `@pending` fallback |
+| `renderToStaticMarkup(el, props?, opts?)` | `octane/server` | no (sync) | fallback; **no** hydration markers/seeds |
+| `prerender(el, props?, opts?)` | `octane/static` | yes | awaits data, renders the success arm |
+
+> Streaming (`renderToPipeableStream` / `renderToReadableStream`, React's
+> out-of-order Suspense flushing) is in progress.
 
 ```ts
 // entry-client.ts

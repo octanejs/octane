@@ -37,10 +37,10 @@ describe('hydration — .tsx <Context.Provider> descriptor children', () => {
 	afterEach(() => container.remove());
 
 	it('SSR renders the provider child + context, and the client adopts it (no mismatch)', async () => {
-		const { body } = await ServerRT.render(server.App, {});
-		expect(body).toContain('class="leaf"');
-		expect(body).toContain('provided'); // children NOT dropped (bug 1)
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.App, {});
+		expect(html).toContain('class="leaf"');
+		expect(html).toContain('provided'); // children NOT dropped (bug 1)
+		container.innerHTML = html;
 		const before = container.innerHTML;
 		const root = hydrateRoot(container, App as any, {});
 		flushSync(() => {});
@@ -57,8 +57,8 @@ describe('hydration — .tsx <Context.Provider> descriptor children', () => {
 	// (`ssrDeoptBlockChildren`) — so this round-trips byte-for-byte.
 	it('hydrates a de-opt host with a component-list child without mismatch', async () => {
 		const dserver = serverModule('packages/octane/tests/_fixtures/jsx-context-children.tsx');
-		const { body } = await ServerRT.render(dserver.ProviderApp, {});
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(dserver.ProviderApp, {});
+		container.innerHTML = html;
 		const before = container.innerHTML;
 		const root = hydrateRoot(container, ProviderApp as any, {});
 		flushSync(() => {});
