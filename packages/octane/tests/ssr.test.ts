@@ -195,3 +195,26 @@ describe('SSR — React 19 function form actions', () => {
 		expect(withStr).toContain(' formaction="/submit"');
 	});
 });
+
+describe('SSR — plain-.ts root returning a createElement descriptor', () => {
+	// A root authored in plain .ts (the shape every @octanejs binding produces)
+	// returns a descriptor, not an HTML string. render() must normalize it
+	// through ssrChild exactly like ssrComponent does for child components —
+	// previously the descriptor object itself became the body
+	// ('[object Object]').
+	it('renders a host-descriptor root', async () => {
+		const Root = () => RT.createElement('main', { class: 'app' }, RT.createElement('h1', null, 'hi'));
+		const { body } = await RT.render(Root as any);
+		expect(body).toContain('<main class="app"><h1>hi</h1></main>');
+		expect(body).not.toContain('[object Object]');
+	});
+
+	it('renders a component-descriptor root and null root', async () => {
+		const Inner = () => RT.createElement('span', null, 'x');
+		const Root = () => RT.createElement(Inner, null);
+		const { body } = await RT.render(Root as any);
+		expect(body).toContain('<span>x</span>');
+		const { body: empty } = await RT.render((() => null) as any);
+		expect(empty).not.toContain('[object Object]');
+	});
+});

@@ -41,8 +41,22 @@ export function normalizeClass(value: unknown): string {
  * Custom properties (`--myVar`) and already-hyphenated names (anything starting
  * with `-`) pass through verbatim — custom properties are case-sensitive and
  * must NOT be hyphenated. No regex (char-walk) to avoid backtracking concerns.
+ *
+ * Memoized: the key universe is bounded (CSS property names), and style-object
+ * diffing hits this per key per write — at animation frequency the camelCase
+ * char-walk + allocation would dominate. The cache returns the identical string.
  */
+const styleNameCache = new Map<string, string>();
+
 export function styleName(name: string): string {
+	const cached = styleNameCache.get(name);
+	if (cached !== undefined) return cached;
+	const result = hyphenateStyleName(name);
+	styleNameCache.set(name, result);
+	return result;
+}
+
+function hyphenateStyleName(name: string): string {
 	// `--custom-prop` and pre-hyphenated `-webkit-…` keys: leave untouched.
 	if (name.charCodeAt(0) === 45 /* - */) return name;
 	// Fast path: no uppercase → already kebab (the common case), no allocation.

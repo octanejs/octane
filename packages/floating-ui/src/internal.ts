@@ -8,8 +8,20 @@
 // @octanejs bindings.)
 
 // Derive a stable, distinct sub-slot from a wrapper's slot, namespaced per hook.
+// Memoized: subSlot runs on EVERY hook call every render, and the naive form
+// pays a string concat + global symbol-registry lookup each time. The cache is
+// keyed by the slot symbol itself; the minted value is byte-identical to the
+// uncached Symbol.for result, so identity is preserved across HMR re-evals and
+// the per-package copies of this helper. Key universe is bounded: slots are
+// per-call-site module constants (never minted per render).
+const subSlotCache = new Map<symbol, Map<string, symbol>>();
 export function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	return slot !== undefined ? Symbol.for((slot.description ?? '') + ':' + tag) : undefined;
+	if (slot === undefined) return undefined;
+	let byTag = subSlotCache.get(slot);
+	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
+	let sym = byTag.get(tag);
+	if (sym === undefined) byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':' + tag)));
+	return sym;
 }
 
 // Split the compiler-injected trailing slot off a hook's args. Needed because the
@@ -26,6 +38,9 @@ export function splitSlot(args: any[]): [any[], symbol | undefined] {
 // stable Symbol.for(tag) resolves to a distinct slot per instance. Pass S('tag')
 // as the slot to base hooks; sub-hooks derive their own sub-slots from its
 // description.
+const sCache = new Map<string, symbol>();
 export function S(tag: string): symbol {
-	return Symbol.for('@octanejs/floating-ui:' + tag);
+	let sym = sCache.get(tag);
+	if (sym === undefined) sCache.set(tag, (sym = Symbol.for('@octanejs/floating-ui:' + tag)));
+	return sym;
 }

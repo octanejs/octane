@@ -8,14 +8,16 @@
 //   pnpm --filter octane-tsrx-jsbench dev   # .tsrx variant on 5176
 //   pnpm --filter octane-jsx-jsbench dev    # .tsx (JSX) variant on 5177
 //   node benchmarks/js-framework/run.mjs [iterations]   # default 8
+//   BENCH_JSON=results/js-framework.json node run.mjs   # + machine-readable copy
 //
 // By default this drives BOTH octane authoring dialects and reports the
-// jsx/tsrx ratio. They are NOT expected to be equal: `.tsrx` `@for (...; key)`
-// compiles to octane's keyed FAST path (forBlock — targeted per-row updates),
-// while React-style `.tsx` `items.map(... key=)` compiles to the keyed DE-OPT
-// list path (reconcileKeyed — correct + keyed, but each row rebuilds its host
-// DOM per parent re-render). The ratio quantifies that gap on the re-render ops
-// (update / select / swap / remove). Run only one by passing a TARGETS env.
+// jsx/tsrx ratio. Both lower to the SAME compiled output: `.tsrx`
+// `@for (...; key)` and React-style `.tsx` `items.map(... key=)` each compile
+// to octane's keyed forBlock fast path (the compiler recognizes a keyed JSX
+// `.map` and compiles it like `@for`), so the ratio is expected to sit ~1.0.
+// It exists as a regression tripwire: a ratio drifting above 1 means a change
+// knocked the JSX dialect off the fast path. Run only one by passing a
+// TARGETS env.
 //
 // To compare against an inferno-next baseline (or any other target whose
 // bench app exposes the same DOM contract), keep its dev server running
@@ -24,6 +26,7 @@
 //             {"name":"inferno-next","url":"http://localhost:5175/","ready":"#run"}]' \
 //     node run.mjs
 
+import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
@@ -42,6 +45,9 @@ const TARGETS = process.env.TARGETS
 const OPS = [
 	{ name: 'run', pre: 'empty', click: '#run' },
 	{ name: 'replace', pre: 'rows', click: '#run' },
+	// Canonical krausest "append 1,000 rows to a table of 1,000 rows". The
+	// next op's ensureState sees 2000 rows ≠ 1000 and rebuilds via #run.
+	{ name: 'add', pre: 'rows', click: '#add' },
 	{ name: 'update', pre: 'rows', click: '#update' },
 	{ name: 'select', pre: 'rows', click: 'tbody tr:nth-child(5) td:nth-child(2) a' },
 	{ name: 'swap', pre: 'rows', click: '#swaprows' },
@@ -182,6 +188,26 @@ async function runTarget(t) {
 			}
 			console.log();
 		}
+	}
+
+	// Machine-readable results for the CI runner (see the BENCH_JSON contract
+	// in the benchmarks README): milliseconds, one ops map per target.
+	if (process.env.BENCH_JSON) {
+		const payload = {
+			suite: 'js-framework',
+			iterations: ITER,
+			targets: TARGETS.map((t) => ({
+				name: t.name,
+				ops: Object.fromEntries(
+					OPS.map((op) => {
+						const r = all[t.name][op.name];
+						return [op.name, { median: r.median, min: r.min, samples: r.samples.length }];
+					}),
+				),
+			})),
+		};
+		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');
+		console.error(`BENCH_JSON written to ${process.env.BENCH_JSON}`);
 	}
 })().catch((e) => {
 	console.error(e);

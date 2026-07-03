@@ -93,6 +93,37 @@ function buildData(count: number): Row[] {
 	return data;
 }
 
+// ── Deterministic shuffle machinery (identical in all four bench fixtures,
+// replayed by ../../run-reorder.mjs for its identity gate) ──────────────────
+// Every #shuffle click derives a fresh 32-bit seed from a module-level
+// mulberry32 stream with a FIXED seed, then runs Fisher–Yates with a PRNG
+// seeded by it. The seed stream advances exactly once per click — in the
+// click handler, before the flushSync — so identical clicks produce
+// identical permutations across all four targets.
+function mulberry32(seed: number) {
+	return () => {
+		seed |= 0;
+		seed = (seed + 0x6d2b79f5) | 0;
+		let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+}
+const SHUFFLE_SEED = 42;
+const shuffleSeeds = mulberry32(SHUFFLE_SEED);
+const nextShuffleSeed = () => (shuffleSeeds() * 4294967296) >>> 0;
+function shuffleWithSeed<T>(d: T[], seed: number): T[] {
+	const rand = mulberry32(seed);
+	const out = d.slice();
+	for (let i = out.length - 1; i > 0; i--) {
+		const j = (rand() * (i + 1)) | 0;
+		const tmp = out[i];
+		out[i] = out[j];
+		out[j] = tmp;
+	}
+	return out;
+}
+
 export default function App() @{
 	let &[items] = track<Row[]>([]);
 	let &[selected] = track<number | undefined>(undefined);
@@ -133,6 +164,60 @@ export default function App() @{
 		const clone = items.slice();
 		clone.splice(clone.indexOf(row), 1);
 		items = clone;
+	});
+
+	// Keyed-reorder matrix handlers (../../run-reorder.mjs). Every button below
+	// binds an IDENTIFIER-callee arrow (`onClick={() => reverseRows()}`) —
+	// matching the octane fixtures' handler shape. All ops assign a fresh array
+	// to `items` inside a flushSync (synchronous commit); nothing mutates in
+	// place.
+	const reverseRows = () => flushSync(() => {
+		items = items.toReversed();
+	});
+	const shuffleRows = () => {
+		// Seed derived HERE (once per click), before the flush — see the
+		// shuffle-machinery comment above.
+		const seed = nextShuffleSeed();
+		flushSync(() => {
+			items = shuffleWithSeed(items, seed);
+		});
+	};
+	const rotateForward = () => flushSync(() => {
+		if (items.length > 0) {
+			items = [items[items.length - 1], ...items.slice(0, -1)];
+		}
+	});
+	const rotateBackward = () => flushSync(() => {
+		if (items.length > 0) {
+			items = [...items.slice(1), items[0]];
+		}
+	});
+	const prepend100 = () => flushSync(() => {
+		// NOTE: ripple renders this op INTERLEAVED ([new0, old0, new1, old1, …])
+		// even though the data array is unambiguously [100 new, then 1000 old].
+		// Verified independent of construction (concat / spread / explicit push
+		// loop all give identical correct data yet identical interleaved DOM), so
+		// this is a genuine ripple keyed-@for reconciler bug for prepend-many-at-
+		// head — NOT octane and NOT a fixture defect. Left as the faithful op; the
+		// run-reorder identity gate correctly flags ripple/prepend100.
+		items = [...buildData(100), ...items];
+	});
+	const append100 = () => flushSync(() => {
+		items = items.concat(buildData(100));
+	});
+	const insertMid100 = () => flushSync(() => {
+		const mid = items.length >> 1;
+		items = items.slice(0, mid).concat(buildData(100), items.slice(mid));
+	});
+	const removeFirst = () => flushSync(() => {
+		items = items.slice(1);
+	});
+	const removeEvery10 = () => flushSync(() => {
+		items = items.filter((_, i) => i % 10 !== 0);
+	});
+	// displace_k: move the FIRST k rows (as a group, order preserved) to the END.
+	const displace = (k: number) => flushSync(() => {
+		items = items.slice(k).concat(items.slice(0, k));
 	});
 
 	<div class="container">
@@ -190,6 +275,120 @@ export default function App() @{
 								id="swaprows"
 								onClick={swap}
 							>{'Swap Rows'}</button>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="reverse"
+								onClick={() => reverseRows()}
+							>{'Reverse rows'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="shuffle"
+								onClick={() => shuffleRows()}
+							>{'Shuffle rows (seeded)'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="rotatef"
+								onClick={() => rotateForward()}
+							>{'Rotate last to front'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="rotateb"
+								onClick={() => rotateBackward()}
+							>{'Rotate first to end'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="prepend100"
+								onClick={() => prepend100()}
+							>{'Prepend 100 rows'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="append100"
+								onClick={() => append100()}
+							>{'Append 100 rows'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="insertmid100"
+								onClick={() => insertMid100()}
+							>{'Insert 100 rows at middle'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="removefirst"
+								onClick={() => removeFirst()}
+							>{'Remove first row'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="removeevery10"
+								onClick={() => removeEvery10()}
+							>{'Remove every 10th row'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="displace3"
+								onClick={() => displace(3)}
+							>{'Displace first 3 to end'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="displace4"
+								onClick={() => displace(4)}
+							>{'Displace first 4 to end'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="displace5"
+								onClick={() => displace(5)}
+							>{'Displace first 5 to end'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="displace6"
+								onClick={() => displace(6)}
+							>{'Displace first 6 to end'}</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="displace8"
+								onClick={() => displace(8)}
+							>{'Displace first 8 to end'}</button>
 						</div>
 					</div>
 				</div>

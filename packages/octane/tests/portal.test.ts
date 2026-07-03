@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
-import { App } from './_fixtures/portal.tsrx';
+import { App, InlineModal } from './_fixtures/portal.tsrx';
 
 describe('portal', () => {
 	it('renders content into a foreign DOM target, with context flowing through', () => {
@@ -35,6 +35,26 @@ describe('portal', () => {
 		expect(portalTarget.querySelector('.modal')).not.toBe(null);
 
 		r.unmount();
+		portalTarget.remove();
+	});
+});
+
+describe('portal — inline element body (React authoring shape)', () => {
+	it('compiles and renders an inline host-element body into the target, updating reactively', () => {
+		const portalTarget = document.createElement('section');
+		document.body.appendChild(portalTarget);
+
+		const r = mount(InlineModal, { target: portalTarget });
+		expect(r.findAll('.inline-modal')).toHaveLength(0);
+		const modal = portalTarget.querySelector('.inline-modal');
+		expect(modal).not.toBe(null);
+		expect(modal!.textContent).toBe('count:0');
+
+		r.click('#bump');
+		expect(portalTarget.querySelector('.inline-modal')!.textContent).toBe('count:1');
+
+		r.unmount();
+		expect(portalTarget.querySelector('.inline-modal')).toBe(null);
 		portalTarget.remove();
 	});
 });

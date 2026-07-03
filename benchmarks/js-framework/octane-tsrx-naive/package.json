@@ -1,0 +1,19 @@
+{
+  "name": "octane-tsrx-naive-jsbench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "js-framework-benchmark fixture for octane authored in NAIVE .tsrx (cross-module Row component, {...spread} on the row, member-callee handlers, inline style objects) - the de-opt authoring-cliff twin of octane-tsrx-jsbench; same DOM/button contract.",
+  "scripts": {
+    "dev": "vite --host --port 5213 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5213 --strictPort"
+  },
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default",
+    "terser": "catalog:default"
+  }
+}

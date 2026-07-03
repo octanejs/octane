@@ -5,13 +5,20 @@
 import { motionValue } from 'motion';
 import { useState } from 'octane';
 
+// Memoized tagless sub-slot (single entry per caller slot) — same interned
+// Symbol.for value, minus the per-render concat + registry lookup.
+const mvSlotCache = new Map<symbol, symbol>();
+function mvSlot(slot: symbol | undefined): symbol | undefined {
+	if (slot === undefined) return undefined;
+	let sym = mvSlotCache.get(slot);
+	if (sym === undefined) mvSlotCache.set(slot, (sym = Symbol.for((slot.description ?? '') + ':mv')));
+	return sym;
+}
+
 export function useMotionValue<T>(initial: T, ...args: any[]): any {
 	const tail = args[args.length - 1];
 	const slot = typeof tail === 'symbol' ? (tail as symbol) : undefined;
-	const [mv] = useState(
-		() => motionValue(initial),
-		slot !== undefined ? Symbol.for((slot.description ?? '') + ':mv') : undefined,
-	);
+	const [mv] = useState(() => motionValue(initial), mvSlot(slot));
 	return mv;
 }
 

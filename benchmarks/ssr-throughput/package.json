@@ -1,0 +1,18 @@
+{
+  "name": "octane-ssr-throughput-benchmarks",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Node-only SSR throughput bench - ops/sec + latency percentiles + memory growth for octane render() vs react-dom/server vs @solidjs/web on the news page, plus octane-only waterfall / deopt-page / escape-heavy fixtures.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:smoke": "node run.mjs 2"
+  },
+  "dependencies": {
+    "vite": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "solid-js": "catalog:default",
+    "@solidjs/web": "catalog:default"
+  }
+}
