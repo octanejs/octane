@@ -5,7 +5,7 @@
 // async render() resolves the route's useSuspenseQuery into a per-request
 // QueryClient (it awaits suspended queries, bounded by the suspense timeout).
 // dehydrate(qc) serializes that cache so the client can seed it (no refetch).
-import { render as renderToString } from 'octane/server';
+import { renderToString } from 'octane/server';
 import { QueryClient, dehydrate } from '@octanejs/query';
 import { loadServerRouter } from '../shared/routes.js';
 import { makeRouter } from './routes.js';

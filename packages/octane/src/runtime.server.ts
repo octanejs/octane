@@ -831,6 +831,24 @@ export interface RenderResult {
 	css: string;
 }
 
+export interface RenderOptions {
+	/**
+	 * Abort the render when the request dies: rejects the pending suspense wait
+	 * with `signal.reason`. Checked before each pass and raced against the await.
+	 */
+	signal?: AbortSignal;
+	/**
+	 * CSP nonce stamped on every inline tag the renderer emits: the deduped
+	 * `<style data-octane>` tags and the suspense seed `<script>`.
+	 */
+	nonce?: string;
+	/**
+	 * Per-render override of the global suspense settle deadline
+	 * (setSsrSuspenseTimeout). 0 disables the deadline for this render.
+	 */
+	timeoutMs?: number;
+}
+
 /** Guard against a `use(thenable)` that never resolves wedging the render loop. */
 const MAX_SUSPENSE_PASSES = 50;
 
@@ -855,7 +873,7 @@ export function getSsrSuspenseTimeout(): number {
  * `\u003c` so the JSON payload can't terminate the `<script>` element or open
  * an HTML comment. Only emitted when at least one value was resolved.
  */
-function serializeSuspenseSeeds(values: unknown[]): string {
+function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
 	// Encode `undefined` (which JSON drops/nulls) as a sentinel so a
 	// `use(thenable)` that resolved to `undefined` round-trips to `undefined` on
 	// the client — not `null`. The replacer fires for array elements AND nested
@@ -863,30 +881,42 @@ function serializeSuspenseSeeds(values: unknown[]): string {
 	const json = JSON.stringify(values, (_key, value) =>
 		value === undefined ? { [UNDEFINED_SENTINEL_KEY]: true } : value,
 	).replace(/</g, '\\u003c');
-	return '<script type="application/json" ' + SUSPENSE_SCRIPT_ATTR + '>' + json + '</script>';
+	return (
+		'<script type="application/json" ' + SUSPENSE_SCRIPT_ATTR + nonceAttr + '>' + json + '</script>'
+	);
 }
 
 /**
  * Render a server-compiled component (a function returning an HTML string) to
  * `{ head, body, css }`. `head` is the hoisted document-head markup
  * (`<title>`/`<meta>`/`<link>`/… collected by `ssrHeadEl` during the render),
- * which the metaframework injects at its `<!--ssr-head-->` placeholder; `css` is
- * the scoped stylesheets of the components that actually rendered, emitted as
- * ready-to-place `<style data-octane="hash">…</style>` tags (one per hash,
- * deduped). The client's `injectStyle` matches that `data-octane` hash and
- * skips re-injecting on hydration — so the styles cross the boundary once.
+ * each element prefixed with a `<!--key-->` marker the client's headBlock
+ * adopts on hydration; the metaframework injects it at its `<!--ssr-head-->`
+ * placeholder. `css` is the scoped stylesheets of the components that actually
+ * rendered, emitted as ready-to-place `<style data-octane="hash">…</style>`
+ * tags (one per hash, deduped). The client's `injectStyle` matches that
+ * `data-octane` hash and skips re-injecting on hydration — so the styles cross
+ * the boundary once.
  *
- * Async because of Suspense (Phase 4): a `use(thenable)` that hasn't resolved
- * suspends the pass; render() awaits it and re-renders, so the @try ends up
- * showing its resolved success arm (or @catch on rejection). Each resolved value
- * is appended to `body` as an inline data `<script>` for the client to seed.
+ * Async because of Suspense: a `use(thenable)` that hasn't resolved suspends
+ * the pass; renderToString awaits it and re-renders, so the @try ends up
+ * showing its resolved success arm (or @catch on rejection). Each resolved
+ * value is appended to `body` as an inline data `<script>` for the client to
+ * seed.
  */
-export async function render(component: ServerComponent, props?: any): Promise<RenderResult> {
+export async function renderToString(
+	component: ServerComponent,
+	props?: any,
+	options?: RenderOptions,
+): Promise<RenderResult> {
+	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
+	const nonceAttr = options?.nonce ? ' nonce="' + escapeAttr(options.nonce) + '"' : '';
 	// The suspense cache persists across this render's passes; it is render-local
 	// (never a module global) so concurrent renders can't share it.
 	const resolved = new Map<string, { value: unknown } | { reason: unknown }>();
 	let attempt = 0;
 	for (;;) {
+		options?.signal?.throwIfAborted();
 		// Run ONE synchronous pass entirely within this tick: save the ambient
 		// module globals, install this pass's fresh state, run the (synchronous)
 		// component, capture the results into locals, then restore the globals —
@@ -932,9 +962,9 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 		if (suspended.length === 0) {
 			let css = '';
 			for (const [hash, sheet] of cssMap) {
-				css += '<style data-octane="' + hash + '">' + sheet + '</style>';
+				css += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
 			}
-			if (serial.length > 0) body += serializeSuspenseSeeds(serial);
+			if (serial.length > 0) body += serializeSuspenseSeeds(serial, nonceAttr);
 			return { head: headBuf.html, body, css };
 		}
 		if (++attempt > MAX_SUSPENSE_PASSES) {
@@ -946,8 +976,9 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 		}
 		// Await everything this pass surfaced; cache each outcome by its key. Only
 		// render-local state (`suspended`, `resolved`) is touched across the await.
-		// Raced against SUSPENSE_TIMEOUT_MS so a thenable that never settles fails
-		// the render (with a clear error) instead of hanging the request forever.
+		// Raced against the settle deadline so a thenable that never settles fails
+		// the render (with a clear error) instead of hanging the request forever,
+		// and against the caller's AbortSignal so a dead request stops rendering.
 		const settleAll = Promise.all(
 			suspended.map(async ({ promise, key }) => {
 				if (resolved.has(key)) return;
@@ -958,29 +989,43 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 				}
 			}),
 		);
-		if (SUSPENSE_TIMEOUT_MS > 0) {
-			let timer: ReturnType<typeof setTimeout> | undefined;
-			const deadline = new Promise<never>((_, reject) => {
-				timer = setTimeout(
-					() =>
-						reject(
-							new Error(
-								'octane SSR: a use(thenable) did not settle within ' + SUSPENSE_TIMEOUT_MS + 'ms.',
+		const racers: Promise<unknown>[] = [settleAll];
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let removeAbort: (() => void) | undefined;
+		if (timeoutMs > 0) {
+			racers.push(
+				new Promise<never>((_, reject) => {
+					timer = setTimeout(
+						() =>
+							reject(
+								new Error('octane SSR: a use(thenable) did not settle within ' + timeoutMs + 'ms.'),
 							),
-						),
-					SUSPENSE_TIMEOUT_MS,
-				);
-				// Don't let the deadline timer hold the event loop open if the render
-				// settles first (Node-only; harmless where unref is absent).
-				(timer as any)?.unref?.();
-			});
-			try {
-				await Promise.race([settleAll, deadline]);
-			} finally {
-				clearTimeout(timer);
-			}
-		} else {
-			await settleAll;
+						timeoutMs,
+					);
+					// Don't let the deadline timer hold the event loop open if the render
+					// settles first (Node-only; harmless where unref is absent).
+					(timer as any)?.unref?.();
+				}),
+			);
+		}
+		if (options?.signal) {
+			const signal = options.signal;
+			racers.push(
+				new Promise<never>((_, reject) => {
+					const onAbort = () => reject(signal.reason);
+					signal.addEventListener('abort', onAbort, { once: true });
+					removeAbort = () => signal.removeEventListener('abort', onAbort);
+				}),
+			);
+		}
+		try {
+			await Promise.race(racers);
+		} finally {
+			clearTimeout(timer);
+			removeAbort?.();
 		}
 	}
 }
+
+/** @deprecated Use renderToString — same function, clearer name. */
+export const render = renderToString;

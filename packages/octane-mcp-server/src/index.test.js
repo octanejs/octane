@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { areaForPath, scaffoldReactPort, validationFor } from './index.js';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+	areaForPath,
+	BUNDLED_SKILLS,
+	isOctaneRepo,
+	scaffoldReactPort,
+	validationFor,
+} from './index.js';
+
+const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('@octanejs/mcp-server helpers', () => {
 	it('classifies Octane repository paths', () => {
@@ -10,6 +20,8 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(areaForPath('packages/octane/src/runtime.ts')).toBe('core-runtime');
 		expect(areaForPath('packages/octane/src/runtime.server.ts')).toBe('ssr');
 		expect(areaForPath('packages/zustand/src/index.ts')).toBe('ecosystem-binding');
+		expect(areaForPath('packages/radix/src/index.ts')).toBe('ecosystem-binding');
+		expect(areaForPath('packages/octane-mcp-server/src/index.js')).toBe('mcp-server');
 		expect(areaForPath('benchmarks/news/run.mjs')).toBe('benchmark');
 		expect(areaForPath('.rulesync/rules/project.md')).toBe('rulesync-source');
 	});
@@ -19,6 +31,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			[
 				'packages/octane/src/runtime.ts',
 				'packages/zustand/src/index.ts',
+				'packages/radix/src/index.ts',
 				'.rulesync/rules/project.md',
 			],
 			'core',
@@ -31,8 +44,25 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(commands).toContain(
 			'./node_modules/.bin/vitest run packages/zustand/tests --project zustand',
 		);
+		expect(commands).toContain(
+			'./node_modules/.bin/vitest run packages/radix/tests --project radix',
+		);
 		expect(commands).toContain('pnpm typecheck');
 		expect(commands).toContain('pnpm format:check');
+	});
+
+	it('detects the octane monorepo for repo-mode tools', async () => {
+		expect(isOctaneRepo(resolve(PACKAGE_ROOT, '../..'))).toBe(true);
+		const elsewhere = await mkdtemp(join(tmpdir(), 'octane-mcp-test-'));
+		expect(isOctaneRepo(elsewhere)).toBe(false);
+	});
+
+	it('ships every bundled skill inside the package', async () => {
+		for (const file of Object.values(BUNDLED_SKILLS)) {
+			expect(existsSync(resolve(PACKAGE_ROOT, file))).toBe(true);
+			const body = await readFile(resolve(PACKAGE_ROOT, file), 'utf8');
+			expect(body).toMatch(/^# Skill:/);
+		}
 	});
 
 	it('runs the React port scaffolder wrapper', async () => {

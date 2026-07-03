@@ -93,14 +93,17 @@ root.render(App, { title: 'Hello world!' });
 
 ```ts
 // entry-server.ts
-import { render } from 'octane/server';
+import { renderToString } from 'octane/server';
 import { App } from './App.tsrx';
 
 export async function renderApp() {
-  const { head, body, css } = await render(App);
+  const { head, body, css } = await renderToString(App);
   return { head, body, css };
 }
 ```
+
+See [docs/ssr.md](./docs/ssr.md) for the full server API (Suspense on the
+server, head hoisting, CSP nonce, AbortSignal) and the current SSR roadmap.
 
 ```ts
 // entry-client.ts
@@ -248,8 +251,8 @@ and client render compose byte-identically, so hydration never mismatches).
 
 ## Packages
 
-This is a pnpm monorepo with nine publishable packages — the core runtime+compiler, the
-metaframework plugin, and seven framework bindings:
+This is a pnpm monorepo with ten publishable packages — the core runtime+compiler, the
+metaframework plugin, and eight framework bindings:
 
 - [`octane`](./packages/octane) is the runtime and the compiler together. It covers
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
@@ -260,8 +263,8 @@ metaframework plugin, and seven framework bindings:
 - The `@octanejs/*` framework bindings — each a faithful octane port of a React library:
   [`zustand`](./packages/zustand), [`query`](./packages/query),
   [`motion`](./packages/motion), [`stylex`](./packages/stylex),
-  [`router`](./packages/router), [`lexical`](./packages/lexical), and
-  [`floating-ui`](./packages/floating-ui).
+  [`router`](./packages/router), [`lexical`](./packages/lexical),
+  [`floating-ui`](./packages/floating-ui), and [`radix`](./packages/radix).
 
 ## Development
 

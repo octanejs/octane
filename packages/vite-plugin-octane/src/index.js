@@ -456,9 +456,13 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 				if (!server || !server[funcName]) return null;
 				return server[funcName];
 			},
+			// The RPC body is a JSON array of call arguments; the response envelope
+			// is `{ value }` so the client can distinguish a result from an error
+			// payload. Kept local — `octane/server` does not ship RPC helpers.
 			async executeServerFunction(fn, body) {
-				const { executeServerFunction } = await vite.ssrLoadModule('octane/server');
-				return executeServerFunction(fn, body);
+				const args = body ? JSON.parse(body) : [];
+				const value = await fn.apply(null, args);
+				return JSON.stringify({ value });
 			},
 			asyncContext,
 			trustProxy,

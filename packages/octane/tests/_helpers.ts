@@ -34,7 +34,15 @@ export function mount<P = undefined>(body: ComponentBody<P>, props?: P): MountRe
 	document.body.appendChild(container);
 	const root = createRoot(container);
 	root.render(body, props);
-	flushSync(() => {});
+	try {
+		flushSync(() => {});
+	} catch (err) {
+		// A throwing initial render can't be unmounted by the caller (mount never
+		// returns) — detach the container so leaked ids don't confuse later
+		// #id-selector queries in the same document.
+		container.remove();
+		throw err;
+	}
 	return {
 		container,
 		root,

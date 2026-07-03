@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/mcp-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "MCP server exposing Octane repository automation for coding agents.",
   "license": "MIT",
@@ -18,6 +18,7 @@
   },
   "files": [
     "src",
+    "skills",
     "README.md"
   ],
   "bin": {
