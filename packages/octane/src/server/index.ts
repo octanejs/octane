@@ -7,12 +7,18 @@
  * suspended), and the deduped scoped-style tags. Options cover an AbortSignal,
  * a CSP nonce for the inline tags, and a per-render suspense deadline.
  *
+ * `executeServerFunction` is the metaframework's RPC executor for `module
+ * server` functions — the vite plugin loads it via
+ * `ssrLoadModule('octane/server')` so it runs inside the SSR module graph.
+ *
  * Everything below the "compiler-emitted" divider is NOT for hand-written
  * code: the `octane/compiler` in `mode: 'server'` emits component modules that
  * import those string-building helpers from here. Treat them as the compiler's
  * private ABI — present because compiled output needs them, not because apps
  * should call them.
  */
+
+export { executeServerFunction } from './rpc.js';
 
 export {
 	// Entry

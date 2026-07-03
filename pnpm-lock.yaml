@@ -831,6 +831,9 @@ importers:
       '@tsrx/core':
         specifier: catalog:default
         version: 0.1.33
+      devalue:
+        specifier: catalog:default
+        version: 5.8.1
       esrap:
         specifier: ^2.2.9
         version: 2.2.11
@@ -990,9 +993,6 @@ importers:
       '@ripple-ts/adapter':
         specifier: catalog:default
         version: 0.3.86
-      devalue:
-        specifier: catalog:default
-        version: 5.8.1
       octane:
         specifier: workspace:*
         version: link:../octane
