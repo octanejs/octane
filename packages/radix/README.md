@@ -39,7 +39,7 @@ children-position `<Trigger asChild><button/></Trigger>`.
 
 ## Status
 
-**Phases 0–3 + the Phase-4 form batch.** Landed:
+**Complete against the unified `radix-ui@1.6.1` component surface.** Landed:
 
 - Composition foundation — `Slot`, `Slottable`, `Primitive.<tag>` (`asChild`), `mergeProps`
   (event chaining, `style` merge, clsx-style `class` composition), `composeRefs` /
@@ -75,6 +75,13 @@ children-position `<Trigger asChild><button/></Trigger>`.
   input" inside forms, so FormData, form reset, and `<form onChange>` reflect
   state natively (see the per-file headers for the documented octane
   adaptations around the uncontrolled-input model).
+- **The final six** — **`Menubar`** (menu family over the shared Menu primitive),
+  **`Select`** (item-aligned + popper positioning, typeahead, hidden native bubble
+  `<select>`), **`NavigationMenu`** (viewport/indicator machinery, motion attributes,
+  delayed open/close), **`Toast`** (viewport hotkey, pausable timers, swipe machinery,
+  announce regions), **`OneTimePasswordField`** (per-char cells, paste distribution,
+  roving focus), and **`PasswordToggleField`** — plus `AccessibleIcon`,
+  `useEffectEvent`, and `useIsHydrated`.
 - Overlay infra — `Portal`, `DismissableLayer`, `FocusScope`, `useFocusGuards`,
   `useScrollLock` (a focused `react-remove-scroll` replacement — see `scroll-lock.ts`),
   with the framework-agnostic `aria-hidden` package reused as-is.
@@ -86,7 +93,8 @@ step; portal'd overlays (which the rig can't see) carry dedicated focus/keyboard
 unit suites. Ports come from the pinned radix-ui/primitives source checkout
 (`.radix-primitives/`); every file header cites its source path.
 
-Deferred (documented in
-[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): `Menubar`;
-`OneTimePasswordField` / `PasswordToggleField` (the most input-heavy primitives —
-a focused follow-up); then `Select` / `NavigationMenu`, and `Toast` in Phase 5.
+Remaining (documented in
+[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): SSR/hydration
+coverage for the overlay/portal components and Phase-5 polish. The port surfaced —
+and fixed, in octane itself — fourteen runtime/compiler parity bugs along the way;
+each is pinned by an octane regression test and a changeset.

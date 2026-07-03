@@ -212,12 +212,45 @@
 > differential). The patch path now threads the real previous style
 > (deopt-style-patch.test.ts).
 >
-> **Still deferred:** `Menubar` (the least-clean menu consumer — shared roving focus
-> across triggers + open-on-hover-when-any-open interplay); `OneTimePasswordField` (974
-> lines) + `PasswordToggleField` (505) — the most input-heavy primitives (selection
-> management, paste, per-char focus juggling; need `use-effect-event`/`use-is-hydrated`
-> helper ports) — deserving a focused pass; `Select`/`NavigationMenu` last per plan;
-> `Toast` in Phase 5.
+> **The final six + helpers (2026-07-03, parallel agent workflow):** `Menubar`,
+> `Select` (the 1972-line giant: item-aligned + popper positioning, typeahead, hidden
+> native bubble `<select>`), `NavigationMenu` (viewport/indicator machinery, motion
+> attrs), `Toast` (viewport hotkey, timers with pause/resume, swipe machinery,
+> announce regions), `OneTimePasswordField` (per-char cells, paste distribution,
+> roving focus, hidden form input), `PasswordToggleField`, plus `AccessibleIcon`,
+> `use-effect-event.ts` (insertion-effect sync), `use-is-hydrated.ts`
+> (useSyncExternalStore). Each port ran port → adversarial fidelity review → fix as a
+> 3-stage agent pipeline (15 agents); all unit suites green (Menubar 7, Select 9,
+> NavigationMenu 10, Toast 8, OTP 8, PasswordToggle 6, AccessibleIcon 1).
+>
+> **FOUR more octane bugs (#11–#14), found via the ports, fixed with regression tests:**
+> (11) `scroll`/`scrollend` never delegated (non-bubbling; now capture + target-only,
+> React 17+ per-element semantics — Select's expand-on-scroll now uses the plain
+> `onScroll` prop). (12) The de-opt reconciler destroyed foreign `createPortal` ranges
+> inside octane-managed elements on the owner's re-render (Toast's viewport lost every
+> toast; portal ranges are now tagged + skipped by reuse/removal/reorder — Toast's
+> documented workaround removed). (13) An unkeyed `{cond ? <Comp/> : null}` de-opt item
+> leaked the toggled-off component's DOM + effects forever (deoptItemBody's pure/Blocks
+> paths now tear down each other's residue). (14) `memo()` was ignored at VALUE
+> positions (childSlot lacked the bail componentSlot had) and the context-refresh walk
+> missed array-children boundaries — fixed via a shared `tryMemoBail` + a childSlot
+> forSlot arm; React's `['App','Consumer']` lazy propagation now holds in binding trees
+> (memo-value-position.test.ts).
+>
+> **NavigationMenu convergence, resolved honestly:** the source relies on React's
+> IMPLICIT same-element bailout to stop its unconditional register-effect cascade. The
+> port expresses that explicitly (a `memo()` pass-through at the provider boundary —
+> functional after fix #14) plus two documented residual adaptations (inlined
+> ViewportContentMounter; a shallow-equal registration bail) where octane's subtree
+> re-rendering + Presence interplay still oscillates. The implicit-bailout gap is now
+> tracked in docs/react-parity-migration-plan.md Tier 2 with a concrete implementation
+> path. `useResizeObserver` sites use `useEffectEvent` (insertion-effect sync) since
+> octane's post-paint passives can expose one-render-stale `useCallbackRef` closures
+> to layout effects.
+>
+> **Port coverage is now COMPLETE against the unified `radix-ui@1.6.1` surface** (every
+> shipped component; `announce` is legacy/unshipped). Remaining: differential fixtures
+> for the new inline-rendering components, SSR/hydration coverage, Phase-5 polish.
 
 ## 1. Recommendation
 

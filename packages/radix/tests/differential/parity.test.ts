@@ -254,6 +254,22 @@ describe('differential: @octanejs/radix vs real Radix on React', () => {
 		d.unmount();
 	});
 
+	it('Menubar (closed): triggers + roving tabindex, byte-identical', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenubarClosed', undefined, CACHE);
+		await d.step('mount', async () => {
+			await settleRaf();
+		});
+		d.unmount();
+	});
+
+	it('NavigationMenu (closed): nav/list/trigger aria wiring, byte-identical', async () => {
+		const d = await mountDifferential(FIXTURE, 'NavMenuClosed', undefined, CACHE);
+		await d.step('mount', async () => {
+			await settleRaf();
+		});
+		d.unmount();
+	});
+
 	it('Accordion (multiple): items open independently, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'AccordionMultiple', undefined, CACHE);
 		await d.step('mount (a open)', () => {});

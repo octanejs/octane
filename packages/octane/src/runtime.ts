@@ -3753,6 +3753,11 @@ const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
 	'pointerleave',
 	'mouseenter',
 	'mouseleave',
+	// Element `scroll`/`scrollend` don't bubble either. React 17+ made onScroll
+	// NON-bubbling (it fires only on the scrolled element), so they get the
+	// enter/leave target-only treatment below.
+	'scroll',
+	'scrollend',
 ]);
 const delegatedCapture = (name: string): boolean => CAPTURE_DELEGATED.has(name);
 
@@ -3767,6 +3772,10 @@ const TARGET_ONLY_DELEGATED = /* @__PURE__ */ new Set([
 	'pointerleave',
 	'mouseenter',
 	'mouseleave',
+	// React 17+ parity: onScroll fires on the scrolled element only (no synthetic
+	// bubbling), and ancestors receive their own scroll events natively.
+	'scroll',
+	'scrollend',
 ]);
 
 export function delegateEvents(eventNames: string[]): void {
@@ -4244,6 +4253,11 @@ function renderPortalState(
 		if (state !== null) teardownPortalState(state);
 		const start = document.createComment('portal');
 		const end = document.createComment('/portal');
+		// Mark the range so the raw de-opt reconciler treats it as FOREIGN content:
+		// a portal may target an octane-managed element, and its nodes must survive
+		// the target owner's re-renders (React parity — portals coexist with the
+		// container's own children). See reconcileDeoptChildren.
+		(start as any).$$portalEnd = end;
 		target.appendChild(start);
 		target.appendChild(end);
 		// The portal owns its start/end markers (default exclusiveMarkers=false), so
@@ -4707,29 +4721,8 @@ export function componentSlot(
 		}
 	} else if (state.block) {
 		// `memo(Component)` — skip the body when new props shallow-equal the
-		// committed props. Matches React.memo's contract; the wrapped fn carries
-		// the `__memo: true` marker the wrapper installs.
-		if ((comp as any).__memo === true) {
-			const compare = (comp as any).__compare as ((prev: any, next: any) => boolean) | undefined;
-			// React.memo's optional comparator: returns true when props are equal
-			// (→ skip the render). Falls back to a shallow Object.is comparison.
-			const equal = compare
-				? compare(state.block.props, props)
-				: shallowEqualProps(state.block.props, props);
-			if (equal) {
-				// Props are equal → bail the body, UNLESS this component itself
-				// directly reads a changed context (then it must re-run — fall
-				// through). If only a DESCENDANT consumes a changed context, refresh
-				// just those consumers without re-running this body: React's lazy
-				// propagation, so a bailed-out pure indirection is not re-rendered.
-				if (!ctxDirectChanged(state.block)) {
-					if (ctxDepsChanged(state.block)) refreshContextConsumers(state.block);
-					// Keep the committed props identity — diffing against them next
-					// time is what makes the memo terminate.
-					return;
-				}
-			}
-		}
+		// committed props (React.memo's contract; see tryMemoBail).
+		if (tryMemoBail(state.block, comp, props)) return;
 		state.block.props = props;
 		renderBlock(state.block);
 	}
@@ -5338,12 +5331,35 @@ function reconcileDeoptChildren(
 		}
 		return;
 	}
+	// Collect the children we OWN, skipping foreign `<!--portal-->…<!--/portal-->`
+	// ranges: a portal rendered elsewhere may target this element, and its nodes are
+	// not ours to reuse, remove, or reorder (React parity — portal content coexists
+	// with the container's rendered children). Range starts carry $$portalEnd.
+	let owned: Node[] | null = null;
+	let hasForeign = false;
+	{
+		let scan: Node | null = el.firstChild;
+		const acc: Node[] = [];
+		while (scan !== null) {
+			const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
+			if (rangeEnd != null) {
+				hasForeign = true;
+				let m: Node | null = scan;
+				while (m !== null && m !== rangeEnd) m = m.nextSibling;
+				scan = (m ?? scan).nextSibling;
+				continue;
+			}
+			acc.push(scan);
+			scan = scan.nextSibling;
+		}
+		owned = acc;
+	}
 	// Partition current children: keyed (by stamped descriptor key) vs the rest
 	// (unkeyed elements + text/adopted nodes), which are reused in document order.
 	let byKey: Map<any, Node> | null = null;
 	const unkeyed: Node[] = [];
-	for (let i = 0; i < existing.length; i++) {
-		const n = existing[i];
+	for (let i = 0; i < owned.length; i++) {
+		const n = owned[i];
 		const k = getDeoptDesc(n)?.key;
 		if (k != null) {
 			if (byKey === null) byKey = new Map();
@@ -5370,20 +5386,44 @@ function reconcileDeoptChildren(
 		const node = reconcileDeoptNode(prev, child, ownerBlock, childNs);
 		if (node !== null) result.push(node);
 	}
-	// Remove existing children not reused.
+	// Remove OWNED children not reused (foreign portal ranges stay untouched).
 	const keep = result.length > 0 ? new Set<Node>(result) : null;
-	for (let i = existing.length - 1; i >= 0; i--) {
-		const n = existing[i];
+	for (let i = owned.length - 1; i >= 0; i--) {
+		const n = owned[i];
 		if (keep === null || !keep.has(n)) {
 			detachDeoptRef(n);
 			el.removeChild(n);
 		}
 	}
-	// Order survivors/new nodes to match the descriptor.
+	// Order survivors/new nodes to match the descriptor. With foreign ranges present,
+	// index against the i-th OWNED live child (a foreign range floats in place,
+	// like a React portal whose container children reorder around it).
 	for (let i = 0; i < result.length; i++) {
 		const want = result[i];
-		if (existing[i] !== want) el.insertBefore(want, existing[i] ?? null);
+		const at = hasForeign ? liveOwnedChildAt(el, i) : (existing[i] ?? null);
+		if (at !== want) el.insertBefore(want, at);
 	}
+}
+
+// The i-th child of `el` that the de-opt reconciler OWNS, skipping foreign
+// `<!--portal-->…<!--/portal-->` ranges (see reconcileDeoptChildren). Live walk —
+// called per reorder step, only when a foreign range exists.
+function liveOwnedChildAt(el: Element, index: number): Node | null {
+	let i = 0;
+	let scan: Node | null = el.firstChild;
+	while (scan !== null) {
+		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
+		if (rangeEnd != null) {
+			let m: Node | null = scan;
+			while (m !== null && m !== rangeEnd) m = m.nextSibling;
+			scan = (m ?? scan).nextSibling;
+			continue;
+		}
+		if (i === index) return scan;
+		i++;
+		scan = scan.nextSibling;
+	}
+	return null;
 }
 
 // `reconcileKeyed` item body for one de-opt array element. Each item rebuilds its
@@ -5398,12 +5438,28 @@ function deoptItemBody(item: any, scope: Scope): void {
 	// nested childSlot on this item's own scope: it owns a marker pair inside the
 	// item's range and mounts the subtree as proper, reconciled child Blocks (the
 	// host-with-components case lands on childSlot's reconciling host path). Pure
-	// host/primitive items stay on the cheap rebuild path below. The two paths don't
-	// mix in one item — keyed reconciliation gives each array element its own stable
-	// item scope, so `_item` either always holds Blocks or never does.
+	// host/primitive items stay on the cheap rebuild path below. The two paths CAN
+	// mix in one item — an UNKEYED `{cond ? <Comp/> : null}` sits at a stable index
+	// key and flips between a component descriptor (Blocks) and null/text/pure-host
+	// (raw) — so each branch tears down the other's residue on a switch (previously
+	// the pure path left a toggled-off component's Blocks + DOM in the range forever).
 	if (descNeedsBlocks(item)) {
+		// Switching pure → Blocks: drop the raw node the pure path left in the range.
+		const stale = block.deoptNode;
+		if (stale != null) {
+			if (stale.parentNode === block.parentNode) {
+				detachDeoptRef(stale);
+				block.parentNode.removeChild(stale);
+			}
+			block.deoptNode = null;
+		}
 		childSlot(scope, 0, block.parentNode, item, block.endMarker);
 		return;
+	}
+	// Switching Blocks → pure: unmount the childSlot content the Blocks path mounted
+	// (effect cleanups + DOM) by reconciling it to null. Idempotent once cleared.
+	if (scope.slots[0] !== undefined && scope.slots[0] !== null) {
+		childSlot(scope, 0, block.parentNode, null, block.endMarker);
 	}
 	// Pure host/text item → reconcile in place, REUSING the item's existing node so
 	// DOM-resident state (input value, focus, …) survives a re-render. The reuse
@@ -5772,7 +5828,11 @@ export function childSlot(
 			return;
 		}
 		if (state.block !== null && comp === state.currentComp) {
-			// Same component identity → update in place (matches componentSlot).
+			// Same component identity → update in place (matches componentSlot),
+			// honoring React.memo's bail — previously only componentSlot did, so a
+			// memo()'d component rendered as VALUE-POSITION children (e.g. provider
+			// children in a `.ts` binding tree) re-rendered unconditionally.
+			if (tryMemoBail(state.block, comp, props)) return;
 			state.block.props = props;
 			renderBlock(state.block);
 			return;
@@ -6048,11 +6108,39 @@ function refreshContextConsumers(block: Block): void {
 				if (s.emptyBlock) refreshBlockForContext(s.emptyBlock);
 			} else if (s.block) {
 				// componentSlotSlot | ifBlockSlot | switchBlockSlot | activityBlockSlot
-				// | trySlotSlot | portalSlotSlot — each holds a single child Block.
+				// | trySlotSlot | portalSlotSlot | childSlot (single-child mode) — each
+				// holds a single child Block.
 				refreshBlockForContext(s.block);
+			} else if (s.__kind === 'childSlot' && s.forSlot) {
+				// childSlot in ARRAY mode: the keyed list lives in an EMBEDDED forSlot
+				// (state.block is null), e.g. a memo boundary whose children are an
+				// array of elements. Without this arm the consumers under it were
+				// stranded by the bail.
+				const items = s.forSlot.items as Map<any, Block>;
+				for (const item of items.values()) refreshBlockForContext(item);
 			}
 		}
 	}
+}
+
+// React.memo's bail, shared by BOTH same-component update paths (componentSlot for
+// compiled component positions, childSlot for value-position children — provider
+// children, `.ts` binding trees). Skip the body when new props compare equal to the
+// committed props, UNLESS the component itself directly reads a changed context (then
+// it must re-run). If only a DESCENDANT consumes a changed context, refresh just those
+// consumers without re-running this body — React's lazy propagation. Returns true when
+// the update was fully handled (bail taken); the committed props identity is kept, and
+// diffing against it next time is what makes the memo terminate.
+function tryMemoBail(block: Block, comp: any, props: any): boolean {
+	if ((comp as any).__memo !== true) return false;
+	const compare = (comp as any).__compare as ((prev: any, next: any) => boolean) | undefined;
+	// React.memo's optional comparator: returns true when props are equal
+	// (→ skip the render). Falls back to a shallow Object.is comparison.
+	const equal = compare ? compare(block.props, props) : shallowEqualProps(block.props, props);
+	if (!equal) return false;
+	if (ctxDirectChanged(block)) return false;
+	if (ctxDepsChanged(block)) refreshContextConsumers(block);
+	return true;
 }
 
 function refreshBlockForContext(block: Block): void {

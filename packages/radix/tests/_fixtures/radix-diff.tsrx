@@ -16,6 +16,8 @@ import {
 	Switch,
 	RadioGroup,
 	Slider,
+	Menubar,
+	NavigationMenu,
 } from '@octanejs/radix';
 
 // Self-contained fixtures for the differential rig: the SAME source runs on octane (via
@@ -251,4 +253,43 @@ export function SliderDiff() @{
 			<SliderThumb id="sl-th" />
 		</SliderRoot>
 	</form>
+}
+
+const MenubarRoot = Menubar.Root;
+const MenubarMenu = Menubar.Menu;
+const MenubarTrigger = Menubar.Trigger;
+const NavigationMenuRoot = NavigationMenu.Root;
+const NavigationMenuList = NavigationMenu.List;
+const NavigationMenuItem = NavigationMenu.Item;
+const NavigationMenuTrigger = NavigationMenu.Trigger;
+const NavigationMenuLink = NavigationMenu.Link;
+
+// Closed-state byte parity for the two new container-visible components (their open
+// content portals / needs pointer timing, covered by unit suites).
+export function MenubarClosed() @{
+	<div>
+		<MenubarRoot id="mb">
+			<MenubarMenu value="file">
+				<MenubarTrigger id="mb-file">File</MenubarTrigger>
+			</MenubarMenu>
+			<MenubarMenu value="edit">
+				<MenubarTrigger id="mb-edit">Edit</MenubarTrigger>
+			</MenubarMenu>
+		</MenubarRoot>
+	</div>
+}
+
+export function NavMenuClosed() @{
+	<div>
+		<NavigationMenuRoot id="nm">
+			<NavigationMenuList id="nm-list">
+				<NavigationMenuItem value="one">
+					<NavigationMenuTrigger id="nm-t1">One</NavigationMenuTrigger>
+				</NavigationMenuItem>
+				<NavigationMenuItem value="two">
+					<NavigationMenuLink id="nm-l" href="#">Two</NavigationMenuLink>
+				</NavigationMenuItem>
+			</NavigationMenuList>
+		</NavigationMenuRoot>
+	</div>
 }

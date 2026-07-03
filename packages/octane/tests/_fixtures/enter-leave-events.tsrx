@@ -16,3 +16,13 @@ export function EnterLeaveEvents() @{
 		<span class="log">{log}</span>
 	</div>
 }
+
+// scroll doesn't bubble either (React 17+: onScroll is per-element, no synthetic
+// bubbling) — capture-delegated, target-only, ancestors get their own events.
+export function ScrollEvents() @{
+	const [log, setLog] = useState('');
+	<div class="outer" onScroll={() => setLog((l) => l + 'O')}>
+		<div class="inner" onScroll={() => setLog((l) => l + 'i')}>{'content'}</div>
+		<span class="slog">{log}</span>
+	</div>
+}
