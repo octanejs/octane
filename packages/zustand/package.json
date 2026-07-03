@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/zustand",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "type": "module",
   "description": "zustand bindings for the octane renderer — reuses zustand's framework-agnostic vanilla store and swaps the React binding for octane's useSyncExternalStore.",

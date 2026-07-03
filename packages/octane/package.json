@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "description": "A fast, TypeScript-first UI framework and the successor to Inferno: the React API you already know, a compiler that keeps the runtime small and fast, and hooks without the rules of hooks.",
