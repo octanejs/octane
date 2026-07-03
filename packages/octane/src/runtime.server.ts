@@ -33,8 +33,8 @@ import {
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
 // hyphenated style keys stay byte-equal across the two runtimes).
-export { normalizeClass } from './css.js';
-import { styleName } from './css.js';
+import { normalizeClass, styleName } from './css.js';
+export { normalizeClass };
 
 interface SSRScope {
 	parent: SSRScope | null;
