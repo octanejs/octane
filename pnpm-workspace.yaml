@@ -10,6 +10,14 @@ packages:
   - benchmarks/signal-favoring/*
   - benchmarks/dbmon
   - benchmarks/dbmon/*
+  - benchmarks/effectful-list
+  - benchmarks/effectful-list/*
+  - benchmarks/memo-wall
+  - benchmarks/memo-wall/*
+  - benchmarks/portal-swarm
+  - benchmarks/portal-swarm/*
+  - benchmarks/ssr-throughput
+  - benchmarks/ssr-throughput/*
   - playground/*
   - examples/*
 

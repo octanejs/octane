@@ -31,6 +31,11 @@ import {
 	cssStyleValue,
 } from './constants.js';
 
+// Shared client/SSR CSS helpers (single source in css.ts so class strings and
+// hyphenated style keys stay byte-equal across the two runtimes).
+export { normalizeClass } from './css.js';
+import { styleName } from './css.js';
+
 interface SSRScope {
 	parent: SSRScope | null;
 	/** Context Provider values stamped on this scope (lazily allocated). */
@@ -142,12 +147,25 @@ export function createElement(
 // Escaping
 // ---------------------------------------------------------------------------
 
+// Guarded escapers: a single .test() scan first, so the common no-escape case
+// returns the ORIGINAL string with zero allocation (~5x on clean text). When
+// something does need escaping, the chained native .replace passes are kept —
+// measured faster than an exec-loop or replace-with-callback single pass on V8
+// for both sparse and dense escape densities.
+const HTML_ESCAPE_RE = /[&<>]/g;
 export function escapeHtml(v: unknown): string {
-	return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	const s = typeof v === 'string' ? v : String(v);
+	HTML_ESCAPE_RE.lastIndex = 0;
+	if (!HTML_ESCAPE_RE.test(s)) return s;
+	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+const ATTR_ESCAPE_RE = /[&"]/g;
 export function escapeAttr(v: unknown): string {
-	return String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+	const s = typeof v === 'string' ? v : String(v);
+	ATTR_ESCAPE_RE.lastIndex = 0;
+	if (!ATTR_ESCAPE_RE.test(s)) return s;
+	return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
 // ---------------------------------------------------------------------------
@@ -360,32 +378,6 @@ export function ssrPortal(): string {
 }
 
 /** A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit. */
-// Compose a `class` / `className` value into a class string, clsx-style — the exact
-// twin of runtime.ts `normalizeClass` so SSR and the client produce byte-equal class
-// strings (hydration parity). See that copy for the semantics.
-export function normalizeClass(value: unknown): string {
-	if (typeof value === 'string') return value;
-	if (typeof value !== 'object') {
-		return typeof value === 'number' && value ? '' + value : '';
-	}
-	if (value === null) return '';
-	let str = '';
-	if (Array.isArray(value)) {
-		for (let i = 0; i < value.length; i++) {
-			const item = value[i];
-			if (item) {
-				const inner = normalizeClass(item);
-				if (inner) str = str ? str + ' ' + inner : inner;
-			}
-		}
-	} else {
-		for (const k in value as Record<string, unknown>) {
-			if ((value as Record<string, unknown>)[k]) str = str ? str + ' ' + k : k;
-		}
-	}
-	return str;
-}
-
 export function ssrAttr(name: string, v: unknown): string {
 	// React-parity alias, mirroring class/className: `htmlFor` serialises as `for`.
 	if (name === 'htmlFor') name = 'for';
@@ -413,26 +405,8 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 		const val = obj[k];
 		if (val == null || val === false) continue;
 		// React parity: numeric values get `px` (except 0 / unitless / custom props).
-		out += hyphenate(k) + ':' + cssStyleValue(k, val) + ';';
+		out += styleName(k) + ':' + cssStyleValue(k, val) + ';';
 	}
-	return out;
-}
-
-// camelCase / vendor-prefixed style keys → kebab-case (mirrors runtime.styleName).
-function hyphenate(name: string): string {
-	if (name.charCodeAt(0) === 45 /* - */) return name; // --custom-prop / -webkit-…
-	let out = '';
-	let changed = false;
-	for (let i = 0; i < name.length; i++) {
-		const c = name.charCodeAt(i);
-		if (c >= 65 && c <= 90) {
-			out += '-' + String.fromCharCode(c + 32);
-			changed = true;
-		} else out += name[i];
-	}
-	if (!changed) return name;
-	if (out.charCodeAt(0) === 109 && out.charCodeAt(1) === 115 && out.charCodeAt(2) === 45)
-		out = '-' + out;
 	return out;
 }
 
@@ -912,7 +886,12 @@ export async function render(component: ServerComponent, props?: any): Promise<R
 		CURRENT_SCOPE = root;
 		let body = '';
 		try {
-			body = component(props ?? {}, root, undefined) ?? '';
+			// Normalize the root's return the same way ssrComponent normalizes child
+			// components: a compiled component returns its HTML string, but a plain
+			// `.ts` root (the shape every @octanejs binding produces) returns a
+			// createElement descriptor that must render through ssrChild.
+			const out = component(props ?? {}, root, undefined);
+			body = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, root);
 		} catch (err) {
 			// A suspension with no enclosing @try unwinds to here; its thenable is
 			// already in `suspended`, so fall through to the await + retry. Any other

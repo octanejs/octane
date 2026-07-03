@@ -1,0 +1,58 @@
+name: Bench
+
+# The unified benchmark runner as a REGRESSION GATE. It enforces ONLY the
+# hardware-independent ratio guards in benchmarks/baselines/ratios.json
+# (`--ratios`): each guard compares two targets measured on the SAME runner in
+# the SAME run, so the number is a ratio and is safe to enforce on GitHub's
+# shared CI hardware.
+#
+# Absolute-baseline comparison (`--record` / `--compare` against
+# benchmarks/baselines/local/*.json) is deliberately NOT run here — those
+# millisecond numbers are machine-specific and only meaningful locally. See
+# benchmarks/baselines/README.md.
+#
+# Runs on manual dispatch and a weekly cron (not on every push — the browser
+# suites take minutes). The collected per-suite JSON is uploaded as an artifact.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays 06:00 UTC.
+    - cron: "0 6 * * 1"
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --prod false --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter octane-tsrx-jsbench exec playwright install --with-deps chromium
+
+      # --quick keeps every code path + correctness gate exercised at reduced
+      # iterations; --ratios enforces the committed ratio guards and fails the job
+      # on any breach. Absolute baselines are intentionally not compared here.
+      - name: Run benchmarks (quick, ratio guards)
+        run: node benchmarks/bench.mjs --quick --ratios
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: benchmarks/results/
+          if-no-files-found: warn

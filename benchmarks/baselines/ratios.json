@@ -1,0 +1,74 @@
+[
+  {
+    "suite": "js-framework",
+    "op": "run",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2.0,
+    "note": "create-1k: octane must not fall to >2x React's create time (known ~0.8-1.0x; generous headroom)."
+  },
+  {
+    "suite": "js-framework",
+    "op": "update",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2.0,
+    "note": "partial update: octane vs React (known ~1x)."
+  },
+  {
+    "suite": "js-framework",
+    "op": "swap",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2.5,
+    "note": "swap rows: LIS keyed reconcile vs React (known <1x)."
+  },
+  {
+    "suite": "js-framework-reorder",
+    "op": "rotateb",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.6,
+    "note": "rotate-backward is the LIS-vs-lastPlacedIndex differentiator: octane moves 1 node, React moves all survivors (known ~12x faster → 0.08x). Guard 0.6 leaves huge headroom while still catching a fast-path break."
+  },
+  {
+    "suite": "memo-wall",
+    "op": "mount",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.6,
+    "note": "1000 memo(Row) mount: octane compiles the wall (known ~0.12x React)."
+  },
+  {
+    "suite": "memo-wall",
+    "op": "parent_rerender_equal_A",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.6,
+    "note": "parent re-render absorbed by 1000 shallow-equal bails: structural octane win (known ~0.11x). If octane stops bailing this shoots past 1."
+  },
+  {
+    "suite": "dbmon",
+    "op": "tick",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2.0,
+    "note": "full per-cell update churn: octane's per-binding diff vs React (known <1x)."
+  },
+  {
+    "suite": "ssr-throughput",
+    "op": "render",
+    "target": "news-50/octane-tsrx",
+    "reference": "news-50/react",
+    "maxRatio": 1.2,
+    "note": "octane server render() vs react-dom renderToString at 50 cards (known ~0.6x → octane faster). Guard 1.2 tolerates noise but catches an octane SSR regression."
+  },
+  {
+    "suite": "ssr-throughput",
+    "op": "render",
+    "target": "deopt-page/octane-deopt",
+    "reference": "deopt-page/octane-fast",
+    "maxRatio": 4.0,
+    "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio→1) or a runaway deopt (ratio>4) both surface."
+  }
+]

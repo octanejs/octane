@@ -1,0 +1,2 @@
+Absolute per-suite baselines recorded by `node benchmarks/bench.mjs --record`
+land here (e.g. js-framework.json). They are machine-specific — see ../README.md.

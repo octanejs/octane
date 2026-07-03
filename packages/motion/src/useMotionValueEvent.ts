@@ -5,8 +5,16 @@
 // which returns the unsubscribe fn (and, for 'change', stops idle animations).
 import { useInsertionEffect } from 'octane';
 
+// Memoized — runs per hook call per render; the cache returns the identical
+// Symbol.for-interned value without the concat + registry lookup.
+const subCache = new Map<symbol, Map<string, symbol>>();
 function sub(slot: symbol | undefined, tag: string): symbol | undefined {
-	return slot !== undefined ? Symbol.for((slot.description ?? '') + ':umve:' + tag) : undefined;
+	if (slot === undefined) return undefined;
+	let byTag = subCache.get(slot);
+	if (byTag === undefined) subCache.set(slot, (byTag = new Map()));
+	let sym = byTag.get(tag);
+	if (sym === undefined) byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':umve:' + tag)));
+	return sym;
 }
 
 export function useMotionValueEvent(...args: any[]): void {

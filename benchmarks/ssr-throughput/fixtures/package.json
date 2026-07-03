@@ -1,0 +1,13 @@
+{
+  "name": "octane-ssr-throughput-fixtures",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "SSR-only octane fixtures for the ssr-throughput bench: waterfall (sequential use(thenable) Suspense passes), deopt-page (compiled .tsrx vs plain-.ts createElement twins), escape-heavy (10k escaped text holes). No client build, no dev server.",
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default"
+  }
+}

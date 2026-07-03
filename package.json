@@ -13,6 +13,7 @@
     "test": "vitest run",
     "build": "pnpm --filter octane build",
     "bench": "pnpm --filter @benchmarks/news bench",
+    "bench:all": "node benchmarks/bench.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsgo --noEmit -p packages/octane/tsconfig.json && tsgo --noEmit -p packages/vite-plugin-octane/tsconfig.typecheck.json && tsgo --noEmit -p packages/zustand/tsconfig.json && tsgo --noEmit -p packages/query/tsconfig.json && tsgo --noEmit -p packages/motion/tsconfig.json && tsgo --noEmit -p packages/stylex/tsconfig.json && tsgo --noEmit -p packages/router/tsconfig.json && tsgo --noEmit -p packages/lexical/tsconfig.json && tsgo --noEmit -p packages/floating-ui/tsconfig.json && tsgo --noEmit -p packages/radix/tsconfig.json",

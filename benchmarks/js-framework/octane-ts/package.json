@@ -1,0 +1,19 @@
+{
+  "name": "octane-ts-jsbench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "js-framework-benchmark fixture for octane authored in PURE plain-.ts createElement (no .tsrx, no .tsx, no templates - the shape every @octanejs binding produces) - the maximal de-opt authoring-cliff twin of octane-tsrx-jsbench; same DOM/button contract.",
+  "scripts": {
+    "dev": "vite --host --port 5215 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5215 --strictPort"
+  },
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default",
+    "terser": "catalog:default"
+  }
+}

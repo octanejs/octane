@@ -39,3 +39,18 @@ export function App(props) @{
 		</Theme.Provider>
 	</div>
 }
+
+// React's most common authoring shape: an INLINE element (no arrow, no @{})
+// as the portal body. The compiler hoists the element into a sub-template
+// render fn (same lowering as an @if branch body) — previously this printed
+// the raw JSX into the emitted portal() call, producing invalid output.
+export function InlineModal(props) @{
+	const [n, setN] = useState(0);
+	<section class="inline-anchor">
+		<button id="bump" onClick={() => setN(n + 1)}>{'bump'}</button>
+		{createPortal(
+			<div class="inline-modal">{'count:' + n}</div>,
+			props.target,
+		)}
+	</section>
+}

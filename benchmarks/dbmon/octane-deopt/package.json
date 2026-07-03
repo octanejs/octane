@@ -1,0 +1,18 @@
+{
+  "name": "octane-deopt-dbmon-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "dbmon bench for octane authored in PLAIN .ts createElement (no .tsrx, no templates) - the de-opt authoring-cliff twin of octane-tsrx-dbmon-bench; same data + window.__mount/__tick/__tickPartial/__remount/__sort/__unmount/__reset contract.",
+  "scripts": {
+    "dev": "vite --host --port 5209 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5209 --strictPort"
+  },
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default"
+  }
+}

@@ -1258,9 +1258,8 @@ function disposeReturnSlot(block: Block, state: any): void {
 			state.portal = null;
 		}
 		if (state.forSlot) {
-			const items = state.forSlot.items as Map<any, Block>;
-			const it = items.values();
-			for (let r = it.next(); !r.done; r = it.next()) unmountBlock(r.value, true);
+			for (let b: Block | null = state.forSlot.head; b !== null; b = b.nextSibling)
+				unmountBlock(b, true);
 			if (state.forSlot.emptyBlock) unmountBlock(state.forSlot.emptyBlock, true);
 			state.forSlot = null;
 		}
@@ -1416,26 +1415,6 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 	// component that suspended/threw before inserting) — nothing to remove.
 }
 
-/** Fire cleanups (parent scope before children — pre-order) without touching
- *  the DOM. This is a deletion path (used by batchClearItems when a keyed list
- *  is cleared), so it follows the same parent → child order as unmountScope, to
- *  match React's commitDeletionEffects walk. Within each scope, cleanups fire in
- *  REVERSE-mount order — last useEffect declared has its cleanup run first — so
- *  later effects can rely on resources from earlier ones during teardown.
- */
-function fireCleanupsOnly(scope: Scope): void {
-	const c = scope.cleanups;
-	for (let i = c.length - 1; i >= 0; i--) {
-		try {
-			c[i]();
-		} catch (err) {
-			console.error(err);
-		}
-	}
-	const children = scope.children;
-	for (let i = 0, n = children.length; i < n; i++) fireCleanupsOnly(children[i].scope);
-}
-
 /**
  * Register a slot object as owned by `scope`. Called from each slot-creation
  * site in runtime.ts (portal, componentSlot, trySlot, ifBlock, switchBlock,
@@ -1485,9 +1464,10 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 			if (k === 'ifBlockSlot' || k === 'switchBlockSlot' || k === 'activityBlockSlot') {
 				if (val.block) unmountBlock(val.block, detachDom);
 			} else if (k === 'forBlockSlot') {
-				const items = val.items as Map<any, Block>;
-				const it = items.values();
-				for (let r = it.next(); !r.done; r = it.next()) unmountBlock(r.value, detachDom);
+				// Item Blocks form an intrusive chain (head → nextSibling) — walk it
+				// instead of the keyed Map's iterator (zero-alloc, monomorphic).
+				for (let b: Block | null = val.head; b !== null; b = b.nextSibling)
+					unmountBlock(b, detachDom);
 				// An @empty branch (if any) hangs off the same slot.
 				if (val.emptyBlock) unmountBlock(val.emptyBlock, detachDom);
 			} else if (k === 'childSlot') {
@@ -1497,9 +1477,8 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				// cleanups fire on unmount (the array branch was previously unhandled).
 				if (val.block) unmountBlock(val.block, detachDom);
 				if (val.forSlot) {
-					const items = val.forSlot.items as Map<any, Block>;
-					const it = items.values();
-					for (let r = it.next(); !r.done; r = it.next()) unmountBlock(r.value, detachDom);
+					for (let b: Block | null = val.forSlot.head; b !== null; b = b.nextSibling)
+						unmountBlock(b, detachDom);
 					if (val.forSlot.emptyBlock) unmountBlock(val.forSlot.emptyBlock, detachDom);
 				}
 				// A `{createPortal(...)}` value hole — its content lives in a foreign
@@ -1724,12 +1703,6 @@ function enqueueEffect(slot: symbol, fn: EffectFn, deps: any[] | undefined, phas
 	if (prev && !depsChanged(prev.deps, deps)) return;
 	if (!prev) {
 		ensureHooks(scope).set(slot, { deps, cleanup: undefined, effect: true });
-		// Mark any enclosing for-block items so batch-clear knows to walk cleanups.
-		let b: Block | null = scope.block;
-		while (b) {
-			if (b.forSlot) b.forSlot.hasCleanups = true;
-			b = b.parentBlock;
-		}
 	} else {
 		prev.deps = deps;
 	}
@@ -3289,37 +3262,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	else el.setAttribute(name, v);
 }
 
-// Compose a `class` / `className` value into a class string, clsx-style. Strings
-// pass straight through (the hot path — a single `typeof`); finite numbers stringify
-// (falsy `0` contributes nothing); arrays recurse and join truthy parts with a space;
-// plain objects contribute the keys whose values are truthy; `null` / `undefined` /
-// `false` / `true` contribute nothing. This mirrors the `clsx` / `classnames` packages
-// so `class={['a', cond && 'b', { c: isC }]}` works like the React ecosystem expects.
-// The identical function lives in runtime.server.ts so SSR and the client compose
-// byte-equal class strings (hydration parity).
-export function normalizeClass(value: unknown): string {
-	if (typeof value === 'string') return value;
-	if (typeof value !== 'object') {
-		// number → its decimal form; `0` (and any other falsy primitive) drops out.
-		return typeof value === 'number' && value ? '' + value : '';
-	}
-	if (value === null) return '';
-	let str = '';
-	if (Array.isArray(value)) {
-		for (let i = 0; i < value.length; i++) {
-			const item = value[i];
-			if (item) {
-				const inner = normalizeClass(item);
-				if (inner) str = str ? str + ' ' + inner : inner;
-			}
-		}
-	} else {
-		for (const k in value as Record<string, unknown>) {
-			if ((value as Record<string, unknown>)[k]) str = str ? str + ' ' + k : k;
-		}
-	}
-	return str;
-}
+// clsx-style `class`/`className` composition — shared with the SSR serializer
+// via css.ts so client and server compose byte-equal class strings (hydration
+// parity). Re-exported here because it is part of the semi-public surface.
+export { normalizeClass } from './css.js';
+import { styleName } from './css.js';
 
 export function setClassName(el: Element, value: unknown): void {
 	// clsx-compose first so arrays / objects become a class string (and the hydration
@@ -3453,48 +3400,6 @@ function applyStyleValue(style: CSSStyleDeclaration, value: any, prev: any): voi
 			if (v != null && v !== false) applyStyleProperty(style, k, v);
 		}
 	}
-}
-
-// Normalize a style-object key to a CSS property name CSSOM accepts. Supports
-// BOTH kebab-case (`font-size`) and React-style camelCase (`fontSize`) keys —
-// the latter is converted to kebab. Mirrors React's hyphenateStyleName:
-//   fontSize        → font-size
-//   backgroundColor → background-color
-//   WebkitTransform → -webkit-transform   (leading uppercase = vendor prefix)
-//   msFilter        → -ms-filter          (the `ms` prefix gets a leading dash)
-// Custom properties (`--myVar`) and already-hyphenated names (anything starting
-// with `-`) pass through verbatim — custom properties are case-sensitive and
-// must NOT be hyphenated. No regex (char-walk) to avoid backtracking concerns.
-function styleName(name: string): string {
-	// `--custom-prop` and pre-hyphenated `-webkit-…` keys: leave untouched.
-	if (name.charCodeAt(0) === 45 /* - */) return name;
-	// Fast path: no uppercase → already kebab (the common case), no allocation.
-	let hasUpper = false;
-	for (let i = 0; i < name.length; i++) {
-		const c = name.charCodeAt(i);
-		if (c >= 65 && c <= 90) {
-			hasUpper = true;
-			break;
-		}
-	}
-	if (!hasUpper) return name;
-	let out = '';
-	for (let i = 0; i < name.length; i++) {
-		const c = name.charCodeAt(i);
-		// Uppercase → `-` + lowercase. A leading uppercase therefore yields the
-		// leading dash a vendor prefix needs (`WebkitX` → `-webkit-x`).
-		if (c >= 65 && c <= 90) out += '-' + String.fromCharCode(c + 32);
-		else out += name[i];
-	}
-	// React parity: `msFoo` → `ms-foo` (above) → `-ms-foo`.
-	if (
-		out.charCodeAt(0) === 109 /* m */ &&
-		out.charCodeAt(1) === 115 /* s */ &&
-		out.charCodeAt(2) === 45
-	) {
-		out = '-' + out;
-	}
-	return out;
 }
 
 function applyStyleProperty(style: CSSStyleDeclaration, name: string, value: any): void {
@@ -5798,7 +5703,6 @@ export function childSlot(
 				head: null,
 				tail: null,
 				size: 0,
-				hasCleanups: true,
 				cachedDeps: null,
 				emptyBlock: null,
 			};
@@ -7922,8 +7826,7 @@ function forEachSubtreeChild(scope: Scope, visit: (child: Scope) => void): void 
 		for (let i = 0, n = slots.length; i < n; i++) {
 			const val = slots[i];
 			if (val.__kind === 'forBlockSlot') {
-				const it = (val.items as Map<any, Block>).values();
-				for (let r = it.next(); !r.done; r = it.next()) visit(r.value);
+				for (let b: Block | null = val.head; b !== null; b = b.nextSibling) visit(b);
 				if (val.emptyBlock) visit(val.emptyBlock);
 			} else if (val.block) {
 				visit(val.block);
@@ -8081,7 +7984,6 @@ interface ForSlot {
 	head: Block | null; // first item Block in DOM order
 	tail: Block | null; // last item Block in DOM order
 	size: number; // count of item Blocks
-	hasCleanups: boolean; // true once any item registered a useEffect cleanup
 	// Last-render snapshot of the body's closed-over parent locals. The compiler
 	// emits a fresh `deps` array on every parent render for DEP-PURE for-of
 	// calls (impure body, no hooks/comps/control-flow). When this render's deps
@@ -8152,7 +8054,6 @@ export function forBlock<T>(
 			head: null,
 			tail: null,
 			size: 0,
-			hasCleanups: false,
 			cachedDeps: null,
 			emptyBlock: null,
 		};
@@ -8844,8 +8745,13 @@ function reconcileKeyed<T>(
  * on Chromium per Ripple's measured advantage on the `clear` op. Otherwise
  * falls back to a scoped Range deletion.
  *
- * Skips the per-item disposal loop unless at least one item has cleanups,
- * which is detected by tracking `hasCleanups` on the ForSlot.
+ * Every item still gets a disposal pass: items whose scope carries cleanups,
+ * child scopes, or slot-stashed Blocks (a cross-module `<Row/>` lives on the
+ * item's `_slots` as a componentSlot, NOT on `.children`) tear down through
+ * `unmountBlock(b, false)` — full scope walk incl. `_slots`, portal
+ * self-detach from foreign targets, and trySlot bookkeeping — with the DOM
+ * skipped because the batch clear already removed the whole range. Plain
+ * template rows (the common bulk-clear case) hit only the three-field guard.
  */
 function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 	const p = state.start.parentNode!;
@@ -8861,14 +8767,15 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 		range.setEndBefore(state.end);
 		range.deleteContents();
 	}
-	// Disposal: mark + run cleanups only when needed. Common case (no useEffect
-	// inside list items) skips the iteration entirely.
-	if (state.hasCleanups) {
-		const it = oldItems.values();
-		for (let r = it.next(); !r.done; r = it.next()) {
-			const b = r.value;
+	// Walk the intrusive item chain (head → nextSibling) rather than the Map's
+	// iterator: zero allocation and a monomorphic pointer chase. Callers reset
+	// head/tail only AFTER this returns, so the chain still covers exactly the
+	// old items here.
+	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
+		if (b.cleanups.length > 0 || b.children.length > 0 || b._slots !== null) {
+			unmountBlock(b, false);
+		} else {
 			b.disposed = true;
-			if (b.cleanups.length > 0 || b.children.length > 0) fireCleanupsOnly(b);
 		}
 	}
 	oldItems.clear();

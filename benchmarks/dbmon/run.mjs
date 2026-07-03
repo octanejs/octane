@@ -31,6 +31,7 @@
 // Usage:  node run.mjs [iter]   # default 30
 
 import { chromium } from 'playwright';
+import fs from 'node:fs';
 
 const ITER = parseInt(process.argv[2] || '30', 10);
 const WARMUP = 10;
@@ -220,6 +221,26 @@ const OPS = ['mount', 'tick', 'tick_partial', 'remount', 'sort', 'unmount'];
 			const ratio = r.tick_partial.median / r.tick.median;
 			console.log(`  ${c.padEnd(16)} ${ratio.toFixed(3)}x  (ideal: ~0.1)`);
 		}
+	}
+
+	// Machine-readable results for the unified bench runner (see the BENCH_JSON
+	// contract in benchmarks/README.md): milliseconds, one ops map per target.
+	if (process.env.BENCH_JSON) {
+		const payload = {
+			suite: 'dbmon',
+			iterations: ITER,
+			targets: TARGETS.map((t) => ({
+				name: t.name,
+				ops: Object.fromEntries(
+					OPS.map((op) => {
+						const r = all[t.name][op];
+						return [op, { median: r.median, min: r.min, p95: r.p95, sd: r.stddev, samples: ITER }];
+					}),
+				),
+			})),
+		};
+		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');
+		console.error(`BENCH_JSON written to ${process.env.BENCH_JSON}`);
 	}
 })().catch((e) => {
 	console.error(e);
