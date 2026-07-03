@@ -156,3 +156,42 @@ describe('SSR — ssrSpread attribute-name validation', () => {
 		expect(out).not.toContain('alert');
 	});
 });
+
+describe('SSR — static-literal attribute fast paths', () => {
+	it('serialises static aria-* boolean literals as enumerated "true"/"false"', async () => {
+		// React parity, mirroring ssrAttr's dynamic-path handling: aria-* is
+		// ENUMERATED, so `aria-hidden={false}` must serialize as "false" (not
+		// drop) and `aria-expanded={true}` as "true" (not a bare attribute).
+		// A non-aria boolean literal keeps the generic handling (false drops).
+		const mod = evalServer(
+			`export function A() @{ <div aria-hidden={false} aria-expanded={true} hidden={false}>{'x'}</div> }`,
+			'aria-static.tsrx',
+		);
+		const out = (await RT.render(mod.A)).body;
+		expect(out).toContain(' aria-hidden="false"');
+		expect(out).toContain(' aria-expanded="true"');
+		expect(out).not.toContain(' hidden');
+	});
+});
+
+describe('SSR — React 19 function form actions', () => {
+	it('drops a function-valued action/formAction; string values still serialize', async () => {
+		// A function action is submit wiring for the client's setFormAction —
+		// serializing it would put function source into the HTML as a navigable
+		// URL. Mirrors the client's tag+name condition.
+		const mod = evalServer(
+			`export function F(props) @{
+				<form action={props.act}>
+					<button formAction={props.act}>{'go'}</button>
+				</form>
+			}`,
+			'fn-action.tsrx',
+		);
+		const withFn = (await RT.render(mod.F, { act: () => {} })).body;
+		expect(withFn).not.toContain('action');
+		expect(withFn).not.toContain('=>');
+		const withStr = (await RT.render(mod.F, { act: '/submit' })).body;
+		expect(withStr).toContain(' action="/submit"');
+		expect(withStr).toContain(' formaction="/submit"');
+	});
+});

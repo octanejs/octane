@@ -41,3 +41,16 @@ export function FnSetter() @{
 		{n as string}
 	</button>
 }
+
+// `aria-*` is ENUMERATED (React parity): boolean LITERALS must bake as the
+// strings "true"/"false" in the static template fast path — matching the
+// runtime setAttribute / ssrAttr handling of dynamic values.
+export function AriaStaticLiterals() @{
+	<div
+		id="aria-host"
+		aria-hidden={false}
+		aria-expanded={true}
+		aria-label="lbl"
+		hidden={false}
+	>{'aria'}</div>
+}

@@ -1,7 +1,8 @@
 /**
  * octane runtime — template-clone renderer with React-shape state model.
  *
- * Architecture: see /PLAN-TEMPLATE-RUNTIME.md.
+ * Architecture overview: see /README.md (project positioning + `.tsrx` syntax) and
+ * the section headers throughout this file — the comments here are the design spec.
  *
  * Block = mount/unmount boundary (Root / control-flow / dynamic / portal).
  * Scope = per-call-site hook bag inside a Block.
@@ -25,8 +26,8 @@ import {
 // ---------------------------------------------------------------------------
 
 export type ComponentBody<P = any, E = any> = (props: P, scope: Scope, extra: E) => void;
-export type EffectFn = () => void | (() => void);
-export type Cleanup = () => void;
+type EffectFn = () => void | (() => void);
+type Cleanup = () => void;
 
 export interface Scope {
 	block: Block;
@@ -149,6 +150,23 @@ function isHydrationSuppressed(el: Node | null): boolean {
 }
 
 /**
+ * Shared preamble for the hydration VALUE-mismatch write sites (`setAttribute` /
+ * `setClassName` / `setClassAttr` / `setStyle`): decides whether the site must pay the
+ * server-value read + compare at all. Only two things ever require it: the element
+ * opted out via `suppressHydrationWarning` (read in dev AND prod — suppression keeps
+ * the SERVER value, changing the recovery, not just the warning), or a dev source loc
+ * is stamped (`__oct_loc` exists only in dev-compiled output, so a non-suppressed prod
+ * hydration pays nothing for the warning path). Returns the disposition:
+ *   0 — plain apply: no compare needed, the client write itself patches/recovers.
+ *   1 — suppressed: compare, and on divergence KEEP the server value (skip the write).
+ *   2 — dev-warn: compare, warn on divergence, then apply the client value.
+ */
+function hydrationMismatchMode(el: Element): 0 | 1 | 2 {
+	if (isHydrationSuppressed(el)) return 1;
+	return (el as any).__oct_loc !== undefined ? 2 : 0;
+}
+
+/**
  * DEV-only hydration-mismatch warning. Gated on `loc` being non-empty — the dev source
  * location (`el.__oct_loc` / `siteLoc(...)`) only exists in `dev`-compiled output, so in
  * production `loc` is empty and this no-ops (the patch/recovery already ran regardless).
@@ -247,7 +265,7 @@ function removeHydrationRange(start: Node, end: Node): void {
 	}
 }
 
-export type BlockKind = 'root' | 'control-flow' | 'dynamic' | 'portal';
+type BlockKind = 'root' | 'control-flow' | 'dynamic' | 'portal';
 
 export interface Block extends Scope {
 	kind: BlockKind;
@@ -369,13 +387,6 @@ interface PendingEffect {
 
 let CURRENT_SCOPE: Scope | null = null;
 let CURRENT_BLOCK: Block | null = null;
-
-export function getCurrentScope(): Scope {
-	return CURRENT_SCOPE!;
-}
-export function getCurrentBlock(): Block {
-	return CURRENT_BLOCK!;
-}
 
 // ---------------------------------------------------------------------------
 // Scheduler — microtask-flushed queue with React-18-shaped automatic batching
@@ -531,7 +542,7 @@ export function setIsOctaneActEnvironment(value: boolean): void {
 	IS_OCTANE_ACT_ENVIRONMENT = value;
 }
 
-export function scheduleRender(block: Block): void {
+function scheduleRender(block: Block): void {
 	if (block.disposed) return;
 	// Test-env warning: a state update happened with no flushSync or act()
 	// scope around it. The test will likely assert on stale DOM and fail
@@ -643,16 +654,15 @@ function flush(): void {
 
 /** Drain pending passive effects ahead of a render pass (see flush()). */
 function drainPassivesBeforeRender(): void {
-	if (effectQueues[PASSIVE].length > 0) {
-		passiveScheduled = false;
-		drainPhase(PASSIVE);
-	}
+	if (effectQueues[PASSIVE].length > 0) drainPassiveEffects();
 }
 
 /**
  * React-DOM parity. Runs `fn` and synchronously drains any renders/effects it scheduled
  * before returning. Bypasses the microtask-batched flush — used by the benchmark
- * timing rig to measure operation wall-clock without microtask coalescing.
+ * timing rig to measure operation wall-clock without microtask coalescing. Also the
+ * discrete-event commit path: maybeFlushDiscrete flushes through here so
+ * click/keydown/input handlers commit before the browser regains control.
  */
 export function flushSync<T>(fn: () => T): T {
 	const prevSync = syncFlush;
@@ -660,9 +670,12 @@ export function flushSync<T>(fn: () => T): T {
 	try {
 		const result = fn();
 		// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
+		// Match React semantics: flushSync drains insertion + layout synchronously, but
+		// passive effects (useEffect) still fire AFTER paint via the regular scheduler —
+		// exactly what commitEffects already does.
 		if (QUEUE.length > 0) drainPassivesBeforeRender();
 		let pendingError = drainQueue();
-		commitEffectsSync();
+		commitEffects();
 		// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
 		// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
 		// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
@@ -687,7 +700,7 @@ export function flushSync<T>(fn: () => T): T {
 				drainPassivesBeforeRender();
 				const err = drainQueue();
 				if (err !== null && pendingError === null) pendingError = err;
-				commitEffectsSync();
+				commitEffects();
 				for (let i = 0; i < QUEUE.length; i++) {
 					const b = QUEUE[i];
 					if (seen.has(b)) {
@@ -720,9 +733,11 @@ const LAYOUT_CASCADE_LIMIT = 50;
 /**
  * Compiler-emitted on a host element's ref MOUNT. Defers the attach until commit
  * (drainRefAttaches) so the node is connected when a callback ref fires and
- * ref.current is set before layout effects run. `depth` (block-tree depth) drives
- * child-before-parent ordering, matching effect ordering. Ref UPDATES stay inline
- * (the element is already connected by then).
+ * ref.current is set before layout effects run. Each entry records its owning
+ * `block` plus an enqueue-order `seq`; drainRefAttaches sorts with
+ * comparePostOrder (post-order via the parentBlock chain, seq as tiebreak) for
+ * child-before-parent ordering, matching effect ordering. Ref UPDATES stay
+ * inline (the element is already connected by then).
  */
 export function queueRefAttach(scope: Scope, fn: () => void): void {
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push({
@@ -826,22 +841,6 @@ export async function act<T>(fn: () => T | Promise<T>): Promise<T> {
 		);
 	} finally {
 		actScopeDepth--;
-	}
-}
-
-function commitEffectsSync(): void {
-	// Match React semantics: flushSync drains insertion + layout synchronously,
-	// but passive effects (useEffect) still fire AFTER paint via the regular scheduler.
-	drainPhase(INSERTION);
-	drainRefAttaches();
-	reapplyFragmentBindings();
-	drainPhase(LAYOUT);
-	if (effectQueues[PASSIVE].length > 0 && !passiveScheduled) {
-		passiveScheduled = true;
-		schedulePostPaint(() => {
-			passiveScheduled = false;
-			drainPhase(PASSIVE);
-		});
 	}
 }
 
@@ -952,14 +951,16 @@ function drainPhase(phase: Phase): void {
 
 // `schedulePostPaint` — fires after the next paint (React's scheduler trick).
 let _postPaintCbs: Array<() => void> = [];
+/** Swap out the pending post-paint callbacks and run them (both delivery paths). */
+function drainPostPaint(): void {
+	const cbs = _postPaintCbs;
+	_postPaintCbs = [];
+	for (let i = 0; i < cbs.length; i++) cbs[i]();
+}
 let _channel: MessageChannel | null = null;
 if (typeof MessageChannel !== 'undefined') {
 	_channel = new MessageChannel();
-	_channel.port1.onmessage = () => {
-		const cbs = _postPaintCbs;
-		_postPaintCbs = [];
-		for (let i = 0; i < cbs.length; i++) cbs[i]();
-	};
+	_channel.port1.onmessage = drainPostPaint;
 }
 function schedulePostPaint(cb: () => void): void {
 	_postPaintCbs.push(cb);
@@ -967,13 +968,7 @@ function schedulePostPaint(cb: () => void): void {
 		// rAF lands before paint; MessageChannel posts a macrotask after paint.
 		requestAnimationFrame(() => _channel!.port2.postMessage(0));
 	} else {
-		requestAnimationFrame(() =>
-			setTimeout(() => {
-				const cbs = _postPaintCbs;
-				_postPaintCbs = [];
-				for (let i = 0; i < cbs.length; i++) cbs[i]();
-			}, 0),
-		);
+		requestAnimationFrame(() => setTimeout(drainPostPaint, 0));
 	}
 }
 
@@ -986,8 +981,9 @@ function schedulePostPaint(cb: () => void): void {
  * `new` so V8 derives the hidden class from this single constructor, instead
  * of synthesising it from an object-literal site (which V8 can also do but
  * with a less predictable optimisation profile when the literal has many
- * fields). Compiled bodies still stamp dynamic `b$N` / `_for$N` props on the
- * instance — V8 transitions all blocks through the same transition tree.
+ * fields). Compiled bodies stamp their dynamic per-call-site keys on the
+ * `slots[0]` binding bag, NOT on the Block/Scope instance (see Scope.slots),
+ * so every BlockImpl instance shares one hidden class outright.
  *
  * All fields initialised in a single, fixed order. Item-only fields
  * (prev/next sibling, key, itemIndex) sit on every Block as null/0 so root
@@ -1109,7 +1105,7 @@ class BlockImpl {
  *
  * Field order matches the prior object-literal at withScope so existing
  * code that walked the keys (now via the indexed `_slots` array — see
- * runtime.ts:583) sees identical structure.
+ * registerSlot / unmountScope) sees identical structure.
  */
 class ScopeImpl {
 	block: Block;
@@ -1141,7 +1137,7 @@ class ScopeImpl {
 	}
 }
 
-export function createBlock(
+function createBlock(
 	kind: BlockKind,
 	parentBlock: Block | null,
 	parentNode: Node,
@@ -1287,35 +1283,6 @@ function disposeReturnSlot(block: Block, state: any): void {
 }
 
 /**
- * Open (or reuse) a per-call-site Scope inside the current Block, then run `body` in it.
- * The compiler emits this for every static-inline component call.
- */
-export function withScope<P>(parent: Scope, key: symbol, body: ComponentBody<P>, props: P): void {
-	const children = parent.children;
-	let scope: Scope | undefined;
-	// Linear scan — faster than Map.get for the typical small N. Most parents
-	// have ≤ 4 sub-component call sites.
-	for (let i = 0, n = children.length; i < n; i++) {
-		if (children[i].key === key) {
-			scope = children[i].scope;
-			break;
-		}
-	}
-	if (scope === undefined) {
-		scope = new ScopeImpl(parent, parent.block);
-		children.push({ key, scope });
-	}
-	const prevScope = CURRENT_SCOPE;
-	CURRENT_SCOPE = scope;
-	try {
-		body(props, scope, undefined);
-		if (!scope.mounted) scope.mounted = true;
-	} finally {
-		CURRENT_SCOPE = prevScope;
-	}
-}
-
-/**
  * Lite component slot: allocates ONLY a per-call-site Scope — no Block, no
  * Comment markers, no CompSlot wrapper. Emitted by octane/compiler at call
  * sites whose callee is a same-module FunctionDeclaration that:
@@ -1418,7 +1385,7 @@ export function componentSlotLite<P>(
 	}
 }
 
-export function unmountBlock(block: Block, detachDom: boolean = true): void {
+function unmountBlock(block: Block, detachDom: boolean = true): void {
 	if (block.disposed) return;
 	block.disposed = true;
 	// Depth-first cleanup of all scopes reachable from this block.
@@ -1472,13 +1439,14 @@ function fireCleanupsOnly(scope: Scope): void {
 /**
  * Register a slot object as owned by `scope`. Called from each slot-creation
  * site in runtime.ts (portal, componentSlot, trySlot, ifBlock, switchBlock,
- * forBlock). The lazy `_slots` array lets `unmountScope` walk slots in O(slot)
- * instead of `for (key in scope)` enumerating the entire hidden-class chain
- * (~25-30 keys per Block at ~57k key visits in a 2047-component tree).
+ * forBlock, activityBlock, childSlot). The lazy `_slots` array lets
+ * `unmountScope` walk slots in O(slot) instead of `for (key in scope)`
+ * enumerating the entire hidden-class chain (~25-30 keys per Block at ~57k key
+ * visits in a 2047-component tree).
  *
  * Invariant: every slot whose teardown requires recursing into a child Block
- * MUST be registered here. The runtime currently has exactly six creation
- * sites; the octane/compiler compiler never creates slot objects directly.
+ * MUST be registered here (one creation site per slot kind); the
+ * octane/compiler compiler never creates slot objects directly.
  */
 function registerSlot(scope: Scope, slot: any): void {
 	const slots = scope._slots;
@@ -1548,9 +1516,11 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				// scope is being torn down (e.g. an @if branch unmounts mid-pending,
 				// or the whole component unmounts while still suspended), mark the
 				// tryBlock disposed AND clear pendingThenable. That makes the
-				// promise's .then-retry callback short-circuit on the disposed check
-				// at runtime.ts:1695, preventing late commits into a torn-down DOM
-				// range. We mark via `disposed = true` rather than calling
+				// promise's .then-retry callback short-circuit (attachResume's retry
+				// bails when pendingThenable was cleared; commitResume and
+				// flushStagedReveals bail on a disposed tryBlock), preventing late
+				// commits into a torn-down DOM range. We mark via `disposed = true`
+				// rather than calling
 				// unmountBlock because the tryBlock's DOM was already torn down by
 				// its parent's unmount, and a second pass through unmountBlock
 				// would re-walk the same scopes / double-fire cleanups.
@@ -1600,13 +1570,14 @@ function missingSlot(name: string): never {
 
 // withSlot — establishes hook call-site identity via a per-render PATH STACK, so a
 // hook reached THROUGH a custom-hook wrapper combines the wrapper's call-site symbol
-// with its own. The compiler emits each hook call as `withSlot(sym, hook, ...args)`
-// — passing the hook + args directly (no per-render closure to allocate). The base
-// hook reads the combined path as its slot when no explicit `slot` arg is given (the
-// trailing-arg form stays supported for the existing `@{}` emission, so this is
-// additive). Two calls to the same custom hook push DIFFERENT call-site symbols →
-// different paths → independent state; a hook in a loop repeats one call-site symbol,
-// which the compiler rejects.
+// with its own. The compiler wraps CUSTOM hook calls only, as
+// `withSlot(sym, hook, ...args, sym)` — the hook + args pass through directly (no
+// per-render closure to allocate), and the trailing `sym` is retained so library
+// bindings that read the slot off their last argument keep working. BASE hooks keep
+// the plain trailing-slot form (`useState(0, sym)`); inside a wrapper, resolveSlot
+// folds the path in. Two calls to the same custom hook push DIFFERENT call-site
+// symbols → different paths → independent state; a hook in a loop repeats one
+// call-site symbol, which the compiler rejects.
 const slotStack: symbol[] = [];
 export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T {
 	slotStack.push(sym);
@@ -1769,11 +1740,13 @@ function enqueueEffect(slot: symbol, fn: EffectFn, deps: any[] | undefined, phas
 }
 
 // ABI: the compiler appends the hook slot as the LAST argument. When the user
-// omits deps (`useEffect(fn)`), the call arrives as `useEffect(fn, slot)` — the
-// symbol lands in the deps position and the real slot param is undefined. Detect
-// the trailing symbol and reinterpret so optional-deps forms work. A returned
-// undefined deps means "run on every commit" (React parity for omitted deps).
-function resolveEffectArgs(
+// omits deps (`useEffect(fn)` / `useMemo(fn)`), the call arrives as `hook(fn, slot)`
+// — the symbol lands in the deps position and the real slot param is undefined.
+// Detect the trailing symbol and reinterpret so optional-deps forms work. A
+// returned undefined deps means "run on every commit/render" (React parity for
+// omitted deps). Shared by the effect hooks AND useMemo; useCallback keeps its own
+// reinterpret fork (see its comment — it must forward the RAW slot to useMemo).
+function resolveHookArgs(
 	name: string,
 	deps: any[] | symbol | undefined,
 	slot: symbol | undefined,
@@ -1788,38 +1761,30 @@ function resolveEffectArgs(
 }
 
 export function useEffect(fn: EffectFn, deps?: any[], slot?: symbol): void {
-	const [d, s] = resolveEffectArgs('useEffect', deps, slot);
+	const [d, s] = resolveHookArgs('useEffect', deps, slot);
 	enqueueEffect(s, fn, d, PASSIVE);
 }
 export function useLayoutEffect(fn: EffectFn, deps?: any[], slot?: symbol): void {
-	const [d, s] = resolveEffectArgs('useLayoutEffect', deps, slot);
+	const [d, s] = resolveHookArgs('useLayoutEffect', deps, slot);
 	enqueueEffect(s, fn, d, LAYOUT);
 }
 export function useInsertionEffect(fn: EffectFn, deps?: any[], slot?: symbol): void {
-	const [d, s] = resolveEffectArgs('useInsertionEffect', deps, slot);
+	const [d, s] = resolveHookArgs('useInsertionEffect', deps, slot);
 	enqueueEffect(s, fn, d, INSERTION);
 }
 
 export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[], slot?: symbol): T {
-	// ABI: the compiler appends the hook slot as the LAST argument. When the user
-	// omits deps (`useMemo(fn)`), that call arrives as `useMemo(fn, slot)` — the
-	// symbol lands in the deps position. Reinterpret so optional-deps forms work.
-	if (slot === undefined && typeof deps === 'symbol') {
-		slot = deps as unknown as symbol;
-		deps = undefined;
-	}
-	slot = resolveSlot(slot);
-	if (slot === undefined) missingSlot('useMemo');
+	const [d, s] = resolveHookArgs('useMemo', deps, slot);
 	const scope = CURRENT_SCOPE!;
-	const prev = scope.hooks?.get(slot) as { deps: any[] | undefined; value: T } | undefined;
+	const prev = scope.hooks?.get(s) as { deps: any[] | undefined; value: T } | undefined;
 	// deps === undefined → recompute every render (React parity for omitted deps).
-	if (prev && deps !== undefined && !depsChanged(prev.deps, deps)) return prev.value;
+	if (prev && d !== undefined && !depsChanged(prev.deps, d)) return prev.value;
 	// Spread deps as positional args (superset of React — see PendingEffect.args):
 	// a factory written as a pure function of its deps is hoistable. Zero-arg
 	// React-style factories ignore the extra args.
 	// eslint-disable-next-line prefer-spread
-	const value = compute.apply(null, (deps ?? []) as []);
-	ensureHooks(scope).set(slot, { deps, value });
+	const value = compute.apply(null, (d ?? []) as []);
+	ensureHooks(scope).set(s, { deps: d, value });
 	return value;
 }
 
@@ -1828,7 +1793,7 @@ export function useCallback<F extends (...args: any[]) => any>(
 	deps?: any[],
 	slot?: symbol,
 ): F {
-	// Trailing-symbol ABI (see resolveEffectArgs): `useCallback(fn)` arrives as
+	// Trailing-symbol ABI (see resolveHookArgs): `useCallback(fn)` arrives as
 	// `useCallback(fn, slot)`. Reinterpret the omitted-deps case HERE so the slot Symbol
 	// can't leak into useMemo's `deps` array (it would in a custom-hook context, where
 	// resolveSlot turns the otherwise-undefined slot into the path prefix, defeating
@@ -1869,7 +1834,7 @@ export function useImperativeHandle<T>(
 	deps?: any[],
 	slot?: symbol,
 ): void {
-	const [resolvedDeps, resolvedSlot] = resolveEffectArgs('useImperativeHandle', deps, slot);
+	const [resolvedDeps, resolvedSlot] = resolveHookArgs('useImperativeHandle', deps, slot);
 	deps = resolvedDeps;
 	slot = resolvedSlot;
 	const setRef = (value: T | null): void => {
@@ -1895,13 +1860,6 @@ export function useImperativeHandle<T>(
 }
 
 /**
- * React 19 `useEffectEvent` — returns a stable function whose body always
- * reflects the latest version of `fn`. Use inside `useEffect` deps to escape
- * the "must re-create the effect just because a closure-captured value changed"
- * trap. The returned function has the same identity across renders; calling it
- * invokes the most-recent `fn` (i.e., it always sees fresh closure values).
- */
-/**
  * React 18+ `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot?)`.
  *
  * Mirrors React's contract: subscribe is called on mount with an
@@ -1916,10 +1874,12 @@ export function useImperativeHandle<T>(
  * any client/server difference. For a non-SSR build the `hydrating` guard
  * constant-folds the branch away.
  *
- * Built on top of useState + useEffect. The user's `slot` is the call
- * site's compiler-injected symbol; two derived sub-slots
- * (`<slot>:uses:tick` and `<slot>:uses:effect`) host the internal hooks
- * so the two sub-hooks have stable, distinct identities within the call.
+ * Built on top of the base hooks. The user's `slot` is the call site's
+ * compiler-injected symbol; four derived sub-slots host the internal hooks so
+ * each sub-hook has a stable, distinct identity within the call:
+ * `<slot>:uses:tick` (the forceUpdate useState), `<slot>:uses:inst` (the
+ * last-committed-snapshot useRef cell), `<slot>:uses:layout` (the value-sync
+ * useLayoutEffect), and `<slot>:uses:effect` (the subscribe useEffect).
  */
 export function useSyncExternalStore<T>(
 	subscribe: (onStoreChange: () => void) => () => void,
@@ -1933,7 +1893,7 @@ export function useSyncExternalStore<T>(
 	// trailing Symbol preceded by another arg → user passed getServerSnapshot.
 	let slot = rest[rest.length - 1] as symbol | undefined;
 	slot = resolveSlot(slot);
-	if (slot === undefined || typeof slot !== 'symbol') missingSlot('useSyncExternalStore');
+	if (typeof slot !== 'symbol') missingSlot('useSyncExternalStore');
 	const getServerSnapshot = rest.length >= 2 ? (rest[0] as () => T) : undefined;
 	const desc = slot.description ?? '';
 	const tickSlot = Symbol.for(desc + ':uses:tick');
@@ -2005,6 +1965,13 @@ export function useSyncExternalStore<T>(
 	return value;
 }
 
+/**
+ * React 19 `useEffectEvent` — returns a stable function whose body always
+ * reflects the latest version of `fn`. Use inside `useEffect` deps to escape
+ * the "must re-create the effect just because a closure-captured value changed"
+ * trap. The returned function has the same identity across renders; calling it
+ * invokes the most-recent `fn` (i.e., it always sees fresh closure values).
+ */
 export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: symbol): F {
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useEffectEvent');
@@ -2021,7 +1988,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 }
 
 // ---------------------------------------------------------------------------
-// Context — createContext + use() (React 19 shape, no useContext)
+// Context — createContext + use() (React 19 shape; useContext provided as an alias)
 // ---------------------------------------------------------------------------
 
 const CONTEXT_TAG = Symbol.for('octane.context');
@@ -2378,17 +2345,30 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 	const t = document.createElement('template');
 	if (ns === 0) {
 		t.innerHTML = html;
-		return t.content.firstChild as Element;
+		const root = t.content.firstChild as Element;
+		// Multi-root HTML templates arrive wrapped in a synthetic <octane-frag>. The
+		// wrapper never exists in the server DOM (the roots render bare), so stamp it
+		// for clone() to SKIP the structural hydration check — there is no 1:1 server
+		// node to compare the wrapper against.
+		if (root.nodeType === 1 && root.localName === 'octane-frag') {
+			(root as any).__oct_frag = true;
+		}
+		return root;
 	}
 	// Wrap in <svg>/<math> so the HTML5 parser places descendants in the right
 	// foreign-content namespace (Svelte/Ripple's trick — also works around
 	// happy-dom which doesn't enter MathML foreign-content mode from a bare
 	// <math> root). For multi-root templates (frag=1) return the wrapper itself
-	// so the caller can drain its children.
+	// so the caller can drain its children — stamped like <octane-frag> above,
+	// since the synthetic wrapper has no server counterpart either.
 	const wrap = ns === 1 ? 'svg' : 'math';
 	t.innerHTML = `<${wrap}>${html}</${wrap}>`;
 	const wrapEl = t.content.firstChild as Element;
-	return frag ? wrapEl : (wrapEl.firstChild as Element);
+	if (frag) {
+		(wrapEl as any).__oct_frag = true;
+		return wrapEl;
+	}
+	return wrapEl.firstChild as Element;
 }
 
 // ---------------------------------------------------------------------------
@@ -2432,8 +2412,11 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 		// REBUILD the subtree on the client — discard the divergent server node/range, fall
 		// back to a fresh clone (whose markerless template routes nested slots to client
 		// mount), and advance the cursor past the discarded range so siblings stay aligned.
-		// `loc` is emitted only in dev, so the warning is dev-only; the rebuild runs always.
-		if (loc !== undefined && !hydrationNodeMatches(hydrateNode, node)) {
+		// The detection + rebuild run in dev AND prod (matching the other recovery sites);
+		// `loc` is emitted only in dev, so warnHydrationStructuralMismatch's loc gate makes
+		// the warning dev-only. Skipped for a synthetic multi-root wrapper (`__oct_frag`,
+		// stamped by template()): the wrapper has no 1:1 server node to compare against.
+		if (!(node as any).__oct_frag && !hydrationNodeMatches(hydrateNode, node)) {
 			warnHydrationStructuralMismatch(
 				loc,
 				describeHydrationNode(node),
@@ -2466,6 +2449,17 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 }
 
 /**
+ * Text-binding coercion, shared by htext / htextSwap / setText: null/undefined/
+ * false render as '' and everything else stringifies (string fast path first —
+ * `{x as string}` holes are overwhelmingly already strings). NOTE this is NOT
+ * coerceChildText: a text *binding* renders `true` as "true", while a child
+ * *slot* renders `true` as empty (React parity for renderable children).
+ */
+function coerceText(value: unknown): string {
+	return value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+}
+
+/**
  * Compiler-emitted for a single-text-child binding's mount. Normally creates the
  * text node and appends it; while hydrating, ADOPTS the element's existing
  * (server-rendered) text node so the DOM isn't rebuilt. The prev-value the
@@ -2476,8 +2470,7 @@ export function htext(el: Node, value: unknown): Text {
 	// Coerce here (mirrors setText) rather than at every call site — keeps the
 	// per-text-hole mount codegen to a bare `htext(el, _v)`. Mount-once, so folding
 	// the coercion in costs nothing on the hot update path.
-	const text =
-		value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+	const text = coerceText(value);
 	if (hydrating) {
 		const first = el.firstChild;
 		if (first !== null && first.nodeType === 3) {
@@ -2512,8 +2505,7 @@ export function htext(el: Node, value: unknown): Text {
  */
 export function htextSwap(posNode: Node | null, value: unknown): Text {
 	// Coerce here (see htext) so the call site stays a bare `htextSwap(pos, _v)`.
-	const text =
-		value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+	const text = coerceText(value);
 	if (hydrating) {
 		if (posNode !== null && posNode.nodeType === 3) {
 			// Adopt the server text node. On a VALUE mismatch, patch to the client value
@@ -2646,8 +2638,7 @@ export function setText(node: Text, value: any): void {
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
 	// for the hot text-update path.
-	node.nodeValue =
-		value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+	node.nodeValue = coerceText(value);
 }
 
 // Apply a ref attachment. Accepts the three supported shapes:
@@ -2658,33 +2649,53 @@ export function setText(node: Text, value: any): void {
 //               Matches React's `ref={[a, b]}` convention.
 // Called by the compiler-emitted ref binding mount + update paths and
 // by the scope cleanup hook installed at mount time.
-// React 19 callback-ref cleanup. A callback ref may RETURN a cleanup function;
-// when it does, that cleanup runs on detach INSTEAD of calling the ref with
-// null. We remember the returned cleanup keyed by the ref function so the later
-// detach call — `attachRef(ref, null)`, emitted as the scope cleanup — can run
-// it. Legacy callback refs (that return nothing) keep the `ref(null)` contract.
-const refCleanups = new WeakMap<(el: any) => unknown, () => void>();
+// React 19 callback-ref cleanup. A callback ref may RETURN a cleanup function; when it
+// does, that cleanup runs on detach INSTEAD of calling the ref with null. React keeps
+// the cleanup per ATTACH SITE, so the SAME callback ref attached to several elements
+// (`ref={registerItem}` on every list row) holds one independent cleanup per element.
+// We mirror that by keying cleanups per (ref, target): an outer WeakMap by the ref
+// function, an inner WeakMap by the attached element/FragmentInstance. Detach sites
+// pass the previously-attached target — `attachRef(ref, null, target)` — so the RIGHT
+// cleanup runs (and only that one is forgotten). A targetless detach falls back to the
+// most recent cleanup-producing attach, matching the old single-slot behavior for
+// external callers that attach a ref once. Legacy callback refs (that return nothing)
+// keep the `ref(null)` detach contract.
+const refCleanups = new WeakMap<(el: any) => unknown, WeakMap<object, () => void>>();
+const refLastCleanupTarget = new WeakMap<(el: any) => unknown, object>();
 
-export function attachRef(ref: any, el: Element | FragmentInstance | null): void {
+export function attachRef(
+	ref: any,
+	el: Element | FragmentInstance | null,
+	prevTarget?: Element | FragmentInstance | null,
+): void {
 	if (ref == null) return;
 	if (typeof ref === 'function') {
 		if (el === null) {
-			// Detach: prefer the React-19 cleanup the callback returned at attach.
-			const cleanup = refCleanups.get(ref);
+			// Detach: prefer the React-19 cleanup the callback returned when it was
+			// attached to `prevTarget` (falling back to the latest attach's target).
+			const perTarget = refCleanups.get(ref);
+			const target = prevTarget ?? refLastCleanupTarget.get(ref);
+			const cleanup = perTarget !== undefined && target != null ? perTarget.get(target) : undefined;
 			if (cleanup !== undefined) {
-				refCleanups.delete(ref);
+				perTarget!.delete(target as object);
+				if (refLastCleanupTarget.get(ref) === target) refLastCleanupTarget.delete(ref);
 				cleanup();
 			} else {
 				ref(null);
 			}
 		} else {
 			const cleanup = ref(el);
-			if (typeof cleanup === 'function') refCleanups.set(ref, cleanup as () => void);
+			if (typeof cleanup === 'function') {
+				let perTarget = refCleanups.get(ref);
+				if (perTarget === undefined) refCleanups.set(ref, (perTarget = new WeakMap()));
+				perTarget.set(el, cleanup as () => void);
+				refLastCleanupTarget.set(ref, el);
+			}
 		}
 		return;
 	}
 	if (Array.isArray(ref)) {
-		for (let i = 0; i < ref.length; i++) attachRef(ref[i], el);
+		for (let i = 0; i < ref.length; i++) attachRef(ref[i], el, prevTarget);
 		return;
 	}
 	ref.current = el;
@@ -3174,7 +3185,7 @@ export function mountFragmentRef(
 	// so the detach cleanup always releases whatever ref is current on unmount.
 	queueRefAttach(scope, () => attachRef(fi._currentRef, fi));
 	scope.cleanups.push(() => {
-		attachRef(fi._currentRef, null);
+		attachRef(fi._currentRef, null, fi);
 		fi._destroy();
 	});
 	return fi;
@@ -3225,13 +3236,12 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// Hydration VALUE-mismatch handling. The normal write below already PATCHES the adopted
 	// element to the client value (so prod recovers for free); here we only (dev) warn on a
 	// server/client divergence and (dev+prod) honor `suppressHydrationWarning` by keeping the
-	// server attribute. The server-attr read is skipped entirely when neither applies — so a
-	// non-suppressed prod hydration adds no `getAttribute` cost. Guarded by `hydrating`, so
-	// steady-state re-renders are untouched.
+	// server attribute. `hydrationMismatchMode` skips the server-attr read entirely when
+	// neither applies — so a non-suppressed prod hydration adds no `getAttribute` cost.
+	// Guarded by `hydrating`, so steady-state re-renders are untouched.
 	if (hydrating) {
-		const suppress = isHydrationSuppressed(el);
-		const loc = (el as any).__oct_loc;
-		if (suppress || loc !== undefined) {
+		const mode = hydrationMismatchMode(el);
+		if (mode !== 0) {
 			const clientAttr =
 				name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')
 					? value == null
@@ -3247,8 +3257,13 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				? el.getAttributeNS(nsd, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
 				: el.getAttribute(name);
 			if (serverAttr !== clientAttr) {
-				if (suppress) return; // keep the server attribute (React semantics)
-				warnHydrationValueMismatch(loc, `attribute \`${name}\``, serverAttr, clientAttr);
+				if (mode === 1) return; // keep the server attribute (React semantics)
+				warnHydrationValueMismatch(
+					(el as any).__oct_loc,
+					`attribute \`${name}\``,
+					serverAttr,
+					clientAttr,
+				);
 			}
 		}
 	}
@@ -3312,16 +3327,16 @@ export function setClassName(el: Element, value: unknown): void {
 	const cls = normalizeClass(value);
 	// Hydration VALUE-mismatch detection for `class` (parity with `setAttribute`): the write
 	// below patches to the client value; here we (dev) warn on a server/client divergence and
-	// honor `suppressHydrationWarning` (keep the server class). Skipped unless dev or suppressed
-	// so a non-suppressed prod hydration adds no cost. Guarded by `hydrating`.
+	// honor `suppressHydrationWarning` (keep the server class). `hydrationMismatchMode` skips
+	// the compare unless dev or suppressed so a non-suppressed prod hydration adds no cost.
+	// Guarded by `hydrating`.
 	if (hydrating) {
-		const suppress = isHydrationSuppressed(el);
-		const loc = (el as any).__oct_loc;
-		if (suppress || loc !== undefined) {
+		const mode = hydrationMismatchMode(el);
+		if (mode !== 0) {
 			const serverClass = el.getAttribute('class') ?? '';
 			if (serverClass !== cls) {
-				if (suppress) return; // keep the server class
-				warnHydrationValueMismatch(loc, 'attribute `class`', serverClass, cls);
+				if (mode === 1) return; // keep the server class
+				warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', serverClass, cls);
 			}
 		}
 	}
@@ -3332,22 +3347,40 @@ export function setClassName(el: Element, value: unknown): void {
 	(el as any).className = cls;
 }
 
-// SVG/MathML class setter for compiled TEMPLATE bindings, where `className` is a
-// read-only SVGAnimatedString so the fast `setClassName` can't be used. clsx-composes
-// the value; a nullish/false value REMOVES the attribute (parity with the generic
-// setAttribute this binding routed through before clsx composition existed).
+// Attribute-based class setter: SVG/MathML compiled TEMPLATE bindings (where
+// `className` is a read-only SVGAnimatedString so the fast `setClassName` can't be
+// used), setDeoptClass's SVG arm, and setSpread's class arm all route here.
+// clsx-composes the value; a nullish/false value REMOVES the attribute (parity with
+// the generic setAttribute this binding routed through before clsx composition
+// existed).
 export function setClassAttr(el: Element, value: unknown): void {
-	if (value == null || value === false) el.removeAttribute('class');
-	else el.setAttribute('class', normalizeClass(value));
+	const cls = value == null || value === false ? null : normalizeClass(value);
+	// Hydration VALUE-mismatch handling, mirroring `setClassName`: honor
+	// `suppressHydrationWarning` (keep the server class) and dev-warn on a divergence —
+	// so SVG/spread classes get the same suppress/warn semantics as an HTML `className`
+	// binding instead of silently clobbering the adopted server class.
+	if (hydrating) {
+		const mode = hydrationMismatchMode(el);
+		if (mode !== 0) {
+			const serverClass = el.getAttribute('class');
+			if (serverClass !== cls) {
+				if (mode === 1) return; // keep the server class
+				warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', serverClass, cls);
+			}
+		}
+	}
+	if (cls === null) el.removeAttribute('class');
+	else el.setAttribute('class', cls);
 }
 
 // SVG-safe class setter for the de-opt / hostComponent paths, which (unlike the
 // compiled template) can hit an SVGElement whose `className` is a read-only
-// SVGAnimatedString. Routes SVG through setAttribute('class', …) and keeps HTML on the
-// fast `setClassName`; both clsx-compose the value.
+// SVGAnimatedString. Routes SVG through the attribute-based `setClassAttr` and keeps
+// HTML on the fast `setClassName`; both clsx-compose the value and share the same
+// hydration suppress/warn semantics.
 function setDeoptClass(el: Element, value: unknown): void {
 	if (el.namespaceURI === SVG_NS) {
-		el.setAttribute('class', normalizeClass(value));
+		setClassAttr(el, value);
 	} else {
 		setClassName(el, value);
 	}
@@ -3368,17 +3401,23 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	// free, as with attributes) then, in dev, warn if it actually changed the adopted server
 	// style. The before/after `cssText` compare needs no manual serialization and no-ops when
 	// the styles match. `suppressHydrationWarning` keeps the server style + suppresses.
+	// `hydrationMismatchMode` gates the compare exactly like the attribute/class sites, so a
+	// non-suppressed prod hydration pays no cssText serialization for the (loc-gated,
+	// guaranteed-no-op) warning.
 	if (hydrating) {
-		const before = style.cssText;
-		if (isHydrationSuppressed(el)) {
+		const mode = hydrationMismatchMode(el);
+		if (mode === 1) {
 			// Keep the server style — skip the client apply entirely.
 			return;
 		}
-		applyStyleValue(style, value, prev);
-		if (style.cssText !== before) {
-			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, style.cssText);
+		if (mode === 2) {
+			const before = style.cssText;
+			applyStyleValue(style, value, prev);
+			if (style.cssText !== before) {
+				warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, style.cssText);
+			}
+			return;
 		}
-		return;
 	}
 	applyStyleValue(style, value, prev);
 }
@@ -3531,12 +3570,59 @@ function eventSlot(name: string): { type: string; key: string; capture: boolean 
 	return { type, key: capture ? CAPTURE_PREFIX + type : '$$' + type, capture };
 }
 
+// Remove ONE host prop that was present last render and is gone this render. This is
+// the single shared removal path for all three prop-diff loops — setSpread's prev-loop,
+// patchDeoptProps' prev-loop (the de-opt reconcile path) and applyHostProps' prev-loop —
+// so removal stays symmetric with the corresponding SET path:
+//   - `class`/`className`      → removeAttribute('class') (React parity; never `class=""`).
+//   - `style`                  → setStyle(el, null, prevValue), diff-clearing an object prev.
+//   - `dangerouslySetInnerHTML`→ clear innerHTML (the raw HTML owned the content).
+//   - `suppressHydrationWarning` → reset the `__oct_suppress` JS flag. It was never a DOM
+//     attribute (see applyDeoptProps), so a removeAttribute would silently no-op and leak
+//     the suppression onto later hydrations of a reused element.
+//   - `on*` handlers           → null the delegated slot key (bubble or capture phase).
+//   - everything else          → setAttribute(el, name, null), which applies the same
+//     htmlFor→for alias, aria-* semantics, and attribute-namespace routing the SET path
+//     used — a raw removeAttribute(name) here would e.g. remove the nonexistent
+//     `htmlFor` attribute and leak the real `for`.
+// `ref` is intentionally NOT handled here: each caller owns its ref lifecycle (setSpread
+// and applyHostProps detach inline with the element as the cleanup target, and
+// applyHostProps also clears `state.ref`; patchDeoptProps detaches once up front as the
+// reconcile path's sole detach point) — see the call sites.
+function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
+	if (name === 'class' || name === 'className') {
+		el.removeAttribute('class');
+	} else if (name === 'style') {
+		setStyle(el as HTMLElement, null, prevValue);
+	} else if (name === 'dangerouslySetInnerHTML') {
+		el.innerHTML = '';
+	} else if (name === 'suppressHydrationWarning') {
+		(el as any).__oct_suppress = false;
+	} else {
+		const ev = eventSlot(name);
+		if (ev) (el as any)[ev.key] = null;
+		else setAttribute(el, name, null);
+	}
+}
+
 export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope): void {
 	// `mountScope` is passed only on the mount call (not on updates). When present
 	// a spread-supplied ref attach is DEFERRED to commit so a callback ref sees a
 	// connected node — same React-19 timing as element/fragment refs. On update
 	// the element is already connected, so the ref attaches inline.
-	// Remove keys present in prev but absent (or set differently for events) in value.
+	// Stamp `suppressHydrationWarning` BEFORE either loop (order-independent, like React
+	// reading it off props ahead of the diff) so the attribute/class/style writes below
+	// see the flag no matter where the key sits in the spread object. A JS flag only —
+	// never a DOM attribute — matching the compiler's direct-attribute binding, the
+	// de-opt/host paths, and ssrSpread (which skips the key entirely, so writing an
+	// attribute here would itself manufacture the very server/client divergence the
+	// flag exists to suppress). A vanished key is reset by the removal loop below.
+	if (value != null && 'suppressHydrationWarning' in value) {
+		(el as any).__oct_suppress = value.suppressHydrationWarning !== false;
+	}
+	// Remove keys present in prev but absent in value (removeHostProp routes each to
+	// the removal that mirrors its SET path — class, style, innerHTML, suppress flag,
+	// event slot, aliased/namespaced attribute).
 	if (prev) {
 		for (const k in prev) {
 			if (k === 'key' || k === 'children') continue;
@@ -3545,24 +3631,15 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 				// identity changed (the value loop re-attaches a changed ref).
 				// attachRef runs a callback's React-19 cleanup-return (or calls it
 				// with null) and clears object/array refs — full parity with a
-				// direct `ref={}` binding.
+				// direct `ref={}` binding. Handled here (not in removeHostProp)
+				// because the detach passes THIS element, so a callback ref shared
+				// across elements releases its per-element cleanup.
 				const nextRef = value ? value.ref : undefined;
-				if (prev.ref != null && prev.ref !== nextRef) attachRef(prev.ref, null);
+				if (prev.ref != null && prev.ref !== nextRef) attachRef(prev.ref, null, el);
 				continue;
 			}
 			if (value && k in value) continue;
-			const removedEv = eventSlot(k);
-			if (removedEv) {
-				(el as any)[removedEv.key] = null;
-			} else if (k === 'class' || k === 'className') {
-				el.removeAttribute('class');
-			} else if (k === 'style') {
-				setStyle(el as HTMLElement, null, prev[k]);
-			} else if (k === 'dangerouslySetInnerHTML') {
-				el.innerHTML = '';
-			} else {
-				el.removeAttribute(k);
-			}
+			removeHostProp(el, k, prev[k]);
 		}
 	}
 	if (value == null) return;
@@ -3580,10 +3657,12 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 			else attachRef(v, el);
 			continue;
 		}
+		if (k === 'suppressHydrationWarning') continue; // stamped before the loops (see above)
 		if (k === 'class' || k === 'className') {
 			if (v === pv) continue;
-			if (v == null || v === false) el.removeAttribute('class');
-			else el.setAttribute('class', normalizeClass(v));
+			// Hydration-aware + SVG-safe class write (suppress/warn parity with a
+			// direct class binding); nullish/false removes the attribute.
+			setClassAttr(el, v);
 			continue;
 		}
 		if (k === 'style') {
@@ -4102,10 +4181,14 @@ export function setFormAction(
 		el.removeAttribute(name);
 		return;
 	}
-	// Non-function (string/null): native behavior. Clear any prior handler.
+	// Non-function (string/null): native behavior. Clear any prior handler AND drop the
+	// wired flag so a later string→function flip re-installs `$$submit` — without the
+	// reset, the re-wire guard above would still see `$$formSubmitWired` and leave
+	// submit interception permanently dead for this form.
 	(el as any).$$formAction = undefined;
 	if (typeof prev === 'function' && el.nodeName === 'FORM') {
 		(el as any).$$submit = undefined;
+		(el as any).$$formSubmitWired = false;
 	}
 	setAttribute(el, name, value);
 }
@@ -4796,8 +4879,6 @@ function coerceChildText(v: unknown): string {
 	return v == null || v === false || v === true ? '' : String(v);
 }
 
-// Remove the slot's current content (Block or Text) while preserving its marker
-// pair, so a mode switch (or component-identity swap) rebuilds in place.
 // ---------------------------------------------------------------------------
 // Off-screen (WIP-model) rendering — React's "render the new tree off the current
 // one, commit atomically" applied per-swap. When a TRANSITION render replaces
@@ -4869,6 +4950,9 @@ function disposeWip(wip: OffscreenWip): void {
 	unmountBlock(wip.block, true);
 }
 
+// Remove the slot's current content (Block, Text, or pure-host node) while
+// preserving its marker pair, so a mode switch (or component-identity swap)
+// rebuilds in place.
 function clearChildContent(state: ChildSlot): void {
 	if (state.block !== null) {
 		// Fire the subtree's cleanups but DON'T let unmountBlock strip the DOM —
@@ -4891,12 +4975,10 @@ function clearChildContent(state: ChildSlot): void {
 		}
 	} else if (state.text !== null) {
 		// Client text path: a single tracked Text node, no start marker to sweep.
+		// (A pure-host node never appears here: the pure-host branch of childSlot
+		// mints `start` before it ever sets `hostNode`, so a live hostNode is
+		// always swept by the marker-range branch above.)
 		state.text.remove();
-	} else if (state.hostNode !== null) {
-		// Pure-host de-opt node with no start marker (rare) — remove it directly, detaching
-		// its ref first so a `ref={obj}` doesn't dangle at the removed element.
-		detachDeoptRef(state.hostNode);
-		(state.hostNode as ChildNode).remove?.();
 	}
 	state.text = null;
 	state.currentComp = null;
@@ -4951,17 +5033,6 @@ function deoptKeyPositional(item: any, index: number): any {
 	return item != null && item.$$kind === ELEMENT_TAG && item.key != null ? item.key : index;
 }
 
-// Whether a prop name is an `on<Upper>` delegated-event handler (e.g. `onClick`).
-function isDelegatedEventName(name: string): boolean {
-	return (
-		name.length > 2 &&
-		name.charCodeAt(0) === 111 /* o */ &&
-		name.charCodeAt(1) === 110 /* n */ &&
-		name.charCodeAt(2) >= 65 &&
-		name.charCodeAt(2) <= 90 /* on<Upper> */
-	);
-}
-
 // Apply ONE host prop, reusing the same helpers the compiler emits (className/style/
 // setAttribute + `$$type` delegated-event slots + deferred ref attach).
 function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): void {
@@ -4971,32 +5042,17 @@ function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): v
 		setDeoptClass(el, v);
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, v, undefined);
-	} else if (isDelegatedEventName(name)) {
-		const ev = eventSlot(name)!;
-		(el as any)[ev.key] = v;
-		if (ev.capture) delegateCaptureEvents([ev.type]);
-		else delegateEvents([ev.type]);
 	} else {
-		setAttribute(el, name, v);
-	}
-}
-
-// Remove a host prop that was present last render and is gone this render (reconcile
-// path). The node is being REUSED (not unmounted), so a removed `ref` is left to the
-// unmount path rather than detached here.
-function removeDeoptProp(el: Element, name: string): void {
-	if (name === 'ref') {
-		/* reused node — ref detach is the unmount path's job */
-	} else if (name === 'className' || name === 'class') {
-		setDeoptClass(el, '');
-	} else if (name === 'style') {
-		el.removeAttribute('style');
-	} else if (name === 'dangerouslySetInnerHTML') {
-		el.innerHTML = '';
-	} else if (isDelegatedEventName(name)) {
-		(el as any)[eventSlot(name)!.key] = undefined;
-	} else {
-		el.removeAttribute(name);
+		// eventSlot returns non-null exactly for `on<Upper>` delegated-handler names
+		// (the same classification setSpread/applyHostProps use).
+		const ev = eventSlot(name);
+		if (ev !== null) {
+			(el as any)[ev.key] = v;
+			if (ev.capture) delegateCaptureEvents([ev.type]);
+			else delegateEvents([ev.type]);
+		} else {
+			setAttribute(el, name, v);
+		}
 	}
 }
 
@@ -5030,15 +5086,19 @@ function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock: Block): void {
 	// ref lifecycle on a REUSED node: detach the previous ref if it was removed or its identity
 	// changed (the apply loop below re-attaches a changed one via applyDeoptProp). Without this a
-	// removed/swapped `ref={obj}` keeps pointing at this element. `removeDeoptProp` intentionally
-	// no-ops `ref`, so this is the sole detach point for the reconcile path.
+	// removed/swapped `ref={obj}` keeps pointing at this element. The prev-loop below skips
+	// `ref`, so this is the sole detach point for the reconcile path (the detach passes the
+	// element so a callback ref shared across elements releases its per-element cleanup).
 	const prevRef = prevProps != null ? prevProps.ref : undefined;
 	const nextRef = nextProps != null ? nextProps.ref : undefined;
-	if (prevRef != null && prevRef !== nextRef) attachRef(prevRef, null);
+	if (prevRef != null && prevRef !== nextRef) attachRef(prevRef, null, el);
 	if (prevProps != null) {
 		for (const name in prevProps) {
-			if (name === 'key' || name === 'children' || name === 'suppressHydrationWarning') continue;
-			if (nextProps == null || !(name in nextProps)) removeDeoptProp(el, name);
+			// `ref` was handled above; everything else routes through the shared removal
+			// path — including `suppressHydrationWarning`, whose disappearance must reset
+			// the element's `__oct_suppress` flag (parity with applyHostProps' prev-loop).
+			if (name === 'key' || name === 'children' || name === 'ref') continue;
+			if (nextProps == null || !(name in nextProps)) removeHostProp(el, name, prevProps[name]);
 		}
 	}
 	if (nextProps != null) {
@@ -5112,7 +5172,7 @@ export function hostComponent(
 		scope.children.push({ key: slot, scope: childScope });
 		block.parentNode.insertBefore(el, anchor ?? block.endMarker);
 		scope.cleanups.push(() => {
-			if (state!.ref != null) attachRef(state!.ref, null);
+			if (state!.ref != null) attachRef(state!.ref, null, state!.el);
 		});
 	}
 	const el = state.el;
@@ -5137,35 +5197,22 @@ export function hostComponent(
 // while className/style/events/attributes are idempotently re-set.
 function applyHostProps(el: Element, props: any, scope: Scope, state: HostComponentSlot): void {
 	const prev = state.props;
-	// REMOVE props/events present last render but gone now (parity with setSpread /
-	// patchDeoptProps) — a reused element must not keep stale props/listeners.
+	// REMOVE props/events present last render but gone now, via the shared removeHostProp
+	// (parity with setSpread / patchDeoptProps) — a reused element must not keep stale
+	// props/listeners. `ref` stays here (not in removeHostProp) because this path also
+	// clears the persistent `state.ref` alongside the detach.
 	if (prev != null) {
 		for (const k in prev) {
 			if (k === 'key' || k === 'children') continue;
 			if (props != null && k in props) continue;
 			if (k === 'ref') {
 				if (prev.ref != null) {
-					attachRef(prev.ref, null);
+					attachRef(prev.ref, null, el);
 					if (state.ref === prev.ref) state.ref = undefined;
 				}
 				continue;
 			}
-			if (k === 'suppressHydrationWarning') {
-				(el as any).__oct_suppress = false;
-				continue;
-			}
-			const removedEv = eventSlot(k);
-			if (removedEv) {
-				(el as any)[removedEv.key] = null;
-			} else if (k === 'className' || k === 'class') {
-				el.removeAttribute('class');
-			} else if (k === 'style') {
-				setStyle(el as HTMLElement, null, prev[k]);
-			} else if (k === 'dangerouslySetInnerHTML') {
-				el.innerHTML = '';
-			} else {
-				el.removeAttribute(k);
-			}
+			removeHostProp(el, k, prev[k]);
 		}
 	}
 	state.props = props;
@@ -5179,7 +5226,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 		}
 		if (name === 'ref') {
 			if (v !== state.ref) {
-				if (state.ref != null) attachRef(state.ref, null);
+				if (state.ref != null) attachRef(state.ref, null, el);
 				if (v != null) queueRefAttach(scope, () => attachRef(v, el));
 				state.ref = v;
 			}
@@ -5228,7 +5275,7 @@ function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 // No-op for nodes without a de-opt descriptor or without a ref (adopted/text/plain nodes).
 function detachDeoptRef(node: Node): void {
 	const ref = getDeoptDesc(node)?.props?.ref;
-	if (ref != null) attachRef(ref, null);
+	if (ref != null) attachRef(ref, null, node as Element);
 }
 
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
@@ -5335,24 +5382,18 @@ function reconcileDeoptChildren(
 	// ranges: a portal rendered elsewhere may target this element, and its nodes are
 	// not ours to reuse, remove, or reorder (React parity — portal content coexists
 	// with the container's rendered children). Range starts carry $$portalEnd.
-	let owned: Node[] | null = null;
+	const owned: Node[] = [];
 	let hasForeign = false;
-	{
-		let scan: Node | null = el.firstChild;
-		const acc: Node[] = [];
-		while (scan !== null) {
-			const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
-			if (rangeEnd != null) {
-				hasForeign = true;
-				let m: Node | null = scan;
-				while (m !== null && m !== rangeEnd) m = m.nextSibling;
-				scan = (m ?? scan).nextSibling;
-				continue;
-			}
-			acc.push(scan);
-			scan = scan.nextSibling;
+	let scan: Node | null = el.firstChild;
+	while (scan !== null) {
+		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
+		if (rangeEnd != null) {
+			hasForeign = true;
+			scan = nodeAfterPortalRange(scan, rangeEnd);
+			continue;
 		}
-		owned = acc;
+		owned.push(scan);
+		scan = scan.nextSibling;
 	}
 	// Partition current children: keyed (by stamped descriptor key) vs the rest
 	// (unkeyed elements + text/adopted nodes), which are reused in document order.
@@ -5405,6 +5446,16 @@ function reconcileDeoptChildren(
 	}
 }
 
+// Resume point of an owned-children walk after a foreign portal range: the first
+// node AFTER the range close (`end`). Tolerates a torn range (the close was removed
+// out from under us) by resuming right after `start`, so the walk can never loop.
+// Shared by reconcileDeoptChildren's owned-children scan and liveOwnedChildAt.
+function nodeAfterPortalRange(start: Node, end: Node): Node | null {
+	let m: Node | null = start;
+	while (m !== null && m !== end) m = m.nextSibling;
+	return (m ?? start).nextSibling;
+}
+
 // The i-th child of `el` that the de-opt reconciler OWNS, skipping foreign
 // `<!--portal-->…<!--/portal-->` ranges (see reconcileDeoptChildren). Live walk —
 // called per reorder step, only when a foreign range exists.
@@ -5414,9 +5465,7 @@ function liveOwnedChildAt(el: Element, index: number): Node | null {
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
 		if (rangeEnd != null) {
-			let m: Node | null = scan;
-			while (m !== null && m !== rangeEnd) m = m.nextSibling;
-			scan = (m ?? scan).nextSibling;
+			scan = nodeAfterPortalRange(scan, rangeEnd);
 			continue;
 		}
 		if (i === index) return scan;
@@ -5426,10 +5475,12 @@ function liveOwnedChildAt(el: Element, index: number): Node | null {
 	return null;
 }
 
-// `reconcileKeyed` item body for one de-opt array element. Each item rebuilds its
-// DOM from the descriptor every render — host elements carry no state, so a
-// rebuild reproduces React's observable output (it does NOT preserve host node
-// identity across parent re-renders; that's the documented de-opt trade-off).
+// `reconcileKeyed` item body for one de-opt array element. A pure host/text item
+// is reconciled IN PLACE against the node from last render (`block.deoptNode`) —
+// props patched, children matched — so host node identity and DOM-resident state
+// (input value, focus, …) survive parent re-renders; only an incompatible node
+// (tag/type change) is rebuilt. Component-bearing items delegate to a nested
+// childSlot so their subtrees get real, reconcilable Blocks.
 function deoptItemBody(item: any, scope: Scope): void {
 	const block = scope.block;
 	// An item whose subtree contains a COMPONENT descriptor (a bare `<Comp/>`, or a
@@ -5620,6 +5671,20 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	if (!hasDangerHTML(d.props)) childSlot(block, 0, el, d.children, null);
 }
 
+// Tear down a childSlot's de-opt keyed list when the slot leaves array mode (a
+// portal descriptor switches in, or the value stops being an array): unmount all
+// items in one batched sweep and drop the list so a later array rebuilds fresh.
+// (disposeReturnSlot has its own variant — it also unmounts @empty and skips the
+// bookkeeping reset because the whole slot is being discarded.)
+function teardownChildForSlot(state: ChildSlot): void {
+	const fs = state.forSlot!;
+	batchClearItems(fs, fs.items);
+	fs.head = null;
+	fs.tail = null;
+	fs.size = 0;
+	state.forSlot = null;
+}
+
 export function childSlot(
 	parentScope: Scope,
 	slotKey: number,
@@ -5695,13 +5760,7 @@ export function childSlot(
 		state.portal = null;
 	}
 	if (portalDesc !== null) {
-		if (state.forSlot !== null) {
-			batchClearItems(state.forSlot, state.forSlot.items);
-			state.forSlot.head = null;
-			state.forSlot.tail = null;
-			state.forSlot.size = 0;
-			state.forSlot = null;
-		}
+		if (state.forSlot !== null) teardownChildForSlot(state);
 		if (state.block !== null || state.text !== null || state.hostNode !== null) {
 			clearChildContent(state);
 		}
@@ -5750,26 +5809,20 @@ export function childSlot(
 			value,
 			POSITIONAL_CHILDREN.has(value as object) ? deoptKeyPositional : deoptKey,
 			deoptItemBody as any,
-			undefined,
 			false,
 			false,
 		);
 		return;
 	}
 	// Value is NOT an array — if we were in array mode, tear the list down first.
-	if (state.forSlot !== null) {
-		batchClearItems(state.forSlot, state.forSlot.items);
-		state.forSlot.head = null;
-		state.forSlot.tail = null;
-		state.forSlot.size = 0;
-		state.forSlot = null;
-	}
+	if (state.forSlot !== null) teardownChildForSlot(state);
 	// Classify the value. A host descriptor whose subtree contains component
 	// descendants can't be a raw rebuild (its components need reconcilable Blocks) →
 	// route it through the component path below with the stable `hostElementBody`
 	// renderer, which keeps the element across renders and mounts its component
-	// children as proper Blocks. A pure-host descriptor (host/text only) stays on the
-	// cheap de-opt rebuild — host carries no state, so it's rebuilt each render. A
+	// children as proper Blocks. A pure-host descriptor (host/text only) is
+	// reconciled in place against `state.hostNode` (props patched, children matched)
+	// so DOM-resident state survives; only an incompatible node is rebuilt. A
 	// function is a `{children}`-style render body; a component descriptor carries its
 	// `type` + props; anything else is text/empty.
 	let comp: ComponentBody | null = null;
@@ -5843,7 +5896,7 @@ export function childSlot(
 		// before the new suspends (which would blank the boundary). Only when there's
 		// committed old content to hold; urgent + hydration keep the legacy path below.
 		if (state.block !== null && !hydrating && parentBlock.currentRenderMode === 'transition') {
-			const r = renderOffscreen(parentBlock, domParent, state.end!, comp, props);
+			const r = renderOffscreen(parentBlock, domParent, state.end, comp, props);
 			if (r.suspended || r.error) {
 				// Discard the partial; the OLD content was never touched, so it stays live.
 				// Re-throw so the enclosing tryBlock's existing catch holds the old content
@@ -5858,7 +5911,7 @@ export function childSlot(
 			// OUTSIDE that range so it's untouched), then move the WIP into the slot range.
 			// Synchronous, so there is no painted blank between the two.
 			clearChildContent(state);
-			commitOffscreen(r.wip, state.end!);
+			commitOffscreen(r.wip, state.end);
 			state.block = r.wip.block;
 			state.currentComp = comp;
 			return;
@@ -5884,7 +5937,7 @@ export function childSlot(
 		renderBlock(b);
 		// Advance the cursor past this child's adopted range so a following sibling
 		// hole adopts the right node (mirrors componentSlot's post-render advance).
-		if (hydrating && state.end !== null) hydrateNode = state.end.nextSibling;
+		if (hydrating) hydrateNode = state.end.nextSibling;
 		return;
 	}
 
@@ -5950,10 +6003,13 @@ export function textSlot(
 		state === undefined ||
 		state.block !== null ||
 		state.forSlot !== null ||
-		state.hostNode !== null
+		state.hostNode !== null ||
+		state.portal !== null
 	) {
 		// First render (state init + hydration adoption) or a mode switch out of
-		// non-text content — let the full classifier handle it.
+		// non-text content (block / array / host node / portal) — let the full
+		// classifier handle it (it also tears the outgoing mode down, e.g. a
+		// portal's foreign-target content).
 		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd);
 		return;
 	}
@@ -6118,6 +6174,13 @@ function refreshContextConsumers(block: Block): void {
 				// stranded by the bail.
 				const items = s.forSlot.items as Map<any, Block>;
 				for (const item of items.values()) refreshBlockForContext(item);
+			} else if (s.__kind === 'childSlot' && s.portal !== null && s.portal.block !== null) {
+				// childSlot in PORTAL mode: the content Block lives in the EMBEDDED
+				// PortalSlot (state.block is null), e.g. a memo boundary whose
+				// value-position child is `createPortal(...)`. The `s.block` arm above
+				// covers only the compiler fast path's standalone portalSlotSlot; without
+				// this arm, consumers inside a value-position portal were stranded.
+				refreshBlockForContext(s.portal.block);
 			}
 		}
 	}
@@ -6213,8 +6276,10 @@ export function memo<P>(
 //
 //   1. Defers to the current `fn` on every call — invocations route through
 //      `wrapper[HMR].fn` so `update()` can replace it.
-//   2. Tracks every live Block currently using this wrapper (keyed weakly via
-//      a Set so reload-races don't leak). On `update(newFn)` we mutate each
+//   2. Tracks every live Block currently using this wrapper in a plain (strong)
+//      Set, pruned lazily: disposed blocks are retained until the next
+//      `update()` call deletes them (dev-only, so retention is bounded by edit
+//      frequency). On `update(newFn)` we mutate each
 //      block's `body` to point at the new fn and re-render — hook state is
 //      preserved because the compiler emits `Symbol.for(stableId)` for hook
 //      slots (re-imports get the same Symbol identity, so the existing
@@ -6322,7 +6387,11 @@ interface TrySlot {
 	tryBody: ComponentBody;
 	catchBody: ComponentBody | null;
 	pendingBody: ComponentBody | null;
-	/** Has the try body ever rendered to completion? Diagnostic only. */
+	/**
+	 * True once the try body has committed at least once. Load-bearing: gates
+	 * the transition-hold path in handleSuspense — a boundary with no committed
+	 * content must show @pending, not hold prior DOM it never had.
+	 */
 	hasResolved: boolean;
 	err: any;
 	/** The thenable we're currently waiting on (so duplicate listeners don't fire). */
@@ -6338,7 +6407,7 @@ interface TrySlot {
 	 * transition-priority render suspends on an already-committed try block
 	 * we hold the prior DOM AND schedule a fallback swap so the user isn't
 	 * stuck with stale content forever. Matches React's "eventually shows
-	 * fallback" contract — see TRANSITION_FALLBACK_TIMEOUT_MS below.
+	 * fallback" contract — see TRANSITION_FALLBACK_TIMEOUT_MS.
 	 *
 	 * Cleared (clearTimeout) on retry resolve, on switchToCatch, and on
 	 * scope teardown so we don't leak callbacks past the slot's lifetime.
@@ -6462,15 +6531,18 @@ export function tryBlock(
 
 function mountTry(state: TrySlot): void {
 	// Fresh start. If there's leftover state from a prior cycle (e.g. after
-	// catch reset), clear it first.
-	if (state.tryBlock) {
-		unmountBlock(state.tryBlock);
+	// catch reset), clear it first. Compare `block` against the tryBlock we are
+	// about to unmount so a visible try body isn't sent through unmountBlock a
+	// second time (it's idempotent, but the second pass is pure waste).
+	const oldTry = state.tryBlock;
+	if (oldTry) {
+		unmountBlock(oldTry);
 		state.tryBlock = null;
 	}
-	if (state.block && state.block !== state.tryBlock) {
+	if (state.block && state.block !== oldTry) {
 		unmountBlock(state.block);
-		state.block = null;
 	}
+	state.block = null;
 	state.savedDom = null;
 	state.hasResolved = false;
 	state.branch = 1;
@@ -6678,55 +6750,72 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 		return;
 	}
 
-	// PRESERVE the try-body block's hooks Map, `_b.*` bindings, and DOM via
-	// softDetach — whether the suspend came from the try-body block itself OR a
-	// nested descendant block (e.g. a child component that re-renders on its own
-	// and then suspends). The old nested-case behavior unmounted the whole try
-	// subtree, discarding every descendant `scope.hooks` Map, so useState /
-	// useMemo / useRef silently reset on resume — a latent data-loss bug. Keeping
-	// the same blocks means the resume path (attachResume) re-renders the held
-	// tryBlock, which reconciles descendants by key with their state intact —
-	// React's committed-state-preserved-while-suspended contract.
+	// PRESERVE the try-body block's hooks Map, `_b.*` bindings, and DOM (via the
+	// helper's softDetach) — whether the suspend came from the try-body block
+	// itself OR a nested descendant block (e.g. a child component that re-renders
+	// on its own and then suspends). The old nested-case behavior unmounted the
+	// whole try subtree, discarding every descendant `scope.hooks` Map, so
+	// useState / useMemo / useRef silently reset on resume — a latent data-loss
+	// bug. Keeping the same blocks means the resume path (attachResume)
+	// re-renders the held tryBlock, which reconciles descendants by key with
+	// their state intact — React's committed-state-preserved-while-suspended
+	// contract. (The transition HOLD path keeps content visible and does NOT
+	// come here, so its effects correctly stay live.)
+	if (!hideTryContentAndMountPending(state)) return;
+	attachResume(state, thenable);
+}
+
+/**
+ * Hide the try content behind the @pending fallback. The single hide-and-mount
+ * sequence shared by handleSuspense's suspend path and swapToPendingFallback:
+ *
+ *  1. softDetach the tryBlock — its hooks Map, `_b.*` bindings, and DOM are
+ *     preserved (DOM parked in `savedDom`) for the resume re-attach.
+ *  2. React parity: while the boundary shows its fallback, the hidden subtree's
+ *     effects are DESTROYED (cleanups run) and RECREATED on reveal — a suspended
+ *     subtree has no active effects. deactivateScope recursively fires the
+ *     subtree's effect cleanups + clears their deps so the resume re-render
+ *     re-enqueues + re-fires them. Per ReactSuspenseEffectsSemantics-test.js.
+ *  3. Detach the hidden subtree's host refs (object → null, callbacks called
+ *     with null), recreated on reveal — React cycles refs across a suspend like
+ *     layout effects. Only on the FIRST hide; a re-suspend during a partial
+ *     resolve must not re-detach.
+ *  4. Mark the hidden subtree inactive (the <Activity> mechanism) so drainPhase
+ *     SKIPS any effects the just-aborted (re-)suspending render enqueued for it —
+ *     otherwise a boundary that re-suspends DURING a resume (e.g. one of several
+ *     promises resolves but another is still pending) leaves stale layout effects
+ *     in the queue, and the scheduler never goes quiescent. Cleared on reveal
+ *     (attachResume) so effects re-fire; inactive also blocks further enqueues.
+ *  5. A re-suspend while ALREADY pending (branch === 2, a @pending body mounted)
+ *     must REPLACE the prior pending body, not stack a second one. The existing
+ *     pending block lives in `state.block` (it is never the tryBlock once we've
+ *     soft-detached); unmount it so its DOM is removed exactly once before the
+ *     fresh @pending body mounts. Without this, two consecutive suspends on the
+ *     same boundary (e.g. two sequential useSuspenseQuery calls) leave both
+ *     fallbacks — and ultimately the resolved content alongside a stuck fallback
+ *     — in the DOM at once. The tryBlock is preserved separately (savedDom), so
+ *     this never touches it.
+ *  6. Mount the fresh @pending body between minted `pend-b` markers; a throw
+ *     while rendering it unwinds to @catch via switchToCatch.
+ *
+ * Returns false when the pending body threw and the boundary switched to @catch
+ * — the caller must bail out (no resume wiring for a dead boundary).
+ */
+function hideTryContentAndMountPending(state: TrySlot): boolean {
 	softDetachTryBlock(state);
-	// React parity: while the boundary shows its fallback, the hidden subtree's effects
-	// are DESTROYED (cleanups run) and RECREATED on reveal — a suspended subtree has no
-	// active effects. softDetach preserves the blocks (so useState/useMemo/useRef state
-	// survives), and deactivateScope recursively fires the subtree's effect cleanups +
-	// clears their deps so the resume re-render re-enqueues + re-fires them. (The
-	// transition HOLD path keeps content visible and does NOT come here, so its effects
-	// correctly stay live.) Per ReactSuspenseEffectsSemantics-test.js.
 	if (state.tryBlock) {
 		deactivateScope(state.tryBlock);
-		// Detach the hidden subtree's host refs (object → null, callbacks called with null),
-		// recreated on reveal — React cycles refs across a suspend like layout effects. Only
-		// on the FIRST hide; a re-suspend during a partial resolve must not re-detach.
 		if (state.detachedRefs === null) {
 			state.detachedRefs = [];
 			detachSubtreeRefs(state.tryBlock, state.detachedRefs);
 		}
-		// Mark the hidden subtree inactive (the <Activity> mechanism) so drainPhase SKIPS
-		// any effects the just-aborted (re-)suspending render enqueued for it — otherwise a
-		// boundary that re-suspends DURING a resume (e.g. one of several promises resolves
-		// but another is still pending) leaves stale layout effects in the queue, and the
-		// scheduler never goes quiescent. Cleared on reveal (attachResume) so effects
-		// re-fire. inactive also prevents any further enqueues while hidden.
 		state.tryBlock.inactive = true;
 	}
-	// A re-suspend while ALREADY pending (branch === 2, a @pending body mounted)
-	// must REPLACE the prior pending body, not stack a second one. The existing
-	// pending block lives in `state.block` (it is never the tryBlock once we've
-	// soft-detached); unmount it so its DOM is removed exactly once before we
-	// mount the fresh @pending body below. Without this, two consecutive
-	// suspends on the same boundary (e.g. two sequential useSuspenseQuery calls)
-	// leave both fallbacks — and ultimately the resolved content alongside a
-	// stuck fallback — in the DOM at once. The tryBlock is preserved separately
-	// (softDetach saves its DOM in `savedDom`), so this never touches it.
 	if (state.block && state.block !== state.tryBlock) {
 		unmountBlock(state.block);
 	}
 	state.block = null;
 	state.branch = 2;
-
 	if (state.pendingBody) {
 		const bStart = document.createComment('pend-b');
 		const bEnd = document.createComment('/pend-b');
@@ -6751,10 +6840,10 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 				state.block = null;
 			}
 			switchToCatch(state, err);
-			return;
+			return false;
 		}
 	}
-	attachResume(state, thenable);
+	return true;
 }
 
 /**
@@ -6763,56 +6852,18 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
  * transition-fallback timeout when a held transition runs over budget — by
  * that point the user has waited long enough that React (and we) commit the
  * fallback to give visual feedback. The retry path re-attaches savedDom on
- * resolve, so this is recoverable.
+ * resolve, so this is recoverable. (The resume listener is already attached —
+ * the hold began in handleSuspense — so unlike the suspend path there is no
+ * attachResume here.)
  *
  * No-op when no pending body was compiled OR when state has already moved
  * (e.g. resolve raced the timeout).
  */
 function swapToPendingFallback(state: TrySlot): void {
 	if (!state.pendingBody || state.branch !== 1 || !state.tryBlock) return;
-	softDetachTryBlock(state);
-	// The transition hold ran past its fallback timeout → the held content is now hidden
-	// behind the @pending fallback, so destroy its effects (recreated on resume), same as
-	// the urgent re-suspend path above. See ReactSuspenseEffectsSemantics-test.js.
-	deactivateScope(state.tryBlock);
-	if (state.detachedRefs === null) {
-		state.detachedRefs = [];
-		detachSubtreeRefs(state.tryBlock, state.detachedRefs);
-	}
-	state.tryBlock.inactive = true;
-	state.block = null;
-	state.branch = 2;
-	const bStart = document.createComment('pend-b');
-	const bEnd = document.createComment('/pend-b');
-	state.domParent.insertBefore(bStart, state.end);
-	state.domParent.insertBefore(bEnd, state.end);
-	const b = createBlock(
-		'control-flow',
-		state.parentBlock,
-		state.domParent,
-		bStart,
-		bEnd,
-		state.pendingBody,
-		undefined,
-	);
-	(b as any).__trySlot = state;
-	state.block = b;
-	try {
-		renderBlock(b);
-	} catch (err) {
-		if (state.block) {
-			unmountBlock(state.block);
-			state.block = null;
-		}
-		switchToCatch(state, err);
-	}
+	hideTryContentAndMountPending(state);
 }
 
-/**
- * Wire up a `.then` listener that retries the try body when the thenable
- * settles. Dedupes by `pendingThenable` so two suspends on the same promise
- * don't queue two retries.
- */
 // Commit a resolved boundary's reveal: reattach its held/detached DOM, re-render the
 // try body, re-attach host refs, and drain its effects. Runs in a thenable microtask
 // (outside the normal flush) OR from the entangled-batch flush. Releases the transition
@@ -6916,6 +6967,11 @@ function flushStagedReveals(): void {
 	}
 }
 
+/**
+ * Wire up a `.then` listener that retries the try body when the thenable
+ * settles. Dedupes by `pendingThenable` so two suspends on the same promise
+ * don't queue two retries.
+ */
 function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 	if (state.pendingThenable === thenable) return;
 	state.pendingThenable = thenable;
@@ -7035,9 +7091,10 @@ export function useTransition(
 // receiving the previous COMPLETED result as previousState. `isPending` is true
 // from dispatch until the queue drains. The action's resolved value becomes the
 // new state. Errors route to the nearest @try boundary (else console.error).
-// `permalink` (SSR progressive enhancement) is accepted for signature parity and
-// ignored — octane is client-only. Form auto-reset is intentionally skipped
-// for useActionState forms (typed-in values are kept), matching React.
+// `permalink` (server-action progressive enhancement) is accepted for signature
+// parity and ignored — octane actions run only on the client (no server-action
+// execution); SSR renders the initial state. Form auto-reset is intentionally
+// skipped for useActionState forms (typed-in values are kept), matching React.
 // ---------------------------------------------------------------------------
 
 interface ActionStateSlot<S> {
@@ -7310,7 +7367,7 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 	// arg → user passed initialValue. Same hook-slot semantics either way.
 	let slot = rest[rest.length - 1] as symbol | undefined;
 	slot = resolveSlot(slot);
-	if (slot === undefined || typeof slot !== 'symbol') missingSlot('useDeferredValue');
+	if (typeof slot !== 'symbol') missingSlot('useDeferredValue');
 	const initialValue = rest.length >= 2 ? (rest[0] as T) : undefined;
 	const hasInitial = rest.length >= 2;
 	const scope = CURRENT_SCOPE!;
@@ -7331,7 +7388,10 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 					if (!s!.scheduled || s!.block.disposed) return;
 					s!.scheduled = false;
 					s!.current = s!.next;
-					scheduleRender(s!.block);
+					// Same transition priority as the steady-state deferral below: the
+					// initialValue→value swap can be interrupted by urgent updates and
+					// won't tear down the initial DOM if the swapped-in value suspends.
+					startTransition(() => scheduleRender(s!.block));
 				});
 			}
 			return initialValue as T;
@@ -7391,8 +7451,12 @@ function switchToCatch(state: TrySlot, err: any): void {
 	}
 	// Catch is a fresh terminal state — discard any preserved try-body hook
 	// state. `reset()` will mountTry fresh from the catch arm if user retries.
-	if (state.tryBlock) {
-		unmountBlock(state.tryBlock);
+	// Compare `block` against the tryBlock we just unmounted so a visible try
+	// body isn't sent through unmountBlock a second time (it's idempotent, but
+	// the second pass is pure waste).
+	const oldTry = state.tryBlock;
+	if (oldTry) {
+		unmountBlock(oldTry);
 		state.tryBlock = null;
 	}
 	if (state.savedDom) {
@@ -7401,10 +7465,10 @@ function switchToCatch(state: TrySlot, err: any): void {
 		// because they're detached from the document).
 		state.savedDom = null;
 	}
-	if (state.block && state.block !== state.tryBlock) {
+	if (state.block && state.block !== oldTry) {
 		unmountBlock(state.block);
-		state.block = null;
 	}
+	state.block = null;
 	state.hasResolved = false;
 	state.pendingThenable = null;
 	if (state.transitionHeld) {
@@ -7452,7 +7516,7 @@ function switchToCatch(state: TrySlot, err: any): void {
 }
 
 /** Walk Block.parentBlock chain looking for a `$$tryHandler` registration. */
-export function findTryHandler(block: Block | null): ((err: any) => void) | null {
+function findTryHandler(block: Block | null): ((err: any) => void) | null {
 	let b: Block | null = block;
 	while (b) {
 		const h = (b as any).$$tryHandler;
@@ -7487,65 +7551,55 @@ function handleRenderError(block: Block, err: any): void {
 }
 
 // ---------------------------------------------------------------------------
-// Control flow: ifBlock — swap a subtree based on a predicate
+// Control flow: branch slots — ifBlock (@if/@else) and switchBlock (@switch)
 // ---------------------------------------------------------------------------
+//
+// Both lower to the SAME one-branch-mounted-at-a-time state machine; only the
+// branch RESOLUTION differs (a boolean picking then/else vs `===` over the case
+// tests). Each keeps its own slot init (hydration marker adoption differs — see
+// the callers), resolves the next branch index + body, and hands the swap /
+// re-render to `renderBranchSlot`, the single copy of the machinery.
 
-interface IfSlot {
-	__kind: 'ifBlockSlot';
-	/** Insertion point for the FIRST branch (compiler position / null = append). */
+/**
+ * Common slot shape behind IfSlot / SwitchSlot — everything renderBranchSlot
+ * touches. See the field docs on IfSlot; the two differ only in `__kind` and
+ * in how `branch` is encoded.
+ */
+interface BranchSlot {
+	__kind: 'ifBlockSlot' | 'switchBlockSlot';
 	anchor: Node | null;
-	/**
-	 * Non-null once the slot uses comment markers: adopted server markers
-	 * (hydration), or client markers minted for a multi-node / empty branch (or
-	 * after a swap). Null while self-marking a single-element branch — then the
-	 * element IS the boundary (block.startMarker === endMarker === it).
-	 */
 	start: Comment | null;
-	/** Trailing node of the current branch: the self-marking element, the end
-	 *  marker, or an empty placeholder — the position reference for the next swap. */
 	end: Node | null;
-	/** Current branch: 1 = then, 0 = else, -1 = uninitialized. */
-	branch: -1 | 0 | 1;
+	branch: number;
 	block: Block | null;
 }
 
-export function ifBlock(
+/**
+ * The shared branch-swap core. When `next` differs from the mounted branch:
+ * probe off-screen (transitions), tear the old branch down, and mount `body`
+ * with the dynamic self-marking scheme; when it's the same branch, re-render
+ * in place so hook state / event bindings survive. `marker` is the comment
+ * label minted for the slot's boundary — `<!--if-->…<!--/if-->` /
+ * `<!--switch-->…<!--/switch-->`, following the file-wide open/`/`close
+ * convention (try//try, comp//comp, activity//activity, for//for).
+ */
+function renderBranchSlot(
 	parentScope: Scope,
 	slotKey: number,
+	state: BranchSlot,
 	domParent: Node,
-	cond: boolean,
-	thenBody: ComponentBody | null,
-	elseBody: ComponentBody | null,
-	anchor?: Node | null,
+	next: number,
+	body: ComponentBody | null,
+	marker: string,
 ): void {
 	const parentBlock = parentScope.block;
-	let state = parentScope.slots[slotKey] as IfSlot | undefined;
-	if (state === undefined) {
-		let start: Comment | null = null;
-		let end: Node | null = null;
-		// Hydration: adopt the server's `<!--[-->…<!--]-->` slot range (client mounts
-		// defer marker creation entirely). `resolveHydrationOpen` also covers the
-		// SOLE-hole case — a @if that is the only thing an enclosing arm/component
-		// renders (e.g. `@try { @if (…) {…} }`, the router Match shape) — where the
-		// anchor is the arm's END marker and the cursor is parked on the @if's open.
-		const open = resolveHydrationOpen(anchor ?? null, domParent);
-		if (open !== null) {
-			start = open;
-			end = matchingClose(open);
-		}
-		state = { __kind: 'ifBlockSlot', anchor: anchor ?? null, start, end, branch: -1, block: null };
-		parentScope.slots[slotKey] = state;
-		registerSlot(parentScope, state);
-	}
-	const next: 0 | 1 = cond ? 1 : 0;
-	const body = next ? thenBody : elseBody;
 	if (next !== state.branch) {
 		// Off-screen probe (React WIP model): on a TRANSITION swap to a new branch that
 		// may suspend, render it off-screen FIRST without tearing down the old branch. If
 		// it suspends, route to the enclosing tryBlock so its transition hold keeps the
 		// old branch on screen and resumes — the resume re-renders the try body, which
 		// re-drives this swap. If it completes, discard the probe and fall through to the
-		// normal in-place path below (now non-suspending). Reuses ifBlock's marker logic.
+		// normal in-place path below (now non-suspending). Reuses the slot's marker logic.
 		if (
 			state.block !== null &&
 			body !== null &&
@@ -7616,12 +7670,7 @@ export function ifBlock(
 					'an empty branch',
 					describeHydrationNode(state.start.nextSibling),
 				);
-				let n: Node | null = state.start.nextSibling;
-				while (n !== null && n !== state.end) {
-					const next: Node | null = n.nextSibling;
-					(n as ChildNode).remove();
-					n = next;
-				}
+				removeRange(state.start.nextSibling, state.end);
 			}
 		} else if (firstMount && body) {
 			// First client mount — pick the boundary by what the branch renders.
@@ -7640,8 +7689,8 @@ export function ifBlock(
 				state.end = first;
 			} else {
 				// Multi-node (or rendered nothing) — mint markers around the content.
-				const s = document.createComment('if');
-				const e = document.createComment('if');
+				const s = document.createComment(marker);
+				const e = document.createComment('/' + marker);
 				domParent.insertBefore(s, first ?? after);
 				domParent.insertBefore(e, after);
 				b.startMarker = s;
@@ -7653,8 +7702,8 @@ export function ifBlock(
 		} else {
 			// Swap away from a self-marked branch, or an empty branch: mint stable
 			// markers at the position so the slot has a boundary from here on.
-			const s = document.createComment('if');
-			const e = document.createComment('if');
+			const s = document.createComment(marker);
+			const e = document.createComment('/' + marker);
 			domParent.insertBefore(s, after);
 			domParent.insertBefore(e, after);
 			state.start = s;
@@ -7671,6 +7720,56 @@ export function ifBlock(
 		state.block.body = body!;
 		renderBlock(state.block);
 	}
+}
+
+interface IfSlot extends BranchSlot {
+	__kind: 'ifBlockSlot';
+	/** Insertion point for the FIRST branch (compiler position / null = append). */
+	anchor: Node | null;
+	/**
+	 * Non-null once the slot uses comment markers: adopted server markers
+	 * (hydration), or client markers minted for a multi-node / empty branch (or
+	 * after a swap). Null while self-marking a single-element branch — then the
+	 * element IS the boundary (block.startMarker === endMarker === it).
+	 */
+	start: Comment | null;
+	/** Trailing node of the current branch: the self-marking element, the end
+	 *  marker, or an empty placeholder — the position reference for the next swap. */
+	end: Node | null;
+	/** Current branch: 1 = then, 0 = else, -1 = uninitialized. */
+	branch: number;
+	block: Block | null;
+}
+
+export function ifBlock(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	cond: boolean,
+	thenBody: ComponentBody | null,
+	elseBody: ComponentBody | null,
+	anchor?: Node | null,
+): void {
+	let state = parentScope.slots[slotKey] as IfSlot | undefined;
+	if (state === undefined) {
+		let start: Comment | null = null;
+		let end: Node | null = null;
+		// Hydration: adopt the server's `<!--[-->…<!--]-->` slot range (client mounts
+		// defer marker creation entirely). `resolveHydrationOpen` also covers the
+		// SOLE-hole case — a @if that is the only thing an enclosing arm/component
+		// renders (e.g. `@try { @if (…) {…} }`, the router Match shape) — where the
+		// anchor is the arm's END marker and the cursor is parked on the @if's open.
+		const open = resolveHydrationOpen(anchor ?? null, domParent);
+		if (open !== null) {
+			start = open;
+			end = matchingClose(open);
+		}
+		state = { __kind: 'ifBlockSlot', anchor: anchor ?? null, start, end, branch: -1, block: null };
+		parentScope.slots[slotKey] = state;
+		registerSlot(parentScope, state);
+	}
+	const next: 0 | 1 = cond ? 1 : 0;
+	renderBranchSlot(parentScope, slotKey, state, domParent, next, next ? thenBody : elseBody, 'if');
 }
 
 // ---------------------------------------------------------------------------
@@ -7805,12 +7904,37 @@ export function activityBlock(
 }
 
 /**
- * Run a subtree's effect CLEANUPS without disposing it, and reset its effect
- * slots so the setups re-fire on reactivation. Used by activityBlock on hide:
- * effects are torn down (cleanups run, parent-before-child) while state, DOM and
- * the blocks all stay alive. Refs are intentionally LEFT attached to the
- * preserved (hidden) DOM — they point at valid, still-present nodes.
+ * Enumerate the LIVE child scopes reachable from `scope` — component children plus
+ * every control-flow slot's mounted block(s) — without disposing anything. This is
+ * the single home of the control-flow slot taxonomy for non-destructive subtree
+ * walks (a new slot kind only needs to be added here): `forBlockSlot` contributes
+ * each keyed item block plus the optional `@empty` block; every other slot kind
+ * contributes its generic `.block`; a `trySlotSlot` additionally contributes the
+ * hidden-but-alive `tryBlock` when the boundary is showing @pending/@catch (the
+ * content subtree is soft-detached, not disposed, so it must still be visited).
+ * Shared by detachSubtreeRefs and deactivateScope, which recurse via `visit`.
  */
+function forEachSubtreeChild(scope: Scope, visit: (child: Scope) => void): void {
+	const children = scope.children;
+	for (let i = 0, n = children.length; i < n; i++) visit(children[i].scope);
+	const slots = scope._slots;
+	if (slots !== null) {
+		for (let i = 0, n = slots.length; i < n; i++) {
+			const val = slots[i];
+			if (val.__kind === 'forBlockSlot') {
+				const it = (val.items as Map<any, Block>).values();
+				for (let r = it.next(); !r.done; r = it.next()) visit(r.value);
+				if (val.emptyBlock) visit(val.emptyBlock);
+			} else if (val.block) {
+				visit(val.block);
+				if (val.__kind === 'trySlotSlot' && val.tryBlock && val.tryBlock !== val.block) {
+					visit(val.tryBlock);
+				}
+			}
+		}
+	}
+}
+
 // Detach every host ref in a subtree (object refs → null, callback refs called with
 // null), collecting {ref, el} for later re-attach. Used ONLY by the suspense-hide path
 // (NOT by <Activity>, which intentionally keeps refs) so React's "refs cycle null→node
@@ -7818,7 +7942,7 @@ export function activityBlock(
 // DOM node. The compiler stores host refs as `slot._ref$N` paired with `slot._el$N` in a
 // component's local `scope.slots`; de-opt host slots store `state.ref` + the node. We
 // walk component-local slots for refs and recurse through children + control-flow slots
-// the same way deactivateScope does.
+// via forEachSubtreeChild (the same walk deactivateScope uses).
 function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 	const slots = scope.slots;
 	for (let i = 0, n = slots.length; i < n; i++) {
@@ -7827,7 +7951,7 @@ function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 		// De-opt host element slot (value-position `<tag>` / motion-style): { el, anchor, ref }.
 		if (s.ref != null && s.anchor !== undefined && s.el instanceof Element) {
 			out.push({ ref: s.ref, el: s.el });
-			attachRef(s.ref, null);
+			attachRef(s.ref, null, s.el);
 		}
 		for (const k in s) {
 			// `_ref$N` (compiled template host ref). charCodeAt: '_'=95, 'r'=114.
@@ -7836,30 +7960,23 @@ function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 				if (ref == null) continue;
 				const el = s['_el$' + k.slice(5)];
 				out.push({ ref, el });
-				attachRef(ref, null);
+				attachRef(ref, null, el);
 			}
 		}
 	}
-	const children = scope.children;
-	for (let i = 0, n = children.length; i < n; i++) detachSubtreeRefs(children[i].scope, out);
-	const cf = scope._slots;
-	if (cf !== null) {
-		for (let i = 0, n = cf.length; i < n; i++) {
-			const val = cf[i];
-			if (val.__kind === 'forBlockSlot') {
-				const it = (val.items as Map<any, Block>).values();
-				for (let r = it.next(); !r.done; r = it.next()) detachSubtreeRefs(r.value, out);
-				if (val.emptyBlock) detachSubtreeRefs(val.emptyBlock, out);
-			} else if (val.block) {
-				detachSubtreeRefs(val.block, out);
-				if (val.__kind === 'trySlotSlot' && val.tryBlock && val.tryBlock !== val.block) {
-					detachSubtreeRefs(val.tryBlock, out);
-				}
-			}
-		}
-	}
+	forEachSubtreeChild(scope, (child) => detachSubtreeRefs(child, out));
 }
 
+/**
+ * Run a subtree's effect CLEANUPS without disposing it, and reset its effect
+ * slots so the setups re-fire on reactivation. Used by activityBlock on hide
+ * AND by the tryBlock suspense-hide path (hideTryContentAndMountPending):
+ * effects are torn down (cleanups run, parent-before-child) while state, DOM and
+ * the blocks all stay alive. Refs are intentionally LEFT attached to the
+ * preserved (hidden) DOM when hiding an <Activity> — they point at valid,
+ * still-present nodes; the suspense path detaches them separately
+ * (detachSubtreeRefs) to match React's ref-cycling contract.
+ */
 function deactivateScope(scope: Scope): void {
 	const hooks = scope.hooks;
 	if (hooks) {
@@ -7882,24 +7999,7 @@ function deactivateScope(scope: Scope): void {
 			}
 		}
 	}
-	const children = scope.children;
-	for (let i = 0, n = children.length; i < n; i++) deactivateScope(children[i].scope);
-	const slots = scope._slots;
-	if (slots !== null) {
-		for (let i = 0, n = slots.length; i < n; i++) {
-			const val = slots[i];
-			if (val.__kind === 'forBlockSlot') {
-				const it = (val.items as Map<any, Block>).values();
-				for (let r = it.next(); !r.done; r = it.next()) deactivateScope(r.value);
-				if (val.emptyBlock) deactivateScope(val.emptyBlock);
-			} else if (val.block) {
-				deactivateScope(val.block);
-				if (val.__kind === 'trySlotSlot' && val.tryBlock && val.tryBlock !== val.block) {
-					deactivateScope(val.tryBlock);
-				}
-			}
-		}
-	}
+	forEachSubtreeChild(scope, deactivateScope);
 }
 
 // ---------------------------------------------------------------------------
@@ -7912,26 +8012,17 @@ function deactivateScope(scope: Scope): void {
 // order; the first hit wins, falling back to `defaultBody` when none match
 // (`defaultBody` is `null` when the user wrote no `@default`).
 //
-// State machine mirrors `ifBlock`: a permanent `start`/`end` Comment marker
-// pair brackets the slot's DOM range. When the selected case index changes
-// we tear down the previous branch Block (which removes its own inner
-// markers + DOM) and mount a fresh one; when the selected index is
-// unchanged we re-render in place so hook state / event bindings survive.
-// Index `-2` is reserved for the default branch, `-1` for uninitialized.
-interface SwitchSlot {
+// State machine mirrors `ifBlock` — both delegate to `renderBranchSlot` (see
+// the branch-slots section above ifBlock): when the selected case index
+// changes we tear down the previous branch Block and mount a fresh one; when
+// the selected index is unchanged we re-render in place so hook state / event
+// bindings survive. Index `-2` is reserved for the default branch, `-1` for
+// uninitialized.
+interface SwitchSlot extends BranchSlot {
 	__kind: 'switchBlockSlot';
-	/** Insertion point for the FIRST case (compiler position / null = append). */
-	anchor: Node | null;
-	/** Non-null once the slot uses comment markers (hydration-adopted, or minted
-	 *  for a multi-node / post-swap case); null while self-marking a single-element
-	 *  case (the element is its own boundary). See IfSlot for the full scheme. */
-	start: Comment | null;
-	/** Trailing node of the current case — the self-marking element, the end
-	 *  marker, or an empty placeholder (position reference for the next swap). */
-	end: Node | null;
-	/** Currently-mounted case index, or -1 if uninitialized / -2 for default. */
-	caseIdx: number;
-	block: Block | null;
+	/** Currently-mounted case index, or -1 if uninitialized / -2 for default.
+	 *  All other fields as documented on IfSlot. */
+	branch: number;
 }
 
 export function switchBlock(
@@ -7943,7 +8034,6 @@ export function switchBlock(
 	defaultBody: ComponentBody | null,
 	anchor?: Node | null,
 ): void {
-	const parentBlock = parentScope.block;
 	let state = parentScope.slots[slotKey] as SwitchSlot | undefined;
 	if (state === undefined) {
 		let start: Comment | null = null;
@@ -7960,7 +8050,7 @@ export function switchBlock(
 			anchor: anchor ?? null,
 			start,
 			end,
-			caseIdx: -1,
+			branch: -1,
 			block: null,
 		};
 		parentScope.slots[slotKey] = state;
@@ -7976,128 +8066,7 @@ export function switchBlock(
 			break;
 		}
 	}
-	if (nextIdx !== state.caseIdx) {
-		// Off-screen probe (React WIP model) — same as ifBlock: on a TRANSITION swap to a
-		// new case that may suspend, render it off-screen first; if it suspends, re-throw
-		// so the enclosing tryBlock holds the old case + resumes; if it completes, fall
-		// through to render in place. Reuses switchBlock's marker logic below.
-		if (
-			state.block !== null &&
-			body !== null &&
-			!hydrating &&
-			parentBlock.currentRenderMode === 'transition'
-		) {
-			const probeAfter = state.end ?? state.anchor;
-			if (probeAfter !== null) {
-				const r = renderOffscreen(parentBlock, domParent, probeAfter, body, undefined);
-				disposeWip(r.wip);
-				if (r.error) throw r.error;
-				if (r.suspended) throw new SuspenseException(r.suspended);
-			}
-		}
-		// Position for the new case (after the current trailing node, or the slot
-		// anchor on first mount), captured BEFORE teardown. Same dynamic self-marking
-		// scheme as ifBlock: single-element case → self-mark; multi-node / empty →
-		// mint markers; swap away from self-marked → mint markers; hydration → adopt.
-		const after: Node | null = state.end !== null ? state.end.nextSibling : state.anchor;
-		const firstMount = state.caseIdx === -1;
-		if (state.block) {
-			unmountBlock(state.block);
-			state.block = null;
-		}
-		state.caseIdx = nextIdx;
-		if (state.start !== null) {
-			// MARKER path — hydration-adopted, or already markered (multi-node / post-swap).
-			if (body) {
-				let bStart: Node;
-				let bEnd: Node;
-				let borrowed = false;
-				if (hydrating && isBlockOpen(state.start.nextSibling)) {
-					bStart = state.start.nextSibling as Comment;
-					bEnd = matchingClose(bStart);
-					hydrateNode = bStart.nextSibling;
-				} else {
-					bStart = state.start;
-					bEnd = state.end as Node;
-					borrowed = true;
-					// Hydrating with no inner branch markers = the SERVER rendered this branch
-					// EMPTY (the client now renders content, or vice-versa). Park the cursor on
-					// the slot's first node (the close marker when empty) so the branch body's
-					// clone() sees "nothing here" and client-builds, instead of reading a stale
-					// cursor.
-					if (hydrating) hydrateNode = state.start.nextSibling;
-				}
-				const b = createBlock(
-					'control-flow',
-					parentBlock,
-					domParent,
-					bStart,
-					bEnd,
-					body,
-					undefined,
-				);
-				if (borrowed) b.exclusiveMarkers = true;
-				state.block = b;
-				renderBlock(b);
-			} else if (hydrating && state.start.nextSibling !== state.end) {
-				// EMPTY client branch, but the server rendered content in this slot (e.g. an
-				// `@else` with content on the server, empty `@if` on the client). Discard the
-				// stale server range so the empty branch leaves a clean range + siblings stay
-				// aligned (structural mismatch).
-				warnHydrationStructuralMismatch(
-					siteLoc(parentScope, slotKey),
-					'an empty branch',
-					describeHydrationNode(state.start.nextSibling),
-				);
-				let n: Node | null = state.start.nextSibling;
-				while (n !== null && n !== state.end) {
-					const next: Node | null = n.nextSibling;
-					(n as ChildNode).remove();
-					n = next;
-				}
-			}
-		} else if (firstMount && body) {
-			// First client mount — self-mark a single-element case, else mint markers.
-			const before = after ? after.previousSibling : domParent.lastChild;
-			const b = createBlock('control-flow', parentBlock, domParent, null, after, body, undefined);
-			state.block = b;
-			renderBlock(b);
-			const first = before ? before.nextSibling : domParent.firstChild;
-			const last = after ? after.previousSibling : domParent.lastChild;
-			if (last !== null && first === last && (first as Node).nodeType === 1) {
-				b.startMarker = first;
-				b.endMarker = first;
-				state.end = first;
-			} else {
-				const s = document.createComment('switch');
-				const e = document.createComment('switch');
-				domParent.insertBefore(s, first ?? after);
-				domParent.insertBefore(e, after);
-				b.startMarker = s;
-				b.endMarker = e;
-				b.exclusiveMarkers = true;
-				state.start = s;
-				state.end = e;
-			}
-		} else {
-			// Swap away from a self-marked case, or an empty case: mint stable markers.
-			const s = document.createComment('switch');
-			const e = document.createComment('switch');
-			domParent.insertBefore(s, after);
-			domParent.insertBefore(e, after);
-			state.start = s;
-			state.end = e;
-			if (body) {
-				const b = createBlock('control-flow', parentBlock, domParent, s, e, body, undefined);
-				b.exclusiveMarkers = true;
-				state.block = b;
-				renderBlock(b);
-			}
-		}
-	} else if (state.block) {
-		state.block.body = body!;
-		renderBlock(state.block);
-	}
+	renderBranchSlot(parentScope, slotKey, state, domParent, nextIdx, body, 'switch');
 }
 
 // ---------------------------------------------------------------------------
@@ -8128,14 +8097,13 @@ interface ForSlot {
 	emptyBlock: Block | null;
 }
 
-export function forBlock<T, E = undefined>(
+export function forBlock<T>(
 	parentScope: Scope,
 	slotKey: number,
 	domParent: Node,
 	items: ArrayLike<T>,
 	getKey: (item: T, index: number) => any,
-	itemBody: (item: T, scope: Scope, extra: E) => void,
-	extra?: E,
+	itemBody: (item: T, scope: Scope) => void,
 	flags?: number,
 	deps?: any[],
 	emptyBody?: ComponentBody | null,
@@ -8199,7 +8167,7 @@ export function forBlock<T, E = undefined>(
 	if (isEmpty && emptyBody) {
 		if (state.size > 0) {
 			// had items last render, now we're empty — tear down the chain.
-			reconcileKeyed(parentBlock, state, items, getKey, itemBody as any, extra, false, false);
+			reconcileKeyed(parentBlock, state, items, getKey, itemBody as any, false, false);
 		}
 		if (state.emptyBlock) {
 			// keep the existing empty branch mounted, but re-render in case the
@@ -8215,17 +8183,15 @@ export function forBlock<T, E = undefined>(
 			// hydration suspended (so it client-mounts instead of mis-adopting an item).
 			let suspendForEmpty = false;
 			if (hydrating && isBlockOpen(state.start.nextSibling)) {
+				// Prefer the @for's own compiled source loc (siteLoc; for-constructs carry
+				// `loc` in `__s.locs`) — the parent element's `__oct_loc` stamp exists only
+				// when the parent carries dynamic bindings.
 				warnHydrationStructuralMismatch(
-					(domParent as any).__oct_loc,
+					siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc,
 					'an empty list (@empty)',
 					'a populated list',
 				);
-				let n: Node | null = state.start.nextSibling;
-				while (n !== null && n !== state.end) {
-					const next: Node | null = n.nextSibling;
-					(n as ChildNode).remove();
-					n = next;
-				}
+				removeRange(state.start.nextSibling, state.end);
 				domParent.insertBefore(bStart, state.end);
 				domParent.insertBefore(bEnd, state.end);
 				suspendForEmpty = true;
@@ -8279,16 +8245,11 @@ export function forBlock<T, E = undefined>(
 		!isBlockOpen(state.start.nextSibling)
 	) {
 		warnHydrationStructuralMismatch(
-			(domParent as any).__oct_loc,
+			siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc,
 			'a populated list',
 			'an empty list (@empty)',
 		);
-		let n: Node | null = state.start.nextSibling;
-		while (n !== null && n !== state.end) {
-			const next: Node | null = n.nextSibling;
-			(n as ChildNode).remove();
-			n = next;
-		}
+		removeRange(state.start.nextSibling, state.end);
 		hydrateNode = state.end;
 	}
 	const f = flags || 0;
@@ -8298,7 +8259,8 @@ export function forBlock<T, E = undefined>(
 	// as PURE for the survivor short-circuit. The body still runs for moved/
 	// mounted/removed items — only stable survivors get skipped.
 	// `lite` = body is depEligible but did NOT promote to pure this render.
-	// depEligible (compile.js:2553-2555) means no hooks, no nested comps, no
+	// depEligible (see makeForCall's body analysis in compile.js, packed into
+	// the forBlock `flags` bits) means no hooks, no nested comps, no
 	// control flow → the body can't observe CURRENT_SCOPE / CURRENT_BLOCK and
 	// never throws Suspense. We skip renderBlock's activeBlock plumbing and
 	// call itemBody directly. Saves ~10 ops/survivor — meaningful on the
@@ -8313,17 +8275,7 @@ export function forBlock<T, E = undefined>(
 		}
 		state.cachedDeps = deps;
 	}
-	reconcileKeyed(
-		parentBlock,
-		state,
-		items,
-		getKey,
-		itemBody as any,
-		extra,
-		pure,
-		(f & 2) !== 0,
-		lite,
-	);
+	reconcileKeyed(parentBlock, state, items, getKey, itemBody as any, pure, (f & 2) !== 0, lite);
 	// Advance the hydration cursor past the @for's `<!--]-->` so a later sibling's
 	// clone() starts after this block — covers the zero-item, no-@empty case where
 	// reconcileKeyed mounts nothing and the cursor would otherwise stay on the
@@ -8341,8 +8293,22 @@ export function forBlock<T, E = undefined>(
  * extra server rows don't linger. Same-parent guarded; stops AT `end` (never past it).
  */
 function discardLeftoverHydrationItems(end: Node): void {
-	let n: Node | null = hydrateNode;
+	const n = hydrateNode;
 	if (n === null || n === end || n.parentNode !== end.parentNode) return;
+	removeRange(n, end);
+}
+
+/**
+ * Remove every sibling from `from` (inclusive) up to but NOT including `end`.
+ * The shared hydration "discard the stale server range" sweep: used when the
+ * server-rendered content inside an adopted `<!--[-->…<!--]-->` range doesn't
+ * match what the client renders (content vs empty branch in @if/@switch, items
+ * vs @empty in @for, leftover server items past the client's last item).
+ * `end` may be null (an @if slot whose end marker isn't minted yet) — then the
+ * sweep runs to the last sibling, exactly as the open-coded loops did.
+ */
+function removeRange(from: Node | null, end: Node | null): void {
+	let n: Node | null = from;
 	while (n !== null && n !== end) {
 		const next: Node | null = n.nextSibling;
 		(n as ChildNode).remove();
@@ -8350,11 +8316,15 @@ function discardLeftoverHydrationItems(end: Node): void {
 	}
 }
 
+// Deps-snapshot compare for the @for DEP-PURE promotion. Object.is per element — the
+// same equality the hook-side `depsChanged` uses — so a NaN dep doesn't permanently
+// defeat the pure promotion (`NaN !== NaN` would fail every render) and ±0 behave
+// identically on both paths.
 function depsEqual(a: any[], b: any[]): boolean {
 	const n = a.length;
 	if (n !== b.length) return false;
 	for (let i = 0; i < n; i++) {
-		if (a[i] !== b[i]) return false;
+		if (!Object.is(a[i], b[i])) return false;
 	}
 	return true;
 }
@@ -8364,8 +8334,10 @@ function depsEqual(a: any[], b: any[]): boolean {
 // we compute the move set directly in O(K_DISP) instead of paying the LIS
 // path's O(N) alloc + back-walk. Covers single drag-and-drop, undo/redo of a
 // recent edit, animated swap transitions, A/B variant toggles, etc. Above
-// this threshold the LIS path wins. The buffer is reused across calls
-// (single-threaded JS, no recursion through reconcileKeyed).
+// this threshold the LIS path wins. The module-level buffer is safely reused
+// across calls: reconcileKeyed CAN re-enter (a nested @for inside an item body
+// re-enters via renderBlock), but never between _disp's fill and consume — no
+// user code runs in that window — so the buffer is never clobbered while live.
 const K_DISP = 4;
 const _disp = new Int32Array(K_DISP);
 
@@ -8385,13 +8357,43 @@ const _disp = new Int32Array(K_DISP);
  * and in the splice step that reattaches the new middle to the surrounding
  * chain.
  */
-function reconcileKeyed<T, E>(
+// Update ONE surviving keyed block for the new render pass — shared by all three
+// survivor walks in reconcileKeyed (prefix, suffix, middle). Top-level (not a
+// closure) so reconcileKeyed's hot path allocates nothing for it.
+//   - Pure-body memo: when the compiler statically proved the for-of body closes
+//     over nothing from parent scope, body output is a pure function of
+//     (item, itemIndex). Identical refs → skip renderBlock entirely (only
+//     the body ref is refreshed).
+//   - `lite` = depEligible body (no hooks, no comps, no control flow): skip
+//     renderBlock's activeBlock plumbing and call the body directly.
+function updateSurvivor<T>(
+	block: Block,
+	newItem: T,
+	newIdx: number,
+	itemBody: (item: T, scope: Scope) => void,
+	pure: boolean,
+	lite: boolean,
+): void {
+	if (pure && block.props === newItem && block.itemIndex === newIdx) {
+		block.body = itemBody as ComponentBody;
+	} else {
+		block.props = newItem;
+		block.body = itemBody as ComponentBody;
+		block.itemIndex = newIdx;
+		if (lite) {
+			(itemBody as any)(newItem, block);
+		} else {
+			renderBlock(block);
+		}
+	}
+}
+
+function reconcileKeyed<T>(
 	parentBlock: Block,
 	state: ForSlot,
 	items: ArrayLike<T>,
 	getKey: (item: T, index: number) => any,
-	itemBody: (item: T, scope: Scope, extra: E) => void,
-	extra: E,
+	itemBody: (item: T, scope: Scope) => void,
 	pure: boolean,
 	singleRoot: boolean,
 	lite: boolean = false,
@@ -8415,7 +8417,6 @@ function reconcileKeyed<T, E>(
 				item,
 				i,
 				itemBody,
-				extra,
 				state,
 				singleRoot,
 			);
@@ -8447,26 +8448,7 @@ function reconcileKeyed<T, E>(
 		const newKey = getKey(items[prefixLen], prefixLen);
 		if (oldFirst.key !== newKey) break;
 		const block = oldFirst;
-		const newItem = items[prefixLen];
-		// Pure-body memo: when the compiler statically proved this for-of body
-		// closes over nothing from parent scope, body output is a pure function
-		// of (item, itemIndex). Identical refs → skip renderBlock entirely.
-		if (pure && block.props === newItem && block.itemIndex === prefixLen) {
-			block.extra = extra;
-			block.body = itemBody as ComponentBody;
-		} else {
-			block.props = newItem;
-			block.extra = extra;
-			block.body = itemBody as ComponentBody;
-			block.itemIndex = prefixLen;
-			if (lite) {
-				// depEligible body — no hooks, no comps, no control flow.
-				// Skip renderBlock's activeBlock plumbing; call body directly.
-				(itemBody as any)(newItem, block, extra);
-			} else {
-				renderBlock(block);
-			}
-		}
+		updateSurvivor(block, items[prefixLen], prefixLen, itemBody, pure, lite);
 		oldFirst = block.nextSibling!;
 		prefixLen++;
 	}
@@ -8482,21 +8464,7 @@ function reconcileKeyed<T, E>(
 		const newKey = getKey(items[newEnd], newEnd);
 		if (oldLast.key !== newKey) break;
 		const block = oldLast;
-		const newItem = items[newEnd];
-		if (pure && block.props === newItem && block.itemIndex === newEnd) {
-			block.extra = extra;
-			block.body = itemBody as ComponentBody;
-		} else {
-			block.props = newItem;
-			block.extra = extra;
-			block.body = itemBody as ComponentBody;
-			block.itemIndex = newEnd;
-			if (lite) {
-				(itemBody as any)(newItem, block, extra);
-			} else {
-				renderBlock(block);
-			}
-		}
+		updateSurvivor(block, items[newEnd], newEnd, itemBody, pure, lite);
 		oldLast = block.prevSibling!;
 		newEnd--;
 		oldRemain--;
@@ -8531,7 +8499,6 @@ function reconcileKeyed<T, E>(
 				item,
 				i,
 				itemBody,
-				extra,
 				state,
 				singleRoot,
 			);
@@ -8609,7 +8576,6 @@ function reconcileKeyed<T, E>(
 					item,
 					i,
 					itemBody,
-					extra,
 					state,
 					singleRoot,
 				);
@@ -8650,23 +8616,8 @@ function reconcileKeyed<T, E>(
 			if (newRelIdx < lastIdx) moved = true;
 			else lastIdx = newRelIdx;
 			patched++;
-			const block = cur!;
 			const newIdx = prefixLen + newRelIdx;
-			const newItem = items[newIdx];
-			if (pure && block.props === newItem && block.itemIndex === newIdx) {
-				block.extra = extra;
-				block.body = itemBody as ComponentBody;
-			} else {
-				block.props = newItem;
-				block.extra = extra;
-				block.body = itemBody as ComponentBody;
-				block.itemIndex = newIdx;
-				if (lite) {
-					(itemBody as any)(newItem, block, extra);
-				} else {
-					renderBlock(block);
-				}
-			}
+			updateSurvivor(cur!, items[newIdx], newIdx, itemBody, pure, lite);
 		}
 		cur = next;
 		oldIdx++;
@@ -8819,7 +8770,6 @@ function reconcileKeyed<T, E>(
 					item,
 					targetIdx,
 					itemBody,
-					extra,
 					state,
 					singleRoot,
 				);
@@ -8858,7 +8808,6 @@ function reconcileKeyed<T, E>(
 					item,
 					targetIdx,
 					itemBody,
-					extra,
 					state,
 					singleRoot,
 				);
@@ -8925,14 +8874,13 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 	oldItems.clear();
 }
 
-function mountItem<T, E>(
+function mountItem<T>(
 	parentBlock: Block,
 	parentNode: Node,
 	anchor: Node,
 	item: T,
 	index: number,
-	body: (item: T, s: Scope, extra: E) => void,
-	extra: E,
+	body: (item: T, s: Scope) => void,
 	forSlot: ForSlot,
 	singleRoot: boolean,
 ): Block {
@@ -8957,17 +8905,7 @@ function mountItem<T, E>(
 			const saved = hydrating;
 			hydrating = false;
 			try {
-				return mountItem(
-					parentBlock,
-					parentNode,
-					anchor,
-					item,
-					index,
-					body,
-					extra,
-					forSlot,
-					singleRoot,
-				);
+				return mountItem(parentBlock, parentNode, anchor, item, index, body, forSlot, singleRoot);
 			} finally {
 				hydrating = saved;
 			}
@@ -8983,7 +8921,6 @@ function mountItem<T, E>(
 			itemEnd,
 			body as ComponentBody,
 			item,
-			extra,
 		);
 		block.forSlot = forSlot;
 		block.itemIndex = index;
@@ -9005,7 +8942,6 @@ function mountItem<T, E>(
 			anchor,
 			body as ComponentBody,
 			item,
-			extra,
 		);
 		block.forSlot = forSlot;
 		block.itemIndex = index;
@@ -9032,7 +8968,6 @@ function mountItem<T, E>(
 		end,
 		body as ComponentBody,
 		item,
-		extra,
 	);
 	block.forSlot = forSlot;
 	block.itemIndex = index;

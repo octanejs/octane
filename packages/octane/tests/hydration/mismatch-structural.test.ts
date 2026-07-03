@@ -41,6 +41,17 @@ function devClientModule(fixture: string, file: string): Record<string, any> {
 	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ClientRT, {});
 }
 
+// PROD-compiled client module (dev: false → no `loc` argument to clone(), no
+// `__oct_loc` stamps): the structural detection + rebuild must still run — only
+// the warning is dev-gated.
+function prodClientModule(fixture: string, file: string): Record<string, any> {
+	let { code } = compile(readFileSync(fixture, 'utf8'), file, { mode: 'client' });
+	code = code.replace(/import\s*\{([^}]*)\}\s*from\s*['"]octane['"];?/g, 'const {$1} = __rt;');
+	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
+	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
+	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ClientRT, {});
+}
+
 describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays aligned)', () => {
 	const server = serverModule(CONTROL, 'control.tsrx');
 	const clientDev = devClientModule(CONTROL, 'control.tsrx');
@@ -162,6 +173,36 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		expect(section.querySelector('span.s1')).toBeNull(); // stale nested markup discarded
 		expect(section.textContent).toContain('two');
 		expect(warns().length).toBeGreaterThanOrEqual(1);
+	});
+
+	it('PROD build: @if branch swap rebuilds SILENTLY (recovery is not gated on the dev loc)', async () => {
+		// clone()'s structural check used to be gated on the dev-only `loc` argument,
+		// so prod builds silently adopted the WRONG server branch. The detection +
+		// rebuild now run in dev AND prod; only the warning needs `loc`.
+		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
+		const { body } = await ServerRT.render(server.Toggle, { on: true });
+		expect(body).toContain('<button id="hit"');
+		container.innerHTML = body;
+
+		hydrateRoot(container, clientProd.Toggle, { on: false });
+		flushSync(() => {});
+
+		const div = container.querySelector('#toggle')!;
+		expect(div.querySelector('span.off')).not.toBeNull(); // rebuilt to the client branch
+		expect(div.querySelector('#hit')).toBeNull(); // stale server branch discarded
+		expect(div.textContent).toContain('off');
+		expect(warns()).toEqual([]); // prod: recovery without the dev warning
+	});
+
+	it('PROD build: matching branch adopts unchanged (structural check has no false positives)', async () => {
+		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
+		const { body } = await ServerRT.render(server.Toggle, { on: true });
+		container.innerHTML = body;
+		const before = container.innerHTML;
+		hydrateRoot(container, clientProd.Toggle, { on: true });
+		flushSync(() => {});
+		expect(container.innerHTML).toBe(before);
+		expect(warns()).toEqual([]);
 	});
 
 	it('no warning + adopted unchanged when the branch matches', async () => {

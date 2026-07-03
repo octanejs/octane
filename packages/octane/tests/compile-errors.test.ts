@@ -64,4 +64,21 @@ describe('compile errors — rejected authoring patterns', () => {
 		// also guards the lowered node. Either way the contract is: it throws.
 		expect(() => compile(src, 'for-await.tsrx')).toThrow();
 	});
+
+	it('accepts a valueless `key` attribute on an element inside @for', () => {
+		const src = `
+      export function L(props) @{
+        <ul>
+          @for (const x of props.items) {
+            <li key>{x as string}</li>
+          }
+        </ul>
+      }
+    `;
+		// A bare `key` carries no expression — makeForCall must skip it (like
+		// makeCompCall's null-value handling) and fall back to the default
+		// `x.id ?? x` key, not crash dereferencing `keyAttr.value.type`.
+		expect(() => compile(src, 'valueless-key.tsrx')).not.toThrow();
+		expect(() => compile(src, 'valueless-key.tsrx', { mode: 'server' })).not.toThrow();
+	});
 });

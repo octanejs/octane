@@ -4,19 +4,24 @@ import pkg from '../package.json' with { type: 'json' };
 // package version (the previous hardcoded literal already had).
 export const version: string = pkg.version;
 
+// The export surface has exactly three tiers — keep new exports in the right one:
+//
+//  1. PUBLIC API — mirrors React's API, no octane-invented surface. If React
+//     doesn't ship it, it doesn't belong here.
+//  2. SEMI-PUBLIC compiler/binding helpers — the contract between the compiler's
+//     emitted code (and the @octanejs/* bindings) and the runtime. Not for app
+//     code; may change with the compiler in lockstep.
+//  3. TEST-ONLY — used by this repo's test infrastructure. Not API at all.
 export {
-	// Public API
+	// ── 1. Public API (React parity) ──────────────────────────────────────────
 	createRoot,
 	hydrateRoot,
 	flushSync,
-	drainPassiveEffects,
 	act,
-	setIsOctaneActEnvironment,
 	type Root,
-
-	// Hooks
+	// Hooks (octane extension: each accepts a trailing slot symbol — required
+	// when calling from plain .ts, injected by the compiler in .tsrx/.tsx)
 	useState,
-	withSlot,
 	useReducer,
 	useEffect,
 	useLayoutEffect,
@@ -35,26 +40,29 @@ export {
 	useOptimistic,
 	type FormStatus,
 	startTransition,
-	setTransitionFallbackTimeout,
-	getTransitionFallbackTimeout,
 	memo,
-
 	// Context
 	createContext,
-	provideContext,
 	use,
 	useContext,
 	type Context,
-
-	// Suspense / error boundaries as JSX components (alongside the @try directive)
+	// Components
 	Suspense,
 	ErrorBoundary,
+	Activity,
+	Fragment,
+	createPortal,
+	type PortalDescriptor,
+	// Elements
+	createElement,
+	cloneElement,
+	isValidElement,
+	Children,
+	type ElementDescriptor,
+	type ComponentBody,
 
-	// HMR (compiler-emitted when the Vite plugin's hmr option is on)
-	hmr,
-	HMR,
-
-	// Compiler-emitted runtime helpers
+	// ── 2. Semi-public: compiler-emitted / binding-infrastructure helpers ─────
+	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)
 	template,
 	clone,
 	htext,
@@ -80,7 +88,6 @@ export {
 	tryBlock,
 	switchBlock,
 	activityBlock,
-	Activity,
 	componentSlot,
 	componentSlotLite,
 	childSlot,
@@ -88,25 +95,20 @@ export {
 	textHole,
 	childTextHole,
 	hostComponent,
-	Fragment,
-	FragmentInstance,
-	mountFragmentRef,
-	portal,
-	createPortal,
-	type PortalDescriptor,
-	createElement,
-	cloneElement,
-	isValidElement,
-	Children,
-	type ElementDescriptor,
-	withScope,
 	renderBlock,
-	createBlock,
-	unmountBlock,
-	scheduleRender,
-	getCurrentScope,
-	getCurrentBlock,
-	type ComponentBody,
+	portal,
+	withSlot,
+	provideContext,
+	mountFragmentRef,
+	FragmentInstance,
+	hmr,
+	HMR,
 	type Scope,
 	type Block,
+
+	// ── 3. Test-only (this repo's test infrastructure; not API) ───────────────
+	drainPassiveEffects,
+	setIsOctaneActEnvironment,
+	setTransitionFallbackTimeout,
+	getTransitionFallbackTimeout,
 } from './runtime.js';

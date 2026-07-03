@@ -478,7 +478,7 @@ describe('TSRX features — for-of auto-memo (pure body skip)', () => {
 	});
 });
 
-describe('TSRX features — {html expr} only-child', () => {
+describe('TSRX features — dangerouslySetInnerHTML only-child', () => {
 	it('sets innerHTML so the markup parses into real DOM', () => {
 		const r = mount(HtmlOnlyChild, {
 			markup: '<strong class="bold">hi</strong> <em>there</em>',

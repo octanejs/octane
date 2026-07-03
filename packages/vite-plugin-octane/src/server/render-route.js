@@ -15,14 +15,13 @@ import {
  */
 
 /**
- * octane RenderResult — `render()` is ASYNC and `css` is ALREADY a deduped
+ * octane RenderResult — imported from 'octane/server' (the single source of
+ * truth) rather than re-declared, so the shape can't silently drift. Note
+ * `render()` is ASYNC and `css` is ALREADY a deduped
  * `<style data-octane="hash">…</style>` string (NOT a Set<string> needing a
- * `get_css_for_hashes` lookup like Ripple). So CSS handling here is identity.
+ * `get_css_for_hashes` lookup like Ripple), so CSS handling here is identity.
  *
- * @typedef {Object} RenderResult
- * @property {string} head
- * @property {string} body
- * @property {string} css
+ * @typedef {import('octane/server').RenderResult} RenderResult
  */
 
 /**

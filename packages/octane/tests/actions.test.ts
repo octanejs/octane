@@ -333,3 +333,35 @@ describe('raw <form action={fn}> auto-reset', () => {
 		r.unmount();
 	});
 });
+
+describe('<form action> function → string → function toggle', () => {
+	it('re-wires submit interception after the action flips back to a function', async () => {
+		// Regression: switching fn→string cleared `$$submit` but left `$$formSubmitWired`
+		// set, so flipping BACK to a function skipped the wire-once guard and submit
+		// interception stayed permanently dead for the form.
+		const calls: string[] = [];
+		const fn1 = () => {
+			calls.push('fn1');
+		};
+		const fn2 = () => {
+			calls.push('fn2');
+		};
+		const r = mount(RawForm, { action: fn1 });
+		flushSync(() => {});
+		submit(r.container);
+		await settle();
+		expect(calls).toEqual(['fn1']);
+
+		// → string action: native semantics, the intercepting handler is cleared.
+		r.update(RawForm, { action: '/native' });
+		const form = r.container.querySelector('form')!;
+		expect(form.getAttribute('action')).toBe('/native');
+
+		// → function again: interception must be re-installed.
+		r.update(RawForm, { action: fn2 });
+		submit(r.container);
+		await settle();
+		expect(calls).toEqual(['fn1', 'fn2']);
+		r.unmount();
+	});
+});

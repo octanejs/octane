@@ -6,6 +6,8 @@ import * as ServerRT from 'octane/server';
 import { mount } from './_helpers';
 import { hydrateRoot, flushSync } from '../src/index.js';
 import { RetToggle, AtToggle } from './_fixtures/control-fold.tsrx';
+import { Count as RetCount } from './_fixtures/return-count.tsrx';
+import { AtBraceCount } from './_fixtures/atbrace-count.tsrx';
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/control-fold.tsrx');
 function serverModule(): Record<string, any> {
@@ -86,5 +88,33 @@ describe('folded @if hydrates against the @{} oracle markup', () => {
 		expect(btn.textContent).toBe('on:1'); // handler is live on the adopted node
 		root.unmount();
 		container.remove();
+	});
+});
+
+// Stage 0 of the fold: a plain single-root return-JSX component (no control flow)
+// folds to the return-based fragment model. Same contract as above — the inline
+// `@{}` form is the oracle for the produced DOM, and updates PATCH the mounted
+// nodes in place (non-VDOM: the same button/text nodes survive re-renders).
+describe('folded return-JSX single root matches the inline @{} oracle', () => {
+	it('byte-equal DOM on mount (markerless single-root)', () => {
+		const a = mount(RetCount as any);
+		const b = mount(AtBraceCount as any);
+		expect(a.container.innerHTML).toBe(b.container.innerHTML);
+		expect(a.container.innerHTML).toBe('<button>0</button>');
+		a.unmount();
+		b.unmount();
+	});
+
+	it('reconciles in place: same button node patched 0->1->2 (non-VDOM)', () => {
+		const r = mount(RetCount as any);
+		const btn = r.container.querySelector('button')!;
+		expect(btn.textContent).toBe('0');
+		btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(btn.textContent).toBe('1');
+		expect(r.container.querySelector('button')).toBe(btn); // SAME node — patched
+		btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(btn.textContent).toBe('2');
+		expect(r.container.querySelector('button')).toBe(btn);
+		r.unmount();
 	});
 });

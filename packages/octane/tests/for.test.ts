@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
-import { List, MutableList, ListWithEmpty, ToggleableEmpty } from './_fixtures/for.tsrx';
+import {
+	List,
+	MutableList,
+	ListWithEmpty,
+	ToggleableEmpty,
+	DepPureList,
+	setExternal,
+} from './_fixtures/for.tsrx';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
 
@@ -140,5 +147,25 @@ describe('forBlock — @empty branch', () => {
 		expect(r.findAll('.empty')).toHaveLength(0);
 		expect(r.findAll('.row').map((li) => li.textContent)).toEqual(['x', 'y']);
 		r.unmount();
+	});
+});
+
+describe('forBlock — DEP-PURE promotion compares deps with Object.is', () => {
+	it('a NaN dep still promotes stable survivors to pure (bodies skipped)', () => {
+		const r = mount(DepPureList);
+		expect(r.findAll('.dp-row').map((li) => li.textContent)).toEqual(['row1:tick0', 'row2:tick0']);
+
+		// Make the captured dep NaN (deps changed → this render's bodies re-run).
+		r.click('#nanify');
+		// Mutate the non-dep external, then re-render with UNCHANGED deps ([NaN]).
+		setExternal('tick1');
+		r.click('#rerender');
+		// Object.is(NaN, NaN) → the pure promotion holds: survivor bodies are SKIPPED,
+		// so the changed external is NOT re-read — identical to any other stable dep.
+		// (Under a `!==` compare, a NaN dep permanently defeated the promotion and the
+		// re-run bodies would show tick1.)
+		expect(r.findAll('.dp-row').map((li) => li.textContent)).toEqual(['row1:tick0', 'row2:tick0']);
+		r.unmount();
+		setExternal('tick0'); // reset the module-level fixture state
 	});
 });

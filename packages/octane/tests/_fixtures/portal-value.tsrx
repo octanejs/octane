@@ -1,4 +1,4 @@
-import { useState, createPortal, createContext, use } from 'octane';
+import { useState, createPortal, createContext, use, memo } from 'octane';
 
 export const Theme = createContext('light');
 
@@ -84,6 +84,44 @@ export function FlipApp(props) @{
 		<button class="b-null" onClick={() => setMode('null')}>{'null'}</button>
 		<button class="b-portal" onClick={() => setMode('portal')}>{'portal'}</button>
 		<Flipper mode={mode} target={props.target} />
+	</div>
+}
+
+// 7. A memo boundary whose RETURN is a createPortal value: on a provider-value
+//    change with equal props the memo BAILS, and the lazy context propagation must
+//    reach the consumer INSIDE the portal (the content Block lives in the childSlot's
+//    embedded PortalSlot, not in state.block).
+function PortalIndirectionImpl(props) {
+	return createPortal(ThemedBody, props.target, undefined);
+}
+const PortalIndirection = memo(PortalIndirectionImpl);
+
+export function MemoPortalApp(props) @{
+	const [theme, setTheme] = useState('light');
+	<div class="root">
+		<button class="b-dark" onClick={() => setTheme('dark')}>{'dark'}</button>
+		<Theme.Provider value={theme}>
+			<PortalIndirection target={props.target} />
+		</Theme.Provider>
+	</div>
+}
+
+// 8. A `{expr}` hole in a template-less body (→ the textSlot fast path) whose value
+//    flips between a createPortal descriptor and a plain string: the flip must route
+//    through the full childSlot classifier so the portal is torn down.
+function ValueHole(props) @{
+	<>
+		{props.value}
+	</>
+}
+
+export function TextPortalFlip(props) @{
+	const [showPortal, setShowPortal] = useState(true);
+	<div class="root">
+		<button class="b-flip" onClick={() => setShowPortal(!showPortal)}>{'flip'}</button>
+		<ValueHole
+			value={showPortal ? createPortal(ModalBody, props.target, { label: 'text-flip' }) : 'plain'}
+		/>
 	</div>
 }
 

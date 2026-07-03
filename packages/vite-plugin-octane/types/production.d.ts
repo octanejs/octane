@@ -36,15 +36,14 @@ export interface ServerManifest {
 }
 
 /**
- * octane RenderResult — `render()` is async; `css` is ALREADY a ready,
- * deduped `<style data-octane="hash">…</style>` string (NOT a Set<string>
- * needing a `getCss` lookup like Ripple).
+ * octane RenderResult — re-exported from 'octane/server' (the single source of
+ * truth) rather than re-declared, so the shape can't silently drift. Note
+ * `render()` is async and `css` is ALREADY a ready, deduped
+ * `<style data-octane="hash">…</style>` string (NOT a Set<string> needing a
+ * `getCss` lookup like Ripple).
  */
-export interface RenderResult {
-	head: string;
-	body: string;
-	css: string;
-}
+export type { RenderResult } from 'octane/server';
+import type { RenderResult } from 'octane/server';
 
 export interface HandlerOptions {
 	render: (component: Function, props?: unknown) => Promise<RenderResult>;

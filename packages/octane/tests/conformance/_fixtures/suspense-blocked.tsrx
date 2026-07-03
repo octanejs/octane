@@ -73,3 +73,28 @@ export function DeferredWithInitial(props) @{
 		{v.tag as string}
 	</span>
 }
+
+// The initialValue→value swap must run at TRANSITION priority (same as the
+// steady-state deferral path): when the consumer SUSPENDS on the real value, the
+// initial content is HELD on screen — no fallback flash, no DOM teardown. An
+// urgent swap would tear down the initial DOM and show @pending instead.
+// Reference: ReactDeferredValue-test.js (the deferred commit is a transition).
+function SuspendOnReal(props) @{
+	if (props.value === 'real') {
+		use(props.promise);
+	}
+	<span class="out">
+		{props.value as string}
+	</span>
+}
+
+export function DeferredInitialSuspends(props) @{
+	const v = useDeferredValue(props.value, props.initialValue);
+	<>
+		@try {
+			<SuspendOnReal value={v} promise={props.promise} />
+		} @pending {
+			<span class="fallback">{'pending'}</span>
+		}
+	</>
+}
