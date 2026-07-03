@@ -156,6 +156,9 @@ catalogs:
     aria-hidden:
       specifier: ^1.2.6
       version: 1.2.6
+    devalue:
+      specifier: ^5.8.1
+      version: 5.8.1
     esbuild:
       specifier: ^0.28.1
       version: 0.28.1
@@ -987,6 +990,9 @@ importers:
       '@ripple-ts/adapter':
         specifier: catalog:default
         version: 0.3.86
+      devalue:
+        specifier: catalog:default
+        version: 5.8.1
       octane:
         specifier: workspace:*
         version: link:../octane

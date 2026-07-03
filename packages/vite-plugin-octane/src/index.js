@@ -27,6 +27,7 @@ import {
 } from './project-codegen.js';
 
 import { patch_global_fetch, is_rpc_request, handle_rpc_request } from '@ripple-ts/adapter/rpc';
+import * as devalue from 'devalue';
 
 // Re-export route classes + config helpers (public API surface).
 export { RenderRoute, ServerRoute } from './routes.js';
@@ -456,13 +457,14 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 				if (!server || !server[funcName]) return null;
 				return server[funcName];
 			},
-			// The RPC body is a JSON array of call arguments; the response envelope
-			// is `{ value }` so the client can distinguish a result from an error
-			// payload. Kept local — `octane/server` does not ship RPC helpers.
+			// Wire format matches @ripple-ts/adapter's client stub: the body is a
+			// devalue-encoded argument array and the response a devalue-encoded
+			// `{ value }` envelope (devalue, not JSON, so Dates/Maps/undefined/
+			// cycles round-trip). Kept local — `octane/server` ships no RPC helpers.
 			async executeServerFunction(fn, body) {
-				const args = body ? JSON.parse(body) : [];
+				const args = devalue.parse(body);
 				const value = await fn.apply(null, args);
-				return JSON.stringify({ value });
+				return devalue.stringify({ value });
 			},
 			asyncContext,
 			trustProxy,
