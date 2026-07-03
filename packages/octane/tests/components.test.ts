@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mount } from './_helpers';
+import { createElement, useState, template, clone } from 'octane';
+import { mount, act } from './_helpers';
 import {
 	Greeting,
 	App,
@@ -108,6 +109,65 @@ describe('key-driven remount on standalone component', () => {
 		expect(r.find('.label').textContent).toBe('second'); // prop updated
 		expect(fx.mountCount).toBe(1); // no remount
 		expect(fx.cleanupCount).toBe(0);
+		r.unmount();
+	});
+});
+
+// Library-binding shape, hand-written (no compiler): a plain function component
+// RETURNS a `createElement` descriptor whose `type` is a compiled-style imperative
+// renderer (mounts once, patches holes on re-render). renderBlock childSlots the
+// return; childSlot reconciles by `type` IDENTITY — so on re-render the SAME
+// button + text node survive (holes patched, not rebuilt). Non-VDOM proof for the
+// descriptor-returning path the `@octanejs/*` bindings rely on.
+describe('hand-written descriptor renderer (return-based body, no compiler)', () => {
+	// The compiled imperative renderer for `<button onClick={onInc}>{n}</button>`.
+	const _btn = template('<button></button>');
+	function CountButtonFrag(props: any, __s: any) {
+		const __block = __s.block;
+		let _b = __s.b$0;
+		if (_b === undefined) {
+			_b = {};
+			const el = clone(_btn) as HTMLButtonElement;
+			const txt = document.createTextNode(String(props.n));
+			el.appendChild(txt);
+			el.onclick = props.onInc;
+			_b.el = el;
+			_b.txt = txt;
+			_b.n = props.n;
+			__block.parentNode.insertBefore(el, __block.endMarker);
+			__s.b$0 = _b;
+		} else {
+			if (_b.n !== props.n) {
+				_b.txt.data = String(props.n);
+				_b.n = props.n;
+			}
+			_b.el.onclick = props.onInc; // latest closure
+		}
+	}
+
+	// "Just a function" — has a hook (manual stable slot), RETURNS a descriptor.
+	const SLOT = Symbol.for('poc:Count.useState#0');
+	function Count(): any {
+		const [n, setN] = useState(0, SLOT);
+		return createElement(CountButtonFrag, { n, onInc: () => setN(n + 1) });
+	}
+
+	it('mounts via the return and PATCHES (same node) on re-render — no rebuild/VDOM', () => {
+		const r = mount(Count as any);
+		const btn = r.container.querySelector('button')!;
+		const txt = btn.firstChild;
+		expect(btn.textContent).toBe('0');
+
+		act(() => btn.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+		expect(btn.textContent).toBe('1');
+		// The LINCHPIN: identity preserved → reconciled in place, not rebuilt.
+		expect(r.container.querySelector('button')).toBe(btn);
+		expect(btn.firstChild).toBe(txt);
+
+		act(() => btn.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+		expect(btn.textContent).toBe('2');
+		expect(r.container.querySelector('button')).toBe(btn);
 		r.unmount();
 	});
 });

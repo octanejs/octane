@@ -7,6 +7,7 @@ import {
 	DoubleClicker,
 	FnSetter,
 	SpreadDoubleClicker,
+	AriaStaticLiterals,
 } from './_fixtures/attrs-events.tsrx';
 
 describe('attributes', () => {
@@ -21,6 +22,20 @@ describe('attributes', () => {
 		const a = r.find('a') as HTMLAnchorElement;
 		expect(a.getAttribute('href')).toBe('https://x');
 		expect(a.getAttribute('title')).toBe('hi');
+		r.unmount();
+	});
+
+	it('bakes static aria-* boolean literals as enumerated "true"/"false"', () => {
+		// React parity: `aria-hidden={false}` renders `aria-hidden="false"` (it
+		// must NOT drop), `aria-expanded={true}` renders "true" (not a bare
+		// attribute) — matching the runtime setAttribute/ssrAttr dynamic path.
+		// A non-aria boolean literal keeps the generic handling (false drops).
+		const r = mount(AriaStaticLiterals);
+		const host = r.find('#aria-host');
+		expect(host.getAttribute('aria-hidden')).toBe('false');
+		expect(host.getAttribute('aria-expanded')).toBe('true');
+		expect(host.getAttribute('aria-label')).toBe('lbl');
+		expect(host.hasAttribute('hidden')).toBe(false);
 		r.unmount();
 	});
 });

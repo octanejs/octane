@@ -97,3 +97,31 @@ export function MutableList() @{
 		</ul>
 	</div>
 }
+
+// DEP-PURE @for with a possibly-NaN dep. The body closes over `marker` (a component
+// local → the compiler emits `[marker]` as the forBlock deps array, flags bit 4) and
+// reads the module-level EXTERNAL (mutable, NOT a dep — module vars don't affect the
+// purity analysis). The reconciler's depsEqual must compare with Object.is so a NaN
+// dep still promotes stable survivors to pure — the test observes the promotion via
+// EXTERNAL: a promoted (skipped) body never re-reads it.
+let EXTERNAL = 'tick0';
+export function setExternal(v) {
+	EXTERNAL = v;
+}
+
+export function DepPureList() @{
+	const [marker, setMarker] = useState(0);
+	const [items] = useState([{ id: 1 }, { id: 2 }]);
+	const [, setN] = useState(0);
+	<div>
+		<button id="nanify" onClick={() => setMarker(NaN)}>{'nan'}</button>
+		<button id="rerender" onClick={() => setN((n) => n + 1)}>{'go'}</button>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li class="dp-row" data-m={marker}>
+					{'row' + item.id + ':' + EXTERNAL}
+				</li>
+			}
+		</ul>
+	</div>
+}

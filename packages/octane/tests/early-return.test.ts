@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
 import { Maybe, Multi, Toggleable, NoBraces } from './_fixtures/early-return.tsrx';
+import { App as HelperApp } from './_fixtures/return-from-helper.tsrx';
 
 describe('early returns', () => {
 	it('renders nothing when the early-return guard is true', () => {
@@ -43,6 +44,26 @@ describe('early returns', () => {
 		expect(r.findAll('.visible')).toHaveLength(0);
 		r.update(NoBraces, { hide: false });
 		expect(r.find('.visible').textContent).toBe('visible');
+		r.unmount();
+	});
+});
+
+// Early return interacting with the return-based body: `App(props)` early-returns a
+// BARE STRING (coerced to text by the renderable return path), and its normal path
+// returns JSX built by ANOTHER function (`useDiv(text)`) — proving props bind
+// correctly through a helper-built JSX return and the two return shapes swap cleanly.
+describe('early return of a bare string vs JSX from a helper function', () => {
+	it('renders the helper-built JSX when enabled (props bind correctly)', () => {
+		const r = mount(HelperApp as any, { disabled: false, text: 'hello' });
+		const div = r.container.querySelector('div.made');
+		expect(div?.textContent).toBe('hello');
+		r.unmount();
+	});
+
+	it('renders the bare string on the early return', () => {
+		const r = mount(HelperApp as any, { disabled: true, text: 'fallback' });
+		expect(r.container.textContent).toContain('fallback');
+		expect(r.container.querySelector('div.made')).toBeNull();
 		r.unmount();
 	});
 });

@@ -1,26 +1,29 @@
 /**
- * octane/compiler compiler — compiles TSRX source into JS that targets
- * the octane runtime.
+ * octane/compiler — compiles TSRX source into JS that targets the octane
+ * runtime.
  *
- * Architecture (mirrors PLAN-TEMPLATE-RUNTIME.md §6 and §7):
+ * Architecture:
  *   1. Parse TSRX via @tsrx/core's parseModule.
  *   2. For each top-level node:
- *        - Component → compile to a function that takes (scope, props, extra).
- *        - Other (imports, regular consts/functions) → emit as-is via esrap.
- *   3. Within a Component body:
- *        - Statements (declarations, hook calls, etc.) are kept and run on
- *          every invocation. Hook calls get a fresh module-scope Symbol
- *          passed as their last argument (conditional-hook-safe, §6.5).
- *        - JSX statements are extracted into a hoisted HTML template + a
- *          plan of dynamic bindings (text holes, attribute holes, event
- *          handlers) and a forBlock call for any for-of inside element
- *          children.
+ *        - Component (`@{ … }` body or a return-JSX function) → compile to a
+ *          function taking the props-first ABI `(…userParams, __s, __extra)`.
+ *        - Other (imports, regular consts/functions) → emit as-is via esrap
+ *          (with real per-token source maps merged into the module map).
+ *   3. Within a component body:
+ *        - Setup statements (declarations, hook calls, etc.) are kept and run
+ *          on every invocation. Hook calls get a stable module-scope Symbol
+ *          passed as their last argument (conditional-hook-safe).
+ *        - The render JSX is extracted into a hoisted HTML template + a plan
+ *          of dynamic bindings (text/attr/class/style holes, events, refs,
+ *          spreads) and runtime construct calls for the directive blocks —
+ *          forBlock (@for), ifBlock (@if), switchBlock (@switch), tryBlock
+ *          (@try), componentSlot (<Foo/>), portal (createPortal), headBlock
+ *          (hoisted <title>/<meta>/<link>) — plus scoped-CSS injection and
+ *          optional HMR wrapping.
  *
- * Scope of the spike: handles the constructs used by the js-framework-benchmark
- * fixture (Main.tsrx). Sufficient for: components with attributes (static +
- * dynamic), event handlers, only-child text holes, for-of with keyed
- * reconciliation. Out of scope: TSRX `<style>`, scoped CSS, lazy destructure,
- * ifBlock, dynamic components, portals.
+ * `mode: 'server'` selects a parallel, self-contained SSR codegen (see the
+ * "Server (SSR) codegen" section) that emits HTML-string-building bodies with
+ * hydration markers instead of template/clone DOM code.
  */
 
 import {
@@ -107,6 +110,39 @@ function nsForRootTag(node, parentNs) {
 	if (t === 'svg') return 'svg';
 	if (t === 'math') return 'mathml';
 	return parentNs;
+}
+
+// ---------------------------------------------------------------------------
+// JSX attribute-name pre-processing — shared by the client template emitter
+// (emitElementHtml) and the SSR emitter (ssrEmitElement) so the two paths
+// can't drift on name handling.
+// ---------------------------------------------------------------------------
+
+// Attribute name exactly as written in the JSX. A namespaced name
+// (`xlink:href`) arrives as a JSXNamespacedName { namespace, name } pair —
+// concatenate it back to the literal attribute name (the browser/serializer
+// knows the namespace).
+function jsxAttrRawName(attr) {
+	const n = attr.name;
+	if (n && (n.type === 'JSXNamespacedName' || n.type === 'NamespacedName')) {
+		return `${n.namespace.name}:${n.name.name}`;
+	}
+	return n.name || n;
+}
+
+// `className`/`htmlFor` are React-shape JSX aliases; emit the native
+// `class`/`for` names so the browser actually applies them (and dynamic
+// bindings know which setter to pick).
+function normalizeJsxAttrName(raw) {
+	return raw === 'className' ? 'class' : raw === 'htmlFor' ? 'for' : raw;
+}
+
+// React-shape `onXxx` event-handler attribute: `on` + an uppercase letter, so
+// `onClick`/`onDblClickCapture` match but a lowercase native attr doesn't.
+// Events have no server semantics (SSR drops them) and become delegated
+// bindings on the client.
+function isEventAttrName(name) {
+	return name.length > 2 && name.startsWith('on') && /^[A-Z]/.test(name[2]);
 }
 
 // All keys + values are string/number/bool literals → safe to serialize at
@@ -427,6 +463,17 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
 	return modified ? { ...stmt, declarations: newDecls } : stmt;
 }
 
+// Field names skipped by the generic AST child-walks below: source positions
+// plus the two known back-reference carriers — `metadata` (TSRX CSS ASTs whose
+// `parent_rule` / rule-node arrays form real cycles) and `parent` (acorn-
+// typescript sometimes attaches one). Skipping them is necessary but NOT
+// sufficient: even cycle-free ASTs can carry shared-subtree pointers (compiler
+// passes reuse nodes via spread), so every generic walk ALSO keeps a WeakSet
+// visited guard — without one the `for (k in n)` traversal can re-enter the
+// same subtree combinatorially, observed as a vitest worker hang on the bigger
+// fixture files.
+const AST_WALK_SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'metadata', 'parent']);
+
 /**
  * Walk an AST subtree collecting Identifier references that are NOT bound
  * locally (inside the subtree). Tracks block/function scopes so inner `const`
@@ -434,6 +481,7 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
  */
 function collectFreeIdentifiers(root, initiallyBound) {
 	const free = new Set();
+	const seen = new WeakSet();
 	walk(root, new Set(initiallyBound));
 	return free;
 
@@ -447,6 +495,8 @@ function collectFreeIdentifiers(root, initiallyBound) {
 
 		const t = n.type;
 		if (!t) return;
+		if (seen.has(n)) return;
+		seen.add(n);
 
 		if (t === 'Identifier') {
 			if (!scope.has(n.name)) free.add(n.name);
@@ -525,15 +575,7 @@ function collectFreeIdentifiers(root, initiallyBound) {
 
 		// Default: walk all child fields.
 		for (const key in n) {
-			if (
-				key === 'type' ||
-				key === 'loc' ||
-				key === 'start' ||
-				key === 'end' ||
-				key === 'range' ||
-				key === 'metadata'
-			)
-				continue;
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
 			walk(n[key], scope);
 		}
 	}
@@ -549,6 +591,7 @@ function collectFreeIdentifiers(root, initiallyBound) {
  */
 function containsComponentCallOrControlFlow(stmts) {
 	let found = false;
+	const seen = new WeakSet();
 	function walk(n) {
 		if (found || !n) return;
 		if (Array.isArray(n)) {
@@ -558,6 +601,8 @@ function containsComponentCallOrControlFlow(stmts) {
 		if (typeof n !== 'object') return;
 		const t = n.type;
 		if (!t) return;
+		if (seen.has(n)) return;
+		seen.add(n);
 		// Component calls — old `Element` or new `JSXElement` with capitalised tag.
 		if ((t === 'Element' || t === 'JSXElement') && isComponentTag(n)) {
 			found = true;
@@ -593,15 +638,7 @@ function containsComponentCallOrControlFlow(stmts) {
 			return;
 		}
 		for (const key in n) {
-			if (
-				key === 'type' ||
-				key === 'loc' ||
-				key === 'start' ||
-				key === 'end' ||
-				key === 'range' ||
-				key === 'metadata'
-			)
-				continue;
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
 			walk(n[key]);
 		}
 	}
@@ -778,9 +815,9 @@ function dangerHtmlExpr(node) {
 	};
 }
 
-// Recognise the dynamic form `{style (expr)}` — TSRX parses that as a
-// `CallExpression(style, [expr])` because parenthesised expressions don't take
-// the special Style path. We bridge here so both forms behave the same.
+// Recognise `{style (expr)}` — TSRX parses it as a plain
+// `CallExpression(style, [expr])` (the dedicated `Style` intrinsic node is
+// gone); resolveStyleExpr rewrites it into a scoped class-string expression.
 function isStyleCall(node) {
 	return (
 		node &&
@@ -792,23 +829,16 @@ function isStyleCall(node) {
 	);
 }
 
-// Resolve a `{ type: 'Style', value }` AST node — TSRX's `{style 'cls'}`
-// expression — into a plain expression that yields a class string. The
-// component's scoped css hash is prepended (so `{style 'row'}` in a component
-// with hash "tsrx-abc" produces "tsrx-abc row"). Literal values inline; dynamic
-// values become a runtime string concat. If the component has no <style> block
-// the hash is dropped and the inner value is used as-is.
+// Resolve a `{style (expr)}` CallExpression (see isStyleCall) into a plain
+// expression that yields a class string, with the component's scoped css hash
+// prepended (so `{style ('row')}` in a component with hash "tsrx-abc" produces
+// "tsrx-abc row"). Literal values inline; dynamic values become a runtime
+// string concat. Components without a <style> block (no hash) — and any other
+// expression shape — pass through untouched.
 function resolveStyleExpr(node, cssHash) {
 	if (!node) return node;
-	let inner;
-	if (node.type === 'Style') inner = node.value;
-	else if (isStyleCall(node) && cssHash) inner = node.arguments[0];
-	else return node;
-	if (!cssHash) {
-		return inner.type === 'Literal' && typeof inner.value === 'string'
-			? { type: 'Literal', value: inner.value, raw: JSON.stringify(inner.value) }
-			: inner;
-	}
+	if (!isStyleCall(node) || !cssHash) return node;
+	const inner = node.arguments[0];
 	if (inner.type === 'Literal' && typeof inner.value === 'string') {
 		const combined = inner.value ? `${cssHash} ${inner.value}` : cssHash;
 		return { type: 'Literal', value: combined, raw: JSON.stringify(combined) };
@@ -1180,11 +1210,11 @@ export function compile(source, filename, options) {
 		// Body walk: reject @try / TryStatement / unknown free-function calls
 		// (catches transitive hooks via same-module helpers and unknown imports).
 		if (eligible) {
-			// Cycle / shared-subtree guard. Some AST nodes carry back-references
-			// (e.g. `parent`, `scope`) and even cycle-free ASTs can have shared
-			// subtree pointers; without a WeakSet the `for (k in n)` traversal can
-			// re-enter the same subtree N times — observable as a vitest worker
-			// hang on the bigger fixture files.
+			// Cycle / shared-subtree guard — see AST_WALK_SKIP_KEYS: the skip set
+			// blocks the known back-reference carriers (CSS `metadata.parent_rule` /
+			// rule-node arrays, acorn-typescript's `parent`), and the WeakSet blocks
+			// shared-subtree re-entry, which otherwise hung vitest workers on the
+			// bigger fixture files.
 			const seen = new WeakSet();
 			const reject = (function walk(n) {
 				if (!n) return false;
@@ -1204,15 +1234,7 @@ export function compile(source, filename, options) {
 					}
 				}
 				for (const k in n) {
-					if (
-						k === 'type' ||
-						k === 'loc' ||
-						k === 'start' ||
-						k === 'end' ||
-						k === 'range' ||
-						k === 'parent'
-					)
-						continue;
+					if (AST_WALK_SKIP_KEYS.has(k)) continue;
 					if (walk(n[k])) return true;
 				}
 				return false;
@@ -1425,10 +1447,7 @@ export function compile(source, filename, options) {
 			'}\n';
 	}
 
-	// `runtimeImport` is built ABOVE this point, BEFORE `ctx.runtimeNeeded` may
-	// get `hmr` and `HMR` added — so rebuild it after HMR wiring so the prelude
-	// import includes them. Same for `delegateCall` (which already ran above):
-	// we re-emit the prelude bits with the now-complete `runtimeNeeded` set.
+	// Built after HMR wiring so the import list includes `hmr`/`HMR` when needed.
 	const finalRuntimeImport =
 		ctx.runtimeNeeded.size > 0
 			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'octane';\n\n`
@@ -1542,16 +1561,32 @@ function compileServer(source, filename, options) {
 	return { code, map: buildSourceMap(source, ctx.mapSourceName, []) };
 }
 
+// Reject async/generator component declarations — shared by the client and
+// server compiles so the diagnostic (including the `use(promise)` remedy)
+// can't drift between the two paths. The octane target has no async/generator
+// component model; without this guard such a body compiles to broken
+// synchronous code with no diagnostic — the worst failure mode. Fail loudly.
+function rejectAsyncOrGenerator(node, name) {
+	if (node.async) {
+		throw new Error(
+			`Component \`${name}\` is declared \`async\`, which the octane target does not support. ` +
+				`Load async data with \`use(promise)\` inside a \`@try\` / \`@pending\` boundary instead of ` +
+				`awaiting in the component body.`,
+		);
+	}
+	if (node.generator) {
+		throw new Error(
+			`Component \`${name}\` is declared as a generator (\`function*\`), which the octane ` +
+				`target does not support.`,
+		);
+	}
+}
+
 function compileServerComponent(node, ctx) {
 	const name = node.id.name;
-	if (node.async)
-		throw new Error(`Component \`${name}\` is declared \`async\`, which octane does not support.`);
-	if (node.generator)
-		throw new Error(
-			`Component \`${name}\` is declared as a generator, which octane does not support.`,
-		);
+	rejectAsyncOrGenerator(node, name);
 
-	const isExported = !!(node.export || node.default || node.exported);
+	const isExported = !!(node.export || node.default);
 	const isDefault = !!node.default;
 
 	// Scoped <style>: applyCssScoping stamps hash classes + registers cssInjections.
@@ -1765,29 +1800,14 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
-		// Namespaced attribute names (`xlink:href`) — parser gives us a
-		// JSXNamespacedName { namespace, name } pair; concatenate to the literal name.
-		let rawAttrName;
-		if (
-			attr.name &&
-			(attr.name.type === 'JSXNamespacedName' || attr.name.type === 'NamespacedName')
-		) {
-			rawAttrName = `${attr.name.namespace.name}:${attr.name.name.name}`;
-		} else {
-			rawAttrName = attr.name.name || attr.name;
-		}
+		const rawAttrName = jsxAttrRawName(attr);
 		if (rawAttrName === 'key') continue;
 		// `suppressHydrationWarning` is a client-only hydration hint — never serialize it.
 		if (rawAttrName === 'suppressHydrationWarning') continue;
 		// Events and refs have no server semantics — dropped.
 		if (rawAttrName === 'ref') continue;
-		if (rawAttrName.length > 2 && rawAttrName.startsWith('on') && /^[A-Z]/.test(rawAttrName[2]))
-			continue;
-		// Function form/button actions are events too; a static string `action`
-		// falls through to the normal attribute path below.
-		// `className`/`htmlFor` are React-shape JSX; emit the native names.
-		const attrName =
-			rawAttrName === 'className' ? 'class' : rawAttrName === 'htmlFor' ? 'for' : rawAttrName;
+		if (isEventAttrName(rawAttrName)) continue;
+		const attrName = normalizeJsxAttrName(rawAttrName);
 		const val = attr.value;
 		const isAfterSpread = firstSpreadIdx !== -1 && attrI > firstSpreadIdx;
 
@@ -1829,7 +1849,33 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		if (!isAfterSpread && inner.type === 'Literal') {
 			if (typeof inner.value === 'string') lit += ` ${attrName}="${escapeAttr(inner.value)}"`;
 			else if (typeof inner.value === 'number') lit += ` ${attrName}="${inner.value}"`;
-			else if (inner.value === true) lit += ` ${attrName}`;
+			else if (typeof inner.value === 'boolean' && attrName.startsWith('aria-')) {
+				// `aria-*` is ENUMERATED (React parity, mirroring ssrAttr): a boolean
+				// literal serialises as "true"/"false" — `aria-hidden={false}` must
+				// render, not drop out via the generic boolean handling.
+				lit += ` ${attrName}="${inner.value}"`;
+			} else if (inner.value === true) lit += ` ${attrName}`;
+			continue;
+		}
+
+		// React 19 function actions: a function-valued `<form action={fn}>` /
+		// `<button formAction={fn}>` / `<input formAction={fn}>` is submit wiring,
+		// not a serializable URL — the client routes it to setFormAction. Server-
+		// side, drop the function (mirroring the client's tag+name condition) so
+		// pre-hydration HTML doesn't carry function source as a navigable action;
+		// string values still serialize (under the native lowercase name, like the
+		// client's setFormAction). Static string literals were already inlined above.
+		if (
+			(tag === 'form' && attrName === 'action') ||
+			((tag === 'button' || tag === 'input') &&
+				(attrName === 'formAction' || attrName === 'formaction'))
+		) {
+			flush();
+			ctx.runtimeNeeded.add('ssrAttr');
+			const outName = tag === 'form' ? 'action' : 'formaction';
+			parts.push(
+				`ssrAttr(${JSON.stringify(outName)}, ((__v) => (typeof __v === 'function' ? null : __v))(${printExprWithTsrx(inner, ctx, name, inlinedSubs)}))`,
+			);
 			continue;
 		}
 
@@ -2115,25 +2161,6 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash) {
 // ===========================================================================
 
 /**
- * Walk a new-TSRX component (its `JSXCodeBlock` body) for `JSXStyleElement`
- * nodes. For each one found:
- *   - Pull the pre-parsed `StyleSheet` AST out of its children.
- *   - Run `prepareStylesheetForRender` (rewrites `.foo` → `.foo.<hash>` —
- *     mutates the sheet in place).
- *   - Collect into a list rendered via `renderStylesheets` to a CSS string.
- *   - Register `{hash, css}` on `ctx.cssInjections` so a module-level
- *     `injectStyle(hash, css)` is emitted in the prelude.
- *   - Run `annotateWithHash` over `body.render` to stamp the hash class on
- *     every native JSX element AND remove the JSXStyleElement nodes from
- *     the rendered tree (they don't contribute DOM in the new model).
- *
- * Returns the hash, or `null` when no `<style>` blocks are present.
- *
- * The first `JSXStyleElement` we see contributes the canonical hash for the
- * whole component — multiple `<style>` blocks share it; that matches Ripple's
- * `annotate_component_with_hash`.
- */
-/**
  * Style maps: `const styles = <style>...</style>;`
  *
  * Upstream ripple's headline form for "named class lookup": the variable's
@@ -2211,12 +2238,11 @@ function wrapScopedClassExprs(node, ctx) {
 					attr.value?.type === 'JSXExpressionContainer'
 				) {
 					const expr = attr.value.expression;
-					// Skip string literals (fold statically) and `{style …}` directives
+					// Skip string literals (fold statically) and `{style (…)}` calls
 					// (resolveStyleExpr owns those). Everything else is a runtime value.
 					if (
 						expr &&
 						!(expr.type === 'Literal' && typeof expr.value === 'string') &&
-						expr.type !== 'Style' &&
 						!isStyleCall(expr)
 					) {
 						attr.value.expression = {
@@ -2239,6 +2265,25 @@ function wrapScopedClassExprs(node, ctx) {
 	}
 }
 
+/**
+ * Walk a new-TSRX component (its `JSXCodeBlock` body) for `JSXStyleElement`
+ * nodes. For each one found:
+ *   - Pull the pre-parsed `StyleSheet` AST out of its children.
+ *   - Run `prepareStylesheetForRender` (rewrites `.foo` → `.foo.<hash>` —
+ *     mutates the sheet in place).
+ *   - Collect into a list rendered via `renderStylesheets` to a CSS string.
+ *   - Register `{hash, css}` on `ctx.cssInjections` so a module-level
+ *     `injectStyle(hash, css)` is emitted in the prelude.
+ *   - Run `annotateWithHash` over `body.render` to stamp the hash class on
+ *     every native JSX element AND remove the JSXStyleElement nodes from
+ *     the rendered tree (they don't contribute DOM in the new model).
+ *
+ * Returns the hash, or `null` when no `<style>` blocks are present.
+ *
+ * The first `JSXStyleElement` we see contributes the canonical hash for the
+ * whole component — multiple `<style>` blocks share it; that matches Ripple's
+ * `annotate_component_with_hash`.
+ */
 function applyCssScoping(componentNode, ctx) {
 	if (!componentNode.body || componentNode.body.type !== 'JSXCodeBlock') return null;
 	let cssHash = null;
@@ -2292,23 +2337,8 @@ function applyCssScoping(componentNode, ctx) {
 
 function compileComponent(node, ctx, options) {
 	const name = node.id.name;
-	// The octane target has no async/generator component model. Without this
-	// guard an `async function` / `function*` component body compiles to broken
-	// synchronous code with no diagnostic — the worst failure mode. Fail loudly.
-	if (node.async) {
-		throw new Error(
-			`Component \`${name}\` is declared \`async\`, which the octane target does not support. ` +
-				`Load async data with \`use(promise)\` inside a \`@try\` / \`@pending\` boundary instead of ` +
-				`awaiting in the component body.`,
-		);
-	}
-	if (node.generator) {
-		throw new Error(
-			`Component \`${name}\` is declared as a generator (\`function*\`), which the octane ` +
-				`target does not support.`,
-		);
-	}
-	const isExported = !!(node.export || node.default || node.exported);
+	rejectAsyncOrGenerator(node, name);
+	const isExported = !!(node.export || node.default);
 	const isDefault = !!node.default;
 	const hmrWrap = !!(options && options.hmrWrap);
 
@@ -2318,8 +2348,7 @@ function compileComponent(node, ctx, options) {
 	// @tsrx/core scoping pipeline (rewrites `.foo` → `.foo.<hash>` AND stamps
 	// the hash class onto every element under this component), emit a single
 	// module-level `injectStyle(hash, css)`, and surface `cssHash` so
-	// resolveStyleExpr can also prefix any legacy `{style 'cls'}` usages still
-	// present in fixtures.
+	// resolveStyleExpr can also prefix any `{style (expr)}` class expressions.
 	let cssHash = applyCssScoping(node, ctx);
 	// Backwards-compat: internal callers (legacy synthetic Component shapes)
 	// may still attach `.css` directly on the node.
@@ -2377,11 +2406,10 @@ function compileComponent(node, ctx, options) {
  * SVG/MathML context it inherits that ns.
  *
  * `cssHash` is the enclosing component's scoped-style hash (or null) — used to
- * resolve `{style 'cls'}` expressions to "<hash> cls" strings.
+ * resolve `{style ('cls')}` expressions to "<hash> cls" strings.
  */
 function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null, options = null) {
 	const params = node.params.map((p) => printNode(p)).join(', ');
-	const paramsClause = params ? `, ${params}` : '';
 
 	// Body splitting. Two shapes to handle:
 	//   (new TSRX)  node.body is a `JSXCodeBlock { body: Statement[], render: Node|null }`.
@@ -2392,7 +2420,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	//   (legacy)    node.body is `Statement[]` with JSX nodes interleaved as
 	//               statements. Used by internal callers that construct synthetic
 	//               Component shapes (rewriteTsrxBlocks for old `<tsrx>` blocks,
-	//               makeForCall/makeIfCall/makeTryCall for inlined sub-bodies).
+	//               hoistBodyHelper for the constructs' inlined sub-bodies).
 	//               Keep the old split + rewriteEarlyExits path for these.
 	let statements;
 	let jsxNodes;
@@ -2493,7 +2521,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			`  if (__s.locs === undefined) { __s.locs = ${plan.locs}; __s.locFile = ${JSON.stringify(ctx.mapSourceName)}; }`,
 		);
 	}
-	if (plan.bindingsName) {
+	if (plan.hasBag) {
 		lines.push(`  let _b = __s.slots[0];`);
 		// Deferred property-write diffs (plan.everyRender) run on BOTH mount and
 		// re-render, so they live after the if/else; the mount branch only clones +
@@ -2593,44 +2621,6 @@ function rewriteHookCalls(node, ctx, componentName) {
 	});
 }
 
-// Like rewriteHookCalls, but wraps each BASE hook call in `withSlot(sym, hook,
-// ...args)` — passing the hook + args directly (no per-render closure), so the
-// call-site symbol is pushed on the path stack and the base hook keys off the
-// combined path. Custom (`use*`) hook calls keep the trailing-arg form for now, so
-// existing hand-written bindings (which extract the trailing slot) keep working.
-// Used by the return-JSX function path; the `@{}` path still uses rewriteHookCalls.
-function rewriteHookCallsWithSlot(node, ctx, componentName) {
-	return mapAst(node, (n) => {
-		if (n.type === 'CallExpression' && n.callee.type === 'Identifier') {
-			const name = n.callee.name;
-			const isBuiltin = HOOK_NAMES.has(name);
-			const isCustom = /^use[A-Z]/.test(name) && name !== 'useContext';
-			if (isBuiltin || isCustom) {
-				const symVar = allocHookSymbol(ctx, `${componentName}.${name}#${ctx.nextHookSymId}`);
-				// Recurse into args (nested hooks get their own slots) — mapAst won't.
-				const args = n.arguments.map((a) => rewriteHookCallsWithSlot(a, ctx, componentName));
-				if (isBuiltin) {
-					ctx.runtimeNeeded.add(name);
-					ctx.runtimeNeeded.add('withSlot');
-					return {
-						type: 'CallExpression',
-						callee: { type: 'Identifier', name: 'withSlot' },
-						arguments: [
-							{ type: 'Identifier', name: symVar },
-							{ type: 'Identifier', name },
-							...args,
-						],
-						optional: false,
-					};
-				}
-				// Custom hook → trailing-arg (binding forwards it).
-				return { ...n, arguments: [...args, { type: 'Identifier', name: symVar }] };
-			}
-		}
-		return null;
-	});
-}
-
 // Compile a plain return-JSX function "as just a function": slot its hooks (withSlot)
 // and lower its returned JSX to a `createElement(...)` descriptor. The function stays
 // callable/return-based; `renderBlock` renders whatever it returns (reconciled by
@@ -2649,7 +2639,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 		// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
 		// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
 		if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
-			return { ...h, argument: lowerReturnJsx(h.argument, ctx, name, compInlinedSubs) };
+			return { ...h, argument: lowerReturnJsx(h.argument, ctx, compInlinedSubs) };
 		}
 		return rewriteJsxValues(h, ctx);
 	});
@@ -2678,9 +2668,9 @@ function compileReturnJsxFunction(node, ctx, options) {
 // descriptor (`createElement(_frag$N, holeProps)`) so it rides childSlot's reconcile
 // path; a component element / fragment / directive keeps the existing value-lowering
 // (components already reconcile by identity).
-function lowerReturnJsx(node, ctx, componentName, compInlinedSubs) {
+function lowerReturnJsx(node, ctx, compInlinedSubs) {
 	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
-		return lowerHostFragment(node, ctx, componentName, compInlinedSubs, 'html', null);
+		return lowerHostFragment(node, ctx, compInlinedSubs, 'html', null);
 	}
 	return rewriteJsxValues(node, ctx);
 }
@@ -2731,7 +2721,12 @@ function extractFragment(node, ctx, holeProps) {
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') {
-			newAttrs.push(attr); // non-spread non-attribute — leave (TODO)
+			// Unknown attribute node kind — nothing in the current @tsrx/core
+			// grammar produces one (spreads and plain/namespaced attributes are
+			// handled above). Pass it through unchanged: it carries no expression
+			// for us to thread out as a hole, and emitElementHtml's attribute loop
+			// skips node types it doesn't recognize, so the pass-through is inert.
+			newAttrs.push(attr);
 			continue;
 		}
 		const v = attr.value;
@@ -2836,14 +2831,7 @@ function extractFragment(node, ctx, holeProps) {
 							loc: child.loc, // preserve position for dev hydration LOC
 						}
 					: child;
-			const ic = makeIfCall(
-				ifNode,
-				ctx,
-				fc.componentName,
-				fc.compInlinedSubs,
-				fc.parentNs,
-				fc.cssHash,
-			);
+			const ic = makeIfCall(ifNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const condHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(condHole, rewriteJsxValues(ic.condTest, ctx)));
 			const thenHole = `h${holeProps.length}`;
@@ -2867,8 +2855,8 @@ function extractFragment(node, ctx, holeProps) {
 			// FOLD a `@for`: the item/empty bodies are compiled component-side (closure);
 			// `items`, the item-body fn, the empty-body fn, and (for the dep-pure path)
 			// each dep value thread as `props.hN` holes. The key fn is already module-
-			// hoisted (no closure), so it stays a bare reference; `extra`/`flags` are
-			// constants. Normalize the raw JSXForExpression to the ForOfStatement shape
+			// hoisted (no closure), so it stays a bare reference; `flags` is a
+			// constant. Normalize the raw JSXForExpression to the ForOfStatement shape
 			// makeForCall expects (same as normalizeChildren).
 			const fc = ctx._foldCtx;
 			const forNode =
@@ -2885,14 +2873,7 @@ function extractFragment(node, ctx, holeProps) {
 							loc: child.loc, // preserve position for dev hydration LOC
 						}
 					: child;
-			const rec = makeForCall(
-				forNode,
-				ctx,
-				fc.componentName,
-				fc.compInlinedSubs,
-				fc.parentNs,
-				fc.cssHash,
-			);
+			const rec = makeForCall(forNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const itemsHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(itemsHole, rewriteJsxValues(forNode.right, ctx)));
 			const bodyHole = `h${holeProps.length}`;
@@ -2934,14 +2915,7 @@ function extractFragment(node, ctx, holeProps) {
 							loc: child.loc, // preserve position for dev hydration LOC
 						}
 					: child;
-			const rec = makeSwitchCall(
-				swNode,
-				ctx,
-				fc.componentName,
-				fc.compInlinedSubs,
-				fc.parentNs,
-				fc.cssHash,
-			);
+			const rec = makeSwitchCall(swNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const discHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(discHole, rewriteJsxValues(rec.discNode, ctx)));
 			rec.discExpr = `props.${discHole}`;
@@ -2983,14 +2957,7 @@ function extractFragment(node, ctx, holeProps) {
 							loc: child.loc, // preserve position for dev hydration LOC
 						}
 					: child;
-			const rec = makeTryCall(
-				tryNode,
-				ctx,
-				fc.componentName,
-				fc.compInlinedSubs,
-				fc.parentNs,
-				fc.cssHash,
-			);
+			const rec = makeTryCall(tryNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const tryHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(tryHole, { type: 'Identifier', name: rec.tryHelper }));
 			rec.tryHelper = `props.${tryHole}`;
@@ -3025,23 +2992,14 @@ function extractFragment(node, ctx, holeProps) {
 // A host JSX element → a hoisted compiled renderer + `createElement(_frag$N, {...})`.
 // `compInlinedSubs` is the COMPONENT's inlinedSubs: a folded directive's branch
 // helper functions are emitted there (closure preserved), not in the renderer.
-function lowerHostFragment(
-	node,
-	ctx,
-	componentName,
-	compInlinedSubs,
-	parentNs = 'html',
-	cssHash = null,
-) {
+function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHash = null) {
 	const holeProps = [];
 	const directiveCalls = { ifCalls: [], forCalls: [], switchCalls: [], tryCalls: [] };
 	// extractFragment reads `ctx._foldCtx` for any directive child it folds (and to
 	// route helper defs into the component). Save/restore so it never leaks.
 	const prevFold = ctx._foldCtx;
 	ctx._foldCtx =
-		compInlinedSubs !== undefined
-			? { componentName, compInlinedSubs, directiveCalls, parentNs, cssHash }
-			: null;
+		compInlinedSubs !== undefined ? { compInlinedSubs, directiveCalls, parentNs, cssHash } : null;
 	const rendererEl = extractFragment(node, ctx, holeProps);
 	ctx._foldCtx = prevFold;
 	const fragName = `_frag$${ctx.nextFragId++}`;
@@ -3147,14 +3105,10 @@ function rewriteJsxValues(node, ctx) {
 			return jsxElementToCreateElement(n, ctx);
 		}
 		if (t === 'Fragment' || t === 'JSXFragment') {
-			// `<>…</>` at a value position → an array of its lowered children. The
-			// de-opt childSlot flattens nested arrays, matching React's fragment.
-			const els = [];
-			for (const c of n.children || []) {
-				const e = lowerJsxChild(c, ctx);
-				if (e !== null) els.push(e);
-			}
-			return { type: 'ArrayExpression', elements: els };
+			// `<>…</>` at a value position → an array of its lowered children (the
+			// de-opt childSlot flattens nested arrays, matching React's fragment).
+			// lowerJsxChild owns the single implementation of fragment lowering.
+			return lowerJsxChild(n, ctx);
 		}
 		return null;
 	});
@@ -3286,15 +3240,6 @@ function allocHookSymbol(ctx, debugName) {
 // JSX planning
 // ===========================================================================
 
-/**
- * Normalize a list of JSX child nodes:
- *   - Whitespace-only JSXText → dropped
- *   - JSXText with content → text Literal node
- *   - JSXExpressionContainer → Text hole
- *   - JSXElement → Element (matches our compiler's expected shape)
- *   - Tsx (`<>...</>`) and Tsrx (`<tsrx>...</tsrx>`) → flattened (children inlined)
- *   - Anything else (Element / ForOf / If / etc.) → passed through
- */
 // ===========================================================================
 // Hoisted document metadata (<title>/<meta>/<link>) — React-19 model
 // ===========================================================================
@@ -3365,7 +3310,7 @@ function headElementArgs(node, index) {
 		// Events/refs/key have no head semantics; `class` is the CSS-scoping stamp
 		// (meaningless on title/meta/link) — drop them all.
 		if (attrName === 'key' || attrName === 'ref' || attrName === 'class') continue;
-		if (attrName.length > 2 && attrName.startsWith('on') && /^[A-Z]/.test(attrName[2])) continue;
+		if (isEventAttrName(attrName)) continue;
 		const val = a.value;
 		if (val == null) {
 			attrParts.push(`${JSON.stringify(attrName)}: true`);
@@ -3431,6 +3376,26 @@ function emitHeadServer(headNodes, ctx) {
 	return headNodes.map((h, i) => `  ssrHeadEl(${headElementArgs(h, i)});`).join('\n') + '\n';
 }
 
+/**
+ * Normalize a list of JSX child nodes into the shapes the emitters consume:
+ *   - Whitespace-only JSXText / JSX comments (`{…}` empty containers) → dropped
+ *   - JSXText with content → `Text` node wrapping a string Literal
+ *   - `{expr}` container → `Text` hole, or `TSRXExpression` when the
+ *     expression needs the rich dispatcher (portals, JSX ternaries,
+ *     `.map(x => <jsx/>)`, `() => @{…}` render props — see needsRichDispatch);
+ *     a `{xs.map(x => <li key/>)}` hole lowers to a synthetic `@for`
+ *     (ForOfStatement) so it takes the keyed forBlock/ssrBlock fast path
+ *   - JSXElement → `Element` (with `<Fragment ref>` expanded to a
+ *     FragmentStart/…/FragmentEnd sequence, `<Activity>` lowered to an
+ *     ActivityStatement, `<title>/<meta>/<link>` hoisted as `HeadHoist`,
+ *     and `<head>` rejected)
+ *   - Fragments (`<>…</>`, Tsx/Tsrx) → flattened (children inlined)
+ *   - JSXStyleElement → dropped (its CSS is handled by the scoping pipeline)
+ *   - Directive expressions (@if/@for/@try/@switch, `@{…}` child blocks) →
+ *     lowered to the statement shapes makeIfCall/makeForCall/makeTryCall/
+ *     makeSwitchCall consume
+ *   - Anything else → passed through
+ */
 function normalizeChildren(nodes) {
 	const out = [];
 	if (!nodes) return out;
@@ -3543,10 +3508,6 @@ function normalizeChildren(nodes) {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
 			}
-			// Skip JSXStyleElement nested as a child — its CSS gets registered via
-			// the @tsrx/core scoping pipeline elsewhere; it contributes no DOM.
-			// (Detected separately via JSXStyleElement type but the parser may also
-			// surface a regular JSXElement with tag 'style' in some edge cases.)
 			out.push({
 				type: 'Element',
 				id: n.openingElement.name,
@@ -3559,8 +3520,9 @@ function normalizeChildren(nodes) {
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
 			out.push(...normalizeChildren(n.children || []));
 		} else if (n.type === 'JSXStyleElement') {
-			// Drop — its CSS gets pulled out of the render tree elsewhere.
-			// No DOM contribution at this child position.
+			// Drop a `<style>` block at child position — its CSS gets registered
+			// via the @tsrx/core scoping pipeline (applyCssScoping / applyStyleMap);
+			// it contributes no DOM here.
 			continue;
 		} else if (n.type === 'JSXIfExpression') {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
@@ -3663,23 +3625,6 @@ function needsRichDispatch(expr) {
 	return false;
 }
 
-/**
- * Walk through `as string` / `as TSStringKeyword` casts so the inner
- * expression is the one we emit. Other TS-only wrappers (TSNonNullExpression,
- * TSTypeAssertion with TSStringKeyword) are stripped the same way — they're
- * compile-time hints with no runtime semantics in our emit.
- */
-// Predicate: is this expression statically known to be a string? Used at
-// text-binding creation time to mark the binding so the runtime emit can
-// skip the `String(_v)` coercion on the hot path. Recognised shapes:
-//   - String Literal:               'foo' / "bar"
-//   - TemplateLiteral:               `${x}-${y}` (always coerces to string)
-//   - `as string` / `<string>x`:     user-asserted string-typed expression
-//   - `satisfies string`:            same intent
-//   - Wrappers (`!`, instantiation): peel and check inside
-//   - String `+` concat:             at least one operand known-string
-// Conservative — returns false for anything we can't prove. Safe to use
-// from any text-binding site BEFORE the TS-wrapper strip in printNode.
 // A text child that is a plain string literal — `<el>plain text</el>` (JSXText)
 // or `<el>{'literal'}</el>` — can be baked directly into the template HTML
 // instead of emitting a runtime text binding. Returns the literal string, or
@@ -3696,6 +3641,17 @@ function staticTextLiteral(node) {
 	return null;
 }
 
+// Predicate: is this expression statically known to be a string? Used at
+// text-binding creation time to mark the binding so the runtime emit can
+// skip the `String(_v)` coercion on the hot path. Recognised shapes:
+//   - String Literal:               'foo' / "bar"
+//   - TemplateLiteral:               `${x}-${y}` (always coerces to string)
+//   - `as string` / `<string>x`:     user-asserted string-typed expression
+//   - `satisfies string`:            same intent
+//   - Wrappers (`!`, instantiation): peel and check inside
+//   - String `+` concat:             at least one operand known-string
+// Conservative — returns false for anything we can't prove. Safe to use
+// from any text-binding site BEFORE the TS-wrapper strip in printNode.
 function isKnownStringExpression(node, locals) {
 	if (node == null || typeof node !== 'object') return false;
 	if (node.type === 'Literal' || node.type === 'StringLiteral') {
@@ -3961,6 +3917,22 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// through the wrapper path; HTML-contributing nodes are at `_root.childNodes[i]`.
 	const single =
 		jsxNodes.length === 1 && jsxNodes[0].type === 'Element' && !isComponentTag(jsxNodes[0]);
+	// Top-level control-flow directives (@if/@for/@switch/@try/<Activity>). In a
+	// body that ALSO has static template roots, each construct emits a `<!>`
+	// anchor at its child index (mirroring the in-element mixed-children path)
+	// so its content mounts at its source position BETWEEN static siblings —
+	// and so `htmlIdx` counts it like any other HTML-contributing root. In a
+	// control-flow-only body (no static root) constructs emit no HTML and
+	// anchor at `__block.endMarker` instead (the bagless noTemplate path).
+	const isConstructNode = (n) =>
+		n.type === 'IfStatement' ||
+		n.type === 'ActivityStatement' ||
+		n.type === 'ForOfStatement' ||
+		n.type === 'TryStatement' ||
+		n.type === 'SwitchStatement';
+	const hasStaticRoot = jsxNodes.some(
+		(n) => !isConstructNode(n) && !(n.type === 'Element' && isComponentTag(n)),
+	);
 	const partsHtml = [];
 	let htmlIdx = 0;
 	for (const node of jsxNodes) {
@@ -3968,24 +3940,30 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// Single non-comp Element: path=[] (lives at _root directly).
 		// Otherwise (wrapped in <octane-frag>): path=[htmlIdx] when HTML-contributing.
 		// Component-call: path=[] (no DOM contributed, host is the wrapper).
-		const nodePath = !single && !nodeIsComp ? [htmlIdx] : [];
-		partsHtml.push(
-			emitNodeHtml(
-				node,
-				nodePath,
-				elementBindings,
-				forCalls,
-				ifCalls,
-				compCalls,
-				tryCalls,
-				ctx,
-				componentName,
-				inlinedSubs,
-				parentNs,
-				cssHash,
-			),
+		// Construct: path=[htmlIdx] when it gets a `<!>` anchor (static siblings
+		// exist), else [] — emitNodeHtml keys the anchor emit off the path.
+		const nodePath =
+			!single && !nodeIsComp && (hasStaticRoot || !isConstructNode(node)) ? [htmlIdx] : [];
+		const part = emitNodeHtml(
+			node,
+			nodePath,
+			elementBindings,
+			forCalls,
+			ifCalls,
+			compCalls,
+			tryCalls,
+			ctx,
+			componentName,
+			inlinedSubs,
+			parentNs,
+			cssHash,
 		);
-		if (!nodeIsComp) htmlIdx++;
+		partsHtml.push(part);
+		// Advance the child index only when the node actually contributed template
+		// HTML (an element / text / `<!>` anchor). Component calls and un-anchored
+		// constructs contribute none — advancing for them would shift every later
+		// sibling's template path off by one.
+		if (part !== '') htmlIdx++;
 	}
 	const html = partsHtml.join('');
 	// Was every emitted JSX node a component-call (or any non-HTML node that
@@ -3994,7 +3972,6 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// __block.endMarker as the anchor.
 	const noTemplate = html === '';
 
-	const bindingsName = `b$${ctx.nextHelperId++}`;
 	const mountLines = [];
 	// Initialize `_b` as a LOCAL only — commit to `__s.slots[0]` at the
 	// VERY END of the mount path. If anything thrown mid-mount (e.g. a `use()`
@@ -4117,7 +4094,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// __block.parentNode — recomputable every render — so this body needs NO
 		// binding bag at all. Hosts resolve directly; the bag alloc/commit and the
 		// `let _b … if (undefined) … else {}` wrapper are skipped (see `noTemplate`
-		// guards below + `bindingsName: null` in the plan).
+		// guards below + `hasBag: false` in the plan).
 		ensureVar = () => `__block.parentNode`;
 	}
 
@@ -4209,81 +4186,50 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		if (b.kind === 'text') deferredTextMounts.push(emitBindingMount(b, elVar));
 		else mountLines.push(emitBindingMount(b, elVar));
 	}
-	for (const fc of forCalls) {
-		const elVar = ensureVar(fc.hostPath);
-		fc.elVar = elVar;
-		if (!noTemplate) mountLines.push(`    _b._for$${fc.id} = ${elVar};`);
-		if (!noTemplate) stampHostLoc(elVar, fc.hostPath, fc.loc);
-		if (fc.anchorPath) {
-			const anchorVar = ensureVar(fc.anchorPath);
-			fc.anchorVar = anchorVar;
-			mountLines.push(`    _b._forAnchor$${fc.id} = ${anchorVar};`);
+	// Shared construct mount-loop (@for/@if/component/@try/@switch/portal):
+	// resolve each record's host element, stash it on the bag under the
+	// construct's key (`_<hostKey>$id`), DEV-stamp the host's source LOC (so a
+	// hydration mismatch in e.g. childTextHole — which has the host, not a
+	// template binding — can report `file:line:col`), and, when the plan
+	// recorded a `<!>` source-order anchor, resolve + stash that too
+	// (`_<anchorKey>$id`). Only the bag key naming varies per construct kind;
+	// `each` appends kind-specific per-record mount lines.
+	const mountConstructs = (list, hostKey, { anchorKey = null, stampLoc = true, each = null }) => {
+		for (const c of list) {
+			const elVar = ensureVar(c.hostPath || []);
+			c.elVar = elVar;
+			if (!noTemplate) mountLines.push(`    _b._${hostKey}$${c.id} = ${elVar};`);
+			if (!noTemplate && stampLoc) stampHostLoc(elVar, c.hostPath, c.loc);
+			if (anchorKey !== null && c.anchorPath) {
+				const anchorVar = ensureVar(c.anchorPath);
+				c.anchorVar = anchorVar;
+				mountLines.push(`    _b._${anchorKey}$${c.id} = ${anchorVar};`);
+			}
+			if (each) each(c);
 		}
-	}
-	for (const ic of ifCalls) {
-		const elVar = ensureVar(ic.hostPath);
-		ic.elVar = elVar;
-		if (!noTemplate) mountLines.push(`    _b._ifHost$${ic.id} = ${elVar};`);
-		if (!noTemplate) stampHostLoc(elVar, ic.hostPath, ic.loc);
-		if (ic.anchorPath) {
-			const anchorVar = ensureVar(ic.anchorPath);
-			ic.anchorVar = anchorVar;
-			mountLines.push(`    _b._ifAnchor$${ic.id} = ${anchorVar};`);
-		}
-	}
-	for (const cc of compCalls) {
-		const elVar = ensureVar(cc.hostPath);
-		cc.elVar = elVar;
-		if (!noTemplate) mountLines.push(`    _b._compHost$${cc.id} = ${elVar};`);
-		// DEV: stamp the child/component host element so a hydration mismatch in childTextHole
-		// (which has the host, not a template binding) can report `file:line:col`.
-		if (!noTemplate) stampHostLoc(elVar, cc.hostPath, cc.loc);
-		if (cc.anchorPath) {
-			const anchorVar = ensureVar(cc.anchorPath);
-			cc.anchorVar = anchorVar;
-			mountLines.push(`    _b._compAnchor$${cc.id} = ${anchorVar};`);
-		}
-		// A renderable `{expr}` child in a TEMPLATE body (has a bag) uses the inline
-		// text-hole fast path — cache its text node (`_chv`) + last value (`_chp`) on
-		// the bag so updates do a direct `setText` like a `.tsrx` text binding. Init
-		// in the mount branch so the bag shape stays monomorphic.
-		if (cc.isChild && !noTemplate) {
-			mountLines.push(`    _b._chv$${cc.id} = null;`);
-			mountLines.push(`    _b._chp$${cc.id} = undefined;`);
-		}
-	}
-	// tryBlock targets.
-	for (const tc of tryCalls) {
-		const elVar = ensureVar(tc.hostPath);
-		tc.elVar = elVar;
-		if (!noTemplate) mountLines.push(`    _b._tryHost$${tc.id} = ${elVar};`);
-		if (!noTemplate) stampHostLoc(elVar, tc.hostPath, tc.loc);
-		if (tc.anchorPath) {
-			const anchorVar = ensureVar(tc.anchorPath);
-			tc.anchorVar = anchorVar;
-			mountLines.push(`    _b._tryAnchor$${tc.id} = ${anchorVar};`);
-		}
-	}
-	// switchBlock targets.
-	for (const sc of ctx._switchCalls) {
-		const elVar = ensureVar(sc.hostPath);
-		sc.elVar = elVar;
-		if (!noTemplate) mountLines.push(`    _b._switchHost$${sc.id} = ${elVar};`);
-		if (!noTemplate) stampHostLoc(elVar, sc.hostPath, sc.loc);
-		if (sc.anchorPath) {
-			const anchorVar = ensureVar(sc.anchorPath);
-			sc.anchorVar = anchorVar;
-			mountLines.push(`    _b._switchAnchor$${sc.id} = ${anchorVar};`);
-		}
-	}
-	// Portal host targets — element containing the createPortal JSX position.
-	// Stashed so the runtime can stamp $$portalParent on the portal's mounted
-	// children pointing here, giving React-shape bubble-out semantics.
-	for (const pc of ctx._portalCalls) {
-		const elVar = ensureVar(pc.hostPath || []);
-		pc.elVar = elVar;
-		if (!noTemplate) mountLines.push(`    _b._portalHost$${pc.id} = ${elVar};`);
-	}
+	};
+	mountConstructs(forCalls, 'for', { anchorKey: 'forAnchor' });
+	mountConstructs(ifCalls, 'ifHost', { anchorKey: 'ifAnchor' });
+	mountConstructs(compCalls, 'compHost', {
+		anchorKey: 'compAnchor',
+		each: (cc) => {
+			// A renderable `{expr}` child in a TEMPLATE body (has a bag) uses the inline
+			// text-hole fast path — cache its text node (`_chv`) + last value (`_chp`) on
+			// the bag so updates do a direct `setText` like a `.tsrx` text binding. Init
+			// in the mount branch so the bag shape stays monomorphic.
+			if (cc.isChild && !noTemplate) {
+				mountLines.push(`    _b._chv$${cc.id} = null;`);
+				mountLines.push(`    _b._chp$${cc.id} = undefined;`);
+			}
+		},
+	});
+	mountConstructs(tryCalls, 'tryHost', { anchorKey: 'tryAnchor' });
+	mountConstructs(ctx._switchCalls, 'switchHost', { anchorKey: 'switchAnchor' });
+	// Portal hosts — the element containing the createPortal JSX position, stashed
+	// so the runtime can stamp $$portalParent on the portal's mounted children
+	// pointing here (React-shape bubble-out semantics). No LOC stamp, no `<!>`
+	// anchor — the portal's content renders into a foreign target.
+	mountConstructs(ctx._portalCalls, 'portalHost', { stampLoc: false });
 	// Flush the deferred sibling-text-hole mounts now that every element walk is emitted —
 	// `htextSwap` can safely detach its `<!>` placeholder without breaking later navigation.
 	for (const line of deferredTextMounts) mountLines.push(line);
@@ -4354,6 +4300,27 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// stays inside the block)? In-template hosts are the navigated `_el…` vars and the
 	// single-root template root `_root` itself.
 	const isElHost = (v) => v === '_root' || v.startsWith('_el');
+	// Shared anchor selection for every construct emit (@for/@if/@switch/@try/
+	// component/child slots). Three cases:
+	//   - The construct has source-order siblings: the mixed-children /
+	//     multi-root emit placed a `<!>` placeholder at its child index and the
+	//     mount loop stashed it on the bag (`_<anchorKey>$id`) — insert BEFORE
+	//     it so sibling order is preserved.
+	//   - The host is the block's own parentNode (`c.elVar` resolved to
+	//     `__block.parentNode` — a control-flow-only or multi-root body, never
+	//     an `_el`/`_root` template var): anchor at `__block.endMarker` so the
+	//     construct's content stays INSIDE the owning block's range (for-of
+	//     reorder / tryBlock unmount move the slot DOM along with the block,
+	//     and content never lands after later siblings).
+	//   - The host is a real in-template element: no anchor — append into it
+	//     (insertBefore(_, null) === appendChild).
+	// Returns the anchor EXPRESSION, or null for the append case.
+	const anchorExprFor = (c, anchorKey) =>
+		c.anchorVar
+			? `__s.slots[0]._${anchorKey}$${c.id}`
+			: !isElHost(c.elVar)
+				? '__block.endMarker'
+				: null;
 	for (const fc of forCalls) {
 		ctx.runtimeNeeded.add('forBlock');
 		const slotIndex = fc.slotIndex;
@@ -4363,15 +4330,14 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		//        bit 2 = depEligible (runtime compares deps array, upgrades to pure
 		//        for survivors when deps unchanged this render).
 		const flags = (fc.pure ? 1 : 0) | (fc.singleRoot ? 2 : 0) | (fc.depEligible ? 4 : 0);
-		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, extra, flags?, deps?, emptyBody?, anchor?).
-		// `emptyHelper` ('null' literal when no `@empty` branch) lands as the
-		// trailing arg. We backfill `flags` and `deps` placeholders (`0` and
-		// `undefined`) when only the empty branch is present so the runtime sees
-		// it at the right position. When the @for has a source-order anchor
-		// (because it sits before static siblings in mixed children), we backfill
-		// all earlier trailing positions and append the anchor expression last so
-		// forBlock's optional `anchor` param lines up positionally.
-		const hasAnchor = !!fc.anchorVar;
+		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, flags?, deps?, emptyBody?, anchor?).
+		// Optional args backfill positionally: `flags`/`deps` placeholders
+		// (`0`/`undefined`) when only `emptyHelper` ('null' literal when no
+		// `@empty` branch) or the anchor is present, and a `null` empty-body
+		// placeholder when only the anchor is, so each lands at its positional
+		// parameter.
+		const anchorExpr = anchorExprFor(fc, 'forAnchor');
+		const hasAnchor = anchorExpr !== null;
 		const hasEmpty = fc.emptyHelper && fc.emptyHelper !== 'null';
 		const flagsPart = flags || hasEmpty || hasAnchor ? ', ' + (flags || 0) : '';
 		const depsPart = fc.depEligible
@@ -4380,25 +4346,18 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				? ', undefined'
 				: '';
 		const emptyPart = hasEmpty ? `, ${fc.emptyHelper}` : hasAnchor ? ', null' : '';
-		const anchorPart = hasAnchor ? `, __s.slots[0]._forAnchor$${fc.id}` : '';
+		const anchorPart = hasAnchor ? `, ${anchorExpr}` : '';
 		pushAfter(
 			fc.id,
-			`  forBlock(__s, ${slotIndex}, ${hostExpr}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}, ${fc.extraExpr}${flagsPart}${depsPart}${emptyPart}${anchorPart});`,
+			`  forBlock(__s, ${slotIndex}, ${hostExpr}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}${flagsPart}${depsPart}${emptyPart}${anchorPart});`,
 		);
 	}
 	for (const ic of ifCalls) {
 		const slotIndex = ic.slotIndex;
 		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._ifHost$' + ic.id;
-		// Anchor selection mirrors componentSlot: with `<!>`-anchored source-order
-		// siblings, pass the captured anchor var so the start/end markers land
-		// BEFORE it (preserving order). When the host is the body's own parentNode
-		// (a control-flow-only body, host var is `_b._compHost`, not an `_el`),
-		// pass `__block.endMarker` so the markers stay INSIDE the owning block's
-		// range. Otherwise (host is a real template element) omit it (append into
-		// the element).
-		let anchorArg = '';
-		if (ic.anchorVar) anchorArg = `, __s.slots[0]._ifAnchor$${ic.id}`;
-		else if (ic.elVar && !isElHost(ic.elVar)) anchorArg = ', __block.endMarker';
+		// Anchor selection — see anchorExprFor.
+		const ifAnchor = anchorExprFor(ic, 'ifAnchor');
+		const anchorArg = ifAnchor ? `, ${ifAnchor}` : '';
 		if (ic.activity) {
 			ctx.runtimeNeeded.add('activityBlock');
 			pushAfter(
@@ -4435,13 +4394,9 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				);
 				continue;
 			}
-			// Anchor expression (no leading comma): a `<!>` source-order placeholder,
-			// the block end-marker, or none (append into an in-template element host).
-			const anchorExpr = cc.anchorVar
-				? `__s.slots[0]._compAnchor$${cc.id}`
-				: isElHost(cc.elVar)
-					? 'null'
-					: '__block.endMarker';
+			// Anchor expression (no leading comma; 'null' = append into an
+			// in-template element host) — see anchorExprFor.
+			const anchorExpr = anchorExprFor(cc, 'compAnchor') ?? 'null';
 			if (noTemplate) {
 				// No bag to cache on → the small `textSlot` wrapper (fast inline for a
 				// primitive into a text slot; delegates to `childSlot` otherwise).
@@ -4477,16 +4432,10 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// <span> as a sibling of its parent <div>).
 		if (cc.liteEligible) {
 			ctx.runtimeNeeded.add('componentSlotLite');
-			// Anchor: same rules as componentSlot — anchorVar overrides; otherwise
-			// omit when the host is a nested in-template element (the body can
-			// safely appendChild), or pass __block.endMarker when the host is the
-			// block's own parentNode (so the lite range stays inside the block).
-			let anchorArg = '';
-			if (cc.anchorVar) {
-				anchorArg = `, __s.slots[0]._compAnchor$${cc.id}`;
-			} else if (!isElHost(cc.elVar)) {
-				anchorArg = ', __block.endMarker';
-			}
+			// Anchor — same rules as componentSlot (see anchorExprFor); the
+			// endMarker case keeps the lite range inside the owning block.
+			const liteAnchor = anchorExprFor(cc, 'compAnchor');
+			const anchorArg = liteAnchor ? `, ${liteAnchor}` : '';
 			pushAfter(
 				cc.id,
 				`  componentSlotLite(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg});`,
@@ -4494,22 +4443,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			continue;
 		}
 		ctx.runtimeNeeded.add('componentSlot');
-		// Anchor selection:
-		//   - In mixed children with source-order siblings, we emitted a `<!>`
-		//     placeholder at the component's index and stored its el var on
-		//     `cc.anchorVar` — pass that so componentSlot inserts BEFORE it.
-		//   - When the host is the block's own parentNode (multi-root /
-		//     noTemplate cases), pass __block.endMarker so the slot's markers
-		//     stay inside the block's range (for-of reorder / tryBlock unmount
-		//     move the slot DOM along with the block).
-		//   - When the host is a nested element with no in-template anchor,
-		//     the slot can safely append (insertBefore ignores foreign anchors).
-		let anchorArg;
-		if (cc.anchorVar) {
-			anchorArg = `, __s.slots[0]._compAnchor$${cc.id}`;
-		} else {
-			anchorArg = isElHost(cc.elVar) ? '' : ', __block.endMarker';
-		}
+		// Anchor selection — see anchorExprFor (the endMarker case keeps the
+		// slot's markers inside the block's range so for-of reorder / tryBlock
+		// unmount move the slot DOM along with the block; an element host with
+		// no in-template anchor can safely append).
+		const compAnchor = anchorExprFor(cc, 'compAnchor');
+		let anchorArg = compAnchor ? `, ${compAnchor}` : '';
 		// key arg is positional AFTER anchor in componentSlot's signature. When a
 		// key is present but anchor isn't, supply `undefined` for the anchor slot
 		// so the key lands in the right argument position — the runtime's
@@ -4546,12 +4485,10 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const slotIndex = tc.slotIndex;
 		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._tryHost$' + tc.id;
 		ctx.runtimeNeeded.add('tryBlock');
-		// Anchor selection mirrors componentSlot:
-		//   - In mixed children with source-order siblings, we emitted a `<!>`
-		//     placeholder at the @try's index and stored its el var on
-		//     `tc.anchorVar` — pass that so tryBlock inserts BEFORE it.
-		//   - Otherwise omit (runtime treats undefined === appendChild).
-		const tryAnchorArg = tc.anchorVar ? `, __s.slots[0]._tryAnchor$${tc.id}` : '';
+		// Anchor selection — see anchorExprFor (mirrors ifBlock, including the
+		// __block.endMarker fallback for a body that is ONLY a @try).
+		const tryAnchor = anchorExprFor(tc, 'tryAnchor');
+		const tryAnchorArg = tryAnchor ? `, ${tryAnchor}` : '';
 		pushAfter(
 			tc.id,
 			`  tryBlock(__s, ${slotIndex}, ${hostExpr}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg});`,
@@ -4561,12 +4498,10 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const slotIndex = sc.slotIndex;
 		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._switchHost$' + sc.id;
 		ctx.runtimeNeeded.add('switchBlock');
-		// Anchor selection mirrors componentSlot:
-		//   - When the @switch had source-order siblings (mixed-children loop
-		//     emitted a `<!>` placeholder at its index), pass the stashed
-		//     anchor node so switchBlock inserts BEFORE it.
-		//   - Otherwise omit the arg; the runtime defaults to appendChild.
-		const anchorArg = sc.anchorVar ? `, __s.slots[0]._switchAnchor$${sc.id}` : '';
+		// Anchor selection — see anchorExprFor (mirrors ifBlock, including the
+		// __block.endMarker fallback for a body that is ONLY a @switch).
+		const switchAnchor = anchorExprFor(sc, 'switchAnchor');
+		const anchorArg = switchAnchor ? `, ${switchAnchor}` : '';
 		pushAfter(
 			sc.id,
 			`  switchBlock(__s, ${slotIndex}, ${hostExpr}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg});`,
@@ -4583,9 +4518,10 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	ctx._elemLocs = _prevElemLocs;
 
 	return {
-		// Control-flow-only bodies carry no bag → no `let _b … if (undefined) … else {}`
-		// wrapper in the assembled body (the slot calls use __block.parentNode directly).
-		bindingsName: noTemplate ? null : bindingsName,
+		// Does this body carry a binding bag (`__s.slots[0]`)? Control-flow-only
+		// bodies don't → no `let _b … if (undefined) … else {}` wrapper in the
+		// assembled body (the slot calls use __block.parentNode directly).
+		hasBag: !noTemplate,
 		mount: mountLines.join('\n'),
 		update: updateLines.join('\n'),
 		everyRender: everyRenderLines.join('\n'),
@@ -4712,7 +4648,7 @@ function emitBindingMount(b, elVar) {
       setSpread(${elVar}, _v, undefined, __s);
       _b._el$${b.id} = ${elVar};
       _b._sp$${b.id} = _v;
-      __s.cleanups.push(() => { const _sp = _b._sp$${b.id}; if (_sp != null && _sp.ref != null) attachRef(_sp.ref, null); });
+      __s.cleanups.push(() => { const _sp = _b._sp$${b.id}; if (_sp != null && _sp.ref != null) attachRef(_sp.ref, null, _b._el$${b.id}); });
     }`;
 		}
 		case 'event': {
@@ -4749,13 +4685,16 @@ function emitBindingMount(b, elVar) {
 			// The attach is DEFERRED via queueRefAttach so it runs at commit, after
 			// the subtree is inserted into the document — a callback ref then sees a
 			// connected node and ref.current is set before layout effects run
-			// (React-19 commit-phase ref timing). Detach stays synchronous on unmount.
+			// (React-19 commit-phase ref timing). Detach stays synchronous on unmount
+			// and passes the bound element as attachRef's cleanup target, so a
+			// callback ref shared across elements (ref={registerItem} on every @for
+			// row) releases ITS row's React-19 cleanup, not another row's.
 			return `    {
       const _r = (${b.expr});
       _b._ref$${b.id} = _r;
       _b._el$${b.id} = ${elVar};
       queueRefAttach(__s, () => attachRef(_r, _b._el$${b.id}));
-      __s.cleanups.push(() => attachRef(_b._ref$${b.id}, null));
+      __s.cleanups.push(() => attachRef(_b._ref$${b.id}, null, _b._el$${b.id}));
     }`;
 		}
 		case 'fragmentRef': {
@@ -4848,7 +4787,7 @@ function emitBindingUpdate(b) {
       const _r = (${b.expr});
       if (_r !== _b._ref$${b.id}) {
         const _old = _b._ref$${b.id};
-        if (_old != null) attachRef(_old, null);
+        if (_old != null) attachRef(_old, null, _b._el$${b.id});
         attachRef(_r, _b._el$${b.id});
         _b._ref$${b.id} = _r;
       }
@@ -4863,7 +4802,7 @@ function emitBindingUpdate(b) {
       const _r = (${b.expr});
       const _fi = _b._fi$${b.id};
       if (_fi && _r !== _fi._currentRef) {
-        attachRef(_fi._currentRef, null);
+        attachRef(_fi._currentRef, null, _fi);
         attachRef(_r, _fi);
         _fi._currentRef = _r;
       }
@@ -4906,7 +4845,7 @@ function emitNodeHtml(
 		// Bare `{expr}` (no string cast) → RENDERABLE hole at a top-level / multi-
 		// root position. Host is the parent (the dropped last path segment), anchor
 		// is this node's `<!>` slot.
-		const ch = makeChildCall(node.expression, ctx, cssHash);
+		const ch = makeChildCall(node.expression, ctx, componentName, inlinedSubs, cssHash);
 		ch.hostPath = path.slice(0, -1);
 		ch.anchorPath = path;
 		compCalls.push(ch);
@@ -4920,19 +4859,9 @@ function emitNodeHtml(
 	// the PortalDescriptor; any inner JSX lowers to createElement). Without this a
 	// top-level rich hole compiled to nothing.
 	if (node.type === 'TSRXExpression') {
-		const ch = {
-			id: ctx.nextHelperId++,
-			loc: devLoc(ctx, node),
-			isChild: true,
-			valueExpr: printExprWithTsrx(
-				resolveStyleExpr(rewriteJsxValues(node.expression, ctx), cssHash),
-				ctx,
-				componentName,
-				inlinedSubs,
-			),
-			hostPath: path.slice(0, -1),
-			anchorPath: path,
-		};
+		const ch = makeChildCall(node.expression, ctx, componentName, inlinedSubs, cssHash);
+		ch.hostPath = path.slice(0, -1);
+		ch.anchorPath = path;
 		compCalls.push(ch);
 		return '<!>';
 	}
@@ -4975,35 +4904,36 @@ function emitNodeHtml(
 		);
 	if (node.type === 'Literal' && typeof node.value === 'string') return escapeHtml(node.value);
 	// Top-level control-flow — register as a call hosted on the body's parent.
+	// When planJsx passed a non-empty `path` (a multi-root body with static
+	// template siblings), the construct emits a `<!>` anchor at its child index
+	// and records it as `anchorPath`, so the runtime block inserts BEFORE it —
+	// preserving source order between static roots, exactly like the in-element
+	// mixed-children path. With an empty path (control-flow-only body) it emits
+	// no HTML and anchors at `__block.endMarker` (see anchorExprFor).
+	const anchored = path.length > 0;
+	const registerConstruct = (rec, list) => {
+		rec.hostPath = [];
+		if (anchored) rec.anchorPath = path;
+		list.push(rec);
+		return anchored ? '<!>' : '';
+	};
 	if (node.type === 'IfStatement') {
-		const ic = makeIfCall(node, ctx, componentName, inlinedSubs, parentNs, cssHash);
-		ic.hostPath = [];
-		ifCalls.push(ic);
-		return '';
+		return registerConstruct(makeIfCall(node, ctx, inlinedSubs, parentNs, cssHash), ifCalls);
 	}
 	if (node.type === 'ActivityStatement') {
-		const ic = makeActivityCall(node, ctx, componentName, inlinedSubs, parentNs, cssHash);
-		ic.hostPath = [];
-		ifCalls.push(ic);
-		return '';
+		return registerConstruct(makeActivityCall(node, ctx, inlinedSubs, parentNs, cssHash), ifCalls);
 	}
 	if (node.type === 'ForOfStatement') {
-		const fc = makeForCall(node, ctx, componentName, inlinedSubs, parentNs, cssHash);
-		fc.hostPath = [];
-		forCalls.push(fc);
-		return '';
+		return registerConstruct(makeForCall(node, ctx, inlinedSubs, parentNs, cssHash), forCalls);
 	}
 	if (node.type === 'TryStatement') {
-		const tc = makeTryCall(node, ctx, componentName, inlinedSubs, parentNs, cssHash);
-		tc.hostPath = [];
-		tryCalls.push(tc);
-		return '';
+		return registerConstruct(makeTryCall(node, ctx, inlinedSubs, parentNs, cssHash), tryCalls);
 	}
 	if (node.type === 'SwitchStatement') {
-		const sc = makeSwitchCall(node, ctx, componentName, inlinedSubs, parentNs, cssHash);
-		sc.hostPath = [];
-		ctx._switchCalls.push(sc);
-		return '';
+		return registerConstruct(
+			makeSwitchCall(node, ctx, inlinedSubs, parentNs, cssHash),
+			ctx._switchCalls,
+		);
 	}
 	return '';
 }
@@ -5078,18 +5008,7 @@ function emitElementHtml(
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
-		// Namespaced attribute names (`xlink:href`) — parser gives us a
-		// JSXNamespacedName { namespace, name } pair. Concatenate so the runtime
-		// sets the literal `xlink:href` attribute (the browser knows the ns).
-		let rawAttrName;
-		if (
-			attr.name &&
-			(attr.name.type === 'JSXNamespacedName' || attr.name.type === 'NamespacedName')
-		) {
-			rawAttrName = `${attr.name.namespace.name}:${attr.name.name.name}`;
-		} else {
-			rawAttrName = attr.name.name || attr.name;
-		}
+		const rawAttrName = jsxAttrRawName(attr);
 		// `key` on a regular element:
 		//   - inside @for: consumed by the keyFn (keyed reconciliation drives
 		//     this).
@@ -5113,11 +5032,7 @@ function emitElementHtml(
 			if (!isFalse) bindings.push({ id: bindings.length, kind: 'suppress', path });
 			continue;
 		}
-		// `className`/`htmlFor` are React-shape JSX; emit the native `class`/`for` in
-		// HTML so the browser actually applies them (and dynamic bindings also know
-		// which kind to pick).
-		const attrName =
-			rawAttrName === 'className' ? 'class' : rawAttrName === 'htmlFor' ? 'for' : rawAttrName;
+		const attrName = normalizeJsxAttrName(rawAttrName);
 
 		const val = attr.value;
 		// If this attr comes AFTER a spread, we MUST emit as a binding (later wins).
@@ -5196,7 +5111,7 @@ function emitElementHtml(
 			continue;
 		}
 		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
-		// `{style 'cls'}` in attribute position — resolve to a class string
+		// `{style ('cls')}` in attribute position — resolve to a class string
 		// (literal or runtime concat) before any further handling.
 		inner = resolveStyleExpr(inner, cssHash);
 
@@ -5225,6 +5140,11 @@ function emitElementHtml(
 				attrHtml += ` ${attrName}="${escapeAttr(inner.value)}"`;
 			} else if (typeof inner.value === 'number') {
 				attrHtml += ` ${attrName}="${inner.value}"`;
+			} else if (typeof inner.value === 'boolean' && attrName.startsWith('aria-')) {
+				// `aria-*` is ENUMERATED (React parity, mirroring the runtime
+				// setAttribute / ssrAttr): a boolean literal bakes as the string
+				// "true"/"false" — `aria-hidden={false}` must render, not drop.
+				attrHtml += ` ${attrName}="${inner.value}"`;
 			} else if (inner.value === true) {
 				attrHtml += ` ${attrName}`;
 			}
@@ -5234,7 +5154,7 @@ function emitElementHtml(
 		// Dynamic value — record a binding. (Also reached for literal values that
 		// come after a spread, since those need to win over the spread at runtime.)
 		const expr = printExprWithTsrx(inner, ctx, componentName, inlinedSubs);
-		if (attrName.length > 2 && attrName.startsWith('on') && /^[A-Z]/.test(attrName[2])) {
+		if (isEventAttrName(attrName)) {
 			// React-shape: a trailing `Capture` selects the capture phase (fired
 			// root→target before bubble handlers), stamped under `$$capture:<type>`.
 			// The real events gotpointercapture / lostpointercapture literally end in
@@ -5284,7 +5204,8 @@ function emitElementHtml(
 					ns: hostNs,
 				});
 			}
-		} else if (attrName === 'class' || attrName === 'className') {
+		} else if (attrName === 'class') {
+			// (`className` was already normalized to `class` above.)
 			bindings.push({ id: bindings.length, kind: 'class', expr, path, ns: hostNs });
 		} else if (
 			(tag === 'form' && attrName === 'action') ||
@@ -5346,20 +5267,11 @@ function emitElementHtml(
 			// runtime `childTextHole` owns that branch; the server emits `ssrChildText`
 			// (markerless text for a primitive, a `<!--[-->…<!--]-->` block otherwise),
 			// so hydration adopts either shape.
-			const ch = makeChildCall(txtChild.expression, ctx, cssHash);
+			const ch = makeChildCall(txtChild.expression, ctx, componentName, inlinedSubs, cssHash);
 			ch.hostPath = path;
 			ch.onlyChildText = true;
 			compCalls.push(ch);
 		}
-	} else if (children.length === 1 && children[0].type === 'Html') {
-		// `{html expr}` as the only child — set the element's innerHTML directly.
-		// Empty template; runtime injects the HTML on mount and diff-replaces on update.
-		bindings.push({
-			id: bindings.length,
-			kind: 'htmlOnlyChild',
-			expr: printExpr(children[0].expression),
-			path,
-		});
 	} else {
 		// Mixed children — walk them in order.
 		let childIdx = 0;
@@ -5438,7 +5350,7 @@ function emitElementHtml(
 					// Bare `{expr}` (no string cast) → RENDERABLE hole (component /
 					// element / children-fn render; primitive → text; nullish/boolean →
 					// nothing). Same `<!>` anchor + host as a component child.
-					const ch = makeChildCall(child.expression, ctx, cssHash);
+					const ch = makeChildCall(child.expression, ctx, componentName, inlinedSubs, cssHash);
 					ch.hostPath = path;
 					ch.anchorPath = [...path, childIdx];
 					compCalls.push(ch);
@@ -5494,7 +5406,7 @@ function emitElementHtml(
 					childIdx++;
 				}
 			} else if (child.type === 'ForOfStatement') {
-				const forCall = makeForCall(child, ctx, componentName, inlinedSubs, childNs, cssHash);
+				const forCall = makeForCall(child, ctx, inlinedSubs, childNs, cssHash);
 				forCall.hostPath = path;
 				// Emit a `<!>` anchor at the @for's source-order position so forBlock
 				// inserts its start/end markers BEFORE this anchor — preserving sibling
@@ -5506,7 +5418,7 @@ function emitElementHtml(
 				html += '<!>';
 				childIdx++;
 			} else if (child.type === 'IfStatement') {
-				const ifCall = makeIfCall(child, ctx, componentName, inlinedSubs, childNs, cssHash);
+				const ifCall = makeIfCall(child, ctx, inlinedSubs, childNs, cssHash);
 				ifCall.hostPath = path;
 				// Emit a `<!>` anchor at the if-block's source-order position so
 				// ifBlock inserts its start/end markers BEFORE this anchor —
@@ -5554,7 +5466,7 @@ function emitElementHtml(
 					childIdx++;
 				}
 			} else if (child.type === 'ActivityStatement') {
-				const ac = makeActivityCall(child, ctx, componentName, inlinedSubs, childNs, cssHash);
+				const ac = makeActivityCall(child, ctx, inlinedSubs, childNs, cssHash);
 				ac.hostPath = path;
 				// `<!>` anchor so activityBlock's markers insert before later siblings
 				// (same sibling-order reasoning as @if above).
@@ -5563,7 +5475,7 @@ function emitElementHtml(
 				html += '<!>';
 				childIdx++;
 			} else if (child.type === 'TryStatement') {
-				const tc = makeTryCall(child, ctx, componentName, inlinedSubs, childNs, cssHash);
+				const tc = makeTryCall(child, ctx, inlinedSubs, childNs, cssHash);
 				tc.hostPath = path;
 				// Emit a `<!>` anchor at the tryBlock's source-order position so
 				// tryBlock inserts BEFORE this anchor — preserving sibling order
@@ -5575,7 +5487,7 @@ function emitElementHtml(
 				html += '<!>';
 				childIdx++;
 			} else if (child.type === 'SwitchStatement') {
-				const sc = makeSwitchCall(child, ctx, componentName, inlinedSubs, childNs, cssHash);
+				const sc = makeSwitchCall(child, ctx, inlinedSubs, childNs, cssHash);
 				sc.hostPath = path;
 				// Emit a `<!>` anchor at the switch's source-order position so
 				// switchBlock inserts BEFORE this anchor — preserving sibling
@@ -5586,46 +5498,15 @@ function emitElementHtml(
 				ctx._switchCalls.push(sc);
 				html += '<!>';
 				childIdx++;
-			} else if (child.type === 'Style') {
-				// `{style 'cls'}` at child position — resolve to a class-name string
-				// and emit as a text hole. Useful for passing scoped class names down
-				// through render-prop boundaries.
-				bindings.push({
-					id: bindings.length,
-					kind: 'text',
-					expr: printExpr(resolveStyleExpr(child, cssHash)),
-					// `{style 'cls'}` resolves to a String class name at compile time.
-					knownString: true,
-					path,
-					childIndex: childIdx,
-				});
-				html += '<!>';
-				childIdx++;
-			} else if (child.type === 'Html') {
-				// `{html expr}` mixed with sibling children isn't supported — wrap the
-				// expression in a dedicated parent (e.g. `<span>{html ...}</span>`)
-				// and the only-child fast path will set innerHTML on the wrapper.
-				throw new Error(
-					'{html expr} must be the ONLY child of its parent element. ' +
-						'Wrap it in a dedicated element like <span>{html expr}</span>.',
-				);
 			} else if (child.type === 'TSRXExpression') {
 				// {expr} at JSX child position. Recognised forms:
-				//   - `{ref refExpr}` → ref-attach binding on the host element
 				//   - `{createPortal(BODY, TARGET, PROPS?)}` → portal() call
 				//   - `{cond ? <JSX/> : <JSX/>}` → lowered to ifBlock (so the branches
 				//      mount real DOM, not stringified text)
-				//   - `{items.map(x => <JSX/>)}` → compile error, point to for-of
-				//   - anything else → emit as a text hole (runtime stringifies)
+				//   - a known-string expression → text-hole binding
+				//   - anything else → renderable childSlot hole
 				const expr = child.expression;
-				if (expr && expr.type === 'RefExpression') {
-					bindings.push({
-						id: bindings.length,
-						kind: 'ref',
-						expr: printExpr(expr.argument),
-						path,
-					});
-				} else if (isCreatePortalCall(expr)) {
+				if (isCreatePortalCall(expr)) {
 					const pc = makePortalCall(expr, ctx, componentName, inlinedSubs);
 					// Stash the JSX-tree host (the element containing this createPortal
 					// call) so the runtime can stamp $$portalParent on portal children
@@ -5643,7 +5524,7 @@ function emitElementHtml(
 						alternate: wrapAsBlockStmt(expr.alternate),
 						loc: expr.loc, // carry source position for dev hydration-mismatch LOC
 					};
-					const ic = makeIfCall(asIf, ctx, componentName, inlinedSubs, childNs, cssHash);
+					const ic = makeIfCall(asIf, ctx, inlinedSubs, childNs, cssHash);
 					ic.hostPath = path;
 					ifCalls.push(ic);
 				} else if (isKnownStringExpression(expr, ctx.knownStringLocals)) {
@@ -5663,25 +5544,16 @@ function emitElementHtml(
 					html += '<!>';
 					childIdx++;
 				} else {
-					// Bare `{expr}` (no string cast) → RENDERABLE hole. Lower any host /
-					// component JSX in the expression to `createElement(...)` first — this
-					// is what makes `{items.map((x) => <li key={x.id}>{x.name}</li>)}`, a
-					// lone `{<li/>}`, and array-of-elements children compile (the runtime
-					// de-opt childSlot renders the result). Then ride the TSRX-aware printer
-					// + childSlot path like the simpler Text branch.
-					const ch = {
-						id: ctx.nextHelperId++,
-						loc: devLoc(ctx, expr),
-						isChild: true,
-						valueExpr: printExprWithTsrx(
-							resolveStyleExpr(rewriteJsxValues(expr, ctx), cssHash),
-							ctx,
-							componentName,
-							inlinedSubs,
-						),
-						hostPath: path,
-						anchorPath: [...path, childIdx],
-					};
+					// Bare `{expr}` (no string cast) → RENDERABLE hole. makeChildCall
+					// lowers any host / component JSX in the expression to
+					// `createElement(...)` — this is what makes
+					// `{items.map((x) => <li key={x.id}>{x.name}</li>)}`, a lone
+					// `{<li/>}`, and array-of-elements children compile (the runtime
+					// de-opt childSlot renders the result) — and rides the TSRX-aware
+					// printer + childSlot path like the simpler Text branch.
+					const ch = makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash);
+					ch.hostPath = path;
+					ch.anchorPath = [...path, childIdx];
 					compCalls.push(ch);
 					html += '<!>';
 					childIdx++;
@@ -5720,43 +5592,50 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs) {
 	};
 }
 
-// ===========================================================================
-// for-of inside element children → forBlock call
-// ===========================================================================
+// Hoist a construct sub-body (an @if/@else branch, an `<Activity>`/@try/
+// @pending/@catch/@switch-case body, component children, a @for item/@empty
+// body) as an inlined helper: wrap the statements in the legacy synthetic
+// `Component` shape compileFunctionBody understands, compile it, and push the
+// result into the surrounding component's `inlinedSubs` — the helper is
+// emitted INSIDE the component function, so its closures capture the parent's
+// locals. Returns the generated helper name.
+function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssHash) {
+	const helperName = `${prefix}$${ctx.nextHelperId++}`;
+	const fake = {
+		type: 'Component',
+		id: { type: 'Identifier', name: helperName },
+		params: params || [],
+		body: stmts,
+	};
+	inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash) + ';');
+	return helperName;
+}
 
 // ===========================================================================
 // if-statement inside element children → ifBlock call
 // ===========================================================================
 
-function makeIfCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', cssHash = null) {
+function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	// node.test, node.consequent (BlockStatement | Element), node.alternate (BlockStatement | IfStatement | null)
 	const condExpr = printExpr(node.test);
 
 	const thenStmts =
 		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
-	const thenHelperName = `__then$${ctx.nextHelperId++}`;
-	const thenFake = {
-		type: 'Component',
-		id: { type: 'Identifier', name: thenHelperName },
-		params: [],
-		body: thenStmts,
-	};
-	const thenFn = compileFunctionBody(thenFake, ctx, thenHelperName, parentNs, cssHash);
-	inlinedSubs.push(thenFn + ';');
+	const thenHelperName = hoistBodyHelper(
+		ctx,
+		inlinedSubs,
+		'__then',
+		thenStmts,
+		[],
+		parentNs,
+		cssHash,
+	);
 
 	let elseHelperName = null;
 	if (node.alternate) {
 		const elseStmts =
 			node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
-		elseHelperName = `__else$${ctx.nextHelperId++}`;
-		const elseFake = {
-			type: 'Component',
-			id: { type: 'Identifier', name: elseHelperName },
-			params: [],
-			body: elseStmts,
-		};
-		const elseFn = compileFunctionBody(elseFake, ctx, elseHelperName, parentNs, cssHash);
-		inlinedSubs.push(elseFn + ';');
+		elseHelperName = hoistBodyHelper(ctx, inlinedSubs, '__else', elseStmts, [], parentNs, cssHash);
 	}
 
 	return {
@@ -5775,24 +5654,17 @@ function makeIfCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', cs
 // the host/anchor mount-loop). The afterLines emit branches on `.activity` to
 // call `activityBlock` instead of `ifBlock`. `mode` is inlined and re-evaluated
 // every parent render (like ifBlock's cond); a missing mode defaults to visible.
-function makeActivityCall(
-	node,
-	ctx,
-	componentName,
-	inlinedSubs,
-	parentNs = 'html',
-	cssHash = null,
-) {
+function makeActivityCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	const modeExpr = node.mode ? printExpr(node.mode) : "'visible'";
-	const bodyHelperName = `__activity$${ctx.nextHelperId++}`;
-	const bodyFake = {
-		type: 'Component',
-		id: { type: 'Identifier', name: bodyHelperName },
-		params: [],
-		body: node.children,
-	};
-	const bodyFn = compileFunctionBody(bodyFake, ctx, bodyHelperName, parentNs, cssHash);
-	inlinedSubs.push(bodyFn + ';');
+	const bodyHelperName = hoistBodyHelper(
+		ctx,
+		inlinedSubs,
+		'__activity',
+		node.children,
+		[],
+		parentNs,
+		cssHash,
+	);
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
@@ -5890,21 +5762,30 @@ function soleRenderPropChild(children) {
 // null/undefined/boolean/'' render nothing. It rides the compCall machinery
 // (host + `<!>` anchor resolution, hole-aware child/sibling hydration walk) but
 // emits `childSlot(...)` instead of `componentSlot(...)`. The caller sets
-// `.hostPath` / `.anchorPath` exactly like a component call.
+// `.hostPath` / `.anchorPath` exactly like a component call. The single
+// construction site for these records — every renderable-hole position
+// (top-level Text/TSRXExpression, only-child, mixed-children) builds through
+// here so the emit can't drift.
 //
-// `rewriteJsxValues` lowers any JSX inside the expression to `createElement(...)`
-// — same as the `TSRXExpression` renderable-hole path (emitElementHtml). This
-// covers a React-style render-prop arrow whose body is bare JSX
+// `rewriteJsxValues` lowers any JSX inside the expression to `createElement(...)`.
+// This covers a React-style render-prop arrow whose body is bare JSX
 // (`(data) => <span/>`): the arrow is preserved (passed as a callable
 // `children` prop the consuming component invokes), while its `<span/>` body
 // becomes a printable descriptor. Without it, the raw JSX leaks into the
-// emitted `childSlot(...)` call as unparseable source.
-function makeChildCall(expr, ctx, cssHash) {
+// emitted `childSlot(...)` call as unparseable source. Printing goes through
+// the TSRX-aware printer so a nested `() => @{…}` sub-template hoists (and
+// server-mode `use(thenable)` calls get their stable keys).
+function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash) {
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, expr),
 		isChild: true,
-		valueExpr: printExpr(resolveStyleExpr(rewriteJsxValues(expr, ctx), cssHash)),
+		valueExpr: printExprWithTsrx(
+			resolveStyleExpr(rewriteJsxValues(expr, ctx), cssHash),
+			ctx,
+			componentName,
+			inlinedSubs,
+		),
 	};
 }
 
@@ -5987,15 +5868,15 @@ function makeCompCall(
 		// Compile children as a render function: (scope) => { renders JSX into scope }.
 		// The function is inlined inside the parent component body so its closures
 		// capture the parent's locals (props, state, etc.).
-		const childrenHelperName = `__children$${ctx.nextHelperId++}`;
-		const fakeBody = {
-			type: 'Component',
-			id: { type: 'Identifier', name: childrenHelperName },
-			params: [],
-			body: children,
-		};
-		const childrenFn = compileFunctionBody(fakeBody, ctx, childrenHelperName, parentNs, cssHash);
-		inlinedSubs.push(childrenFn + ';');
+		const childrenHelperName = hoistBodyHelper(
+			ctx,
+			inlinedSubs,
+			'__children',
+			children,
+			[],
+			parentNs,
+			cssHash,
+		);
 		propParts.push(`"children": ${childrenHelperName}`);
 	}
 
@@ -6046,33 +5927,31 @@ function makeCompCall(
 // try/catch → tryBlock call
 // ===========================================================================
 
-function makeTryCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', cssHash = null) {
+function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	// node.block = try BlockStatement, node.handler = CatchClause (param, resetParam, body),
 	// node.pending = optional BlockStatement (TSRX `pending { ... }`)
-	const tryStmts = node.block.body;
-	const tryHelperName = `__try$${ctx.nextHelperId++}`;
-	const tryFake = {
-		type: 'Component',
-		id: { type: 'Identifier', name: tryHelperName },
-		params: [],
-		body: tryStmts,
-	};
-	const tryFn = compileFunctionBody(tryFake, ctx, tryHelperName, parentNs, cssHash);
-	inlinedSubs.push(tryFn + ';');
+	const tryHelperName = hoistBodyHelper(
+		ctx,
+		inlinedSubs,
+		'__try',
+		node.block.body,
+		[],
+		parentNs,
+		cssHash,
+	);
 
 	// Optional `pending { ... }` arm — compiled like any sub-body.
 	let pendingHelperName = 'null';
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
-		const pendingHelper = `__pending$${ctx.nextHelperId++}`;
-		const pendingFake = {
-			type: 'Component',
-			id: { type: 'Identifier', name: pendingHelper },
-			params: [],
-			body: node.pending.body,
-		};
-		const pendingFn = compileFunctionBody(pendingFake, ctx, pendingHelper, parentNs, cssHash);
-		inlinedSubs.push(pendingFn + ';');
-		pendingHelperName = pendingHelper;
+		pendingHelperName = hoistBodyHelper(
+			ctx,
+			inlinedSubs,
+			'__pending',
+			node.pending.body,
+			[],
+			parentNs,
+			cssHash,
+		);
 	}
 
 	let catchHelperName = 'null';
@@ -6081,7 +5960,6 @@ function makeTryCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', c
 		const errName = handler.param?.name || '_err';
 		const resetName = handler.resetParam?.name || '_reset';
 		const catchStmts = handler.body.body;
-		const tmpName = `__catch$${ctx.nextHelperId++}`;
 		// The catch body sees `err` and `reset` as bindings unpacked from the
 		// tryBlock-supplied props object. We synthesize a small destructuring
 		// VariableDeclaration at the top of the body so the user's identifiers
@@ -6119,15 +5997,15 @@ function makeTryCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', c
 				},
 			],
 		};
-		const catchFake = {
-			type: 'Component',
-			id: { type: 'Identifier', name: tmpName },
-			params: [{ type: 'Identifier', name: '__props' }],
-			body: [destructure, ...catchStmts],
-		};
-		const catchFn = compileFunctionBody(catchFake, ctx, tmpName, parentNs, cssHash);
-		inlinedSubs.push(catchFn + ';');
-		catchHelperName = tmpName;
+		catchHelperName = hoistBodyHelper(
+			ctx,
+			inlinedSubs,
+			'__catch',
+			[destructure, ...catchStmts],
+			[{ type: 'Identifier', name: '__props' }],
+			parentNs,
+			cssHash,
+		);
 	}
 	return {
 		id: ctx.nextHelperId++,
@@ -6149,22 +6027,22 @@ function makeTryCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', c
  * writes a case with no explicit terminator, the case's body still runs to
  * completion (it's just a function call) and only that case's body renders.
  */
-function makeSwitchCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', cssHash = null) {
+function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	const discExpr = printExpr(node.discriminant);
 	const caseRecords = [];
 	let defaultHelper = 'null';
 	for (const c of node.cases || []) {
 		const stmts = c.consequent || [];
 		const isDefault = c.test == null;
-		const helperName = `__${isDefault ? 'default' : 'case'}$${ctx.nextHelperId++}`;
-		const fake = {
-			type: 'Component',
-			id: { type: 'Identifier', name: helperName },
-			params: [],
-			body: stmts,
-		};
-		const fn = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash);
-		inlinedSubs.push(fn + ';');
+		const helperName = hoistBodyHelper(
+			ctx,
+			inlinedSubs,
+			`__${isDefault ? 'default' : 'case'}`,
+			stmts,
+			[],
+			parentNs,
+			cssHash,
+		);
 		if (isDefault) {
 			defaultHelper = helperName;
 		} else {
@@ -6185,7 +6063,11 @@ function makeSwitchCall(node, ctx, componentName, inlinedSubs, parentNs = 'html'
 	};
 }
 
-function makeForCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', cssHash = null) {
+// ===========================================================================
+// for-of inside element children → forBlock call
+// ===========================================================================
+
+function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	// `@for await (...)` (async iteration) has no meaning for the runtime's
 	// synchronous keyed reconciler. The TSRX parser currently rejects the surface
 	// syntax outright, but guard the lowered node too so a future parser change
@@ -6209,15 +6091,7 @@ function makeForCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', c
 	let emptyHelperName = 'null';
 	if (node.empty) {
 		const stmts = node.empty.type === 'BlockStatement' ? node.empty.body : [node.empty];
-		emptyHelperName = `__empty$${ctx.nextHelperId++}`;
-		const fake = {
-			type: 'Component',
-			id: { type: 'Identifier', name: emptyHelperName },
-			params: [],
-			body: stmts,
-		};
-		const fn = compileFunctionBody(fake, ctx, emptyHelperName, parentNs, cssHash);
-		inlinedSubs.push(fn + ';');
+		emptyHelperName = hoistBodyHelper(ctx, inlinedSubs, '__empty', stmts, [], parentNs, cssHash);
 	}
 	const leftDeclId = node.left.declarations[0].id;
 	const isDestructured = leftDeclId.type !== 'Identifier';
@@ -6258,7 +6132,10 @@ function makeForCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', c
 		const keyAttr = (firstEl.attributes || firstEl.openingElement?.attributes || []).find(
 			(a) => (a.name?.name || a.name) === 'key',
 		);
-		if (keyAttr) {
+		// A valueless `<li key>` carries no expression — skip it (mirroring
+		// makeCompCall's null-value handling) and fall through to the header key /
+		// index / `x.id ?? x` default instead of crashing on `keyAttr.value.type`.
+		if (keyAttr && keyAttr.value != null) {
 			const inner =
 				keyAttr.value.type === 'JSXExpressionContainer' ? keyAttr.value.expression : keyAttr.value;
 			keyFn = mkKeyFn(inner);
@@ -6361,15 +6238,15 @@ function makeForCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', c
 		depNames.sort();
 	}
 
-	const itemHelperName = `__item$${ctx.nextHelperId++}`;
-	const fakeComponent = {
-		type: 'Component',
-		id: { type: 'Identifier', name: itemHelperName },
-		params: [{ type: 'Identifier', name: itemName }],
-		body: [...indexInjection, ...destructureInjection, ...subStmts],
-	};
-	const itemFnSource = compileFunctionBody(fakeComponent, ctx, itemHelperName, parentNs, cssHash);
-	inlinedSubs.push(itemFnSource + ';');
+	const itemHelperName = hoistBodyHelper(
+		ctx,
+		inlinedSubs,
+		'__item',
+		[...indexInjection, ...destructureInjection, ...subStmts],
+		[{ type: 'Identifier', name: itemName }],
+		parentNs,
+		cssHash,
+	);
 
 	// Single-root detection: when the body emits exactly one Element root and
 	// no other JSX siblings (no Fragment, no Component, no top-level if/for/try),
@@ -6396,7 +6273,6 @@ function makeForCall(node, ctx, componentName, inlinedSubs, parentNs = 'html', c
 		itemsExpr,
 		keyHelper,
 		bodyHelper: itemHelperName,
-		extraExpr: 'undefined',
 		pure,
 		singleRoot,
 		// DEP-PURE candidates emit `[dep0, dep1, ...]` as the deps arg in the

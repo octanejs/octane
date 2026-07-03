@@ -4,6 +4,7 @@ import {
 	UseInsideMemo,
 	PendingThrowBubblesUp,
 	DeferredWithInitial,
+	DeferredInitialSuspends,
 } from './_fixtures/suspense-blocked.tsrx';
 
 interface Deferred<T> {
@@ -81,6 +82,33 @@ describe('useDeferredValue — initialValue (React 19 overload)', () => {
 		// Drain — the scheduled microtask commits the real value.
 		await act(() => {});
 		expect(observed[observed.length - 1]).toBe(realValue);
+		expect(r.find('.out').textContent).toBe('real');
+		r.unmount();
+	});
+
+	it('the initialValue→value swap is a TRANSITION: a suspending consumer keeps the initial content', async () => {
+		// The steady-state deferral commits via startTransition so a suspending
+		// consumer keeps the prior DOM; the initialValue→value swap must use the
+		// same priority. An urgent swap would tear down the initial content and
+		// show the @pending fallback here.
+		const d = deferred<string>();
+		const r = mount(DeferredInitialSuspends, {
+			value: 'real',
+			initialValue: 'init',
+			promise: d.promise,
+		});
+		expect(r.find('.out').textContent).toBe('init');
+
+		// Drain the swap microtask: the transition render suspends → the initial
+		// content is HELD (no fallback, no teardown).
+		await act(() => {});
+		expect(r.findAll('.fallback')).toHaveLength(0);
+		expect(r.find('.out').textContent).toBe('init');
+
+		// Resolve → the held transition completes and commits the real value.
+		await act(() => {
+			d.resolve('ok');
+		});
 		expect(r.find('.out').textContent).toBe('real');
 		r.unmount();
 	});

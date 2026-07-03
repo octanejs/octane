@@ -143,6 +143,58 @@ describe('hydrateRoot — VALUE mismatch (text + attribute) detect/patch/warn', 
 		expect(warns.length).toBeGreaterThanOrEqual(2); // id + text
 	});
 
+	it('spread suppressHydrationWarning: keeps SERVER attr/class/text, no warning, no junk attribute', async () => {
+		const srv = serverModule(SUPPRESS, 'suppress.tsrx');
+		const cli = devClientModule(SUPPRESS, 'suppress.tsrx');
+		const { body } = await ServerRT.render(srv.SpreadSuppressed, {
+			rest: { id: 'server-id', class: 'server-cls', suppressHydrationWarning: true },
+			text: 'server',
+		});
+		// The opt-out is NOT serialized into the server HTML (ssrSpread skips it).
+		expect(body).not.toContain('suppresshydrationwarning');
+		container.innerHTML = body;
+
+		hydrateRoot(container, cli.SpreadSuppressed, {
+			rest: { id: 'client-id', class: 'client-cls', suppressHydrationWarning: true },
+			text: 'client',
+		});
+		flushSync(() => {});
+
+		const div = container.querySelector('div')!;
+		// The flag is a JS stamp, not an attribute — writing it as an attribute would
+		// itself be a guaranteed mismatch (the server skips the key).
+		expect(div.hasAttribute('suppresshydrationwarning')).toBe(false);
+		expect(div.getAttribute('id')).toBe('server-id'); // SERVER value kept
+		expect(div.getAttribute('class')).toBe('server-cls'); // SERVER class kept
+		expect(div.textContent).toBe('server'); // SERVER text kept
+		const warns = errSpy.mock.calls
+			.map((c) => String(c[0]))
+			.filter((m) => m.includes('hydration mismatch'));
+		expect(warns).toEqual([]); // suppressed
+	});
+
+	it('spread class mismatch (no suppress): patches to the client class + warns', async () => {
+		const srv = serverModule(SUPPRESS, 'suppress.tsrx');
+		const cli = devClientModule(SUPPRESS, 'suppress.tsrx');
+		const { body } = await ServerRT.render(srv.SpreadClassed, {
+			rest: { class: 'server-cls' },
+		});
+		expect(body).toContain('class="server-cls"');
+		container.innerHTML = body;
+
+		hydrateRoot(container, cli.SpreadClassed, { rest: { class: 'client-cls' } });
+		flushSync(() => {});
+
+		const div = container.querySelector('div')!;
+		expect(div.getAttribute('class')).toBe('client-cls'); // patched
+		const warn = errSpy.mock.calls
+			.map((c) => String(c[0]))
+			.find((m) => m.includes('attribute `class`'));
+		expect(warn).toBeTruthy();
+		expect(warn).toContain('suppress.tsrx:');
+		expect(warn).toContain('"server-cls"');
+	});
+
 	it('markerless `{expr}` text mismatch: patch + warn via the text hole slot LOC', async () => {
 		const srv = serverModule(MARKERLESS, 'markerless-text.tsx');
 		const cli = devClientModule(MARKERLESS, 'markerless-text.tsx');

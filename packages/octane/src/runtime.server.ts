@@ -161,6 +161,18 @@ export function ssrText(v: unknown): string {
 	return escapeHtml(v);
 }
 
+// Render a COMPONENT `ElementDescriptor` (`d.type` is a function) via ssrComponent,
+// threading positional `d.children` through as `props.children` (don't drop them).
+// `createElement` already mirrors positional children into `props.children`, so for
+// its descriptors the spread is a no-op copy — it stays as a defensive guard for
+// hand-rolled descriptors whose props/children were never reconciled.
+function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
+	return ssrComponent(scope, d.type as ServerComponent, {
+		...d.props,
+		children: d.children ?? d.props?.children,
+	});
+}
+
 /**
  * A RENDERABLE expression hole — the value of a `{expr}` that is NOT marked as
  * definite text (`{expr as string}`). Mirrors Ripple: a `{children}` / component
@@ -197,7 +209,7 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 		// ssrComponent, passing `children` through (don't drop them).
 		if (typeof d.type === 'string')
 			return ssrBlock(ssrHostElement(d.type, d.props, d.children, scope));
-		return ssrComponent(scope, d.type, { ...d.props, children: d.children ?? d.props?.children });
+		return ssrComponentDescriptor(d, scope);
 	}
 	return ssrBlock(escapeHtml(v));
 }
@@ -216,7 +228,8 @@ export function ssrChildText(v: unknown, scope: SSRScope): string {
 
 // One item of an array child: each is its own `<!--[-->…<!--]-->` block (the unit
 // the client de-opt list adopts on hydration). A nested array flattens into more
-// sibling item blocks (React fragment-of-arrays); everything else reuses ssrChild's
+// sibling item blocks (React fragment-of-arrays) — NOT the extra wrapping block
+// ssrChild gives a whole array hole — while every non-array item reuses ssrChild's
 // per-value serialization (host element, component, primitive, or empty).
 function ssrChildItem(v: unknown, scope: SSRScope): string {
 	if (Array.isArray(v)) {
@@ -224,15 +237,7 @@ function ssrChildItem(v: unknown, scope: SSRScope): string {
 		for (let i = 0; i < v.length; i++) out += ssrChildItem(v[i], scope);
 		return out;
 	}
-	if (v == null || v === false || v === true) return ssrBlock('');
-	if (typeof v === 'object' && (v as any).$$kind === ELEMENT_TAG) {
-		const d = v as ElementDescriptor;
-		if (typeof d.type === 'string')
-			return ssrBlock(ssrHostElement(d.type, d.props, d.children, scope));
-		return ssrComponent(scope, d.type, { ...d.props, children: d.children ?? d.props?.children });
-	}
-	if (typeof v === 'function') return ssrComponent(scope, v as ServerComponent, {});
-	return ssrBlock(escapeHtml(v));
+	return ssrChild(v, scope);
 }
 
 // Serialize a HOST element descriptor (`createElement('span', props, ...children)`)
@@ -247,19 +252,15 @@ function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope)
 	let innerHTML: unknown = undefined;
 	if (props != null) {
 		for (const k in props) {
-			if (k === 'key' || k === 'ref' || k === 'children') continue;
-			// Client-only hydration hint — never serialize it as a DOM attribute.
-			if (k === 'suppressHydrationWarning') continue;
-			// onX events have no server semantics (no DOM); drop them.
-			if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') continue;
 			const val = props[k];
+			// `dangerouslySetInnerHTML` is element CONTENT, not an attribute — capture
+			// it here (last write wins) and route everything else through the shared
+			// filter/serializer.
 			if (k === 'dangerouslySetInnerHTML') {
 				innerHTML = val == null || val.__html == null ? '' : val.__html;
 				continue;
 			}
-			if (k === 'style') attrs += ssrStyle(val);
-			else if (k === 'className' || k === 'class') attrs += ssrAttr('class', val);
-			else if (VALID_ATTR_NAME.test(k)) attrs += ssrAttr(k, val);
+			attrs += ssrAttrEntry(k, val);
 		}
 	}
 	const hasChildren =
@@ -334,7 +335,7 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
 	if (typeof v === 'object' && (v as any).$$kind === ELEMENT_TAG) {
 		const d = v as ElementDescriptor;
 		if (typeof d.type === 'string') return ssrHostElement(d.type, d.props, d.children, scope);
-		return ssrComponent(scope, d.type, { ...d.props, children: d.children ?? d.props?.children });
+		return ssrComponentDescriptor(d, scope);
 	}
 	if (typeof v === 'function') return ssrComponent(scope, v as ServerComponent, {});
 	return escapeHtml(v);
@@ -448,18 +449,33 @@ export function ssrStyle(v: unknown): string {
 // 'x onload=alert(1)' or 'a>'); mirrors the client's setAttribute behavior.
 const VALID_ATTR_NAME = /^[^\s"'>\/=\u0000-\u001F]+$/;
 
+// One prop entry → its ` name="value"` attribute fragment (or ''). The shared
+// filter/route used by ssrHostElement's attr loop and ssrSpread: key/ref/children
+// never serialize, `suppressHydrationWarning` is a client-only hydration hint,
+// onX events have no server semantics (no DOM), `style` / `className` / `class`
+// route to their dedicated serializers, and VALID_ATTR_NAME rejects
+// injection-unsafe names. `dangerouslySetInnerHTML` is element CONTENT, not an
+// attribute — callers must intercept it BEFORE routing an entry here.
+function ssrAttrEntry(k: string, v: unknown): string {
+	if (k === 'key' || k === 'ref' || k === 'children') return '';
+	if (k === 'suppressHydrationWarning') return '';
+	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
+	if (k === 'style') return ssrStyle(v);
+	if (k === 'className' || k === 'class') return ssrAttr('class', v);
+	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v);
+	return '';
+}
+
 /** A spread `{...obj}`: serialize attr-like keys; drop events/refs/key/children. */
 export function ssrSpread(obj: unknown): string {
 	if (obj == null || typeof obj !== 'object') return '';
 	let out = '';
 	for (const k in obj as Record<string, unknown>) {
-		if (k === 'ref' || k === 'key' || k === 'children' || k === 'dangerouslySetInnerHTML') continue;
-		if (k === 'suppressHydrationWarning') continue; // client-only hydration hint
-		if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') continue; // onX
-		const v = (obj as Record<string, unknown>)[k];
-		if (k === 'style') out += ssrStyle(v);
-		else if (k === 'className') out += ssrAttr('class', v);
-		else if (VALID_ATTR_NAME.test(k)) out += ssrAttr(k, v); // skip injection-unsafe names
+		// A spread `dangerouslySetInnerHTML` is element content, not an attribute —
+		// the compiler collects it at the emit site (compile.js `htmlSources`, which
+		// feeds `ssrInnerHtml`), so the attr serializer drops it here.
+		if (k === 'dangerouslySetInnerHTML') continue;
+		out += ssrAttrEntry(k, (obj as Record<string, unknown>)[k]);
 	}
 	return out;
 }
@@ -572,15 +588,17 @@ export function ErrorBoundary(
 
 const CONTEXT_TAG = Symbol.for('octane.context');
 
+// NOTE: unlike the client runtime's Context, there is no `$$version` here — that
+// field drives the client's provider-change invalidation machinery, which has no
+// server analogue (an SSR pass reads each provider value exactly once, top-down).
 export interface Context<T> {
 	$$kind: typeof CONTEXT_TAG;
 	defaultValue: T;
-	$$version: number;
 	Provider: (props: { value: T; children?: any }, scope: SSRScope) => string;
 }
 
 export function createContext<T>(defaultValue: T): Context<T> {
-	const ctx = { $$kind: CONTEXT_TAG, defaultValue, $$version: 0 } as Context<T>;
+	const ctx = { $$kind: CONTEXT_TAG, defaultValue } as Context<T>;
 	ctx.Provider = function ProviderBody(props, scope) {
 		if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
 		scope.$$ctxValues.set(ctx, props.value);
@@ -833,9 +851,9 @@ export function getSsrSuspenseTimeout(): number {
 
 /**
  * Serialize the resolved `use(thenable)` values (in render order) into an inline
- * data `<script>` the client reads during hydration. `<` is escaped to `<`
- * so the JSON payload can't terminate the `<script>` element or open an HTML
- * comment. Only emitted when at least one value was resolved.
+ * data `<script>` the client reads during hydration. `<` is escaped to
+ * `\u003c` so the JSON payload can't terminate the `<script>` element or open
+ * an HTML comment. Only emitted when at least one value was resolved.
  */
 function serializeSuspenseSeeds(values: unknown[]): string {
 	// Encode `undefined` (which JSON drops/nulls) as a sentinel so a
@@ -850,7 +868,9 @@ function serializeSuspenseSeeds(values: unknown[]): string {
 
 /**
  * Render a server-compiled component (a function returning an HTML string) to
- * `{ head, body, css }`. `head` is empty (no document-head API yet); `css` is
+ * `{ head, body, css }`. `head` is the hoisted document-head markup
+ * (`<title>`/`<meta>`/`<link>`/… collected by `ssrHeadEl` during the render),
+ * which the metaframework injects at its `<!--ssr-head-->` placeholder; `css` is
  * the scoped stylesheets of the components that actually rendered, emitted as
  * ready-to-place `<style data-octane="hash">…</style>` tags (one per hash,
  * deduped). The client's `injectStyle` matches that `data-octane` hash and
