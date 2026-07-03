@@ -139,6 +139,18 @@ are the *subtle scheduling heuristics*:
 Octane covers basic context + memo-through-context (`hook-fixes.test.ts`). The deep
 propagation heuristics are unpinned:
 
+> **Update (2026-07-03):** `memo()`'s bail + lazy per-context consumer refresh now also
+> work at VALUE positions (provider children, `createElement` binding trees) and through
+> array-children boundaries — see `memo-value-position.test.ts` and the childSlot
+> `tryMemoBail` unification. React's **implicit same-element bailout** (identical child
+> element reference → skip the subtree, refresh only changed-context consumers) remains
+> UNIMPLEMENTED: octane re-renders the provider's subtree, and bindings that rely on the
+> implicit bail express it explicitly with a `memo()` pass-through (see
+> `@octanejs/radix`'s NavigationMenu `MemoChildren` + its two documented residual
+> adaptations). Implementing the implicit bail = extending `tryMemoBail`'s comparison to
+> identical incoming descriptors on non-memo components; the context-refresh machinery it
+> would ride already exists.
+
 | React file | Gap | Severity |
 |---|---|---|
 | `ReactNewContext-test.js` (32) | Consumer bails on `Object.is`-equal value (`:218,:458`); consumer **inside a bailed subtree still re-renders** if context changed but **doesn't bail if nothing above bailed** (`:624,:1130,:1267`); doesn't bail inside hidden subtree (`:706`); doesn't skip siblings (`:776`); provider bails if children+value unchanged (`:956`). | High |
