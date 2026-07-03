@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/vite-plugin",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "description": "Vite metaframework plugin for the octane renderer (dev SSR + routing + hydrate)",
