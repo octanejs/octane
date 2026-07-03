@@ -179,6 +179,16 @@ propagation heuristics are unpinned:
 
 ### Tier 4 — SSR / hydration determinism
 
+**SSR API — React-aligned (2026-07).** The octane-invented `render() → { head, body, css }`
+is replaced by `renderToString` / `renderToStaticMarkup` (`octane/server`, React's
+`react-dom/server`) and `prerender` (`octane/static`, React's `react-dom/static`). All return
+`{ html, css }`: the separate `head` field is dropped (hoisted `<title>`/`<meta>`/`<link>`
+fold into `html`, spliced into `<head>` when present else prepended — React-19 resource
+hoisting), and `css` stays a distinct field as a **deliberate, minimal divergence** from
+React's bare-string return — octane has scoped CSS that React core does not, and the field
+lets the framework place the deduped `<style>` tags. Streaming (`renderToPipeableStream` /
+`renderToReadableStream`, out-of-order Suspense) is the in-progress follow-on.
+
 Octane SSR + hydration adoption work. **Mismatch detection + recovery is now implemented**
 (2026-06-30): on a server/client divergence the runtime patches VALUE mismatches (text/attr)
 to the client value, rebuilds STRUCTURAL mismatches (swapped `@if`/`@switch` branch, changed

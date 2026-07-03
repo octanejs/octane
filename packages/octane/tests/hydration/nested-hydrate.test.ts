@@ -34,16 +34,19 @@ afterEach(() => container.remove());
 
 describe('hydrateRoot — nested component (SSR Phase 6 / M1)', () => {
 	it('adopts the server DOM (no rebuild) and the nested component is interactive', async () => {
-		const { body } = await ServerRT.render(server.Panel, { title: 'Headlines', label: 'Story' });
+		const { html } = await ServerRT.renderToString(server.Panel, {
+			title: 'Headlines',
+			label: 'Story',
+		});
 		// The nested <Item> output is wrapped in a hydration block range.
-		expect(body).toBe(
+		expect(html).toBe(
 			'<div id="panel"><h2>Headlines</h2>' +
 				'<!--[--><li class="item"><span class="label">Story</span>' +
 				'<button class="bump">x0</button></li><!--]-->' +
 				'</div>',
 		);
 
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const before = container.innerHTML;
 		const panel = container.querySelector('#panel') as HTMLElement;
 		const li = container.querySelector('li.item') as HTMLElement;

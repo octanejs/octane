@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
+import { prerender } from 'octane/static';
 
 // SSR suspense "discovery" optimization (runtime.server.ts render()). A waterfall
 // (each level's use() only reachable once the previous resolves) used to cost D+1
@@ -76,7 +77,7 @@ describe('SSR suspense — discovery re-render (subtree-scoped passes)', () => {
 			makeCounts[level] = (makeCounts[level] ?? 0) + 1;
 			return Promise.resolve(level * 10);
 		};
-		const out = await RT.render(wf.App, {
+		const out = await prerender(wf.App, {
 			depth: 3,
 			items: [1, 2, 3],
 			tick: () => ticks++,
@@ -97,16 +98,16 @@ describe('SSR suspense — discovery re-render (subtree-scoped passes)', () => {
 		expect(makeCounts[1]).toBeLessThan(4);
 
 		// And the body is fully resolved (every @pending gone, final chain present).
-		expect(out.body).not.toContain('loading');
-		expect(out.body).toContain('L1=10');
-		expect(out.body).toContain('L2=20');
-		expect(out.body).toContain('L3=30');
+		expect(out.html).not.toContain('loading');
+		expect(out.html).toContain('L1=10');
+		expect(out.html).toContain('L2=20');
+		expect(out.html).toContain('L3=30');
 	});
 
 	it('scales the outer render count as a CONSTANT (D=6 still renders App twice)', async () => {
 		let ticks = 0;
 		let bigs = 0;
-		const out = await RT.render(wf.App, {
+		const out = await prerender(wf.App, {
 			depth: 6,
 			items: [1],
 			tick: () => ticks++,
@@ -115,7 +116,7 @@ describe('SSR suspense — discovery re-render (subtree-scoped passes)', () => {
 		});
 		expect(ticks).toBe(2); // depth+1 = 7 on the old loop
 		expect(bigs).toBe(4);
-		expect(out.body).toContain('L6=6');
+		expect(out.html).toContain('L6=6');
 	});
 
 	// Key stability across a component membrane: the SAME component containing a
@@ -133,15 +134,15 @@ describe('SSR suspense — discovery re-render (subtree-scoped passes)', () => {
 			 }`,
 			'membrane.tsrx',
 		);
-		const out = await RT.render(mod.App, {
+		const out = await prerender(mod.App, {
 			inside: Promise.resolve('IN'),
 			after: Promise.resolve('AF'),
 		});
-		expect(out.body).toContain('<span class="inside">IN</span>');
-		expect(out.body).toContain('<span class="after">AF</span>');
-		expect(out.body).not.toContain('>AF</span></span>'); // sanity: not crossed
-		expect(out.body).not.toContain('<span class="inside">AF</span>');
-		expect(out.body).not.toContain('<span class="after">IN</span>');
+		expect(out.html).toContain('<span class="inside">IN</span>');
+		expect(out.html).toContain('<span class="after">AF</span>');
+		expect(out.html).not.toContain('>AF</span></span>'); // sanity: not crossed
+		expect(out.html).not.toContain('<span class="inside">AF</span>');
+		expect(out.html).not.toContain('<span class="after">IN</span>');
 	});
 
 	// Parallel discovery jobs: a suspending @try inside a per-iteration COMPONENT
@@ -157,16 +158,16 @@ describe('SSR suspense — discovery re-render (subtree-scoped passes)', () => {
 			 }`,
 			'foritem.tsrx',
 		);
-		const out = await RT.render(mod.App, {
+		const out = await prerender(mod.App, {
 			items: [
 				{ id: 1, v: Promise.resolve('a') },
 				{ id: 2, v: Promise.resolve('b') },
 				{ id: 3, v: Promise.resolve('c') },
 			],
 		});
-		expect(out.body).toContain('<li>a</li>');
-		expect(out.body).toContain('<li>b</li>');
-		expect(out.body).toContain('<li>c</li>');
+		expect(out.html).toContain('<li>a</li>');
+		expect(out.html).toContain('<li>b</li>');
+		expect(out.html).toContain('<li>c</li>');
 	});
 
 	// Concurrency across DISCOVERY rounds: two D=2 waterfalls in flight at once,
@@ -191,22 +192,22 @@ describe('SSR suspense — discovery re-render (subtree-scoped passes)', () => {
 		const a2 = deferred<any>();
 		const b1 = deferred<any>();
 		const b2 = deferred<any>();
-		const pA = RT.render(mod.App, { next: a1.promise });
-		const pB = RT.render(mod.App, { next: b1.promise });
+		const pA = prerender(mod.App, { next: a1.promise });
+		const pB = prerender(mod.App, { next: b1.promise });
 		// Interleave: drive B a level, then A a level, then B's leaf, then A's leaf.
 		b1.resolve({ label: 'B1', child: b2.promise });
 		a1.resolve({ label: 'A1', child: a2.promise });
 		b2.resolve({ label: 'B2', child: null });
 		a2.resolve({ label: 'A2', child: null });
 		const [ra, rb] = await Promise.all([pA, pB]);
-		expect(ra.body).toContain('A1');
-		expect(ra.body).toContain('A2');
-		expect(ra.body).not.toContain('B1');
-		expect(ra.body).not.toContain('B2');
-		expect(rb.body).toContain('B1');
-		expect(rb.body).toContain('B2');
-		expect(rb.body).not.toContain('A1');
-		expect(rb.body).not.toContain('A2');
+		expect(ra.html).toContain('A1');
+		expect(ra.html).toContain('A2');
+		expect(ra.html).not.toContain('B1');
+		expect(ra.html).not.toContain('B2');
+		expect(rb.html).toContain('B1');
+		expect(rb.html).toContain('B2');
+		expect(rb.html).not.toContain('A1');
+		expect(rb.html).not.toContain('A2');
 	});
 
 	// A Provider ABOVE the boundary stamps context on scope objects the discovery
@@ -229,8 +230,8 @@ describe('SSR suspense — discovery re-render (subtree-scoped passes)', () => {
 			 }`,
 			'ctx-boundary.tsrx',
 		);
-		const out = await RT.render(mod.App, { promise: Promise.resolve('DATA') });
-		expect(out.body).toContain('ctxval:DATA');
+		const out = await prerender(mod.App, { promise: Promise.resolve('DATA') });
+		expect(out.html).toContain('ctxval:DATA');
 	});
 
 	// REQ from the adversarial review: a REAL error thrown by a component during a
@@ -260,11 +261,11 @@ describe('SSR suspense — discovery re-render (subtree-scoped passes)', () => {
 			'discovery-error.tsrx',
 		);
 		const d = deferred<string>();
-		const p = RT.render(mod.App, { promise: d.promise });
+		const p = prerender(mod.App, { promise: d.promise });
 		d.resolve('boom');
-		const { body } = await p;
-		expect(body).toContain('class="caught"');
-		expect(body).toContain('exploded: boom');
-		expect(body).not.toContain('class="ok"');
+		const { html } = await p;
+		expect(html).toContain('class="caught"');
+		expect(html).toContain('exploded: boom');
+		expect(html).not.toContain('class="ok"');
 	});
 });

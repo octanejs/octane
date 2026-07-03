@@ -50,13 +50,13 @@ describe('folded @switch (return-JSX) matches the inline @{} oracle', () => {
 describe('folded @switch hydrates against the @{} oracle markup', () => {
 	it('SSR byte-equals the inline form and adopts on hydrate', async () => {
 		const server = serverModule();
-		const ret = await ServerRT.render(server.RetSwitch, { k: 'b' });
-		const at = await ServerRT.render(server.AtSwitch, { k: 'b' });
-		expect(ret.body).toBe(at.body);
+		const ret = await ServerRT.renderToString(server.RetSwitch, { k: 'b' });
+		const at = await ServerRT.renderToString(server.AtSwitch, { k: 'b' });
+		expect(ret.html).toBe(at.html);
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);
-		container.innerHTML = ret.body;
+		container.innerHTML = ret.html;
 		const span = container.querySelector('.r') as HTMLElement;
 		const root = hydrateRoot(container, RetSwitch, { k: 'b' });
 		flushSync(() => {});

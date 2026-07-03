@@ -49,12 +49,12 @@ describe('hydrateRoot — markerless only-child `{expr}` value hole', () => {
 	});
 
 	it('SSR is markerless and the client adopts the text node (interactive)', async () => {
-		const { body } = await ServerRT.render(server.Counter, {});
+		const { html } = ServerRT.renderToString(server.Counter, {});
 		// Bare text inside the span — no childSlot block range.
-		expect(body).toContain('<span id="c">0</span>');
-		expect(body).not.toContain('<!--[-->');
+		expect(html).toContain('<span id="c">0</span>');
+		expect(html).not.toContain('<!--[-->');
 
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const span = container.querySelector('#c') as HTMLElement;
 		const textNode = span.firstChild; // the server's bare text node
 		expect(textNode?.nodeType).toBe(3);

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
+import { prerender } from 'octane/static';
 
 // SSR Phase 4 — Suspense + data serialization. render() is async: a
 // use(thenable) that hasn't resolved suspends the pass (the @try shows
@@ -44,45 +45,45 @@ function deferred<T>() {
 
 describe('SSR Phase 4 — render() awaits use(promise)', () => {
 	it('@try awaits use(promise) and renders the resolved success arm + seed', async () => {
-		const out = await RT.render(m.Boundary, { promise: Promise.resolve('hi') });
+		const out = await prerender(m.Boundary, { promise: Promise.resolve('hi') });
 		// Nested ranges: outer = try-slot, inner = the resolved success arm.
-		expect(out.body).toBe(
+		expect(out.html).toBe(
 			`<div id="box">${OPEN}${OPEN}<span class="ok">hi</span>${CLOSE}${CLOSE}</div>` +
 				seed('["hi"]'),
 		);
 	});
 
 	it('a bare use(promise) with no @try boundary is awaited and resolved', async () => {
-		const out = await RT.render(m.AsyncLeaf, { promise: Promise.resolve('hello') });
-		expect(out.body).toBe('<div id="leaf">hello</div>' + seed('["hello"]'));
+		const out = await prerender(m.AsyncLeaf, { promise: Promise.resolve('hello') });
+		expect(out.html).toBe('<div id="leaf">hello</div>' + seed('["hello"]'));
 	});
 
 	it('routes a rejected use(promise) to @catch (rejected boundaries are not seeded)', async () => {
-		const out = await RT.render(m.Boundary, { promise: Promise.reject(new Error('nope')) });
-		expect(out.body).toBe(
+		const out = await prerender(m.Boundary, { promise: Promise.reject(new Error('nope')) });
+		expect(out.html).toBe(
 			`<div id="box">${OPEN}${OPEN}<span class="err">nope</span>${CLOSE}${CLOSE}</div>`,
 		);
-		expect(out.body).not.toContain('data-octane-suspense');
+		expect(out.html).not.toContain('data-octane-suspense');
 	});
 
 	it('resolves NESTED suspense across multiple passes (outer gates inner)', async () => {
-		const out = await RT.render(m.Nested, {
+		const out = await prerender(m.Nested, {
 			outer: Promise.resolve('O'),
 			inner: Promise.resolve('I'),
 		});
 		// Two nested @try, each = slot + arm → four nested ranges around the span.
-		expect(out.body).toBe(
+		expect(out.html).toBe(
 			`<div id="outer">${OPEN}${OPEN}${OPEN}${OPEN}<span class="both">O:I</span>${CLOSE}${CLOSE}${CLOSE}${CLOSE}</div>` +
 				seed('["O","I"]'),
 		);
 	});
 
 	it('resolves independent SIBLING boundaries (distinct call-site keys)', async () => {
-		const out = await RT.render(m.Siblings, {
+		const out = await prerender(m.Siblings, {
 			a: Promise.resolve('A'),
 			b: Promise.resolve('B'),
 		});
-		expect(out.body).toBe(
+		expect(out.html).toBe(
 			`<div id="sibs">${OPEN}${OPEN}<span class="a">A</span>${CLOSE}${CLOSE}${OPEN}${OPEN}<span class="b">B</span>${CLOSE}${CLOSE}</div>` +
 				seed('["A","B"]'),
 		);
@@ -91,20 +92,20 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 	it('seeds values in render (depth-first) order', async () => {
 		// The seed array order is what the client consumes by cursor on hydrate, so
 		// it must match the order use() is reached during render.
-		const out = await RT.render(m.Nested, {
+		const out = await prerender(m.Nested, {
 			outer: Promise.resolve('first'),
 			inner: Promise.resolve('second'),
 		});
-		const json = out.body.match(/data-octane-suspense>(.*?)<\/script>/)![1];
+		const json = out.html.match(/data-octane-suspense>(.*?)<\/script>/)![1];
 		expect(JSON.parse(json)).toEqual(['first', 'second']);
 	});
 
 	it('escapes `<` in the serialized seed payload so it cannot break out of <script>', async () => {
-		const out = await RT.render(m.AsyncLeaf, { promise: Promise.resolve('</script><x>') });
+		const out = await prerender(m.AsyncLeaf, { promise: Promise.resolve('</script><x>') });
 		// Body text is HTML-escaped as usual…
-		expect(out.body).toContain('<div id="leaf">&lt;/script&gt;&lt;x&gt;</div>');
+		expect(out.html).toContain('<div id="leaf">&lt;/script&gt;&lt;x&gt;</div>');
 		// …and the JSON payload escapes every `<` to < (no literal `<` in it).
-		const json = out.body.match(/data-octane-suspense>(.*?)<\/script>$/)![1];
+		const json = out.html.match(/data-octane-suspense>(.*?)<\/script>$/)![1];
 		expect(json).not.toContain('<');
 		expect(JSON.parse(json)).toEqual(['</script><x>']);
 	});
@@ -116,30 +117,30 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 		// start both (both suspend), then resolve in reverse order.
 		const dA = deferred<string>();
 		const dB = deferred<string>();
-		const pA = RT.render(m.Siblings, { a: dA.promise, b: Promise.resolve('A2') });
-		const pB = RT.render(m.AsyncLeaf, { promise: dB.promise });
+		const pA = prerender(m.Siblings, { a: dA.promise, b: Promise.resolve('A2') });
+		const pB = prerender(m.AsyncLeaf, { promise: dB.promise });
 		dB.resolve('B1');
 		dA.resolve('A1');
 		const [a, b] = await Promise.all([pA, pB]);
-		expect(a.body).toBe(
+		expect(a.html).toBe(
 			`<div id="sibs">${OPEN}${OPEN}<span class="a">A1</span>${CLOSE}${CLOSE}${OPEN}${OPEN}<span class="b">A2</span>${CLOSE}${CLOSE}</div>` +
 				seed('["A1","A2"]'),
 		);
 		// b must contain ONLY its own seed — not A's values leaking through SERIAL.
-		expect(b.body).toBe('<div id="leaf">B1</div>' + seed('["B1"]'));
+		expect(b.html).toBe('<div id="leaf">B1</div>' + seed('["B1"]'));
 	});
 
 	it('non-suspending components emit no seed <script>', async () => {
-		const out = await RT.render(m.Boundary, { promise: Promise.resolve('x') });
+		const out = await prerender(m.Boundary, { promise: Promise.resolve('x') });
 		// (sanity: suspending one DOES seed)
-		expect(out.body).toContain('data-octane-suspense');
+		expect(out.html).toContain('data-octane-suspense');
 		const plain = evalServer(
 			`export function Plain() @{ <div id="p">{'static'}</div> }`,
 			'plain.tsrx',
 		);
-		const out2 = await RT.render(plain.Plain);
-		expect(out2.body).toBe('<div id="p">static</div>');
-		expect(out2.body).not.toContain('data-octane-suspense');
+		const out2 = await prerender(plain.Plain);
+		expect(out2.html).toBe('<div id="p">static</div>');
+		expect(out2.html).not.toContain('data-octane-suspense');
 	});
 
 	it('a use(thenable) that never settles fails the render via the suspense deadline (no hang)', async () => {
@@ -150,7 +151,7 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 			// would hang forever (MAX_SUSPENSE_PASSES only bounds the pass COUNT, and
 			// is checked BEFORE the await).
 			const stuck = new Promise<string>(() => {});
-			await expect(RT.render(m.AsyncLeaf, { promise: stuck })).rejects.toThrow(
+			await expect(prerender(m.AsyncLeaf, { promise: stuck })).rejects.toThrow(
 				/did not settle within 50ms/,
 			);
 		} finally {
@@ -174,15 +175,15 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 			}`,
 			'cross.tsrx',
 		);
-		const out = await RT.render(mod.App, {
+		const out = await prerender(mod.App, {
 			show: Promise.resolve(true),
 			x: Promise.resolve('X'),
 			y: Promise.resolve('Y'),
 		});
 		// x must render "X" and y must render "Y" — NOT crossed (pre-fix: both "Y").
-		expect(out.body).toContain('<span class="x">X</span>');
-		expect(out.body).toContain('<span class="y">Y</span>');
-		expect(out.body).not.toContain('<span class="x">Y</span>');
+		expect(out.html).toContain('<span class="x">X</span>');
+		expect(out.html).toContain('<span class="y">Y</span>');
+		expect(out.html).not.toContain('<span class="x">Y</span>');
 	});
 
 	it('keys use() per call-site in an @for body (distinct value per iteration)', async () => {
@@ -194,10 +195,10 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 			}`,
 			'forUse.tsrx',
 		);
-		const out = await RT.render(mod.App, {
+		const out = await prerender(mod.App, {
 			items: Promise.resolve([{ v: Promise.resolve('a') }, { v: Promise.resolve('b') }]),
 		});
-		expect(out.body).toContain('<li>a</li>');
-		expect(out.body).toContain('<li>b</li>');
+		expect(out.html).toContain('<li>a</li>');
+		expect(out.html).toContain('<li>b</li>');
 	});
 });

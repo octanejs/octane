@@ -44,22 +44,22 @@ describe('component that returns a non-JSX value', () => {
 describe('non-JSX return on the server (props-first ABI)', () => {
 	it('SSR renders the trailing primitive return', async () => {
 		const server = serverModule();
-		const { body } = await ServerRT.render(server.App, { foo: false, title: 'hello' });
-		expect(body).toContain('hello');
+		const { html } = await ServerRT.renderToString(server.App, { foo: false, title: 'hello' });
+		expect(html).toContain('hello');
 	});
 
 	it('SSR renders the early-return primitive', async () => {
 		const server = serverModule();
-		const { body } = await ServerRT.render(server.App, { foo: true, title: 'hello' });
-		expect(body).toContain('123');
+		const { html } = await ServerRT.renderToString(server.App, { foo: true, title: 'hello' });
+		expect(html).toContain('123');
 	});
 
 	it('hydrates the server-rendered primitive (adopts, stays consistent)', async () => {
 		const server = serverModule();
-		const { body } = await ServerRT.render(server.App, { foo: false, title: 'hello' });
+		const { html } = await ServerRT.renderToString(server.App, { foo: false, title: 'hello' });
 		const container = document.createElement('div');
 		document.body.appendChild(container);
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const div = container.querySelector('div') as HTMLElement;
 		const root = hydrateRoot(container, App, { foo: false, title: 'hello' });
 		flushSync(() => {});

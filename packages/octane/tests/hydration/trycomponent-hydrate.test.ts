@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { prerender } from 'octane/static';
 import { TryFor, TryComponent, TryComponentFor, MatchShape } from './_fixtures/trycomponent.tsrx';
 
 // SSR Phase 6 — hydration of a @try whose SUCCESS-arm body is a COMPONENT (the
@@ -41,8 +42,8 @@ const items = [
 describe('hydrateRoot — @try with a component body (router Match shape)', () => {
 	// Shape (a): @try { @for } — the body is a @for directly (a sole-hole arm).
 	it('(a) adopts a @try whose body is a @for directly (no throw, no rebuild)', async () => {
-		const { body } = await ServerRT.render(server.TryFor, { promise: Promise.resolve(items) });
-		container.innerHTML = body;
+		const { html } = await prerender(server.TryFor, { promise: Promise.resolve(items) });
+		container.innerHTML = html;
 		// Snapshot the #try-for subtree (NOT container.innerHTML — that includes the
 		// inline suspense seed <script>, which hydrateRoot consumes + removes).
 		const wrapper = container.querySelector('#try-for') as HTMLElement;
@@ -64,10 +65,10 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 
 	// Shape (b): @try { <Comp/> } — THROWS pre-fix.
 	it('(b) adopts a @try whose body is a component (no throw, no rebuild)', async () => {
-		const { body } = await ServerRT.render(server.TryComponent, {
+		const { html } = await prerender(server.TryComponent, {
 			promise: Promise.resolve('hello'),
 		});
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const wrapper = container.querySelector('#try-comp') as HTMLElement;
 		const before = wrapper.outerHTML;
 		const leaf = container.querySelector('.leaf') as HTMLElement;
@@ -88,10 +89,10 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 
 	// Shape (c): @try { <Comp/> } where Comp contains a @for — THROWS pre-fix.
 	it('(c) adopts a @try whose component body itself contains a @for (no throw, no rebuild)', async () => {
-		const { body } = await ServerRT.render(server.TryComponentFor, {
+		const { html } = await prerender(server.TryComponentFor, {
 			promise: Promise.resolve(items),
 		});
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const wrapper = container.querySelector('#try-comp-for') as HTMLElement;
 		const before = wrapper.outerHTML;
 		const ul = container.querySelector('ul.list-leaf') as HTMLElement;
@@ -113,10 +114,10 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 
 	// The exact router `Match` shape: @try { <Comp/> } @pending { <Fallback/> }.
 	it('adopts the router Match shape (@try component body + @pending component fallback)', async () => {
-		const { body } = await ServerRT.render(server.MatchShape, {
+		const { html } = await prerender(server.MatchShape, {
 			promise: Promise.resolve('route'),
 		});
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const wrapper = container.querySelector('#match') as HTMLElement;
 		const before = wrapper.outerHTML;
 		const matched = container.querySelector('.matched') as HTMLElement;

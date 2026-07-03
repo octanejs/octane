@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { prerender } from 'octane/static';
 // CLIENT-compiled components (normal .tsrx import path). Importing AsyncCounter
 // (which has an onClick) makes this module register click delegation at load.
 import { AsyncLeaf, AsyncCounter, AsyncUndef } from '../_fixtures/ssr-suspense.tsrx';
@@ -35,13 +36,13 @@ afterEach(() => container.remove());
 
 describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 	it('seeds the server value so use(promise) returns synchronously (no re-suspend, no rebuild)', async () => {
-		const { body } = await ServerRT.render(server.AsyncLeaf, { promise: Promise.resolve('hello') });
-		expect(body).toBe(
+		const { html } = await prerender(server.AsyncLeaf, { promise: Promise.resolve('hello') });
+		expect(html).toBe(
 			'<div id="leaf">hello</div>' +
 				'<script type="application/json" data-octane-suspense>["hello"]</script>',
 		);
 
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const div = container.querySelector('#leaf') as HTMLElement;
 		const textNode = div.firstChild; // the server text node — must be adopted
 
@@ -58,16 +59,16 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 	});
 
 	it('round-trips an undefined-resolving use() as undefined, not null', async () => {
-		const { body } = await ServerRT.render(server.AsyncUndef, {
+		const { html } = await prerender(server.AsyncUndef, {
 			promise: Promise.resolve(undefined),
 		});
 		// Server saw `undefined` and the seed encodes it via the sentinel — NOT
 		// `[null]` (which a naive JSON.stringify of `[undefined]` would produce).
-		expect(body).toContain('<div id="undef">is-undefined</div>');
-		expect(body).toContain('__octane_new_undefined__');
-		expect(body).not.toContain('>[null]<');
+		expect(html).toContain('<div id="undef">is-undefined</div>');
+		expect(html).toContain('__octane_new_undefined__');
+		expect(html).not.toContain('>[null]<');
 
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const div = container.querySelector('#undef') as HTMLElement;
 		const root = hydrateRoot(container, AsyncUndef, { promise: Promise.resolve(undefined) });
 		flushSync(() => {});
@@ -83,10 +84,10 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 	it('reads the seed value, not the client promise (server is the source of truth)', async () => {
 		// Server resolved to 'server-value'; hand the client a DIFFERENT promise.
 		// The seeded value must win — the client must not re-fetch / re-suspend.
-		const { body } = await ServerRT.render(server.AsyncLeaf, {
+		const { html } = await prerender(server.AsyncLeaf, {
 			promise: Promise.resolve('server-value'),
 		});
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const div = container.querySelector('#leaf') as HTMLElement;
 
 		const root = hydrateRoot(container, AsyncLeaf, { promise: Promise.resolve('client-value') });
@@ -97,15 +98,15 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 	});
 
 	it('composes seeded use() with a stateful, interactive counter (the example app shape)', async () => {
-		const { body } = await ServerRT.render(server.AsyncCounter, {
+		const { html } = await prerender(server.AsyncCounter, {
 			promise: Promise.resolve('Hi'),
 		});
-		expect(body).toBe(
+		expect(html).toBe(
 			'<main id="ac"><h1>Hi</h1><button id="ac-btn">count:0</button></main>' +
 				'<script type="application/json" data-octane-suspense>["Hi"]</script>',
 		);
 
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const before = container.querySelector('#ac')!.outerHTML;
 		const root = hydrateRoot(container, AsyncCounter, { promise: Promise.resolve('Hi') });
 		flushSync(() => {});

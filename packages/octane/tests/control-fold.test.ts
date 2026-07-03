@@ -68,18 +68,18 @@ describe('folded @if (return-JSX) matches the inline @{} oracle', () => {
 describe('folded @if hydrates against the @{} oracle markup', () => {
 	it('SSR of the folded form byte-equals the inline form', async () => {
 		const server = serverModule();
-		const ret = await ServerRT.render(server.RetToggle, { on: true });
-		const at = await ServerRT.render(server.AtToggle, { on: true });
-		expect(ret.body).toBe(at.body);
-		expect(ret.body).toContain('on:0');
+		const ret = await ServerRT.renderToString(server.RetToggle, { on: true });
+		const at = await ServerRT.renderToString(server.AtToggle, { on: true });
+		expect(ret.html).toBe(at.html);
+		expect(ret.html).toContain('on:0');
 	});
 
 	it('adopts the server-rendered branch and stays interactive', async () => {
 		const server = serverModule();
-		const { body } = await ServerRT.render(server.RetToggle, { on: true });
+		const { html } = await ServerRT.renderToString(server.RetToggle, { on: true });
 		const container = document.createElement('div');
 		document.body.appendChild(container);
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const btn = container.querySelector('button') as HTMLButtonElement;
 		const root = hydrateRoot(container, RetToggle, { on: true });
 		flushSync(() => {});

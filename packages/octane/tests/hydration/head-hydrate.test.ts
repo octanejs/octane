@@ -8,8 +8,8 @@ import { Page } from './_fixtures/head.tsrx';
 
 // Hoisted document metadata (React-19 model): inline `<title>`/`<meta>` are
 // routed out of the body, so the remaining single body root takes the
-// single-root path (no <octane-frag>) and the metadata goes to render().head
-// (server, via ssrHeadEl) / document.head (client, via headBlock). On hydrateRoot,
+// single-root path (no <octane-frag>) and the metadata folds into render().html
+// (server, via ssrHeadEl → folded into html) / document.head (client, via headBlock). On hydrateRoot,
 // headBlock ADOPTS the server-rendered element (matched by its `<!--key-->`
 // marker) rather than appending a duplicate, and removes it on unmount.
 
@@ -67,25 +67,31 @@ describe('hoisted document metadata — compile', () => {
 });
 
 describe('hoisted document metadata — SSR', () => {
-	it('render().head carries the title + meta (each marker-prefixed); body is single-root', async () => {
-		const { head, body, css } = await ServerRT.render(server.Page, { params: {} });
-		expect(head).toContain('<title>TSRX Page</title>');
-		expect(head).toContain('name="description"');
-		expect(head).toContain('content="A test page"');
-		expect(head).toMatch(/^<!--rnh-/); // leading adoption marker
-		// Body is the single <section> (wrapped in the component block markers),
-		// NOT a <octane-frag> multi-root.
-		expect(body).toContain('<section id="body"');
-		expect(body).not.toContain('octane-frag');
+	it('html carries the title + meta (each marker-prefixed) folded to the front; body is single-root', () => {
+		const { html, css } = ServerRT.renderToString(server.Page, { params: {} });
+		expect(html).toContain('<title>TSRX Page</title>');
+		expect(html).toContain('name="description"');
+		expect(html).toContain('content="A test page"');
+		// Head metadata folds to the FRONT of html (a body-only render has no
+		// <head> to splice into), each still prefixed by its adoption marker.
+		expect(html).toMatch(/^<!--rnh-/);
+		expect(html.indexOf('<title')).toBeLessThan(html.indexOf('<section'));
+		// Body is the single <section>, NOT a <octane-frag> multi-root.
+		expect(html).toContain('<section id="body"');
+		expect(html).not.toContain('octane-frag');
 		// The <style> still routes to CSS.
 		expect(css).toContain('rebeccapurple');
 	});
 });
 
 describe('hoisted document metadata — hydration', () => {
-	it('adopts the server head (one <title>/<meta>, markers removed) + single-root body, removed on unmount', async () => {
-		const { head, body } = await ServerRT.render(server.Page, { params: {} });
-		// Simulate the metaframework injecting render().head into the document head.
+	it('adopts the server head (one <title>/<meta>, markers removed) + single-root body, removed on unmount', () => {
+		const { html } = ServerRT.renderToString(server.Page, { params: {} });
+		// html folds head metadata to the front + body after. A document places the
+		// head part in <head> and the body part in the app container — split there.
+		const bodyStart = html.indexOf('<section');
+		const head = html.slice(0, bodyStart);
+		const body = html.slice(bodyStart);
 		document.head.innerHTML = head;
 		expect(document.head.querySelectorAll('title').length).toBe(1);
 		expect(document.title).toBe('TSRX Page');

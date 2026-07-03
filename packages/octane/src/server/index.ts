@@ -9,9 +9,14 @@
  */
 
 export {
-	// Entry
-	render,
+	// Entry — React `react-dom/server` parity (buffered; streaming lands in a
+	// later phase). `renderToString` is a single sync pass (fallbacks for
+	// suspended boundaries); `renderToStaticMarkup` is non-hydratable clean HTML.
+	// The await-everything behaviour lives in `octane/static` as `prerender`.
+	renderToString,
+	renderToStaticMarkup,
 	type RenderResult,
+	type RenderOptions,
 	setSsrSuspenseTimeout,
 	getSsrSuspenseTimeout,
 

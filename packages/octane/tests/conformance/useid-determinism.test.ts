@@ -118,11 +118,11 @@ describe('useId determinism', () => {
 		const warm = mount(Triple);
 		warm.unmount();
 
-		const out = await RT.render(serverMod.Single);
-		const serverId = out.body.match(/data-testid="([^"]+)"/)?.[1];
+		const out = await RT.renderToString(serverMod.Single);
+		const serverId = out.html.match(/data-testid="([^"]+)"/)?.[1];
 
 		const container = document.createElement('div');
-		container.innerHTML = out.body;
+		container.innerHTML = out.html;
 		document.body.appendChild(container);
 
 		let clientId: string | undefined;

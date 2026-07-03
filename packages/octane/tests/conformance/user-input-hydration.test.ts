@@ -69,8 +69,8 @@ async function preserveUserInput(
 	changed: unknown,
 	props: any = {},
 ) {
-	const { body } = await ServerRT.render(server[name], props);
-	container.innerHTML = body;
+	const { html } = await ServerRT.renderToString(server[name], props);
+	container.innerHTML = html;
 	const field = container.querySelector('#fi') as any;
 	expect(field[valueKey]).toBe(initial); // server value reflected into the property
 

@@ -39,9 +39,9 @@ describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
 			{ id: 3, name: 'Gamma' },
 		];
 		const onPick = vi.fn();
-		const { body } = await ServerRT.render(server.List, { items, onPick: () => {} });
+		const { html } = ServerRT.renderToString(server.List, { items, onPick: () => {} });
 
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const before = container.innerHTML;
 		const rows = [...container.querySelectorAll('li.row')];
 		expect(rows.length).toBe(3);

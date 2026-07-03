@@ -71,9 +71,9 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		errSpy.mock.calls.map((c) => String(c[0])).filter((m) => m.includes('hydration mismatch'));
 
 	it('@if branch swap: server <button>, client <span> → rebuilds the span, discards the button', async () => {
-		const { body } = await ServerRT.render(server.Toggle, { on: true });
-		expect(body).toContain('<button id="hit"');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
+		expect(html).toContain('<button id="hit"');
+		container.innerHTML = html;
 
 		// Hydrate with on:false → the client takes the ELSE (span) branch.
 		hydrateRoot(container, clientDev.Toggle, { on: false });
@@ -92,9 +92,9 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 	it('@switch case swap (different tags): server <em>, client <strong> → rebuilds case b', async () => {
 		const srv = serverModule(STRUCTURAL, 'structural.tsrx');
 		const cli = devClientModule(STRUCTURAL, 'structural.tsrx');
-		const { body } = await ServerRT.render(srv.Pick, { k: 'a' });
-		expect(body).toContain('<em class="a">');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(srv.Pick, { k: 'a' });
+		expect(html).toContain('<em class="a">');
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.Pick, { k: 'b' });
 		flushSync(() => {});
@@ -109,9 +109,9 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 	it('@switch SAME-tag swap (static class differs): server <span class="a">, client class "b"', async () => {
 		// control.tsrx Pick: every case is a <span>, distinguished only by a STATIC class.
 		// The tag-only check would miss this; the static-attribute check catches it + rebuilds.
-		const { body } = await ServerRT.render(server.Pick, { k: 'a' });
-		expect(body).toContain('<span class="a">');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Pick, { k: 'a' });
+		expect(html).toContain('<span class="a">');
+		container.innerHTML = html;
 
 		hydrateRoot(container, clientDev.Pick, { k: 'b' });
 		flushSync(() => {});
@@ -126,9 +126,9 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 	it('host → component swap: server <p>, client <Inner> → rebuilds the component', async () => {
 		const srv = serverModule(SWAP, 'swap.tsrx');
 		const cli = devClientModule(SWAP, 'swap.tsrx');
-		const { body } = await ServerRT.render(srv.Swap, { host: true });
-		expect(body).toContain('<p class="host">');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
+		expect(html).toContain('<p class="host">');
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.Swap, { host: false });
 		flushSync(() => {});
@@ -143,9 +143,9 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 	it('component → host swap: server <Inner>, client <p> → rebuilds the host', async () => {
 		const srv = serverModule(SWAP, 'swap.tsrx');
 		const cli = devClientModule(SWAP, 'swap.tsrx');
-		const { body } = await ServerRT.render(srv.Swap, { host: false });
-		expect(body).toContain('<b class="inner">');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(srv.Swap, { host: false });
+		expect(html).toContain('<b class="inner">');
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.Swap, { host: true });
 		flushSync(() => {});
@@ -160,9 +160,9 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 	it('same-root, different NESTED static structure: server <span>, client <p> → rebuilds', async () => {
 		const srv = serverModule(NESTEDSWAP, 'nested-swap.tsrx');
 		const cli = devClientModule(NESTEDSWAP, 'nested-swap.tsrx');
-		const { body } = await ServerRT.render(srv.NestedStatic, { x: true });
-		expect(body).toContain('<span class="s1">');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(srv.NestedStatic, { x: true });
+		expect(html).toContain('<span class="s1">');
+		container.innerHTML = html;
 
 		// Both branches are `<section class="box">` — only the nested static markup differs.
 		hydrateRoot(container, cli.NestedStatic, { x: false });
@@ -180,9 +180,9 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		// so prod builds silently adopted the WRONG server branch. The detection +
 		// rebuild now run in dev AND prod; only the warning needs `loc`.
 		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
-		const { body } = await ServerRT.render(server.Toggle, { on: true });
-		expect(body).toContain('<button id="hit"');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
+		expect(html).toContain('<button id="hit"');
+		container.innerHTML = html;
 
 		hydrateRoot(container, clientProd.Toggle, { on: false });
 		flushSync(() => {});
@@ -196,8 +196,8 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 
 	it('PROD build: matching branch adopts unchanged (structural check has no false positives)', async () => {
 		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
-		const { body } = await ServerRT.render(server.Toggle, { on: true });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
+		container.innerHTML = html;
 		const before = container.innerHTML;
 		hydrateRoot(container, clientProd.Toggle, { on: true });
 		flushSync(() => {});
@@ -206,8 +206,8 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 	});
 
 	it('no warning + adopted unchanged when the branch matches', async () => {
-		const { body } = await ServerRT.render(server.Toggle, { on: true });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
+		container.innerHTML = html;
 		const before = container.innerHTML;
 		hydrateRoot(container, clientDev.Toggle, { on: true });
 		flushSync(() => {});
@@ -223,8 +223,8 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 			{ id: 2, name: 'b' },
 		];
 		const three = [...two, { id: 3, name: 'c' }];
-		const { body } = await ServerRT.render(srv.List, { items: two, onPick: () => {} });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(srv.List, { items: two, onPick: () => {} });
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.List, { items: three, onPick: () => {} });
 		flushSync(() => {});
@@ -244,8 +244,8 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 			{ id: 3, name: 'c' },
 		];
 		const two = three.slice(0, 2);
-		const { body } = await ServerRT.render(srv.List, { items: three, onPick: () => {} });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(srv.List, { items: three, onPick: () => {} });
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.List, { items: two, onPick: () => {} });
 		flushSync(() => {});
@@ -265,8 +265,8 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 			{ id: 2, name: 'b' },
 			{ id: 3, name: 'c' },
 		];
-		const { body } = await ServerRT.render(srv.List, { items: three, onPick: () => {} });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(srv.List, { items: three, onPick: () => {} });
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.List, {
 			items: three.slice(0, 2),
@@ -284,14 +284,14 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 	it('@empty: server rendered items, client is empty → items discarded, @empty shown', async () => {
 		const srv = serverModule(EMPTYFOR, 'emptyfor.tsrx');
 		const cli = devClientModule(EMPTYFOR, 'emptyfor.tsrx');
-		const { body } = await ServerRT.render(srv.WithEmpty, {
+		const { html } = await ServerRT.renderToString(srv.WithEmpty, {
 			items: [
 				{ id: 1, name: 'a' },
 				{ id: 2, name: 'b' },
 			],
 		});
-		expect(body).toContain('<li class="row">');
-		container.innerHTML = body;
+		expect(html).toContain('<li class="row">');
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.WithEmpty, { items: [] });
 		flushSync(() => {});
@@ -305,9 +305,9 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 	it('@empty: server rendered @empty, client has items → @empty discarded, items shown', async () => {
 		const srv = serverModule(EMPTYFOR, 'emptyfor.tsrx');
 		const cli = devClientModule(EMPTYFOR, 'emptyfor.tsrx');
-		const { body } = await ServerRT.render(srv.WithEmpty, { items: [] });
-		expect(body).toContain('<li class="empty">');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(srv.WithEmpty, { items: [] });
+		expect(html).toContain('<li class="empty">');
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.WithEmpty, {
 			items: [

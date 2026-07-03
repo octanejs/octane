@@ -34,8 +34,8 @@ afterEach(() => container.remove());
 
 describe('hydrateRoot — empty @for (SSR Phase 6, Bugbot fixes)', () => {
 	it('zero items + no @empty: trailing component after the empty @for still adopts', async () => {
-		const { body } = await ServerRT.render(server.FeedOrEmpty, { items: [] });
-		container.innerHTML = body;
+		const { html } = ServerRT.renderToString(server.FeedOrEmpty, { items: [] });
+		container.innerHTML = html;
 		expect(container.querySelectorAll('p.row').length).toBe(0);
 		const tail = container.querySelector('#tail') as HTMLButtonElement;
 		expect(tail).not.toBeNull();
@@ -51,8 +51,8 @@ describe('hydrateRoot — empty @for (SSR Phase 6, Bugbot fixes)', () => {
 	});
 
 	it('zero items + @empty: the @empty content is adopted (same element, single instance)', async () => {
-		const { body } = await ServerRT.render(server.WithEmpty, { items: [] });
-		container.innerHTML = body;
+		const { html } = ServerRT.renderToString(server.WithEmpty, { items: [] });
+		container.innerHTML = html;
 		const empty = container.querySelector('li.empty') as HTMLElement;
 		expect(empty.textContent).toBe('No items yet');
 
@@ -70,8 +70,8 @@ describe('hydrateRoot — empty @for (SSR Phase 6, Bugbot fixes)', () => {
 			{ id: 1, name: 'A' },
 			{ id: 2, name: 'B' },
 		];
-		const { body } = await ServerRT.render(server.FeedOrEmpty, { items });
-		container.innerHTML = body;
+		const { html } = ServerRT.renderToString(server.FeedOrEmpty, { items });
+		container.innerHTML = html;
 		const rows = [...container.querySelectorAll('p.row')];
 		const tail = container.querySelector('#tail') as HTMLButtonElement;
 

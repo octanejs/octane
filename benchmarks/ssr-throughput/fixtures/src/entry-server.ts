@@ -1,5 +1,4 @@
-import { render } from 'octane/server';
-import type { RenderResult } from 'octane/server';
+import { prerender } from 'octane/static';
 import { WaterfallApp } from './Waterfall.tsrx';
 import { DeoptPageFast } from './DeoptFast.tsrx';
 import { DeoptPagePlain } from './deopt-plain';
@@ -13,20 +12,25 @@ import { EscapeApp } from './Escape.tsrx';
 export { expectedChainValue } from './waterfall-data';
 export { ESCAPE_PROBE } from './escape-data';
 
-export function renderWaterfall(depth: number): Promise<RenderResult> {
-	return render(WaterfallApp, { depth });
+// The harness reads `.body`; prerender returns { html, css } (head folded into
+// html — these fixtures render no <head>), so map html → body.
+type BodyResult = { body: string; css: string };
+const toBody = (r: { html: string; css: string }): BodyResult => ({ body: r.html, css: r.css });
+
+export async function renderWaterfall(depth: number): Promise<BodyResult> {
+	return toBody(await prerender(WaterfallApp, { depth }));
 }
 
-export function renderDeoptFast(): Promise<RenderResult> {
-	return render(DeoptPageFast);
+export async function renderDeoptFast(): Promise<BodyResult> {
+	return toBody(await prerender(DeoptPageFast));
 }
 
-export function renderDeoptPlain(): Promise<RenderResult> {
-	// render() normalizes a descriptor-returning root through ssrChild (same as
+export async function renderDeoptPlain(): Promise<BodyResult> {
+	// prerender normalizes a descriptor-returning root through ssrChild (same as
 	// ssrComponent does for children), so the plain-.ts page renders directly.
-	return render(DeoptPagePlain as any);
+	return toBody(await prerender(DeoptPagePlain as any));
 }
 
-export function renderEscapeHeavy(): Promise<RenderResult> {
-	return render(EscapeApp);
+export async function renderEscapeHeavy(): Promise<BodyResult> {
+	return toBody(await prerender(EscapeApp));
 }

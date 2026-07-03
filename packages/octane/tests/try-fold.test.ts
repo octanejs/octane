@@ -43,13 +43,13 @@ describe('folded @try (return-JSX) matches the inline @{} oracle', () => {
 describe('folded @try hydrates against the @{} oracle markup', () => {
 	it('SSR byte-equals the inline form and adopts on hydrate', async () => {
 		const server = serverModule();
-		const ret = await ServerRT.render(server.RetTry, { boom: false });
-		const at = await ServerRT.render(server.AtTry, { boom: false });
-		expect(ret.body).toBe(at.body);
+		const ret = await ServerRT.renderToString(server.RetTry, { boom: false });
+		const at = await ServerRT.renderToString(server.AtTry, { boom: false });
+		expect(ret.html).toBe(at.html);
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);
-		container.innerHTML = ret.body;
+		container.innerHTML = ret.html;
 		const ok = container.querySelector('.ok') as HTMLElement;
 		const root = hydrateRoot(container, RetTry, { boom: false });
 		flushSync(() => {});

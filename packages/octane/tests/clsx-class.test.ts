@@ -161,24 +161,27 @@ describe('clsx class composition — SSR output', () => {
 	const server = evalModule('server', ServerRT);
 
 	it('serialises an array class', async () => {
-		const { body } = await ServerRT.render(server.ArrayClass, { on: true });
-		expect(body).toContain('class="a b c"');
+		const { html } = await ServerRT.renderToString(server.ArrayClass, { on: true });
+		expect(html).toContain('class="a b c"');
 	});
 
 	it('serialises an object class', async () => {
-		const { body } = await ServerRT.render(server.ObjectClass, { active: true, disabled: false });
-		expect(body).toContain('class="active"');
+		const { html } = await ServerRT.renderToString(server.ObjectClass, {
+			active: true,
+			disabled: false,
+		});
+		expect(html).toContain('class="active"');
 	});
 
 	it('serialises a scoped array class with the hash appended', async () => {
-		const { body } = await ServerRT.render(server.ScopedArray, { on: true });
-		expect(body).toMatch(/class="a b tsrx-[0-9a-f]+"/);
+		const { html } = await ServerRT.renderToString(server.ScopedArray, { on: true });
+		expect(html).toMatch(/class="a b tsrx-[0-9a-f]+"/);
 	});
 
 	it('scoped nullish class serialises without the literal "undefined"', async () => {
-		const { body } = await ServerRT.render(server.ScopedNullish, { cls: undefined });
-		expect(body).not.toContain('undefined');
-		expect(body).toMatch(/class="\s*tsrx-[0-9a-f]+"/);
+		const { html } = await ServerRT.renderToString(server.ScopedNullish, { cls: undefined });
+		expect(html).not.toContain('undefined');
+		expect(html).toMatch(/class="\s*tsrx-[0-9a-f]+"/);
 	});
 });
 
@@ -198,8 +201,8 @@ describe('clsx class composition — hydration parity', () => {
 	});
 
 	it('adopts a composed array class with no mismatch', async () => {
-		const { body } = await ServerRT.render(server.ArrayClass, { on: true });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.ArrayClass, { on: true });
+		container.innerHTML = html;
 		hydrateRoot(container, client.ArrayClass, { on: true });
 		flushSync(() => {});
 		expect(container.querySelector('div')!.className).toBe('a b c');
@@ -208,8 +211,8 @@ describe('clsx class composition — hydration parity', () => {
 	});
 
 	it('adopts a scoped composed class with no mismatch', async () => {
-		const { body } = await ServerRT.render(server.ScopedArray, { on: false });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.ScopedArray, { on: false });
+		container.innerHTML = html;
 		hydrateRoot(container, client.ScopedArray, { on: false });
 		flushSync(() => {});
 		expect(container.querySelector('div')!.className).toMatch(/^a tsrx-[0-9a-f]+$/);

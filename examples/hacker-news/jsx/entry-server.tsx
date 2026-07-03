@@ -5,7 +5,7 @@
 // async render() resolves the route's useSuspenseQuery into a per-request
 // QueryClient (it awaits suspended queries, bounded by the suspense timeout).
 // dehydrate(qc) serializes that cache so the client can seed it (no refetch).
-import { render as renderToString } from 'octane/server';
+import { prerender } from 'octane/static';
 import { QueryClient, dehydrate } from '@octanejs/query';
 import { loadServerRouter } from '../shared/routes.js';
 import { makeRouter } from './routes.js';
@@ -29,8 +29,10 @@ export async function render(url: string): Promise<RenderResult> {
 	// following any redirect the router issues.
 	const router = await loadServerRouter(makeRouter, url, queryClient);
 
-	const { head, body, css } = await renderToString(App, { router, queryClient });
+	// prerender awaits the route's useSuspenseQuery; { html, css } (head folded
+	// into html). Adapt to the server.mjs shape (head kept empty — this app has none).
+	const { html, css } = await prerender(App, { router, queryClient });
 
 	// dehydrate() captures the warm cache so the client hydrates from it (no flash).
-	return { head, body, css, state: dehydrate(queryClient) };
+	return { head: '', body: html, css, state: dehydrate(queryClient) };
 }

@@ -141,9 +141,9 @@ describe('renderable holes — updates', () => {
 
 describe('renderable holes — hydration', () => {
 	it('adopts a primitive text hole (no rebuild)', async () => {
-		const { body } = await ServerRT.render(server.Hole, { value: 'hello' });
-		expect(body).toContain('hello');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Hole, { value: 'hello' });
+		expect(html).toContain('hello');
+		container.innerHTML = html;
 		const div = container.querySelector('#h') as HTMLElement;
 		const root = hydrateRoot(container, Hole, { value: 'hello' });
 		flushSync(() => {});
@@ -153,9 +153,9 @@ describe('renderable holes — hydration', () => {
 	});
 
 	it('adopts a component child + keeps it interactive', async () => {
-		const { body } = await ServerRT.render(server.Layout, { children: server.Counter });
-		expect(body).toContain('count:0');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Layout, { children: server.Counter });
+		expect(html).toContain('count:0');
+		container.innerHTML = html;
 		const main = container.querySelector('#layout') as HTMLElement;
 		const btn = container.querySelector('#counter') as HTMLButtonElement;
 		const root = hydrateRoot(container, Layout, { children: Counter });
@@ -174,9 +174,9 @@ describe('renderable holes — hydration', () => {
 	// frag template contributes no body DOM, so the sole childSlot adopts the
 	// server's range off the hydrateRoot cursor.
 	it('adopts a component child through a fragment layout whose only root is {children}', async () => {
-		const { body } = await ServerRT.render(server.FragLayout, { children: server.Counter });
-		expect(body).toContain('count:0');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.FragLayout, { children: server.Counter });
+		expect(html).toContain('count:0');
+		container.innerHTML = html;
 		const btn = container.querySelector('#counter') as HTMLButtonElement;
 		const root = hydrateRoot(container, FragLayout, { children: Counter });
 		flushSync(() => {});
@@ -187,8 +187,8 @@ describe('renderable holes — hydration', () => {
 	});
 
 	it('adopts an empty hole (renders nothing on both sides)', async () => {
-		const { body } = await ServerRT.render(server.Hole, { value: null });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Hole, { value: null });
+		container.innerHTML = html;
 		const div = container.querySelector('#h') as HTMLElement;
 		const root = hydrateRoot(container, Hole, { value: null });
 		flushSync(() => {});
