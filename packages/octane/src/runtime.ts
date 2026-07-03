@@ -202,8 +202,9 @@ function describeHydrationNode(node: Node | null): string {
 
 /**
  * DEV-only STRUCTURAL hydration-mismatch warning (wrong tag / swapped branch / list shape /
- * component-vs-host). Gated on `loc` truthiness so it no-ops in production — the recovery at
- * the call site runs in dev AND prod regardless.
+ * component-vs-host). Callers pre-gate on `loc` truthiness so production pays no diagnostic
+ * argument construction (describeHydrationNode etc.) — the internal `!loc` return stays as
+ * defense-in-depth. The recovery at the call site runs in dev AND prod regardless.
  */
 function warnHydrationStructuralMismatch(
 	loc: string | undefined,
@@ -466,6 +467,55 @@ let passiveScheduled = false;
 // PendingEffect.seq / comparePostOrder). Shared so refs and effects sequence consistently.
 let commitSeq = 0;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// useSyncExternalStore commit-sync queue (React's `updateStoreInstance` shape).
+//
+// A uSES consumer must, at COMMIT, reconcile the snapshot it read during render
+// against the store as it stands at commit time — a store that mutated in the
+// render→commit window would otherwise leave the committed DOM torn. React does
+// this by pushing the fiber onto a per-root store-consistency list drained after
+// the layout effects (updateStoreInstance); we mirror it with a dedicated,
+// SORT-FREE queue instead of routing each consumer through the generic layout
+// effect (enqueueEffect → depsChanged → PendingEffect alloc → drainPhase's
+// post-order sort + per-entry hooks-map/cleanup/finalizer bookkeeping).
+//
+// The win is twofold: (1) the entries carry no cleanup and never reorder, so the
+// heavyweight effect machinery is pure overhead for them; (2) the enqueue is
+// GATED (see enqueueStoreSync) — a re-render whose snapshot is Object.is-unchanged
+// pushes NOTHING, so the dominant zustand/query pattern (a fresh inline
+// getSnapshot every render over an unchanged snapshot) drops from one layout
+// entry per consumer per parent re-render to zero. Subscription lifecycle stays a
+// real passive `useEffect` (it owns cleanup/unmount); only the value-sync moves
+// here. See useSyncExternalStore for the full contract.
+interface StoreInst<T> {
+	/** The last-COMMITTED snapshot. onStoreChange dedups notifies against this. */
+	value: T;
+	/** Latest getSnapshot — updated in RENDER (see the render-phase gate) so the
+	 *  subscription handler always compares against the freshest read. */
+	getSnapshot: () => T;
+	/** The snapshot read during the render that queued this entry; committed to
+	 *  `value` at drain (React binds it as updateStoreInstance's nextSnapshot arg). */
+	pending: T;
+	/** The subscribe last seen at enqueue — a store swap re-arms the tear check. */
+	subscribe: (onStoreChange: () => void) => () => void;
+	/** Force a re-render of the owning block (same path as a useState setter). */
+	forceUpdate: () => void;
+	/** Stable notify handler handed to subscribe(); re-renders iff the snapshot
+	 *  changed (Object.is dedup). Stable across re-subscribes by design. */
+	onStoreChange: () => void;
+	/** Owning block — drainStoreSyncs skips disposed/hidden blocks like drainPhase. */
+	block: Block;
+	/** True while this inst sits in the sync queue — prevents a second push when a
+	 *  block renders twice before its single commit (last render's `pending` wins). */
+	queued: boolean;
+}
+
+// Pending store-syncs to reconcile at the next commit (drained in commitEffects
+// after drainPhase(LAYOUT)). Populated at RENDER time, so — like effects — pushes
+// during an off-screen (WIP) render are redirected into WIP_CAPTURE.stores and
+// spliced back only if that render commits (see renderOffscreen/commitOffscreen).
+const storeSyncQueue: StoreInst<any>[] = [];
+
 // Deferred ref attaches (React-19 timing parity). On mount the whole subtree is
 // built and inserted before its DOM is connected to the document, so attaching a
 // ref inline would hand a callback ref / measure a node that is NOT yet
@@ -493,6 +543,11 @@ const refAttachQueue: RefAttach[] = [];
 interface OffscreenCapture {
 	effects: [PendingEffect[], PendingEffect[], PendingEffect[]];
 	refs: RefAttach[];
+	// uSES store-syncs enqueued during this off-screen render (see storeSyncQueue).
+	// Spliced into the live queue on commit, dropped on dispose — a WIP that never
+	// lands must not mutate a committed inst (its inst is fresh anyway, per the
+	// fresh-block render, so dropping is both correct and cheap).
+	stores: StoreInst<any>[];
 }
 let WIP_CAPTURE: OffscreenCapture | null = null;
 
@@ -779,6 +834,11 @@ function commitEffects(): void {
 	drainRefAttaches();
 	reapplyFragmentBindings();
 	drainPhase(LAYOUT);
+	// After layout effects (so a sibling layout effect that mutates+notifies the
+	// store has already run), reconcile each uSES consumer's committed snapshot
+	// against the store and re-render any that tore. Mirrors React draining its
+	// store-consistency checks right after commitLayoutEffects.
+	drainStoreSyncs();
 	if (effectQueues[PASSIVE].length && !passiveScheduled) {
 		passiveScheduled = true;
 		schedulePostPaint(() => {
@@ -806,7 +866,8 @@ function hasPendingWork(): boolean {
 		QUEUE.length > 0 ||
 		effectQueues[INSERTION].length > 0 ||
 		effectQueues[LAYOUT].length > 0 ||
-		effectQueues[PASSIVE].length > 0
+		effectQueues[PASSIVE].length > 0 ||
+		storeSyncQueue.length > 0
 	);
 }
 
@@ -946,6 +1007,42 @@ function drainPhase(phase: Phase): void {
 				});
 			}
 		}
+	}
+}
+
+// True if the store's current snapshot differs from the inst's last-committed
+// value. A throwing getSnapshot is treated as "changed" so the render-phase read
+// re-runs and surfaces the error (React's behavior). Hoisted (not a per-render
+// closure) — the inst carries everything it needs.
+function checkStoreChanged(inst: StoreInst<any>): boolean {
+	try {
+		return !Object.is(inst.value, inst.getSnapshot());
+	} catch {
+		return true;
+	}
+}
+
+// Commit-phase drain of the uSES store-sync queue (see storeSyncQueue). Runs in
+// commitEffects AFTER drainPhase(LAYOUT). For each queued consumer: promote the
+// render-read snapshot to the committed `value`, then tear-check against the store
+// as of NOW — if a mutation slipped into the render→commit window (e.g. a sibling
+// layout effect that mutated+notified), force a re-render so the DOM catches up.
+// No sort (order is irrelevant: each entry only touches its own inst) and no
+// cleanup bookkeeping — the whole point of not routing these through drainPhase.
+function drainStoreSyncs(): void {
+	if (storeSyncQueue.length === 0) return;
+	// Snapshot-and-clear up front (like drainPhase): a forced re-render below could
+	// synchronously re-enter this drain; it must see only entries queued AFTER this
+	// point, never re-process the batch we already own.
+	const q = storeSyncQueue.splice(0);
+	for (let i = 0; i < q.length; i++) {
+		const inst = q[i];
+		inst.queued = false;
+		// Skip a consumer whose block was unmounted, or hidden by <Activity>, between
+		// enqueue and now — same guards drainPhase applies to effects.
+		if (inst.block.disposed || inInactiveSubtree(inst.block)) continue;
+		inst.value = inst.pending;
+		if (checkStoreChanged(inst)) inst.forceUpdate();
 	}
 }
 
@@ -1832,6 +1929,63 @@ export function useImperativeHandle<T>(
 	);
 }
 
+// Per-call-site cache of the two derived sub-slot symbols a uSES call needs (the
+// inst cell + the subscribe effect). Computing `Symbol.for(desc + …)` and hitting
+// the global Symbol registry on EVERY render was pure overhead; the resolved slot
+// is stable per call site (resolveSlot interns custom-hook call PATHS), so one
+// lookup per site amortizes to nothing. Grows monotonically, bounded by resolved
+// call paths — strictly fewer entries than the four registry symbols the old code
+// re-derived every render.
+const USES_SUBSLOTS = new Map<symbol, { inst: symbol; effect: symbol }>();
+function usesSubslots(slot: symbol): { inst: symbol; effect: symbol } {
+	let s = USES_SUBSLOTS.get(slot);
+	if (s === undefined) {
+		const desc = slot.description ?? '';
+		s = { inst: Symbol.for(desc + ':uses:inst'), effect: Symbol.for(desc + ':uses:effect') };
+		USES_SUBSLOTS.set(slot, s);
+	}
+	return s;
+}
+
+// Push (or refresh) a consumer's pending commit-sync onto the store-sync queue.
+// GATED by the caller (mount, or a snapshot/subscribe change) so an unchanged
+// render enqueues nothing. The `queued` flag collapses a double push when a block
+// renders twice before its single commit — the later render's snapshot wins.
+// Off-screen renders redirect into WIP_CAPTURE.stores (spliced back only if the
+// WIP commits), exactly like enqueueEffect.
+function enqueueStoreSync(
+	inst: StoreInst<any>,
+	value: any,
+	subscribe: (cb: () => void) => () => void,
+): void {
+	inst.pending = value;
+	inst.subscribe = subscribe;
+	if (inst.queued) return;
+	inst.queued = true;
+	(WIP_CAPTURE !== null ? WIP_CAPTURE.stores : storeSyncQueue).push(inst);
+}
+
+// Passive-phase subscription body for uSES, written as a DEPS-AS-ARGS function
+// (drainPhase applies the deps array positionally — a Ripple superset, see
+// PendingEffect.args) so it lives at module scope with zero per-render capture.
+// The PARAMETER ORDER MUST MATCH the deps array `[inst, subscribe]` at the call
+// site — reordering the deps silently mis-binds these arguments. Re-fires only
+// when inst (stable) or subscribe changes: on a store swap the effect slot's
+// cleanup unsubscribes the old store first, then this re-subscribes to the new.
+function subscribeToStore(
+	inst: StoreInst<any>,
+	subscribe: (cb: () => void) => () => void,
+): Cleanup {
+	// The store may have mutated between the render read and this subscription
+	// taking effect; re-check immediately so an early notify isn't missed. Uses
+	// inst.getSnapshot, which render already advanced to the latest closure.
+	if (checkStoreChanged(inst)) inst.forceUpdate();
+	// One stable handler across re-subscribes (inst.onStoreChange never changes) —
+	// harmless here since stores key listeners by our Set membership, and the
+	// swap-cleanup removes the old registration before we add the new one.
+	return subscribe(inst.onStoreChange);
+}
+
 /**
  * React 18+ `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot?)`.
  *
@@ -1843,16 +1997,35 @@ export function useImperativeHandle<T>(
  *
  * `getServerSnapshot` IS used: on the server it supplies the SSR snapshot, and
  * during client hydration the first read uses it (see below) so the adopted DOM
- * matches the server value before the hydrate-then-sync layout effect reconciles
- * any client/server difference. For a non-SSR build the `hydrating` guard
+ * matches the server value before the commit-time store-sync reconciles any
+ * client/server difference. For a non-SSR build the `hydrating` guard
  * constant-folds the branch away.
  *
- * Built on top of the base hooks. The user's `slot` is the call site's
- * compiler-injected symbol; four derived sub-slots host the internal hooks so
- * each sub-hook has a stable, distinct identity within the call:
- * `<slot>:uses:tick` (the forceUpdate useState), `<slot>:uses:inst` (the
- * last-committed-snapshot useRef cell), `<slot>:uses:layout` (the value-sync
- * useLayoutEffect), and `<slot>:uses:effect` (the subscribe useEffect).
+ * Implementation. A single identity-stable `inst` cell (StoreInst) holds the
+ * last-COMMITTED snapshot, the latest getSnapshot, the block's forceUpdate, and a
+ * stable onStoreChange handler. Two derived sub-slots host it: `<slot>:uses:inst`
+ * (the cell, in the hooks map) and `<slot>:uses:effect` (the passive subscribe
+ * effect). The value-sync that reconciles the render-read snapshot at commit does
+ * NOT go through a layout effect — it rides the dedicated, sort-free
+ * `storeSyncQueue` (drainStoreSyncs, run after drainPhase(LAYOUT)). Two payoffs:
+ *
+ *  1. The commit-sync entry carries no cleanup and never reorders, so the generic
+ *     effect machinery (deps compare, PendingEffect alloc, post-order sort,
+ *     per-entry cleanup/finalizer bookkeeping) is skipped for it.
+ *  2. The enqueue is GATED: a re-render whose snapshot is Object.is-unchanged (and
+ *     whose store wasn't swapped) enqueues NOTHING, even with a fresh inline
+ *     getSnapshot every render (the dominant zustand/query pattern). getSnapshot is
+ *     refreshed in RENDER instead of at commit, so onStoreChange always dedups
+ *     against the freshest read while unchanged renders stay allocation-free.
+ *
+ * DIVERGENCE FROM REACT (documented in docs/react-parity-migration-plan.md):
+ * React's updateSyncExternalStore re-pushes updateStoreInstance whenever
+ * `inst.getSnapshot !== getSnapshot`, giving a commit-time snapshot re-read even
+ * when the value was unchanged. We drop that: a store that mutates WITHOUT
+ * notifying in the render→commit window is no longer caught on a render where ONLY
+ * getSnapshot identity changed. Octane's synchronous renderer closes React's
+ * motivating concurrent-interleaving window, and any store that actually notifies
+ * is unaffected (onStoreChange uses the render-fresh getSnapshot).
  */
 export function useSyncExternalStore<T>(
 	subscribe: (onStoreChange: () => void) => () => void,
@@ -1868,72 +2041,59 @@ export function useSyncExternalStore<T>(
 	slot = resolveSlot(slot);
 	if (typeof slot !== 'symbol') missingSlot('useSyncExternalStore');
 	const getServerSnapshot = rest.length >= 2 ? (rest[0] as () => T) : undefined;
-	const desc = slot.description ?? '';
-	const tickSlot = Symbol.for(desc + ':uses:tick');
-	const instSlot = Symbol.for(desc + ':uses:inst');
-	const layoutSlot = Symbol.for(desc + ':uses:layout');
-	const effectSlot = Symbol.for(desc + ':uses:effect');
+	const subs = usesSubslots(slot);
 
-	// Fresh read on every render — guards against tearing between commits. DURING
-	// HYDRATION the first read must use getServerSnapshot (if provided) so it
-	// matches the server-rendered value — the layout effect below then re-checks
-	// getSnapshot() and forces an update if the client value differs (React's
-	// hydrate-then-sync behavior). `hydrating` constant-folds out for non-SSR
-	// builds (see the hydration DCE contract).
+	// Fresh read on every render — the anti-tearing snapshot. DURING HYDRATION the
+	// first read uses getServerSnapshot (if provided) so the adopted DOM matches the
+	// server value; the commit-time store-sync then re-checks getSnapshot() and
+	// forces an update if the client value differs (React's hydrate-then-sync).
+	// `hydrating` constant-folds out for non-SSR builds (the hydration DCE contract).
 	const value = hydrating && getServerSnapshot !== undefined ? getServerSnapshot() : getSnapshot();
 
-	// `inst` mirrors React's mutable cell: the last-committed snapshot plus the
-	// getSnapshot used to produce it. checkIfSnapshotChanged compares the current
-	// store value against it with Object.is — this is the dedup that stops a
-	// store notification from re-rendering when the snapshot is referentially
-	// unchanged.
-	const inst = useRef<{ value: T; getSnapshot: () => T }>({ value, getSnapshot }, instSlot) as {
-		current: { value: T; getSnapshot: () => T };
-	};
-
-	// forceUpdate: a tick bump. setTick uses Object.is internally, so always
-	// increment (never compare against a stale tick) to guarantee a re-render.
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const [, setTick] = useState(0, tickSlot);
-	const forceUpdate = (): void => setTick((t: number) => t + 1);
-
-	const checkIfSnapshotChanged = (): boolean => {
-		try {
-			return !Object.is(inst.current.value, inst.current.getSnapshot());
-		} catch {
-			// A throwing getSnapshot means the store likely mutated — re-render so
-			// the render-phase read surfaces the error (React's behavior).
-			return true;
+	const scope = CURRENT_SCOPE!;
+	let inst = scope.hooks?.get(subs.inst) as StoreInst<T> | undefined;
+	if (inst === undefined) {
+		// MOUNT — create the stable cell once (useEffectEvent's mount-once pattern).
+		// forceUpdate schedules the block directly (identical to a useState setter,
+		// which also captures CURRENT_BLOCK at mount and calls scheduleRender —
+		// disposed blocks no-op via scheduleRender's guard).
+		const block = CURRENT_BLOCK!;
+		const created: StoreInst<T> = {
+			value,
+			getSnapshot,
+			pending: value,
+			subscribe,
+			forceUpdate: () => scheduleRender(block),
+			onStoreChange: () => {
+				if (checkStoreChanged(created)) created.forceUpdate();
+			},
+			block,
+			queued: false,
+		};
+		inst = created;
+		ensureHooks(scope).set(subs.inst, inst);
+		// Always enqueue on mount: the first commit must run the tear check — for
+		// hydrate-then-sync, and for any store mutation in the render→commit window.
+		enqueueStoreSync(inst, value, subscribe);
+	} else {
+		// UPDATE — advance getSnapshot in RENDER (not at commit) so onStoreChange
+		// dedups against the freshest read; this is what lets an unchanged snapshot
+		// with an unstable inline getSnapshot enqueue nothing. Queue a commit-sync
+		// ONLY when the read snapshot moved off the last-committed value, or the store
+		// was swapped — an unchanged snapshot pushes nothing (the optimization).
+		inst.getSnapshot = getSnapshot;
+		if (!Object.is(value, inst.value) || subscribe !== inst.subscribe) {
+			enqueueStoreSync(inst, value, subscribe);
 		}
-	};
+	}
 
-	// Layout-phase value sync: record the snapshot read during render, then catch
-	// any store mutation that happened between render and commit (re-render if so).
-	// Deps include `value`/`getSnapshot` so the synced cell tracks each render.
-	useLayoutEffect(
-		() => {
-			inst.current.value = value;
-			inst.current.getSnapshot = getSnapshot;
-			if (checkIfSnapshotChanged()) forceUpdate();
-		},
-		[subscribe, value, getSnapshot],
-		layoutSlot,
-	);
-
-	// Subscribe in the passive phase (React parity). Immediately re-check after
-	// subscribing: the store may have changed in the window between the render
-	// read and the subscription taking effect, which would otherwise be missed.
-	useEffect(
-		() => {
-			if (checkIfSnapshotChanged()) forceUpdate();
-			const handleStoreChange = (): void => {
-				if (checkIfSnapshotChanged()) forceUpdate();
-			};
-			return subscribe(handleStoreChange);
-		},
-		[subscribe],
-		effectSlot,
-	);
+	// Subscription lifecycle stays a real passive effect — it owns the unsubscribe
+	// cleanup (re-subscribe on store swap, unsubscribe on unmount) a bare queue
+	// entry can't carry. inst is identity-stable, so the deps `[inst, subscribe]`
+	// fire exactly when the old `[subscribe]` deps did. Body is the module-level
+	// deps-as-args fn (cast: EffectFn is nominally zero-arg, but drainPhase applies
+	// the deps positionally — see subscribeToStore).
+	useEffect(subscribeToStore as unknown as EffectFn, [inst, subscribe], subs.effect);
 
 	return value;
 }
@@ -2390,11 +2550,12 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 		// the warning dev-only. Skipped for a synthetic multi-root wrapper (`__oct_frag`,
 		// stamped by template()): the wrapper has no 1:1 server node to compare against.
 		if (!(node as any).__oct_frag && !hydrationNodeMatches(hydrateNode, node)) {
-			warnHydrationStructuralMismatch(
-				loc,
-				describeHydrationNode(node),
-				describeHydrationNode(hydrateNode),
-			);
+			if (loc)
+				warnHydrationStructuralMismatch(
+					loc,
+					describeHydrationNode(node),
+					describeHydrationNode(hydrateNode),
+				);
 			const stale = hydrateNode;
 			if (stale.nodeType === 8 && (stale as Comment).data === HYDRATION_END) {
 				// The server rendered NOTHING at this slot (the cursor sits on the ENCLOSING
@@ -3265,8 +3426,8 @@ export function setAttribute(el: Element, name: string, value: any): void {
 // clsx-style `class`/`className` composition — shared with the SSR serializer
 // via css.ts so client and server compose byte-equal class strings (hydration
 // parity). Re-exported here because it is part of the semi-public surface.
-export { normalizeClass } from './css.js';
-import { styleName } from './css.js';
+import { normalizeClass, styleName } from './css.js';
+export { normalizeClass };
 
 export function setClassName(el: Element, value: unknown): void {
 	// clsx-compose first so arrays / objects become a class string (and the hydration
@@ -4813,7 +4974,7 @@ function renderOffscreen(
 	const ref = afterNode.nextSibling;
 	domParent.insertBefore(start, ref);
 	domParent.insertBefore(end, ref);
-	const capture: OffscreenCapture = { effects: [[], [], []], refs: [] };
+	const capture: OffscreenCapture = { effects: [[], [], []], refs: [], stores: [] };
 	const prev = WIP_CAPTURE;
 	WIP_CAPTURE = capture;
 	const block = createBlock('dynamic', parentBlock, domParent, start, end, body, props);
@@ -4847,6 +5008,9 @@ function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
 		for (let i = 0; i < src.length; i++) effectQueues[p].push(src[i]);
 	}
 	for (let i = 0; i < wip.capture.refs.length; i++) refAttachQueue.push(wip.capture.refs[i]);
+	// Store-syncs enqueued off-screen now belong to committed DOM — hand them to the
+	// live queue so the surrounding commit's drainStoreSyncs reconciles them.
+	for (let i = 0; i < wip.capture.stores.length; i++) storeSyncQueue.push(wip.capture.stores[i]);
 }
 
 // Discard an off-screen WIP (suspended or superseded): remove its node range + fire any
@@ -5524,11 +5688,11 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		// discard the divergent server node/range, advance the cursor, then build the correct
 		// element fresh with hydration SUSPENDED for its subtree (so children client-mount
 		// rather than mis-adopt). Recovery runs in dev + prod; the warning is dev-only.
-		warnHydrationStructuralMismatch(
-			(hydrateNode.parentNode as any)?.__oct_loc,
-			`<${d.type}>`,
-			describeHydrationNode(hydrateNode),
-		);
+		{
+			const mmLoc = (hydrateNode.parentNode as any)?.__oct_loc;
+			if (mmLoc)
+				warnHydrationStructuralMismatch(mmLoc, `<${d.type}>`, describeHydrationNode(hydrateNode));
+		}
 		const stale = hydrateNode;
 		if (isBlockOpen(stale)) {
 			const close = matchingClose(stale);
@@ -6128,16 +6292,44 @@ function refreshBlockForContext(block: Block): void {
 	}
 }
 
+const hasOwnProp = Object.prototype.hasOwnProperty;
+const OBJ_PROTO = Object.prototype;
+
+// Runs on every re-render for every memo child (both tryMemoBail call sites),
+// so the common plain-object case is a zero-allocation for-in compare — no
+// Object.keys arrays. Semantics match React's shallowEqual exactly: Object.is
+// on values (NaN equal, ±0 differ), own-enumerable string keys only, key-SET
+// equality (loop 1 checks values, loop 2's count balances the key sets), and
+// an explicit-`undefined` prop still differs from a missing key (the hasOwn
+// guard). Non-plain prototypes (class instances / Object.create props can
+// arrive raw through createElement's props pass-through) take the exact
+// Object.keys slow path, where for-in would also see inherited keys.
 function shallowEqualProps(a: any, b: any): boolean {
 	if (a === b) return true;
 	if (a == null || b == null) return false;
+	const pa = Object.getPrototypeOf(a);
+	const pb = Object.getPrototypeOf(b);
+	if ((pa !== OBJ_PROTO && pa !== null) || (pb !== OBJ_PROTO && pb !== null)) {
+		return shallowEqualPropsExact(a, b);
+	}
+	let count = 0;
+	for (const k in a) {
+		const v = a[k];
+		if (!Object.is(v, b[k]) || (v === undefined && !hasOwnProp.call(b, k))) return false;
+		count++;
+	}
+	for (const _k in b) count--;
+	return count === 0;
+}
+
+function shallowEqualPropsExact(a: any, b: any): boolean {
 	const ka = Object.keys(a),
 		kb = Object.keys(b);
 	if (ka.length !== kb.length) return false;
 	for (let i = 0; i < ka.length; i++) {
 		const k = ka[i];
 		// React uses Object.is (not ===) so NaN props compare equal and ±0 differ.
-		if (!Object.prototype.hasOwnProperty.call(b, k) || !Object.is(a[k], b[k])) return false;
+		if (!hasOwnProp.call(b, k) || !Object.is(a[k], b[k])) return false;
 	}
 	return true;
 }
@@ -7569,11 +7761,13 @@ function renderBranchSlot(
 				// `@else` with content on the server, empty `@if` on the client). Discard the
 				// stale server range so the empty branch leaves a clean range + siblings stay
 				// aligned (structural mismatch).
-				warnHydrationStructuralMismatch(
-					siteLoc(parentScope, slotKey),
-					'an empty branch',
-					describeHydrationNode(state.start.nextSibling),
-				);
+				const mmLoc = siteLoc(parentScope, slotKey);
+				if (mmLoc)
+					warnHydrationStructuralMismatch(
+						mmLoc,
+						'an empty branch',
+						describeHydrationNode(state.start.nextSibling),
+					);
 				removeRange(state.start.nextSibling, state.end);
 			}
 		} else if (firstMount && body) {
@@ -8087,11 +8281,9 @@ export function forBlock<T>(
 				// Prefer the @for's own compiled source loc (siteLoc; for-constructs carry
 				// `loc` in `__s.locs`) — the parent element's `__oct_loc` stamp exists only
 				// when the parent carries dynamic bindings.
-				warnHydrationStructuralMismatch(
-					siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc,
-					'an empty list (@empty)',
-					'a populated list',
-				);
+				const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
+				if (mmLoc)
+					warnHydrationStructuralMismatch(mmLoc, 'an empty list (@empty)', 'a populated list');
 				removeRange(state.start.nextSibling, state.end);
 				domParent.insertBefore(bStart, state.end);
 				domParent.insertBefore(bEnd, state.end);
@@ -8145,11 +8337,8 @@ export function forBlock<T>(
 		state.start.nextSibling !== state.end &&
 		!isBlockOpen(state.start.nextSibling)
 	) {
-		warnHydrationStructuralMismatch(
-			siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc,
-			'a populated list',
-			'an empty list (@empty)',
-		);
+		const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
+		if (mmLoc) warnHydrationStructuralMismatch(mmLoc, 'a populated list', 'an empty list (@empty)');
 		removeRange(state.start.nextSibling, state.end);
 		hydrateNode = state.end;
 	}
@@ -8804,11 +8993,13 @@ function mountItem<T>(
 			// other content). Without this guard `matchingClose` would walk off the end and
 			// crash. Recover by building THIS item fresh — suspend hydration for the item's
 			// whole subtree (via a re-entrant call) so it client-mounts instead of adopting.
-			warnHydrationStructuralMismatch(
-				(parentNode as any).__oct_loc,
-				'another list item',
-				describeHydrationNode(hydrateNode),
-			);
+			const mmLoc = (parentNode as any).__oct_loc;
+			if (mmLoc)
+				warnHydrationStructuralMismatch(
+					mmLoc,
+					'another list item',
+					describeHydrationNode(hydrateNode),
+				);
 			const saved = hydrating;
 			hydrating = false;
 			try {
