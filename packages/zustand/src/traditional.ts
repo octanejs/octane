@@ -35,7 +35,8 @@ function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
 	let byTag = subSlotCache.get(slot);
 	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
 	let sym = byTag.get(tag);
-	if (sym === undefined) byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':wsel:' + tag)));
+	if (sym === undefined)
+		byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':wsel:' + tag)));
 	return sym;
 }
 

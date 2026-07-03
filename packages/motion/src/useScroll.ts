@@ -13,7 +13,8 @@ function sub(slot: symbol | undefined, tag: string): symbol | undefined {
 	let byTag = subCache.get(slot);
 	if (byTag === undefined) subCache.set(slot, (byTag = new Map()));
 	let sym = byTag.get(tag);
-	if (sym === undefined) byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':us:' + tag)));
+	if (sym === undefined)
+		byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':us:' + tag)));
 	return sym;
 }
 

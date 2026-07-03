@@ -8,7 +8,13 @@
 // per-item removal path handled them correctly.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mount, flushEffects } from './_helpers';
-import { ComponentRows, RefRows, PortalRows, log, resetLog } from './_fixtures/for-batch-clear.tsrx';
+import {
+	ComponentRows,
+	RefRows,
+	PortalRows,
+	log,
+	resetLog,
+} from './_fixtures/for-batch-clear.tsrx';
 
 beforeEach(resetLog);
 

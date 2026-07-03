@@ -79,7 +79,14 @@ const OPS = [
 		perSamplePre: true,
 		inner: 1,
 		rowsAfter: 1000,
-		expect: { mounts: 1000, cleanups: 0, refs: 1000, refCleanups: 0, layouts: 100, hPositive: true },
+		expect: {
+			mounts: 1000,
+			cleanups: 0,
+			refs: 1000,
+			refCleanups: 0,
+			layouts: 100,
+			hPositive: true,
+		},
 	},
 	{
 		name: 'update_nodeps',

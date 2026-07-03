@@ -66,10 +66,32 @@ const OPS = [
 		reps: 1,
 		expect: { rowA: ROWS, innerA: ROWS, leafA: ROWS, rowB: ROWS, innerB: ROWS, leafB: ROWS },
 	},
-	{ name: 'parent_rerender_equal_A', hook: '__tickA', reps: 10, expect: { ...Z }, zeroRowLoop: true },
-	{ name: 'parent_rerender_equal_B', hook: '__tickB', reps: 10, expect: { ...Z }, zeroRowLoop: true },
-	{ name: 'one_change_A', hook: '__oneChangeA', reps: 10, expect: { ...Z, rowA: 1, innerA: 1, leafA: 1 } },
-	{ name: 'one_change_B', hook: '__oneChangeB', reps: 10, expect: { ...Z, rowB: 1, innerB: 1, leafB: 1 } },
+	{
+		name: 'parent_rerender_equal_A',
+		hook: '__tickA',
+		reps: 10,
+		expect: { ...Z },
+		zeroRowLoop: true,
+	},
+	{
+		name: 'parent_rerender_equal_B',
+		hook: '__tickB',
+		reps: 10,
+		expect: { ...Z },
+		zeroRowLoop: true,
+	},
+	{
+		name: 'one_change_A',
+		hook: '__oneChangeA',
+		reps: 10,
+		expect: { ...Z, rowA: 1, innerA: 1, leafA: 1 },
+	},
+	{
+		name: 'one_change_B',
+		hook: '__oneChangeB',
+		reps: 10,
+		expect: { ...Z, rowB: 1, innerB: 1, leafB: 1 },
+	},
 	{ name: 'ctx_through_wall_A', hook: '__ctxA', reps: 5, expect: { ...Z, leafA: ROWS } },
 	{ name: 'ctx_through_wall_B', hook: '__ctxB', reps: 5, expect: { ...Z, leafB: ROWS } },
 ];
@@ -189,8 +211,7 @@ async function measureLoop(browser, url, op) {
 	return res;
 }
 
-const countersEqual = (got, expect) =>
-	Object.keys(Z).every((k) => got[k] === expect[k]);
+const countersEqual = (got, expect) => Object.keys(Z).every((k) => got[k] === expect[k]);
 const fmtCounts = (c) => JSON.stringify(c);
 
 // Gate check for one op's verification results. Returns a list of failure
@@ -222,12 +243,18 @@ function checkGates(op, res) {
 	) {
 		errs.push(`${op.name}: wall B leaf text "${res.dom.leafB0}" !== theme "${res.state.themeB}"`);
 	}
-	if (op.name === 'one_change_A' && !String(res.dom.midInnerA).startsWith(String(res.state.midValueA))) {
+	if (
+		op.name === 'one_change_A' &&
+		!String(res.dom.midInnerA).startsWith(String(res.state.midValueA))
+	) {
 		errs.push(
 			`${op.name}: changed row inner text "${res.dom.midInnerA}" does not show value ${res.state.midValueA}`,
 		);
 	}
-	if (op.name === 'one_change_B' && !String(res.dom.midInnerB).startsWith(String(res.state.midValueB))) {
+	if (
+		op.name === 'one_change_B' &&
+		!String(res.dom.midInnerB).startsWith(String(res.state.midValueB))
+	) {
 		errs.push(
 			`${op.name}: changed row inner text "${res.dom.midInnerB}" does not show value ${res.state.midValueB}`,
 		);

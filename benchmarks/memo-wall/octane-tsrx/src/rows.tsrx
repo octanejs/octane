@@ -26,7 +26,9 @@ export const ThemeB = createContext('t0');
 function Leaf(props) @{
 	window.__renders['leaf' + props.wall]++;
 	const theme = useContext(props.wall === 'A' ? ThemeA : ThemeB);
-	<span class="leaf">{theme as string}</span>
+	<span class="leaf">
+		{theme as string}
+	</span>
 }
 
 // The nested memo boundary INSIDE Row — a memo'd pure indirection wrapping the

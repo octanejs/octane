@@ -39,7 +39,12 @@ export default function Row(props) @{
 	});
 
 	<tr ref={rowRef}>
-		<td class="col-id" ref={(el) => { cell = el; }}>{props.item.id}</td>
+		<td
+			class="col-id"
+			ref={(el) => {
+				cell = el;
+			}}
+		>{props.item.id}</td>
 		<td class="col-label">{props.item.label}</td>
 		<td class="col-value">{props.item.value}</td>
 	</tr>

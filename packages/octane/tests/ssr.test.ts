@@ -203,7 +203,8 @@ describe('SSR — plain-.ts root returning a createElement descriptor', () => {
 	// previously the descriptor object itself became the body
 	// ('[object Object]').
 	it('renders a host-descriptor root', async () => {
-		const Root = () => RT.createElement('main', { class: 'app' }, RT.createElement('h1', null, 'hi'));
+		const Root = () =>
+			RT.createElement('main', { class: 'app' }, RT.createElement('h1', null, 'hi'));
 		const { body } = await RT.render(Root as any);
 		expect(body).toContain('<main class="app"><h1>hi</h1></main>');
 		expect(body).not.toContain('[object Object]');

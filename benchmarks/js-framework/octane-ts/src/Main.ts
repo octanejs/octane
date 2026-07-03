@@ -135,7 +135,12 @@ function button(id: string, label: string, onClick: () => void) {
 
 // One row descriptor — cell-for-cell the tuned fixtures' markup, built with
 // per-row closures over the current handlers (the binding-authored shape).
-function row(item: Item, selectedId: number, select: (id: number) => void, remove: (row: Item) => void) {
+function row(
+	item: Item,
+	selectedId: number,
+	select: (id: number) => void,
+	remove: (row: Item) => void,
+) {
 	return h(
 		'tr',
 		{ key: item.id, className: selectedId === item.id ? 'danger' : '' },
