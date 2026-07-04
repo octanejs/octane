@@ -40,6 +40,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'octane-jsx', url: 'http://localhost:5177/', ready: '#run' },
 			{ name: 'react', url: 'http://localhost:5175/', ready: '#run' },
 			{ name: 'ripple', url: 'http://localhost:5178/', ready: '#run' },
+			{ name: 'solid', url: 'http://localhost:5179/', ready: '#run' },
 		];
 
 const OPS = [

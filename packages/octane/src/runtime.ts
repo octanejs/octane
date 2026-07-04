@@ -8339,7 +8339,9 @@ export function forBlock<T>(
 ): void {
 	// flags bitfield: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item
 	// Comment markers), bit 2 = depEligible (compare `deps` to cachedDeps and
-	// promote body to PURE when unchanged). Packed into one numeric literal.
+	// promote body to PURE when unchanged), bit 3 = indexIndependent (the body
+	// binds no `index` name → a pure reorder that only moves a survivor's
+	// position need not re-render it). Packed into one numeric literal.
 	const parentBlock = parentScope.block;
 	let state = parentScope.slots[slotKey] as ForSlot | undefined;
 	if (state === undefined) {
@@ -8497,7 +8499,17 @@ export function forBlock<T>(
 		}
 		state.cachedDeps = deps;
 	}
-	reconcileKeyed(parentBlock, state, items, getKey, itemBody as any, pure, (f & 2) !== 0, lite);
+	reconcileKeyed(
+		parentBlock,
+		state,
+		items,
+		getKey,
+		itemBody as any,
+		pure,
+		(f & 2) !== 0,
+		lite,
+		(f & 8) !== 0,
+	);
 	// Advance the hydration cursor past the @for's `<!--]-->` so a later sibling's
 	// clone() starts after this block — covers the zero-item, no-@empty case where
 	// reconcileKeyed mounts nothing and the cursor would otherwise stay on the
@@ -8595,8 +8607,14 @@ function updateSurvivor<T>(
 	itemBody: (item: T, scope: Scope) => void,
 	pure: boolean,
 	lite: boolean,
+	indexIndependent: boolean,
 ): void {
-	if (pure && block.props === newItem && block.itemIndex === newIdx) {
+	// Pure short-circuit: skip the body when the item ref is unchanged AND either
+	// the body can't observe position (indexIndependent — the common index-less
+	// `@for`) or the position is also unchanged. This is what makes a pure reorder
+	// (shuffle / reverse / rotate) move survivors' DOM without re-rendering them.
+	if (pure && block.props === newItem && (indexIndependent || block.itemIndex === newIdx)) {
+		block.itemIndex = newIdx;
 		block.body = itemBody as ComponentBody;
 	} else {
 		block.props = newItem;
@@ -8619,6 +8637,7 @@ function reconcileKeyed<T>(
 	pure: boolean,
 	singleRoot: boolean,
 	lite: boolean = false,
+	indexIndependent: boolean = false,
 ): void {
 	const oldItems = state.items;
 	const oldSize = state.size;
@@ -8670,7 +8689,7 @@ function reconcileKeyed<T>(
 		const newKey = getKey(items[prefixLen], prefixLen);
 		if (oldFirst.key !== newKey) break;
 		const block = oldFirst;
-		updateSurvivor(block, items[prefixLen], prefixLen, itemBody, pure, lite);
+		updateSurvivor(block, items[prefixLen], prefixLen, itemBody, pure, lite, indexIndependent);
 		oldFirst = block.nextSibling!;
 		prefixLen++;
 	}
@@ -8686,7 +8705,7 @@ function reconcileKeyed<T>(
 		const newKey = getKey(items[newEnd], newEnd);
 		if (oldLast.key !== newKey) break;
 		const block = oldLast;
-		updateSurvivor(block, items[newEnd], newEnd, itemBody, pure, lite);
+		updateSurvivor(block, items[newEnd], newEnd, itemBody, pure, lite, indexIndependent);
 		oldLast = block.prevSibling!;
 		newEnd--;
 		oldRemain--;
@@ -8839,7 +8858,7 @@ function reconcileKeyed<T>(
 			else lastIdx = newRelIdx;
 			patched++;
 			const newIdx = prefixLen + newRelIdx;
-			updateSurvivor(cur!, items[newIdx], newIdx, itemBody, pure, lite);
+			updateSurvivor(cur!, items[newIdx], newIdx, itemBody, pure, lite, indexIndependent);
 		}
 		cur = next;
 		oldIdx++;

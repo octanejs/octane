@@ -4328,8 +4328,14 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._for$' + fc.id;
 		// flags: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item markers),
 		//        bit 2 = depEligible (runtime compares deps array, upgrades to pure
-		//        for survivors when deps unchanged this render).
-		const flags = (fc.pure ? 1 : 0) | (fc.singleRoot ? 2 : 0) | (fc.depEligible ? 4 : 0);
+		//        for survivors when deps unchanged this render),
+		//        bit 3 = indexIndependent (body binds no `index` → a pure reorder
+		//        that only changes a survivor's position need not re-render it).
+		const flags =
+			(fc.pure ? 1 : 0) |
+			(fc.singleRoot ? 2 : 0) |
+			(fc.depEligible ? 4 : 0) |
+			(fc.indexIndependent ? 8 : 0);
 		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, flags?, deps?, emptyBody?, anchor?).
 		// Optional args backfill positionally: `flags`/`deps` placeholders
 		// (`0`/`undefined`) when only `emptyHelper` ('null' literal when no
@@ -6289,6 +6295,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// this render, treats the body as PURE for the survivor short-circuit.
 		depEligible,
 		depNames,
+		// True only when the header binds NO `index <name>` — the body then can't
+		// observe an item's position, so a pure reorder (same item ref, position
+		// changed) need not re-render the survivor. Conservative: an index binding
+		// (or any uncertainty) leaves this false and keeps the re-render.
+		indexIndependent: !node.index,
 		// `@empty` branch helper name (or literal 'null' when none).
 		emptyHelper: emptyHelperName,
 		hostPath: null,
