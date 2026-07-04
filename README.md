@@ -116,6 +116,10 @@ export async function renderApp() {
 | `renderToStaticMarkup(el, props?, opts?)` | `octane/server` | no (sync) | fallback; **no** hydration markers/seeds |
 | `prerender(el, props?, opts?)` | `octane/static` | yes | awaits data, renders the success arm |
 
+All three accept a `RenderOptions` (CSP `nonce`, an `AbortSignal`, a per-render
+`timeoutMs`). See [docs/ssr.md](./docs/ssr.md) for the full server guide (Suspense
+on the server, head hoisting, `module server` RPC) and the SSR roadmap.
+
 > Streaming (`renderToPipeableStream` / `renderToReadableStream`, React's
 > out-of-order Suspense flushing) is in progress.
 
@@ -265,8 +269,8 @@ and client render compose byte-identically, so hydration never mismatches).
 
 ## Packages
 
-This is a pnpm monorepo with nine publishable packages — the core runtime+compiler, the
-metaframework plugin, and seven framework bindings:
+This is a pnpm monorepo with ten publishable packages — the core runtime+compiler, the
+metaframework plugin, and eight framework bindings:
 
 - [`octane`](./packages/octane) is the runtime and the compiler together. It covers
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
@@ -277,8 +281,8 @@ metaframework plugin, and seven framework bindings:
 - The `@octanejs/*` framework bindings — each a faithful octane port of a React library:
   [`zustand`](./packages/zustand), [`query`](./packages/query),
   [`motion`](./packages/motion), [`stylex`](./packages/stylex),
-  [`router`](./packages/router), [`lexical`](./packages/lexical), and
-  [`floating-ui`](./packages/floating-ui).
+  [`router`](./packages/router), [`lexical`](./packages/lexical),
+  [`floating-ui`](./packages/floating-ui), and [`radix`](./packages/radix).
 
 ## Development
 

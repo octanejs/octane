@@ -223,7 +223,9 @@ export function LazyInitOnce() @{
 	</div>
 }
 
-// useReducer Object.is bailout — reducer returns SAME reference: no render.
+// useReducer does NOT eagerly bail — unlike useState's setter, a dispatch whose
+// reducer returns the SAME reference still re-renders the component once.
+// Per ReactHooksWithNoopRenderer-test.js:3889.
 let _reducerCalls = 0;
 export function getReducerCalls() {
 	return _reducerCalls;
@@ -234,7 +236,7 @@ export function resetReducerCalls() {
 export function ReducerSameRefBailout() @{
 	const [state, dispatch] = useReducer((s, action) => {
 		_reducerCalls++;
-		if (action === 'keep') return s; // same reference — must skip render
+		if (action === 'keep') return s; // same reference — still renders once
 		return { v: s.v + 1 };
 	}, { v: 0 });
 	_setN = dispatch;

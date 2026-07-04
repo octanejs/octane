@@ -1,12 +1,27 @@
 /**
  * `octane/server` — server-rendering entry.
  *
- * Re-exports the server runtime. The `octane/compiler` compiler, in
- * `mode: 'server'`, emits component modules that `import { … } from
- * 'octane/server'` — pulling the server hook implementations and the `ssr*`
- * string-building helpers from here. `render(Component, props)` is the server
- * analogue of `createRoot().render()`.
+ * Public API (React `react-dom/server` parity): `renderToString(Component,
+ * props?, options?)` (a single sync pass; suspended boundaries render their
+ * fallback) and `renderToStaticMarkup` (clean, non-hydratable HTML). Both return
+ * `{ html, css }`: hoisted head folds into `html` (plus the suspense seed script
+ * when anything resolved synchronously) and the deduped scoped-style tags are in
+ * `css`. The await-everything renderer is `prerender` in `octane/static`.
+ * `RenderOptions` cover an `AbortSignal`, a CSP `nonce` for the inline tags, and a
+ * per-render suspense deadline (`timeoutMs`).
+ *
+ * `executeServerFunction` is the metaframework's RPC executor for `module
+ * server` functions — the vite plugin loads it via
+ * `ssrLoadModule('octane/server')` so it runs inside the SSR module graph.
+ *
+ * Everything below the "compiler-emitted" divider is NOT for hand-written
+ * code: the `octane/compiler` in `mode: 'server'` emits component modules that
+ * import those string-building helpers from here. Treat them as the compiler's
+ * private ABI — present because compiled output needs them, not because apps
+ * should call them.
  */
+
+export { executeServerFunction } from './rpc.js';
 
 export {
 	// Entry — React `react-dom/server` parity (buffered; streaming lands in a
@@ -54,7 +69,7 @@ export {
 	type Context,
 	type FormStatus,
 
-	// Compiler-emitted codegen helpers
+	// Compiler-emitted codegen helpers (private ABI — see module doc)
 	createElement,
 	escapeHtml,
 	escapeAttr,

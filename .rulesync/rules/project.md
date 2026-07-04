@@ -25,7 +25,7 @@ code and READMEs:
   keyed reconciler, scheduler, events, context, Suspense). It is large and heavily
   commented; the comments are the design spec.
 - `packages/octane/src/runtime.server.ts` + `packages/octane/src/server/index.ts` —
-  SSR (`render()` → `{ head, body, css }`).
+  SSR (`render()` → `{ head, body, css }`; see `docs/ssr.md`).
 - `packages/octane/src/compiler/` — the TSRX→Octane compiler (exposed as
   `octane/compiler`, `octane/compiler/vite`, `octane/compiler/volar`).
 - `packages/octane/src/index.ts` / `constants.ts` — the public client API surface.

@@ -16,7 +16,7 @@ Read first:
 1. `.ai/project-map.md`
 2. `docs/react-library-compat-plan.md`
 3. `docs/react-parity-migration-plan.md`
-4. Existing closest binding in `packages/{zustand,query,motion,stylex,router,lexical,floating-ui}/`
+4. Existing closest binding in `packages/{zustand,query,motion,stylex,router,lexical,floating-ui,radix}/`
 5. `vitest.config.js` aliases/exclusions for existing binding packages
 
 ## Workflow
