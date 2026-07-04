@@ -3942,8 +3942,15 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// Component-call: path=[] (no DOM contributed, host is the wrapper).
 		// Construct: path=[htmlIdx] when it gets a `<!>` anchor (static siblings
 		// exist), else [] — emitNodeHtml keys the anchor emit off the path.
-		const nodePath =
-			!single && !nodeIsComp && (hasStaticRoot || !isConstructNode(node)) ? [htmlIdx] : [];
+		// A COMPONENT root normally contributes no HTML and appends at
+		// `__block.endMarker` (path=[]). But in a MIXED body — a component root
+		// alongside a static/HTML template root — it must sit at its source-order
+		// position relative to that static content, so (like a construct root) it
+		// emits a `<!>` anchor at `[htmlIdx]`. Without the anchor the static content
+		// drains into the parent first and the component appends AFTER it, reversing
+		// source order (e.g. a `<Comp/>` before an `<input/>` sibling).
+		const nodeNeedsAnchor = nodeIsComp || isConstructNode(node);
+		const nodePath = !single && (nodeNeedsAnchor ? hasStaticRoot : true) ? [htmlIdx] : [];
 		const part = emitNodeHtml(
 			node,
 			nodePath,
@@ -4978,6 +4985,18 @@ function emitElementHtml(
 			parentNs,
 			cssHash,
 		);
+		// A component root in a MIXED multi-root body (planJsx passed a non-empty
+		// `path`) emits a `<!>` anchor at its source-order position, so componentSlot
+		// inserts BEFORE it — preserving order against static template siblings.
+		// Mirrors the in-element mixed-children path and the control-flow root path.
+		// With an empty path (a sole/all-component body) it contributes no HTML and
+		// appends at `__block.endMarker`.
+		if (path.length > 0) {
+			cc.hostPath = path.slice(0, -1);
+			cc.anchorPath = path;
+			compCalls.push(cc);
+			return '<!>';
+		}
 		cc.hostPath = path;
 		compCalls.push(cc);
 		return ''; // no HTML

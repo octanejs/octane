@@ -304,6 +304,47 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'base-ui',
+					include: ['packages/base-ui/tests/**/*.test.ts', 'packages/base-ui/tests/**/*.test.tsx'],
+					environment: 'jsdom',
+					// Differential precompile for base-ui fixtures: rewrites `@octanejs/base-ui/<sub>`
+					// → `@base-ui-components/react/<sub>` so the React side runs real Base UI.
+					globalSetup: ['packages/base-ui/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				// base-ui's `.ts` foundation forwards the caller's slot via subSlot, so it must
+				// be EXCLUDED from the auto-slotting pass — as must @octanejs/floating-ui, which
+				// base-ui's overlays build on.
+				plugins: [
+					octane({
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/query/src/',
+							'/packages/motion/src/',
+							'/packages/base-ui/src/',
+							'/packages/floating-ui/src/',
+						],
+					}),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/base-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/base-ui\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/floating-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'octane-mcp-server',
 					include: ['packages/octane-mcp-server/src/**/*.test.js'],
 					environment: 'node',

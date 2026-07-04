@@ -555,6 +555,31 @@ effects-semantics, reveal-throttle, async-actions, Activity ports + the fidelity
   Behaviors were unchanged (comment/citation-only edits). octane-specific regression
   fixtures (`nested-suspend`, `consecutive-suspend`) are honestly labeled as such.
 
+### API-surface additions — Phase A (DONE, 2026-07-04)
+The missing React APIs short of streaming SSR are now shipped (client +
+`octane/server` mirrors, `tests/lazy.test.ts` + `tests/form-reset.test.ts`):
+
+- **`lazy(load)`** — a stable wrapper `ComponentBody` that suspends on the load
+  promise (same contract as a body opening with `use(loadPromise)`) and tail-calls
+  the loaded component once fulfilled, so every mount site (componentSlot, value
+  position, `memo(lazy(...))`) works unchanged. Server: records its promise for the
+  render loop (deliberately NOT via `use()` — a module namespace must never enter
+  the client-seed stream), so `renderToString` emits the fallback and `prerender`
+  awaits the module. Rejection routes to `@catch`.
+- **`requestFormReset(form)`** — deferred to the enclosing transition/action
+  settle (flushed when the last in-flight async transition closes); warns + resets
+  immediately outside one. (The AUTOMATIC reset of plain `<form action={fn}>` on
+  success already existed.)
+- **`useDebugValue`** (no-op) — trivial parity; one of the two symbols blocking
+  mechanical library-binding ports.
+
+Still intentionally absent: `createRef` (exists for class components — maintainer
+decision 2026-07-04), `StrictMode`, `Profiler`, `SuspenseList`, `forwardRef`
+(React 19 refs-as-props), `cache()` (RSC-oriented), resource hints
+(`preload`/`preinit`/…), and the streaming entries (`renderToPipeableStream` /
+`renderToReadableStream`) — the planned SSR follow-on.
+
 ### Suite status
 **204 test files, 1074 passed, 0 expected-fail, 0 regressions** (after the off-screen
 transition fix). Typecheck + format clean. (Earlier checkpoint: 106 files / 752.)
+Post-Phase-A: 265 files / 1487 passed (includes parallel binding-suite growth).

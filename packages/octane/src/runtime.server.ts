@@ -774,6 +774,74 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: string | s
 }
 
 // ---------------------------------------------------------------------------
+// lazy — React's code-splitting wrapper, server semantics.
+// ---------------------------------------------------------------------------
+
+// Distinguishes lazy payloads in the render loop's suspense cache. Payload state
+// lives on the wrapper itself (module-level, like the client), so the key only
+// has to be unique per lazy() call — not per frame like use()'s data keys.
+let LAZY_ID = 0;
+
+/**
+ * React's `lazy(load)` — the server mirror of the client wrapper. Unresolved,
+ * it records its promise for render()'s await loop and throws the suspense
+ * sentinel, so `renderToString` emits the nearest `@pending` fallback for the
+ * pass and `prerender` awaits the module and re-renders. Once fulfilled it
+ * tail-calls the loaded server component. Deliberately does NOT go through
+ * `use()` — a module namespace must never enter the client-seed stream
+ * (`SERIAL`), which serializes resolved use() values in render order.
+ */
+export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
+	let status: 'uninitialized' | 'pending' | 'fulfilled' | 'rejected' = 'uninitialized';
+	let result: any = null; // fulfilled → component; rejected → the reason
+	let promise: PromiseLike<unknown> | null = null;
+	const key = '|lazy#' + LAZY_ID++;
+	const lazyWrapper = (props: any, scope: SSRScope, extra?: any): unknown => {
+		if (status === 'fulfilled') return (result as ServerComponent)(props, scope, extra);
+		if (status === 'rejected') throw result;
+		if (status === 'uninitialized') {
+			status = 'pending';
+			promise = load();
+			promise.then(
+				(mod: any) => {
+					const comp = mod != null && mod.default !== undefined ? mod.default : mod;
+					if (typeof comp !== 'function') {
+						status = 'rejected';
+						result = new Error(
+							'lazy: expected the load() promise to resolve to a component function or a ' +
+								"module with a component as its default export, got '" +
+								typeof comp +
+								"'",
+						);
+					} else {
+						status = 'fulfilled';
+						result = comp;
+					}
+				},
+				(err: any) => {
+					status = 'rejected';
+					result = err;
+				},
+			);
+		}
+		// Same suspend bookkeeping as use(thenable), minus the SERIAL seed push.
+		if (SUSPENDED !== null) SUSPENDED.push({ promise: promise!, key });
+		const frame = FRAME;
+		if (DEFERRED !== null && CURRENT_COMP !== null && frame !== null && !frame.deferred) {
+			frame.deferred = true;
+			DEFERRED.push({
+				comp: CURRENT_COMP,
+				props: CURRENT_PROPS,
+				parentScope: CURRENT_PARENT_SCOPE,
+				frame,
+			});
+		}
+		throw SSR_SUSPENSE;
+	};
+	return lazyWrapper as unknown as C;
+}
+
+// ---------------------------------------------------------------------------
 // Hooks — server semantics. All accept the compiler-injected trailing slot
 // symbol (ignored: a server render is single-pass with no re-render).
 // ---------------------------------------------------------------------------
@@ -811,6 +879,16 @@ export function useCallback<F>(fn: F): F {
 export function useRef<T>(initial: T): { current: T } {
 	return { current: initial };
 }
+
+/** React's `useDebugValue` — devtools-only on the client, no-op everywhere. */
+export function useDebugValue(_value?: unknown, _format?: unknown): void {}
+
+/**
+ * React DOM's `requestFormReset` — a server no-op (there is no DOM form to
+ * reset; the client runtime owns the real implementation). Exported so
+ * isomorphic component code resolves under the server build.
+ */
+export function requestFormReset(_form?: unknown): void {}
 
 export function useId(): string {
 	// Same shape as the client (':in-<base36>:') so a future hydrate pass lines up.

@@ -38,9 +38,12 @@ export {
 	useActionState,
 	useFormStatus,
 	useOptimistic,
+	useDebugValue,
 	type FormStatus,
 	startTransition,
+	requestFormReset,
 	memo,
+	lazy,
 	// Context
 	createContext,
 	use,
