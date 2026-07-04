@@ -28,15 +28,14 @@
 //   deliver on `observe()` is delivered on a 0-timeout instead (deferred like the rAF
 //   path), so the indicator/viewport still receive their first measurement.
 //
-// - React's IMPLICIT same-element bailout, expressed explicitly where octane can:
-//   the provider renders its children through a `memo()` pass-through (`MemoChildren`)
-//   so identity-stable user children skip provider-state re-renders while consumers of
-//   the CHANGED context refresh (octane's memo bail + per-context lazy propagation).
-//   Two residual adaptations where octane's subtree re-rendering still differs from
-//   React's implicit bail: (a) the source's standalone `ViewportContentMounter` is
-//   inlined into Content (see the note there) and (b) `onViewportContentChange` bails
-//   on shallow-equal registration data — both converge exactly where React does, with
-//   identical observable registrations. See docs/react-parity-migration-plan.md.
+// - React's IMPLICIT same-element bailout is now native in octane (childSlot's
+//   `oldProps === newProps` bail + lazy per-context consumer refresh), so the
+//   provider passes user children straight through — the old `MemoChildren`
+//   memo() shim AND the `onViewportContentChange` shallow-equal convergence
+//   bail are gone (the register cascade no longer oscillates once identity-
+//   stable subtrees bail like React's). One residual adaptation remains: the
+//   source's standalone `ViewportContentMounter` is inlined into Content (see
+//   the note there). See docs/react-parity-migration-plan.md.
 // - `useResizeObserver` uses `useEffectEvent` (insertion-effect sync) instead of the
 //   source's `useCallbackRef` (passive-effect sync): octane's passives are post-paint,
 //   so a layout effect (or a timer it schedules) could observe a one-render-stale
@@ -51,7 +50,6 @@
 import {
 	createElement,
 	createPortal,
-	memo,
 	useCallback,
 	useEffect,
 	useLayoutEffect,
@@ -303,13 +301,6 @@ export function Sub(props: any): any {
 
 /* -----------------------------------------------------------------------------------------------*/
 
-// React parity: the provider subtree bails on identity-stable children while context
-// consumers refresh per-context (see the file header). memo() rides octane's existing
-// bail + refreshContextConsumers machinery.
-const MemoChildren = memo(function MemoChildren(props: any) {
-	return props.children;
-});
-
 function NavigationMenuProvider(props: any): any {
 	const slot = S('NavigationMenu.Provider');
 	const {
@@ -359,17 +350,6 @@ function NavigationMenuProvider(props: any): any {
 		onViewportContentChange: useCallback(
 			(contentValue: string, contentData: ContentData) => {
 				setViewportContent((prevContent) => {
-					// octane adaptation (documented, see file header): convergence bail. Even
-					// with the MemoChildren element bail, octane's subtree re-rendering plus
-					// the Presence/viewport interplay lets the register cascade oscillate
-					// (Content's return flips Presence ⟷ ViewportContentMounter as
-					// `context.viewport` detaches/re-attaches mid-cascade) — React's implicit
-					// same-element bailout stops the cycle one level deeper than memo() can
-					// express here. The registered data's values are identity-stable across
-					// these cascades, so a shallow-equality bail converges exactly where
-					// React does, with identical observable registrations.
-					const prevData = prevContent.get(contentValue);
-					if (prevData && shallowEqual(prevData, contentData)) return prevContent;
 					prevContent.set(contentValue, contentData);
 					return new Map(prevContent);
 				});
@@ -393,7 +373,10 @@ function NavigationMenuProvider(props: any): any {
 			children: createElement(ViewportContentProvider, {
 				scope,
 				items: viewportContent,
-				children: createElement(MemoChildren, { children }),
+				// Identity-stable user children ride octane's implicit same-element
+				// bailout (React beginWork parity): provider-state re-renders skip
+				// them while consumers of the CHANGED context refresh lazily.
+				children,
 			}),
 		}),
 	});
@@ -823,16 +806,6 @@ export function Content(props: any): any {
 /* -----------------------------------------------------------------------------------------------*/
 
 const ROOT_CONTENT_DISMISS = 'navigationMenu.rootContentDismiss';
-
-function shallowEqual(a: Record<string, any>, b: Record<string, any>): boolean {
-	const ka = Object.keys(a);
-	const kb = Object.keys(b);
-	if (ka.length !== kb.length) return false;
-	for (const k of ka) {
-		if (!Object.is(a[k], b[k])) return false;
-	}
-	return true;
-}
 
 type MotionAttribute = 'to-start' | 'to-end' | 'from-start' | 'from-end';
 

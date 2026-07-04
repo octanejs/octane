@@ -156,28 +156,25 @@ to the working optimistic flow. Deferred; revisit alongside the broader schedule
 
 ---
 
-## 7. `useInsertionEffect` is toggled by `<Activity>` hide/show
+## 7. `useInsertionEffect` is toggled by `<Activity>` hide/show — ✅ CLOSED (2026-07-04)
 
 **Where it shows up:** `Activity-test.js:1428` ("insertion effects are not disconnected
-when the visibility changes").
+when the visibility changes"); pinned by
+[activity.test.ts](__tests__/activity.test.ts) — the "insertion effects stay
+connected while hidden" conformance pair.
 
 **React behavior:** hiding an `<Activity>` destroys its layout + passive effects but NOT
 its insertion effects (they stay connected); an update WHILE hidden still fires insertion
 effects (the subtree is pre-rendered). Insertion effects are for injecting styles, which
 should persist while a tab is merely hidden.
 
-**octane behavior:** octane's hide path (`deactivateScope`) runs ALL effect cleanups
-uniformly — including insertion effects (verified: `useInsertionEffect`'s cleanup fires on
-hide, re-fires on reveal) — and the `inactive` gate skips re-enqueues uniformly, so an
-update while hidden does not fire insertion effects either. octane's `EffectSlot` does not
-record its phase, so the hide path cannot single insertion effects out.
-
-**Surface impact:** Very low. `useInsertionEffect` is rare (CSS-in-JS style injection) and
-`<Activity>` rarer still; the worst case is styles re-injected on tab show.
-
-**Closure plan:** tag each `EffectSlot` with its phase and have `deactivateScope` (and the
-`inactive` enqueue gate) treat `INSERTION` specially — skip cleanup on hide, allow enqueue
-while hidden. Small but touches the effect-slot shape; deferred until there's a real need.
+**octane now matches:** each `EffectSlot` records its phase, and the hide machinery
+singles `INSERTION` out — `deactivateScope` skips its cleanup AND keeps its deps (so
+reveal doesn't re-fire it), while `enqueueEffect`/`drainPhase`'s inactive gates exempt
+it (so a deps-changed update while hidden still cycles it). A real unmount still tears
+it down via the scope finalizer. The exemption applies to both hide paths that share
+`deactivateScope` (Activity hide AND suspense-hide), matching React's Offscreen
+semantics — insertion effects only unmount on deletion.
 
 ---
 
@@ -230,10 +227,11 @@ React on, including:
 - Host refs under suspense: a suspended boundary's host refs are DETACHED on hide
   (object refs → null, callback refs called with null) and re-attached on reveal — React
   cycles refs like layout effects even though the DOM node is preserved. Covers the
-  compiled template host-ref path and de-opt host slots;
+  compiled template host-ref path, de-opt host slots, AND (since 2026-07-04) the
+  closure-attached flavors: refs inside a SPREAD (`_sp$N` bindings), `<Fragment ref>`
+  (FragmentInstance), and refs on value-position pure-host descriptors (the de-opt
+  DEOPT_DESC walk, nested elements included);
   `ReactSuspenseEffectsSemantics-test.js:2877`, `conformance/suspense-refs.test.ts`.
-  (NOTE — narrow limitation: refs attached purely through closures — prop spread, the
-  de-opt prop path, fragment refs — are not yet cycled across a suspend.)
 - `useDeferredValue` identity stability.
 - `useDeferredValue(value, initialValue)` React-19 overload.
 - `useTransition` rising/falling `isPending` edges.

@@ -143,14 +143,30 @@ propagation heuristics are unpinned:
 > **Update (2026-07-03):** `memo()`'s bail + lazy per-context consumer refresh now also
 > work at VALUE positions (provider children, `createElement` binding trees) and through
 > array-children boundaries — see `memo-value-position.test.ts` and the childSlot
-> `tryMemoBail` unification. React's **implicit same-element bailout** (identical child
-> element reference → skip the subtree, refresh only changed-context consumers) remains
-> UNIMPLEMENTED: octane re-renders the provider's subtree, and bindings that rely on the
-> implicit bail express it explicitly with a `memo()` pass-through (see
-> `@octanejs/radix`'s NavigationMenu `MemoChildren` + its two documented residual
-> adaptations). Implementing the implicit bail = extending `tryMemoBail`'s comparison to
-> identical incoming descriptors on non-memo components; the context-refresh machinery it
-> would ride already exists.
+> `tryMemoBail` unification.
+>
+> **Update (2026-07-04): React's implicit same-element bailout is IMPLEMENTED**
+> (`tryImplicitBail` in runtime.ts, `conformance/implicit-element-bailout.test.ts`).
+> A value-position child receiving the IDENTICAL committed props object (cached
+> element / `children` passthrough / cached array item — items route through a
+> nested childSlot, so per-item bail is free) skips its body; changed-context
+> consumers below refresh lazily. Value-position component blocks are ARMED as
+> context-stamping targets (`$$implicitBail`, memoInChain) at mount so the bail is
+> always sound; compiled template positions (componentSlot) re-create props per
+> render and stay unarmed (no cost, no bail possible). Radix NavigationMenu's
+> `MemoChildren` shim AND its shallow-equal registration convergence bail are
+> deleted — the native bail stops the register-cascade oscillation at its root.
+> Known non-armed edges (correct, just unoptimized — they re-render): the
+> transition off-screen swap commit path, and `$$singleRoot` return descriptors
+> (routed via componentSlot).
+>
+> The work also surfaced + fixed a REAL propagation bug: an ancestor memo's
+> re-render interleaved with an inner bail cleared the ancestor's `$$ctxReads`
+> without the bailed subtree re-stamping them, so a later context change bailed
+> past a stranded consumer (stale value on screen). Bails now merge the bailed
+> block's surviving context deps onto memo/armed ancestors (`restampCtxDeps`;
+> pinned by `conformance/context-bailout.test.ts` Case E, per
+> ReactContextPropagation-test.js:711).
 
 | React file | Gap | Severity |
 |---|---|---|
