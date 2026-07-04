@@ -282,6 +282,21 @@ describe('TSRX features — for-of with `index` AND `key`', () => {
 		expect(r.findAll('li').map((li) => li.className)).toEqual(['k-3', 'k-1', 'k-2']);
 		r.unmount();
 	});
+
+	it('re-renders the index on a SAME-ref reorder (index binding is conservative)', () => {
+		// The index-independent reorder skip must NOT apply when the header binds
+		// an `index` — otherwise a pure reorder of the SAME item objects would
+		// leave stale index text. Reversing identical refs must still update i.
+		const a = { id: 1, label: 'a' };
+		const b = { id: 2, label: 'b' };
+		const c = { id: 3, label: 'c' };
+		const r = mount(ForOfIndexAndKey, { items: [a, b, c] });
+		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['0:a', '1:b', '2:c']);
+
+		r.update(ForOfIndexAndKey, { items: [c, b, a] }); // same refs, reversed
+		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['0:c', '1:b', '2:a']);
+		r.unmount();
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -440,23 +455,21 @@ describe('TSRX features — for-of auto-memo (pure body skip)', () => {
 		const c = spyItem(3, 'c', reads);
 		const r = mount(PureForOf, { items: [a, b, c] });
 		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['a', 'b', 'c']);
-		const baseline = reads.n;
 
-		// Reorder — same item refs, different positions. With auto-memo the
-		// body should NOT re-read `label` on any item (item refs + positions
-		// both still resolved correctly: pos 0 has a, pos 2 has c — survivors
-		// at positions 1 swap; only the actual movers should re-render).
-		// Actually for a reverse, EVERY position's item ref changed → all
-		// re-render. Test a SWAP-of-2 to keep most in place.
-		r.update(PureForOf, { items: [c, b, a] }); // reverse: every pos changes
-		const afterReverse = reads.n - baseline;
-		expect(afterReverse).toBeGreaterThan(0); // moved items did re-render
-
-		// Now PASS THE SAME ARRAY again — every item ref + position unchanged.
-		// With memo: zero reads. Without memo: 3 reads.
+		// Reverse — the SAME item refs, only their positions change. The body
+		// binds no `index`, so it can't observe position: with the auto-memo +
+		// index-independent skip, a pure reorder re-renders NOTHING (survivors
+		// move in the DOM but their body never re-runs). Was 3 re-reads before
+		// the index-independent optimization landed.
 		reads.n = 0;
 		r.update(PureForOf, { items: [c, b, a] });
-		expect(reads.n).toBe(0); // ← the auto-memo proof
+		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['c', 'b', 'a']);
+		expect(reads.n).toBe(0); // ← pure index-independent reorder = zero re-render
+
+		// Same array again — every item ref + position unchanged → still zero.
+		reads.n = 0;
+		r.update(PureForOf, { items: [c, b, a] });
+		expect(reads.n).toBe(0);
 		r.unmount();
 	});
 
