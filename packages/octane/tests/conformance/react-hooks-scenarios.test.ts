@@ -264,23 +264,23 @@ describe('useState — object identity drives re-render', () => {
 	});
 });
 
-describe('useReducer — Object.is bailout on same-reference state', () => {
-	it('reducer returning the SAME state reference triggers neither a render nor an effect re-run', () => {
+describe('useReducer — no eager bailout on same-reference state', () => {
+	// Per ReactHooksWithNoopRenderer-test.js:3889 — useReducer does NOT eagerly
+	// bail out (unlike useState's setter): a no-op action still re-renders the
+	// component once per commit; only useState's dispatchSetState has the eager
+	// Object.is fast path.
+	it('reducer returning the SAME state reference still re-renders once per dispatch', () => {
 		const r = mount(ReducerSameRefBailout);
 		const initialRenders = getRenderCount();
-		// 'keep' returns the SAME state object — Object.is true → bail out.
 		r.click('#keep');
 		r.click('#keep');
 		r.click('#keep');
-		// Reducer DID run (we increment _reducerCalls each call) but no
-		// render happened.
 		expect(getReducerCalls()).toBe(3);
-		expect(getRenderCount()).toBe(initialRenders);
+		expect(getRenderCount()).toBe(initialRenders + 3);
 		expect(r.find('#out').textContent).toBe('0');
-		// 'inc' returns a NEW object — render fires.
 		r.click('#inc');
 		expect(r.find('#out').textContent).toBe('1');
-		expect(getRenderCount()).toBe(initialRenders + 1);
+		expect(getRenderCount()).toBe(initialRenders + 4);
 		r.unmount();
 	});
 });

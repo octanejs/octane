@@ -958,6 +958,23 @@ export interface RenderOptions {
 	identifierPrefix?: string;
 	/** Called with any error thrown during the render (before it propagates). */
 	onError?: (error: unknown) => void;
+	/**
+	 * Abort the render when the request dies: rejects the pending suspense wait
+	 * with `signal.reason`. Checked before each pass and raced against the await.
+	 * Async renders only (`prerender`); `renderToString` is a single sync pass.
+	 */
+	signal?: AbortSignal;
+	/**
+	 * CSP nonce stamped on every inline tag the renderer emits: the deduped
+	 * `<style data-octane>` tags and the suspense seed `<script>`.
+	 */
+	nonce?: string;
+	/**
+	 * Per-render override of the global suspense settle deadline
+	 * (setSsrSuspenseTimeout). 0 disables the deadline for this render. Async
+	 * renders only (`prerender`).
+	 */
+	timeoutMs?: number;
 }
 
 // Insert the hoisted head markup into `body`: before `</head>` when the render
@@ -995,7 +1012,7 @@ export function getSsrSuspenseTimeout(): number {
  * `\u003c` so the JSON payload can't terminate the `<script>` element or open
  * an HTML comment. Only emitted when at least one value was resolved.
  */
-function serializeSuspenseSeeds(values: unknown[]): string {
+function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
 	// Encode `undefined` (which JSON drops/nulls) as a sentinel so a
 	// `use(thenable)` that resolved to `undefined` round-trips to `undefined` on
 	// the client — not `null`. The replacer fires for array elements AND nested
@@ -1003,23 +1020,24 @@ function serializeSuspenseSeeds(values: unknown[]): string {
 	const json = JSON.stringify(values, (_key, value) =>
 		value === undefined ? { [UNDEFINED_SENTINEL_KEY]: true } : value,
 	).replace(/</g, '\\u003c');
-	return '<script type="application/json" ' + SUSPENSE_SCRIPT_ATTR + '>' + json + '</script>';
+	return (
+		'<script type="application/json" ' + SUSPENSE_SCRIPT_ATTR + nonceAttr + '>' + json + '</script>'
+	);
 }
 
 /**
- * Render a server-compiled component (a function returning an HTML string) to
- * `{ head, body, css }`. `head` is the hoisted document-head markup
- * (`<title>`/`<meta>`/`<link>`/… collected by `ssrHeadEl` during the render),
- * which the metaframework injects at its `<!--ssr-head-->` placeholder; `css` is
- * the scoped stylesheets of the components that actually rendered, emitted as
- * ready-to-place `<style data-octane="hash">…</style>` tags (one per hash,
- * deduped). The client's `injectStyle` matches that `data-octane` hash and
- * skips re-injecting on hydration — so the styles cross the boundary once.
+ * The buffered render pipeline (`renderToString` / `renderToStaticMarkup` /
+ * `prerender`). Hoisted document-head markup (`<title>`/`<meta>`/`<link>`
+ * collected by `ssrHeadEl`, each prefixed with a `<!--key-->` adoption marker)
+ * folds into the result `html`; scoped stylesheets are emitted as deduped
+ * `<style data-octane="hash">…</style>` tags in `css` (the client's
+ * `injectStyle` matches the hash and skips re-injecting on hydration, so the
+ * styles cross the boundary once).
  *
- * Async because of Suspense (Phase 4): a `use(thenable)` that hasn't resolved
- * suspends the pass; render() awaits it and re-renders, so the @try ends up
- * showing its resolved success arm (or @catch on rejection). Each resolved value
- * is appended to `body` as an inline data `<script>` for the client to seed.
+ * Suspense: a `use(thenable)` that hasn't resolved suspends the pass; `prerender`
+ * awaits it and re-renders so the @try shows its resolved success arm (or @catch
+ * on rejection), while `renderToString` (sync) leaves the @pending fallback. Each
+ * resolved value is appended as an inline data `<script>` for the client to seed.
  */
 type SuspendedList = { promise: PromiseLike<unknown>; key: string }[];
 type ResolvedMap = Map<string, { value: unknown } | { reason: unknown }>;
@@ -1085,10 +1103,17 @@ function restoreAmbient(a: Ambient): void {
 // Run ONE full canonical pass over the whole tree, synchronously within this
 // tick. The emitted body/head/css/seeds always come from here (a normal full
 // render), so hydration byte-format is identical whether or not discovery ran.
+// A CSP nonce as an attribute fragment (` nonce="…"`) for inline `<style>`/
+// `<script>` tags, or '' when no nonce is set. Empty is the common (no-CSP) case.
+function nonceAttrOf(options: RenderOptions | undefined): string {
+	return options?.nonce ? ' nonce="' + escapeAttr(options.nonce) + '"' : '';
+}
+
 function runFullFramedPass(
 	component: ServerComponent,
 	props: any,
 	resolved: ResolvedMap,
+	nonceAttr: string = '',
 ): FullPassResult {
 	const saved = saveAmbient();
 	ID_COUNTER = 0;
@@ -1124,7 +1149,7 @@ function runFullFramedPass(
 	}
 	let css = '';
 	for (const [hash, sheet] of cssMap) {
-		css += '<style data-octane="' + hash + '">' + sheet + '</style>';
+		css += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
 	}
 	return { body, head: headBuf.html, css, serial, suspended, deferred };
 }
@@ -1186,10 +1211,16 @@ function runDiscoveryRound(
 }
 
 // Await everything a pass/round surfaced; cache each outcome in `resolved` by its
-// key. Only render-local state is touched across the await. Raced against
-// SUSPENSE_TIMEOUT_MS so a thenable that never settles fails the render (with a
-// clear error) instead of hanging the request forever.
-async function settleSuspended(suspended: SuspendedList, resolved: ResolvedMap): Promise<void> {
+// key. Only render-local state is touched across the await. Raced against the
+// settle deadline (`timeoutMs`; 0 disables) so a thenable that never settles
+// fails the render instead of hanging the request forever, and against the
+// caller's AbortSignal so a dead request stops rendering.
+async function settleSuspended(
+	suspended: SuspendedList,
+	resolved: ResolvedMap,
+	timeoutMs: number,
+	signal: AbortSignal | undefined,
+): Promise<void> {
 	const settleAll = Promise.all(
 		suspended.map(async ({ promise, key }) => {
 			if (resolved.has(key)) return;
@@ -1200,51 +1231,66 @@ async function settleSuspended(suspended: SuspendedList, resolved: ResolvedMap):
 			}
 		}),
 	);
-	if (SUSPENSE_TIMEOUT_MS > 0) {
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		const deadline = new Promise<never>((_, reject) => {
-			timer = setTimeout(
-				() =>
-					reject(
-						new Error(
-							'octane SSR: a use(thenable) did not settle within ' + SUSPENSE_TIMEOUT_MS + 'ms.',
+	const racers: Promise<unknown>[] = [settleAll];
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	let removeAbort: (() => void) | undefined;
+	if (timeoutMs > 0) {
+		racers.push(
+			new Promise<never>((_, reject) => {
+				timer = setTimeout(
+					() =>
+						reject(
+							new Error('octane SSR: a use(thenable) did not settle within ' + timeoutMs + 'ms.'),
 						),
-					),
-				SUSPENSE_TIMEOUT_MS,
-			);
-			// Don't let the deadline timer hold the event loop open if the render
-			// settles first (Node-only; harmless where unref is absent).
-			(timer as any)?.unref?.();
-		});
-		try {
-			await Promise.race([settleAll, deadline]);
-		} finally {
-			clearTimeout(timer);
-		}
-	} else {
-		await settleAll;
+					timeoutMs,
+				);
+				// Don't let the deadline timer hold the event loop open if the render
+				// settles first (Node-only; harmless where unref is absent).
+				(timer as any)?.unref?.();
+			}),
+		);
+	}
+	if (signal) {
+		racers.push(
+			new Promise<never>((_, reject) => {
+				const onAbort = () => reject(signal.reason);
+				signal.addEventListener('abort', onAbort, { once: true });
+				removeAbort = () => signal.removeEventListener('abort', onAbort);
+			}),
+		);
+	}
+	try {
+		await (racers.length === 1 ? settleAll : Promise.race(racers));
+	} finally {
+		clearTimeout(timer);
+		removeAbort?.();
 	}
 }
 
 // The await-everything render core. Runs full canonical passes interleaved with
 // cheap discovery rounds until nothing suspends, then returns the final pass —
 // so every `use(thenable)` is resolved and the @try success arms are rendered.
-// Shared by `prerender` (React's static API) and the deprecated `render`.
+// Used by `prerender` (React's static API).
 async function runBuffered(
 	component: ServerComponent,
 	props: any,
 	options: RenderOptions | undefined,
+	nonceAttr: string,
 ): Promise<FullPassResult> {
+	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
+	const signal = options?.signal;
 	// The suspense cache persists across this render's passes; it is render-local
 	// (never a module global) so concurrent renders can't share it.
 	const resolved: ResolvedMap = new Map();
 	let attempt = 0;
 	for (;;) {
+		// Bail before doing pass work if the request already died.
+		signal?.throwIfAborted();
 		// A full canonical pass. If nothing suspended, this IS the answer — the
 		// no-suspense fast path returns here after exactly one pass.
 		let pass: FullPassResult;
 		try {
-			pass = runFullFramedPass(component, props, resolved);
+			pass = runFullFramedPass(component, props, resolved, nonceAttr);
 		} catch (err) {
 			options?.onError?.(err);
 			throw err;
@@ -1268,7 +1314,7 @@ async function runBuffered(
 				options?.onError?.(err);
 				throw err;
 			}
-			await settleSuspended(pending, resolved);
+			await settleSuspended(pending, resolved, timeoutMs, signal);
 			if (jobs.length === 0 || !jobs.every((j) => j.frame.parent !== null)) break;
 			const round = runDiscoveryRound(jobs, resolved);
 			if (round.suspended.length === 0) break; // fully discovered → next full pass is canonical
@@ -1282,9 +1328,9 @@ async function runBuffered(
 }
 
 /** Turn a completed pass into the `{ html, css }` result (head folded in, seeds appended). */
-function passToResult(pass: FullPassResult): RenderResult {
+function passToResult(pass: FullPassResult, nonceAttr: string): RenderResult {
 	let body = pass.body;
-	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial);
+	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	return { html: spliceHead(body, pass.head), css: pass.css };
 }
 
@@ -1299,7 +1345,8 @@ export async function prerender(
 	props?: any,
 	options?: RenderOptions,
 ): Promise<RenderResult> {
-	return passToResult(await runBuffered(component, props, options));
+	const nonceAttr = nonceAttrOf(options);
+	return passToResult(await runBuffered(component, props, options, nonceAttr), nonceAttr);
 }
 
 /**
@@ -1314,15 +1361,17 @@ export function renderToString(
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
+	options?.signal?.throwIfAborted();
+	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = new Map();
 	let pass: FullPassResult;
 	try {
-		pass = runFullFramedPass(component, props, resolved);
+		pass = runFullFramedPass(component, props, resolved, nonceAttr);
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;
 	}
-	return passToResult(pass);
+	return passToResult(pass, nonceAttr);
 }
 
 /**
@@ -1335,12 +1384,14 @@ export function renderToStaticMarkup(
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
+	options?.signal?.throwIfAborted();
+	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = new Map();
 	const prevMarkers = MARKERS;
 	MARKERS = false;
 	let pass: FullPassResult;
 	try {
-		pass = runFullFramedPass(component, props, resolved);
+		pass = runFullFramedPass(component, props, resolved, nonceAttr);
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;

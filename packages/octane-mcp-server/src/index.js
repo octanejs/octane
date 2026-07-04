@@ -2,14 +2,28 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { bridgeReport, KNOWN_BINDINGS } from './bridge.js';
 
 const __filename = fileURLToPath(import.meta.url);
+const PACKAGE_ROOT = resolve(dirname(__filename), '..');
 
-export const SKILLS = {
+// Bundled skills ship with the npm package and work in ANY project using
+// octane. Repo skills live in the octane monorepo's .ai/skills and are only
+// available when the server runs against a checkout (they cover maintainer
+// workflows: triage, PRs, core changes).
+export const BUNDLED_SKILLS = {
+	'bridge-react-package': 'skills/bridge-react-package.md',
+	'migrate-react-component': 'skills/migrate-react-component.md',
+	'react-divergences': 'skills/react-divergences.md',
+	'setup-ssr': 'skills/setup-ssr.md',
+};
+
+export const REPO_SKILLS = {
 	'bug-hunter': '.ai/skills/bug-hunter.md',
 	'create-a-pr': '.ai/skills/create-a-pr.md',
 	'handle-issue': '.ai/skills/handle-issue.md',
@@ -33,6 +47,10 @@ export function text(content) {
 	return { content: [{ type: 'text', text: content }] };
 }
 
+export function isOctaneRepo(root) {
+	return existsSync(resolve(root, 'packages/octane/src/runtime.ts'));
+}
+
 export function areaForPath(path) {
 	if (path.startsWith('packages/octane/src/compiler/')) return 'compiler';
 	if (path.startsWith('packages/octane/src/server/') || path.includes('runtime.server'))
@@ -42,7 +60,8 @@ export function areaForPath(path) {
 	}
 	if (path.startsWith('packages/octane/tests/')) return 'core-tests';
 	if (path.startsWith('packages/vite-plugin-octane/')) return 'vite-plugin';
-	if (/^packages\/(zustand|query|motion|stylex|router|lexical|floating-ui)\//.test(path)) {
+	if (path.startsWith('packages/octane-mcp-server/')) return 'mcp-server';
+	if (/^packages\/(zustand|query|motion|stylex|router|lexical|floating-ui|radix)\//.test(path)) {
 		return 'ecosystem-binding';
 	}
 	if (path.startsWith('benchmarks/')) return 'benchmark';
@@ -69,12 +88,19 @@ export function validationFor(paths, taskKind) {
 	}
 	if (areas.has('ecosystem-binding')) {
 		for (const path of paths) {
-			const match = path.match(/^packages\/([^/]+)\//);
+			const match = path.match(
+				/^packages\/(zustand|query|motion|stylex|router|lexical|floating-ui|radix)\//,
+			);
 			if (match)
 				commands.add(
 					`./node_modules/.bin/vitest run packages/${match[1]}/tests --project ${match[1]}`,
 				);
 		}
+	}
+	if (areas.has('mcp-server')) {
+		commands.add(
+			'./node_modules/.bin/vitest run packages/octane-mcp-server --project octane-mcp-server',
+		);
 	}
 	if (areas.has('vite-plugin')) commands.add('pnpm typecheck');
 	if (areas.has('benchmark') || taskKind === 'performance') commands.add('pnpm bench');
@@ -191,7 +217,7 @@ export async function issueContext(repoRoot, input) {
 						? 'performance'
 						: 'triage-needed';
 	return {
-		command: ['gh', 'issue', 'view', String(input.issue), '--json', fields],
+		command: ['gh', 'issue', 'view', String(issue.number ?? input.issue), '--json', fields],
 		issue,
 		triage: {
 			suggestedArea,
@@ -202,10 +228,74 @@ export async function issueContext(repoRoot, input) {
 	};
 }
 
-export function createServer(options = {}) {
-	const repoRoot = resolve(options.repoRoot || process.env.OCTANE_REPO_ROOT || process.cwd());
-	const server = new McpServer({ name: 'octane', version: '0.1.0' });
+function registerUserTools(server, repoRoot, repoMode) {
+	const skills = repoMode ? { ...BUNDLED_SKILLS, ...REPO_SKILLS } : BUNDLED_SKILLS;
 
+	server.registerTool(
+		'octane_skill',
+		{
+			title: 'Octane skill',
+			description:
+				'Return an Octane agent skill by name. Bundled skills cover working WITH octane in any project: bridging React packages, migrating React components to .tsrx, intentional React divergences, and SSR setup.' +
+				(repoMode ? ' Repo skills cover octane maintainer workflows.' : ''),
+			inputSchema: {
+				name: z.enum(Object.keys(skills)),
+			},
+		},
+		async ({ name }) => {
+			const root = name in BUNDLED_SKILLS ? PACKAGE_ROOT : repoRoot;
+			const body = await readFile(resolve(root, skills[name]), 'utf8');
+			return text(body);
+		},
+	);
+
+	server.registerTool(
+		'octane_bridge_react_package',
+		{
+			title: 'Bridge a React package to Octane',
+			description:
+				'Scan a React package (from node_modules by name, or any source directory by path) for React API usage and return an Octane compatibility report: which APIs map 1:1, which need rewrites (forwardRef, useDebugValue, lazy, class components), whether a framework-agnostic core can be reused verbatim, whether an official @octanejs binding already exists, and a step-by-step bridge plan. Follow up with the bridge-react-package skill for the full workflow.',
+			inputSchema: {
+				package: z
+					.string()
+					.optional()
+					.describe('npm package name to scan, resolved from projectRoot/node_modules.'),
+				path: z
+					.string()
+					.optional()
+					.describe('Directory of source files to scan instead of an installed package.'),
+				projectRoot: z
+					.string()
+					.optional()
+					.describe('Project to resolve node_modules from. Defaults to the server cwd.'),
+			},
+		},
+		async (input) => {
+			if (!input.package && !input.path) {
+				return text(JSON.stringify({ error: "Provide either 'package' or 'path'." }, null, 2));
+			}
+			const report = await bridgeReport({
+				packageName: input.package,
+				path: input.path,
+				projectRoot: input.projectRoot,
+			});
+			return text(JSON.stringify(report, null, 2));
+		},
+	);
+
+	server.registerTool(
+		'octane_bindings',
+		{
+			title: 'List official Octane bindings',
+			description:
+				'Return the map of React packages that already have maintained @octanejs/* Octane ports. Check here before bridging by hand.',
+			inputSchema: {},
+		},
+		async () => text(JSON.stringify(KNOWN_BINDINGS, null, 2)),
+	);
+}
+
+function registerRepoTools(server, repoRoot) {
 	server.registerTool(
 		'octane_project_map',
 		{
@@ -217,21 +307,6 @@ export function createServer(options = {}) {
 		async () => {
 			const projectMap = await readFile(resolve(repoRoot, '.ai/project-map.md'), 'utf8');
 			return text(projectMap);
-		},
-	);
-
-	server.registerTool(
-		'octane_skill',
-		{
-			title: 'Octane skill',
-			description: 'Return a repository-local Octane agent skill by name.',
-			inputSchema: {
-				name: z.enum(Object.keys(SKILLS)),
-			},
-		},
-		async ({ name }) => {
-			const body = await readFile(resolve(repoRoot, SKILLS[name]), 'utf8');
-			return text(body);
 		},
 	);
 
@@ -328,7 +403,14 @@ export function createServer(options = {}) {
 		},
 		async (input) => commandResult(await issueContext(repoRoot, input)),
 	);
+}
 
+export function createServer(options = {}) {
+	const repoRoot = resolve(options.repoRoot || process.env.OCTANE_REPO_ROOT || process.cwd());
+	const repoMode = isOctaneRepo(repoRoot);
+	const server = new McpServer({ name: 'octane', version: '0.2.0' });
+	registerUserTools(server, repoRoot, repoMode);
+	if (repoMode) registerRepoTools(server, repoRoot);
 	return server;
 }
 

@@ -337,6 +337,15 @@ export interface Block extends Scope {
 	$$ctxDirect: Map<Context<any>, any> | null;
 	/** Per-render `use(thenable)` call-order counter; reset at the top of renderBlock. */
 	__thenableIdx: number;
+	/**
+	 * Render-loop guard: the drainQueue pass this block last rendered in, and how
+	 * many times it rendered within that pass. A block that keeps re-queueing
+	 * itself from its own render body (an unguarded render-phase setState) is a
+	 * non-converging loop — drainQueue throws after RENDER_PHASE_UPDATE_LIMIT,
+	 * mirroring React's "Too many re-renders".
+	 */
+	drainStamp: number;
+	drainRenders: number;
 }
 
 interface EffectSlot {
@@ -633,6 +642,11 @@ function scheduleRender(block: Block): void {
 	}
 }
 
+// Monotonic id per drainQueue pass, paired with Block.drainStamp/drainRenders
+// for the render-phase-update loop guard. 25 matches React's cap.
+let DRAIN_ID = 0;
+const RENDER_PHASE_UPDATE_LIMIT = 25;
+
 // Block-tree depth (root = 0), by walking the parentBlock chain. Used to drain
 // the render queue ancestors-first so cascade coalescing is order-independent.
 function blockDepth(b: Block): number {
@@ -661,6 +675,7 @@ function sortWaveByDepth(wave: Block[]): Block[] {
 // Returns the first unhandled render error to surface after commit.
 function drainQueue(): { err: any } | null {
 	let pendingError: { err: any } | null = null;
+	const drainId = ++DRAIN_ID;
 	if (QUEUE.length > 1) sortWaveByDepth(QUEUE);
 	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
 	// render) — it appends to QUEUE, and `i < QUEUE.length` is re-evaluated every
@@ -676,6 +691,20 @@ function drainQueue(): { err: any } | null {
 		block.pending = false;
 		if (block.disposed) continue;
 		try {
+			// Guarded render-phase updates (derived state) converge in a couple of
+			// passes; an unguarded one re-queues its own block forever. Cap per-block
+			// renders within one drain so the loop throws (catchable by @try /
+			// ErrorBoundary, like React's equivalent) instead of hanging.
+			if (block.drainStamp === drainId) {
+				if (++block.drainRenders > RENDER_PHASE_UPDATE_LIMIT) {
+					throw new Error(
+						'Too many re-renders. Octane limits the number of renders to prevent an infinite loop.',
+					);
+				}
+			} else {
+				block.drainStamp = drainId;
+				block.drainRenders = 1;
+			}
 			renderBlock(block);
 		} catch (err) {
 			try {
@@ -1125,6 +1154,9 @@ class BlockImpl {
 	$$ctxCache: Map<Context<any>, any> | null;
 	// __thenableIdx is reset every renderBlock so pre-init costs nothing.
 	__thenableIdx: number;
+	// Render-loop guard bookkeeping (see the Block interface).
+	drainStamp: number;
+	drainRenders: number;
 	// De-opt host node managed by this Block (deoptItemBody / hostElementBody), reused
 	// across renders. Null for all other blocks; declared so the shape stays monomorphic.
 	deoptNode: Node | null;
@@ -1181,6 +1213,8 @@ class BlockImpl {
 		this.$$ctxDirect = null;
 		this.$$ctxCache = null;
 		this.__thenableIdx = 0;
+		this.drainStamp = 0;
+		this.drainRenders = 0;
 		this.deoptNode = null;
 		this.slots = [];
 		this.forSlot = null;
@@ -1751,10 +1785,12 @@ export function useReducer<S, A, I = S>(
 		s = {
 			value: initVal,
 			reducer,
+			// React parity: unlike useState's setter, dispatch does NOT eagerly bail
+			// when the reducer returns the same state — a no-op action still renders
+			// the component once (children then bail as usual). Per
+			// ReactHooksWithNoopRenderer-test.js:3889.
 			dispatch: (action) => {
-				const next = s!.reducer(s!.value, action);
-				if (Object.is(next, s!.value)) return;
-				s!.value = next;
+				s!.value = s!.reducer(s!.value, action);
 				scheduleRender(block);
 			},
 		};

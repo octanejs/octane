@@ -64,6 +64,7 @@
   },
   "dependencies": {
     "@tsrx/core": "catalog:default",
+    "devalue": "catalog:default",
     "esrap": "catalog:default"
   },
   "devDependencies": {

@@ -21,7 +21,8 @@ Always prefer current source over summaries:
 
 - `packages/octane/` (`octane`) — core runtime, compiler, SSR, tests.
 - `packages/vite-plugin-octane/` (`@octanejs/vite-plugin`) — optional metaframework/plugin surface.
-- `packages/{zustand,query,motion,stylex,router,lexical,floating-ui}/` — Octane ports/bindings for React ecosystem libraries.
+- `packages/{zustand,query,motion,stylex,router,lexical,floating-ui,radix}/` — Octane ports/bindings for React ecosystem libraries.
+- `packages/octane-mcp-server/` (`@octanejs/mcp-server`) — MCP server: user-facing bridge/migration/SSR skills plus repo automation tools.
 - `benchmarks/` — perf harnesses: news, js-framework, recursive-context, signal-favoring, dbmon.
 - `examples/`, `playground/` — runnable apps and manual validation.
 - `scripts/scaffold-react-port.mjs` — creates React test-port skeletons with in/out-of-scope triage.
