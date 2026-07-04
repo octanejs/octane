@@ -33,31 +33,31 @@ afterEach(() => container.remove());
 
 describe('value-position JSX — SSR', () => {
 	it('renders a render-prop child returning a host element (attrs + nested text)', async () => {
-		const { body } = await ServerRT.render(server.HostProp);
-		expect(body).toContain('<span class="lbl" data-k="v">DATA</span>');
+		const { html } = ServerRT.renderToString(server.HostProp);
+		expect(html).toContain('<span class="lbl" data-k="v">DATA</span>');
 	});
 
 	it('renders all items of `{xs.map(x => <li/>)}`', async () => {
-		const { body } = await ServerRT.render(server.MapList, { items: ['a', 'b', 'c'] });
-		expect(body).toContain('<li class="row">a</li>');
-		expect(body).toContain('<li class="row">b</li>');
-		expect(body).toContain('<li class="row">c</li>');
+		const { html } = ServerRT.renderToString(server.MapList, { items: ['a', 'b', 'c'] });
+		expect(html).toContain('<li class="row">a</li>');
+		expect(html).toContain('<li class="row">b</li>');
+		expect(html).toContain('<li class="row">c</li>');
 		// Empty list renders the `<ul>` with no rows.
-		const { body: empty } = await ServerRT.render(server.MapList, { items: [] });
+		const { html: empty } = ServerRT.renderToString(server.MapList, { items: [] });
 		expect(empty).not.toContain('<li');
 	});
 
 	it('renders a render-prop child returning a fragment', async () => {
-		const { body } = await ServerRT.render(server.FragProp);
-		expect(body).toContain('<b>DATA</b>');
-		expect(body).toContain('<i>!</i>');
+		const { html } = ServerRT.renderToString(server.FragProp);
+		expect(html).toContain('<b>DATA</b>');
+		expect(html).toContain('<i>!</i>');
 	});
 });
 
 describe('value-position JSX — hydration', () => {
 	it('hydrates a render-prop host element with no markup mismatch', async () => {
-		const { body } = await ServerRT.render(server.HostProp);
-		container.innerHTML = body;
+		const { html } = ServerRT.renderToString(server.HostProp);
+		container.innerHTML = html;
 		const rp = container.querySelector('#rp') as HTMLElement;
 		const root = hydrateRoot(container, HostProp, {});
 		flushSync(() => {});
@@ -72,8 +72,8 @@ describe('value-position JSX — hydration', () => {
 
 	it('hydrates a `{xs.map(...)}` list with all items present', async () => {
 		const items = ['a', 'b', 'c'];
-		const { body } = await ServerRT.render(server.MapList, { items });
-		container.innerHTML = body;
+		const { html } = ServerRT.renderToString(server.MapList, { items });
+		container.innerHTML = html;
 		const ul = container.querySelector('#ml') as HTMLElement;
 		const root = hydrateRoot(container, MapList, { items });
 		flushSync(() => {});
@@ -84,8 +84,8 @@ describe('value-position JSX — hydration', () => {
 	});
 
 	it('hydrates a render-prop fragment child', async () => {
-		const { body } = await ServerRT.render(server.FragProp);
-		container.innerHTML = body;
+		const { html } = ServerRT.renderToString(server.FragProp);
+		container.innerHTML = html;
 		const rp = container.querySelector('#rp') as HTMLElement;
 		const root = hydrateRoot(container, FragProp, {});
 		flushSync(() => {});

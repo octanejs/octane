@@ -1,11 +1,14 @@
 /**
  * `octane/server` — server-rendering entry.
  *
- * Public API: `render(Component, props?, options?)`, the server analogue of
- * `createRoot().render()`. It resolves to `{ head, body, css }`: hoisted head
- * elements, the rendered body (plus the suspense seed script when anything
- * suspended), and the deduped scoped-style tags. Options cover an AbortSignal,
- * a CSP nonce for the inline tags, and a per-render suspense deadline.
+ * Public API (React `react-dom/server` parity): `renderToString(Component,
+ * props?, options?)` (a single sync pass; suspended boundaries render their
+ * fallback) and `renderToStaticMarkup` (clean, non-hydratable HTML). Both return
+ * `{ html, css }`: hoisted head folds into `html` (plus the suspense seed script
+ * when anything resolved synchronously) and the deduped scoped-style tags are in
+ * `css`. The await-everything renderer is `prerender` in `octane/static`.
+ * `RenderOptions` cover an `AbortSignal`, a CSP `nonce` for the inline tags, and a
+ * per-render suspense deadline (`timeoutMs`).
  *
  * `executeServerFunction` is the metaframework's RPC executor for `module
  * server` functions — the vite plugin loads it via
@@ -21,8 +24,12 @@
 export { executeServerFunction } from './rpc.js';
 
 export {
-	// Entry
-	render,
+	// Entry — React `react-dom/server` parity (buffered; streaming lands in a
+	// later phase). `renderToString` is a single sync pass (fallbacks for
+	// suspended boundaries); `renderToStaticMarkup` is non-hydratable clean HTML.
+	// The await-everything behaviour lives in `octane/static` as `prerender`.
+	renderToString,
+	renderToStaticMarkup,
 	type RenderResult,
 	type RenderOptions,
 	setSsrSuspenseTimeout,

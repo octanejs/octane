@@ -33,10 +33,10 @@ afterEach(() => container.remove());
 
 describe('hydrateRoot — @if (SSR Phase 6 / M3)', () => {
 	it('adopts the taken branch (same element) and it stays interactive', async () => {
-		const { body } = await ServerRT.render(server.Toggle, { on: true });
-		expect(body).toContain('<button id="hit" class="on">on:0</button>');
+		const { html } = ServerRT.renderToString(server.Toggle, { on: true });
+		expect(html).toContain('<button id="hit" class="on">on:0</button>');
 
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const btn = container.querySelector('#hit') as HTMLButtonElement;
 		const root = hydrateRoot(container, Toggle, { on: true });
 		flushSync(() => {});
@@ -57,8 +57,8 @@ describe('hydrateRoot — @if (SSR Phase 6 / M3)', () => {
 		// this render would wipe the container and mount a fresh node — losing both
 		// the adopted node identity and the client-driven count state. Asserting both
 		// survive is the discriminator.
-		const { body } = await ServerRT.render(server.Toggle, { on: true });
-		container.innerHTML = body;
+		const { html } = ServerRT.renderToString(server.Toggle, { on: true });
+		container.innerHTML = html;
 		const btn = container.querySelector('#hit') as HTMLButtonElement;
 		const root = hydrateRoot(container, Toggle, { on: true });
 		flushSync(() => {});
@@ -76,9 +76,9 @@ describe('hydrateRoot — @if (SSR Phase 6 / M3)', () => {
 	});
 
 	it('adopts the @else branch when the condition is false', async () => {
-		const { body } = await ServerRT.render(server.Toggle, { on: false });
-		expect(body).toContain('<span class="off">off</span>');
-		container.innerHTML = body;
+		const { html } = ServerRT.renderToString(server.Toggle, { on: false });
+		expect(html).toContain('<span class="off">off</span>');
+		container.innerHTML = html;
 		const off = container.querySelector('.off') as HTMLElement;
 		const root = hydrateRoot(container, Toggle, { on: false });
 		flushSync(() => {});
@@ -89,9 +89,9 @@ describe('hydrateRoot — @if (SSR Phase 6 / M3)', () => {
 
 describe('hydrateRoot — @switch (SSR Phase 6 / M3)', () => {
 	it('adopts the matched case branch', async () => {
-		const { body } = await ServerRT.render(server.Pick, { k: 'b' });
-		expect(body).toContain('<span class="b">BBB</span>');
-		container.innerHTML = body;
+		const { html } = ServerRT.renderToString(server.Pick, { k: 'b' });
+		expect(html).toContain('<span class="b">BBB</span>');
+		container.innerHTML = html;
 		const span = container.querySelector('.b') as HTMLElement;
 		const root = hydrateRoot(container, Pick, { k: 'b' });
 		flushSync(() => {});

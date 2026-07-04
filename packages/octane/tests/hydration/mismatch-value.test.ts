@@ -56,9 +56,13 @@ describe('hydrateRoot — VALUE mismatch (text + attribute) detect/patch/warn', 
 	});
 
 	it('patches a TEXT mismatch to the client value + warns with LOC', async () => {
-		const { body } = await ServerRT.render(server.Attrs, { id: 'a', cls: 'c', text: 'server' });
-		expect(body).toContain('>server</div>');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Attrs, {
+			id: 'a',
+			cls: 'c',
+			text: 'server',
+		});
+		expect(html).toContain('>server</div>');
+		container.innerHTML = html;
 
 		hydrateRoot(container, clientDev.Attrs, { id: 'a', cls: 'c', text: 'client' });
 		flushSync(() => {});
@@ -73,9 +77,13 @@ describe('hydrateRoot — VALUE mismatch (text + attribute) detect/patch/warn', 
 	});
 
 	it('patches an ATTRIBUTE mismatch to the client value + warns with LOC', async () => {
-		const { body } = await ServerRT.render(server.Attrs, { id: 'server-id', cls: 'c', text: 't' });
-		expect(body).toContain('id="server-id"');
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Attrs, {
+			id: 'server-id',
+			cls: 'c',
+			text: 't',
+		});
+		expect(html).toContain('id="server-id"');
+		container.innerHTML = html;
 
 		hydrateRoot(container, clientDev.Attrs, { id: 'client-id', cls: 'c', text: 't' });
 		flushSync(() => {});
@@ -91,8 +99,12 @@ describe('hydrateRoot — VALUE mismatch (text + attribute) detect/patch/warn', 
 	});
 
 	it('does NOT warn when server and client agree (DOM untouched)', async () => {
-		const { body } = await ServerRT.render(server.Attrs, { id: 'a', cls: 'c', text: 'same' });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Attrs, {
+			id: 'a',
+			cls: 'c',
+			text: 'same',
+		});
+		container.innerHTML = html;
 		const before = container.innerHTML;
 
 		hydrateRoot(container, clientDev.Attrs, { id: 'a', cls: 'c', text: 'same' });
@@ -108,10 +120,13 @@ describe('hydrateRoot — VALUE mismatch (text + attribute) detect/patch/warn', 
 	it('suppressHydrationWarning: keeps the SERVER value + no warning (text + attr)', async () => {
 		const srv = serverModule(SUPPRESS, 'suppress.tsrx');
 		const cli = devClientModule(SUPPRESS, 'suppress.tsrx');
-		const { body } = await ServerRT.render(srv.Suppressed, { id: 'server-id', text: 'server' });
+		const { html } = await ServerRT.renderToString(srv.Suppressed, {
+			id: 'server-id',
+			text: 'server',
+		});
 		// The opt-out is NOT serialized into the server HTML.
-		expect(body).not.toContain('suppressHydrationWarning');
-		container.innerHTML = body;
+		expect(html).not.toContain('suppressHydrationWarning');
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.Suppressed, { id: 'client-id', text: 'client' });
 		flushSync(() => {});
@@ -128,8 +143,11 @@ describe('hydrateRoot — VALUE mismatch (text + attribute) detect/patch/warn', 
 	it('control (no suppress): same shape warns + patches', async () => {
 		const srv = serverModule(SUPPRESS, 'suppress.tsrx');
 		const cli = devClientModule(SUPPRESS, 'suppress.tsrx');
-		const { body } = await ServerRT.render(srv.NotSuppressed, { id: 'server-id', text: 'server' });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(srv.NotSuppressed, {
+			id: 'server-id',
+			text: 'server',
+		});
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.NotSuppressed, { id: 'client-id', text: 'client' });
 		flushSync(() => {});
@@ -146,13 +164,13 @@ describe('hydrateRoot — VALUE mismatch (text + attribute) detect/patch/warn', 
 	it('spread suppressHydrationWarning: keeps SERVER attr/class/text, no warning, no junk attribute', async () => {
 		const srv = serverModule(SUPPRESS, 'suppress.tsrx');
 		const cli = devClientModule(SUPPRESS, 'suppress.tsrx');
-		const { body } = await ServerRT.render(srv.SpreadSuppressed, {
+		const { html } = await ServerRT.renderToString(srv.SpreadSuppressed, {
 			rest: { id: 'server-id', class: 'server-cls', suppressHydrationWarning: true },
 			text: 'server',
 		});
 		// The opt-out is NOT serialized into the server HTML (ssrSpread skips it).
-		expect(body).not.toContain('suppresshydrationwarning');
-		container.innerHTML = body;
+		expect(html).not.toContain('suppresshydrationwarning');
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.SpreadSuppressed, {
 			rest: { id: 'client-id', class: 'client-cls', suppressHydrationWarning: true },
@@ -176,11 +194,11 @@ describe('hydrateRoot — VALUE mismatch (text + attribute) detect/patch/warn', 
 	it('spread class mismatch (no suppress): patches to the client class + warns', async () => {
 		const srv = serverModule(SUPPRESS, 'suppress.tsrx');
 		const cli = devClientModule(SUPPRESS, 'suppress.tsrx');
-		const { body } = await ServerRT.render(srv.SpreadClassed, {
+		const { html } = await ServerRT.renderToString(srv.SpreadClassed, {
 			rest: { class: 'server-cls' },
 		});
-		expect(body).toContain('class="server-cls"');
-		container.innerHTML = body;
+		expect(html).toContain('class="server-cls"');
+		container.innerHTML = html;
 
 		hydrateRoot(container, cli.SpreadClassed, { rest: { class: 'client-cls' } });
 		flushSync(() => {});
@@ -198,9 +216,9 @@ describe('hydrateRoot — VALUE mismatch (text + attribute) detect/patch/warn', 
 	it('markerless `{expr}` text mismatch: patch + warn via the text hole slot LOC', async () => {
 		const srv = serverModule(MARKERLESS, 'markerless-text.tsx');
 		const cli = devClientModule(MARKERLESS, 'markerless-text.tsx');
-		const { body } = await ServerRT.render(srv.Counter, {});
+		const { html } = await ServerRT.renderToString(srv.Counter, {});
 		// Server rendered 0; tamper the server text so hydration sees a divergence.
-		container.innerHTML = body.replace('>0<', '>9<');
+		container.innerHTML = html.replace('>0<', '>9<');
 
 		hydrateRoot(container, cli.Counter, {});
 		flushSync(() => {});

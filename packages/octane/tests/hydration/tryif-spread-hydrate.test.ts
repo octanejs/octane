@@ -66,8 +66,8 @@ function assertCleanHydration(serverBody: string, clientComp: any, clientProps: 
 describe('hydrateRoot — router Match shape: @try > @if > component with a spread root', () => {
 	// Simple shape: <div><MatchesLike/></div> hydrated directly.
 	it('adopts the server <header> for the spread (no throw, no rebuild)', async () => {
-		const { body } = await ServerRT.render(server.MatchSpread, props);
-		assertCleanHydration(body, MatchSpread, props);
+		const { html } = ServerRT.renderToString(server.MatchSpread, props);
+		assertCleanHydration(html, MatchSpread, props);
 	});
 
 	// The full app shape: nested context providers whose children are createElement
@@ -95,7 +95,7 @@ describe('hydrateRoot — router Match shape: @try > @if > component with a spre
 				scope,
 			);
 		const clientTree = () => tree({ createElement }, { Wrap, RPLike });
-		const { body } = await ServerRT.render(serverTree, {});
-		assertCleanHydration(body, clientTree, {});
+		const { html } = ServerRT.renderToString(serverTree, {});
+		assertCleanHydration(html, clientTree, {});
 	});
 });

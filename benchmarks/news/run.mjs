@@ -187,6 +187,35 @@ console.log(`hydrate    (ms) |${f(hyd.median)} |${f(hyd.min)} |${f(hyd.p95)}`);
 console.log(
 	`\ncorrectness: cards=${check.cards}  no-rebuild=${check.noRebuild}  interactive=${check.toggled}`,
 );
+
+// Machine-readable results for the unified bench runner (see the BENCH_JSON
+// contract in benchmarks/README.md). This harness is per-target, so it writes a
+// single-target payload; the runner loops the targets and merges them into one
+// `news` suite result. On a failed correctness gate it still writes the JSON with
+// a top-level `failed` field (then exits non-zero below).
+if (process.env.BENCH_JSON) {
+	const ok = check.noRebuild && check.toggled && check.cards > 0;
+	const payload = {
+		suite: 'news',
+		iterations: ITER,
+		targets: [
+			{
+				name: target,
+				ops: {
+					ssr_render: { median: ssr.median, min: ssr.min, p95: ssr.p95, samples: ITER },
+					hydrate: { median: hyd.median, min: hyd.min, p95: hyd.p95, samples: ITER },
+				},
+				meta: { htmlBytes, cards: check.cards },
+			},
+		],
+	};
+	if (!ok) {
+		payload.failed = `news/${target} correctness: noRebuild=${check.noRebuild} interactive=${check.toggled} cards=${check.cards}`;
+	}
+	fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');
+	console.error(`BENCH_JSON written to ${process.env.BENCH_JSON}`);
+}
+
 if (!check.noRebuild || !check.toggled || check.cards === 0) {
 	console.error('\n✗ hydration correctness check FAILED');
 	process.exit(1);

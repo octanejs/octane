@@ -9,7 +9,7 @@ const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 // SSR Phase 1: server render of static markup + dynamic text + attributes +
 // nested components. The compiler (mode: 'server') emits HTML-string-building
 // bodies that import from 'octane/server'; we eval them with that same
-// runtime module injected, then call render() and snapshot { head, body, css }.
+// runtime module injected, then call renderToString() and snapshot { html, css }.
 
 function evalServer(source: string, file: string): Record<string, any> {
 	let { code } = compile(source, file, { mode: 'server' });
@@ -31,91 +31,90 @@ const ssr = evalServer(fixture('ssr'), 'ssr.tsrx');
 
 describe('SSR Phase 1 — basic fixtures', () => {
 	it('renders static markup, dynamic text, and attributes', async () => {
-		expect(await RT.render(basic.Hello)).toMatchSnapshot('Hello');
-		expect(await RT.render(basic.Counter, { n: 5 })).toMatchSnapshot('Counter');
-		expect(await RT.render(basic.Greet, { name: 'Ada' })).toMatchSnapshot('Greet');
-		expect(await RT.render(basic.Mixed)).toMatchSnapshot('Mixed');
+		expect(await RT.renderToString(basic.Hello)).toMatchSnapshot('Hello');
+		expect(await RT.renderToString(basic.Counter, { n: 5 })).toMatchSnapshot('Counter');
+		expect(await RT.renderToString(basic.Greet, { name: 'Ada' })).toMatchSnapshot('Greet');
+		expect(await RT.renderToString(basic.Mixed)).toMatchSnapshot('Mixed');
 	});
 
 	it('renders SVG and MathML (static + dynamic attrs)', async () => {
-		expect(await RT.render(basic.SvgStatic)).toMatchSnapshot('SvgStatic');
-		expect(await RT.render(basic.SvgDynamic, { klass: 'c', w: 30, fill: 'blue' })).toMatchSnapshot(
-			'SvgDynamic',
-		);
+		expect(await RT.renderToString(basic.SvgStatic)).toMatchSnapshot('SvgStatic');
 		expect(
-			await RT.render(basic.MathDynamic, { display: 'block', klass: 'm', value: 'x' }),
+			await RT.renderToString(basic.SvgDynamic, { klass: 'c', w: 30, fill: 'blue' }),
+		).toMatchSnapshot('SvgDynamic');
+		expect(
+			await RT.renderToString(basic.MathDynamic, { display: 'block', klass: 'm', value: 'x' }),
 		).toMatchSnapshot('MathDynamic');
 	});
 });
 
 describe('SSR Phase 1 — ssr fixture (style / spread / innerHTML / components / hooks / css)', () => {
 	it('renders dynamic object style with camelCase keys', async () => {
-		expect(await RT.render(ssr.Styled, { klass: 'a', color: 'red', label: 'hi' })).toMatchSnapshot(
-			'Styled',
-		);
+		expect(
+			await RT.renderToString(ssr.Styled, { klass: 'a', color: 'red', label: 'hi' }),
+		).toMatchSnapshot('Styled');
 	});
 
 	it('renders boolean attributes, void elements, and dynamic attrs', async () => {
-		expect(await RT.render(ssr.Field, { value: 'v', disabled: true })).toMatchSnapshot(
+		expect(await RT.renderToString(ssr.Field, { value: 'v', disabled: true })).toMatchSnapshot(
 			'Field-disabled',
 		);
-		expect(await RT.render(ssr.Field, { value: 'v', disabled: false })).toMatchSnapshot(
+		expect(await RT.renderToString(ssr.Field, { value: 'v', disabled: false })).toMatchSnapshot(
 			'Field-enabled',
 		);
 	});
 
 	it('serializes spread attributes', async () => {
-		expect(await RT.render(ssr.Spread, { attrs: { id: 'x', 'data-k': '1' } })).toMatchSnapshot(
-			'Spread',
-		);
+		expect(
+			await RT.renderToString(ssr.Spread, { attrs: { id: 'x', 'data-k': '1' } }),
+		).toMatchSnapshot('Spread');
 	});
 
 	it('emits innerHTML raw (unescaped)', async () => {
-		expect(await RT.render(ssr.Raw, { html: '<b>bold</b>' })).toMatchSnapshot('Raw');
+		expect(await RT.renderToString(ssr.Raw, { html: '<b>bold</b>' })).toMatchSnapshot('Raw');
 	});
 
 	it('emits dangerouslySetInnerHTML raw when carried through a spread', async () => {
-		const { body } = await RT.render(ssr.RawSpread, {
+		const { html } = await RT.renderToString(ssr.RawSpread, {
 			attrs: { id: 'r', dangerouslySetInnerHTML: { __html: '<b>via spread</b>' } },
 		});
-		expect(body).toContain('id="r"'); // other spread attrs still serialized
-		expect(body).toContain('class="base"');
-		expect(body).toContain('<b>via spread</b>'); // raw HTML rendered as content
-		expect(body).not.toContain('dangerouslysetinnerhtml'); // not a dead attribute
+		expect(html).toContain('id="r"'); // other spread attrs still serialized
+		expect(html).toContain('class="base"');
+		expect(html).toContain('<b>via spread</b>'); // raw HTML rendered as content
+		expect(html).not.toContain('dangerouslysetinnerhtml'); // not a dead attribute
 	});
 
 	it('renders nested component composition', async () => {
-		expect(await RT.render(ssr.Card, { title: 'T', tag: 'new' })).toMatchSnapshot('Card');
+		expect(await RT.renderToString(ssr.Card, { title: 'T', tag: 'new' })).toMatchSnapshot('Card');
 	});
 
 	it('collects scoped CSS into the css field', async () => {
-		const out = await RT.render(ssr.Scoped);
+		const out = await RT.renderToString(ssr.Scoped);
 		expect(out).toMatchSnapshot('Scoped');
 		expect(out.css).toContain('.box.tsrx-');
-		expect(out.body).toContain('class="box tsrx-');
+		expect(out.html).toContain('class="box tsrx-');
 	});
 });
 
 describe('SSR Phase 1 — semantics', () => {
 	it('escapes dynamic text and attribute values', async () => {
-		const out = await RT.render(basic.Greet, { name: '<script>"x"' });
-		expect(out.body).toContain('&lt;script&gt;');
-		expect(out.body).not.toContain('<script>');
+		const out = await RT.renderToString(basic.Greet, { name: '<script>"x"' });
+		expect(out.html).toContain('&lt;script&gt;');
+		expect(out.html).not.toContain('<script>');
 	});
 
 	it('hooks render their initial value; effects do NOT run on the server', async () => {
 		const onEffect = vi.fn();
-		const out = await RT.render(ssr.HookView, { start: 7, onEffect });
-		expect(out.body).toContain('<span class="n">7</span>');
-		expect(out.body).toContain('<span class="d">14</span>'); // useMemo ran once
-		expect(out.body).toMatch(/id=":in-[0-9a-z]+:"/); // deterministic useId
+		const out = await RT.renderToString(ssr.HookView, { start: 7, onEffect });
+		expect(out.html).toContain('<span class="n">7</span>');
+		expect(out.html).toContain('<span class="d">14</span>'); // useMemo ran once
+		expect(out.html).toMatch(/id=":in-[0-9a-z]+:"/); // deterministic useId
 		expect(onEffect).not.toHaveBeenCalled(); // useEffect is a no-op on the server
 	});
 
-	it('returns the { head, body, css } shape', async () => {
-		const out = await RT.render(basic.Hello);
-		expect(Object.keys(out).sort()).toEqual(['body', 'css', 'head']);
-		expect(out.head).toBe('');
+	it('returns the { html, css } shape', async () => {
+		const out = await RT.renderToString(basic.Hello);
+		expect(Object.keys(out).sort()).toEqual(['css', 'html']);
 	});
 
 	it('still rejects truly-unsupported server constructs (e.g. <Activity>)', () => {
@@ -167,7 +166,7 @@ describe('SSR — static-literal attribute fast paths', () => {
 			`export function A() @{ <div aria-hidden={false} aria-expanded={true} hidden={false}>{'x'}</div> }`,
 			'aria-static.tsrx',
 		);
-		const out = (await RT.render(mod.A)).body;
+		const out = (await RT.renderToString(mod.A)).html;
 		expect(out).toContain(' aria-hidden="false"');
 		expect(out).toContain(' aria-expanded="true"');
 		expect(out).not.toContain(' hidden');
@@ -187,11 +186,35 @@ describe('SSR — React 19 function form actions', () => {
 			}`,
 			'fn-action.tsrx',
 		);
-		const withFn = (await RT.render(mod.F, { act: () => {} })).body;
+		const withFn = (await RT.renderToString(mod.F, { act: () => {} })).html;
 		expect(withFn).not.toContain('action');
 		expect(withFn).not.toContain('=>');
-		const withStr = (await RT.render(mod.F, { act: '/submit' })).body;
+		const withStr = (await RT.renderToString(mod.F, { act: '/submit' })).html;
 		expect(withStr).toContain(' action="/submit"');
 		expect(withStr).toContain(' formaction="/submit"');
+	});
+});
+
+describe('SSR — plain-.ts root returning a createElement descriptor', () => {
+	// A root authored in plain .ts (the shape every @octanejs binding produces)
+	// returns a descriptor, not an HTML string. render() must normalize it
+	// through ssrChild exactly like ssrComponent does for child components —
+	// previously the descriptor object itself became the body
+	// ('[object Object]').
+	it('renders a host-descriptor root', async () => {
+		const Root = () =>
+			RT.createElement('main', { class: 'app' }, RT.createElement('h1', null, 'hi'));
+		const { html } = await RT.renderToString(Root as any);
+		expect(html).toContain('<main class="app"><h1>hi</h1></main>');
+		expect(html).not.toContain('[object Object]');
+	});
+
+	it('renders a component-descriptor root and null root', async () => {
+		const Inner = () => RT.createElement('span', null, 'x');
+		const Root = () => RT.createElement(Inner, null);
+		const { html } = await RT.renderToString(Root as any);
+		expect(html).toContain('<span>x</span>');
+		const { html: empty } = await RT.renderToString((() => null) as any);
+		expect(empty).not.toContain('[object Object]');
 	});
 });

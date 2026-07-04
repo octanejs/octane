@@ -6,7 +6,9 @@
   "description": "js-framework-benchmark umbrella for ripple ecosystem - drives each renderer's bench app via Playwright.",
   "scripts": {
     "bench": "node run.mjs",
-    "bench:long": "node run.mjs 16"
+    "bench:long": "node run.mjs 16",
+    "bench:reorder": "node run-reorder.mjs",
+    "bench:reorder:long": "node run-reorder.mjs 16"
   },
   "dependencies": {
     "playwright": "catalog:default"

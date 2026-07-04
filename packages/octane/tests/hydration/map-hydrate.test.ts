@@ -43,11 +43,11 @@ describe('hydrateRoot — `.tsx` `.map()` keyed list (forBlock parity)', () => {
 	});
 
 	it('adopts the server-rendered list items (same nodes) and a keyed reorder reuses them', async () => {
-		const { body } = await ServerRT.render(server.MapList, {});
-		expect(body).toContain('data-id="1"');
-		expect(body).toContain('data-id="3"');
+		const { html } = ServerRT.renderToString(server.MapList, {});
+		expect(html).toContain('data-id="1"');
+		expect(html).toContain('data-id="3"');
 
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const lis = Array.from(container.querySelectorAll('li.row')) as HTMLElement[];
 		expect(lis.map((li) => li.getAttribute('data-id'))).toEqual(['1', '2', '3']);
 		expect(lis.map((li) => li.textContent)).toEqual(['a', 'b', 'c']);

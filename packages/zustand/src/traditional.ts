@@ -27,8 +27,17 @@ const identity = <T>(arg: T): T => arg;
 // Derive a stable, distinct sub-slot from the wrapper's slot. `Symbol.for` interns
 // by description, so the same call site always yields the same sub-slot; the
 // `:wsel:` namespace keeps it clear of useSyncExternalStore's `:uses:` slots.
+// Memoized — subSlot runs per hook call per render; the cache returns the
+// identical Symbol.for-interned value without the concat + registry lookup.
+const subSlotCache = new Map<symbol, Map<string, symbol>>();
 function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	return slot !== undefined ? Symbol.for((slot.description ?? '') + ':wsel:' + tag) : undefined;
+	if (slot === undefined) return undefined;
+	let byTag = subSlotCache.get(slot);
+	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
+	let sym = byTag.get(tag);
+	if (sym === undefined)
+		byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':wsel:' + tag)));
+	return sym;
 }
 
 interface SelectionCell<U> {

@@ -1,0 +1,14 @@
+{
+  "name": "@benchmarks/effectful-list",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "effectful-list bench: a 1k-row keyed table whose every row carries useEffect/useLayoutEffect/shared-callback-ref lifecycle machinery; harness measures mount_1k / update_nodeps / update_deps / clear / remount / remove_100_scattered across octane-tsrx, octane-jsx, react, solid and ripple, gated on analytic effect-counter expectations.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:long": "node run.mjs 50"
+  },
+  "dependencies": {
+    "playwright": "catalog:default"
+  }
+}

@@ -3,7 +3,11 @@ import { useState } from 'octane';
 // Canonical js-framework-benchmark fixture. The six button IDs (run, runlots,
 // add, update, clear, swaprows) plus the per-row <a> tags in column 2
 // (select) and column 3 (remove) are addressable by the Playwright harness
-// at /Users/domgan/Projects/ripple/benchmarks/js-framework/run.mjs.
+// at ../../run.mjs. The SECOND jumbotron button row (reverse / shuffle /
+// rotatef / rotateb / prepend100 / append100 / insertmid100 / removefirst /
+// removeevery10 / displace{3,4,5,6,8}) is the keyed-reorder matrix driven by
+// ../../run-reorder.mjs — every op is a pure permutation / splice of the
+// current keyed list, applied through setItems (never in-place mutation).
 //
 // All handlers are written to play to octane's strengths:
 //   * Top-level handlers (run / runLots / add / clear / update / swap) are
@@ -89,6 +93,38 @@ function buildData(count) {
 	return data;
 }
 
+// ── Deterministic shuffle machinery (identical in all four bench fixtures,
+// replayed by ../../run-reorder.mjs for its identity gate) ──────────────────
+// Every #shuffle click derives a fresh 32-bit seed from a module-level
+// mulberry32 stream with a FIXED seed, then runs Fisher–Yates with a PRNG
+// seeded by it. The seed stream advances exactly once per click — in the
+// click handler, never inside the state updater — so a framework that
+// re-invokes updaters/reducers cannot skew the sequence. Identical clicks
+// therefore produce identical permutations across all four targets.
+function mulberry32(seed) {
+	return () => {
+		seed |= 0;
+		seed = seed + 1831565813 | 0;
+		let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+		t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+		return ((t ^ t >>> 14) >>> 0) / 4294967296;
+	};
+}
+const SHUFFLE_SEED = 42;
+const shuffleSeeds = mulberry32(SHUFFLE_SEED);
+const nextShuffleSeed = () => shuffleSeeds() * 4294967296 >>> 0;
+function shuffleWithSeed(d, seed) {
+	const rand = mulberry32(seed);
+	const out = d.slice();
+	for (let i = out.length - 1; i > 0; i--) {
+		const j = rand() * (i + 1) | 0;
+		const tmp = out[i];
+		out[i] = out[j];
+		out[j] = tmp;
+	}
+	return out;
+}
+
 export default function Main() @{
 	const [items, setItems] = useState([]);
 	const [selected, setSelected] = useState(0);
@@ -119,6 +155,33 @@ export default function Main() @{
 		out.splice(out.indexOf(row), 1);
 		return out;
 	});
+
+	// Keyed-reorder matrix handlers (../../run-reorder.mjs). Every button below
+	// binds an IDENTIFIER-callee arrow (`onClick={() => reverseRows()}`) so it
+	// compiles to the same stable event-bundle as the per-row arrows — the
+	// fixtures stay on the tuned path. All ops replace `items` with a fresh
+	// array via setItems; nothing mutates in place.
+	const reverseRows = () => setItems((d) => d.toReversed());
+	const shuffleRows = () => {
+		// Seed derived HERE (once per click), not inside the updater — see the
+		// shuffle-machinery comment above.
+		const seed = nextShuffleSeed();
+		setItems((d) => shuffleWithSeed(d, seed));
+	};
+	const rotateForward = () => setItems(
+		(d) => (d.length === 0 ? d : [d[d.length - 1], ...d.slice(0, -1)]),
+	);
+	const rotateBackward = () => setItems((d) => (d.length === 0 ? d : [...d.slice(1), d[0]]));
+	const prepend100 = () => setItems((d) => buildData(100).concat(d));
+	const append100 = () => setItems((d) => d.concat(buildData(100)));
+	const insertMid100 = () => setItems((d) => {
+		const mid = d.length >> 1;
+		return d.slice(0, mid).concat(buildData(100), d.slice(mid));
+	});
+	const removeFirst = () => setItems((d) => d.slice(1));
+	const removeEvery10 = () => setItems((d) => d.filter((_, i) => i % 10 !== 0));
+	// displace_k: move the FIRST k rows (as a group, order preserved) to the END.
+	const displace = (k) => setItems((d) => d.slice(k).concat(d.slice(0, k)));
 
 	<div class="container">
 		<div class="jumbotron">
@@ -160,6 +223,120 @@ export default function Main() @{
 							<button type="button" class="btn btn-primary btn-block" id="swaprows" onClick={swap}>
 								Swap Rows
 							</button>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="reverse"
+								onClick={() => reverseRows()}
+							>Reverse rows</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="shuffle"
+								onClick={() => shuffleRows()}
+							>Shuffle rows (seeded)</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="rotatef"
+								onClick={() => rotateForward()}
+							>Rotate last to front</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="rotateb"
+								onClick={() => rotateBackward()}
+							>Rotate first to end</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="prepend100"
+								onClick={() => prepend100()}
+							>Prepend 100 rows</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="append100"
+								onClick={() => append100()}
+							>Append 100 rows</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="insertmid100"
+								onClick={() => insertMid100()}
+							>Insert 100 rows at middle</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="removefirst"
+								onClick={() => removeFirst()}
+							>Remove first row</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="removeevery10"
+								onClick={() => removeEvery10()}
+							>Remove every 10th row</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="displace3"
+								onClick={() => displace(3)}
+							>Displace first 3 to end</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="displace4"
+								onClick={() => displace(4)}
+							>Displace first 4 to end</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="displace5"
+								onClick={() => displace(5)}
+							>Displace first 5 to end</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="displace6"
+								onClick={() => displace(6)}
+							>Displace first 6 to end</button>
+						</div>
+						<div class="col-sm-6 smallpad">
+							<button
+								type="button"
+								class="btn btn-primary btn-block"
+								id="displace8"
+								onClick={() => displace(8)}
+							>Displace first 8 to end</button>
 						</div>
 					</div>
 				</div>

@@ -6,8 +6,17 @@ import { useState, useCallback, useSyncExternalStore, useEffect } from 'octane';
 import { MutationObserver, noop, notifyManager, shouldThrowError } from '@tanstack/query-core';
 import { resolveClient } from './context';
 
+// Memoized — subSlot runs per hook call per render; the cache returns the
+// identical Symbol.for-interned value without the concat + registry lookup.
+const subSlotCache = new Map<symbol, Map<string, symbol>>();
 function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	return slot !== undefined ? Symbol.for((slot.description ?? '') + ':om:' + tag) : undefined;
+	if (slot === undefined) return undefined;
+	let byTag = subSlotCache.get(slot);
+	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
+	let sym = byTag.get(tag);
+	if (sym === undefined)
+		byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':om:' + tag)));
+	return sym;
 }
 
 export function useMutation(options: any, ...rest: any[]): any {

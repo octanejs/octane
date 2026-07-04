@@ -60,6 +60,7 @@ don't port:
 | **Controlled components + synthetic `onChange`** (value/checked re-asserted from a controlled prop, edits reverted, `defaultValue` mapping, `<select value>`/`<textarea value>` controlled semantics) | **Intentional divergence (decided 2026-06-24).** Octane is native-event / uncontrolled by design: `value`/`checked` are plain attributes, events are native (`onInput`), and the DOM is the source of truth. React's controlled-input contract is explicitly NOT a target. **Do NOT port `ReactDOMInput`/`Select`/`Textarea` controlled-value tests.** The *uncontrolled* DOM-attribute and event-delegation behaviors (attribute removal vs empty-string, boolean reflection, **event bubbling incl. through portals**) ARE in scope. |
 | DEV-only warnings (unknown props, casing, controlled↔uncontrolled switch, nesting validation) | Octane's warning policy differs; port the functional outcome only. |
 | `class` / `className` value coercion | **Intentional divergence.** Octane composes `class`/`className` clsx-style (strings, numbers, arrays, objects, nesting; falsy drops out) at every apply site — client, spread, SVG, scoped-`<style>`, and SSR (byte-identical, so hydration matches). React coerces `className={['a','b']}` to `"a,b"`; Octane yields `"a b"`. A plain string still takes the fast path. |
+| **`useSyncExternalStore` commit-time getSnapshot re-read** (the `useSyncExternalStore-test.js` `:144` tearing check) | **Intentional divergence (decided 2026-07-03).** React's `updateSyncExternalStore` re-pushes `updateStoreInstance` whenever `inst.getSnapshot !== getSnapshot`, giving a commit-time snapshot re-read even for an unchanged value. Octane drops that: getSnapshot is refreshed in RENDER, and the commit-time store-sync (drainStoreSyncs) only runs when the read snapshot actually moved off the last-committed value (or the store was swapped) — so an unchanged snapshot with an unstable inline getSnapshot (the zustand/query pattern) enqueues nothing. Consequence: a store that mutates WITHOUT notifying in the render→commit window is no longer caught on a render where ONLY getSnapshot identity changed. Octane's synchronous renderer closes React's motivating concurrent-interleaving window, and any store that actually notifies is unaffected (onStoreChange compares against the render-fresh getSnapshot). Do NOT "fix" this back toward React's per-render commit re-read. See `useSyncExternalStore` in `runtime.ts`. |
 | Owner-based identity (`should NOT replace children with different owners`) | Modern React already dropped owner identity — confirm Octane matches (mount=1, unmount=0) but it's a 1-test check, not an area. |
 | Server Components / RSC / Flight | Not supported. |
 | Fizz **streaming** APIs (renderToPipeableStream, progressive chunks, shell hydration, selective/priority hydration of streamed boundaries) | Octane SSR is non-streaming. *Salvage the OUTCOME-level hydration tests (mismatch recovery, useId match, input value preservation), skip the streaming machinery.* |
@@ -177,6 +178,16 @@ propagation heuristics are unpinned:
 > scoped-style coverage — those areas need only edge-case top-ups, not new suites.
 
 ### Tier 4 — SSR / hydration determinism
+
+**SSR API — React-aligned (2026-07).** The octane-invented `render() → { head, body, css }`
+is replaced by `renderToString` / `renderToStaticMarkup` (`octane/server`, React's
+`react-dom/server`) and `prerender` (`octane/static`, React's `react-dom/static`). All return
+`{ html, css }`: the separate `head` field is dropped (hoisted `<title>`/`<meta>`/`<link>`
+fold into `html`, spliced into `<head>` when present else prepended — React-19 resource
+hoisting), and `css` stays a distinct field as a **deliberate, minimal divergence** from
+React's bare-string return — octane has scoped CSS that React core does not, and the field
+lets the framework place the deduped `<style>` tags. Streaming (`renderToPipeableStream` /
+`renderToReadableStream`, out-of-order Suspense) is the in-progress follow-on.
 
 Octane SSR + hydration adoption work. **Mismatch detection + recovery is now implemented**
 (2026-06-30): on a server/client divergence the runtime patches VALUE mismatches (text/attr)

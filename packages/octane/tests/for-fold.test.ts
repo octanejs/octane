@@ -72,13 +72,13 @@ describe('folded @for (return-JSX) matches the inline @{} oracle', () => {
 describe('folded @for hydrates against the @{} oracle markup', () => {
 	it('SSR byte-equals the inline form and adopts on hydrate', async () => {
 		const server = serverModule();
-		const ret = await ServerRT.render(server.RetList, { items: ITEMS });
-		const at = await ServerRT.render(server.AtList, { items: ITEMS });
-		expect(ret.body).toBe(at.body);
+		const ret = await ServerRT.renderToString(server.RetList, { items: ITEMS });
+		const at = await ServerRT.renderToString(server.AtList, { items: ITEMS });
+		expect(ret.html).toBe(at.html);
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);
-		container.innerHTML = ret.body;
+		container.innerHTML = ret.html;
 		const firstLi = container.querySelector('li') as HTMLElement;
 		const root = hydrateRoot(container, RetList, { items: ITEMS });
 		flushSync(() => {});

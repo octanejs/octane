@@ -15,13 +15,14 @@ import {
  */
 
 /**
- * octane RenderResult — imported from 'octane/server' (the single source of
- * truth) rather than re-declared, so the shape can't silently drift. Note
- * `render()` is ASYNC and `css` is ALREADY a deduped
+ * octane RenderResult — imported from 'octane/static' (the single source of
+ * truth) rather than re-declared, so the shape can't silently drift. `prerender`
+ * is ASYNC (awaits Suspense data) and returns `{ html, css }`: `html` has any
+ * hoisted `<head>` metadata folded in, and `css` is ALREADY a deduped
  * `<style data-octane="hash">…</style>` string (NOT a Set<string> needing a
  * `get_css_for_hashes` lookup like Ripple), so CSS handling here is identity.
  *
- * @typedef {import('octane/server').RenderResult} RenderResult
+ * @typedef {import('octane/static').RenderResult} RenderResult
  */
 
 /**
@@ -42,10 +43,10 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 			/** @type {any} */ (globalThis).rpc_modules = new Map();
 		}
 
-		// Load the octane server runtime. The wrappers call components directly
+		// Load the octane static renderer. The wrappers call components directly
 		// (no ssrComponent injection — the root must NOT be marker-wrapped), so
-		// only `render` is needed here.
-		const { render } = await vite.ssrLoadModule('octane/server');
+		// only `prerender` is needed here (await-all, complete HTML).
+		const { prerender } = await vite.ssrLoadModule('octane/static');
 
 		// Load the page component (compiled in server mode by octane()).
 		const entryPath = get_route_entry_path(route.entry);
@@ -80,10 +81,11 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 			RootComponent = createPropsWrapper(/** @type {any} */ (PageComponent), pageProps);
 		}
 
-		// Render to HTML. `head` carries the hoisted <title>/<meta>/<link> markup;
-		// `body` already contains any inline <script data-octane-suspense> seed.
+		// Render to HTML. prerender() is async (awaits Suspense data) and returns
+		// { html, css }: `html` has any hoisted <head> metadata folded in and
+		// already contains any inline <script data-octane-suspense> seed.
 		/** @type {RenderResult} */
-		const { head, body, css } = await render(RootComponent);
+		const { html: body, css } = await prerender(RootComponent);
 
 		// CSS is already a ready <style> string (or '') — identity, no re-wrapping.
 		const cssContent = css || '';
@@ -102,7 +104,6 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 			params: context.params,
 		});
 		const headContent = [
-			head,
 			cssContent,
 			`<script id="__octane_data" type="application/json">${escapeScript(routeData)}</script>`,
 		]

@@ -32,15 +32,15 @@ afterEach(() => container.remove());
 
 describe('hydrateRoot — hookless lite components (SSR Phase 6)', () => {
 	it('adopts each lite component (same elements), incl. the block-skipped 2nd one', async () => {
-		const { body } = await ServerRT.render(server.Shell, { title: 'T', a: 'Alpha', b: 'Beta' });
-		expect(body).toBe(
+		const { html } = ServerRT.renderToString(server.Shell, { title: 'T', a: 'Alpha', b: 'Beta' });
+		expect(html).toBe(
 			'<div id="shell"><h3>T</h3>' +
 				'<!--[--><span class="badge">Alpha</span><!--]-->' +
 				'<!--[--><span class="badge">Beta</span><!--]-->' +
 				'</div>',
 		);
 
-		container.innerHTML = body;
+		container.innerHTML = html;
 		const badges = [...container.querySelectorAll('span.badge')];
 		expect(badges.length).toBe(2);
 
