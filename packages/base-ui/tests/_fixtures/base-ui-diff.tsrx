@@ -116,7 +116,12 @@ export function MeterRange() @{
 
 // Explicit Intl format — the value text + aria-valuetext format as a plain number.
 export function MeterFormatted() @{
-	<Meter.Root className="meter" value={72} format={{ style: 'unit', unit: 'percent' }} aria-label="Usage">
+	<Meter.Root
+		className="meter"
+		value={72}
+		format={{ style: 'unit', unit: 'percent' }}
+		aria-label="Usage"
+	>
 		<Meter.Value className="meter-val" />
 	</Meter.Root>
 }
