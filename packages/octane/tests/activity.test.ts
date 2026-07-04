@@ -238,3 +238,70 @@ describe('<Activity> — effect cleanup order on hide (conformance)', () => {
 		r.unmount();
 	});
 });
+
+import { InsertionActivityHost } from './_fixtures/activity.tsrx';
+
+describe('<Activity> — insertion effects stay connected while hidden (conformance)', () => {
+	function setupInsertion() {
+		const log: string[] = [];
+		let setN: ((u: (v: number) => number) => void) | null = null;
+		const opts = {
+			mode: 'visible',
+			log: (s: string) => log.push(s),
+			expose: (fn: any) => (setN = fn),
+		};
+		const r = mount(InsertionActivityHost, opts);
+		flushEffects();
+		return {
+			r,
+			log,
+			setMode: (m: string) => {
+				r.update(InsertionActivityHost, { ...opts, mode: m });
+				flushEffects();
+			},
+			bump: () => {
+				flushSync(() => setN!((v) => v + 1));
+				flushEffects();
+			},
+		};
+	}
+
+	// Per Activity-test.js:1428 — 'insertion effects are not disconnected when the
+	// visibility changes'. Hiding destroys layout (and passive) effects but leaves
+	// insertion effects connected; revealing recreates layout effects but does NOT
+	// re-fire the still-connected insertion effect.
+	it('hide runs no insertion cleanup; reveal does not re-fire it', () => {
+		const t = setupInsertion();
+		expect(t.log).toEqual(['insertion mount 0', 'layout mount']);
+		t.log.length = 0;
+
+		t.setMode('hidden');
+		expect(t.log).toEqual(['layout cleanup']); // insertion untouched
+		t.log.length = 0;
+
+		t.setMode('visible');
+		expect(t.log).toEqual(['layout mount']); // insertion not re-fired
+		t.r.unmount();
+		// A real unmount DOES tear the insertion effect down.
+		expect(t.log).toEqual(['layout mount', 'layout cleanup', 'insertion cleanup 0']);
+	});
+
+	// Per Activity-test.js:1428 — an update WHILE hidden still fires the
+	// (deps-changed) insertion effect: the hidden subtree is pre-rendered and its
+	// styles must track it. Layout/passive stay silent until reveal.
+	it('a deps-changed update while hidden still cycles the insertion effect', () => {
+		const t = setupInsertion();
+		t.setMode('hidden');
+		t.log.length = 0;
+
+		t.bump(); // n: 0 → 1 while hidden
+		expect(t.log).toEqual(['insertion cleanup 0', 'insertion mount 1']);
+		t.log.length = 0;
+
+		t.setMode('visible');
+		// Reveal recreates the layout effect only — the insertion effect is
+		// already current for n=1.
+		expect(t.log).toEqual(['layout mount']);
+		t.r.unmount();
+	});
+});

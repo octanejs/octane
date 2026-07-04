@@ -335,6 +335,13 @@ export interface Block extends Scope {
 	inactive: boolean;
 	/** Direct (own) context reads this render — drives memo invalidation alongside $$ctxReads. */
 	$$ctxDirect: Map<Context<any>, any> | null;
+	/**
+	 * Armed for React's IMPLICIT same-element bailout (beginWork's
+	 * oldProps === newProps skip). Set at value-position component mounts
+	 * (childSlot); makes the block a context-stamping target like `__memo` so
+	 * the bail's lazy consumer refresh is sound.
+	 */
+	$$implicitBail: boolean;
 	/** Per-render `use(thenable)` call-order counter; reset at the top of renderBlock. */
 	__thenableIdx: number;
 	/**
@@ -353,6 +360,14 @@ interface EffectSlot {
 	cleanup: Cleanup | undefined;
 	/** Discriminant so deactivateScope can find effect slots among state/memo/ref. */
 	effect: true;
+	/**
+	 * The slot's phase (INSERTION/LAYOUT/PASSIVE), fixed at creation (a hook slot
+	 * is one call site, and a call site has one phase). deactivateScope uses it to
+	 * spare INSERTION effects on hide: React never disconnects insertion effects
+	 * for a hidden (<Activity>/suspended) tree — they own injected styles that
+	 * must persist — only a real unmount cleans them up.
+	 */
+	phase: Phase;
 	/**
 	 * True once a per-slot finalizer has been registered in scope.cleanups (on the
 	 * slot's first body run, in drainPhase). The finalizer fires slot.cleanup
@@ -986,10 +1001,12 @@ function drainPhase(phase: Phase): void {
 	// Skip entries whose subtree was hidden by <Activity> after they were queued
 	// but before this drain: deactivateScope already fired their cleanups, and the
 	// body must not run while hidden (it re-enqueues on reveal). See
-	// inInactiveSubtree.
+	// inInactiveSubtree. INSERTION entries are exempt — they stay connected and
+	// keep firing while hidden (deactivateScope spares them too).
+	const skipInactive = phase !== INSERTION;
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
-		if (e.scope.block.disposed || inInactiveSubtree(e.scope.block)) continue;
+		if (e.scope.block.disposed || (skipInactive && inInactiveSubtree(e.scope.block))) continue;
 		const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
 		if (slot && slot.cleanup) {
 			try {
@@ -1002,7 +1019,7 @@ function drainPhase(phase: Phase): void {
 	}
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
-		if (e.scope.block.disposed || inInactiveSubtree(e.scope.block)) continue;
+		if (e.scope.block.disposed || (skipInactive && inInactiveSubtree(e.scope.block))) continue;
 		let cleanup: void | Cleanup;
 		try {
 			// Spread deps as positional args (see PendingEffect.args). A no-deps
@@ -1152,6 +1169,12 @@ class BlockImpl {
 	$$ctxDirect: Map<Context<any>, any> | null;
 	// Resolved-provider cache for `use(ctx)` — see Scope.$$ctxCache.
 	$$ctxCache: Map<Context<any>, any> | null;
+	// Armed for React's IMPLICIT same-element bailout (beginWork's
+	// oldProps === newProps skip). Set at value-position component mounts
+	// (childSlot) — the only sites that can receive a cached descriptor back.
+	// Arming makes the block a stamping target (like __memo) so the bail's lazy
+	// consumer refresh has the context deps it needs.
+	$$implicitBail: boolean;
 	// __thenableIdx is reset every renderBlock so pre-init costs nothing.
 	__thenableIdx: number;
 	// Render-loop guard bookkeeping (see the Block interface).
@@ -1212,6 +1235,7 @@ class BlockImpl {
 		this.$$ctxReads = null;
 		this.$$ctxDirect = null;
 		this.$$ctxCache = null;
+		this.$$implicitBail = false;
 		this.__thenableIdx = 0;
 		this.drainStamp = 0;
 		this.drainRenders = 0;
@@ -1831,11 +1855,13 @@ function enqueueEffect(slot: symbol, fn: EffectFn, deps: any[] | undefined, phas
 	// the Activity becomes visible (deactivateScope also clears prior deps). Walk
 	// ancestors so a visible inner block inside a hidden outer Activity is skipped
 	// too. Effects are rare on the hot path, so this extra walk is cheap.
-	if (inInactiveSubtree(scope.block)) return;
+	// INSERTION effects are exempt (React: they stay connected while hidden and an
+	// update in a hidden-but-rendered subtree still fires them — Activity-test.js:1428).
+	if (phase !== INSERTION && inInactiveSubtree(scope.block)) return;
 	const prev = scope.hooks?.get(slot) as EffectSlot | undefined;
 	if (prev && !depsChanged(prev.deps, deps)) return;
 	if (!prev) {
-		ensureHooks(scope).set(slot, { deps, cleanup: undefined, effect: true });
+		ensureHooks(scope).set(slot, { deps, cleanup: undefined, effect: true, phase });
 	} else {
 		prev.deps = deps;
 	}
@@ -2374,10 +2400,10 @@ function useContextInternal<T>(context: Context<T>): T {
 		// or an inline lite descendant sharing the block) must re-run when this
 		// context changes — it can't be skipped past.
 		(CURRENT_BLOCK.$$ctxDirect ??= new Map()).set(context, context.$$version);
-		// TRANSITIVE: stamp every memo ancestor so the bailout knows a consumer
-		// lives below it and descends instead of skipping.
+		// TRANSITIVE: stamp every memo (or implicit-bail-armed) ancestor so the
+		// bailout knows a consumer lives below it and descends instead of skipping.
 		for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
-			if ((b.body as any)?.__memo === true) {
+			if ((b.body as any)?.__memo === true || b.$$implicitBail === true) {
 				(b.$$ctxReads ??= new Map()).set(context, context.$$version);
 			}
 		}
@@ -6177,6 +6203,12 @@ export function childSlot(
 			// memo()'d component rendered as VALUE-POSITION children (e.g. provider
 			// children in a `.ts` binding tree) re-rendered unconditionally.
 			if (tryMemoBail(state.block, comp, props)) return;
+			// React's implicit same-element bailout: the IDENTICAL committed props
+			// object (same cached descriptor, or a host descriptor re-passed as-is)
+			// skips the body outright; changed-context consumers below refresh
+			// lazily. This is what lets a `{children}` passthrough under a
+			// re-rendering Provider skip untouched subtrees without a memo() shim.
+			if (props === state.block.props && tryImplicitBail(state.block)) return;
 			state.block.props = props;
 			renderBlock(state.block);
 			return;
@@ -6225,6 +6257,17 @@ export function childSlot(
 			domParent.insertBefore(state.start, state.end);
 		}
 		const b = createBlock('dynamic', parentBlock, domParent, state.start, state.end, comp, props);
+		// Arm React's implicit same-element bailout: value-position mounts are the
+		// sites that can receive a CACHED descriptor back (provider children, `.ts`
+		// binding trees, `return children` passthroughs), so their context reads
+		// must stamp ancestors (memoInChain, like memo blocks) for the bail's lazy
+		// consumer refresh to be sound. Set BEFORE renderBlock so the first render
+		// stamps. Body-fn children re-create identity per render — no bail is ever
+		// possible, so they skip the stamping cost.
+		if (!isBodyFn) {
+			b.$$implicitBail = true;
+			b.memoInChain = true;
+		}
 		state.block = b;
 		renderBlock(b);
 		// Advance the cursor past this child's adopted range so a following sibling
@@ -6495,7 +6538,56 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 	if (!equal) return false;
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
+	restampCtxDeps(block);
 	return true;
+}
+
+// React beginWork's IMPLICIT bailout (`oldProps === newProps` → skip): the SAME
+// committed props object (a cached element, a `children` passthrough) cannot
+// produce different output, so skip the body and lazily refresh only the
+// changed-context consumers below — identical contract to the memo bail, minus
+// the props comparison (reference equality was already established by the
+// caller). Only ARMED blocks (value-position mounts, which stamp context deps
+// like memo blocks) may take this path; an unarmed block has no dep info, so
+// bailing it could strand consumers. Returns true when the update was handled.
+function tryImplicitBail(block: Block): boolean {
+	if (block.$$implicitBail !== true) return false;
+	if (ctxDirectChanged(block)) return false;
+	if (ctxDepsChanged(block)) refreshContextConsumers(block);
+	restampCtxDeps(block);
+	return true;
+}
+
+// After a bail the bailed subtree did NOT re-run, so its context reads were not
+// re-stamped onto ancestors — but any ancestor that re-rendered THIS pass had
+// its own $$ctxReads cleared by renderBlock. Without merging the bailed block's
+// surviving deps back up, a later bail on that ancestor can't see that a
+// consumer lives below it and strands the consumer (a changed context would
+// never descend). Merge onto every memo/armed ancestor; prefer a STALE version
+// over a current one so a still-pending refresh can't be masked by a fresher
+// read of the same context elsewhere in the ancestor's subtree.
+function restampCtxDeps(block: Block): void {
+	const reads = block.$$ctxReads;
+	const direct = block.$$ctxDirect;
+	const hasReads = reads !== null && reads.size > 0;
+	const hasDirect = direct !== null && direct.size > 0;
+	if (!hasReads && !hasDirect) return;
+	for (let b: Block | null = block.parentBlock; b !== null; b = b.parentBlock) {
+		if ((b.body as any)?.__memo !== true && b.$$implicitBail !== true) continue;
+		const m = (b.$$ctxReads ??= new Map());
+		if (hasReads) {
+			for (const [ctx, v] of reads!) {
+				const cur = m.get(ctx);
+				if (cur === undefined || cur === (ctx as any).$$version) m.set(ctx, v);
+			}
+		}
+		if (hasDirect) {
+			for (const [ctx, v] of direct!) {
+				const cur = m.get(ctx);
+				if (cur === undefined || cur === (ctx as any).$$version) m.set(ctx, v);
+			}
+		}
+	}
 }
 
 function refreshBlockForContext(block: Block): void {
@@ -6504,9 +6596,9 @@ function refreshBlockForContext(block: Block): void {
 		// with a lite descendant that does): re-run it. renderBlock re-renders its
 		// own subtree top-down, so nested consumers below it are reached normally.
 		renderBlock(block);
-	} else if ((block.body as any)?.__memo === true) {
-		// A memo'd pure indirection: its $$ctxReads is stamped, so prune to subtrees
-		// that actually hold a changed-context consumer.
+	} else if ((block.body as any)?.__memo === true || block.$$implicitBail === true) {
+		// A memo'd (or implicit-bail-armed) pure indirection: its $$ctxReads is
+		// stamped, so prune to subtrees that actually hold a changed-context consumer.
 		if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	} else {
 		// A non-memo intermediate (control-flow branch, plain wrapper) isn't stamped
@@ -8314,6 +8406,11 @@ function forEachSubtreeChild(scope: Scope, visit: (child: Scope) => void): void 
 // walk component-local slots for refs and recurse through children + control-flow slots
 // via forEachSubtreeChild (the same walk deactivateScope uses).
 function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
+	// A block managing a de-opt host subtree (deoptItemBody / pure-host items):
+	// every node the de-opt reconciler built carries its descriptor (DEOPT_DESC),
+	// whose props may hold a ref — walk the DOM subtree for them.
+	const deoptRoot = (scope as any).deoptNode as Node | null | undefined;
+	if (deoptRoot != null) detachDeoptTreeRefs(deoptRoot, out);
 	const slots = scope.slots;
 	for (let i = 0, n = slots.length; i < n; i++) {
 		const s = slots[i];
@@ -8323,18 +8420,62 @@ function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 			out.push({ ref: s.ref, el: s.el });
 			attachRef(s.ref, null, s.el);
 		}
+		// childSlot managing a pure-host de-opt node — same DEOPT_DESC walk.
+		if (s.__kind === 'childSlot' && s.hostNode != null) {
+			detachDeoptTreeRefs(s.hostNode, out);
+		}
 		for (const k in s) {
-			// `_ref$N` (compiled template host ref). charCodeAt: '_'=95, 'r'=114.
-			if (k.charCodeAt(0) === 95 && k.charCodeAt(1) === 114 && k.charCodeAt(4) === 36) {
+			const c0 = k.charCodeAt(0);
+			if (c0 !== 95 /* '_' */) continue;
+			const c1 = k.charCodeAt(1);
+			// `_ref$N` (compiled template host ref). 'r'=114.
+			if (c1 === 114 && k.charCodeAt(4) === 36) {
 				const ref = s[k];
 				if (ref == null) continue;
 				const el = s['_el$' + k.slice(5)];
 				out.push({ ref, el });
 				attachRef(ref, null, el);
+			} else if (
+				c1 === 115 /* 's' */ &&
+				k.charCodeAt(2) === 112 /* 'p' */ &&
+				k.charCodeAt(3) === 36
+			) {
+				// `_sp$N` (compiled spread binding): the committed spread object may
+				// carry a ref; the element lives in the paired `_el$N`.
+				const ref = s[k]?.ref;
+				if (ref == null) continue;
+				const el = s['_el$' + k.slice(4)];
+				if (el == null) continue;
+				out.push({ ref, el });
+				attachRef(ref, null, el);
+			} else if (
+				c1 === 102 /* 'f' */ &&
+				k.charCodeAt(2) === 105 /* 'i' */ &&
+				k.charCodeAt(3) === 36
+			) {
+				// `_fi$N` (<Fragment ref>): detach the FragmentInstance's current ref;
+				// reveal re-attaches the same instance.
+				const fi = s[k];
+				if (fi == null || fi._currentRef == null) continue;
+				out.push({ ref: fi._currentRef, el: fi });
+				attachRef(fi._currentRef, null, fi);
 			}
 		}
 	}
 	forEachSubtreeChild(scope, (child) => detachSubtreeRefs(child, out));
+}
+
+// Walk a de-opt-built DOM subtree detaching every stamped descriptor ref
+// (object refs → null, callback refs' cleanup), collecting {ref, el} pairs for
+// the reveal re-attach. Nested de-opt elements are stamped too (every element
+// reconcileDeoptNode builds gets setDeoptDesc), so recurse through children.
+function detachDeoptTreeRefs(node: Node, out: { ref: any; el: any }[]): void {
+	const ref = getDeoptDesc(node)?.props?.ref;
+	if (ref != null) {
+		out.push({ ref, el: node });
+		attachRef(ref, null, node as Element);
+	}
+	for (let c = node.firstChild; c !== null; c = c.nextSibling) detachDeoptTreeRefs(c, out);
 }
 
 /**
@@ -8353,6 +8494,12 @@ function deactivateScope(scope: Scope): void {
 		for (const slot of hooks.values()) {
 			if (slot && (slot as EffectSlot).effect === true) {
 				const e = slot as EffectSlot;
+				// INSERTION effects stay CONNECTED while hidden (React parity,
+				// Activity-test.js:1428): no cleanup on hide, deps kept so the
+				// reveal re-render doesn't re-fire them. They own injected styles
+				// that must persist while a tree is merely hidden; only a real
+				// unmount (the scope.cleanups finalizer) tears them down.
+				if (e.phase === INSERTION) continue;
 				if (typeof e.cleanup === 'function') {
 					const cleanup = e.cleanup;
 					// Clear it BEFORE firing so the per-slot unmount finalizer (still

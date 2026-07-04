@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '../_helpers';
-import { App, AppIndirect, AppSiblings, AppList, setSink } from '../_fixtures/context-bailout.tsrx';
+import {
+	App,
+	AppIndirect,
+	AppSiblings,
+	AppList,
+	AppInterleaved,
+	setSink,
+} from '../_fixtures/context-bailout.tsrx';
 
 // Ports the context propagation-through-bailout heuristics from
 // react-reconciler/src/__tests__/ReactNewContext-test.js. A module-level render
@@ -125,6 +132,34 @@ describe('context propagation: bailout heuristics', () => {
 		expect(log).toEqual(['App', 'Row:1', 'Row:2']);
 		expect(r.findAll('li.row-1, li.row-2').map((e) => e.textContent)).toEqual(['2', '2']);
 		expect(r.find('.extra').textContent).toBe('2');
+		r.unmount();
+		setSink(null);
+	});
+
+	// Per ReactContextPropagation-test.js:711 — 'context is propagated across
+	// bailouts'. The interleave: OuterWrap re-renders for its OWN props change
+	// while InnerPure bails (so the consumer's read never re-executes under
+	// OuterWrap's fresh render), THEN the context changes while OuterWrap bails.
+	// The consumer must still receive the new value — a bailed subtree's context
+	// deps must survive on the bailed boundary's ancestors.
+	it('a consumer is not stranded by an ancestor re-render interleaved between bails', () => {
+		const log: string[] = [];
+		setSink((s) => log.push(s));
+		const r = mount(AppInterleaved, { value: 0, label: 'a' });
+		expect(log).toEqual(['App', 'OuterWrap:a', 'InnerPure', 'DeepConsumer:0']);
+		log.length = 0;
+
+		// OuterWrap's own props change → it re-runs; InnerPure bails (stable props,
+		// unchanged context) so DeepConsumer does not re-render.
+		r.update(AppInterleaved, { value: 0, label: 'b' });
+		expect(log).toEqual(['App', 'OuterWrap:b']);
+		log.length = 0;
+
+		// Now ONLY the context changes → OuterWrap and InnerPure both bail; the
+		// consumer must still refresh (React: bailouts never sever propagation).
+		r.update(AppInterleaved, { value: 1, label: 'b' });
+		expect(log).toEqual(['App', 'DeepConsumer:1']);
+		expect(r.find('.deep').textContent).toBe('1');
 		r.unmount();
 		setSink(null);
 	});
