@@ -1,5 +1,7 @@
 function Leaf(props) @{
-	<div class="leaf">{props.label as string}</div>
+	<div class="leaf">
+		{props.label as string}
+	</div>
 }
 
 // A component whose body is a MIXED multi-root fragment: a COMPONENT root (<Leaf/>)
