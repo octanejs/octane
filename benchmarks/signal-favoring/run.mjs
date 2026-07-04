@@ -31,6 +31,7 @@
 //   node benchmarks/signal-favoring/run.mjs [iter]   # default 20
 
 import { chromium } from 'playwright';
+import fs from 'node:fs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
 const WARMUP = 5;
@@ -337,6 +338,26 @@ const OPS = [
 			const ratioStr = !fwd ? '—' : (r.bump_sweep_reverse.mean / fwd).toFixed(2) + 'x';
 			console.log(`  ${c.padEnd(14)} ${ratioStr}  (on means)`);
 		}
+	}
+
+	// Machine-readable results for the unified bench runner (see the BENCH_JSON
+	// contract in benchmarks/README.md): milliseconds, one ops map per target.
+	if (process.env.BENCH_JSON) {
+		const payload = {
+			suite: 'signal-favoring',
+			iterations: ITER,
+			targets: TARGETS.map((t) => ({
+				name: t.name,
+				ops: Object.fromEntries(
+					OPS.map((op) => {
+						const r = all[t.name][op];
+						return [op, { median: r.median, min: r.min, p95: r.p95, sd: r.stddev, samples: ITER }];
+					}),
+				),
+			})),
+		};
+		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');
+		console.error(`BENCH_JSON written to ${process.env.BENCH_JSON}`);
 	}
 })().catch((e) => {
 	console.error(e);

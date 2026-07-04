@@ -4,25 +4,32 @@ Use this when adding server-side rendering to an Octane app.
 
 ## The API
 
-```ts
-import { render } from 'octane/server';
+The entry points mirror React: `octane/server` (`react-dom/server`) has
+`renderToString` (sync) and `renderToStaticMarkup`; `octane/static`
+(`react-dom/static`) has `prerender` (async, awaits Suspense data). All return
+`{ html, css }`.
 
-const { head, body, css } = await render(App, props, {
+```ts
+import { prerender } from 'octane/static';
+
+const { html, css } = await prerender(App, props, {
 	signal: request.signal,
 	nonce: cspNonce,
 	timeoutMs: 5000,
 });
 ```
 
-- `body`: rendered HTML with hydration markers, plus an inline suspense seed
-  script when anything suspended.
-- `head`: hoisted `<title>/<meta>/<link>` markup; place inside `<head>`.
-- `css`: deduped `<style data-octane>` tags from scoped styles; place after
-  `head`.
-- Options are optional: `signal` aborts the render with the request, `nonce`
-  stamps CSP nonces on the emitted inline tags, `timeoutMs` bounds how long a
-  `use(thenable)` may take to settle (global default via
-  `setSsrSuspenseTimeout`).
+- `html`: rendered markup with hydration markers, plus an inline suspense seed
+  script when anything resolved. Hoisted `<title>/<meta>/<link>` fold in
+  (spliced into `<head>` if present, else prepended).
+- `css`: deduped `<style data-octane>` tags from scoped styles; place inside
+  `<head>`.
+- Use `renderToString` (from `octane/server`) for a single synchronous pass that
+  leaves `@pending` fallbacks in place; use `prerender` to await the data.
+- Options are optional: `nonce` stamps CSP nonces on the emitted inline tags (all
+  renderers); `signal` aborts a suspended render with the request and `timeoutMs`
+  bounds how long a `use(thenable)` may take to settle (async `prerender`; global
+  default via `setSsrSuspenseTimeout`); `onError` observes render errors.
 
 On the client:
 
@@ -42,14 +49,14 @@ hydration-stable; the client adopts server DOM instead of rebuilding it.
    Production server output is not generated yet; for production SSR today use
    path 2.
 2. **Custom server**: write `entry-server.ts` exporting a function that calls
-   `render()` and splices the result into your HTML template, and
+   `prerender()` (or `renderToString()`) and splices the result into your HTML template, and
    `entry-client.ts` calling `hydrateRoot`. Serialize app data (for example a
    dehydrated query-client cache) into your own inline JSON script and read it
    before hydrating.
 
 ## Data and Suspense on the server
 
-`use(promise)` suspends a pass; `render()` awaits it and re-renders, so
+`use(promise)` suspends a pass; `prerender()` awaits it and re-renders, so
 `@try { } @pending { }` boundaries resolve to their success arm in the emitted
 HTML. Resolved values serialize into the seed script and hydration consumes
 them without re-fetching. For query-style data, prefetch into a cache before
@@ -60,7 +67,7 @@ rendering and dehydrate it yourself.
 - Effects never run on the server; state hooks return initial values;
   `useSyncExternalStore` uses `getServerSnapshot`.
 - Server components must be compiled by the Octane compiler in server mode;
-  you cannot feed client-compiled output to `render()`.
+  you cannot feed client-compiled output to the renderers.
 - Output is buffered, not streamed: send it as one response.
 - Render errors reject the promise unless an `ErrorBoundary`/`@catch` inside
   the tree handles them; map rejections to HTTP status codes in your server.

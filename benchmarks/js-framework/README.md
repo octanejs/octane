@@ -2,8 +2,10 @@
 
 DOM-based benchmark that mirrors the canonical
 [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark)
-suite. Drives the same six-button + table fixture against `octane` and times
-each operation via Playwright.
+suite, plus a **keyed-reorder matrix** extension (`run-reorder.mjs`) that
+sweeps list permutations the canonical suite never touches. Drives the shared
+button + table fixture against `octane` and times each operation via
+Playwright.
 
 This complements the Node-only [`tracked-values`](../tracked-values.js)
 micro-suite by measuring end-to-end render performance — which is where the
@@ -17,15 +19,20 @@ benchmarks/js-framework/
 ├── octane-jsx/     # Vite app, dev server on :5177 — same app authored in React-style .tsx
 ├── react/          # Vite app, dev server on :5175 — canonical keyed react-hooks
 ├── ripple/         # Vite app, dev server on :5178 — keyed ripple (ported to current syntax)
-├── run.mjs             # Playwright harness — drives each target N iterations
+├── run.mjs             # Playwright harness — the canonical krausest ops
+├── run-reorder.mjs     # Playwright harness — the keyed-reorder matrix (see below)
 ├── package.json        # umbrella; depends on playwright
 ├── results/            # output / scratch
 └── README.md           # this file
 ```
 
+There is **no solid fixture** in this suite (ripple is the fine-grained foil
+here); both harnesses compare octane-tsrx / octane-jsx / react / ripple, with
+octane-tsrx as the ratio baseline.
+
 The octane app is authored **twice** over the same octane core — once in `.tsrx`
 (directive syntax) and once in React-style `.tsx` (JSX). Both emit the same DOM
-and expose the same six-button + table contract:
+and expose the same button + table contract:
 
 - **`octane-tsrx`** — `@for (const row of items; key row.id)` compiles to octane's
   keyed `forBlock` fast path: a compiled per-item body, targeted per-row updates,
@@ -66,13 +73,109 @@ pnpm --filter octane-js-framework-benchmarks bench
 pnpm --filter octane-js-framework-benchmarks bench:long
 ```
 
-To drive just one dialect, pass a `TARGETS` env (see `run.mjs`).
+To drive just one dialect, pass a `TARGETS` env (see `run.mjs`). Both harnesses
+accept an iterations argv (`node run.mjs 3` for a quick smoke pass) and write a
+machine-readable copy of the results when `BENCH_JSON=<path>` is set
+(milliseconds; one `ops` map per target; a failed gate still writes the file
+with a top-level `"failed"` field).
 
 Output is a table of median + min millis per operation: `run`, `replace`,
-`update`, `select`, `swap`, `remove`, `clear`. The harness uses
-`page.evaluate(el.click)` to fire clicks synchronously inside the page — avoids
-per-click CDP IPC overhead (~10ms each on Chromium) so the numbers reflect the
-renderer's wall time, not Playwright transport.
+`add`, `update`, `select`, `swap`, `remove`, `runlots`, `clear`. The harness
+uses `page.evaluate(el.click)` to fire clicks synchronously inside the page —
+avoids per-click CDP IPC overhead (~10ms each on Chromium) so the numbers
+reflect the renderer's wall time, not Playwright transport.
+
+## Keyed-reorder matrix (`run-reorder.mjs`)
+
+The canonical suite only ever reorders two rows (`swap`). `run-reorder.mjs`
+drives the second jumbotron button row every fixture exposes — pure
+permutations / splices of the current keyed 1k list, always applied through
+the state setter (never in-place mutation):
+
+| op                          | shape                                                       |
+| --------------------------- | ----------------------------------------------------------- |
+| `reverse`                   | `rows.toReversed()` — every survivor moves                  |
+| `shuffle`                   | seeded Fisher–Yates; the seed advances deterministically per click (module-level mulberry32, fixed seed 42 — identical permutations across all four targets) |
+| `rotatef`                   | rotate forward by 1 — last row to front                     |
+| `rotateb`                   | rotate backward by 1 — first row to end                     |
+| `prepend100` / `append100`  | 100 fresh-id rows at head / tail                            |
+| `insertmid100`              | 100 fresh-id rows at index `length/2`                       |
+| `removefirst`               | drop row 0                                                  |
+| `removeevery10`             | drop every 10th row                                         |
+| `displace{3,4,5,6,8}`       | **displace_k**: move the FIRST k rows (as a group, order preserved) to the END — survivors stay relatively ordered, exactly k rows displaced |
+
+**Headline framing — rotate is the LIS-vs-lastPlacedIndex differentiator.**
+Octane's keyed reconciler computes a minimal move set via LIS; React's uses
+`lastPlacedIndex`. On `rotatef` (last row moved to the front) the two diverge
+maximally: React's first-placed child pins `lastPlacedIndex` at the old tail
+index, so **every one of the 999 survivors** is physically moved, while LIS
+moves exactly **1** node. The `differential/` test suite can't see this (it
+compares final innerHTML, which is identical); this harness's wall time can.
+Do NOT read `prepend100` as an LIS win — React handles prepended NEW items
+with zero survivor moves, so both strategies are minimal there.
+
+**displace_k and the K_DISP bracket.** `runtime.ts` (~line 8341) has a
+small-displacement shortcut in `reconcileKeyed`: when every old item survives
+and at most `K_DISP = 4` middle positions changed, it computes the move set
+directly in O(K_DISP) instead of paying the LIS pass's O(N) allocation +
+back-walk. The k ∈ {3, 4, 5, 6, 8} sweep brackets that threshold from both
+sides, so a regression in either the shortcut or the LIS fallback shows up as
+a step between adjacent k columns. (Note the shortcut's trigger counts
+*changed positions* after prefix/suffix trimming — a group-move-to-end shifts
+every position, so per the current code these ops are expected to exercise
+the LIS pass with a k-node move set; the sweep documents whichever path fires
+and keeps the boundary pinned.)
+
+Two methodology points, both visible in the harness source:
+
+- **Inner-loop timing.** The tiny ops (rotate / displace_k / remove\*) are far
+  below `performance.now()` resolution for a single click, so each timed
+  sample loops N clicks and divides: N=20 for displace/rotate/remove, N=4 for
+  reverse/shuffle (reverse is self-inverse; shuffle reseeds per click, so
+  repeated clicks are valid work), N=1 for the 100-row inserts. Caveat:
+  `removeevery10` decays 1000 → ~122 rows across its 20 clicks, so its number
+  is the mean over that decaying sequence — comparable across targets, not to
+  a single 1000-row click. Every sample starts from a fresh 1k `#run` (reset
+  outside the timed window).
+- **Identity gate** (uibench-style), run once per op outside the timed loop:
+  every `<tr>` is stamped with `tr.__benchId = <row id>` before the op; after
+  one click the harness asserts every surviving row id is rendered by the
+  SAME `<tr>` node (the framework *moved* the row, it didn't rebuild it) and
+  that DOM order equals data order (the op — including the shared shuffle
+  stream — is replayed on the pre-click id list). A gate failure is recorded
+  per `(target, op)`: that op is skipped for that target (its DOM is wrong, so a
+  timing number would be garbage) and shown as `GATE FAIL` in the table, but the
+  run continues so every other target/op still produces a full matrix. If ANY
+  op failed, the run prints the failures, writes `BENCH_JSON` with a top-level
+  `failed` field and that target's `meta.identityGate: "fail: <op>[, …]"`, and
+  exits 1. A fully-clean run reports `meta.identityGate: "pass"` for every
+  target and exits 0.
+
+  **Known ripple failures.** ripple fails the gate on `prepend100` and
+  `insertmid100` — the two ops that insert a run of 100 *new* keys *before*
+  surviving keys. ripple's keyed reconciler renders those interleaved
+  (`[new0, old0, new1, old1, …]`) even though the data array is unambiguously
+  `[100 new, then survivors]` (verified independent of how the array is built —
+  concat / spread / explicit push loop all give identical correct data yet
+  identical interleaved DOM). This is a genuine **ripple** keyed-reconciler bug,
+  **not** octane and **not** a fixture defect; the fixtures are left faithful and
+  the gate correctly flags them. `append100` is the only insert op ripple renders
+  correctly, because there are no survivors *after* the inserted run. octane-tsrx,
+  octane-jsx, and react pass all 14 ops.
+
+Run it against the same four dev servers as `run.mjs`:
+
+```bash
+node run-reorder.mjs           # 8 iterations
+node run-reorder.mjs 16        # longer sample
+# or: pnpm --filter octane-js-framework-benchmarks bench:reorder
+```
+
+A bad number here points at `reconcileKeyed` (`packages/octane/src/runtime.ts`):
+the prefix/suffix walks (rotate defeats both), the small-displacement shortcut
+vs LIS-pass boundary (displace sweep), survivor-splice + mount interleaving
+(`insertmid100`), and the linked-list relink paths (`removeevery10` mixes
+survivors and unmounts).
 
 ## Comparing against an external baseline
 

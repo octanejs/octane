@@ -70,21 +70,21 @@ const warns = () =>
 
 // Server-render `name` with serverProps, hydrate with clientProps, drive the render.
 async function reconnect(name: string, serverProps: any, clientProps: any) {
-	const { body } = await ServerRT.render(server[name], serverProps);
-	container.innerHTML = body;
+	const { html } = await ServerRT.renderToString(server[name], serverProps);
+	container.innerHTML = html;
 	hydrateRoot(container, client[name], clientProps);
 	flushSync(() => {});
-	return body;
+	return html;
 }
 
 // Server-render one component and hydrate with a DIFFERENT one (React's expectMarkupMatch of
 // e.g. a Pure Component against a Bare Element — different "kinds" that emit the same markup).
 async function crossReconnect(serverName: string, clientName: string, props: any) {
-	const { body } = await ServerRT.render(server[serverName], props);
-	container.innerHTML = body;
+	const { html } = await ServerRT.renderToString(server[serverName], props);
+	container.innerHTML = html;
 	hydrateRoot(container, client[clientName], props);
 	flushSync(() => {});
-	return body;
+	return html;
 }
 
 describe('conformance: hydration mismatch (ReactDOMHydrationDiff + ReactDOMServerIntegrationReconnecting)', () => {

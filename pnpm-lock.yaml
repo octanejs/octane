@@ -281,6 +281,16 @@ importers:
         specifier: catalog:default
         version: 1.61.0
 
+  benchmarks/dbmon/octane-deopt:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
   benchmarks/dbmon/octane-jsx:
     dependencies:
       octane:
@@ -346,6 +356,92 @@ importers:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
 
+  benchmarks/effectful-list:
+    dependencies:
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
+
+  benchmarks/effectful-list/octane-jsx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/effectful-list/octane-tsrx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/effectful-list/react:
+    dependencies:
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: catalog:default
+        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/effectful-list/ripple:
+    dependencies:
+      ripple:
+        specifier: catalog:default
+        version: 0.3.86
+    devDependencies:
+      '@ripple-ts/vite-plugin':
+        specifier: catalog:default
+        version: 0.3.86
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/effectful-list/solid:
+    dependencies:
+      '@solidjs/web':
+        specifier: catalog:default
+        version: 2.0.0-beta.14(solid-js@2.0.0-beta.14)
+      solid-js:
+        specifier: catalog:default
+        version: 2.0.0-beta.14
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+      vite-plugin-solid:
+        specifier: catalog:default
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
+
   benchmarks/js-framework:
     dependencies:
       playwright:
@@ -365,7 +461,46 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
+  benchmarks/js-framework/octane-jsx-naive:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/js-framework/octane-ts:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
   benchmarks/js-framework/octane-tsrx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/js-framework/octane-tsrx-naive:
     dependencies:
       octane:
         specifier: workspace:*
@@ -406,6 +541,57 @@ importers:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
         version: 0.3.86
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/memo-wall:
+    dependencies:
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
+
+  benchmarks/memo-wall/octane-jsx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/memo-wall/octane-tsrx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/memo-wall/react:
+    dependencies:
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: catalog:default
+        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
@@ -489,6 +675,63 @@ importers:
       '@tsrx/vite-plugin-solid':
         specifier: catalog:default
         version: 0.0.63(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+      vite-plugin-solid:
+        specifier: catalog:default
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
+
+  benchmarks/portal-swarm:
+    dependencies:
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
+
+  benchmarks/portal-swarm/octane-tsrx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/portal-swarm/react:
+    dependencies:
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: catalog:default
+        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/portal-swarm/solid:
+    dependencies:
+      '@solidjs/web':
+        specifier: catalog:default
+        version: 2.0.0-beta.14(solid-js@2.0.0-beta.14)
+      solid-js:
+        specifier: catalog:default
+        version: 2.0.0-beta.14
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
       vite:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
@@ -637,6 +880,34 @@ importers:
       vite-plugin-solid:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0))
+
+  benchmarks/ssr-throughput:
+    dependencies:
+      '@solidjs/web':
+        specifier: catalog:default
+        version: 2.0.0-beta.14(solid-js@2.0.0-beta.14)
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      solid-js:
+        specifier: catalog:default
+        version: 2.0.0-beta.14
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
+
+  benchmarks/ssr-throughput/fixtures:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)
 
   examples/hacker-news:
     dependencies:

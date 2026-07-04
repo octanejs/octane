@@ -81,20 +81,20 @@ describe('numeric style px — SSR', () => {
 	const server = evalModule('server', ServerRT);
 
 	it('serialises a dynamic object style with px / unitless / 0 / custom-prop rules', async () => {
-		const { body } = await ServerRT.render(server.DynStyle, {
+		const { html } = await ServerRT.renderToString(server.DynStyle, {
 			s: { width: 100, opacity: 0.5, marginTop: 0, zIndex: 5, fontSize: 12, '--gap': 8 },
 		});
-		expect(body).toContain('width:100px');
-		expect(body).toContain('opacity:0.5');
-		expect(body).toContain('margin-top:0;'); // 0 → no px
-		expect(body).toContain('z-index:5'); // unitless
-		expect(body).toContain('font-size:12px'); // camelCase → kebab + px
-		expect(body).toContain('--gap:8'); // custom prop → no px
+		expect(html).toContain('width:100px');
+		expect(html).toContain('opacity:0.5');
+		expect(html).toContain('margin-top:0;'); // 0 → no px
+		expect(html).toContain('z-index:5'); // unitless
+		expect(html).toContain('font-size:12px'); // camelCase → kebab + px
+		expect(html).toContain('--gap:8'); // custom prop → no px
 	});
 
 	it('static object style serialises identically to the client bake', async () => {
-		const { body } = await ServerRT.render(server.StaticStyle, {});
-		expect(body).toContain(
+		const { html } = await ServerRT.renderToString(server.StaticStyle, {});
+		expect(html).toContain(
 			'style="width: 100px; opacity: 0.5; line-height: 2; margin-top: 0; z-index: 3; background-color: red"',
 		);
 	});
@@ -117,8 +117,8 @@ describe('numeric style px — hydration parity', () => {
 
 	it('adopts a numeric object style with no mismatch', async () => {
 		const style = { width: 100, opacity: 0.5, zIndex: 3 };
-		const { body } = await ServerRT.render(server.DynStyle, { s: style });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.DynStyle, { s: style });
+		container.innerHTML = html;
 		hydrateRoot(container, client.DynStyle, { s: { ...style } });
 		flushSync(() => {});
 		expect((container.querySelector('#d') as HTMLElement).style.width).toBe('100px');

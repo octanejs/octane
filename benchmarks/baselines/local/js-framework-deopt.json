@@ -1,0 +1,207 @@
+{
+  "suite": "js-framework-deopt",
+  "iterations": 8,
+  "targets": [
+    {
+      "name": "octane-tsrx",
+      "ops": {
+        "run": {
+          "median": 1.7000000029802322,
+          "min": 1.5,
+          "samples": 8
+        },
+        "replace": {
+          "median": 3.5999999940395355,
+          "min": 3.3999999910593033,
+          "samples": 8
+        },
+        "add": {
+          "median": 1.5,
+          "min": 1.4000000059604645,
+          "samples": 8
+        },
+        "update": {
+          "median": 0.10000000894069672,
+          "min": 0.09999999403953552,
+          "samples": 8
+        },
+        "select": {
+          "median": 0,
+          "min": 0,
+          "samples": 8
+        },
+        "swap": {
+          "median": 0.29999999701976776,
+          "min": 0.20000000298023224,
+          "samples": 8
+        },
+        "remove": {
+          "median": 0.10000000894069672,
+          "min": 0,
+          "samples": 8
+        },
+        "runlots": {
+          "median": 14.400000005960464,
+          "min": 13.5,
+          "samples": 8
+        },
+        "clear": {
+          "median": 24.5,
+          "min": 17.299999997019768,
+          "samples": 8
+        }
+      }
+    },
+    {
+      "name": "octane-tsrx-naive",
+      "ops": {
+        "run": {
+          "median": 2.5999999940395355,
+          "min": 2.3999999910593033,
+          "samples": 8
+        },
+        "replace": {
+          "median": 5.299999997019768,
+          "min": 4.700000002980232,
+          "samples": 8
+        },
+        "add": {
+          "median": 3,
+          "min": 2.7000000029802322,
+          "samples": 8
+        },
+        "update": {
+          "median": 0.5999999940395355,
+          "min": 0.5,
+          "samples": 8
+        },
+        "select": {
+          "median": 0.09999999403953552,
+          "min": 0,
+          "samples": 8
+        },
+        "swap": {
+          "median": 0.7000000029802322,
+          "min": 0.6000000089406967,
+          "samples": 8
+        },
+        "remove": {
+          "median": 0.6000000089406967,
+          "min": 0.5,
+          "samples": 8
+        },
+        "runlots": {
+          "median": 23.200000002980232,
+          "min": 22.600000008940697,
+          "samples": 8
+        },
+        "clear": {
+          "median": 29,
+          "min": 23.5,
+          "samples": 8
+        }
+      }
+    },
+    {
+      "name": "octane-jsx-naive",
+      "ops": {
+        "run": {
+          "median": 3.2000000029802322,
+          "min": 3.199999988079071,
+          "samples": 8
+        },
+        "replace": {
+          "median": 5.5999999940395355,
+          "min": 5.399999991059303,
+          "samples": 8
+        },
+        "add": {
+          "median": 2.7999999970197678,
+          "min": 2.5,
+          "samples": 8
+        },
+        "update": {
+          "median": 0.29999999701976776,
+          "min": 0.20000000298023224,
+          "samples": 8
+        },
+        "select": {
+          "median": 0.10000000894069672,
+          "min": 0.09999999403953552,
+          "samples": 8
+        },
+        "swap": {
+          "median": 0.4000000059604645,
+          "min": 0.29999999701976776,
+          "samples": 8
+        },
+        "remove": {
+          "median": 0.5,
+          "min": 0.3999999910593033,
+          "samples": 8
+        },
+        "runlots": {
+          "median": 27,
+          "min": 25.099999994039536,
+          "samples": 8
+        },
+        "clear": {
+          "median": 29.900000005960464,
+          "min": 22.799999997019768,
+          "samples": 8
+        }
+      }
+    },
+    {
+      "name": "octane-ts",
+      "ops": {
+        "run": {
+          "median": 3.6000000089406967,
+          "min": 3.5,
+          "samples": 8
+        },
+        "replace": {
+          "median": 6.700000002980232,
+          "min": 6.5,
+          "samples": 8
+        },
+        "add": {
+          "median": 7.299999997019768,
+          "min": 7.100000008940697,
+          "samples": 8
+        },
+        "update": {
+          "median": 3.2000000029802322,
+          "min": 3,
+          "samples": 8
+        },
+        "select": {
+          "median": 0.10000000894069672,
+          "min": 0,
+          "samples": 8
+        },
+        "swap": {
+          "median": 5.700000002980232,
+          "min": 5.5999999940395355,
+          "samples": 8
+        },
+        "remove": {
+          "median": 3.1000000089406967,
+          "min": 3,
+          "samples": 8
+        },
+        "runlots": {
+          "median": 34,
+          "min": 33.599999994039536,
+          "samples": 8
+        },
+        "clear": {
+          "median": 34.099999994039536,
+          "min": 25.900000005960464,
+          "samples": 8
+        }
+      }
+    }
+  ],
+  "harnessExit": 0
+}

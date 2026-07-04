@@ -4,8 +4,9 @@
  * The `octane/compiler` compiler, in `mode: 'server'`, emits component bodies
  * that build an HTML STRING (instead of cloning a DOM template) by calling the
  * `ssr*` helpers here, and that call these server hook implementations. The
- * server analogue of `createRoot().render()` is `render(Component, props)` →
- * `{ head, body, css }`.
+ * server analogues of `createRoot().render()` are `renderToString` /
+ * `renderToStaticMarkup` (`octane/server`) and `prerender` (`octane/static`),
+ * each returning `{ html, css }` (hoisted head folded into `html`).
  *
  * Scope: static markup, dynamic text holes, attributes (incl. class / style /
  * spread), control flow (@if/@for/@switch/@try), nested components, scoped CSS
@@ -31,6 +32,11 @@ import {
 	cssStyleValue,
 } from './constants.js';
 
+// Shared client/SSR CSS helpers (single source in css.ts so class strings and
+// hyphenated style keys stay byte-equal across the two runtimes).
+import { normalizeClass, styleName } from './css.js';
+export { normalizeClass };
+
 interface SSRScope {
 	parent: SSRScope | null;
 	/** Context Provider values stamped on this scope (lazily allocated). */
@@ -42,28 +48,95 @@ type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
 let CURRENT_SCOPE: SSRScope | null = null;
 let ID_COUNTER = 0;
 let CSS: Map<string, string> | null = null;
-// Accumulates top-level `<head>` content during the active render pass (a
-// mutable container, mirroring CSS's mutable Map, so a per-pass local capture
-// keeps accumulating via `HEAD.html +=` even though strings are immutable).
-// Returned as RenderResult.head; the metaframework injects it at <!--ssr-head-->.
+// Emit hydration block markers (`<!--[-->…<!--]-->`) and head-adoption markers?
+// True for hydratable output (renderToString / prerender / streaming); flipped
+// false for the whole of a `renderToStaticMarkup` render, which produces clean,
+// non-hydratable HTML (emails / static pages). Set only around a synchronous
+// pass, so no concurrency save/restore is needed.
+let MARKERS = true;
+// Accumulates hoisted `<head>` content (`<title>`/`<meta>`/`<link>`) during the
+// active render pass (a mutable container, mirroring CSS's mutable Map, so a
+// per-pass local capture keeps accumulating via `HEAD.html +=` even though
+// strings are immutable). Folded into the result `html` by `spliceHead` (into
+// `<head>` when present, else prepended).
 let HEAD: { html: string } | null = null;
 
 // Suspense (SSR Phase 4). A render pass that reaches an unresolved `use(thenable)`
 // records the thenable in SUSPENDED and throws SSR_SUSPENSE; the nearest @try
-// renders its @pending fallback. render()'s retry loop awaits everything in
-// SUSPENDED, caches each outcome in RESOLVED (keyed by the compiler-injected
-// call-site key + per-pass occurrence index), then re-renders — on the next pass
+// renders its @pending fallback. render()'s loop awaits everything in SUSPENDED,
+// caches each outcome in RESOLVED (keyed by the FRAME path + compiler-injected
+// call-site key + per-frame occurrence index), then re-renders — a later pass'
 // use() finds the cached value and returns it, so the @try renders its success
 // arm (or, on rejection, routes the error to @catch). SERIAL collects the
 // resolved values in render (depth-first) order so the client can seed them back
-// in the same order during hydration. OCC counts per-site occurrences so a use()
-// inside an @for gets a distinct key per iteration. All four are reinstalled
-// fresh at the top of every pass (see render()) so concurrent render() calls
-// that interleave across an `await` cannot clobber one another.
+// in the same order during hydration.
+//
+// A waterfall (each level's use() only reachable after the previous resolves)
+// would otherwise cost D+1 FULL-tree passes — O(tree × D), re-serializing all
+// the static bulk on every pass. Instead, when a component's use() suspends we
+// record a DISCOVERY JOB { comp, props, parentScope, frame }: the innermost
+// COMPONENT enclosing that use(). Between the (few) canonical full passes,
+// render() re-runs just those job SUBTREES — discarding their output, only
+// populating RESOLVED — so a deep waterfall becomes ~2 full passes + D cheap
+// subtree re-runs instead of D+1 full passes. The emitted HTML/head/css/seeds
+// always come from a normal FULL pass (never spliced), so useId, the seed
+// cursor order, and head ordering are byte-identical to the retry-loop design.
+//
+// use() keys are scoped to the current FRAME (one per component; inline
+// @if/@for/@switch stay in their component's frame) so a key is identical
+// between the pass a boundary first renders, its discovery re-run, and the final
+// full pass — and disjoint across component membranes, so resolved data can't
+// cross between two use() sites. Keys are internal only (the client seeds by
+// cursor, not by key).
+//
+// All of these are reinstalled fresh at the top of every pass / discovery round
+// (see render()) so concurrent render() calls that interleave across an `await`
+// cannot clobber one another.
+interface Frame {
+	parent: Frame | null;
+	// This frame's index among its parent's component children (built into the
+	// path); reproduced verbatim on a discovery re-run so keys stay stable.
+	seg: number;
+	// Monotonic counter handing the NEXT child component its `seg`.
+	nextChild: number;
+	// Per-site use() occurrence counter (a use() in an inline @for hits the same
+	// site N times → distinct keys). Lazily allocated (never for a use()-free
+	// component, i.e. the common case).
+	occ: Map<string, number> | null;
+	// Memoized materialized path ('/seg/seg…'); segs are immutable so it's stable.
+	path: string | null;
+	// Whether this component already registered a discovery job this pass (dedupe
+	// two sibling suspending use()s in one component to a single job).
+	deferred: boolean;
+}
+interface Job {
+	comp: ServerComponent;
+	props: any;
+	parentScope: SSRScope | null;
+	frame: Frame;
+}
 let SUSPENDED: { promise: PromiseLike<unknown>; key: string }[] | null = null;
 let RESOLVED: Map<string, { value: unknown } | { reason: unknown }> | null = null;
 let SERIAL: unknown[] | null = null;
-let OCC: Map<string, number> | null = null;
+// The active component frame (see Frame). Never null during a render pass —
+// render() installs a root frame before invoking the component.
+let FRAME: Frame | null = null;
+// Discovery jobs surfaced THIS pass/round (innermost suspending components).
+let DEFERRED: Job[] | null = null;
+// The innermost component currently rendering, so a suspending use() can capture
+// it as a discovery job. Set by renderComponentFramed (and by render() for the
+// root, whose bare use() has no enclosing sub-component).
+let CURRENT_COMP: ServerComponent | null = null;
+let CURRENT_PROPS: any = null;
+let CURRENT_PARENT_SCOPE: SSRScope | null = null;
+
+// Walk a frame to its dotted path ('' for the root). Memoized per frame.
+function framePath(f: Frame): string {
+	if (f.path !== null) return f.path;
+	const p = f.parent === null ? '' : framePath(f.parent) + '/' + f.seg;
+	f.path = p;
+	return p;
+}
 
 function ssrScope(parent: SSRScope | null): SSRScope {
 	return { parent, $$ctxValues: null };
@@ -131,8 +204,15 @@ export function createElement(
 	const stripKey = src != null && 'key' in src;
 	const addChildren = children.length > 0;
 	if (stripKey || addChildren) {
-		p = src != null ? { ...src } : {};
-		if (stripKey) delete p.key;
+		// Manual copy-minus-key, NOT spread + delete: `delete` drops the object
+		// into V8 dictionary mode, slowing every later for-in over these props
+		// (mirrors the client createElement; own-key guard matches spread).
+		p = {};
+		if (src != null) {
+			for (const k in src) {
+				if (k !== 'key' && Object.prototype.hasOwnProperty.call(src, k)) p[k] = src[k];
+			}
+		}
 		if (addChildren) p.children = kids;
 	}
 	return { $$kind: ELEMENT_TAG, type, props: p, key, children: kids ?? null };
@@ -142,12 +222,25 @@ export function createElement(
 // Escaping
 // ---------------------------------------------------------------------------
 
+// Guarded escapers: a single .test() scan first, so the common no-escape case
+// returns the ORIGINAL string with zero allocation (~5x on clean text). When
+// something does need escaping, the chained native .replace passes are kept —
+// measured faster than an exec-loop or replace-with-callback single pass on V8
+// for both sparse and dense escape densities.
+const HTML_ESCAPE_RE = /[&<>]/g;
 export function escapeHtml(v: unknown): string {
-	return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	const s = typeof v === 'string' ? v : String(v);
+	HTML_ESCAPE_RE.lastIndex = 0;
+	if (!HTML_ESCAPE_RE.test(s)) return s;
+	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+const ATTR_ESCAPE_RE = /[&"]/g;
 export function escapeAttr(v: unknown): string {
-	return String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+	const s = typeof v === 'string' ? v : String(v);
+	ATTR_ESCAPE_RE.lastIndex = 0;
+	if (!ATTR_ESCAPE_RE.test(s)) return s;
+	return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
 // ---------------------------------------------------------------------------
@@ -348,7 +441,7 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
  * protocol (shared constants in ./constants).
  */
 export function ssrBlock(content: string): string {
-	return BLOCK_OPEN + content + BLOCK_CLOSE;
+	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : content;
 }
 
 /**
@@ -360,32 +453,6 @@ export function ssrPortal(): string {
 }
 
 /** A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit. */
-// Compose a `class` / `className` value into a class string, clsx-style — the exact
-// twin of runtime.ts `normalizeClass` so SSR and the client produce byte-equal class
-// strings (hydration parity). See that copy for the semantics.
-export function normalizeClass(value: unknown): string {
-	if (typeof value === 'string') return value;
-	if (typeof value !== 'object') {
-		return typeof value === 'number' && value ? '' + value : '';
-	}
-	if (value === null) return '';
-	let str = '';
-	if (Array.isArray(value)) {
-		for (let i = 0; i < value.length; i++) {
-			const item = value[i];
-			if (item) {
-				const inner = normalizeClass(item);
-				if (inner) str = str ? str + ' ' + inner : inner;
-			}
-		}
-	} else {
-		for (const k in value as Record<string, unknown>) {
-			if ((value as Record<string, unknown>)[k]) str = str ? str + ' ' + k : k;
-		}
-	}
-	return str;
-}
-
 export function ssrAttr(name: string, v: unknown): string {
 	// React-parity alias, mirroring class/className: `htmlFor` serialises as `for`.
 	if (name === 'htmlFor') name = 'for';
@@ -413,26 +480,8 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 		const val = obj[k];
 		if (val == null || val === false) continue;
 		// React parity: numeric values get `px` (except 0 / unitless / custom props).
-		out += hyphenate(k) + ':' + cssStyleValue(k, val) + ';';
+		out += styleName(k) + ':' + cssStyleValue(k, val) + ';';
 	}
-	return out;
-}
-
-// camelCase / vendor-prefixed style keys → kebab-case (mirrors runtime.styleName).
-function hyphenate(name: string): string {
-	if (name.charCodeAt(0) === 45 /* - */) return name; // --custom-prop / -webkit-…
-	let out = '';
-	let changed = false;
-	for (let i = 0; i < name.length; i++) {
-		const c = name.charCodeAt(i);
-		if (c >= 65 && c <= 90) {
-			out += '-' + String.fromCharCode(c + 32);
-			changed = true;
-		} else out += name[i];
-	}
-	if (!changed) return name;
-	if (out.charCodeAt(0) === 109 && out.charCodeAt(1) === 115 && out.charCodeAt(2) === 45)
-		out = '-' + out;
 	return out;
 }
 
@@ -493,16 +542,29 @@ export function ssrInnerHtml(sources: unknown[]): string | undefined {
 	return undefined;
 }
 
-/** Render a child component into the string: fresh scope, server body → HTML. */
-export function ssrComponent(parent: SSRScope, comp: ServerComponent, props: any): string {
-	const prev = CURRENT_SCOPE;
-	const scope = ssrScope(parent ?? prev);
+// Render a component body under an explicit frame, tracking it as the innermost
+// component (so a suspending use() inside it captures it as a discovery job). The
+// output shape is byte-identical to a bare invocation: the body's HTML wrapped in
+// one hydration block range.
+function renderComponentFramed(
+	comp: ServerComponent,
+	props: any,
+	parent: SSRScope | null,
+	frame: Frame,
+): string {
+	const prevScope = CURRENT_SCOPE;
+	const prevFrame = FRAME;
+	const prevComp = CURRENT_COMP;
+	const prevProps = CURRENT_PROPS;
+	const prevParent = CURRENT_PARENT_SCOPE;
+	const parentScope = parent ?? prevScope;
+	const scope = ssrScope(parentScope);
 	CURRENT_SCOPE = scope;
+	FRAME = frame;
+	CURRENT_COMP = comp;
+	CURRENT_PROPS = props;
+	CURRENT_PARENT_SCOPE = parentScope;
 	try {
-		// Wrap the child's output in a hydration block range so the client's
-		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
-		// become the slot's start/end markers, exactly like control-flow blocks).
-		//
 		// The compiled body normally returns its HTML string, but a component that
 		// early-returns non-template JSX (the de-opt path — e.g. a `.tsx` `if (…)
 		// return <div/>`) returns a `createElement` DESCRIPTOR / array / primitive
@@ -511,10 +573,32 @@ export function ssrComponent(parent: SSRScope, comp: ServerComponent, props: any
 		// would stringify to `[object Object]`.
 		const out = comp(props ?? {}, scope, undefined);
 		const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, scope);
-		return BLOCK_OPEN + inner + BLOCK_CLOSE;
+		// Wrap the child's output in a hydration block range so the client's
+		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
+		// become the slot's start/end markers, exactly like control-flow blocks).
+		// `renderToStaticMarkup` sets MARKERS=false — no hydration, so no markers.
+		return MARKERS ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
 	} finally {
-		CURRENT_SCOPE = prev;
+		CURRENT_SCOPE = prevScope;
+		FRAME = prevFrame;
+		CURRENT_COMP = prevComp;
+		CURRENT_PROPS = prevProps;
+		CURRENT_PARENT_SCOPE = prevParent;
 	}
+}
+
+/** Render a child component into the string: fresh scope + frame, body → HTML. */
+export function ssrComponent(parent: SSRScope, comp: ServerComponent, props: any): string {
+	const pf = FRAME;
+	// A fresh child frame: its `seg` is the parent's next child index (built into
+	// the path so sibling instances of the same component get distinct keys). `pf`
+	// is only null defensively (render() always installs a root frame); use an
+	// ad-hoc root frame so keys still work.
+	const frame: Frame =
+		pf === null
+			? { parent: null, seg: 0, nextChild: 0, occ: null, path: null, deferred: false }
+			: { parent: pf, seg: pf.nextChild++, nextChild: 0, occ: null, path: null, deferred: false };
+	return renderComponentFramed(comp, props, parent, frame);
 }
 
 // A component's children reach the server body as a render FUNCTION (the
@@ -638,20 +722,27 @@ export function ssrIsSuspense(err: unknown): boolean {
 
 export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: string | symbol): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) return readContext(usable as Context<T>);
-	// A thenable. Key it by the compiler-injected call-site key, disambiguated by
-	// how many times this site has already run THIS pass (so a use() inside an
-	// @for gets a distinct key per iteration). The key is stable across passes
-	// because each pass re-derives it from the same deterministic render.
+	// A thenable. Key it by the current FRAME path + the compiler-injected
+	// call-site key + a per-frame occurrence index (so a use() inside an @for gets
+	// a distinct key per iteration). Scoping to the frame makes the key identical
+	// between the pass a boundary first renders, its discovery re-run, and the
+	// final full pass, and disjoint across component membranes.
 	const base =
 		siteKey === undefined
 			? '@'
 			: typeof siteKey === 'symbol'
 				? (siteKey as symbol).toString()
 				: String(siteKey);
-	const occ = OCC;
-	const n = occ !== null ? (occ.get(base) ?? 0) : 0;
-	if (occ !== null) occ.set(base, n + 1);
-	const key = base + '#' + n;
+	const frame = FRAME;
+	let n = 0;
+	let prefix = '';
+	if (frame !== null) {
+		if (frame.occ === null) frame.occ = new Map();
+		n = frame.occ.get(base) ?? 0;
+		frame.occ.set(base, n + 1);
+		prefix = framePath(frame);
+	}
+	const key = prefix + '|' + base + '#' + n;
 
 	const resolved = RESOLVED;
 	if (resolved !== null && resolved.has(key)) {
@@ -666,6 +757,19 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: string | s
 	// First time we reach this site this render — record the thenable so render()'s
 	// loop can await it, then suspend so the nearest @try shows @pending this pass.
 	if (SUSPENDED !== null) SUSPENDED.push({ promise: usable as PromiseLike<unknown>, key });
+	// Register the innermost enclosing component as a discovery job (once per
+	// component/pass), so render() can re-render just this subtree next round
+	// instead of the whole tree. A bare use() at the root captures the root
+	// component (CURRENT_COMP set by render()).
+	if (DEFERRED !== null && CURRENT_COMP !== null && frame !== null && !frame.deferred) {
+		frame.deferred = true;
+		DEFERRED.push({
+			comp: CURRENT_COMP,
+			props: CURRENT_PROPS,
+			parentScope: CURRENT_PARENT_SCOPE,
+			frame,
+		});
+	}
 	throw SSR_SUSPENSE;
 }
 
@@ -805,7 +909,9 @@ export function ssrHeadEl(
 	text: unknown,
 ): void {
 	if (HEAD === null) return;
-	let s = '<!--' + key + '--><' + tag;
+	// The `<!--key-->` prefix is the client headBlock's adoption marker; static
+	// markup is non-hydratable, so it's omitted there.
+	let s = (MARKERS ? '<!--' + key + '-->' : '') + '<' + tag;
 	if (attrs !== null) {
 		for (const k in attrs) {
 			const v = attrs[k];
@@ -825,16 +931,37 @@ export function ssrHeadEl(
 // Entry point
 // ---------------------------------------------------------------------------
 
+/**
+ * The result of a buffered server render (`renderToString` / `renderToStaticMarkup`
+ * / `prerender`).
+ *
+ * - `html` — the rendered markup. Hoisted document metadata (`<title>`/`<meta>`/
+ *   `<link>`, collected via `ssrHeadEl`) is folded IN: spliced before `</head>`
+ *   when the render produced a document, otherwise prepended. (React folds head
+ *   resources into the document too, so there is no separate `head` channel.)
+ * - `css` — the scoped stylesheets of the components that rendered, as
+ *   ready-to-place `<style data-octane="hash">…</style>` tags (one per hash,
+ *   deduped). Kept as its own field because octane has scoped CSS that React core
+ *   does not; the client's `injectStyle` matches the `data-octane` hash and skips
+ *   re-injecting on hydration, so the styles cross the boundary once. (Streaming
+ *   has no `css` field — scoped `<style>` flushes inline with the content that
+ *   uses it, as React does.)
+ */
 export interface RenderResult {
-	head: string;
-	body: string;
+	html: string;
 	css: string;
 }
 
+/** Options accepted by the buffered render entry points (React-shaped subset). */
 export interface RenderOptions {
+	/** Prefix for `useId`-generated ids (React parity; reserved — not yet used). */
+	identifierPrefix?: string;
+	/** Called with any error thrown during the render (before it propagates). */
+	onError?: (error: unknown) => void;
 	/**
 	 * Abort the render when the request dies: rejects the pending suspense wait
 	 * with `signal.reason`. Checked before each pass and raced against the await.
+	 * Async renders only (`prerender`); `renderToString` is a single sync pass.
 	 */
 	signal?: AbortSignal;
 	/**
@@ -844,9 +971,21 @@ export interface RenderOptions {
 	nonce?: string;
 	/**
 	 * Per-render override of the global suspense settle deadline
-	 * (setSsrSuspenseTimeout). 0 disables the deadline for this render.
+	 * (setSsrSuspenseTimeout). 0 disables the deadline for this render. Async
+	 * renders only (`prerender`).
 	 */
 	timeoutMs?: number;
+}
+
+// Insert the hoisted head markup into `body`: before `</head>` when the render
+// produced a document (React-19 resource-hoisting shape), otherwise prepend it so
+// the caller/metaframework can place `html` in a document whose `<head>` then
+// contains the metadata. Empty head → body unchanged.
+function spliceHead(body: string, head: string): string {
+	if (head === '') return body;
+	const headClose = body.indexOf('</head>');
+	if (headClose !== -1) return body.slice(0, headClose) + head + body.slice(headClose);
+	return head + body;
 }
 
 /** Guard against a `use(thenable)` that never resolves wedging the render loop. */
@@ -887,142 +1026,378 @@ function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
 }
 
 /**
- * Render a server-compiled component (a function returning an HTML string) to
- * `{ head, body, css }`. `head` is the hoisted document-head markup
- * (`<title>`/`<meta>`/`<link>`/… collected by `ssrHeadEl` during the render),
- * each element prefixed with a `<!--key-->` marker the client's headBlock
- * adopts on hydration; the metaframework injects it at its `<!--ssr-head-->`
- * placeholder. `css` is the scoped stylesheets of the components that actually
- * rendered, emitted as ready-to-place `<style data-octane="hash">…</style>`
- * tags (one per hash, deduped). The client's `injectStyle` matches that
- * `data-octane` hash and skips re-injecting on hydration — so the styles cross
- * the boundary once.
+ * The buffered render pipeline (`renderToString` / `renderToStaticMarkup` /
+ * `prerender`). Hoisted document-head markup (`<title>`/`<meta>`/`<link>`
+ * collected by `ssrHeadEl`, each prefixed with a `<!--key-->` adoption marker)
+ * folds into the result `html`; scoped stylesheets are emitted as deduped
+ * `<style data-octane="hash">…</style>` tags in `css` (the client's
+ * `injectStyle` matches the hash and skips re-injecting on hydration, so the
+ * styles cross the boundary once).
  *
- * Async because of Suspense: a `use(thenable)` that hasn't resolved suspends
- * the pass; render() awaits it and re-renders, so the @try ends up
- * showing its resolved success arm (or @catch on rejection). Each resolved
- * value is appended to `body` as an inline data `<script>` for the client to
- * seed.
+ * Suspense: a `use(thenable)` that hasn't resolved suspends the pass; `prerender`
+ * awaits it and re-renders so the @try shows its resolved success arm (or @catch
+ * on rejection), while `renderToString` (sync) leaves the @pending fallback. Each
+ * resolved value is appended as an inline data `<script>` for the client to seed.
  */
-export async function render(
+type SuspendedList = { promise: PromiseLike<unknown>; key: string }[];
+type ResolvedMap = Map<string, { value: unknown } | { reason: unknown }>;
+
+interface FullPassResult {
+	body: string;
+	head: string;
+	css: string;
+	serial: unknown[];
+	suspended: SuspendedList;
+	deferred: Job[];
+}
+
+// Snapshot / install / restore the module globals around ONE synchronous pass
+// (or discovery round). Everything a pass touches lives here so a concurrent
+// render() that interleaves across our `await` can't observe or clobber our
+// in-flight pass — the globals are always restored before we yield the tick.
+interface Ambient {
+	scope: SSRScope | null;
+	id: number;
+	css: Map<string, string> | null;
+	head: { html: string } | null;
+	susp: SuspendedList | null;
+	res: ResolvedMap | null;
+	serial: unknown[] | null;
+	frame: Frame | null;
+	deferred: Job[] | null;
+	comp: ServerComponent | null;
+	props: any;
+	parentScope: SSRScope | null;
+}
+function saveAmbient(): Ambient {
+	return {
+		scope: CURRENT_SCOPE,
+		id: ID_COUNTER,
+		css: CSS,
+		head: HEAD,
+		susp: SUSPENDED,
+		res: RESOLVED,
+		serial: SERIAL,
+		frame: FRAME,
+		deferred: DEFERRED,
+		comp: CURRENT_COMP,
+		props: CURRENT_PROPS,
+		parentScope: CURRENT_PARENT_SCOPE,
+	};
+}
+function restoreAmbient(a: Ambient): void {
+	CURRENT_SCOPE = a.scope;
+	ID_COUNTER = a.id;
+	CSS = a.css;
+	HEAD = a.head;
+	SUSPENDED = a.susp;
+	RESOLVED = a.res;
+	SERIAL = a.serial;
+	FRAME = a.frame;
+	DEFERRED = a.deferred;
+	CURRENT_COMP = a.comp;
+	CURRENT_PROPS = a.props;
+	CURRENT_PARENT_SCOPE = a.parentScope;
+}
+
+// Run ONE full canonical pass over the whole tree, synchronously within this
+// tick. The emitted body/head/css/seeds always come from here (a normal full
+// render), so hydration byte-format is identical whether or not discovery ran.
+// A CSP nonce as an attribute fragment (` nonce="…"`) for inline `<style>`/
+// `<script>` tags, or '' when no nonce is set. Empty is the common (no-CSP) case.
+function nonceAttrOf(options: RenderOptions | undefined): string {
+	return options?.nonce ? ' nonce="' + escapeAttr(options.nonce) + '"' : '';
+}
+
+function runFullFramedPass(
+	component: ServerComponent,
+	props: any,
+	resolved: ResolvedMap,
+	nonceAttr: string = '',
+): FullPassResult {
+	const saved = saveAmbient();
+	ID_COUNTER = 0;
+	const cssMap = (CSS = new Map<string, string>());
+	const headBuf = (HEAD = { html: '' });
+	const suspended = (SUSPENDED = [] as SuspendedList);
+	const serial = (SERIAL = [] as unknown[]);
+	const deferred = (DEFERRED = [] as Job[]);
+	RESOLVED = resolved;
+	const root = ssrScope(null);
+	CURRENT_SCOPE = root;
+	// A root frame so use() keys resolve; the root component is the fallback
+	// discovery job for a bare use() with no enclosing sub-component boundary.
+	FRAME = { parent: null, seg: 0, nextChild: 0, occ: null, path: '', deferred: false };
+	CURRENT_COMP = component;
+	CURRENT_PROPS = props;
+	CURRENT_PARENT_SCOPE = null;
+	let body = '';
+	try {
+		// Normalize the root's return the same way ssrComponent normalizes child
+		// components: a compiled component returns its HTML string, but a plain
+		// `.ts` root (the shape every @octanejs binding produces) returns a
+		// createElement descriptor that must render through ssrChild.
+		const out = component(props ?? {}, root, undefined);
+		body = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, root);
+	} catch (err) {
+		// A suspension with no enclosing @try unwinds to here; its thenable is
+		// already in `suspended`, so fall through to the await + retry. Any other
+		// throw is a genuine render failure — propagate it (the finally restores).
+		if (!ssrIsSuspense(err)) throw err;
+	} finally {
+		restoreAmbient(saved);
+	}
+	let css = '';
+	for (const [hash, sheet] of cssMap) {
+		css += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
+	}
+	return { body, head: headBuf.html, css, serial, suspended, deferred };
+}
+
+// Re-run a set of discovery jobs (each an innermost suspending COMPONENT) in
+// isolation, discarding their output — the emitted HTML always comes from a full
+// pass. The point is only to reach the NEXT level's use() and populate RESOLVED,
+// so a deep waterfall costs cheap subtree re-runs instead of full-tree re-renders.
+// Returns the newly-surfaced suspensions + jobs. Ambient globals are saved /
+// restored so concurrent renders stay isolated across the subsequent await.
+function runDiscoveryRound(
+	jobs: Job[],
+	resolved: ResolvedMap,
+): { suspended: SuspendedList; deferred: Job[] } {
+	const saved = saveAmbient();
+	ID_COUNTER = 0;
+	CSS = new Map();
+	HEAD = { html: '' };
+	const suspended = (SUSPENDED = [] as SuspendedList);
+	SERIAL = [] as unknown[];
+	const deferred = (DEFERRED = [] as Job[]);
+	RESOLVED = resolved;
+	FRAME = null;
+	CURRENT_COMP = null;
+	CURRENT_PROPS = null;
+	CURRENT_PARENT_SCOPE = null;
+	try {
+		for (let i = 0; i < jobs.length; i++) {
+			const job = jobs[i];
+			// A fresh frame reproducing the component's own path verbatim (same
+			// parent chain + seg → framePath() yields the same string as the full
+			// pass, so use() keys match RESOLVED across passes and rounds).
+			const frame: Frame = {
+				parent: job.frame.parent,
+				seg: job.frame.seg,
+				nextChild: 0,
+				occ: null,
+				path: null,
+				deferred: false,
+			};
+			try {
+				renderComponentFramed(job.comp, job.props, job.parentScope, frame);
+			} catch (err) {
+				// A bare (@try-less) use() in the job body rethrows SSR_SUSPENSE; the
+				// thenable is already queued. A REAL error is DISCARDED here, not
+				// propagated: discovery output is throwaway, and only the canonical
+				// full pass renders the real tree, where the error can unwind to its
+				// actual ancestor @catch (throwing from a discovery re-run would
+				// reject render() even when an ancestor boundary handles it). The
+				// error re-occurs deterministically on the final pass because its
+				// use() inputs come from the same RESOLVED cache.
+				if (!ssrIsSuspense(err)) continue;
+			}
+		}
+	} finally {
+		restoreAmbient(saved);
+	}
+	return { suspended, deferred };
+}
+
+// Await everything a pass/round surfaced; cache each outcome in `resolved` by its
+// key. Only render-local state is touched across the await. Raced against the
+// settle deadline (`timeoutMs`; 0 disables) so a thenable that never settles
+// fails the render instead of hanging the request forever, and against the
+// caller's AbortSignal so a dead request stops rendering.
+async function settleSuspended(
+	suspended: SuspendedList,
+	resolved: ResolvedMap,
+	timeoutMs: number,
+	signal: AbortSignal | undefined,
+): Promise<void> {
+	const settleAll = Promise.all(
+		suspended.map(async ({ promise, key }) => {
+			if (resolved.has(key)) return;
+			try {
+				resolved.set(key, { value: await promise });
+			} catch (reason) {
+				resolved.set(key, { reason });
+			}
+		}),
+	);
+	const racers: Promise<unknown>[] = [settleAll];
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	let removeAbort: (() => void) | undefined;
+	if (timeoutMs > 0) {
+		racers.push(
+			new Promise<never>((_, reject) => {
+				timer = setTimeout(
+					() =>
+						reject(
+							new Error('octane SSR: a use(thenable) did not settle within ' + timeoutMs + 'ms.'),
+						),
+					timeoutMs,
+				);
+				// Don't let the deadline timer hold the event loop open if the render
+				// settles first (Node-only; harmless where unref is absent).
+				(timer as any)?.unref?.();
+			}),
+		);
+	}
+	if (signal) {
+		racers.push(
+			new Promise<never>((_, reject) => {
+				const onAbort = () => reject(signal.reason);
+				signal.addEventListener('abort', onAbort, { once: true });
+				removeAbort = () => signal.removeEventListener('abort', onAbort);
+			}),
+		);
+	}
+	try {
+		await (racers.length === 1 ? settleAll : Promise.race(racers));
+	} finally {
+		clearTimeout(timer);
+		removeAbort?.();
+	}
+}
+
+// The await-everything render core. Runs full canonical passes interleaved with
+// cheap discovery rounds until nothing suspends, then returns the final pass —
+// so every `use(thenable)` is resolved and the @try success arms are rendered.
+// Used by `prerender` (React's static API).
+async function runBuffered(
+	component: ServerComponent,
+	props: any,
+	options: RenderOptions | undefined,
+	nonceAttr: string,
+): Promise<FullPassResult> {
+	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
+	const signal = options?.signal;
+	// The suspense cache persists across this render's passes; it is render-local
+	// (never a module global) so concurrent renders can't share it.
+	const resolved: ResolvedMap = new Map();
+	let attempt = 0;
+	for (;;) {
+		// Bail before doing pass work if the request already died.
+		signal?.throwIfAborted();
+		// A full canonical pass. If nothing suspended, this IS the answer — the
+		// no-suspense fast path returns here after exactly one pass.
+		let pass: FullPassResult;
+		try {
+			pass = runFullFramedPass(component, props, resolved, nonceAttr);
+		} catch (err) {
+			options?.onError?.(err);
+			throw err;
+		}
+		if (pass.suspended.length === 0) return pass;
+		// Between full passes, greedily discover deeper waterfall levels with cheap
+		// SUBTREE re-runs (skipping the static bulk) so the NEXT full pass jumps
+		// straight to canonical. A root-level boundary (job.frame.parent === null)
+		// re-runs the whole tree anyway, so for those we just loop to a full pass.
+		let jobs = pass.deferred;
+		let pending = pass.suspended;
+		for (;;) {
+			// MAX bounds the TOTAL awaits (full-pass- and round-driven) so a
+			// never-resolving or nondeterministic use() can't wedge the loop.
+			if (++attempt > MAX_SUSPENSE_PASSES) {
+				const err = new Error(
+					'octane SSR: exceeded ' +
+						MAX_SUSPENSE_PASSES +
+						' suspense passes — a use(thenable) never resolved.',
+				);
+				options?.onError?.(err);
+				throw err;
+			}
+			await settleSuspended(pending, resolved, timeoutMs, signal);
+			if (jobs.length === 0 || !jobs.every((j) => j.frame.parent !== null)) break;
+			const round = runDiscoveryRound(jobs, resolved);
+			if (round.suspended.length === 0) break; // fully discovered → next full pass is canonical
+			pending = round.suspended;
+			jobs = round.deferred;
+		}
+		// Loop → another full canonical pass with the now-populated cache. If it
+		// still suspends (a nondeterministic render whose keys shift), it simply
+		// makes progress via more full passes, bounded by MAX_SUSPENSE_PASSES.
+	}
+}
+
+/** Turn a completed pass into the `{ html, css }` result (head folded in, seeds appended). */
+function passToResult(pass: FullPassResult, nonceAttr: string): RenderResult {
+	let body = pass.body;
+	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
+	return { html: spliceHead(body, pass.head), css: pass.css };
+}
+
+/**
+ * React `react-dom/static` `prerender` — await ALL data (Suspense boundaries
+ * resolve to their success arm), then return the complete `{ html, css }`. Use
+ * for SSG / any place that wants fully-resolved HTML with no client fallback.
+ * This is the buffered, await-everything behaviour of the old `render()`.
+ */
+export async function prerender(
 	component: ServerComponent,
 	props?: any,
 	options?: RenderOptions,
 ): Promise<RenderResult> {
-	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
-	const nonceAttr = options?.nonce ? ' nonce="' + escapeAttr(options.nonce) + '"' : '';
-	// The suspense cache persists across this render's passes; it is render-local
-	// (never a module global) so concurrent renders can't share it.
-	const resolved = new Map<string, { value: unknown } | { reason: unknown }>();
-	let attempt = 0;
-	for (;;) {
-		options?.signal?.throwIfAborted();
-		// Run ONE synchronous pass entirely within this tick: save the ambient
-		// module globals, install this pass's fresh state, run the (synchronous)
-		// component, capture the results into locals, then restore the globals —
-		// all before the `await` below. So no pass state is ever held in a module
-		// global across a suspension point, and a concurrent render() that runs
-		// during our await can't observe or clobber our in-flight pass.
-		const prevScope = CURRENT_SCOPE;
-		const prevId = ID_COUNTER;
-		const prevCss = CSS;
-		const prevHead = HEAD;
-		const prevSusp = SUSPENDED;
-		const prevRes = RESOLVED;
-		const prevSerial = SERIAL;
-		const prevOcc = OCC;
-		ID_COUNTER = 0;
-		const cssMap = (CSS = new Map());
-		const headBuf = (HEAD = { html: '' });
-		const suspended = (SUSPENDED = [] as { promise: PromiseLike<unknown>; key: string }[]);
-		const serial = (SERIAL = [] as unknown[]);
-		OCC = new Map();
-		RESOLVED = resolved;
-		const root = ssrScope(null);
-		CURRENT_SCOPE = root;
-		let body = '';
-		try {
-			body = component(props ?? {}, root, undefined) ?? '';
-		} catch (err) {
-			// A suspension with no enclosing @try unwinds to here; its thenable is
-			// already in `suspended`, so fall through to the await + retry. Any other
-			// throw is a genuine render failure — propagate it (the finally restores).
-			if (!ssrIsSuspense(err)) throw err;
-		} finally {
-			CURRENT_SCOPE = prevScope;
-			ID_COUNTER = prevId;
-			CSS = prevCss;
-			HEAD = prevHead;
-			SUSPENDED = prevSusp;
-			RESOLVED = prevRes;
-			SERIAL = prevSerial;
-			OCC = prevOcc;
-		}
+	const nonceAttr = nonceAttrOf(options);
+	return passToResult(await runBuffered(component, props, options, nonceAttr), nonceAttr);
+}
 
-		if (suspended.length === 0) {
-			let css = '';
-			for (const [hash, sheet] of cssMap) {
-				css += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
-			}
-			if (serial.length > 0) body += serializeSuspenseSeeds(serial, nonceAttr);
-			return { head: headBuf.html, body, css };
-		}
-		if (++attempt > MAX_SUSPENSE_PASSES) {
-			throw new Error(
-				'octane SSR: exceeded ' +
-					MAX_SUSPENSE_PASSES +
-					' suspense passes — a use(thenable) never resolved.',
-			);
-		}
-		// Await everything this pass surfaced; cache each outcome by its key. Only
-		// render-local state (`suspended`, `resolved`) is touched across the await.
-		// Raced against the settle deadline so a thenable that never settles fails
-		// the render (with a clear error) instead of hanging the request forever,
-		// and against the caller's AbortSignal so a dead request stops rendering.
-		const settleAll = Promise.all(
-			suspended.map(async ({ promise, key }) => {
-				if (resolved.has(key)) return;
-				try {
-					resolved.set(key, { value: await promise });
-				} catch (reason) {
-					resolved.set(key, { reason });
-				}
-			}),
-		);
-		const racers: Promise<unknown>[] = [settleAll];
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		let removeAbort: (() => void) | undefined;
-		if (timeoutMs > 0) {
-			racers.push(
-				new Promise<never>((_, reject) => {
-					timer = setTimeout(
-						() =>
-							reject(
-								new Error('octane SSR: a use(thenable) did not settle within ' + timeoutMs + 'ms.'),
-							),
-						timeoutMs,
-					);
-					// Don't let the deadline timer hold the event loop open if the render
-					// settles first (Node-only; harmless where unref is absent).
-					(timer as any)?.unref?.();
-				}),
-			);
-		}
-		if (options?.signal) {
-			const signal = options.signal;
-			racers.push(
-				new Promise<never>((_, reject) => {
-					const onAbort = () => reject(signal.reason);
-					signal.addEventListener('abort', onAbort, { once: true });
-					removeAbort = () => signal.removeEventListener('abort', onAbort);
-				}),
-			);
-		}
-		try {
-			await Promise.race(racers);
-		} finally {
-			clearTimeout(timer);
-			removeAbort?.();
-		}
+/**
+ * React `react-dom/server` `renderToString` — a SINGLE synchronous pass, no
+ * awaiting. A Suspense boundary that suspends renders its fallback (the inline
+ * `@try`/`@pending` arm); a bare `use(thenable)` with no enclosing boundary ends
+ * the render early (its partial output is returned). Synchronously-resolved
+ * `use()` in the shell still seeds. Use `prerender` when you need the data awaited.
+ */
+export function renderToString(
+	component: ServerComponent,
+	props?: any,
+	options?: RenderOptions,
+): RenderResult {
+	options?.signal?.throwIfAborted();
+	const nonceAttr = nonceAttrOf(options);
+	const resolved: ResolvedMap = new Map();
+	let pass: FullPassResult;
+	try {
+		pass = runFullFramedPass(component, props, resolved, nonceAttr);
+	} catch (err) {
+		options?.onError?.(err);
+		throw err;
 	}
+	return passToResult(pass, nonceAttr);
+}
+
+/**
+ * React `react-dom/server` `renderToStaticMarkup` — a single synchronous pass
+ * producing clean, NON-hydratable HTML: no `<!--[-->`/`<!--]-->` block markers,
+ * no head-adoption markers, no suspense seed script. For static pages / email.
+ */
+export function renderToStaticMarkup(
+	component: ServerComponent,
+	props?: any,
+	options?: RenderOptions,
+): RenderResult {
+	options?.signal?.throwIfAborted();
+	const nonceAttr = nonceAttrOf(options);
+	const resolved: ResolvedMap = new Map();
+	const prevMarkers = MARKERS;
+	MARKERS = false;
+	let pass: FullPassResult;
+	try {
+		pass = runFullFramedPass(component, props, resolved, nonceAttr);
+	} catch (err) {
+		options?.onError?.(err);
+		throw err;
+	} finally {
+		MARKERS = prevMarkers;
+	}
+	// No seeds (non-hydratable). Head is folded in without adoption markers.
+	return { html: spliceHead(pass.body, pass.head), css: pass.css };
 }

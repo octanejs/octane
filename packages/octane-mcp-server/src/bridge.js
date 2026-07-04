@@ -104,7 +104,7 @@ export const REACT_API_MAP = {
 	findDOMNode: { status: 'unsupported', note: 'Removed in React 19 too. Use refs.' },
 	renderToString: {
 		status: 'rewrite',
-		note: 'Use render() from octane/server; it is async and returns { head, body, css }.',
+		note: 'Use renderToString() from octane/server (sync) or prerender() from octane/static (async, awaits Suspense); both return { html, css }.',
 	},
 	renderToPipeableStream: {
 		status: 'unsupported',

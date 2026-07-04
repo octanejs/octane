@@ -5507,7 +5507,7 @@ function emitElementHtml(
 				//   - anything else → renderable childSlot hole
 				const expr = child.expression;
 				if (isCreatePortalCall(expr)) {
-					const pc = makePortalCall(expr, ctx, componentName, inlinedSubs);
+					const pc = makePortalCall(expr, ctx, componentName, inlinedSubs, childNs, cssHash);
 					// Stash the JSX-tree host (the element containing this createPortal
 					// call) so the runtime can stamp $$portalParent on portal children
 					// pointing back at it. That makes events bubble OUT of the portal
@@ -5576,11 +5576,20 @@ function isCreatePortalCall(node) {
 	);
 }
 
-function makePortalCall(callNode, ctx, componentName, inlinedSubs) {
+function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, cssHash) {
 	const [bodyArg, targetArg, propsArg] = callNode.arguments;
-	// The body is typically a <tsrx>...</tsrx> block — compile to a render fn.
-	// rewriteTsrxBlocks turns Tsrx/Tsx into an Identifier referencing a hoisted fn.
-	const bodyExpr = printExprWithTsrx(bodyArg, ctx, componentName, inlinedSubs);
+	// The body is typically a <tsrx>...</tsrx> block or an arrow-`@{}` — both
+	// rewritten to a hoisted render fn by printExprWithTsrx. An INLINE JSX
+	// element/fragment body (`createPortal(<div…/>, target)`) is not a Tsrx
+	// block, so it must be hoisted here — otherwise the raw JSX would be
+	// printed verbatim into the emitted portal() call (invalid output).
+	let bodyExpr;
+	const bt = bodyArg ? bodyArg.type : null;
+	if (bt === 'Element' || bt === 'Fragment' || bt === 'JSXElement' || bt === 'JSXFragment') {
+		bodyExpr = hoistBodyHelper(ctx, inlinedSubs, '__portal', [bodyArg], [], parentNs, cssHash);
+	} else {
+		bodyExpr = printExprWithTsrx(bodyArg, ctx, componentName, inlinedSubs);
+	}
 	const targetExpr = printExpr(targetArg);
 	const propsExpr = propsArg ? printExpr(propsArg) : 'undefined';
 	return {

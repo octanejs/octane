@@ -78,15 +78,15 @@ describe('octane/server — withSlot + startTransition (BLOCKER 1)', () => {
 
 	it('server-compiles + SSRs a .tsrx using a custom hook and startTransition', async () => {
 		const server = serverModule(); // throws if any octane/server import is missing
-		const { body } = await ServerRT.render(server.Widget, { start: 5 });
+		const { html } = await ServerRT.renderToString(server.Widget, { start: 5 });
 		// The custom hook's useState returned its initial; rendered through withSlot.
-		expect(body).toBe('<button id="w">count:5</button>');
+		expect(html).toBe('<button id="w">count:5</button>');
 	});
 
 	it('hydrates the SSR output and the transition setter is interactive', async () => {
 		const server = serverModule();
-		const { body } = await ServerRT.render(server.Widget, { start: 0 });
-		container.innerHTML = body;
+		const { html } = await ServerRT.renderToString(server.Widget, { start: 0 });
+		container.innerHTML = html;
 		const btn = container.querySelector('#w') as HTMLButtonElement;
 
 		const root = hydrateRoot(container, Widget, { start: 0 });
