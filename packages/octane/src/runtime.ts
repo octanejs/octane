@@ -1929,6 +1929,14 @@ export function useRef<T>(initial: T, slot?: symbol): { current: T } {
 }
 
 /**
+ * React's `useDebugValue(value, format?)` — a devtools-only label for custom
+ * hooks. Octane has no devtools inspector, so it is a no-op; exported so custom
+ * hooks ported from React run unchanged. Accepts (and ignores) the compiler's
+ * trailing slot symbol like every other hook.
+ */
+export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: symbol): void {}
+
+/**
  * React's `useImperativeHandle(ref, factory, deps)` — exposes an imperative
  * API to a parent via the ref. Scheduled as a layout-phase effect so the
  * `ref.current` is populated before paint and before any layout effects in
@@ -2488,6 +2496,81 @@ function useThenable<T>(thenable: TrackedThenable<T>): T {
 		);
 	}
 	throw new SuspenseException(thenable);
+}
+
+// ---------------------------------------------------------------------------
+// lazy — React's code-splitting component wrapper.
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve a lazy module payload to its component. Accepts React's canonical
+ * `{ default: Component }` (a dynamic `import()` namespace) and — as a
+ * pragmatic extension — a bare component function, so `lazy(() =>
+ * import('./x').then((m) => m.Named))` works without a `{ default }` shim.
+ */
+function resolveLazyModule(mod: any): ComponentBody<any> {
+	const comp = mod != null && mod.default !== undefined ? mod.default : mod;
+	if (typeof comp !== 'function') {
+		throw new Error(
+			'lazy: expected the load() promise to resolve to a component function or a ' +
+				"module with a component as its default export, got '" +
+				typeof comp +
+				"'",
+		);
+	}
+	return comp as ComponentBody<any>;
+}
+
+/**
+ * React's `lazy(load)` — code-splitting. Returns a component; the first time it
+ * renders it calls `load()` (once, cached on the payload for every mount of this
+ * lazy component) and SUSPENDS on the returned promise, exactly like a body that
+ * opens with `use(loadPromise)`: the nearest `@try`/`<Suspense>` shows its
+ * pending arm and retries when the module settles. Once fulfilled it tail-calls
+ * the loaded component with the same `(props, scope, extra)`, so hooks, context,
+ * children, and return-based bodies all behave as if the component were imported
+ * statically. A rejected load throws the rejection reason on retry, routing to
+ * the nearest `@catch` (React parity).
+ *
+ * The wrapper's identity is stable, so `componentSlot`'s `comp !==
+ * state.currentComp` check never spuriously remounts, and `memo(lazy(...))`
+ * composes (memoWrapper tail-calls this wrapper). The wrapper carries no
+ * `$$singleRoot` flag — a value-position lazy mounts through childSlot's
+ * marked path, which is correct for any root shape the loaded module may have.
+ */
+export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ default: C } | C>): C {
+	let status: 'uninitialized' | 'pending' | 'fulfilled' | 'rejected' = 'uninitialized';
+	let result: any = null; // fulfilled → component; rejected → the reason
+	let thenable: TrackedThenable<any> | null = null;
+	const lazyWrapper = (props: any, scope: Scope, extra: any): unknown => {
+		if (status === 'fulfilled') return (result as ComponentBody<any>)(props, scope, extra);
+		if (status === 'rejected') throw result;
+		if (status === 'uninitialized') {
+			status = 'pending';
+			const p = load();
+			thenable = p as TrackedThenable<any>;
+			p.then(
+				(mod: any) => {
+					// This handler was attached FIRST, so by the time the boundary's retry
+					// listener fires the payload is already fulfilled/rejected and the
+					// re-render takes the synchronous branch above.
+					try {
+						result = resolveLazyModule(mod);
+						status = 'fulfilled';
+					} catch (err) {
+						result = err;
+						status = 'rejected';
+					}
+				},
+				(err: any) => {
+					result = err;
+					status = 'rejected';
+				},
+			);
+		}
+		throw new SuspenseException(thenable!);
+	};
+	return lazyWrapper as unknown as C;
 }
 
 // Monotonic counter — produces stable cross-render IDs.
@@ -4255,6 +4338,55 @@ function setFormStatus(form: HTMLFormElement, status: FormStatus): void {
 	FORM_STATUS.set(form, status);
 	const ls = FORM_STATUS_LISTENERS.get(form);
 	if (ls) for (const l of ls) l();
+}
+
+// Forms whose reset was requested during a transition/action window, applied
+// when the window closes (see flushFormResets / startTransition).
+let PENDING_FORM_RESETS: Set<HTMLFormElement> | null = null;
+
+function resetFormNow(form: HTMLFormElement): void {
+	try {
+		form.reset();
+	} catch {
+		/* jsdom/detached form */
+	}
+}
+
+/**
+ * React DOM's `requestFormReset(form)` — schedule a reset of the form's
+ * uncontrolled fields, tied to the enclosing transition/action: the reset is
+ * deferred until the action window closes (every in-flight async transition has
+ * settled), matching React's "reset when the action's transition commits". This
+ * is the manual companion to the automatic reset a plain `<form action={fn}>`
+ * gets on success — use it from `onSubmit` + `startTransition` flows or
+ * `useActionState` forms that DO want a reset.
+ *
+ * Called outside any transition or action, React logs an error; octane does the
+ * same and applies the reset immediately (the least surprising fallback).
+ */
+export function requestFormReset(form: HTMLFormElement): void {
+	if (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0) {
+		(PENDING_FORM_RESETS ??= new Set()).add(form);
+		return;
+	}
+	console.error(
+		'requestFormReset was called outside a transition or action. To fix, move to ' +
+			'an action, or wrap with startTransition.',
+	);
+	resetFormNow(form);
+}
+
+// Apply the queued form resets once NO transition/action window remains open.
+// Called from every startTransition settle path; the guard makes overlapping
+// async actions coalesce — resets fire when the LAST one settles (success or
+// failure: React applies queued resets when the transition commits, and an
+// action whose error routes to a boundary still commits).
+function flushFormResets(): void {
+	if (PENDING_FORM_RESETS === null) return;
+	if (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0) return;
+	const forms = PENDING_FORM_RESETS;
+	PENDING_FORM_RESETS = null;
+	for (const f of forms) resetFormNow(f);
 }
 
 /**
@@ -7214,6 +7346,10 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 		}
 	} catch (err) {
 		tickTransitionCount(-1);
+		// Don't strand resets queued before the throw — they'd fire on an unrelated
+		// later transition's settle otherwise. (flushFormResets self-guards if an
+		// outer transition window is still open.)
+		flushFormResets();
 		throw err;
 	}
 	if (result != null && typeof (result as { then?: unknown }).then === 'function') {
@@ -7232,6 +7368,8 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 			settled = true;
 			ASYNC_TRANSITION_COUNT--;
 			tickTransitionCount(-1);
+			// The action window (may have) closed — apply queued requestFormReset()s.
+			flushFormResets();
 		};
 		(result as Promise<unknown>).then(settle, settle);
 	} else {
@@ -7239,7 +7377,10 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 		// flush the queued renders this transition produced — if any of those
 		// renders held the transition open by suspending, they incremented the
 		// count themselves via handleSuspense, so the net count stays > 0.
-		queueMicrotask(() => tickTransitionCount(-1));
+		queueMicrotask(() => {
+			tickTransitionCount(-1);
+			flushFormResets();
+		});
 	}
 }
 

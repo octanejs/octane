@@ -53,9 +53,12 @@ export {
 	useActionState,
 	useFormStatus,
 	useOptimistic,
+	useDebugValue,
 	memo,
+	lazy,
 	withSlot,
 	startTransition,
+	requestFormReset,
 
 	// Suspense / error boundaries as JSX components (alongside the @try directive)
 	Suspense,

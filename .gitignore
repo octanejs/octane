@@ -20,3 +20,7 @@ benchmarks/baselines/ratios.suggested.json
 # Pinned radix-ui/primitives checkout — the porting source-of-truth for @octanejs/radix
 # (see docs/radix-migration-plan.md; clone is re-created on demand, never committed).
 .radix-primitives/
+
+# Pinned mui/base-ui checkout — the porting source-of-truth for @octanejs/base-ui
+# (see docs/base-ui-migration-plan.md; clone is re-created on demand, never committed).
+.base-ui/
