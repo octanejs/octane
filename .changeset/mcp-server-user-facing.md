@@ -1,5 +1,5 @@
 ---
-"@octanejs/mcp-server": minor
+"@octanejs/mcp-server": patch
 ---
 
 Rework the MCP server around Octane users, not just repo maintainers. Skills now ship

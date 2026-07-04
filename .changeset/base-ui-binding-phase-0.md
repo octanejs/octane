@@ -1,5 +1,5 @@
 ---
-"@octanejs/base-ui": minor
+"@octanejs/base-ui": patch
 ---
 
 New binding: `@octanejs/base-ui` — Base UI (`@base-ui/react`) ported to the
