@@ -693,7 +693,21 @@ function renderComponentFramed(
 }
 
 /** Render a child component into the string: fresh scope + frame, body → HTML. */
-export function ssrComponent(parent: SSRScope, comp: ServerComponent, props: any): string {
+export function ssrComponent(parent: SSRScope, comp: ServerComponent | string, props: any): string {
+	// A member/dynamic tag (`<obj.tag/>`, `<{expr}/>`) can resolve to a host tag
+	// STRING at runtime (e.g. MDX's `_components.h1` mapping, unoverridden). The
+	// client renders these — a value-lowered `createElement(obj.tag, …)` routes
+	// `typeof type === 'string'` through the de-opt host path — so the server
+	// must too, instead of CALLING the string as a component body. Serialize the
+	// host element inside the same single `<!--[-->…<!--]-->` range a component
+	// body gets (exactly ssrChild's host-descriptor shape), so the client's
+	// adoption sees one uniform block whichever kind the tag resolved to.
+	// Children arrive as `props.children` — plain values/descriptors from a
+	// value-position call site, or a `__schildren$N` render fn from a template
+	// one; ssrHostElement's content path handles both.
+	if (typeof comp === 'string') {
+		return ssrBlock(ssrHostElement(comp, props, props?.children, parent));
+	}
 	const pf = FRAME;
 	// A fresh child frame: its `seg` is the parent's next child index (built into
 	// the path so sibling instances of the same component get distinct keys). `pf`
