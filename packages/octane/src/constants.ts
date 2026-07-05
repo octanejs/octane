@@ -110,6 +110,27 @@ export const BOOLEAN_DROPPED_STRING_ATTR_PROPS = new Set([
 	'formaction',
 ]);
 
+/**
+ * The three global ENUMERATED attributes whose boolean prop forms must
+ * stringify: `false` must WRITE "false" (an ABSENT attribute means "inherit /
+ * UA default", a different state), and `true` writes "true". Applies on every
+ * element (they're global attributes — custom elements included). Matched
+ * case-insensitively: JSX arrives camelCase (`spellCheck`), spreads/de-opt
+ * props may arrive lowercase.
+ */
+export function isEnumeratedBooleanAttr(name: string): boolean {
+	// Length-bucketed so non-matching names never pay the toLowerCase.
+	switch (name.length) {
+		case 10:
+			return name.toLowerCase() === 'spellcheck';
+		case 9:
+			return name.toLowerCase() === 'draggable';
+		case 15:
+			return name.toLowerCase() === 'contenteditable';
+	}
+	return false;
+}
+
 // ---------------------------------------------------------------------------
 // Style value coercion — React parity for numeric style-object values.
 //

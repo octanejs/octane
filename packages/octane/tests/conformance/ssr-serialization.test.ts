@@ -138,6 +138,7 @@ export function OptionSelected(p) @{ <select><option selected={p.sel} value="a">
 export function CustomCls() @{ <custom-element className="test" /> }
 export function CustomFor() @{ <custom-element htmlFor="test" /> }
 export function CustomFoo(p) @{ <custom-element foo={p.v} /> }
+export function CustomData(p) @{ <custom-element data-foo={p.v} /> }
 export function CustomOn() @{ <custom-element onunknown="bar" /> }
 export function IsElement(p) @{ <div is="custom-element" className="test" foo={p.foo} /> }
 export function InertDiv(p) @{ <div inert={p.v} /> }
@@ -1100,6 +1101,20 @@ describe('conformance: SSR serialization — custom elements (Attributes)', () =
 			'bar',
 		);
 		expect(parse(ssr('CustomOn')).firstElementChild!.getAttribute('onunknown')).toBe('bar');
+	});
+
+	// data-* booleans stringify on custom elements too (same as standard
+	// elements — the client setAttribute writes the identical string, so
+	// hydration adopts cleanly).
+	it('stringifies data-* booleans on custom elements', () => {
+		expect(parse(ssr('CustomData', { v: true })).firstElementChild!.getAttribute('data-foo')).toBe(
+			'true',
+		);
+		expect(parse(ssr('CustomData', { v: false })).firstElementChild!.getAttribute('data-foo')).toBe(
+			'false',
+		);
+		expectCleanHydrate('CustomData', { v: true });
+		expectCleanHydrate('CustomData', { v: false });
 	});
 
 	it('serializes unknown boolean attributes on custom elements (Per :741/:746/:774)', () => {

@@ -21,6 +21,7 @@ import {
 	HYDRATION_TEXT_SEP,
 	POSITIVE_NUMERIC_ATTR_PROPS,
 	BOOLEAN_DROPPED_STRING_ATTR_PROPS,
+	isEnumeratedBooleanAttr,
 	UNDEFINED_SENTINEL_KEY,
 	cssStyleValue,
 } from './constants.js';
@@ -3966,22 +3967,6 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 		return null;
 	}
 	return v;
-}
-
-// The three global enumerated attributes whose boolean prop forms must stringify
-// (see setAttribute). Case-insensitive: JSX arrives camelCase (`spellCheck`),
-// spreads/de-opt props may arrive lowercase.
-function isEnumeratedBooleanAttr(name: string): boolean {
-	// Length-bucketed so non-matching names never pay the toLowerCase.
-	switch (name.length) {
-		case 10:
-			return name.toLowerCase() === 'spellcheck';
-		case 9:
-			return name.toLowerCase() === 'draggable';
-		case 15:
-			return name.toLowerCase() === 'contenteditable';
-	}
-	return false;
 }
 
 // clsx-style `class`/`className` composition — shared with the SSR serializer

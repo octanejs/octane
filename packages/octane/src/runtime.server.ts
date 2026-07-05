@@ -35,6 +35,7 @@ import {
 	STREAM_SEED_COMMENT,
 	POSITIVE_NUMERIC_ATTR_PROPS,
 	BOOLEAN_DROPPED_STRING_ATTR_PROPS,
+	isEnumeratedBooleanAttr,
 	cssStyleValue,
 } from './constants.js';
 
@@ -520,9 +521,21 @@ export function ssrAttr(name: string, v: unknown, tag?: string): string {
 	}
 	// React-only warning-suppression hints never serialize (client parity).
 	if (name === 'suppressContentEditableWarning' || name === 'suppressHydrationWarning') return '';
+	const t = typeof v;
+	// spellcheck / contenteditable / draggable are ENUMERATED — a boolean
+	// stringifies ("false" is a real state; absent means inherit). Global
+	// attributes, so custom elements included (mirrors coerceAttrValue).
+	if (t === 'boolean' && isEnumeratedBooleanAttr(name)) {
+		return ' ' + name + '="' + v + '"';
+	}
+	// data-* attributes stringify booleans on EVERY element (custom included —
+	// the client writes the same): `data-x={false}` → "false"; a dataset
+	// consumer reads the string, so dropping/bare-ing loses the value.
+	if (t === 'boolean' && name.startsWith('data-')) {
+		return ' ' + name + '="' + v + '"';
+	}
 	// Function/symbol values are never meaningful attribute text (client parity:
 	// setAttribute removes them) — stringifying a function leaks source into markup.
-	const t = typeof v;
 	if (t === 'function' || t === 'symbol') return '';
 	if (!isCustomTag) {
 		// Unknown lowercase `on*` attributes are dropped on standard elements (React
@@ -536,27 +549,25 @@ export function ssrAttr(name: string, v: unknown, tag?: string): string {
 		const lower = name.toLowerCase();
 		// NOTE no boolean-prop truthiness table (React drops `hidden={0}`): the
 		// ADJUDICATED divergence (see constants.ts) writes values through natively.
-		// data-* attributes stringify booleans (`data-x={false}` → "false") — a
-		// dataset consumer reads the string, so dropping/bare-ing loses the value.
-		if (t === 'boolean' && lower.startsWith('data-')) {
-			return ' ' + name + '="' + v + '"';
-		}
 		if (t === 'boolean' && BOOLEAN_DROPPED_STRING_ATTR_PROPS.has(lower)) return '';
 		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && (t === 'boolean' || !(Number(v) >= 1))) return '';
-		// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers would
-		// re-fetch the whole document as an image/script/stylesheet. React strips
-		// these; so does the client's setAttribute. `<a href="">`/`<area href="">`
-		// stays — an empty href is a legitimate "link to this page".
-		if (
-			v === '' &&
-			(name === 'src' || (name === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area'))
-		) {
-			return '';
-		}
 	}
 	if (v == null || v === false) return '';
+	const s = v === true ? '' : String(v);
+	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers would
+	// re-fetch the whole document as an image/script/stylesheet. React strips
+	// these; so does the client's setAttribute (element-agnostic, custom
+	// elements included — and `true` coerces to '' first, exactly like the
+	// client). `<a href="">`/`<area href="">` stays — an empty href is a
+	// legitimate "link to this page".
+	if (
+		s === '' &&
+		(name === 'src' || (name === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area'))
+	) {
+		return '';
+	}
 	if (v === true) return ' ' + name;
-	return ' ' + name + '="' + escapeAttr(v) + '"';
+	return ' ' + name + '="' + escapeAttr(s) + '"';
 }
 
 function styleObjectToCss(obj: Record<string, unknown>): string {
