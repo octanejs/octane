@@ -693,7 +693,17 @@ function renderComponentFramed(
 }
 
 /** Render a child component into the string: fresh scope + frame, body → HTML. */
-export function ssrComponent(parent: SSRScope, comp: ServerComponent, props: any): string {
+export function ssrComponent(parent: SSRScope, comp: ServerComponent | string, props: any): string {
+	// A STRING comp: a dynamic JSX tag — `<props.parts.title>`, `<Tag/>` with
+	// `const Tag = 'h1'`, `<{expr}/>` — that resolved to a HOST tag name at
+	// runtime. Serialize the host element inside the SAME one-block range a
+	// component occupies, so the client's componentSlot adopts the range
+	// uniformly on hydration. A `children` render-fn routes through
+	// ssrHostElement → ssrDescriptorContent's function branch into its own inner
+	// block — the shape the client's hostElementBody → childSlot adopts.
+	if (typeof comp === 'string') {
+		return ssrBlock(ssrHostElement(comp, props, props != null ? props.children : null, parent));
+	}
 	const pf = FRAME;
 	// A fresh child frame: its `seg` is the parent's next child index (built into
 	// the path so sibling instances of the same component get distinct keys). `pf`
