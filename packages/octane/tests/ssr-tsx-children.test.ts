@@ -37,7 +37,7 @@ describe('.tsx return-form component children — server matches client (descrip
 		const code = serverCode(RETURN_FORM);
 		// children must be a createElement(Inner, …) descriptor — matching the client —
 		// so `{props.children}` → ssrChild(descriptor) is ONE block, like childSlot.
-		expect(code).toMatch(/"children":\s*\(createElement\(\s*Inner/);
+		expect(code).toMatch(/"children":\s*\(_\$createElement\(\s*Inner/);
 		// It must NOT wrap children in a __schildren render-fn (that adds a block).
 		expect(code).not.toMatch(/"children":\s*__schildren/);
 	});

@@ -36,7 +36,7 @@ function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIX, 'utf8'), FILE, { mode: 'server' });
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		'const {$1} = __rt;',
+		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
@@ -44,7 +44,10 @@ function serverModule(): Record<string, any> {
 }
 function devClientModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIX, 'utf8'), FILE, { mode: 'client', dev: true });
-	code = code.replace(/import\s*\{([^}]*)\}\s*from\s*['"]octane['"];?/g, 'const {$1} = __rt;');
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane['"];?/g,
+		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
+	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
 	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ClientRT, {});

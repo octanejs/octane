@@ -19,7 +19,7 @@ function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'tryif-spread.tsrx', { mode: 'server' });
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		'const {$1} = __rt;',
+		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');

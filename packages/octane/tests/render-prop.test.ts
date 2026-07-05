@@ -35,6 +35,6 @@ describe('render-prop children (bare-JSX arrow)', () => {
 			'export function App() @{ <Provide>{(v) => (<span class="rendered">{v as string}</span>)}</Provide> }';
 		const { code } = compile(src, 'rp-paren.tsrx', { mode: 'client' });
 		expect(code).not.toMatch(/<span/); // no raw (unlowered) JSX leaked
-		expect(code).toContain('(v) => createElement');
+		expect(code).toContain('(v) => _$createElement');
 	});
 });

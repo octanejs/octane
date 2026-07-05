@@ -150,7 +150,7 @@ function evalModule(mode: 'server' | 'client', rt: unknown): Record<string, any>
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'clsx-class.tsrx', { mode });
 	code = code.replace(
 		new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*['"]${src}['"];?`, 'g'),
-		'const {$1} = __rt;',
+		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
