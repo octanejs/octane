@@ -283,6 +283,50 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	it('NumberField: Root/Group/Input/steppers render the formatted value byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'NumberFieldBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('NumberField: at max boundary the Increment button is disabled', async () => {
+		const d = await mountDifferential(FIXTURE, 'NumberFieldBoundary', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Slider: Root/Value/Control/Track/Indicator/Thumb render the value byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'SliderBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Slider: range slider renders two thumbs + sorted values byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'SliderRange', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Slider: ArrowUp on the thumb steps the value (aria-valuenow + indicator % + output re-render)', async () => {
+		const d = await mountDifferential(FIXTURE, 'SliderBasic', undefined, CACHE);
+		await d.step('mount (30)', () => {});
+		await d.step('ArrowUp → 31', async (i, r) => {
+			await i.keydown('input[type="range"]', 'ArrowUp');
+			await r.keydown('input[type="range"]', 'ArrowUp');
+		});
+		d.unmount();
+	});
+
+	it('Slider: range ArrowRight steps only the pressed (first) thumb', async () => {
+		const d = await mountDifferential(FIXTURE, 'SliderRange', undefined, CACHE);
+		await d.step('mount ([20, 60])', () => {});
+		await d.step('ArrowRight on thumb 0 → 21', async (i, r) => {
+			await i.keydown('input[type="range"]', 'ArrowRight');
+			await r.keydown('input[type="range"]', 'ArrowRight');
+		});
+		d.unmount();
+	});
+
 	it('RadioGroup: composite roving focus + value → aria-checked; click moves selection', async () => {
 		const d = await mountDifferential(FIXTURE, 'RadioGroupBasic', undefined, CACHE);
 		await d.step('mount (a selected)', () => {});

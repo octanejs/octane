@@ -1,0 +1,4 @@
+// Ported verbatim from .base-ui/packages/react/src/number-field/utils/constants.ts.
+export const CHANGE_VALUE_TICK_DELAY = 60;
+export const START_AUTO_CHANGE_DELAY = 400;
+export const SCROLLING_POINTER_MOVE_DISTANCE = 8;

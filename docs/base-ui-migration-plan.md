@@ -10,6 +10,53 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 2 COMPLETE — Slider DONE (2026-07). Green: 47 differential tests, full monorepo suite
+> 2155 green.** `src/slider.ts` — the last Phase-2 giant, all 7 parts + 9 pure utils: `Slider.Root`
+> (value/format state machine over `useControlled` + a sorted `values` array; `setValue` clones the
+> event to expose `event.target.value` for form libs; wraps its `<div role="group">` in the
+> composite `CompositeList` so thumbs self-register), `Slider.Control` (the full pointer/drag
+> finger-tracking + thumb-collision engine — inert in jsdom but ported faithfully), `Slider.Track`,
+> `Slider.Indicator` (centered/inset fill %), `Slider.Thumb` (a `<div>` + nested
+> `<input type="range">`, `useCompositeListItem` registration, per-thumb aria-valuetext, the full
+> arrow/Page/Home/End keyboard state machine via `getNewValue`/`handleInputChange`), `Slider.Value`
+> (`<output>` with a multi-input `htmlFor` derived from the thumb map), `Slider.Label` (root-label
+> id association via `useLabel`). New pure utils `utils/slider/{asc,replaceArrayItemAtIndex,
+> getSliderValue,roundValueToStep,valueArrayToPercentages,getMidpoint,validateMinimumDistance,
+> getPushedThumbValues,resolveThumbCollision}` (all ported verbatim); new helpers `useIsHydrating`
+> (client → false), `resolveAriaLabelledBy`/`getDefaultLabelId`, `matchesFocusVisible` (jsdom-true),
+> `createGenericEventDetails`, `REASONS.{trackPress,drag}`, `PAGE_UP`/`PAGE_DOWN`. **Key octane
+> finding:** a controlled range input reflects its live value to the `value` ATTRIBUTE (verified vs
+> React), so — unlike a controlled TEXT input (NumberField) — octane's native attribute write
+> matches with NO freeze/property adaptation. With the default `center` alignment, thumb/indicator
+> positions are pure math, so mount AND keyboard stepping (arrow keys re-render `aria-valuenow` +
+> the `%` positions + the `<output>` text + the value attribute) are all byte-verified. Added a
+> `keydown(selector, key)` helper to the shared differential rig (`_rig.ts`) to drive this. Pointer
+> drag needs real layout → inert in jsdom, so not differential-covered (documented blind spot).
+> **Phase 2 done: Field/Form + Checkbox/CheckboxGroup/Switch/Radio/RadioGroup + NumberField +
+> Input + Slider. Next: Phase 3 (overlays on `@octanejs/floating-ui`).**
+
+> **Phase 2 (in progress) — NumberField CORE DONE (2026-07). Green: 43 differential tests, full
+> monorepo suite 2155 green.** `src/number-field.ts` — the first of the two Phase-2 giants. The
+> value/format state machine ported faithfully: `NumberField.Root` (+ `NumberFieldRootContext`,
+> `useControlled` value, `useForcedRerendering`, `setValue`/`incrementValue`/`getStepAmount`/
+> `getAllowedNonNumericKeys` via `useStableCallback`, `formatNumber`-based `inputValue` state,
+> and a hidden `<input type="number">` for form submission), `NumberField.Group` (`role="group"`),
+> `NumberField.Input` (`<input type="text">` with the full onChange/onKeyDown/onBlur/onFocus/onPaste
+> handler set: locale-aware numeral filtering, arrow/Home/End stepping, blur re-format, paste
+> parse), and `NumberField.Increment`/`Decrement` (`useNumberFieldStepperButton` + `useButton`,
+> `focusableWhenDisabled`, boundary-disabled at min/max). New utils: `utils/number/{parse,validate,
+> constants,types}.ts` (parse/validate ported verbatim), `useForcedRerendering`, `addEventListener`,
+> `platform`, and `REASONS` gained the number-field reason strings. **octane adaptations:** native
+> events (no `.nativeEvent`); the text-input value adaptation applied to BOTH the visible input and
+> the hidden number input (initial value → the `value` ATTRIBUTE; live value driven via the `.value`
+> PROPERTY in a layout effect). **Deferred (stubbed):** `usePressAndHold` auto-repeat (single-click
+> stepping works; hold-to-repeat inert) + the ScrubArea. Increment/decrement value changes are
+> invisible in `innerHTML` (React drives the value via the property too), so the differential gates
+> the formatted-value render + the boundary-disabled state; value-change behavior is covered by the
+> parse/validate ports and the handler logic.
+> **Remaining Phase 2: usePressAndHold auto-repeat + ScrubArea (NumberField polish) + Slider
+> (~2835 lines)** — the last large dedicated item.
+
 > **Phase 2 (in progress) — CheckboxGroup DONE (2026-07). Green: 41 differential tests.**
 > `src/checkbox-group.ts` — a `role="group"` whose child `<Checkbox.Root>`s derive `checked`
 > from a shared value array; the previously-dormant parent-checkbox branches in `checkbox.ts`
