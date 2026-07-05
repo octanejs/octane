@@ -32,6 +32,19 @@
  *     would run with `__s === undefined` and lean on scope-recovery). The pass
  *     rewrites the bare call to `<MDX$CreateMdxContent {...props}/>` so both
  *     branches mount through the component machinery on client AND server.
+ *  3. SERVER mode only: MDX renders markdown elements through its components
+ *     mapping — `<_components.h1>` — whose value is a host tag STRING unless
+ *     overridden. octane's CLIENT lowering of a member-expression tag is a
+ *     `createElement` descriptor, which the runtime's de-opt renderer accepts
+ *     for strings; the SERVER's template lowering routes it to
+ *     `ssrComponent(scope, comp, …)`, which CALLS `comp` — a string crashes
+ *     (an octane compiler/server-runtime gap: member/dynamic tags resolving to
+ *     host tag strings work on the client, not in SSR). The pass wraps every
+ *     `_components.*`-tagged element in JSX-child position in an expression
+ *     container (`{<_components.h1>…</_components.h1>}`) so the server codegen
+ *     treats it as a VALUE hole — `ssrChild(createElement(…))` — which handles
+ *     string tags. Client output is left untouched; drop this once
+ *     `ssrComponent` (or the server lowering) accepts host tag strings.
  */
 import {
 	compile as mdxCompile,
@@ -132,7 +145,10 @@ function buildMdxOptions(id: string, options: CompileMdxOptions): CompileOptions
 		...(provider === null ? {} : { providerImportSource: provider }),
 		remarkPlugins: options.remarkPlugins ?? defaultRemarkPlugins,
 		rehypePlugins: options.rehypePlugins,
-		recmaPlugins: [...(options.recmaPlugins ?? []), recmaOctaneAdapter],
+		recmaPlugins: [
+			...(options.recmaPlugins ?? []),
+			[recmaOctaneAdapter, { mode: options.mode ?? 'client' }],
+		],
 	};
 }
 
@@ -157,9 +173,10 @@ const MDX_BODY_SOURCE_NAME = '_createMdxContent';
 // name-mangling and implausible as a user export from a document).
 const MDX_BODY_NAME = 'MDX$CreateMdxContent';
 
-function recmaOctaneAdapter() {
+function recmaOctaneAdapter(options?: { mode?: 'client' | 'server' }) {
+	const server = options?.mode === 'server';
 	return (tree: unknown): void => {
-		walkReplace(tree as EstreeNode, adaptNode);
+		walkReplace(tree as EstreeNode, (node) => adaptNode(node, server));
 	};
 }
 
@@ -174,8 +191,8 @@ function isNode(value: unknown): value is EstreeNode {
 }
 
 // Visit `node` (post-decision, pre-recursion): return a replacement node to
-// swap in (not recursed into), or null to keep the node and recurse.
-function adaptNode(node: EstreeNode): EstreeNode | null {
+// swap in (recursed into by the caller), or null to keep the node and recurse.
+function adaptNode(node: EstreeNode, server: boolean): EstreeNode | null {
 	// (2) `_createMdxContent(props)` → `<MDX$CreateMdxContent {...props}/>`.
 	// Matched BEFORE the rename visits the callee identifier below.
 	if (
@@ -196,7 +213,53 @@ function adaptNode(node: EstreeNode): EstreeNode | null {
 	) {
 		node.name = MDX_BODY_NAME;
 	}
+	if (server) {
+		// (3) `_components.*` elements in JSX-CHILD position → `{<element/>}`
+		// expression holes (see module doc). Wrapping edits the PARENT's children
+		// array, so an already-wrapped element (now behind an expression
+		// container) is never re-wrapped.
+		if (
+			(node.type === 'JSXElement' || node.type === 'JSXFragment') &&
+			Array.isArray(node.children)
+		) {
+			const children = node.children as unknown[];
+			for (let i = 0; i < children.length; i++) {
+				const child = children[i];
+				if (isNode(child) && isComponentsMappedElement(child)) {
+					children[i] = { type: 'JSXExpressionContainer', expression: child };
+				}
+			}
+		}
+		// A `return <_components.p>…</_components.p>` (single-block document) has
+		// no JSX parent to wrap under — hoist it into a fragment-with-hole.
+		if (
+			node.type === 'ReturnStatement' &&
+			isNode(node.argument) &&
+			isComponentsMappedElement(node.argument)
+		) {
+			node.argument = {
+				type: 'JSXFragment',
+				openingFragment: { type: 'JSXOpeningFragment', attributes: [], selfClosing: false },
+				closingFragment: { type: 'JSXClosingFragment' },
+				children: [{ type: 'JSXExpressionContainer', expression: node.argument }],
+			};
+		}
+	}
 	return null;
+}
+
+// `<_components.x …>` — an element whose tag reads off MDX's components
+// mapping (and can therefore be a host tag STRING at runtime).
+function isComponentsMappedElement(node: EstreeNode): boolean {
+	if (node.type !== 'JSXElement') return false;
+	const name = (node.openingElement as EstreeNode | undefined)?.name as EstreeNode | undefined;
+	return (
+		!!name &&
+		name.type === 'JSXMemberExpression' &&
+		isNode(name.object) &&
+		name.object.type === 'JSXIdentifier' &&
+		name.object.name === '_components'
+	);
 }
 
 // Depth-first walk that can REPLACE child nodes in place (arrays and single

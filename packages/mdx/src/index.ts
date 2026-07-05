@@ -4,27 +4,28 @@
  * Strategy (docs/react-library-compat-plan.md §2): @mdx-js/mdx's core is
  * framework-agnostic (the compile pipeline lives in `./compile` + `./vite`);
  * only @mdx-js/react's thin React layer is ported here, onto octane context.
- * `MDXProvider` / `useMDXComponents` are a line-for-line port of
- * @mdx-js/react/lib/index.js (v3): the same context, the same
- * function-vs-object `components` merge, the same `disableParentContext`
- * behavior.
+ * `MDXProvider` / `useMDXComponents` are a port of @mdx-js/react/lib/index.js
+ * (v3): the same context, the same function-vs-object `components` merge, the
+ * same `disableParentContext` behavior.
  *
  * Compiled `.mdx` modules import `useMDXComponents` from here (the pipeline's
  * default `providerImportSource`) and merge its result under `props.components`
  * — so a components mapping can come from either the provider context or the
  * `components` prop, exactly like MDX + React.
  *
- * Octane-specific mechanics: this is a plain-`.ts` binding, so its own hook
- * calls take EXPLICIT slot symbols (the package is excluded from the compiler's
- * auto-slotting pass; published node_modules are skipped by it anyway). A
- * compiled caller of `useMDXComponents` gets a per-call-site slot appended by
- * the compiler (`use*` name), which we split off the tail and forward to
- * `useMemo`; an unslotted caller — chiefly the `_provideComponents()` alias MDX
- * emits, whose name the compiler does not recognize as a hook — falls back to a
- * stable module-level symbol (hook state is keyed per (scope, slot), so a
- * module-level symbol is a distinct slot per component instance).
+ * ONE deliberate divergence from the React source: @mdx-js/react wraps the
+ * merge in `useMemo([contextComponents, components])` — a referential-stability
+ * optimization only. Octane's `useMemo` is the CLIENT runtime's (the `octane`
+ * entry has no server condition), and it requires a live render scope — a
+ * server-compiled document calls `useMDXComponents()` during `renderToString`,
+ * where the client scope is null and `useMemo` would crash. `useContext`, by
+ * contrast, is null-scope safe (it returns the context default). So the merge
+ * runs unmemoized: same observable mapping every render, valid in both
+ * runtimes (on the server the client context yields its default `{}`, and the
+ * `props.components` route still applies — context threading across an SSR
+ * pass is an open question for all octane bindings).
  */
-import { createContext, createElement, useContext, useMemo, type ComponentBody } from 'octane';
+import { createContext, createElement, useContext, type ComponentBody } from 'octane';
 
 /**
  * A components mapping: markdown element name (`h1`, `p`, `code`, …) or
@@ -43,39 +44,27 @@ export type MDXComponentsProp = MDXComponents | ((inherited: MDXComponents) => M
 const emptyComponents: MDXComponents = {};
 const MDXContext = createContext<MDXComponents>(emptyComponents);
 
-// Module-level slot fallbacks (see module doc): distinct per component instance
-// because hook state is keyed per (scope, slot).
-const USE_MDX_COMPONENTS_SLOT = Symbol.for('@octanejs/mdx:useMDXComponents');
-const MDX_PROVIDER_SLOT = Symbol.for('@octanejs/mdx:MDXProvider');
-
 /**
  * Get the current components mapping: the provider context merged with (or
- * mapped through) `components`. Port of @mdx-js/react's `useMDXComponents`,
- * including the `useMemo` on `[contextComponents, components]` so the merged
- * object is referentially stable across re-renders with unchanged inputs.
+ * mapped through) `components`. Port of @mdx-js/react's `useMDXComponents`
+ * (see the module doc for the deliberately-dropped `useMemo`).
+ *
+ * `use*`-named, so a compiled caller appends its call-site slot symbol as the
+ * trailing arg — tolerated and ignored (no hook state lives here; `useContext`
+ * is not slot-threaded in octane).
  */
 export function useMDXComponents(
 	components?: MDXComponentsProp | null | symbol,
-	slot?: symbol,
+	_slot?: symbol,
 ): MDXComponents {
-	// Compiled callers append their call-site slot as the TRAILING arg — which is
-	// arg 0 for the common no-`components` call (`useMDXComponents()` compiles to
-	// `useMDXComponents(SLOT)`). Normalize: a symbol anywhere in the tail is the
-	// slot, never a components value.
-	if (typeof components === 'symbol') {
-		slot = components;
-		components = undefined;
-	}
+	// The compiler-injected slot is arg 0 for the common no-`components` call
+	// (`useMDXComponents()` compiles to `useMDXComponents(SLOT)`). A symbol is
+	// never a components value — normalize it away.
+	if (typeof components === 'symbol') components = undefined;
 	const contextComponents = useContext(MDXContext);
-	return useMemo(
-		() => {
-			// Custom merge via a function (@mdx-js/react parity).
-			if (typeof components === 'function') return components(contextComponents);
-			return { ...contextComponents, ...(components as MDXComponents | null | undefined) };
-		},
-		[contextComponents, components],
-		slot ?? USE_MDX_COMPONENTS_SLOT,
-	);
+	// Custom merge via a function (@mdx-js/react parity).
+	if (typeof components === 'function') return components(contextComponents);
+	return { ...contextComponents, ...components };
 }
 
 export interface MDXProviderProps {
@@ -100,7 +89,7 @@ export function MDXProvider(props: MDXProviderProps): unknown {
 				? props.components(emptyComponents)
 				: (props.components ?? emptyComponents);
 	} else {
-		allComponents = useMDXComponents(props.components, MDX_PROVIDER_SLOT);
+		allComponents = useMDXComponents(props.components);
 	}
 	return createElement(MDXContext.Provider as ComponentBody<any>, {
 		value: allComponents,
