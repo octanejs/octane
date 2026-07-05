@@ -2480,6 +2480,37 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 	scope.$$ctxValues.set(context, value);
 }
 
+// Marker for compiler-generated children-block render functions. `.tsrx` lowers a component's
+// element/text children (`<C><D/></C>`) to a render function `__children$N(__props, __s, __extra)`,
+// while a render-prop child (`<C>{(data) => …}</C>`) is passed through RAW. Both are
+// `typeof === 'function'`, so React-ecosystem code that branches on `typeof children === 'function'`
+// (function-as-child / render-prop APIs) cannot tell them apart. The compiler tags the FORMER with
+// this symbol so `isChildrenBlock()` can exclude it. `Symbol.for` so the identity survives multiple
+// runtime copies (e.g. a binding bundled against its own octane).
+const CHILDREN_BLOCK: unique symbol = Symbol.for('octane.childrenBlock') as any;
+
+/**
+ * Compiler-emitted: tag a children-block render function so `isChildrenBlock` recognises it.
+ * Returns the function for inline use (`{ children: markChildrenBlock(__children$N) }`).
+ * @internal
+ */
+export function markChildrenBlock<T>(fn: T): T {
+	if (typeof fn === 'function') {
+		(fn as any)[CHILDREN_BLOCK] = true;
+	}
+	return fn;
+}
+
+/**
+ * True when `value` is a compiler-generated children-block — a component's element/text children
+ * that `.tsrx` lowered to a render function — as opposed to a user render-prop function or any other
+ * value. Lets a binding with a function-as-child API tell `<C>{(x) => …}</C>` (call it) apart from
+ * `<C><D/></C>` (render it): `typeof children === 'function' && !isChildrenBlock(children)`.
+ */
+export function isChildrenBlock(value: unknown): boolean {
+	return typeof value === 'function' && (value as any)[CHILDREN_BLOCK] === true;
+}
+
 /**
  * The children reaching `<Suspense>` / `<ErrorBoundary>` are rendered as the try
  * BODY — `renderBlock` invokes it as `block.body(props, scope, extra)`. The `.tsrx`

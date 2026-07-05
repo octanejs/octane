@@ -17,6 +17,7 @@ import {
 	useRef,
 	useCallback,
 	useImperativeHandle,
+	isChildrenBlock,
 } from 'octane';
 
 import { S, subSlot } from './internal';
@@ -336,9 +337,12 @@ function useRenderDialogRoot<Payload>(props: any, mode: 'dialog' | 'drawer' | 'a
 
 	const contextValue = useMemo(() => ({ store }), [store], subSlot(slot, 'ctx'));
 
-	// NOTE: Base UI's `children`-as-payload-render-function API isn't distinguishable in octane
-	// (octane compiles ALL children-position JSX to a thunk), so plain children are passed straight
-	// through and octane's renderer invokes the thunk. (Payload render functions are a later TODO.)
+	// Base UI's `children` may be a payload render function (`{({ payload }) => …}`). octane passes
+	// a render-prop child RAW but compiles element/text children to a `markChildrenBlock`-tagged
+	// render fn — both are `typeof === 'function'`, so `isChildrenBlock` excludes the latter.
+	const resolvedChildren =
+		typeof children === 'function' && !isChildrenBlock(children) ? children({ payload }) : children;
+
 	const interactions = shouldRenderInteractions
 		? createElement(DialogInteractions, {
 				store,
@@ -351,7 +355,7 @@ function useRenderDialogRoot<Payload>(props: any, mode: 'dialog' | 'drawer' | 'a
 		value: false,
 		children: createElement(DialogRootContext.Provider, {
 			value: contextValue as DialogRootContextValue,
-			children: interactions ? [interactions, children] : children,
+			children: interactions ? [interactions, resolvedChildren] : resolvedChildren,
 		}),
 	});
 }

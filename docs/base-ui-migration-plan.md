@@ -23,11 +23,14 @@ work around it in the binding.**
 > `useEnhancedClickHandler.ts`, `useOpenInteractionType.ts`, `popupStateMapping.ts`
 > (triggerOpenStateMapping). **`DialogInteractions` is STUBBED** (returns null) pending the
 > `useDismiss`/`FloatingFocusManager`/`FloatingPortal` layer — it's only rendered when open, so the
-> CLOSED differential is fully faithful (React also doesn't render it closed). **octane finding
-> (not a bug — a documented divergence):** octane compiles children-position JSX to a render THUNK,
-> so Base UI's `children`-as-payload-render-function API isn't distinguishable — plain children are
-> passed straight through to `createElement` (octane's renderer invokes the thunk); payload render
-> functions are a deferred TODO. **Next: the OPEN path** — port `useDismiss` (~754), the store-based
+> CLOSED differential is fully faithful (React also doesn't render it closed). **octane fix (bug #2 — children-block
+> detection):** octane compiles a component's element/text children to a render function but passes a
+> render-prop child (`{(x) => …}`) RAW — both are `typeof === 'function'`, so Base UI's
+> `children`-as-payload-render-function API couldn't be distinguished. FIXED IN OCTANE: the compiler
+> now tags compiled children-blocks (`markChildrenBlock`) and a new public `isChildrenBlock(value)`
+> excludes them, so the binding writes `typeof children === 'function' && !isChildrenBlock(children)`
+> to detect a genuine render-prop child (payload render functions now work). Regression:
+> `packages/octane/tests/children-block.test.ts`; changeset `.changeset/is-children-block.md`. **Next: the OPEN path** — port `useDismiss` (~754), the store-based
 > `FloatingFocusManager` (~991), `FloatingPortal` (~307), `useScrollLock`, the real
 > `DialogInteractions`, and the Portal/Backdrop/Popup/Title/Description/Close/Viewport parts, then an
 > open-dialog differential + focus-trap/return-focus/dismiss tests.
