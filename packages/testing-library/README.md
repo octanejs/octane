@@ -77,11 +77,12 @@ React-specific remappings:
   drain via dom-testing-library's `eventWrapper`, so non-discrete/programmatic
   events also commit — with their `useEffect` cascades — before `fireEvent`
   returns (the equivalent of RTL's `act()` around each dispatch).
-- **Host elements at the root render between comment anchors.**
+- **Host elements at the root are `container.firstChild`, like RTL.**
   `render(createElement('div', …))` goes through octane's value-position
-  renderer, so `container.firstChild` is a comment node — use
-  `container.firstElementChild` (or just queries). Component roots
-  (`render(App, …)`) mount their template directly, no anchors.
+  renderer, which mounts a lone host element anchorless (the element
+  self-delimits, no comment markers) — so RTL's `container.firstChild` idiom
+  works as-is. Component roots (`render(App, …)`) mount their template
+  directly, also without anchors.
 - **`renderHook` and hook slots.** Octane hooks are keyed by compiler-assigned
   call-site slots. Hook callbacks written in your test files Just Work — the
   vite plugin's surgical pass slots base-hook calls in plain `.ts`, and
