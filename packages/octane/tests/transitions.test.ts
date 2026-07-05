@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { mount, act } from './_helpers';
+import { mount, act, createLog } from './_helpers';
+import { flushSync } from '../src/index.js';
 import {
 	TransitionBasics,
+	DeferredSpawnListenerApp,
 	TransitionKeepsDom,
 	StandaloneStartTransition,
 	DeferredValueWithSuspense,
@@ -372,6 +374,37 @@ describe('Transitions — multiple-suspend edge cases', () => {
 		expect(r.find('#original').textContent).toBe('Original: 2');
 		expect(r.find('#deferred').textContent).toBe('Deferred: 2'); // NOT 1!
 		r.unmount();
+	});
+
+	it("deferred-swap 'deferred lane' tag does not leak to useTransition listener renders", async () => {
+		// Regression (PR review): spawnDeferredSwap's DEFERRED_SPAWN flag must
+		// wrap ONLY the scheduleRender for the deferred block. startTransition
+		// synchronously notifies useTransition listeners (tickTransitionCount)
+		// before running its callback; those listeners scheduleRender their own
+		// blocks. If the flag covered the whole startTransition call, the
+		// probe's render would be tagged as a deferred pass and a
+		// useDeferredValue mounting in it would wrongly skip its preview state.
+		const log = createLog();
+		let setValue!: (v: number) => void;
+		const r = mount(DeferredSpawnListenerApp, {
+			expose: (s: any) => (setValue = s),
+			log: log.push,
+		});
+		await act(() => {});
+		expect(r.find('#deferred').textContent).toBe('Deferred: 1');
+		expect(r.find('#probe-idle').textContent).toBe('idle');
+
+		// Urgent update → useDeferredValue defers and spawns its swap. The swap's
+		// startTransition flips isPending true, mounting the probe's inner
+		// useDeferredValue in the SAME flush as the deferred pass.
+		flushSync(() => setValue(2));
+		expect(r.find('#deferred').textContent).toBe('Deferred: 1');
+		await act(() => {});
+		expect(r.find('#deferred').textContent).toBe('Deferred: 2');
+		const entries = log.drain();
+		r.unmount();
+		// The probe is NOT part of the deferred pass — its preview must render.
+		expect(entries[0]).toBe('render:Preview');
 	});
 });
 
