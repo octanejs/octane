@@ -3498,6 +3498,25 @@ function attrNamespace(name: string): string | null {
 	return null;
 }
 
+// HTML void elements (no content model) — mirrors the compiler's VOID_ELEMENTS.
+// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
+const VOID_ELEMENTS = new Set([
+	'area',
+	'base',
+	'br',
+	'col',
+	'embed',
+	'hr',
+	'img',
+	'input',
+	'link',
+	'meta',
+	'param',
+	'source',
+	'track',
+	'wbr',
+]);
+
 export function setAttribute(el: Element, name: string, value: any): void {
 	// React-style `dangerouslySetInnerHTML={{__html}}` is a PROPERTY write, not an
 	// attribute. The compiler's fast path sets `el.innerHTML` directly, but when the
@@ -3511,6 +3530,17 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		// means the author thought dSIH takes HTML directly).
 		if (value != null && (typeof value !== 'object' || !('__html' in value))) {
 			throw new Error('`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`');
+		}
+		// React parity: void elements have no content model — an innerHTML write on
+		// `<input>`/`<br>`/… is invisible-content corruption, so fail loudly like
+		// React (ReactDOMComponent-test.js:1807). Explicit dSIH on a void tag is
+		// already a compile-time error; this arm guards the routes the compiler
+		// can't see — spreads and de-opt (createElement) descriptors.
+		if (value != null && VOID_ELEMENTS.has(el.localName)) {
+			throw new Error(
+				`\`${el.localName}\` is a void element tag and must neither have ` +
+					'`children` nor use `dangerouslySetInnerHTML`.',
+			);
 		}
 		const html = value == null ? null : value.__html;
 		// `__html: false` renders 'false' (React coerces; only null/undefined clear) —

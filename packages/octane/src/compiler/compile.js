@@ -54,6 +54,52 @@ const VOID_ELEMENTS = new Set([
 	'wbr',
 ]);
 
+// React parity: a void element must neither have children nor use
+// `dangerouslySetInnerHTML` — React throws (ReactDOMComponent-test.js:1794/:1807).
+// Without this guard the failure is SILENT: the template parser drops the
+// children out of `<input>…</input>` markup, and the htmlOnlyChild fast path
+// writes invisible `input.innerHTML`. Shared by the client (emitElementHtml),
+// the server (ssrEmitElement), and the value-position lowering
+// (jsxElementToCreateElement) so the diagnostic can't drift between paths. A
+// spread-supplied `dangerouslySetInnerHTML` is invisible at compile time — the
+// runtime's setAttribute danger arm throws on that route.
+function rejectVoidElementContent(tag, node, ctx) {
+	if (!VOID_ELEMENTS.has(tag)) return;
+	// Renderable-children check, deliberately lightweight (whitespace-only JSX
+	// text and `{/* comments */}` produce no child — same as normalizeChildren,
+	// without running the full lowering machinery on an element we may reject).
+	let offending = false;
+	for (const c of node.children || []) {
+		if (!c) continue;
+		if (c.type === 'JSXText') {
+			if (/^\s*$/.test(c.value)) continue;
+		} else if (c.type === 'JSXExpressionContainer') {
+			if (!c.expression || c.expression.type === 'JSXEmptyExpression') continue;
+		} else if (c.type === 'JSXStyleElement') {
+			continue;
+		}
+		offending = true;
+		break;
+	}
+	if (!offending) {
+		const attrs = node.attributes || node.openingElement?.attributes || [];
+		for (const a of attrs) {
+			if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
+			if (jsxAttrRawName(a) === 'dangerouslySetInnerHTML') {
+				offending = true;
+				break;
+			}
+		}
+	}
+	if (!offending) return;
+	const l = node.loc && node.loc.start;
+	const at = l ? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})` : '';
+	throw new Error(
+		`\`<${tag}>\` is a void element tag and must neither have children nor use ` +
+			`\`dangerouslySetInnerHTML\`.${at}`,
+	);
+}
+
 export const HOOK_NAMES = new Set([
 	'useState',
 	'useReducer',
@@ -1750,6 +1796,7 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 
 function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	const tag = elementTagName(node);
+	rejectVoidElementContent(tag, node, ctx);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const selfNs = nsForSelf(node, parentNs);
 	const childNs = nsForChildren(node, selfNs);
@@ -3173,6 +3220,7 @@ function jsxElementToCreateElement(node, ctx) {
 	const compNode = isComponentTag(node)
 		? jsxNameToExpr(nameNode)
 		: { type: 'Literal', value: nameNode.name != null ? nameNode.name : String(nameNode) };
+	if (!isComponentTag(node)) rejectVoidElementContent(compNode.value, node, ctx);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const properties = [];
 	for (const attr of attrs) {
@@ -5006,6 +5054,7 @@ function emitElementHtml(
 
 	const tag = node.id?.name || node.openingElement?.name?.name;
 	if (!tag) throw new Error('Element without tag');
+	rejectVoidElementContent(tag, node, ctx);
 
 	// The host element's own namespace (e.g. `<svg>` is in SVG ns even if its
 	// parent context is HTML); its descendants' inherited ns may differ
