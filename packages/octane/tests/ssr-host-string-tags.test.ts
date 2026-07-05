@@ -62,6 +62,9 @@ const mod = evalServer(
 	export function TemplateDynamic(props) @{
 		<div><{props.tag}>x</{props.tag}></div>
 	}
+	export function TemplateHole(props) @{
+		<div><props.parts.title>n={props.value}</props.parts.title></div>
+	}
 	`,
 	'host-string-tags.tsrx',
 );
@@ -124,14 +127,25 @@ describe('SSR — member/dynamic tags resolving to host tag strings (value posit
 describe('SSR — member/dynamic tags resolving to host tag strings (template position)', () => {
 	it('renders a member tag string inside a template body', async () => {
 		const { html } = await RT.renderToString(mod.TemplateMember, { parts: { title: 'h2' } });
-		expect(html).toContain('<h2>');
-		expect(html).toContain('hi');
-		expect(html).toContain('</h2>');
-		expect(html).toContain('<section>');
+		// ONE block — the component site's own adoption range around the element.
+		// The `__schildren$N` render fn's HTML inlines as the element's PLAIN
+		// content (`<h2>hi</h2>`, the static-tag / client de-opt shape), NOT as a
+		// nested component body (`<h2><!--[-->hi<!--]--></h2>`).
+		expect(html).toContain('<section><!--[--><h2>hi</h2><!--]--></section>');
 	});
 
 	it('renders a dynamic tag string inside a template body (clean static markup)', async () => {
 		const r = RT.renderToStaticMarkup(mod.TemplateDynamic, { tag: 'strong' });
 		expect(r.html).toBe('<div><strong>x</strong></div>');
+	});
+
+	it('keeps template holes inside a string tag hydratable (their own blocks, inline content)', async () => {
+		const { html } = await RT.renderToString(mod.TemplateHole, {
+			parts: { title: 'h3' },
+			value: 42,
+		});
+		// The hole carries its own `<!--[-->…<!--]-->` (a renderable hole always
+		// does); the element's static text stays plain.
+		expect(html).toContain('<h3>n=<!--[-->42<!--]--></h3>');
 	});
 });

@@ -374,8 +374,16 @@ function ssrChildItem(v: unknown, scope: SSRScope): string {
 // flattened, spread-unsafe / event / ref / key / children props skipped, and
 // children recursed via ssrChild (array → blocks, element/component → render,
 // primitive → escaped text). `dangerouslySetInnerHTML={{__html}}`, if present, is
-// raw (unescaped) content.
-function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope): string {
+// raw (unescaped) content. `rawInner`, when given, is PRE-RENDERED content HTML
+// (a template call site's `__schildren$N` output — see ssrComponent's string
+// branch) emitted verbatim in place of the `children` recursion.
+function ssrHostElement(
+	tag: string,
+	props: any,
+	children: any,
+	scope: SSRScope,
+	rawInner?: string,
+): string {
 	// A descriptor tag is concatenated into the response verbatim — validate it
 	// like React does (Invalid tag → throw) so a hostile/buggy dynamic tag (e.g.
 	// 'div><img onerror=…>') can never become live markup. The client is guarded
@@ -399,13 +407,17 @@ function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope)
 		}
 	}
 	const hasChildren =
-		children != null && children !== false && children !== true && children !== '';
+		rawInner !== undefined
+			? rawInner !== ''
+			: children != null && children !== false && children !== true && children !== '';
 	if (VOID_ELEMENTS.has(tag) && !hasChildren && innerHTML === undefined) {
 		return '<' + tag + attrs + '/>';
 	}
 	let inner = '';
 	if (innerHTML !== undefined) {
 		inner = innerHTML == null ? '' : String(innerHTML);
+	} else if (rawInner !== undefined) {
+		inner = rawInner;
 	} else if (hasChildren) {
 		// A de-opt host whose children contain COMPONENTS renders those children on the
 		// client through `hostElementBody` → `childSlot` (a Block path that ADOPTS markers
@@ -703,10 +715,26 @@ export function ssrComponent(parent: SSRScope, comp: ServerComponent | string, p
 	// body gets (exactly ssrChild's host-descriptor shape), so the client's
 	// adoption sees one uniform block whichever kind the tag resolved to.
 	// Children arrive as `props.children` — plain values/descriptors from a
-	// value-position call site, or a `__schildren$N` render fn from a template
-	// one; ssrHostElement's content path handles both.
+	// value-position call site (ssrHostElement's content path handles those), or
+	// a render FUNCTION from a template one.
 	if (typeof comp === 'string') {
-		return ssrBlock(ssrHostElement(comp, props, props?.children, parent));
+		const kids = props?.children;
+		if (typeof kids === 'function') {
+			// A TEMPLATE call site compiles children to a `__schildren$N` render fn.
+			// Call it directly (`(undefined, scope)`, the ssrChildrenHtml/ProviderBody
+			// convention) and inline its HTML as the element's plain content — the
+			// shape a static host tag emits (`<h1>hi</h1>`, holes inside carry their
+			// own blocks). Routing the fn through ssrHostElement's descriptor-content
+			// path would render it as a nested COMPONENT body instead: wrong calling
+			// convention and a stray `<!--[-->…<!--]-->` around the element's content.
+			// A non-compiled fn (a render-prop child on a tag that resolved to a
+			// string) returns a descriptor, not HTML — normalize via ssrChild, exactly
+			// like renderComponentFramed normalizes a de-opt body's return.
+			const out = (kids as any)(undefined, parent);
+			const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, parent);
+			return ssrBlock(ssrHostElement(comp, props, null, parent, inner));
+		}
+		return ssrBlock(ssrHostElement(comp, props, kids, parent));
 	}
 	const pf = FRAME;
 	// A fresh child frame: its `seg` is the parent's next child index (built into
