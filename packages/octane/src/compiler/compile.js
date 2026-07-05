@@ -6167,7 +6167,12 @@ function makeCompCall(
 			parentNs,
 			cssHash,
 		);
-		propParts.push(`"children": ${childrenHelperName}`);
+		// Tag the children-block render fn so a consumer can tell it from a render-prop
+		// function child (`<C>{(x) => …}</C>`, passed RAW above) — both are `typeof === 'function'`,
+		// so React-ecosystem `typeof children === 'function'` checks need `isChildrenBlock` to
+		// exclude compiled element/text children. See runtime `markChildrenBlock`/`isChildrenBlock`.
+		ctx.runtimeNeeded.add('markChildrenBlock');
+		propParts.push(`"children": _$markChildrenBlock(${childrenHelperName})`);
 	}
 
 	const propsExpr = `{ ${propParts.join(', ')} }`;
