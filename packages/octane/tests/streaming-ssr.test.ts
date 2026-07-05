@@ -219,6 +219,37 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(tail).toContain('nope');
 	});
 
+	it('abort landing during a wave coalesce cancels the pass — no post-abort segment', async () => {
+		const d = deferred<string>();
+		const c = collector();
+		const onError = vi.fn();
+		const events: string[] = [];
+		const { pipe, abort } = ServerRT.renderToPipeableStream(
+			server.Boundary,
+			{ promise: d.promise },
+			{ onError, onAllReady: () => events.push('all') },
+		);
+		pipe(c.dest);
+		// Land the abort INSIDE the wave's coalesce window: resolve now (the
+		// resolution wins the guarded race), then abort on the same macrotask
+		// channel the coalesce yield uses. Our callback is queued BEFORE the
+		// wave schedules its own yield (that happens a few microtasks from
+		// now), so it runs first — after the race settled, before the wave
+		// returns. The wave must still surface the abort instead of spending a
+		// pass, flushing the segment, and firing allReady on a dead request.
+		d.resolve('too late');
+		const afterRaceSettles =
+			typeof setImmediate === 'function' ? setImmediate : (fn: () => void) => setTimeout(fn, 0);
+		afterRaceSettles(() => abort(new Error('gone')));
+		await c.ended;
+		const tail = c.chunks.slice(1).join('');
+		expect(tail).not.toContain('data-oct-s=');
+		expect(tail).not.toContain('too late');
+		expect(tail).toContain('$OCTRX("0")');
+		expect(events).not.toContain('all');
+		expect(onError).toHaveBeenCalled();
+	});
+
 	it('abort marks pending boundaries errored and ends the stream', async () => {
 		const d = deferred<string>();
 		const c = collector();

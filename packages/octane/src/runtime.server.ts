@@ -1526,9 +1526,15 @@ async function settleFirstOfWave(
 	for (;;) {
 		await Promise.resolve();
 		await Promise.resolve();
-		if (resolved.size === size) return;
+		if (resolved.size === size) break;
 		size = resolved.size;
 	}
+	// The coalesce yields sit OUTSIDE the guarded race, so an abort landing in
+	// that window would otherwise hand back a normally-"settled" wave — and the
+	// caller would spend a full pass (and possibly flush segments, or even
+	// report allReady) on a dead request. Surface it here; the caller's catch
+	// then marks pending boundaries errored exactly as a mid-race abort does.
+	signal?.throwIfAborted();
 }
 
 // The await-everything render core. Runs full canonical passes interleaved with
