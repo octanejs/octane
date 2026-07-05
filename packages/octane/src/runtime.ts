@@ -8275,12 +8275,19 @@ function spawnDeferredSwap<T>(s: DeferredSlot<T>): void {
 		s.scheduled = false;
 		if (Object.is(s.current, s.next)) return;
 		s.current = s.next;
-		DEFERRED_SPAWN = true;
-		try {
-			startTransition(() => scheduleRender(s.block));
-		} finally {
-			DEFERRED_SPAWN = false;
-		}
+		// Set the flag INSIDE the callback so it wraps only the scheduleRender
+		// for the deferred block: startTransition synchronously notifies
+		// useTransition listeners (tickTransitionCount) BEFORE running fn, and
+		// those listeners scheduleRender their own blocks — which must NOT be
+		// tagged as deferred passes.
+		startTransition(() => {
+			DEFERRED_SPAWN = true;
+			try {
+				scheduleRender(s.block);
+			} finally {
+				DEFERRED_SPAWN = false;
+			}
+		});
 	});
 }
 
