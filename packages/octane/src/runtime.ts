@@ -688,9 +688,10 @@ function sortWaveByDepth(wave: Block[]): Block[] {
 // synchronous, so we sort and drain the LIVE array in place — no per-flush snapshot
 // allocation, no O(n) shift re-indexing. The sort runs only on batches (>1 block),
 // so the common single-update flush reorders nothing and pays no depth-walk.
-// Returns the first unhandled render error to surface after commit.
+// Returns the unhandled render error(s) to surface after commit — multiple
+// failed roots in one flush aggregate like React (AggregateError).
 function drainQueue(): { err: any } | null {
-	let pendingError: { err: any } | null = null;
+	let pendingError: { err: any; all: any[] } | null = null;
 	const drainId = ++DRAIN_ID;
 	if (QUEUE.length > 1) sortWaveByDepth(QUEUE);
 	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
@@ -729,8 +730,20 @@ function drainQueue(): { err: any } | null {
 				// No tryBlock claimed this error. Don't let it abandon the rest of
 				// the queue or skip commit — that would strand unrelated roots
 				// batched into the same flush and drop their already-rendered
-				// effects. Remember the first and surface it once the flush drains.
-				if (pendingError === null) pendingError = { err: unhandled };
+				// effects. Collect them all; a multi-root flush with several
+				// unhandled errors surfaces an AggregateError (React parity), a
+				// single one rethrows as-is.
+				if (pendingError === null) pendingError = { err: unhandled, all: [unhandled] };
+				else {
+					pendingError.all.push(unhandled);
+					pendingError.err =
+						typeof AggregateError === 'function'
+							? new AggregateError(
+									pendingError.all,
+									'Multiple errors were thrown during the render flush.',
+								)
+							: pendingError.all[0];
+				}
 				// React 19 contract: an error no boundary handles unmounts the
 				// ENTIRE tree of the failed root — known-broken UI never stays on
 				// screen (ReactIncrementalErrorHandling:1338/:712). Only the
