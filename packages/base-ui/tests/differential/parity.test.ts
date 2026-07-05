@@ -295,6 +295,12 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	it('Dialog: closed Root+Trigger renders the trigger byte-identically (Store foundation)', async () => {
+		const d = await mountDifferential(FIXTURE, 'DialogClosed', undefined, CACHE);
+		await d.step('mount (closed)', () => {});
+		d.unmount();
+	});
+
 	it('Slider: Root/Value/Control/Track/Indicator/Thumb render the value byte-identically', async () => {
 		const d = await mountDifferential(FIXTURE, 'SliderBasic', undefined, CACHE);
 		await d.step('mount', () => {});
