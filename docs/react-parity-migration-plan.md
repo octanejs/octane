@@ -1,5 +1,12 @@
 # React → Octane Test-Parity Migration Plan
 
+> **STATUS: COMPLETE (2026-07-05).** Every phase and tier below is ported or
+> accounted; remaining runtime work lives in pinned `it.fails` tests + spawned
+> follow-up tasks. The distilled, user-facing summary of every intentional
+> divergence is **[differences-from-react.md](./differences-from-react.md)** —
+> keep that page current when a divergence is added or closed; this document is
+> the historical execution record and porting methodology.
+
 > Goal: systematically port the *in-scope* unit-test behaviors from `facebook/react`
 > into Octane's `.tsrx` test suite, and close the runtime gaps those tests expose —
 > so "you can swap React for Octane" is proven, not asserted.
