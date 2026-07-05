@@ -16,6 +16,7 @@ import { Field } from '@octanejs/base-ui/field';
 import { Form } from '@octanejs/base-ui/form';
 import { Input } from '@octanejs/base-ui/input';
 import { Slider } from '@octanejs/base-ui/slider';
+import { Dialog } from '@octanejs/base-ui/dialog';
 
 // Self-contained differential fixtures: the SAME source runs on octane (via
 // @octanejs/base-ui/<sub>) AND on React (the setup rewrites imports to the real
@@ -137,6 +138,16 @@ export function NumberFieldBasic() @{
 			<NumberField.Increment className="nf-inc">+</NumberField.Increment>
 		</NumberField.Group>
 	</NumberField.Root>
+}
+
+// Dialog (CLOSED) — Root + Trigger only. The popup/interactions are unmounted while closed, so
+// this renders just the trigger button. Proves the whole Store-based popup foundation (DialogStore
+// on ReactStore, the popups engine's trigger registration + open-change sync, useClick) produces a
+// byte-identical closed trigger vs real Base UI.
+export function DialogClosed() @{
+	<Dialog.Root>
+		<Dialog.Trigger className="dlg-trigger">Open</Dialog.Trigger>
+	</Dialog.Root>
 }
 
 // Slider — Root (role=group) / Value (output) / Control / Track / Indicator / Thumb (a div +

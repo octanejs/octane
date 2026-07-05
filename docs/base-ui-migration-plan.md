@@ -10,6 +10,82 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3 — FIRST OVERLAY (closed Dialog) landed + differential-verified (2026-07). Green: 48
+> differential tests, full monorepo suite 2175 green.** The Store-based popup foundation is now
+> proven end-to-end. `src/dialog.ts` — the CLOSED-state path: `DialogStore` (extends the octane
+> `ReactStore`; dialog-specific state/selectors + `setOpen`), `DialogHandle`/`createDialogHandle`,
+> `DialogRootContext`/`IsDrawerContext`, `useDialogRoot` (uses the popups engine's `usePopupRootSync`
+> + `useImplicitActiveTrigger` + `useOpenStateTransitions` + `useImperativeHandle` — NOT `useDismiss`),
+> `useRenderDialogRoot` (renders `DialogInteractions` only when `open || mounted`), `DialogRoot`,
+> and `DialogTrigger` (a `<button>` via `useRenderElement` + `useClick` + `useTriggerDataForwarding`
+> + `useButton` + `useOpenMethodTriggerProps`). New floating pieces: `useClick.ts` (store-connected,
+> ~130 lines), `element.ts`/`event.ts` additions (isTypeableElement/isMouseLikePointerType),
+> `useEnhancedClickHandler.ts`, `useOpenInteractionType.ts`, `popupStateMapping.ts`
+> (triggerOpenStateMapping). **`DialogInteractions` is STUBBED** (returns null) pending the
+> `useDismiss`/`FloatingFocusManager`/`FloatingPortal` layer — it's only rendered when open, so the
+> CLOSED differential is fully faithful (React also doesn't render it closed). **octane finding
+> (not a bug — a documented divergence):** octane compiles children-position JSX to a render THUNK,
+> so Base UI's `children`-as-payload-render-function API isn't distinguishable — plain children are
+> passed straight through to `createElement` (octane's renderer invokes the thunk); payload render
+> functions are a deferred TODO. **Next: the OPEN path** — port `useDismiss` (~754), the store-based
+> `FloatingFocusManager` (~991), `FloatingPortal` (~307), `useScrollLock`, the real
+> `DialogInteractions`, and the Portal/Backdrop/Popup/Title/Description/Close/Viewport parts, then an
+> open-dialog differential + focus-trap/return-focus/dismiss tests.
+
+> **Phase 3 STARTED — the overlay foundation (part 1) landed (2026-07). base-ui typecheck green.**
+> **Key architectural discovery:** Base UI **1.6.0 forked its vendored `floating-ui-react` to be
+> Store-based.** The overlays no longer consume upstream-shaped `@floating-ui/react` hooks — they
+> consume a reactive `FloatingRootStore` + store-connected `useDismiss`/`useClick`/`useFocus`/
+> `useClientPoint` (which return `{reference, trigger, floating}` prop bags), plus a shared
+> ~1231-line `utils/popups` store engine, all built on a `Store`/`ReactStore` system
+> (`@base-ui/utils/store`). **This invalidates the plan's original assumption that
+> `@octanejs/floating-ui` (an upstream-`@floating-ui/react` port) is the drop-in overlay substrate.**
+> Decision (user-approved): **port Base UI's Store-based floating layer faithfully**, reusing from
+> `@octanejs/floating-ui` only what is shape-compatible (`safePolygon` geometry; possibly
+> `FloatingFocusManager`/`FloatingPortal`/`FloatingTree` with adapters). This makes Phase 3 a
+> genuinely multi-turn effort: ~2500 lines of interlocking Store foundation must land before ANY
+> overlay renders/tests.
+>
+> **Foundation part 2 landed (2026-07, all typecheck-green, not yet imported by a component):** the
+> **popups store engine + floating tree**. `utils/popups/store.ts` (the `PopupStoreState` shape +
+> `popupStoreSelectors` + `createInitialPopupStoreState` + `createPopupFloatingRootContext`, shared
+> by every popup), `utils/popups/popupStoreUtils.ts` (the ~500-line engine — `usePopupStore`,
+> `useTriggerRegistration`, `useTriggerDataForwarding`, `useImplicitActiveTrigger`,
+> `useOpenStateTransitions`, `usePopupInteractionProps`, `usePopupRootSync`, `applyPopupOpenChange`,
+> `setPopupOpenState`, `FOCUSABLE_POPUP_PROPS` — every hook slot-threaded; `ReactDOM.flushSync` →
+> octane `flushSync`). `utils/floating/FloatingTree.ts` + `FloatingTreeStore.ts` (nested-popup tree:
+> `useFloatingParentNodeId`/`useFloatingTree`/`useFloatingNodeId` + `FloatingNode`/`FloatingTree`
+> components), `useSyncedFloatingRootContext.ts` (keeps a `FloatingRootStore` synced to a popup
+> store). Small utils: `empty.ts` (EMPTY_OBJECT/ARRAY), `dom.ts` (isElement/isHTMLElement),
+> `useOnFirstRender.ts`, `floating/constants.ts` (`FOCUSABLE_ATTRIBUTE`), `floating/event.ts`
+> (`isClickLikeEvent`); `REASONS` gained the popup reasons (triggerHover/triggerFocus/outsidePress/
+> closePress/focusOut/escapeKey/imperativeAction). **The store + popups-engine foundation — the
+> hardest architectural part — is now complete.** What remains before Dialog: the store-connected
+> floating interaction/focus/portal layer (`useDismiss` ~754, `FloatingFocusManager` ~991,
+> `FloatingPortal` ~307, `useScrollLock`), then Dialog.
+>
+> **Landed earlier (foundation part 1, all typecheck-green):**
+> - **Store system** (`utils/store/`): `Store.ts` (verbatim observer store), `createSelector.ts`
+>   (verbatim runtime), `useStore.ts` (octane-adapted — a ref-cached selection over octane's real
+>   `useSyncExternalStore`, the same trick as `@octanejs/zustand/traditional`, no concurrent-mode
+>   shim), `ReactStore.ts` (octane-adapted — **every hook-bearing method threads an explicit slot**:
+>   `useState(key, slot, …)`, `useSyncedValue(key, value, slot)`, `useControlledProp`,
+>   `useContextCallback`, `useStateSetter`; `useIsoLayoutEffect` → octane `useLayoutEffect`; dev
+>   warnings dropped).
+> - **Floating store layer** (`utils/floating/`): `FloatingRootStore.ts` (the Store-based root
+>   context, extends `ReactStore`), `getEmptyRootContext.ts`, `createEventEmitter.ts`, `event.ts`
+>   (`isClickLikeEvent`), `types.ts` (FloatingRootContext/Context/Events/ElementProps subset); plus
+>   `utils/popups/popupTriggerMap.ts` (`PopupTriggerMap`, verbatim).
+>
+> **Remaining Phase-3 foundation (next turns), by size:** the store-connected interaction hooks
+> (`useDismiss` ~754, `useClick` ~226, `useFocus` ~250, `useClientPoint` ~260), `FloatingFocusManager`
+> ~991, `FloatingPortal` ~307, `FloatingTree` ~95, and the `utils/popups` engine (`popupStoreUtils`
+> ~512, `inlineRect` ~292, `useTriggerFocusGuards` ~95, `store.ts` ~224). **Then Dialog** (~1400:
+> Root/Trigger/Portal/Backdrop/Popup/Title/Description/Close/Viewport + its Store/Handle +
+> `useDialogRoot`/`DialogInteractions`) as the first testable overlay (differential mount +
+> open/close + a dedicated focus-trap/return-focus/dismiss test). Then Popover/Tooltip/PreviewCard/
+> AlertDialog/Menu(+Context/Menubar)/Toast.
+
 > **Phase 2 COMPLETE — Slider DONE (2026-07). Green: 47 differential tests, full monorepo suite
 > 2155 green.** `src/slider.ts` — the last Phase-2 giant, all 7 parts + 9 pure utils: `Slider.Root`
 > (value/format state machine over `useControlled` + a sorted `values` array; `setValue` clones the

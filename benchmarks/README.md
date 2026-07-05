@@ -26,9 +26,9 @@ then kills the servers **by port** (`lsof -ti tcp:<port>`). Suites run
 **sequentially** so ports and CPU never contend. Collected results land in
 `benchmarks/results/<suite>.json` (gitignored), one file per suite.
 
-Two suites need no servers: **news** vite-builds and times each target itself
+Three suites need no servers: **news** vite-builds and times each target itself
 (the runner loops its per-target invocations and merges them), and
-**ssr-throughput** is Node-only.
+**ssr-throughput** and **streaming-ssr** are Node-only.
 
 ## Regression modes
 
@@ -112,6 +112,7 @@ internally, get their own baseline and guard namespace.
 | `memo-wall` | memo-wall | octane-tsrx/jsx, react | memo bail + context walk |
 | `portal-swarm` | portal-swarm | octane-tsrx, react, solid | portal render/dispatch |
 | `ssr-throughput` | ssr-throughput | none (Node-only) | SSR ops/sec, waterfall, deopt, escape |
+| `streaming-ssr` | streaming-ssr | none (Node-only) | streaming shell TTFB, stream totals, chunking |
 | `dbmon-deopt` | dbmon | octane-tsrx + octane-deopt | tuned vs plain-.ts cliff |
 | `js-framework-deopt` | js-framework | octane-tsrx + naive triplet | tuned vs naive-authoring cliff |
 

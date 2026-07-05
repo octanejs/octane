@@ -22,6 +22,13 @@ export const REASONS = {
 	scrub: 'scrub',
 	trackPress: 'track-press',
 	drag: 'drag',
+	triggerHover: 'trigger-hover',
+	triggerFocus: 'trigger-focus',
+	outsidePress: 'outside-press',
+	closePress: 'close-press',
+	focusOut: 'focus-out',
+	escapeKey: 'escape-key',
+	imperativeAction: 'imperative-action',
 } as const;
 
 export type BaseUIEventReason = (typeof REASONS)[keyof typeof REASONS];

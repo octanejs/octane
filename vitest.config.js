@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
+import { octaneMdx } from './packages/mdx/src/vite.ts';
 import { stylex } from './packages/stylex/src/vite.js';
 
 export default defineConfig({
@@ -366,6 +367,52 @@ export default defineConfig({
 				],
 				resolve: {
 					alias: [
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'mdx',
+					include: ['packages/mdx/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				// octaneMdx() owns `.mdx`/`.md` (it runs the FULL pipeline — @mdx-js/mdx →
+				// octane compile — and returns final JS); octane() compiles the `.tsrx`
+				// fixtures embedded in documents and the test files. The binding's own
+				// `.ts` sources call hooks with EXPLICIT slot symbols, so they are
+				// excluded from the auto-slotting pass — as is @octanejs/testing-library,
+				// which the tests mount through.
+				plugins: [
+					octaneMdx(),
+					octane({
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/query/src/',
+							'/packages/motion/src/',
+							'/packages/mdx/src/',
+							'/packages/testing-library/src/',
+						],
+					}),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/mdx$/,
+							replacement: resolve(import.meta.dirname, 'packages/mdx/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/mdx\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/mdx/src') + '/$1.ts',
+						},
 						{
 							find: /^@octanejs\/testing-library$/,
 							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
