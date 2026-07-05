@@ -675,6 +675,35 @@ divergences: uncaught-error surface is console.error (not a caller rethrow /
 onUncaughtError), and the render-once-more retry heuristic is classified N/A
 (concurrent-lane mechanism) — flagged for revisit if evidence appears.
 
+### Phase C COMPLETE — every tier ported (2026-07-05)
+The final wave closed Tiers 1, 4, and 6 (three parallel agents; full per-case
+accounting blocks in each file):
+
+- **Tier 1** (`deferred-value`, `insertion-effect-order`, `use-replay-extra`,
+  `hooks-arity` conformance files): octane's useDeferredValue matches the
+  reuse-previous / initialValue / Object.is-skip / no-infinite-defer heuristics;
+  7 pins remain on the missing "deferred render" bit (preview waterfalls,
+  hidden-tree reveals) + effect unmount/update choreography — follow-up task
+  spawned. BONUS: found a real compiler bug (user `setText` binding shadows the
+  emitted runtime helper — task spawned).
+- **Tier 4** (`ssr-serialization` — 107 dual-compile tests asserting server bytes
+  AND hydration adoption, `ssr-server-semantics`, `form-actions-extra`): 21 pins
+  incl. two SERIOUS hydration bugs (nested-root-fragment content loss;
+  adjacent-empty-text-hole crash) — follow-up task spawned. Server hooks
+  render-phase updates are inert (single-pass) — pinned. requestFormReset /
+  auto-reset / queue-threading all verified; error-doesn't-cancel-queue is a
+  documented positive divergence.
+- **Tier 6** (`scheduling-triage` + full N/A table): AggregateError for multiple
+  unhandled root errors FIXED (drainQueue collects all); flushSync
+  passives-post-paint and whole-queue drain ADJUDICATED as intentional
+  divergences (they pin octane's two-priority design, per effect-timing /
+  transitions tests); everything lane/expiration/time-slicing classified N/A
+  with precise reasons (no yield points in a sync scheduler).
+
+With Tier 0/3/7 (earlier waves) and Phases A/B/D, **every tier in §3 is now
+ported or accounted.** Remaining runtime work lives in pinned it.fails +
+spawned tasks, not in this plan.
+
 ### Suite status
 **204 test files, 1074 passed, 0 expected-fail, 0 regressions** (after the off-screen
 transition fix). Typecheck + format clean. (Earlier checkpoint: 106 files / 752.)

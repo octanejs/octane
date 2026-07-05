@@ -524,8 +524,11 @@ const VALID_TAG_NAME = /^[a-zA-Z][a-zA-Z0-9:._-]*$/;
 // attribute — callers must intercept it BEFORE routing an entry here.
 function ssrAttrEntry(k: string, v: unknown): string {
 	if (k === 'key' || k === 'ref' || k === 'children') return '';
-	if (k === 'suppressHydrationWarning') return '';
+	if (k === 'suppressHydrationWarning' || k === 'suppressContentEditableWarning') return '';
 	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
+	// Function/symbol values never serialize (client parity: setAttribute removes
+	// them) — stringifying a function would put its SOURCE into the markup.
+	if (typeof v === 'function' || typeof v === 'symbol') return '';
 	if (k === 'style') return ssrStyle(v);
 	if (k === 'className' || k === 'class') return ssrAttr('class', v);
 	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v);
