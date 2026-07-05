@@ -14,21 +14,24 @@ import * as ServerRT from 'octane/server';
 // mismatch" console.error).
 //
 // OCTANE SERIALIZATION PROTOCOL vs REACT (intentional, asserted at OUTCOME level):
-//   * React separates adjacent text nodes with `<!-- -->` comments; octane's
-//     provably-string holes serialize MARKERLESS and adjacent runs merge into one
-//     text node (static literal runs are compile-time-folded on the client too, so
-//     the merged node adopts cleanly — see the GAP below for the dynamic case).
+//   * Adjacent STATIC text runs serialize merged into one text node (they're
+//     compile-time-folded on the client too, so the merged node adopts cleanly).
+//     When at least one side of a text adjacency is a DYNAMIC hole, the server
+//     emits React's `<!-- -->` separator so the parser can't merge them and the
+//     hydration walk adopts each hole's node.
 //   * A bare renderable `{expr}` hole serializes as a `<!--[-->…<!--]-->` block
 //     range (octane's hydration protocol); React emits no markers. Child-count
 //     assertions therefore filter octane's protocol comments.
 //   * class/className compose clsx-style at every apply site (documented project
 //     divergence): `className={true}` yields `class=""` where React drops it.
-//   * octane serializes attributes AS WRITTEN (native-attribute semantics): no
-//     boolean-property table, no positive-numeric table, no empty-URL strip. Where
-//     that changes the FUNCTIONAL outcome (presence/absence flips), the case is
-//     pinned as a GAP below; where only the serialized value differs but the
-//     platform semantics are identical (e.g. `hidden="foo"` vs React's
-//     `hidden=""` — both just "present"), the test asserts presence.
+//   * ssrAttr mirrors React's value-type filters where the FUNCTIONAL outcome
+//     would flip (positive-numeric drop, empty-URL strip, function/symbol
+//     drop, boolean-on-string-prop drop, data-* boolean stringify) — and the
+//     client setAttribute applies the SAME rules (shared tables in
+//     constants.ts) so hydration agrees with the serialized markup. There is
+//     deliberately NO boolean-prop truthiness table (adjudicated 2026-07-04):
+//     `hidden={0}` / `inert=""` serialize as written — presence means
+//     platform-true, exactly like hand-authored markup.
 //
 // Out of scope per docs/react-parity-migration-plan.md §2 (documented, not ported):
 //   * class components / factory components (Elements :631, :640, :924, :938, :964)
@@ -135,6 +138,7 @@ export function OptionSelected(p) @{ <select><option selected={p.sel} value="a">
 export function CustomCls() @{ <custom-element className="test" /> }
 export function CustomFor() @{ <custom-element htmlFor="test" /> }
 export function CustomFoo(p) @{ <custom-element foo={p.v} /> }
+export function CustomData(p) @{ <custom-element data-foo={p.v} /> }
 export function CustomOn() @{ <custom-element onunknown="bar" /> }
 export function IsElement(p) @{ <div is="custom-element" className="test" foo={p.foo} /> }
 export function InertDiv(p) @{ <div inert={p.v} /> }
@@ -261,12 +265,7 @@ describe('conformance: SSR serialization — text children (Elements)', () => {
 		expect(ssr('MultiEmptyText')).toBe('<div></div>');
 	});
 
-	// GAP: hydrating multiple adjacent EMPTY dynamic text holes crashes — the
-	// server serializes nothing for them (no text node, no separator), and the
-	// client template's sibling walk (`_el0.nextSibling` off a null firstChild)
-	// NPEs. Same root cause as the adjacent-dynamic-text separator gap below:
-	// markerless text holes need a serialized position (React's `<!-- -->`).
-	it.fails('hydrates multiple empty text children (Per :92)', () => {
+	it('hydrates multiple empty text children (Per :92)', () => {
 		const r = hydrate('MultiEmptyText');
 		expect(warns()).toEqual([]);
 		expect(stripComments(r.after)).toBe(stripComments(r.before));
@@ -325,16 +324,10 @@ describe('conformance: SSR serialization — text children (Elements)', () => {
 		expect(container.querySelector('div')!.textContent).toBe('foobar');
 	});
 
-	// GAP: adjacent DYNAMIC text holes serialize with no separator (React emits
-	// `<!-- -->` between text nodes so hydration can split them). The server
-	// merges `{p.a}{p.b}` into ONE text node 'foobar'; the client template has
-	// TWO text-node bindings, so htextSwap adopts the merged node for the first
-	// hole (spurious mismatch warn + patch to 'foo') and the second hole's node
-	// is created detached — the DOM loses 'bar'. Likely fix: the server compiler
-	// (compile.js ssrText emission) must emit an empty-comment separator between
-	// adjacent markerless text holes, and the client's hydration walk must skip
-	// it (runtime.ts htextSwap / sibling navigation).
-	it.fails('hydrates adjacent dynamic text holes without a mismatch (Per :182)', () => {
+	// The server separates adjacent dynamic text holes with a `<!-- -->` comment
+	// (React's convention) so the parser can't merge them into one node; the
+	// client's hole-aware sibling() walk steps across it.
+	it('hydrates adjacent dynamic text holes without a mismatch (Per :182)', () => {
 		const r = hydrate('TwoTextDyn', { a: 'foo', b: 'bar' });
 		expect(warns()).toEqual([]);
 		expect(r.after).toBe(r.before);
@@ -357,14 +350,10 @@ describe('conformance: SSR serialization — text children (Elements)', () => {
 		expect(e.querySelector('div')!.textContent).toBe('cd');
 	});
 
-	// GAP: hydrating a component that returns a NESTED array (`[<Zero/>, ['c']]`)
-	// warns "expected another list item … fewer nodes than expected" and rebuilds:
-	// the server flattens nested arrays into SIBLING item blocks (ssrChildItem,
-	// runtime.server.ts) while the client's de-opt keyed list hydration counts a
-	// different item shape for the nested array. Likely fix: align mountItem's
-	// hydrating item-count walk (runtime.ts) with the server's flattened
-	// one-block-per-leaf-item emission.
-	it.fails('hydrates a nested-array component return cleanly (Per :235)', () => {
+	// The client de-opt list flattens nested-array members one-item-per-leaf
+	// (matching the server's ssrChildItem emission), so hydration adopts the
+	// per-leaf `<!--[-->…<!--]-->` ranges 1:1.
+	it('hydrates a nested-array component return cleanly (Per :235)', () => {
 		const r = hydrate('SiblingTree');
 		expect(warns()).toEqual([]);
 		expect(stripComments(r.after)).toBe(stripComments(r.before));
@@ -510,12 +499,10 @@ describe('conformance: SSR serialization — newline-eating elements (Elements)'
 		expectCleanHydrate('PreNl', { t: 'Hello' });
 	});
 
-	// GAP: the HTML parser eats a newline immediately after <pre> (and <textarea>/
-	// <listing>). React protects it by emitting an EXTRA leading \n; octane's
-	// serializer emits the content verbatim, so '\nHello' round-trips as 'Hello'.
-	// Likely fix: runtime.server.ts ssrText/compile.js static emission must prepend
-	// '\n' when the first content of a newline-eating tag starts with '\n'.
-	it.fails('renders pre content starting with \\n (Per :607)', () => {
+	// The HTML parser eats a newline immediately after <pre> (and <textarea>/
+	// <listing>); the serializer protects it by emitting an EXTRA leading \n
+	// (ssrTextPre / the compiler's static first-child guard), React-style.
+	it('renders pre content starting with \\n (Per :607)', () => {
 		const e = parse(ssr('PreNl', { t: '\nHello' })).querySelector('pre')!;
 		expect(e.textContent).toBe('\nHello');
 	});
@@ -547,13 +534,14 @@ describe('conformance: SSR serialization — component hierarchies (Elements)', 
 	});
 
 	// GAP: hydrating nested `{children}` component chains is not byte-stable —
-	// the inner componentSlot fails to adopt the server's `<!--[-->` pair (its
-	// parked-cursor resolution misses) and mints fresh `<!--comp-->` markers /
-	// shifts which block pair owns which element. Element structure and text
-	// survive (see the content-level assertions above), but the marker topology
-	// diverges from the serialized protocol. Likely fix: componentSlot's
-	// open-marker resolution in runtime.ts (~"componentSlotSlot" mount) for a
-	// component whose children prop renders another component directly.
+	// at depth >= 2 the SERVER collapses the children-fn block and the nested
+	// component's block into ONE `<!--[-->…<!--]-->` range, while the client
+	// layers a childSlot AND a componentSlot; the inner componentSlot finds no
+	// second range to adopt and mints fresh `<!--comp-->` markers. Elements,
+	// text, and warnings are all clean (see the content-level assertions above)
+	// — only the marker topology diverges. Fix needs the client componentSlot
+	// to BORROW its childSlot's adopted markers when the server emitted a
+	// single collapsed range (or the server to stop collapsing).
 	it.fails('hydrates component hierarchies byte-stably (Per :657/:677)', () => {
 		const one = hydrate('SingleHier');
 		expect(one.after).toBe(one.before);
@@ -632,24 +620,20 @@ describe('conformance: SSR serialization — carriage return / null character (E
 		expect(e.textContent).toBe('foo\nbar\nbaz\nqux');
 	});
 
-	// GAP: React deliberately does NOT report a hydration mismatch when the only
-	// difference is parser CR/CRLF→LF normalization (the client value has \r, the
-	// parsed server node has \n). Octane's htextSwap compares nodeValue byte-wise
-	// and warns + patches. Likely fix: normalize \r\n?/  in the hydration
-	// text comparison (runtime.ts htextSwap / warnHydrationValueMismatch guard).
-	it.fails('does not report a mismatch for CR/CRLF-normalized text (Per :834)', () => {
+	// A client value differing from the adopted server text ONLY by parser
+	// CR/CRLF→LF normalization is not a mismatch (React parity) — the hydration
+	// text compare normalizes before warning/patching.
+	it('does not report a mismatch for CR/CRLF-normalized text (Per :834)', () => {
 		hydrate('DivNl', { t: 'foo\rbar\r\nbaz\nqux' });
 		expect(warns()).toEqual([]);
 	});
 });
 
 describe('conformance: SSR serialization — badly-typed children (Elements)', () => {
-	// GAP: React throws 'Objects are not valid as a React child' for a plain-object
-	// child (Elements :948-:989); octane's ssrChild falls through to
-	// escapeHtml(String(v)) and serializes '[object Object]' into the markup.
-	// Likely fix: runtime.server.ts ssrChild should throw for a non-descriptor
-	// object child (mirroring the tag-name validation precedent in ssrHostElement).
-	it.fails('throws for a plain-object child (Per :948)', () => {
+	// A plain (non-descriptor) object child throws, like React's 'Objects are
+	// not valid as a React child' — serializing it would put '[object Object]'
+	// into the markup.
+	it('throws for a plain-object child (Per :948)', () => {
 		expect(() => ssr('Hole', { x: { x: 123 } })).toThrow();
 	});
 
@@ -678,11 +662,10 @@ describe('conformance: SSR serialization — string properties (Attributes)', ()
 		).toBe('');
 	});
 
-	// GAP: React strips an EMPTY url on <img src>, <base href>, <link href> (and
-	// <area href>) so the browser doesn't fetch the page itself; octane serializes
-	// the empty attribute as written. Likely fix: an empty-URL strip table in
-	// runtime.server.ts ssrAttr (and the client attribute writer for parity).
-	it.fails('strips empty src/href on img/base/link (Per :64/:74/:89)', () => {
+	// An empty url on <img src>, <base href>, <link href> strips (the browser
+	// would fetch the page itself) — mirrors the client setAttribute policy;
+	// <a href=""> stays (a legitimate link to this page).
+	it('strips empty src/href on img/base/link (Per :64/:74/:89)', () => {
 		expect(
 			parse(ssr('ImgSrc', { v: '' }))
 				.querySelector('img')!
@@ -700,10 +683,9 @@ describe('conformance: SSR serialization — string properties (Attributes)', ()
 		).toBe(null);
 	});
 
-	// GAP: React drops a boolean `true` on a string-typed prop (href={true});
-	// octane serializes the bare attribute. Functional difference: href becomes
-	// present (an empty-URL link). Same family: React's value-type filter.
-	it.fails('drops a string prop with true value (Per :94)', () => {
+	// A boolean on a string-typed prop (href={true}) drops — a bare href would
+	// be a present empty-URL link (React's value-type filter).
+	it('drops a string prop with true value (Per :94)', () => {
 		expect(
 			parse(ssr('AnchorHref', { v: true }))
 				.querySelector('a')!
@@ -724,11 +706,9 @@ describe('conformance: SSR serialization — string properties (Attributes)', ()
 		).toBe(false);
 	});
 
-	// GAP: React drops function- and symbol-valued attributes entirely; octane's
-	// ssrAttr String()-coerces them ('function () {}' / 'Symbol(foo)') into the
-	// markup. Likely fix: typeof function/symbol guard in ssrAttr
-	// (runtime.server.ts) mirroring React's shouldRemoveAttribute.
-	it.fails('drops string props with function/symbol values (Per :109/:114)', () => {
+	// Function- and symbol-valued attributes drop entirely (client setAttribute
+	// parity) — stringifying a function would leak source into the markup.
+	it('drops string props with function/symbol values (Per :109/:114)', () => {
 		expect(
 			parse(ssr('WidthDiv', { w: function () {} }))
 				.querySelector('div')!
@@ -773,25 +753,26 @@ describe('conformance: SSR serialization — boolean properties (Attributes)', (
 		}
 	});
 
-	// GAP: React drops FALSY non-boolean values on boolean props (hidden={0},
-	// hidden="") — octane serializes them, so the element becomes hidden where
-	// React leaves it visible. A real functional flip. Likely fix: a boolean-prop
-	// table in ssrAttr coercing to present/absent like React's.
-	it.fails('drops boolean prop with zero/empty-string value (Per :139/:169)', () => {
+	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04, see the inert="" test in
+	// dom-attributes.test.ts): React drops FALSY non-boolean values on boolean
+	// props (hidden={0}, hidden=""); octane writes attribute values through
+	// natively — the value serializes and PRESENCE means platform-true, exactly
+	// as hand-written markup. Pass a real boolean for JS-boolean behavior.
+	it('serializes falsy non-boolean values on boolean props natively (React drops — Per :139/:169)', () => {
 		expect(
 			parse(ssr('Hidden', { v: 0 }))
 				.querySelector('div')!
-				.hasAttribute('hidden'),
-		).toBe(false);
+				.getAttribute('hidden'),
+		).toBe('0');
 		expect(
 			parse(ssr('Hidden', { v: '' }))
 				.querySelector('div')!
-				.hasAttribute('hidden'),
-		).toBe(false);
+				.getAttribute('hidden'),
+		).toBe('');
 	});
 
-	// GAP: function/symbol family (see string properties above).
-	it.fails('drops boolean props with function/symbol values (Per :179/:184)', () => {
+	// Function/symbol family (see string properties above).
+	it('drops boolean props with function/symbol values (Per :179/:184)', () => {
 		expect(
 			parse(ssr('Hidden', { v: function () {} }))
 				.querySelector('div')!
@@ -861,9 +842,8 @@ describe('conformance: SSR serialization — className / htmlFor (Attributes)', 
 		expectCleanHydrate('HtmlFor', { v: 'myFor' });
 	});
 
-	// GAP: React drops boolean values on htmlFor (:308/:313); octane emits a bare
-	// `for` for true (value-type filter family; false correctly drops).
-	it.fails('drops htmlFor with true value (Per :308)', () => {
+	// Boolean values on htmlFor drop (value-type filter family).
+	it('drops htmlFor with true value (Per :308)', () => {
 		expect(
 			parse(ssr('HtmlFor', { v: true }))
 				.querySelector('label')!
@@ -887,10 +867,9 @@ describe('conformance: SSR serialization — numeric properties (Attributes)', (
 		expectCleanHydrate('InputSize', { v: 2 });
 	});
 
-	// GAP: `size` is a POSITIVE-numeric prop in React — zero is dropped (:338);
-	// octane has no numeric-prop table and serializes size="0" (which is invalid
-	// per the HTML spec: size must be > 0).
-	it.fails('drops positive numeric property with zero value (Per :338)', () => {
+	// `size` is a POSITIVE-numeric prop — zero drops (size="0" is invalid per
+	// the HTML spec: size must be > 0).
+	it('drops positive numeric property with zero value (Per :338)', () => {
 		expect(
 			parse(ssr('InputSize', { v: 0 }))
 				.querySelector('input')!
@@ -918,11 +897,9 @@ describe('conformance: SSR serialization — props with special meaning (Attribu
 		expect(e.getAttribute('dangerouslysetinnerhtml')).toBe(null);
 	});
 
-	// GAP: suppressContentEditableWarning is a React-only prop and must never
-	// serialize; octane's ssrAttrEntry skip-list only knows suppressHydrationWarning,
-	// so the static emitter leaks it as a bare attribute. Likely fix: add it to the
-	// compiler's skip-list / ssrAttrEntry (runtime.server.ts).
-	it.fails('serializes no suppressContentEditableWarning attribute (Per :398)', () => {
+	// suppressContentEditableWarning is a React-only hint — never serializes
+	// (compiler skip-list + ssrAttr, mirroring the client setAttribute skip).
+	it('serializes no suppressContentEditableWarning attribute (Per :398)', () => {
 		const e = parse(ssr('Scew')).querySelector('div')!;
 		expect(e.attributes.length).toBe(0);
 	});
@@ -1030,12 +1007,9 @@ describe('conformance: SSR serialization — aria + unknown attributes (Attribut
 		expect(form.hasAttribute('accept-charset')).toBe(false);
 	});
 
-	// GAP: React stringifies booleans on data-*/unknown attributes
-	// (data-foobar={true} → "true", {false} → "false"); octane's generic ssrAttr
-	// emits a bare attribute for true and DROPS false — a dataset consumer reads
-	// '' / undefined instead of 'true' / 'false'. Likely fix: data-*/unknown attrs
-	// must String()-serialize booleans in ssrAttr (runtime.server.ts).
-	it.fails('stringifies booleans on data- attributes (Per :620/:625)', () => {
+	// data-* attributes stringify booleans (data-foobar={true} → "true") — a
+	// dataset consumer reads the string value.
+	it('stringifies booleans on data- attributes (Per :620/:625)', () => {
 		expect(
 			parse(ssr('DataFoo', { v: true }))
 				.querySelector('div')!
@@ -1059,12 +1033,9 @@ describe('conformance: SSR serialization — events (Attributes)', () => {
 		expect(e.attributes.length).toBe(0);
 	});
 
-	// GAP: React nulls out unknown lowercase on* attributes (onunknownevent);
-	// octane's event filter only strips camelCase onX props, so a lowercase
-	// on* attribute (with an attacker-ish string payload) serializes through.
-	// Likely fix: extend the on*-skip in ssrAttrEntry/compile.js to lowercase
-	// on-prefixed names on non-custom elements.
-	it.fails('serializes no unknown events (Per :682)', () => {
+	// Unknown lowercase on* attributes drop on standard elements (injection
+	// surface, not an attribute); custom elements and the bare `on` attr pass.
+	it('serializes no unknown events (Per :682)', () => {
 		const e = parse(ssr('OnUnknown', { v: 'alert("hack")' })).querySelector('div')!;
 		expect(e.getAttribute('onunknownevent')).toBe(null);
 	});
@@ -1117,10 +1088,9 @@ describe('conformance: SSR serialization — custom elements (Attributes)', () =
 		expect(e.getAttribute('class')).toBe('test');
 	});
 
-	// GAP: React passes htmlFor through VERBATIM on custom elements (they get raw
-	// props, no alias tables); octane's ssrAttr renames htmlFor→for everywhere.
-	// Likely fix: gate the htmlFor→for alias on the tag not being a custom element.
-	it.fails('keeps htmlFor verbatim on custom elements (Per :719)', () => {
+	// Custom elements get htmlFor VERBATIM (raw props, no `for` alias) —
+	// className→class still applies.
+	it('keeps htmlFor verbatim on custom elements (Per :719)', () => {
 		const e = parse(ssr('CustomFor')).firstElementChild!;
 		expect(e.getAttribute('htmlfor')).toBe('test');
 		expect(e.getAttribute('for')).toBe(null);
@@ -1131,6 +1101,20 @@ describe('conformance: SSR serialization — custom elements (Attributes)', () =
 			'bar',
 		);
 		expect(parse(ssr('CustomOn')).firstElementChild!.getAttribute('onunknown')).toBe('bar');
+	});
+
+	// data-* booleans stringify on custom elements too (same as standard
+	// elements — the client setAttribute writes the identical string, so
+	// hydration adopts cleanly).
+	it('stringifies data-* booleans on custom elements', () => {
+		expect(parse(ssr('CustomData', { v: true })).firstElementChild!.getAttribute('data-foo')).toBe(
+			'true',
+		);
+		expect(parse(ssr('CustomData', { v: false })).firstElementChild!.getAttribute('data-foo')).toBe(
+			'false',
+		);
+		expectCleanHydrate('CustomData', { v: true });
+		expectCleanHydrate('CustomData', { v: false });
 	});
 
 	it('serializes unknown boolean attributes on custom elements (Per :741/:746/:774)', () => {
@@ -1154,15 +1138,16 @@ describe('conformance: SSR serialization — custom elements (Attributes)', () =
 		).toBe(false);
 	});
 
-	// GAP: React 19 treats inert="" as false (drops it, with a warning); octane
-	// serializes the empty string as written (boolean falsy-value family, see
-	// the hidden="" GAP above).
-	it.fails('drops inert="" (Per :757)', () => {
+	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04, mirroring the client half
+	// in dom-attributes.test.ts): React 19 treats inert="" as false and drops
+	// it; octane serializes the empty string as written — present ⇒
+	// platform-true, per the HTML boolean-attribute rules.
+	it('keeps inert="" present (React drops — Per :757)', () => {
 		expect(
 			parse(ssr('InertDiv', { v: '' }))
 				.querySelector('div')!
-				.hasAttribute('inert'),
-		).toBe(false);
+				.getAttribute('inert'),
+		).toBe('');
 	});
 
 	it('serializes attributes on is="custom-element" hosts (Per :701/:782)', () => {
@@ -1199,12 +1184,7 @@ describe('conformance: SSR serialization — fragments (Fragment)', () => {
 		expect(host.querySelector('h2')!.parentNode).toBe(host);
 	});
 
-	// GAP: hydrating a ROOT fragment whose members include components desyncs
-	// the cursor — the client expects Header's <p> where the server's earlier
-	// host siblings sit, warns a structural mismatch, and rebuilds. Likely fix:
-	// hydrateRoot's root-level multi-node adoption (renderBlock cursor parking in
-	// runtime.ts) must advance past host siblings before a component slot member.
-	it.fails('hydrates a fragment with component members cleanly (Per :51)', () => {
+	it('hydrates a fragment with component members cleanly (Per :51)', () => {
 		const r = hydrate('FragSeveral');
 		expect(warns()).toEqual([]);
 		expect(r.after).toBe(r.before);
@@ -1217,11 +1197,7 @@ describe('conformance: SSR serialization — fragments (Fragment)', () => {
 		expect(host.textContent).toBe('text1text2');
 	});
 
-	// GAP: hydrating a nested ROOT fragment loses content — 'text1' is detached
-	// from its <div> and re-appended at the tail (the nested-fragment cursor walk
-	// mis-pairs the root's static hosts with the flattened server output). Same
-	// suspected root cause as the previous GAP (root multi-node cursor parking).
-	it.fails('hydrates a nested fragment cleanly (Per :79)', () => {
+	it('hydrates a nested fragment cleanly (Per :79)', () => {
 		const r = hydrate('FragNested');
 		expect(warns()).toEqual([]);
 		expect(stripComments(r.after)).toBe(stripComments(r.before));

@@ -1769,24 +1769,88 @@ function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html')
 	return `function ${name}(${sig}) {\n${cssLines}${headLines}${setupBlock}${subsBlock}  return ${htmlExpr};\n}`;
 }
 
+// Classify a normalized JSX child for TEXT-ADJACENCY purposes. Shared by the
+// client template walk (emitElementHtml / planJsx) and the server emitter
+// (ssrEmitNodes) so the two sides stay in lockstep about which siblings
+// produce mergeable text nodes:
+//   'static' — a static string-literal Text (bakes / serializes as literal text)
+//   'empty'  — a static literal that renders NOTHING (adjacency-transparent)
+//   'dyn'    — a known-string dynamic text hole (client `<!>` + htextSwap,
+//              server markerless ssrText)
+//   'other'  — everything else (elements, renderable `{expr}` holes, control
+//              flow — all serialize elements or `<!--[-->…<!--]-->` ranges
+//              that break text-node adjacency on their own)
+function textAdjacencyKind(node, ctx) {
+	if (node.type !== 'Text') return 'other';
+	const lit = staticTextLiteral(node.expression);
+	if (lit !== null) return lit === '' ? 'empty' : 'static';
+	return isKnownStringExpression(node.expression, ctx.knownStringLocals) ? 'dyn' : 'other';
+}
+
+// Does the child at `i` have a text-producing sibling next to it (looking
+// through adjacency-transparent 'empty' literals)? Used to decide which
+// dynamic text holes need the hole-aware hydration walk on the client — the
+// exact positions where the server emits a `<!-- -->` separator.
+function hasTextNeighbor(kinds, i) {
+	for (let j = i - 1; j >= 0; j--) {
+		if (kinds[j] === 'empty') continue;
+		if (kinds[j] === 'static' || kinds[j] === 'dyn') return true;
+		break;
+	}
+	for (let j = i + 1; j < kinds.length; j++) {
+		if (kinds[j] === 'empty') continue;
+		if (kinds[j] === 'static' || kinds[j] === 'dyn') return true;
+		break;
+	}
+	return false;
+}
+
 // Serialize a list of normalized JSX nodes to a JS expression that evaluates to
 // an HTML string (the concatenation of each node's expression).
-function ssrEmitNodes(nodes, ctx, name, inlinedSubs, parentNs, cssHash) {
+// `nlGuardFirst`: the children belong to a newline-eating element (`<pre>`/
+// `<textarea>`/`<listing>`) — the parser discards a '\n' immediately after the
+// opening tag, so the FIRST emitted text part protects a leading newline by
+// doubling it (React parity; a comment/element first part shields it already).
+function ssrEmitNodes(nodes, ctx, name, inlinedSubs, parentNs, cssHash, nlGuardFirst = false) {
 	const parts = [];
+	// Adjacent text nodes MERGE when the browser re-parses the serialized HTML,
+	// which would fuse a dynamic text hole with its text neighbour into ONE node
+	// and leave the client's hydration walk a node short (React has the same
+	// problem and the same cure: a `<!-- -->` comment between adjacent texts).
+	// Emit the separator between two text-producing siblings whenever at least
+	// one side is a DYNAMIC hole; static/static pairs stay markerless (the
+	// client bakes those folded into the template, so the merged node adopts
+	// cleanly). Empty static literals serialize nothing and are transparent to
+	// adjacency. The client counterpart is the hole-aware `sibling()` walk in
+	// runtime.ts, which treats separators as protocol nodes. Keep the comment
+	// payload in sync with HYDRATION_TEXT_SEP (constants.ts).
+	let prevText = null; // 'static' | 'dyn' | null — last emitted part's text kind
 	for (const n of nodes) {
-		const p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash);
-		if (p) parts.push(p);
+		const kind = textAdjacencyKind(n, ctx);
+		if (kind === 'empty') continue; // serializes nothing — skip, adjacency-transparent
+		const nlGuard = nlGuardFirst && parts.length === 0;
+		const p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard);
+		if (p) {
+			if (kind !== 'other' && prevText !== null && (kind === 'dyn' || prevText === 'dyn')) {
+				parts.push(JSON.stringify('<!-- -->'));
+			}
+			parts.push(p);
+			prevText = kind === 'other' ? null : kind;
+		}
 	}
 	return parts.length ? parts.join(' + ') : "''";
 }
 
-function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = false) {
 	switch (node.type) {
 		case 'Text': {
 			const expr = node.expression;
 			if (expr && expr.type === 'Literal' && typeof expr.value === 'string') {
-				// Static text — escape at compile time, inline as a literal chunk.
-				return JSON.stringify(escapeHtml(expr.value));
+				// Static text — escape at compile time, inline as a literal chunk. In
+				// first-child position of a newline-eating tag, protect a leading '\n'
+				// by doubling it (the parser eats the first — see ssrEmitNodes).
+				const guard = nlGuard && expr.value.charCodeAt(0) === 10 ? '\n' : '';
+				return JSON.stringify(guard + escapeHtml(expr.value));
 			}
 			// `{x as string}` / literals / templates / `+`-concats → definite TEXT.
 			// Everything else (`{children}`, `{<Comp/>}`, possibly-renderable values)
@@ -1795,8 +1859,11 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			// rewriteHookCalls: a `use(thenable)` in this hole bypasses the setup
 			// rewrite, so key it here too (else it collides with sibling/nested use()).
 			if (isKnownStringExpression(expr, ctx.knownStringLocals)) {
-				ctx.runtimeNeeded.add('ssrText');
-				return `_$ssrText(${printExpr(resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash))})`;
+				// ssrTextPre = ssrText + the runtime leading-'\n' protection (the value
+				// isn't known at compile time here).
+				const fn = nlGuard ? 'ssrTextPre' : 'ssrText';
+				ctx.runtimeNeeded.add(fn);
+				return `_$${fn}(${printExpr(resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash))})`;
 			}
 			ctx.runtimeNeeded.add('ssrChild');
 			// rewriteJsxValues lowers any JSX embedded in the expression (e.g.
@@ -1875,7 +1942,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 				tempName: tmp,
 				argExpr: printExprWithTsrx(attr.argument, ctx, name, inlinedSubs),
 			});
-			parts.push(`_$ssrSpread(${tmp})`);
+			parts.push(`_$ssrSpread(${tmp}, ${JSON.stringify(tag)})`);
 			// The spread may carry `dangerouslySetInnerHTML` — record it as a raw-HTML
 			// source (at this source position) so it participates in last-wins ordering.
 			htmlSources.push(`(${tmp} != null ? ${tmp}.dangerouslySetInnerHTML : void 0)`);
@@ -1884,12 +1951,22 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const rawAttrName = jsxAttrRawName(attr);
 		if (rawAttrName === 'key') continue;
-		// `suppressHydrationWarning` is a client-only hydration hint — never serialize it.
+		// React-only hints — never serialize (`suppressHydrationWarning` is the
+		// client hydration opt-out; `suppressContentEditableWarning` suppresses a
+		// React DEV warning octane doesn't emit, but the key must not land in the
+		// markup either — mirrors the client setAttribute skip).
 		if (rawAttrName === 'suppressHydrationWarning') continue;
+		if (rawAttrName === 'suppressContentEditableWarning') continue;
 		// Events and refs have no server semantics — dropped.
 		if (rawAttrName === 'ref') continue;
 		if (isEventAttrName(rawAttrName)) continue;
-		const attrName = normalizeJsxAttrName(rawAttrName);
+		// Custom elements keep `htmlFor` VERBATIM (React parity — they get raw
+		// props, no `for` alias; `className`→`class` still applies); ssrAttr
+		// applies the same gate for dynamic values.
+		const attrName =
+			rawAttrName === 'htmlFor' && tag.includes('-')
+				? rawAttrName
+				: normalizeJsxAttrName(rawAttrName);
 		const val = attr.value;
 		const isAfterSpread = firstSpreadIdx !== -1 && attrI > firstSpreadIdx;
 
@@ -1956,7 +2033,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			ctx.runtimeNeeded.add('ssrAttr');
 			const outName = tag === 'form' ? 'action' : 'formaction';
 			parts.push(
-				`_$ssrAttr(${JSON.stringify(outName)}, ((__v) => (typeof __v === 'function' ? null : __v))(${printExprWithTsrx(inner, ctx, name, inlinedSubs)}))`,
+				`_$ssrAttr(${JSON.stringify(outName)}, ((__v) => (typeof __v === 'function' ? null : __v))(${printExprWithTsrx(inner, ctx, name, inlinedSubs)}), ${JSON.stringify(tag)})`,
 			);
 			continue;
 		}
@@ -1965,7 +2042,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		flush();
 		ctx.runtimeNeeded.add('ssrAttr');
 		parts.push(
-			`_$ssrAttr(${JSON.stringify(attrName)}, ${printExprWithTsrx(inner, ctx, name, inlinedSubs)})`,
+			`_$ssrAttr(${JSON.stringify(attrName)}, ${printExprWithTsrx(inner, ctx, name, inlinedSubs)}, ${JSON.stringify(tag)})`,
 		);
 	}
 
@@ -1996,7 +2073,18 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		ctx.runtimeNeeded.add('ssrChildText');
 		childrenExpr = `_$ssrChildText(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx), cssHash))}, __s)`;
 	} else {
-		childrenExpr = ssrEmitNodes(normChildren, ctx, name, inlinedSubs, childNs, cssHash);
+		// pre/textarea/listing: the parser eats a '\n' right after the opening tag —
+		// the first text part must protect a leading newline (see ssrEmitNodes).
+		const nlGuardFirst = tag === 'pre' || tag === 'textarea' || tag === 'listing';
+		childrenExpr = ssrEmitNodes(
+			normChildren,
+			ctx,
+			name,
+			inlinedSubs,
+			childNs,
+			cssHash,
+			nlGuardFirst,
+		);
 	}
 	if (htmlSources.length > 0) {
 		// Raw HTML (explicit and/or spread-supplied) wins over children when present
@@ -4044,7 +4132,13 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	);
 	const partsHtml = [];
 	let htmlIdx = 0;
-	for (const node of jsxNodes) {
+	// Text-adjacency classification of the root nodes (see textAdjacencyKind):
+	// root-level text holes are `<!>` bindings too, so a dynamic hole with a
+	// text neighbour needs the same adjacentText flag as the in-element walk
+	// (the server separates the pair with `<!-- -->`).
+	const rootAdjKinds = jsxNodes.map((n) => textAdjacencyKind(n, ctx));
+	for (let rootI = 0; rootI < jsxNodes.length; rootI++) {
+		const node = jsxNodes[rootI];
 		const nodeIsComp = node.type === 'Element' && isComponentTag(node);
 		// Single non-comp Element: path=[] (lives at _root directly).
 		// Otherwise (wrapped in <octane-frag>): path=[htmlIdx] when HTML-contributing.
@@ -4060,6 +4154,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// source order (e.g. a `<Comp/>` before an `<input/>` sibling).
 		const nodeNeedsAnchor = nodeIsComp || isConstructNode(node);
 		const nodePath = !single && (nodeNeedsAnchor ? hasStaticRoot : true) ? [htmlIdx] : [];
+		const bindingsBefore = elementBindings.length;
 		const part = emitNodeHtml(
 			node,
 			nodePath,
@@ -4074,6 +4169,15 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			parentNs,
 			cssHash,
 		);
+		// Flag a root-level text binding whose neighbour is also text — the server
+		// separates the pair with `<!-- -->`, so the walk must be hole-aware. Only
+		// the binding this very node pushed qualifies (element roots push their own
+		// nested bindings, but those were flagged by the in-element walk already).
+		if (node.type === 'Text' && hasTextNeighbor(rootAdjKinds, rootI)) {
+			for (let bi = bindingsBefore; bi < elementBindings.length; bi++) {
+				if (elementBindings[bi].kind === 'text') elementBindings[bi].adjacentText = true;
+			}
+		}
 		partsHtml.push(part);
 		// Advance the child index only when the node actually contributed template
 		// HTML (an element / text / `<!>` anchor). Component calls and un-anchored
@@ -4147,7 +4251,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			compCalls.length > 0 ||
 			tryCalls.length > 0 ||
 			ctx._switchCalls.length > 0 ||
-			ctx._portalCalls.length > 0;
+			ctx._portalCalls.length > 0 ||
+			// A dynamic text hole with a text-producing neighbour: the server emits a
+			// `<!-- -->` separator between the two texts (else the parser would merge
+			// them), and only the hole-aware sibling() walk knows to step across it.
+			elementBindings.some((b) => b.kind === 'text' && b.adjacentText);
 		if (hasHoles) {
 			ctx.runtimeNeeded.add('child');
 			ctx.runtimeNeeded.add('sibling');
@@ -4357,9 +4465,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		if (single) {
 			mountLines.push(`    __block.parentNode.insertBefore(_root, __block.endMarker);`);
 		} else {
-			mountLines.push(
-				`    while (_root.firstChild) __block.parentNode.insertBefore(_root.firstChild, __block.endMarker);`,
-			);
+			// Multi-root: drain the <octane-frag> wrapper's children into the live
+			// parent via the runtime helper — a hydration-aware no-op when clone()
+			// adopted the server content in place (virtual wrapper).
+			ctx.runtimeNeeded.add('drainFrag');
+			mountLines.push(`    _$drainFrag(_root, __block.parentNode, __block.endMarker);`);
 		}
 	}
 	// Commit the binding bag to the scope LAST — see the matching comment at
@@ -5429,13 +5539,17 @@ function emitElementHtml(
 		// Mixed children — walk them in order.
 		let childIdx = 0;
 		// Whether the PREVIOUS emitted child was a baked static-text literal. Two
-		// adjacent baked text nodes would collapse into a single DOM text node
-		// (the HTML parser merges them), throwing off `childIndex` counting for
-		// later siblings — so a static text adjacent to another baked text falls
-		// back to a `<!>` binding instead. Comments (`<!>`, `<!--frag-->`) and
-		// elements between two texts prevent the merge, so this only trips on
-		// genuinely consecutive literals (`{'a'}{'b'}`).
+		// adjacent baked text nodes collapse into a single DOM text node (the HTML
+		// parser merges them) — so a static text following another baked text FOLDS
+		// into the same run: emitted into the template but consuming no new
+		// childIndex, exactly mirroring the server's merged one-chunk emission.
 		let prevBakedText = false;
+		// Text-adjacency classification of every child (see textAdjacencyKind):
+		// a dynamic text hole with a text-producing neighbour is where the server
+		// emits a `<!-- -->` separator, so its binding is flagged `adjacentText`
+		// and the template's hydration walk switches to the hole-aware
+		// child/sibling navigators (which understand separators).
+		const adjKinds = children.map((c) => textAdjacencyKind(c, ctx));
 		// Stack of in-flight fragmentRef bindings: each FragmentStart pushes a
 		// binding (path captured); the matching FragmentEnd pops and patches in
 		// the endPath. Stacked so nested <Fragment ref={…}> pairs cleanly.
@@ -5454,7 +5568,8 @@ function emitElementHtml(
 				break;
 			}
 		}
-		for (const child of children) {
+		for (let childI = 0; childI < children.length; childI++) {
+			const child = children[childI];
 			const prevBaked = prevBakedText;
 			prevBakedText = false;
 			if (child.type === 'FragmentStart') {
@@ -5481,13 +5596,23 @@ function emitElementHtml(
 			}
 			if (child.type === 'Text') {
 				const staticLit = staticTextLiteral(child.expression);
-				if (staticLit !== null && !prevBaked) {
-					// Static literal with no baked-text neighbour → bake into the
-					// template HTML (no binding), occupying one childNode slot just like
-					// the `<!>` it replaces, so sibling `childIndex`es are unchanged.
+				if (staticLit === '') {
+					// Renders nothing: bake nothing and consume no childIndex (an empty
+					// text produces NO node when the template HTML is parsed, so counting
+					// it would desync every later sibling's path). Stays transparent to
+					// text adjacency — the server's ssrEmitNodes skips it the same way.
+					prevBakedText = prevBaked;
+					continue;
+				}
+				if (staticLit !== null) {
+					// Static literal → bake into the template HTML (no binding). When the
+					// PREVIOUS emitted child was also baked text the parser merges the two
+					// into a single DOM text node, so FOLD: emit the text without
+					// consuming a new childIndex — matching the server, which serializes
+					// a static run as one merged chunk with no separator.
 					html += escapeHtml(staticLit);
 					prevBakedText = true;
-					childIdx++;
+					if (!prevBaked) childIdx++;
 				} else if (isKnownStringExpression(child.expression, ctx.knownStringLocals)) {
 					bindings.push({
 						id: bindings.length,
@@ -5496,6 +5621,9 @@ function emitElementHtml(
 						knownString: true,
 						path,
 						childIndex: childIdx,
+						// A text-producing neighbour → the server emits a `<!-- -->`
+						// separator here; the walk must be hole-aware (see hasHoles).
+						adjacentText: hasTextNeighbor(adjKinds, childI),
 					});
 					html += '<!>'; // placeholder we'll replace at mount
 					childIdx++;
