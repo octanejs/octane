@@ -11,10 +11,19 @@ never silently paper over it.
 
 ## Progress (reverse-chronological)
 
-> **Phase 0 — the full pipeline + provider layer landed (2026-07). Green: 25
+> **Phase 1 — all six open questions resolved (2026-07-06): hydration
+> (byte-adoption tests, on top of the two octane gap fixes below), SSR provider
+> context (`@octanejs/mdx/server`), Shiki recipe + integration tests, `.mdx`
+> fast refresh, `.md` default-on + asset-query passthrough, and chained
+> two-stage sourcemaps (machinery landed; composes fully once octane maps
+> return-JSX functions — pinned `it.fails`). Both octane gaps below are fixed
+> (`ssrComponent` host-string tags; server value-lowering of returned
+> fragments), and the adapter is down to ONE fixup. mdx suite: 51 tests.**
+>
+> Phase 0 — the full pipeline + provider layer landed (2026-07). Green: 25
 > tests (compile shape, markdown/GFM/`.md` rendering, embedded `.tsrx`
 > components, provider semantics, frontmatter, SSR renderToString), full
-> monorepo suite 2200 green, typecheck + format clean.**
+> monorepo suite 2200 green, typecheck + format clean.
 
 ## Architecture — compile, don't interpret
 
@@ -25,22 +34,25 @@ exactly the React-style `.tsx` dialect octane's compiler already handles, so:
 
 ```
 .mdx / .md
-  → @mdx-js/mdx compile({ jsx: true, providerImportSource: '@octanejs/mdx', … })   (JSX/ESM source)
-  → recmaOctaneAdapter                                                             (3 small ESTree fixups, below)
-  → octane/compiler compile(source, id, { mode: 'client' | 'server' })             (real octane codegen)
+  → @mdx-js/mdx compile({ jsx: true, SourceMapGenerator, providerImportSource, … })  (JSX/ESM source)
+  → recmaOctaneAdapter                                                               (1 small ESTree fixup, below)
+  → octane/compiler compile(source, id, { mode: 'client' | 'server' })               (real octane codegen)
 ```
+
+(`providerImportSource` defaults per mode: `@octanejs/mdx` client,
+`@octanejs/mdx/server` server — each runtime's own context store.)
 
 What each MDX construct becomes under octane's `.tsx` handling:
 
 - `_createMdxContent(props)` (the document body, `return <>…</>`) — a
   return-JSX function: octane compiles it to the `(props, __s, __extra)` ABI;
   the fragment return value-lowers to an array of `createElement` descriptors
-  (client) / `ssrComponent`+`ssrChild` string building (server). A single-root
-  document lowers to one descriptor.
+  (client) / `ssrChild([...])` over the same descriptor array (server) — one
+  slot range + one block per item, the shape hydration adopts.
 - `<_components.h1>` member tags (markdown elements via the mapping, value
   `"h1"` unless overridden) — component-tagged elements whose runtime value may
-  be a host tag STRING; handled by the client de-opt renderer (and see gap 2
-  for the server).
+  be a host tag STRING; the client de-opt renderer and the server's
+  `ssrComponent`/`ssrChild` both render string comps in the same block shape.
 - `MDXContent` (the default export, `return MDXLayout ? <MDXLayout…> : …`) — a
   passthrough function; its value-position JSX lowers to descriptors, and
   `renderBlock`/`renderComponentFramed` mount/normalize the returned
@@ -58,45 +70,55 @@ What each MDX construct becomes under octane's `.tsx` handling:
   from `octane/compiler/vite` — composes with the octane plugin with no
   ordering hazard (disjoint extensions).
 - `packages/mdx/src/index.ts` — the @mdx-js/react port: `MDXProvider`,
-  `useMDXComponents`, `MDXComponents` types.
+  `useMDXComponents`, `MDXComponents` types (client runtime context).
+- `packages/mdx/src/server.ts` — the same provider layer mirrored onto
+  `octane/server` context for SSR passes (keep merge semantics in lockstep
+  with index.ts).
 
 ## recmaOctaneAdapter — the two-compiler adaptations
 
-All three are small ESTree fixups over MDX's emitted program, each tied to an
-octane gap or ABI difference and revertible:
+Down to ONE small ESTree fixup over MDX's emitted program (an ABI difference,
+not a gap): **rewrite the bare `_createMdxContent(props)` call to
+`<_createMdxContent {...props}/>`.** The direct call bypasses the
+`(props, __s, __extra)` ABI (the server body would run on `__s === undefined`
+scope recovery); as JSX both layout branches mount through the component
+machinery on client and server.
 
-1. **Rename `_createMdxContent` → `MDX$CreateMdxContent`.** octane's JSX
-   lowering treats identifier tags as components only when `/^[A-Z]/` —
-   `<_createMdxContent/>` lowers to a host STRING tag (gap 1 below).
-2. **Rewrite the bare `_createMdxContent(props)` call to
-   `<MDX$CreateMdxContent {...props}/>`.** The direct call bypasses the
-   `(props, __s, __extra)` ABI (the server body would run on `__s === undefined`
-   scope recovery); as JSX both layout branches mount through the component
-   machinery on client and server.
-3. **Server mode only: wrap `_components.*` elements in JSX-child position in
-   expression containers** (`{<_components.h1>…</_components.h1>}`), routing
-   them through the server's VALUE hole (`ssrChild(createElement(…))`), which
-   accepts string tags — `ssrComponent` does not (gap 2 below).
+Former adaptations, dropped as their octane gaps were fixed:
 
-## octane gaps hit (fix in octane, then simplify here)
+- ~~Rename `_createMdxContent` (a `_`-prefixed identifier tag compiled as a
+  host string tag)~~ — fixed in octane: `isComponentTag` classifies `_`/`$`-
+  prefixed identifier tags as component references, per JSX semantics.
+- ~~Server mode: wrap `_components.*` elements in expression containers~~ —
+  fixed in octane (both halves, 2026-07-06): `ssrComponent` renders a
+  host-tag-STRING comp as the `<!--[--><tag>…</tag><!--]-->` block the client's
+  componentSlot/de-opt renderer adopts, and the server compiler value-lowers a
+  RETURNED FRAGMENT through `ssrChild([...])` — the exact per-item block shape
+  (text items included) the client's return-slot childSlot adopts on
+  hydration. Both sides now take the same shape from the same source.
 
-1. **`<_foo/>` / `<$foo/>` identifier tags compile as host string tags.** JSX
-   semantics (Babel, TypeScript): only `/^[a-z]/`-starting identifiers are
-   intrinsics; `_`/`$`-starting identifiers are component references.
-   `isComponentTag` (packages/octane/src/compiler/compile.js) checks
-   `/^[A-Z]/`. Repro: compile `function App() { return <_Inner/>; }` — emits
-   `createElement('_Inner', {})`, renders `<_inner>` (client) / throws
-   `Invalid tag` (server). Fix → drop adaptation 1 (and 2's rename half).
-2. **A member-expression / dynamic component tag resolving to a host tag
-   STRING renders on the client but crashes SSR.** The client lowers
-   `<obj.tag/>` to a `createElement` descriptor and the de-opt renderer
-   accepts `typeof type === 'string'`; the server's template lowering emits
-   `ssrComponent(__s, obj.tag, …)`, which CALLS the tag —
-   `TypeError: comp is not a function`. Repro: server-compile
-   `function App(props) { return <><props.parts.title>hi</props.parts.title></>; }`
-   and `renderToString(App, { parts: { title: 'h1' } })`. Fix (accept strings
-   in `ssrComponent`, or value-lower stringable tags server-side like the
-   client) → drop adaptation 3.
+## octane gaps hit (fixed in octane, simplified here)
+
+1. **FIXED — `<_foo/>` / `<$foo/>` identifier tags compiled as host string
+   tags.** `isComponentTag` now follows JSX semantics (only `/^[a-z]/` is an
+   intrinsic).
+2. **FIXED — a member-expression/dynamic tag resolving to a host tag STRING
+   crashed SSR** (`ssrComponent` called the string). `ssrComponent` now
+   serializes string comps inside the standard component block range (client
+   `componentSlot` routes strings through the de-opt host renderer), so the
+   shape matches across client mount, SSR, and hydration adoption.
+3. **FIXED — a return-JSX component returning a FRAGMENT desynced hydration.**
+   The client value-lowers `return <>…</>` to a descriptor array (return-slot
+   childSlot: one slot range + one `<!--[-->…<!--]-->` block per item); the
+   server's template walk concatenated children with markerless text
+   separators and no slot range — silently duplicating content on hydrate. The
+   server compiler now routes value-position returned fragments through
+   `ssrChild([...])` (compile.js `ssrCompileBody`), byte-aligning both sides.
+4. **OPEN (octane compiler, chip filed) — `compileReturnJsxFunction` emits no
+   sourcemap segments** (map-less `printNode`), so the two-stage .mdx map
+   chain composes to empty for document bodies; the pipeline falls back to
+   octane's intermediate-JSX map. Pinned: `tests/sourcemap.test.ts`
+   (`it.fails`) auto-flips when fixed.
 
 ## API coverage vs @mdx-js/react
 
@@ -133,28 +155,64 @@ Mounted with `@octanejs/testing-library` (dogfooded, workspace dep):
 - `frontmatter.test.ts` — `export const frontmatter` + values in expressions;
   YAML block not rendered.
 - `ssr.test.ts` — server-compiled documents through `octane/server`
-  `renderToString` (the hydration.test.ts eval trick + a provider stub):
-  markdown output, `components` prop server-side, frontmatter server-side.
+  `renderToString` (the eval trick, injecting the REAL `@octanejs/mdx/server`
+  provider): markdown output, `components` prop server-side, server
+  `MDXProvider` across a render pass, provider-route ≡ prop-route payload
+  bytes, frontmatter server-side.
+- `hydration.test.ts` — server-render → `hydrateRoot` adoption: byte-identical
+  DOM (markers included), adopted (not rebuilt) nodes, no console.error, an
+  embedded `.tsrx` Counter interactive post-hydration, prop-mapping and
+  server-provider→client-provider parity, post-hydration re-render.
+- `shiki.test.ts` — the optional `@shikijs/rehype` recipe (devDependency
+  only): highlighted tokens client-side, SSR/client payload parity, hydration
+  adoption of the highlighted tree.
+- `hmr.test.ts` — fast-refresh: emit shape (hmr wrap + self-accept, client
+  serve only) and a live hot-swap through the runtime `hmr()` wrapper.
+- `vite.test.ts` — plugin id claiming: `.md` default-on, `md: false`, asset
+  queries (`?raw`/`?url`/`?inline`) pass through, bookkeeping queries don't.
+- `sourcemap.test.ts` — two-stage map: valid v3 output naming the document;
+  the full chain pinned `it.fails` on octane gap 4.
 
-## Open design questions
+## Open design questions — RESOLVED (2026-07-06)
 
-- **Hydration.** SSR output renders, but client/server block alignment for
-  MDX's descriptor-array bodies is untested — `hydrateRoot` over a
-  server-rendered document is future work (needs gap 2 fixed first so both
-  sides take the same shape).
-- **Provider context across SSR.** `MDXProvider` context is client-only: the
-  `octane` entry is the client runtime, whose context is disjoint from
-  `octane/server`'s. Every octane binding shares this limitation; if a
-  server-condition export (or shared context store) lands, `useMDXComponents`
-  picks it up for free. Until then, pass `components` as a prop for SSR.
-- **Syntax highlighting.** The hook point is `rehypePlugins` (e.g.
-  `@shikijs/rehype` — its hast output serializes through the same pipeline);
-  not bundled by default to keep the dependency surface flat. Worth a
-  documented recipe once a docs site consumes this.
-- **HMR.** `.mdx` edits invalidate the module (no HMR-accept boundary);
-  fast-refresh for documents would need the octane HMR wrapper to cover
-  return-JSX/passthrough components.
-- **`.md` opt-out ergonomics.** `octaneMdx({ md: false })` exists; whether
-  `.md` should default to opt-in (some apps import `.md` as raw text via
-  `?raw`) can be revisited when a consumer hits it — `?raw`/query'd imports
-  are already left alone.
+All six answered; details below for the record.
+
+- **Hydration — DONE.** Gaps 2+3 fixed in octane made client/server take the
+  same shape from the same source; `hydration.test.ts` asserts byte-adoption
+  (`container.innerHTML === html` post-hydrate), node identity, zero
+  console.error, and an interactive embedded Counter. One cosmetic note: a
+  keyless-array `console.warn` fires only when a document RE-RENDERS with a
+  changed mapping (documents are keyless descriptor arrays; index fallback is
+  correct for static content).
+- **Provider context across SSR — DONE via `@octanejs/mdx/server`.** No
+  cross-runtime bridge needed: the server runtime has full context support
+  (`scope.$$ctxValues`, top-down within a pass), so the ~40-line provider
+  layer is mirrored onto `octane/server` context and server-mode documents
+  default `providerImportSource` to `@octanejs/mdx/server`. The server
+  provider threads the mapping across `renderToString`, serializes the same
+  payload as the `components` prop route, and hydrates byte-for-byte into the
+  client `MDXProvider`. The two layers must stay in lockstep (noted in both
+  files). The `components` prop remains the runtime-agnostic route.
+- **Syntax highlighting — DONE as a recipe.** `@shikijs/rehype` through
+  `rehypePlugins` (README recipe + `shiki.test.ts`); devDependency only,
+  nothing bundled. Async plugin ⇒ `compileMdx`/the vite plugin, not
+  `compileMdxSync`.
+- **HMR — DONE.** octane's runtime `hmr()` wrapper handles return-based
+  components fine; the octane COMPILER only auto-wraps exported `@{}`-form
+  components, and MDX's `MDXContent` (ternary-returning passthrough) isn't
+  recognized as one. The pipeline knows its own emitted shape, so it appends
+  the identical registration itself (wrap default export + self-accept) for
+  client+hmr compiles — `.mdx` edits now re-render live mounts in place.
+- **`.md` default-on — KEPT.** Docs trees want plain markdown compiled;
+  `md: false` opts out wholesale. The "left alone" claim for query'd imports
+  was WRONG (the transform stripped the query before matching) — fixed:
+  asset queries (`?raw`, `?url`, `?inline`, workers) now pass through
+  untouched (vite's asset plugin owns them), while vite-internal bookkeeping
+  queries (`?v=`, `?used`, `?import`) still transform. Tested.
+- **Sourcemaps — machinery DONE, full fidelity blocked on octane gap 4.**
+  @mdx-js/mdx emits stage-one (via `source-map`'s `SourceMapGenerator`);
+  octane emits stage-two; `@jridgewell/remapping` composes. Today the chain
+  is empty for real documents (gap 4), so the pipeline keeps octane's
+  intermediate-JSX map as the fallback; the chained path activates by itself
+  (guarded on non-empty mappings) once octane maps return-JSX functions —
+  chip filed, `it.fails` pinned.

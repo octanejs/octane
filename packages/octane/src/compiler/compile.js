@@ -1716,7 +1716,24 @@ function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html')
 				// return-JSX form: the returned host element (+ its directive children) is
 				// the render output — route it to jsxNodes so it flows through ssrEmitNode
 				// (byte-identical SSR to the `@{}` form), not printed as `return <jsx>`.
-				jsxNodes.push(child.argument);
+				// EXCEPT a returned FRAGMENT: the client VALUE-lowers `return <>…</>` to an
+				// array of createElement descriptors (rewriteJsxValues), mounted by the
+				// return-slot childSlot — whose hydration adopts ONE `<!--[-->…<!--]-->`
+				// range for the slot plus one range PER ITEM (including text items). The
+				// template walk would instead concatenate children with markerless text
+				// separators and no slot range, desyncing the hydration cursor. Route the
+				// whole fragment through the same value hole (`ssrChild(loweredArray)`) so
+				// the runtime's ssrChild array branch emits the exact per-item shape the
+				// client adopts.
+				if (child.argument.type === 'JSXFragment' || child.argument.type === 'Fragment') {
+					jsxNodes.push({
+						type: 'TSRXExpression',
+						expression: child.argument,
+						loc: child.argument.loc,
+					});
+				} else {
+					jsxNodes.push(child.argument);
+				}
 			} else if (isJsxNode(child)) {
 				if (child.type === 'Element' && elementTagName(child) === 'style') continue;
 				jsxNodes.push(child);

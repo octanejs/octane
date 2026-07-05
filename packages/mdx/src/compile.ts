@@ -17,30 +17,24 @@
  * @mdx-js/react's provider).
  *
  * The only adaptation between the two compilers is `recmaOctaneAdapter`, a tiny
- * ESTree pass over MDX's output:
+ * ESTree pass over MDX's output: MDX's no-layout branch CALLS
+ * `_createMdxContent(props)` directly, which bypasses octane's
+ * `(props, __s, __extra)` component ABI (the server body would run with
+ * `__s === undefined` and lean on scope-recovery). The pass rewrites the bare
+ * call to `<_createMdxContent {...props}/>` so both branches mount through the
+ * component machinery on client AND server. (The layout branch's
+ * `<_createMdxContent {...props}/>` tag needs no help: octane classifies
+ * `_`-starting identifier tags as component references, per JSX semantics.)
  *
- *  1. MDX's no-layout branch CALLS `_createMdxContent(props)` directly, which
- *     bypasses octane's `(props, __s, __extra)` component ABI (the server body
- *     would run with `__s === undefined` and lean on scope-recovery). The pass
- *     rewrites the bare call to `<_createMdxContent {...props}/>` so both
- *     branches mount through the component machinery on client AND server.
- *     (The layout branch's `<_createMdxContent {...props}/>` tag needs no help:
- *     octane classifies `_`-starting identifier tags as component references,
- *     per JSX semantics.)
- *  2. SERVER mode only: MDX renders markdown elements through its components
- *     mapping — `<_components.h1>` — whose value is a host tag STRING unless
- *     overridden. octane's CLIENT lowering of a member-expression tag is a
- *     `createElement` descriptor, which the runtime's de-opt renderer accepts
- *     for strings; the SERVER's template lowering routes it to
- *     `ssrComponent(scope, comp, …)`, which CALLS `comp` — a string crashes
- *     (an octane compiler/server-runtime gap: member/dynamic tags resolving to
- *     host tag strings work on the client, not in SSR). The pass wraps every
- *     `_components.*`-tagged element in JSX-child position in an expression
- *     container (`{<_components.h1>…</_components.h1>}`) so the server codegen
- *     treats it as a VALUE hole — `ssrChild(createElement(…))` — which handles
- *     string tags. Client output is left untouched; drop this once
- *     `ssrComponent` (or the server lowering) accepts host tag strings.
+ * The two former SERVER-mode fixups are gone — their octane gaps are fixed:
+ * `ssrComponent` renders a host-tag-STRING comp as a
+ * `<!--[--><tag>…</tag><!--]-->` block (the shape the client's componentSlot /
+ * de-opt host renderer adopts on hydration), and the server compiler
+ * value-lowers a returned fragment through `ssrChild([...])` exactly like the
+ * client's descriptor array — so `<_components.h1>` member tags and the
+ * document's fragment body take the SAME shape on both sides (hydration-safe).
  */
+import remapping from '@jridgewell/remapping';
 import {
 	compile as mdxCompile,
 	compileSync as mdxCompileSync,
@@ -50,6 +44,7 @@ import { compile as octaneCompile } from 'octane/compiler';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 import remarkMdxFrontmatter from 'remark-mdx-frontmatter';
+import { SourceMapGenerator } from 'source-map';
 
 export interface CompileMdxResult {
 	code: string;
@@ -65,8 +60,10 @@ export interface CompileMdxOptions {
 	dev?: boolean;
 	/**
 	 * Module the emitted document reads the provider mapping from
-	 * (`useMDXComponents`). Defaults to `'@octanejs/mdx'`; pass `null` to
-	 * disable the provider wiring entirely (only `props.components` applies).
+	 * (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /
+	 * `'@octanejs/mdx/server'` (server), so each runtime reads ITS OWN context
+	 * store (they are disjoint; see src/server.ts). Pass `null` to disable the
+	 * provider wiring entirely (only `props.components` applies).
 	 */
 	providerImportSource?: string | null;
 	/** remark plugins. Defaults to `defaultRemarkPlugins` (GFM + frontmatter + frontmatter-export). */
@@ -88,6 +85,7 @@ export interface CompileMdxOptions {
 		| 'rehypePlugins'
 		| 'recmaPlugins'
 		| 'format'
+		| 'SourceMapGenerator'
 	>;
 }
 
@@ -109,7 +107,7 @@ export async function compileMdx(
 	options: CompileMdxOptions = {},
 ): Promise<CompileMdxResult> {
 	const out = await mdxCompile({ value: source, path: id }, buildMdxOptions(id, options));
-	return octaneStage(String(out.value), id, options);
+	return octaneStage(String(out.value), out.map, id, options);
 }
 
 /** Synchronous {@link compileMdx} (the default plugin set is fully sync). */
@@ -119,7 +117,7 @@ export function compileMdxSync(
 	options: CompileMdxOptions = {},
 ): CompileMdxResult {
 	const out = mdxCompileSync({ value: source, path: id }, buildMdxOptions(id, options));
-	return octaneStage(String(out.value), id, options);
+	return octaneStage(String(out.value), out.map, id, options);
 }
 
 function buildMdxOptions(id: string, options: CompileMdxOptions): CompileOptions {
@@ -130,33 +128,79 @@ function buildMdxOptions(id: string, options: CompileMdxOptions): CompileOptions
 				? 'md'
 				: 'mdx';
 	const provider =
-		options.providerImportSource === undefined ? '@octanejs/mdx' : options.providerImportSource;
+		options.providerImportSource === undefined
+			? options.mode === 'server'
+				? '@octanejs/mdx/server'
+				: '@octanejs/mdx'
+			: options.providerImportSource;
 	return {
 		...options.mdxOptions,
 		format,
 		// The load-bearing switch: emit JSX SOURCE (no jsx-runtime calls), which
 		// octane's compiler lowers to its own codegen.
 		jsx: true,
+		// Map the intermediate JSX back to the .mdx source — stage one of the
+		// chained map octaneStage composes (stage two is octane's own map).
+		SourceMapGenerator,
 		...(provider === null ? {} : { providerImportSource: provider }),
 		remarkPlugins: options.remarkPlugins ?? defaultRemarkPlugins,
 		rehypePlugins: options.rehypePlugins,
-		recmaPlugins: [
-			...(options.recmaPlugins ?? []),
-			[recmaOctaneAdapter, { mode: options.mode ?? 'client' }],
-		],
+		recmaPlugins: [...(options.recmaPlugins ?? []), recmaOctaneAdapter],
 	};
 }
 
-function octaneStage(jsxSource: string, id: string, options: CompileMdxOptions): CompileMdxResult {
+function octaneStage(
+	jsxSource: string,
+	mdxMap: unknown,
+	id: string,
+	options: CompileMdxOptions,
+): CompileMdxResult {
 	const mode = options.mode ?? 'client';
-	// NOTE on sourcemaps: octane's map references the INTERMEDIATE JSX text, not
-	// the original .mdx — a faithful two-stage chain is future work. The map is
-	// still returned so line-ish positions survive into the bundle.
-	return octaneCompile(jsxSource, id, {
+	const out = octaneCompile(jsxSource, id, {
 		mode,
 		hmr: mode === 'client' && !!options.hmr,
 		dev: mode === 'client' && !!options.dev,
 	});
+	// Two-stage sourcemap: octane's map targets the INTERMEDIATE JSX text;
+	// @mdx-js/mdx's map (via SourceMapGenerator) targets the original .mdx.
+	// Compose them (most-recent-first) so generated positions trace all the way
+	// back to the document.
+	//
+	// GAP (octane compiler): today the chain composes to an EMPTY map for real
+	// documents — octane's `compileReturnJsxFunction` prints its output with
+	// the map-less `printNode` (no esrap segments), and the MDX body
+	// (`_createMdxContent`) is exactly that shape, so octane has no segments on
+	// the one intermediate line the mdx map covers (the document content) and
+	// remapping drops everything. Until that emits real segments, an empty
+	// chain falls back to octane's intermediate map (its `sourcesContent` is
+	// the intermediate JSX — still steppable in devtools, unlike a blank map).
+	// The octane SERVER compile emits an empty-mappings map by design (SSR maps
+	// are a later octane refinement).
+	if (out.map && mdxMap) {
+		const chained = remapping([out.map as any, mdxMap as any], () => null);
+		if (String(chained.mappings).length > 0) out.map = chained;
+	}
+	// Fast refresh for documents: octane's compiler only auto-wraps EXPORTED
+	// `@{}`-form components in `hmr(...)` — `MDXContent` (a passthrough function
+	// returning a ternary of descriptors) isn't recognized as one, so the octane
+	// `hmr` flag alone leaves `.mdx` edits as full module invalidations. The
+	// PIPELINE knows the emitted shape, so it appends the exact registration the
+	// octane compiler emits for `.tsrx` exports: wrap the default export in the
+	// runtime `hmr()` (identity-stable across edits — parents keep their mounted
+	// wrapper) + a self-accepting `import.meta.hot` block that swaps the body
+	// and re-renders live blocks in place. Appending after the fact keeps the
+	// source map's earlier segments valid (ESM imports hoist).
+	if (mode === 'client' && options.hmr && /\bexport default function MDXContent\b/.test(out.code)) {
+		out.code +=
+			"\nimport { hmr as _$mdxHmr, HMR as _$mdxHMR } from 'octane';\n" +
+			'MDXContent = _$mdxHmr(MDXContent);\n' +
+			'if (import.meta.hot) {\n' +
+			'  import.meta.hot.accept((module) => {\n' +
+			'    module && MDXContent[_$mdxHMR].update(module.default);\n' +
+			'  });\n' +
+			'}\n';
+	}
+	return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -165,10 +209,9 @@ function octaneStage(jsxSource: string, id: string, options: CompileMdxOptions):
 
 const MDX_BODY_NAME = '_createMdxContent';
 
-function recmaOctaneAdapter(options?: { mode?: 'client' | 'server' }) {
-	const server = options?.mode === 'server';
+function recmaOctaneAdapter() {
 	return (tree: unknown): void => {
-		walkReplace(tree as EstreeNode, (node) => adaptNode(node, server));
+		walkReplace(tree as EstreeNode, adaptNode);
 	};
 }
 
@@ -182,8 +225,8 @@ function isNode(value: unknown): value is EstreeNode {
 
 // Visit `node` (post-decision, pre-recursion): return a replacement node to
 // swap in (recursed into by the caller), or null to keep the node and recurse.
-function adaptNode(node: EstreeNode, server: boolean): EstreeNode | null {
-	// (1) `_createMdxContent(props)` → `<_createMdxContent {...props}/>`.
+function adaptNode(node: EstreeNode): EstreeNode | null {
+	// `_createMdxContent(props)` → `<_createMdxContent {...props}/>`.
 	if (
 		node.type === 'CallExpression' &&
 		isNode(node.callee) &&
@@ -195,53 +238,7 @@ function adaptNode(node: EstreeNode, server: boolean): EstreeNode | null {
 	) {
 		return jsxSelfClosing(MDX_BODY_NAME, (node.arguments[0] as EstreeNode) ?? null);
 	}
-	if (server) {
-		// (2) `_components.*` elements in JSX-CHILD position → `{<element/>}`
-		// expression holes (see module doc). Wrapping edits the PARENT's children
-		// array, so an already-wrapped element (now behind an expression
-		// container) is never re-wrapped.
-		if (
-			(node.type === 'JSXElement' || node.type === 'JSXFragment') &&
-			Array.isArray(node.children)
-		) {
-			const children = node.children as unknown[];
-			for (let i = 0; i < children.length; i++) {
-				const child = children[i];
-				if (isNode(child) && isComponentsMappedElement(child)) {
-					children[i] = { type: 'JSXExpressionContainer', expression: child };
-				}
-			}
-		}
-		// A `return <_components.p>…</_components.p>` (single-block document) has
-		// no JSX parent to wrap under — hoist it into a fragment-with-hole.
-		if (
-			node.type === 'ReturnStatement' &&
-			isNode(node.argument) &&
-			isComponentsMappedElement(node.argument)
-		) {
-			node.argument = {
-				type: 'JSXFragment',
-				openingFragment: { type: 'JSXOpeningFragment', attributes: [], selfClosing: false },
-				closingFragment: { type: 'JSXClosingFragment' },
-				children: [{ type: 'JSXExpressionContainer', expression: node.argument }],
-			};
-		}
-	}
 	return null;
-}
-
-// `<_components.x …>` — an element whose tag reads off MDX's components
-// mapping (and can therefore be a host tag STRING at runtime).
-function isComponentsMappedElement(node: EstreeNode): boolean {
-	if (node.type !== 'JSXElement') return false;
-	const name = (node.openingElement as EstreeNode | undefined)?.name as EstreeNode | undefined;
-	return (
-		!!name &&
-		name.type === 'JSXMemberExpression' &&
-		isNode(name.object) &&
-		name.object.type === 'JSXIdentifier' &&
-		name.object.name === '_components'
-	);
 }
 
 // Depth-first walk that can REPLACE child nodes in place (arrays and single
