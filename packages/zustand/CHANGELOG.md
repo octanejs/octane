@@ -1,5 +1,31 @@
 # @octanejs/zustand
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [71b5167]
+- Updated dependencies [7b2acbd]
+- Updated dependencies [a000fa2]
+- Updated dependencies [71b5167]
+- Updated dependencies [735f5ca]
+- Updated dependencies [634c4b4]
+- Updated dependencies [1987d47]
+- Updated dependencies [fda2200]
+- Updated dependencies [71b5167]
+- Updated dependencies [fda2200]
+- Updated dependencies [3431ec3]
+- Updated dependencies [3afe217]
+- Updated dependencies [1a1f1db]
+- Updated dependencies [3431ec3]
+- Updated dependencies [5e3858f]
+- Updated dependencies [d2afbbb]
+- Updated dependencies [1987d47]
+- Updated dependencies [eb48930]
+- Updated dependencies [3431ec3]
+- Updated dependencies [87c5bc3]
+  - octane@0.1.3
+
 ## 0.1.1
 
 ### Patch Changes

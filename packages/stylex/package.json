@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/stylex",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "description": "StyleX bindings for the octane renderer — reuses StyleX's framework-agnostic compiler core and routes the generated atomic CSS through octane's stylesheet channel (client dedupe + SSR render().css).",
