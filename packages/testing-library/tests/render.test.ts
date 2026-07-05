@@ -17,10 +17,9 @@ describe('render', () => {
 	// Per react-testing-library src/__tests__/render.js:28 ("renders div into document")
 	it('renders a host element into the document', () => {
 		const { container } = render(createElement('div', { id: 'whatever' }, 'hello'));
-		// DIVERGENCE (documented in the README): a host descriptor at the root
-		// renders through octane's value-position path, which brackets it with
-		// comment anchors — so it's `firstElementChild`, not RTL's `firstChild`.
-		expect(container.firstElementChild!.id).toBe('whatever');
+		// A lone host descriptor at the root renders ANCHORLESS (no comment
+		// markers), so RTL's ubiquitous `container.firstChild` idiom holds.
+		expect((container.firstChild as HTMLElement).id).toBe('whatever');
 		expect(container.textContent).toBe('hello');
 		expect(document.body.contains(container)).toBe(true);
 	});
