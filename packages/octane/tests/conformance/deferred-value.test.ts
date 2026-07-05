@@ -114,34 +114,27 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 		r.unmount();
 	});
 
-	it.fails(
-		"works if there's a render phase update (does not defer during a transition)",
-		async () => {
-			// Per ReactDeferredValue-test.js:232 — the same component updated inside
-			// a TRANSITION must commit Original and Deferred in the SAME pass ("if it
-			// updates during a transition, it doesn't defer").
-			//
-			// GAP: a render-phase setState in octane schedules a plain (urgent)
-			// re-render instead of inheriting the in-progress render's transition
-			// priority (React render-phase updates inherit the current render lanes).
-			// The replayed body therefore sees currentRenderMode !== 'transition' and
-			// defers, committing the deferred value one microtask later. The direct
-			// (non-render-phase) shape has no such gap — see the :108 port above.
-			let setValue!: (v: number) => void;
-			const r = mount(RenderPhaseDeferredHost, { expose: (s: any) => (setValue = s) });
-			await act(() => {});
-			expect(r.find('#deferred').textContent).toBe('Deferred: 1');
+	it("works if there's a render phase update (does not defer during a transition)", async () => {
+		// Per ReactDeferredValue-test.js:232 — the same component updated inside
+		// a TRANSITION must commit Original and Deferred in the SAME pass ("if it
+		// updates during a transition, it doesn't defer"). The render-phase
+		// setState replay inherits the in-progress render's transition priority
+		// (scheduleRender's render-phase self-update path), so the replayed body
+		// sees currentRenderMode === 'transition' and commits directly.
+		let setValue!: (v: number) => void;
+		const r = mount(RenderPhaseDeferredHost, { expose: (s: any) => (setValue = s) });
+		await act(() => {});
+		expect(r.find('#deferred').textContent).toBe('Deferred: 1');
 
-			flushSync(() => startTransition(() => setValue(2)));
-			const original = r.find('#original').textContent;
-			const deferred = r.find('#deferred').textContent;
-			await act(() => {});
-			r.unmount();
-			expect(original).toBe('Original: 2');
-			// React commits the deferred value in the same render as the original.
-			expect(deferred).toBe('Deferred: 2');
-		},
-	);
+		flushSync(() => startTransition(() => setValue(2)));
+		const original = r.find('#original').textContent;
+		const deferred = r.find('#deferred').textContent;
+		await act(() => {});
+		r.unmount();
+		expect(original).toBe('Original: 2');
+		// React commits the deferred value in the same render as the original.
+		expect(deferred).toBe('Deferred: 2');
+	});
 
 	it('regression test: during urgent update, reuse previous value, not initial value', async () => {
 		// Per ReactDeferredValue-test.js:298 — after a TRANSITION commit moved the
@@ -152,10 +145,8 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 		await act(() => {});
 		expect(r.find('#deferred').textContent).toBe('Deferred: 1');
 
-		// Non-urgent update. (React commits both in one pass; octane's
-		// render-phase-update transition gap — pinned in the :232 it.fails above —
-		// adds a microtask before the deferred value lands, so settle with act()
-		// before the step this regression test actually targets.)
+		// Non-urgent update: both values commit in one pass (the render-phase
+		// replay inherits the transition priority — see the :232 port above).
 		flushSync(() => startTransition(() => setValue(2)));
 		expect(r.find('#original').textContent).toBe('Original: 2');
 		await act(() => {});
@@ -219,35 +210,24 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 		r.unmount();
 	});
 
-	it.fails(
-		'if there are multiple useDeferredValues in the same tree, only the first level defers; subsequent ones go straight to the final value, to avoid a waterfall',
-		async () => {
-			// Per ReactDeferredValue-test.js:564 — a useDeferredValue hook MOUNTED
-			// inside the spawned deferred render must skip its own preview state and
-			// go straight to the final value (React intentionally differs from nested
-			// Suspense here: the OUTER preview already covered the loading state).
-			//
-			// GAP: octane's useDeferredValue mount path always returns initialValue
-			// and spawns its own deferred swap — it does not know it is rendering
-			// inside an already-spawned deferred pass (there is no "deferred lane"
-			// bit on the render, only the transition flag, and mount ignores both).
-			// So the inner hook renders 'Content Preview' first: a preview waterfall
-			// React avoids. Fix hypothesis: thread an "is deferred render" flag from
-			// the useDeferredValue-spawned startTransition(scheduleRender) into
-			// mount-with-initialValue (and reveal-from-hidden), committing the final
-			// value directly there.
-			const log = createLog();
-			const r = mount(WaterfallApp, { log: log.push });
-			expect(r.find('#app-preview').textContent).toBe('App Preview');
-			await act(() => {});
-			const entries = log.drain();
-			const finalHtml = r.find('#content').textContent;
-			r.unmount();
-			expect(finalHtml).toBe('Content');
-			// React never renders the inner preview — this is the failing assertion.
-			expect(entries).not.toContain('render:Content Preview');
-		},
-	);
+	it('if there are multiple useDeferredValues in the same tree, only the first level defers; subsequent ones go straight to the final value, to avoid a waterfall', async () => {
+		// Per ReactDeferredValue-test.js:564 — a useDeferredValue hook MOUNTED
+		// inside the spawned deferred render must skip its own preview state and
+		// go straight to the final value (React intentionally differs from nested
+		// Suspense here: the OUTER preview already covered the loading state).
+		// The spawned swap tags its pass with the "deferred lane" bit
+		// (Block.currentRenderDeferred), which the mount path reads.
+		const log = createLog();
+		const r = mount(WaterfallApp, { log: log.push });
+		expect(r.find('#app-preview').textContent).toBe('App Preview');
+		await act(() => {});
+		const entries = log.drain();
+		const finalHtml = r.find('#content').textContent;
+		r.unmount();
+		expect(finalHtml).toBe('Content');
+		// React never renders the inner preview.
+		expect(entries).not.toContain('render:Content Preview');
+	});
 
 	it("regression: useDeferredValue's initial value argument works even if an unrelated transition is suspended", async () => {
 		// Per ReactDeferredValue-test.js:611 — while screen A's final value is
@@ -274,18 +254,11 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 		r.unmount();
 	});
 
-	it.fails('useDeferredValue can prerender the initial value inside a hidden tree', async () => {
+	it('useDeferredValue can prerender the initial value inside a hidden tree', async () => {
 		// Per ReactDeferredValue-test.js:746 — updating a HIDDEN prerendered tree
-		// should switch to prerendering the NEW preview state (revealing a hidden
-		// tree is treated like a fresh mount, so the preview must exist).
-		//
-		// GAP: octane's useDeferredValue slot is oblivious to Activity visibility.
-		// An update while hidden takes the steady-state path: it returns the
-		// previous committed value ('A'), then swaps straight to the final value
-		// ('B') on the deferred microtask — the new preview state is never
-		// rendered. Fix hypothesis: when the owning block is inside a hidden
-		// Activity subtree, treat a changed value like a fresh mount (render
-		// initialValue, then spawn the swap).
+		// switches to prerendering the NEW preview state (revealing a hidden tree
+		// is treated like a fresh mount, so the preview must exist). A changed
+		// value while inside a hidden subtree re-runs mount semantics.
 		const log = createLog();
 		const r = mount(ActivityDeferredContainer, { text: 'A', shouldShow: false, log: log.push });
 		await act(() => {});
@@ -317,58 +290,43 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 		r.unmount();
 	});
 
-	it.fails(
-		'useDeferredValue does not skip the preview state when revealing a hidden tree if the final value is different from the currently rendered one',
-		async () => {
-			// Per ReactDeferredValue-test.js:848 — revealing with a DIFFERENT value
-			// cannot bail: React treats the reveal as a fresh mount and shows the
-			// preview state first, then the final value.
-			//
-			// GAP: same root cause as the hidden-prerender case — octane's slot
-			// ignores the hidden→visible transition and takes the steady-state defer
-			// path, briefly showing the PREVIOUS committed value ('A') instead of the
-			// new preview ('Preview [B]').
-			const log = createLog();
-			const r = mount(ActivityDeferredContainer, { text: 'A', shouldShow: false, log: log.push });
-			await act(() => {});
-			log.clear();
+	it('useDeferredValue does not skip the preview state when revealing a hidden tree if the final value is different from the currently rendered one', async () => {
+		// Per ReactDeferredValue-test.js:848 — revealing with a DIFFERENT value
+		// cannot bail: React treats the reveal as a fresh mount and shows the
+		// preview state first, then the final value.
+		const log = createLog();
+		const r = mount(ActivityDeferredContainer, { text: 'A', shouldShow: false, log: log.push });
+		await act(() => {});
+		log.clear();
 
-			r.update(ActivityDeferredContainer, { text: 'B', shouldShow: true, log: log.push });
-			const intermediate = r.find('#app').textContent;
-			await act(() => {});
-			const finalText = r.find('#app').textContent;
-			r.unmount();
-			expect(finalText).toBe('B');
-			// React first commits the preview state — this is the failing assertion.
-			expect(intermediate).toBe('Preview [B]');
-		},
-	);
+		r.update(ActivityDeferredContainer, { text: 'B', shouldShow: true, log: log.push });
+		const intermediate = r.find('#app').textContent;
+		await act(() => {});
+		const finalText = r.find('#app').textContent;
+		r.unmount();
+		expect(finalText).toBe('B');
+		// React first commits the preview state.
+		expect(intermediate).toBe('Preview [B]');
+	});
 
-	it.fails(
-		'useDeferredValue does not show "previous" value when revealing a hidden tree (no initial value)',
-		async () => {
-			// Per ReactDeferredValue-test.js:894 — updating and revealing a hidden
-			// tree in the same (sync) update must show the NEW value immediately:
-			// conceptually this is a new tree, so there is no "previous" value to
-			// defer to.
-			//
-			// GAP: octane's slot keeps the hidden tree's committed value and defers
-			// the urgent update as usual, so 'A' flashes before the microtask commits
-			// 'B'. Fix hypothesis: reveal-from-hidden (like mount) should adopt the
-			// incoming value directly.
-			const log = createLog();
-			const r = mount(ActivityNoInitialContainer, { text: 'A', shouldShow: false, log: log.push });
-			await act(() => {});
-			expect(log.drain()).toEqual(['render:A']);
+	it('useDeferredValue does not show "previous" value when revealing a hidden tree (no initial value)', async () => {
+		// Per ReactDeferredValue-test.js:894 — updating and revealing a hidden
+		// tree in the same (sync) update must show the NEW value immediately:
+		// conceptually this is a new tree, so there is no "previous" value to
+		// defer to. Reveal-from-hidden (like mount) adopts the incoming value
+		// directly when there is no initialValue.
+		const log = createLog();
+		const r = mount(ActivityNoInitialContainer, { text: 'A', shouldShow: false, log: log.push });
+		await act(() => {});
+		expect(log.drain()).toEqual(['render:A']);
 
-			r.update(ActivityNoInitialContainer, { text: 'B', shouldShow: true, log: log.push });
-			const intermediate = r.find('#app').textContent;
-			await act(() => {});
-			r.unmount();
-			// React commits B in the same sync update.
-			expect(intermediate).toBe('B');
-		},
-	);
+		r.update(ActivityNoInitialContainer, { text: 'B', shouldShow: true, log: log.push });
+		const intermediate = r.find('#app').textContent;
+		await act(() => {});
+		r.unmount();
+		// React commits B in the same sync update.
+		expect(intermediate).toBe('B');
+	});
 });
 
 // ============================================================================
@@ -378,10 +336,9 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 //   :171 "does not defer during a transition" — COVERED-BY-EXISTING:
 //        transitions.test.ts:361 ('useDeferredValue does NOT defer when called
 //        during a transition render') + suspense.test.ts:425 (urgent deferral).
-//   :232 "works if there's a render phase update" — PORTED as two tests: the
-//        urgent path passes; the no-defer-during-transition half is it.fails
-//        (// GAP: render-phase setState re-renders urgently instead of
-//        inheriting the in-progress transition priority).
+//   :232 "works if there's a render phase update" — PORTED as two tests
+//        (urgent path + no-defer-during-transition; both pass — render-phase
+//        setState inherits the in-progress render's priority).
 //   :298 "regression test: during urgent update, reuse previous value, not
 //        initial value" — PORTED (passes).
 //   :374 "supports initialValue argument" — PORTED (passes).
@@ -399,23 +356,25 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 //        Suspense boundary (see :407), and choosing between two parked
 //        in-flight renders is time-slicing choreography; octane's deferred
 //        swap supersedes the initial value as soon as its microtask runs.
-//   :564 "only the first level defers…" — PORTED as it.fails (// GAP: no
-//        "deferred render" bit; mount always shows initialValue → waterfall).
+//   :564 "only the first level defers…" — PORTED (passes; the spawned swap
+//        tags its pass with Block.currentRenderDeferred and the mount path
+//        adopts the final value directly inside such a pass).
 //   :611 "initial value argument works even if an unrelated transition is
 //        suspended" — PORTED (passes).
 //   :653 "avoids a useDeferredValue waterfall when separated by a Suspense
-//        boundary" — same single gap as :564 (the first-level-only skip);
-//        subsumed by the :564 it.fails pin, not separately ported.
+//        boundary" — same single behavior as :564 (the first-level-only
+//        skip); subsumed by the :564 port, not separately ported.
 //   :699 "can spawn a deferred task while prerendering a hidden tree" — N/A:
 //        depends on Suspense pre-warming inside a hidden prerender (offscreen
 //        lanes); the non-suspending halves are pinned by the :746/:808 ports.
-//   :746 "can prerender the initial value inside a hidden tree" — PORTED as
-//        it.fails (// GAP: hidden-tree update doesn't re-show the preview).
+//   :746 "can prerender the initial value inside a hidden tree" — PORTED
+//        (passes; a changed value inside a hidden subtree re-runs mount
+//        semantics for the slot).
 //   :808 "skips the preview state when revealing a hidden tree if the final
 //        value is referentially identical" — PORTED (passes).
 //   :848 "does not skip the preview state when revealing a hidden tree if the
-//        final value is different" — PORTED as it.fails (// GAP: reveal is not
-//        treated as a fresh mount; previous value flashes).
+//        final value is different" — PORTED (passes; reveal-from-hidden is
+//        treated as a fresh mount for the slot).
 //   :894 "does not show 'previous' value when revealing a hidden tree (no
-//        initial value)" — PORTED as it.fails (// GAP: same reveal root cause).
+//        initial value)" — PORTED (passes; same fresh-mount reveal rule).
 // ============================================================================
