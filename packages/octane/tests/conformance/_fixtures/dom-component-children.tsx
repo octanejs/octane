@@ -46,6 +46,13 @@ export function ChildrenPlusDanger(props: { on: boolean }) {
 	});
 }
 
+// dangerouslySetInnerHTML on a VOID host via the de-opt descriptor path — the
+// compile-time void guard can't see this shape (or a spread-supplied dSIH);
+// runtime setAttribute's danger arm throws (Per ReactDOMComponent-test.js:1807).
+export function VoidDeoptDanger(props: { h: string }) {
+	return createElement('input', { id: 'vdd', dangerouslySetInnerHTML: { __html: props.h } });
+}
+
 // Invalid tag names — document.createElement must reject these natively.
 export function BadTag(props: { tag: string }) {
 	return createElement(props.tag);
