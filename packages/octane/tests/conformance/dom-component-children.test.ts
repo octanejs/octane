@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { compile } from 'octane/compiler';
 import { mount } from '../_helpers';
 import { DangerValue, TextHole, PlainDiv } from './_fixtures/dom-component-children.tsrx';
 import {
@@ -6,6 +7,7 @@ import {
 	NestedDeoptContent,
 	MalformedDanger,
 	ChildrenPlusDanger,
+	VoidDeoptDanger,
 	BadTag,
 } from './_fixtures/dom-component-children.tsx';
 
@@ -179,26 +181,29 @@ describe('ReactDOMComponent — dangerouslySetInnerHTML validation', () => {
 
 describe('ReactDOMComponent — void elements', () => {
 	// Per ReactDOMComponent-test.js:1794 — should throw on children for void elements
-	// (also accounts :1932 — class-component duplicate — and :2038 — the update-path variant)
-	// GAP: React throws "input is a void element tag and must neither have
-	// `children` nor use `dangerouslySetInnerHTML`"; octane's template compiler
-	// emits `<input>children</input>` into the template HTML and the parser
-	// silently DROPS the text (verified: DOM is a bare `<input>`) — no error.
-	// Location: compiler (compile.js VOID_ELEMENTS — only used to decide
-	// self-closing, never to reject children).
-	it.fails('throws for children on a void element', async () => {
-		const mod = await import('./_fixtures/dom-component-void.tsrx');
-		expect(() => mount(mod.VoidChildren)).toThrow();
+	// (also accounts :1932 — class-component duplicate — and :2038 — the update-path
+	// variant). React rejects at render time; octane's templates are static, so the
+	// same authoring error is rejected at COMPILE time (both client and server
+	// emit), before it can silently drop the children out of `<input>…</input>`.
+	it('rejects children on a void element at compile time', () => {
+		const src = `export function VoidChildren() @{ <input id="vc">{'children'}</input> }`;
+		expect(() => compile(src, 'void-children.tsrx')).toThrow(/void element/);
+		expect(() => compile(src, 'void-children.tsrx', { mode: 'server' })).toThrow(/void element/);
 	});
 
-	// Per ReactDOMComponent-test.js:1807 — should throw on dangerouslySetInnerHTML for void elements
-	// (also accounts :2053 — the update-path variant)
-	// GAP: React throws; octane's htmlOnlyChild fast path assigns
-	// `input.innerHTML` (invisible content), silently. Same compiler/runtime
-	// void-element validation gap as above.
-	it.fails('throws for dangerouslySetInnerHTML on a void element', async () => {
-		const mod = await import('./_fixtures/dom-component-void.tsrx');
-		expect(() => mount(mod.VoidDanger, { h: 'content' })).toThrow();
+	// Per ReactDOMComponent-test.js:1807 — should throw on dangerouslySetInnerHTML for
+	// void elements (also accounts :2053 — the update-path variant).
+	it('rejects dangerouslySetInnerHTML on a void element at compile time', () => {
+		const src = `export function VoidDanger(props) @{ <input id="vd" dangerouslySetInnerHTML={{ __html: props.h }} /> }`;
+		expect(() => compile(src, 'void-danger.tsrx')).toThrow(/void element/);
+		expect(() => compile(src, 'void-danger.tsrx', { mode: 'server' })).toThrow(/void element/);
+	});
+
+	// Per ReactDOMComponent-test.js:1807 — the RUNTIME arm: a de-opt (createElement)
+	// descriptor or a spread can carry dangerouslySetInnerHTML onto a void host where
+	// the compiler can't see it; setAttribute's danger arm throws (React's message).
+	it('throws for dangerouslySetInnerHTML on a void element on the de-opt path', () => {
+		expect(() => mount(VoidDeoptDanger, { h: 'content' })).toThrow(/void element/);
 	});
 });
 
