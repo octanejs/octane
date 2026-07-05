@@ -99,11 +99,17 @@ function useRenderElementProps<State extends Record<string, any>>(
 	const refs = Array.isArray(ref)
 		? [outProps.ref, renderRef, ...ref]
 		: [outProps.ref, renderRef, ref];
-	outProps.ref = useComposedRefs(...refs, subSlot(slot, 'refs'));
+	const composedRef = useComposedRefs(...refs, subSlot(slot, 'refs'));
 
+	// When disabled, `outProps` IS the shared EMPTY_OBJECT — assigning `.ref` (or
+	// className/style) would mutate it and leak (e.g. a later component reading default
+	// state via getStateAttributesProps would render `data-ref="<fn>"`). Return it
+	// untouched; the composed-refs hook still ran above for slot stability.
 	if (!enabled) {
 		return EMPTY_OBJECT;
 	}
+
+	outProps.ref = composedRef;
 
 	if (className !== undefined) {
 		outProps.className = mergeClassNames(outProps.className, className);

@@ -7,6 +7,12 @@ import { Toggle } from '@octanejs/base-ui/toggle';
 import { ToggleGroup } from '@octanejs/base-ui/toggle-group';
 import { Avatar } from '@octanejs/base-ui/avatar';
 import { Switch } from '@octanejs/base-ui/switch';
+import { Checkbox } from '@octanejs/base-ui/checkbox';
+import { Radio } from '@octanejs/base-ui/radio';
+import { RadioGroup } from '@octanejs/base-ui/radio-group';
+import { Field } from '@octanejs/base-ui/field';
+import { Form } from '@octanejs/base-ui/form';
+import { Input } from '@octanejs/base-ui/input';
 
 // Self-contained differential fixtures: the SAME source runs on octane (via
 // @octanejs/base-ui/<sub>) AND on React (the setup rewrites imports to the real
@@ -255,4 +261,97 @@ export function SwitchDisabled() @{
 	<Switch.Root className="sw" disabled>
 		<Switch.Thumb className="sw-thumb" />
 	</Switch.Root>
+}
+
+// Checkbox — role="checkbox" span + hidden input + a transition-mounted Indicator (only
+// present when checked/indeterminate). Reuses the uncontrolled-input adaptation; clicking
+// toggles aria-checked and mounts the Indicator, byte-identical to Base UI.
+export function CheckboxBasic() @{
+	<Checkbox.Root className="cb">
+		<Checkbox.Indicator className="cb-ind" />
+	</Checkbox.Root>
+}
+
+// Uncontrolled default-checked — aria-checked true, data-checked, Indicator present from mount.
+export function CheckboxDefaultChecked() @{
+	<Checkbox.Root className="cb" defaultChecked={true}>
+		<Checkbox.Indicator className="cb-ind" />
+	</Checkbox.Root>
+}
+
+// Indeterminate — aria-checked="mixed", data-indeterminate, Indicator present.
+export function CheckboxIndeterminate() @{
+	<Checkbox.Root className="cb" indeterminate={true}>
+		<Checkbox.Indicator className="cb-ind" />
+	</Checkbox.Root>
+}
+
+// Disabled — native disabled input + data-disabled; click is a no-op.
+export function CheckboxDisabled() @{
+	<Checkbox.Root className="cb" disabled>
+		<Checkbox.Indicator className="cb-ind" />
+	</Checkbox.Root>
+}
+
+// RadioGroup — role="radiogroup" (CompositeRoot roving focus) with radios. The selected
+// radio holds the active tab stop; each radio derives aria-checked + data-checked from the
+// group value. Clicking a radio moves the selection, byte-identical to Base UI.
+export function RadioGroupBasic() @{
+	<RadioGroup className="rg" defaultValue="a" aria-label="Choice">
+		<Radio.Root className="r" value="a">
+			<Radio.Indicator className="r-ind" />
+		</Radio.Root>
+		<Radio.Root className="r" value="b">
+			<Radio.Indicator className="r-ind" />
+		</Radio.Root>
+		<Radio.Root className="r" value="c">
+			<Radio.Indicator className="r-ind" />
+		</Radio.Root>
+	</RadioGroup>
+}
+
+// Disabled group — aria-disabled + every radio disabled; clicks are no-ops.
+export function RadioGroupDisabled() @{
+	<RadioGroup className="rg" defaultValue="a" disabled aria-label="Choice">
+		<Radio.Root className="r" value="a">
+			<Radio.Indicator className="r-ind" />
+		</Radio.Root>
+		<Radio.Root className="r" value="b">
+			<Radio.Indicator className="r-ind" />
+		</Radio.Root>
+	</RadioGroup>
+}
+
+// Field — the label/control/description association: the Label's `for` = the Control's `id`,
+// the Control's `aria-labelledby` = the Label's `id`, and `aria-describedby` = the Description's
+// `id`. Proves LabelableProvider + FieldRoot + the real field contexts render byte-identically.
+export function FieldBasic() @{
+	<Field.Root className="f">
+		<Field.Label className="f-label">Name</Field.Label>
+		<Field.Control className="f-ctrl" />
+		<Field.Description className="f-desc">Enter your name</Field.Description>
+	</Field.Root>
+}
+
+// Disabled field — data-disabled propagates from Field.Root to label/control/description.
+export function FieldDisabled() @{
+	<Field.Root className="f" disabled>
+		<Field.Label className="f-label">Name</Field.Label>
+		<Field.Control className="f-ctrl" />
+	</Field.Root>
+}
+
+// Standalone Input (= Field.Control with no Field.Root) — uses the inert default field context.
+export function InputBasic() @{
+	<Input className="in" />
+}
+
+// Form wrapping a Field — `<form novalidate>` provides the FormContext.
+export function FormBasic() @{
+	<Form className="form">
+		<Field.Root className="f">
+			<Field.Label className="f-label">Email</Field.Label>
+			<Field.Control className="f-ctrl" name="email" />
+		</Field.Root>
+	</Form>
 }

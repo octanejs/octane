@@ -10,6 +10,42 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 2 (in progress) — the Field/Form validation SYSTEM + Input DONE (2026-07). Green:
+> 39 differential tests vs real `@base-ui/react@1.6.0`, base-ui typecheck clean.** This is the
+> densest Phase-2 subsystem (~1800 lines):
+> - **Field** (`src/field.ts`): `Field.Root` (+ the real `FieldRootContext` via
+>   `useFieldValidation` — the native-constraint + custom async validation state machine — and
+>   `useFieldControlRegistration`), `Field.Control`, `Field.Label`, `Field.Description`,
+>   `Field.Error` (transition-mounted), `Field.Validity` (render-prop), `Field.Item`. The real
+>   `LabelableProvider` (`src/utils/field/`) drives the label↔control↔description id association
+>   (`for` / `aria-labelledby` / `aria-describedby`) — verified byte-identical.
+> - **Form** (`src/form.ts`): `<form noValidate>` + the real `FormContext` (field registry,
+>   submit-time validation, first-invalid focus). **Input** (`src/input.ts`) = `<Field.Control/>`.
+> - octane text-input adaptation: the initial value is the `value` ATTRIBUTE, a controlled value
+>   is driven via the `.value` PROPERTY (mirrors the checkbox adaptation).
+>
+> **Binding bug fixed (my `useRenderElement` port, not octane):** the `enabled: false` path
+> assigned `outProps = EMPTY_OBJECT` (shared module const) then mutated `outProps.ref`, poisoning
+> `EMPTY_OBJECT.ref` with a stale composed-ref callback. A later component rendering with the
+> DEFAULT (no-state) EMPTY_OBJECT then emitted `data-ref="<fn>"` via `getStateAttributesProps`.
+> Surfaced by a differential test-ordering probe (RadioGroup's grouped Radio uses `enabled:false`
+> → then Form failed). Fix: run the composed-refs hook for slot stability but only assign
+> `outProps.ref` when enabled, returning EMPTY_OBJECT untouched.
+
+> **Phase 2 (in progress) — Checkbox + Radio + RadioGroup DONE (2026-07). Green: 35 differential
+> tests vs real `@base-ui/react@1.6.0`.** The boolean/choice-control family is complete
+> (Switch, Checkbox, Radio, RadioGroup), all reusing the octane uncontrolled-input adaptation
+> + the field-context infrastructure:
+> - **Checkbox** (`src/checkbox.ts`): `Root` + transition-mounted `Indicator`; indeterminate
+>   (`aria-checked="mixed"` + `input.indeterminate` property). Group/parent-checkbox branches
+>   dormant until CheckboxGroup.
+> - **Radio** (`src/radio.ts`) + **RadioGroup** (`src/radio-group.ts`): RadioGroup renders a
+>   `role="radiogroup"` via **CompositeRoot** (reusing the Phase-1 roving-focus system), each
+>   Radio a **CompositeItem** deriving `aria-checked` from the group value; the selected radio
+>   holds the active tab stop (`data-composite-item-active`). New small utils: `serializeValue`,
+>   `contains`, `FieldItemContext`, `getDefaultFormSubmitter`, `CheckboxGroupContext`/`RadioGroupContext`.
+> - Click interactions verified byte-identical (toggle, selection-move).
+
 > **Phase 2 (in progress) — Field/Form context infrastructure + Switch DONE (2026-07).
 > Green: 29 differential tests vs real `@base-ui/react@1.6.0` (3 new Switch: uncontrolled
 > toggle, default-checked, disabled — all with click interaction), base-ui typecheck clean.**

@@ -4,9 +4,15 @@
 // re-exports the public surface for convenience as components land.
 export { Separator } from './separator';
 export { Avatar } from './avatar';
+export { Checkbox } from './checkbox';
+export { Field } from './field';
 export { Fieldset } from './fieldset';
+export { Form } from './form';
+export { Input } from './input';
 export { Meter } from './meter';
 export { Progress } from './progress';
+export { Radio } from './radio';
+export { RadioGroup } from './radio-group';
 export { Switch } from './switch';
 export { Toggle } from './toggle';
 export { ToggleGroup } from './toggle-group';

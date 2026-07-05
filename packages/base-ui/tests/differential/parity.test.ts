@@ -230,4 +230,80 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		});
 		d.unmount();
 	});
+
+	it('Checkbox: uncontrolled — click ticks + mounts the Indicator', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxBasic', undefined, CACHE);
+		await d.step('mount (unchecked, no indicator)', () => {});
+		await d.step('click → checked + indicator', async (i, r) => {
+			await i.click('[role="checkbox"]');
+			await r.click('[role="checkbox"]');
+		});
+		d.unmount();
+	});
+
+	it('Checkbox: uncontrolled default-checked (aria-checked true, data-checked, indicator)', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxDefaultChecked', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('click → unchecked', async (i, r) => {
+			await i.click('[role="checkbox"]');
+			await r.click('[role="checkbox"]');
+		});
+		d.unmount();
+	});
+
+	it('Checkbox: indeterminate (aria-checked="mixed" + data-indeterminate)', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxIndeterminate', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Checkbox: disabled (native disabled input + data-disabled; click is a no-op)', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('click → still unchecked', async (i, r) => {
+			await i.click('[role="checkbox"]');
+			await r.click('[role="checkbox"]');
+		});
+		d.unmount();
+	});
+
+	it('RadioGroup: composite roving focus + value → aria-checked; click moves selection', async () => {
+		const d = await mountDifferential(FIXTURE, 'RadioGroupBasic', undefined, CACHE);
+		await d.step('mount (a selected)', () => {});
+		await d.step('click b → selection moves', async (i, r) => {
+			await i.click('.r:nth-child(3)');
+			await r.click('.r:nth-child(3)');
+		});
+		d.unmount();
+	});
+
+	it('RadioGroup: disabled group (aria-disabled + every radio disabled)', async () => {
+		const d = await mountDifferential(FIXTURE, 'RadioGroupDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Field: label/control/description id association (for/aria-labelledby/aria-describedby)', async () => {
+		const d = await mountDifferential(FIXTURE, 'FieldBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Field: disabled (data-disabled propagates to parts)', async () => {
+		const d = await mountDifferential(FIXTURE, 'FieldDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Input: standalone (Field.Control with the inert default context)', async () => {
+		const d = await mountDifferential(FIXTURE, 'InputBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Form: wraps a Field (form novalidate + FormContext)', async () => {
+		const d = await mountDifferential(FIXTURE, 'FormBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
 });
