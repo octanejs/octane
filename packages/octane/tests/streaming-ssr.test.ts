@@ -130,6 +130,62 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(tail).toContain('beta');
 	});
 
+	it('streams each boundary at its own resolve time, not the wave-set slowest', async () => {
+		// REAL timers on purpose (no vi.useFakeTimers): the assertion is about
+		// wall-clock chunk arrival. Margins are generous so CI jitter can't flip
+		// it — the early chunk must land in [EARLY, LATE - 50], i.e. long before
+		// the late boundary's data even resolves.
+		const EARLY = 20;
+		const LATE = 250;
+		const a = new Promise<string>((r) => setTimeout(() => r('alpha'), EARLY));
+		const b = new Promise<string>((r) => setTimeout(() => r('beta'), LATE));
+		const arrivals: { chunk: string; at: number }[] = [];
+		let end!: () => void;
+		const ended = new Promise<void>((res) => (end = res));
+		const t0 = performance.now();
+		const { pipe } = ServerRT.renderToPipeableStream(server.Siblings, { a, b });
+		pipe({
+			write: (chunk: string) => arrivals.push({ chunk, at: performance.now() - t0 }),
+			end: () => end(),
+		});
+		await ended;
+
+		// Shell + one segment chunk PER boundary. The old settle-all round held
+		// alpha's segment until beta landed and shipped both in ONE chunk.
+		expect(arrivals).toHaveLength(3);
+		const [, first, second] = arrivals;
+		expect(first.chunk).toContain('data-oct-s="0"');
+		expect(first.chunk).toContain('alpha');
+		expect(first.chunk).not.toContain('beta');
+		expect(second.chunk).toContain('data-oct-s="1"');
+		expect(second.chunk).toContain('beta');
+		expect(first.at).toBeGreaterThanOrEqual(EARLY - 5); // not before its data
+		expect(first.at).toBeLessThan(LATE - 50); // on the wire while beta still pends
+		expect(second.at).toBeGreaterThanOrEqual(LATE - 5);
+	});
+
+	it('coalesces resolutions landing in the same wave into one chunk/pass', async () => {
+		let ra!: (v: string) => void;
+		let rb!: (v: string) => void;
+		const a = new Promise<string>((r) => (ra = r));
+		const b = new Promise<string>((r) => (rb = r));
+		// Both settle in the SAME event-loop turn → they must share one re-pass
+		// and flush as one chunk, not cost a wave (and a full pass) each.
+		setTimeout(() => {
+			ra('alpha');
+			rb('beta');
+		}, 10);
+		const c = collector();
+		const { pipe } = ServerRT.renderToPipeableStream(server.Siblings, { a, b });
+		pipe(c.dest);
+		await c.ended;
+		expect(c.chunks).toHaveLength(2); // shell + ONE coalesced segment chunk
+		expect(c.chunks[1]).toContain('data-oct-s="0"');
+		expect(c.chunks[1]).toContain('data-oct-s="1"');
+		expect(c.chunks[1]).toContain('alpha');
+		expect(c.chunks[1]).toContain('beta');
+	});
+
 	it('streams a nested boundary parent-first', async () => {
 		const outer = deferred<string>();
 		const inner = deferred<string>();

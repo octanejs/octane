@@ -1185,7 +1185,7 @@ const MAX_SUSPENSE_PASSES = 50;
 
 // Wall-clock bound on a single suspense await. MAX_SUSPENSE_PASSES caps the
 // NUMBER of re-render passes, but it's checked BEFORE the await — so a thenable
-// that never settles would leave `Promise.all` (and the request) hung forever.
+// that never settles would leave the settle await (and the request) hung forever.
 // This deadline races that await so a stuck thenable fails the render instead.
 // 0 disables the deadline (await indefinitely). Configurable for tests/hosts.
 let SUSPENSE_TIMEOUT_MS = 10_000;
@@ -1405,28 +1405,16 @@ function runDiscoveryRound(
 	return { suspended, deferred };
 }
 
-// Await everything a pass/round surfaced; cache each outcome in `resolved` by its
-// key. Only render-local state is touched across the await. Raced against the
-// settle deadline (`timeoutMs`; 0 disables) so a thenable that never settles
-// fails the render instead of hanging the request forever, and against the
-// caller's AbortSignal so a dead request stops rendering.
-async function settleSuspended(
-	suspended: SuspendedList,
-	resolved: ResolvedMap,
+// Race a settle await against the deadline (`timeoutMs`; 0 disables) so a
+// thenable that never settles fails the render instead of hanging the request
+// forever, and against the caller's AbortSignal so a dead request stops
+// rendering.
+async function raceSettleGuards(
+	work: Promise<unknown>,
 	timeoutMs: number,
 	signal: AbortSignal | undefined,
 ): Promise<void> {
-	const settleAll = Promise.all(
-		suspended.map(async ({ promise, key }) => {
-			if (resolved.has(key)) return;
-			try {
-				resolved.set(key, { value: await promise });
-			} catch (reason) {
-				resolved.set(key, { reason });
-			}
-		}),
-	);
-	const racers: Promise<unknown>[] = [settleAll];
+	const racers: Promise<unknown>[] = [work];
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let removeAbort: (() => void) | undefined;
 	if (timeoutMs > 0) {
@@ -1455,10 +1443,91 @@ async function settleSuspended(
 		);
 	}
 	try {
-		await (racers.length === 1 ? settleAll : Promise.race(racers));
+		await (racers.length === 1 ? work : Promise.race(racers));
 	} finally {
 		clearTimeout(timer);
 		removeAbort?.();
+	}
+}
+
+// Await everything a pass/round surfaced; cache each outcome in `resolved` by
+// its key. Only render-local state is touched across the await. This is the
+// BUFFERED pipeline's settle — nothing ships until everything resolves, so one
+// settle-all per waterfall level is the fewest possible passes. The streaming
+// pipeline uses settleFirstOfWave instead, so an early boundary isn't held
+// hostage by a slow sibling.
+async function settleSuspended(
+	suspended: SuspendedList,
+	resolved: ResolvedMap,
+	timeoutMs: number,
+	signal: AbortSignal | undefined,
+): Promise<void> {
+	const settleAll = Promise.all(
+		suspended.map(async ({ promise, key }) => {
+			if (resolved.has(key)) return;
+			try {
+				resolved.set(key, { value: await promise });
+			} catch (reason) {
+				resolved.set(key, { reason });
+			}
+		}),
+	);
+	await raceSettleGuards(settleAll, timeoutMs, signal);
+}
+
+// One macrotask turn. Settlements triggered by the same event-loop turn (N
+// timers expiring at the same deadline, a batch of IO completions) arrive as
+// SEPARATE callbacks with a full microtask drain between each, so a
+// microtask-only yield after the first settle cannot see the rest of the
+// burst. setImmediate (Node) runs after the whole timers/poll phase — i.e.
+// after every callback of the burst — with no timer clamp; setTimeout(0) is
+// the portable fallback (edge runtimes without setImmediate).
+const yieldMacrotask: () => Promise<void> =
+	typeof setImmediate === 'function'
+		? () => new Promise((resolve) => setImmediate(resolve))
+		: () => new Promise((resolve) => setTimeout(resolve, 0));
+
+// The STREAMING settle: await only until the FIRST unresolved thenable
+// settles, then coalesce — one macrotask yield plus microtask drains — so
+// everything else that landed in the same event-loop wave records into
+// `resolved` too. The caller re-passes once per WAVE: on a staggered schedule
+// the earliest boundary flushes at its own resolve time instead of waiting for
+// the slowest sibling (a settle-all here held EVERY segment until the last
+// thenable landed), while simultaneous resolutions still share one re-pass
+// instead of costing a pass each.
+async function settleFirstOfWave(
+	suspended: SuspendedList,
+	resolved: ResolvedMap,
+	timeoutMs: number,
+	signal: AbortSignal | undefined,
+): Promise<void> {
+	const recorders: Promise<void>[] = [];
+	for (const { promise, key } of suspended) {
+		if (resolved.has(key)) continue;
+		recorders.push(
+			(async () => {
+				try {
+					const value = await promise;
+					if (!resolved.has(key)) resolved.set(key, { value });
+				} catch (reason) {
+					if (!resolved.has(key)) resolved.set(key, { reason });
+				}
+			})(),
+		);
+	}
+	if (recorders.length === 0) return;
+	await raceSettleGuards(Promise.race(recorders), timeoutMs, signal);
+	// The winning recorder has recorded. Yield one macrotask so the rest of
+	// this turn's burst fires, then drain microtasks while settlements keep
+	// recording (a chained/non-native thenable needs an extra tick or two);
+	// stop as soon as a drain adds nothing — stragglers get the next wave.
+	await yieldMacrotask();
+	let size = resolved.size;
+	for (;;) {
+		await Promise.resolve();
+		await Promise.resolve();
+		if (resolved.size === size) return;
+		size = resolved.size;
 	}
 }
 
@@ -1607,13 +1676,17 @@ export function renderToStaticMarkup(
 //      registers itself (keyed by frame path, so the id is stable across
 //      passes). The shell flushes immediately (styles + head + body + shell
 //      seeds + the inline swap runtime).
-//   2. Each ROUND: await the suspended thenables (settleSuspended), re-run a
-//      full pass against the now-warmer RESOLVED cache. `ssrTry` captures each
-//      registered boundary's freshly-rendered content + its `use()` seed slice;
-//      newly-completed boundaries flush as hidden segments
+//   2. Each WAVE: await the FIRST suspended thenable to settle — coalescing
+//      anything else that lands in the same event-loop turn
+//      (settleFirstOfWave) — then re-run a full pass against the now-warmer
+//      RESOLVED cache. `ssrTry` captures each registered boundary's
+//      freshly-rendered content + its `use()` seed slice; newly-completed
+//      boundaries flush as hidden segments
 //      `<div hidden data-oct-s="N">…` followed by `<script>$OCTRC("N")</script>`
-//      which swaps the content into the boundary's live range. Rounds repeat
-//      until no boundary is pending (bounded by MAX_SUSPENSE_PASSES).
+//      which swaps the content into the boundary's live range. Waves repeat
+//      until no boundary is pending (MAX_SUSPENSE_PASSES bounds CONSECUTIVE
+//      passes that complete no boundary — one pass per resolution wave is the
+//      design, not a runaway, so flushing a segment resets the counter).
 //
 // A registered boundary ALWAYS returns its pending form (template + fallback)
 // to the surrounding pass — its real content ships ONLY via its own segment, so
@@ -1631,8 +1704,10 @@ export function renderToStaticMarkup(
 //
 // Intentional scope notes (documented divergences from React Fizz):
 //   - No selective hydration (octane has no synthetic event replay system).
-//   - Per-ROUND full re-passes rather than per-boundary incremental renders —
-//     the same cost model as `prerender`, reusing its cache + discovery engine.
+//   - Per-WAVE full re-passes rather than per-boundary incremental renders —
+//     each resolution wave costs one full pass (reusing `prerender`'s cache +
+//     discovery engine), buying per-boundary delivery: a boundary streams at
+//     its own resolve time, not at the round's slowest sibling.
 //   - Head elements hoisted from INSIDE a streamed boundary don't ship in the
 //     stream (the shell's head already flushed); the client re-creates them on
 //     hydration via headBlock.
@@ -1883,18 +1958,25 @@ async function runStream(
 	sink.shellReady();
 
 	let suspended = pass.suspended;
+	// `attempt` counts CONSECUTIVE passes that completed no boundary. One pass
+	// per resolution wave is the design (10 staggered cards legitimately take
+	// ~10 passes), so this bound can't cap TOTAL passes the way the buffered
+	// loop does — flushing a segment resets it. It still trips on what it's
+	// for: an intra-boundary waterfall deeper than MAX (parity with the
+	// buffered bound) and the nondeterministic-key runaway, which never
+	// completes its boundary.
 	let attempt = 0;
 	while ([...stream.boundaries.values()].some((b) => b.state === 'pending')) {
 		try {
 			signal?.throwIfAborted();
 			if (++attempt > MAX_SUSPENSE_PASSES) {
 				throw new Error(
-					'octane SSR: exceeded ' +
+					'octane SSR: ' +
 						MAX_SUSPENSE_PASSES +
-						' streaming passes — a use(thenable) never resolved.',
+						' consecutive streaming passes completed no boundary — a use(thenable) never resolved.',
 				);
 			}
-			await settleSuspended(suspended, resolved, timeoutMs, signal);
+			await settleFirstOfWave(suspended, resolved, timeoutMs, signal);
 			pass = withStream(stream, () => runFullFramedPass(component, props, resolved, nonceAttr));
 			suspended = pass.suspended;
 		} catch (err) {
@@ -1921,6 +2003,7 @@ async function runStream(
 		const done = [...stream.boundaries.values()]
 			.filter((b) => b.state === 'done' && !flushedSegments.has(b.id))
 			.sort((a, b) => a.id - b.id);
+		if (done.length > 0) attempt = 0; // boundary progress — this wave was legitimate
 		for (const b of done) {
 			flushedSegments.add(b.id);
 			chunk += segmentChunk(b, nonceAttr);
