@@ -43,7 +43,8 @@ file, so `render` (and `rerender`) take two forms:
 ```ts
 render(Counter, { props: { step: 2 }, wrapper: Providers }); // body + props option
 render(createElement(Counter, { step: 2 }), { wrapper: Providers }); // RTL-style element
-rerender(Counter, { step: 3 }); // rerender takes bare props as the 2nd arg
+rerender(Counter, { props: { step: 3 } }); // symmetric with render's options
+rerender({ props: { step: 3 } }); // shorthand: original component, new props
 ```
 
 Same component ⇒ props update in place; a different component tears down and
@@ -112,3 +113,13 @@ afterEach(cleanup);
 
 `@octanejs/testing-library/pure` skips the side effects entirely, exactly like
 `@testing-library/react/pure`.
+
+
+## `@testing-library/user-event`
+
+Works as-is — no octane adapter needed. `user-event` is framework-agnostic and
+dispatches **real native events**, which is exactly octane's event model (a
+better fit than React, where it relies on the synthetic layer picking natives
+up). Install it alongside this package and use it unchanged; the pairing is
+pinned by `tests/user-event.test.ts` (click, `type()` per-keystroke `onInput`,
+`keyboard()`).
