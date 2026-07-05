@@ -16,8 +16,7 @@
  */
 import { compileMdx, type CompileMdxOptions } from './compile';
 
-export interface OctaneMdxPluginOptions
-	extends Omit<CompileMdxOptions, 'mode' | 'hmr' | 'dev'> {
+export interface OctaneMdxPluginOptions extends Omit<CompileMdxOptions, 'mode' | 'hmr' | 'dev'> {
 	/**
 	 * Force the codegen target for EVERY module — `true` always server, `false`
 	 * always client. Leave unset for per-module auto-detection (standard Vite
@@ -62,8 +61,8 @@ export function octaneMdx(options: OctaneMdxPluginOptions = {}): OctaneMdxPlugin
 				forceSsr !== undefined
 					? forceSsr
 					: transformOptions?.ssr === true ||
-						(this as { environment?: { config?: { consumer?: string } } }).environment
-							?.config?.consumer === 'server';
+						(this as { environment?: { config?: { consumer?: string } } }).environment?.config
+							?.consumer === 'server';
 			return compileMdx(code, file, {
 				...compileOptions,
 				mode: ssr ? 'server' : 'client',

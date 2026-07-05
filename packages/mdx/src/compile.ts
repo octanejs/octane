@@ -184,9 +184,7 @@ type EstreeNode = { type: string; [key: string]: unknown };
 
 function isNode(value: unknown): value is EstreeNode {
 	return (
-		value !== null &&
-		typeof value === 'object' &&
-		typeof (value as EstreeNode).type === 'string'
+		value !== null && typeof value === 'object' && typeof (value as EstreeNode).type === 'string'
 	);
 }
 
@@ -290,9 +288,7 @@ function jsxSelfClosing(name: string, spreadArgument: EstreeNode | null): Estree
 		openingElement: {
 			type: 'JSXOpeningElement',
 			name: { type: 'JSXIdentifier', name },
-			attributes: spreadArgument
-				? [{ type: 'JSXSpreadAttribute', argument: spreadArgument }]
-				: [],
+			attributes: spreadArgument ? [{ type: 'JSXSpreadAttribute', argument: spreadArgument }] : [],
 			selfClosing: true,
 		},
 		closingElement: null,
