@@ -15,20 +15,16 @@ describe('compileMdxSync', () => {
 		expect(code).toContain('export default');
 	});
 
-	it('renames MDX body identifiers so no `_`-prefixed component tags remain', () => {
-		// octane compiler gap: a `<_foo/>` identifier tag lowers to a host STRING
-		// tag (JSX semantics make any non-lowercase-start identifier a component
-		// reference) — the recma adapter renames `_createMdxContent` around it.
+	it('mounts the MDX body through the component machinery in both branches', () => {
 		const { code } = compileMdxSync('# hi\n', '/docs/doc.mdx');
-		expect(code).toContain('MDX$CreateMdxContent');
-		expect(code).not.toContain('_createMdxContent');
 		// The no-layout branch mounts through the component machinery (the bare
 		// `_createMdxContent(props)` call was rewritten to JSX and lowered to a
-		// descriptor) — no direct call that would bypass the
+		// descriptor — `<_createMdxContent/>` is a component REFERENCE per JSX
+		// semantics) — no direct call that would bypass the
 		// `(props, __s, __extra)` ABI.
-		expect(code).toContain('_$createElement(MDX$CreateMdxContent');
+		expect(code).toContain('_$createElement(_createMdxContent');
 		// …and the emitted ternary-else direct-call shape is gone.
-		expect(code).not.toContain(': MDX$CreateMdxContent(');
+		expect(code).not.toContain(': _createMdxContent(');
 	});
 
 	it('emits SERVER codegen with mode: server', () => {

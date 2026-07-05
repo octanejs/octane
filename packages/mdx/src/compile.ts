@@ -19,20 +19,15 @@
  * The only adaptation between the two compilers is `recmaOctaneAdapter`, a tiny
  * ESTree pass over MDX's output:
  *
- *  1. MDX names its body component `_createMdxContent`. octane's JSX lowering
- *     treats an identifier tag as a component only when it starts with an
- *     UPPERCASE letter, so the layout branch's `<_createMdxContent {...props}/>`
- *     would lower to `createElement('_createMdxContent', …)` — a host STRING
- *     tag (JSX semantics say a `_`-starting identifier is a component
- *     reference; Babel/TS agree). The pass renames it to `MDX$CreateMdxContent`.
- *     This is a documented workaround for an octane compiler gap — drop the
- *     rename once `<_Foo/>` compiles as a component reference.
- *  2. MDX's no-layout branch CALLS `_createMdxContent(props)` directly, which
+ *  1. MDX's no-layout branch CALLS `_createMdxContent(props)` directly, which
  *     bypasses octane's `(props, __s, __extra)` component ABI (the server body
  *     would run with `__s === undefined` and lean on scope-recovery). The pass
- *     rewrites the bare call to `<MDX$CreateMdxContent {...props}/>` so both
+ *     rewrites the bare call to `<_createMdxContent {...props}/>` so both
  *     branches mount through the component machinery on client AND server.
- *  3. SERVER mode only: MDX renders markdown elements through its components
+ *     (The layout branch's `<_createMdxContent {...props}/>` tag needs no help:
+ *     octane classifies `_`-starting identifier tags as component references,
+ *     per JSX semantics.)
+ *  2. SERVER mode only: MDX renders markdown elements through its components
  *     mapping — `<_components.h1>` — whose value is a host tag STRING unless
  *     overridden. octane's CLIENT lowering of a member-expression tag is a
  *     `createElement` descriptor, which the runtime's de-opt renderer accepts
@@ -168,10 +163,7 @@ function octaneStage(jsxSource: string, id: string, options: CompileMdxOptions):
 // recmaOctaneAdapter — the ESTree pass described in the module doc.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MDX_BODY_SOURCE_NAME = '_createMdxContent';
-// Capitalized (octane component tag) + `$` (never produced by MDX's own
-// name-mangling and implausible as a user export from a document).
-const MDX_BODY_NAME = 'MDX$CreateMdxContent';
+const MDX_BODY_NAME = '_createMdxContent';
 
 function recmaOctaneAdapter(options?: { mode?: 'client' | 'server' }) {
 	const server = options?.mode === 'server';
@@ -191,28 +183,20 @@ function isNode(value: unknown): value is EstreeNode {
 // Visit `node` (post-decision, pre-recursion): return a replacement node to
 // swap in (recursed into by the caller), or null to keep the node and recurse.
 function adaptNode(node: EstreeNode, server: boolean): EstreeNode | null {
-	// (2) `_createMdxContent(props)` → `<MDX$CreateMdxContent {...props}/>`.
-	// Matched BEFORE the rename visits the callee identifier below.
+	// (1) `_createMdxContent(props)` → `<_createMdxContent {...props}/>`.
 	if (
 		node.type === 'CallExpression' &&
 		isNode(node.callee) &&
 		node.callee.type === 'Identifier' &&
-		node.callee.name === MDX_BODY_SOURCE_NAME &&
+		node.callee.name === MDX_BODY_NAME &&
 		Array.isArray(node.arguments) &&
 		node.arguments.length <= 1 &&
 		(node.arguments.length === 0 || isNode(node.arguments[0]))
 	) {
 		return jsxSelfClosing(MDX_BODY_NAME, (node.arguments[0] as EstreeNode) ?? null);
 	}
-	// (1) Rename every reference (declaration id, JSX tag, plain identifier).
-	if (
-		(node.type === 'Identifier' || node.type === 'JSXIdentifier') &&
-		node.name === MDX_BODY_SOURCE_NAME
-	) {
-		node.name = MDX_BODY_NAME;
-	}
 	if (server) {
-		// (3) `_components.*` elements in JSX-CHILD position → `{<element/>}`
+		// (2) `_components.*` elements in JSX-CHILD position → `{<element/>}`
 		// expression holes (see module doc). Wrapping edits the PARENT's children
 		// array, so an already-wrapped element (now behind an expression
 		// container) is never re-wrapped.
