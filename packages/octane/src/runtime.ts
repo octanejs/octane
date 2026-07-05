@@ -1024,8 +1024,14 @@ export function drainPassiveEffects(): void {
 	drainPhase(PASSIVE);
 }
 
-/** True if there's a queued render or any uncommitted effect. Used by `act`. */
-function hasPendingWork(): boolean {
+/**
+ * True if there's a queued render or any uncommitted effect. Used by `act`,
+ * and exported (tier 2, binding infrastructure) so @octanejs/testing-library's
+ * synchronous settle can loop to EXACT quiescence instead of a fixed bound.
+ * Purely promise-driven work (use(promise), async transitions) is not "pending"
+ * by this definition — it needs `waitFor`/async `act`.
+ */
+export function hasPendingWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
 		effectQueues[INSERTION].length > 0 ||

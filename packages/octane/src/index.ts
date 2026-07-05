@@ -113,6 +113,8 @@ export {
 	FragmentInstance,
 	hmr,
 	HMR,
+	// Scheduler-quiescence probe for @octanejs/testing-library's sync settle.
+	hasPendingWork,
 	type Scope,
 	type Block,
 

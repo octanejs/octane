@@ -26,6 +26,7 @@ import {
 	createRoot,
 	drainPassiveEffects,
 	flushSync,
+	hasPendingWork,
 	hydrateRoot,
 	isValidElement,
 	useEffect,
@@ -165,15 +166,14 @@ function mountable(element: ElementDescriptor): ElementDescriptor {
 // round runs queued useEffect bodies (which may setState) and then commits the
 // renders they scheduled (flushSync also runs layout-effect cascades, queuing
 // the next round's passives). This is the observable behavior of RTL wrapping
-// work in a sync React `act()`. The scheduler's pending state isn't observable
-// from outside the runtime (its `hasPendingWork` is private — octane's async
-// `act` loops on it internally), so the loop is a fixed bound instead of an
-// exact quiescence check; both calls are O(1) no-ops once the queues are empty,
-// and 20 rounds is far deeper than any sane effect→setState chain. Purely
-// promise-driven work (use(promise), transitions) can never settle
-// synchronously — that's what `waitFor`/`findBy*`/`act` are for, same as RTL.
+// work in a sync React `act()`. Loops on octane's scheduler-quiescence probe
+// (`hasPendingWork`) for an EXACT settle; the round cap only guards against a
+// pathological unbounded effect→setState cycle (which octane's own
+// "Too many re-renders" guard would surface anyway). Purely promise-driven work
+// (use(promise), transitions) can never settle synchronously — that's what
+// `waitFor`/`findBy*`/`act` are for, same as RTL.
 function settleSync(): void {
-	for (let i = 0; i < 20; i++) {
+	for (let i = 0; i < 50 && hasPendingWork(); i++) {
 		drainPassiveEffects();
 		flushSync(() => {});
 	}
