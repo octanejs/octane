@@ -1,0 +1,46 @@
+{
+  "name": "@octanejs/mdx",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "MDX for the octane renderer — compiles .mdx/.md through @mdx-js/mdx to JSX source and then through octane/compiler, so documents render as real compiled octane components (templates, not runtime descriptors); ships the @mdx-js/react provider layer (MDXProvider/useMDXComponents) ported onto octane context.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/mdx"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./compile": "./src/compile.ts",
+    "./vite": "./src/vite.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mdx-js/mdx": "catalog:default",
+    "octane": "workspace:*",
+    "remark-frontmatter": "catalog:default",
+    "remark-gfm": "catalog:default",
+    "remark-mdx-frontmatter": "catalog:default"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

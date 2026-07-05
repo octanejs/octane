@@ -6,6 +6,7 @@ export { Separator } from './separator';
 export { Avatar } from './avatar';
 export { Checkbox } from './checkbox';
 export { CheckboxGroup } from './checkbox-group';
+export { Dialog } from './dialog';
 export { Field } from './field';
 export { Fieldset } from './fieldset';
 export { Form } from './form';

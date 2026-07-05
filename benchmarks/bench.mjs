@@ -176,6 +176,17 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n, quick) => (quick ? ['--quick'] : [String(n)]) }],
 	},
 	{
+		// Node-only streaming SSR (no servers, no browser): shell TTFB, stream-end
+		// total, chunk framing + all-fast throughput for octane
+		// renderToPipeableStream vs React Fizz vs Solid renderToStream vs Ripple's
+		// stream mode. Iteration-counted (renders per target per scenario).
+		name: 'streaming-ssr',
+		cwd: 'streaming-ssr',
+		servers: [],
+		iter: { normal: 30, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// De-opt cliff (dbmon): tuned .tsrx fixture vs the plain-.ts createElement
 		// twin, driven through dbmon's own harness via a TARGETS pairing.
 		name: 'dbmon-deopt',
