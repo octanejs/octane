@@ -147,11 +147,11 @@ describe('hmr — runtime wrapper', () => {
 		const { code } = compile(src, 'file.tsrx', { hmr: true });
 		// Stable Symbol.for-based hook slot (so re-imports get the same identity).
 		expect(code).toMatch(/Symbol\.for\("octane:file\.tsrx:Foo\.useState#0"\)/);
-		// Inline HMR wrapping on the exported component.
-		expect(code).toMatch(/export const Foo = hmr\(function Foo/);
+		// Inline HMR wrapping on the exported component (shadow-proof `_$` alias).
+		expect(code).toMatch(/export const Foo = _\$hmr\(function Foo/);
 		// Vite-shaped accept block.
 		expect(code).toMatch(/if \(import\.meta\.hot\)/);
-		expect(code).toMatch(/Foo\[HMR\]\.update\(module\.Foo\)/);
+		expect(code).toMatch(/Foo\[_\$HMR\]\.update\(module\.Foo\)/);
 	});
 
 	it('hmr option off → no wrapping, no accept block', async () => {
