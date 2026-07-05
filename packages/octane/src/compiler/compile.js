@@ -6000,7 +6000,12 @@ function isComponentTag(node) {
 	// codegen path as `<Foo>` / `<ctx.Provider>`.
 	if (name.type === 'JSXExpressionContainer' && name.isDynamic === true) return true;
 	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
-		return typeof name.name === 'string' && /^[A-Z]/.test(name.name);
+		if (typeof name.name !== 'string') return false;
+		// JSX semantics (Babel/TS `isCompatTag`): an identifier tag is a HOST
+		// string tag only when it starts with a lowercase ASCII letter (or isn't
+		// a plain identifier, e.g. `<my-element>`); everything else — `<Foo>`,
+		// `<_Inner>`, `<$Inner>` — is a component REFERENCE.
+		return !/^[a-z]/.test(name.name) && !name.name.includes('-');
 	}
 	return false;
 }
