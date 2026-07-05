@@ -196,4 +196,38 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		await d.step('mount', () => {});
 		d.unmount();
 	});
+
+	it('Switch: uncontrolled — click toggles aria-checked + data-checked (native input adaptation)', async () => {
+		const d = await mountDifferential(FIXTURE, 'SwitchBasic', undefined, CACHE);
+		await d.step('mount (unchecked)', () => {});
+		await d.step('click → checked', async (i, r) => {
+			await i.click('[role="switch"]');
+			await r.click('[role="switch"]');
+		});
+		await d.step('click → unchecked', async (i, r) => {
+			await i.click('[role="switch"]');
+			await r.click('[role="switch"]');
+		});
+		d.unmount();
+	});
+
+	it('Switch: uncontrolled default-checked (aria-checked starts true; click unchecks)', async () => {
+		const d = await mountDifferential(FIXTURE, 'SwitchDefaultChecked', undefined, CACHE);
+		await d.step('mount (checked)', () => {});
+		await d.step('click → unchecked', async (i, r) => {
+			await i.click('[role="switch"]');
+			await r.click('[role="switch"]');
+		});
+		d.unmount();
+	});
+
+	it('Switch: disabled (native disabled input + data-disabled; click is a no-op)', async () => {
+		const d = await mountDifferential(FIXTURE, 'SwitchDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('click → still unchecked', async (i, r) => {
+			await i.click('[role="switch"]');
+			await r.click('[role="switch"]');
+		});
+		d.unmount();
+	});
 });

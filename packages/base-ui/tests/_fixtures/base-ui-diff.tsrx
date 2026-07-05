@@ -6,6 +6,7 @@ import { Progress } from '@octanejs/base-ui/progress';
 import { Toggle } from '@octanejs/base-ui/toggle';
 import { ToggleGroup } from '@octanejs/base-ui/toggle-group';
 import { Avatar } from '@octanejs/base-ui/avatar';
+import { Switch } from '@octanejs/base-ui/switch';
 
 // Self-contained differential fixtures: the SAME source runs on octane (via
 // @octanejs/base-ui/<sub>) AND on React (the setup rewrites imports to the real
@@ -229,4 +230,29 @@ export function AvatarFallbackOnly() @{
 	<Avatar.Root className="av">
 		<Avatar.Fallback className="av-fb">AB</Avatar.Fallback>
 	</Avatar.Root>
+}
+
+// Switch — a role="switch" <span> + hidden checkbox <input>. Proves the octane
+// uncontrolled-input adaptation (checked driven via the native property setter, NOT a
+// `checked` attribute the way React's controlled input avoids) + the field-context surface
+// (inert standalone). Clicking the switch dispatches a click on the hidden input, toggling
+// aria-checked + data-checked/unchecked byte-identically to Base UI.
+export function SwitchBasic() @{
+	<Switch.Root className="sw">
+		<Switch.Thumb className="sw-thumb" />
+	</Switch.Root>
+}
+
+// Uncontrolled default-checked — aria-checked starts true, data-checked on root + thumb.
+export function SwitchDefaultChecked() @{
+	<Switch.Root className="sw" defaultChecked={true}>
+		<Switch.Thumb className="sw-thumb" />
+	</Switch.Root>
+}
+
+// Disabled — native disabled on the hidden input + data-disabled; click is a no-op.
+export function SwitchDisabled() @{
+	<Switch.Root className="sw" disabled>
+		<Switch.Thumb className="sw-thumb" />
+	</Switch.Root>
 }

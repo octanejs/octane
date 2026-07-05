@@ -7,6 +7,7 @@ export { Avatar } from './avatar';
 export { Fieldset } from './fieldset';
 export { Meter } from './meter';
 export { Progress } from './progress';
+export { Switch } from './switch';
 export { Toggle } from './toggle';
 export { ToggleGroup } from './toggle-group';
 export { useRender } from './use-render';
