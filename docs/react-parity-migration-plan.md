@@ -263,7 +263,7 @@ the gap (port OUTCOMES via `@try`/`@catch`):
 | `ReactIncrementalErrorHandling-test.internal.js` (`:1540,:685-803`) | Render-one-more-time before catching (retry heuristic); nearest **handling** boundary selection (a non-handling boundary doesn't stop propagation); aborted render's WIP discarded. | Medium |
 | `ErrorBoundaryReconciliation-test.internal.js` (`:73,:76`) | Fallback rendering **same type** reuses, **different type** remounts. | Medium |
 | `ReactErrorBoundaries-test.internal.js` (`:1158,:1209,:2782`), `ReactFiberRefs-test.js` (`:64`) | Refs reset on aborted mount; ref-detach throw must not block unmount; ref attaches on commit even with no other update. | Medium |
-| `refs-test.js` (`:274,:346,:379,:443`) | **React-19 ref cleanup return**: cleanup runs (called with no arg) instead of `null` re-invoke; stable-identity ref not re-run on update. (Octane `ref-cleanup.test.ts`/`ref-identity.test.ts` cover much of this — confirm parity, fill `:346` stable-identity-skip.) | Medium |
+| `refs-test.js` (`:274,:346,:379,:443`) | ~~**React-19 ref cleanup return**~~ **Done**: ported in `conformance/refs.test.ts` (plus `:62` ref hopping, `:121` stable stateless ref, `:176` root refs, `:491-:528` useImperativeHandle) and `conformance/refs-destruction.test.ts` (`:69,:85,:103`). Landing the ports fixed two real gaps: (1) ref detaches — teardown AND identity swaps — now defer to commit and drain before that commit's attaches (React's mutation→layout phasing; the `:62` hop pattern previously ended with the hopped ref nulled by a later binding's detach, and a state-setter-as-ref on a torn-down element oscillated); (2) `useImperativeHandle` honors a callback ref's React-19 cleanup return instead of always re-invoking with `null`. | Done |
 
 ---
 
