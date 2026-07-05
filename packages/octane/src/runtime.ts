@@ -328,6 +328,19 @@ export interface Block extends Scope {
 	/** The render mode in effect during the body's *current* execution. */
 	currentRenderMode: 'urgent' | 'transition' | null;
 	/**
+	 * "Deferred lane" bit riding alongside pendingMode: true when the next
+	 * scheduled render was spawned by useDeferredValue's deferred swap. Read &
+	 * cleared with pendingMode when the render is dispatched.
+	 */
+	pendingDeferred: boolean;
+	/**
+	 * True while the body executes inside a useDeferredValue-spawned deferred
+	 * pass (inherited by nested renders, like currentRenderMode). Drives React's
+	 * anti-waterfall rule: only the FIRST useDeferredValue level defers — a hook
+	 * mounting inside an already-deferred pass adopts its final value directly.
+	 */
+	currentRenderDeferred: boolean;
+	/**
 	 * Set on a block inside a HIDDEN `<Activity>` subtree. While inactive, the
 	 * block still renders (state + DOM are produced/updated) but its effects do
 	 * NOT run (enqueueEffect skips when any ancestor is inactive); on reveal the
@@ -440,6 +453,15 @@ let TRANSITION_DEPTH = 0;
  * would need AsyncContext, which isn't available in the browser target.
  */
 let ASYNC_TRANSITION_COUNT = 0;
+/**
+ * True only while useDeferredValue's spawned swap dispatches its re-render
+ * (the microtask's startTransition(scheduleRender) call — see
+ * spawnDeferredSwap). scheduleRender copies it onto the scheduled block as
+ * `pendingDeferred`: the "deferred lane" bit that lets a useDeferredValue
+ * mounting inside that pass skip its own preview state (React's
+ * anti-waterfall — only the first level defers).
+ */
+let DEFERRED_SPAWN = false;
 /**
  * Outstanding transition WORK count — incremented when startTransition fires,
  * decremented when its renders commit (and again for any tryBlock that holds
@@ -642,14 +664,31 @@ function scheduleRender(block: Block): void {
 	// Capture the caller's priority — setters inside startTransition() see
 	// TRANSITION_DEPTH > 0 and tag the render as 'transition'. An urgent setter
 	// arriving for a block already queued at 'transition' upgrades it.
+	// A RENDER-PHASE self-update (setState while this block's own body is on the
+	// stack — CURRENT_BLOCK is only non-null inside renderBlock) inherits the
+	// in-progress render's priority AND deferred bit instead of defaulting to
+	// urgent. React parity: render-phase updates render in the current pass's
+	// lanes, so a transition render that syncs state from props replays at
+	// transition priority (and useDeferredValue in the replay doesn't defer) —
+	// per ReactDeferredValue-test.js:232.
+	const renderPhaseSelf = CURRENT_BLOCK === block;
 	const mode: 'urgent' | 'transition' =
-		TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0 ? 'transition' : 'urgent';
+		TRANSITION_DEPTH > 0 ||
+		ASYNC_TRANSITION_COUNT > 0 ||
+		(renderPhaseSelf && block.currentRenderMode === 'transition')
+			? 'transition'
+			: 'urgent';
+	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
 	if (block.pending) {
-		if (mode === 'urgent') block.pendingMode = 'urgent';
+		if (mode === 'urgent') {
+			block.pendingMode = 'urgent';
+			block.pendingDeferred = false;
+		}
 		return;
 	}
 	block.pending = true;
 	block.pendingMode = mode;
+	block.pendingDeferred = deferred;
 	QUEUE.push(block);
 	if (syncFlush) return;
 	if (!scheduled) {
@@ -1227,6 +1266,8 @@ class BlockImpl {
 	mounted: boolean;
 	pendingMode: 'urgent' | 'transition' | null;
 	currentRenderMode: 'urgent' | 'transition' | null;
+	pendingDeferred: boolean;
+	currentRenderDeferred: boolean;
 	inactive: boolean;
 	// Hooks + cleanups (per-block state).
 	hooks: Map<symbol, any> | null;
@@ -1303,6 +1344,8 @@ class BlockImpl {
 		this.mounted = false;
 		this.pendingMode = null;
 		this.currentRenderMode = null;
+		this.pendingDeferred = false;
+		this.currentRenderDeferred = false;
 		this.inactive = false;
 		this.hooks = null;
 		this.cleanups = [];
@@ -1416,7 +1459,15 @@ export function renderBlock(block: Block): void {
 	// if, for, comp slots) called synchronously inside an outer body should
 	// run at the outer body's priority so transitions propagate down naturally.
 	block.currentRenderMode = block.pendingMode ?? prevBlock?.currentRenderMode ?? 'urgent';
+	// The deferred bit rides the same channel: explicit when this block was
+	// scheduled with a mode (pendingMode set), otherwise inherited from the
+	// enclosing render so it reaches components mounting inside a deferred pass.
+	block.currentRenderDeferred =
+		block.pendingMode !== null
+			? block.pendingDeferred
+			: (prevBlock?.currentRenderDeferred ?? false);
 	block.pendingMode = null;
+	block.pendingDeferred = false;
 	try {
 		const out = (block.body as (p: any, s: Scope, e: any) => unknown)(
 			block.props,
@@ -8230,6 +8281,44 @@ interface DeferredSlot<T> {
 	next: T; // latest pending value
 	scheduled: boolean;
 	block: Block;
+	/**
+	 * Whether this slot's LAST render ran inside a hidden <Activity>/suspended
+	 * subtree. Revealing a hidden tree is a fresh mount for this hook (React:
+	 * the prerendered tree has no on-screen "previous" value to defer to), so
+	 * the first visible render after hidden re-runs mount semantics.
+	 */
+	wasHidden: boolean;
+}
+
+/**
+ * Schedule the deferred current→next swap on a microtask. The re-render runs
+ * at transition priority — it can be interrupted by urgent updates and won't
+ * tear down the prior DOM if the swapped-in value suspends. DEFERRED_SPAWN
+ * tags the pass as a DEFERRED render (Block.pendingDeferred) so a
+ * useDeferredValue mounting inside it adopts its final value directly instead
+ * of waterfalling its own preview (React: only the first level defers).
+ */
+function spawnDeferredSwap<T>(s: DeferredSlot<T>): void {
+	s.scheduled = true;
+	queueMicrotask(() => {
+		if (!s.scheduled || s.block.disposed) return;
+		s.scheduled = false;
+		if (Object.is(s.current, s.next)) return;
+		s.current = s.next;
+		// Set the flag INSIDE the callback so it wraps only the scheduleRender
+		// for the deferred block: startTransition synchronously notifies
+		// useTransition listeners (tickTransitionCount) BEFORE running fn, and
+		// those listeners scheduleRender their own blocks — which must NOT be
+		// tagged as deferred passes.
+		startTransition(() => {
+			DEFERRED_SPAWN = true;
+			try {
+				scheduleRender(s.block);
+			} finally {
+				DEFERRED_SPAWN = false;
+			}
+		});
+	});
 }
 
 export function useDeferredValue<T>(value: T, ...rest: any[]): T {
@@ -8245,36 +8334,47 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 	const hasInitial = rest.length >= 2;
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
+	const hidden = inInactiveSubtree(block);
 	let s = scope.hooks?.get(slot) as DeferredSlot<T> | undefined;
 	if (s === undefined) {
-		if (hasInitial) {
+		if (hasInitial && !block.currentRenderDeferred) {
 			// First render returns the user's initialValue; if it differs from
 			// `value`, schedule a deferred re-render to swap to `value`. Mirrors
 			// React's "useDeferredValue with initialValue" contract: a UI that
 			// wants to show stable initial content while the expensive `value`
 			// computation settles in the background.
-			s = { current: initialValue as T, next: value, scheduled: false, block };
+			s = { current: initialValue as T, next: value, scheduled: false, block, wasHidden: hidden };
 			ensureHooks(scope).set(slot, s);
-			if (!Object.is(initialValue as T, value)) {
-				s.scheduled = true;
-				queueMicrotask(() => {
-					if (!s!.scheduled || s!.block.disposed) return;
-					s!.scheduled = false;
-					s!.current = s!.next;
-					// Same transition priority as the steady-state deferral below: the
-					// initialValue→value swap can be interrupted by urgent updates and
-					// won't tear down the initial DOM if the swapped-in value suspends.
-					startTransition(() => scheduleRender(s!.block));
-				});
-			}
+			if (!Object.is(initialValue as T, value)) spawnDeferredSwap(s);
 			return initialValue as T;
 		}
-		s = { current: value, next: value, scheduled: false, block };
+		// No initialValue — or mounting INSIDE an already-spawned deferred pass,
+		// where the OUTER preview already covered the loading state, so the final
+		// value is adopted directly (React's anti-waterfall: only the first
+		// useDeferredValue level defers — ReactDeferredValue-test.js:564).
+		s = { current: value, next: value, scheduled: false, block, wasHidden: hidden };
 		ensureHooks(scope).set(slot, s);
 		return value;
 	}
 	s.next = value;
+	const wasHidden = s.wasHidden;
+	s.wasHidden = hidden;
 	if (Object.is(s.current, value)) return s.current;
+	// Hidden-prerender update, or the first render after a hidden→visible
+	// reveal: React treats the (re)appearing tree as a fresh mount for this
+	// hook — there is no on-screen "previous" value to defer to
+	// (ReactDeferredValue-test.js:746/:848/:894). Re-run mount semantics:
+	// show the NEW preview and spawn the swap, or adopt the value directly
+	// when there is no initialValue (or this is already a deferred pass).
+	if (hidden || wasHidden) {
+		if (hasInitial && !block.currentRenderDeferred && !Object.is(initialValue as T, value)) {
+			s.current = initialValue as T;
+			if (!s.scheduled) spawnDeferredSwap(s);
+			return initialValue as T;
+		}
+		s.current = value;
+		return value;
+	}
 	// If the CURRENT render is already at transition priority, don't defer —
 	// commit the new value immediately. Matches React's `useDeferredValue does
 	// not defer during a transition` semantics — both Original and Deferred
@@ -8283,18 +8383,7 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 		s.current = value;
 		return value;
 	}
-	if (!s.scheduled) {
-		s.scheduled = true;
-		queueMicrotask(() => {
-			s!.scheduled = false;
-			if (s!.block.disposed || Object.is(s!.current, s!.next)) return;
-			s!.current = s!.next;
-			// Re-render at transition priority — matches React's contract that the
-			// deferred-value commit can be interrupted by urgent updates and won't
-			// tear down the prior DOM if it suspends.
-			startTransition(() => scheduleRender(s!.block));
-		});
-	}
+	if (!s.scheduled) spawnDeferredSwap(s);
 	return s.current;
 }
 
