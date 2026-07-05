@@ -10,6 +10,34 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 2 (in progress) — Field/Form context infrastructure + Switch DONE (2026-07).
+> Green: 29 differential tests vs real `@base-ui/react@1.6.0` (3 new Switch: uncontrolled
+> toggle, default-checked, disabled — all with click interaction), base-ui typecheck clean.**
+>
+> - **Field/Form context infrastructure** (`src/utils/field/` + `src/utils/{owner,useValueChanged,noop}.ts`):
+>   the context surfaces every form control threads through, ported with Base UI's DEFAULT
+>   values so controls work standalone (inert validation): `FieldRootContext`
+>   (+ `DEFAULT_FIELD_ROOT_CONTEXT`), `FormContext`, `LabelableContext`, `field/constants`
+>   (`DEFAULT_FIELD_ROOT_STATE`/`fieldValidityMapping`/`FieldValidityData`), and the consumer
+>   hooks `useRegisterFieldControl`, `useAriaLabelledBy`, `useLabelableId`, `useValueChanged`.
+>   The full `Field.Root`/`Form` PROVIDERS (which override the defaults + run validation) land
+>   later this phase; the controls are differential-tested standalone first.
+> - **Switch** (`src/switch.ts`) — `Switch.Root` (`role="switch"` span + hidden checkbox input)
+>   + `Switch.Thumb`. Reuses `useButton`/`useControlled`.
+>
+> **octane uncontrolled-input adaptation (the Phase-2 crux, reusable by Checkbox/Radio/etc.):**
+> octane inputs are UNCONTROLLED (a `checked` prop writes a `checked` ATTRIBUTE), but React's
+> controlled `<input checked>` reflects only the INITIAL checked to the attribute (as its
+> default-state) and drives the live value via the `.checked` PROPERTY. So the port: (1) passes
+> `checked: initialCheckedRef.current || undefined` (the initial state → attribute), (2) drives
+> the live `input.checked` PROPERTY imperatively via the native
+> `HTMLInputElement.prototype` setter in a layout effect, and (3) the root's `onClick`
+> dispatches a native `click` on the hidden input → native `change` → `onChange` (octane
+> delegates `change` for de-opt `createElement` inputs — confirmed). This mirrors the proven
+> `@octanejs/radix` bubble-input pattern; it is a binding adaptation to octane's *documented*
+> uncontrolled-input divergence, not a workaround for a bug. Verified byte-identical incl. the
+> click-toggle interaction.
+
 > **Phase 1 COMPLETE — ToggleGroup + Avatar DONE (2026-07). Green: 26 differential tests
 > vs real `@base-ui/react@1.6.0`, base-ui typecheck clean, full monorepo suite green.**
 > All Phase-1 components shipped: Separator, Fieldset, Meter, Progress, Toggle, **ToggleGroup**,
