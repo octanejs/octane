@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/router",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "description": "TanStack Router bindings for the octane renderer — reuses @tanstack/router-core and swaps the React binding for octane's hooks.",

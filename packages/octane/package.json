@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "license": "MIT",
   "type": "module",
   "description": "A fast, modern UI framework and the successor to Inferno",

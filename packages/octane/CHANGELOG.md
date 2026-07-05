@@ -1,5 +1,179 @@
 # octane
 
+## 0.1.3
+
+### Patch Changes
+
+- 71b5167: Attribute-write fixes surfaced by the Tier-3 React DOM attribute-matrix port:
+
+  - **Enumerated attributes stringify their boolean form**: `spellCheck={false}` / `contentEditable={false}` / `draggable={false}` now write `"false"` instead of removing the attribute — an absent enumerated attribute means "inherit / UA default", a genuinely different platform state (e.g. `contentEditable={false}` used to silently flip back to inherited editability).
+  - **Empty `src`/`href` are stripped** (React parity, dev + prod): an empty-string URL resolves to the current page, so browsers would re-fetch the whole document as an image/script/stylesheet. `<a href="">`/`<area href="">` keep it (a legitimate self-link).
+  - **Function and symbol attribute values are removed** instead of stringified — a function's source text can never leak into the DOM.
+  - **`className={null}` removes the `class` attribute** (React parity); an empty string still writes `class=""` — the raw-value distinction is checked before clsx composition erases it.
+  - **SSR style values are trimmed** (`{left: '16 '}` → `left:16`), matching what the client CSSOM produces on parse — removes a server/client byte divergence.
+
+  Documented intentional divergences (native pass-through, no known-attribute table): `unknown={true}` writes boolean presence (`""`) rather than being stripped; `inert=""` stays present (platform: presence = true; React coerces to false); truthy strings on boolean attributes stay verbatim (`disabled="disabled"` — functionally identical state); throwing-valueOf objects render their `toString()` instead of throwing. React-19 custom-element semantics (lowercase `on*` listeners, property-vs-attribute heuristics) remain an open, pinned gap.
+
+- 7b2acbd: `useDeferredValue` React-parity fixes (closes the five gaps pinned from
+  ReactDeferredValue-test.js) via a "deferred lane" bit on the scheduler:
+
+  - **Render-phase updates inherit the in-progress render's priority**: a
+    setState fired while the same component's body is rendering replays at the
+    current pass's priority (and deferred bit) instead of always urgent — so a
+    transition render that syncs state from props no longer makes
+    `useDeferredValue` defer in the replay (both values commit in one pass).
+  - **Only the first `useDeferredValue` level defers**: the spawned deferred
+    swap tags its re-render pass as deferred (`Block.currentRenderDeferred`); a
+    `useDeferredValue(value, initialValue)` MOUNTING inside that pass adopts the
+    final value directly instead of waterfalling its own preview — the outer
+    preview already covered the loading state (React's anti-waterfall rule).
+  - **Hidden `<Activity>` trees behave like fresh mounts for the hook**: a value
+    change while hidden re-renders the NEW preview state (prerender keeps up);
+    revealing hidden→visible with a different value shows the preview first
+    (with `initialValue`) or adopts the new value immediately (without) — the
+    hidden tree's committed value never flashes on reveal. Revealing with an
+    identical value still skips the preview (prerender payoff, unchanged).
+
+- a000fa2: Host-element ref lifecycle now matches React's commit phasing across all paths.
+
+  - De-opt host refs (object and callback `ref`s on `createElement`/value-position
+    JSX) are detached when their subtree is torn down: keyed-list item removal,
+    full list clears (including the `batchClearItems` fast path), wholesale scope
+    unmount of a pure `hostNode` or `hostElementBody` element, and mode-switch
+    rebuilds. Previously `ref.current` kept pointing at the removed DOM node and
+    callback refs never received their `null`/cleanup call.
+  - All ref detaches — teardown and identity swaps, compiled templates, spreads,
+    fragment refs, and the de-opt paths alike — are deferred to commit and drain
+    before that commit's ref attaches (React's mutation→layout phasing). A ref
+    hopping between elements in one render no longer ends `null` when a later
+    binding's detach ran after an earlier binding's attach, and a state setter
+    used as a ref settles on the replacement element instead of oscillating.
+  - `useImperativeHandle` honors a callback ref's React-19 cleanup return: detach
+    runs the returned cleanup instead of re-invoking the ref with `null`.
+
+- 71b5167: Hardening + parity fixes surfaced by the ReactDOMComponent conformance port:
+
+  - **SSR tag-name validation** (security): a dynamic de-opt tag like `createElement('div><img onerror=…>')` was concatenated verbatim into the server response — it now throws `Invalid tag` like React. (The client was already guarded by `document.createElement` itself.)
+  - **Client attribute writes are guarded**: an injection-shaped attribute name arriving through a spread used to crash the whole render with `InvalidCharacterError`; it is now reported and skipped, mirroring the SSR serializer's `VALID_ATTR_NAME` rejection.
+  - **`dangerouslySetInnerHTML` validation** (React parity): a malformed value (not `{__html}`) and combining it with `children` now throw instead of silently rendering; `__html: false` renders `'false'` consistently on both the compiled and spread paths.
+  - **`<link onLoad>`/`onError` now fire**: hoisted head elements live outside every delegation root, so the compiler now passes `on*` props through and `headBlock` attaches them as direct listeners (SSR skips them).
+  - **iOS Safari tap delivery**: delegation roots (createRoot containers + portal targets) get a noop `onclick` property so the whole subtree is tappable — the root-delegation equivalent of React's per-element stamping.
+  - **Boolean style values clear the property** (`fontFamily: true` no longer sets the literal string `"true"`), client + SSR.
+  - **`suppressContentEditableWarning` never lands in the DOM.**
+
+  Documented intentional divergences: no `possibleStandardNames` alias table (attribute names are written as authored — use native spellings like `accept-charset={…}`, valid in TSRX and React alike), and `muted` stays a plain attribute per the no-controlled-properties policy (the live `.muted` property belongs to the platform). Still pinned: void-element children/dSIH validation (compile-time diagnostic planned) and React-19 custom-element semantics.
+
+- 735f5ca: Keyed `@for` reorders no longer re-render survivors whose only change is position.
+
+  When a `@for` header binds no `index` name, its body cannot observe an item's
+  position, so a pure reorder (same item reference, moved to a new index) does not
+  need to re-render the survivor — only its DOM moves. The compiler now marks such
+  loops index-independent (a new `forBlock` flag), and the reconciler's pure
+  short-circuit skips the body for a moved survivor instead of calling `renderBlock`.
+  Previously every moved survivor re-rendered even though its output was identical.
+
+  Measured on a 1000-row keyed table: displace-k −46–48%, rotate/remove-first
+  −21–33%, reverse/shuffle a few percent (there the DOM moves dominate). An `@for`
+  that binds an `index` still re-renders on reorder so the index value stays correct
+  (conservative: the optimization applies only when the header provably binds no
+  index).
+
+- 634c4b4: Compiler-emitted runtime helpers can no longer be shadowed by user bindings. Generated code used to import and call helpers by their bare names (`setText`, `htext`, `clone`, `template`, …), so a user binding with the same name inside a component silently hijacked the generated call — `const [text, setText] = useState('')` (React's most common naming for text state) broke the text-hole update and stored a DOM Text node in state, and a module-level `const template = …` was a duplicate-declaration SyntaxError against the prelude import. The compiler now imports every generated-code helper under a collision-proof alias (`import { setText as _$setText } from 'octane'`) and references it as `_$setText(…)`, on both the client and server (`octane/server`) codegen paths — covering all emitted helpers (text/attr/style/class/spread setters, block helpers, refs, `createElement`, `withSlot`, `normalizeClass`, HMR wiring, and the `ssr*` family). Names the user's own code references — their preserved `octane` import specifiers (including `x as y` renames, which previously lost the alias) and slotted base-hook call sites — stay un-aliased.
+- 1987d47: Implement React's implicit same-element bailout, and fix a context-propagation bug the work surfaced:
+
+  - **Implicit bailout (React beginWork's `oldProps === newProps` skip):** re-rendering a parent that passes an identical (reference-equal) element to a value position (provider children, `.ts` binding trees, `return children` passthroughs, cached array items) now skips that child's body outright, while consumers of a changed context inside the bailed subtree still refresh via lazy per-context propagation. Value-position component blocks are armed as context-stamping targets (like `memo()` blocks) so the bail is always sound; compiled template positions re-create props per render and pay nothing. `@octanejs/radix`'s NavigationMenu no longer needs its `MemoChildren` memo() shim or its shallow-equal registration convergence bail — both were workarounds for this exact gap and are now deleted.
+  - **Bugfix — bailed subtrees no longer strand context consumers:** a memo boundary's re-render (own props changed) interleaved with an inner memo bail used to erase the outer boundary's recorded context dependencies (its `$$ctxReads` cleared, the bailed inner subtree never re-stamping them), so a LATER context change could bail straight past the consumer and leave it on a stale value. Bails now re-stamp the bailed block's surviving context deps onto memo/armed ancestors.
+
+- fda2200: Compiler: fix reversed child order when a component root precedes a static host root
+  in a multi-root fragment body.
+
+  A component authored as `<><Comp/><input/></>` (or whose children are threaded through
+  `createElement` as a compiled children fragment — e.g. a headless UI binding that renders
+  `createElement('fieldset', { children })`) dropped the component root's source-order `<!>`
+  anchor. The static template content drained into the parent first and the component was
+  appended at `endMarker` AFTER it, so `<Comp/>` before `<input/>` rendered as
+  `<input/>` then `<Comp/>`. The fix emits the `<!>` anchor for a component root in a mixed
+  body, mirroring the in-element mixed-children path and the control-flow root path — so the
+  component mounts at its source position. The server already emitted source order, so this
+  also removes a client/server divergence that could mis-adopt on hydration.
+
+- 71b5167: Native event delegation fixes (surfaced by the Tier-3 React event-matrix port — 212 conformance tests, all passing):
+
+  - **Non-bubbling native events now reach their target's handler.** The media/resource lifecycle family (`play`, `pause`, `timeupdate`, `load`, `error`, `loadstart`, …), `toggle`/`beforetoggle`, `close`/`cancel`, `abort`, and `resize` were delegated with a bubble-phase root listener that never hears a non-bubbling event — so `onPlay` on the `<video>` itself silently never fired. They are now capture-delegated with target-only delivery: the target's own handler fires, ancestors' do not — exactly the platform contract. (React's synthetic layer re-dispatches these up the tree; octane deliberately does not — documented intentional divergence.)
+  - **Capture handlers now fire before bubble/target handlers for capture-delegated types** (`focus`, `blur`, `invalid`, `scroll`, `scrollend`, and the new family). Both dispatchers are capture-phase listeners on the same root, so same-node registration order used to invert React/platform ordering (bubble walk before capture pass). The walk dispatcher now runs the capture pass explicitly first and honors a capture-phase `stopPropagation`.
+  - **A throwing or invalid listener no longer aborts the dispatch walk.** Each handler invocation is guarded like a separate native listener: exceptions surface through the global error event (`reportError`, with the standard polyfill fallback) and the walk continues to ancestors; a non-function listener value is reported and skipped instead of crashing dispatch.
+
+- fda2200: Add three React parity APIs, closing the "missing API" gaps short of streaming SSR:
+
+  - `lazy(load)` — code-splitting. Suspends into the nearest `@try`/`<Suspense>` until the module promise settles, then tail-calls the loaded component (hooks, context, and props flow as if statically imported); a rejected load routes to `@catch`. Works on the server too: `renderToString` emits the pending fallback, `prerender` awaits the module. Accepts `{ default: Component }` or a bare component function.
+  - `requestFormReset(form)` — React DOM parity. Inside a transition/action the reset is deferred until the action window settles (the manual companion to the automatic reset of plain `<form action={fn}>`); outside one it warns and resets immediately.
+  - `useDebugValue()` — no-op (octane has no devtools inspector), so custom hooks ported from React run unchanged.
+
+  All three are exported from `octane` and mirrored in `octane/server`. (`createRef` stays out: it exists for class components, which octane does not support.)
+
+- 3431ec3: React parity: an unguarded render-phase state update (a `setState` called
+  unconditionally during render) now throws `Too many re-renders. Octane limits the
+number of renders to prevent an infinite loop.` after 25 same-block re-renders in one
+  drain, instead of hanging the flush forever. The error routes through `@try` /
+  `ErrorBoundary` like any render error. Guarded derived-state patterns (mirror a prop,
+  converge in a few passes) are unaffected and now pinned by conformance tests.
+- 3afe217: Resource hints land (React DOM parity): `preload`, `preinit`, `preconnect`, and `prefetchDNS`, exported from `octane` and mirrored in `octane/server`. Client calls insert deduped `<link>`/async-`<script>` tags into `document.head`; server calls collect into the render's head output (flushed with the streaming shell). A shared `data-oct-hint` dedupe key means a hydrating client call for an SSR-emitted resource is a no-op.
+- 1a1f1db: Multiple unhandled root errors in one flush now aggregate (React parity): when several roots throw during a single synchronous flush and no boundary handles them, the flush rethrows an `AggregateError` carrying every error instead of silently keeping only the first. A single unhandled error still rethrows as-is; failed roots still unmount and the rest of the queue still commits. Also: SSR spread attributes now skip function/symbol values and `suppressContentEditableWarning` (mirroring the client's setAttribute policy).
+- 3431ec3: SSR: the buffered renderers (`renderToString`/`renderToStaticMarkup` in
+  `octane/server`, `prerender` in `octane/static`) gain a `RenderOptions` argument:
+  `nonce` (CSP nonce stamped on the emitted inline `<style>` tags and the suspense seed
+  script — all renderers), plus `signal` (AbortSignal that rejects a suspended render
+  when the request dies) and `timeoutMs` (per-render override of the suspense settle
+  deadline) on the async `prerender`. `octane/server` now documents which exports are
+  the compiler's private ABI and exports the `executeServerFunction` RPC executor the
+  vite plugin's dev RPC handler loads via `ssrLoadModule('octane/server')` (previously a
+  missing export, so any `module server` call crashed). Wire format is devalue, matching
+  `@ripple-ts/adapter`'s client stub: devalue-encoded argument array in, devalue-encoded
+  `{ value }` envelope out. See the new `docs/ssr.md` for the full SSR guide and the
+  current gaps (streaming, selective hydration, production server build).
+- 5e3858f: SSR serialization + hydration React-parity fixes (Tier-4 conformance):
+
+  - Adjacent dynamic text holes serialize with a `<!-- -->` separator so the parser can't merge them; the hydration walk adopts each hole's node (previously the second hole's content was lost, and adjacent empty holes crashed hydration). Empty static text literals no longer desync template child paths.
+  - Multi-root fragment bodies hydrate through a virtual wrapper: root fragments with component members adopt cleanly (previously the cursor desynced and content was detached/re-appended), and the mount drain is a hydration no-op (`drainFrag`).
+  - Nested-array children flatten one item per leaf in the de-opt list (React fragment semantics) — previously a nested array member rendered as nothing on the client and desynced hydration; component-bearing items now borrow their adopted item range.
+  - `ssrAttr` mirrors React's value-type filters where the functional outcome flips — and the client `setAttribute` applies the same rules (shared tables in constants.ts) so hydration agrees with the serialized markup: positive-numeric drop (`size={0}`), empty `src`/`href` strip (except `<a>`/`<area>`), function/symbol drop, `data-*` boolean stringify, boolean drop on string props (`href={true}`), unknown lowercase `on*` drop, `htmlFor` kept verbatim on custom elements, and `suppressContentEditableWarning` never serializes. Boolean-prop truthiness (`hidden={0}`, `inert=""`) deliberately stays native-as-written on both sides (adjudicated divergence).
+  - `<pre>`/`<textarea>`/`<listing>` protect a leading newline (the parser eats it) by emitting an extra `\n`.
+  - A plain-object child throws ("Objects are not valid as a child") instead of serializing `[object Object]`.
+  - Parser CR/CRLF→LF normalization no longer reports a spurious hydration text mismatch.
+
+- d2afbbb: Streaming SSR: `renderToPipeableStream` (Node streams) and `renderToReadableStream` (web streams) land in `octane/server` — React `react-dom/server` parity with out-of-order Suspense streaming.
+
+  - **Shell first**: one synchronous pass flushes immediately — scoped styles, hoisted head, the body with each still-pending `@try`/`<Suspense>` boundary rendering its fallback behind a `<template data-oct-b="N">` sentinel, the shell's `use()` seeds, and a ~600-byte inline swap runtime. `onShellReady` fires at flush.
+  - **Out-of-order completion**: as each boundary's data settles, the stream appends a hidden segment (`<div hidden data-oct-s="N">`) holding the real content plus that boundary's own `use()` seed JSON, followed by `$OCTRC("N")` — which swaps the content into the boundary's live range, stashes the seeds on `window.$OCTS`, and leaves a `<!--oct-seed:N-->` scoping comment. Nested boundaries stream parent-first; a rejected promise streams the `@catch` arm through the same path. `onAllReady` fires when the last boundary lands; `abort()`/`signal` mark still-pending boundaries errored (`$OCTRX`) so hydration client-renders them.
+  - **Hydration**: the client's `mountTry` recognizes the seed-scope comment and scopes that boundary's seeds to its subtree during adoption — a streamed page hydrates byte-for-byte with no re-suspend, no rebuild, and no mismatch warnings, verified end-to-end (stream → swap-runtime execution → `hydrateRoot`).
+  - Built on the same pass/cache engine as `prerender`: each settle round re-renders against the warmed cache and flushes newly-completed boundaries (plus any late scoped styles). The compiled `@try` emit now routes through a runtime `ssrTry` helper (byte-identical output for buffered renders), and the JSX `<Suspense>` builtin streams too.
+
+  Documented divergences from React Fizz: no selective hydration (octane has no synthetic event replay), per-round re-passes rather than per-boundary incremental renders, and head elements hoisted from inside a streamed boundary are re-created client-side on hydration rather than shipped mid-stream.
+
+- 1987d47: Two hide/reveal fidelity fixes (React Offscreen parity):
+
+  - **Insertion effects stay connected while hidden** (per `Activity-test.js:1428`): hiding an `<Activity>` (or a suspended boundary) no longer runs `useInsertionEffect` cleanups, revealing no longer re-fires them, and a deps-changed update while hidden still cycles them — insertion effects own injected styles that must persist while a tree is merely hidden; only a real unmount tears them down. Each effect slot now records its phase so the hide machinery can single insertion effects out.
+  - **Closure-attached refs now cycle across a suspend** (per `ReactSuspenseEffectsSemantics-test.js:2877`): refs inside a spread object, `<Fragment ref>` instances, and refs on value-position pure-host descriptors (the de-opt path, nested elements included) are now detached when a boundary suspends and re-attached on reveal, matching the compiled template host-ref behavior. Previously these three flavors kept pointing at hidden DOM.
+
+- eb48930: Error-handling fixes surfaced by the Tier-7 React error-boundary port (React 19 parity):
+
+  - **Deletion-phase errors reach boundaries**: an error thrown by an unmount cleanup used to be swallowed with `console.error`; it is now collected during the teardown walk and dispatched to the boundary enclosing the deletion after the walk completes (a boundary inside the deleted range is itself dying and is skipped), so the enclosing `@try` shows its `@catch` like React's `commitDeletionEffects` error routing.
+  - **Throwing ref detaches route to the boundary too**: a callback ref that throws on its `null` detach no longer escapes `flushSync` to the caller — the queued detach is guarded, the remaining detaches/attaches still run, and the error reaches the nearest still-mounted boundary.
+  - **Refs of aborted mounts are never invoked**: when a boundary unwinds a mount that never completed, the queued ref detach is suppressed — React never calls a ref (not even with `null`) for work that never committed. A previously-attached ref still detaches normally on real unmounts.
+  - **Uncaught errors unmount the whole tree**: when no boundary handles an error, the failed root's entire tree is removed from the DOM before the error is rethrown from the flush (React's documented contract — known-broken UI never stays on screen). Unrelated roots batched into the same flush keep draining.
+
+  The port also stress-verified the LIS keyed reconciler under mid-reconcile throws (40 seeded shuffle streams of 101 keyed rows, byte-equal against from-scratch baselines) — no inconsistency found.
+
+- 3431ec3: React parity: `useReducer` dispatch no longer eagerly bails out on `Object.is`-equal
+  state. Unlike `useState`'s setter (which keeps its eager fast path, matching React's
+  `dispatchSetState`), a dispatch whose reducer returns the same state still re-renders
+  the component once, matching `ReactHooksWithNoopRenderer-test.js` ("useReducer does not
+  eagerly bail out of state updates").
+- 87c5bc3: Children and `dangerouslySetInnerHTML` on void elements (`<input>`, `<br>`, `<img>`, …) are now rejected instead of failing silently (React parity — React throws "`input` is a void element tag and must neither have `children` nor use `dangerouslySetInnerHTML`"):
+
+  - **Compile-time diagnostic** (client, server, and value-position `createElement` lowering): `<input>{'kid'}</input>` and `<input dangerouslySetInnerHTML={…}/>` now fail the compile with a source-located error. Previously the template parser silently dropped the children out of the emitted `<input>…</input>` markup, and the `htmlOnlyChild` fast path wrote invisible `input.innerHTML`.
+  - **Runtime throw** on the routes the compiler can't see: a spread (`<input {...props}/>`) or de-opt (`createElement('input', {dangerouslySetInnerHTML})`) descriptor carrying `dangerouslySetInnerHTML` onto a void host now throws from `setAttribute`'s danger arm.
+
 ## 0.1.2
 
 ### Patch Changes

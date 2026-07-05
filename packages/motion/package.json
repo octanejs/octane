@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/motion",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "description": "Framer Motion bindings for the octane renderer — reuses motion-dom's animation engine, swaps the React components for octane host components.",
