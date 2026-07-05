@@ -133,5 +133,8 @@ export function cssStyleValue(name: string, value: unknown): string {
 	) {
 		return value + 'px';
 	}
-	return '' + value;
+	// Trim string values (React parity, CSSPropertyOperations-test.js:32): the
+	// client CSSOM trims on parse, so an untrimmed SSR emit would be a
+	// server/client byte divergence for the same style object.
+	return typeof value === 'string' ? value.trim() : '' + value;
 }

@@ -595,6 +595,43 @@ decision 2026-07-04), `StrictMode`, `Profiler`, `SuspenseList`, `forwardRef`
 (`preload`/`preinit`/…), and the streaming entries (`renderToPipeableStream` /
 `renderToReadableStream`) — the planned SSR follow-on.
 
+### Tier 3 — event + attribute matrix: PORTED (2026-07-04)
+Four parallel port agents covered ReactDOMEventListener (23), InvalidEventListeners
+(2), ReactBrowserEventEmitter (10), ReactDOMEventPropagation (89), ReactTreeTraversal
+(11), ReactDOMAttribute (13), DOMPropertyOperations (47), CSSPropertyOperations (15),
+and ReactDOMComponent (163) — ~370 cases fully accounted (ported / covered-by-existing
+/ skipped-with-reason blocks in each file). New conformance files: event-listener,
+browser-event-emitter, invalid-listeners, event-propagation, enter-leave-traversal,
+dom-attributes, css-properties, dom-component-{styles,attributes,children,
+custom-elements,events,ssr}.
+
+**Runtime fixes the port surfaced (all landed):** non-bubbling native families
+(media/toggle/close/load/error/resize) now capture-delegated TARGET-ONLY (they were
+silently dropped — even the target's own handler never fired); capture-before-bubble
+ordering for capture-delegated types; guarded per-listener dispatch (throwing/
+non-function listeners report via reportError + continue the walk); enumerated
+attrs (spellcheck/contenteditable/draggable) stringify booleans; empty src/href
+stripped (self-refetch footgun; a/area exempt); function/symbol attr values removed;
+className={null} removes class (raw-value check — differential rig proved React
+keeps class="" for ''); SSR style trim + boolean style values cleared (client+SSR);
+SSR tag-name validation (injection guard); client attr-write guarded against
+InvalidCharacterError crashes; dSIH shape + children-exclusivity throws;
+`<link onLoad>` fires (compiler passes on* to headBlock → direct listeners; head is
+outside delegation roots); noop onclick stamped on delegation roots (iOS Safari).
+
+**Documented intentional divergences (2026-07-04 maintainer ruling — no synthetic
+event system, no known-attribute tables):** no ancestor re-dispatch of non-bubbling
+events; no enter/leave synthesis (real native events); no synthetic onChange/
+onBeforeInput/onSelect polyfills; unknown={true} → boolean presence; inert="" stays
+(platform-true); verbatim boolean-attr strings; lenient toString() coercion; no
+possibleStandardNames alias table (native spellings are the idiom); muted stays a
+plain attribute (no property routing). Each is a positive platform-contract test
+citing the React line.
+
+**Still pinned (3 it.fails):** React-19 custom-element semantics (lowercase on*
+listeners + property heuristic — needs a maintainer decision) and void-element
+children/dSIH validation ×2 (compile-time diagnostic; follow-up task spawned).
+
 ### Suite status
 **204 test files, 1074 passed, 0 expected-fail, 0 regressions** (after the off-screen
 transition fix). Typecheck + format clean. (Earlier checkpoint: 106 files / 752.)

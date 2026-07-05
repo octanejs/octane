@@ -3506,10 +3506,21 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// `.__html` off the value object and assign the property. A literal
 	// `setAttribute('dangerouslySetInnerHTML', …)` would only add a dead attribute.
 	if (name === 'dangerouslySetInnerHTML') {
+		// React parity: the value must be `{__html: …}` — anything else is a
+		// programming error worth failing loudly on (a plain string here usually
+		// means the author thought dSIH takes HTML directly).
+		if (value != null && (typeof value !== 'object' || !('__html' in value))) {
+			throw new Error('`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`');
+		}
 		const html = value == null ? null : value.__html;
-		el.innerHTML = html == null || html === false ? '' : String(html);
+		// `__html: false` renders 'false' (React coerces; only null/undefined clear) —
+		// keeps this path consistent with the compiled htmlOnlyChild path.
+		el.innerHTML = html == null ? '' : String(html);
 		return;
 	}
+	// Never a DOM attribute — a React warning-suppression hint (octane doesn't emit
+	// the warning, but the key must not land in the markup either).
+	if (name === 'suppressContentEditableWarning') return;
 	// React-parity alias, mirroring class/className: `htmlFor` writes the native `for`.
 	if (name === 'htmlFor') name = 'for';
 	// Hydration VALUE-mismatch handling. The normal write below already PATCHES the adopted
@@ -3553,6 +3564,23 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		else el.setAttribute(name, String(value));
 		return;
 	}
+	// spellcheck / contenteditable / draggable are ENUMERATED too — `false` must
+	// WRITE "false" (an ABSENT attribute means "inherit / UA default", which is a
+	// different state), and `true` writes "true". Octane's generic boolean handling
+	// (false → remove) would silently flip e.g. contentEditable={false} back to
+	// inherited editability. Names are matched case-insensitively because JSX
+	// authors write the React camelCase forms.
+	if (typeof value === 'boolean' && isEnumeratedBooleanAttr(name)) {
+		el.setAttribute(name, value ? 'true' : 'false');
+		return;
+	}
+	// Function and symbol values are never meaningful attribute text (React removes
+	// them); stringifying a function would leak its source into the DOM.
+	const t = typeof value;
+	if (t === 'function' || t === 'symbol') {
+		el.removeAttribute(name);
+		return;
+	}
 	const ns = attrNamespace(name);
 	if (value == null || value === false) {
 		if (ns) {
@@ -3564,8 +3592,44 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		return;
 	}
 	const v = value === true ? '' : String(value);
-	if (ns) el.setAttributeNS(ns, name, v);
-	else el.setAttribute(name, v);
+	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers will
+	// re-fetch the whole document as an image/script/stylesheet. React strips these
+	// (dev AND prod); so do we. `<a href="">` (and `<area>`) stays — an empty href
+	// is a legitimate "link to this page".
+	if (
+		v === '' &&
+		(name === 'src' || (name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA'))
+	) {
+		el.removeAttribute(name);
+		return;
+	}
+	// Guarded write: an injection-shaped/invalid attribute NAME (e.g. a hostile
+	// spread key like `'x onload=…'`) makes the platform throw InvalidCharacterError,
+	// which would crash the whole render. Report + skip instead — the SSR serializer
+	// rejects the same names via VALID_ATTR_NAME (runtime.server.ts). try/catch is
+	// free on the no-throw path, so the hot path pays nothing.
+	try {
+		if (ns) el.setAttributeNS(ns, name, v);
+		else el.setAttribute(name, v);
+	} catch (err) {
+		console.error(err);
+	}
+}
+
+// The three global enumerated attributes whose boolean prop forms must stringify
+// (see setAttribute). Case-insensitive: JSX arrives camelCase (`spellCheck`),
+// spreads/de-opt props may arrive lowercase.
+function isEnumeratedBooleanAttr(name: string): boolean {
+	// Length-bucketed so non-matching names never pay the toLowerCase.
+	switch (name.length) {
+		case 10:
+			return name.toLowerCase() === 'spellcheck';
+		case 9:
+			return name.toLowerCase() === 'draggable';
+		case 15:
+			return name.toLowerCase() === 'contenteditable';
+	}
+	return false;
 }
 
 // clsx-style `class`/`className` composition — shared with the SSR serializer
@@ -3597,7 +3661,12 @@ export function setClassName(el: Element, value: unknown): void {
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
 	// because SVGElement.className is a read-only SVGAnimatedString and assignment
 	// is a no-op in real browsers.
-	(el as any).className = cls;
+	// A NULLISH/false className REMOVES the attribute (React parity: null removes;
+	// an empty STRING still writes `class=""` — the differential rig pins that
+	// distinction against React). Same raw-value rule as setClassAttr: composition
+	// erases the null-vs-'' difference, so the check must be on `value`.
+	if (value == null || value === false) el.removeAttribute('class');
+	else (el as any).className = cls;
 }
 
 // Attribute-based class setter: SVG/MathML compiled TEMPLATE bindings (where
@@ -3696,14 +3765,16 @@ function applyStyleValue(style: CSSStyleDeclaration, value: any, prev: any): voi
 		for (const k in value) {
 			const v = value[k];
 			if (v === prev[k]) continue;
-			if (v == null || v === false) style.removeProperty(styleName(k));
+			// Booleans clear the property (React parity): `fontFamily: true` must not
+			// set the literal string "true" (a valid font name!).
+			if (v == null || typeof v === 'boolean') style.removeProperty(styleName(k));
 			else applyStyleProperty(style, k, v);
 		}
 	} else {
 		if (typeof prev === 'string') style.cssText = '';
 		for (const k in value) {
 			const v = value[k];
-			if (v != null && v !== false) applyStyleProperty(style, k, v);
+			if (v != null && typeof v !== 'boolean') applyStyleProperty(style, k, v);
 		}
 	}
 }
@@ -3923,6 +3994,8 @@ const _injectedStyles = new Set<string>();
 
 interface HeadSlot {
 	el: Element;
+	/** Direct listeners for on* props — head elements sit outside delegation roots. */
+	handlers?: Map<string, EventListener>;
 }
 
 // Find the server-rendered element for `key` in <head> (it directly follows the
@@ -3972,7 +4045,26 @@ export function headBlock(
 	}
 	const el = state.el;
 	if (attrs !== null) {
-		for (const k in attrs) setAttribute(el, k, attrs[k]);
+		for (const k in attrs) {
+			// Hoisted head elements live in document.head — OUTSIDE every delegation
+			// root — and their load/error events don't bubble anyway, so on* props
+			// get DIRECT listeners here (`<link onLoad={…}>` must fire like React's).
+			const ev = k.length > 2 && k[0] === 'o' && k[1] === 'n' ? eventSlot(k) : null;
+			if (ev !== null) {
+				const v = attrs[k];
+				const hs = (state.handlers ??= new Map<string, EventListener>());
+				const prevH = hs.get(ev.type);
+				if (prevH) el.removeEventListener(ev.type, prevH, ev.capture);
+				if (typeof v === 'function') {
+					el.addEventListener(ev.type, v as EventListener, ev.capture);
+					hs.set(ev.type, v as EventListener);
+				} else {
+					hs.delete(ev.type);
+				}
+				continue;
+			}
+			setAttribute(el, k, attrs[k]);
+		}
 	}
 	if (text != null) {
 		const t = String(text);
@@ -4032,6 +4124,46 @@ const _delegatedCapture = new Set<string>();
 // upward, which reproduces React's bubbling `onFocus`/`onBlur`. (All other events
 // keep the cheaper bubbling-phase delegation.) The flag must match between
 // add/removeEventListener, so it is derived from the name both times.
+// The remaining NON-BUBBLING native families (media/resource lifecycle,
+// <details>/<dialog> state events, resize). The platform fires these on the
+// target only; ancestors never hear them natively. React's synthetic layer
+// re-dispatches them up the tree — octane deliberately does NOT (maintainer
+// ruling 2026-07-04: never replicate the synthetic event system) — but the
+// TARGET's own handler must still fire, which requires capture-phase delegation
+// (a bubble-phase root listener never hears a non-bubbling event at all).
+// Delivery is target-only, exactly like the platform.
+const NON_BUBBLING_TARGET_EVENTS = [
+	'abort',
+	'beforetoggle',
+	'cancel',
+	'canplay',
+	'canplaythrough',
+	'close',
+	'durationchange',
+	'emptied',
+	'encrypted',
+	'ended',
+	'error',
+	'load',
+	'loadeddata',
+	'loadedmetadata',
+	'loadstart',
+	'pause',
+	'play',
+	'playing',
+	'progress',
+	'ratechange',
+	'resize',
+	'seeked',
+	'seeking',
+	'stalled',
+	'suspend',
+	'timeupdate',
+	'toggle',
+	'volumechange',
+	'waiting',
+];
+
 const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
 	'focus',
 	'blur',
@@ -4048,6 +4180,7 @@ const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
 	// enter/leave target-only treatment below.
 	'scroll',
 	'scrollend',
+	...NON_BUBBLING_TARGET_EVENTS,
 ]);
 const delegatedCapture = (name: string): boolean => CAPTURE_DELEGATED.has(name);
 
@@ -4066,6 +4199,9 @@ const TARGET_ONLY_DELEGATED = /* @__PURE__ */ new Set([
 	// bubbling), and ancestors receive their own scroll events natively.
 	'scroll',
 	'scrollend',
+	// Platform semantics for every other non-bubbling family (media, toggle,
+	// close, load/error, …): the target's handler fires, ancestors' do not.
+	...NON_BUBBLING_TARGET_EVENTS,
 ]);
 
 export function delegateEvents(eventNames: string[]): void {
@@ -4108,6 +4244,13 @@ function registerDelegationTarget(target: Node): void {
 	const prev = _delegationTargets.get(target) || 0;
 	_delegationTargets.set(target, prev + 1);
 	if (prev === 0) {
+		// iOS Safari quirk (React parity): elements without a DIRECT click listener
+		// don't dispatch taps up to a delegated ancestor listener. A noop `onclick`
+		// on the delegation root (createRoot container / portal target) makes the
+		// whole subtree tappable. Property assignment — never an attribute.
+		if ((target as any).onclick == null && (target as any).nodeType === 1) {
+			(target as any).onclick = noop;
+		}
 		for (const name of _delegated) {
 			target.addEventListener(name, dispatchDelegated, delegatedCapture(name));
 		}
@@ -4223,25 +4366,68 @@ const CAPTURE_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched.capture');
 
 // Invoke one event slot — a bare handler `fn(event)` or a `{ fn, args }` bundle
 // (the compiler's stable-arrow optimisation) as `fn(...args, event)`.
+//
+// GUARDED like the platform guards each listener invocation: a throwing handler
+// (or a non-function listener value that arrived through a spread/prop) reports
+// its error and must NOT abort the rest of the dispatch walk — ancestors still
+// receive the event, exactly as separate native listeners would. `reportError`
+// surfaces through the global error event (window.onerror) like an uncaught
+// listener exception; console.error is the non-browser fallback.
 function fireEventSlot(slot: HandlerBundle | ((e: Event) => any), event: Event): void {
-	if (typeof slot === 'function') {
-		slot(event);
+	try {
+		if (typeof slot === 'function') {
+			slot(event);
+			return;
+		}
+		const fn = slot.fn as unknown;
+		if (typeof fn !== 'function') {
+			// React parity outcome: a non-function listener is reported and ignored;
+			// it never blocks sibling/ancestor handlers.
+			console.error(
+				'Expected an event listener to be a function, instead got a value of type ' +
+					typeof (fn ?? slot),
+			);
+			return;
+		}
+		const a = slot.args;
+		switch (a.length) {
+			case 0:
+				slot.fn(event);
+				break;
+			case 1:
+				slot.fn(a[0], event);
+				break;
+			case 2:
+				slot.fn(a[0], a[1], event);
+				break;
+			default:
+				slot.fn.apply(null, a.concat(event));
+		}
+	} catch (err) {
+		reportListenerError(err);
+	}
+}
+
+// Surface a guarded listener exception the way the platform surfaces an uncaught
+// one: through the global error event, then the console if nothing canceled it.
+// `reportError` is exactly that; the fallback is the standard polyfill shape for
+// environments without it (jsdom).
+function reportListenerError(err: unknown): void {
+	if (typeof reportError === 'function') {
+		reportError(err);
 		return;
 	}
-	const a = slot.args;
-	switch (a.length) {
-		case 0:
-			slot.fn(event);
-			break;
-		case 1:
-			slot.fn(a[0], event);
-			break;
-		case 2:
-			slot.fn(a[0], a[1], event);
-			break;
-		default:
-			slot.fn.apply(null, a.concat(event));
+	if (typeof window !== 'undefined' && typeof ErrorEvent === 'function') {
+		const ev = new ErrorEvent('error', {
+			error: err,
+			message: String((err as any)?.message ?? err),
+			cancelable: true,
+		});
+		window.dispatchEvent(ev);
+		if (!ev.defaultPrevented) console.error(err);
+		return;
 	}
+	console.error(err);
 }
 
 // React parity: discrete events (click, keydown, input, …) must commit before the
@@ -4266,6 +4452,21 @@ function dispatchDelegated(event: Event): void {
 	_dispatchDepth++;
 	let node = event.target as any;
 	try {
+		// CAPTURE_DELEGATED types have BOTH dispatchers attached as capture-phase
+		// listeners on the same root, so same-node registration ORDER — not phase —
+		// would decide whether the capture pass or this walk runs first. Run the
+		// capture pass explicitly first (it self-stamps, so the natively-queued
+		// capture listener no-ops), and honor a capture-phase stopPropagation
+		// before walking — native cross-phase semantics. Nested inside our
+		// _dispatchDepth++ so the capture pass can't flush discrete work mid-event.
+		if (
+			delegatedCapture(event.type) &&
+			(event as any)[CAPTURE_DISPATCHED] !== true &&
+			_delegatedCapture.has(event.type)
+		) {
+			dispatchDelegatedCapture(event);
+			if (event.cancelBubble) return;
+		}
 		while (node !== null && node !== undefined) {
 			const slot = node[key] as EventSlot;
 			if (slot) {
@@ -5379,8 +5580,14 @@ function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): v
 // child reconciliation entirely: applyDeoptProps/patchDeoptProps already wrote
 // `el.innerHTML`, and running childSlot/reconcileDeoptChildren with (empty) children
 // would wipe it. (SSR already implements raw-HTML-wins; see runtime.server.ts.)
+// Supplying BOTH is a programming error — throw like React (silently letting the
+// raw HTML win would hide the author's dead `children`).
 function hasDangerHTML(props: any): boolean {
-	return props != null && props.dangerouslySetInnerHTML != null;
+	if (props == null || props.dangerouslySetInnerHTML == null) return false;
+	if (props.children != null) {
+		throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+	}
+	return true;
 }
 
 // Route a host descriptor's props onto a FRESH element (first build).

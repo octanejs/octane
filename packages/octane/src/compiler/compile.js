@@ -3307,10 +3307,12 @@ function headElementArgs(node, index) {
 		}
 		if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
 		const attrName = a.name.name || a.name;
-		// Events/refs/key have no head semantics; `class` is the CSS-scoping stamp
-		// (meaningless on title/meta/link) — drop them all.
+		// refs/key have no head semantics; `class` is the CSS-scoping stamp
+		// (meaningless on title/meta/link) — drop them. EVENTS pass through: a
+		// hoisted element lives in document.head, outside every delegation root,
+		// so the client headBlock attaches on* props as DIRECT listeners
+		// (`<link onLoad={…}>` — React parity); the server ssrHeadEl skips them.
 		if (attrName === 'key' || attrName === 'ref' || attrName === 'class') continue;
-		if (isEventAttrName(attrName)) continue;
 		const val = a.value;
 		if (val == null) {
 			attrParts.push(`${JSON.stringify(attrName)}: true`);
