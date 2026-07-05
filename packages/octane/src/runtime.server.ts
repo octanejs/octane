@@ -1979,3 +1979,110 @@ export function renderToReadableStream(
 		});
 	});
 }
+
+// ---------------------------------------------------------------------------
+// Resource hints — server mirrors of React DOM's preload / preinit /
+// preconnect / prefetchDNS. Each emits one deduped tag into the render's HEAD
+// buffer (folded into <head> / flushed with the streaming shell). The
+// `data-oct-hint` key matches the client's dedupe set, so a hydrating client
+// call for the same resource is a no-op.
+// ---------------------------------------------------------------------------
+
+// Per-render emitted-hint keys. Reset via the HEAD identity: each pass installs
+// a fresh HEAD buffer, so tracking last-seen HEAD keeps this render-local
+// without touching saveAmbient.
+let _hintHead: { html: string } | null = null;
+let _hintKeys: Set<string> | null = null;
+
+function emitHeadHint(key: string, html: string): void {
+	if (HEAD === null) return;
+	if (_hintHead !== HEAD) {
+		_hintHead = HEAD;
+		_hintKeys = new Set();
+	}
+	if (_hintKeys!.has(key)) return;
+	_hintKeys!.add(key);
+	HEAD.html += html;
+}
+
+function hintAttrs(opts: Record<string, unknown> | undefined, skipAs: boolean): string {
+	let out = '';
+	if (opts == null) return out;
+	for (const k in opts) {
+		if (skipAs && k === 'as') continue;
+		const v = (opts as any)[k];
+		if (v == null || v === false) continue;
+		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
+		out += ' ' + name + (v === true ? '' : '="' + escapeAttr(v) + '"');
+	}
+	return out;
+}
+
+/** React DOM `preload(href, {as, …})`. */
+export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
+	if (!href || !options?.as) return;
+	const key = 'preload:' + options.as + ':' + href;
+	emitHeadHint(
+		key,
+		'<link rel="preload" href="' +
+			escapeAttr(href) +
+			'"' +
+			hintAttrs(options, false) +
+			' data-oct-hint="' +
+			escapeAttr(key) +
+			'">',
+	);
+}
+
+/** React DOM `preinit(href, {as: 'style'|'script', …})`. */
+export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
+	if (!href || !options?.as) return;
+	const key = 'preinit:' + options.as + ':' + href;
+	const hint = ' data-oct-hint="' + escapeAttr(key) + '"';
+	emitHeadHint(
+		key,
+		options.as === 'style'
+			? '<link rel="stylesheet" href="' +
+					escapeAttr(href) +
+					'"' +
+					hintAttrs(options, true) +
+					hint +
+					'>'
+			: '<script src="' +
+					escapeAttr(href) +
+					'" async' +
+					hintAttrs(options, true) +
+					hint +
+					'></script>',
+	);
+}
+
+/** React DOM `preconnect(href, {crossOrigin?})`. */
+export function preconnect(href: string, options?: { crossOrigin?: string }): void {
+	if (!href) return;
+	const key = 'preconnect:' + href;
+	emitHeadHint(
+		key,
+		'<link rel="preconnect" href="' +
+			escapeAttr(href) +
+			'"' +
+			hintAttrs(options, false) +
+			' data-oct-hint="' +
+			escapeAttr(key) +
+			'">',
+	);
+}
+
+/** React DOM `prefetchDNS(href)`. */
+export function prefetchDNS(href: string): void {
+	if (!href) return;
+	const key = 'dns-prefetch:' + href;
+	emitHeadHint(
+		key,
+		'<link rel="dns-prefetch" href="' +
+			escapeAttr(href) +
+			'" data-oct-hint="' +
+			escapeAttr(key) +
+			'">',
+	);
+}

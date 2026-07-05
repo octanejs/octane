@@ -44,6 +44,11 @@ export {
 	requestFormReset,
 	memo,
 	lazy,
+	// Resource hints (React DOM parity)
+	preload,
+	preinit,
+	preconnect,
+	prefetchDNS,
 	// Context
 	createContext,
 	use,
