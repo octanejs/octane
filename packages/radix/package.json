@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/radix",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "description": "Radix UI Primitives for the octane renderer — a port of @radix-ui/react (headless, accessible UI primitives) on octane's hooks, built on the same @octanejs/floating-ui substrate.",
