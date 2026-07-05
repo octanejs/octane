@@ -158,4 +158,42 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		});
 		d.unmount();
 	});
+
+	it('ToggleGroup: single-select (composite roving tabindex + value → aria-pressed)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToggleGroupSingle', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('click center → value moves', async (i, r) => {
+			await i.click('.ti:nth-child(2)');
+			await r.click('.ti:nth-child(2)');
+		});
+		d.unmount();
+	});
+
+	it('ToggleGroup: multiple-select (data-multiple, two items pressed)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToggleGroupMultiple', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('click center → adds to selection', async (i, r) => {
+			await i.click('.ti:nth-child(2)');
+			await r.click('.ti:nth-child(2)');
+		});
+		d.unmount();
+	});
+
+	it('ToggleGroup: disabled group (data-disabled + every button disabled)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToggleGroupDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Avatar: image + fallback (image inert under jsdom → fallback shows, img unmounted)', async () => {
+		const d = await mountDifferential(FIXTURE, 'AvatarBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Avatar: fallback only (no image)', async () => {
+		const d = await mountDifferential(FIXTURE, 'AvatarFallbackOnly', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
 });

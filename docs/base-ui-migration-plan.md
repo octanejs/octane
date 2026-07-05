@@ -10,6 +10,34 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 1 COMPLETE — ToggleGroup + Avatar DONE (2026-07). Green: 26 differential tests
+> vs real `@base-ui/react@1.6.0`, base-ui typecheck clean, full monorepo suite green.**
+> All Phase-1 components shipped: Separator, Fieldset, Meter, Progress, Toggle, **ToggleGroup**,
+> **Avatar**.
+>
+> - **ToggleGroup** (`src/toggle-group.ts`) + Toggle's group path — required porting Base UI's
+>   entire **composite roving-focus system** (`src/utils/composite/`): `CompositeRoot` +
+>   `useCompositeRoot` (arrow/Home/End keyboard nav, default tab stop), `CompositeList` +
+>   `useCompositeListItem` (stable-Map registration → document-order index + MutationObserver),
+>   `CompositeItem` + `useCompositeItem` (roving `tabIndex` 0/-1 + focus/hover), plus vendored
+>   floating-ui list utils (`list-utils.ts`), `keys.ts` (nav constants + `scrollIntoViewIfNeeded`),
+>   a minimal `DirectionContext`, and `useRefWithInit`. Decision: **ported Base UI's composite
+>   directly** rather than bridging to `@octanejs/floating-ui`'s `Composite` (different API +
+>   behavior would break byte-parity). Differential tests: single-select (roving tabindex +
+>   value→aria-pressed + click moves value), multiple-select (`data-multiple`), disabled group.
+>   **This unlocks Toolbar / Menu / Menubar / Select / NavigationMenu / Tabs / RadioGroup for
+>   later phases.**
+> - **Avatar** (`src/avatar.ts`) — Root/Image/Fallback + the **transition system**:
+>   `useTransitionStatus` (+ `transitionStatusMapping` → `data-starting-style`/`data-ending-style`),
+>   `useOpenChangeComplete` → `useAnimationsFinished` → `useAnimationFrame`/`resolveRef`,
+>   `useImageLoadingStatus` (off-DOM `new Image()` load tracking), `useTimeout`. Under jsdom the
+>   image never resolves, so (identically on both renderers) the `<img>` stays unmounted and the
+>   Fallback shows — verified `<span class="av"><span class="av-fb">JD</span></span>`.
+>
+> Internals now available for Phase 2+: the composite system, the transition/animation system,
+> `useButton`/`useControlled`/`useFocusableWhenDisabled`, `useStableCallback`/`useValueAsRef`/
+> `useRefWithInit`/`useTimeout`, `useBaseUiId`/`useRegisteredLabelId`, `DirectionContext`.
+
 > **Phase 1 (in progress) — Meter + Progress + Toggle DONE (2026-07). Green: 21 differential
 > tests vs real `@base-ui/react@1.6.0` (Separator ×5, useRender ×2, Fieldset ×4, Meter ×3,
 > Progress ×3, Toggle ×4), base-ui typecheck clean, full monorepo suite 1497 green.**

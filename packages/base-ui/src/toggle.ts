@@ -8,6 +8,8 @@
 // event directly (Base UI reads `event.nativeEvent` off the synthetic wrapper — octane has
 // none, so we pass the native event straight into the change-details); the dev
 // group-value warning is dropped.
+import { createElement, useMemo } from 'octane';
+
 import { S, subSlot } from './internal';
 import { useRenderElement, type RenderProp } from './utils/useRenderElement';
 import { useBaseUiId } from './utils/useBaseUiId';
@@ -15,6 +17,7 @@ import { useButton } from './utils/useButton';
 import { useControlled } from './utils/useControlled';
 import { useToggleGroupContext } from './utils/ToggleGroupContext';
 import { createChangeEventDetails, REASONS } from './utils/createChangeEventDetails';
+import { CompositeItem } from './utils/composite/CompositeItem';
 
 export interface ToggleState {
 	pressed: boolean;
@@ -114,12 +117,26 @@ function Toggle(props: ToggleProps): any {
 		subSlot(slot, 're'),
 	);
 
+	// A disabled toggle is natively disabled and cannot hold roving focus. Toolbar reads this
+	// to compute `disabledIndices` (consumed by the group/CompositeItem path).
+	const itemMetadata = useMemo(
+		() => ({ disabled, focusableWhenDisabled: false }),
+		[disabled],
+		subSlot(slot, 'meta'),
+	);
+
 	if (groupContext) {
-		// Group path: a grouped Toggle renders through CompositeItem for roving focus and
-		// its `itemMetadata` (`{ disabled, focusableWhenDisabled: false }`). That lands with
-		// ToggleGroup + the composite system; no <ToggleGroup> provider exists yet, so this
-		// branch is currently unreachable.
-		throw new Error('Base UI: <Toggle> inside a <ToggleGroup> requires the composite system.');
+		// Group path: render through CompositeItem for roving focus.
+		return createElement(CompositeItem, {
+			tag: 'button',
+			render,
+			className,
+			style,
+			metadata: itemMetadata,
+			state,
+			refs,
+			props: buttonProps,
+		});
 	}
 
 	return element;
