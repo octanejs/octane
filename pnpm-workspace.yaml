@@ -87,6 +87,7 @@ catalogs:
     '@tanstack/react-router': 1.170.16
     '@tanstack/router-core': 1.171.13
     '@tanstack/store': ^0.9.3
+    '@testing-library/dom': ^10.4.1
     '@tsrx/core': ^0.1.33
     '@tsrx/prettier-plugin': ^0.3.86
     '@tsrx/ripple': ^0.1.34
