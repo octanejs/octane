@@ -4,6 +4,8 @@ import { Fieldset } from '@octanejs/base-ui/fieldset';
 import { Meter } from '@octanejs/base-ui/meter';
 import { Progress } from '@octanejs/base-ui/progress';
 import { Toggle } from '@octanejs/base-ui/toggle';
+import { ToggleGroup } from '@octanejs/base-ui/toggle-group';
+import { Avatar } from '@octanejs/base-ui/avatar';
 
 // Self-contained differential fixtures: the SAME source runs on octane (via
 // @octanejs/base-ui/<sub>) AND on React (the setup rewrites imports to the real
@@ -180,4 +182,51 @@ export function ToggleDisabled() @{
 // onPressedChange wired), matching React's controlled Toggle.
 export function ToggleControlled() @{
 	<Toggle className="tgl" pressed={true}>Bold</Toggle>
+}
+
+// ToggleGroup — role="group" + data-orientation, composite roving focus (item 0 gets
+// tabindex 0, the rest -1), and single-select value. Proves the whole composite system:
+// CompositeRoot/CompositeList/CompositeItem registration + highlighted-index default +
+// each Toggle deriving `aria-pressed` from the group value.
+export function ToggleGroupSingle() @{
+	<ToggleGroup className="tg" defaultValue={['left']} aria-label="Align">
+		<Toggle className="ti" value="left">L</Toggle>
+		<Toggle className="ti" value="center">C</Toggle>
+		<Toggle className="ti" value="right">R</Toggle>
+	</ToggleGroup>
+}
+
+// Multiple-select — data-multiple on the group; two items pressed at once.
+export function ToggleGroupMultiple() @{
+	<ToggleGroup className="tg" multiple defaultValue={['left', 'right']} aria-label="Format">
+		<Toggle className="ti" value="left">B</Toggle>
+		<Toggle className="ti" value="center">I</Toggle>
+		<Toggle className="ti" value="right">U</Toggle>
+	</ToggleGroup>
+}
+
+// Disabled group — data-disabled on the group; every button natively disabled.
+export function ToggleGroupDisabled() @{
+	<ToggleGroup className="tg" disabled defaultValue={['left']} aria-label="Align">
+		<Toggle className="ti" value="left">L</Toggle>
+		<Toggle className="ti" value="center">C</Toggle>
+	</ToggleGroup>
+}
+
+// Avatar — Root/Image/Fallback. The image loads off-DOM and never resolves under jsdom, so
+// (identically on both renderers) the <img> stays unmounted via the transition system and the
+// Fallback shows. Proves the transition system + image-load hook + multi-part context render
+// byte-identically to Base UI even when the image path is inert.
+export function AvatarBasic() @{
+	<Avatar.Root className="av">
+		<Avatar.Image className="av-img" src="https://example.com/a.png" />
+		<Avatar.Fallback className="av-fb">JD</Avatar.Fallback>
+	</Avatar.Root>
+}
+
+// Fallback only — no <Avatar.Image>; the Fallback renders immediately.
+export function AvatarFallbackOnly() @{
+	<Avatar.Root className="av">
+		<Avatar.Fallback className="av-fb">AB</Avatar.Fallback>
+	</Avatar.Root>
 }
