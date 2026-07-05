@@ -15,6 +15,7 @@
 
 import {
 	SUSPENSE_SCRIPT_ATTR,
+	STREAM_SEED_COMMENT,
 	HYDRATION_START,
 	HYDRATION_END,
 	UNDEFINED_SENTINEL_KEY,
@@ -335,6 +336,13 @@ export interface Block extends Scope {
 	inactive: boolean;
 	/** Direct (own) context reads this render — drives memo invalidation alongside $$ctxReads. */
 	$$ctxDirect: Map<Context<any>, any> | null;
+	/**
+	 * Armed for React's IMPLICIT same-element bailout (beginWork's
+	 * oldProps === newProps skip). Set at value-position component mounts
+	 * (childSlot); makes the block a context-stamping target like `__memo` so
+	 * the bail's lazy consumer refresh is sound.
+	 */
+	$$implicitBail: boolean;
 	/** Per-render `use(thenable)` call-order counter; reset at the top of renderBlock. */
 	__thenableIdx: number;
 	/**
@@ -353,6 +361,14 @@ interface EffectSlot {
 	cleanup: Cleanup | undefined;
 	/** Discriminant so deactivateScope can find effect slots among state/memo/ref. */
 	effect: true;
+	/**
+	 * The slot's phase (INSERTION/LAYOUT/PASSIVE), fixed at creation (a hook slot
+	 * is one call site, and a call site has one phase). deactivateScope uses it to
+	 * spare INSERTION effects on hide: React never disconnects insertion effects
+	 * for a hidden (<Activity>/suspended) tree — they own injected styles that
+	 * must persist — only a real unmount cleans them up.
+	 */
+	phase: Phase;
 	/**
 	 * True once a per-slot finalizer has been registered in scope.cleanups (on the
 	 * slot's first body run, in drainPhase). The finalizer fires slot.cleanup
@@ -672,9 +688,10 @@ function sortWaveByDepth(wave: Block[]): Block[] {
 // synchronous, so we sort and drain the LIVE array in place — no per-flush snapshot
 // allocation, no O(n) shift re-indexing. The sort runs only on batches (>1 block),
 // so the common single-update flush reorders nothing and pays no depth-walk.
-// Returns the first unhandled render error to surface after commit.
+// Returns the unhandled render error(s) to surface after commit — multiple
+// failed roots in one flush aggregate like React (AggregateError).
 function drainQueue(): { err: any } | null {
-	let pendingError: { err: any } | null = null;
+	let pendingError: { err: any; all: any[] } | null = null;
 	const drainId = ++DRAIN_ID;
 	if (QUEUE.length > 1) sortWaveByDepth(QUEUE);
 	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
@@ -713,8 +730,27 @@ function drainQueue(): { err: any } | null {
 				// No tryBlock claimed this error. Don't let it abandon the rest of
 				// the queue or skip commit — that would strand unrelated roots
 				// batched into the same flush and drop their already-rendered
-				// effects. Remember the first and surface it once the flush drains.
-				if (pendingError === null) pendingError = { err: unhandled };
+				// effects. Collect them all; a multi-root flush with several
+				// unhandled errors surfaces an AggregateError (React parity), a
+				// single one rethrows as-is.
+				if (pendingError === null) pendingError = { err: unhandled, all: [unhandled] };
+				else {
+					pendingError.all.push(unhandled);
+					pendingError.err =
+						typeof AggregateError === 'function'
+							? new AggregateError(
+									pendingError.all,
+									'Multiple errors were thrown during the render flush.',
+								)
+							: pendingError.all[0];
+				}
+				// React 19 contract: an error no boundary handles unmounts the
+				// ENTIRE tree of the failed root — known-broken UI never stays on
+				// screen (ReactIncrementalErrorHandling:1338/:712). Only the
+				// offending root is torn down; unrelated roots keep draining.
+				let root: Block = block;
+				while (root.parentBlock !== null) root = root.parentBlock;
+				if (root.kind === 'root' && !root.disposed) unmountBlock(root);
 			}
 		}
 	}
@@ -820,8 +856,10 @@ const LAYOUT_CASCADE_LIMIT = 50;
  * ref.current is set before layout effects run. Each entry records its owning
  * `block` plus an enqueue-order `seq`; drainRefAttaches sorts with
  * comparePostOrder (post-order via the parentBlock chain, seq as tiebreak) for
- * child-before-parent ordering, matching effect ordering. Ref UPDATES stay
- * inline (the element is already connected by then).
+ * child-before-parent ordering, matching effect ordering. Ref identity UPDATES
+ * queue here too (paired with a queueRefDetach of the old ref), so within one
+ * commit every detach drains before every attach — a ref hopping between
+ * elements never ends null, whichever binding updates first.
  */
 export function queueRefAttach(scope: Scope, fn: () => void): void {
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push({
@@ -829,6 +867,57 @@ export function queueRefAttach(scope: Scope, fn: () => void): void {
 		seq: commitSeq++,
 		block: scope.block,
 	});
+}
+
+/**
+ * Deferred de-opt host ref DETACHES, queued by detachDeoptTreeRefs during teardown
+ * (item removal, list clear, wholesale unmount, mode-switch rebuild) and drained at
+ * commit BEFORE the mount attaches — React's mutation-before-layout phasing. Flat
+ * [ref, el, ref, el, …] pairs: `el` is the node the ref was attached to, so a
+ * callback ref shared across elements releases the RIGHT per-element cleanup.
+ * Deliberately NOT the attach queue: attaches skip disposed subtrees
+ * (blockSubtreeDisposed), while a teardown detach must fire precisely BECAUSE its
+ * subtree is disposed.
+ */
+const refDetachQueue: any[] = [];
+
+/**
+ * Queue a teardown ref detach for commit (compiled `ref` binding / spread-ref /
+ * hostComponent / fragment-ref unmount cleanups, and the de-opt teardown walk).
+ * Unmount cleanups run mid-render (unmountScope), and a ref can be a setState
+ * function whose value feeds back into what an owner renders — firing `ref(null)`
+ * synchronously lets that null-update render before the replacement element's
+ * deferred attach, oscillating forever when the teardown was a rebuild. Deferring
+ * to commit puts the null and the new element in the SAME batch (React's
+ * mutation→layout phasing). `el` is the element the ref was attached to, so a
+ * callback ref shared across elements releases ITS element's React-19 cleanup.
+ */
+export function queueRefDetach(ref: any, el: Element | FragmentInstance | null): void {
+	if (ref == null || SUPPRESS_UNCOMMITTED_REF_DETACH) return;
+	// Capture the active teardown boundary (if we're inside an unmount walk) so a
+	// throwing detach at drain time routes there — React's safelyDetachRef →
+	// captureCommitPhaseError (ReactErrorBoundaries:2782).
+	refDetachQueue.push(ref, el, TEARDOWN_HANDLER);
+}
+
+// See unmountScope — true while running the cleanups of a block whose deferred
+// ref attaches never committed (aborted mount).
+let SUPPRESS_UNCOMMITTED_REF_DETACH = false;
+
+function drainRefDetaches(): void {
+	if (refDetachQueue.length === 0) return;
+	const q = refDetachQueue.splice(0);
+	for (let i = 0; i < q.length; i += 3) {
+		try {
+			attachRef(q[i], null, q[i + 1]);
+		} catch (err) {
+			// A throwing ref detach must not abort the commit (the remaining detaches
+			// + attaches still run) — route to the deletion's boundary like React.
+			const handler = q[i + 2] as ((e: any) => void) | null;
+			if (handler !== null) handler(err);
+			else console.error(err);
+		}
+	}
 }
 
 /** Drain queued mount ref attaches in React's post-order (descendant-before-ancestor). */
@@ -860,6 +949,9 @@ function blockSubtreeDisposed(block: Block | null): boolean {
 
 function commitEffects(): void {
 	drainPhase(INSERTION);
+	// Teardown ref detaches fire before this commit's attaches (mutation → layout),
+	// so a ref moving between elements cycles null → new-node in one commit.
+	drainRefDetaches();
 	drainRefAttaches();
 	reapplyFragmentBindings();
 	drainPhase(LAYOUT);
@@ -986,10 +1078,12 @@ function drainPhase(phase: Phase): void {
 	// Skip entries whose subtree was hidden by <Activity> after they were queued
 	// but before this drain: deactivateScope already fired their cleanups, and the
 	// body must not run while hidden (it re-enqueues on reveal). See
-	// inInactiveSubtree.
+	// inInactiveSubtree. INSERTION entries are exempt — they stay connected and
+	// keep firing while hidden (deactivateScope spares them too).
+	const skipInactive = phase !== INSERTION;
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
-		if (e.scope.block.disposed || inInactiveSubtree(e.scope.block)) continue;
+		if (e.scope.block.disposed || (skipInactive && inInactiveSubtree(e.scope.block))) continue;
 		const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
 		if (slot && slot.cleanup) {
 			try {
@@ -1002,7 +1096,7 @@ function drainPhase(phase: Phase): void {
 	}
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
-		if (e.scope.block.disposed || inInactiveSubtree(e.scope.block)) continue;
+		if (e.scope.block.disposed || (skipInactive && inInactiveSubtree(e.scope.block))) continue;
 		let cleanup: void | Cleanup;
 		try {
 			// Spread deps as positional args (see PendingEffect.args). A no-deps
@@ -1152,6 +1246,12 @@ class BlockImpl {
 	$$ctxDirect: Map<Context<any>, any> | null;
 	// Resolved-provider cache for `use(ctx)` — see Scope.$$ctxCache.
 	$$ctxCache: Map<Context<any>, any> | null;
+	// Armed for React's IMPLICIT same-element bailout (beginWork's
+	// oldProps === newProps skip). Set at value-position component mounts
+	// (childSlot) — the only sites that can receive a cached descriptor back.
+	// Arming makes the block a stamping target (like __memo) so the bail's lazy
+	// consumer refresh has the context deps it needs.
+	$$implicitBail: boolean;
 	// __thenableIdx is reset every renderBlock so pre-init costs nothing.
 	__thenableIdx: number;
 	// Render-loop guard bookkeeping (see the Block interface).
@@ -1212,6 +1312,7 @@ class BlockImpl {
 		this.$$ctxReads = null;
 		this.$$ctxDirect = null;
 		this.$$ctxCache = null;
+		this.$$implicitBail = false;
 		this.__thenableIdx = 0;
 		this.drainStamp = 0;
 		this.drainRenders = 0;
@@ -1395,7 +1496,7 @@ function disposeReturnSlot(block: Block, state: any): void {
 			state.forSlot = null;
 		}
 		// Fires the content's cleanups and sweeps the nodes between the markers.
-		clearChildContent(state, true);
+		clearChildContent(state);
 		(state.start as ChildNode | null)?.remove();
 		(state.end as ChildNode | null)?.remove();
 	} else {
@@ -1515,9 +1616,55 @@ export function componentSlotLite<P>(
 	}
 }
 
+// ── Teardown error routing (React's captureCommitPhaseError for deletions) ──
+// The handler is resolved ONCE at the outermost unmount entry, from the deletion
+// root's PARENT chain — a boundary inside the deleted range is itself dying and
+// cannot handle anything. Cleanup throws are COLLECTED during the walk and
+// dispatched only after the outermost unmount returns: invoking a boundary
+// mid-teardown would re-enter reconciliation over a half-torn tree (React
+// likewise schedules the boundary update rather than running it inline).
+// queueRefDetach captures the live handler per entry, so a commit-time ref
+// detach throw (drainRefDetaches) routes to the same boundary.
+let TEARDOWN_DEPTH = 0;
+let TEARDOWN_HANDLER: ((err: any) => void) | null = null;
+let TEARDOWN_ERRORS: any[] | null = null;
+
+function reportTeardownError(err: any): void {
+	if (TEARDOWN_HANDLER !== null) (TEARDOWN_ERRORS ??= []).push(err);
+	else console.error(err);
+}
+
+function dispatchTeardownErrors(): void {
+	const errs = TEARDOWN_ERRORS;
+	const h = TEARDOWN_HANDLER;
+	TEARDOWN_ERRORS = null;
+	TEARDOWN_HANDLER = null;
+	if (errs !== null && h !== null) {
+		for (let i = 0; i < errs.length; i++) h(errs[i]);
+	}
+}
+
 function unmountBlock(block: Block, detachDom: boolean = true): void {
 	if (block.disposed) return;
+	if (TEARDOWN_DEPTH === 0) TEARDOWN_HANDLER = findTryHandler(block.parentBlock);
+	TEARDOWN_DEPTH++;
+	try {
+		unmountBlockInner(block, detachDom);
+	} finally {
+		if (--TEARDOWN_DEPTH === 0) dispatchTeardownErrors();
+	}
+}
+
+function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
+	// De-opt-managed host subtree (deoptItemBody item / hostElementBody element):
+	// detach its stamped refs so a `ref={obj}` / callback ref doesn't keep pointing
+	// at the removed node. Runs even when detachDom is false — those callers
+	// (batchClearItems, clearChildContent) remove the DOM themselves, but the
+	// teardown is just as permanent. Before unmountScope: a deleted host's ref
+	// detaches before its component descendants' cleanups (React's pre-order
+	// deletion walk).
+	if (block.deoptNode !== null) detachDeoptTreeRefs(block.deoptNode, null);
 	// Depth-first cleanup of all scopes reachable from this block.
 	unmountScope(block, detachDom);
 	if (!detachDom) return;
@@ -1574,13 +1721,28 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	// exactly as in React, where the parent's destroy runs while the subtree is
 	// still mounted.
 	const c = scope.cleanups;
+	// Suppress queued ref detaches while unwinding an ABORTED mount (the scope's
+	// render never completed — `mounted` is only set at the successful end of
+	// renderBlock/componentSlotLite): its deferred ref attaches were — or will
+	// be — skipped by drainRefAttaches' disposed-subtree guard, so firing
+	// `ref(null)` would invoke a callback ref for work that never existed
+	// (React never invokes refs for uncommitted work; ReactErrorBoundaries:1158).
+	// De-opt refs are unaffected: their detaches queue from detachDeoptTreeRefs
+	// walks outside this cleanups loop.
+	const prevSuppress = SUPPRESS_UNCOMMITTED_REF_DETACH;
+	SUPPRESS_UNCOMMITTED_REF_DETACH = (scope as any).mounted !== true;
 	for (let i = c.length - 1; i >= 0; i--) {
 		try {
 			c[i]();
 		} catch (err) {
-			console.error(err);
+			// Route to the boundary enclosing the DELETION (collected + dispatched
+			// after the walk — see reportTeardownError); React parity: an error in a
+			// deletion-phase cleanup reaches the nearest still-mounted boundary
+			// instead of being swallowed (ReactErrorBoundaries:1927).
+			reportTeardownError(err);
 		}
 	}
+	SUPPRESS_UNCOMMITTED_REF_DETACH = prevSuppress;
 	// Then recurse into child scopes (parent → child order).
 	const children = scope.children;
 	for (let i = 0, n = children.length; i < n; i++) unmountScope(children[i].scope, detachDom);
@@ -1615,6 +1777,11 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				// A `{createPortal(...)}` value hole — its content lives in a foreign
 				// target, so (like portalSlotSlot) it must always self-detach.
 				if (val.portal) teardownPortalState(val.portal);
+				// A pure-host de-opt node managed directly by the slot (no Block):
+				// this wholesale unmount is the only teardown it gets, so detach its
+				// stamped refs here (the Block/forSlot cases above handle theirs via
+				// unmountBlock's deoptNode hook).
+				if (val.hostNode != null) detachDeoptTreeRefs(val.hostNode, null);
 			} else {
 				// componentSlotSlot | portalSlotSlot | trySlotSlot
 				// Portal DOM lives in a FOREIGN target — the root-level batched clear
@@ -1831,11 +1998,13 @@ function enqueueEffect(slot: symbol, fn: EffectFn, deps: any[] | undefined, phas
 	// the Activity becomes visible (deactivateScope also clears prior deps). Walk
 	// ancestors so a visible inner block inside a hidden outer Activity is skipped
 	// too. Effects are rare on the hot path, so this extra walk is cheap.
-	if (inInactiveSubtree(scope.block)) return;
+	// INSERTION effects are exempt (React: they stay connected while hidden and an
+	// update in a hidden-but-rendered subtree still fires them — Activity-test.js:1428).
+	if (phase !== INSERTION && inInactiveSubtree(scope.block)) return;
 	const prev = scope.hooks?.get(slot) as EffectSlot | undefined;
 	if (prev && !depsChanged(prev.deps, deps)) return;
 	if (!prev) {
-		ensureHooks(scope).set(slot, { deps, cleanup: undefined, effect: true });
+		ensureHooks(scope).set(slot, { deps, cleanup: undefined, effect: true, phase });
 	} else {
 		prev.deps = deps;
 	}
@@ -1951,10 +2120,6 @@ export function useImperativeHandle<T>(
 	const [resolvedDeps, resolvedSlot] = resolveHookArgs('useImperativeHandle', deps, slot);
 	deps = resolvedDeps;
 	slot = resolvedSlot;
-	const setRef = (value: T | null): void => {
-		if (typeof ref === 'function') (ref as any)(value);
-		else if (ref != null) (ref as { current: T | null }).current = value;
-	};
 	// Re-run when the deps OR the ref IDENTITY changes. React manages ref attachment
 	// independently of deps — a swapped ref must detach the old (cleanup → setRef(null) on
 	// the PREVIOUS ref) and populate the new one, even when deps are stable (e.g. `[]`).
@@ -1965,8 +2130,21 @@ export function useImperativeHandle<T>(
 	enqueueEffect(
 		slot,
 		() => {
-			setRef(factory());
-			return () => setRef(null);
+			// React-19 callback-ref cleanup (refs-test.js:528): a callback ref may
+			// RETURN a cleanup; detach then runs the cleanup INSTEAD of ref(null).
+			// Handled locally (not via attachRef) because the handle value can be a
+			// primitive, which attachRef's per-target WeakMap can't key.
+			let cleanup: unknown;
+			if (typeof ref === 'function') cleanup = (ref as any)(factory());
+			else if (ref != null) (ref as { current: T | null }).current = factory();
+			return () => {
+				if (typeof cleanup === 'function') {
+					cleanup();
+					return;
+				}
+				if (typeof ref === 'function') (ref as any)(null);
+				else if (ref != null) (ref as { current: T | null }).current = null;
+			};
 		},
 		effectDeps,
 		LAYOUT,
@@ -2374,10 +2552,10 @@ function useContextInternal<T>(context: Context<T>): T {
 		// or an inline lite descendant sharing the block) must re-run when this
 		// context changes — it can't be skipped past.
 		(CURRENT_BLOCK.$$ctxDirect ??= new Map()).set(context, context.$$version);
-		// TRANSITIVE: stamp every memo ancestor so the bailout knows a consumer
-		// lives below it and descends instead of skipping.
+		// TRANSITIVE: stamp every memo (or implicit-bail-armed) ancestor so the
+		// bailout knows a consumer lives below it and descends instead of skipping.
 		for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
-			if ((b.body as any)?.__memo === true) {
+			if ((b.body as any)?.__memo === true || b.$$implicitBail === true) {
 				(b.$$ctxReads ??= new Map()).set(context, context.$$version);
 			}
 		}
@@ -2656,6 +2834,25 @@ let hydrateNode: Node | null = null;
 // constant-fold away with the rest of the hydration path in client-only builds.
 let hydrationSeeds: unknown[] | null = null;
 let hydrationSeedCursor = 0;
+
+/**
+ * Parse a seed-JSON payload (the shell's `data-octane-suspense` script or a
+ * streamed boundary's `window.$OCTS[id]` stash). The reviver decodes the
+ * server's `undefined` sentinel back to `undefined` (JSON has no `undefined`),
+ * so a `use(thenable)` that resolved to `undefined` seeds as `undefined`, not
+ * `null`. Returns null on malformed input (the caller re-suspends client-side).
+ */
+function parseSeedJson(raw: string): unknown[] | null {
+	try {
+		return JSON.parse(raw, (_key, value) =>
+			value !== null && typeof value === 'object' && value[UNDEFINED_SENTINEL_KEY] === true
+				? undefined
+				: value,
+		);
+	} catch {
+		return null;
+	}
+}
 
 export function clone<T extends Node>(node: T, loc?: string): T {
 	if (hydrating && hydrateNode !== null) {
@@ -3438,7 +3635,11 @@ export function mountFragmentRef(
 	// so the detach cleanup always releases whatever ref is current on unmount.
 	queueRefAttach(scope, () => attachRef(fi._currentRef, fi));
 	scope.cleanups.push(() => {
-		attachRef(fi._currentRef, null, fi);
+		// Detach at commit, not inline (queueRefDetach) — unmount cleanups run
+		// mid-render, and a state-setter ref firing null synchronously can render
+		// before a replacement's attach. The instance is destroyed now; the queued
+		// attachRef only nulls/cleans the user's ref, which needs no live instance.
+		queueRefDetach(fi._currentRef, fi);
 		fi._destroy();
 	});
 	return fi;
@@ -3480,10 +3681,21 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// `.__html` off the value object and assign the property. A literal
 	// `setAttribute('dangerouslySetInnerHTML', …)` would only add a dead attribute.
 	if (name === 'dangerouslySetInnerHTML') {
+		// React parity: the value must be `{__html: …}` — anything else is a
+		// programming error worth failing loudly on (a plain string here usually
+		// means the author thought dSIH takes HTML directly).
+		if (value != null && (typeof value !== 'object' || !('__html' in value))) {
+			throw new Error('`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`');
+		}
 		const html = value == null ? null : value.__html;
-		el.innerHTML = html == null || html === false ? '' : String(html);
+		// `__html: false` renders 'false' (React coerces; only null/undefined clear) —
+		// keeps this path consistent with the compiled htmlOnlyChild path.
+		el.innerHTML = html == null ? '' : String(html);
 		return;
 	}
+	// Never a DOM attribute — a React warning-suppression hint (octane doesn't emit
+	// the warning, but the key must not land in the markup either).
+	if (name === 'suppressContentEditableWarning') return;
 	// React-parity alias, mirroring class/className: `htmlFor` writes the native `for`.
 	if (name === 'htmlFor') name = 'for';
 	// Hydration VALUE-mismatch handling. The normal write below already PATCHES the adopted
@@ -3527,6 +3739,23 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		else el.setAttribute(name, String(value));
 		return;
 	}
+	// spellcheck / contenteditable / draggable are ENUMERATED too — `false` must
+	// WRITE "false" (an ABSENT attribute means "inherit / UA default", which is a
+	// different state), and `true` writes "true". Octane's generic boolean handling
+	// (false → remove) would silently flip e.g. contentEditable={false} back to
+	// inherited editability. Names are matched case-insensitively because JSX
+	// authors write the React camelCase forms.
+	if (typeof value === 'boolean' && isEnumeratedBooleanAttr(name)) {
+		el.setAttribute(name, value ? 'true' : 'false');
+		return;
+	}
+	// Function and symbol values are never meaningful attribute text (React removes
+	// them); stringifying a function would leak its source into the DOM.
+	const t = typeof value;
+	if (t === 'function' || t === 'symbol') {
+		el.removeAttribute(name);
+		return;
+	}
 	const ns = attrNamespace(name);
 	if (value == null || value === false) {
 		if (ns) {
@@ -3538,8 +3767,44 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		return;
 	}
 	const v = value === true ? '' : String(value);
-	if (ns) el.setAttributeNS(ns, name, v);
-	else el.setAttribute(name, v);
+	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers will
+	// re-fetch the whole document as an image/script/stylesheet. React strips these
+	// (dev AND prod); so do we. `<a href="">` (and `<area>`) stays — an empty href
+	// is a legitimate "link to this page".
+	if (
+		v === '' &&
+		(name === 'src' || (name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA'))
+	) {
+		el.removeAttribute(name);
+		return;
+	}
+	// Guarded write: an injection-shaped/invalid attribute NAME (e.g. a hostile
+	// spread key like `'x onload=…'`) makes the platform throw InvalidCharacterError,
+	// which would crash the whole render. Report + skip instead — the SSR serializer
+	// rejects the same names via VALID_ATTR_NAME (runtime.server.ts). try/catch is
+	// free on the no-throw path, so the hot path pays nothing.
+	try {
+		if (ns) el.setAttributeNS(ns, name, v);
+		else el.setAttribute(name, v);
+	} catch (err) {
+		console.error(err);
+	}
+}
+
+// The three global enumerated attributes whose boolean prop forms must stringify
+// (see setAttribute). Case-insensitive: JSX arrives camelCase (`spellCheck`),
+// spreads/de-opt props may arrive lowercase.
+function isEnumeratedBooleanAttr(name: string): boolean {
+	// Length-bucketed so non-matching names never pay the toLowerCase.
+	switch (name.length) {
+		case 10:
+			return name.toLowerCase() === 'spellcheck';
+		case 9:
+			return name.toLowerCase() === 'draggable';
+		case 15:
+			return name.toLowerCase() === 'contenteditable';
+	}
+	return false;
 }
 
 // clsx-style `class`/`className` composition — shared with the SSR serializer
@@ -3571,7 +3836,12 @@ export function setClassName(el: Element, value: unknown): void {
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
 	// because SVGElement.className is a read-only SVGAnimatedString and assignment
 	// is a no-op in real browsers.
-	(el as any).className = cls;
+	// A NULLISH/false className REMOVES the attribute (React parity: null removes;
+	// an empty STRING still writes `class=""` — the differential rig pins that
+	// distinction against React). Same raw-value rule as setClassAttr: composition
+	// erases the null-vs-'' difference, so the check must be on `value`.
+	if (value == null || value === false) el.removeAttribute('class');
+	else (el as any).className = cls;
 }
 
 // Attribute-based class setter: SVG/MathML compiled TEMPLATE bindings (where
@@ -3670,14 +3940,16 @@ function applyStyleValue(style: CSSStyleDeclaration, value: any, prev: any): voi
 		for (const k in value) {
 			const v = value[k];
 			if (v === prev[k]) continue;
-			if (v == null || v === false) style.removeProperty(styleName(k));
+			// Booleans clear the property (React parity): `fontFamily: true` must not
+			// set the literal string "true" (a valid font name!).
+			if (v == null || typeof v === 'boolean') style.removeProperty(styleName(k));
 			else applyStyleProperty(style, k, v);
 		}
 	} else {
 		if (typeof prev === 'string') style.cssText = '';
 		for (const k in value) {
 			const v = value[k];
-			if (v != null && v !== false) applyStyleProperty(style, k, v);
+			if (v != null && typeof v !== 'boolean') applyStyleProperty(style, k, v);
 		}
 	}
 }
@@ -3793,8 +4065,9 @@ function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope): void {
 	// `mountScope` is passed only on the mount call (not on updates). When present
 	// a spread-supplied ref attach is DEFERRED to commit so a callback ref sees a
-	// connected node — same React-19 timing as element/fragment refs. On update
-	// the element is already connected, so the ref attaches inline.
+	// connected node — same React-19 timing as element/fragment refs. Updates
+	// defer too when the caller passes its scope (compiled output does), keeping
+	// every attach ordered after every queued detach within the commit.
 	// Stamp `suppressHydrationWarning` BEFORE either loop (order-independent, like React
 	// reading it off props ahead of the diff) so the attribute/class/style writes below
 	// see the flag no matter where the key sits in the spread object. A JS flag only —
@@ -3820,7 +4093,9 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 				// because the detach passes THIS element, so a callback ref shared
 				// across elements releases its per-element cleanup.
 				const nextRef = value ? value.ref : undefined;
-				if (prev.ref != null && prev.ref !== nextRef) attachRef(prev.ref, null, el);
+				// Commit-phase (queueRefDetach) so a swap pairs with the value loop's
+				// queued re-attach: detaches drain before attaches.
+				if (prev.ref != null && prev.ref !== nextRef) queueRefDetach(prev.ref, el);
 				continue;
 			}
 			if (value && k in value) continue;
@@ -3835,9 +4110,12 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 		if (k === 'ref') {
 			if (v === pv) continue;
 			// Route through attachRef for full parity: callback cleanup-return,
-			// object `.current`, and array refs. The prior ref (if any) was already
-			// detached in the removal loop above (detach-before-attach). On mount,
-			// defer the attach to commit so a callback ref sees a connected node.
+			// object `.current`, and array refs. The prior ref (if any) was queued
+			// for detach in the removal loop above; queued detaches drain before
+			// queued attaches at commit, so a swap cycles old → null → new even
+			// across elements. Compiled callers pass their scope on BOTH mount and
+			// update so the attach lands at commit (connected node, ordered after
+			// all detaches); the scope-less inline fallback serves external callers.
 			if (mountScope) queueRefAttach(mountScope, () => attachRef(v, el));
 			else attachRef(v, el);
 			continue;
@@ -3897,6 +4175,8 @@ const _injectedStyles = new Set<string>();
 
 interface HeadSlot {
 	el: Element;
+	/** Direct listeners for on* props — head elements sit outside delegation roots. */
+	handlers?: Map<string, EventListener>;
 }
 
 // Find the server-rendered element for `key` in <head> (it directly follows the
@@ -3946,7 +4226,26 @@ export function headBlock(
 	}
 	const el = state.el;
 	if (attrs !== null) {
-		for (const k in attrs) setAttribute(el, k, attrs[k]);
+		for (const k in attrs) {
+			// Hoisted head elements live in document.head — OUTSIDE every delegation
+			// root — and their load/error events don't bubble anyway, so on* props
+			// get DIRECT listeners here (`<link onLoad={…}>` must fire like React's).
+			const ev = k.length > 2 && k[0] === 'o' && k[1] === 'n' ? eventSlot(k) : null;
+			if (ev !== null) {
+				const v = attrs[k];
+				const hs = (state.handlers ??= new Map<string, EventListener>());
+				const prevH = hs.get(ev.type);
+				if (prevH) el.removeEventListener(ev.type, prevH, ev.capture);
+				if (typeof v === 'function') {
+					el.addEventListener(ev.type, v as EventListener, ev.capture);
+					hs.set(ev.type, v as EventListener);
+				} else {
+					hs.delete(ev.type);
+				}
+				continue;
+			}
+			setAttribute(el, k, attrs[k]);
+		}
 	}
 	if (text != null) {
 		const t = String(text);
@@ -4006,6 +4305,46 @@ const _delegatedCapture = new Set<string>();
 // upward, which reproduces React's bubbling `onFocus`/`onBlur`. (All other events
 // keep the cheaper bubbling-phase delegation.) The flag must match between
 // add/removeEventListener, so it is derived from the name both times.
+// The remaining NON-BUBBLING native families (media/resource lifecycle,
+// <details>/<dialog> state events, resize). The platform fires these on the
+// target only; ancestors never hear them natively. React's synthetic layer
+// re-dispatches them up the tree — octane deliberately does NOT (maintainer
+// ruling 2026-07-04: never replicate the synthetic event system) — but the
+// TARGET's own handler must still fire, which requires capture-phase delegation
+// (a bubble-phase root listener never hears a non-bubbling event at all).
+// Delivery is target-only, exactly like the platform.
+const NON_BUBBLING_TARGET_EVENTS = [
+	'abort',
+	'beforetoggle',
+	'cancel',
+	'canplay',
+	'canplaythrough',
+	'close',
+	'durationchange',
+	'emptied',
+	'encrypted',
+	'ended',
+	'error',
+	'load',
+	'loadeddata',
+	'loadedmetadata',
+	'loadstart',
+	'pause',
+	'play',
+	'playing',
+	'progress',
+	'ratechange',
+	'resize',
+	'seeked',
+	'seeking',
+	'stalled',
+	'suspend',
+	'timeupdate',
+	'toggle',
+	'volumechange',
+	'waiting',
+];
+
 const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
 	'focus',
 	'blur',
@@ -4022,6 +4361,7 @@ const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
 	// enter/leave target-only treatment below.
 	'scroll',
 	'scrollend',
+	...NON_BUBBLING_TARGET_EVENTS,
 ]);
 const delegatedCapture = (name: string): boolean => CAPTURE_DELEGATED.has(name);
 
@@ -4040,6 +4380,9 @@ const TARGET_ONLY_DELEGATED = /* @__PURE__ */ new Set([
 	// bubbling), and ancestors receive their own scroll events natively.
 	'scroll',
 	'scrollend',
+	// Platform semantics for every other non-bubbling family (media, toggle,
+	// close, load/error, …): the target's handler fires, ancestors' do not.
+	...NON_BUBBLING_TARGET_EVENTS,
 ]);
 
 export function delegateEvents(eventNames: string[]): void {
@@ -4082,6 +4425,13 @@ function registerDelegationTarget(target: Node): void {
 	const prev = _delegationTargets.get(target) || 0;
 	_delegationTargets.set(target, prev + 1);
 	if (prev === 0) {
+		// iOS Safari quirk (React parity): elements without a DIRECT click listener
+		// don't dispatch taps up to a delegated ancestor listener. A noop `onclick`
+		// on the delegation root (createRoot container / portal target) makes the
+		// whole subtree tappable. Property assignment — never an attribute.
+		if ((target as any).onclick == null && (target as any).nodeType === 1) {
+			(target as any).onclick = noop;
+		}
 		for (const name of _delegated) {
 			target.addEventListener(name, dispatchDelegated, delegatedCapture(name));
 		}
@@ -4197,25 +4547,68 @@ const CAPTURE_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched.capture');
 
 // Invoke one event slot — a bare handler `fn(event)` or a `{ fn, args }` bundle
 // (the compiler's stable-arrow optimisation) as `fn(...args, event)`.
+//
+// GUARDED like the platform guards each listener invocation: a throwing handler
+// (or a non-function listener value that arrived through a spread/prop) reports
+// its error and must NOT abort the rest of the dispatch walk — ancestors still
+// receive the event, exactly as separate native listeners would. `reportError`
+// surfaces through the global error event (window.onerror) like an uncaught
+// listener exception; console.error is the non-browser fallback.
 function fireEventSlot(slot: HandlerBundle | ((e: Event) => any), event: Event): void {
-	if (typeof slot === 'function') {
-		slot(event);
+	try {
+		if (typeof slot === 'function') {
+			slot(event);
+			return;
+		}
+		const fn = slot.fn as unknown;
+		if (typeof fn !== 'function') {
+			// React parity outcome: a non-function listener is reported and ignored;
+			// it never blocks sibling/ancestor handlers.
+			console.error(
+				'Expected an event listener to be a function, instead got a value of type ' +
+					typeof (fn ?? slot),
+			);
+			return;
+		}
+		const a = slot.args;
+		switch (a.length) {
+			case 0:
+				slot.fn(event);
+				break;
+			case 1:
+				slot.fn(a[0], event);
+				break;
+			case 2:
+				slot.fn(a[0], a[1], event);
+				break;
+			default:
+				slot.fn.apply(null, a.concat(event));
+		}
+	} catch (err) {
+		reportListenerError(err);
+	}
+}
+
+// Surface a guarded listener exception the way the platform surfaces an uncaught
+// one: through the global error event, then the console if nothing canceled it.
+// `reportError` is exactly that; the fallback is the standard polyfill shape for
+// environments without it (jsdom).
+function reportListenerError(err: unknown): void {
+	if (typeof reportError === 'function') {
+		reportError(err);
 		return;
 	}
-	const a = slot.args;
-	switch (a.length) {
-		case 0:
-			slot.fn(event);
-			break;
-		case 1:
-			slot.fn(a[0], event);
-			break;
-		case 2:
-			slot.fn(a[0], a[1], event);
-			break;
-		default:
-			slot.fn.apply(null, a.concat(event));
+	if (typeof window !== 'undefined' && typeof ErrorEvent === 'function') {
+		const ev = new ErrorEvent('error', {
+			error: err,
+			message: String((err as any)?.message ?? err),
+			cancelable: true,
+		});
+		window.dispatchEvent(ev);
+		if (!ev.defaultPrevented) console.error(err);
+		return;
 	}
+	console.error(err);
 }
 
 // React parity: discrete events (click, keydown, input, …) must commit before the
@@ -4240,6 +4633,21 @@ function dispatchDelegated(event: Event): void {
 	_dispatchDepth++;
 	let node = event.target as any;
 	try {
+		// CAPTURE_DELEGATED types have BOTH dispatchers attached as capture-phase
+		// listeners on the same root, so same-node registration ORDER — not phase —
+		// would decide whether the capture pass or this walk runs first. Run the
+		// capture pass explicitly first (it self-stamps, so the natively-queued
+		// capture listener no-ops), and honor a capture-phase stopPropagation
+		// before walking — native cross-phase semantics. Nested inside our
+		// _dispatchDepth++ so the capture pass can't flush discrete work mid-event.
+		if (
+			delegatedCapture(event.type) &&
+			(event as any)[CAPTURE_DISPATCHED] !== true &&
+			_delegatedCapture.has(event.type)
+		) {
+			dispatchDelegatedCapture(event);
+			if (event.cancelBubble) return;
+		}
 		while (node !== null && node !== undefined) {
 			const slot = node[key] as EventSlot;
 			if (slot) {
@@ -5245,17 +5653,8 @@ function disposeWip(wip: OffscreenWip): void {
 // Remove the slot's current content (Block, Text, or pure-host node) while
 // preserving its marker pair, so a mode switch (or component-identity swap)
 // rebuilds in place.
-//
-// `detachRefs` — whether to fire de-opt refs (object nulled / callback null-or-
-// cleanup) across the swept trees. TRUE for genuine unmounts (value → null/text,
-// component identity swap, portal/array/transition swaps): React unmounts there,
-// so refs must detach. FALSE for an INTERNAL pure⟷Blocks strategy flip that keeps
-// the slot root's host tag: the program's JSX still renders the same element, so
-// React would never remount — firing `ref(null)` mid-flip is wrong and can loop
-// forever when the ref is a state setter that gates the flip (e.g. Radix Toast's
-// `<ol ref={setTarget}>` + `{target && createPortal(...)}`: null-fire → portal
-// drops → pure mode → rebuild re-attaches → portal returns → Blocks mode → …).
-function clearChildContent(state: ChildSlot, detachRefs: boolean): void {
+function clearChildContent(state: ChildSlot): void {
+	const hadBlock = state.block !== null;
 	if (state.block !== null) {
 		// Fire the subtree's cleanups but DON'T let unmountBlock strip the DOM —
 		// it would take our markers with it. We remove the content nodes by hand.
@@ -5265,12 +5664,16 @@ function clearChildContent(state: ChildSlot, detachRefs: boolean): void {
 	if (state.start !== null) {
 		// Component (or hydrated) range: sweep everything between the markers —
 		// covers a multi-node component body as well as any leftover text node.
+		// Block teardown above already detached every de-opt ref it owns
+		// (unmountBlock's deoptNode hook + the slot walk), so detach here only on
+		// the blockless path — the pure-host node (or hydrated leftovers), whose
+		// subtree may carry stamped refs.
 		const parent = state.start.parentNode;
 		if (parent !== null) {
 			let n: Node | null = state.start.nextSibling;
 			while (n !== null && n !== state.end) {
 				const next: Node | null = n.nextSibling;
-				if (detachRefs) detachDeoptTreeRefs(n);
+				if (!hadBlock) detachDeoptTreeRefs(n, null);
 				parent.removeChild(n);
 				n = next;
 			}
@@ -5363,8 +5766,14 @@ function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): v
 // child reconciliation entirely: applyDeoptProps/patchDeoptProps already wrote
 // `el.innerHTML`, and running childSlot/reconcileDeoptChildren with (empty) children
 // would wipe it. (SSR already implements raw-HTML-wins; see runtime.server.ts.)
+// Supplying BOTH is a programming error — throw like React (silently letting the
+// raw HTML win would hide the author's dead `children`).
 function hasDangerHTML(props: any): boolean {
-	return props != null && props.dangerouslySetInnerHTML != null;
+	if (props == null || props.dangerouslySetInnerHTML == null) return false;
+	if (props.children != null) {
+		throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+	}
+	return true;
 }
 
 // Route a host descriptor's props onto a FRESH element (first build).
@@ -5391,9 +5800,11 @@ function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock
 	// removed/swapped `ref={obj}` keeps pointing at this element. The prev-loop below skips
 	// `ref`, so this is the sole detach point for the reconcile path (the detach passes the
 	// element so a callback ref shared across elements releases its per-element cleanup).
+	// Queued for commit — the re-attach is queued too (applyDeoptProp), and detaches drain
+	// first, so a ref hopping between elements never ends null (React mutation→layout order).
 	const prevRef = prevProps != null ? prevProps.ref : undefined;
 	const nextRef = nextProps != null ? nextProps.ref : undefined;
-	if (prevRef != null && prevRef !== nextRef) attachRef(prevRef, null, el);
+	if (prevRef != null && prevRef !== nextRef) queueRefDetach(prevRef, el);
 	if (prevProps != null) {
 		for (const name in prevProps) {
 			// `ref` was handled above; everything else routes through the shared removal
@@ -5473,9 +5884,7 @@ export function hostComponent(
 		state.childScope = childScope;
 		scope.children.push({ key: slot, scope: childScope });
 		block.parentNode.insertBefore(el, anchor ?? block.endMarker);
-		scope.cleanups.push(() => {
-			if (state!.ref != null) attachRef(state!.ref, null, state!.el);
-		});
+		scope.cleanups.push(() => queueRefDetach(state!.ref, state!.el));
 	}
 	const el = state.el;
 	applyHostProps(el, props, scope, state);
@@ -5509,7 +5918,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 			if (props != null && k in props) continue;
 			if (k === 'ref') {
 				if (prev.ref != null) {
-					attachRef(prev.ref, null, el);
+					queueRefDetach(prev.ref, el);
 					if (state.ref === prev.ref) state.ref = undefined;
 				}
 				continue;
@@ -5528,7 +5937,11 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 		}
 		if (name === 'ref') {
 			if (v !== state.ref) {
-				if (state.ref != null) attachRef(state.ref, null, el);
+				// Detach + attach both land at commit (detaches drain first), so a
+				// ref hopping between elements in one render cycles old → null → new
+				// regardless of which element's props apply first (React's
+				// mutation→layout phasing; see queueRefDetach).
+				if (state.ref != null) queueRefDetach(state.ref, el);
 				if (v != null) queueRefAttach(scope, () => attachRef(v, el));
 				state.ref = v;
 			}
@@ -5570,35 +5983,6 @@ function getDeoptDesc(n: Node): ElementDescriptor | undefined {
 }
 function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 	(el as Element & DeoptStamped)[DEOPT_DESC] = d;
-}
-
-// Detach a de-opt host node's object/callback ref when the node is being REMOVED — so a
-// `ref={obj}` (or callback ref) doesn't keep pointing at a node that's no longer in the DOM.
-// No-op for nodes without a de-opt descriptor or without a ref (adopted/text/plain nodes).
-function detachDeoptRef(node: Node): void {
-	const ref = getDeoptDesc(node)?.props?.ref;
-	if (ref != null) attachRef(ref, null, node as Element);
-}
-
-// Detach de-opt refs across a WHOLE subtree being removed. Every element built by
-// reconcileDeoptNode is DEOPT_DESC-stamped — nested ones included — so removing a
-// pure-host tree like `<div><span ref={r}/></div>` must detach the nested span's ref
-// too, not just the root's. Foreign `<!--portal-->…<!--/portal-->` ranges are skipped:
-// their content belongs to a portal Block that is still mounted elsewhere and owns its
-// own ref lifecycle (same ownership rule as reconcileDeoptChildren's child scan).
-function detachDeoptTreeRefs(node: Node): void {
-	detachDeoptRef(node);
-	if (node.nodeType !== 1 /* Element */) return;
-	let child: Node | null = (node as Element).firstChild;
-	while (child !== null) {
-		const rangeEnd = (child as any).$$portalEnd as Node | undefined;
-		if (rangeEnd != null) {
-			child = nodeAfterPortalRange(child, rangeEnd);
-			continue;
-		}
-		detachDeoptTreeRefs(child);
-		child = child.nextSibling;
-	}
 }
 
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
@@ -5755,7 +6139,7 @@ function reconcileDeoptChildren(
 	for (let i = owned.length - 1; i >= 0; i--) {
 		const n = owned[i];
 		if (keep === null || !keep.has(n)) {
-			detachDeoptTreeRefs(n);
+			detachDeoptTreeRefs(n, null);
 			el.removeChild(n);
 		}
 	}
@@ -5822,7 +6206,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		const stale = block.deoptNode;
 		if (stale != null) {
 			if (stale.parentNode === block.parentNode) {
-				detachDeoptTreeRefs(stale);
+				detachDeoptTreeRefs(stale, null);
 				block.parentNode.removeChild(stale);
 			}
 			block.deoptNode = null;
@@ -5851,7 +6235,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		// Built a fresh node (first mount, or a tag/type change) — drop the old one
 		// and insert the new node into the item's range.
 		if (prev != null && prev !== node && prev.parentNode === block.parentNode) {
-			detachDeoptTreeRefs(prev);
+			detachDeoptTreeRefs(prev, null);
 			block.parentNode.removeChild(prev);
 		}
 		if (node !== null) block.parentNode.insertBefore(node, endM);
@@ -6085,7 +6469,7 @@ export function childSlot(
 	if (portalDesc !== null) {
 		if (state.forSlot !== null) teardownChildForSlot(state);
 		if (state.block !== null || state.text !== null || state.hostNode !== null) {
-			clearChildContent(state, true);
+			clearChildContent(state);
 		}
 		state.portal = renderPortalState(
 			state.portal,
@@ -6108,7 +6492,7 @@ export function childSlot(
 			// markers and `reconcileKeyed`/`mountItem` ADOPT those ranges off the
 			// cursor. Sweeping here would delete the very item DOM (and break the
 			// hydrateNode chain) the de-opt list is about to adopt.
-			if (!hydrating) clearChildContent(state, true);
+			if (!hydrating) clearChildContent(state);
 			if (state.start === null) {
 				state.start = document.createComment('');
 				domParent.insertBefore(state.start, state.end);
@@ -6154,18 +6538,8 @@ export function childSlot(
 		if (!descNeedsBlocks(value)) {
 			// Pure host/text → reconcile in place, REUSING the existing node so DOM
 			// state survives a re-render. Switching in from a component/text first
-			// tears that down (also nulls a stale hostNode). Blocks→pure with the SAME
-			// root tag is an INTERNAL strategy flip (the subtree merely lost its
-			// component/portal descendants) — the program's JSX still renders the same
-			// element, so the rebuild must not fire refs (see clearChildContent).
-			if (state.block !== null || state.text !== null) {
-				const sameHostFlip =
-					state.block !== null &&
-					state.currentComp === (hostElementBody as unknown as ComponentBody) &&
-					state.block.deoptNode !== null &&
-					(state.block.deoptNode as Element).localName === value.type;
-				clearChildContent(state, !sameHostFlip);
-			}
+			// tears that down (also nulls a stale hostNode).
+			if (state.block !== null || state.text !== null) clearChildContent(state);
 			if (state.start === null) {
 				state.start = document.createComment('');
 				domParent.insertBefore(state.start, state.end);
@@ -6180,7 +6554,7 @@ export function childSlot(
 			const node = reconcileDeoptNode(prev, value, parentBlock);
 			if (node !== prev) {
 				if (prev != null && prev !== node && prev.parentNode !== null) {
-					detachDeoptTreeRefs(prev);
+					detachDeoptTreeRefs(prev, null);
 					prev.parentNode.removeChild(prev);
 				}
 				if (node !== null) state.start.parentNode!.insertBefore(node, state.end);
@@ -6218,6 +6592,12 @@ export function childSlot(
 			// memo()'d component rendered as VALUE-POSITION children (e.g. provider
 			// children in a `.ts` binding tree) re-rendered unconditionally.
 			if (tryMemoBail(state.block, comp, props)) return;
+			// React's implicit same-element bailout: the IDENTICAL committed props
+			// object (same cached descriptor, or a host descriptor re-passed as-is)
+			// skips the body outright; changed-context consumers below refresh
+			// lazily. This is what lets a `{children}` passthrough under a
+			// re-rendering Provider skip untouched subtrees without a memo() shim.
+			if (props === state.block.props && tryImplicitBail(state.block)) return;
 			state.block.props = props;
 			renderBlock(state.block);
 			return;
@@ -6242,7 +6622,7 @@ export function childSlot(
 			// Completed → commit: tear down old (sweeps state.start..state.end; the WIP sits
 			// OUTSIDE that range so it's untouched), then move the WIP into the slot range.
 			// Synchronous, so there is no painted blank between the two.
-			clearChildContent(state, true);
+			clearChildContent(state);
 			commitOffscreen(r.wip, state.end);
 			state.block = r.wip.block;
 			state.currentComp = comp;
@@ -6256,17 +6636,7 @@ export function childSlot(
 		// (a detached node), desyncing every sibling/descendant below. Mirrors the
 		// array path's `if (!hydrating) clearChildContent` guard above. (A post-
 		// hydration identity swap runs with hydrating=false and clears normally.)
-		// Pure→Blocks with the SAME root tag is an INTERNAL strategy flip (the
-		// subtree gained a component/portal descendant) — same element from the
-		// program's view, so the rebuild must not fire refs (see clearChildContent).
-		if (!hydrating) {
-			const sameHostFlip =
-				comp === (hostElementBody as unknown as ComponentBody) &&
-				state.hostNode !== null &&
-				state.hostNode.nodeType === 1 &&
-				(state.hostNode as Element).localName === (props as ElementDescriptor).type;
-			clearChildContent(state, !sameHostFlip);
-		}
+		if (!hydrating) clearChildContent(state);
 		state.currentComp = comp;
 		state.currentIsBodyFn = isBodyFn;
 		if (state.start === null) {
@@ -6276,6 +6646,17 @@ export function childSlot(
 			domParent.insertBefore(state.start, state.end);
 		}
 		const b = createBlock('dynamic', parentBlock, domParent, state.start, state.end, comp, props);
+		// Arm React's implicit same-element bailout: value-position mounts are the
+		// sites that can receive a CACHED descriptor back (provider children, `.ts`
+		// binding trees, `return children` passthroughs), so their context reads
+		// must stamp ancestors (memoInChain, like memo blocks) for the bail's lazy
+		// consumer refresh to be sound. Set BEFORE renderBlock so the first render
+		// stamps. Body-fn children re-create identity per render — no bail is ever
+		// possible, so they skip the stamping cost.
+		if (!isBodyFn) {
+			b.$$implicitBail = true;
+			b.memoInChain = true;
+		}
 		state.block = b;
 		renderBlock(b);
 		// Advance the cursor past this child's adopted range so a following sibling
@@ -6286,7 +6667,7 @@ export function childSlot(
 
 	// Text / empty.
 	// Swapped away from a component OR a pure-host de-opt node → tear it down first.
-	if (state.block !== null || state.hostNode !== null) clearChildContent(state, true);
+	if (state.block !== null || state.hostNode !== null) clearChildContent(state);
 	const str = coerceChildText(value);
 	if (str === '') {
 		// `null` / `undefined` / `false` / `true` / `''` render NOTHING — not even
@@ -6546,7 +6927,56 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 	if (!equal) return false;
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
+	restampCtxDeps(block);
 	return true;
+}
+
+// React beginWork's IMPLICIT bailout (`oldProps === newProps` → skip): the SAME
+// committed props object (a cached element, a `children` passthrough) cannot
+// produce different output, so skip the body and lazily refresh only the
+// changed-context consumers below — identical contract to the memo bail, minus
+// the props comparison (reference equality was already established by the
+// caller). Only ARMED blocks (value-position mounts, which stamp context deps
+// like memo blocks) may take this path; an unarmed block has no dep info, so
+// bailing it could strand consumers. Returns true when the update was handled.
+function tryImplicitBail(block: Block): boolean {
+	if (block.$$implicitBail !== true) return false;
+	if (ctxDirectChanged(block)) return false;
+	if (ctxDepsChanged(block)) refreshContextConsumers(block);
+	restampCtxDeps(block);
+	return true;
+}
+
+// After a bail the bailed subtree did NOT re-run, so its context reads were not
+// re-stamped onto ancestors — but any ancestor that re-rendered THIS pass had
+// its own $$ctxReads cleared by renderBlock. Without merging the bailed block's
+// surviving deps back up, a later bail on that ancestor can't see that a
+// consumer lives below it and strands the consumer (a changed context would
+// never descend). Merge onto every memo/armed ancestor; prefer a STALE version
+// over a current one so a still-pending refresh can't be masked by a fresher
+// read of the same context elsewhere in the ancestor's subtree.
+function restampCtxDeps(block: Block): void {
+	const reads = block.$$ctxReads;
+	const direct = block.$$ctxDirect;
+	const hasReads = reads !== null && reads.size > 0;
+	const hasDirect = direct !== null && direct.size > 0;
+	if (!hasReads && !hasDirect) return;
+	for (let b: Block | null = block.parentBlock; b !== null; b = b.parentBlock) {
+		if ((b.body as any)?.__memo !== true && b.$$implicitBail !== true) continue;
+		const m = (b.$$ctxReads ??= new Map());
+		if (hasReads) {
+			for (const [ctx, v] of reads!) {
+				const cur = m.get(ctx);
+				if (cur === undefined || cur === (ctx as any).$$version) m.set(ctx, v);
+			}
+		}
+		if (hasDirect) {
+			for (const [ctx, v] of direct!) {
+				const cur = m.get(ctx);
+				if (cur === undefined || cur === (ctx as any).$$version) m.set(ctx, v);
+			}
+		}
+	}
 }
 
 function refreshBlockForContext(block: Block): void {
@@ -6555,9 +6985,9 @@ function refreshBlockForContext(block: Block): void {
 		// with a lite descendant that does): re-run it. renderBlock re-renders its
 		// own subtree top-down, so nested consumers below it are reached normally.
 		renderBlock(block);
-	} else if ((block.body as any)?.__memo === true) {
-		// A memo'd pure indirection: its $$ctxReads is stamped, so prune to subtrees
-		// that actually hold a changed-context consumer.
+	} else if ((block.body as any)?.__memo === true || block.$$implicitBail === true) {
+		// A memo'd (or implicit-bail-armed) pure indirection: its $$ctxReads is
+		// stamped, so prune to subtrees that actually hold a changed-context consumer.
 		if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	} else {
 		// A non-memo intermediate (control-flow branch, plain wrapper) isn't stamped
@@ -6919,14 +7349,35 @@ function mountTry(state: TrySlot): void {
 	state.branch = 1;
 	let bStart: Node;
 	let bEnd: Node;
-	if (hydrating && isBlockOpen(state.start.nextSibling)) {
+	// Streamed-boundary seed scope: the swap runtime ($OCTRC) left a
+	// `<!--oct-seed:id-->` comment between the slot's open marker and the inner
+	// branch range, with the boundary's seed JSON stashed on window.$OCTS[id].
+	// Scope the seed stream to THIS boundary while its subtree hydrates (a
+	// depth-first synchronous render), restoring the outer scope after — nested
+	// streamed boundaries push again naturally.
+	let scopedSeeds: unknown[] | null = null;
+	let adoptCursor = state.start.nextSibling;
+	if (
+		hydrating &&
+		adoptCursor !== null &&
+		adoptCursor.nodeType === 8 &&
+		(adoptCursor as Comment).data.startsWith(STREAM_SEED_COMMENT)
+	) {
+		const id = (adoptCursor as Comment).data.slice(STREAM_SEED_COMMENT.length);
+		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
+		const raw = stash !== undefined ? stash[id] : undefined;
+		if (typeof raw === 'string') scopedSeeds = parseSeedJson(raw);
+		adoptCursor = adoptCursor.nextSibling;
+	}
+	if (hydrating && isBlockOpen(adoptCursor)) {
 		// ADOPT the server's inner arm range (no inserted markers — byte-for-byte;
 		// see ifBlock). The seeded use() values let the try body render its success
 		// arm and adopt the server DOM.
-		bStart = state.start.nextSibling as Comment;
+		bStart = adoptCursor as Comment;
 		bEnd = matchingClose(bStart);
 		hydrateNode = bStart.nextSibling;
 	} else {
+		scopedSeeds = null;
 		bStart = document.createComment('try-b');
 		bEnd = document.createComment('/try-b');
 		state.domParent.insertBefore(bStart, state.end);
@@ -6949,6 +7400,13 @@ function mountTry(state: TrySlot): void {
 	};
 	state.tryBlock = b;
 	state.block = b;
+	// Install this boundary's streamed seed scope (if any) for the subtree render.
+	const prevSeeds = hydrationSeeds;
+	const prevSeedCursor = hydrationSeedCursor;
+	if (scopedSeeds !== null) {
+		hydrationSeeds = scopedSeeds;
+		hydrationSeedCursor = 0;
+	}
 	try {
 		renderBlock(b);
 		state.hasResolved = true;
@@ -6962,6 +7420,11 @@ function mountTry(state: TrySlot): void {
 				state.block = null;
 			}
 			switchToCatch(state, err);
+		}
+	} finally {
+		if (scopedSeeds !== null) {
+			hydrationSeeds = prevSeeds;
+			hydrationSeedCursor = prevSeedCursor;
 		}
 	}
 }
@@ -8365,6 +8828,11 @@ function forEachSubtreeChild(scope: Scope, visit: (child: Scope) => void): void 
 // walk component-local slots for refs and recurse through children + control-flow slots
 // via forEachSubtreeChild (the same walk deactivateScope uses).
 function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
+	// A block managing a de-opt host subtree (deoptItemBody / pure-host items):
+	// every node the de-opt reconciler built carries its descriptor (DEOPT_DESC),
+	// whose props may hold a ref — walk the DOM subtree for them.
+	const deoptRoot = (scope as any).deoptNode as Node | null | undefined;
+	if (deoptRoot != null) detachDeoptTreeRefs(deoptRoot, out);
 	const slots = scope.slots;
 	for (let i = 0, n = slots.length; i < n; i++) {
 		const s = slots[i];
@@ -8374,18 +8842,90 @@ function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 			out.push({ ref: s.ref, el: s.el });
 			attachRef(s.ref, null, s.el);
 		}
+		// childSlot managing a pure-host de-opt node — same DEOPT_DESC walk.
+		if (s.__kind === 'childSlot' && s.hostNode != null) {
+			detachDeoptTreeRefs(s.hostNode, out);
+		}
 		for (const k in s) {
-			// `_ref$N` (compiled template host ref). charCodeAt: '_'=95, 'r'=114.
-			if (k.charCodeAt(0) === 95 && k.charCodeAt(1) === 114 && k.charCodeAt(4) === 36) {
+			const c0 = k.charCodeAt(0);
+			if (c0 !== 95 /* '_' */) continue;
+			const c1 = k.charCodeAt(1);
+			// `_ref$N` (compiled template host ref). 'r'=114.
+			if (c1 === 114 && k.charCodeAt(4) === 36) {
 				const ref = s[k];
 				if (ref == null) continue;
 				const el = s['_el$' + k.slice(5)];
 				out.push({ ref, el });
 				attachRef(ref, null, el);
+			} else if (
+				c1 === 115 /* 's' */ &&
+				k.charCodeAt(2) === 112 /* 'p' */ &&
+				k.charCodeAt(3) === 36
+			) {
+				// `_sp$N` (compiled spread binding): the committed spread object may
+				// carry a ref; the element lives in the paired `_el$N`.
+				const ref = s[k]?.ref;
+				if (ref == null) continue;
+				const el = s['_el$' + k.slice(4)];
+				if (el == null) continue;
+				out.push({ ref, el });
+				attachRef(ref, null, el);
+			} else if (
+				c1 === 102 /* 'f' */ &&
+				k.charCodeAt(2) === 105 /* 'i' */ &&
+				k.charCodeAt(3) === 36
+			) {
+				// `_fi$N` (<Fragment ref>): detach the FragmentInstance's current ref;
+				// reveal re-attaches the same instance.
+				const fi = s[k];
+				if (fi == null || fi._currentRef == null) continue;
+				out.push({ ref: fi._currentRef, el: fi });
+				attachRef(fi._currentRef, null, fi);
 			}
 		}
 	}
 	forEachSubtreeChild(scope, (child) => detachSubtreeRefs(child, out));
+}
+
+// Walk a de-opt-built DOM subtree detaching every stamped descriptor ref
+// (object refs → null, callback refs' cleanup). `out` collects {ref, el} pairs for
+// the suspense-hide reveal re-attach; teardown callers pass null (permanent detach,
+// nothing to re-attach). Nested de-opt elements are stamped too (every element
+// reconcileDeoptNode builds gets setDeoptDesc), so recurse through children —
+// EXCEPT foreign `<!--portal-->…<!--/portal-->` ranges: a portal targeting one of
+// these elements owns its content's refs (its slot detaches them on ITS teardown).
+function detachDeoptTreeRefs(node: Node, out: { ref: any; el: any }[] | null): void {
+	const ref = getDeoptDesc(node)?.props?.ref;
+	if (ref != null) {
+		if (out !== null) {
+			// Suspense-hide: detach NOW (the caller re-attaches on reveal).
+			out.push({ ref, el: node });
+			attachRef(ref, null, node as Element);
+		} else {
+			// Teardown: DEFER the detach to commit (drainRefDetaches), before the
+			// mount attaches. Teardown runs mid-render (reconcile/unmount), and a
+			// ref can be a setState function whose value feeds back into what the
+			// owner renders (Radix Toast: `ref={setTarget}` gates a portal). Firing
+			// `ref(null)` synchronously lets that null-update RENDER before the
+			// rebuilt element's deferred attach fires — flipping the owner back,
+			// rebuilding again, forever. Deferring puts null + new-element in the
+			// SAME commit (React's mutation→layout phasing), so state settles on
+			// the new element before the next render pass. Route through
+			// queueRefDetach so the entry stride (ref, el, teardown-handler) stays
+			// uniform with the compiled-binding path.
+			queueRefDetach(ref, node as Element);
+		}
+	}
+	let c: Node | null = node.firstChild;
+	while (c !== null) {
+		const rangeEnd = (c as any).$$portalEnd as Node | undefined;
+		if (rangeEnd != null) {
+			c = nodeAfterPortalRange(c, rangeEnd);
+			continue;
+		}
+		detachDeoptTreeRefs(c, out);
+		c = c.nextSibling;
+	}
 }
 
 /**
@@ -8404,6 +8944,12 @@ function deactivateScope(scope: Scope): void {
 		for (const slot of hooks.values()) {
 			if (slot && (slot as EffectSlot).effect === true) {
 				const e = slot as EffectSlot;
+				// INSERTION effects stay CONNECTED while hidden (React parity,
+				// Activity-test.js:1428): no cleanup on hide, deps kept so the
+				// reveal re-render doesn't re-fire them. They own injected styles
+				// that must persist while a tree is merely hidden; only a real
+				// unmount (the scope.cleanups finalizer) tears them down.
+				if (e.phase === INSERTION) continue;
 				if (typeof e.cleanup === 'function') {
 					const cleanup = e.cleanup;
 					// Clear it BEFORE firing so the per-slot unmount finalizer (still
@@ -9307,6 +9853,11 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 		if (b.cleanups.length > 0 || b.children.length > 0 || b._slots !== null) {
 			unmountBlock(b, false);
 		} else {
+			// Pure-host de-opt item (deoptItemBody with no component descendants):
+			// nothing to unmount scope-wise, but its subtree may carry stamped refs
+			// that must not keep pointing at the batch-removed DOM. Guarded so the
+			// common template-row clear stays a single null check.
+			if (b.deoptNode !== null) detachDeoptTreeRefs(b.deoptNode, null);
 			b.disposed = true;
 		}
 	}
@@ -9557,6 +10108,9 @@ function makeRoot(
 				// teardown because their DOM lives in a foreign target — see the
 				// portalSlotSlot branch in unmountScope.
 				unmountBlock(rootBlock, /*detachDom*/ false);
+				// Root unmount runs outside any flush, so no commit follows — drain the
+				// teardown ref detaches queued above directly.
+				drainRefDetaches();
 				container.textContent = '';
 				rootBlock = null;
 				currentBody = null;
@@ -9622,18 +10176,7 @@ export function hydrateRoot(
 	// node) and stage them for useThenable to consume in render order.
 	const seedScript = container.querySelector('script[' + SUSPENSE_SCRIPT_ATTR + ']');
 	if (seedScript !== null) {
-		try {
-			// Reviver decodes the server's `undefined` sentinel back to `undefined`
-			// (JSON has no `undefined`), so a `use(thenable)` that resolved to
-			// `undefined` is seeded as `undefined`, not `null`.
-			hydrationSeeds = JSON.parse(seedScript.textContent || '[]', (_key, value) =>
-				value !== null && typeof value === 'object' && value[UNDEFINED_SENTINEL_KEY] === true
-					? undefined
-					: value,
-			);
-		} catch {
-			hydrationSeeds = null;
-		}
+		hydrationSeeds = parseSeedJson(seedScript.textContent || '[]');
 		hydrationSeedCursor = 0;
 		seedScript.remove();
 	}

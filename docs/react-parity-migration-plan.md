@@ -143,14 +143,30 @@ propagation heuristics are unpinned:
 > **Update (2026-07-03):** `memo()`'s bail + lazy per-context consumer refresh now also
 > work at VALUE positions (provider children, `createElement` binding trees) and through
 > array-children boundaries — see `memo-value-position.test.ts` and the childSlot
-> `tryMemoBail` unification. React's **implicit same-element bailout** (identical child
-> element reference → skip the subtree, refresh only changed-context consumers) remains
-> UNIMPLEMENTED: octane re-renders the provider's subtree, and bindings that rely on the
-> implicit bail express it explicitly with a `memo()` pass-through (see
-> `@octanejs/radix`'s NavigationMenu `MemoChildren` + its two documented residual
-> adaptations). Implementing the implicit bail = extending `tryMemoBail`'s comparison to
-> identical incoming descriptors on non-memo components; the context-refresh machinery it
-> would ride already exists.
+> `tryMemoBail` unification.
+>
+> **Update (2026-07-04): React's implicit same-element bailout is IMPLEMENTED**
+> (`tryImplicitBail` in runtime.ts, `conformance/implicit-element-bailout.test.ts`).
+> A value-position child receiving the IDENTICAL committed props object (cached
+> element / `children` passthrough / cached array item — items route through a
+> nested childSlot, so per-item bail is free) skips its body; changed-context
+> consumers below refresh lazily. Value-position component blocks are ARMED as
+> context-stamping targets (`$$implicitBail`, memoInChain) at mount so the bail is
+> always sound; compiled template positions (componentSlot) re-create props per
+> render and stay unarmed (no cost, no bail possible). Radix NavigationMenu's
+> `MemoChildren` shim AND its shallow-equal registration convergence bail are
+> deleted — the native bail stops the register-cascade oscillation at its root.
+> Known non-armed edges (correct, just unoptimized — they re-render): the
+> transition off-screen swap commit path, and `$$singleRoot` return descriptors
+> (routed via componentSlot).
+>
+> The work also surfaced + fixed a REAL propagation bug: an ancestor memo's
+> re-render interleaved with an inner bail cleared the ancestor's `$$ctxReads`
+> without the bailed subtree re-stamping them, so a later context change bailed
+> past a stranded consumer (stale value on screen). Bails now merge the bailed
+> block's surviving context deps onto memo/armed ancestors (`restampCtxDeps`;
+> pinned by `conformance/context-bailout.test.ts` Case E, per
+> ReactContextPropagation-test.js:711).
 
 | React file | Gap | Severity |
 |---|---|---|
@@ -170,8 +186,8 @@ propagation heuristics are unpinned:
 |---|---|---|
 | `ReactDOMComponent-test.js` (152) / `ReactDOMAttribute-test.js` / `DOMPropertyOperations-test.js` | Attribute **removal vs empty-string** (src/href/action `:594-690`); boolean reflection/strip; property-vs-attribute matrix + namespaced xlink; no-op mutation minimization. (Octane has SVG/MathML/style coverage already; this fills the HTML-attribute matrix.) | Medium |
 | `CSSPropertyOperations-test.js` | px auto-append, vendor-prefix casing, CSS-var passthrough, empty-style→omit. (Octane `style.test.ts` is strong; cross-check the edges.) | Low |
-| `ReactDOMEventListener-test.js` (24) | **Real-delegation divergence checks**: non-bubbling event emulation (toggle/cancel/close/invalid/media `:706-794`) vs scroll/selectionchange **not** emulated (`:875,:1275`); media/dialog/load delegated without a direct listener (`:446-669`); no duplicate dispatch (`:295`). | High |
-| `ReactDOMEventPropagation-test.js` (89) | Bubble inner→outer for every event; **bubbling through portals** (✅ confirmed working incl. nested portals — see §8); mouseenter/leave + pointerenter/leave **synthesis** (non-bubbling, per-element `:1444,:1517`). NB: capture-phase JSX handlers (`onClickCapture`) ARE now implemented — real capture-phase delegated listeners fire root→target (see `tests/capture-events.test.ts`, compiler `delegateCaptureEvents` + runtime `dispatchDelegatedCapture`). | High |
+| `ReactDOMEventListener-test.js` (24) | **Real-delegation checks** — SCOPE RULE (maintainer, 2026-07-04): octane never replicates the synthetic event system, so React's non-bubbling-event EMULATION (re-dispatching toggle/cancel/close/invalid/media/load so ancestors fire, `:706-794`) is an **intentional divergence** — port those as positive platform-contract tests, not gaps. In scope as real parity: scroll/selectionchange not-emulated (`:875,:1275` — platform-matching anyway), no duplicate dispatch (`:295`), dispatch-once across roots/portals. | High |
+| `ReactDOMEventPropagation-test.js` (89) | Bubble inner→outer + capture ordering for genuinely-bubbling events — real parity, in scope. **Bubbling through portals** (✅ confirmed working incl. nested portals — see §8). mouseenter/leave + pointerenter/leave: React SYNTHESIZES pairs from over/out — octane uses REAL native enter/leave events (**intentional divergence**, same 2026-07-04 scope rule); the platform's own common-ancestor semantics apply. NB: capture-phase JSX handlers (`onClickCapture`) ARE implemented (see `tests/capture-events.test.ts`). | High |
 | `ReactBrowserEventEmitter-test.js`, `ReactTreeTraversal-test.js`, `InvalidEventListeners-test.js` | stopPropagation + mid-dispatch handler snapshot (`:332,:346`); enter/leave common-ancestor path; non-function/null listener safety. | Medium |
 
 > Octane already has strong fragment-ref, SVG, MathML, portal-event, and
@@ -186,8 +202,18 @@ is replaced by `renderToString` / `renderToStaticMarkup` (`octane/server`, React
 fold into `html`, spliced into `<head>` when present else prepended — React-19 resource
 hoisting), and `css` stays a distinct field as a **deliberate, minimal divergence** from
 React's bare-string return — octane has scoped CSS that React core does not, and the field
-lets the framework place the deduped `<style>` tags. Streaming (`renderToPipeableStream` /
-`renderToReadableStream`, out-of-order Suspense) is the in-progress follow-on.
+lets the framework place the deduped `<style>` tags.
+
+**Streaming — SHIPPED (2026-07-05).** `renderToPipeableStream` / `renderToReadableStream`
+with out-of-order Suspense streaming (`tests/streaming-ssr.test.ts`, incl. a full
+stream → swap-runtime → hydrateRoot E2E): shell + `<template data-oct-b>` sentinels,
+hidden segments + inline `$OCTRC` swap runtime, per-boundary `use()` seed scoping in the
+client's `mountTry`, parent-first nested delivery, `@catch`-on-rejection, abort → `$OCTRX`
+(hydration client-renders). Built on the prerender pass/cache engine (per-ROUND re-passes,
+a documented divergence from Fizz's per-boundary incremental renders); the compiled `@try`
+now routes through a runtime `ssrTry` (byte-identical buffered output) so JSX `<Suspense>`
+boundaries stream too. Not in scope: selective hydration (no synthetic event replay);
+head hoists inside streamed boundaries re-create client-side on hydration.
 
 Octane SSR + hydration adoption work. **Mismatch detection + recovery is now implemented**
 (2026-06-30): on a server/client divergence the runtime patches VALUE mismatches (text/attr)
@@ -247,7 +273,7 @@ the gap (port OUTCOMES via `@try`/`@catch`):
 | `ReactIncrementalErrorHandling-test.internal.js` (`:1540,:685-803`) | Render-one-more-time before catching (retry heuristic); nearest **handling** boundary selection (a non-handling boundary doesn't stop propagation); aborted render's WIP discarded. | Medium |
 | `ErrorBoundaryReconciliation-test.internal.js` (`:73,:76`) | Fallback rendering **same type** reuses, **different type** remounts. | Medium |
 | `ReactErrorBoundaries-test.internal.js` (`:1158,:1209,:2782`), `ReactFiberRefs-test.js` (`:64`) | Refs reset on aborted mount; ref-detach throw must not block unmount; ref attaches on commit even with no other update. | Medium |
-| `refs-test.js` (`:274,:346,:379,:443`) | **React-19 ref cleanup return**: cleanup runs (called with no arg) instead of `null` re-invoke; stable-identity ref not re-run on update. (Octane `ref-cleanup.test.ts`/`ref-identity.test.ts` cover much of this — confirm parity, fill `:346` stable-identity-skip.) | Medium |
+| `refs-test.js` (`:274,:346,:379,:443`) | ~~**React-19 ref cleanup return**~~ **Done**: ported in `conformance/refs.test.ts` (plus `:62` ref hopping, `:121` stable stateless ref, `:176` root refs, `:491-:528` useImperativeHandle) and `conformance/refs-destruction.test.ts` (`:69,:85,:103`). Landing the ports fixed two real gaps: (1) ref detaches — teardown AND identity swaps — now defer to commit and drain before that commit's attaches (React's mutation→layout phasing; the `:62` hop pattern previously ended with the hopped ref nulled by a later binding's detach, and a state-setter-as-ref on a torn-down element oscillated); (2) `useImperativeHandle` honors a callback ref's React-19 cleanup return instead of always re-invoking with `null`. | Done |
 
 ---
 
@@ -578,6 +604,105 @@ decision 2026-07-04), `StrictMode`, `Profiler`, `SuspenseList`, `forwardRef`
 (React 19 refs-as-props), `cache()` (RSC-oriented), resource hints
 (`preload`/`preinit`/…), and the streaming entries (`renderToPipeableStream` /
 `renderToReadableStream`) — the planned SSR follow-on.
+
+### Tier 3 — event + attribute matrix: PORTED (2026-07-04)
+Four parallel port agents covered ReactDOMEventListener (23), InvalidEventListeners
+(2), ReactBrowserEventEmitter (10), ReactDOMEventPropagation (89), ReactTreeTraversal
+(11), ReactDOMAttribute (13), DOMPropertyOperations (47), CSSPropertyOperations (15),
+and ReactDOMComponent (163) — ~370 cases fully accounted (ported / covered-by-existing
+/ skipped-with-reason blocks in each file). New conformance files: event-listener,
+browser-event-emitter, invalid-listeners, event-propagation, enter-leave-traversal,
+dom-attributes, css-properties, dom-component-{styles,attributes,children,
+custom-elements,events,ssr}.
+
+**Runtime fixes the port surfaced (all landed):** non-bubbling native families
+(media/toggle/close/load/error/resize) now capture-delegated TARGET-ONLY (they were
+silently dropped — even the target's own handler never fired); capture-before-bubble
+ordering for capture-delegated types; guarded per-listener dispatch (throwing/
+non-function listeners report via reportError + continue the walk); enumerated
+attrs (spellcheck/contenteditable/draggable) stringify booleans; empty src/href
+stripped (self-refetch footgun; a/area exempt); function/symbol attr values removed;
+className={null} removes class (raw-value check — differential rig proved React
+keeps class="" for ''); SSR style trim + boolean style values cleared (client+SSR);
+SSR tag-name validation (injection guard); client attr-write guarded against
+InvalidCharacterError crashes; dSIH shape + children-exclusivity throws;
+`<link onLoad>` fires (compiler passes on* to headBlock → direct listeners; head is
+outside delegation roots); noop onclick stamped on delegation roots (iOS Safari).
+
+**Documented intentional divergences (2026-07-04 maintainer ruling — no synthetic
+event system, no known-attribute tables):** no ancestor re-dispatch of non-bubbling
+events; no enter/leave synthesis (real native events); no synthetic onChange/
+onBeforeInput/onSelect polyfills; unknown={true} → boolean presence; inert="" stays
+(platform-true); verbatim boolean-attr strings; lenient toString() coercion; no
+possibleStandardNames alias table (native spellings are the idiom); muted stays a
+plain attribute (no property routing). Each is a positive platform-contract test
+citing the React line.
+
+**Still pinned (3 it.fails):** React-19 custom-element semantics (lowercase on*
+listeners + property heuristic — needs a maintainer decision) and void-element
+children/dSIH validation ×2 (compile-time diagnostic; follow-up task spawned).
+
+### Tier 7 — errors under reconciliation: PORTED (2026-07-05)
+Two parallel agents covered ReactErrorBoundaries-test.internal.js (50 — OUTCOME
+ports; class-lifecycle mechanics skipped per §2), ErrorBoundaryReconciliation (4),
+ReactIncrementalErrorHandling-test.internal.js (43 — 18 concurrent/class-only N/A,
+each with a reason), ReactFiberRefs (5), refs-test.js (12, already fully covered by
+conformance/refs.test.ts). New files: error-reconciliation-stress,
+refs-under-error, error-handling-heuristics, error-boundary-reconciliation.
+
+**Headline: the :1978 keyed-shuffle stress (101 keyed rows, seeded shuffle streams,
+one thrower flipping mid-reconcile, from-scratch innerHTML baselines) passes clean —
+no LIS-reconciler-under-error inconsistency exists.** The one place the intentional
+LIS move-pattern divergence could have hidden a real bug is now stress-verified.
+
+**Runtime fixes the port surfaced (all landed):** deletion-phase cleanup throws now
+route to the boundary enclosing the deletion (collected during the walk, dispatched
+after — reportTeardownError/dispatchTeardownErrors); throwing ref detaches are
+guarded + routed instead of escaping flushSync; refs of never-committed (aborted)
+mounts are never invoked (unmountScope suppresses their queued detaches via the
+`mounted !== true` guard); an uncaught error unmounts the failed root's ENTIRE tree
+before rethrowing (React's documented contract). One prior assertion updated:
+ref-dispose.test.ts now expects the aborted mount's object ref UNTOUCHED (React
+:1158) rather than nulled — its no-resurrection purpose is preserved.
+
+**Semantic mappings recorded in the test files:** React's "noop boundary" →
+octane's no-@catch-arm `@try` AND a rethrowing `@catch` (both bubble outward);
+WIP-discard → per-swap off-screen render whose thrown subtree is disposed with no
+leaked markers/effects; catch-fallback reconciliation asserts FRESH nodes for same
+AND different types (React's forceUnmountCurrentAndReconcile — the plan's earlier
+"same type reuses" note was wrong, verified against the v19.2.7 source). Documented
+divergences: uncaught-error surface is console.error (not a caller rethrow /
+onUncaughtError), and the render-once-more retry heuristic is classified N/A
+(concurrent-lane mechanism) — flagged for revisit if evidence appears.
+
+### Phase C COMPLETE — every tier ported (2026-07-05)
+The final wave closed Tiers 1, 4, and 6 (three parallel agents; full per-case
+accounting blocks in each file):
+
+- **Tier 1** (`deferred-value`, `insertion-effect-order`, `use-replay-extra`,
+  `hooks-arity` conformance files): octane's useDeferredValue matches the
+  reuse-previous / initialValue / Object.is-skip / no-infinite-defer heuristics;
+  7 pins remain on the missing "deferred render" bit (preview waterfalls,
+  hidden-tree reveals) + effect unmount/update choreography — follow-up task
+  spawned. BONUS: found a real compiler bug (user `setText` binding shadows the
+  emitted runtime helper — task spawned).
+- **Tier 4** (`ssr-serialization` — 107 dual-compile tests asserting server bytes
+  AND hydration adoption, `ssr-server-semantics`, `form-actions-extra`): 21 pins
+  incl. two SERIOUS hydration bugs (nested-root-fragment content loss;
+  adjacent-empty-text-hole crash) — follow-up task spawned. Server hooks
+  render-phase updates are inert (single-pass) — pinned. requestFormReset /
+  auto-reset / queue-threading all verified; error-doesn't-cancel-queue is a
+  documented positive divergence.
+- **Tier 6** (`scheduling-triage` + full N/A table): AggregateError for multiple
+  unhandled root errors FIXED (drainQueue collects all); flushSync
+  passives-post-paint and whole-queue drain ADJUDICATED as intentional
+  divergences (they pin octane's two-priority design, per effect-timing /
+  transitions tests); everything lane/expiration/time-slicing classified N/A
+  with precise reasons (no yield points in a sync scheduler).
+
+With Tier 0/3/7 (earlier waves) and Phases A/B/D, **every tier in §3 is now
+ported or accounted.** Remaining runtime work lives in pinned it.fails +
+spawned tasks, not in this plan.
 
 ### Suite status
 **204 test files, 1074 passed, 0 expected-fail, 0 regressions** (after the off-screen

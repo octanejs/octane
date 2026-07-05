@@ -158,4 +158,168 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		});
 		d.unmount();
 	});
+
+	it('ToggleGroup: single-select (composite roving tabindex + value → aria-pressed)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToggleGroupSingle', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('click center → value moves', async (i, r) => {
+			await i.click('.ti:nth-child(2)');
+			await r.click('.ti:nth-child(2)');
+		});
+		d.unmount();
+	});
+
+	it('ToggleGroup: multiple-select (data-multiple, two items pressed)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToggleGroupMultiple', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('click center → adds to selection', async (i, r) => {
+			await i.click('.ti:nth-child(2)');
+			await r.click('.ti:nth-child(2)');
+		});
+		d.unmount();
+	});
+
+	it('ToggleGroup: disabled group (data-disabled + every button disabled)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToggleGroupDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Avatar: image + fallback (image inert under jsdom → fallback shows, img unmounted)', async () => {
+		const d = await mountDifferential(FIXTURE, 'AvatarBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Avatar: fallback only (no image)', async () => {
+		const d = await mountDifferential(FIXTURE, 'AvatarFallbackOnly', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Switch: uncontrolled — click toggles aria-checked + data-checked (native input adaptation)', async () => {
+		const d = await mountDifferential(FIXTURE, 'SwitchBasic', undefined, CACHE);
+		await d.step('mount (unchecked)', () => {});
+		await d.step('click → checked', async (i, r) => {
+			await i.click('[role="switch"]');
+			await r.click('[role="switch"]');
+		});
+		await d.step('click → unchecked', async (i, r) => {
+			await i.click('[role="switch"]');
+			await r.click('[role="switch"]');
+		});
+		d.unmount();
+	});
+
+	it('Switch: uncontrolled default-checked (aria-checked starts true; click unchecks)', async () => {
+		const d = await mountDifferential(FIXTURE, 'SwitchDefaultChecked', undefined, CACHE);
+		await d.step('mount (checked)', () => {});
+		await d.step('click → unchecked', async (i, r) => {
+			await i.click('[role="switch"]');
+			await r.click('[role="switch"]');
+		});
+		d.unmount();
+	});
+
+	it('Switch: disabled (native disabled input + data-disabled; click is a no-op)', async () => {
+		const d = await mountDifferential(FIXTURE, 'SwitchDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('click → still unchecked', async (i, r) => {
+			await i.click('[role="switch"]');
+			await r.click('[role="switch"]');
+		});
+		d.unmount();
+	});
+
+	it('Checkbox: uncontrolled — click ticks + mounts the Indicator', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxBasic', undefined, CACHE);
+		await d.step('mount (unchecked, no indicator)', () => {});
+		await d.step('click → checked + indicator', async (i, r) => {
+			await i.click('[role="checkbox"]');
+			await r.click('[role="checkbox"]');
+		});
+		d.unmount();
+	});
+
+	it('Checkbox: uncontrolled default-checked (aria-checked true, data-checked, indicator)', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxDefaultChecked', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('click → unchecked', async (i, r) => {
+			await i.click('[role="checkbox"]');
+			await r.click('[role="checkbox"]');
+		});
+		d.unmount();
+	});
+
+	it('Checkbox: indeterminate (aria-checked="mixed" + data-indeterminate)', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxIndeterminate', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Checkbox: disabled (native disabled input + data-disabled; click is a no-op)', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		await d.step('click → still unchecked', async (i, r) => {
+			await i.click('[role="checkbox"]');
+			await r.click('[role="checkbox"]');
+		});
+		d.unmount();
+	});
+
+	it('CheckboxGroup: shared value — child derives checked; click updates the group', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxGroupBasic', undefined, CACHE);
+		await d.step('mount (a checked)', () => {});
+		await d.step('click b → added to group', async (i, r) => {
+			await i.click('.cb:nth-child(3)');
+			await r.click('.cb:nth-child(3)');
+		});
+		d.unmount();
+	});
+
+	it('CheckboxGroup: parent (select-all) is indeterminate when some children are ticked', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxGroupParent', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('RadioGroup: composite roving focus + value → aria-checked; click moves selection', async () => {
+		const d = await mountDifferential(FIXTURE, 'RadioGroupBasic', undefined, CACHE);
+		await d.step('mount (a selected)', () => {});
+		await d.step('click b → selection moves', async (i, r) => {
+			await i.click('.r:nth-child(3)');
+			await r.click('.r:nth-child(3)');
+		});
+		d.unmount();
+	});
+
+	it('RadioGroup: disabled group (aria-disabled + every radio disabled)', async () => {
+		const d = await mountDifferential(FIXTURE, 'RadioGroupDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Field: label/control/description id association (for/aria-labelledby/aria-describedby)', async () => {
+		const d = await mountDifferential(FIXTURE, 'FieldBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Field: disabled (data-disabled propagates to parts)', async () => {
+		const d = await mountDifferential(FIXTURE, 'FieldDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Input: standalone (Field.Control with the inert default context)', async () => {
+		const d = await mountDifferential(FIXTURE, 'InputBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Form: wraps a Field (form novalidate + FormContext)', async () => {
+		const d = await mountDifferential(FIXTURE, 'FormBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
 });

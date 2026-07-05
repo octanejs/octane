@@ -175,3 +175,44 @@ export function AppList(props) @{
 		</Ctx.Provider>
 	</div>
 }
+
+// ---------------------------------------------------------------------------
+// Case E — a consumer must not be STRANDED when its memo ancestor re-rendered
+// (own props changed) while an inner memo bailed, and the context changes
+// afterwards (ReactContextPropagation-test.js:711 'context is propagated across
+// bailouts'). The hazard: OuterWrap's re-render clears its $$ctxReads; the
+// bailed InnerPure never re-runs the consumer's read, so without re-stamping on
+// bail, OuterWrap's next bail can't see that a consumer lives below it.
+// ---------------------------------------------------------------------------
+function DeepConsumerImpl() @{
+	const value = use(Ctx);
+	log('DeepConsumer:' + value);
+	<span class="deep">
+		{value as string}
+	</span>
+}
+const DeepConsumer = memo(DeepConsumerImpl);
+
+function InnerPureImpl() @{
+	log('InnerPure');
+	<DeepConsumer />
+}
+const InnerPure = memo(InnerPureImpl);
+
+function OuterWrapImpl(props) @{
+	log('OuterWrap:' + props.label);
+	<div class="outer">
+		<span class="label">{props.label}</span>
+		<InnerPure />
+	</div>
+}
+const OuterWrap = memo(OuterWrapImpl);
+
+export function AppInterleaved(props) @{
+	log('App');
+	<div id="app-interleaved">
+		<Ctx.Provider value={props.value}>
+			<OuterWrap label={props.label} />
+		</Ctx.Provider>
+	</div>
+}

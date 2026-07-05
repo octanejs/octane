@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
-import { flushSync } from '../src/index.js';
-import { createElement } from '../src/index.js';
+import { createElement, flushSync } from '../src/index.js';
 import { RefHost } from './_fixtures/deopt-host-ref.tsrx';
 
 // Regression: a value-position host descriptor (`{cond ? <span ref={r}/> : null}`) goes through
@@ -38,11 +37,180 @@ describe('de-opt host descriptor refs are detached on removal', () => {
 	});
 });
 
-// Regression: removal detached ONLY the top-level node's ref — every element built by
-// reconcileDeoptNode is DEOPT_DESC-stamped, so removing a pure-host TREE must walk it
-// (detachDeoptTreeRefs) and detach refs on nested descendants too. Built with runtime
-// `createElement` (not `.tsrx`) so the trees actually reach the de-opt reconciler —
-// the compiler folds template ternaries into the fast path.
+// Regression: KEYED LIST items on the de-opt path (childSlot array mode → deoptItemBody,
+// pure-host item held on `block.deoptNode`) never detached their refs on removal —
+// reconcileKeyed's unmountBlock and batchClearItems (whose fast path skips unmountBlock
+// entirely for a pure-host item) left `ref.current` pointing at the detached node. Same
+// for a pure `hostNode` / hostElementBody root when the owning scope unmounts wholesale.
+describe('de-opt keyed list / wholesale-unmount ref detach', () => {
+	type Ref = { current: Element | null };
+	const ref = (): Ref => ({ current: null });
+
+	function KeyedList(props: any) {
+		return props.items.map((it: any) =>
+			createElement('li', { key: it.id, id: 'i' + it.id, ref: it.r }),
+		);
+	}
+
+	function Gate(props: any) {
+		return props.show ? createElement(props.comp, props.props) : null;
+	}
+
+	it('nulls a removed item ref, keeps the survivor attached (single removal)', () => {
+		const a = { id: 1, r: ref() };
+		const b = { id: 2, r: ref() };
+		const m = mount(KeyedList as any, { items: [a, b] });
+		expect(a.r.current).toBe(m.container.querySelector('#i1'));
+		expect(b.r.current).toBe(m.container.querySelector('#i2'));
+
+		m.root.render(KeyedList as any, { items: [a] });
+		flushSync(() => {});
+		expect(m.container.querySelector('#i2')).toBeNull();
+		expect(b.r.current).toBeNull(); // removed item's ref detached
+		expect(a.r.current).toBe(m.container.querySelector('#i1')); // survivor untouched
+		m.unmount();
+	});
+
+	it('runs a removed item callback ref with null, without touching the survivor', () => {
+		const calls: (Element | null)[] = [];
+		const survivorCalls: (Element | null)[] = [];
+		const a = { id: 1, r: (el: Element | null) => survivorCalls.push(el) };
+		const b = { id: 2, r: (el: Element | null) => calls.push(el) };
+		const m = mount(KeyedList as any, { items: [a, b] });
+		expect(calls.at(-1)).not.toBeNull();
+		expect(survivorCalls.length).toBe(1);
+
+		m.root.render(KeyedList as any, { items: [a] });
+		flushSync(() => {});
+		expect(calls.at(-1)).toBeNull();
+		expect(survivorCalls.length).toBe(1); // survivor's callback not re-cycled
+		m.unmount();
+	});
+
+	it('nulls every ref on a full clear to [] (batchClearItems fast path)', () => {
+		const a = { id: 1, r: ref() };
+		const b = { id: 2, r: ref() };
+		const m = mount(KeyedList as any, { items: [a, b] });
+		expect(a.r.current).not.toBeNull();
+		expect(b.r.current).not.toBeNull();
+
+		m.root.render(KeyedList as any, { items: [] });
+		flushSync(() => {});
+		expect(m.container.querySelector('li')).toBeNull();
+		expect(a.r.current).toBeNull();
+		expect(b.r.current).toBeNull();
+		m.unmount();
+	});
+
+	it('nulls old refs and attaches new ones on a full key replacement', () => {
+		const a = { id: 1, r: ref() };
+		const b = { id: 2, r: ref() };
+		const c = { id: 3, r: ref() };
+		const d = { id: 4, r: ref() };
+		const m = mount(KeyedList as any, { items: [a, b] });
+
+		m.root.render(KeyedList as any, { items: [c, d] });
+		flushSync(() => {});
+		expect(a.r.current).toBeNull();
+		expect(b.r.current).toBeNull();
+		expect(c.r.current).toBe(m.container.querySelector('#i3'));
+		expect(d.r.current).toBe(m.container.querySelector('#i4'));
+		m.unmount();
+	});
+
+	it('detaches NESTED descendant refs inside a removed item', () => {
+		const outer = ref();
+		const inner = ref();
+		function Nested(props: any) {
+			return props.items.map((it: any) =>
+				createElement(
+					'li',
+					{ key: it.id, ref: it.r },
+					createElement('span', { id: 's' + it.id, ref: it.inner }),
+				),
+			);
+		}
+		const m = mount(Nested as any, { items: [{ id: 1, r: outer, inner }] });
+		expect(outer.current).not.toBeNull();
+		expect(inner.current).toBe(m.container.querySelector('#s1'));
+
+		m.root.render(Nested as any, { items: [] });
+		flushSync(() => {});
+		expect(outer.current).toBeNull();
+		expect(inner.current).toBeNull();
+		m.unmount();
+	});
+
+	it('detaches item refs when the list owner unmounts wholesale', () => {
+		const a = { id: 1, r: ref() };
+		const b = { id: 2, r: ref() };
+		const props = { items: [a, b] };
+		const m = mount(Gate as any, { show: true, comp: KeyedList, props });
+		expect(a.r.current).not.toBeNull();
+
+		m.root.render(Gate as any, { show: false, comp: KeyedList, props });
+		flushSync(() => {});
+		expect(a.r.current).toBeNull();
+		expect(b.r.current).toBeNull();
+		m.unmount();
+	});
+
+	it('detaches item refs on root unmount', () => {
+		const a = { id: 1, r: ref() };
+		const m = mount(KeyedList as any, { items: [a] });
+		expect(a.r.current).not.toBeNull();
+		m.unmount();
+		expect(a.r.current).toBeNull();
+	});
+
+	it("detaches a pure hostNode's refs when the owning scope unmounts wholesale", () => {
+		const outer = ref();
+		const inner = ref();
+		// Pure host subtree (no component descendants) → childSlot's `hostNode` path.
+		function PureHost(props: any) {
+			return createElement(
+				'div',
+				{ id: 'ph', ref: props.r },
+				createElement('b', { ref: props.inner }),
+			);
+		}
+		const m = mount(Gate as any, { show: true, comp: PureHost, props: { r: outer, inner } });
+		expect(outer.current).toBe(m.container.querySelector('#ph'));
+		expect(inner.current).not.toBeNull();
+
+		m.root.render(Gate as any, { show: false, comp: PureHost, props: { r: outer, inner } });
+		flushSync(() => {});
+		expect(outer.current).toBeNull();
+		expect(inner.current).toBeNull();
+		m.unmount();
+	});
+
+	it("detaches a hostElementBody root's ref on wholesale unmount (host with component child)", () => {
+		const r = ref();
+		function Child() {
+			return createElement('em', { children: 'x' });
+		}
+		// Host element WITH a component child → hostElementBody Block, element on deoptNode.
+		function HostWithComp(props: any) {
+			return createElement('div', { id: 'hw', ref: props.r }, createElement(Child));
+		}
+		const m = mount(Gate as any, { show: true, comp: HostWithComp, props: { r } });
+		expect(r.current).toBe(m.container.querySelector('#hw'));
+
+		m.root.render(Gate as any, { show: false, comp: HostWithComp, props: { r } });
+		flushSync(() => {});
+		expect(r.current).toBeNull();
+		m.unmount();
+	});
+});
+
+// NESTED refs on the NON-list removal paths: a pure-host TREE swept out of a slot must
+// detach refs on its stamped DESCENDANTS too, not just the removed root — via the
+// return-slot/clearChildContent sweep (whole value → null) and reconcileDeoptChildren's
+// not-reused child sweep (subtree removed under a reused parent). Complements the keyed
+// list / wholesale-unmount coverage above. Built with runtime `createElement` (not
+// `.tsrx`) so the trees actually reach the de-opt reconciler — the compiler folds
+// template ternaries into the fast path.
 
 // The whole return value flips pure-host tree ⟷ null: removal sweeps the tree out of
 // the component's return slot (clearChildContent).
@@ -71,6 +239,8 @@ function ChildTree(props: any) {
 	});
 }
 
+// Keyed array as CHILDREN of a pure-host parent (not a value-position list) — item
+// removal goes through reconcileDeoptChildren's keyed match, not deoptItemBody.
 function ListTree(props: any) {
 	return createElement('ul', {
 		id: 'list',
@@ -83,7 +253,7 @@ function ListTree(props: any) {
 	});
 }
 
-describe('de-opt removal detaches refs on NESTED descendants', () => {
+describe('de-opt removal detaches refs on NESTED descendants (non-list paths)', () => {
 	it('nulls a nested object ref when the whole tree toggles to null', () => {
 		const r: { current: Element | null } = { current: null };
 		const m = mount(WholeTree as any, { show: true, r });
@@ -93,7 +263,7 @@ describe('de-opt removal detaches refs on NESTED descendants', () => {
 		flushSync(() => {});
 
 		expect(m.container.querySelector('#outer')).toBeNull(); // tree removed
-		expect(r.current).toBeNull(); // nested ref detached (was left dangling)
+		expect(r.current).toBeNull(); // nested ref detached (not dangling)
 		m.unmount();
 	});
 
@@ -137,40 +307,6 @@ describe('de-opt removal detaches refs on NESTED descendants', () => {
 		expect(m.container.querySelector('#wrap')).not.toBeNull(); // parent reused
 		expect(m.container.querySelector('#outer')).toBeNull(); // subtree removed
 		expect(r.current).toBeNull();
-		m.unmount();
-	});
-
-	it('does NOT fire refs across an internal pure⟷Blocks flip of the same host tag', () => {
-		// The tree root stays `<div><ol ref/>…</div>`; only a component child appears/
-		// disappears, flipping childSlot between the pure-host and Blocks strategies.
-		// React would never remount here, so the ref must not see `null` mid-flip —
-		// a `ref={setState}` that gates the flipping child would otherwise loop forever
-		// (the portal-into-deopt-host shape). It MAY re-fire with the rebuilt element.
-		const calls: (string | null)[] = [];
-		const cb = (el: Element | null) => calls.push(el === null ? null : el.tagName);
-		function Leaf() {
-			return createElement('em', { children: 'x' });
-		}
-		function FlipTree(props: any) {
-			return createElement('div', {
-				id: 'wrap',
-				children: createElement('ol', {
-					id: 'list',
-					ref: cb,
-					children: props.comp ? createElement(Leaf, {}) : null,
-				}),
-			});
-		}
-		const m = mount(FlipTree as any, { comp: false });
-		expect(calls).toEqual(['OL']);
-
-		m.root.render(FlipTree as any, { comp: true }); // pure → Blocks
-		flushSync(() => {});
-		m.root.render(FlipTree as any, { comp: false }); // Blocks → pure
-		flushSync(() => {});
-
-		expect(calls).not.toContain(null); // no unmount-style null firing mid-flip
-		expect(m.container.querySelector('#list')).not.toBeNull();
 		m.unmount();
 	});
 

@@ -29,6 +29,10 @@ import {
 	EMPTY_COMMENT,
 	SUSPENSE_SCRIPT_ATTR,
 	UNDEFINED_SENTINEL_KEY,
+	STREAM_BOUNDARY_ATTR,
+	STREAM_SEGMENT_ATTR,
+	STREAM_SEED_ATTR,
+	STREAM_SEED_COMMENT,
 	cssStyleValue,
 } from './constants.js';
 
@@ -341,6 +345,13 @@ function ssrChildItem(v: unknown, scope: SSRScope): string {
 // primitive → escaped text). `dangerouslySetInnerHTML={{__html}}`, if present, is
 // raw (unescaped) content.
 function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope): string {
+	// A descriptor tag is concatenated into the response verbatim — validate it
+	// like React does (Invalid tag → throw) so a hostile/buggy dynamic tag (e.g.
+	// 'div><img onerror=…>') can never become live markup. The client is guarded
+	// by the platform itself: document.createElement throws for these names.
+	if (!VALID_TAG_NAME.test(tag)) {
+		throw new Error('Invalid tag: ' + tag);
+	}
 	let attrs = '';
 	let innerHTML: unknown = undefined;
 	if (props != null) {
@@ -478,7 +489,9 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 	let out = '';
 	for (const k in obj) {
 		const val = obj[k];
-		if (val == null || val === false) continue;
+		// Booleans never serialize (client parity: `fontFamily: true` clears, it
+		// must not emit the literal string "true").
+		if (val == null || typeof val === 'boolean') continue;
 		// React parity: numeric values get `px` (except 0 / unitless / custom props).
 		out += styleName(k) + ':' + cssStyleValue(k, val) + ';';
 	}
@@ -498,6 +511,10 @@ export function ssrStyle(v: unknown): string {
 // 'x onload=alert(1)' or 'a>'); mirrors the client's setAttribute behavior.
 const VALID_ATTR_NAME = /^[^\s"'>\/=\u0000-\u001F]+$/;
 
+// Legal element tag name (React's VALID_TAG_REGEX): letters first, then
+// letters/digits/`:`/`.`/`-`/`_`. Anything else could open/close markup.
+const VALID_TAG_NAME = /^[a-zA-Z][a-zA-Z0-9:._-]*$/;
+
 // One prop entry → its ` name="value"` attribute fragment (or ''). The shared
 // filter/route used by ssrHostElement's attr loop and ssrSpread: key/ref/children
 // never serialize, `suppressHydrationWarning` is a client-only hydration hint,
@@ -507,8 +524,11 @@ const VALID_ATTR_NAME = /^[^\s"'>\/=\u0000-\u001F]+$/;
 // attribute — callers must intercept it BEFORE routing an entry here.
 function ssrAttrEntry(k: string, v: unknown): string {
 	if (k === 'key' || k === 'ref' || k === 'children') return '';
-	if (k === 'suppressHydrationWarning') return '';
+	if (k === 'suppressHydrationWarning' || k === 'suppressContentEditableWarning') return '';
 	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
+	// Function/symbol values never serialize (client parity: setAttribute removes
+	// them) — stringifying a function would put its SOURCE into the markup.
+	if (typeof v === 'function' || typeof v === 'symbol') return '';
 	if (k === 'style') return ssrStyle(v);
 	if (k === 'className' || k === 'class') return ssrAttr('class', v);
 	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v);
@@ -626,15 +646,16 @@ export function Suspense(
 	props: { fallback?: unknown; children?: unknown },
 	scope: SSRScope,
 ): string {
-	return ssrBlock(
-		(() => {
-			try {
-				return ssrBlock(ssrChildrenHtml(props.children, scope));
-			} catch (e) {
-				if (ssrIsSuspense(e)) return ssrBlock(ssrChild(props.fallback, scope));
-				throw e;
-			}
-		})(),
+	// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
+	// real STREAMING boundary too (registration + template sentinel), with the
+	// identical nested-block byte shape as before for buffered renders. Errors
+	// rethrow to an outer boundary (catchFn = null), matching the old emit.
+	return ssrTry(
+		scope,
+		'jsx-suspense',
+		(_arg, s) => ssrChildrenHtml(props.children, s),
+		(_arg, s) => ssrChild(props.fallback, s),
+		null,
 	);
 }
 
@@ -994,6 +1015,10 @@ export function ssrHeadEl(
 		for (const k in attrs) {
 			const v = attrs[k];
 			if (v == null || v === false) continue;
+			// on* event props reach us since the compiler passes them through for the
+			// client headBlock's direct listeners — no server semantics, never serialize
+			// (a function value must not stringify into markup).
+			if (typeof v === 'function' || (k.length > 2 && k[0] === 'o' && k[1] === 'n')) continue;
 			s += v === true ? ' ' + k : ' ' + k + '="' + escapeAttr(v) + '"';
 		}
 	}
@@ -1127,6 +1152,9 @@ interface FullPassResult {
 	serial: unknown[];
 	suspended: SuspendedList;
 	deferred: Job[];
+	/** Per-hash scoped stylesheets from this pass — the streaming renderer diffs
+	 *  these against what it already flushed to emit late boundaries' styles. */
+	cssEntries: Map<string, string>;
 }
 
 // Snapshot / install / restore the module globals around ONE synchronous pass
@@ -1229,7 +1257,7 @@ function runFullFramedPass(
 	for (const [hash, sheet] of cssMap) {
 		css += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
 	}
-	return { body, head: headBuf.html, css, serial, suspended, deferred };
+	return { body, head: headBuf.html, css, serial, suspended, deferred, cssEntries: cssMap };
 }
 
 // Re-run a set of discovery jobs (each an innermost suspending COMPONENT) in
@@ -1478,4 +1506,476 @@ export function renderToStaticMarkup(
 	}
 	// No seeds (non-hydratable). Head is folded in without adoption markers.
 	return { html: spliceHead(pass.body, pass.head), css: pass.css };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Streaming SSR — renderToPipeableStream / renderToReadableStream.
+//
+// Pass-based out-of-order streaming built on the SAME engine as `prerender`:
+//
+//   1. SHELL pass: one `runFullFramedPass`. A `@try` that suspends emits its
+//      fallback with a leading `<template data-oct-b="N">` sentinel and
+//      registers itself (keyed by frame path, so the id is stable across
+//      passes). The shell flushes immediately (styles + head + body + shell
+//      seeds + the inline swap runtime).
+//   2. Each ROUND: await the suspended thenables (settleSuspended), re-run a
+//      full pass against the now-warmer RESOLVED cache. `ssrTry` captures each
+//      registered boundary's freshly-rendered content + its `use()` seed slice;
+//      newly-completed boundaries flush as hidden segments
+//      `<div hidden data-oct-s="N">…` followed by `<script>$OCTRC("N")</script>`
+//      which swaps the content into the boundary's live range. Rounds repeat
+//      until no boundary is pending (bounded by MAX_SUSPENSE_PASSES).
+//
+// A registered boundary ALWAYS returns its pending form (template + fallback)
+// to the surrounding pass — its real content ships ONLY via its own segment, so
+// a nested pending boundary inside a completed one swaps later by id order
+// (ids are allocated parent-first). A promise REJECTION needs no special path:
+// the next pass's `use()` throws the reason, the boundary's `@catch` renders,
+// and the catch arm streams as a normal segment.
+//
+// Hydration: `$OCTRC` stashes the boundary's seed JSON on `window.$OCTS[id]`
+// and leaves a `<!--oct-seed:id-->` comment where the template was; the client
+// `mountTry` sees the comment, scopes that boundary's seeds, and adopts the
+// swapped-in DOM byte-for-byte. A boundary still pending when the stream ends
+// (abort/error) keeps its template — hydration's structural-mismatch recovery
+// client-renders it (the standard degraded path).
+//
+// Intentional scope notes (documented divergences from React Fizz):
+//   - No selective hydration (octane has no synthetic event replay system).
+//   - Per-ROUND full re-passes rather than per-boundary incremental renders —
+//     the same cost model as `prerender`, reusing its cache + discovery engine.
+//   - Head elements hoisted from INSIDE a streamed boundary don't ship in the
+//     stream (the shell's head already flushed); the client re-creates them on
+//     hydration via headBlock.
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface StreamBoundary {
+	id: number;
+	state: 'pending' | 'done';
+	/** Inner branch-range html (`<!--[-->…<!--]-->`) from the resolving pass. */
+	html: string;
+	/** This boundary's `use()` seed slice from the resolving pass. */
+	seeds: unknown[];
+}
+
+interface StreamState {
+	boundaries: Map<string, StreamBoundary>;
+	nextId: number;
+}
+
+// Active streaming render, or null (buffered/sync renders). NOT part of the
+// ambient snapshot: a streaming render installs it only around its own
+// synchronous passes, so concurrent buffered renders never observe it.
+let STREAM: StreamState | null = null;
+
+/**
+ * Compiled `@try` / JSX `<Suspense>` boundary. `siteKey` is the compiler's
+ * source-position hash; combined with the frame path + per-frame occurrence it
+ * identifies THIS boundary instance stably across streaming passes. Byte-parity
+ * contract with the old inline emit (hydration compatibility):
+ *   success            → ssrBlock(ssrBlock(tryHtml))
+ *   suspend, @pending  → ssrBlock(ssrBlock(pendingHtml))
+ *   suspend, no arm    → ssrBlock('')
+ *   error, @catch      → ssrBlock(ssrBlock(catchHtml))
+ *   error, no @catch   → rethrow
+ * In streaming mode a suspended boundary additionally carries the
+ * `<template data-oct-b>` sentinel, and a REGISTERED boundary keeps returning
+ * its pending form (content ships via its segment).
+ */
+export function ssrTry(
+	scope: SSRScope,
+	siteKey: string,
+	tryFn: (arg: unknown, scope: SSRScope) => string,
+	pendFn: ((arg: unknown, scope: SSRScope) => string) | null,
+	catchFn: ((err: unknown, scope: SSRScope) => string) | null,
+): string {
+	const stream = STREAM;
+	let key = '';
+	let entry: StreamBoundary | undefined;
+	let serialStart = 0;
+	if (stream !== null) {
+		// Stable per-instance id: frame path + site + per-frame occurrence —
+		// the same scheme use() keys its thenables with.
+		const frame = FRAME;
+		const base = '@try:' + siteKey;
+		let n = 0;
+		let prefix = '';
+		if (frame !== null) {
+			if (frame.occ === null) frame.occ = new Map();
+			n = frame.occ.get(base) ?? 0;
+			frame.occ.set(base, n + 1);
+			prefix = framePath(frame);
+		}
+		key = prefix + '|' + base + '#' + n;
+		entry = stream.boundaries.get(key);
+		serialStart = SERIAL !== null ? SERIAL.length : 0;
+	}
+	const pendingForm = (): string => {
+		const fallback = pendFn !== null ? ssrBlock(pendFn(undefined, scope)) : '';
+		if (entry !== undefined) {
+			return ssrBlock(
+				'<template ' + STREAM_BOUNDARY_ATTR + '="' + entry.id + '"></template>' + fallback,
+			);
+		}
+		return ssrBlock(pendFn !== null ? fallback : '');
+	};
+	try {
+		const inner = ssrBlock(tryFn(undefined, scope));
+		if (entry !== undefined) {
+			// Registered (was pending in an earlier pass): capture the content +
+			// this boundary's seed slice for its segment; the surrounding pass
+			// keeps seeing the pending form so the shell shape stays stable.
+			if (entry.state !== 'done') {
+				entry.state = 'done';
+				entry.html = inner;
+				if (SERIAL !== null) {
+					entry.seeds = SERIAL.slice(serialStart);
+					SERIAL.length = serialStart;
+				}
+			} else if (SERIAL !== null) {
+				// Later passes re-render from cache — drop the duplicate seeds.
+				SERIAL.length = serialStart;
+			}
+			return pendingForm();
+		}
+		return ssrBlock(inner);
+	} catch (e) {
+		if (ssrIsSuspense(e)) {
+			if (stream !== null) {
+				// Drop seeds pushed by the partially-rendered body — they belong to
+				// the boundary's own slice once it completes.
+				if (SERIAL !== null) SERIAL.length = serialStart;
+				if (entry === undefined) {
+					entry = { id: stream.nextId++, state: 'pending', html: '', seeds: [] };
+					stream.boundaries.set(key, entry);
+				}
+			}
+			return pendingForm();
+		}
+		if (entry !== undefined && SERIAL !== null) SERIAL.length = serialStart;
+		if (catchFn !== null) {
+			const inner = ssrBlock(catchFn(e, scope));
+			if (entry !== undefined) {
+				if (entry.state !== 'done') {
+					entry.state = 'done';
+					entry.html = inner;
+					entry.seeds = [];
+				}
+				return pendingForm();
+			}
+			return ssrBlock(inner);
+		}
+		throw e;
+	}
+}
+
+// The inline client swap runtime, emitted ONCE (before the first segment).
+// $OCTRC(id): stash the segment's seed JSON on window.$OCTS, remove the
+// fallback (template's siblings up to the balanced block close), move the
+// segment's children into place, and replace the template with the
+// `<!--oct-seed:id-->` scoping comment. $OCTRX(id): mark the boundary errored
+// (hydration client-renders it via mismatch recovery).
+const STREAM_RUNTIME_JS =
+	'(function(){var d=document;var S=window.$OCTS=window.$OCTS||{};' +
+	'window.$OCTRC=function(id){' +
+	"var t=d.querySelector('template[" +
+	STREAM_BOUNDARY_ATTR +
+	"=\"'+id+'\"]');" +
+	"var s=d.querySelector('[" +
+	STREAM_SEGMENT_ATTR +
+	"=\"'+id+'\"]');" +
+	'if(!t||!s)return;' +
+	'var sd=s.querySelector("script[' +
+	STREAM_SEED_ATTR +
+	']");' +
+	'if(sd){S[id]=sd.textContent;sd.parentNode.removeChild(sd);}' +
+	'var n=t.nextSibling,depth=1;' +
+	'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
+	'if(v==="[")depth++;else if(v==="]"){depth--;if(depth===0)break;}' +
+	'n.parentNode.removeChild(n);n=x;}' +
+	'var p=t.parentNode;' +
+	'while(s.firstChild)p.insertBefore(s.firstChild,n);' +
+	'p.replaceChild(d.createComment("' +
+	STREAM_SEED_COMMENT +
+	'"+id),t);' +
+	's.parentNode.removeChild(s);};' +
+	'window.$OCTRX=function(id){' +
+	"var t=d.querySelector('template[" +
+	STREAM_BOUNDARY_ATTR +
+	"=\"'+id+'\"]');" +
+	'if(t)t.setAttribute("data-oct-err","");};' +
+	'})();';
+
+interface StreamSink {
+	write(chunk: string): void;
+	shellReady(): void;
+	shellError(err: unknown): void;
+	allReady(): void;
+	fatal(err: unknown): void;
+}
+
+export interface StreamOptions extends RenderOptions {
+	onShellReady?: () => void;
+	onShellError?: (err: unknown) => void;
+	onAllReady?: () => void;
+}
+
+function withStream<T>(stream: StreamState, fn: () => T): T {
+	const prev = STREAM;
+	STREAM = stream;
+	try {
+		return fn();
+	} finally {
+		STREAM = prev;
+	}
+}
+
+function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
+	let seedScript = '';
+	if (b.seeds.length > 0) {
+		const json = JSON.stringify(b.seeds, (_key, value) =>
+			value === undefined ? { [UNDEFINED_SENTINEL_KEY]: true } : value,
+		).replace(/</g, '\\u003c');
+		seedScript =
+			'<script type="application/json" ' + STREAM_SEED_ATTR + nonceAttr + '>' + json + '</script>';
+	}
+	return (
+		'<div hidden ' +
+		STREAM_SEGMENT_ATTR +
+		'="' +
+		b.id +
+		'">' +
+		seedScript +
+		b.html +
+		'</div><script' +
+		nonceAttr +
+		'>$OCTRC("' +
+		b.id +
+		'")</script>'
+	);
+}
+
+/** The shared streaming engine both public APIs drive. */
+async function runStream(
+	component: ServerComponent,
+	props: any,
+	options: StreamOptions | undefined,
+	sink: StreamSink,
+): Promise<void> {
+	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
+	const signal = options?.signal;
+	const nonceAttr = nonceAttrOf(options);
+	const resolved: ResolvedMap = new Map();
+	const stream: StreamState = { boundaries: new Map(), nextId: 0 };
+	const emittedCss = new Set<string>();
+	const flushedSegments = new Set<number>();
+
+	let pass: FullPassResult;
+	try {
+		signal?.throwIfAborted();
+		pass = withStream(stream, () => runFullFramedPass(component, props, resolved, nonceAttr));
+	} catch (err) {
+		options?.onError?.(err);
+		sink.shellError(err);
+		return;
+	}
+	// SHELL: styles first (so painted fallbacks are styled), hoisted head, body,
+	// the shell-scope seed script, then the swap runtime iff anything is pending.
+	let shell = '';
+	for (const [hash, sheet] of pass.cssEntries) {
+		emittedCss.add(hash);
+		shell += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
+	}
+	shell += pass.head + pass.body;
+	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
+	const anyPending = stream.boundaries.size > 0;
+	if (anyPending) shell += '<script' + nonceAttr + '>' + STREAM_RUNTIME_JS + '</script>';
+	sink.write(shell);
+	sink.shellReady();
+
+	let suspended = pass.suspended;
+	let attempt = 0;
+	while ([...stream.boundaries.values()].some((b) => b.state === 'pending')) {
+		try {
+			signal?.throwIfAborted();
+			if (++attempt > MAX_SUSPENSE_PASSES) {
+				throw new Error(
+					'octane SSR: exceeded ' +
+						MAX_SUSPENSE_PASSES +
+						' streaming passes — a use(thenable) never resolved.',
+				);
+			}
+			await settleSuspended(suspended, resolved, timeoutMs, signal);
+			pass = withStream(stream, () => runFullFramedPass(component, props, resolved, nonceAttr));
+			suspended = pass.suspended;
+		} catch (err) {
+			// Abort / timeout / render throw after the shell: mark every still-pending
+			// boundary errored (hydration client-renders them) and end the stream.
+			options?.onError?.(err);
+			let tail = '';
+			for (const b of stream.boundaries.values()) {
+				if (b.state === 'pending')
+					tail += '<script' + nonceAttr + '>$OCTRX("' + b.id + '")</script>';
+			}
+			if (tail !== '') sink.write(tail);
+			sink.fatal(err);
+			return;
+		}
+		let chunk = '';
+		for (const [hash, sheet] of pass.cssEntries) {
+			if (emittedCss.has(hash)) continue;
+			emittedCss.add(hash);
+			chunk += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
+		}
+		// Parent-first: ids are allocated in discovery order, so ascending id
+		// guarantees an outer boundary's swap lands before a nested one's.
+		const done = [...stream.boundaries.values()]
+			.filter((b) => b.state === 'done' && !flushedSegments.has(b.id))
+			.sort((a, b) => a.id - b.id);
+		for (const b of done) {
+			flushedSegments.add(b.id);
+			chunk += segmentChunk(b, nonceAttr);
+		}
+		if (chunk !== '') sink.write(chunk);
+	}
+	sink.allReady();
+}
+
+/**
+ * React `react-dom/server` `renderToPipeableStream` (Node streams). Returns
+ * `{ pipe, abort }`; chunks buffer until `pipe(destination)` is called.
+ * `onShellReady` fires once the shell (fallbacks included) has been produced;
+ * `onAllReady` once every boundary has streamed. Octane signature convention:
+ * `(Component, props?, options?)`.
+ */
+export function renderToPipeableStream(
+	component: ServerComponent,
+	props?: any,
+	options?: StreamOptions,
+): {
+	pipe: <T extends { write(chunk: string): unknown; end(): unknown }>(destination: T) => T;
+	abort: (reason?: unknown) => void;
+} {
+	const controller = new AbortController();
+	if (options?.signal) {
+		const outer = options.signal;
+		if (outer.aborted) controller.abort(outer.reason);
+		else outer.addEventListener('abort', () => controller.abort(outer.reason), { once: true });
+	}
+	let destination: { write(chunk: string): unknown; end(): unknown } | null = null;
+	const buffered: string[] = [];
+	let ended = false;
+	const flushEnd = (): void => {
+		ended = true;
+		if (destination !== null) destination.end();
+	};
+	runStream(
+		component,
+		props,
+		{ ...options, signal: controller.signal },
+		{
+			write(chunk) {
+				if (destination !== null) destination.write(chunk);
+				else buffered.push(chunk);
+			},
+			shellReady() {
+				options?.onShellReady?.();
+			},
+			shellError(err) {
+				options?.onShellError?.(err);
+				flushEnd();
+			},
+			allReady() {
+				options?.onAllReady?.();
+				flushEnd();
+			},
+			fatal() {
+				flushEnd();
+			},
+		},
+	).catch((err) => {
+		options?.onError?.(err);
+		flushEnd();
+	});
+	return {
+		pipe(dest) {
+			destination = dest;
+			for (const chunk of buffered) dest.write(chunk);
+			buffered.length = 0;
+			if (ended) dest.end();
+			return dest;
+		},
+		abort(reason?: unknown) {
+			controller.abort(reason ?? new Error('The render was aborted.'));
+		},
+	};
+}
+
+/**
+ * React `react-dom/server` `renderToReadableStream` (web streams). Resolves
+ * with the ReadableStream once the shell is ready (rejects on a shell error);
+ * the stream's `allReady` promise settles when every boundary has flushed.
+ */
+export function renderToReadableStream(
+	component: ServerComponent,
+	props?: any,
+	options?: StreamOptions,
+): Promise<ReadableStream<Uint8Array> & { allReady: Promise<void> }> {
+	return new Promise((resolveShell, rejectShell) => {
+		const encoder = new TextEncoder();
+		let controller!: ReadableStreamDefaultController<Uint8Array>;
+		let allReadyResolve!: () => void;
+		let allReadyReject!: (err: unknown) => void;
+		const allReady = new Promise<void>((res, rej) => {
+			allReadyResolve = res;
+			allReadyReject = rej;
+		});
+		// A stream consumer may never read `allReady`; don't let its rejection
+		// surface as an unhandled rejection on the abort path.
+		allReady.catch(() => {});
+		const stream = new ReadableStream<Uint8Array>({
+			start(c) {
+				controller = c;
+			},
+		}) as ReadableStream<Uint8Array> & { allReady: Promise<void> };
+		stream.allReady = allReady;
+		let shellDone = false;
+		runStream(component, props, options, {
+			write(chunk) {
+				controller.enqueue(encoder.encode(chunk));
+			},
+			shellReady() {
+				shellDone = true;
+				options?.onShellReady?.();
+				resolveShell(stream);
+			},
+			shellError(err) {
+				options?.onShellError?.(err);
+				if (!shellDone) rejectShell(err);
+				allReadyReject(err);
+				try {
+					controller.close();
+				} catch {
+					/* already closed */
+				}
+			},
+			allReady() {
+				options?.onAllReady?.();
+				allReadyResolve();
+				controller.close();
+			},
+			fatal(err) {
+				allReadyReject(err);
+				try {
+					controller.close();
+				} catch {
+					/* already closed */
+				}
+			},
+		}).catch((err) => {
+			options?.onError?.(err);
+			if (!shellDone) rejectShell(err);
+			allReadyReject(err);
+		});
+	});
 }

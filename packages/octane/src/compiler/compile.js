@@ -2100,13 +2100,13 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	// Each arm's content is wrapped in an INNER ssrBlock (see ssrEmitIf) so the
 	// client adopts it as the boundary's branch range during hydration without
 	// inserting comment markers (byte-for-byte). The OUTER ssrBlock is the slot.
-	let pendingCall = "''";
+	let pendFnName = 'null'; // no @pending → ssrTry renders an empty slot on suspend
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
 		const pendSub = ssrCompileSub(node.pending.body, ctx, '__spend', [], cssHash, parentNs);
 		inlinedSubs.push(pendSub.fn + ';');
-		pendingCall = `ssrBlock(${pendSub.fnName}(undefined, __s))`;
+		pendFnName = pendSub.fnName;
 	}
-	let catchExpr = 'throw __e'; // no @catch → rethrow non-suspense errors
+	let catchFnName = 'null'; // no @catch → ssrTry rethrows non-suspense errors
 	if (node.handler) {
 		const params = node.handler.param ? [node.handler.param] : [];
 		const catchSub = ssrCompileSub(
@@ -2118,15 +2118,29 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			parentNs,
 		);
 		inlinedSubs.push(catchSub.fn + ';');
-		catchExpr = node.handler.param
-			? `return ssrBlock(${catchSub.fnName}(__e, __s))`
-			: `return ssrBlock(${catchSub.fnName}(undefined, __s))`;
+		// A no-param @catch simply ignores the error argument ssrTry passes.
+		catchFnName = catchSub.fnName;
 	}
-	ctx.runtimeNeeded.add('ssrBlock');
-	ctx.runtimeNeeded.add('ssrIsSuspense');
-	// SSR @try: render the try body; a `use(thenable)` suspension renders the
-	// @pending fallback; any other thrown error renders @catch (or rethrows).
-	return `ssrBlock((() => { try { return ssrBlock(${trySub.fnName}(undefined, __s)); } catch (__e) { if (ssrIsSuspense(__e)) return ${pendingCall}; ${catchExpr}; } })())`;
+	ctx.runtimeNeeded.add('ssrTry');
+	// SSR @try routes through the runtime ssrTry helper: a `use(thenable)`
+	// suspension renders the @pending fallback (plus, in STREAMING renders, the
+	// boundary registration + `<template data-oct-b>` sentinel); any other thrown
+	// error renders @catch (or rethrows). Output is byte-identical to the old
+	// inline try/catch emit for buffered renders (hydration compatibility).
+	// `siteKey` is a stable source-position hash so a boundary keeps its identity
+	// across streaming passes (the runtime adds the frame path per instance).
+	return `ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName})`;
+}
+
+// Deterministic per-boundary site key for ssrTry — same scheme as headKey:
+// keyed ONLY on the node's source position (same AST → same offset across the
+// client and server compiles of one source), hashed compactly.
+function ssrTryKey(node) {
+	const pos = node && node.start != null ? node.start : 0;
+	const src = `try:${pos}`;
+	let h = 5381;
+	for (let i = 0; i < src.length; i++) h = (Math.imul(h, 33) + src.charCodeAt(i)) | 0;
+	return 't' + (h >>> 0).toString(36);
 }
 
 // `{createPortal(...)}` (and other JSX-bearing expression holes) at child
@@ -3307,10 +3321,12 @@ function headElementArgs(node, index) {
 		}
 		if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
 		const attrName = a.name.name || a.name;
-		// Events/refs/key have no head semantics; `class` is the CSS-scoping stamp
-		// (meaningless on title/meta/link) — drop them all.
+		// refs/key have no head semantics; `class` is the CSS-scoping stamp
+		// (meaningless on title/meta/link) — drop them. EVENTS pass through: a
+		// hoisted element lives in document.head, outside every delegation root,
+		// so the client headBlock attaches on* props as DIRECT listeners
+		// (`<link onLoad={…}>` — React parity); the server ssrHeadEl skips them.
 		if (attrName === 'key' || attrName === 'ref' || attrName === 'class') continue;
-		if (isEventAttrName(attrName)) continue;
 		const val = a.value;
 		if (val == null) {
 			attrParts.push(`${JSON.stringify(attrName)}: true`);
@@ -4174,15 +4190,18 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		if (b.kind === 'formAction') ctx.runtimeNeeded.add('setFormAction');
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
-			ctx.runtimeNeeded.add('attachRef'); // unmount-detach of a spread-supplied ref
+			ctx.runtimeNeeded.add('queueRefDetach'); // unmount-detach of a spread-supplied ref
 		}
 		if (b.kind === 'ref') {
 			ctx.runtimeNeeded.add('attachRef');
 			ctx.runtimeNeeded.add('queueRefAttach'); // deferred mount attach (commit-phase timing)
+			ctx.runtimeNeeded.add('queueRefDetach'); // deferred unmount detach (same phasing)
 		}
 		if (b.kind === 'fragmentRef') {
 			ctx.runtimeNeeded.add('attachRef');
 			ctx.runtimeNeeded.add('mountFragmentRef');
+			ctx.runtimeNeeded.add('queueRefAttach'); // deferred update re-attach
+			ctx.runtimeNeeded.add('queueRefDetach'); // deferred update/unmount detach
 			// Fragment refs need a SECOND template-walked node for the end
 			// marker; emitBindingMount expects a single elVar so we resolve
 			// the end-marker var here and stash it on the binding for the
@@ -4654,14 +4673,17 @@ function emitBindingMount(b, elVar) {
 		case 'spread': {
 			// Detach a spread-supplied `ref` on unmount. setSpread attaches/updates
 			// the ref during mount/update, but only a scope cleanup can detach it
-			// when the element unmounts — read the final spread value's ref and run
-			// its React-19 cleanup-return (or null) via attachRef.
+			// when the element unmounts — read the final spread value's ref and
+			// queue its React-19 cleanup-return (or null call) for commit
+			// (queueRefDetach: unmount cleanups run mid-render, and a state-setter
+			// ref firing null synchronously can render before a replacement
+			// element's deferred attach — commit-phase detach batches the two).
 			return `    {
       const _v = ${E};
       setSpread(${elVar}, _v, undefined, __s);
       _b._el$${b.id} = ${elVar};
       _b._sp$${b.id} = _v;
-      __s.cleanups.push(() => { const _sp = _b._sp$${b.id}; if (_sp != null && _sp.ref != null) attachRef(_sp.ref, null, _b._el$${b.id}); });
+      __s.cleanups.push(() => { const _sp = _b._sp$${b.id}; if (_sp != null && _sp.ref != null) queueRefDetach(_sp.ref, _b._el$${b.id}); });
     }`;
 		}
 		case 'event': {
@@ -4698,16 +4720,20 @@ function emitBindingMount(b, elVar) {
 			// The attach is DEFERRED via queueRefAttach so it runs at commit, after
 			// the subtree is inserted into the document — a callback ref then sees a
 			// connected node and ref.current is set before layout effects run
-			// (React-19 commit-phase ref timing). Detach stays synchronous on unmount
-			// and passes the bound element as attachRef's cleanup target, so a
-			// callback ref shared across elements (ref={registerItem} on every @for
-			// row) releases ITS row's React-19 cleanup, not another row's.
+			// (React-19 commit-phase ref timing). The unmount detach is DEFERRED too
+			// (queueRefDetach, drained at commit before that commit's attaches):
+			// cleanups run mid-render, and a state-setter ref firing null
+			// synchronously can render before a replacement element's attach —
+			// commit-phase detach lands null + new element in the same batch. The
+			// bound element rides along as the cleanup target, so a callback ref
+			// shared across elements (ref={registerItem} on every @for row)
+			// releases ITS row's React-19 cleanup, not another row's.
 			return `    {
       const _r = (${b.expr});
       _b._ref$${b.id} = _r;
       _b._el$${b.id} = ${elVar};
       queueRefAttach(__s, () => attachRef(_r, _b._el$${b.id}));
-      __s.cleanups.push(() => attachRef(_b._ref$${b.id}, null, _b._el$${b.id}));
+      __s.cleanups.push(() => queueRefDetach(_b._ref$${b.id}, _b._el$${b.id}));
     }`;
 		}
 		case 'fragmentRef': {
@@ -4757,7 +4783,10 @@ function emitBindingUpdate(b) {
 			// setSpread does its own per-key diffing internally and handles cleanup
 			// of keys that vanished — always call it, but skip if the reference is
 			// identical (the user opted-in to a stable object).
-			return `    { const _v = ${E}; if (_b._sp$${b.id} !== _v) { setSpread(_b._el$${b.id}, _v, _b._sp$${b.id}); _b._sp$${b.id} = _v; } }`;
+			// `__s` rides along on updates too so a spread-supplied ref's attach is
+			// deferred to commit (after all queued detaches) — same phasing as the
+			// direct `ref` binding above.
+			return `    { const _v = ${E}; if (_b._sp$${b.id} !== _v) { setSpread(_b._el$${b.id}, _v, _b._sp$${b.id}, __s); _b._sp$${b.id} = _v; } }`;
 		}
 		case 'event': {
 			return `    _b._el$${b.id}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
@@ -4789,34 +4818,39 @@ function emitBindingUpdate(b) {
 			// Ref expression identity may change across renders. React 19: detach
 			// the PRIOR ref fully before attaching the new one — for an object ref
 			// that clears `.current`; for a callback ref that runs its returned
-			// cleanup (or calls it with null). The old code skipped detaching
-			// function refs (`typeof _old !== 'function'`), so a callback ref's
-			// identity change (or replacement by null) never ran its cleanup and
-			// orphaned it — a React-19 divergence and a leak. Detach old uniformly;
-			// attachRef routes functions/objects/arrays to the right detach path.
-			// The outer `_r !== _b._ref$` guard already prevents re-firing a stable
-			// ref, so this never double-invokes an unchanged callback ref.
+			// cleanup (or calls it with null). attachRef routes functions/objects/
+			// arrays to the right detach path. BOTH halves are deferred to commit
+			// (queueRefDetach / queueRefAttach): all of a commit's detaches drain
+			// before its attaches — React's mutation→layout phasing — so a ref
+			// HOPPING between two elements in one render (refs-test.js:62) ends on
+			// the new element no matter which element's binding updates first
+			// (inline pairs ran attach-then-later-detach across bindings, nulling
+			// the hopped ref). The outer `_r !== _b._ref$` guard already prevents
+			// re-firing a stable ref, so this never double-invokes an unchanged
+			// callback ref.
 			return `    {
       const _r = (${b.expr});
       if (_r !== _b._ref$${b.id}) {
         const _old = _b._ref$${b.id};
-        if (_old != null) attachRef(_old, null, _b._el$${b.id});
-        attachRef(_r, _b._el$${b.id});
+        if (_old != null) queueRefDetach(_old, _b._el$${b.id});
+        if (_r != null) queueRefAttach(__s, () => attachRef(_r, _b._el$${b.id}));
         _b._ref$${b.id} = _r;
       }
     }`;
 		}
 		case 'fragmentRef': {
 			// A changing `<Fragment ref={…}>` expression must detach the old ref and
-			// re-point the new one at the SAME (persistent) FragmentInstance. The
-			// instance is already mounted + connected, so attach inline. _currentRef
-			// (read by the mount cleanup) is updated so unmount detaches the new ref.
+			// re-point the new one at the SAME (persistent) FragmentInstance. Both
+			// halves defer to commit (detaches drain before attaches) — same phasing
+			// as element refs, so a ref hopping between fragments never ends null.
+			// _currentRef (read by the mount cleanup) is updated NOW so unmount
+			// detaches the new ref.
 			return `    {
       const _r = (${b.expr});
       const _fi = _b._fi$${b.id};
       if (_fi && _r !== _fi._currentRef) {
-        attachRef(_fi._currentRef, null, _fi);
-        attachRef(_r, _fi);
+        if (_fi._currentRef != null) queueRefDetach(_fi._currentRef, _fi);
+        if (_r != null) queueRefAttach(__s, () => attachRef(_r, _fi));
         _fi._currentRef = _r;
       }
     }`;

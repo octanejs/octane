@@ -45,6 +45,24 @@ export const SUSPENSE_SCRIPT_ATTR = 'data-octane-suspense';
  */
 export const UNDEFINED_SENTINEL_KEY = '__octane_new_undefined__';
 
+// ── Streaming SSR protocol (renderToPipeableStream / renderToReadableStream) ──
+// A boundary that is still PENDING when the shell flushes emits its fallback
+// with a leading `<template data-oct-b="N">` sentinel. When the boundary's data
+// resolves, the stream appends a hidden segment `<div hidden data-oct-s="N">`
+// holding the real content (+ that boundary's use() seed JSON in a
+// `data-oct-seed` script) and an inline `$OCTRC("N")` call that swaps the
+// content into the boundary's range, stashes the seeds on `window.$OCTS`, and
+// replaces the template with a `<!--oct-seed:N-->` comment the client's
+// hydration uses to scope that boundary's seeds.
+/** Sentinel <template> attribute marking a pending streamed boundary. */
+export const STREAM_BOUNDARY_ATTR = 'data-oct-b';
+/** Hidden segment container attribute carrying a completed boundary's content. */
+export const STREAM_SEGMENT_ATTR = 'data-oct-s';
+/** Per-boundary seed-JSON script attribute (inside the segment). */
+export const STREAM_SEED_ATTR = 'data-oct-seed';
+/** Comment-data prefix left in a swapped boundary for hydration seed scoping. */
+export const STREAM_SEED_COMMENT = 'oct-seed:';
+
 // ---------------------------------------------------------------------------
 // Style value coercion — React parity for numeric style-object values.
 //
@@ -133,5 +151,8 @@ export function cssStyleValue(name: string, value: unknown): string {
 	) {
 		return value + 'px';
 	}
-	return '' + value;
+	// Trim string values (React parity, CSSPropertyOperations-test.js:32): the
+	// client CSSOM trims on parse, so an untrimmed SSR emit would be a
+	// server/client byte divergence for the same style object.
+	return typeof value === 'string' ? value.trim() : '' + value;
 }

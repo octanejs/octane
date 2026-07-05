@@ -9,10 +9,14 @@ describe('deferred ref attach — same-flush unmount', () => {
 
 		// The try body threw during mount; the catch branch rendered.
 		expect(r.find('#caught').textContent).toBe('caught');
-		// The ref-detach cleanup ran during the try unmount (current -> null), and
-		// the deferred attach was skipped because its subtree was disposed. Before
-		// the fix the drain re-ran attachRef and resurrected the dead node here.
-		expect(refObj.current).toBe(null);
+		// React contract (ReactErrorBoundaries:1158, conformance/refs-under-error):
+		// a ref belonging to work that never COMMITTED is never invoked at all —
+		// the deferred attach is skipped (disposed subtree) AND the teardown detach
+		// is suppressed (unmountScope's `mounted !== true` guard), so the ref keeps
+		// its prior value. The original regression this test pinned (the drain
+		// re-running attachRef and resurrecting the torn-down node) stays covered:
+		// current must NOT be the dead element.
+		expect(refObj.current).toBe('sentinel');
 
 		r.unmount();
 	});

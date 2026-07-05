@@ -10,6 +10,107 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 2 (in progress) — CheckboxGroup DONE (2026-07). Green: 41 differential tests.**
+> `src/checkbox-group.ts` — a `role="group"` whose child `<Checkbox.Root>`s derive `checked`
+> from a shared value array; the previously-dormant parent-checkbox branches in `checkbox.ts`
+> are now wired via `useCheckboxGroupParent` (a 3-state select-all parent: indeterminate when
+> only some children are ticked). New utils: `areArraysEqual`, `useCheckboxGroupParent`.
+> **Remaining Phase 2: NumberField (~2600 lines) + Slider (~2835 lines)** — each a mini-subsystem
+> (value/format state machine + pointer scrub/drag) whose architecture is mapped; they are the
+> two large dedicated items left.
+
+> **Phase 2 (in progress) — the Field/Form validation SYSTEM + Input DONE (2026-07). Green:
+> 39 differential tests vs real `@base-ui/react@1.6.0`, base-ui typecheck clean.** This is the
+> densest Phase-2 subsystem (~1800 lines):
+> - **Field** (`src/field.ts`): `Field.Root` (+ the real `FieldRootContext` via
+>   `useFieldValidation` — the native-constraint + custom async validation state machine — and
+>   `useFieldControlRegistration`), `Field.Control`, `Field.Label`, `Field.Description`,
+>   `Field.Error` (transition-mounted), `Field.Validity` (render-prop), `Field.Item`. The real
+>   `LabelableProvider` (`src/utils/field/`) drives the label↔control↔description id association
+>   (`for` / `aria-labelledby` / `aria-describedby`) — verified byte-identical.
+> - **Form** (`src/form.ts`): `<form noValidate>` + the real `FormContext` (field registry,
+>   submit-time validation, first-invalid focus). **Input** (`src/input.ts`) = `<Field.Control/>`.
+> - octane text-input adaptation: the initial value is the `value` ATTRIBUTE, a controlled value
+>   is driven via the `.value` PROPERTY (mirrors the checkbox adaptation).
+>
+> **Binding bug fixed (my `useRenderElement` port, not octane):** the `enabled: false` path
+> assigned `outProps = EMPTY_OBJECT` (shared module const) then mutated `outProps.ref`, poisoning
+> `EMPTY_OBJECT.ref` with a stale composed-ref callback. A later component rendering with the
+> DEFAULT (no-state) EMPTY_OBJECT then emitted `data-ref="<fn>"` via `getStateAttributesProps`.
+> Surfaced by a differential test-ordering probe (RadioGroup's grouped Radio uses `enabled:false`
+> → then Form failed). Fix: run the composed-refs hook for slot stability but only assign
+> `outProps.ref` when enabled, returning EMPTY_OBJECT untouched.
+
+> **Phase 2 (in progress) — Checkbox + Radio + RadioGroup DONE (2026-07). Green: 35 differential
+> tests vs real `@base-ui/react@1.6.0`.** The boolean/choice-control family is complete
+> (Switch, Checkbox, Radio, RadioGroup), all reusing the octane uncontrolled-input adaptation
+> + the field-context infrastructure:
+> - **Checkbox** (`src/checkbox.ts`): `Root` + transition-mounted `Indicator`; indeterminate
+>   (`aria-checked="mixed"` + `input.indeterminate` property). Group/parent-checkbox branches
+>   dormant until CheckboxGroup.
+> - **Radio** (`src/radio.ts`) + **RadioGroup** (`src/radio-group.ts`): RadioGroup renders a
+>   `role="radiogroup"` via **CompositeRoot** (reusing the Phase-1 roving-focus system), each
+>   Radio a **CompositeItem** deriving `aria-checked` from the group value; the selected radio
+>   holds the active tab stop (`data-composite-item-active`). New small utils: `serializeValue`,
+>   `contains`, `FieldItemContext`, `getDefaultFormSubmitter`, `CheckboxGroupContext`/`RadioGroupContext`.
+> - Click interactions verified byte-identical (toggle, selection-move).
+
+> **Phase 2 (in progress) — Field/Form context infrastructure + Switch DONE (2026-07).
+> Green: 29 differential tests vs real `@base-ui/react@1.6.0` (3 new Switch: uncontrolled
+> toggle, default-checked, disabled — all with click interaction), base-ui typecheck clean.**
+>
+> - **Field/Form context infrastructure** (`src/utils/field/` + `src/utils/{owner,useValueChanged,noop}.ts`):
+>   the context surfaces every form control threads through, ported with Base UI's DEFAULT
+>   values so controls work standalone (inert validation): `FieldRootContext`
+>   (+ `DEFAULT_FIELD_ROOT_CONTEXT`), `FormContext`, `LabelableContext`, `field/constants`
+>   (`DEFAULT_FIELD_ROOT_STATE`/`fieldValidityMapping`/`FieldValidityData`), and the consumer
+>   hooks `useRegisterFieldControl`, `useAriaLabelledBy`, `useLabelableId`, `useValueChanged`.
+>   The full `Field.Root`/`Form` PROVIDERS (which override the defaults + run validation) land
+>   later this phase; the controls are differential-tested standalone first.
+> - **Switch** (`src/switch.ts`) — `Switch.Root` (`role="switch"` span + hidden checkbox input)
+>   + `Switch.Thumb`. Reuses `useButton`/`useControlled`.
+>
+> **octane uncontrolled-input adaptation (the Phase-2 crux, reusable by Checkbox/Radio/etc.):**
+> octane inputs are UNCONTROLLED (a `checked` prop writes a `checked` ATTRIBUTE), but React's
+> controlled `<input checked>` reflects only the INITIAL checked to the attribute (as its
+> default-state) and drives the live value via the `.checked` PROPERTY. So the port: (1) passes
+> `checked: initialCheckedRef.current || undefined` (the initial state → attribute), (2) drives
+> the live `input.checked` PROPERTY imperatively via the native
+> `HTMLInputElement.prototype` setter in a layout effect, and (3) the root's `onClick`
+> dispatches a native `click` on the hidden input → native `change` → `onChange` (octane
+> delegates `change` for de-opt `createElement` inputs — confirmed). This mirrors the proven
+> `@octanejs/radix` bubble-input pattern; it is a binding adaptation to octane's *documented*
+> uncontrolled-input divergence, not a workaround for a bug. Verified byte-identical incl. the
+> click-toggle interaction.
+
+> **Phase 1 COMPLETE — ToggleGroup + Avatar DONE (2026-07). Green: 26 differential tests
+> vs real `@base-ui/react@1.6.0`, base-ui typecheck clean, full monorepo suite green.**
+> All Phase-1 components shipped: Separator, Fieldset, Meter, Progress, Toggle, **ToggleGroup**,
+> **Avatar**.
+>
+> - **ToggleGroup** (`src/toggle-group.ts`) + Toggle's group path — required porting Base UI's
+>   entire **composite roving-focus system** (`src/utils/composite/`): `CompositeRoot` +
+>   `useCompositeRoot` (arrow/Home/End keyboard nav, default tab stop), `CompositeList` +
+>   `useCompositeListItem` (stable-Map registration → document-order index + MutationObserver),
+>   `CompositeItem` + `useCompositeItem` (roving `tabIndex` 0/-1 + focus/hover), plus vendored
+>   floating-ui list utils (`list-utils.ts`), `keys.ts` (nav constants + `scrollIntoViewIfNeeded`),
+>   a minimal `DirectionContext`, and `useRefWithInit`. Decision: **ported Base UI's composite
+>   directly** rather than bridging to `@octanejs/floating-ui`'s `Composite` (different API +
+>   behavior would break byte-parity). Differential tests: single-select (roving tabindex +
+>   value→aria-pressed + click moves value), multiple-select (`data-multiple`), disabled group.
+>   **This unlocks Toolbar / Menu / Menubar / Select / NavigationMenu / Tabs / RadioGroup for
+>   later phases.**
+> - **Avatar** (`src/avatar.ts`) — Root/Image/Fallback + the **transition system**:
+>   `useTransitionStatus` (+ `transitionStatusMapping` → `data-starting-style`/`data-ending-style`),
+>   `useOpenChangeComplete` → `useAnimationsFinished` → `useAnimationFrame`/`resolveRef`,
+>   `useImageLoadingStatus` (off-DOM `new Image()` load tracking), `useTimeout`. Under jsdom the
+>   image never resolves, so (identically on both renderers) the `<img>` stays unmounted and the
+>   Fallback shows — verified `<span class="av"><span class="av-fb">JD</span></span>`.
+>
+> Internals now available for Phase 2+: the composite system, the transition/animation system,
+> `useButton`/`useControlled`/`useFocusableWhenDisabled`, `useStableCallback`/`useValueAsRef`/
+> `useRefWithInit`/`useTimeout`, `useBaseUiId`/`useRegisteredLabelId`, `DirectionContext`.
+
 > **Phase 1 (in progress) — Meter + Progress + Toggle DONE (2026-07). Green: 21 differential
 > tests vs real `@base-ui/react@1.6.0` (Separator ×5, useRender ×2, Fieldset ×4, Meter ×3,
 > Progress ×3, Toggle ×4), base-ui typecheck clean, full monorepo suite 1497 green.**

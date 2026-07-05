@@ -1,4 +1,4 @@
-import { Activity, useState, useEffect, useLayoutEffect } from 'octane';
+import { Activity, useState, useEffect, useLayoutEffect, useInsertionEffect } from 'octane';
 
 // Child logs render + effect mount/unmount, exposes its setState so the test can
 // bump state, and renders its count so state preservation is observable.
@@ -23,6 +23,35 @@ export function ActivityHost(props) @{
 	<div id="host">
 		<Activity mode={props.mode}>
 			<Child log={props.log} expose={props.expose} />
+		</Activity>
+	</div>
+}
+
+// Insertion + layout effects side by side, with bumpable state so the test can
+// UPDATE the child while hidden. React keeps insertion effects CONNECTED across
+// visibility changes (they own injected styles): hide runs no insertion cleanup,
+// reveal doesn't re-fire them, and a deps-changed update while hidden still
+// cycles them (the subtree is pre-rendered) — Activity-test.js:1428.
+function InsertionChild(props) @{
+	const [n, setN] = useState(0);
+	props.expose(setN);
+	useInsertionEffect(() => {
+		props.log('insertion mount ' + n);
+		return () => props.log('insertion cleanup ' + n);
+	}, [n]);
+	useLayoutEffect(() => {
+		props.log('layout mount');
+		return () => props.log('layout cleanup');
+	}, []);
+	<span id="ichild">
+		{n as number}
+	</span>
+}
+
+export function InsertionActivityHost(props) @{
+	<div id="host">
+		<Activity mode={props.mode}>
+			<InsertionChild log={props.log} expose={props.expose} />
 		</Activity>
 	</div>
 }

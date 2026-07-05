@@ -4,6 +4,16 @@ import { Fieldset } from '@octanejs/base-ui/fieldset';
 import { Meter } from '@octanejs/base-ui/meter';
 import { Progress } from '@octanejs/base-ui/progress';
 import { Toggle } from '@octanejs/base-ui/toggle';
+import { ToggleGroup } from '@octanejs/base-ui/toggle-group';
+import { Avatar } from '@octanejs/base-ui/avatar';
+import { Switch } from '@octanejs/base-ui/switch';
+import { Checkbox } from '@octanejs/base-ui/checkbox';
+import { CheckboxGroup } from '@octanejs/base-ui/checkbox-group';
+import { Radio } from '@octanejs/base-ui/radio';
+import { RadioGroup } from '@octanejs/base-ui/radio-group';
+import { Field } from '@octanejs/base-ui/field';
+import { Form } from '@octanejs/base-ui/form';
+import { Input } from '@octanejs/base-ui/input';
 
 // Self-contained differential fixtures: the SAME source runs on octane (via
 // @octanejs/base-ui/<sub>) AND on React (the setup rewrites imports to the real
@@ -180,4 +190,198 @@ export function ToggleDisabled() @{
 // onPressedChange wired), matching React's controlled Toggle.
 export function ToggleControlled() @{
 	<Toggle className="tgl" pressed={true}>Bold</Toggle>
+}
+
+// ToggleGroup — role="group" + data-orientation, composite roving focus (item 0 gets
+// tabindex 0, the rest -1), and single-select value. Proves the whole composite system:
+// CompositeRoot/CompositeList/CompositeItem registration + highlighted-index default +
+// each Toggle deriving `aria-pressed` from the group value.
+export function ToggleGroupSingle() @{
+	<ToggleGroup className="tg" defaultValue={['left']} aria-label="Align">
+		<Toggle className="ti" value="left">L</Toggle>
+		<Toggle className="ti" value="center">C</Toggle>
+		<Toggle className="ti" value="right">R</Toggle>
+	</ToggleGroup>
+}
+
+// Multiple-select — data-multiple on the group; two items pressed at once.
+export function ToggleGroupMultiple() @{
+	<ToggleGroup className="tg" multiple defaultValue={['left', 'right']} aria-label="Format">
+		<Toggle className="ti" value="left">B</Toggle>
+		<Toggle className="ti" value="center">I</Toggle>
+		<Toggle className="ti" value="right">U</Toggle>
+	</ToggleGroup>
+}
+
+// Disabled group — data-disabled on the group; every button natively disabled.
+export function ToggleGroupDisabled() @{
+	<ToggleGroup className="tg" disabled defaultValue={['left']} aria-label="Align">
+		<Toggle className="ti" value="left">L</Toggle>
+		<Toggle className="ti" value="center">C</Toggle>
+	</ToggleGroup>
+}
+
+// Avatar — Root/Image/Fallback. The image loads off-DOM and never resolves under jsdom, so
+// (identically on both renderers) the <img> stays unmounted via the transition system and the
+// Fallback shows. Proves the transition system + image-load hook + multi-part context render
+// byte-identically to Base UI even when the image path is inert.
+export function AvatarBasic() @{
+	<Avatar.Root className="av">
+		<Avatar.Image className="av-img" src="https://example.com/a.png" />
+		<Avatar.Fallback className="av-fb">JD</Avatar.Fallback>
+	</Avatar.Root>
+}
+
+// Fallback only — no <Avatar.Image>; the Fallback renders immediately.
+export function AvatarFallbackOnly() @{
+	<Avatar.Root className="av">
+		<Avatar.Fallback className="av-fb">AB</Avatar.Fallback>
+	</Avatar.Root>
+}
+
+// Switch — a role="switch" <span> + hidden checkbox <input>. Proves the octane
+// uncontrolled-input adaptation (checked driven via the native property setter, NOT a
+// `checked` attribute the way React's controlled input avoids) + the field-context surface
+// (inert standalone). Clicking the switch dispatches a click on the hidden input, toggling
+// aria-checked + data-checked/unchecked byte-identically to Base UI.
+export function SwitchBasic() @{
+	<Switch.Root className="sw">
+		<Switch.Thumb className="sw-thumb" />
+	</Switch.Root>
+}
+
+// Uncontrolled default-checked — aria-checked starts true, data-checked on root + thumb.
+export function SwitchDefaultChecked() @{
+	<Switch.Root className="sw" defaultChecked={true}>
+		<Switch.Thumb className="sw-thumb" />
+	</Switch.Root>
+}
+
+// Disabled — native disabled on the hidden input + data-disabled; click is a no-op.
+export function SwitchDisabled() @{
+	<Switch.Root className="sw" disabled>
+		<Switch.Thumb className="sw-thumb" />
+	</Switch.Root>
+}
+
+// Checkbox — role="checkbox" span + hidden input + a transition-mounted Indicator (only
+// present when checked/indeterminate). Reuses the uncontrolled-input adaptation; clicking
+// toggles aria-checked and mounts the Indicator, byte-identical to Base UI.
+export function CheckboxBasic() @{
+	<Checkbox.Root className="cb">
+		<Checkbox.Indicator className="cb-ind" />
+	</Checkbox.Root>
+}
+
+// Uncontrolled default-checked — aria-checked true, data-checked, Indicator present from mount.
+export function CheckboxDefaultChecked() @{
+	<Checkbox.Root className="cb" defaultChecked={true}>
+		<Checkbox.Indicator className="cb-ind" />
+	</Checkbox.Root>
+}
+
+// Indeterminate — aria-checked="mixed", data-indeterminate, Indicator present.
+export function CheckboxIndeterminate() @{
+	<Checkbox.Root className="cb" indeterminate={true}>
+		<Checkbox.Indicator className="cb-ind" />
+	</Checkbox.Root>
+}
+
+// Disabled — native disabled input + data-disabled; click is a no-op.
+export function CheckboxDisabled() @{
+	<Checkbox.Root className="cb" disabled>
+		<Checkbox.Indicator className="cb-ind" />
+	</Checkbox.Root>
+}
+
+// CheckboxGroup — a role="group" whose child checkboxes derive `checked` from the shared
+// value array. Clicking a child adds/removes it from the group value, byte-identical to Base UI.
+export function CheckboxGroupBasic() @{
+	<CheckboxGroup className="cbg" defaultValue={['a']} aria-label="Options">
+		<Checkbox.Root className="cb" name="a">
+			<Checkbox.Indicator className="cb-ind" />
+		</Checkbox.Root>
+		<Checkbox.Root className="cb" name="b">
+			<Checkbox.Indicator className="cb-ind" />
+		</Checkbox.Root>
+	</CheckboxGroup>
+}
+
+// Parent (select-all) checkbox — `allValues` + `parent` gives a 3-state parent that is
+// indeterminate ("mixed") when only some children are ticked.
+export function CheckboxGroupParent() @{
+	<CheckboxGroup className="cbg" allValues={['a', 'b']} defaultValue={['a']} aria-label="Options">
+		<Checkbox.Root className="cb cb-parent" parent>
+			<Checkbox.Indicator className="cb-ind" />
+		</Checkbox.Root>
+		<Checkbox.Root className="cb" name="a">
+			<Checkbox.Indicator className="cb-ind" />
+		</Checkbox.Root>
+		<Checkbox.Root className="cb" name="b">
+			<Checkbox.Indicator className="cb-ind" />
+		</Checkbox.Root>
+	</CheckboxGroup>
+}
+
+// RadioGroup — role="radiogroup" (CompositeRoot roving focus) with radios. The selected
+// radio holds the active tab stop; each radio derives aria-checked + data-checked from the
+// group value. Clicking a radio moves the selection, byte-identical to Base UI.
+export function RadioGroupBasic() @{
+	<RadioGroup className="rg" defaultValue="a" aria-label="Choice">
+		<Radio.Root className="r" value="a">
+			<Radio.Indicator className="r-ind" />
+		</Radio.Root>
+		<Radio.Root className="r" value="b">
+			<Radio.Indicator className="r-ind" />
+		</Radio.Root>
+		<Radio.Root className="r" value="c">
+			<Radio.Indicator className="r-ind" />
+		</Radio.Root>
+	</RadioGroup>
+}
+
+// Disabled group — aria-disabled + every radio disabled; clicks are no-ops.
+export function RadioGroupDisabled() @{
+	<RadioGroup className="rg" defaultValue="a" disabled aria-label="Choice">
+		<Radio.Root className="r" value="a">
+			<Radio.Indicator className="r-ind" />
+		</Radio.Root>
+		<Radio.Root className="r" value="b">
+			<Radio.Indicator className="r-ind" />
+		</Radio.Root>
+	</RadioGroup>
+}
+
+// Field — the label/control/description association: the Label's `for` = the Control's `id`,
+// the Control's `aria-labelledby` = the Label's `id`, and `aria-describedby` = the Description's
+// `id`. Proves LabelableProvider + FieldRoot + the real field contexts render byte-identically.
+export function FieldBasic() @{
+	<Field.Root className="f">
+		<Field.Label className="f-label">Name</Field.Label>
+		<Field.Control className="f-ctrl" />
+		<Field.Description className="f-desc">Enter your name</Field.Description>
+	</Field.Root>
+}
+
+// Disabled field — data-disabled propagates from Field.Root to label/control/description.
+export function FieldDisabled() @{
+	<Field.Root className="f" disabled>
+		<Field.Label className="f-label">Name</Field.Label>
+		<Field.Control className="f-ctrl" />
+	</Field.Root>
+}
+
+// Standalone Input (= Field.Control with no Field.Root) — uses the inert default field context.
+export function InputBasic() @{
+	<Input className="in" />
+}
+
+// Form wrapping a Field — `<form novalidate>` provides the FormContext.
+export function FormBasic() @{
+	<Form className="form">
+		<Field.Root className="f">
+			<Field.Label className="f-label">Email</Field.Label>
+			<Field.Control className="f-ctrl" name="email" />
+		</Field.Root>
+	</Form>
 }

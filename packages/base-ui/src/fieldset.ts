@@ -30,9 +30,9 @@ export interface FieldsetRootContextValue {
 
 const FieldsetRootContext = createContext<FieldsetRootContextValue | undefined>(undefined);
 
-function useFieldsetRootContext(optional: true): FieldsetRootContextValue | undefined;
-function useFieldsetRootContext(optional?: false): FieldsetRootContextValue;
-function useFieldsetRootContext(optional = false): FieldsetRootContextValue | undefined {
+export function useFieldsetRootContext(optional: true): FieldsetRootContextValue | undefined;
+export function useFieldsetRootContext(optional?: false): FieldsetRootContextValue;
+export function useFieldsetRootContext(optional = false): FieldsetRootContextValue | undefined {
 	// octane context reads are not slot-threaded (see runtime `useContext`).
 	const context = useContext(FieldsetRootContext);
 	if (!context && !optional) {
