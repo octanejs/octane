@@ -35,6 +35,7 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@testing-library/user-event": "^14.6.1",
     "vitest": "catalog:default"
   }
 }

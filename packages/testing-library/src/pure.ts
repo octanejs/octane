@@ -221,8 +221,14 @@ export type RenderResult = {
 	container: HTMLElement;
 	baseElement: HTMLElement;
 	debug: DebugFn;
-	/** Re-render (same component ⇒ props update in place, like RTL's rerender). */
-	rerender: (ui: OctaneUI, props?: any) => void;
+	/**
+	 * Re-render (same component ⇒ props update in place, like RTL's rerender).
+	 * Three forms, symmetric with `render`:
+	 *   rerender(createElement(Comp, props))  — RTL-classic descriptor
+	 *   rerender(Comp, { props })             — component + options (same as render)
+	 *   rerender({ props })                   — shorthand: original component, new props
+	 */
+	rerender: (ui?: OctaneUI | { props?: any }, options?: { props?: any }) => void;
 	unmount: () => void;
 	asFragment: () => DocumentFragment;
 } & BoundFunctions<typeof defaultQueries>;
@@ -280,13 +286,21 @@ export function render<P = any>(ui: OctaneUI<P>, options: RenderOptions<P> = {})
 				root.unmount();
 			});
 		},
-		rerender: (rerenderUi: OctaneUI, rerenderProps?: any) => {
+		rerender: (rerenderUi?: OctaneUI | { props?: any }, rerenderOptions?: { props?: any }) => {
+			// Normalize the three forms (see RenderResult.rerender) to one element.
+			let element: ElementDescriptor;
+			if (rerenderUi === undefined) {
+				element = toElement(ui, props); // re-run with the original props
+			} else if (isValidElement(rerenderUi) || typeof rerenderUi === 'function') {
+				element = toElement(rerenderUi as OctaneUI, rerenderOptions?.props);
+			} else {
+				// `{ props }` shorthand: reuse the ORIGINAL component with new props.
+				const comp = isValidElement(ui) ? (ui as ElementDescriptor).type : ui;
+				element = createElement(comp as any, (rerenderUi as { props?: any }).props);
+			}
 			// The wrapper is re-applied so component identity is stable across
 			// rerenders (same body ⇒ octane updates props in place).
-			commitRender(
-				root,
-				mountable(wrapUiIfNeeded(toElement(rerenderUi, rerenderProps), WrapperComponent)),
-			);
+			commitRender(root, mountable(wrapUiIfNeeded(element, WrapperComponent)));
 		},
 		asFragment: () => document.createRange().createContextualFragment(container.innerHTML),
 		...(getQueriesForElement(baseElement, queries as any) as BoundFunctions<typeof defaultQueries>),
@@ -378,7 +392,9 @@ export function renderHook<Result, Props = undefined>(
 	return {
 		result,
 		rerender: (rerenderCallbackProps?: Props) =>
-			baseRerender(TestComponent, { renderCallbackProps: rerenderCallbackProps as Props }),
+			baseRerender(TestComponent, {
+				props: { renderCallbackProps: rerenderCallbackProps as Props },
+			}),
 		unmount,
 	};
 }

@@ -112,7 +112,7 @@ describe('render', () => {
 			'before',
 		);
 		// The fragment is a snapshot — later rerenders don't mutate it.
-		rerender(Message, { text: 'after' });
+		rerender(Message, { props: { text: 'after' } });
 		expect((frag.querySelector('[data-testid="message"]') as HTMLElement).textContent).toBe(
 			'before',
 		);
@@ -130,7 +130,7 @@ describe('rerender', () => {
 		const { container, rerender } = render(Greeting, { props: { name: 'first' } });
 		const node = container.firstChild;
 		expect(container.textContent).toBe('Hello, first!');
-		rerender(Greeting, { name: 'second' });
+		rerender(Greeting, { props: { name: 'second' } });
 		expect(container.textContent).toBe('Hello, second!');
 		// Same component identity → the DOM node was updated, not replaced.
 		expect(container.firstChild).toBe(node);
@@ -148,7 +148,7 @@ describe('rerender', () => {
 			props: { text: 'a' },
 			wrapper: MainWrapper,
 		});
-		rerender(Message, { text: 'b' });
+		rerender({ props: { text: 'b' } });
 		expect((container.firstChild as HTMLElement).tagName).toBe('MAIN');
 		expect(getByTestId('message').textContent).toBe('b');
 	});
