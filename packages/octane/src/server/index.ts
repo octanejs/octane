@@ -30,8 +30,11 @@ export {
 	// The await-everything behaviour lives in `octane/static` as `prerender`.
 	renderToString,
 	renderToStaticMarkup,
+	renderToPipeableStream,
+	renderToReadableStream,
 	type RenderResult,
 	type RenderOptions,
+	type StreamOptions,
 	setSsrSuspenseTimeout,
 	getSsrSuspenseTimeout,
 
@@ -86,6 +89,7 @@ export {
 	ssrInnerHtml,
 	ssrComponent,
 	ssrBlock,
+	ssrTry,
 	ssrPortal,
 	injectStyle,
 	ssrHeadEl,

@@ -15,6 +15,7 @@
 
 import {
 	SUSPENSE_SCRIPT_ATTR,
+	STREAM_SEED_COMMENT,
 	HYDRATION_START,
 	HYDRATION_END,
 	UNDEFINED_SENTINEL_KEY,
@@ -2820,6 +2821,25 @@ let hydrateNode: Node | null = null;
 // constant-fold away with the rest of the hydration path in client-only builds.
 let hydrationSeeds: unknown[] | null = null;
 let hydrationSeedCursor = 0;
+
+/**
+ * Parse a seed-JSON payload (the shell's `data-octane-suspense` script or a
+ * streamed boundary's `window.$OCTS[id]` stash). The reviver decodes the
+ * server's `undefined` sentinel back to `undefined` (JSON has no `undefined`),
+ * so a `use(thenable)` that resolved to `undefined` seeds as `undefined`, not
+ * `null`. Returns null on malformed input (the caller re-suspends client-side).
+ */
+function parseSeedJson(raw: string): unknown[] | null {
+	try {
+		return JSON.parse(raw, (_key, value) =>
+			value !== null && typeof value === 'object' && value[UNDEFINED_SENTINEL_KEY] === true
+				? undefined
+				: value,
+		);
+	} catch {
+		return null;
+	}
+}
 
 export function clone<T extends Node>(node: T, loc?: string): T {
 	if (hydrating && hydrateNode !== null) {
@@ -7316,14 +7336,35 @@ function mountTry(state: TrySlot): void {
 	state.branch = 1;
 	let bStart: Node;
 	let bEnd: Node;
-	if (hydrating && isBlockOpen(state.start.nextSibling)) {
+	// Streamed-boundary seed scope: the swap runtime ($OCTRC) left a
+	// `<!--oct-seed:id-->` comment between the slot's open marker and the inner
+	// branch range, with the boundary's seed JSON stashed on window.$OCTS[id].
+	// Scope the seed stream to THIS boundary while its subtree hydrates (a
+	// depth-first synchronous render), restoring the outer scope after — nested
+	// streamed boundaries push again naturally.
+	let scopedSeeds: unknown[] | null = null;
+	let adoptCursor = state.start.nextSibling;
+	if (
+		hydrating &&
+		adoptCursor !== null &&
+		adoptCursor.nodeType === 8 &&
+		(adoptCursor as Comment).data.startsWith(STREAM_SEED_COMMENT)
+	) {
+		const id = (adoptCursor as Comment).data.slice(STREAM_SEED_COMMENT.length);
+		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
+		const raw = stash !== undefined ? stash[id] : undefined;
+		if (typeof raw === 'string') scopedSeeds = parseSeedJson(raw);
+		adoptCursor = adoptCursor.nextSibling;
+	}
+	if (hydrating && isBlockOpen(adoptCursor)) {
 		// ADOPT the server's inner arm range (no inserted markers — byte-for-byte;
 		// see ifBlock). The seeded use() values let the try body render its success
 		// arm and adopt the server DOM.
-		bStart = state.start.nextSibling as Comment;
+		bStart = adoptCursor as Comment;
 		bEnd = matchingClose(bStart);
 		hydrateNode = bStart.nextSibling;
 	} else {
+		scopedSeeds = null;
 		bStart = document.createComment('try-b');
 		bEnd = document.createComment('/try-b');
 		state.domParent.insertBefore(bStart, state.end);
@@ -7346,6 +7387,13 @@ function mountTry(state: TrySlot): void {
 	};
 	state.tryBlock = b;
 	state.block = b;
+	// Install this boundary's streamed seed scope (if any) for the subtree render.
+	const prevSeeds = hydrationSeeds;
+	const prevSeedCursor = hydrationSeedCursor;
+	if (scopedSeeds !== null) {
+		hydrationSeeds = scopedSeeds;
+		hydrationSeedCursor = 0;
+	}
 	try {
 		renderBlock(b);
 		state.hasResolved = true;
@@ -7359,6 +7407,11 @@ function mountTry(state: TrySlot): void {
 				state.block = null;
 			}
 			switchToCatch(state, err);
+		}
+	} finally {
+		if (scopedSeeds !== null) {
+			hydrationSeeds = prevSeeds;
+			hydrationSeedCursor = prevSeedCursor;
 		}
 	}
 }
@@ -10110,18 +10163,7 @@ export function hydrateRoot(
 	// node) and stage them for useThenable to consume in render order.
 	const seedScript = container.querySelector('script[' + SUSPENSE_SCRIPT_ATTR + ']');
 	if (seedScript !== null) {
-		try {
-			// Reviver decodes the server's `undefined` sentinel back to `undefined`
-			// (JSON has no `undefined`), so a `use(thenable)` that resolved to
-			// `undefined` is seeded as `undefined`, not `null`.
-			hydrationSeeds = JSON.parse(seedScript.textContent || '[]', (_key, value) =>
-				value !== null && typeof value === 'object' && value[UNDEFINED_SENTINEL_KEY] === true
-					? undefined
-					: value,
-			);
-		} catch {
-			hydrationSeeds = null;
-		}
+		hydrationSeeds = parseSeedJson(seedScript.textContent || '[]');
 		hydrationSeedCursor = 0;
 		seedScript.remove();
 	}

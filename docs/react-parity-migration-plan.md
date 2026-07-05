@@ -202,8 +202,18 @@ is replaced by `renderToString` / `renderToStaticMarkup` (`octane/server`, React
 fold into `html`, spliced into `<head>` when present else prepended — React-19 resource
 hoisting), and `css` stays a distinct field as a **deliberate, minimal divergence** from
 React's bare-string return — octane has scoped CSS that React core does not, and the field
-lets the framework place the deduped `<style>` tags. Streaming (`renderToPipeableStream` /
-`renderToReadableStream`, out-of-order Suspense) is the in-progress follow-on.
+lets the framework place the deduped `<style>` tags.
+
+**Streaming — SHIPPED (2026-07-05).** `renderToPipeableStream` / `renderToReadableStream`
+with out-of-order Suspense streaming (`tests/streaming-ssr.test.ts`, incl. a full
+stream → swap-runtime → hydrateRoot E2E): shell + `<template data-oct-b>` sentinels,
+hidden segments + inline `$OCTRC` swap runtime, per-boundary `use()` seed scoping in the
+client's `mountTry`, parent-first nested delivery, `@catch`-on-rejection, abort → `$OCTRX`
+(hydration client-renders). Built on the prerender pass/cache engine (per-ROUND re-passes,
+a documented divergence from Fizz's per-boundary incremental renders); the compiled `@try`
+now routes through a runtime `ssrTry` (byte-identical buffered output) so JSX `<Suspense>`
+boundaries stream too. Not in scope: selective hydration (no synthetic event replay);
+head hoists inside streamed boundaries re-create client-side on hydration.
 
 Octane SSR + hydration adoption work. **Mismatch detection + recovery is now implemented**
 (2026-06-30): on a server/client divergence the runtime patches VALUE mismatches (text/attr)
