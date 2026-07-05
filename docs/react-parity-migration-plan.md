@@ -632,6 +632,39 @@ citing the React line.
 listeners + property heuristic — needs a maintainer decision) and void-element
 children/dSIH validation ×2 (compile-time diagnostic; follow-up task spawned).
 
+### Tier 7 — errors under reconciliation: PORTED (2026-07-05)
+Two parallel agents covered ReactErrorBoundaries-test.internal.js (50 — OUTCOME
+ports; class-lifecycle mechanics skipped per §2), ErrorBoundaryReconciliation (4),
+ReactIncrementalErrorHandling-test.internal.js (43 — 18 concurrent/class-only N/A,
+each with a reason), ReactFiberRefs (5), refs-test.js (12, already fully covered by
+conformance/refs.test.ts). New files: error-reconciliation-stress,
+refs-under-error, error-handling-heuristics, error-boundary-reconciliation.
+
+**Headline: the :1978 keyed-shuffle stress (101 keyed rows, seeded shuffle streams,
+one thrower flipping mid-reconcile, from-scratch innerHTML baselines) passes clean —
+no LIS-reconciler-under-error inconsistency exists.** The one place the intentional
+LIS move-pattern divergence could have hidden a real bug is now stress-verified.
+
+**Runtime fixes the port surfaced (all landed):** deletion-phase cleanup throws now
+route to the boundary enclosing the deletion (collected during the walk, dispatched
+after — reportTeardownError/dispatchTeardownErrors); throwing ref detaches are
+guarded + routed instead of escaping flushSync; refs of never-committed (aborted)
+mounts are never invoked (unmountScope suppresses their queued detaches via the
+`mounted !== true` guard); an uncaught error unmounts the failed root's ENTIRE tree
+before rethrowing (React's documented contract). One prior assertion updated:
+ref-dispose.test.ts now expects the aborted mount's object ref UNTOUCHED (React
+:1158) rather than nulled — its no-resurrection purpose is preserved.
+
+**Semantic mappings recorded in the test files:** React's "noop boundary" →
+octane's no-@catch-arm `@try` AND a rethrowing `@catch` (both bubble outward);
+WIP-discard → per-swap off-screen render whose thrown subtree is disposed with no
+leaked markers/effects; catch-fallback reconciliation asserts FRESH nodes for same
+AND different types (React's forceUnmountCurrentAndReconcile — the plan's earlier
+"same type reuses" note was wrong, verified against the v19.2.7 source). Documented
+divergences: uncaught-error surface is console.error (not a caller rethrow /
+onUncaughtError), and the render-once-more retry heuristic is classified N/A
+(concurrent-lane mechanism) — flagged for revisit if evidence appears.
+
 ### Suite status
 **204 test files, 1074 passed, 0 expected-fail, 0 regressions** (after the off-screen
 transition fix). Typecheck + format clean. (Earlier checkpoint: 106 files / 752.)

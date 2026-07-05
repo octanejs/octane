@@ -267,6 +267,22 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	it('CheckboxGroup: shared value — child derives checked; click updates the group', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxGroupBasic', undefined, CACHE);
+		await d.step('mount (a checked)', () => {});
+		await d.step('click b → added to group', async (i, r) => {
+			await i.click('.cb:nth-child(3)');
+			await r.click('.cb:nth-child(3)');
+		});
+		d.unmount();
+	});
+
+	it('CheckboxGroup: parent (select-all) is indeterminate when some children are ticked', async () => {
+		const d = await mountDifferential(FIXTURE, 'CheckboxGroupParent', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
 	it('RadioGroup: composite roving focus + value → aria-checked; click moves selection', async () => {
 		const d = await mountDifferential(FIXTURE, 'RadioGroupBasic', undefined, CACHE);
 		await d.step('mount (a selected)', () => {});

@@ -6,7 +6,7 @@ New binding: `@octanejs/base-ui` — Base UI (`@base-ui/react`) ported to the oc
 renderer, at full fidelity from `mui/base-ui` `v1.6.0` and verified byte-identical against
 the real `@base-ui/react` via differential parity tests. Public API mirrors Base UI's
 deep-subpath imports (`@octanejs/base-ui/separator`, `/fieldset`, `/meter`, `/progress`,
-`/toggle`, `/toggle-group`, `/avatar`, `/switch`, `/checkbox`, `/radio`, `/radio-group`, `/field`, `/form`, `/input`, `/use-render`, `/merge-props`).
+`/toggle`, `/toggle-group`, `/avatar`, `/switch`, `/checkbox`, `/radio`, `/radio-group`, `/checkbox-group`, `/field`, `/form`, `/input`, `/use-render`, `/merge-props`).
 
 Foundation: the shared composition engine (`useRender` / `useRenderElement` / `mergeProps`
 — Base UI's universal `render`-prop model over octane's `cloneElement`/`createElement`;
