@@ -1395,7 +1395,7 @@ function disposeReturnSlot(block: Block, state: any): void {
 			state.forSlot = null;
 		}
 		// Fires the content's cleanups and sweeps the nodes between the markers.
-		clearChildContent(state);
+		clearChildContent(state, true);
 		(state.start as ChildNode | null)?.remove();
 		(state.end as ChildNode | null)?.remove();
 	} else {
@@ -5245,7 +5245,17 @@ function disposeWip(wip: OffscreenWip): void {
 // Remove the slot's current content (Block, Text, or pure-host node) while
 // preserving its marker pair, so a mode switch (or component-identity swap)
 // rebuilds in place.
-function clearChildContent(state: ChildSlot): void {
+//
+// `detachRefs` — whether to fire de-opt refs (object nulled / callback null-or-
+// cleanup) across the swept trees. TRUE for genuine unmounts (value → null/text,
+// component identity swap, portal/array/transition swaps): React unmounts there,
+// so refs must detach. FALSE for an INTERNAL pure⟷Blocks strategy flip that keeps
+// the slot root's host tag: the program's JSX still renders the same element, so
+// React would never remount — firing `ref(null)` mid-flip is wrong and can loop
+// forever when the ref is a state setter that gates the flip (e.g. Radix Toast's
+// `<ol ref={setTarget}>` + `{target && createPortal(...)}`: null-fire → portal
+// drops → pure mode → rebuild re-attaches → portal returns → Blocks mode → …).
+function clearChildContent(state: ChildSlot, detachRefs: boolean): void {
 	if (state.block !== null) {
 		// Fire the subtree's cleanups but DON'T let unmountBlock strip the DOM —
 		// it would take our markers with it. We remove the content nodes by hand.
@@ -5260,7 +5270,7 @@ function clearChildContent(state: ChildSlot): void {
 			let n: Node | null = state.start.nextSibling;
 			while (n !== null && n !== state.end) {
 				const next: Node | null = n.nextSibling;
-				detachDeoptRef(n);
+				if (detachRefs) detachDeoptTreeRefs(n);
 				parent.removeChild(n);
 				n = next;
 			}
@@ -5570,6 +5580,27 @@ function detachDeoptRef(node: Node): void {
 	if (ref != null) attachRef(ref, null, node as Element);
 }
 
+// Detach de-opt refs across a WHOLE subtree being removed. Every element built by
+// reconcileDeoptNode is DEOPT_DESC-stamped — nested ones included — so removing a
+// pure-host tree like `<div><span ref={r}/></div>` must detach the nested span's ref
+// too, not just the root's. Foreign `<!--portal-->…<!--/portal-->` ranges are skipped:
+// their content belongs to a portal Block that is still mounted elsewhere and owns its
+// own ref lifecycle (same ownership rule as reconcileDeoptChildren's child scan).
+function detachDeoptTreeRefs(node: Node): void {
+	detachDeoptRef(node);
+	if (node.nodeType !== 1 /* Element */) return;
+	let child: Node | null = (node as Element).firstChild;
+	while (child !== null) {
+		const rangeEnd = (child as any).$$portalEnd as Node | undefined;
+		if (rangeEnd != null) {
+			child = nodeAfterPortalRange(child, rangeEnd);
+			continue;
+		}
+		detachDeoptTreeRefs(child);
+		child = child.nextSibling;
+	}
+}
+
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
 // `createElement` collapses positional children and `.map()` results into arrays)
 // into a flat list of renderable values, dropping empties (null/undefined/false/
@@ -5724,7 +5755,7 @@ function reconcileDeoptChildren(
 	for (let i = owned.length - 1; i >= 0; i--) {
 		const n = owned[i];
 		if (keep === null || !keep.has(n)) {
-			detachDeoptRef(n);
+			detachDeoptTreeRefs(n);
 			el.removeChild(n);
 		}
 	}
@@ -5791,7 +5822,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		const stale = block.deoptNode;
 		if (stale != null) {
 			if (stale.parentNode === block.parentNode) {
-				detachDeoptRef(stale);
+				detachDeoptTreeRefs(stale);
 				block.parentNode.removeChild(stale);
 			}
 			block.deoptNode = null;
@@ -5820,7 +5851,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		// Built a fresh node (first mount, or a tag/type change) — drop the old one
 		// and insert the new node into the item's range.
 		if (prev != null && prev !== node && prev.parentNode === block.parentNode) {
-			detachDeoptRef(prev);
+			detachDeoptTreeRefs(prev);
 			block.parentNode.removeChild(prev);
 		}
 		if (node !== null) block.parentNode.insertBefore(node, endM);
@@ -6054,7 +6085,7 @@ export function childSlot(
 	if (portalDesc !== null) {
 		if (state.forSlot !== null) teardownChildForSlot(state);
 		if (state.block !== null || state.text !== null || state.hostNode !== null) {
-			clearChildContent(state);
+			clearChildContent(state, true);
 		}
 		state.portal = renderPortalState(
 			state.portal,
@@ -6077,7 +6108,7 @@ export function childSlot(
 			// markers and `reconcileKeyed`/`mountItem` ADOPT those ranges off the
 			// cursor. Sweeping here would delete the very item DOM (and break the
 			// hydrateNode chain) the de-opt list is about to adopt.
-			if (!hydrating) clearChildContent(state);
+			if (!hydrating) clearChildContent(state, true);
 			if (state.start === null) {
 				state.start = document.createComment('');
 				domParent.insertBefore(state.start, state.end);
@@ -6123,8 +6154,18 @@ export function childSlot(
 		if (!descNeedsBlocks(value)) {
 			// Pure host/text → reconcile in place, REUSING the existing node so DOM
 			// state survives a re-render. Switching in from a component/text first
-			// tears that down (also nulls a stale hostNode).
-			if (state.block !== null || state.text !== null) clearChildContent(state);
+			// tears that down (also nulls a stale hostNode). Blocks→pure with the SAME
+			// root tag is an INTERNAL strategy flip (the subtree merely lost its
+			// component/portal descendants) — the program's JSX still renders the same
+			// element, so the rebuild must not fire refs (see clearChildContent).
+			if (state.block !== null || state.text !== null) {
+				const sameHostFlip =
+					state.block !== null &&
+					state.currentComp === (hostElementBody as unknown as ComponentBody) &&
+					state.block.deoptNode !== null &&
+					(state.block.deoptNode as Element).localName === value.type;
+				clearChildContent(state, !sameHostFlip);
+			}
 			if (state.start === null) {
 				state.start = document.createComment('');
 				domParent.insertBefore(state.start, state.end);
@@ -6139,7 +6180,7 @@ export function childSlot(
 			const node = reconcileDeoptNode(prev, value, parentBlock);
 			if (node !== prev) {
 				if (prev != null && prev !== node && prev.parentNode !== null) {
-					detachDeoptRef(prev);
+					detachDeoptTreeRefs(prev);
 					prev.parentNode.removeChild(prev);
 				}
 				if (node !== null) state.start.parentNode!.insertBefore(node, state.end);
@@ -6201,7 +6242,7 @@ export function childSlot(
 			// Completed → commit: tear down old (sweeps state.start..state.end; the WIP sits
 			// OUTSIDE that range so it's untouched), then move the WIP into the slot range.
 			// Synchronous, so there is no painted blank between the two.
-			clearChildContent(state);
+			clearChildContent(state, true);
 			commitOffscreen(r.wip, state.end);
 			state.block = r.wip.block;
 			state.currentComp = comp;
@@ -6215,7 +6256,17 @@ export function childSlot(
 		// (a detached node), desyncing every sibling/descendant below. Mirrors the
 		// array path's `if (!hydrating) clearChildContent` guard above. (A post-
 		// hydration identity swap runs with hydrating=false and clears normally.)
-		if (!hydrating) clearChildContent(state);
+		// Pure→Blocks with the SAME root tag is an INTERNAL strategy flip (the
+		// subtree gained a component/portal descendant) — same element from the
+		// program's view, so the rebuild must not fire refs (see clearChildContent).
+		if (!hydrating) {
+			const sameHostFlip =
+				comp === (hostElementBody as unknown as ComponentBody) &&
+				state.hostNode !== null &&
+				state.hostNode.nodeType === 1 &&
+				(state.hostNode as Element).localName === (props as ElementDescriptor).type;
+			clearChildContent(state, !sameHostFlip);
+		}
 		state.currentComp = comp;
 		state.currentIsBodyFn = isBodyFn;
 		if (state.start === null) {
@@ -6235,7 +6286,7 @@ export function childSlot(
 
 	// Text / empty.
 	// Swapped away from a component OR a pure-host de-opt node → tear it down first.
-	if (state.block !== null || state.hostNode !== null) clearChildContent(state);
+	if (state.block !== null || state.hostNode !== null) clearChildContent(state, true);
 	const str = coerceChildText(value);
 	if (str === '') {
 		// `null` / `undefined` / `false` / `true` / `''` render NOTHING — not even
