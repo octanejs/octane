@@ -62,6 +62,10 @@ export {
 	withSlot,
 	startTransition,
 	requestFormReset,
+	preload,
+	preinit,
+	preconnect,
+	prefetchDNS,
 
 	// Suspense / error boundaries as JSX components (alongside the @try directive)
 	Suspense,

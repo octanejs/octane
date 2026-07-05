@@ -10321,3 +10321,88 @@ export function hydrateRoot(
 	// different component tears down and remounts.
 	return makeRoot(container, rootBlock, body);
 }
+
+// ---------------------------------------------------------------------------
+// Resource hints — React DOM's preload / preinit / preconnect / prefetchDNS.
+// Each call inserts one deduped <link>/<script> into document.head (client).
+// Dedupe key = rel/kind + href, matching React's resource identity model.
+// ---------------------------------------------------------------------------
+
+const _resourceHints = new Set<string>();
+
+function insertHeadHint(key: string, build: () => Element): void {
+	if (typeof document === 'undefined' || _resourceHints.has(key)) return;
+	_resourceHints.add(key);
+	// SSR dedupe: the server may have emitted this hint already.
+	if (document.head.querySelector('[data-oct-hint="' + key + '"]') !== null) return;
+	const el = build();
+	el.setAttribute('data-oct-hint', key);
+	document.head.appendChild(el);
+}
+
+function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined): void {
+	if (opts == null) return;
+	for (const k in opts) {
+		const v = (opts as any)[k];
+		if (v == null || v === false) continue;
+		el.setAttribute(
+			k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase(),
+			v === true ? '' : String(v),
+		);
+	}
+}
+
+/** React DOM `preload(href, {as, …})` — `<link rel="preload">`. */
+export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
+	if (!href || !options?.as) return;
+	insertHeadHint('preload:' + options.as + ':' + href, () => {
+		const l = document.createElement('link');
+		l.rel = 'preload';
+		l.href = href;
+		applyHintAttrs(l, options);
+		return l;
+	});
+}
+
+/** React DOM `preinit(href, {as: 'style'|'script', …})` — executes/applies the resource. */
+export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
+	if (!href || !options?.as) return;
+	const as = options.as;
+	insertHeadHint('preinit:' + as + ':' + href, () => {
+		if (as === 'style') {
+			const l = document.createElement('link');
+			l.rel = 'stylesheet';
+			l.href = href;
+			applyHintAttrs(l, { ...options, as: undefined });
+			return l;
+		}
+		const s = document.createElement('script');
+		(s as HTMLScriptElement).src = href;
+		(s as HTMLScriptElement).async = true;
+		applyHintAttrs(s, { ...options, as: undefined });
+		return s;
+	});
+}
+
+/** React DOM `preconnect(href, {crossOrigin?})` — `<link rel="preconnect">`. */
+export function preconnect(href: string, options?: { crossOrigin?: string }): void {
+	if (!href) return;
+	insertHeadHint('preconnect:' + href, () => {
+		const l = document.createElement('link');
+		l.rel = 'preconnect';
+		l.href = href;
+		applyHintAttrs(l, options);
+		return l;
+	});
+}
+
+/** React DOM `prefetchDNS(href)` — `<link rel="dns-prefetch">`. */
+export function prefetchDNS(href: string): void {
+	if (!href) return;
+	insertHeadHint('dns-prefetch:' + href, () => {
+		const l = document.createElement('link');
+		l.rel = 'dns-prefetch';
+		l.href = href;
+		return l;
+	});
+}
