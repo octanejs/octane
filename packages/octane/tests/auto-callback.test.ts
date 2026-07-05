@@ -12,6 +12,10 @@ import { compile } from 'octane/compiler';
 //
 // Audited path: rewriteAutoCallback in compile.js (around lines 174-279)
 // plus the source-order walk in compileComponent (~lines 816-820).
+//
+// The compiler-inserted callee is the shadow-proof alias `_$useCallback`
+// (imported as `useCallback as _$useCallback`) so a user binding named
+// `useCallback` can't hijack the generated wrap.
 
 const c = (src: string): string => compile(src, 'auto-cb.tsrx').code;
 
@@ -27,8 +31,8 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
         <button onClick={reset}>{count as string}</button>
       }
     `);
-		expect(code).toMatch(/const\s+reset\s*=\s*useCallback\s*\(/);
-		expect(code).toMatch(/useCallback\s*\([\s\S]*?,\s*\[\s*setCount\s*\]/);
+		expect(code).toMatch(/const\s+reset\s*=\s*_\$useCallback\s*\(/);
+		expect(code).toMatch(/_\$useCallback\s*\([\s\S]*?,\s*\[\s*setCount\s*\]/);
 		expect(code).toMatch(/import\s*\{[^}]*useCallback[^}]*\}\s*from\s*['"]octane['"]/);
 	});
 
@@ -40,7 +44,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
       }
     `);
 		expect(code).toMatch(/const\s+greet\s*=\s*\(/);
-		expect(code).not.toMatch(/const\s+greet\s*=\s*useCallback/);
+		expect(code).not.toMatch(/const\s+greet\s*=\s*(_\$)?useCallback/);
 	});
 
 	it('transitive stability: arrow b calling stable arrow a is also wrapped', () => {
@@ -53,8 +57,8 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
         <button onClick={b}>{'go'}</button>
       }
     `);
-		expect(code).toMatch(/const\s+a\s*=\s*useCallback\([\s\S]*?,\s*\[\s*setX\s*\]/);
-		expect(code).toMatch(/const\s+b\s*=\s*useCallback\([\s\S]*?,\s*\[\s*a\s*\]/);
+		expect(code).toMatch(/const\s+a\s*=\s*_\$useCallback\([\s\S]*?,\s*\[\s*setX\s*\]/);
+		expect(code).toMatch(/const\s+b\s*=\s*_\$useCallback\([\s\S]*?,\s*\[\s*a\s*\]/);
 	});
 
 	it('useRef return is stable; .current accesses do NOT add deps', () => {
@@ -66,7 +70,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
         <input ref={r} onClick={focus} />
       }
     `);
-		expect(code).toMatch(/const\s+focus\s*=\s*useCallback\([\s\S]*?,\s*\[\s*r\s*\]/);
+		expect(code).toMatch(/const\s+focus\s*=\s*_\$useCallback\([\s\S]*?,\s*\[\s*r\s*\]/);
 	});
 
 	it('idempotency: user-authored useCallback is not re-wrapped', () => {
@@ -78,7 +82,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
         <button onClick={cb}>{'go'}</button>
       }
     `);
-		expect(code).not.toMatch(/useCallback\s*\(\s*useCallback/);
+		expect(code).not.toMatch(/(_\$)?useCallback\s*\(\s*useCallback/);
 	});
 
 	it('useState VALUE (first tuple element) is NOT stable; closure over it bails', () => {
@@ -90,7 +94,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
         <button onClick={read}>{count as string}</button>
       }
     `);
-		expect(code).not.toMatch(/const\s+read\s*=\s*useCallback/);
+		expect(code).not.toMatch(/const\s+read\s*=\s*(_\$)?useCallback/);
 	});
 
 	it('destructured useRef return is NOT stable (only Identifier-bound stays)', () => {
@@ -102,7 +106,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
         <button onClick={fn}>{'x'}</button>
       }
     `);
-		expect(code).not.toMatch(/const\s+fn\s*=\s*useCallback/);
+		expect(code).not.toMatch(/const\s+fn\s*=\s*(_\$)?useCallback/);
 	});
 
 	it("module-level identifier doesn't block rewrite and is not added to deps", () => {
@@ -115,7 +119,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
         <button onClick={fn}>{'z'}</button>
       }
     `);
-		expect(code).toMatch(/const\s+fn\s*=\s*useCallback\([\s\S]*?,\s*\[\s*setX\s*\]/);
+		expect(code).toMatch(/const\s+fn\s*=\s*_\$useCallback\([\s\S]*?,\s*\[\s*setX\s*\]/);
 		expect(code).not.toMatch(/\[\s*setX\s*,\s*ZERO\s*\]/);
 	});
 
@@ -133,7 +137,7 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
     `);
 		// The for-body inline arrow may be optimized as an event-bundle but should
 		// NOT be hoisted into a useCallback at component-body scope.
-		expect(code).not.toMatch(/const\s+click\s*=\s*useCallback/);
+		expect(code).not.toMatch(/const\s+click\s*=\s*(_\$)?useCallback/);
 	});
 
 	it('mixed stable + unstable closure (prop reference inside arrow) bails', () => {
@@ -145,6 +149,6 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
         <button onClick={fn}>{'x'}</button>
       }
     `);
-		expect(code).not.toMatch(/const\s+fn\s*=\s*useCallback/);
+		expect(code).not.toMatch(/const\s+fn\s*=\s*(_\$)?useCallback/);
 	});
 });

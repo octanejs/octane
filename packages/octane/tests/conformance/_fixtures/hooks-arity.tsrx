@@ -34,10 +34,9 @@ export function StableRefAcrossRenderPhase(props) @{
 
 // Per ReactDOMHooks-test.js:157 — a state update scheduled from within an
 // event handler must not be (eagerly) bailed out: the label re-renders with
-// the input's text. (Named inputText/setInputText rather than React's
-// text/setText: a user binding called `setText` currently shadows the
-// compiler-emitted runtime helper of the same name — real bug, tracked
-// separately — and this test targets the event-update heuristic, not that.)
+// the input's text. (Naming the binding `setText` is safe nowadays — the
+// compiler imports its helpers under `_$` aliases; helper-shadowing.test.ts
+// pins that — this fixture just predates the fix.)
 export function InputEventUpdate(props) @{
 	const [inputText, setInputText] = useState('');
 	<div>

@@ -25,7 +25,8 @@ function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'server-withslot.tsrx', { mode: 'server' });
 	// Capture the import name list so we can assert every name resolves on ServerRT.
 	const importLine = code.match(/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/);
-	const names = importLine![1].split(',').map((s) => s.trim());
+	// Specifiers may be aliased (`ssrText as _$ssrText`) — the EXPORT is the left name.
+	const names = importLine![1].split(',').map((s) => s.trim().split(' as ')[0]);
 	for (const n of names) {
 		if ((ServerRT as any)[n] === undefined) {
 			throw new Error(`octane/server is missing the compiler-emitted import: ${n}`);
@@ -33,7 +34,7 @@ function serverModule(): Record<string, any> {
 	}
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		'const {$1} = __rt;',
+		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');

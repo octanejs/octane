@@ -235,6 +235,44 @@ export function DeferredValueInTransition() @{
 }
 
 // ---------------------------------------------------------------------------
+// Regression: the deferred-swap "deferred lane" tag applies ONLY to the
+// deferred block's own re-render. startTransition notifies useTransition
+// listeners synchronously (tickTransitionCount) around running its callback;
+// a probe re-rendered by that notification mounts a fresh useDeferredValue,
+// which must still show its preview — it is NOT part of the deferred pass.
+// ---------------------------------------------------------------------------
+function ListenerPreviewProbe(props) @{
+	const text = useDeferredValue('Final', 'Preview');
+	props.log('render:' + text);
+	<span id="probe">
+		{text as string}
+	</span>
+}
+
+function TransitionPendingProbe(props) @{
+	const [isPending] = useTransition();
+	<div>
+		@if (isPending) {
+			<ListenerPreviewProbe log={props.log} />
+		} @else {
+			<span id="probe-idle">{'idle'}</span>
+		}
+	</div>
+}
+
+export function DeferredSpawnListenerApp(props) @{
+	const [value, setValue] = useState(1);
+	props.expose(setValue);
+	const deferredValue = useDeferredValue(value);
+	<div>
+		<span id="deferred">
+			{'Deferred: ' + deferredValue}
+		</span>
+		<TransitionPendingProbe log={props.log} />
+	</div>
+}
+
+// ---------------------------------------------------------------------------
 // Urgent supersede: a transition suspends on promise B, then an urgent
 // setter swaps to promise C (already-resolved). The transition should be
 // DISCARDED — isPending flips false, C is shown, and when B eventually

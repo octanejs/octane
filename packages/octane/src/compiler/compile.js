@@ -54,6 +54,94 @@ const VOID_ELEMENTS = new Set([
 	'wbr',
 ]);
 
+// React parity: a void element must neither have children nor use
+// `dangerouslySetInnerHTML` — React throws (ReactDOMComponent-test.js:1794/:1807).
+// Without this guard the failure is SILENT: the template parser drops the
+// children out of `<input>…</input>` markup, and the htmlOnlyChild fast path
+// writes invisible `input.innerHTML`. Shared by the client (emitElementHtml),
+// the server (ssrEmitElement), and the value-position lowering
+// (jsxElementToCreateElement) so the diagnostic can't drift between paths. A
+// spread-supplied `dangerouslySetInnerHTML` is invisible at compile time — the
+// runtime's setAttribute danger arm throws on that route.
+function rejectVoidElementContent(tag, node, ctx) {
+	if (!VOID_ELEMENTS.has(tag)) return;
+	// Renderable-children check, deliberately lightweight (whitespace-only JSX
+	// text and `{/* comments */}` produce no child — same as normalizeChildren,
+	// without running the full lowering machinery on an element we may reject).
+	let offending = false;
+	for (const c of node.children || []) {
+		if (!c) continue;
+		if (c.type === 'JSXText') {
+			if (/^\s*$/.test(c.value)) continue;
+		} else if (c.type === 'JSXExpressionContainer') {
+			if (!c.expression || c.expression.type === 'JSXEmptyExpression') continue;
+		} else if (c.type === 'JSXStyleElement') {
+			continue;
+		}
+		offending = true;
+		break;
+	}
+	if (!offending) {
+		const attrs = node.attributes || node.openingElement?.attributes || [];
+		for (const a of attrs) {
+			if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
+			if (jsxAttrRawName(a) === 'dangerouslySetInnerHTML') {
+				offending = true;
+				break;
+			}
+		}
+	}
+	if (!offending) return;
+	const l = node.loc && node.loc.start;
+	const at = l ? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})` : '';
+	throw new Error(
+		`\`<${tag}>\` is a void element tag and must neither have children nor use ` +
+			`\`dangerouslySetInnerHTML\`.${at}`,
+	);
+}
+
+// Compiler-generated code references runtime helpers under a collision-proof
+// `_$` alias — `import { setText as _$setText } from 'octane'` + `_$setText(…)`
+// — because generated statements are interleaved with USER statements inside
+// the component function, where a user binding with the same name would
+// silently shadow a bare helper (`const [text, setText] = useState('')` is the
+// canonical collision). Every name in `ctx.runtimeNeeded` is emitted aliased;
+// names the user's own code references (their preserved `octane` import
+// specifiers + slotted base-hook call sites) live in `ctx.userRuntimeNames`
+// and stay un-aliased. A name can appear in both (two import specifiers of
+// the same export — valid JS).
+export function rtAlias(name) {
+	return '_$' + name;
+}
+
+// Merge one import list: user specifiers verbatim (preserving `x as y`
+// aliases) + every generated-code helper aliased to `_$name`.
+function buildRuntimeImport(ctx, moduleName) {
+	const specifiers = new Set(ctx.userRuntimeNames);
+	for (const n of ctx.runtimeNeeded) specifiers.add(`${n} as ${rtAlias(n)}`);
+	if (specifiers.size === 0) return '';
+	return `import { ${[...specifiers].sort().join(', ')} } from '${moduleName}';\n\n`;
+}
+
+// Record a user `import { … } from 'octane'` declaration's specifiers so the
+// merged prelude import re-exposes exactly the local names the user's code
+// references (including `imported as local` renames).
+function addUserImportSpecifiers(ctx, node) {
+	for (const sp of node.specifiers || []) {
+		if (
+			sp.type === 'ImportSpecifier' &&
+			sp.imported?.name &&
+			sp.local?.name &&
+			sp.imported.name !== sp.local.name
+		) {
+			ctx.userRuntimeNames.add(`${sp.imported.name} as ${sp.local.name}`);
+			continue;
+		}
+		const name = sp.imported?.name || sp.local?.name;
+		if (name) ctx.userRuntimeNames.add(name);
+	}
+}
+
 export const HOOK_NAMES = new Set([
 	'useState',
 	'useReducer',
@@ -449,7 +537,10 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
 			...decl,
 			init: {
 				type: 'CallExpression',
-				callee: { type: 'Identifier', name: 'useCallback' },
+				// `_octaneGenerated` tells rewriteHookCalls (which slots this call next)
+				// that the callee is compiler-inserted — it renames it to the shadow-proof
+				// `_$useCallback` alias instead of treating it as a user identifier.
+				callee: { type: 'Identifier', name: 'useCallback', _octaneGenerated: true },
 				arguments: [
 					arrow,
 					{
@@ -1115,7 +1206,8 @@ export function compile(source, filename, options) {
 		filename,
 		mode,
 		dev: devEnabled,
-		runtimeNeeded: new Set(),
+		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
+		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		hoistedTemplates: [], // { name, html }
 		hoistedHelpers: [], // raw JS strings (sub-components, hook Symbols, key fns)
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
@@ -1348,10 +1440,7 @@ export function compile(source, filename, options) {
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
 			// Preserve ALL user-imported names from octane (Portal, createContext,
 			// use, custom helpers, etc.) — merged into the single prelude import.
-			for (const sp of node.specifiers || []) {
-				const name = sp.imported?.name || sp.local?.name;
-				if (name) ctx.runtimeNeeded.add(name);
-			}
+			addUserImportSpecifiers(ctx, node);
 		} else {
 			// Style maps: rewrite `const x = <style>…</style>` before printing — the
 			// initialiser becomes an ObjectExpression with hashed class names, and
@@ -1397,14 +1486,14 @@ export function compile(source, filename, options) {
 	// import list includes `hmr` / `HMR` when needed.
 	const delegateCall =
 		(ctx.delegatedEvents.size > 0
-			? `delegateEvents(${JSON.stringify([...ctx.delegatedEvents].sort())});\n`
+			? `_$delegateEvents(${JSON.stringify([...ctx.delegatedEvents].sort())});\n`
 			: '') +
 		(ctx.capturedEvents.size > 0
-			? `delegateCaptureEvents(${JSON.stringify([...ctx.capturedEvents].sort())});\n`
+			? `_$delegateCaptureEvents(${JSON.stringify([...ctx.capturedEvents].sort())});\n`
 			: '') +
 		(ctx.delegatedEvents.size > 0 || ctx.capturedEvents.size > 0 ? '\n' : '');
 	const styleInjections = ctx.cssInjections
-		.map((i) => `injectStyle(${JSON.stringify(i.hash)}, ${JSON.stringify(i.css)});`)
+		.map((i) => `_$injectStyle(${JSON.stringify(i.hash)}, ${JSON.stringify(i.css)});`)
 		.join('\n');
 	const styleBlock = styleInjections ? styleInjections + '\n\n' : '';
 	const templates = ctx.hoistedTemplates
@@ -1412,7 +1501,7 @@ export function compile(source, filename, options) {
 			const args = [JSON.stringify(t.html)];
 			if (t.ns || t.frag) args.push(String(t.ns | 0));
 			if (t.frag) args.push(String(t.frag | 0));
-			return `const ${t.name} = template(${args.join(', ')});`;
+			return `const ${t.name} = _$template(${args.join(', ')});`;
 		})
 		.join('\n');
 	const templatesBlock = templates ? templates + '\n\n' : '';
@@ -1435,7 +1524,7 @@ export function compile(source, filename, options) {
 		const updates = hmrComponents
 			.map((c) => {
 				const accessor = c.exportKind === 'default' ? 'module.default' : `module.${c.name}`;
-				return `    ${c.name}[HMR].update(${accessor});`;
+				return `    ${c.name}[_$HMR].update(${accessor});`;
 			})
 			.join('\n');
 		hmrBlock =
@@ -1448,10 +1537,7 @@ export function compile(source, filename, options) {
 	}
 
 	// Built after HMR wiring so the import list includes `hmr`/`HMR` when needed.
-	const finalRuntimeImport =
-		ctx.runtimeNeeded.size > 0
-			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'octane';\n\n`
-			: '';
+	const finalRuntimeImport = buildRuntimeImport(ctx, 'octane');
 
 	// Everything before `body` in the output — shifts every body segment's
 	// generated line down by the prelude's line count.
@@ -1504,7 +1590,8 @@ function compileServer(source, filename, options) {
 	const ctx = {
 		filename,
 		mode: 'server',
-		runtimeNeeded: new Set(),
+		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
+		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		hoistedHelpers: [],
 		cssInjections: [],
 		currentComponentLocals: null,
@@ -1537,10 +1624,7 @@ function compileServer(source, filename, options) {
 			body += compileServerComponent({ ...node.declaration, default: true }, ctx) + '\n\n';
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
 			// User imports from 'octane' resolve to the server runtime instead.
-			for (const sp of node.specifiers || []) {
-				const name = sp.imported?.name || sp.local?.name;
-				if (name) ctx.runtimeNeeded.add(name);
-			}
+			addUserImportSpecifiers(ctx, node);
 		} else {
 			applyStyleMap(node, ctx);
 			if (node.type === 'ExportNamedDeclaration' && node.declaration) {
@@ -1550,10 +1634,7 @@ function compileServer(source, filename, options) {
 		}
 	}
 
-	const runtimeImport =
-		ctx.runtimeNeeded.size > 0
-			? `import { ${[...ctx.runtimeNeeded].sort().join(', ')} } from 'octane/server';\n\n`
-			: '';
+	const runtimeImport = buildRuntimeImport(ctx, 'octane/server');
 	const helpers = ctx.hoistedHelpers.length ? ctx.hoistedHelpers.join('\n') + '\n\n' : '';
 	const code = runtimeImport + helpers + body;
 	// Minimal (valid, empty-mapping) source map. SSR source maps are a later
@@ -1672,7 +1753,7 @@ function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html')
 		ctx.runtimeNeeded.add('injectStyle');
 		cssLines =
 			cssEntries
-				.map((e) => `  injectStyle(${JSON.stringify(e.hash)}, ${JSON.stringify(e.css)});`)
+				.map((e) => `  _$injectStyle(${JSON.stringify(e.hash)}, ${JSON.stringify(e.css)});`)
 				.join('\n') + '\n';
 	}
 	// `ssrHeadEl(…)` side-effect statements (one per hoisted head element), like injectStyle.
@@ -1782,7 +1863,7 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = 
 				// isn't known at compile time here).
 				const fn = nlGuard ? 'ssrTextPre' : 'ssrText';
 				ctx.runtimeNeeded.add(fn);
-				return `${fn}(${printExpr(resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash))})`;
+				return `_$${fn}(${printExpr(resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash))})`;
 			}
 			ctx.runtimeNeeded.add('ssrChild');
 			// rewriteJsxValues lowers any JSX embedded in the expression (e.g.
@@ -1790,7 +1871,7 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = 
 			// createElement(...) descriptors — exactly like ssrEmitTsrxExpression and
 			// the client makeChildCall. Without it the raw JSX leaks into the emitted
 			// ssrChild(...) call as unparseable source.
-			return `ssrChild(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx), cssHash))}, __s)`;
+			return `_$ssrChild(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx), cssHash))}, __s)`;
 		}
 		case 'Element':
 			if (isComponentTag(node)) return ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash);
@@ -1817,6 +1898,7 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = 
 
 function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	const tag = elementTagName(node);
+	rejectVoidElementContent(tag, node, ctx);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const selfNs = nsForSelf(node, parentNs);
 	const childNs = nsForChildren(node, selfNs);
@@ -1860,7 +1942,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 				tempName: tmp,
 				argExpr: printExprWithTsrx(attr.argument, ctx, name, inlinedSubs),
 			});
-			parts.push(`ssrSpread(${tmp}, ${JSON.stringify(tag)})`);
+			parts.push(`_$ssrSpread(${tmp}, ${JSON.stringify(tag)})`);
 			// The spread may carry `dangerouslySetInnerHTML` — record it as a raw-HTML
 			// source (at this source position) so it participates in last-wins ordering.
 			htmlSources.push(`(${tmp} != null ? ${tmp}.dangerouslySetInnerHTML : void 0)`);
@@ -1918,7 +2000,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			}
 			flush();
 			ctx.runtimeNeeded.add('ssrStyle');
-			parts.push(`ssrStyle(${printExprWithTsrx(inner, ctx, name, inlinedSubs)})`);
+			parts.push(`_$ssrStyle(${printExprWithTsrx(inner, ctx, name, inlinedSubs)})`);
 			continue;
 		}
 
@@ -1951,7 +2033,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			ctx.runtimeNeeded.add('ssrAttr');
 			const outName = tag === 'form' ? 'action' : 'formaction';
 			parts.push(
-				`ssrAttr(${JSON.stringify(outName)}, ((__v) => (typeof __v === 'function' ? null : __v))(${printExprWithTsrx(inner, ctx, name, inlinedSubs)}), ${JSON.stringify(tag)})`,
+				`_$ssrAttr(${JSON.stringify(outName)}, ((__v) => (typeof __v === 'function' ? null : __v))(${printExprWithTsrx(inner, ctx, name, inlinedSubs)}), ${JSON.stringify(tag)})`,
 			);
 			continue;
 		}
@@ -1960,7 +2042,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		flush();
 		ctx.runtimeNeeded.add('ssrAttr');
 		parts.push(
-			`ssrAttr(${JSON.stringify(attrName)}, ${printExprWithTsrx(inner, ctx, name, inlinedSubs)}, ${JSON.stringify(tag)})`,
+			`_$ssrAttr(${JSON.stringify(attrName)}, ${printExprWithTsrx(inner, ctx, name, inlinedSubs)}, ${JSON.stringify(tag)})`,
 		);
 	}
 
@@ -1989,7 +2071,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		!isKnownStringExpression(onlyChild0.expression, ctx.knownStringLocals)
 	) {
 		ctx.runtimeNeeded.add('ssrChildText');
-		childrenExpr = `ssrChildText(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx), cssHash))}, __s)`;
+		childrenExpr = `_$ssrChildText(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx), cssHash))}, __s)`;
 	} else {
 		// pre/textarea/listing: the parser eats a '\n' right after the opening tag —
 		// the first text part must protect a leading newline (see ssrEmitNodes).
@@ -2009,7 +2091,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		// at runtime (last source wins); otherwise the children render.
 		ctx.runtimeNeeded.add('ssrInnerHtml');
 		flush();
-		parts.push(`(ssrInnerHtml([${htmlSources.join(', ')}]) ?? (${childrenExpr}))`);
+		parts.push(`(_$ssrInnerHtml([${htmlSources.join(', ')}]) ?? (${childrenExpr}))`);
 	} else if (childrenExpr !== "''") {
 		flush();
 		parts.push(childrenExpr);
@@ -2089,14 +2171,14 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 		}
 	}
 	ctx.runtimeNeeded.add('ssrComponent');
-	return `ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} })`;
+	return `_$ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} })`;
 }
 
 // ---------------------------------------------------------------------------
 // Server control flow — @if/@for/@switch/@try lowered to HTML-string builders.
 // Each branch/item/case body is compiled (via ssrCompileSub) into a server
 // sub-function returning a string, and the chosen branch's output is wrapped in
-// `ssrBlock(…)` (BLOCK_OPEN/BLOCK_CLOSE markers) so a future client hydrate
+// `_$ssrBlock(…)` (BLOCK_OPEN/BLOCK_CLOSE markers) so a future client hydrate
 // cursor can find the boundaries. Expressions (test/items/discriminant) are
 // printed and evaluated at render time.
 // ---------------------------------------------------------------------------
@@ -2134,9 +2216,9 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	// taken branch's content. The client adopts BOTH on hydration (slot = outer,
 	// branch = inner) so no comment markers are inserted — byte-for-byte, exactly
 	// like @for. The not-taken arm emits no inner range (just `''`).
-	const thenInner = `ssrBlock(${thenSub.fnName}(undefined, __s))`;
-	const elseInner = node.alternate ? `ssrBlock(${elseCall})` : "''";
-	return `ssrBlock((${testExpr}) ? ${thenInner} : ${elseInner})`;
+	const thenInner = `_$ssrBlock(${thenSub.fnName}(undefined, __s))`;
+	const elseInner = node.alternate ? `_$ssrBlock(${elseCall})` : "''";
+	return `_$ssrBlock((${testExpr}) ? ${thenInner} : ${elseInner})`;
 }
 
 function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
@@ -2156,11 +2238,11 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	const mapper = node.index
-		? `(__it, __i) => ssrBlock(${itemSub.fnName}(__it, __i, __s))`
-		: `(__it) => ssrBlock(${itemSub.fnName}(__it, __s))`;
+		? `(__it, __i) => _$ssrBlock(${itemSub.fnName}(__it, __i, __s))`
+		: `(__it) => _$ssrBlock(${itemSub.fnName}(__it, __s))`;
 	// Eager: render every item now and join. No keyed reconciliation server-side;
 	// each item gets its own block marker for a future hydrate to match.
-	return `ssrBlock((() => { const __items = Array.from((${itemsExpr}) ?? []); return __items.length === 0 ? ${emptyCall} : __items.map(${mapper}).join(''); })())`;
+	return `_$ssrBlock((() => { const __items = Array.from((${itemsExpr}) ?? []); return __items.length === 0 ? ${emptyCall} : __items.map(${mapper}).join(''); })())`;
 }
 
 function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
@@ -2173,13 +2255,13 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		inlinedSubs.push(sub.fn + ';');
 		// Inner ssrBlock wraps the matched case's content (see ssrEmitIf) so the
 		// client adopts it as the branch range during hydration (no inserted markers).
-		if (c.test == null) defaultCall = `ssrBlock(${sub.fnName}(undefined, __s))`;
-		else arms.push(`__d === (${printExpr(c.test)}) ? ssrBlock(${sub.fnName}(undefined, __s))`);
+		if (c.test == null) defaultCall = `_$ssrBlock(${sub.fnName}(undefined, __s))`;
+		else arms.push(`__d === (${printExpr(c.test)}) ? _$ssrBlock(${sub.fnName}(undefined, __s))`);
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	// First case matching by strict-equality wins (no JS fall-through); else default.
 	const selector = arms.length ? `${arms.join(' : ')} : ${defaultCall}` : defaultCall;
-	return `ssrBlock((() => { const __d = (${discExpr}); return ${selector}; })())`;
+	return `_$ssrBlock((() => { const __d = (${discExpr}); return ${selector}; })())`;
 }
 
 function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
@@ -2217,7 +2299,7 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	// inline try/catch emit for buffered renders (hydration compatibility).
 	// `siteKey` is a stable source-position hash so a boundary keeps its identity
 	// across streaming passes (the runtime adds the frame path per instance).
-	return `ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName})`;
+	return `_$ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName})`;
 }
 
 // Deterministic per-boundary site key for ssrTry — same scheme as headKey:
@@ -2249,13 +2331,13 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash) {
 		expr.callee.name === 'createPortal'
 	) {
 		ctx.runtimeNeeded.add('ssrPortal');
-		return 'ssrPortal()';
+		return '_$ssrPortal()';
 	}
 	ctx.runtimeNeeded.add('ssrChild');
 	// rewriteHookCalls first (key any `use(thenable)` in the hole — it bypasses the
 	// setup rewrite), then rewriteJsxValues (lower nested JSX to createElement).
 	const lowered = rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx);
-	return `ssrChild(${printExpr(resolveStyleExpr(lowered, cssHash))}, __s)`;
+	return `_$ssrChild(${printExpr(resolveStyleExpr(lowered, cssHash))}, __s)`;
 }
 
 // ===========================================================================
@@ -2349,7 +2431,7 @@ function wrapScopedClassExprs(node, ctx) {
 					) {
 						attr.value.expression = {
 							type: 'CallExpression',
-							callee: { type: 'Identifier', name: 'normalizeClass' },
+							callee: { type: 'Identifier', name: '_$normalizeClass' },
 							arguments: [expr],
 							optional: false,
 						};
@@ -2489,7 +2571,7 @@ function compileComponent(node, ctx, options) {
 	// function-name identity by NAMING the inner FunctionExpression — `hmr`
 	// returns a wrapper that delegates to whatever fn is currently committed,
 	// and `module.Foo[HMR].update(...)` swaps it on each accept.
-	const valueExpr = hmrWrap && isExported ? `hmr(${fn})` : fn;
+	const valueExpr = hmrWrap && isExported ? `_$hmr(${fn})` : fn;
 	if (isDefault) {
 		return `const ${name} = ${valueExpr};\nexport default ${name};`;
 	}
@@ -2679,8 +2761,15 @@ function rewriteHookCalls(node, ctx, componentName) {
 			const isCustom = /^use[A-Z]/.test(name) && name !== 'useContext';
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isCustom || isServerUse) {
-				if (isBuiltin) ctx.runtimeNeeded.add(name);
-				if (isServerUse) ctx.runtimeNeeded.add('use');
+				// A builtin hook call site is USER code (the user's own identifier), so
+				// its import stays bare — EXCEPT compiler-inserted calls (auto-callback's
+				// `useCallback`), whose callee is renamed to the `_$` alias below so a
+				// user binding of the same name can't shadow it.
+				if (isBuiltin) {
+					if (n.callee._octaneGenerated) ctx.runtimeNeeded.add(name);
+					else ctx.userRuntimeNames.add(name);
+				}
+				if (isServerUse) ctx.userRuntimeNames.add('use');
 				const debug = isServerUse
 					? `${componentName}.use#${ctx.nextHookSymId}`
 					: `${componentName}.${name}#${ctx.nextHookSymId}`;
@@ -2703,7 +2792,7 @@ function rewriteHookCalls(node, ctx, componentName) {
 					ctx.runtimeNeeded.add('withSlot');
 					return {
 						type: 'CallExpression',
-						callee: { type: 'Identifier', name: 'withSlot' },
+						callee: { type: 'Identifier', name: '_$withSlot' },
 						arguments: [
 							{ type: 'Identifier', name: symVar },
 							n.callee,
@@ -2715,6 +2804,9 @@ function rewriteHookCalls(node, ctx, componentName) {
 				}
 				return {
 					...n,
+					callee: n.callee._octaneGenerated
+						? { type: 'Identifier', name: rtAlias(name) }
+						: n.callee,
 					arguments: [...args, { type: 'Identifier', name: symVar }],
 				};
 			}
@@ -3123,7 +3215,7 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 	ctx.runtimeNeeded.add('createElement');
 	return {
 		type: 'CallExpression',
-		callee: { type: 'Identifier', name: 'createElement' },
+		callee: { type: 'Identifier', name: '_$createElement' },
 		arguments: [
 			{ type: 'Identifier', name: fragName },
 			{ type: 'ObjectExpression', properties: holeProps },
@@ -3275,6 +3367,7 @@ function jsxElementToCreateElement(node, ctx) {
 	const compNode = isComponentTag(node)
 		? jsxNameToExpr(nameNode)
 		: { type: 'Literal', value: nameNode.name != null ? nameNode.name : String(nameNode) };
+	if (!isComponentTag(node)) rejectVoidElementContent(compNode.value, node, ctx);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const properties = [];
 	for (const attr of attrs) {
@@ -3318,7 +3411,7 @@ function jsxElementToCreateElement(node, ctx) {
 	}
 	return {
 		type: 'CallExpression',
-		callee: { type: 'Identifier', name: 'createElement' },
+		callee: { type: 'Identifier', name: '_$createElement' },
 		arguments: args,
 		optional: false,
 	};
@@ -3467,7 +3560,7 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 	// Each hoisted head element gets a dense scope slot (after the body's constructs);
 	// the content `key` stays as a later arg for SSR-adoption matching.
 	return headNodes
-		.map((h, i) => `  headBlock(__s, ${slotBase + i}, ${headElementArgs(h, i)});`)
+		.map((h, i) => `  _$headBlock(__s, ${slotBase + i}, ${headElementArgs(h, i)});`)
 		.join('\n');
 }
 
@@ -3477,7 +3570,7 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 function emitHeadServer(headNodes, ctx) {
 	if (!headNodes.length) return '';
 	ctx.runtimeNeeded.add('ssrHeadEl');
-	return headNodes.map((h, i) => `  ssrHeadEl(${headElementArgs(h, i)});`).join('\n') + '\n';
+	return headNodes.map((h, i) => `  _$ssrHeadEl(${headElementArgs(h, i)});`).join('\n') + '\n';
 }
 
 /**
@@ -4141,7 +4234,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			const lc = devLoc(ctx, jsxNodes[0]);
 			if (lc) cloneLoc = `, ${JSON.stringify(`${ctx.mapSourceName}:${lc[0]}:${lc[1]}`)}`;
 		}
-		mountLines.push(`    const _root = clone(${tpl}${cloneLoc});`);
+		mountLines.push(`    const _root = _$clone(${tpl}${cloneLoc});`);
 		elementVars = new Map();
 		let varCounter = 0;
 		// Does this template contain a control-flow / component / portal hole? If so
@@ -4200,7 +4293,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				// raw `.nextSibling` for hole-free templates. sibVar already resolves to the
 				// (k−sibSteps)-th child, so n steps across lands on the k-th.
 				if (hasHoles) {
-					step = `sibling(${sibVar}, ${sibSteps})`;
+					step = `_$sibling(${sibVar}, ${sibSteps})`;
 				} else {
 					step = sibVar;
 					for (let i = 0; i < sibSteps; i++) step += '.nextSibling';
@@ -4376,7 +4469,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			// parent via the runtime helper — a hydration-aware no-op when clone()
 			// adopted the server content in place (virtual wrapper).
 			ctx.runtimeNeeded.add('drainFrag');
-			mountLines.push(`    drainFrag(_root, __block.parentNode, __block.endMarker);`);
+			mountLines.push(`    _$drainFrag(_root, __block.parentNode, __block.endMarker);`);
 		}
 	}
 	// Commit the binding bag to the scope LAST — see the matching comment at
@@ -4491,7 +4584,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const anchorPart = hasAnchor ? `, ${anchorExpr}` : '';
 		pushAfter(
 			fc.id,
-			`  forBlock(__s, ${slotIndex}, ${hostExpr}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}${flagsPart}${depsPart}${emptyPart}${anchorPart});`,
+			`  _$forBlock(__s, ${slotIndex}, ${hostExpr}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}${flagsPart}${depsPart}${emptyPart}${anchorPart});`,
 		);
 	}
 	for (const ic of ifCalls) {
@@ -4504,7 +4597,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			ctx.runtimeNeeded.add('activityBlock');
 			pushAfter(
 				ic.id,
-				`  activityBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.modeExpr}), ${ic.thenHelper}${anchorArg});`,
+				`  _$activityBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.modeExpr}), ${ic.thenHelper}${anchorArg});`,
 			);
 			continue;
 		}
@@ -4512,7 +4605,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const elseArg = ic.elseHelper || 'null';
 		pushAfter(
 			ic.id,
-			`  ifBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.condExpr}), ${ic.thenHelper}, ${elseArg}${anchorArg});`,
+			`  _$ifBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.condExpr}), ${ic.thenHelper}, ${elseArg}${anchorArg});`,
 		);
 	}
 	for (const cc of compCalls) {
@@ -4532,7 +4625,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				ctx.runtimeNeeded.add('childTextHole');
 				pushAfter(
 					cc.id,
-					`  { const _v = (${cc.valueExpr}); if (_b._chp$${cc.id} !== _v) { _b._chp$${cc.id} = _v; const _t = _b._chv$${cc.id}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') setText(_t, _v); else _b._chv$${cc.id} = childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); } }`,
+					`  { const _v = (${cc.valueExpr}); if (_b._chp$${cc.id} !== _v) { _b._chp$${cc.id} = _v; const _t = _b._chv$${cc.id}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') _$setText(_t, _v); else _b._chv$${cc.id} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); } }`,
 				);
 				continue;
 			}
@@ -4546,7 +4639,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				const anchorArg = anchorExpr === 'null' ? '' : `, ${anchorExpr}`;
 				pushAfter(
 					cc.id,
-					`  textSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg});`,
+					`  _$textSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg});`,
 				);
 				continue;
 			}
@@ -4563,7 +4656,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			const ownEndArg = cc.anchorVar ? ', true' : '';
 			pushAfter(
 				cc.id,
-				`  { const _v = (${cc.valueExpr}); if (_b._chp$${cc.id} !== _v) { _b._chp$${cc.id} = _v; const _t = _b._chv$${cc.id}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') setText(_t, _v); else _b._chv$${cc.id} = textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}); } }`,
+				`  { const _v = (${cc.valueExpr}); if (_b._chp$${cc.id} !== _v) { _b._chp$${cc.id} = _v; const _t = _b._chv$${cc.id}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') _$setText(_t, _v); else _b._chv$${cc.id} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}); } }`,
 			);
 			continue;
 		}
@@ -4580,7 +4673,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			const anchorArg = liteAnchor ? `, ${liteAnchor}` : '';
 			pushAfter(
 				cc.id,
-				`  componentSlotLite(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg});`,
+				`  _$componentSlotLite(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg});`,
 			);
 			continue;
 		}
@@ -4609,7 +4702,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		}
 		pushAfter(
 			cc.id,
-			`  componentSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg});`,
+			`  _$componentSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg});`,
 		);
 	}
 	for (const pc of ctx._portalCalls) {
@@ -4618,7 +4711,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		ctx.runtimeNeeded.add('portal');
 		pushAfter(
 			pc.id,
-			`  portal(__s, ${slotIndex}, ${pc.targetExpr}, ${pc.bodyExpr}, ${pc.propsExpr}, ${hostExpr});`,
+			`  _$portal(__s, ${slotIndex}, ${pc.targetExpr}, ${pc.bodyExpr}, ${pc.propsExpr}, ${hostExpr});`,
 		);
 	}
 	// Restore the outer plan's portal-call list — pairs with the save above.
@@ -4633,7 +4726,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const tryAnchorArg = tryAnchor ? `, ${tryAnchor}` : '';
 		pushAfter(
 			tc.id,
-			`  tryBlock(__s, ${slotIndex}, ${hostExpr}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg});`,
+			`  _$tryBlock(__s, ${slotIndex}, ${hostExpr}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg});`,
 		);
 	}
 	for (const sc of ctx._switchCalls) {
@@ -4646,7 +4739,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const anchorArg = switchAnchor ? `, ${switchAnchor}` : '';
 		pushAfter(
 			sc.id,
-			`  switchBlock(__s, ${slotIndex}, ${hostExpr}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg});`,
+			`  _$switchBlock(__s, ${slotIndex}, ${hostExpr}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg});`,
 		);
 	}
 	// Restore the outer plan's switch-call list — pairs with the save above.
@@ -4725,7 +4818,7 @@ function emitBindingMount(b, elVar) {
 			// hydration mismatch re-render).
 			return `    {
       const _v = ${E};
-      _b._txt$${b.id} = htext(${elVar}, _v);
+      _b._txt$${b.id} = _$htext(${elVar}, _v);
       _b._prev$${b.id} = _v;
     }`;
 		}
@@ -4748,14 +4841,14 @@ function emitBindingMount(b, elVar) {
 			// htextSwap coerces the value itself, so the mount is a bare call.
 			return `    {
       const _v = ${E};
-      _b._txt$${b.id} = htextSwap(${elVar}, _v);
+      _b._txt$${b.id} = _$htextSwap(${elVar}, _v);
       _b._prev$${b.id} = _v;
     }`;
 		}
 		case 'attr': {
 			return `    {
       const _v = ${E};
-      setAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
+      _$setAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
       _b._el$${b.id} = ${elVar};
       _b._prev$${b.id} = _v;
     }`;
@@ -4764,7 +4857,7 @@ function emitBindingMount(b, elVar) {
 			// On SVG/MathML hosts the `className` property is read-only — fall back
 			// to setAttribute. Compile-time choice, zero runtime branching.
 			const setter =
-				b.ns && b.ns !== 'html' ? `setClassAttr(${elVar}, _v)` : `setClassName(${elVar}, _v)`;
+				b.ns && b.ns !== 'html' ? `_$setClassAttr(${elVar}, _v)` : `_$setClassName(${elVar}, _v)`;
 			return `    {
       const _v = ${E};
       ${setter};
@@ -4775,7 +4868,7 @@ function emitBindingMount(b, elVar) {
 		case 'style': {
 			return `    {
       const _v = ${E};
-      setStyle(${elVar}, _v, undefined);
+      _$setStyle(${elVar}, _v, undefined);
       _b._el$${b.id} = ${elVar};
       _b._sty$${b.id} = _v;
     }`;
@@ -4790,10 +4883,10 @@ function emitBindingMount(b, elVar) {
 			// element's deferred attach — commit-phase detach batches the two).
 			return `    {
       const _v = ${E};
-      setSpread(${elVar}, _v, undefined, __s);
+      _$setSpread(${elVar}, _v, undefined, __s);
       _b._el$${b.id} = ${elVar};
       _b._sp$${b.id} = _v;
-      __s.cleanups.push(() => { const _sp = _b._sp$${b.id}; if (_sp != null && _sp.ref != null) queueRefDetach(_sp.ref, _b._el$${b.id}); });
+      __s.cleanups.push(() => { const _sp = _b._sp$${b.id}; if (_sp != null && _sp.ref != null) _$queueRefDetach(_sp.ref, _b._el$${b.id}); });
     }`;
 		}
 		case 'event': {
@@ -4806,7 +4899,7 @@ function emitBindingMount(b, elVar) {
 			// function identity on update.
 			return `    {
       const _v = ${E};
-      setFormAction(${elVar}, ${JSON.stringify(b.name)}, _v, undefined);
+      _$setFormAction(${elVar}, ${JSON.stringify(b.name)}, _v, undefined);
       _b._el$${b.id} = ${elVar};
       _b._prev$${b.id} = _v;
     }`;
@@ -4842,8 +4935,8 @@ function emitBindingMount(b, elVar) {
       const _r = (${b.expr});
       _b._ref$${b.id} = _r;
       _b._el$${b.id} = ${elVar};
-      queueRefAttach(__s, () => attachRef(_r, _b._el$${b.id}));
-      __s.cleanups.push(() => queueRefDetach(_b._ref$${b.id}, _b._el$${b.id}));
+      _$queueRefAttach(__s, () => _$attachRef(_r, _b._el$${b.id}));
+      __s.cleanups.push(() => _$queueRefDetach(_b._ref$${b.id}, _b._el$${b.id}));
     }`;
 		}
 		case 'fragmentRef': {
@@ -4855,7 +4948,7 @@ function emitBindingMount(b, elVar) {
 			// the ref + destroys the instance on unmount.
 			return `    {
       const _r = (${b.expr});
-      _b._fi$${b.id} = mountFragmentRef(__s, ${elVar}, ${b.endElVar}, _r);
+      _b._fi$${b.id} = _$mountFragmentRef(__s, ${elVar}, ${b.endElVar}, _r);
     }`;
 		}
 	}
@@ -4867,27 +4960,27 @@ function emitBindingUpdate(b) {
 	switch (b.kind) {
 		case 'textOnlyChild':
 		case 'text': {
-			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { setText(_b._txt$${b.id}, _v); _b._prev$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { _$setText(_b._txt$${b.id}, _v); _b._prev$${b.id} = _v; } }`;
 		}
 		case 'htmlOnlyChild': {
 			const coerce = b.knownString ? '_v' : 'String(_v)';
 			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { _b._el$${b.id}.innerHTML = (_v == null ? '' : ${coerce}); _b._prev$${b.id} = _v; } }`;
 		}
 		case 'attr': {
-			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { setAttribute(_b._el$${b.id}, ${JSON.stringify(b.name)}, _v); _b._prev$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { _$setAttribute(_b._el$${b.id}, ${JSON.stringify(b.name)}, _v); _b._prev$${b.id} = _v; } }`;
 		}
 		case 'class': {
 			const setter =
 				b.ns && b.ns !== 'html'
-					? `setClassAttr(_b._el$${b.id}, _v)`
-					: `setClassName(_b._el$${b.id}, _v)`;
+					? `_$setClassAttr(_b._el$${b.id}, _v)`
+					: `_$setClassName(_b._el$${b.id}, _v)`;
 			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { ${setter}; _b._prev$${b.id} = _v; } }`;
 		}
 		case 'style': {
 			// Object styles need per-prop diffing — call setStyle even when the
 			// reference is unchanged it'd just no-op via the internal diff. We DO
 			// skip identity matches to avoid the call overhead.
-			return `    { const _v = ${E}; if (_b._sty$${b.id} !== _v) { setStyle(_b._el$${b.id}, _v, _b._sty$${b.id}); _b._sty$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (_b._sty$${b.id} !== _v) { _$setStyle(_b._el$${b.id}, _v, _b._sty$${b.id}); _b._sty$${b.id} = _v; } }`;
 		}
 		case 'spread': {
 			// setSpread does its own per-key diffing internally and handles cleanup
@@ -4896,13 +4989,13 @@ function emitBindingUpdate(b) {
 			// `__s` rides along on updates too so a spread-supplied ref's attach is
 			// deferred to commit (after all queued detaches) — same phasing as the
 			// direct `ref` binding above.
-			return `    { const _v = ${E}; if (_b._sp$${b.id} !== _v) { setSpread(_b._el$${b.id}, _v, _b._sp$${b.id}, __s); _b._sp$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (_b._sp$${b.id} !== _v) { _$setSpread(_b._el$${b.id}, _v, _b._sp$${b.id}, __s); _b._sp$${b.id} = _v; } }`;
 		}
 		case 'event': {
 			return `    _b._el$${b.id}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
 		}
 		case 'formAction': {
-			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { setFormAction(_b._el$${b.id}, ${JSON.stringify(b.name)}, _v, _b._prev$${b.id}); _b._prev$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { _$setFormAction(_b._el$${b.id}, ${JSON.stringify(b.name)}, _v, _b._prev$${b.id}); _b._prev$${b.id} = _v; } }`;
 		}
 		case 'event-bundle': {
 			// Diff fn + each arg against the per-slot cache. Only rebuild + assign
@@ -4942,8 +5035,8 @@ function emitBindingUpdate(b) {
       const _r = (${b.expr});
       if (_r !== _b._ref$${b.id}) {
         const _old = _b._ref$${b.id};
-        if (_old != null) queueRefDetach(_old, _b._el$${b.id});
-        if (_r != null) queueRefAttach(__s, () => attachRef(_r, _b._el$${b.id}));
+        if (_old != null) _$queueRefDetach(_old, _b._el$${b.id});
+        if (_r != null) _$queueRefAttach(__s, () => _$attachRef(_r, _b._el$${b.id}));
         _b._ref$${b.id} = _r;
       }
     }`;
@@ -4959,8 +5052,8 @@ function emitBindingUpdate(b) {
       const _r = (${b.expr});
       const _fi = _b._fi$${b.id};
       if (_fi && _r !== _fi._currentRef) {
-        if (_fi._currentRef != null) queueRefDetach(_fi._currentRef, _fi);
-        if (_r != null) queueRefAttach(__s, () => attachRef(_r, _fi));
+        if (_fi._currentRef != null) _$queueRefDetach(_fi._currentRef, _fi);
+        if (_r != null) _$queueRefAttach(__s, () => _$attachRef(_r, _fi));
         _fi._currentRef = _r;
       }
     }`;
@@ -5148,6 +5241,7 @@ function emitElementHtml(
 
 	const tag = node.id?.name || node.openingElement?.name?.name;
 	if (!tag) throw new Error('Element without tag');
+	rejectVoidElementContent(tag, node, ctx);
 
 	// The host element's own namespace (e.g. `<svg>` is in SVG ns even if its
 	// parent context is HTML); its descendants' inherited ns may differ
@@ -6606,8 +6700,8 @@ function walkExprH(rootVar, path) {
 	let expr = rootVar;
 	for (let i = 0; i < path.length; i++) {
 		const idx = path[i];
-		expr = `child(${expr})`;
-		if (idx > 0) expr = `sibling(${expr}, ${idx})`;
+		expr = `_$child(${expr})`;
+		if (idx > 0) expr = `_$sibling(${expr}, ${idx})`;
 	}
 	return expr;
 }

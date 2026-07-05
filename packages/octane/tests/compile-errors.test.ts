@@ -65,6 +65,37 @@ describe('compile errors — rejected authoring patterns', () => {
 		expect(() => compile(src, 'for-await.tsrx')).toThrow();
 	});
 
+	it('rejects children on a void element (`<input>…</input>`)', () => {
+		const src = `export function V() @{ <input>{'kid'}</input> }`;
+		// React throws at render time (ReactDOMComponent-test.js:1794); octane's
+		// templates are static so the rejection moves to compile time. Without it
+		// the template parser silently DROPS the children.
+		expect(() => compile(src, 'void-children.tsrx')).toThrow(/void element/);
+		expect(() => compile(src, 'void-children.tsrx', { mode: 'server' })).toThrow(/void element/);
+	});
+
+	it('rejects `dangerouslySetInnerHTML` on a void element', () => {
+		const src = `export function V(props) @{ <input dangerouslySetInnerHTML={{ __html: props.h }} /> }`;
+		// Without this guard the htmlOnlyChild fast path writes invisible
+		// `input.innerHTML` (ReactDOMComponent-test.js:1807 throws).
+		expect(() => compile(src, 'void-danger.tsrx')).toThrow(/void element/);
+		expect(() => compile(src, 'void-danger.tsrx', { mode: 'server' })).toThrow(/void element/);
+	});
+
+	it('accepts a childless void element (attributes, whitespace, and comments are fine)', () => {
+		const src = `
+      export function V(props) @{
+        <div>
+          <input value={props.v} />
+          <br />
+          <img src={props.src} />
+        </div>
+      }
+    `;
+		expect(() => compile(src, 'void-ok.tsrx')).not.toThrow();
+		expect(() => compile(src, 'void-ok.tsrx', { mode: 'server' })).not.toThrow();
+	});
+
 	it('accepts a valueless `key` attribute on an element inside @for', () => {
 		const src = `
       export function L(props) @{
