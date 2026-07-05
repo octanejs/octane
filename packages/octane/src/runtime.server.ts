@@ -341,6 +341,13 @@ function ssrChildItem(v: unknown, scope: SSRScope): string {
 // primitive → escaped text). `dangerouslySetInnerHTML={{__html}}`, if present, is
 // raw (unescaped) content.
 function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope): string {
+	// A descriptor tag is concatenated into the response verbatim — validate it
+	// like React does (Invalid tag → throw) so a hostile/buggy dynamic tag (e.g.
+	// 'div><img onerror=…>') can never become live markup. The client is guarded
+	// by the platform itself: document.createElement throws for these names.
+	if (!VALID_TAG_NAME.test(tag)) {
+		throw new Error('Invalid tag: ' + tag);
+	}
 	let attrs = '';
 	let innerHTML: unknown = undefined;
 	if (props != null) {
@@ -478,7 +485,9 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 	let out = '';
 	for (const k in obj) {
 		const val = obj[k];
-		if (val == null || val === false) continue;
+		// Booleans never serialize (client parity: `fontFamily: true` clears, it
+		// must not emit the literal string "true").
+		if (val == null || typeof val === 'boolean') continue;
 		// React parity: numeric values get `px` (except 0 / unitless / custom props).
 		out += styleName(k) + ':' + cssStyleValue(k, val) + ';';
 	}
@@ -497,6 +506,10 @@ export function ssrStyle(v: unknown): string {
 // `=`, or control chars. Rejects spread keys that would inject markup (e.g.
 // 'x onload=alert(1)' or 'a>'); mirrors the client's setAttribute behavior.
 const VALID_ATTR_NAME = /^[^\s"'>\/=\u0000-\u001F]+$/;
+
+// Legal element tag name (React's VALID_TAG_REGEX): letters first, then
+// letters/digits/`:`/`.`/`-`/`_`. Anything else could open/close markup.
+const VALID_TAG_NAME = /^[a-zA-Z][a-zA-Z0-9:._-]*$/;
 
 // One prop entry → its ` name="value"` attribute fragment (or ''). The shared
 // filter/route used by ssrHostElement's attr loop and ssrSpread: key/ref/children
@@ -994,6 +1007,10 @@ export function ssrHeadEl(
 		for (const k in attrs) {
 			const v = attrs[k];
 			if (v == null || v === false) continue;
+			// on* event props reach us since the compiler passes them through for the
+			// client headBlock's direct listeners — no server semantics, never serialize
+			// (a function value must not stringify into markup).
+			if (typeof v === 'function' || (k.length > 2 && k[0] === 'o' && k[1] === 'n')) continue;
 			s += v === true ? ' ' + k : ' ' + k + '="' + escapeAttr(v) + '"';
 		}
 	}

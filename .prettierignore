@@ -24,6 +24,11 @@ benchmarks/js-framework/octane-jsx/src/Main.tsx
 # Dependencies
 **/node_modules/
 
+# Claude Code session worktrees (gitignored working copies — never in CI's
+# checkout; sweeping them makes local format:check disagree with CI while a
+# background session is active)
+.claude/worktrees/
+
 # Editor/IDE generated files
 **/.cache/
 **/coverage/
