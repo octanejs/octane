@@ -51,9 +51,11 @@ describe('@octanejs/radix — Form', () => {
 		const msg = $('[data-testid="msg-missing"]')!;
 		expect(msg).not.toBe(null);
 		expect(msg.textContent!.trim()).toBe('Please enter your email');
-		expect($('[data-testid="field"]')!.getAttribute('data-invalid')).toBe('');
-		expect(control.getAttribute('data-invalid')).toBe('');
-		expect($('[data-testid="label"]')!.getAttribute('data-invalid')).toBe('');
+		// data-* booleans stringify (React parity): Radix's `data-invalid={true}`
+		// renders "true", exactly as it does under React.
+		expect($('[data-testid="field"]')!.getAttribute('data-invalid')).toBe('true');
+		expect(control.getAttribute('data-invalid')).toBe('true');
+		expect($('[data-testid="label"]')!.getAttribute('data-invalid')).toBe('true');
 		// The message id lands in the control's aria-describedby.
 		expect(control.getAttribute('aria-describedby')).toBe(msg.id);
 
@@ -64,7 +66,7 @@ describe('@octanejs/radix — Form', () => {
 		});
 		await settle();
 		expect($('[data-testid="msg-missing"]')).toBe(null);
-		expect($('[data-testid="field"]')!.getAttribute('data-valid')).toBe('');
+		expect($('[data-testid="field"]')!.getAttribute('data-valid')).toBe('true');
 		r.unmount();
 	});
 
@@ -85,7 +87,7 @@ describe('@octanejs/radix — Form', () => {
 		expect(msg.textContent!.trim()).toBe('Email already taken');
 		expect($('[data-testid="msg-missing"]')).toBe(null); // built-in not matched
 		expect(control.validity.customError).toBe(true); // setCustomValidity applied
-		expect($('[data-testid="field"]')!.getAttribute('data-invalid')).toBe('');
+		expect($('[data-testid="field"]')!.getAttribute('data-invalid')).toBe('true');
 
 		// A non-matching value clears it.
 		flushSync(() => {

@@ -73,6 +73,7 @@ export {
 	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)
 	template,
 	clone,
+	drainFrag,
 	htext,
 	htextSwap,
 	child,

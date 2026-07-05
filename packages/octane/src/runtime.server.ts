@@ -33,6 +33,9 @@ import {
 	STREAM_SEGMENT_ATTR,
 	STREAM_SEED_ATTR,
 	STREAM_SEED_COMMENT,
+	POSITIVE_NUMERIC_ATTR_PROPS,
+	BOOLEAN_DROPPED_STRING_ATTR_PROPS,
+	isEnumeratedBooleanAttr,
 	cssStyleValue,
 } from './constants.js';
 
@@ -151,6 +154,10 @@ const NOOP = (): void => {};
 // Matches the client runtime's `ELEMENT_TAG` (createElement descriptor marker)
 // so `ssrChild` can render a `<Comp/>`-as-value descriptor server-side too.
 const ELEMENT_TAG = Symbol.for('octane.element');
+// Matches the client runtime's `PORTAL_TAG` (createPortal descriptor marker) so
+// a portal flowing through props/children to `ssrChild` leaves its site anchor
+// instead of tripping the plain-object child throw.
+const PORTAL_TAG = Symbol.for('octane.portal');
 
 // Void (self-closing) HTML elements — no end tag, no children. Mirrors the
 // compiler's VOID_ELEMENTS so a host descriptor serialized by `ssrChild`
@@ -258,6 +265,18 @@ export function ssrText(v: unknown): string {
 	return escapeHtml(v);
 }
 
+/**
+ * A dynamic text hole in FIRST-CHILD position of a newline-eating element
+ * (`<pre>`/`<textarea>`/`<listing>`): the HTML parser discards a newline that
+ * immediately follows the opening tag, so a value starting with '\n' gets an
+ * EXTRA leading newline (React's protection) — the parser eats the sacrificial
+ * one and the real content round-trips intact.
+ */
+export function ssrTextPre(v: unknown): string {
+	const s = ssrText(v);
+	return s.charCodeAt(0) === 10 ? '\n' + s : s;
+}
+
 // Render a COMPONENT `ElementDescriptor` (`d.type` is a function) via ssrComponent,
 // threading positional `d.children` through as `props.children` (don't drop them).
 // `createElement` already mirrors positional children into `props.children`, so for
@@ -297,16 +316,28 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 	}
 	// A component-body / children render function, or `<Comp/>` used as a value.
 	if (typeof v === 'function') return ssrComponent(scope, v as ServerComponent, {});
-	if (typeof v === 'object' && (v as any).$$kind === ELEMENT_TAG) {
-		const d = v as ElementDescriptor;
-		// HOST descriptor (`createElement('span', …)`, from value-position JSX) →
-		// serialize the element directly; its content REPLACES the childSlot range
-		// the client adopts (de-opt host children are rebuilt, not adopted in place,
-		// so only the outer marker pair must line up). COMPONENT descriptor →
-		// ssrComponent, passing `children` through (don't drop them).
-		if (typeof d.type === 'string')
-			return ssrBlock(ssrHostElement(d.type, d.props, d.children, scope));
-		return ssrComponentDescriptor(d, scope);
+	if (typeof v === 'object') {
+		if ((v as any).$$kind === ELEMENT_TAG) {
+			const d = v as ElementDescriptor;
+			// HOST descriptor (`createElement('span', …)`, from value-position JSX) →
+			// serialize the element directly; its content REPLACES the childSlot range
+			// the client adopts (de-opt host children are rebuilt, not adopted in place,
+			// so only the outer marker pair must line up). COMPONENT descriptor →
+			// ssrComponent, passing `children` through (don't drop them).
+			if (typeof d.type === 'string')
+				return ssrBlock(ssrHostElement(d.type, d.props, d.children, scope));
+			return ssrComponentDescriptor(d, scope);
+		}
+		// A portal as a value: its body renders into a foreign target client-side —
+		// server-side the site leaves the anchor placeholder (see ssrPortal).
+		if ((v as any).$$kind === PORTAL_TAG) return ssrBlock(ssrPortal());
+		// A plain object is never a renderable child — serializing `String(v)` puts
+		// '[object Object]' in the markup. Throw like React so the bug is loud.
+		throw new Error(
+			'Objects are not valid as a child (found: object with keys {' +
+				Object.keys(v as object).join(', ') +
+				'}). If you meant to render a collection of children, use an array instead.',
+		);
 	}
 	return ssrBlock(escapeHtml(v));
 }
@@ -364,7 +395,7 @@ function ssrHostElement(tag: string, props: any, children: any, scope: SSRScope)
 				innerHTML = val == null || val.__html == null ? '' : val.__html;
 				continue;
 			}
-			attrs += ssrAttrEntry(k, val);
+			attrs += ssrAttrEntry(k, val, tag);
 		}
 	}
 	const hasChildren =
@@ -463,10 +494,18 @@ export function ssrPortal(): string {
 	return EMPTY_COMMENT;
 }
 
-/** A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit. */
-export function ssrAttr(name: string, v: unknown): string {
+/**
+ * A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit.
+ * `tag` (the owning element's tag name, when the emit site knows it) gates the
+ * tag-sensitive React-parity rules: custom elements get RAW attribute
+ * semantics (no alias, no value tables), and the empty-URL strip exempts
+ * `<a>`/`<area>` href. Mirrors the client's setAttribute policies (runtime.ts).
+ */
+export function ssrAttr(name: string, v: unknown, tag?: string): string {
+	const isCustomTag = tag !== undefined && tag.indexOf('-') !== -1;
 	// React-parity alias, mirroring class/className: `htmlFor` serialises as `for`.
-	if (name === 'htmlFor') name = 'for';
+	// Custom elements get their props VERBATIM (no alias tables) — React parity.
+	if (name === 'htmlFor' && !isCustomTag) name = 'for';
 	// `class` / `className` clsx-compose so arrays / objects serialise the same string
 	// the client writes (a nullish/false class still drops out; a truthy-but-empty
 	// compose emits `class=""`, matching `el.className = ''`).
@@ -480,9 +519,55 @@ export function ssrAttr(name: string, v: unknown): string {
 		if (v == null) return '';
 		return ' ' + name + '="' + escapeAttr(String(v)) + '"';
 	}
+	// React-only warning-suppression hints never serialize (client parity).
+	if (name === 'suppressContentEditableWarning' || name === 'suppressHydrationWarning') return '';
+	const t = typeof v;
+	// spellcheck / contenteditable / draggable are ENUMERATED — a boolean
+	// stringifies ("false" is a real state; absent means inherit). Global
+	// attributes, so custom elements included (mirrors coerceAttrValue).
+	if (t === 'boolean' && isEnumeratedBooleanAttr(name)) {
+		return ' ' + name + '="' + v + '"';
+	}
+	// data-* attributes stringify booleans on EVERY element (custom included —
+	// the client writes the same): `data-x={false}` → "false"; a dataset
+	// consumer reads the string, so dropping/bare-ing loses the value.
+	if (t === 'boolean' && name.startsWith('data-')) {
+		return ' ' + name + '="' + v + '"';
+	}
+	// Function/symbol values are never meaningful attribute text (client parity:
+	// setAttribute removes them) — stringifying a function leaks source into markup.
+	if (t === 'function' || t === 'symbol') return '';
+	if (!isCustomTag) {
+		// Unknown lowercase `on*` attributes are dropped on standard elements (React
+		// nulls them — an event-ish name with a string payload is markup-injection
+		// surface, not an attribute). Custom elements keep them (raw semantics), and
+		// the bare `on` attribute (AMP) passes. CamelCase onX events never reach
+		// here — the compiler / ssrAttrEntry filter them earlier.
+		if (name.length > 2 && name.charCodeAt(0) === 111 /* o */ && name.charCodeAt(1) === 110) {
+			return '';
+		}
+		const lower = name.toLowerCase();
+		// NOTE no boolean-prop truthiness table (React drops `hidden={0}`): the
+		// ADJUDICATED divergence (see constants.ts) writes values through natively.
+		if (t === 'boolean' && BOOLEAN_DROPPED_STRING_ATTR_PROPS.has(lower)) return '';
+		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && (t === 'boolean' || !(Number(v) >= 1))) return '';
+	}
 	if (v == null || v === false) return '';
+	const s = v === true ? '' : String(v);
+	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers would
+	// re-fetch the whole document as an image/script/stylesheet. React strips
+	// these; so does the client's setAttribute (element-agnostic, custom
+	// elements included — and `true` coerces to '' first, exactly like the
+	// client). `<a href="">`/`<area href="">` stays — an empty href is a
+	// legitimate "link to this page".
+	if (
+		s === '' &&
+		(name === 'src' || (name === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area'))
+	) {
+		return '';
+	}
 	if (v === true) return ' ' + name;
-	return ' ' + name + '="' + escapeAttr(v) + '"';
+	return ' ' + name + '="' + escapeAttr(s) + '"';
 }
 
 function styleObjectToCss(obj: Record<string, unknown>): string {
@@ -522,7 +607,7 @@ const VALID_TAG_NAME = /^[a-zA-Z][a-zA-Z0-9:._-]*$/;
 // route to their dedicated serializers, and VALID_ATTR_NAME rejects
 // injection-unsafe names. `dangerouslySetInnerHTML` is element CONTENT, not an
 // attribute — callers must intercept it BEFORE routing an entry here.
-function ssrAttrEntry(k: string, v: unknown): string {
+function ssrAttrEntry(k: string, v: unknown, tag?: string): string {
 	if (k === 'key' || k === 'ref' || k === 'children') return '';
 	if (k === 'suppressHydrationWarning' || k === 'suppressContentEditableWarning') return '';
 	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
@@ -530,13 +615,13 @@ function ssrAttrEntry(k: string, v: unknown): string {
 	// them) — stringifying a function would put its SOURCE into the markup.
 	if (typeof v === 'function' || typeof v === 'symbol') return '';
 	if (k === 'style') return ssrStyle(v);
-	if (k === 'className' || k === 'class') return ssrAttr('class', v);
-	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v);
+	if (k === 'className' || k === 'class') return ssrAttr('class', v, tag);
+	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v, tag);
 	return '';
 }
 
 /** A spread `{...obj}`: serialize attr-like keys; drop events/refs/key/children. */
-export function ssrSpread(obj: unknown): string {
+export function ssrSpread(obj: unknown, tag?: string): string {
 	if (obj == null || typeof obj !== 'object') return '';
 	let out = '';
 	for (const k in obj as Record<string, unknown>) {
@@ -544,7 +629,7 @@ export function ssrSpread(obj: unknown): string {
 		// the compiler collects it at the emit site (compile.js `htmlSources`, which
 		// feeds `ssrInnerHtml`), so the attr serializer drops it here.
 		if (k === 'dangerouslySetInnerHTML') continue;
-		out += ssrAttrEntry(k, (obj as Record<string, unknown>)[k]);
+		out += ssrAttrEntry(k, (obj as Record<string, unknown>)[k], tag);
 	}
 	return out;
 }
@@ -1019,6 +1104,10 @@ export function ssrHeadEl(
 			// client headBlock's direct listeners — no server semantics, never serialize
 			// (a function value must not stringify into markup).
 			if (typeof v === 'function' || (k.length > 2 && k[0] === 'o' && k[1] === 'n')) continue;
+			// An empty src/href would make the browser fetch/resolve the page itself
+			// (`<link href="">`, `<base href="">`) — strip like ssrAttr does; head
+			// tags are never <a>/<area>, so the href exemption doesn't apply here.
+			if (v === '' && (k === 'src' || k === 'href')) continue;
 			s += v === true ? ' ' + k : ' ' + k + '="' + escapeAttr(v) + '"';
 		}
 	}

@@ -26,6 +26,19 @@ export const BLOCK_CLOSE = `<!--${HYDRATION_END}-->`;
 export const EMPTY_COMMENT = '<!---->';
 
 /**
+ * Payload of the text-hole separator comment `<!-- -->` the server emits
+ * between two adjacent text nodes when at least one side is a DYNAMIC text
+ * hole (React's convention). Without it the browser's HTML parser would merge
+ * the two texts into ONE node and the client's hydration walk would come up a
+ * node short (losing the second hole's content). The compiler's server emit
+ * (`ssrEmitNodes` in `octane/compiler`) writes it; the client's hole-aware
+ * `sibling()` walk (runtime.ts) treats it as a protocol node — stepping across
+ * it between two text holes, or adopting it as the insert-before stand-in
+ * position when a hole's server text was empty.
+ */
+export const HYDRATION_TEXT_SEP = ' ';
+
+/**
  * Marker attribute on the inline `<script type="application/json">` that the
  * server emits to carry the JSON-serialized `use(thenable)` values it resolved
  * during render (SSR Suspense). The client `hydrateRoot()` finds this
@@ -62,6 +75,61 @@ export const STREAM_SEGMENT_ATTR = 'data-oct-s';
 export const STREAM_SEED_ATTR = 'data-oct-seed';
 /** Comment-data prefix left in a swapped boundary for hydration seed scoping. */
 export const STREAM_SEED_COMMENT = 'oct-seed:';
+
+// ---------------------------------------------------------------------------
+// Attribute value-type tables — React parity where the FUNCTIONAL outcome
+// would flip. Shared by the client (`setAttribute`, runtime.ts) and SSR
+// (`ssrAttr`, runtime.server.ts) so both sides serialize/write the same
+// presence/absence for the same value — otherwise hydration would resurrect
+// an attribute SSR omitted (or vice versa) and warn on the divergence.
+// Custom elements are exempt everywhere (raw attribute semantics).
+// ---------------------------------------------------------------------------
+
+// NOTE deliberately NO boolean-prop truthiness table (React coerces
+// `hidden={0}` / `inert=""` to absent): octane's ADJUDICATED divergence
+// (2026-07-04, see dom-attributes.test.ts) writes attribute values through
+// natively — a falsy non-boolean stays present exactly as hand-written markup
+// would be, and authors pass a real boolean for JS-boolean behavior.
+
+/**
+ * React's POSITIVE-numeric props: values below 1 (incl. 0 and non-numeric)
+ * drop — `size="0"` is invalid per the HTML spec (size must be > 0).
+ */
+export const POSITIVE_NUMERIC_ATTR_PROPS = new Set(['size', 'cols', 'rows', 'span']);
+
+/**
+ * String-typed props where a boolean value is meaningless and React drops it
+ * (`href={true}` must not become a present empty-URL link). `download` is NOT
+ * here — it's React's overloaded boolean (true → bare attribute).
+ */
+export const BOOLEAN_DROPPED_STRING_ATTR_PROPS = new Set([
+	'href',
+	'src',
+	'for',
+	'action',
+	'formaction',
+]);
+
+/**
+ * The three global ENUMERATED attributes whose boolean prop forms must
+ * stringify: `false` must WRITE "false" (an ABSENT attribute means "inherit /
+ * UA default", a different state), and `true` writes "true". Applies on every
+ * element (they're global attributes — custom elements included). Matched
+ * case-insensitively: JSX arrives camelCase (`spellCheck`), spreads/de-opt
+ * props may arrive lowercase.
+ */
+export function isEnumeratedBooleanAttr(name: string): boolean {
+	// Length-bucketed so non-matching names never pay the toLowerCase.
+	switch (name.length) {
+		case 10:
+			return name.toLowerCase() === 'spellcheck';
+		case 9:
+			return name.toLowerCase() === 'draggable';
+		case 15:
+			return name.toLowerCase() === 'contenteditable';
+	}
+	return false;
+}
 
 // ---------------------------------------------------------------------------
 // Style value coercion — React parity for numeric style-object values.

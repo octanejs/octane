@@ -84,6 +84,7 @@ export {
 	escapeHtml,
 	escapeAttr,
 	ssrText,
+	ssrTextPre,
 	ssrChild,
 	ssrChildText,
 	ssrAttr,

@@ -18,6 +18,10 @@ import {
 	STREAM_SEED_COMMENT,
 	HYDRATION_START,
 	HYDRATION_END,
+	HYDRATION_TEXT_SEP,
+	POSITIVE_NUMERIC_ATTR_PROPS,
+	BOOLEAN_DROPPED_STRING_ATTR_PROPS,
+	isEnumeratedBooleanAttr,
 	UNDEFINED_SENTINEL_KEY,
 	cssStyleValue,
 } from './constants.js';
@@ -2941,12 +2945,35 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 			}
 			return node.cloneNode(true) as T;
 		}
+		// Multi-root template: the synthetic <octane-frag> wrapper has NO server
+		// counterpart — the roots render BARE at the cursor level. Adopting the
+		// cursor node itself would make the walk descend INTO the first root (and
+		// the mount's drain would rip that root's children out). Instead return a
+		// VIRTUAL wrapper whose `firstChild` is the cursor node, so both the raw
+		// path walk (`_root.firstChild…`) and the hole-aware walk (`child(_root)`)
+		// resolve to the server's first root — one level up, exactly where the
+		// template wrapper's children sit. drainFrag() recognizes the marker and
+		// skips the drain (the server content is already in place).
+		if ((node as any).__oct_frag) {
+			return { __oct_vfrag: true, firstChild: hydrateNode } as unknown as T;
+		}
 		// Adopt the server node at the cursor as this template's root. The cursor
 		// stays put so a hole-template's subsequent child()/sibling() walk descends
 		// into it; for a hole-free leaf the raw path-walk takes over from here.
 		return hydrateNode as unknown as T;
 	}
 	return node.cloneNode(true) as T;
+}
+
+/**
+ * Compiler-emitted for a multi-root template's mount: drain the cloned
+ * <octane-frag> wrapper's children into the live parent. While hydrating, the
+ * "wrapper" is clone()'s virtual stand-in for server content that is ALREADY
+ * in place — nothing to move.
+ */
+export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
+	if (hydrating && (root as any).__oct_vfrag === true) return;
+	while (root.firstChild) parent.insertBefore(root.firstChild, anchor);
 }
 
 /**
@@ -2958,6 +2985,19 @@ export function clone<T extends Node>(node: T, loc?: string): T {
  */
 function coerceText(value: unknown): string {
 	return value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+}
+
+/**
+ * The HTML parser normalizes `\r` / `\r\n` in source markup to `\n`, so an
+ * adopted server text node differing from the client value ONLY by that
+ * normalization is NOT a real hydration mismatch (React parity) — adopt the
+ * server node silently, no warn, no patch. Cheap gate: values without a CR
+ * can't be a normalization artifact.
+ */
+function isCRLFNormalizedMatch(server: string | null, client: string): boolean {
+	return (
+		server !== null && client.indexOf('\r') !== -1 && server === client.replace(/\r\n?/g, '\n')
+	);
 }
 
 /**
@@ -2976,9 +3016,10 @@ export function htext(el: Node, value: unknown): Text {
 		const first = el.firstChild;
 		if (first !== null && first.nodeType === 3) {
 			// Adopt the server text node. On a VALUE mismatch, patch to the client value
-			// (React-recoverable) unless the element opted out — then keep the server value.
+			// (React-recoverable) unless the element opted out — then keep the server
+			// value. Parser CR/CRLF→LF normalization is not a mismatch (React parity).
 			const server = (first as Text).nodeValue;
-			if (server !== text && !isHydrationSuppressed(el)) {
+			if (server !== text && !isCRLFNormalizedMatch(server, text) && !isHydrationSuppressed(el)) {
 				warnHydrationValueMismatch((el as any).__oct_loc, 'text', server, text);
 				(first as Text).nodeValue = text;
 			}
@@ -3010,9 +3051,10 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 	if (hydrating) {
 		if (posNode !== null && posNode.nodeType === 3) {
 			// Adopt the server text node. On a VALUE mismatch, patch to the client value
-			// unless the owning element opted out (then keep the server value, React-style).
+			// unless the owning element opted out (then keep the server value, React-
+			// style). Parser CR/CRLF→LF normalization is not a mismatch (React parity).
 			const server = (posNode as Text).nodeValue;
-			if (server !== text) {
+			if (server !== text && !isCRLFNormalizedMatch(server, text)) {
 				const host = posNode.parentNode;
 				if (!isHydrationSuppressed(host)) {
 					warnHydrationValueMismatch(host && (host as any).__oct_loc, 'text', server, text);
@@ -3056,6 +3098,15 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 /** True if `node` is a server block-open marker `<!--[-->`. */
 function isBlockOpen(node: Node | null): node is Comment {
 	return node !== null && node.nodeType === 8 && (node as Comment).data === HYDRATION_START;
+}
+
+/**
+ * True if `node` is a server text-hole separator `<!-- -->` — emitted between
+ * two adjacent text nodes when at least one is a dynamic text hole, so the
+ * parser can't merge them into one node (see HYDRATION_TEXT_SEP, constants.ts).
+ */
+function isTextSeparator(node: Node | null): node is Comment {
+	return node !== null && node.nodeType === 8 && (node as Comment).data === HYDRATION_TEXT_SEP;
 }
 
 /**
@@ -3117,7 +3168,27 @@ export function sibling(node: Node, n: number = 1): Node | null {
 	for (let i = 0; i < n; i++) {
 		// Over-walk (cursor already past the last node) → return null, don't throw.
 		if (c === null) return null;
-		if (hydrating && isBlockOpen(c)) c = matchingClose(c);
+		if (hydrating) {
+			if (isBlockOpen(c)) c = matchingClose(c);
+			if (isTextSeparator(c)) {
+				// Standing on an empty text hole's stand-in separator — the next
+				// logical item starts immediately after it.
+				c = c.nextSibling;
+				continue;
+			}
+			c = c.nextSibling;
+			if (isTextSeparator(c)) {
+				// Crossed the `<!-- -->` delimiter between two adjacent text holes.
+				// The next item is the following text node when the server rendered
+				// one; a following separator means the next hole is EMPTY and that
+				// separator is its stand-in. Anything else (element / end of scope):
+				// the crossed separator itself stands in for the empty hole —
+				// htextSwap inserts before it, which is order-correct.
+				const after: Node | null = c.nextSibling;
+				if (after !== null && (after.nodeType === 3 || isTextSeparator(after))) c = after;
+			}
+			continue;
+		}
 		c = c.nextSibling;
 	}
 	return c;
@@ -3777,8 +3848,16 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// Never a DOM attribute — a React warning-suppression hint (octane doesn't emit
 	// the warning, but the key must not land in the markup either).
 	if (name === 'suppressContentEditableWarning') return;
-	// React-parity alias, mirroring class/className: `htmlFor` writes the native `for`.
-	if (name === 'htmlFor') name = 'for';
+	// React-parity alias, mirroring class/className: `htmlFor` writes the native
+	// `for`. Custom elements keep it VERBATIM (raw props, no alias tables) —
+	// parity with the server's ssrAttr gate.
+	if (name === 'htmlFor' && el.localName.indexOf('-') === -1) name = 'for';
+	// Coerce ONCE to the final attribute string (null = absent). The hydration
+	// compare below and the write share the result, so the compare can never
+	// disagree with what actually lands in the DOM — and the value rules mirror
+	// the server's ssrAttr exactly (shared tables in constants.ts), so SSR
+	// presence/absence and the client write always agree.
+	const next = coerceAttrValue(el, name, value);
 	// Hydration VALUE-mismatch handling. The normal write below already PATCHES the adopted
 	// element to the client value (so prod recovers for free); here we only (dev) warn on a
 	// server/client divergence and (dev+prod) honor `suppressHydrationWarning` by keeping the
@@ -3788,57 +3867,23 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	if (hydrating) {
 		const mode = hydrationMismatchMode(el);
 		if (mode !== 0) {
-			const clientAttr =
-				name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')
-					? value == null
-						? null
-						: String(value)
-					: value == null || value === false
-						? null
-						: value === true
-							? ''
-							: String(value);
 			const nsd = attrNamespace(name);
 			const serverAttr = nsd
 				? el.getAttributeNS(nsd, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
 				: el.getAttribute(name);
-			if (serverAttr !== clientAttr) {
+			if (serverAttr !== next) {
 				if (mode === 1) return; // keep the server attribute (React semantics)
 				warnHydrationValueMismatch(
 					(el as any).__oct_loc,
 					`attribute \`${name}\``,
 					serverAttr,
-					clientAttr,
+					next,
 				);
 			}
 		}
 	}
-	// `aria-*` attributes are ENUMERATED (React parity): `false` renders as "false"
-	// (NOT removed) and `true` as "true" (NOT ""); only null/undefined removes them.
-	if (name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')) {
-		if (value == null) el.removeAttribute(name);
-		else el.setAttribute(name, String(value));
-		return;
-	}
-	// spellcheck / contenteditable / draggable are ENUMERATED too — `false` must
-	// WRITE "false" (an ABSENT attribute means "inherit / UA default", which is a
-	// different state), and `true` writes "true". Octane's generic boolean handling
-	// (false → remove) would silently flip e.g. contentEditable={false} back to
-	// inherited editability. Names are matched case-insensitively because JSX
-	// authors write the React camelCase forms.
-	if (typeof value === 'boolean' && isEnumeratedBooleanAttr(name)) {
-		el.setAttribute(name, value ? 'true' : 'false');
-		return;
-	}
-	// Function and symbol values are never meaningful attribute text (React removes
-	// them); stringifying a function would leak its source into the DOM.
-	const t = typeof value;
-	if (t === 'function' || t === 'symbol') {
-		el.removeAttribute(name);
-		return;
-	}
 	const ns = attrNamespace(name);
-	if (value == null || value === false) {
+	if (next === null) {
 		if (ns) {
 			const colon = name.indexOf(':');
 			el.removeAttributeNS(ns, colon >= 0 ? name.slice(colon + 1) : name);
@@ -3847,45 +3892,81 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		}
 		return;
 	}
-	const v = value === true ? '' : String(value);
-	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers will
-	// re-fetch the whole document as an image/script/stylesheet. React strips these
-	// (dev AND prod); so do we. `<a href="">` (and `<area>`) stays — an empty href
-	// is a legitimate "link to this page".
-	if (
-		v === '' &&
-		(name === 'src' || (name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA'))
-	) {
-		el.removeAttribute(name);
-		return;
-	}
 	// Guarded write: an injection-shaped/invalid attribute NAME (e.g. a hostile
 	// spread key like `'x onload=…'`) makes the platform throw InvalidCharacterError,
 	// which would crash the whole render. Report + skip instead — the SSR serializer
 	// rejects the same names via VALID_ATTR_NAME (runtime.server.ts). try/catch is
 	// free on the no-throw path, so the hot path pays nothing.
 	try {
-		if (ns) el.setAttributeNS(ns, name, v);
-		else el.setAttribute(name, v);
+		if (ns) el.setAttributeNS(ns, name, next);
+		else el.setAttribute(name, next);
 	} catch (err) {
 		console.error(err);
 	}
 }
 
-// The three global enumerated attributes whose boolean prop forms must stringify
-// (see setAttribute). Case-insensitive: JSX arrives camelCase (`spellCheck`),
-// spreads/de-opt props may arrive lowercase.
-function isEnumeratedBooleanAttr(name: string): boolean {
-	// Length-bucketed so non-matching names never pay the toLowerCase.
-	switch (name.length) {
-		case 10:
-			return name.toLowerCase() === 'spellcheck';
-		case 9:
-			return name.toLowerCase() === 'draggable';
-		case 15:
-			return name.toLowerCase() === 'contenteditable';
+/**
+ * The final attribute string for `(el, name, value)`, or `null` for "absent".
+ * One coercion feeds setAttribute's hydration compare AND its write, and the
+ * rules mirror the server's ssrAttr byte-for-byte (shared value-type tables in
+ * constants.ts) — without the mirror, SSR would omit an attribute (e.g.
+ * `hidden` for `hidden={0}`) that hydration then resurrects, flipping the
+ * platform state and warning on the divergence.
+ */
+function coerceAttrValue(el: Element, name: string, value: any): string | null {
+	// `aria-*` attributes are ENUMERATED (React parity): `false` renders as
+	// "false" (NOT removed) and `true` as "true" (NOT ""); only nullish removes.
+	if (name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')) {
+		return value == null ? null : String(value);
 	}
-	return false;
+	const t = typeof value;
+	// spellcheck / contenteditable / draggable are ENUMERATED too — `false` must
+	// WRITE "false" (an ABSENT attribute means "inherit / UA default", which is a
+	// different state), and `true` writes "true". The generic boolean handling
+	// (false → remove) would silently flip e.g. contentEditable={false} back to
+	// inherited editability. Matched case-insensitively (JSX arrives camelCase).
+	if (t === 'boolean' && isEnumeratedBooleanAttr(name)) return value ? 'true' : 'false';
+	// data-* attributes stringify booleans: `data-x={false}` must write "false" —
+	// a dataset consumer reads the string, so removing would lose the value.
+	if (t === 'boolean' && name.startsWith('data-')) return value ? 'true' : 'false';
+	// Function and symbol values are never meaningful attribute text (React
+	// removes them); stringifying a function would leak its source into the DOM.
+	if (t === 'function' || t === 'symbol') return null;
+	// React's value-type tables — custom elements are exempt (raw semantics).
+	if (el.localName.indexOf('-') === -1) {
+		const lower = name.toLowerCase();
+		// NOTE no boolean-prop truthiness table (React drops `hidden={0}`): the
+		// ADJUDICATED divergence (see constants.ts + the inert="" test in
+		// dom-attributes.test.ts) writes values through natively.
+		// String-typed props drop meaningless booleans (`href={true}` must not
+		// become a present empty-URL link).
+		if (t === 'boolean' && BOOLEAN_DROPPED_STRING_ATTR_PROPS.has(lower)) return null;
+		// Positive-numeric props: below 1 (or a boolean) drops — `size="0"` is
+		// invalid per the HTML spec.
+		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && (t === 'boolean' || !(Number(value) >= 1))) {
+			return null;
+		}
+		// Unknown lowercase on* names never write on standard elements (an
+		// event-ish name with a string payload is injection surface, not an
+		// attribute); camelCase onX events compile to delegated bindings and
+		// never reach setAttribute. Custom elements keep them (raw semantics).
+		if (name.length > 2 && name.charCodeAt(0) === 111 /* o */ && name.charCodeAt(1) === 110) {
+			return null;
+		}
+	}
+	if (value == null || value === false) return null;
+	const v = value === true ? '' : String(value);
+	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers will
+	// re-fetch the whole document as an image/script/stylesheet. React strips
+	// these (dev AND prod); so do we. `<a href="">` (and `<area>`) stays — an
+	// empty href is a legitimate "link to this page".
+	if (
+		v === '' &&
+		(name === 'src' || (name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA'))
+	) {
+		return null;
+	}
+	return v;
 }
 
 // clsx-style `class`/`className` composition — shared with the SSR serializer
@@ -6066,6 +6147,18 @@ function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 	(el as Element & DeoptStamped)[DEOPT_DESC] = d;
 }
 
+// Flatten a possibly-nested array child into one item per LEAF, KEEPING empties
+// (they occupy an index slot; see the childSlot array branch). Distinct from
+// flattenDeoptChildren below, which serves the raw host-children reconciler and
+// DROPS empties.
+function flattenChildItems(out: any[], v: any[]): void {
+	for (let i = 0; i < v.length; i++) {
+		const item = v[i];
+		if (Array.isArray(item)) flattenChildItems(out, item);
+		else out.push(item);
+	}
+}
+
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
 // `createElement` collapses positional children and `.map()` results into arrays)
 // into a flat list of renderable values, dropping empties (null/undefined/false/
@@ -6291,6 +6384,30 @@ function deoptItemBody(item: any, scope: Scope): void {
 				block.parentNode.removeChild(stale);
 			}
 			block.deoptNode = null;
+		}
+		// Hydration: the server serialized this component-bearing item as ONE
+		// `<!--[-->…<!--]-->` range (ssrChildItem emits no extra block for the
+		// item/childSlot layering, which is client-only structure), and mountItem
+		// already adopted that pair as the item block's markers. Seed the nested
+		// childSlot with the SAME markers so it BORROWS the item's range — without
+		// this it would grab the next `<!--[-->` at the cursor (the component's
+		// return content, one level too deep) as its own, desyncing everything
+		// inside. The cursor already sits on the item's first content node.
+		if (hydrating && scope.slots[0] === undefined && isBlockOpen(block.startMarker)) {
+			const seeded: ChildSlot = {
+				__kind: 'childSlot',
+				start: block.startMarker as Comment,
+				end: block.endMarker as Comment,
+				block: null,
+				text: null,
+				currentComp: null,
+				currentIsBodyFn: false,
+				forSlot: null,
+				hostNode: null,
+				portal: null,
+			};
+			scope.slots[0] = seeded;
+			registerSlot(scope, seeded);
 		}
 		childSlot(scope, 0, block.parentNode, item, block.endMarker);
 		return;
@@ -6590,15 +6707,26 @@ export function childSlot(
 				emptyBlock: null,
 			};
 		}
-		reconcileKeyed(
-			parentBlock,
-			state.forSlot,
-			value,
-			POSITIONAL_CHILDREN.has(value as object) ? deoptKeyPositional : deoptKey,
-			deoptItemBody as any,
-			false,
-			false,
-		);
+		// A NESTED array member is a fragment (React parity): its leaves render as
+		// SIBLING items of this list, one item per leaf. Flatten before keying —
+		// without this a nested-array item reaches deoptItemBody as an array, which
+		// the pure host reconciler renders as NOTHING (content silently dropped).
+		// Empties (null/false) are KEPT as items: they occupy an index slot (React's
+		// array-diff semantics) and mirror the server's one-`<!--[-->…<!--]-->`-per-
+		// leaf emission (ssrChildItem serializes an empty leaf as an EMPTY block),
+		// so hydration adopts item ranges 1:1. The positional-key choice is made on
+		// the ORIGINAL array — the flattened copy is a fresh, untagged allocation.
+		const keyFn = POSITIONAL_CHILDREN.has(value as object) ? deoptKeyPositional : deoptKey;
+		let items: any[] = value;
+		for (let i = 0; i < items.length; i++) {
+			if (Array.isArray(items[i])) {
+				const flat: any[] = [];
+				flattenChildItems(flat, value);
+				items = flat;
+				break;
+			}
+		}
+		reconcileKeyed(parentBlock, state.forSlot, items, keyFn, deoptItemBody as any, false, false);
 		return;
 	}
 	// Value is NOT an array — if we were in array mode, tear the list down first.
@@ -6898,8 +7026,13 @@ export function childTextHole(
 			// warn with the text hole's own source location (a tracked construct slot).
 			const f = domParent.firstChild;
 			if (f !== null && f.nodeType === 3) {
+				// Parser CR/CRLF→LF normalization is not a mismatch (React parity).
 				const server = (f as Text).nodeValue;
-				if (server !== str && !isHydrationSuppressed(domParent)) {
+				if (
+					server !== str &&
+					!isCRLFNormalizedMatch(server, str) &&
+					!isHydrationSuppressed(domParent)
+				) {
 					// LOC: this hole's tracked construct slot (the precise `{expr}` position);
 					// fall back to the host element's stamp only as defense-in-depth.
 					const loc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
