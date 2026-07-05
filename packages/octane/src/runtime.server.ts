@@ -33,6 +33,8 @@ import {
 	STREAM_SEGMENT_ATTR,
 	STREAM_SEED_ATTR,
 	STREAM_SEED_COMMENT,
+	POSITIVE_NUMERIC_ATTR_PROPS,
+	BOOLEAN_DROPPED_STRING_ATTR_PROPS,
 	cssStyleValue,
 } from './constants.js';
 
@@ -491,50 +493,6 @@ export function ssrPortal(): string {
 	return EMPTY_COMMENT;
 }
 
-// React's BOOLEAN-prop family (lowercased): the value's TRUTHINESS decides
-// presence — a falsy non-boolean (`hidden={0}`, `inert=""`) must DROP the
-// attribute (serializing it would flip the platform state: a boolean attribute
-// is active by presence). Truthy non-boolean values serialize as written
-// (documented octane divergence from React's `""`-normalization — the platform
-// outcome is identical).
-const BOOLEAN_PROPS = new Set([
-	'allowfullscreen',
-	'async',
-	'autofocus',
-	'autoplay',
-	'checked',
-	'controls',
-	'default',
-	'defer',
-	'disabled',
-	'disablepictureinpicture',
-	'disableremoteplayback',
-	'formnovalidate',
-	'hidden',
-	'inert',
-	'itemscope',
-	'loop',
-	'multiple',
-	'muted',
-	'nomodule',
-	'novalidate',
-	'open',
-	'playsinline',
-	'readonly',
-	'required',
-	'reversed',
-	'selected',
-]);
-
-// React's POSITIVE-numeric props: values below 1 (incl. 0 and non-numeric)
-// drop — `size="0"` is invalid per the HTML spec (size must be > 0).
-const POSITIVE_NUMERIC_PROPS = new Set(['size', 'cols', 'rows', 'span']);
-
-// String-typed props where a boolean value is meaningless and React drops it
-// (`href={true}` must not become a present empty-URL link). `download` is NOT
-// here — it's React's overloaded boolean (true → bare attribute).
-const BOOLEAN_DROPPED_STRING_PROPS = new Set(['href', 'src', 'for', 'action', 'formaction']);
-
 /**
  * A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit.
  * `tag` (the owning element's tag name, when the emit site knows it) gates the
@@ -576,18 +534,15 @@ export function ssrAttr(name: string, v: unknown, tag?: string): string {
 			return '';
 		}
 		const lower = name.toLowerCase();
-		if (BOOLEAN_PROPS.has(lower)) {
-			if (!v) return ''; // falsy (false/null/0/''/NaN) → absent (React parity)
-			if (v === true) return ' ' + name;
-			return ' ' + name + '="' + escapeAttr(v) + '"';
-		}
+		// NOTE no boolean-prop truthiness table (React drops `hidden={0}`): the
+		// ADJUDICATED divergence (see constants.ts) writes values through natively.
 		// data-* attributes stringify booleans (`data-x={false}` → "false") — a
 		// dataset consumer reads the string, so dropping/bare-ing loses the value.
 		if (t === 'boolean' && lower.startsWith('data-')) {
 			return ' ' + name + '="' + v + '"';
 		}
-		if (t === 'boolean' && BOOLEAN_DROPPED_STRING_PROPS.has(lower)) return '';
-		if (POSITIVE_NUMERIC_PROPS.has(lower) && (t === 'boolean' || !(Number(v) >= 1))) return '';
+		if (t === 'boolean' && BOOLEAN_DROPPED_STRING_ATTR_PROPS.has(lower)) return '';
+		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && (t === 'boolean' || !(Number(v) >= 1))) return '';
 		// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers would
 		// re-fetch the whole document as an image/script/stylesheet. React strips
 		// these; so does the client's setAttribute. `<a href="">`/`<area href="">`

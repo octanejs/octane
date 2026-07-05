@@ -25,11 +25,13 @@ import * as ServerRT from 'octane/server';
 //   * class/className compose clsx-style at every apply site (documented project
 //     divergence): `className={true}` yields `class=""` where React drops it.
 //   * ssrAttr mirrors React's value-type filters where the FUNCTIONAL outcome
-//     would flip (boolean-prop falsy drop, positive-numeric drop, empty-URL
-//     strip, function/symbol drop, data-* boolean stringify). Where only the
-//     serialized VALUE differs but the platform semantics are identical
-//     (e.g. `hidden="foo"` vs React's `hidden=""` — both just "present"),
-//     octane serializes as written and the test asserts presence.
+//     would flip (positive-numeric drop, empty-URL strip, function/symbol
+//     drop, boolean-on-string-prop drop, data-* boolean stringify) — and the
+//     client setAttribute applies the SAME rules (shared tables in
+//     constants.ts) so hydration agrees with the serialized markup. There is
+//     deliberately NO boolean-prop truthiness table (adjudicated 2026-07-04):
+//     `hidden={0}` / `inert=""` serialize as written — presence means
+//     platform-true, exactly like hand-authored markup.
 //
 // Out of scope per docs/react-parity-migration-plan.md §2 (documented, not ported):
 //   * class components / factory components (Elements :631, :640, :924, :938, :964)
@@ -750,19 +752,22 @@ describe('conformance: SSR serialization — boolean properties (Attributes)', (
 		}
 	});
 
-	// Falsy non-boolean values on boolean props (hidden={0}, hidden="") drop —
-	// serializing them would flip the platform state (present = active).
-	it('drops boolean prop with zero/empty-string value (Per :139/:169)', () => {
+	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04, see the inert="" test in
+	// dom-attributes.test.ts): React drops FALSY non-boolean values on boolean
+	// props (hidden={0}, hidden=""); octane writes attribute values through
+	// natively — the value serializes and PRESENCE means platform-true, exactly
+	// as hand-written markup. Pass a real boolean for JS-boolean behavior.
+	it('serializes falsy non-boolean values on boolean props natively (React drops — Per :139/:169)', () => {
 		expect(
 			parse(ssr('Hidden', { v: 0 }))
 				.querySelector('div')!
-				.hasAttribute('hidden'),
-		).toBe(false);
+				.getAttribute('hidden'),
+		).toBe('0');
 		expect(
 			parse(ssr('Hidden', { v: '' }))
 				.querySelector('div')!
-				.hasAttribute('hidden'),
-		).toBe(false);
+				.getAttribute('hidden'),
+		).toBe('');
 	});
 
 	// Function/symbol family (see string properties above).
@@ -1118,14 +1123,16 @@ describe('conformance: SSR serialization — custom elements (Attributes)', () =
 		).toBe(false);
 	});
 
-	// inert="" is falsy on a boolean prop — drops (React 19; same family as
-	// hidden="" above).
-	it('drops inert="" (Per :757)', () => {
+	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04, mirroring the client half
+	// in dom-attributes.test.ts): React 19 treats inert="" as false and drops
+	// it; octane serializes the empty string as written — present ⇒
+	// platform-true, per the HTML boolean-attribute rules.
+	it('keeps inert="" present (React drops — Per :757)', () => {
 		expect(
 			parse(ssr('InertDiv', { v: '' }))
 				.querySelector('div')!
-				.hasAttribute('inert'),
-		).toBe(false);
+				.getAttribute('inert'),
+		).toBe('');
 	});
 
 	it('serializes attributes on is="custom-element" hosts (Per :701/:782)', () => {

@@ -19,6 +19,8 @@ import {
 	HYDRATION_START,
 	HYDRATION_END,
 	HYDRATION_TEXT_SEP,
+	POSITIVE_NUMERIC_ATTR_PROPS,
+	BOOLEAN_DROPPED_STRING_ATTR_PROPS,
 	UNDEFINED_SENTINEL_KEY,
 	cssStyleValue,
 } from './constants.js';
@@ -3845,8 +3847,16 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// Never a DOM attribute — a React warning-suppression hint (octane doesn't emit
 	// the warning, but the key must not land in the markup either).
 	if (name === 'suppressContentEditableWarning') return;
-	// React-parity alias, mirroring class/className: `htmlFor` writes the native `for`.
-	if (name === 'htmlFor') name = 'for';
+	// React-parity alias, mirroring class/className: `htmlFor` writes the native
+	// `for`. Custom elements keep it VERBATIM (raw props, no alias tables) —
+	// parity with the server's ssrAttr gate.
+	if (name === 'htmlFor' && el.localName.indexOf('-') === -1) name = 'for';
+	// Coerce ONCE to the final attribute string (null = absent). The hydration
+	// compare below and the write share the result, so the compare can never
+	// disagree with what actually lands in the DOM — and the value rules mirror
+	// the server's ssrAttr exactly (shared tables in constants.ts), so SSR
+	// presence/absence and the client write always agree.
+	const next = coerceAttrValue(el, name, value);
 	// Hydration VALUE-mismatch handling. The normal write below already PATCHES the adopted
 	// element to the client value (so prod recovers for free); here we only (dev) warn on a
 	// server/client divergence and (dev+prod) honor `suppressHydrationWarning` by keeping the
@@ -3856,66 +3866,23 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	if (hydrating) {
 		const mode = hydrationMismatchMode(el);
 		if (mode !== 0) {
-			const clientAttr =
-				name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')
-					? value == null
-						? null
-						: String(value)
-					: typeof value === 'boolean' && name.startsWith('data-')
-						? String(value)
-						: value == null || value === false
-							? null
-							: value === true
-								? ''
-								: String(value);
 			const nsd = attrNamespace(name);
 			const serverAttr = nsd
 				? el.getAttributeNS(nsd, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
 				: el.getAttribute(name);
-			if (serverAttr !== clientAttr) {
+			if (serverAttr !== next) {
 				if (mode === 1) return; // keep the server attribute (React semantics)
 				warnHydrationValueMismatch(
 					(el as any).__oct_loc,
 					`attribute \`${name}\``,
 					serverAttr,
-					clientAttr,
+					next,
 				);
 			}
 		}
 	}
-	// `aria-*` attributes are ENUMERATED (React parity): `false` renders as "false"
-	// (NOT removed) and `true` as "true" (NOT ""); only null/undefined removes them.
-	if (name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')) {
-		if (value == null) el.removeAttribute(name);
-		else el.setAttribute(name, String(value));
-		return;
-	}
-	// spellcheck / contenteditable / draggable are ENUMERATED too — `false` must
-	// WRITE "false" (an ABSENT attribute means "inherit / UA default", which is a
-	// different state), and `true` writes "true". Octane's generic boolean handling
-	// (false → remove) would silently flip e.g. contentEditable={false} back to
-	// inherited editability. Names are matched case-insensitively because JSX
-	// authors write the React camelCase forms.
-	if (typeof value === 'boolean' && isEnumeratedBooleanAttr(name)) {
-		el.setAttribute(name, value ? 'true' : 'false');
-		return;
-	}
-	// data-* attributes stringify booleans (React parity, mirrored by the server's
-	// ssrAttr): `data-x={false}` must write "false" — a dataset consumer reads the
-	// string, so removing the attribute would lose the value.
-	if (typeof value === 'boolean' && name.startsWith('data-')) {
-		el.setAttribute(name, value ? 'true' : 'false');
-		return;
-	}
-	// Function and symbol values are never meaningful attribute text (React removes
-	// them); stringifying a function would leak its source into the DOM.
-	const t = typeof value;
-	if (t === 'function' || t === 'symbol') {
-		el.removeAttribute(name);
-		return;
-	}
 	const ns = attrNamespace(name);
-	if (value == null || value === false) {
+	if (next === null) {
 		if (ns) {
 			const colon = name.indexOf(':');
 			el.removeAttributeNS(ns, colon >= 0 ? name.slice(colon + 1) : name);
@@ -3924,29 +3891,81 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		}
 		return;
 	}
-	const v = value === true ? '' : String(value);
-	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers will
-	// re-fetch the whole document as an image/script/stylesheet. React strips these
-	// (dev AND prod); so do we. `<a href="">` (and `<area>`) stays — an empty href
-	// is a legitimate "link to this page".
-	if (
-		v === '' &&
-		(name === 'src' || (name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA'))
-	) {
-		el.removeAttribute(name);
-		return;
-	}
 	// Guarded write: an injection-shaped/invalid attribute NAME (e.g. a hostile
 	// spread key like `'x onload=…'`) makes the platform throw InvalidCharacterError,
 	// which would crash the whole render. Report + skip instead — the SSR serializer
 	// rejects the same names via VALID_ATTR_NAME (runtime.server.ts). try/catch is
 	// free on the no-throw path, so the hot path pays nothing.
 	try {
-		if (ns) el.setAttributeNS(ns, name, v);
-		else el.setAttribute(name, v);
+		if (ns) el.setAttributeNS(ns, name, next);
+		else el.setAttribute(name, next);
 	} catch (err) {
 		console.error(err);
 	}
+}
+
+/**
+ * The final attribute string for `(el, name, value)`, or `null` for "absent".
+ * One coercion feeds setAttribute's hydration compare AND its write, and the
+ * rules mirror the server's ssrAttr byte-for-byte (shared value-type tables in
+ * constants.ts) — without the mirror, SSR would omit an attribute (e.g.
+ * `hidden` for `hidden={0}`) that hydration then resurrects, flipping the
+ * platform state and warning on the divergence.
+ */
+function coerceAttrValue(el: Element, name: string, value: any): string | null {
+	// `aria-*` attributes are ENUMERATED (React parity): `false` renders as
+	// "false" (NOT removed) and `true` as "true" (NOT ""); only nullish removes.
+	if (name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')) {
+		return value == null ? null : String(value);
+	}
+	const t = typeof value;
+	// spellcheck / contenteditable / draggable are ENUMERATED too — `false` must
+	// WRITE "false" (an ABSENT attribute means "inherit / UA default", which is a
+	// different state), and `true` writes "true". The generic boolean handling
+	// (false → remove) would silently flip e.g. contentEditable={false} back to
+	// inherited editability. Matched case-insensitively (JSX arrives camelCase).
+	if (t === 'boolean' && isEnumeratedBooleanAttr(name)) return value ? 'true' : 'false';
+	// data-* attributes stringify booleans: `data-x={false}` must write "false" —
+	// a dataset consumer reads the string, so removing would lose the value.
+	if (t === 'boolean' && name.startsWith('data-')) return value ? 'true' : 'false';
+	// Function and symbol values are never meaningful attribute text (React
+	// removes them); stringifying a function would leak its source into the DOM.
+	if (t === 'function' || t === 'symbol') return null;
+	// React's value-type tables — custom elements are exempt (raw semantics).
+	if (el.localName.indexOf('-') === -1) {
+		const lower = name.toLowerCase();
+		// NOTE no boolean-prop truthiness table (React drops `hidden={0}`): the
+		// ADJUDICATED divergence (see constants.ts + the inert="" test in
+		// dom-attributes.test.ts) writes values through natively.
+		// String-typed props drop meaningless booleans (`href={true}` must not
+		// become a present empty-URL link).
+		if (t === 'boolean' && BOOLEAN_DROPPED_STRING_ATTR_PROPS.has(lower)) return null;
+		// Positive-numeric props: below 1 (or a boolean) drops — `size="0"` is
+		// invalid per the HTML spec.
+		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && (t === 'boolean' || !(Number(value) >= 1))) {
+			return null;
+		}
+		// Unknown lowercase on* names never write on standard elements (an
+		// event-ish name with a string payload is injection surface, not an
+		// attribute); camelCase onX events compile to delegated bindings and
+		// never reach setAttribute. Custom elements keep them (raw semantics).
+		if (name.length > 2 && name.charCodeAt(0) === 111 /* o */ && name.charCodeAt(1) === 110) {
+			return null;
+		}
+	}
+	if (value == null || value === false) return null;
+	const v = value === true ? '' : String(value);
+	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers will
+	// re-fetch the whole document as an image/script/stylesheet. React strips
+	// these (dev AND prod); so do we. `<a href="">` (and `<area>`) stays — an
+	// empty href is a legitimate "link to this page".
+	if (
+		v === '' &&
+		(name === 'src' || (name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA'))
+	) {
+		return null;
+	}
+	return v;
 }
 
 // The three global enumerated attributes whose boolean prop forms must stringify

@@ -77,6 +77,40 @@ export const STREAM_SEED_ATTR = 'data-oct-seed';
 export const STREAM_SEED_COMMENT = 'oct-seed:';
 
 // ---------------------------------------------------------------------------
+// Attribute value-type tables — React parity where the FUNCTIONAL outcome
+// would flip. Shared by the client (`setAttribute`, runtime.ts) and SSR
+// (`ssrAttr`, runtime.server.ts) so both sides serialize/write the same
+// presence/absence for the same value — otherwise hydration would resurrect
+// an attribute SSR omitted (or vice versa) and warn on the divergence.
+// Custom elements are exempt everywhere (raw attribute semantics).
+// ---------------------------------------------------------------------------
+
+// NOTE deliberately NO boolean-prop truthiness table (React coerces
+// `hidden={0}` / `inert=""` to absent): octane's ADJUDICATED divergence
+// (2026-07-04, see dom-attributes.test.ts) writes attribute values through
+// natively — a falsy non-boolean stays present exactly as hand-written markup
+// would be, and authors pass a real boolean for JS-boolean behavior.
+
+/**
+ * React's POSITIVE-numeric props: values below 1 (incl. 0 and non-numeric)
+ * drop — `size="0"` is invalid per the HTML spec (size must be > 0).
+ */
+export const POSITIVE_NUMERIC_ATTR_PROPS = new Set(['size', 'cols', 'rows', 'span']);
+
+/**
+ * String-typed props where a boolean value is meaningless and React drops it
+ * (`href={true}` must not become a present empty-URL link). `download` is NOT
+ * here — it's React's overloaded boolean (true → bare attribute).
+ */
+export const BOOLEAN_DROPPED_STRING_ATTR_PROPS = new Set([
+	'href',
+	'src',
+	'for',
+	'action',
+	'formaction',
+]);
+
+// ---------------------------------------------------------------------------
 // Style value coercion — React parity for numeric style-object values.
 //
 // React appends `px` to a bare NUMBER given to most CSS properties (`{width: 10}`
