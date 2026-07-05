@@ -82,6 +82,7 @@ export {
 	setFormAction,
 	attachRef,
 	queueRefAttach,
+	queueRefDetach,
 	injectStyle,
 	headBlock,
 	delegateEvents,

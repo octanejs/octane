@@ -835,8 +835,10 @@ const LAYOUT_CASCADE_LIMIT = 50;
  * ref.current is set before layout effects run. Each entry records its owning
  * `block` plus an enqueue-order `seq`; drainRefAttaches sorts with
  * comparePostOrder (post-order via the parentBlock chain, seq as tiebreak) for
- * child-before-parent ordering, matching effect ordering. Ref UPDATES stay
- * inline (the element is already connected by then).
+ * child-before-parent ordering, matching effect ordering. Ref identity UPDATES
+ * queue here too (paired with a queueRefDetach of the old ref), so within one
+ * commit every detach drains before every attach — a ref hopping between
+ * elements never ends null, whichever binding updates first.
  */
 export function queueRefAttach(scope: Scope, fn: () => void): void {
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push({
@@ -844,6 +846,40 @@ export function queueRefAttach(scope: Scope, fn: () => void): void {
 		seq: commitSeq++,
 		block: scope.block,
 	});
+}
+
+/**
+ * Deferred de-opt host ref DETACHES, queued by detachDeoptTreeRefs during teardown
+ * (item removal, list clear, wholesale unmount, mode-switch rebuild) and drained at
+ * commit BEFORE the mount attaches — React's mutation-before-layout phasing. Flat
+ * [ref, el, ref, el, …] pairs: `el` is the node the ref was attached to, so a
+ * callback ref shared across elements releases the RIGHT per-element cleanup.
+ * Deliberately NOT the attach queue: attaches skip disposed subtrees
+ * (blockSubtreeDisposed), while a teardown detach must fire precisely BECAUSE its
+ * subtree is disposed.
+ */
+const refDetachQueue: any[] = [];
+
+/**
+ * Queue a teardown ref detach for commit (compiled `ref` binding / spread-ref /
+ * hostComponent / fragment-ref unmount cleanups, and the de-opt teardown walk).
+ * Unmount cleanups run mid-render (unmountScope), and a ref can be a setState
+ * function whose value feeds back into what an owner renders — firing `ref(null)`
+ * synchronously lets that null-update render before the replacement element's
+ * deferred attach, oscillating forever when the teardown was a rebuild. Deferring
+ * to commit puts the null and the new element in the SAME batch (React's
+ * mutation→layout phasing). `el` is the element the ref was attached to, so a
+ * callback ref shared across elements releases ITS element's React-19 cleanup.
+ */
+export function queueRefDetach(ref: any, el: Element | FragmentInstance | null): void {
+	if (ref == null) return;
+	refDetachQueue.push(ref, el);
+}
+
+function drainRefDetaches(): void {
+	if (refDetachQueue.length === 0) return;
+	const q = refDetachQueue.splice(0);
+	for (let i = 0; i < q.length; i += 2) attachRef(q[i], null, q[i + 1]);
 }
 
 /** Drain queued mount ref attaches in React's post-order (descendant-before-ancestor). */
@@ -875,6 +911,9 @@ function blockSubtreeDisposed(block: Block | null): boolean {
 
 function commitEffects(): void {
 	drainPhase(INSERTION);
+	// Teardown ref detaches fire before this commit's attaches (mutation → layout),
+	// so a ref moving between elements cycles null → new-node in one commit.
+	drainRefDetaches();
 	drainRefAttaches();
 	reapplyFragmentBindings();
 	drainPhase(LAYOUT);
@@ -1542,6 +1581,14 @@ export function componentSlotLite<P>(
 function unmountBlock(block: Block, detachDom: boolean = true): void {
 	if (block.disposed) return;
 	block.disposed = true;
+	// De-opt-managed host subtree (deoptItemBody item / hostElementBody element):
+	// detach its stamped refs so a `ref={obj}` / callback ref doesn't keep pointing
+	// at the removed node. Runs even when detachDom is false — those callers
+	// (batchClearItems, clearChildContent) remove the DOM themselves, but the
+	// teardown is just as permanent. Before unmountScope: a deleted host's ref
+	// detaches before its component descendants' cleanups (React's pre-order
+	// deletion walk).
+	if (block.deoptNode !== null) detachDeoptTreeRefs(block.deoptNode, null);
 	// Depth-first cleanup of all scopes reachable from this block.
 	unmountScope(block, detachDom);
 	if (!detachDom) return;
@@ -1639,6 +1686,11 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				// A `{createPortal(...)}` value hole — its content lives in a foreign
 				// target, so (like portalSlotSlot) it must always self-detach.
 				if (val.portal) teardownPortalState(val.portal);
+				// A pure-host de-opt node managed directly by the slot (no Block):
+				// this wholesale unmount is the only teardown it gets, so detach its
+				// stamped refs here (the Block/forSlot cases above handle theirs via
+				// unmountBlock's deoptNode hook).
+				if (val.hostNode != null) detachDeoptTreeRefs(val.hostNode, null);
 			} else {
 				// componentSlotSlot | portalSlotSlot | trySlotSlot
 				// Portal DOM lives in a FOREIGN target — the root-level batched clear
@@ -1977,10 +2029,6 @@ export function useImperativeHandle<T>(
 	const [resolvedDeps, resolvedSlot] = resolveHookArgs('useImperativeHandle', deps, slot);
 	deps = resolvedDeps;
 	slot = resolvedSlot;
-	const setRef = (value: T | null): void => {
-		if (typeof ref === 'function') (ref as any)(value);
-		else if (ref != null) (ref as { current: T | null }).current = value;
-	};
 	// Re-run when the deps OR the ref IDENTITY changes. React manages ref attachment
 	// independently of deps — a swapped ref must detach the old (cleanup → setRef(null) on
 	// the PREVIOUS ref) and populate the new one, even when deps are stable (e.g. `[]`).
@@ -1991,8 +2039,21 @@ export function useImperativeHandle<T>(
 	enqueueEffect(
 		slot,
 		() => {
-			setRef(factory());
-			return () => setRef(null);
+			// React-19 callback-ref cleanup (refs-test.js:528): a callback ref may
+			// RETURN a cleanup; detach then runs the cleanup INSTEAD of ref(null).
+			// Handled locally (not via attachRef) because the handle value can be a
+			// primitive, which attachRef's per-target WeakMap can't key.
+			let cleanup: unknown;
+			if (typeof ref === 'function') cleanup = (ref as any)(factory());
+			else if (ref != null) (ref as { current: T | null }).current = factory();
+			return () => {
+				if (typeof cleanup === 'function') {
+					cleanup();
+					return;
+				}
+				if (typeof ref === 'function') (ref as any)(null);
+				else if (ref != null) (ref as { current: T | null }).current = null;
+			};
 		},
 		effectDeps,
 		LAYOUT,
@@ -3464,7 +3525,11 @@ export function mountFragmentRef(
 	// so the detach cleanup always releases whatever ref is current on unmount.
 	queueRefAttach(scope, () => attachRef(fi._currentRef, fi));
 	scope.cleanups.push(() => {
-		attachRef(fi._currentRef, null, fi);
+		// Detach at commit, not inline (queueRefDetach) — unmount cleanups run
+		// mid-render, and a state-setter ref firing null synchronously can render
+		// before a replacement's attach. The instance is destroyed now; the queued
+		// attachRef only nulls/cleans the user's ref, which needs no live instance.
+		queueRefDetach(fi._currentRef, fi);
 		fi._destroy();
 	});
 	return fi;
@@ -3890,8 +3955,9 @@ function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope): void {
 	// `mountScope` is passed only on the mount call (not on updates). When present
 	// a spread-supplied ref attach is DEFERRED to commit so a callback ref sees a
-	// connected node — same React-19 timing as element/fragment refs. On update
-	// the element is already connected, so the ref attaches inline.
+	// connected node — same React-19 timing as element/fragment refs. Updates
+	// defer too when the caller passes its scope (compiled output does), keeping
+	// every attach ordered after every queued detach within the commit.
 	// Stamp `suppressHydrationWarning` BEFORE either loop (order-independent, like React
 	// reading it off props ahead of the diff) so the attribute/class/style writes below
 	// see the flag no matter where the key sits in the spread object. A JS flag only —
@@ -3917,7 +3983,9 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 				// because the detach passes THIS element, so a callback ref shared
 				// across elements releases its per-element cleanup.
 				const nextRef = value ? value.ref : undefined;
-				if (prev.ref != null && prev.ref !== nextRef) attachRef(prev.ref, null, el);
+				// Commit-phase (queueRefDetach) so a swap pairs with the value loop's
+				// queued re-attach: detaches drain before attaches.
+				if (prev.ref != null && prev.ref !== nextRef) queueRefDetach(prev.ref, el);
 				continue;
 			}
 			if (value && k in value) continue;
@@ -3932,9 +4000,12 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 		if (k === 'ref') {
 			if (v === pv) continue;
 			// Route through attachRef for full parity: callback cleanup-return,
-			// object `.current`, and array refs. The prior ref (if any) was already
-			// detached in the removal loop above (detach-before-attach). On mount,
-			// defer the attach to commit so a callback ref sees a connected node.
+			// object `.current`, and array refs. The prior ref (if any) was queued
+			// for detach in the removal loop above; queued detaches drain before
+			// queued attaches at commit, so a swap cycles old → null → new even
+			// across elements. Compiled callers pass their scope on BOTH mount and
+			// update so the attach lands at commit (connected node, ordered after
+			// all detaches); the scope-less inline fallback serves external callers.
 			if (mountScope) queueRefAttach(mountScope, () => attachRef(v, el));
 			else attachRef(v, el);
 			continue;
@@ -5473,6 +5544,7 @@ function disposeWip(wip: OffscreenWip): void {
 // preserving its marker pair, so a mode switch (or component-identity swap)
 // rebuilds in place.
 function clearChildContent(state: ChildSlot): void {
+	const hadBlock = state.block !== null;
 	if (state.block !== null) {
 		// Fire the subtree's cleanups but DON'T let unmountBlock strip the DOM —
 		// it would take our markers with it. We remove the content nodes by hand.
@@ -5482,12 +5554,16 @@ function clearChildContent(state: ChildSlot): void {
 	if (state.start !== null) {
 		// Component (or hydrated) range: sweep everything between the markers —
 		// covers a multi-node component body as well as any leftover text node.
+		// Block teardown above already detached every de-opt ref it owns
+		// (unmountBlock's deoptNode hook + the slot walk), so detach here only on
+		// the blockless path — the pure-host node (or hydrated leftovers), whose
+		// subtree may carry stamped refs.
 		const parent = state.start.parentNode;
 		if (parent !== null) {
 			let n: Node | null = state.start.nextSibling;
 			while (n !== null && n !== state.end) {
 				const next: Node | null = n.nextSibling;
-				detachDeoptRef(n);
+				if (!hadBlock) detachDeoptTreeRefs(n, null);
 				parent.removeChild(n);
 				n = next;
 			}
@@ -5614,9 +5690,11 @@ function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock
 	// removed/swapped `ref={obj}` keeps pointing at this element. The prev-loop below skips
 	// `ref`, so this is the sole detach point for the reconcile path (the detach passes the
 	// element so a callback ref shared across elements releases its per-element cleanup).
+	// Queued for commit — the re-attach is queued too (applyDeoptProp), and detaches drain
+	// first, so a ref hopping between elements never ends null (React mutation→layout order).
 	const prevRef = prevProps != null ? prevProps.ref : undefined;
 	const nextRef = nextProps != null ? nextProps.ref : undefined;
-	if (prevRef != null && prevRef !== nextRef) attachRef(prevRef, null, el);
+	if (prevRef != null && prevRef !== nextRef) queueRefDetach(prevRef, el);
 	if (prevProps != null) {
 		for (const name in prevProps) {
 			// `ref` was handled above; everything else routes through the shared removal
@@ -5696,9 +5774,7 @@ export function hostComponent(
 		state.childScope = childScope;
 		scope.children.push({ key: slot, scope: childScope });
 		block.parentNode.insertBefore(el, anchor ?? block.endMarker);
-		scope.cleanups.push(() => {
-			if (state!.ref != null) attachRef(state!.ref, null, state!.el);
-		});
+		scope.cleanups.push(() => queueRefDetach(state!.ref, state!.el));
 	}
 	const el = state.el;
 	applyHostProps(el, props, scope, state);
@@ -5732,7 +5808,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 			if (props != null && k in props) continue;
 			if (k === 'ref') {
 				if (prev.ref != null) {
-					attachRef(prev.ref, null, el);
+					queueRefDetach(prev.ref, el);
 					if (state.ref === prev.ref) state.ref = undefined;
 				}
 				continue;
@@ -5751,7 +5827,11 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 		}
 		if (name === 'ref') {
 			if (v !== state.ref) {
-				if (state.ref != null) attachRef(state.ref, null, el);
+				// Detach + attach both land at commit (detaches drain first), so a
+				// ref hopping between elements in one render cycles old → null → new
+				// regardless of which element's props apply first (React's
+				// mutation→layout phasing; see queueRefDetach).
+				if (state.ref != null) queueRefDetach(state.ref, el);
 				if (v != null) queueRefAttach(scope, () => attachRef(v, el));
 				state.ref = v;
 			}
@@ -5793,14 +5873,6 @@ function getDeoptDesc(n: Node): ElementDescriptor | undefined {
 }
 function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 	(el as Element & DeoptStamped)[DEOPT_DESC] = d;
-}
-
-// Detach a de-opt host node's object/callback ref when the node is being REMOVED — so a
-// `ref={obj}` (or callback ref) doesn't keep pointing at a node that's no longer in the DOM.
-// No-op for nodes without a de-opt descriptor or without a ref (adopted/text/plain nodes).
-function detachDeoptRef(node: Node): void {
-	const ref = getDeoptDesc(node)?.props?.ref;
-	if (ref != null) attachRef(ref, null, node as Element);
 }
 
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
@@ -5957,7 +6029,7 @@ function reconcileDeoptChildren(
 	for (let i = owned.length - 1; i >= 0; i--) {
 		const n = owned[i];
 		if (keep === null || !keep.has(n)) {
-			detachDeoptRef(n);
+			detachDeoptTreeRefs(n, null);
 			el.removeChild(n);
 		}
 	}
@@ -6024,7 +6096,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		const stale = block.deoptNode;
 		if (stale != null) {
 			if (stale.parentNode === block.parentNode) {
-				detachDeoptRef(stale);
+				detachDeoptTreeRefs(stale, null);
 				block.parentNode.removeChild(stale);
 			}
 			block.deoptNode = null;
@@ -6053,7 +6125,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		// Built a fresh node (first mount, or a tag/type change) — drop the old one
 		// and insert the new node into the item's range.
 		if (prev != null && prev !== node && prev.parentNode === block.parentNode) {
-			detachDeoptRef(prev);
+			detachDeoptTreeRefs(prev, null);
 			block.parentNode.removeChild(prev);
 		}
 		if (node !== null) block.parentNode.insertBefore(node, endM);
@@ -6372,7 +6444,7 @@ export function childSlot(
 			const node = reconcileDeoptNode(prev, value, parentBlock);
 			if (node !== prev) {
 				if (prev != null && prev !== node && prev.parentNode !== null) {
-					detachDeoptRef(prev);
+					detachDeoptTreeRefs(prev, null);
 					prev.parentNode.removeChild(prev);
 				}
 				if (node !== null) state.start.parentNode!.insertBefore(node, state.end);
@@ -8673,16 +8745,42 @@ function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 }
 
 // Walk a de-opt-built DOM subtree detaching every stamped descriptor ref
-// (object refs → null, callback refs' cleanup), collecting {ref, el} pairs for
-// the reveal re-attach. Nested de-opt elements are stamped too (every element
-// reconcileDeoptNode builds gets setDeoptDesc), so recurse through children.
-function detachDeoptTreeRefs(node: Node, out: { ref: any; el: any }[]): void {
+// (object refs → null, callback refs' cleanup). `out` collects {ref, el} pairs for
+// the suspense-hide reveal re-attach; teardown callers pass null (permanent detach,
+// nothing to re-attach). Nested de-opt elements are stamped too (every element
+// reconcileDeoptNode builds gets setDeoptDesc), so recurse through children —
+// EXCEPT foreign `<!--portal-->…<!--/portal-->` ranges: a portal targeting one of
+// these elements owns its content's refs (its slot detaches them on ITS teardown).
+function detachDeoptTreeRefs(node: Node, out: { ref: any; el: any }[] | null): void {
 	const ref = getDeoptDesc(node)?.props?.ref;
 	if (ref != null) {
-		out.push({ ref, el: node });
-		attachRef(ref, null, node as Element);
+		if (out !== null) {
+			// Suspense-hide: detach NOW (the caller re-attaches on reveal).
+			out.push({ ref, el: node });
+			attachRef(ref, null, node as Element);
+		} else {
+			// Teardown: DEFER the detach to commit (drainRefDetaches), before the
+			// mount attaches. Teardown runs mid-render (reconcile/unmount), and a
+			// ref can be a setState function whose value feeds back into what the
+			// owner renders (Radix Toast: `ref={setTarget}` gates a portal). Firing
+			// `ref(null)` synchronously lets that null-update RENDER before the
+			// rebuilt element's deferred attach fires — flipping the owner back,
+			// rebuilding again, forever. Deferring puts null + new-element in the
+			// SAME commit (React's mutation→layout phasing), so state settles on
+			// the new element before the next render pass.
+			refDetachQueue.push(ref, node);
+		}
 	}
-	for (let c = node.firstChild; c !== null; c = c.nextSibling) detachDeoptTreeRefs(c, out);
+	let c: Node | null = node.firstChild;
+	while (c !== null) {
+		const rangeEnd = (c as any).$$portalEnd as Node | undefined;
+		if (rangeEnd != null) {
+			c = nodeAfterPortalRange(c, rangeEnd);
+			continue;
+		}
+		detachDeoptTreeRefs(c, out);
+		c = c.nextSibling;
+	}
 }
 
 /**
@@ -9610,6 +9708,11 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 		if (b.cleanups.length > 0 || b.children.length > 0 || b._slots !== null) {
 			unmountBlock(b, false);
 		} else {
+			// Pure-host de-opt item (deoptItemBody with no component descendants):
+			// nothing to unmount scope-wise, but its subtree may carry stamped refs
+			// that must not keep pointing at the batch-removed DOM. Guarded so the
+			// common template-row clear stays a single null check.
+			if (b.deoptNode !== null) detachDeoptTreeRefs(b.deoptNode, null);
 			b.disposed = true;
 		}
 	}
@@ -9860,6 +9963,9 @@ function makeRoot(
 				// teardown because their DOM lives in a foreign target — see the
 				// portalSlotSlot branch in unmountScope.
 				unmountBlock(rootBlock, /*detachDom*/ false);
+				// Root unmount runs outside any flush, so no commit follows — drain the
+				// teardown ref detaches queued above directly.
+				drainRefDetaches();
 				container.textContent = '';
 				rootBlock = null;
 				currentBody = null;
