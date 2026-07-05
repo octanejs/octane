@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/lexical",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "description": "Lexical bindings for the octane renderer — reuses the framework-agnostic @lexical/* core and reimplements the @lexical/react layer on octane's hooks.",
