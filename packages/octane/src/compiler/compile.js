@@ -2100,13 +2100,13 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	// Each arm's content is wrapped in an INNER ssrBlock (see ssrEmitIf) so the
 	// client adopts it as the boundary's branch range during hydration without
 	// inserting comment markers (byte-for-byte). The OUTER ssrBlock is the slot.
-	let pendingCall = "''";
+	let pendFnName = 'null'; // no @pending → ssrTry renders an empty slot on suspend
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
 		const pendSub = ssrCompileSub(node.pending.body, ctx, '__spend', [], cssHash, parentNs);
 		inlinedSubs.push(pendSub.fn + ';');
-		pendingCall = `ssrBlock(${pendSub.fnName}(undefined, __s))`;
+		pendFnName = pendSub.fnName;
 	}
-	let catchExpr = 'throw __e'; // no @catch → rethrow non-suspense errors
+	let catchFnName = 'null'; // no @catch → ssrTry rethrows non-suspense errors
 	if (node.handler) {
 		const params = node.handler.param ? [node.handler.param] : [];
 		const catchSub = ssrCompileSub(
@@ -2118,15 +2118,29 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			parentNs,
 		);
 		inlinedSubs.push(catchSub.fn + ';');
-		catchExpr = node.handler.param
-			? `return ssrBlock(${catchSub.fnName}(__e, __s))`
-			: `return ssrBlock(${catchSub.fnName}(undefined, __s))`;
+		// A no-param @catch simply ignores the error argument ssrTry passes.
+		catchFnName = catchSub.fnName;
 	}
-	ctx.runtimeNeeded.add('ssrBlock');
-	ctx.runtimeNeeded.add('ssrIsSuspense');
-	// SSR @try: render the try body; a `use(thenable)` suspension renders the
-	// @pending fallback; any other thrown error renders @catch (or rethrows).
-	return `ssrBlock((() => { try { return ssrBlock(${trySub.fnName}(undefined, __s)); } catch (__e) { if (ssrIsSuspense(__e)) return ${pendingCall}; ${catchExpr}; } })())`;
+	ctx.runtimeNeeded.add('ssrTry');
+	// SSR @try routes through the runtime ssrTry helper: a `use(thenable)`
+	// suspension renders the @pending fallback (plus, in STREAMING renders, the
+	// boundary registration + `<template data-oct-b>` sentinel); any other thrown
+	// error renders @catch (or rethrows). Output is byte-identical to the old
+	// inline try/catch emit for buffered renders (hydration compatibility).
+	// `siteKey` is a stable source-position hash so a boundary keeps its identity
+	// across streaming passes (the runtime adds the frame path per instance).
+	return `ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName})`;
+}
+
+// Deterministic per-boundary site key for ssrTry — same scheme as headKey:
+// keyed ONLY on the node's source position (same AST → same offset across the
+// client and server compiles of one source), hashed compactly.
+function ssrTryKey(node) {
+	const pos = node && node.start != null ? node.start : 0;
+	const src = `try:${pos}`;
+	let h = 5381;
+	for (let i = 0; i < src.length; i++) h = (Math.imul(h, 33) + src.charCodeAt(i)) | 0;
+	return 't' + (h >>> 0).toString(36);
 }
 
 // `{createPortal(...)}` (and other JSX-bearing expression holes) at child
