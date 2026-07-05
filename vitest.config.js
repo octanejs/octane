@@ -345,6 +345,40 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'testing-library',
+					include: ['packages/testing-library/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				// The binding's `.ts` sources call hooks with EXPLICIT slot symbols
+				// (renderHook's harness component), so they must be EXCLUDED from the
+				// auto-slotting pass; the test files themselves stay included so hook
+				// callbacks written inline in tests get their call-site slots.
+				plugins: [
+					octane({
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/query/src/',
+							'/packages/motion/src/',
+							'/packages/testing-library/src/',
+						],
+					}),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'octane-mcp-server',
 					include: ['packages/octane-mcp-server/src/**/*.test.js'],
 					environment: 'node',
