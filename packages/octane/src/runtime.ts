@@ -3854,6 +3854,32 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// Never a DOM attribute — a React warning-suppression hint (octane doesn't emit
 	// the warning, but the key must not land in the markup either).
 	if (name === 'suppressContentEditableWarning') return;
+	// React 19 custom-element semantics: a FUNCTION-valued `on*` prop on a custom
+	// element attaches a real listener for the name after "on", verbatim
+	// (`oncustomevent={fn}` → addEventListener('customevent', fn)). This is not
+	// synthetic emulation — custom elements dispatch arbitrary events and this is
+	// the only declarative way to hear them. Non-function values fall through to
+	// plain attribute semantics; identity swaps re-attach; null detaches.
+	if (
+		name.length > 2 &&
+		name.charCodeAt(0) === 111 /* o */ &&
+		name.charCodeAt(1) === 110 /* n */ &&
+		el.localName.indexOf('-') !== -1 &&
+		(typeof value === 'function' || (el as any).$$ceListeners?.[name] !== undefined)
+	) {
+		const type = name.slice(2);
+		const map: Record<string, EventListener> = ((el as any).$$ceListeners ??= {});
+		const prev = map[name];
+		if (prev !== undefined && prev !== value) el.removeEventListener(type, prev);
+		if (typeof value === 'function') {
+			if (prev !== value) el.addEventListener(type, value as EventListener);
+			map[name] = value as EventListener;
+			el.removeAttribute(name); // a listener prop never lands in the markup
+			return;
+		}
+		delete map[name];
+		// fall through: non-function value now takes plain attribute semantics
+	}
 	// React-parity alias, mirroring class/className: `htmlFor` writes the native
 	// `for`. Custom elements keep it VERBATIM (raw props, no alias tables) —
 	// parity with the server's ssrAttr gate.

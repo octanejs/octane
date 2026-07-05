@@ -2,6 +2,7 @@ import { Separator } from '@octanejs/base-ui/separator';
 import { useRender } from '@octanejs/base-ui/use-render';
 import { Fieldset } from '@octanejs/base-ui/fieldset';
 import { Meter } from '@octanejs/base-ui/meter';
+import { NumberField } from '@octanejs/base-ui/number-field';
 import { Progress } from '@octanejs/base-ui/progress';
 import { Toggle } from '@octanejs/base-ui/toggle';
 import { ToggleGroup } from '@octanejs/base-ui/toggle-group';
@@ -14,6 +15,7 @@ import { RadioGroup } from '@octanejs/base-ui/radio-group';
 import { Field } from '@octanejs/base-ui/field';
 import { Form } from '@octanejs/base-ui/form';
 import { Input } from '@octanejs/base-ui/input';
+import { Slider } from '@octanejs/base-ui/slider';
 
 // Self-contained differential fixtures: the SAME source runs on octane (via
 // @octanejs/base-ui/<sub>) AND on React (the setup rewrites imports to the real
@@ -122,6 +124,62 @@ export function MeterRange() @{
 		</Meter.Track>
 		<Meter.Value className="meter-val" />
 	</Meter.Root>
+}
+
+// NumberField — Root (+ hidden number input) / Group / Decrement / Input / Increment. The
+// visible input shows the formatted value; the steppers are `type="button"` with aria-label.
+// Proves the value/format state machine + the octane text-input value adaptation.
+export function NumberFieldBasic() @{
+	<NumberField.Root className="nf" defaultValue={5}>
+		<NumberField.Group className="nf-group">
+			<NumberField.Decrement className="nf-dec">-</NumberField.Decrement>
+			<NumberField.Input className="nf-input" />
+			<NumberField.Increment className="nf-inc">+</NumberField.Increment>
+		</NumberField.Group>
+	</NumberField.Root>
+}
+
+// Slider — Root (role=group) / Value (output) / Control / Track / Indicator / Thumb (a div +
+// nested <input type=range>). With the default `center` alignment the thumb position + indicator
+// width are pure math (valueToPercent), so mount renders byte-identically without layout. Proves
+// the value state machine, the composite thumb registration (Value's `htmlFor`), and the octane
+// range-input value adaptation.
+export function SliderBasic() @{
+	<Slider.Root className="sl" defaultValue={30}>
+		<Slider.Value className="sl-value" />
+		<Slider.Control className="sl-control">
+			<Slider.Track className="sl-track">
+				<Slider.Indicator className="sl-indicator" />
+				<Slider.Thumb className="sl-thumb" />
+			</Slider.Track>
+		</Slider.Control>
+	</Slider.Root>
+}
+
+// Range slider — two thumbs, two nested range inputs. Exercises the sorted value array, per-thumb
+// aria-valuetext ("start range" / "end range"), and the multi-input `htmlFor` on Value.
+export function SliderRange() @{
+	<Slider.Root className="sl" defaultValue={[20, 60]}>
+		<Slider.Value className="sl-value" />
+		<Slider.Control className="sl-control">
+			<Slider.Track className="sl-track">
+				<Slider.Indicator className="sl-indicator" />
+				<Slider.Thumb className="sl-thumb" index={0} />
+				<Slider.Thumb className="sl-thumb" index={1} />
+			</Slider.Track>
+		</Slider.Control>
+	</Slider.Root>
+}
+
+// At the max boundary — the Increment button is disabled (data-disabled + disabled attr).
+export function NumberFieldBoundary() @{
+	<NumberField.Root className="nf" defaultValue={10} max={10} min={0}>
+		<NumberField.Group className="nf-group">
+			<NumberField.Decrement className="nf-dec">-</NumberField.Decrement>
+			<NumberField.Input className="nf-input" />
+			<NumberField.Increment className="nf-inc">+</NumberField.Increment>
+		</NumberField.Group>
+	</NumberField.Root>
 }
 
 // Explicit Intl format — the value text + aria-valuetext format as a plain number.

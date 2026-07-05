@@ -22,7 +22,7 @@ function isHTMLElement(el: unknown): el is HTMLElement {
 	return el != null && el instanceof HTMLElement;
 }
 
-function focusElementWithVisible(element: HTMLElement): void {
+export function focusElementWithVisible(element: HTMLElement): void {
 	(element as any).focus({ focusVisible: true });
 }
 

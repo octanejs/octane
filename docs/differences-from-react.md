@@ -102,7 +102,10 @@ rather than throwing.
 
 Class components, Server Components/RSC, `StrictMode` double-invoke,
 `Profiler`, `SuspenseList`, `forwardRef`/`createRef` (refs are props),
-`useDebugValue` is a no-op, `cache()`, `React.Children` beyond the basics,
-resource-hint APIs (`preload`/`preinit` — planned). React-19 custom-element
-semantics (lowercase `on*` listeners, property heuristics) are an open
-decision, pinned in the test suite.
+`useDebugValue` is a no-op, `cache()`, `React.Children` beyond the basics.
+Resource hints ARE supported
+(`preload`/`preinit`/`preconnect`/`prefetchDNS`). React-19 custom-element
+listener semantics ARE supported (a function-valued lowercase `on*` prop on a
+custom element attaches a real listener — adjudicated 2026-07-05); the
+property-vs-attribute heuristic is not (attributes only, per the pass-through
+policy).

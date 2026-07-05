@@ -243,6 +243,8 @@ export interface DiffMount {
 	container: HTMLElement;
 	/** Drive a synthetic click on the FIRST element matching the selector. */
 	click(selector: string): Promise<void>;
+	/** Dispatch a bubbling keydown on the FIRST element matching the selector. */
+	keydown(selector: string, key: string, init?: KeyboardEventInit): Promise<void>;
 	/** Find one element (throws if missing). */
 	find(selector: string): Element;
 	/** Find all matching elements. */
@@ -343,6 +345,35 @@ export async function mountDifferential(
 					octaneFlushSync(() => {
 						if (typeof (el as HTMLElement).click === 'function') (el as HTMLElement).click();
 						else el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+					});
+				}
+			},
+			async keydown(selector, key, init) {
+				let el: Element | null = container.querySelector(selector);
+				if (!el && selector.startsWith('#')) {
+					const id = selector.slice(1);
+					const all = container.getElementsByTagName('*');
+					for (let i = 0; i < all.length; i++) {
+						if (all[i].id === id) {
+							el = all[i];
+							break;
+						}
+					}
+				}
+				if (!el)
+					throw new Error(`no element matching ${selector} (${isReact ? 'react' : 'octane'})`);
+				const target = el;
+				const dispatch = () =>
+					target.dispatchEvent(
+						new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }),
+					);
+				if (isReact) {
+					await reactAct(async () => {
+						dispatch();
+					});
+				} else {
+					octaneFlushSync(() => {
+						dispatch();
 					});
 				}
 			},

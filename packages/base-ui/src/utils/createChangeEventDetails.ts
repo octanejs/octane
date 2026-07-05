@@ -12,6 +12,16 @@ export const REASONS = {
 	itemPress: 'item-press',
 	keyboard: 'keyboard',
 	pointer: 'pointer',
+	inputChange: 'input-change',
+	inputClear: 'input-clear',
+	inputBlur: 'input-blur',
+	inputPaste: 'input-paste',
+	incrementPress: 'increment-press',
+	decrementPress: 'decrement-press',
+	wheel: 'wheel',
+	scrub: 'scrub',
+	trackPress: 'track-press',
+	drag: 'drag',
 } as const;
 
 export type BaseUIEventReason = (typeof REASONS)[keyof typeof REASONS];
@@ -54,4 +64,18 @@ export function createChangeEventDetails<Reason extends string = string>(
 		...customProperties,
 	};
 	return details;
+}
+
+// Ported from createBaseUIEventDetails.ts (createGenericEventDetails): a non-cancelable details
+// object for "committed"/generic callbacks (e.g. Slider's `onValueCommitted`).
+export function createGenericEventDetails<Reason extends string = string>(
+	reason: Reason,
+	event?: Event,
+	customProperties?: Record<string, any>,
+): { reason: Reason; event: Event; [key: string]: any } {
+	return {
+		reason,
+		event: event ?? new Event('base-ui'),
+		...customProperties,
+	};
 }

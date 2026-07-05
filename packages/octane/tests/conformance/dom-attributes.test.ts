@@ -463,7 +463,7 @@ describe('DOMPropertyOperations — custom elements', () => {
 	// semantics): no custom-element event-listener path — eventSlot/isEventKey
 	// (runtime.ts) require the React `on[A-Z]` shape. Representative pin for the
 	// whole custom-element custom-event family (see the skip list below).
-	it.fails('function-valued lowercase on* on a custom element attaches a listener', () => {
+	it('function-valued lowercase on* on a custom element attaches a listener', () => {
 		const handler = vi.fn();
 		const r = mount(CustomElCustomEvent, { handler });
 		r.find('#cel').dispatchEvent(new Event('customevent'));
