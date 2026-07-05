@@ -48,7 +48,7 @@ import {
 } from './utils/useTransitionStatus';
 import { useOpenChangeComplete } from './utils/useOpenChangeComplete';
 
-const PARENT_CHECKBOX = 'data-parent';
+export const PARENT_CHECKBOX = 'data-parent';
 
 export interface CheckboxRootState extends FieldRootState {
 	checked: boolean;

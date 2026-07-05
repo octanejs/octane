@@ -8,6 +8,7 @@ import { ToggleGroup } from '@octanejs/base-ui/toggle-group';
 import { Avatar } from '@octanejs/base-ui/avatar';
 import { Switch } from '@octanejs/base-ui/switch';
 import { Checkbox } from '@octanejs/base-ui/checkbox';
+import { CheckboxGroup } from '@octanejs/base-ui/checkbox-group';
 import { Radio } from '@octanejs/base-ui/radio';
 import { RadioGroup } from '@octanejs/base-ui/radio-group';
 import { Field } from '@octanejs/base-ui/field';
@@ -291,6 +292,35 @@ export function CheckboxDisabled() @{
 	<Checkbox.Root className="cb" disabled>
 		<Checkbox.Indicator className="cb-ind" />
 	</Checkbox.Root>
+}
+
+// CheckboxGroup — a role="group" whose child checkboxes derive `checked` from the shared
+// value array. Clicking a child adds/removes it from the group value, byte-identical to Base UI.
+export function CheckboxGroupBasic() @{
+	<CheckboxGroup className="cbg" defaultValue={['a']} aria-label="Options">
+		<Checkbox.Root className="cb" name="a">
+			<Checkbox.Indicator className="cb-ind" />
+		</Checkbox.Root>
+		<Checkbox.Root className="cb" name="b">
+			<Checkbox.Indicator className="cb-ind" />
+		</Checkbox.Root>
+	</CheckboxGroup>
+}
+
+// Parent (select-all) checkbox — `allValues` + `parent` gives a 3-state parent that is
+// indeterminate ("mixed") when only some children are ticked.
+export function CheckboxGroupParent() @{
+	<CheckboxGroup className="cbg" allValues={['a', 'b']} defaultValue={['a']} aria-label="Options">
+		<Checkbox.Root className="cb cb-parent" parent>
+			<Checkbox.Indicator className="cb-ind" />
+		</Checkbox.Root>
+		<Checkbox.Root className="cb" name="a">
+			<Checkbox.Indicator className="cb-ind" />
+		</Checkbox.Root>
+		<Checkbox.Root className="cb" name="b">
+			<Checkbox.Indicator className="cb-ind" />
+		</Checkbox.Root>
+	</CheckboxGroup>
 }
 
 // RadioGroup — role="radiogroup" (CompositeRoot roving focus) with radios. The selected

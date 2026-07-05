@@ -10,6 +10,15 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 2 (in progress) — CheckboxGroup DONE (2026-07). Green: 41 differential tests.**
+> `src/checkbox-group.ts` — a `role="group"` whose child `<Checkbox.Root>`s derive `checked`
+> from a shared value array; the previously-dormant parent-checkbox branches in `checkbox.ts`
+> are now wired via `useCheckboxGroupParent` (a 3-state select-all parent: indeterminate when
+> only some children are ticked). New utils: `areArraysEqual`, `useCheckboxGroupParent`.
+> **Remaining Phase 2: NumberField (~2600 lines) + Slider (~2835 lines)** — each a mini-subsystem
+> (value/format state machine + pointer scrub/drag) whose architecture is mapped; they are the
+> two large dedicated items left.
+
 > **Phase 2 (in progress) — the Field/Form validation SYSTEM + Input DONE (2026-07). Green:
 > 39 differential tests vs real `@base-ui/react@1.6.0`, base-ui typecheck clean.** This is the
 > densest Phase-2 subsystem (~1800 lines):

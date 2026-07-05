@@ -730,6 +730,13 @@ function drainQueue(): { err: any } | null {
 				// batched into the same flush and drop their already-rendered
 				// effects. Remember the first and surface it once the flush drains.
 				if (pendingError === null) pendingError = { err: unhandled };
+				// React 19 contract: an error no boundary handles unmounts the
+				// ENTIRE tree of the failed root — known-broken UI never stays on
+				// screen (ReactIncrementalErrorHandling:1338/:712). Only the
+				// offending root is torn down; unrelated roots keep draining.
+				let root: Block = block;
+				while (root.parentBlock !== null) root = root.parentBlock;
+				if (root.kind === 'root' && !root.disposed) unmountBlock(root);
 			}
 		}
 	}
@@ -872,14 +879,31 @@ const refDetachQueue: any[] = [];
  * callback ref shared across elements releases ITS element's React-19 cleanup.
  */
 export function queueRefDetach(ref: any, el: Element | FragmentInstance | null): void {
-	if (ref == null) return;
-	refDetachQueue.push(ref, el);
+	if (ref == null || SUPPRESS_UNCOMMITTED_REF_DETACH) return;
+	// Capture the active teardown boundary (if we're inside an unmount walk) so a
+	// throwing detach at drain time routes there — React's safelyDetachRef →
+	// captureCommitPhaseError (ReactErrorBoundaries:2782).
+	refDetachQueue.push(ref, el, TEARDOWN_HANDLER);
 }
+
+// See unmountScope — true while running the cleanups of a block whose deferred
+// ref attaches never committed (aborted mount).
+let SUPPRESS_UNCOMMITTED_REF_DETACH = false;
 
 function drainRefDetaches(): void {
 	if (refDetachQueue.length === 0) return;
 	const q = refDetachQueue.splice(0);
-	for (let i = 0; i < q.length; i += 2) attachRef(q[i], null, q[i + 1]);
+	for (let i = 0; i < q.length; i += 3) {
+		try {
+			attachRef(q[i], null, q[i + 1]);
+		} catch (err) {
+			// A throwing ref detach must not abort the commit (the remaining detaches
+			// + attaches still run) — route to the deletion's boundary like React.
+			const handler = q[i + 2] as ((e: any) => void) | null;
+			if (handler !== null) handler(err);
+			else console.error(err);
+		}
+	}
 }
 
 /** Drain queued mount ref attaches in React's post-order (descendant-before-ancestor). */
@@ -1578,8 +1602,46 @@ export function componentSlotLite<P>(
 	}
 }
 
+// ── Teardown error routing (React's captureCommitPhaseError for deletions) ──
+// The handler is resolved ONCE at the outermost unmount entry, from the deletion
+// root's PARENT chain — a boundary inside the deleted range is itself dying and
+// cannot handle anything. Cleanup throws are COLLECTED during the walk and
+// dispatched only after the outermost unmount returns: invoking a boundary
+// mid-teardown would re-enter reconciliation over a half-torn tree (React
+// likewise schedules the boundary update rather than running it inline).
+// queueRefDetach captures the live handler per entry, so a commit-time ref
+// detach throw (drainRefDetaches) routes to the same boundary.
+let TEARDOWN_DEPTH = 0;
+let TEARDOWN_HANDLER: ((err: any) => void) | null = null;
+let TEARDOWN_ERRORS: any[] | null = null;
+
+function reportTeardownError(err: any): void {
+	if (TEARDOWN_HANDLER !== null) (TEARDOWN_ERRORS ??= []).push(err);
+	else console.error(err);
+}
+
+function dispatchTeardownErrors(): void {
+	const errs = TEARDOWN_ERRORS;
+	const h = TEARDOWN_HANDLER;
+	TEARDOWN_ERRORS = null;
+	TEARDOWN_HANDLER = null;
+	if (errs !== null && h !== null) {
+		for (let i = 0; i < errs.length; i++) h(errs[i]);
+	}
+}
+
 function unmountBlock(block: Block, detachDom: boolean = true): void {
 	if (block.disposed) return;
+	if (TEARDOWN_DEPTH === 0) TEARDOWN_HANDLER = findTryHandler(block.parentBlock);
+	TEARDOWN_DEPTH++;
+	try {
+		unmountBlockInner(block, detachDom);
+	} finally {
+		if (--TEARDOWN_DEPTH === 0) dispatchTeardownErrors();
+	}
+}
+
+function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
 	// De-opt-managed host subtree (deoptItemBody item / hostElementBody element):
 	// detach its stamped refs so a `ref={obj}` / callback ref doesn't keep pointing
@@ -1645,13 +1707,28 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	// exactly as in React, where the parent's destroy runs while the subtree is
 	// still mounted.
 	const c = scope.cleanups;
+	// Suppress queued ref detaches while unwinding an ABORTED mount (the scope's
+	// render never completed — `mounted` is only set at the successful end of
+	// renderBlock/componentSlotLite): its deferred ref attaches were — or will
+	// be — skipped by drainRefAttaches' disposed-subtree guard, so firing
+	// `ref(null)` would invoke a callback ref for work that never existed
+	// (React never invokes refs for uncommitted work; ReactErrorBoundaries:1158).
+	// De-opt refs are unaffected: their detaches queue from detachDeoptTreeRefs
+	// walks outside this cleanups loop.
+	const prevSuppress = SUPPRESS_UNCOMMITTED_REF_DETACH;
+	SUPPRESS_UNCOMMITTED_REF_DETACH = (scope as any).mounted !== true;
 	for (let i = c.length - 1; i >= 0; i--) {
 		try {
 			c[i]();
 		} catch (err) {
-			console.error(err);
+			// Route to the boundary enclosing the DELETION (collected + dispatched
+			// after the walk — see reportTeardownError); React parity: an error in a
+			// deletion-phase cleanup reaches the nearest still-mounted boundary
+			// instead of being swallowed (ReactErrorBoundaries:1927).
+			reportTeardownError(err);
 		}
 	}
+	SUPPRESS_UNCOMMITTED_REF_DETACH = prevSuppress;
 	// Then recurse into child scopes (parent → child order).
 	const children = scope.children;
 	for (let i = 0, n = children.length; i < n; i++) unmountScope(children[i].scope, detachDom);
@@ -8767,8 +8844,10 @@ function detachDeoptTreeRefs(node: Node, out: { ref: any; el: any }[] | null): v
 			// rebuilt element's deferred attach fires — flipping the owner back,
 			// rebuilding again, forever. Deferring puts null + new-element in the
 			// SAME commit (React's mutation→layout phasing), so state settles on
-			// the new element before the next render pass.
-			refDetachQueue.push(ref, node);
+			// the new element before the next render pass. Route through
+			// queueRefDetach so the entry stride (ref, el, teardown-handler) stays
+			// uniform with the compiled-binding path.
+			queueRefDetach(ref, node as Element);
 		}
 	}
 	let c: Node | null = node.firstChild;
