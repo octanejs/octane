@@ -5688,6 +5688,12 @@ export function componentSlot(
 // ElementDescriptor) or a single Text node (primitive). A value whose mode
 // flips across renders tears the old content down — cleanups fire, content
 // nodes are removed — and rebuilds in place, keeping the markers.
+//
+// Exception: a client mount whose FIRST value is a lone pure-host descriptor
+// (e.g. `createElement('div')` returned from a component, or rendered at a
+// root) is ANCHORLESS — no markers at all, the element self-delimits (`end`
+// is null; mirrors componentSlot's singleRoot regime). A later mode flip
+// promotes the slot to the marked regime by minting the pair in place.
 
 interface ChildSlot {
 	__kind: 'childSlot';
@@ -5699,7 +5705,17 @@ interface ChildSlot {
 	 * hydration (adopted from the server's `<!--[-->`).
 	 */
 	start: Comment | null;
-	end: Comment;
+	/**
+	 * Upper-bound marker / insertion anchor. Null in ANCHORLESS mode: a client
+	 * mount whose first value is a LONE PURE-HOST descriptor mints NO markers at
+	 * all — the element self-delimits (mirroring componentSlot's singleRoot
+	 * regime), so a host descriptor returned at a root / return slot IS
+	 * `container.firstChild` (React parity). A later render that flips the
+	 * value's mode promotes the slot to the marked regime by minting the pair
+	 * on demand around the host node (see childSlot). Non-null in every other
+	 * regime (and always after hydration).
+	 */
+	end: Comment | null;
 	block: Block | null;
 	text: Text | null;
 	currentComp: ComponentBody | null;
@@ -5848,10 +5864,17 @@ function clearChildContent(state: ChildSlot): void {
 		}
 	} else if (state.text !== null) {
 		// Client text path: a single tracked Text node, no start marker to sweep.
-		// (A pure-host node never appears here: the pure-host branch of childSlot
-		// mints `start` before it ever sets `hostNode`, so a live hostNode is
-		// always swept by the marker-range branch above.)
+		// (A MARKED pure-host node never appears here: the marked host branch of
+		// childSlot mints `start` before it ever sets `hostNode`, so a live marked
+		// hostNode is always swept by the marker-range branch above.)
 		state.text.remove();
+	} else if (state.hostNode !== null && state.hostNode.parentNode !== null) {
+		// ANCHORLESS pure-host slot (end === null, no markers): remove the
+		// self-delimiting node directly — the marker sweep above has nothing to
+		// anchor on. Reached via disposeReturnSlot's kind-flip teardown; childSlot's
+		// own mode flips promote to markers before ever clearing.
+		detachDeoptTreeRefs(state.hostNode, null);
+		state.hostNode.parentNode.removeChild(state.hostNode);
 	}
 	state.text = null;
 	state.currentComp = null;
@@ -6609,10 +6632,15 @@ export function childSlot(
 	ownEnd?: boolean,
 ): void {
 	const parentBlock = parentScope.block;
+	// A LONE PURE-HOST descriptor (host/text-only subtree — no components, no
+	// portals, no render functions). Computed once per call: the slot init below
+	// uses it to pick the ANCHORLESS regime, the promotion after it to detect a
+	// mode flip out of that regime, and the classifier to route the value.
+	const pureHost = isHostDescriptor(value) && !descNeedsBlocks(value);
 	let state = parentScope.slots[slotKey] as ChildSlot | undefined;
 	if (state === undefined) {
 		let start: Comment | null;
-		let end: Comment;
+		let end: Comment | null;
 		if (hydrating && isBlockOpen(anchor ?? null)) {
 			// Hydration (nested hole): the anchor resolved via child/sibling to the
 			// server's `<!--[-->`. Adopt that `<!--[-->…<!--]-->` range as our markers
@@ -6635,6 +6663,15 @@ export function childSlot(
 			// insertBefore per `{expr}` hole (no separate end marker minted).
 			start = null;
 			end = anchor as Comment;
+		} else if (!hydrating && pureHost) {
+			// ANCHORLESS client mount: the value is a lone pure-host descriptor, so
+			// the element self-delimits — mint NO markers at all (mirrors
+			// componentSlot's singleRoot regime). This is what makes a host
+			// descriptor at a root / return slot land as `container.firstChild`
+			// (React parity) instead of `<!----><el/><!---->`. A later render whose
+			// value flips mode promotes to the marked regime (see below).
+			start = null;
+			end = null;
 		} else {
 			// Client mount: a SINGLE end anchor. A text/empty hole tracks its own
 			// `Text` node (no start needed); the component path lazily mints a start
@@ -6657,6 +6694,30 @@ export function childSlot(
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
+	}
+
+	// ANCHORLESS → marked promotion: the slot was created markerless for a lone
+	// pure-host value (init above). The moment a render flips the value to
+	// anything else (component / array / portal / text / null), mint the marker
+	// pair on demand around the current host node, so every path below sees the
+	// normal marked regime — the childSlot analogue of the singleRoot shape-flip
+	// handling in disposeReturnSlot. One-way: once marked, the slot stays marked.
+	if (state.end === null && !pureHost) {
+		const start = document.createComment('');
+		const end = document.createComment('');
+		const host = state.hostNode;
+		if (host !== null && host.parentNode !== null) {
+			const p = host.parentNode;
+			p.insertBefore(start, host);
+			p.insertBefore(end, host.nextSibling);
+		} else {
+			// Defensive — anchorless is only entered after a successful pure-host
+			// render, so a live host should always exist. Pin at the call's anchor.
+			domParent.insertBefore(start, anchor ?? null);
+			domParent.insertBefore(end, anchor ?? null);
+		}
+		state.start = start;
+		state.end = end;
 	}
 
 	// Portal descriptor → render its body into a foreign target; the slot's own
@@ -6704,7 +6765,8 @@ export function childSlot(
 			state.forSlot = {
 				__kind: 'forBlockSlot',
 				start: state.start,
-				end: state.end,
+				// Non-null: an anchorless slot was promoted to markers above.
+				end: state.end!,
 				items: new Map(),
 				head: null,
 				tail: null,
@@ -6750,11 +6812,32 @@ export function childSlot(
 	let props: any = {};
 	let isBodyFn = false;
 	if (isHostDescriptor(value)) {
-		if (!descNeedsBlocks(value)) {
+		if (pureHost) {
 			// Pure host/text → reconcile in place, REUSING the existing node so DOM
 			// state survives a re-render. Switching in from a component/text first
 			// tears that down (also nulls a stale hostNode).
 			if (state.block !== null || state.text !== null) clearChildContent(state);
+			if (state.end === null) {
+				// ANCHORLESS: no markers — the element self-delimits, so reconcile
+				// straight against the tracked node. A same-tag value patches it in
+				// place; an incompatible one is rebuilt at the old node's position
+				// (first render inserts at the call's anchor). `reconcileDeoptNode`
+				// always yields a node for a host descriptor; the null checks are
+				// shape-parity with the marked path below.
+				const prev = state.hostNode;
+				const node = reconcileDeoptNode(prev, value, parentBlock);
+				if (node !== prev) {
+					if (prev !== null && prev.parentNode !== null) {
+						if (node !== null) prev.parentNode.insertBefore(node, prev);
+						detachDeoptTreeRefs(prev, null);
+						prev.parentNode.removeChild(prev);
+					} else if (node !== null) {
+						domParent.insertBefore(node, anchor ?? null);
+					}
+				}
+				state.hostNode = node;
+				return;
+			}
 			if (state.start === null) {
 				state.start = document.createComment('');
 				domParent.insertBefore(state.start, state.end);
@@ -6822,8 +6905,10 @@ export function childSlot(
 		// one off-screen and HOLD the old until it's ready, instead of clearing the old
 		// before the new suspends (which would blank the boundary). Only when there's
 		// committed old content to hold; urgent + hydration keep the legacy path below.
+		// (`state.end` is non-null on this path: a live block implies the marked
+		// regime — anchorless slots never hold a Block.)
 		if (state.block !== null && !hydrating && parentBlock.currentRenderMode === 'transition') {
-			const r = renderOffscreen(parentBlock, domParent, state.end, comp, props);
+			const r = renderOffscreen(parentBlock, domParent, state.end!, comp, props);
 			if (r.suspended || r.error) {
 				// Discard the partial; the OLD content was never touched, so it stays live.
 				// Re-throw so the enclosing tryBlock's existing catch holds the old content
@@ -6838,7 +6923,7 @@ export function childSlot(
 			// OUTSIDE that range so it's untouched), then move the WIP into the slot range.
 			// Synchronous, so there is no painted blank between the two.
 			clearChildContent(state);
-			commitOffscreen(r.wip, state.end);
+			commitOffscreen(r.wip, state.end!);
 			state.block = r.wip.block;
 			state.currentComp = comp;
 			state.currentIsBodyFn = isBodyFn;
@@ -6876,7 +6961,8 @@ export function childSlot(
 		renderBlock(b);
 		// Advance the cursor past this child's adopted range so a following sibling
 		// hole adopts the right node (mirrors componentSlot's post-render advance).
-		if (hydrating) hydrateNode = state.end.nextSibling;
+		// (Hydration always adopts a marker pair, so `state.end` is non-null here.)
+		if (hydrating) hydrateNode = state.end!.nextSibling;
 		return;
 	}
 
