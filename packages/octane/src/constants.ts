@@ -26,6 +26,19 @@ export const BLOCK_CLOSE = `<!--${HYDRATION_END}-->`;
 export const EMPTY_COMMENT = '<!---->';
 
 /**
+ * Payload of the text-hole separator comment `<!-- -->` the server emits
+ * between two adjacent text nodes when at least one side is a DYNAMIC text
+ * hole (React's convention). Without it the browser's HTML parser would merge
+ * the two texts into ONE node and the client's hydration walk would come up a
+ * node short (losing the second hole's content). The compiler's server emit
+ * (`ssrEmitNodes` in `octane/compiler`) writes it; the client's hole-aware
+ * `sibling()` walk (runtime.ts) treats it as a protocol node — stepping across
+ * it between two text holes, or adopting it as the insert-before stand-in
+ * position when a hole's server text was empty.
+ */
+export const HYDRATION_TEXT_SEP = ' ';
+
+/**
  * Marker attribute on the inline `<script type="application/json">` that the
  * server emits to carry the JSON-serialized `use(thenable)` values it resolved
  * during render (SSR Suspense). The client `hydrateRoot()` finds this

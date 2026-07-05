@@ -18,6 +18,7 @@ import {
 	STREAM_SEED_COMMENT,
 	HYDRATION_START,
 	HYDRATION_END,
+	HYDRATION_TEXT_SEP,
 	UNDEFINED_SENTINEL_KEY,
 	cssStyleValue,
 } from './constants.js';
@@ -2890,12 +2891,35 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 			}
 			return node.cloneNode(true) as T;
 		}
+		// Multi-root template: the synthetic <octane-frag> wrapper has NO server
+		// counterpart — the roots render BARE at the cursor level. Adopting the
+		// cursor node itself would make the walk descend INTO the first root (and
+		// the mount's drain would rip that root's children out). Instead return a
+		// VIRTUAL wrapper whose `firstChild` is the cursor node, so both the raw
+		// path walk (`_root.firstChild…`) and the hole-aware walk (`child(_root)`)
+		// resolve to the server's first root — one level up, exactly where the
+		// template wrapper's children sit. drainFrag() recognizes the marker and
+		// skips the drain (the server content is already in place).
+		if ((node as any).__oct_frag) {
+			return { __oct_vfrag: true, firstChild: hydrateNode } as unknown as T;
+		}
 		// Adopt the server node at the cursor as this template's root. The cursor
 		// stays put so a hole-template's subsequent child()/sibling() walk descends
 		// into it; for a hole-free leaf the raw path-walk takes over from here.
 		return hydrateNode as unknown as T;
 	}
 	return node.cloneNode(true) as T;
+}
+
+/**
+ * Compiler-emitted for a multi-root template's mount: drain the cloned
+ * <octane-frag> wrapper's children into the live parent. While hydrating, the
+ * "wrapper" is clone()'s virtual stand-in for server content that is ALREADY
+ * in place — nothing to move.
+ */
+export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
+	if (hydrating && (root as any).__oct_vfrag === true) return;
+	while (root.firstChild) parent.insertBefore(root.firstChild, anchor);
 }
 
 /**
@@ -2907,6 +2931,19 @@ export function clone<T extends Node>(node: T, loc?: string): T {
  */
 function coerceText(value: unknown): string {
 	return value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+}
+
+/**
+ * The HTML parser normalizes `\r` / `\r\n` in source markup to `\n`, so an
+ * adopted server text node differing from the client value ONLY by that
+ * normalization is NOT a real hydration mismatch (React parity) — adopt the
+ * server node silently, no warn, no patch. Cheap gate: values without a CR
+ * can't be a normalization artifact.
+ */
+function isCRLFNormalizedMatch(server: string | null, client: string): boolean {
+	return (
+		server !== null && client.indexOf('\r') !== -1 && server === client.replace(/\r\n?/g, '\n')
+	);
 }
 
 /**
@@ -2925,9 +2962,10 @@ export function htext(el: Node, value: unknown): Text {
 		const first = el.firstChild;
 		if (first !== null && first.nodeType === 3) {
 			// Adopt the server text node. On a VALUE mismatch, patch to the client value
-			// (React-recoverable) unless the element opted out — then keep the server value.
+			// (React-recoverable) unless the element opted out — then keep the server
+			// value. Parser CR/CRLF→LF normalization is not a mismatch (React parity).
 			const server = (first as Text).nodeValue;
-			if (server !== text && !isHydrationSuppressed(el)) {
+			if (server !== text && !isCRLFNormalizedMatch(server, text) && !isHydrationSuppressed(el)) {
 				warnHydrationValueMismatch((el as any).__oct_loc, 'text', server, text);
 				(first as Text).nodeValue = text;
 			}
@@ -2959,9 +2997,10 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 	if (hydrating) {
 		if (posNode !== null && posNode.nodeType === 3) {
 			// Adopt the server text node. On a VALUE mismatch, patch to the client value
-			// unless the owning element opted out (then keep the server value, React-style).
+			// unless the owning element opted out (then keep the server value, React-
+			// style). Parser CR/CRLF→LF normalization is not a mismatch (React parity).
 			const server = (posNode as Text).nodeValue;
-			if (server !== text) {
+			if (server !== text && !isCRLFNormalizedMatch(server, text)) {
 				const host = posNode.parentNode;
 				if (!isHydrationSuppressed(host)) {
 					warnHydrationValueMismatch(host && (host as any).__oct_loc, 'text', server, text);
@@ -3005,6 +3044,15 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 /** True if `node` is a server block-open marker `<!--[-->`. */
 function isBlockOpen(node: Node | null): node is Comment {
 	return node !== null && node.nodeType === 8 && (node as Comment).data === HYDRATION_START;
+}
+
+/**
+ * True if `node` is a server text-hole separator `<!-- -->` — emitted between
+ * two adjacent text nodes when at least one is a dynamic text hole, so the
+ * parser can't merge them into one node (see HYDRATION_TEXT_SEP, constants.ts).
+ */
+function isTextSeparator(node: Node | null): node is Comment {
+	return node !== null && node.nodeType === 8 && (node as Comment).data === HYDRATION_TEXT_SEP;
 }
 
 /**
@@ -3066,7 +3114,27 @@ export function sibling(node: Node, n: number = 1): Node | null {
 	for (let i = 0; i < n; i++) {
 		// Over-walk (cursor already past the last node) → return null, don't throw.
 		if (c === null) return null;
-		if (hydrating && isBlockOpen(c)) c = matchingClose(c);
+		if (hydrating) {
+			if (isBlockOpen(c)) c = matchingClose(c);
+			if (isTextSeparator(c)) {
+				// Standing on an empty text hole's stand-in separator — the next
+				// logical item starts immediately after it.
+				c = c.nextSibling;
+				continue;
+			}
+			c = c.nextSibling;
+			if (isTextSeparator(c)) {
+				// Crossed the `<!-- -->` delimiter between two adjacent text holes.
+				// The next item is the following text node when the server rendered
+				// one; a following separator means the next hole is EMPTY and that
+				// separator is its stand-in. Anything else (element / end of scope):
+				// the crossed separator itself stands in for the empty hole —
+				// htextSwap inserts before it, which is order-correct.
+				const after: Node | null = c.nextSibling;
+				if (after !== null && (after.nodeType === 3 || isTextSeparator(after))) c = after;
+			}
+			continue;
+		}
 		c = c.nextSibling;
 	}
 	return c;
@@ -3712,11 +3780,13 @@ export function setAttribute(el: Element, name: string, value: any): void {
 					? value == null
 						? null
 						: String(value)
-					: value == null || value === false
-						? null
-						: value === true
-							? ''
-							: String(value);
+					: typeof value === 'boolean' && name.startsWith('data-')
+						? String(value)
+						: value == null || value === false
+							? null
+							: value === true
+								? ''
+								: String(value);
 			const nsd = attrNamespace(name);
 			const serverAttr = nsd
 				? el.getAttributeNS(nsd, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
@@ -3746,6 +3816,13 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// inherited editability. Names are matched case-insensitively because JSX
 	// authors write the React camelCase forms.
 	if (typeof value === 'boolean' && isEnumeratedBooleanAttr(name)) {
+		el.setAttribute(name, value ? 'true' : 'false');
+		return;
+	}
+	// data-* attributes stringify booleans (React parity, mirrored by the server's
+	// ssrAttr): `data-x={false}` must write "false" — a dataset consumer reads the
+	// string, so removing the attribute would lose the value.
+	if (typeof value === 'boolean' && name.startsWith('data-')) {
 		el.setAttribute(name, value ? 'true' : 'false');
 		return;
 	}
@@ -5985,6 +6062,18 @@ function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 	(el as Element & DeoptStamped)[DEOPT_DESC] = d;
 }
 
+// Flatten a possibly-nested array child into one item per LEAF, KEEPING empties
+// (they occupy an index slot; see the childSlot array branch). Distinct from
+// flattenDeoptChildren below, which serves the raw host-children reconciler and
+// DROPS empties.
+function flattenChildItems(out: any[], v: any[]): void {
+	for (let i = 0; i < v.length; i++) {
+		const item = v[i];
+		if (Array.isArray(item)) flattenChildItems(out, item);
+		else out.push(item);
+	}
+}
+
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
 // `createElement` collapses positional children and `.map()` results into arrays)
 // into a flat list of renderable values, dropping empties (null/undefined/false/
@@ -6210,6 +6299,30 @@ function deoptItemBody(item: any, scope: Scope): void {
 				block.parentNode.removeChild(stale);
 			}
 			block.deoptNode = null;
+		}
+		// Hydration: the server serialized this component-bearing item as ONE
+		// `<!--[-->…<!--]-->` range (ssrChildItem emits no extra block for the
+		// item/childSlot layering, which is client-only structure), and mountItem
+		// already adopted that pair as the item block's markers. Seed the nested
+		// childSlot with the SAME markers so it BORROWS the item's range — without
+		// this it would grab the next `<!--[-->` at the cursor (the component's
+		// return content, one level too deep) as its own, desyncing everything
+		// inside. The cursor already sits on the item's first content node.
+		if (hydrating && scope.slots[0] === undefined && isBlockOpen(block.startMarker)) {
+			const seeded: ChildSlot = {
+				__kind: 'childSlot',
+				start: block.startMarker as Comment,
+				end: block.endMarker as Comment,
+				block: null,
+				text: null,
+				currentComp: null,
+				currentIsBodyFn: false,
+				forSlot: null,
+				hostNode: null,
+				portal: null,
+			};
+			scope.slots[0] = seeded;
+			registerSlot(scope, seeded);
 		}
 		childSlot(scope, 0, block.parentNode, item, block.endMarker);
 		return;
@@ -6509,15 +6622,26 @@ export function childSlot(
 				emptyBlock: null,
 			};
 		}
-		reconcileKeyed(
-			parentBlock,
-			state.forSlot,
-			value,
-			POSITIONAL_CHILDREN.has(value as object) ? deoptKeyPositional : deoptKey,
-			deoptItemBody as any,
-			false,
-			false,
-		);
+		// A NESTED array member is a fragment (React parity): its leaves render as
+		// SIBLING items of this list, one item per leaf. Flatten before keying —
+		// without this a nested-array item reaches deoptItemBody as an array, which
+		// the pure host reconciler renders as NOTHING (content silently dropped).
+		// Empties (null/false) are KEPT as items: they occupy an index slot (React's
+		// array-diff semantics) and mirror the server's one-`<!--[-->…<!--]-->`-per-
+		// leaf emission (ssrChildItem serializes an empty leaf as an EMPTY block),
+		// so hydration adopts item ranges 1:1. The positional-key choice is made on
+		// the ORIGINAL array — the flattened copy is a fresh, untagged allocation.
+		const keyFn = POSITIONAL_CHILDREN.has(value as object) ? deoptKeyPositional : deoptKey;
+		let items: any[] = value;
+		for (let i = 0; i < items.length; i++) {
+			if (Array.isArray(items[i])) {
+				const flat: any[] = [];
+				flattenChildItems(flat, value);
+				items = flat;
+				break;
+			}
+		}
+		reconcileKeyed(parentBlock, state.forSlot, items, keyFn, deoptItemBody as any, false, false);
 		return;
 	}
 	// Value is NOT an array — if we were in array mode, tear the list down first.
@@ -6817,8 +6941,13 @@ export function childTextHole(
 			// warn with the text hole's own source location (a tracked construct slot).
 			const f = domParent.firstChild;
 			if (f !== null && f.nodeType === 3) {
+				// Parser CR/CRLF→LF normalization is not a mismatch (React parity).
 				const server = (f as Text).nodeValue;
-				if (server !== str && !isHydrationSuppressed(domParent)) {
+				if (
+					server !== str &&
+					!isCRLFNormalizedMatch(server, str) &&
+					!isHydrationSuppressed(domParent)
+				) {
 					// LOC: this hole's tracked construct slot (the precise `{expr}` position);
 					// fall back to the host element's stamp only as defense-in-depth.
 					const loc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
