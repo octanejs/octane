@@ -6,7 +6,7 @@
  * pipeline as any other rehype transform. Highlighting is async, so the
  * async `compileMdx` is required (the vite plugin's transform already is).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import rehypeShiki from '@shikijs/rehype';
 import * as Octane from 'octane';
 import * as ServerRT from 'octane/server';
@@ -33,6 +33,13 @@ async function modules() {
 }
 
 describe('shiki (optional, via rehypePlugins)', () => {
+	// The first highlight pays shiki's engine cold-start (oniguruma WASM +
+	// grammar/theme load; singleton-cached after), which can exceed the default
+	// 5s test timeout on slow CI runners — warm it outside any test's budget.
+	beforeAll(async () => {
+		await modules();
+	}, 60_000);
+
 	it('renders highlighted tokens on the client', async () => {
 		const { client } = await modules();
 		const container = document.createElement('div');
