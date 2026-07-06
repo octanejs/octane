@@ -5557,19 +5557,19 @@ export function componentSlot(
 	const parentBlock = parentScope.block;
 	// A STRING comp: a dynamic JSX tag — `<props.parts.title>`, `<Tag/>` with
 	// `const Tag = 'h1'`, `<{expr}/>` — that resolved to a HOST tag name at
-	// runtime. Render it as a host element through the stable de-opt renderer:
-	// the block's body is `hostElementBody` and its props a host DESCRIPTOR
-	// carrying the tag + props + the compiled `children` render-fn (which
-	// hostElementBody's childSlot renders as its own Block). That matches the
-	// server's emission (ssrComponent's string branch → ssrHostElement), so
-	// hydration adopts `<!--[--><tag>…children block…</tag><!--]-->` uniformly.
-	// Identity below still compares the raw `comp` string: same tag → update in
-	// place (props patched, children reconciled); a different tag or a
-	// string↔function flip → tear down + remount (React's element-type reset).
+	// runtime. Render it as a host element through `hostStringTagBody`: the
+	// block's props is a host DESCRIPTOR carrying the tag + props + the compiled
+	// `children` render-fn, which renders INLINE as the element's entire content
+	// (no nested block). That matches the server's emission (ssrComponent's
+	// string branch inlines the fn's HTML like a static host tag), so hydration
+	// adopts `<!--[--><tag>…</tag><!--]-->` uniformly. Identity below still
+	// compares the raw `comp` string: same tag → update in place (props patched,
+	// children reconciled); a different tag or a string↔function flip → tear
+	// down + remount (React's element-type reset).
 	let body = comp as ComponentBody;
 	let renderProps = props;
 	if (typeof comp === 'string') {
-		body = hostElementBody as unknown as ComponentBody;
+		body = hostStringTagBody as unknown as ComponentBody;
 		renderProps = {
 			$$kind: ELEMENT_TAG,
 			type: comp,
@@ -6704,6 +6704,130 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	// recurses into nested host-with-components subtrees uniformly. Skipped when
 	// dangerouslySetInnerHTML owns the content (see hasDangerHTML).
 	if (!hasDangerHTML(d.props)) childSlot(block, 0, el, d.children, null);
+}
+
+// Stable render body for a componentSlot whose comp resolved to a HOST tag
+// STRING at runtime (`<props.parts.title>` with parts.title === 'h1'; see the
+// string-comp branch in componentSlot). The block's props is a host DESCRIPTOR:
+// `d.type` the tag, `d.props` the raw call-site props, `d.children` the
+// compiled `__children$N` render fn (or absent).
+//
+// DISTINCT from hostElementBody (the value-position de-opt renderer) because
+// the CHILDREN CONVENTION differs: a template call site's children fn is the
+// element's ENTIRE content and renders INLINE into the element — one Block
+// whose range is all of `el`'s content, NO comment markers — matching the
+// server's emission (ssrComponent's string branch inlines the fn's HTML like a
+// static host tag; holes inside carry their own blocks). Value-position
+// function children (via createElement) stay marker-wrapped in
+// hostElementBody/childSlot, because the server block-wraps THOSE
+// (ssrDescriptorContent's function branch) — each position's client/server
+// pair stays aligned.
+function hostStringTagBody(d: ElementDescriptor, block: Block): void {
+	const tag = d.type as string;
+	let el = block.deoptNode as Element | null;
+	// A root `<svg>` opens the SVG namespace (parity with hostElementBody).
+	const elNs = tag === 'svg' ? SVG_NS : undefined;
+	if (el === null) {
+		if (
+			hydrating &&
+			hydrateNode !== null &&
+			hydrateNode.nodeType === 1 &&
+			(hydrateNode as Element).localName === tag &&
+			(elNs === undefined || (hydrateNode as Element).namespaceURI === elNs)
+		) {
+			// Hydration first render: ADOPT the server-rendered element at the cursor,
+			// then point the cursor at its first child so the children fn's clone()
+			// adopts the server content DIRECTLY (it self-bounds on the element — the
+			// server emitted no inner markers).
+			el = hydrateNode as Element;
+			block.deoptNode = el;
+			applyDeoptProps(el, d.props, block);
+			setDeoptDesc(el, d);
+			const savedCursor = hydrateNode.nextSibling;
+			if (!hasDangerHTML(d.props)) {
+				hydrateNode = el.firstChild;
+				renderHostTagChildren(d, block, el);
+			}
+			hydrateNode = savedCursor;
+			return;
+		}
+		if (hydrating && hydrateNode !== null) {
+			// STRUCTURAL mismatch — mirror hostElementBody's recovery: warn, discard
+			// the divergent server node/range, then build fresh with hydration
+			// SUSPENDED for the subtree (children client-mount, not mis-adopt).
+			{
+				const mmLoc = (hydrateNode.parentNode as any)?.__oct_loc;
+				if (mmLoc)
+					warnHydrationStructuralMismatch(mmLoc, `<${tag}>`, describeHydrationNode(hydrateNode));
+			}
+			const stale = hydrateNode;
+			if (isBlockOpen(stale)) {
+				const close = matchingClose(stale);
+				hydrateNode = close.nextSibling;
+				removeHydrationRange(stale, close);
+			} else {
+				hydrateNode = stale.nextSibling;
+				(stale as ChildNode).remove();
+			}
+			el = elNs !== undefined ? document.createElementNS(elNs, tag) : document.createElement(tag);
+			block.deoptNode = el;
+			block.parentNode.insertBefore(el, block.endMarker);
+			applyDeoptProps(el, d.props, block);
+			setDeoptDesc(el, d);
+			if (!hasDangerHTML(d.props)) {
+				const saved = hydrating;
+				hydrating = false;
+				renderHostTagChildren(d, block, el);
+				hydrating = saved;
+			}
+			return;
+		}
+		// Client mount. (The tag is FIXED for this block's life — componentSlot
+		// tears down + remounts on a tag change — so no localName re-check.)
+		el = elNs !== undefined ? document.createElementNS(elNs, tag) : document.createElement(tag);
+		block.deoptNode = el;
+		block.parentNode.insertBefore(el, block.endMarker);
+		applyDeoptProps(el, d.props, block);
+	} else {
+		// Re-render, same tag — diff props in place against the stamped descriptor.
+		patchDeoptProps(el, getDeoptDesc(el)?.props ?? null, d.props, block);
+	}
+	setDeoptDesc(el, d);
+	if (!hasDangerHTML(d.props)) renderHostTagChildren(d, block, el);
+}
+
+// Render a string-tag componentSlot's children into `el`. A FUNCTION child (the
+// compiled `__children$N`, or a render prop) renders through ONE self-bounding
+// Block whose range is all of `el`'s content — parentNode = el, no markers —
+// reused across renders with the body swapped in place (the compiled closure is
+// fresh each parent render but is the same slot child; mirrors childSlot's
+// isBodyFn reconcile). A render prop that RETURNS a renderable instead of
+// rendering imperatively is handled by renderBlock's return-slot (childSlot,
+// marker-wrapped — matching the server's ssrChild normalization of a de-opt
+// return). Non-function children (hand-rolled descriptors only; the compiler
+// always passes a render fn or nothing) fall back to childSlot on their own
+// slot index, which block-wraps exactly like the server's ssrHostElement
+// content path for plain values.
+function renderHostTagChildren(d: ElementDescriptor, block: Block, el: Element): void {
+	const kids = d.children;
+	if (kids == null) return;
+	if (typeof kids === 'function') {
+		let state = block.slots[0] as { __kind: 'hostTagChildrenSlot'; block: Block } | undefined;
+		if (state === undefined) {
+			const child = createBlock('dynamic', block, el, null, null, kids as ComponentBody, {});
+			state = { __kind: 'hostTagChildrenSlot', block: child };
+			block.slots[0] = state;
+			// unmountScope's catch-all slot branch unmounts `state.block`, firing the
+			// children's cleanups; the DOM goes away with `el` (the block has no
+			// markers of its own to sweep).
+			registerSlot(block, state);
+		} else {
+			state.block.body = kids as ComponentBody;
+		}
+		renderBlock(state.block);
+		return;
+	}
+	childSlot(block, 1, el, kids, null);
 }
 
 // Tear down a childSlot's de-opt keyed list when the slot leaves array mode (a
