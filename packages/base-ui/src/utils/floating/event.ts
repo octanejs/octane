@@ -12,3 +12,10 @@ export function isMouseLikePointerType(pointerType: string | undefined, strict?:
 	}
 	return values.includes(pointerType);
 }
+
+// octane events are native, so this is effectively always false for handler `event`s (a native
+// event has no `.nativeEvent`) — ported for faithfulness so `isReactEvent(e) ? e.nativeEvent : e`
+// resolves to the native event.
+export function isReactEvent(event: any): boolean {
+	return event != null && 'nativeEvent' in event;
+}

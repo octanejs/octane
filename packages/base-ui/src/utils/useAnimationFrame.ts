@@ -9,6 +9,11 @@ import { useLayoutEffect, useMemo, useRef } from 'octane';
 
 import { S, splitSlot, subSlot } from '../internal';
 
+export interface Frame {
+	request: (fn: FrameRequestCallback) => number;
+	cancel: () => void;
+}
+
 export const AnimationFrame = {
 	request(fn: FrameRequestCallback): number {
 		return requestAnimationFrame(fn);
@@ -18,12 +23,30 @@ export const AnimationFrame = {
 			cancelAnimationFrame(id);
 		}
 	},
+	// A per-instance frame that supersedes its own pending callback (like `useAnimationFrame`'s
+	// return, but usable outside a component — e.g. useScrollLock's resize handler).
+	create(): Frame {
+		let id: number | null = null;
+		return {
+			request(fn: FrameRequestCallback): number {
+				if (id != null) {
+					cancelAnimationFrame(id);
+				}
+				id = requestAnimationFrame((ts) => {
+					id = null;
+					fn(ts);
+				});
+				return id;
+			},
+			cancel(): void {
+				if (id != null) {
+					cancelAnimationFrame(id);
+					id = null;
+				}
+			},
+		};
+	},
 };
-
-export interface Frame {
-	request: (fn: FrameRequestCallback) => number;
-	cancel: () => void;
-}
 
 export function useAnimationFrame(...args: any[]): Frame {
 	const [, slotArg] = splitSlot(['_', ...args]);

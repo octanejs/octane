@@ -1,24 +1,28 @@
 // Ported from .base-ui/packages/react/src/dialog/ (v1.6.0): store/DialogStore + store/DialogHandle,
-// root/DialogRootContext + root/useDialogRoot + root/useRenderDialogRoot + root/DialogRoot,
-// trigger/DialogTrigger — the CLOSED-state path (Root + Trigger). octane adaptations: forwardRef →
-// ref-as-prop; native events; every Store hook-method + hook threads an explicit slot; `React.
-// createContext` → octane `createContext`.
+// root (context/useDialogRoot/useRenderDialogRoot/DialogRoot + DialogInteractions), trigger, portal,
+// backdrop, popup, title, description, close. octane adaptations: forwardRef → ref-as-prop; native
+// events; every Store hook-method + hook threads an explicit slot; `React.createContext` →
+// octane `createContext`.
 //
-// NOTE: `DialogInteractions` (the open-state floating interactions: useDismiss + scroll-lock +
-// focus) is STUBBED here — it is only rendered when `open || mounted`, so a closed dialog never
-// mounts it, and the differential vs real Base UI matches (React also doesn't render it closed).
-// The Portal/Backdrop/Popup/Title/Description/Close parts + the real DialogInteractions land with
-// the `useDismiss`/`FloatingFocusManager`/`FloatingPortal` layer.
+// INTERIM: `DialogPortal`/`DialogPopup` currently reuse `@octanejs/floating-ui`'s FloatingPortal +
+// FloatingFocusManager (fed a store-derived context adapter). They render a fully functional open,
+// portaled, focus-trapped dialog, BUT `@octanejs/floating-ui` emits `data-floating-ui-*` attributes
+// (+ a different FocusGuard style/role and container handling) where Base UI emits `data-base-ui-*`,
+// so the open path is NOT yet byte-identical to Base UI (its differential is skipped). Byte-parity
+// needs Base UI's own FloatingPortal + FloatingFocusManager ported — swap the two imports then.
 import {
 	createContext,
 	createElement,
 	useContext,
 	useMemo,
 	useRef,
+	useState,
+	useEffect,
 	useCallback,
 	useImperativeHandle,
 	isChildrenBlock,
 } from 'octane';
+import { FloatingFocusManager, FloatingPortal } from '@octanejs/floating-ui';
 
 import { S, subSlot } from './internal';
 import { useRenderElement } from './utils/useRenderElement';
@@ -28,8 +32,18 @@ import { createChangeEventDetails, REASONS } from './utils/createChangeEventDeta
 import { ReactStore } from './utils/store/ReactStore';
 import { createSelector } from './utils/store/createSelector';
 import { useClick } from './utils/floating/useClick';
+import { useDismiss } from './utils/floating/useDismiss';
+import { useScrollLock } from './utils/useScrollLock';
+import { useOpenChangeComplete } from './utils/useOpenChangeComplete';
 import { useOpenMethodTriggerProps } from './utils/useOpenInteractionType';
-import { triggerOpenStateMapping } from './utils/popupStateMapping';
+import { triggerOpenStateMapping, popupStateMapping } from './utils/popupStateMapping';
+import { transitionStatusMapping } from './utils/useTransitionStatus';
+import type { StateAttributesMapping } from './utils/getStateAttributesProps';
+import { EMPTY_OBJECT } from './utils/empty';
+import { inertValue } from './utils/inertValue';
+import { InternalBackdrop } from './utils/InternalBackdrop';
+import { contains, getTarget } from './utils/floating/element';
+import { COMPOSITE_KEYS } from './utils/composite/keys';
 import {
 	createInitialPopupStoreState,
 	createPopupFloatingRootContext,
@@ -39,7 +53,10 @@ import {
 	useImplicitActiveTrigger,
 	useOpenStateTransitions,
 	usePopupRootSync,
+	usePopupInteractionProps,
 	useTriggerDataForwarding,
+	createDefaultInitialFocus,
+	FOCUSABLE_POPUP_PROPS,
 	type PopupStoreState,
 	type PopupStoreContext,
 } from './utils/popups';
@@ -47,6 +64,11 @@ import { PopupTriggerMap } from './utils/popups/popupTriggerMap';
 import type { InteractionType } from './utils/useEnhancedClickHandler';
 
 const CLICK_TRIGGER_IDENTIFIER = 'data-base-ui-click-trigger';
+
+const popupStateAttributesMapping: StateAttributesMapping<any> = {
+	...(popupStateMapping as StateAttributesMapping<any>),
+	...(transitionStatusMapping as StateAttributesMapping<any>),
+};
 
 // --- Store -------------------------------------------------------------------
 
@@ -273,8 +295,118 @@ function useDialogRoot(
 	);
 }
 
-// STUB — see file header. The real open-state interactions land with the useDismiss layer.
-function DialogInteractions(_props: any): any {
+// Runs the open-state floating interactions (dismiss + scroll lock + nested-dialog bookkeeping),
+// and syncs the resulting prop bags into the store. Rendered only when `open || mounted`.
+function DialogInteractions(props: any): any {
+	const slot = S('DialogInteractions');
+	const { store, parentContext, isDrawer } = props;
+
+	const open = store.useState('open', subSlot(slot, 'open'));
+	const disablePointerDismissal = store.useState('disablePointerDismissal', subSlot(slot, 'dpd'));
+	const modal = store.useState('modal', subSlot(slot, 'modal'));
+	const popupElement = store.useState('popupElement', subSlot(slot, 'pel'));
+	const floatingRootContext = store.useState('floatingRootContext', subSlot(slot, 'frc'));
+
+	const [ownNestedOpenDialogs, setOwnNestedOpenDialogs] = useState(0, subSlot(slot, 'nod'));
+	const [ownNestedOpenDrawers, setOwnNestedOpenDrawers] = useState(0, subSlot(slot, 'ndr'));
+	const isTopmost = ownNestedOpenDialogs === 0;
+
+	const dismiss = useDismiss(
+		floatingRootContext,
+		{
+			outsidePressEvent() {
+				if (store.context.internalBackdropRef.current || store.context.backdropRef.current) {
+					return 'intentional';
+				}
+				return {
+					mouse: modal === 'trap-focus' ? 'sloppy' : 'intentional',
+					touch: 'sloppy',
+				};
+			},
+			outsidePress(event: any) {
+				if (!store.context.outsidePressEnabledRef.current) {
+					return false;
+				}
+				if ('button' in event && event.button !== 0) {
+					return false;
+				}
+				if ('touches' in event && event.touches.length !== 1) {
+					return false;
+				}
+				const target = getTarget(event) as Element | null;
+				if (isTopmost && !disablePointerDismissal) {
+					if (modal) {
+						return store.context.internalBackdropRef.current || store.context.backdropRef.current
+							? store.context.internalBackdropRef.current === target ||
+									store.context.backdropRef.current === target ||
+									(contains(target, popupElement) && !target?.hasAttribute('data-base-ui-portal'))
+							: true;
+					}
+					return true;
+				}
+				return false;
+			},
+			escapeKey: isTopmost,
+		},
+		subSlot(slot, 'dismiss'),
+	);
+
+	useScrollLock(open && modal === true, popupElement, subSlot(slot, 'scroll'));
+
+	store.useContextCallback(
+		'onNestedDialogOpen',
+		(dialogCount: number, drawerCount: number) => {
+			setOwnNestedOpenDialogs(dialogCount);
+			setOwnNestedOpenDrawers(drawerCount);
+		},
+		subSlot(slot, 'cc-open'),
+	);
+	store.useContextCallback(
+		'onNestedDialogClose',
+		() => {
+			setOwnNestedOpenDialogs(0);
+			setOwnNestedOpenDrawers(0);
+		},
+		subSlot(slot, 'cc-close'),
+	);
+
+	useEffect(
+		() => {
+			if (parentContext?.onNestedDialogOpen && open) {
+				parentContext.onNestedDialogOpen(
+					ownNestedOpenDialogs + 1,
+					ownNestedOpenDrawers + (isDrawer ? 1 : 0),
+				);
+			}
+			if (parentContext?.onNestedDialogClose && !open) {
+				parentContext.onNestedDialogClose();
+			}
+			return () => {
+				if (parentContext?.onNestedDialogClose && open) {
+					parentContext.onNestedDialogClose();
+				}
+			};
+		},
+		[isDrawer, open, ownNestedOpenDialogs, ownNestedOpenDrawers, parentContext],
+		subSlot(slot, 'e:parent'),
+	);
+
+	const activeTriggerProps = dismiss.reference ?? EMPTY_OBJECT;
+	const inactiveTriggerProps = dismiss.trigger ?? EMPTY_OBJECT;
+	const popupProps = dismiss.floating ?? EMPTY_OBJECT;
+
+	usePopupInteractionProps(
+		store,
+		{
+			activeTriggerProps,
+			inactiveTriggerProps,
+			popupProps,
+			nestedOpenDialogCount: ownNestedOpenDialogs,
+			nestedOpenDrawerCount: ownNestedOpenDrawers,
+		} as any,
+		subSlot(slot, 'pip'),
+	);
+
 	return null;
 }
 
@@ -461,10 +593,278 @@ function DialogTrigger(componentProps: any): any {
 	);
 }
 
-// --- Namespace (Portal/Backdrop/Popup/Title/Description/Close/Viewport land later) ---
+// --- Portal ------------------------------------------------------------------
+
+const DialogPortalContext = createContext<boolean | undefined>(undefined);
+
+function useDialogPortalContext(): boolean {
+	const value = useContext(DialogPortalContext);
+	if (value === undefined) {
+		throw new Error('Base UI: <Dialog.Portal> is missing.');
+	}
+	return value;
+}
+
+function DialogPortal(props: any): any {
+	const slot = S('DialogPortal');
+	const { keepMounted = false, container, children, ...portalProps } = props;
+
+	const { store } = useDialogRootContext() as DialogRootContextValue;
+	const mounted = store.useState('mounted', subSlot(slot, 'mounted'));
+	const modal = store.useState('modal', subSlot(slot, 'modal'));
+	const open = store.useState('open', subSlot(slot, 'open'));
+
+	const shouldRender = mounted || keepMounted;
+	if (!shouldRender) {
+		return null;
+	}
+
+	// Reuse `@octanejs/floating-ui`'s FloatingPortal (portal-node div = `<div id data-base-ui-portal>`,
+	// same as Base UI). Base UI's `container` maps to floating-ui's `root`.
+	return createElement(DialogPortalContext.Provider, {
+		value: keepMounted,
+		children: createElement(FloatingPortal, {
+			root: container,
+			children: [
+				mounted && modal === true
+					? createElement(InternalBackdrop, {
+							ref: store.context.internalBackdropRef,
+							inert: inertValue(!open),
+						})
+					: null,
+				children,
+			],
+		}),
+	});
+}
+
+// --- Backdrop ----------------------------------------------------------------
+
+function DialogBackdrop(componentProps: any): any {
+	const slot = S('DialogBackdrop');
+	const { render, className, style, forceRender = false, ref, ...elementProps } = componentProps;
+	const { store } = useDialogRootContext() as DialogRootContextValue;
+
+	const open = store.useState('open', subSlot(slot, 'open'));
+	const nested = store.useState('nested', subSlot(slot, 'nested'));
+	const mounted = store.useState('mounted', subSlot(slot, 'mounted'));
+	const transitionStatus = store.useState('transitionStatus', subSlot(slot, 'ts'));
+
+	const state = { open, transitionStatus };
+
+	return useRenderElement(
+		'div',
+		{ render, className, style },
+		{
+			state,
+			ref: [store.context.backdropRef, ref],
+			stateAttributesMapping: popupStateAttributesMapping,
+			props: [
+				{
+					role: 'presentation',
+					hidden: !mounted,
+					style: { userSelect: 'none', WebkitUserSelect: 'none' },
+				},
+				elementProps,
+			],
+			enabled: forceRender || !nested,
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+// --- Popup -------------------------------------------------------------------
+
+function DialogPopup(componentProps: any): any {
+	const slot = S('DialogPopup');
+	const { render, className, style, finalFocus, initialFocus, ref, ...elementProps } =
+		componentProps;
+
+	const { store } = useDialogRootContext() as DialogRootContextValue;
+
+	const descriptionElementId = store.useState('descriptionElementId', subSlot(slot, 'did'));
+	const disablePointerDismissal = store.useState('disablePointerDismissal', subSlot(slot, 'dpd'));
+	const floatingRootContext = store.useState('floatingRootContext', subSlot(slot, 'frc'));
+	const rootPopupProps = store.useState('popupProps', subSlot(slot, 'pp'));
+	const modal = store.useState('modal', subSlot(slot, 'modal'));
+	const mounted = store.useState('mounted', subSlot(slot, 'mounted'));
+	const nested = store.useState('nested', subSlot(slot, 'nested'));
+	const nestedOpenDialogCount = store.useState('nestedOpenDialogCount', subSlot(slot, 'nodc'));
+	const open = store.useState('open', subSlot(slot, 'open'));
+	const titleElementId = store.useState('titleElementId', subSlot(slot, 'tid'));
+	const transitionStatus = store.useState('transitionStatus', subSlot(slot, 'ts'));
+	const role = store.useState('role', subSlot(slot, 'role'));
+	const floatingId = floatingRootContext.useState('floatingId', subSlot(slot, 'fid'));
+
+	const popupId = elementProps.id ?? floatingId;
+
+	useDialogPortalContext();
+
+	useOpenChangeComplete(
+		{
+			open,
+			ref: store.context.popupRef,
+			onComplete() {
+				if (open) {
+					store.context.onOpenChangeComplete?.(true);
+				}
+			},
+		},
+		subSlot(slot, 'occ'),
+	);
+
+	const resolvedInitialFocus =
+		initialFocus === undefined ? createDefaultInitialFocus(store.context.popupRef) : initialFocus;
+
+	const nestedDialogOpen = nestedOpenDialogCount > 0;
+	const setPopupElement = store.useStateSetter('popupElement', subSlot(slot, 'spe'));
+
+	const state = { open, nested, transitionStatus, nestedDialogOpen };
+
+	const element = useRenderElement(
+		'div',
+		{ render, className, style },
+		{
+			state,
+			props: [
+				rootPopupProps,
+				{
+					id: popupId,
+					'aria-labelledby': titleElementId ?? undefined,
+					'aria-describedby': descriptionElementId ?? undefined,
+					role,
+					...FOCUSABLE_POPUP_PROPS,
+					hidden: !mounted,
+					onKeyDown(event: any) {
+						if (COMPOSITE_KEYS.has(event.key)) {
+							event.stopPropagation();
+						}
+					},
+				},
+				elementProps,
+			],
+			ref: [ref, store.context.popupRef, setPopupElement],
+			stateAttributesMapping: popupStateAttributesMapping,
+		},
+		subSlot(slot, 're'),
+	);
+
+	// FFM reuse-adapter: present the FloatingRootStore as the upstream-shaped context
+	// `@octanejs/floating-ui`'s FloatingFocusManager reads.
+	const ffmOpen = floatingRootContext.useState('open', subSlot(slot, 'ffmOpen'));
+	const ffmFloating = floatingRootContext.useState('floatingElement', subSlot(slot, 'ffmFel'));
+	const ffmDomReference = floatingRootContext.useState(
+		'domReferenceElement',
+		subSlot(slot, 'ffmDom'),
+	);
+	const ffmContext = useMemo(
+		() => ({
+			open: ffmOpen,
+			onOpenChange: (nextOpen: boolean, event: any, reason: string) => {
+				floatingRootContext.setOpen(
+					nextOpen,
+					createChangeEventDetails(reason ?? REASONS.focusOut, event),
+				);
+			},
+			events: floatingRootContext.context.events,
+			dataRef: floatingRootContext.context.dataRef,
+			elements: { domReference: ffmDomReference, floating: ffmFloating },
+		}),
+		[ffmOpen, ffmFloating, ffmDomReference, floatingRootContext],
+		subSlot(slot, 'ffmCtx'),
+	);
+
+	return createElement(FloatingFocusManager, {
+		context: ffmContext,
+		disabled: !mounted,
+		closeOnFocusOut: !disablePointerDismissal,
+		initialFocus: resolvedInitialFocus,
+		returnFocus: finalFocus,
+		modal: modal !== false,
+		restoreFocus: 'popup',
+		children: element,
+	});
+}
+
+// --- Title / Description / Close ---------------------------------------------
+
+function DialogTitle(componentProps: any): any {
+	const slot = S('DialogTitle');
+	const { render, className, style, id: idProp, ref, ...elementProps } = componentProps;
+	const { store } = useDialogRootContext() as DialogRootContextValue;
+	const id = useBaseUiId(idProp, subSlot(slot, 'id'));
+	store.useSyncedValueWithCleanup('titleElementId', id, subSlot(slot, 'sync'));
+	return useRenderElement(
+		'h2',
+		{ render, className, style },
+		{ ref, props: [{ id }, elementProps] },
+		subSlot(slot, 're'),
+	);
+}
+
+function DialogDescription(componentProps: any): any {
+	const slot = S('DialogDescription');
+	const { render, className, style, id: idProp, ref, ...elementProps } = componentProps;
+	const { store } = useDialogRootContext() as DialogRootContextValue;
+	const id = useBaseUiId(idProp, subSlot(slot, 'id'));
+	store.useSyncedValueWithCleanup('descriptionElementId', id, subSlot(slot, 'sync'));
+	return useRenderElement(
+		'p',
+		{ render, className, style },
+		{ ref, props: [{ id }, elementProps] },
+		subSlot(slot, 're'),
+	);
+}
+
+function DialogClose(componentProps: any): any {
+	const slot = S('DialogClose');
+	const {
+		render,
+		className,
+		style,
+		disabled = false,
+		nativeButton = true,
+		ref,
+		...elementProps
+	} = componentProps;
+	const { store } = useDialogRootContext() as DialogRootContextValue;
+	const open = store.useState('open', subSlot(slot, 'open'));
+
+	const { getButtonProps, buttonRef } = useButton(
+		{ disabled, native: nativeButton },
+		subSlot(slot, 'btn'),
+	);
+
+	const state = { disabled };
+
+	function handleClick(event: any) {
+		if (open) {
+			store.setOpen(false, createChangeEventDetails(REASONS.closePress, event));
+		}
+	}
+
+	return useRenderElement(
+		'button',
+		{ render, className, style },
+		{
+			state,
+			ref: [ref, buttonRef],
+			props: [{ onClick: handleClick }, elementProps, getButtonProps],
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+// --- Namespace ---------------------------------------------------------------
 
 export const Dialog = {
 	Root: DialogRoot,
 	Trigger: DialogTrigger,
+	Portal: DialogPortal,
+	Backdrop: DialogBackdrop,
+	Popup: DialogPopup,
+	Title: DialogTitle,
+	Description: DialogDescription,
+	Close: DialogClose,
 	createHandle: createDialogHandle,
 };

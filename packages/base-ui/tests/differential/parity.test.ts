@@ -301,6 +301,17 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	// GAP: the open path currently reuses `@octanejs/floating-ui`'s FloatingPortal + FocusManager,
+	// which emit `data-floating-ui-*` attributes (+ different FocusGuard style/role and container
+	// handling) — Base UI emits `data-base-ui-*`. Byte-parity needs Base UI's own FloatingPortal +
+	// FloatingFocusManager ported (next). The Root/Trigger/Interactions/parts + dismiss/scroll layer
+	// are all in place; this flips green once those land.
+	it.skip('Dialog: open modal (Portal/Backdrop/Popup/Title/Description/Close) renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'DialogOpen', undefined, CACHE);
+		await d.step('mount (open)', () => {});
+		d.unmount();
+	});
+
 	it('Slider: Root/Value/Control/Track/Indicator/Thumb render the value byte-identically', async () => {
 		const d = await mountDifferential(FIXTURE, 'SliderBasic', undefined, CACHE);
 		await d.step('mount', () => {});

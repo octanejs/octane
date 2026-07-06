@@ -10,6 +10,23 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3 OPEN path (part 1) — the store-connected dismiss/scroll layer landed (2026-07). base-ui
+> typecheck + suite (48) green.** `utils/floating/useDismiss.ts` — the full store-based dismiss hook
+> (Escape + outside-press close, with the complete intentional/sloppy press-type + touch + nested-tree
+> logic; reads `store.useState`/`select`/`setOpen`/`context`; returns `{reference, floating, trigger}`
+> prop bags; native events; slot-threaded). `utils/useScrollLock.ts` (the ref-counted `ScrollLocker`
+> singleton + overlay/inset-scrollbar strategies, near-verbatim). New util deps: `mergeCleanups`,
+> `floating/createAttribute` (`data-base-ui-${name}`), `floating/nodes` (`getNodeChildren`),
+> `floating/element` additions (`isEventTargetWithin`/`isRootElement`/`contains` re-export),
+> `floating/event` additions (`isReactEvent`), `platform` extended (`engine.webkit`,
+> `screenReader.voiceOver`), `AnimationFrame.create()`. **Added `@floating-ui/utils` to base-ui deps**
+> (Base UI imports the SAME package for `getComputedStyle`/`getParentNode`/`isElement`/`isHTMLElement`/
+> `isLastTraversableNode`/`isShadowRoot`/`isOverflowElement`). **Next (OPEN path part 2):** the real
+> `DialogInteractions` (wires useDismiss + useScrollLock), the FFM/FloatingPortal reuse-adapter (feed
+> `@octanejs/floating-ui`'s `FloatingFocusManager`/`FloatingPortal` a store-derived context — the
+> plan's "reuse with adapters" path), the Portal/Backdrop/Popup/Title/Description/Close parts, then an
+> open-dialog differential + focus-trap/return-focus/dismiss tests.
+
 > **Phase 3 — FIRST OVERLAY (closed Dialog) landed + differential-verified (2026-07). Green: 48
 > differential tests, full monorepo suite 2175 green.** The Store-based popup foundation is now
 > proven end-to-end. `src/dialog.ts` — the CLOSED-state path: `DialogStore` (extends the octane
