@@ -74,13 +74,16 @@ describe('@octanejs/radix — Toast', () => {
 	});
 
 	it('auto-dismisses after its duration and reports onOpenChange(false)', async () => {
-		const r = mount(ToastApp, { duration: 50 });
+		// `duration` must comfortably exceed `settle()`'s real setTimeout budget (3×5ms, which the
+		// event loop stretches to tens of ms under full-suite load) so the toast is still open at the
+		// first assertion; the later `wait` then exceeds the duration to observe the auto-dismiss.
+		const r = mount(ToastApp, { duration: 500 });
 		const $ = inC(r.container);
 		await settle();
 		expect($('[data-testid="toast"]')).not.toBe(null);
 		expect($('[data-testid="status"]')!.textContent).toBe('open');
 
-		await wait(150);
+		await wait(700);
 		expect($('[data-testid="toast"]')).toBe(null);
 		expect($('[data-testid="status"]')!.textContent).toBe('closed');
 		r.unmount();

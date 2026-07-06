@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta
+			name="description"
+			content="Octane — React's programming model, compiled ahead of time. No VDOM, no rules of hooks."
+		/>
+		<title>Octane — React's programming model, compiled</title>
+		<style>
+			/* Global base — everything component-scoped lives in scoped <style> blocks;
+			   only the document-level reset/palette belongs here (inline so the SSR
+			   first paint is styled with no external request). react.dev-inspired,
+			   dark-first. */
+			:root {
+				--bg: #23272f;
+				--panel: #2b3138;
+				--code-bg: #16181d;
+				--text: #f6f7f9;
+				--text-secondary: #99a1b3;
+				--accent: #087ea4;
+				--accent-hover: #0a91b8;
+				--accent-text: #58c4dc;
+				--border: rgba(255, 255, 255, 0.1);
+				color-scheme: dark;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			html {
+				-webkit-text-size-adjust: 100%;
+			}
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--text);
+				font-family:
+					Inter,
+					system-ui,
+					-apple-system,
+					'Segoe UI',
+					Roboto,
+					Helvetica,
+					Arial,
+					sans-serif;
+				line-height: 1.6;
+				font-size: 16px;
+			}
+			code,
+			pre,
+			kbd,
+			samp {
+				font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+			}
+			a {
+				color: var(--accent-text);
+				text-decoration: none;
+			}
+			a:hover {
+				text-decoration: underline;
+			}
+			::selection {
+				background: rgba(8, 126, 164, 0.5);
+			}
+			/* Shiki emits `<pre class="shiki github-dark">` with inline token colors;
+			   normalize its frame to the site's code panel. */
+			pre.shiki {
+				background: var(--code-bg) !important;
+				border: 1px solid var(--border);
+				border-radius: 1rem;
+				padding: 1rem 1.25rem;
+				overflow-x: auto;
+				font-size: 0.875rem;
+				line-height: 1.7;
+			}
+		</style>
+		<!--ssr-head-->
+	</head>
+	<body>
+		<div id="root"><!--ssr-body--></div>
+		<!-- SPA bootstrap for the production client build (`vite build`); no-ops in
+		     dev SSR, where @octanejs/vite-plugin injects its own hydrate entry
+		     (production SSR output is the plugin's Phase 2). -->
+		<script type="module" src="/src/entry-spa.ts"></script>
+	</body>
+</html>

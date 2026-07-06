@@ -1,0 +1,20 @@
+```tsrx
+// Counter.tsrx — hooks next to output, no rules of hooks
+import { useState, useEffect } from 'octane';
+
+export function Counter(props) @{
+	const [count, setCount] = useState(0);
+
+	// A hook behind a condition is fine — slots are
+	// assigned by call site, not call order.
+	if (!props.paused) {
+		useEffect(() => {
+			console.log('count is now', count);
+		}, [count]);
+	}
+
+	<button onClick={() => setCount(count + 1)}>
+		{'Count: ' + count}
+	</button>
+}
+```

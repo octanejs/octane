@@ -22,6 +22,7 @@ packages:
   - benchmarks/streaming-ssr/*
   - playground/*
   - examples/*
+  - website
 
 allowBuilds:
   esbuild: true

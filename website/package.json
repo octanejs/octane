@@ -1,0 +1,24 @@
+{
+	"name": "website",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"description": "The official Octane website",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"preview": "vite preview"
+	},
+	"dependencies": {
+		"octane": "workspace:*",
+		"@octanejs/mdx": "workspace:*",
+		"@octanejs/router": "workspace:*",
+		"@octanejs/vite-plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@octanejs/testing-library": "workspace:*",
+		"@shikijs/rehype": "catalog:default",
+		"typescript": "catalog:default",
+		"vite": "catalog:default"
+	}
+}

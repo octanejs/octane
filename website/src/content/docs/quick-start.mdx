@@ -1,0 +1,177 @@
+---
+title: Quick start
+---
+
+# Quick start
+
+Octane is a fast, TypeScript-first UI framework — the successor to Inferno. You
+get the React API you already know, a compiler that keeps the runtime small and
+fast, and hooks that no longer come with the rules of hooks.
+
+Components can be written in standard `.tsx`/`.jsx`, but opting for `.tsrx`
+provides better performance guarantees, especially around collections. TSRX is
+the spiritual successor to JSX, and allows for far better composability and
+future optimizations.
+
+## Install
+
+```bash
+pnpm add octane @octanejs/vite-plugin
+```
+
+Add the compiler plugin to your Vite config:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { octane } from 'octane/compiler/vite';
+
+export default defineConfig({
+	plugins: [octane()],
+});
+```
+
+`@octanejs/vite-plugin` is the optional metaframework (dev SSR, routing,
+hydrate). For a plain SPA you only need the `octane()` compiler plugin shown
+above.
+
+## Mount
+
+```ts
+// main.ts
+import { createRoot } from 'octane';
+import { App } from './App.tsrx';
+
+const root = createRoot(document.getElementById('root')!);
+root.render(App, { title: 'Hello world!' });
+```
+
+## Components
+
+A component is any function you use at a `<Foo/>` site — there's no separate
+"component" declaration. `@{ … }` is shorthand for returning JSX, so hooks and
+locals can sit next to the output:
+
+```tsrx
+import { useState } from 'octane';
+
+export function Counter() @{
+	const [count, setCount] = useState(0);
+
+	<button onClick={() => setCount(count + 1)}>
+		{'Count: ' + count}
+	</button>
+}
+```
+
+The same component written with an explicit `return` is identical — and a
+function is free to return a non-JSX value, which is coerced like any
+renderable:
+
+```tsrx
+export function Counter() {
+	const [count, setCount] = useState(0);
+	return <button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>;
+}
+
+function Label(props) {
+	if (props.hidden) return null; // renders nothing
+	return props.text; // a string renders as text
+}
+```
+
+## State and effects
+
+```tsrx
+import { useState, useEffect } from 'octane';
+
+export function Timer() @{
+	const [seconds, setSeconds] = useState(0);
+
+	useEffect(() => {
+		const id = setInterval(() => setSeconds((s) => s + 1), 1000);
+		return () => clearInterval(id);
+	}, []);
+
+	<p>{'Elapsed: ' + seconds}</p>
+}
+```
+
+## Conditional hooks
+
+Unlike React, a hook can sit behind a guard or after an early `return`. Each
+hook call site has a stable compiler-assigned slot, so render order can't
+desync the hooks:
+
+```tsrx
+import { useState, useEffect } from 'octane';
+
+export function Panel(props) @{
+	const [n, setN] = useState(0);
+
+	// An early return before a hook is fine in octane.
+	if (props.hidden) return;
+
+	useEffect(() => {
+		console.log('n changed:', n);
+	}, [n]);
+
+	<button onClick={() => setN(n + 1)}>{'count: ' + n}</button>
+}
+```
+
+## Control flow
+
+Rendered control flow uses directive-prefixed blocks: `@if`, `@for`, `@switch`,
+and `@try`. Plain JavaScript control flow stays in setup code.
+
+```tsrx
+export function Feed(props) @{
+	<ul>
+		@for (const item of props.items; key item.id) {
+			<li>{item.title as string}</li>
+		} @empty {
+			<li>Nothing to show</li>
+		}
+	</ul>
+}
+```
+
+```tsrx
+export function Greeting(props) @{
+	@if (props.name) {
+		<p>{'Hello, ' + props.name}</p>
+	} @else {
+		<p>Hello, stranger</p>
+	}
+}
+```
+
+## Server render and hydrate
+
+Octane's SSR entry points mirror React's: `octane/server` is the request-time
+renderer, `octane/static` the static-generation renderer. Buffered renders
+return `{ html, css }`; streaming (`renderToPipeableStream` /
+`renderToReadableStream`) flushes out-of-order Suspense like Fizz.
+
+```ts
+// entry-server.ts
+import { prerender } from 'octane/static'; // async; awaits all Suspense data
+import { App } from './App.tsrx';
+
+const { html, css } = await prerender(App);
+```
+
+```ts
+// entry-client.ts
+import { hydrateRoot } from 'octane';
+import { App } from './App.tsrx';
+
+hydrateRoot(document.getElementById('app')!, App);
+```
+
+## Next
+
+- [Differences from React](/docs/differences-from-react) — the deliberate
+  divergences (everything else matching React is the point).
+- [Bindings](/docs/bindings) — the `@octanejs/*` ports of the React ecosystem.
