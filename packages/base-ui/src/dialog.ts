@@ -4,12 +4,8 @@
 // events; every Store hook-method + hook threads an explicit slot; `React.createContext` →
 // octane `createContext`.
 //
-// INTERIM: `DialogPortal`/`DialogPopup` currently reuse `@octanejs/floating-ui`'s FloatingPortal +
-// FloatingFocusManager (fed a store-derived context adapter). They render a fully functional open,
-// portaled, focus-trapped dialog, BUT `@octanejs/floating-ui` emits `data-floating-ui-*` attributes
-// (+ a different FocusGuard style/role and container handling) where Base UI emits `data-base-ui-*`,
-// so the open path is NOT yet byte-identical to Base UI (its differential is skipped). Byte-parity
-// needs Base UI's own FloatingPortal + FloatingFocusManager ported — swap the two imports then.
+// `DialogPortal`/`DialogPopup` use Base UI's own FloatingPortal + FloatingFocusManager (ported to
+// `utils/floating/`, emitting `data-base-ui-*`) fed the FloatingRootStore directly as `context`.
 import {
 	createContext,
 	createElement,
@@ -22,7 +18,8 @@ import {
 	useImperativeHandle,
 	isChildrenBlock,
 } from 'octane';
-import { FloatingFocusManager, FloatingPortal } from '@octanejs/floating-ui';
+import { FloatingFocusManager } from './utils/floating/FloatingFocusManager';
+import { FloatingPortal } from './utils/floating/FloatingPortal';
 
 import { S, subSlot } from './internal';
 import { useRenderElement } from './utils/useRenderElement';
@@ -619,12 +616,10 @@ function DialogPortal(props: any): any {
 		return null;
 	}
 
-	// Reuse `@octanejs/floating-ui`'s FloatingPortal (portal-node div = `<div id data-base-ui-portal>`,
-	// same as Base UI). Base UI's `container` maps to floating-ui's `root`.
 	return createElement(DialogPortalContext.Provider, {
 		value: keepMounted,
 		children: createElement(FloatingPortal, {
-			root: container,
+			container,
 			children: [
 				mounted && modal === true
 					? createElement(InternalBackdrop, {
@@ -691,6 +686,7 @@ function DialogPopup(componentProps: any): any {
 	const nested = store.useState('nested', subSlot(slot, 'nested'));
 	const nestedOpenDialogCount = store.useState('nestedOpenDialogCount', subSlot(slot, 'nodc'));
 	const open = store.useState('open', subSlot(slot, 'open'));
+	const openMethod = store.useState('openMethod', subSlot(slot, 'om'));
 	const titleElementId = store.useState('titleElementId', subSlot(slot, 'tid'));
 	const transitionStatus = store.useState('transitionStatus', subSlot(slot, 'ts'));
 	const role = store.useState('role', subSlot(slot, 'role'));
@@ -740,6 +736,7 @@ function DialogPopup(componentProps: any): any {
 							event.stopPropagation();
 						}
 					},
+					style: { ['--nested-dialogs']: nestedOpenDialogCount },
 				},
 				elementProps,
 			],
@@ -749,33 +746,9 @@ function DialogPopup(componentProps: any): any {
 		subSlot(slot, 're'),
 	);
 
-	// FFM reuse-adapter: present the FloatingRootStore as the upstream-shaped context
-	// `@octanejs/floating-ui`'s FloatingFocusManager reads.
-	const ffmOpen = floatingRootContext.useState('open', subSlot(slot, 'ffmOpen'));
-	const ffmFloating = floatingRootContext.useState('floatingElement', subSlot(slot, 'ffmFel'));
-	const ffmDomReference = floatingRootContext.useState(
-		'domReferenceElement',
-		subSlot(slot, 'ffmDom'),
-	);
-	const ffmContext = useMemo(
-		() => ({
-			open: ffmOpen,
-			onOpenChange: (nextOpen: boolean, event: any, reason: string) => {
-				floatingRootContext.setOpen(
-					nextOpen,
-					createChangeEventDetails(reason ?? REASONS.focusOut, event),
-				);
-			},
-			events: floatingRootContext.context.events,
-			dataRef: floatingRootContext.context.dataRef,
-			elements: { domReference: ffmDomReference, floating: ffmFloating },
-		}),
-		[ffmOpen, ffmFloating, ffmDomReference, floatingRootContext],
-		subSlot(slot, 'ffmCtx'),
-	);
-
 	return createElement(FloatingFocusManager, {
-		context: ffmContext,
+		context: floatingRootContext,
+		openInteractionType: openMethod,
 		disabled: !mounted,
 		closeOnFocusOut: !disablePointerDismissal,
 		initialFocus: resolvedInitialFocus,

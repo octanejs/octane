@@ -225,7 +225,9 @@ export function getTabbableAfterElement(referenceElement: Element | null): Focus
 	return getTabbableNearElement(referenceElement, 1);
 }
 
-export function getTabbableBeforeElement(referenceElement: Element | null): FocusableElement | null {
+export function getTabbableBeforeElement(
+	referenceElement: Element | null,
+): FocusableElement | null {
 	return getTabbableNearElement(referenceElement, -1);
 }
 

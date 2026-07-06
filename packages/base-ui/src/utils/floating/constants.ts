@@ -1,6 +1,7 @@
 // Ported from .base-ui/packages/react/src/floating-ui-react/utils/constants.ts. Marks a popup as
 // programmatically focusable (the focus manager + composite navigation look for it).
 export const FOCUSABLE_ATTRIBUTE = 'data-base-ui-focusable';
+export const CLICK_TRIGGER_IDENTIFIER = 'data-base-ui-click-trigger';
 
 export const TYPEABLE_SELECTOR =
 	"input:not([type='hidden']):not([disabled])," +

@@ -172,6 +172,23 @@ export function DialogOpen() @{
 	</div>
 }
 
+// Dialog (interactive) — a real trigger→open→dismiss flow, for behavior tests (focus/escape/close
+// aren't visible in innerHTML so they can't be differential-tested).
+export function DialogInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="dlg-host" />
+		<Dialog.Root>
+			<Dialog.Trigger className="dlg-trigger">Open</Dialog.Trigger>
+			<Dialog.Portal container={hostRef}>
+				<Dialog.Popup className="dlg-popup">
+					<Dialog.Close className="dlg-close">Close</Dialog.Close>
+				</Dialog.Popup>
+			</Dialog.Portal>
+		</Dialog.Root>
+	</div>
+}
+
 // Slider — Root (role=group) / Value (output) / Control / Track / Indicator / Thumb (a div +
 // nested <input type=range>). With the default `center` alignment the thumb position + indicator
 // width are pure math (valueToPercent), so mount renders byte-identically without layout. Proves
