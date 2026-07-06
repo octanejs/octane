@@ -1,7 +1,7 @@
 # @octanejs/base-ui
 
 [Base UI](https://base-ui.com) (`@base-ui/react`) ported to the
-[octane](https://github.com/octanejs/octane) renderer — headless, accessible, unstyled
+[octane](https://github.com/octanejs/octane) UI framework — headless, accessible, unstyled
 UI primitives.
 
 Alpha, in progress. Ported at full fidelity from the pinned `mui/base-ui` source

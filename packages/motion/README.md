@@ -1,6 +1,6 @@
 # @octanejs/motion
 
-[Framer Motion](https://motion.dev) for the [octane](https://github.com/octanejs/octane) renderer.
+[Framer Motion](https://motion.dev) for the [octane](https://github.com/octanejs/octane) UI framework.
 
 Motion separates a framework-agnostic animation engine (`animate`) and gesture
 primitives (`hover`, `press`) from its React components (`motion.div`,

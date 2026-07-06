@@ -1,7 +1,7 @@
 # @octanejs/testing-library
 
 [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
-for the [octane](https://github.com/octanejs/octane) renderer.
+for the [octane](https://github.com/octanejs/octane) UI framework.
 
 The split mirrors RTL's own architecture (and
 `docs/react-library-compat-plan.md` §2): **`@testing-library/dom` is

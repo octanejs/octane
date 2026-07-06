@@ -1,6 +1,6 @@
 # @octanejs/stylex
 
-[StyleX](https://stylexjs.com) for the [octane](https://github.com/octanejs/octane) renderer.
+[StyleX](https://stylexjs.com) for the [octane](https://github.com/octanejs/octane) UI framework.
 
 StyleX is a **build-time** CSS-in-JS system: a compiler turns `stylex.create({...})`
 into atomic class names and extracts the CSS, and `stylex.props(...)` merges those at
