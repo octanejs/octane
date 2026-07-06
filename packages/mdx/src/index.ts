@@ -22,8 +22,12 @@
  * contrast, is null-scope safe (it returns the context default). So the merge
  * runs unmemoized: same observable mapping every render, valid in both
  * runtimes (on the server the client context yields its default `{}`, and the
- * `props.components` route still applies — context threading across an SSR
- * pass is an open question for all octane bindings).
+ * `props.components` route still applies).
+ *
+ * SSR provider support lives in `@octanejs/mdx/server` — the same layer
+ * mirrored onto `octane/server` context (the two runtimes' context stores are
+ * disjoint; server-mode documents import `useMDXComponents` from there). Keep
+ * the merge semantics here and in src/server.ts in lockstep.
  */
 import { createContext, createElement, useContext, type ComponentBody } from 'octane';
 

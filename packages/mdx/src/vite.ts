@@ -55,8 +55,14 @@ export function octaneMdx(options: OctaneMdxPluginOptions = {}): OctaneMdxPlugin
 			if (hmrEnabled === undefined) hmrEnabled = config.command === 'serve';
 		},
 		async transform(code, id, transformOptions) {
-			const file = id.split('?')[0]; // strip Vite's ?v=/?used query suffix
+			const [file, query = ''] = id.split('?'); // Vite ids carry ?v=/?used/?raw/… suffixes
 			if (!(file.endsWith('.mdx') || (includeMd && file.endsWith('.md')))) return null;
+			// An ASSET-query import (`import text from './doc.md?raw'`, ?url, ?inline)
+			// is vite's territory: its asset plugin already LOADED the module as JS
+			// (`export default "…"`), so compiling here would mangle it — and the
+			// author explicitly asked for the file, not the document. Internal
+			// bookkeeping queries (?v=hash, ?used, ?import) still transform.
+			if (/(^|&)(raw|url|inline|worker|sharedworker)(=|&|$)/.test(query)) return null;
 			const ssr =
 				forceSsr !== undefined
 					? forceSsr
