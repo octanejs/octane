@@ -17,21 +17,17 @@
  * @mdx-js/react's provider).
  *
  * The only adaptation between the two compilers is `recmaOctaneAdapter`, a tiny
- * ESTree pass over MDX's output:
- *
- *  1. MDX's no-layout branch CALLS `_createMdxContent(props)` directly, which
- *     bypasses octane's `(props, __s, __extra)` component ABI (the server body
- *     would run with `__s === undefined` and lean on scope-recovery). The pass
- *     rewrites the bare call to `<_createMdxContent {...props}/>` so both
- *     branches mount through the component machinery on client AND server.
- *     (The layout branch's `<_createMdxContent {...props}/>` tag needs no help:
- *     octane classifies `_`-starting identifier tags as component references,
- *     per JSX semantics.)
- *
- * (MDX's `<_components.h1>`-style member tags, whose runtime value is a host
- * tag STRING unless overridden, need no adaptation: octane's runtime renders a
- * string comp at a component site as the host element on BOTH sides — the
- * server via ssrComponent's string branch, the client via componentSlot's.)
+ * ESTree pass over MDX's output: MDX's no-layout branch CALLS
+ * `_createMdxContent(props)` directly, which bypasses octane's
+ * `(props, __s, __extra)` component ABI (the server body would run with
+ * `__s === undefined` and lean on scope-recovery). The pass rewrites the bare
+ * call to `<_createMdxContent {...props}/>` so both branches mount through the
+ * component machinery on client AND server. (The layout branch's
+ * `<_createMdxContent {...props}/>` tag needs no help: octane classifies
+ * `_`-starting identifier tags as component references, per JSX semantics.
+ * MDX's `<_components.h1>`-style member tags, whose runtime value is a host
+ * tag STRING unless overridden, need no adaptation either: octane renders a
+ * string comp at a component site as the host element on client and server.)
  */
 import {
 	compile as mdxCompile,
@@ -171,7 +167,7 @@ function isNode(value: unknown): value is EstreeNode {
 // Visit `node` (post-decision, pre-recursion): return a replacement node to
 // swap in (recursed into by the caller), or null to keep the node and recurse.
 function adaptNode(node: EstreeNode): EstreeNode | null {
-	// (1) `_createMdxContent(props)` → `<_createMdxContent {...props}/>`.
+	// `_createMdxContent(props)` → `<_createMdxContent {...props}/>`.
 	if (
 		node.type === 'CallExpression' &&
 		isNode(node.callee) &&
