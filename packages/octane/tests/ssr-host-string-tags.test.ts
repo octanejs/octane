@@ -1,13 +1,21 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 
-// Member-expression / dynamic JSX tags (`<obj.tag/>`, `<{expr}/>`) whose RUNTIME
-// value is a host tag STRING — e.g. MDX's `_components.h1` mapping, unoverridden.
-// The client value-lowers these to `createElement(obj.tag, …)` descriptors and the
-// de-opt renderer accepts a string type; the server's `ssrComponent` must match by
-// routing a string comp to the host-element serializer (in the same single
-// `<!--[-->…<!--]-->` block a component body gets) instead of CALLING it.
+// SSR of JSX tags that resolve to a HOST tag STRING at runtime. Two regimes:
+//   - TEMPLATE position (`@{ … }` body): `<props.parts.title>` lowers to
+//     `ssrComponent(__s, props.parts.title, …)` — the string branch serializes
+//     the host element inside the component's one-block range, so the client's
+//     componentSlot adopts it uniformly on hydration.
+//   - VALUE position (`.tsx` return / `{expr}` hole): the de-opt descriptor
+//     path (`ssrChild` → `ssrHostElement`) — already string-aware.
+
+const FIXTURE = join(
+	process.cwd(),
+	'packages/octane/tests/hydration/_fixtures/host-string-tag.tsrx',
+);
 
 function evalServer(source: string, file: string): Record<string, any> {
 	let { code } = compile(source, file, { mode: 'server' });
@@ -20,9 +28,64 @@ function evalServer(source: string, file: string): Record<string, any> {
 	return fn(RT, {});
 }
 
-// Value-position (.tsx return) bodies — the MDX shape (`<_components.h1>` in a
-// compiled document body) — plus template (`@{}`) bodies with the same tags.
-const mod = evalServer(
+const mod = evalServer(readFileSync(FIXTURE, 'utf8'), 'host-string-tag.tsrx');
+
+describe('SSR host string tags — template position', () => {
+	it('serializes a member-expression tag as a host element in one block range', async () => {
+		const { html } = await RT.renderToString(mod.Card, {
+			parts: { title: 'h1' },
+			text: 'Hi',
+			klass: 'big',
+		});
+		expect(html).toBe(
+			'<div id="card"><!--[--><h1 id="t" class="big"><!--[-->Hi<!--]--></h1><!--]--></div>',
+		);
+	});
+
+	it('serializes a variable tag wrapping a component child (nested block)', async () => {
+		const { html } = await RT.renderToString(mod.Wrap, { tag: 'article' });
+		expect(html).toContain('<article id="inner">');
+		expect(html).toContain('count:0');
+		// The component child inside the dynamic host carries its own block range.
+		expect(html).toMatch(/<article id="inner"><!--\[-->.*<!--\]--><\/article>/);
+	});
+
+	it('serializes a childless dynamic VOID tag self-closed', async () => {
+		const { html } = await RT.renderToString(mod.Bare, { tag: 'hr' });
+		expect(html).toBe('<div id="bare"><!--[--><hr data-x="1"/><!--]--></div>');
+	});
+
+	it('drops event/ref props from the serialized element', async () => {
+		const { html } = await RT.renderToString(mod.Clicky, { tag: 'button' });
+		expect(html).toContain('<button id="btn">');
+		expect(html).not.toContain('onPick');
+		expect(html).not.toContain('onClick');
+		expect(html).not.toContain('ref=');
+	});
+
+	it('emits NO hydration markers under renderToStaticMarkup', async () => {
+		const { html } = await RT.renderToStaticMarkup(mod.Card, {
+			parts: { title: 'h2' },
+			text: 'Hi',
+			klass: null,
+		});
+		expect(html).toBe('<div id="card"><h2 id="t">Hi</h2></div>');
+	});
+
+	it('rejects an invalid (markup-injecting) tag like React', async () => {
+		await expect(async () =>
+			RT.renderToString(mod.Card, {
+				parts: { title: 'div><img src=x onerror=alert(1)>' },
+				text: 'x',
+			}),
+		).rejects.toThrow(/Invalid tag/);
+	});
+});
+
+// VALUE position (.tsx return bodies) — the MDX shape (`<_components.h1>` in a
+// compiled document body). These lower to createElement descriptors / direct
+// ssrComponent calls whose tag expression is evaluated at runtime.
+const vmod = evalServer(
 	`
 	export function MemberSole(props) {
 		return <props.parts.title class="title">hi</props.parts.title>;
@@ -56,30 +119,21 @@ const mod = evalServer(
 		const parts = { title: props.useFancy ? Fancy : 'h1' };
 		return <parts.title>Title</parts.title>;
 	}
-	export function TemplateMember(props) @{
-		<section><props.parts.title>hi</props.parts.title></section>
-	}
-	export function TemplateDynamic(props) @{
-		<div><{props.tag}>x</{props.tag}></div>
-	}
-	export function TemplateHole(props) @{
-		<div><props.parts.title>n={props.value}</props.parts.title></div>
-	}
 	`,
-	'host-string-tags.tsrx',
+	'host-string-tags-value.tsrx',
 );
 
-describe('SSR — member/dynamic tags resolving to host tag strings (value position)', () => {
+describe('SSR host string tags — value position (.tsx return)', () => {
 	it('renders a sole member tag string as a host element', async () => {
-		const { html } = await RT.renderToString(mod.MemberSole, { parts: { title: 'h1' } });
+		const { html } = await RT.renderToString(vmod.MemberSole, { parts: { title: 'h1' } });
 		expect(html).toContain('<h1 class="title">hi</h1>');
-		const r = RT.renderToStaticMarkup(mod.MemberSole, { parts: { title: 'h2' } });
+		const r = RT.renderToStaticMarkup(vmod.MemberSole, { parts: { title: 'h2' } });
 		// Static markup: no hydration markers at all.
 		expect(r.html).toBe('<h2 class="title">hi</h2>');
 	});
 
 	it('renders every member tag of a fragment return', async () => {
-		const { html } = await RT.renderToString(mod.MemberFragment, {
+		const { html } = await RT.renderToString(vmod.MemberFragment, {
 			parts: { title: 'h1', body: 'p' },
 		});
 		expect(html).toContain('<h1>Heading</h1>');
@@ -87,22 +141,22 @@ describe('SSR — member/dynamic tags resolving to host tag strings (value posit
 	});
 
 	it('renders nested member tags (list-in-list, the MDX markdown shape)', async () => {
-		const r = RT.renderToStaticMarkup(mod.MemberNested, { c: { ul: 'ul', li: 'li' } });
+		const r = RT.renderToStaticMarkup(vmod.MemberNested, { c: { ul: 'ul', li: 'li' } });
 		expect(r.html).toBe('<ul class="list"><li>a</li><li>b</li></ul>');
 	});
 
 	it('renders a `<{expr}/>` dynamic tag resolving to a string', async () => {
-		const { html } = await RT.renderToString(mod.DynamicTag, { tag: 'button', label: 'go' });
+		const { html } = await RT.renderToString(vmod.DynamicTag, { tag: 'button', label: 'go' });
 		expect(html).toContain('<button id="d">go</button>');
 	});
 
 	it('serializes a void host tag without a closing tag', async () => {
-		const r = RT.renderToStaticMarkup(mod.VoidTag, { parts: { rule: 'hr' } });
+		const r = RT.renderToStaticMarkup(vmod.VoidTag, { parts: { rule: 'hr' } });
 		expect(r.html).toBe('<hr class="sep"/>');
 	});
 
 	it('drops key/ref/event props and keeps attrs (client parity)', async () => {
-		const r = RT.renderToStaticMarkup(mod.Filtered, {
+		const r = RT.renderToStaticMarkup(vmod.Filtered, {
 			parts: { title: 'span' },
 			ref: () => {},
 			onClick: () => {},
@@ -111,41 +165,9 @@ describe('SSR — member/dynamic tags resolving to host tag strings (value posit
 	});
 
 	it('dispatches by RUNTIME kind: the same tag site renders a component when overridden', async () => {
-		const asString = RT.renderToStaticMarkup(mod.Overridable, { useFancy: false });
+		const asString = RT.renderToStaticMarkup(vmod.Overridable, { useFancy: false });
 		expect(asString.html).toBe('<h1>Title</h1>');
-		const asComp = RT.renderToStaticMarkup(mod.Overridable, { useFancy: true });
+		const asComp = RT.renderToStaticMarkup(vmod.Overridable, { useFancy: true });
 		expect(asComp.html).toBe('<em class="fancy">Title</em>');
-	});
-
-	it('rejects an injection-unsafe tag string (React parity)', () => {
-		expect(() =>
-			RT.renderToString(mod.MemberSole, { parts: { title: 'h1><img onerror=x>' } }),
-		).toThrow('Invalid tag');
-	});
-});
-
-describe('SSR — member/dynamic tags resolving to host tag strings (template position)', () => {
-	it('renders a member tag string inside a template body', async () => {
-		const { html } = await RT.renderToString(mod.TemplateMember, { parts: { title: 'h2' } });
-		// ONE block — the component site's own adoption range around the element.
-		// The `__schildren$N` render fn's HTML inlines as the element's PLAIN
-		// content (`<h2>hi</h2>`, the static-tag / client de-opt shape), NOT as a
-		// nested component body (`<h2><!--[-->hi<!--]--></h2>`).
-		expect(html).toContain('<section><!--[--><h2>hi</h2><!--]--></section>');
-	});
-
-	it('renders a dynamic tag string inside a template body (clean static markup)', async () => {
-		const r = RT.renderToStaticMarkup(mod.TemplateDynamic, { tag: 'strong' });
-		expect(r.html).toBe('<div><strong>x</strong></div>');
-	});
-
-	it('keeps template holes inside a string tag hydratable (their own blocks, inline content)', async () => {
-		const { html } = await RT.renderToString(mod.TemplateHole, {
-			parts: { title: 'h3' },
-			value: 42,
-		});
-		// The hole carries its own `<!--[-->…<!--]-->` (a renderable hole always
-		// does); the element's static text stays plain.
-		expect(html).toContain('<h3>n=<!--[-->42<!--]--></h3>');
 	});
 });

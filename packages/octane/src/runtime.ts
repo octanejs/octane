@@ -2480,6 +2480,37 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 	scope.$$ctxValues.set(context, value);
 }
 
+// Marker for compiler-generated children-block render functions. `.tsrx` lowers a component's
+// element/text children (`<C><D/></C>`) to a render function `__children$N(__props, __s, __extra)`,
+// while a render-prop child (`<C>{(data) => …}</C>`) is passed through RAW. Both are
+// `typeof === 'function'`, so React-ecosystem code that branches on `typeof children === 'function'`
+// (function-as-child / render-prop APIs) cannot tell them apart. The compiler tags the FORMER with
+// this symbol so `isChildrenBlock()` can exclude it. `Symbol.for` so the identity survives multiple
+// runtime copies (e.g. a binding bundled against its own octane).
+const CHILDREN_BLOCK: unique symbol = Symbol.for('octane.childrenBlock') as any;
+
+/**
+ * Compiler-emitted: tag a children-block render function so `isChildrenBlock` recognises it.
+ * Returns the function for inline use (`{ children: markChildrenBlock(__children$N) }`).
+ * @internal
+ */
+export function markChildrenBlock<T>(fn: T): T {
+	if (typeof fn === 'function') {
+		(fn as any)[CHILDREN_BLOCK] = true;
+	}
+	return fn;
+}
+
+/**
+ * True when `value` is a compiler-generated children-block — a component's element/text children
+ * that `.tsrx` lowered to a render function — as opposed to a user render-prop function or any other
+ * value. Lets a binding with a function-as-child API tell `<C>{(x) => …}</C>` (call it) apart from
+ * `<C><D/></C>` (render it): `typeof children === 'function' && !isChildrenBlock(children)`.
+ */
+export function isChildrenBlock(value: unknown): boolean {
+	return typeof value === 'function' && (value as any)[CHILDREN_BLOCK] === true;
+}
+
 /**
  * The children reaching `<Suspense>` / `<ErrorBoundary>` are rendered as the try
  * BODY — `renderBlock` invokes it as `block.body(props, scope, extra)`. The `.tsrx`
@@ -5488,7 +5519,11 @@ interface CompSlot {
 	anchor: Node | null;
 	singleRoot: boolean;
 	block: Block | null;
-	currentComp: ComponentBody | null;
+	// The component identity last rendered: a ComponentBody, or a host tag STRING
+	// (a dynamic JSX tag that resolved to e.g. 'h1' — see the string-comp branch
+	// in componentSlot). Compared with `!==` either way, so 'h1'→'h1' updates in
+	// place while 'h1'→'h2' / string↔function flips tear down and remount.
+	currentComp: ComponentBody | string | null;
 	// Last-render `key` value. Sentinel `NO_KEY` when the slot was created
 	// without a key arg, or when the prior render didn't supply one — so a
 	// first render with `key=undefined` followed by a subsequent render with
@@ -5513,13 +5548,36 @@ export function componentSlot(
 	parentScope: Scope,
 	slotKey: number,
 	domParent: Node,
-	comp: ComponentBody,
+	comp: ComponentBody | string,
 	props: any,
 	anchor?: Node | null,
 	key?: any,
 	singleRoot?: boolean,
 ): void {
 	const parentBlock = parentScope.block;
+	// A STRING comp: a dynamic JSX tag — `<props.parts.title>`, `<Tag/>` with
+	// `const Tag = 'h1'`, `<{expr}/>` — that resolved to a HOST tag name at
+	// runtime. Render it as a host element through the stable de-opt renderer:
+	// the block's body is `hostElementBody` and its props a host DESCRIPTOR
+	// carrying the tag + props + the compiled `children` render-fn (which
+	// hostElementBody's childSlot renders as its own Block). That matches the
+	// server's emission (ssrComponent's string branch → ssrHostElement), so
+	// hydration adopts `<!--[--><tag>…children block…</tag><!--]-->` uniformly.
+	// Identity below still compares the raw `comp` string: same tag → update in
+	// place (props patched, children reconciled); a different tag or a
+	// string↔function flip → tear down + remount (React's element-type reset).
+	let body = comp as ComponentBody;
+	let renderProps = props;
+	if (typeof comp === 'string') {
+		body = hostElementBody as unknown as ComponentBody;
+		renderProps = {
+			$$kind: ELEMENT_TAG,
+			type: comp,
+			props,
+			key: null,
+			children: props != null ? props.children : null,
+		} satisfies ElementDescriptor;
+	}
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
 	if (state === undefined) {
 		let start: Comment | null;
@@ -5600,7 +5658,7 @@ export function componentSlot(
 				// pair sits exactly where the old range was — no DOM move needed. We rename
 				// the comments rather than replacing them: descendant slots inside the WIP
 				// (e.g. a return-slot childSlot) may anchor on `wip.end`, so it must survive.
-				const r = renderOffscreen(parentBlock, domParent, state.end, comp, props);
+				const r = renderOffscreen(parentBlock, domParent, state.end, body, renderProps);
 				if (r.suspended || r.error) {
 					disposeWip(r.wip);
 					if (r.error) throw r.error;
@@ -5625,7 +5683,7 @@ export function componentSlot(
 			// then fall through to the legacy singleRoot swap below.
 			const probeAfter = state.end ?? state.anchor;
 			if (probeAfter !== null) {
-				const r = renderOffscreen(parentBlock, domParent, probeAfter, comp, props);
+				const r = renderOffscreen(parentBlock, domParent, probeAfter, body, renderProps);
 				disposeWip(r.wip);
 				if (r.error) throw r.error;
 				if (r.suspended) throw new SuspenseException(r.suspended);
@@ -5664,7 +5722,15 @@ export function componentSlot(
 			// nothing, so we leave start/end null and unmountBlock no-ops for it
 			// (rather than capturing a stale sibling).
 			const before = state.anchor ? state.anchor.previousSibling : domParent.lastChild;
-			const b = createBlock('dynamic', parentBlock, domParent, null, state.anchor, comp, props);
+			const b = createBlock(
+				'dynamic',
+				parentBlock,
+				domParent,
+				null,
+				state.anchor,
+				body,
+				renderProps,
+			);
 			state.block = b;
 			try {
 				renderBlock(b);
@@ -5676,15 +5742,24 @@ export function componentSlot(
 				}
 			}
 		} else {
-			const b = createBlock('dynamic', parentBlock, domParent, state.start, state.end, comp, props);
+			const b = createBlock(
+				'dynamic',
+				parentBlock,
+				domParent,
+				state.start,
+				state.end,
+				body,
+				renderProps,
+			);
 			state.block = b;
 			renderBlock(b);
 		}
 	} else if (state.block) {
 		// `memo(Component)` — skip the body when new props shallow-equal the
-		// committed props (React.memo's contract; see tryMemoBail).
+		// committed props (React.memo's contract; see tryMemoBail). A string comp
+		// is never memo-wrapped, so it falls through to the re-render below.
 		if (tryMemoBail(state.block, comp, props)) return;
-		state.block.props = props;
+		state.block.props = renderProps;
 		renderBlock(state.block);
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the next

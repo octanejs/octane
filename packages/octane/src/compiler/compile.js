@@ -6000,7 +6000,12 @@ function isComponentTag(node) {
 	// codegen path as `<Foo>` / `<ctx.Provider>`.
 	if (name.type === 'JSXExpressionContainer' && name.isDynamic === true) return true;
 	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
-		return typeof name.name === 'string' && /^[A-Z]/.test(name.name);
+		if (typeof name.name !== 'string') return false;
+		// JSX semantics (Babel/TS `isCompatTag`): an identifier tag is a HOST
+		// string tag only when it starts with a lowercase ASCII letter (or isn't
+		// a plain identifier, e.g. `<my-element>`); everything else — `<Foo>`,
+		// `<_Inner>`, `<$Inner>` — is a component REFERENCE.
+		return !/^[a-z]/.test(name.name) && !name.name.includes('-');
 	}
 	return false;
 }
@@ -6167,7 +6172,12 @@ function makeCompCall(
 			parentNs,
 			cssHash,
 		);
-		propParts.push(`"children": ${childrenHelperName}`);
+		// Tag the children-block render fn so a consumer can tell it from a render-prop
+		// function child (`<C>{(x) => …}</C>`, passed RAW above) — both are `typeof === 'function'`,
+		// so React-ecosystem `typeof children === 'function'` checks need `isChildrenBlock` to
+		// exclude compiled element/text children. See runtime `markChildrenBlock`/`isChildrenBlock`.
+		ctx.runtimeNeeded.add('markChildrenBlock');
+		propParts.push(`"children": _$markChildrenBlock(${childrenHelperName})`);
 	}
 
 	const propsExpr = `{ ${propParts.join(', ')} }`;

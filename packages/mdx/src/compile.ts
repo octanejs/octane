@@ -17,26 +17,17 @@
  * @mdx-js/react's provider).
  *
  * The only adaptation between the two compilers is `recmaOctaneAdapter`, a tiny
- * ESTree pass over MDX's output:
- *
- *  1. MDX names its body component `_createMdxContent`. octane's JSX lowering
- *     treats an identifier tag as a component only when it starts with an
- *     UPPERCASE letter, so the layout branch's `<_createMdxContent {...props}/>`
- *     would lower to `createElement('_createMdxContent', …)` — a host STRING
- *     tag (JSX semantics say a `_`-starting identifier is a component
- *     reference; Babel/TS agree). The pass renames it to `MDX$CreateMdxContent`.
- *     This is a documented workaround for an octane compiler gap — drop the
- *     rename once `<_Foo/>` compiles as a component reference.
- *  2. MDX's no-layout branch CALLS `_createMdxContent(props)` directly, which
- *     bypasses octane's `(props, __s, __extra)` component ABI (the server body
- *     would run with `__s === undefined` and lean on scope-recovery). The pass
- *     rewrites the bare call to `<MDX$CreateMdxContent {...props}/>` so both
- *     branches mount through the component machinery on client AND server.
- *
- * (MDX's `<_components.h1>`-style member tags, whose runtime value is a host
- * tag STRING unless overridden, need no adaptation: octane's server runtime
- * renders a string comp at a component site as the host element, matching the
- * client's de-opt descriptor path.)
+ * ESTree pass over MDX's output: MDX's no-layout branch CALLS
+ * `_createMdxContent(props)` directly, which bypasses octane's
+ * `(props, __s, __extra)` component ABI (the server body would run with
+ * `__s === undefined` and lean on scope-recovery). The pass rewrites the bare
+ * call to `<_createMdxContent {...props}/>` so both branches mount through the
+ * component machinery on client AND server. (The layout branch's
+ * `<_createMdxContent {...props}/>` tag needs no help: octane classifies
+ * `_`-starting identifier tags as component references, per JSX semantics.
+ * MDX's `<_components.h1>`-style member tags, whose runtime value is a host
+ * tag STRING unless overridden, need no adaptation either: octane renders a
+ * string comp at a component site as the host element on client and server.)
  */
 import {
 	compile as mdxCompile,
@@ -157,10 +148,7 @@ function octaneStage(jsxSource: string, id: string, options: CompileMdxOptions):
 // recmaOctaneAdapter — the ESTree pass described in the module doc.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MDX_BODY_SOURCE_NAME = '_createMdxContent';
-// Capitalized (octane component tag) + `$` (never produced by MDX's own
-// name-mangling and implausible as a user export from a document).
-const MDX_BODY_NAME = 'MDX$CreateMdxContent';
+const MDX_BODY_NAME = '_createMdxContent';
 
 function recmaOctaneAdapter() {
 	return (tree: unknown): void => {
@@ -179,25 +167,17 @@ function isNode(value: unknown): value is EstreeNode {
 // Visit `node` (post-decision, pre-recursion): return a replacement node to
 // swap in (recursed into by the caller), or null to keep the node and recurse.
 function adaptNode(node: EstreeNode): EstreeNode | null {
-	// (2) `_createMdxContent(props)` → `<MDX$CreateMdxContent {...props}/>`.
-	// Matched BEFORE the rename visits the callee identifier below.
+	// `_createMdxContent(props)` → `<_createMdxContent {...props}/>`.
 	if (
 		node.type === 'CallExpression' &&
 		isNode(node.callee) &&
 		node.callee.type === 'Identifier' &&
-		node.callee.name === MDX_BODY_SOURCE_NAME &&
+		node.callee.name === MDX_BODY_NAME &&
 		Array.isArray(node.arguments) &&
 		node.arguments.length <= 1 &&
 		(node.arguments.length === 0 || isNode(node.arguments[0]))
 	) {
 		return jsxSelfClosing(MDX_BODY_NAME, (node.arguments[0] as EstreeNode) ?? null);
-	}
-	// (1) Rename every reference (declaration id, JSX tag, plain identifier).
-	if (
-		(node.type === 'Identifier' || node.type === 'JSXIdentifier') &&
-		node.name === MDX_BODY_SOURCE_NAME
-	) {
-		node.name = MDX_BODY_NAME;
 	}
 	return null;
 }
