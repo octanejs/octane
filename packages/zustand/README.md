@@ -1,6 +1,6 @@
 # @octanejs/zustand
 
-[zustand](https://github.com/pmndrs/zustand) for the [octane](https://github.com/octanejs/octane) renderer.
+[zustand](https://github.com/pmndrs/zustand) for the [octane](https://github.com/octanejs/octane) UI framework.
 
 zustand separates a framework-agnostic **vanilla store** (`createStore`) from a tiny
 **React binding** (`create` + `useStore`) built on `useSyncExternalStore`. This package

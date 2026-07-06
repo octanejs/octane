@@ -10,6 +10,22 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3 OPEN path (part 2) — all Dialog parts + a functional open dialog landed (2026-07);
+> byte-parity blocked on porting Base UI's FloatingPortal + FFM. base-ui typecheck + suite (48 pass,
+> 1 skip) green.** Built the real `DialogInteractions` (wires `useDismiss` + `useScrollLock` +
+> `usePopupInteractionProps` + nested-dialog bookkeeping) and all remaining parts: `DialogPortal`
+> (+ `DialogPortalContext`, `InternalBackdrop`, `inertValue`), `DialogBackdrop`, `DialogPopup`,
+> `DialogTitle`, `DialogDescription`, `DialogClose`. A `defaultOpen` modal dialog now renders fully —
+> portaled, backdrop + popup(`role=dialog`, aria-labelledby/describedby) + title/description/close +
+> focus guards — and functionally focus-traps/dismisses. **KEY FINDING (corrects last turn's
+> assumption): `@octanejs/floating-ui` emits `data-floating-ui-*` attributes (portal/focus-guard/
+> inert) + a different FocusGuard style (`clip` vs `clip-path`) + role + container handling, whereas
+> Base UI emits `data-base-ui-*`.** So the FFM/Portal reuse-adapter renders a WORKING open dialog but
+> NOT byte-identical to Base UI — the open differential is `it.skip`ped with a GAP note. **Next: port
+> Base UI's own `FloatingPortal` (~307) + `FocusGuard` + `tabbable` (~282) + `FloatingFocusManager`
+> (~991, needs markOthers/enqueueFocus/nodes/composite/event utils) for `data-base-ui-*` parity, then
+> swap the two imports in `dialog.ts` and the open differential flips green.**
+
 > **Phase 3 OPEN path (part 1) — the store-connected dismiss/scroll layer landed (2026-07). base-ui
 > typecheck + suite (48) green.** `utils/floating/useDismiss.ts` — the full store-based dismiss hook
 > (Escape + outside-press close, with the complete intentional/sloppy press-type + touch + nested-tree

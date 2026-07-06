@@ -1,6 +1,6 @@
 # @octanejs/lexical
 
-[Lexical](https://lexical.dev) for the [octane](https://github.com/octanejs/octane) renderer.
+[Lexical](https://lexical.dev) for the [octane](https://github.com/octanejs/octane) UI framework.
 
 Lexical is an extensible rich-text editor framework. This package reuses Lexical's
 framework-agnostic core (`lexical`, `@lexical/rich-text`, `@lexical/history`,

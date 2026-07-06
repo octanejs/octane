@@ -1,7 +1,7 @@
 # @octanejs/mdx
 
 [MDX](https://mdxjs.com) for the [octane](https://github.com/octanejs/octane)
-renderer — documentation stays in `.mdx`/`.md` and renders as **compiled octane
+UI framework — documentation stays in `.mdx`/`.md` and renders as **compiled octane
 components**.
 
 The split mirrors `docs/react-library-compat-plan.md` §2: **@mdx-js/mdx's

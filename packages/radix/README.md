@@ -1,7 +1,7 @@
 # @octanejs/radix
 
 [Radix UI Primitives](https://www.radix-ui.com/primitives) for the
-[octane](https://github.com/octanejs/octane) renderer — a port of
+[octane](https://github.com/octanejs/octane) UI framework — a port of
 [`@radix-ui/react`](https://www.npmjs.com/org/radix-ui) (headless, accessible UI
 primitives) on octane's hooks. It mirrors the unified `radix-ui` package's shape: the
 low-level composition utilities are exported directly, and each component is a namespace
