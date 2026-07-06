@@ -10,6 +10,34 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3 — DIALOG COMPLETE (2026-07). Green: 51 base-ui tests (49 differential + 2 behavior),
+> full monorepo suite 2276 green.** Ported Base UI's own `data-base-ui-*` floating focus/portal layer
+> to `utils/floating/`: `tabbable.ts` (+ `composite.ts`, `activeElement`), `FocusGuard.ts`,
+> `FloatingPortal.ts` (+ `PortalContext`/`useFloatingPortalNode`), `markOthers.ts`, `enqueueFocus.ts`,
+> `FloatingFocusManager.ts` (~600 lines octane; store-connected; focus trap + return + markOthers
+> inert), and element/event/nodes/platform additions (`isTypeableCombobox`/`getFloatingFocusElement`/
+> `isVirtualClick`/`isVirtualPointerEvent`/`getNodeAncestors`; `platform.env.jsdom`/`os.android`).
+> `dialog.ts` now imports the LOCAL FloatingPortal + FFM (fed the FloatingRootStore directly as
+> `context`), so the **open modal Dialog** (Portal → InternalBackdrop + Backdrop + focus-guard + popup
+> `role=dialog` + title/desc/close + focus-guard, all `data-base-ui-*` with `markOthers` inert
+> siblings) is **byte-identical to real Base UI**. Two id fixes for parity: the portal-node id +
+> `floatingId` use RAW `useId` (no `base-ui-` prefix, matching `@base-ui/utils/useId`), and the popup
+> carries `style="--nested-dialogs: 0"`. Added dedicated behavior tests (non-differential —
+> focus/close aren't in innerHTML): trigger opens, Close button + Escape dismiss.
+> **octane bug found + worked around** (see below). **Also fixed a flaky pre-existing radix Toast
+> timing test** (`duration: 50` racing `settle()`'s real timers under load → widened to 500/700).
+> **Next: Popover** (reuses ALL of this — positioner + anchor positioning is the new surface), then
+> Tooltip/PreviewCard/AlertDialog/Menu/Toast.
+>
+> **octane bug (Provider children shape-flip, UNFIXED — binding worked around):** a context Provider
+> whose `children` prop ALTERNATES between a compiled render-body function and an element descriptor
+> across renders crashes octane's reconciler ("Cannot read properties of undefined (reading 'items')")
+> — `childrenAsBody` runs a function child directly in the Provider scope (owning `scope.slots`) but a
+> descriptor child via `childSlot(scope, 0)`, colliding the slot namespaces. Safe octane fix is a
+> shape-flip reset in `ProviderBody` (core teardown — deferred). Binding workaround: keep the
+> Provider's children a STABLE descriptor shape both states (a no-DOM `DialogInteractions`/
+> `DialogChildren` wrapper). Full detail in memory `octane-provider-children-shape-flip`.
+
 > **Phase 3 OPEN path (part 2) — all Dialog parts + a functional open dialog landed (2026-07);
 > byte-parity blocked on porting Base UI's FloatingPortal + FFM. base-ui typecheck + suite (48 pass,
 > 1 skip) green.** Built the real `DialogInteractions` (wires `useDismiss` + `useScrollLock` +

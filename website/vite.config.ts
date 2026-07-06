@@ -43,6 +43,17 @@ export default defineConfig({
 			exclude: ['/packages/router/src/', '/packages/mdx/src/'],
 		}),
 		octaneMetaPlugin,
+		// GAP workaround: the metaPlugin forces `appType: 'custom'`, which kills
+		// Vite's HTML fallback — correct for dev SSR routing, but it also makes
+		// `vite preview` refuse to serve the built client bundle ("Cannot GET /"),
+		// and the plugin's production SSR output is Phase 2 (not implemented). Flip
+		// back to 'spa' AFTER the metaPlugin so `vite preview` serves the SPA build
+		// (entry-spa.ts boots it); dev SSR is unaffected because the plugin's
+		// middleware answers matched routes before the SPA fallback runs.
+		{
+			name: 'website:spa-fallback',
+			config: () => ({ appType: 'spa' as const }),
+		},
 	],
 
 	// The workspace bindings ship raw TS — Vite must transform them for the SSR

@@ -10,11 +10,7 @@ declare module '*.mdx' {
 	export const frontmatter: Record<string, unknown>;
 }
 
-// Vite asset imports (the logo SVG) resolve to their served URL.
-declare module '*.svg' {
-	const url: string;
-	export default url;
-}
+// (Asset imports like the logo `.svg` are typed by vite/client.)
 
 // JSX is not used directly — `.tsrx` files have their own parser. The ambient
 // `any` keeps incidental TSC passes over `.tsrx` from drowning in implicit-any

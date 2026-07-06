@@ -18,9 +18,11 @@
     "src/**/*.ts",
     "src/**/*.d.ts",
     "tests/**/*.ts",
+    "env.d.ts",
     "octane.config.ts",
     "vite.config.ts",
-    "mdx-options.ts"
+    "mdx-options.ts",
+    "mdx-plugin.ts"
   ],
   "exclude": ["node_modules"]
 }

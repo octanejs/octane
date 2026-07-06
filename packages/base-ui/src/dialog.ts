@@ -404,7 +404,14 @@ function DialogInteractions(props: any): any {
 		subSlot(slot, 'pip'),
 	);
 
-	return null;
+	// Renders the Dialog's children (see the note at the `content` call site). No DOM of its own.
+	return props.children ?? null;
+}
+
+// Passthrough used when the interactions aren't mounted, to keep the Provider's children a stable
+// element-descriptor shape (see the note at the `content` call site).
+function DialogChildren(props: any): any {
+	return props.children ?? null;
 }
 
 function useRenderDialogRoot<Payload>(props: any, mode: 'dialog' | 'drawer' | 'alert-dialog') {
@@ -472,19 +479,25 @@ function useRenderDialogRoot<Payload>(props: any, mode: 'dialog' | 'drawer' | 'a
 	const resolvedChildren =
 		typeof children === 'function' && !isChildrenBlock(children) ? children({ payload }) : children;
 
-	const interactions = shouldRenderInteractions
-		? createElement(DialogInteractions, {
-				store,
-				parentContext: parentDialogRootContext?.store.context,
-				isDrawer,
-			})
-		: null;
+	// The Provider's `children` must stay a STABLE shape (always an element descriptor) across
+	// renders: octane's `childrenAsBody` runs a render-FUNCTION child directly in the Provider scope
+	// (owning `scope.slots`) but routes a DESCRIPTOR child through `childSlot(scope, 0)` — alternating
+	// the two across renders (a raw children-block when closed vs a component when open) collides those
+	// slot namespaces and crashes octane's reconciler (see octane bug note). So a no-DOM component
+	// wraps the children in BOTH states: `DialogInteractions` (runs the open-state hooks) when
+	// open/mounted, else `DialogChildren` (a passthrough). Both just render `props.children`.
+	const content = createElement(shouldRenderInteractions ? DialogInteractions : DialogChildren, {
+		store,
+		parentContext: parentDialogRootContext?.store.context,
+		isDrawer,
+		children: resolvedChildren,
+	});
 
 	return createElement(IsDrawerContext.Provider, {
 		value: false,
 		children: createElement(DialogRootContext.Provider, {
 			value: contextValue as DialogRootContextValue,
-			children: interactions ? [interactions, resolvedChildren] : resolvedChildren,
+			children: content,
 		}),
 	});
 }
