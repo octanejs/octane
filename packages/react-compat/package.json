@@ -1,0 +1,31 @@
+{
+  "name": "@octanejs/react-compat",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "POC: a deterministic (non-AI) source-level bridger that detects React↔Octane differences and auto-applies the mechanical fixes, leaving the semantic residual to the MCP.",
+  "main": "src/shim.ts",
+  "exports": {
+    ".": "./src/shim.ts",
+    "./dom": "./src/dom.ts",
+    "./jsx-runtime": "./src/jsx-runtime.ts",
+    "./jsx-dev-runtime": "./src/jsx-runtime.ts"
+  },
+  "bin": {
+    "octane-bridge": "./bin/bridge.mjs"
+  },
+  "scripts": {
+    "bridge": "node bin/bridge.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

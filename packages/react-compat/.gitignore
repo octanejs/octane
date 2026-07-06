@@ -1,0 +1,6 @@
+# Bridged fixtures are generated from examples/*.tsx by the codemod at test time.
+tests/.bridged/
+# Real-React builds of the examples, for the differential oracle.
+tests/.react/
+# CLI --write output.
+examples/*.octane.tsx

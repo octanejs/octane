@@ -310,6 +310,40 @@ export default defineConfig({
 					globals: false,
 				},
 			},
+				{
+					test: {
+						name: 'react-compat',
+						include: ['packages/react-compat/tests/**/*.test.ts'],
+						environment: 'jsdom',
+						// Bridges the unmodified-React examples/*.tsx (codemod) into
+						// tests/.bridged/*.tsx before the run; octane() then compiles those.
+						globalSetup: ['packages/react-compat/tests/_setup.mjs'],
+						globals: false,
+					},
+					plugins: [
+						octane({
+							exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+						}),
+					],
+					// A bridged package imports from '@octanejs/react-compat' — resolve it to
+					// the compat shim source, exactly as a consumer's alias would.
+					resolve: {
+						alias: [
+							{
+								find: /^@octanejs\/react-compat$/,
+								replacement: resolve(import.meta.dirname, 'packages/react-compat/src/shim.ts'),
+							},
+							{
+								find: /^@octanejs\/react-compat\/dom$/,
+								replacement: resolve(import.meta.dirname, 'packages/react-compat/src/dom.ts'),
+							},
+							{
+								find: /^@octanejs\/react-compat\/jsx-runtime$/,
+								replacement: resolve(import.meta.dirname, 'packages/react-compat/src/jsx-runtime.ts'),
+							},
+						],
+					},
+				},
 		],
 	},
 });
