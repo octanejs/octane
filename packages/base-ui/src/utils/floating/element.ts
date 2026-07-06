@@ -6,6 +6,15 @@ import { TYPEABLE_SELECTOR } from './constants';
 export { getTarget } from '../composite/list-utils';
 export { contains } from '../contains';
 
+// Ported from .base-ui/…/internals/shadowDom.ts — the deepest active element across shadow roots.
+export function activeElement(doc: Document): Element | null {
+	let element = doc.activeElement;
+	while (element?.shadowRoot?.activeElement != null) {
+		element = element.shadowRoot.activeElement;
+	}
+	return element;
+}
+
 export function isTypeableElement(element: unknown): boolean {
 	return isHTMLElement(element) && element.matches(TYPEABLE_SELECTOR);
 }
