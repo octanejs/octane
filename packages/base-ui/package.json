@@ -31,6 +31,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@floating-ui/utils": "catalog:default",
     "@octanejs/floating-ui": "workspace:*",
     "aria-hidden": "catalog:default",
     "octane": "workspace:*",

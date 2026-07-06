@@ -1101,6 +1101,9 @@ importers:
 
   packages/base-ui:
     dependencies:
+      '@floating-ui/utils':
+        specifier: catalog:default
+        version: 0.2.11
       '@octanejs/floating-ui':
         specifier: workspace:*
         version: link:../floating-ui

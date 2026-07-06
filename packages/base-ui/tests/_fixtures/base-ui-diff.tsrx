@@ -1,3 +1,4 @@
+import { useRef } from 'octane';
 import { Separator } from '@octanejs/base-ui/separator';
 import { useRender } from '@octanejs/base-ui/use-render';
 import { Fieldset } from '@octanejs/base-ui/fieldset';
@@ -148,6 +149,27 @@ export function DialogClosed() @{
 	<Dialog.Root>
 		<Dialog.Trigger className="dlg-trigger">Open</Dialog.Trigger>
 	</Dialog.Root>
+}
+
+// Dialog (OPEN, modal, defaultOpen) — Portal/Backdrop/Popup/Title/Description/Close. The popup is
+// portaled into an in-fixture host div (so the rig's `container.innerHTML` sees it) and wrapped in
+// the reused `@octanejs/floating-ui` FocusManager. Proves the whole open-state stack (dismiss +
+// scroll-lock + portal + focus-manager adapter + the parts) matches real Base UI byte-for-byte.
+export function DialogOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Dialog.Root defaultOpen>
+			<Dialog.Portal container={containerRef}>
+				<Dialog.Backdrop className="dlg-backdrop" />
+				<Dialog.Popup className="dlg-popup">
+					<Dialog.Title className="dlg-title">Title</Dialog.Title>
+					<Dialog.Description className="dlg-desc">Body</Dialog.Description>
+					<Dialog.Close className="dlg-close">Close</Dialog.Close>
+				</Dialog.Popup>
+			</Dialog.Portal>
+		</Dialog.Root>
+	</div>
 }
 
 // Slider — Root (role=group) / Value (output) / Control / Track / Indicator / Thumb (a div +
