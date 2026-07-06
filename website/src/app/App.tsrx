@@ -12,11 +12,10 @@ import { clientRouter } from './router-client.ts';
 
 const IS_SERVER = typeof document === 'undefined';
 
-function Root(props: { params?: Record<string, string> }) @{
+function Root(props: { pathname?: string }) @{
 	let router: any;
 	if (IS_SERVER) {
-		const pathname = '/' + (props.params?.splat ?? '');
-		const entry = getServerRouterEntry(pathname);
+		const entry = getServerRouterEntry(props.pathname ?? '/');
 		if (!entry.done) use(entry.promise); // octane: hooks may sit behind conditions
 		router = entry.router;
 	} else {
@@ -25,9 +24,9 @@ function Root(props: { params?: Record<string, string> }) @{
 	<RouterProvider router={router} />
 }
 
-export function App(props: { params?: Record<string, string> }) @{
+export function App(props: { pathname?: string }) @{
 	@try {
-		<Root params={props.params} />
+		<Root pathname={props.pathname} />
 	} @pending {
 		<p class="app-loading">{'Loading…'}</p>
 	}

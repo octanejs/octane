@@ -9,18 +9,18 @@ one mirrors its upstream's architecture: the framework-agnostic core is reused
 verbatim wherever the upstream ships one, and only the thin React binding layer
 is reimplemented on octane's hooks — so most code works by changing the import.
 
-| Package | Ports | One-liner |
-| --- | --- | --- |
-| `@octanejs/zustand` | zustand | The bear-necessities state store, bound to octane's `useSyncExternalStore`. |
-| `@octanejs/query` | TanStack Query | `useQuery`/`useSuspenseQuery` data fetching over the verbatim query-core. |
-| `@octanejs/router` | TanStack Router | Code-based routing with concurrent, transition-driven navigation. |
-| `@octanejs/motion` | Motion (Framer) | Animation primitives on motion-dom. |
-| `@octanejs/stylex` | StyleX | Compiled atomic CSS via the StyleX babel pipeline. |
-| `@octanejs/lexical` | @lexical/react | The Lexical editor binding. |
-| `@octanejs/floating-ui` | @floating-ui/react | Positioning + interactions for tooltips, popovers, menus. |
-| `@octanejs/radix` | Radix UI Primitives | Accessible unstyled UI primitives. |
-| `@octanejs/mdx` | @mdx-js/react | MDX documents compiled to octane components (this page is one). |
-| `@octanejs/testing-library` | react-testing-library | `render`/`renderHook`/`act` over the verbatim @testing-library/dom. |
+| Package                     | Ports                 | One-liner                                                                   |
+| --------------------------- | --------------------- | --------------------------------------------------------------------------- |
+| `@octanejs/zustand`         | zustand               | The bear-necessities state store, bound to octane's `useSyncExternalStore`. |
+| `@octanejs/query`           | TanStack Query        | `useQuery`/`useSuspenseQuery` data fetching over the verbatim query-core.   |
+| `@octanejs/router`          | TanStack Router       | Code-based routing with concurrent, transition-driven navigation.           |
+| `@octanejs/motion`          | Motion (Framer)       | Animation primitives on motion-dom.                                         |
+| `@octanejs/stylex`          | StyleX                | Compiled atomic CSS via the StyleX babel pipeline.                          |
+| `@octanejs/lexical`         | @lexical/react        | The Lexical editor binding.                                                 |
+| `@octanejs/floating-ui`     | @floating-ui/react    | Positioning + interactions for tooltips, popovers, menus.                   |
+| `@octanejs/radix`           | Radix UI Primitives   | Accessible unstyled UI primitives.                                          |
+| `@octanejs/mdx`             | @mdx-js/react         | MDX documents compiled to octane components (this page is one).             |
+| `@octanejs/testing-library` | react-testing-library | `render`/`renderHook`/`act` over the verbatim @testing-library/dom.         |
 
 Plus the metaframework plugin:
 
@@ -56,7 +56,9 @@ function Repos() @{
 	} @else {
 		<ul>
 			@for (const repo of data; key repo.id) {
-				<li>{repo.name as string}</li>
+				<li>
+					{repo.name as string}
+				</li>
 			}
 		</ul>
 	}

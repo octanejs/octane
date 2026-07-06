@@ -19,9 +19,9 @@
  * produces at hydration. Client bundles never import this module.
  */
 import { createContext, createElement, useContext } from 'octane/server';
-import type { MDXComponents, MDXComponentsProp, MDXProviderProps } from './index';
+import type { MDXComponents, MDXComponentsProp, MDXProviderProps } from './index.js';
 
-export type { MDXComponents, MDXComponentsProp, MDXProviderProps, MDXProps } from './index';
+export type { MDXComponents, MDXComponentsProp, MDXProviderProps, MDXProps } from './index.js';
 
 const emptyComponents: MDXComponents = {};
 const MDXContext = createContext<MDXComponents>(emptyComponents);

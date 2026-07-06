@@ -14,7 +14,7 @@
  * SAME document renders to HTML strings on the server and hydratable DOM code
  * on the client.
  */
-import { compileMdx, type CompileMdxOptions } from './compile';
+import { compileMdx, type CompileMdxOptions } from './compile.js';
 
 export interface OctaneMdxPluginOptions extends Omit<CompileMdxOptions, 'mode' | 'hmr' | 'dev'> {
 	/**

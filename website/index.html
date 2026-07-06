@@ -8,6 +8,7 @@
 			content="Octane — React's programming model, compiled ahead of time. No VDOM, no rules of hooks."
 		/>
 		<title>Octane — React's programming model, compiled</title>
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<style>
 			/* Global base — everything component-scoped lives in scoped <style> blocks;
 			   only the document-level reset/palette belongs here (inline so the SSR
@@ -17,11 +18,11 @@
 				--bg: #23272f;
 				--panel: #2b3138;
 				--code-bg: #16181d;
-				--text: #f6f7f9;
+				--text: #f4eee8;
 				--text-secondary: #99a1b3;
-				--accent: #087ea4;
-				--accent-hover: #0a91b8;
-				--accent-text: #58c4dc;
+				--accent: #ff415a;
+				--accent-hover: #ff5d72;
+				--accent-text: #ff5d72;
 				--border: rgba(255, 255, 255, 0.1);
 				color-scheme: dark;
 			}
@@ -61,7 +62,7 @@
 				text-decoration: underline;
 			}
 			::selection {
-				background: rgba(8, 126, 164, 0.5);
+				background: rgba(255, 65, 90, 0.45);
 			}
 			/* Shiki emits `<pre class="shiki github-dark">` with inline token colors;
 			   normalize its frame to the site's code panel. */
@@ -73,6 +74,7 @@
 				overflow-x: auto;
 				font-size: 0.875rem;
 				line-height: 1.7;
+				tab-size: 2;
 			}
 		</style>
 		<!--ssr-head-->

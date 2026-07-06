@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import { octane as octaneMeta } from '@octanejs/vite-plugin';
 import { octane as octaneCompiler } from 'octane/compiler/vite';
-import { octaneMdx } from '@octanejs/mdx/vite';
+import { octaneMdx } from './mdx-plugin.ts'; // GAP workaround — see that file
 import { websiteMdxOptions } from './mdx-options.ts';
 
 // SSR alias: on the server, bare `import … from 'octane'` must resolve to the
