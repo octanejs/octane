@@ -102,12 +102,14 @@ Former adaptations, dropped as their octane gaps were fixed:
 
 1. **FIXED — `<_foo/>` / `<$foo/>` identifier tags compiled as host string
    tags.** `isComponentTag` now follows JSX semantics (only `/^[a-z]/` is an
-   intrinsic).
+   intrinsic; tests: `octane/tests/component-tag-names.test.ts`).
 2. **FIXED — a member-expression/dynamic tag resolving to a host tag STRING
    crashed SSR** (`ssrComponent` called the string). `ssrComponent` now
    serializes string comps inside the standard component block range (client
    `componentSlot` routes strings through the de-opt host renderer), so the
-   shape matches across client mount, SSR, and hydration adoption.
+   shape matches across client mount, SSR, and hydration adoption (tests:
+   `octane/tests/ssr-host-string-tags.test.ts`,
+   `octane/tests/hydration/host-string-tag-hydrate.test.ts`).
 3. **FIXED — a return-JSX component returning a FRAGMENT desynced hydration.**
    The client value-lowers `return <>…</>` to a descriptor array (return-slot
    childSlot: one slot range + one `<!--[-->…<!--]-->` block per item); the

@@ -42,3 +42,24 @@ export function Bare(props) @{
 		<props.tag data-x="1" />
 	</div>
 }
+
+// VALUE-position (.tsx return) member tags — the MDX shape (`<_components.h1>`
+// reading off a components mapping whose defaults are strings). These lower to
+// `createElement(obj.tag, …)` descriptors on the client (de-opt host path) and
+// `ssrChild`/`ssrComponent` string handling on the server.
+export function Doc(props) {
+	return <>
+		<props.components.h1 class="title">{props.title}</props.components.h1>
+		<props.components.p>body text</props.components.p>
+	</>;
+}
+
+// The same call site can resolve to a real COMPONENT at runtime (an MDX
+// components-mapping override) — dispatch must stay dynamic on both sides.
+function Fancy(props) {
+	return <em class="fancy">{props.children}</em>;
+}
+export function Overridable(props) {
+	const parts = { title: props.useFancy ? Fancy : 'h2' };
+	return <parts.title>Title</parts.title>;
+}
