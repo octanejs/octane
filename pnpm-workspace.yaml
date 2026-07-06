@@ -58,7 +58,11 @@ catalogs:
     'aria-hidden': ^1.2.6
     'tabbable': ^6.5.0
     '@lexical/code': 0.46.0
+    '@jridgewell/remapping': ^2.3.5
+    '@jridgewell/trace-mapping': ^0.3.31
     '@mdx-js/mdx': ^3.1.1
+    '@shikijs/rehype': ^3.0.0
+    'source-map': ^0.7.6
     'remark-frontmatter': ^5.0.0
     'remark-gfm': ^4.0.1
     'remark-mdx-frontmatter': ^5.2.0

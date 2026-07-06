@@ -24,11 +24,17 @@
  * call to `<_createMdxContent {...props}/>` so both branches mount through the
  * component machinery on client AND server. (The layout branch's
  * `<_createMdxContent {...props}/>` tag needs no help: octane classifies
- * `_`-starting identifier tags as component references, per JSX semantics.
- * MDX's `<_components.h1>`-style member tags, whose runtime value is a host
- * tag STRING unless overridden, need no adaptation either: octane renders a
- * string comp at a component site as the host element on client and server.)
+ * `_`-starting identifier tags as component references, per JSX semantics.)
+ *
+ * The two former SERVER-mode fixups are gone — their octane gaps are fixed:
+ * `ssrComponent` renders a host-tag-STRING comp as a
+ * `<!--[--><tag>…</tag><!--]-->` block (the shape the client's componentSlot /
+ * de-opt host renderer adopts on hydration), and the server compiler
+ * value-lowers a returned fragment through `ssrChild([...])` exactly like the
+ * client's descriptor array — so `<_components.h1>` member tags and the
+ * document's fragment body take the SAME shape on both sides (hydration-safe).
  */
+import remapping from '@jridgewell/remapping';
 import {
 	compile as mdxCompile,
 	compileSync as mdxCompileSync,
@@ -38,6 +44,7 @@ import { compile as octaneCompile } from 'octane/compiler';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 import remarkMdxFrontmatter from 'remark-mdx-frontmatter';
+import { SourceMapGenerator } from 'source-map';
 
 export interface CompileMdxResult {
 	code: string;
@@ -53,8 +60,10 @@ export interface CompileMdxOptions {
 	dev?: boolean;
 	/**
 	 * Module the emitted document reads the provider mapping from
-	 * (`useMDXComponents`). Defaults to `'@octanejs/mdx'`; pass `null` to
-	 * disable the provider wiring entirely (only `props.components` applies).
+	 * (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /
+	 * `'@octanejs/mdx/server'` (server), so each runtime reads ITS OWN context
+	 * store (they are disjoint; see src/server.ts). Pass `null` to disable the
+	 * provider wiring entirely (only `props.components` applies).
 	 */
 	providerImportSource?: string | null;
 	/** remark plugins. Defaults to `defaultRemarkPlugins` (GFM + frontmatter + frontmatter-export). */
@@ -76,6 +85,7 @@ export interface CompileMdxOptions {
 		| 'rehypePlugins'
 		| 'recmaPlugins'
 		| 'format'
+		| 'SourceMapGenerator'
 	>;
 }
 
@@ -97,7 +107,7 @@ export async function compileMdx(
 	options: CompileMdxOptions = {},
 ): Promise<CompileMdxResult> {
 	const out = await mdxCompile({ value: source, path: id }, buildMdxOptions(id, options));
-	return octaneStage(String(out.value), id, options);
+	return octaneStage(String(out.value), out.map, id, options);
 }
 
 /** Synchronous {@link compileMdx} (the default plugin set is fully sync). */
@@ -107,7 +117,7 @@ export function compileMdxSync(
 	options: CompileMdxOptions = {},
 ): CompileMdxResult {
 	const out = mdxCompileSync({ value: source, path: id }, buildMdxOptions(id, options));
-	return octaneStage(String(out.value), id, options);
+	return octaneStage(String(out.value), out.map, id, options);
 }
 
 function buildMdxOptions(id: string, options: CompileMdxOptions): CompileOptions {
@@ -118,13 +128,20 @@ function buildMdxOptions(id: string, options: CompileMdxOptions): CompileOptions
 				? 'md'
 				: 'mdx';
 	const provider =
-		options.providerImportSource === undefined ? '@octanejs/mdx' : options.providerImportSource;
+		options.providerImportSource === undefined
+			? options.mode === 'server'
+				? '@octanejs/mdx/server'
+				: '@octanejs/mdx'
+			: options.providerImportSource;
 	return {
 		...options.mdxOptions,
 		format,
 		// The load-bearing switch: emit JSX SOURCE (no jsx-runtime calls), which
 		// octane's compiler lowers to its own codegen.
 		jsx: true,
+		// Map the intermediate JSX back to the .mdx source — stage one of the
+		// chained map octaneStage composes (stage two is octane's own map).
+		SourceMapGenerator,
 		...(provider === null ? {} : { providerImportSource: provider }),
 		remarkPlugins: options.remarkPlugins ?? defaultRemarkPlugins,
 		rehypePlugins: options.rehypePlugins,
@@ -132,16 +149,51 @@ function buildMdxOptions(id: string, options: CompileMdxOptions): CompileOptions
 	};
 }
 
-function octaneStage(jsxSource: string, id: string, options: CompileMdxOptions): CompileMdxResult {
+function octaneStage(
+	jsxSource: string,
+	mdxMap: unknown,
+	id: string,
+	options: CompileMdxOptions,
+): CompileMdxResult {
 	const mode = options.mode ?? 'client';
-	// NOTE on sourcemaps: octane's map references the INTERMEDIATE JSX text, not
-	// the original .mdx — a faithful two-stage chain is future work. The map is
-	// still returned so line-ish positions survive into the bundle.
-	return octaneCompile(jsxSource, id, {
+	const out = octaneCompile(jsxSource, id, {
 		mode,
 		hmr: mode === 'client' && !!options.hmr,
 		dev: mode === 'client' && !!options.dev,
 	});
+	// Two-stage sourcemap: octane's map targets the INTERMEDIATE JSX text;
+	// @mdx-js/mdx's map (via SourceMapGenerator) targets the original .mdx.
+	// Compose them (most-recent-first) so generated positions trace all the way
+	// back to the document. The non-empty guard is defensive: if a compile shape
+	// ever yields no overlapping segments, keep octane's intermediate map (its
+	// `sourcesContent` is the intermediate JSX — still steppable in devtools,
+	// unlike a blank map). The octane SERVER compile emits an empty-mappings map
+	// by design (SSR maps are a later octane refinement).
+	if (out.map && mdxMap) {
+		const chained = remapping([out.map as any, mdxMap as any], () => null);
+		if (String(chained.mappings).length > 0) out.map = chained;
+	}
+	// Fast refresh for documents: octane's compiler only auto-wraps EXPORTED
+	// `@{}`-form components in `hmr(...)` — `MDXContent` (a passthrough function
+	// returning a ternary of descriptors) isn't recognized as one, so the octane
+	// `hmr` flag alone leaves `.mdx` edits as full module invalidations. The
+	// PIPELINE knows the emitted shape, so it appends the exact registration the
+	// octane compiler emits for `.tsrx` exports: wrap the default export in the
+	// runtime `hmr()` (identity-stable across edits — parents keep their mounted
+	// wrapper) + a self-accepting `import.meta.hot` block that swaps the body
+	// and re-renders live blocks in place. Appending after the fact keeps the
+	// source map's earlier segments valid (ESM imports hoist).
+	if (mode === 'client' && options.hmr && /\bexport default function MDXContent\b/.test(out.code)) {
+		out.code +=
+			"\nimport { hmr as _$mdxHmr, HMR as _$mdxHMR } from 'octane';\n" +
+			'MDXContent = _$mdxHmr(MDXContent);\n' +
+			'if (import.meta.hot) {\n' +
+			'  import.meta.hot.accept((module) => {\n' +
+			'    module && MDXContent[_$mdxHMR].update(module.default);\n' +
+			'  });\n' +
+			'}\n';
+	}
+	return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
