@@ -2887,6 +2887,10 @@ function compileReturnJsxFunction(node, ctx, options) {
 		// The splice inserts `'\n' + subs` after the `{`: every printed line below
 		// the splice line shifts down by the inserted line count. Keep the map in
 		// sync by inserting that many empty mapping lines at the same point.
+		// Decoded rows are dense up to the LAST line with segments, so when the
+		// array ends at (or before) the splice line, every shifted line has no
+		// segments and there is nothing to realign — skip the padding rather than
+		// append useless empty rows.
 		const spliceLine = countNewlines(code.slice(0, i + 1));
 		const inserted = 1 + countNewlines(subs);
 		if (mappings.length > spliceLine + 1) {
