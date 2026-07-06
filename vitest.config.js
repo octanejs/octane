@@ -3,6 +3,7 @@ import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
 import { octaneMdx } from './packages/mdx/src/vite.ts';
 import { stylex } from './packages/stylex/src/vite.js';
+import { websiteMdxOptions } from './website/mdx-options.ts';
 
 export default defineConfig({
 	test: {
@@ -431,6 +432,31 @@ export default defineConfig({
 					environment: 'node',
 					globals: false,
 				},
+			},
+			{
+				test: {
+					name: 'website',
+					include: ['website/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				// The website app stack: octaneMdx() compiles the site's .mdx documents
+				// (same shared options — Shiki + tsrx langAlias — the app itself uses);
+				// octane() compiles the .tsrx pages and slots hooks in app .ts files.
+				// The bindings' own `.ts` sources hand-forward slots, so they are
+				// excluded from the auto-slotting pass (same reasoning as the projects
+				// above). Package imports (@octanejs/router, octane, …) resolve through
+				// website/node_modules workspace links — no aliases needed.
+				plugins: [
+					octaneMdx(websiteMdxOptions),
+					octane({
+						exclude: [
+							'/packages/router/src/',
+							'/packages/mdx/src/',
+							'/packages/testing-library/src/',
+						],
+					}),
+				],
 			},
 		],
 	},
