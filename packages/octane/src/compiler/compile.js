@@ -1423,18 +1423,27 @@ export function compile(source, filename, options) {
 			if (hmrEnabled) hmrComponents.push({ name: c.id.name, exportKind: 'named' });
 		} else if (isReturnJsxFunction(node)) {
 			// `function Foo() { …hooks…; return <jsx>; }` — a plain return-JSX function.
+			const base = bodyLine;
 			ctx._setupMaps = null;
 			const chunk = compileReturnJsxFunction(node, ctx, {}) + '\n\n';
+			pushDeclAnchor(node, base);
+			drainSetupMaps(base);
 			body += chunk;
 			bodyLine += countNewlines(chunk);
 		} else if (node.type === 'ExportNamedDeclaration' && isReturnJsxFunction(node.declaration)) {
+			const base = bodyLine;
 			ctx._setupMaps = null;
 			const chunk = compileReturnJsxFunction(node.declaration, ctx, { export: true }) + '\n\n';
+			pushDeclAnchor(node, base);
+			drainSetupMaps(base);
 			body += chunk;
 			bodyLine += countNewlines(chunk);
 		} else if (node.type === 'ExportDefaultDeclaration' && isReturnJsxFunction(node.declaration)) {
+			const base = bodyLine;
 			ctx._setupMaps = null;
 			const chunk = compileReturnJsxFunction(node.declaration, ctx, { default: true }) + '\n\n';
+			pushDeclAnchor(node, base);
+			drainSetupMaps(base);
 			body += chunk;
 			bodyLine += countNewlines(chunk);
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
@@ -2862,14 +2871,40 @@ function compileReturnJsxFunction(node, ctx, options) {
 		generator: false,
 		body: { type: 'BlockStatement', body: newStatements },
 	};
-	let code = printNode(fn);
+	// Print with esrap's real per-token map (same output bytes as printNode) so
+	// this function contributes segments to the module map — compile() drains
+	// them via ctx._setupMaps, exactly like a component's setup statements.
+	// Chained consumers (e.g. @octanejs/mdx's two-stage .mdx map) need segments
+	// on these lines; a map-less print would compose to an empty chain.
+	const printed = printNodeWithMap(fn, ctx);
+	let code = printed.code;
+	const mappings = printed.mappings;
 	if (compInlinedSubs.length) {
 		// Helpers are hoisted function declarations → position-independent; splice them
 		// in right after the function's opening `{` so they're in the component scope.
 		const i = code.indexOf('{');
 		const subs = compInlinedSubs.map((s) => '  ' + s.replace(/\n/g, '\n  ')).join('\n');
+		// The splice inserts `'\n' + subs` after the `{`: every printed line below
+		// the splice line shifts down by the inserted line count. Keep the map in
+		// sync by inserting that many empty mapping lines at the same point.
+		const spliceLine = countNewlines(code.slice(0, i + 1));
+		const inserted = 1 + countNewlines(subs);
+		if (mappings.length > spliceLine + 1) {
+			mappings.splice(spliceLine + 1, 0, ...Array.from({ length: inserted }, () => []));
+		}
 		code = code.slice(0, i + 1) + '\n' + subs + code.slice(i + 1);
 	}
+	// Thread the mappings back to compile() through the same side-channel the
+	// component path uses (drained by drainSetupMaps at the emit site). The
+	// `export ` prefix shifts only line 0's columns; `export default` appends a
+	// trailing (unmapped) line and shifts nothing.
+	ctx._setupMaps =
+		options && options.export
+			? [
+					{ fnRelLine: 0, colShift: 'export '.length, mappings: mappings.slice(0, 1) },
+					{ fnRelLine: 1, colShift: 0, mappings: mappings.slice(1) },
+				]
+			: [{ fnRelLine: 0, colShift: 0, mappings }];
 	if (options && options.default) return `${code}\nexport default ${name};`;
 	if (options && options.export) return `export ${code}`;
 	return code;

@@ -15,10 +15,11 @@ never silently paper over it.
 > (byte-adoption tests, on top of the two octane gap fixes below), SSR provider
 > context (`@octanejs/mdx/server`), Shiki recipe + integration tests, `.mdx`
 > fast refresh, `.md` default-on + asset-query passthrough, and chained
-> two-stage sourcemaps (machinery landed; composes fully once octane maps
-> return-JSX functions — pinned `it.fails`). Both octane gaps below are fixed
+> two-stage sourcemaps (composes fully — octane gap 4 fixed, generated
+> positions trace back to `.mdx` lines). All octane gaps below are fixed
 > (`ssrComponent` host-string tags; server value-lowering of returned
-> fragments), and the adapter is down to ONE fixup. mdx suite: 51 tests.**
+> fragments; return-JSX sourcemap segments), and the adapter is down to ONE
+> fixup. mdx suite: 51 tests.**
 >
 > Phase 0 — the full pipeline + provider layer landed (2026-07). Green: 25
 > tests (compile shape, markdown/GFM/`.md` rendering, embedded `.tsrx`
@@ -114,11 +115,12 @@ Former adaptations, dropped as their octane gaps were fixed:
    separators and no slot range — silently duplicating content on hydrate. The
    server compiler now routes value-position returned fragments through
    `ssrChild([...])` (compile.js `ssrCompileBody`), byte-aligning both sides.
-4. **OPEN (octane compiler, chip filed) — `compileReturnJsxFunction` emits no
-   sourcemap segments** (map-less `printNode`), so the two-stage .mdx map
-   chain composes to empty for document bodies; the pipeline falls back to
-   octane's intermediate-JSX map. Pinned: `tests/sourcemap.test.ts`
-   (`it.fails`) auto-flips when fixed.
+4. **FIXED — `compileReturnJsxFunction` emitted no sourcemap segments**
+   (map-less `printNode`), so the two-stage .mdx map chain composed to empty
+   for document bodies. It now prints via `printNodeWithMap` and threads
+   esrap's real segments back through the module map (compile.js), so the
+   chain composes and generated positions trace to `.mdx` lines
+   (`tests/sourcemap.test.ts`).
 
 ## API coverage vs @mdx-js/react
 
@@ -171,7 +173,7 @@ Mounted with `@octanejs/testing-library` (dogfooded, workspace dep):
 - `vite.test.ts` — plugin id claiming: `.md` default-on, `md: false`, asset
   queries (`?raw`/`?url`/`?inline`) pass through, bookkeeping queries don't.
 - `sourcemap.test.ts` — two-stage map: valid v3 output naming the document;
-  the full chain pinned `it.fails` on octane gap 4.
+  the full chain traces generated positions back to `.mdx` lines.
 
 ## Open design questions — RESOLVED (2026-07-06)
 
@@ -209,10 +211,9 @@ All six answered; details below for the record.
   asset queries (`?raw`, `?url`, `?inline`, workers) now pass through
   untouched (vite's asset plugin owns them), while vite-internal bookkeeping
   queries (`?v=`, `?used`, `?import`) still transform. Tested.
-- **Sourcemaps — machinery DONE, full fidelity blocked on octane gap 4.**
-  @mdx-js/mdx emits stage-one (via `source-map`'s `SourceMapGenerator`);
-  octane emits stage-two; `@jridgewell/remapping` composes. Today the chain
-  is empty for real documents (gap 4), so the pipeline keeps octane's
-  intermediate-JSX map as the fallback; the chained path activates by itself
-  (guarded on non-empty mappings) once octane maps return-JSX functions —
-  chip filed, `it.fails` pinned.
+- **Sourcemaps — DONE.** @mdx-js/mdx emits stage-one (via `source-map`'s
+  `SourceMapGenerator`); octane emits stage-two; `@jridgewell/remapping`
+  composes. With octane gap 4 fixed (return-JSX functions map via
+  `printNodeWithMap`), the chain composes for real documents and generated
+  positions trace back to `.mdx` lines; the non-empty guard stays as a
+  defensive fallback to octane's intermediate-JSX map.

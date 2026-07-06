@@ -164,18 +164,11 @@ function octaneStage(
 	// Two-stage sourcemap: octane's map targets the INTERMEDIATE JSX text;
 	// @mdx-js/mdx's map (via SourceMapGenerator) targets the original .mdx.
 	// Compose them (most-recent-first) so generated positions trace all the way
-	// back to the document.
-	//
-	// GAP (octane compiler): today the chain composes to an EMPTY map for real
-	// documents — octane's `compileReturnJsxFunction` prints its output with
-	// the map-less `printNode` (no esrap segments), and the MDX body
-	// (`_createMdxContent`) is exactly that shape, so octane has no segments on
-	// the one intermediate line the mdx map covers (the document content) and
-	// remapping drops everything. Until that emits real segments, an empty
-	// chain falls back to octane's intermediate map (its `sourcesContent` is
-	// the intermediate JSX — still steppable in devtools, unlike a blank map).
-	// The octane SERVER compile emits an empty-mappings map by design (SSR maps
-	// are a later octane refinement).
+	// back to the document. The non-empty guard is defensive: if a compile shape
+	// ever yields no overlapping segments, keep octane's intermediate map (its
+	// `sourcesContent` is the intermediate JSX — still steppable in devtools,
+	// unlike a blank map). The octane SERVER compile emits an empty-mappings map
+	// by design (SSR maps are a later octane refinement).
 	if (out.map && mdxMap) {
 		const chained = remapping([out.map as any, mdxMap as any], () => null);
 		if (String(chained.mappings).length > 0) out.map = chained;
