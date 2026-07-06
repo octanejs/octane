@@ -16,7 +16,9 @@ export function DocPage() @{
 		} @else {
 			<div class="doc-missing">
 				<h1>Document not found</h1>
-				<p>{('No document named “' + params.slug + '”.') as string}</p>
+				<p>
+					{'No document named “' + params.slug + '”.' as string}
+				</p>
 			</div>
 		}
 		<style>
@@ -49,7 +51,7 @@ export function DocPage() @{
 				margin: 0.35rem 0;
 			}
 			.prose :global(a) {
-				color: #58c4dc;
+				color: #ff5d72;
 			}
 			.prose :global(code) {
 				background: #16181d;
@@ -68,7 +70,7 @@ export function DocPage() @{
 				margin: 0 0 1.25rem;
 			}
 			.prose :global(blockquote) {
-				border-left: 3px solid #087ea4;
+				border-left: 3px solid #ff415a;
 				margin: 0 0 1rem;
 				padding: 0.25rem 0 0.25rem 1rem;
 				color: #99a1b3;
@@ -83,7 +85,7 @@ export function DocPage() @{
 			}
 			.prose :global(th) {
 				text-align: left;
-				color: #f6f7f9;
+				color: #f4eee8;
 				border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 				padding: 0.5rem 0.75rem;
 			}
@@ -99,7 +101,7 @@ export function DocPage() @{
 				margin: 2rem 0;
 			}
 			.prose :global(strong) {
-				color: #f6f7f9;
+				color: #f4eee8;
 			}
 			.doc-missing :global(h1) {
 				margin-top: 2rem;

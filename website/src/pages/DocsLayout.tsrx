@@ -78,13 +78,13 @@ export function DocsLayout() @{
 					color 0.15s;
 			}
 			.sidebar-list :global(a.sidebar-link:hover) {
-				color: #f6f7f9;
+				color: #f4eee8;
 				background: rgba(255, 255, 255, 0.06);
 				text-decoration: none;
 			}
 			.sidebar-list :global(a.sidebar-link[data-status='active']) {
-				color: #58c4dc;
-				background: rgba(8, 126, 164, 0.18);
+				color: #ff5d72;
+				background: rgba(255, 65, 90, 0.14);
 			}
 			.doc-outlet {
 				min-width: 0;

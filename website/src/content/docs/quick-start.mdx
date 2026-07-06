@@ -71,7 +71,9 @@ renderable:
 ```tsrx
 export function Counter() {
 	const [count, setCount] = useState(0);
-	return <button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>;
+	return <button onClick={() => setCount(count + 1)}>
+		{'Count: ' + count}
+	</button>;
 }
 
 function Label(props) {
@@ -93,7 +95,9 @@ export function Timer() @{
 		return () => clearInterval(id);
 	}, []);
 
-	<p>{'Elapsed: ' + seconds}</p>
+	<p>
+		{'Elapsed: ' + seconds}
+	</p>
 }
 ```
 
@@ -116,7 +120,9 @@ export function Panel(props) @{
 		console.log('n changed:', n);
 	}, [n]);
 
-	<button onClick={() => setN(n + 1)}>{'count: ' + n}</button>
+	<button onClick={() => setN(n + 1)}>
+		{'count: ' + n}
+	</button>
 }
 ```
 
@@ -129,7 +135,9 @@ and `@try`. Plain JavaScript control flow stays in setup code.
 export function Feed(props) @{
 	<ul>
 		@for (const item of props.items; key item.id) {
-			<li>{item.title as string}</li>
+			<li>
+				{item.title as string}
+			</li>
 		} @empty {
 			<li>Nothing to show</li>
 		}
@@ -140,7 +148,9 @@ export function Feed(props) @{
 ```tsrx
 export function Greeting(props) @{
 	@if (props.name) {
-		<p>{'Hello, ' + props.name}</p>
+		<p>
+			{'Hello, ' + props.name}
+		</p>
 	} @else {
 		<p>Hello, stranger</p>
 	}

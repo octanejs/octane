@@ -2,14 +2,14 @@
 // page. Styling is octane's scoped <style> — router <Link>s are separate
 // components, so their classes are styled through :global() descendant holes.
 import { Link, Outlet } from '@octanejs/router';
+import logoUrl from '../assets/octane-logo.svg';
 
 export function Layout() @{
 	<div class="shell">
 		<header class="topnav">
 			<div class="topnav-inner">
-				<Link to="/" class="wordmark">
-					<span class="wordmark-o">{'⌬'}</span>
-					<span>Octane</span>
+				<Link to="/" class="wordmark" aria-label="Octane home">
+					<img src={logoUrl} alt="Octane" class="wordmark-img" />
 				</Link>
 				<nav class="navlinks" aria-label="Main">
 					<Link to="/docs" activeOptions={{ exact: false }} class="nav-link">Docs</Link>
@@ -61,19 +61,14 @@ export function Layout() @{
 			.topnav-inner :global(a.wordmark) {
 				display: inline-flex;
 				align-items: center;
-				gap: 0.5rem;
-				font-size: 1.25rem;
-				font-weight: 700;
-				letter-spacing: -0.02em;
-				color: #f6f7f9;
 			}
 			.topnav-inner :global(a.wordmark:hover) {
 				text-decoration: none;
 			}
-			.topnav-inner :global(.wordmark-o) {
-				color: #58c4dc;
-				font-size: 1.4rem;
-				line-height: 1;
+			.topnav-inner :global(img.wordmark-img) {
+				height: 30px;
+				width: auto;
+				display: block;
 			}
 			.navlinks {
 				display: flex;
@@ -90,13 +85,13 @@ export function Layout() @{
 					color 0.15s;
 			}
 			.navlinks :global(a.nav-link:hover) {
-				color: #f6f7f9;
+				color: #f4eee8;
 				background: rgba(255, 255, 255, 0.06);
 				text-decoration: none;
 			}
 			.navlinks :global(a.nav-link[data-status='active']) {
-				color: #58c4dc;
-				background: rgba(8, 126, 164, 0.18);
+				color: #ff5d72;
+				background: rgba(255, 65, 90, 0.14);
 			}
 			.main {
 				flex: 1;

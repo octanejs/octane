@@ -7,29 +7,25 @@ import CodeSample from '../content/home-sample.mdx';
 const FEATURES = [
 	{
 		title: 'Compiled templates',
-		body:
-			'Components compile ahead of time to template clones and direct DOM ' +
+		body: 'Components compile ahead of time to template clones and direct DOM ' +
 			'writes — no virtual DOM, no diffing, most of React’s runtime work ' +
 			'already done before the page loads.',
 	},
 	{
 		title: 'Native events',
-		body:
-			'Real, delegated DOM events instead of a synthetic layer. onClick is a ' +
+		body: 'Real, delegated DOM events instead of a synthetic layer. onClick is a ' +
 			'click. currentTarget, capture, and propagation behave exactly like the ' +
 			'platform.',
 	},
 	{
 		title: 'Streaming SSR',
-		body:
-			'renderToPipeableStream and renderToReadableStream flush each Suspense ' +
+		body: 'renderToPipeableStream and renderToReadableStream flush each Suspense ' +
 			'boundary as its data resolves — out-of-order, Fizz-style — plus full ' +
 			'buffered SSR and byte-stable hydration.',
 	},
 	{
 		title: 'Drop-in React model',
-		body:
-			'The same hooks, memo, context, portals, Suspense, transitions, and ' +
+		body: 'The same hooks, memo, context, portals, Suspense, transitions, and ' +
 			'actions API. Ports of zustand, TanStack Query & Router, Radix, Lexical ' +
 			'and more work by changing the import.',
 	},
@@ -49,7 +45,7 @@ export function Home() @{
 					virtual DOM. No rules of hooks.
 				</p>
 				<div class="hero-actions">
-					<Link to="/docs" class="btn-primary">Get started</Link>
+					<Link to="/docs/quick-start" class="btn-primary">Get started</Link>
 					<Link to="/docs/differences-from-react" class="btn-ghost">Differences from React</Link>
 				</div>
 			</div>
@@ -67,8 +63,12 @@ export function Home() @{
 		<section class="features">
 			@for (const feature of FEATURES; key feature.title) {
 				<article class="card">
-					<h3 class="card-title">{feature.title as string}</h3>
-					<p class="card-body">{feature.body as string}</p>
+					<h3 class="card-title">
+						{feature.title as string}
+					</h3>
+					<p class="card-body">
+						{feature.body as string}
+					</p>
 				</article>
 			}
 		</section>
@@ -83,11 +83,15 @@ export function Home() @{
 			</div>
 			<div class="proven-stat">
 				<span class="proven-number">0</span>
-				<span class="proven-label">rules of hooks — conditions, early returns and loops are fine</span>
+				<span class="proven-label">
+					rules of hooks — conditions, early returns and loops are fine
+				</span>
 			</div>
 			<div class="proven-stat">
 				<span class="proven-number">10</span>
-				<span class="proven-label">packages: runtime + compiler, metaframework, and 8 ecosystem ports</span>
+				<span class="proven-label">
+					packages: runtime + compiler, metaframework, and 8 ecosystem ports
+				</span>
 			</div>
 		</section>
 
@@ -118,7 +122,7 @@ export function Home() @{
 				font-weight: 800;
 			}
 			.hero-accent {
-				color: #58c4dc;
+				color: #ff415a;
 			}
 			.hero-sub {
 				color: #99a1b3;
@@ -132,19 +136,19 @@ export function Home() @{
 				flex-wrap: wrap;
 			}
 			.hero-actions :global(a.btn-primary) {
-				background: #087ea4;
-				color: #f6f7f9;
+				background: #ff415a;
+				color: #f4eee8;
 				font-weight: 600;
 				padding: 0.7rem 1.4rem;
 				border-radius: 9999px;
 				transition: background 0.15s;
 			}
 			.hero-actions :global(a.btn-primary:hover) {
-				background: #0a91b8;
+				background: #ff5d72;
 				text-decoration: none;
 			}
 			.hero-actions :global(a.btn-ghost) {
-				color: #f6f7f9;
+				color: #f4eee8;
 				font-weight: 600;
 				padding: 0.7rem 1.4rem;
 				border-radius: 9999px;
@@ -249,7 +253,7 @@ export function Home() @{
 				font-size: 2.25rem;
 				font-weight: 800;
 				letter-spacing: -0.02em;
-				color: #58c4dc;
+				color: #ff415a;
 			}
 			.proven-label {
 				color: #99a1b3;
