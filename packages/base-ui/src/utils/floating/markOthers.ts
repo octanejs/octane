@@ -117,7 +117,10 @@ function applyAttributeToOthers(
 		const currentUncontrolledElementsSet = getUncontrolledElementsSet(controlAttribute);
 		uncontrolledElementsSet = currentUncontrolledElementsSet;
 		counterMap = map;
-		const ariaLiveElements = correctElements(body, Array.from(body.querySelectorAll('[aria-live]')));
+		const ariaLiveElements = correctElements(
+			body,
+			Array.from(body.querySelectorAll('[aria-live]')),
+		);
 		const controlElements = avoidElements.concat(ariaLiveElements);
 		const controlTargets = collectOutsideElements(
 			body,

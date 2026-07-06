@@ -4,10 +4,9 @@
 // (`applyPopupOpenChange`), mounted/transition management (`useOpenStateTransitions`), and interaction-
 // prop syncing. octane adaptations: every hook threads an explicit slot; `useIsoLayoutEffect` →
 // `useLayoutEffect`; `ReactDOM.flushSync` → octane `flushSync`; `useId` → `useBaseUiId`.
-import { useRef, useCallback, useLayoutEffect, flushSync } from 'octane';
+import { useRef, useCallback, useLayoutEffect, flushSync, useId } from 'octane';
 
 import { subSlot } from '../../internal';
-import { useBaseUiId } from '../useBaseUiId';
 import { useStableCallback } from '../useStableCallback';
 import { useOnFirstRender } from '../useOnFirstRender';
 import { useTransitionStatus } from '../useTransitionStatus';
@@ -48,7 +47,8 @@ export function usePopupStore<Store extends AnyPopupStore>(
 	treatPopupAsFloatingElement: boolean,
 	slot: symbol | undefined,
 ): { store: Store; internalStore: Store | null } {
-	const floatingId = useBaseUiId(undefined, subSlot(slot, 'fid'));
+	// Raw `useId` (no `base-ui-` prefix), matching Base UI's `@base-ui/utils/useId`.
+	const floatingId = useId(subSlot(slot, 'fid'));
 	const nested = useFloatingParentNodeId() != null;
 
 	const internalStoreRef = useRef<Store | null>(null, subSlot(slot, 'store'));

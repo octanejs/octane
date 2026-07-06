@@ -24,15 +24,31 @@ function isVoiceOver(): boolean {
 	return /Mac OS X|iPhone|iPad/.test(ua());
 }
 
+function isAndroid(): boolean {
+	return /Android/.test(ua());
+}
+
+function isJsdom(): boolean {
+	return /jsdom/i.test(ua());
+}
+
 export const platform = {
 	os: {
 		get ios() {
 			return isIOS();
 		},
+		get android() {
+			return isAndroid();
+		},
 	},
 	engine: {
 		get webkit() {
 			return isWebKit();
+		},
+	},
+	env: {
+		get jsdom() {
+			return isJsdom();
 		},
 	},
 	screenReader: {

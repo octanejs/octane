@@ -12,11 +12,11 @@ import {
 	useMemo,
 	useEffect,
 	useLayoutEffect,
+	useId,
 } from 'octane';
 import { isNode } from '@floating-ui/utils/dom';
 
 import { S, subSlot } from '../../internal';
-import { useBaseUiId } from '../useBaseUiId';
 import { useStableCallback } from '../useStableCallback';
 import { addEventListener } from '../addEventListener';
 import { mergeCleanups } from '../mergeCleanups';
@@ -66,7 +66,8 @@ const attr = createAttribute('portal');
 export function useFloatingPortalNode(userProps: any, slot: symbol | undefined): any {
 	const { ref, container: containerProp, componentProps = EMPTY_OBJECT, elementProps } = userProps;
 
-	const uniqueId = useBaseUiId(undefined, subSlot(slot, 'id'));
+	// Raw `useId` (no `base-ui-` prefix), matching Base UI's `@base-ui/utils/useId`.
+	const uniqueId = useId(subSlot(slot, 'id'));
 	const portalContext = usePortalContext();
 	const parentPortalNode = portalContext?.portalNode;
 
@@ -75,11 +76,14 @@ export function useFloatingPortalNode(userProps: any, slot: symbol | undefined):
 		subSlot(slot, 'cel'),
 	);
 	const [portalNode, setPortalNode] = useState<HTMLElement | null>(null, subSlot(slot, 'pn'));
-	const setPortalNodeRef = useStableCallback((node: HTMLElement | null) => {
-		if (node !== null) {
-			setPortalNode(node);
-		}
-	}, subSlot(slot, 'pnr'));
+	const setPortalNodeRef = useStableCallback(
+		(node: HTMLElement | null) => {
+			if (node !== null) {
+				setPortalNode(node);
+			}
+		},
+		subSlot(slot, 'pnr'),
+	);
 
 	const containerRef = useRef<Element | null>(null, subSlot(slot, 'cref'));
 
