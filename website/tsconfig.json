@@ -1,0 +1,26 @@
+{
+	"compilerOptions": {
+		"module": "esnext",
+		"lib": ["esnext", "dom", "dom.iterable"],
+		"target": "esnext",
+		"noEmit": true,
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"strict": true,
+		"types": ["node", "vite/client"],
+		"jsx": "preserve"
+	},
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.d.ts",
+		"tests/**/*.ts",
+		"octane.config.ts",
+		"vite.config.ts",
+		"mdx-options.ts"
+	],
+	"exclude": ["node_modules"]
+}

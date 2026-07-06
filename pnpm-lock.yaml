@@ -1537,6 +1537,34 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  website:
+    dependencies:
+      '@octanejs/mdx':
+        specifier: workspace:*
+        version: link:../packages/mdx
+      '@octanejs/router':
+        specifier: workspace:*
+        version: link:../packages/router
+      '@octanejs/vite-plugin':
+        specifier: workspace:*
+        version: link:../packages/vite-plugin-octane
+      octane:
+        specifier: workspace:*
+        version: link:../packages/octane
+    devDependencies:
+      '@octanejs/testing-library':
+        specifier: workspace:*
+        version: link:../packages/testing-library
+      '@shikijs/rehype':
+        specifier: catalog:default
+        version: 3.23.0
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
 packages:
 
   '@asamuzakjp/css-color@5.1.11':
