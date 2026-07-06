@@ -62,41 +62,34 @@ What each MDX construct becomes under octane's `.tsx` handling:
 
 ## recmaOctaneAdapter — the two-compiler adaptations
 
-All three are small ESTree fixups over MDX's emitted program, each tied to an
-octane gap or ABI difference and revertible:
+ONE small ESTree fixup over MDX's emitted program remains: **rewrite the bare
+`_createMdxContent(props)` call to `<_createMdxContent {...props}/>`.** The
+direct call bypasses the `(props, __s, __extra)` ABI (the server body would
+run on `__s === undefined` scope recovery); as JSX both layout branches mount
+through the component machinery on client and server.
 
-1. **Rename `_createMdxContent` → `MDX$CreateMdxContent`.** octane's JSX
-   lowering treats identifier tags as components only when `/^[A-Z]/` —
-   `<_createMdxContent/>` lowers to a host STRING tag (gap 1 below).
-2. **Rewrite the bare `_createMdxContent(props)` call to
-   `<MDX$CreateMdxContent {...props}/>`.** The direct call bypasses the
-   `(props, __s, __extra)` ABI (the server body would run on `__s === undefined`
-   scope recovery); as JSX both layout branches mount through the component
-   machinery on client and server.
-3. **Server mode only: wrap `_components.*` elements in JSX-child position in
-   expression containers** (`{<_components.h1>…</_components.h1>}`), routing
-   them through the server's VALUE hole (`ssrChild(createElement(…))`), which
-   accepts string tags — `ssrComponent` does not (gap 2 below).
+Two earlier adaptations were tied to octane gaps that are now fixed (see
+below) and have been dropped: the `_createMdxContent → MDX$CreateMdxContent`
+rename (gap 1) and the server-mode wrapping of `_components.*` elements in
+expression containers (gap 2).
 
-## octane gaps hit (fix in octane, then simplify here)
+## octane gaps hit (fixed in octane, adapter simplified)
 
-1. **`<_foo/>` / `<$foo/>` identifier tags compile as host string tags.** JSX
-   semantics (Babel, TypeScript): only `/^[a-z]/`-starting identifiers are
-   intrinsics; `_`/`$`-starting identifiers are component references.
-   `isComponentTag` (packages/octane/src/compiler/compile.js) checks
-   `/^[A-Z]/`. Repro: compile `function App() { return <_Inner/>; }` — emits
-   `createElement('_Inner', {})`, renders `<_inner>` (client) / throws
-   `Invalid tag` (server). Fix → drop adaptation 1 (and 2's rename half).
-2. **A member-expression / dynamic component tag resolving to a host tag
-   STRING renders on the client but crashes SSR.** The client lowers
-   `<obj.tag/>` to a `createElement` descriptor and the de-opt renderer
-   accepts `typeof type === 'string'`; the server's template lowering emits
-   `ssrComponent(__s, obj.tag, …)`, which CALLS the tag —
-   `TypeError: comp is not a function`. Repro: server-compile
-   `function App(props) { return <><props.parts.title>hi</props.parts.title></>; }`
-   and `renderToString(App, { parts: { title: 'h1' } })`. Fix (accept strings
-   in `ssrComponent`, or value-lower stringable tags server-side like the
-   client) → drop adaptation 3.
+1. **FIXED — `<_foo/>` / `<$foo/>` identifier tags compiled as host string
+   tags.** JSX semantics (Babel, TypeScript): only `/^[a-z]/`-starting
+   identifiers are intrinsics; `_`/`$`-starting identifiers are component
+   references. octane's `isComponentTag` now classifies host tags as
+   `/^[a-z]/`-or-dashed (tests: `octane/tests/component-tag-names.test.ts`) →
+   the rename adaptation was dropped.
+2. **FIXED — a member-expression / dynamic component tag resolving to a host
+   tag STRING rendered on the client but crashed SSR** (`ssrComponent` CALLED
+   the tag — `TypeError: comp is not a function`). Both runtimes now route a
+   string comp at a component site through the host-element machinery: the
+   client's `componentSlot` renders it via the de-opt host renderer, and the
+   server serializes `<!--[--><tag>…</tag><!--]-->` so hydration adopts in
+   place (tests: `octane/tests/ssr-host-string-tags.test.ts`,
+   `octane/tests/hydration/host-string-tag-hydrate.test.ts`) → the
+   expression-container wrapping adaptation was dropped.
 
 ## API coverage vs @mdx-js/react
 

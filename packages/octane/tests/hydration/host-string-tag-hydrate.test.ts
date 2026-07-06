@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { createRoot, hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
-import { Card, Wrap, Clicky, Bare } from './_fixtures/host-string-tag.tsrx';
+import { Card, Wrap, Clicky, Bare, Doc, Overridable } from './_fixtures/host-string-tag.tsrx';
 
 // Template-position dynamic tags that resolve to a HOST tag STRING at runtime
 // (`<props.parts.title>`, `<Tag/>` with `const Tag = 'h1'`). These lower to
@@ -242,6 +242,50 @@ describe('host string tags — hydration', () => {
 		const root = hydrateRoot(container, Bare, { tag: 'hr' });
 		flushSync(() => {});
 		expect(container.querySelector('#bare > hr')).toBe(hr);
+		root.unmount();
+	});
+});
+
+describe('host string tags — value position (.tsx return, the MDX shape) hydration', () => {
+	it('hydrates a document of string member tags with the content intact', async () => {
+		const props = { components: { h1: 'h1', p: 'p' }, title: 'Hello' };
+		const { html } = ServerRT.renderToString(server.Doc, props);
+		expect(html).toContain('<h1 class="title">Hello</h1>');
+		expect(html).toContain('<p>body text</p>');
+
+		container.innerHTML = html;
+		const root = hydrateRoot(container, Doc, props);
+		flushSync(() => {});
+		const h1 = container.querySelector('h1') as HTMLElement;
+		expect(h1).not.toBeNull();
+		expect(h1.textContent).toBe('Hello');
+		expect(h1.className).toBe('title');
+		expect((container.querySelector('p') as HTMLElement).textContent).toBe('body text');
+		root.unmount();
+	});
+
+	it('hydrates the string variant of an overridable tag site', async () => {
+		const props = { useFancy: false };
+		const { html } = ServerRT.renderToString(server.Overridable, props);
+		expect(html).toContain('<h2>Title</h2>');
+
+		container.innerHTML = html;
+		const root = hydrateRoot(container, Overridable, props);
+		flushSync(() => {});
+		expect((container.querySelector('h2') as HTMLElement).textContent).toBe('Title');
+		root.unmount();
+	});
+
+	it('hydrates the component variant of the same site with no mismatch', async () => {
+		const props = { useFancy: true };
+		const { html } = ServerRT.renderToString(server.Overridable, props);
+		expect(html).toContain('<em class="fancy">Title</em>');
+
+		container.innerHTML = html;
+		const before = container.innerHTML;
+		const root = hydrateRoot(container, Overridable, props);
+		flushSync(() => {});
+		expect(container.innerHTML).toBe(before); // component path: adopted, untouched
 		root.unmount();
 	});
 });
