@@ -1,8 +1,35 @@
-// Template-position JSX tags that resolve to a HOST tag STRING at runtime —
-// a member expression (`<props.parts.title>`), a variable (`<Tag/>` with
-// `const Tag = 'h1'`), or a string↔component flip. The compiler can't know the
-// tag statically, so these lower to componentSlot; the runtime must render the
-// string comp as a host element (client) / serialize it host-style (server).
+// JSX tags whose RUNTIME value is a host tag STRING — the MDX shape
+// (`<_components.h1>` reading off a components mapping whose defaults are
+// strings). Two positions with different lowerings:
+//   - VALUE position (.tsx return): the client lowers the tag to a
+//     `createElement(obj.tag, …)` descriptor (de-opt host path); the server's
+//     `ssrComponent` routes the string to the host serializer in the same
+//     single-block shape, so hydration adopts identically either way.
+//   - TEMPLATE position (`@{ … }` body): the tag lowers to componentSlot; the
+//     runtime renders the string comp as a host element with the compiled
+//     children render-fn INLINED as its content (no nested block), matching
+//     the server's `<!--[--><tag>…</tag><!--]-->` emission.
+
+// ── value position ───────────────────────────────────────────────────────────
+
+export function Doc(props) {
+	return <>
+		<props.components.h1 class="title">{props.title}</props.components.h1>
+		<props.components.p>body text</props.components.p>
+	</>;
+}
+
+// The same call site can resolve to a real COMPONENT at runtime (an MDX
+// components-mapping override) — dispatch must stay dynamic on both sides.
+function Fancy(props) {
+	return <em class="fancy">{props.children}</em>;
+}
+export function Overridable(props) {
+	const parts = { title: props.useFancy ? Fancy : 'h2' };
+	return <parts.title>Title</parts.title>;
+}
+
+// ── template position ────────────────────────────────────────────────────────
 
 export function Card(props) @{
 	<div id="card">

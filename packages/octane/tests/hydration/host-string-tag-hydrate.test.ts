@@ -4,13 +4,15 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { createRoot, hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
-import { Card, Wrap, Clicky, Bare } from './_fixtures/host-string-tag.tsrx';
+import { Doc, Overridable, Card, Wrap, Clicky, Bare } from './_fixtures/host-string-tag.tsrx';
 
-// Template-position dynamic tags that resolve to a HOST tag STRING at runtime
-// (`<props.parts.title>`, `<Tag/>` with `const Tag = 'h1'`). These lower to
-// componentSlot; the runtime renders the string comp as a host element via the
-// de-opt host machinery (hostElementBody) — mirroring the server's
-// `<!--[--><tag>…children block…</tag><!--]-->` emission so hydration adopts.
+// JSX tags that resolve to a HOST tag STRING at runtime (`<props.parts.title>`,
+// `<Tag/>` with `const Tag = 'h1'` — the MDX `_components.h1` shape). Value
+// position lowers to a `createElement` descriptor (de-opt host path); template
+// position lowers to componentSlot, whose string branch renders the host
+// element with the compiled children render-fn INLINED as its content — both
+// matching the server's `<!--[--><tag>…</tag><!--]-->` emission so hydration
+// adopts (no mismatch, hosts preserved).
 
 const FIXTURE = join(
 	process.cwd(),
@@ -44,13 +46,21 @@ function mount(body: any, props?: any) {
 	return root;
 }
 
-describe('host string tags — client mount', () => {
+describe('host string tags — client mount (template position)', () => {
 	it('renders a member-expression tag as a host element with props + text child', () => {
 		const root = mount(Card, { parts: { title: 'h1' }, text: 'Hi', klass: 'big' });
 		const t = container.querySelector('#card > h1#t') as HTMLElement;
 		expect(t).not.toBeNull();
 		expect(t.textContent).toBe('Hi');
 		expect(t.className).toBe('big');
+		root.unmount();
+	});
+
+	it('inlines the children as the element content — no marker comments inside', () => {
+		const root = mount(Card, { parts: { title: 'h1' }, text: 'Hi', klass: 'big' });
+		// The children render-fn self-bounds on the element: its content renders
+		// directly inside (the static-tag shape), not as a comment-marked block.
+		expect((container.querySelector('#t') as HTMLElement).innerHTML).toBe('Hi');
 		root.unmount();
 	});
 
@@ -86,7 +96,7 @@ describe('host string tags — client mount', () => {
 	});
 });
 
-describe('host string tags — updates', () => {
+describe('host string tags — updates (template position)', () => {
 	it('same tag string → patches the SAME element in place (props + text)', () => {
 		const root = createRoot(container);
 		root.render(Card, { parts: { title: 'h1' }, text: 'a', klass: 'x' });
@@ -152,19 +162,17 @@ describe('host string tags — updates', () => {
 	});
 });
 
-describe('host string tags — hydration', () => {
-	it('SSR emits the host element inside one component block range', async () => {
+describe('host string tags — hydration (template position)', () => {
+	it('SSR emits the host element in ONE block range, children inlined as plain content', async () => {
 		const { html } = await ServerRT.renderToString(server.Card, {
 			parts: { title: 'h1' },
 			text: 'Hi',
 			klass: 'big',
 		});
-		// One component block range wraps the host element; the children render-fn
-		// output carries its own inner block (the shape hostElementBody's childSlot
-		// adopts on the client).
-		expect(html).toContain(
-			'<div id="card"><!--[--><h1 id="t" class="big"><!--[-->Hi<!--]--></h1><!--]--></div>',
-		);
+		// One block — the component site's own adoption range around the element.
+		// The children render-fn's HTML inlines as the element's PLAIN content
+		// (the static-tag shape), NOT as a nested `<!--[-->…<!--]-->` body.
+		expect(html).toContain('<div id="card"><!--[--><h1 id="t" class="big">Hi</h1><!--]--></div>');
 	});
 
 	it('adopts the server host element + text (no rebuild)', async () => {
@@ -242,6 +250,50 @@ describe('host string tags — hydration', () => {
 		const root = hydrateRoot(container, Bare, { tag: 'hr' });
 		flushSync(() => {});
 		expect(container.querySelector('#bare > hr')).toBe(hr);
+		root.unmount();
+	});
+});
+
+describe('host string tags — hydration (value position, the MDX shape)', () => {
+	it('hydrates a document of string member tags with the content intact', async () => {
+		const props = { components: { h1: 'h1', p: 'p' }, title: 'Hello' };
+		const { html } = await ServerRT.renderToString(server.Doc, props);
+		expect(html).toContain('<h1 class="title">Hello</h1>');
+		expect(html).toContain('<p>body text</p>');
+
+		container.innerHTML = html;
+		const root = hydrateRoot(container, Doc, props);
+		flushSync(() => {});
+		const h1 = container.querySelector('h1') as HTMLElement;
+		expect(h1).not.toBeNull();
+		expect(h1.textContent).toBe('Hello');
+		expect(h1.className).toBe('title');
+		expect((container.querySelector('p') as HTMLElement).textContent).toBe('body text');
+		root.unmount();
+	});
+
+	it('hydrates the string variant of an overridable tag site', async () => {
+		const props = { useFancy: false };
+		const { html } = await ServerRT.renderToString(server.Overridable, props);
+		expect(html).toContain('<h2>Title</h2>');
+
+		container.innerHTML = html;
+		const root = hydrateRoot(container, Overridable, props);
+		flushSync(() => {});
+		expect((container.querySelector('h2') as HTMLElement).textContent).toBe('Title');
+		root.unmount();
+	});
+
+	it('hydrates the component variant of the same site with no mismatch', async () => {
+		const props = { useFancy: true };
+		const { html } = await ServerRT.renderToString(server.Overridable, props);
+		expect(html).toContain('<em class="fancy">Title</em>');
+
+		container.innerHTML = html;
+		const before = container.innerHTML;
+		const root = hydrateRoot(container, Overridable, props);
+		flushSync(() => {});
+		expect(container.innerHTML).toBe(before); // component path: adopted, untouched
 		root.unmount();
 	});
 });
