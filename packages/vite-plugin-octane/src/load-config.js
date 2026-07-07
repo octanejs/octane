@@ -52,6 +52,11 @@ function validate_render_route(route) {
 	if (render_route.layout !== undefined && typeof render_route.layout !== 'string') {
 		throw new Error('[@octanejs/vite-plugin] RenderRoute `layout` must be a string path.');
 	}
+
+	const status = /** @type {{ status?: unknown }} */ (route).status;
+	if (status !== undefined && (typeof status !== 'number' || !Number.isInteger(status))) {
+		throw new Error('[@octanejs/vite-plugin] RenderRoute `status` must be an integer.');
+	}
 }
 
 /**
@@ -120,6 +125,16 @@ export function resolveOctaneConfig(raw, options = {}) {
 		throw new Error('[@octanejs/vite-plugin] router.routes must be an array.');
 	}
 
+	if (raw.router?.preHydrate !== undefined) {
+		// A Vite-root module path: the client hydrate entry dynamic-imports it in
+		// the browser, so it must be root-absolute ('/src/…'), not relative or fs.
+		if (typeof raw.router.preHydrate !== 'string' || !raw.router.preHydrate.startsWith('/')) {
+			throw new Error(
+				"[@octanejs/vite-plugin] router.preHydrate must be a Vite-root module path (e.g. '/src/pre-hydrate.ts').",
+			);
+		}
+	}
+
 	for (const route of raw.router?.routes ?? []) {
 		validate_render_route(route);
 	}
@@ -138,6 +153,7 @@ export function resolveOctaneConfig(raw, options = {}) {
 		adapter: raw.adapter,
 		router: {
 			routes: raw.router?.routes ?? [],
+			preHydrate: raw.router?.preHydrate,
 		},
 		rootBoundary: raw.rootBoundary ?? {},
 		middlewares: raw.middlewares ?? [],

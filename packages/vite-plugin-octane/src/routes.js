@@ -77,6 +77,9 @@ export class RenderRoute {
 	/** @type {Middleware[]} */
 	before;
 
+	/** @type {number | undefined} */
+	status;
+
 	/**
 	 * @param {RenderRouteOptions} options
 	 */
@@ -89,6 +92,7 @@ export class RenderRoute {
 		this.entry = options.entry;
 		this.layout = options.layout;
 		this.before = options.before ?? [];
+		this.status = options.status;
 	}
 }
 

@@ -15,19 +15,27 @@ import {
  */
 
 /**
- * octane RenderResult — imported from 'octane/static' (the single source of
- * truth) rather than re-declared, so the shape can't silently drift. `prerender`
- * is ASYNC (awaits Suspense data) and returns `{ html, css }`: `html` has any
- * hoisted `<head>` metadata folded in, and `css` is ALREADY a deduped
- * `<style data-octane="hash">…</style>` string (NOT a Set<string> needing a
- * `get_css_for_hashes` lookup like Ripple), so CSS handling here is identity.
+ * Handle SSR rendering for a RenderRoute (dev) — STREAMING.
  *
- * @typedef {import('octane/static').RenderResult} RenderResult
+ * The render uses octane's `renderToReadableStream` (octane/server): the shell
+ * (with `@pending` fallbacks for anything still suspended) flushes as soon as
+ * it is ready, and each suspense boundary streams later as a hidden segment +
+ * an inline `$OCTRC` swap script, so a slow `use(thenable)` no longer blocks
+ * TTFB the way the old buffered `prerender` did. Consequences of streaming:
+ *
+ *   - Scoped CSS rides the STREAM (the shell emits its deduped
+ *     `<style data-octane>` tags ahead of the body markup, per-wave styles ride
+ *     their segment chunk), so nothing is spliced into `<!--ssr-head-->`
+ *     anymore — only the hydration data script goes there. `hydrateRoot()`
+ *     skips the shell's leading style tags when adopting.
+ *   - A render error BEFORE the shell completes still produces the dev 500
+ *     page (`renderToReadableStream` rejects on shell errors). An error AFTER
+ *     the shell (a rejected `use(thenable)` with no `@catch`) can't change the
+ *     status — the stream ends with `$OCTRX` markers and hydration
+ *     client-renders the affected boundaries.
  */
 
 /**
- * Handle SSR rendering for a RenderRoute (dev).
- *
  * @param {RenderRoute} route
  * @param {Context} context
  * @param {ViteDevServer} vite
@@ -43,10 +51,10 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 			/** @type {any} */ (globalThis).rpc_modules = new Map();
 		}
 
-		// Load the octane static renderer. The wrappers call components directly
-		// (no ssrComponent injection — the root must NOT be marker-wrapped), so
-		// only `prerender` is needed here (await-all, complete HTML).
-		const { prerender } = await vite.ssrLoadModule('octane/static');
+		// Load the octane streaming renderer. The wrappers call components
+		// directly (no ssrComponent injection — the root must NOT be
+		// marker-wrapped).
+		const { renderToReadableStream } = await vite.ssrLoadModule('octane/server');
 
 		// Load the page component (compiled in server mode by octane()).
 		const entryPath = get_route_entry_path(route.entry);
@@ -60,9 +68,14 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 			throw new Error(`No component found for route ${route.path}`);
 		}
 
-		// Build the component tree (with optional layout).
+		// Build the component tree (with optional layout). Every RenderRoute
+		// component receives the request `url` (pathname + search — origin-free so
+		// the identical string re-renders on the client) alongside its `params`,
+		// so an app-level router can match without baking the URL into per-route
+		// entry exports.
 		let RootComponent;
-		const pageProps = { params: context.params };
+		const requestUrl = context.url.pathname + context.url.search;
+		const pageProps = { params: context.params, url: requestUrl };
 
 		if (route.layout) {
 			const layoutModule = await vite.ssrLoadModule(route.layout);
@@ -81,34 +94,24 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 			RootComponent = createPropsWrapper(/** @type {any} */ (PageComponent), pageProps);
 		}
 
-		// Render to HTML. prerender() is async (awaits Suspense data) and returns
-		// { html, css }: `html` has any hoisted <head> metadata folded in and
-		// already contains any inline <script data-octane-suspense> seed.
-		/** @type {RenderResult} */
-		const { html: body, css } = await prerender(RootComponent);
-
-		// CSS is already a ready <style> string (or '') — identity, no re-wrapping.
-		const cssContent = css || '';
-
 		// Build head content with hydration data. The client entry is CONFIG-FREE
 		// (importing octane.config.ts into the browser would drag the plugin + the
 		// server adapter — and their `node:fs` imports — into the client graph and
 		// break at module-eval). So everything the client needs to pick + import
 		// the page/layout is serialized HERE: entry path, export name, layout path,
-		// and params. routeIndex stays for debugging / Phase-2 static maps.
+		// params, the request url, and the optional preHydrate module the client
+		// entry awaits before hydrateRoot. routeIndex stays for debugging /
+		// Phase-2 static maps.
 		const routeData = JSON.stringify({
 			entry: entryPath,
 			exportName: get_route_entry_export_name(route.entry) ?? null,
 			layout: route.layout ?? null,
 			routeIndex: getRenderRouteIndex(octaneConfig, route),
 			params: context.params,
+			url: requestUrl,
+			preHydrate: octaneConfig?.router.preHydrate ?? null,
 		});
-		const headContent = [
-			cssContent,
-			`<script id="__octane_data" type="application/json">${escapeScript(routeData)}</script>`,
-		]
-			.filter(Boolean)
-			.join('\n');
+		const headContent = `<script id="__octane_data" type="application/json">${escapeScript(routeData)}</script>`;
 
 		// Load and process index.html template.
 		const templatePath = join(vite.config.root, 'index.html');
@@ -117,19 +120,64 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		// Apply Vite's HTML transforms (HMR client, module resolution, etc.).
 		template = await vite.transformIndexHtml(context.url.pathname, template);
 
-		// Replace placeholders.
-		let html = template.replace('<!--ssr-head-->', headContent).replace('<!--ssr-body-->', body);
+		let html = template.replace('<!--ssr-head-->', headContent);
 
 		// Inject the hydration entry before </body>.
 		const hydrationScript = `<script type="module" src="/@id/virtual:octane-hydrate"></script>`;
 		html = html.replace('</body>', `${hydrationScript}\n</body>`);
 
-		return new Response(html, {
-			status: 200,
-			headers: {
-				'Content-Type': 'text/html; charset=utf-8',
+		// Start the render. This await resolves at SHELL-ready (so a synchronous
+		// render error still falls into the catch below and produces the dev 500
+		// page); segments keep flushing through the returned stream afterwards.
+		/** @type {ReadableStream<Uint8Array>} */
+		const renderStream = await renderToReadableStream(RootComponent, undefined, {
+			onError(/** @type {unknown} */ error) {
+				if (error instanceof Error) vite.ssrFixStacktrace(error);
+				console.error('[octane] SSR render error:', error);
 			},
 		});
+
+		const status = route.status ?? 200;
+		const headers = { 'Content-Type': 'text/html; charset=utf-8' };
+
+		// No body placeholder → nothing to stream into; cancel the render and
+		// serve the transformed template (matches the old buffered behavior).
+		const splitAt = html.indexOf('<!--ssr-body-->');
+		if (splitAt === -1) {
+			await renderStream.cancel();
+			return new Response(html, { status, headers });
+		}
+		const prefix = html.slice(0, splitAt);
+		const suffix = html.slice(splitAt + '<!--ssr-body-->'.length);
+
+		// Template prefix → render stream (shell, then out-of-order segments) →
+		// template suffix. The hydration <script> is in the SUFFIX, so by the time
+		// the browser requests the entry every segment is already in the DOM.
+		const encoder = new TextEncoder();
+		const body = new ReadableStream({
+			async start(controller) {
+				controller.enqueue(encoder.encode(prefix));
+				const reader = renderStream.getReader();
+				try {
+					while (true) {
+						const { done, value } = await reader.read();
+						if (done) break;
+						controller.enqueue(value);
+					}
+					controller.enqueue(encoder.encode(suffix));
+					controller.close();
+				} catch (error) {
+					controller.error(error);
+				} finally {
+					reader.releaseLock();
+				}
+			},
+			cancel(reason) {
+				return renderStream.cancel(reason);
+			},
+		});
+
+		return new Response(body, { status, headers });
 	} catch (error) {
 		console.error('[octane] SSR render error:', error);
 
