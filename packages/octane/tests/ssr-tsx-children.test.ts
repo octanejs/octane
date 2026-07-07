@@ -52,6 +52,9 @@ describe('.tsx return-form component children — server matches client (descrip
 				</Provider>
 			}`;
 		const code = serverCode(TEMPLATE_FORM);
-		expect(code).toMatch(/"children":\s*__schildren/);
+		// Tagged with markChildrenBlock (like the client) so render-prop checks
+		// (`typeof children === 'function' && !isChildrenBlock(children)`) agree
+		// on both runtimes.
+		expect(code).toMatch(/"children":\s*_\$markChildrenBlock\(__schildren/);
 	});
 });
