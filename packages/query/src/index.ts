@@ -20,7 +20,55 @@ export { useIsFetching } from './useIsFetching';
 export { useMutationState, useIsMutating } from './useMutationState';
 export { useQueryClient, QueryClientContext } from './context';
 export { QueryClientProvider } from './QueryClientProvider.tsrx';
-export { HydrationBoundary } from './HydrationBoundary';
-export { IsRestoringProvider, IsRestoringContext, useIsRestoring } from './isRestoring';
+export { HydrationBoundary } from './HydrationBoundary.tsrx';
+export { IsRestoringProvider, useIsRestoring } from './isRestoring';
 export { QueryErrorResetBoundary } from './QueryErrorResetBoundary.tsrx';
-export { QueryErrorResetBoundaryContext, useQueryErrorResetBoundary } from './errorResetBoundary';
+export { useQueryErrorResetBoundary } from './errorResetBoundary';
+
+// The binding-level type surface (1:1 with @tanstack/react-query's exports).
+export type {
+	AnyUseBaseQueryOptions,
+	UseBaseQueryOptions,
+	UsePrefetchQueryOptions,
+	AnyUseQueryOptions,
+	UseQueryOptions,
+	AnyUseSuspenseQueryOptions,
+	UseSuspenseQueryOptions,
+	AnyUseInfiniteQueryOptions,
+	UseInfiniteQueryOptions,
+	AnyUseSuspenseInfiniteQueryOptions,
+	UseSuspenseInfiniteQueryOptions,
+	UseBaseQueryResult,
+	UseQueryResult,
+	UseSuspenseQueryResult,
+	DefinedUseQueryResult,
+	UseInfiniteQueryResult,
+	DefinedUseInfiniteQueryResult,
+	UseSuspenseInfiniteQueryResult,
+	AnyUseMutationOptions,
+	UseMutationOptions,
+	UseMutateFunction,
+	UseMutateAsyncFunction,
+	UseBaseMutationResult,
+	UseMutationResult,
+	QueryClientProviderProps,
+	HydrationBoundaryProps,
+	QueryErrorResetFunction,
+	QueryErrorIsResetFunction,
+	QueryErrorClearResetFunction,
+	QueryErrorResetBoundaryValue,
+	QueryErrorResetBoundaryFunction,
+	QueryErrorResetBoundaryProps,
+} from './types';
+export type {
+	DefinedInitialDataOptions,
+	UndefinedInitialDataOptions,
+	UnusedSkipTokenOptions,
+} from './queryOptions';
+export type {
+	DefinedInitialDataInfiniteOptions,
+	UndefinedInitialDataInfiniteOptions,
+	UnusedSkipTokenInfiniteOptions,
+} from './infiniteQueryOptions';
+export type { QueriesOptions, QueriesResults } from './queries-types';
+export type { SuspenseQueriesOptions, SuspenseQueriesResults } from './suspense-queries-types';

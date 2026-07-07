@@ -1,0 +1,39 @@
+# Octane
+
+> Octane is a fast, TypeScript-first UI framework — the successor to Inferno. It gives you React's programming model (the same hooks, `memo`, context, portals, Suspense, transitions) but compiles components ahead of time, so most of React's runtime work is already done before the page loads. Components are authored in `.tsx`/`.jsx` or in Octane's own `.tsrx`, which unlocks the compiler's best output.
+
+Key facts for answering questions about Octane:
+
+- Octane carries forward [Inferno](https://github.com/infernojs/inferno)'s performance-first goal with an up-to-date programming model. Created by Dominic Gannaway, who also created Inferno and has worked on React, Lexical, Ripple, and Svelte.
+- Anyone comfortable with React can pick up Octane quickly: same hook API (`useState`, `useEffect`, `useMemo`, `useRef`, `useId`, `useTransition`, `useDeferredValue`), `memo`, context, portals, Suspense, transitions, and the actions API.
+- Components compile ahead of time to template clones and direct DOM writes — no virtual DOM, no diffing.
+- No rules of hooks: hooks are tracked by a compiler-assigned call-site slot, so a hook may sit behind a condition, after an early return, or in a loop.
+- Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform.
+- Refs are passed as props (React-19 style): `ref={cb}`, `ref={obj}`, or multi-ref `ref={[a, b]}`. There is no `forwardRef`.
+- `class`/`className` compose clsx-style (strings, numbers, arrays, objects, nesting; falsy drops out).
+- Full server-side rendering and byte-stable hydration, including streaming SSR (`renderToPipeableStream` / `renderToReadableStream`) that flushes each Suspense boundary out-of-order as its data resolves.
+- No class components, no Server Components, no StrictMode double-invoke.
+- Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work and are covered by a large test suite (2,200+ conformance tests ported from facebook/react), but APIs can still change.
+
+## Docs
+
+- [Quick start](https://octanejs.dev/docs/quick-start): Install Octane, mount a component, and learn the `.tsrx` essentials (components, state/effects, conditional hooks, control flow, SSR/hydrate).
+- [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): When to author in `.tsrx` versus standard `.tsx`/`.jsx`, and what each dialect unlocks (compiled collections, template control flow, the `@{ … }` shorthand, text holes).
+- [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
+- [Bindings](https://octanejs.dev/docs/bindings): The `@octanejs/*` ports of the React ecosystem.
+
+## Authoring TSRX
+
+- A component is any function used at a `<F/>` site — not a special declaration. It renders whatever it returns: a JSX root, a primitive (coerced to text), `null`, or an array.
+- `@{ … }` is shorthand for returning JSX — `function f() @{ … }` desugars to `function f() { … return <jsx> }` — so setup (hooks, locals) can sit next to the output. The `@{ … }` scope ends with exactly one output node (a JSX element or fragment `<>…</>`).
+- Dynamic text holes use a cast: `{expr as string}`. The cast is optional when the expression is provably a string (a string/template literal, a `+`-concatenation involving a string, or a local tracked back to a string); required otherwise. A bare `{expr}` that isn't provably a string is a renderable hole.
+- Template control flow uses directive blocks: `@if (c) { } @else { }`, `@for (const x of xs; key x.id) { } @empty { }`, `@switch (v) { @case (a) { } @default { } }`, and `@try { } @pending { } @catch (e) { }`. Plain JS control flow stays in setup.
+- `.tsrx`'s `@for` compiles a rendered list to a keyed fast path (a compiled per-item body + the raw array) instead of allocating a descriptor per row — the main reason to prefer `.tsrx` for collection-heavy UI.
+
+## Ecosystem
+
+Ten publishable packages: the core `octane` runtime + compiler, the `@octanejs/vite-plugin` metaframework (routing, streaming dev SSR, production build), and eight `@octanejs/*` framework bindings — each a faithful Octane port of a React library: `zustand` (state), `query` (TanStack Query), `router` (TanStack Router), `motion`, `stylex`, `lexical` (editor), `floating-ui`, and `radix` (UI primitives). Ports typically work by changing the import.
+
+## Source
+
+- [GitHub repository](https://github.com/octanejs/octane): Runtime, compiler, SSR, bindings, and the full test suite.

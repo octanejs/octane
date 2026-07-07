@@ -41,13 +41,24 @@ export function Home() @{
 					{'.'}
 				</h1>
 				<p class="hero-sub">
-					The same hooks, Suspense and actions API you already know — compiled ahead of time. No
-					virtual DOM. No rules of hooks.
+					{'The successor to '}
+					<a
+						href="https://github.com/infernojs/inferno"
+						target="_blank"
+						rel="noreferrer"
+					>{'Inferno'}</a>
+					{', carrying its performance-first goal forward: the hooks, Suspense and ' +
+						'actions API you already know, compiled ahead of time. No virtual DOM. ' +
+						'No rules of hooks.'}
 				</p>
 				<div class="hero-actions">
 					<Link to="/docs/quick-start" class="btn-primary">Get started</Link>
 					<Link to="/docs/differences-from-react" class="btn-ghost">Differences from React</Link>
 				</div>
+				<p class="hero-lineage">
+					{'Created by Dominic Gannaway, who also created Inferno, Lexical, Ripple and has worked on ' +
+						'the React and Svelte core teams.'}
+				</p>
 			</div>
 			<div class="hero-code">
 				<div class="hero-code-bar">
@@ -158,6 +169,19 @@ export function Home() @{
 			.hero-actions :global(a.btn-ghost:hover) {
 				background: rgba(255, 255, 255, 0.06);
 				text-decoration: none;
+			}
+			.hero-sub a {
+				color: #f4eee8;
+				font-weight: 600;
+			}
+			.hero-sub a:hover {
+				color: #ff5d72;
+			}
+			.hero-lineage {
+				color: #99a1b3;
+				font-size: 0.875rem;
+				margin: 1.5rem 0 0;
+				max-width: 34rem;
 			}
 			.hero-code {
 				background: #16181d;

@@ -2,6 +2,7 @@
 // Static imports keep every document in both module graphs (server-compiled
 // for SSR, client-compiled for hydration/navigation) — fine at this scale.
 import QuickStart from './docs/quick-start.mdx';
+import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
 import Bindings from './docs/bindings.mdx';
 
@@ -18,6 +19,12 @@ export const docs: DocEntry[] = [
 		title: 'Quick start',
 		description: 'Install octane, mount a component, and learn the .tsrx essentials.',
 		component: QuickStart as DocEntry['component'],
+	},
+	{
+		slug: 'tsrx-vs-tsx',
+		title: 'TSRX vs TSX/JSX',
+		description: 'When to author in .tsrx versus standard .tsx/.jsx, and what each unlocks.',
+		component: TsrxVsTsx as DocEntry['component'],
 	},
 	{
 		slug: 'differences-from-react',

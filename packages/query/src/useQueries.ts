@@ -1,4 +1,5 @@
 import { QueriesObserver, QueryObserver, noop, notifyManager } from '@tanstack/query-core';
+import type { QueryClient } from '@tanstack/query-core';
 import { useState, useMemo, useSyncExternalStore, useCallback, useEffect, use } from 'octane';
 import { resolveClient } from './context';
 import { useIsRestoring } from './isRestoring';
@@ -12,6 +13,20 @@ import {
 	splitSlot,
 	subSlot,
 } from './internal';
+import type { QueriesOptions, QueriesResults } from './queries-types';
+
+// Signature matches @tanstack/react-query's useQueries.ts — per-entry tuple
+// inference via QueriesOptions/QueriesResults, with `combine` re-typing the
+// aggregate result. The untyped implementation signature also accepts the
+// compiler-injected trailing slot symbol.
+export function useQueries<T extends Array<any>, TCombinedResult = QueriesResults<T>>(
+	options: {
+		queries: readonly [...QueriesOptions<T>];
+		combine?: (result: QueriesResults<T>) => TCombinedResult;
+		subscribed?: boolean;
+	},
+	queryClient?: QueryClient,
+): TCombinedResult;
 
 export function useQueries(options: any, ...rest: any[]): any {
 	const [user, slot] = splitSlot(rest);

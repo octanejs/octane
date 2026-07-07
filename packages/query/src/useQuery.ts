@@ -1,5 +1,41 @@
 import { QueryObserver } from '@tanstack/query-core';
+import type { DefaultError, QueryClient, QueryKey } from '@tanstack/query-core';
 import { useBaseQuery } from './useBaseQuery';
+import type { DefinedUseQueryResult, UseQueryOptions, UseQueryResult } from './types';
+import type { DefinedInitialDataOptions, UndefinedInitialDataOptions } from './queryOptions';
+
+// Overloads match @tanstack/react-query's useQuery.ts: `initialData` narrows the
+// result to DefinedUseQueryResult. The untyped implementation signature also
+// accepts the compiler-injected trailing slot symbol (never visible to users).
+export function useQuery<
+	TQueryFnData = unknown,
+	TError = DefaultError,
+	TData = TQueryFnData,
+	TQueryKey extends QueryKey = QueryKey,
+>(
+	options: DefinedInitialDataOptions<TQueryFnData, TError, TData, TQueryKey>,
+	queryClient?: QueryClient,
+): DefinedUseQueryResult<NoInfer<TData>, TError>;
+
+export function useQuery<
+	TQueryFnData = unknown,
+	TError = DefaultError,
+	TData = TQueryFnData,
+	TQueryKey extends QueryKey = QueryKey,
+>(
+	options: UndefinedInitialDataOptions<TQueryFnData, TError, TData, TQueryKey>,
+	queryClient?: QueryClient,
+): UseQueryResult<NoInfer<TData>, TError>;
+
+export function useQuery<
+	TQueryFnData = unknown,
+	TError = DefaultError,
+	TData = TQueryFnData,
+	TQueryKey extends QueryKey = QueryKey,
+>(
+	options: UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>,
+	queryClient?: QueryClient,
+): UseQueryResult<NoInfer<TData>, TError>;
 
 export function useQuery(options: any, ...rest: any[]): any {
 	// `[queryClient?, slot?]` — the slot (symbol) is the compiler-injected trailing
