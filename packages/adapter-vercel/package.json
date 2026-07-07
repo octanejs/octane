@@ -1,0 +1,32 @@
+{
+  "name": "@octanejs/adapter-vercel",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "description": "Vercel adapter for octane apps (Build Output API v3)",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/adapter-vercel"
+  },
+  "module": "src/index.js",
+  "main": "src/index.js",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    }
+  },
+  "devDependencies": {
+    "@octanejs/vite-plugin": "workspace:*",
+    "@types/node": "catalog:default"
+  }
+}

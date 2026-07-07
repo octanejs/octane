@@ -676,6 +676,23 @@ export function octane(inlineOptions = {}) {
 			console.log(
 				`[@octanejs/vite-plugin] Start with: node ${outDir}/server/${ENTRY_FILENAME} (or octane-preview)`,
 			);
+
+			// ------------------------------------------------------------------
+			// Deploy adapter (SvelteKit-style): with both bundles on disk, let the
+			// config's adapter restructure them for its platform (e.g.
+			// @octanejs/adapter-vercel emits `.vercel/output`).
+			// ------------------------------------------------------------------
+			if (cfg.adapter?.adapt) {
+				const adapterName = cfg.adapter.name ?? 'adapter';
+				console.log(`[@octanejs/vite-plugin] Running ${adapterName} adapt()…`);
+				await cfg.adapter.adapt({
+					root,
+					outDir,
+					clientDir: clientOutDir,
+					serverDir: serverOutDir,
+					log: (message) => console.log(message),
+				});
+			}
 		},
 	};
 

@@ -5,16 +5,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const RESOLVED_ADAPTER_BROWSER_STUB_ID = '\0octane:adapter-browser-stub';
+// Server-only deploy/adapter packages: client-side imports of these specifiers
+// resolve to the browser stub below instead of the real module (whose graph
+// pulls node builtins). Every published adapter package MUST be listed here,
+// and its public exports added to the stub.
 export const SERVER_ONLY_ADAPTER_IDS = new Set([
 	'@ripple-ts/adapter-node',
 	'@ripple-ts/adapter-bun',
 	'@ripple-ts/adapter-vercel',
+	'@octanejs/adapter-vercel',
 ]);
 
 /** @type {Map<string, string>} */
 const generated_file_cache = new Map();
 
 /**
+ * The browser stand-in shared by every SERVER_ONLY_ADAPTER_IDS package — it
+ * must export the UNION of their public names, each failing loudly on use
+ * (never at import, so merely reaching the module keeps the app alive).
  * @returns {string}
  */
 export function create_adapter_browser_stub_source() {
@@ -27,6 +35,12 @@ export function nodeRequestToWebRequest() {
 }
 export function webResponseToNodeResponse() {
   throw new Error('[octane] Node response helpers cannot run in the browser.');
+}
+export function vercel() {
+  throw new Error('[octane] Deploy adapters cannot run in the browser.');
+}
+export function adapt() {
+  throw new Error('[octane] Deploy adapters cannot run in the browser.');
 }
 `;
 }

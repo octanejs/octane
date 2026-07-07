@@ -1099,6 +1099,15 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  packages/adapter-vercel:
+    devDependencies:
+      '@octanejs/vite-plugin':
+        specifier: workspace:*
+        version: link:../vite-plugin-octane
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+
   packages/base-ui:
     dependencies:
       '@floating-ui/utils':
@@ -1539,6 +1548,9 @@ importers:
 
   website:
     dependencies:
+      '@octanejs/adapter-vercel':
+        specifier: workspace:*
+        version: link:../packages/adapter-vercel
       '@octanejs/mdx':
         specifier: workspace:*
         version: link:../packages/mdx

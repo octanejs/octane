@@ -128,10 +128,7 @@ export function useBaseQuery(
 		throw result.error;
 	}
 
-	(client.getDefaultOptions().queries as any)?._experimental_afterQuery?.(
-		defaultedOptions,
-		result,
-	);
+	(client.getDefaultOptions().queries as any)?._experimental_afterQuery?.(defaultedOptions, result);
 
 	// experimental_prefetchInRender: kick the fetch during render so
 	// `result.promise` settles even if the component unmounts, and finalize the
