@@ -2,6 +2,7 @@
 /** @import {OctaneConfigOptions, ResolvedOctaneConfig, RenderRoute} from '@octanejs/vite-plugin' */
 
 import fs from 'node:fs';
+import path from 'node:path';
 import { Readable } from 'node:stream';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
@@ -60,22 +61,40 @@ const VITE_QUERY_MARKERS = ['import', 'direct', 'raw', 'url', 'worker', 'sharedw
  * SSR `/@vite/client` or `/src/main.ts` — those must fall through to Vite's
  * transform middleware. Exported for tests.
  *
+ * A dot in the last path segment is NOT enough to claim a request: page URLs
+ * like `/docs/v2.0` or `/users/jane.doe` carry one too. So an extension only
+ * marks a Vite-owned request when the path names a REAL file under one of
+ * `fileRoots` (the Vite root + publicDir — what the dev server can actually
+ * serve). With no `fileRoots` the check stays the conservative heuristic
+ * (any extension → Vite-owned).
+ *
  * @param {URL} url
+ * @param {string[]} [fileRoots]
  * @returns {boolean}
  */
-export function isViteOwnedUrl(url) {
+export function isViteOwnedUrl(url, fileRoots) {
 	const pathname = url.pathname;
 	// Vite-internal namespaces: /@vite/client, /@id/…, /@fs/…, /@react-refresh.
 	if (pathname.startsWith('/@')) return true;
 	// Vite/devtools internals: /__open-in-editor, /__inspect, …
 	if (pathname.startsWith('/__')) return true;
 	if (pathname.includes('/node_modules/')) return true;
-	// A file extension marks a module/asset request (/src/main.ts, /favicon.svg).
-	// (dot > 0 so a bare dotfile segment like '/.well-known' doesn't count.)
-	const lastSegment = pathname.slice(pathname.lastIndexOf('/') + 1);
-	if (lastSegment.lastIndexOf('.') > 0) return true;
 	for (const marker of VITE_QUERY_MARKERS) {
 		if (url.searchParams.has(marker)) return true;
+	}
+	// A file extension marks a module/asset request (/src/main.ts, /favicon.svg)
+	// — but only when a real file backs it (see above). (dot > 0 so a bare
+	// dotfile segment like '/.well-known' doesn't count.)
+	const lastSegment = pathname.slice(pathname.lastIndexOf('/') + 1);
+	if (lastSegment.lastIndexOf('.') > 0) {
+		if (fileRoots === undefined) return true;
+		let relPath;
+		try {
+			relPath = decodeURIComponent(pathname);
+		} catch {
+			relPath = pathname;
+		}
+		return fileRoots.some((root) => fs.existsSync(path.join(root, relPath)));
 	}
 	return false;
 }
@@ -313,7 +332,13 @@ export function octane(inlineOptions = {}) {
 					// middleware, not SSR — skip them BEFORE the (per-request) config
 					// reload below so module requests stay cheap. ServerRoutes are not
 					// filtered: an explicit '/api/data.json' endpoint is legitimate.
-					if (match.route.type === 'render' && isViteOwnedUrl(url)) {
+					// The file roots let extension-bearing PAGE urls (/docs/v2.0,
+					// /users/jane.doe) SSR — only paths naming a real file are Vite's.
+					const fileRoots = [config.root];
+					if (typeof config.publicDir === 'string' && config.publicDir !== '') {
+						fileRoots.push(config.publicDir);
+					}
+					if (match.route.type === 'render' && isViteOwnedUrl(url, fileRoots)) {
 						next();
 						return;
 					}

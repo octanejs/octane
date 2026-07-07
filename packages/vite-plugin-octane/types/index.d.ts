@@ -30,8 +30,13 @@ export function octane(options?: OctanePluginOptions): Plugin[];
  * Is this a request the Vite dev server owns (module / asset / internal
  * namespace / transform query), as opposed to a page navigation? The dev SSR
  * middleware uses it so a catch-all RenderRoute never swallows Vite requests.
+ *
+ * `fileRoots` (the Vite root + publicDir) gate the file-extension heuristic:
+ * an extension-bearing path is only Vite's when it names a real file under
+ * one of them, so page URLs like `/docs/v2.0` still SSR. Without `fileRoots`
+ * any extension counts (conservative).
  */
-export function isViteOwnedUrl(url: URL): boolean;
+export function isViteOwnedUrl(url: URL, fileRoots?: string[]): boolean;
 export function defineConfig(options: OctaneConfigOptions): OctaneConfigOptions;
 export function resolveOctaneConfig(
 	raw: OctaneConfigOptions,
