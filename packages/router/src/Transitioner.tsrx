@@ -68,8 +68,8 @@ export function Transitioner() @{
 	// on re-runs for the same router instance.
 	useLayoutEffect(() => {
 		if (
-			(typeof window !== 'undefined' && router.ssr) ||
-			(mountLoadForRouter.current.router === router && mountLoadForRouter.current.mounted)
+			typeof window !== 'undefined' && router.ssr ||
+				mountLoadForRouter.current.router === router && mountLoadForRouter.current.mounted
 		) {
 			return;
 		}

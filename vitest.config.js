@@ -93,6 +93,10 @@ export default defineConfig({
 					name: 'router',
 					include: ['packages/router/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					// Differential precompile for router fixtures: rewrites
+					// `@octanejs/router` → `@tanstack/react-router` so the React side
+					// runs real react-router.
+					globalSetup: ['packages/router/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [

@@ -14,6 +14,8 @@ export function Await(props) @{
 	@try {
 		<AwaitInner promise={props.promise} render={props.children} />
 	} @pending {
-		<>{props.fallback}</>
+		<>
+			{props.fallback}
+		</>
 	}
 }

@@ -32,8 +32,10 @@ export function Outlet() @{
 	// whose fallback is the router's defaultPendingComponent (react-router's
 	// Outlet does the same) — the outermost pending UI for the initial load.
 	const DefaultPending = router.options.defaultPendingComponent;
-	const RootSuspense = parentRouteId === rootRouteId ? Suspense : SafeFragment;
-	const pendingElement = DefaultPending ? createElement(DefaultPending, {}) : null;
+	const RootSuspense =
+		parentRouteId === rootRouteId ? Suspense : SafeFragment;
+	const pendingElement =
+		DefaultPending ? createElement(DefaultPending, {}) : null;
 
 	@if (globalNotFound) {
 		<RouteNotFound routeId={parentRouteId} />

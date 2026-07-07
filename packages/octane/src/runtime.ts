@@ -8999,6 +8999,18 @@ function switchToCatch(state: TrySlot, err: any): void {
 	abandonHeldTransition(state);
 	// No catch arm — bubble to the next enclosing tryBlock (or surface).
 	if (state.catchBody === null) {
+		// Mid-render (a component render stack is live): RETHROW instead of
+		// delegating synchronously. The outer boundary's switch sweeps the DOM
+		// of every frame between the throw site and itself — if we called its
+		// handler here and returned, those still-on-stack frames would keep
+		// rendering into the swept range (stale anchors → NotFoundError, and the
+		// bookkeeping error would REPLACE the original). The rethrow unwinds
+		// them; the outer boundary catches it at its own tryBlock frame.
+		if (CURRENT_BLOCK !== null) {
+			throw err;
+		}
+		// Detached context (resume microtask, effect commit): no render frames
+		// to unwind — delegate directly.
 		const parent = findTryHandler(state.parentBlock);
 		if (parent) parent(err);
 		else console.error('tryBlock with no catch arm received error:', err);

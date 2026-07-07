@@ -117,7 +117,7 @@ export function makeLifecycleRouter(initial: string, opts: LifecycleRouterOption
 		getParentRoute: () => rootRoute,
 		path: 'boom',
 		component: BoomPage,
-		errorComponent: (opts.routeError ?? true) ? RouteError : undefined,
+		errorComponent: opts.routeError ?? true ? RouteError : undefined,
 		onCatch: opts.onCatch,
 	});
 	const slowLoaderRoute = createRoute({
@@ -126,6 +126,9 @@ export function makeLifecycleRouter(initial: string, opts: LifecycleRouterOption
 		component: LoaderDone,
 		pendingComponent: LoaderPending,
 		pendingMs: 1,
+		// router-core defaults pendingMinMs to 500ms (once pending UI shows it
+		// stays up that long; runLoader awaits the window) — keep the test fast.
+		pendingMinMs: 1,
 		loader: () => loaderDeferred!.promise,
 	});
 	const nfRenderRoute = createRoute({
@@ -151,6 +154,6 @@ export function makeLifecycleRouter(initial: string, opts: LifecycleRouterOption
 		history: createMemoryHistory({ initialEntries: [initial] }),
 		defaultErrorComponent: opts.defaultError ? DefaultError : undefined,
 		defaultOnCatch: opts.defaultOnCatch,
-		defaultComponent: (opts.defaultComponent ?? true) ? DefaultComp : undefined,
+		defaultComponent: opts.defaultComponent ?? true ? DefaultComp : undefined,
 	});
 }

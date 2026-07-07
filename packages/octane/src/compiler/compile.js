@@ -2837,6 +2837,49 @@ function rewriteHookCalls(node, ctx, componentName) {
 				};
 			}
 		}
+		// METHOD-style custom hooks — `route.useLoaderData()`, `api.useSearch()`
+		// (React-ecosystem object-carried hooks: TanStack Route/RouteApi accessors
+		// and the like). Same `use[A-Z]` convention, applied to the PROPERTY name.
+		// The callee is a member access, so the plain withSlot form would sever
+		// `this`; instead the WHOLE call is wrapped in a thunk —
+		// `_$withSlot(sym, () => obj.useX(...args, sym))` — which pushes the
+		// call-site path symbol for the hook's inner base hooks while the trailing
+		// `sym` still reaches slot-forwarding bindings (splitSlot convention).
+		if (
+			n.type === 'CallExpression' &&
+			!n.optional &&
+			n.callee.type === 'MemberExpression' &&
+			!n.callee.computed &&
+			n.callee.property.type === 'Identifier' &&
+			/^use[A-Z]/.test(n.callee.property.name) &&
+			n.callee.property.name !== 'useContext'
+		) {
+			const debug = `${componentName}.${n.callee.property.name}#${ctx.nextHookSymId}`;
+			const symVar = allocHookSymbol(ctx, debug);
+			ctx.runtimeNeeded.add('withSlot');
+			const object = rewriteHookCalls(n.callee.object, ctx, componentName);
+			const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName));
+			return {
+				type: 'CallExpression',
+				callee: { type: 'Identifier', name: '_$withSlot' },
+				arguments: [
+					{ type: 'Identifier', name: symVar },
+					{
+						type: 'ArrowFunctionExpression',
+						params: [],
+						expression: true,
+						async: false,
+						body: {
+							type: 'CallExpression',
+							callee: { ...n.callee, object },
+							arguments: [...args, { type: 'Identifier', name: symVar }],
+							optional: false,
+						},
+					},
+				],
+				optional: false,
+			};
+		}
 		return null;
 	});
 }
