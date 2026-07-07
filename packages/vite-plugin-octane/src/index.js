@@ -79,8 +79,12 @@ export function isViteOwnedUrl(url, fileRoots) {
 	// Vite/devtools internals: /__open-in-editor, /__inspect, …
 	if (pathname.startsWith('/__')) return true;
 	if (pathname.includes('/node_modules/')) return true;
+	// Vite emits its transform queries as BARE markers (`?url`, `?raw`,
+	// `?worker`, `&import`) — only an EMPTY value counts. A valued param
+	// (`/docs?url=https://example.com`) is an app query string on a page
+	// navigation, not a transform request.
 	for (const marker of VITE_QUERY_MARKERS) {
-		if (url.searchParams.has(marker)) return true;
+		if (url.searchParams.get(marker) === '') return true;
 	}
 	// A file extension marks a module/asset request (/src/main.ts, /favicon.svg)
 	// — but only when a real file backs it (see above). (dot > 0 so a bare

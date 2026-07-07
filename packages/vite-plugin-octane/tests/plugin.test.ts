@@ -37,6 +37,11 @@ describe('isViteOwnedUrl', () => {
 		expect(isViteOwnedUrl(url('/search?q=octane'))).toBe(false);
 		// A bare dotfile segment is not an extension.
 		expect(isViteOwnedUrl(url('/.well-known'))).toBe(false);
+		// VALUED params matching a marker name are app query strings — Vite's
+		// transform markers are always bare (`?url`, `?raw`, `&import`).
+		expect(isViteOwnedUrl(url('/docs?url=https://example.com'))).toBe(false);
+		expect(isViteOwnedUrl(url('/page?raw=1'))).toBe(false);
+		expect(isViteOwnedUrl(url('/jobs?worker=nurse'))).toBe(false);
 	});
 
 	it('with fileRoots, an extension only counts when a real file backs it', () => {
