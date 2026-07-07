@@ -61,7 +61,10 @@ Included: `createRouter`, `createRootRoute`, `createRoute`, `RouterProvider`,
 `Outlet`, `Link`, `Navigate`, `useRouter`, `useRouterState`, `useLocation`,
 `useParams`, `useSearch`, `useLoaderData`, `useMatches`, `useNavigate`,
 **`ScrollRestoration`**, **`Await`/`useAwaited` + `defer` (streaming deferred data)**,
-and **`lazyRouteComponent` (lazy/code-split route components)**, plus the full
+and **`lazyRouteComponent` (lazy/code-split route components)**, and **not-found
+rendering** (`notFoundComponent`/`defaultNotFoundComponent`/`notFoundMode` — an
+unknown URL or a loader throwing `notFound()` renders the not-found UI inside the
+layout, per TanStack's fuzzy/root boundary rules), plus the full
 `@tanstack/router-core` re-export (`redirect`, `notFound`, history, search helpers,
 types).
 

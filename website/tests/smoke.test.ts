@@ -119,14 +119,10 @@ describe('website routes', () => {
 		}
 	});
 
-	// GAP (@octanejs/router): `createRootRoute({ notFoundComponent })` is
-	// accepted but never rendered — the port's <Match> renders only the happy
-	// path ("error/not-found boundaries arrive next", Match.tsrx). Until that
-	// lands, an unknown URL renders the root layout with an empty outlet. This
-	// test pins the current behavior so it flips when the router adds support.
-	it('an unknown route renders the layout shell (notFoundComponent is a router gap)', async () => {
+	it('an unknown route renders the root notFoundComponent inside the layout', async () => {
 		const { container } = await renderRoute('/definitely/not/a/page');
-		expect(container.querySelector('.navlinks')).toBeTruthy(); // layout up, no crash
-		expect(textOf(container)).not.toContain('Page not found'); // flips when router supports it
+		expect(container.querySelector('.navlinks')).toBeTruthy(); // layout chrome stays up
+		expect(textOf(container)).toContain('Page not found'); // NotFound page in the outlet
+		expect(container.querySelector('a.notfound-home')?.getAttribute('href')).toBe('/');
 	});
 });
