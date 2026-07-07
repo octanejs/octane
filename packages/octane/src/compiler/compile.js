@@ -2205,7 +2205,14 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 			// that. Mirrors the client `@{}` convention (componentSlot + a render fn).
 			const sub = ssrCompileSub(node.children, ctx, '__schildren', [], cssHash, 'html');
 			inlinedSubs.push(sub.fn + ';');
-			propParts.push(`"children": ${sub.fnName}`);
+			// Tag the server children-block like the client does (see the client
+			// emission in lowerComponentCall): a consumer's `typeof children ===
+			// 'function' && !isChildrenBlock(children)` render-prop check must agree
+			// on BOTH runtimes. Untagged, a binding (e.g. the router Link) INVOKES
+			// the block as a render prop server-side, gets its HTML string back, and
+			// the enclosing hole escapes that markup into visible text.
+			ctx.runtimeNeeded.add('markChildrenBlock');
+			propParts.push(`"children": _$markChildrenBlock(${sub.fnName})`);
 		}
 	}
 	ctx.runtimeNeeded.add('ssrComponent');
