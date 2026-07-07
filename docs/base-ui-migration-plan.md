@@ -10,6 +10,61 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3 — ALERTDIALOG COMPLETE (2026-07). Green: 58 base-ui tests (54 differential + 4 behavior),
+> full suite green.** `src/alert-dialog.ts` — a thin Dialog variant (the whole Dialog foundation
+> already supported it): `AlertDialogRoot` = `useRenderDialogRoot(props, 'alert-dialog')` (forces
+> `modal: true`, `disablePointerDismissal: true`, `role: 'alertdialog'`), and Trigger/Portal/Backdrop/
+> Popup/Title/Description/Close are Dialog's parts reused verbatim via the `Dialog` namespace.
+> `AlertDialogHandle extends DialogHandle` (enforces the alert-dialog invariants on its store).
+> Exported `useRenderDialogRoot` from `dialog.ts`. **The open modal alert dialog is byte-identical to
+> real Base UI** (only `role="alertdialog"` differs from Dialog) — differential + 2 behavior tests
+> (trigger→open→Close, Escape-still-dismisses-though-outside-press-is-disabled).
+
+> **Phase 3 — POPOVER COMPLETE: OPEN (anchored-positioner) path landed + differential-verified
+> (2026-07). Green: 55 base-ui tests (53 differential + 2 Popover behavior), full monorepo suite 2289
+> green.** Ported the anchored-positioning layer, reusing `@octanejs/floating-ui`'s positioning engine
+> maximally: `utils/floating/useFloating.ts` (Base UI's Store-based `useFloating`, octane-adapted —
+> swaps `@floating-ui/react-dom`'s `useFloating` for `@octanejs/floating-ui`'s `usePositionFloating`,
+> keeping ALL the `FloatingRootStore` logic) + `utils/floating/useFloatingRootContext.ts` (internal
+> fallback store) + `utils/useAnchorPositioning.ts` (~430; the offset/flip/shift/limitShift/size/arrow
+> middleware config, reusing `@octanejs/floating-ui`'s re-exported `@floating-ui/dom` middleware + the
+> ref-aware `arrow`; `@floating-ui/utils` helpers) + `utils/hideMiddleware.ts` +
+> `utils/adaptiveOriginMiddleware.ts` + `utils/usePositioner.ts` + `utils/useAnchoredPopupScrollLock.ts`
+> + `utils/getDisabledMountTransitionStyles.ts` + `utils/constants.ts` + `utils/closePart.ts`
+> (ClosePartProvider/count/registration) + `utils/floating/useHoverFloatingInteraction.ts` (stub, popup
+> side of hover). Then the 8 open-path parts in `src/popover.ts`: `PopoverPortal`, `PopoverPositioner`
+> (useAnchorPositioning + usePositioner + FloatingNode + InternalBackdrop + trigger-change animation
+> gate), `PopoverPopup` (FloatingFocusManager + closePart + useOpenChangeComplete), `PopoverArrow`,
+> `PopoverBackdrop`, `PopoverTitle`, `PopoverDescription`, `PopoverClose`. **The open modal Popover is
+> byte-identical to real Base UI** — including the `@floating-ui/dom`-computed positioner styles
+> (`transform`, `--available-width/height`, `--anchor-*`, `--transform-origin`), the modal backdrop
+> `clip-path` cutout, popup `role=dialog`+aria, arrow, and title/desc/close. **NO octane fix needed**
+> — the positioning engine reuse just worked. **Two rig-blind-spot notes** (differential is final-HTML
+> only, documented to not capture focus/effect-timing): (1) non-modal `FloatingPortal.disableFocusInside`
+> stashes `tabindex→data-tabindex` on a focusout event React's jsdom mount sequences differently — so
+> the differential fixture is `modal` (disables that path, like Dialog); (2) with a trigger, its
+> `element`↔`[guard,element,guard]` shape-flip on open remounts the button, which the positioner
+> observes as a transient "trigger change" (`data-instant`) — so the differential fixture is
+> controlled-`open` WITHOUT a trigger (stable anchor). The trigger open→dismiss flow (Close + Escape)
+> is covered by the `PopoverInteractive` behavior test instead. **Deferred:** the open-on-hover
+> interaction (both stubs) remains off-by-default.
+
+> **Phase 3 — POPOVER started: CLOSED path landed + differential-verified (2026-07). Green: 52
+> base-ui tests, full suite 2277 green.** `src/popover.ts` — `PopoverStore` (extends the octane
+> `ReactStore`; more state than Dialog: disabled/instantType/openChangeReason/stickIfOpen/openOnHover/
+> closeDelay/hasViewport/focusManagerModal + hover/patient-click `setOpen`), `PopoverHandle`/
+> `createPopoverHandle`, contexts, `PopoverInteractions` (useDismiss + usePopupInteractionProps),
+> `PopoverRoot` (wraps a `FloatingTree` at top level), `PopoverTrigger` (useClick + trigger
+> focus-guards + hover). Reuses the ENTIRE Dialog foundation. New: `utils/popups/useTriggerFocusGuards.ts`
+> (ported — tab-out focus guards around an open trigger). **Deferred stubs:**
+> `utils/floating/useHoverReferenceInteraction.ts` (returns `{}`; the ~1400-line hover/safePolygon
+> open-on-hover feature is off by default) — click-to-open is fully functional. Uses the same
+> stable-descriptor Provider-children workaround as Dialog. **Next: the OPEN path** — the Positioner
+> (the big new surface: `useAnchorPositioning` ~755 + `usePositioner` + `adaptiveOrigin` anchor
+> positioning via `@floating-ui/dom`) + Popup + Arrow + Backdrop + Title/Description/Close, then an
+> open-popover differential (positions are jsdom-default but structure/styles must match) + focus/
+> dismiss behavior tests.
+
 > **Phase 3 — DIALOG COMPLETE (2026-07). Green: 51 base-ui tests (49 differential + 2 behavior),
 > full monorepo suite 2276 green.** Ported Base UI's own `data-base-ui-*` floating focus/portal layer
 > to `utils/floating/`: `tabbable.ts` (+ `composite.ts`, `activeElement`), `FocusGuard.ts`,

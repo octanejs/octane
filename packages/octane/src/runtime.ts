@@ -751,6 +751,18 @@ function drainQueue(): { err: any } | null {
 		block.pending = false;
 		if (block.disposed) continue;
 		try {
+			// An update to a block inside a SUSPENSE-HIDDEN subtree (its boundary's
+			// try content is soft-detached into savedDom while the fallback shows):
+			// don't render it in place — its geometry is detached, and a fresh mount
+			// inside it would insert against dismembered parents. Instead re-attempt
+			// the WHOLE boundary. React parity: setState on a suspended component
+			// retries the render; if it no longer suspends (an external store flipped
+			// before the suspending promise resolved), the boundary reveals now.
+			const hiddenTry = findSuspenseHiddenTry(block);
+			if (hiddenTry !== null) {
+				attemptHiddenReveal(hiddenTry);
+				continue;
+			}
 			// Guarded render-phase updates (derived state) converge in a couple of
 			// passes; an unguarded one re-queues its own block forever. Cap per-block
 			// renders within one drain so the loop throws (catchable by @try /
@@ -8304,6 +8316,88 @@ function commitResume(state: TrySlot): void {
 	}
 }
 
+/**
+ * Nearest enclosing SUSPENSE-HIDDEN boundary: a tryBlock ancestor whose slot
+ * has its try content soft-detached into `savedDom` (fallback showing). The
+ * pending arm's own block also carries `__trySlot`, but only the TRY block
+ * matches `slot.tryBlock === p`, so updates inside the fallback render
+ * normally. <Activity>-hidden subtrees (also `inactive`) are untouched — their
+ * DOM stays live, only this savedDom regime is geometry-unsafe to render into.
+ */
+function findSuspenseHiddenTry(block: Block): TrySlot | null {
+	for (let p: Block | null = block; p !== null; p = p.parentBlock) {
+		const slot = (p as any).__trySlot as TrySlot | undefined;
+		if (slot !== undefined && slot.tryBlock === p && slot.savedDom !== null) return slot;
+	}
+	return null;
+}
+
+/**
+ * Re-attempt a suspense-hidden boundary's try body because state INSIDE the
+ * hidden subtree changed (a setState / external-store update scheduled a render
+ * on a soft-detached block). React parity: an update to a suspended component
+ * RETRIES the render — if it no longer suspends (e.g. a store flipped to ready
+ * before the suspending promise resolved), the boundary reveals now, without
+ * that promise ever settling.
+ *
+ * The body must render against LIVE geometry — fresh mounts inside it insert
+ * relative to sibling markers, and a mixed live/detached range makes those
+ * insertions target dismembered parents. So: reattach savedDom first (the
+ * pending arm stays put; nothing paints mid-flush), render, then either commit
+ * the reveal (drop the pending arm, reactivate effects + refs — the
+ * commitResume choreography) or re-stash and stay on the fallback.
+ */
+function attemptHiddenReveal(state: TrySlot): void {
+	const tryBlock = state.tryBlock;
+	if (tryBlock === null || tryBlock.disposed || state.savedDom === null) return;
+	reattachTryBlock(state);
+	tryBlock.body = state.tryBody;
+	tryBlock.inactive = false;
+	try {
+		renderBlock(tryBlock);
+		// Success — reveal without the suspending promise ever resolving.
+		if (state.block !== null && state.block !== tryBlock) {
+			unmountBlock(state.block);
+		}
+		state.block = tryBlock;
+		state.branch = 1;
+		state.hasResolved = true;
+		// Invalidate the wired resume: when the original thenable eventually
+		// settles, its retry sees a mismatched pendingThenable and no-ops.
+		state.pendingThenable = null;
+		if (state.detachedRefs !== null) {
+			const refs = state.detachedRefs;
+			state.detachedRefs = null;
+			for (let i = 0; i < refs.length; i++) attachRef(refs[i].ref, refs[i].el);
+		}
+		if (state.transitionTimeoutId !== null) {
+			clearTimeout(state.transitionTimeoutId);
+			state.transitionTimeoutId = null;
+		}
+		if (state.transitionHeld) {
+			state.transitionHeld = false;
+			tickTransitionCount(-1);
+		}
+		if (HELD_TRANSITIONS.has(state)) {
+			HELD_TRANSITIONS.delete(state);
+			STAGED_REVEALS.delete(state);
+			// Mid-flush: defer the staged-batch check so this drain doesn't
+			// re-enter commitResume for entangled siblings.
+			queueMicrotask(flushStagedRevealsIfReady);
+		}
+	} catch (err) {
+		if (isSuspenseException(err)) {
+			// Still suspended — re-stash the try DOM (the pending arm never moved)
+			// and keep/refresh the resume wiring for the (possibly new) thenable.
+			softDetachTryBlock(state);
+			tryBlock.inactive = true;
+			attachResume(state, (err as SuspenseException).thenable);
+		} else {
+			switchToCatch(state, err);
+		}
+	}
+}
+
 /** Register a boundary as holding prior content for an in-flight transition. */
 function enterHeldTransition(state: TrySlot): void {
 	HELD_TRANSITIONS.add(state);
@@ -8905,6 +8999,18 @@ function switchToCatch(state: TrySlot, err: any): void {
 	abandonHeldTransition(state);
 	// No catch arm — bubble to the next enclosing tryBlock (or surface).
 	if (state.catchBody === null) {
+		// Mid-render (a component render stack is live): RETHROW instead of
+		// delegating synchronously. The outer boundary's switch sweeps the DOM
+		// of every frame between the throw site and itself — if we called its
+		// handler here and returned, those still-on-stack frames would keep
+		// rendering into the swept range (stale anchors → NotFoundError, and the
+		// bookkeeping error would REPLACE the original). The rethrow unwinds
+		// them; the outer boundary catches it at its own tryBlock frame.
+		if (CURRENT_BLOCK !== null) {
+			throw err;
+		}
+		// Detached context (resume microtask, effect commit): no render frames
+		// to unwind — delegate directly.
 		const parent = findTryHandler(state.parentBlock);
 		if (parent) parent(err);
 		else console.error('tryBlock with no catch arm received error:', err);

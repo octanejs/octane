@@ -2,12 +2,18 @@
 // surfaced gaps in: the dev-middleware's Vite-owned URL filter, `octane()`
 // option forwarding to the bundled compiler, the appType default, and the
 // config resolution of `router.preHydrate` / RenderRoute `status`.
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { octane, isViteOwnedUrl, resolveOctaneConfig, RenderRoute } from '../src/index.js';
 
 function url(u: string): URL {
 	return new URL(u, 'http://localhost');
 }
+
+// Use this package as the fake Vite root: '/src/index.js' and '/types/index.d.ts'
+// are real files under it, '/docs/v2.0' etc. are not.
+const PKG_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 describe('isViteOwnedUrl', () => {
 	it('skips Vite-internal namespaces and module/asset requests', () => {
@@ -31,6 +37,27 @@ describe('isViteOwnedUrl', () => {
 		expect(isViteOwnedUrl(url('/search?q=octane'))).toBe(false);
 		// A bare dotfile segment is not an extension.
 		expect(isViteOwnedUrl(url('/.well-known'))).toBe(false);
+		// VALUED params matching a marker name are app query strings — Vite's
+		// transform markers are always bare (`?url`, `?raw`, `&import`).
+		expect(isViteOwnedUrl(url('/docs?url=https://example.com'))).toBe(false);
+		expect(isViteOwnedUrl(url('/page?raw=1'))).toBe(false);
+		expect(isViteOwnedUrl(url('/jobs?worker=nurse'))).toBe(false);
+	});
+
+	it('with fileRoots, an extension only counts when a real file backs it', () => {
+		// Real files under the root → Vite's.
+		expect(isViteOwnedUrl(url('/src/index.js'), [PKG_ROOT])).toBe(true);
+		expect(isViteOwnedUrl(url('/types/index.d.ts?v=abc'), [PKG_ROOT])).toBe(true);
+		// Dotted PAGE urls → SSR them.
+		expect(isViteOwnedUrl(url('/docs/v2.0'), [PKG_ROOT])).toBe(false);
+		expect(isViteOwnedUrl(url('/users/jane.doe'), [PKG_ROOT])).toBe(false);
+		// A missing asset also SSRs (the app's 404 page beats a bare dev 404).
+		expect(isViteOwnedUrl(url('/missing.png'), [PKG_ROOT])).toBe(false);
+		// Multiple roots (root + publicDir).
+		expect(isViteOwnedUrl(url('/src/index.js'), ['/nowhere', PKG_ROOT])).toBe(true);
+		// Non-file checks are unaffected by fileRoots.
+		expect(isViteOwnedUrl(url('/@vite/client'), [PKG_ROOT])).toBe(true);
+		expect(isViteOwnedUrl(url('/src/worker?worker'), [PKG_ROOT])).toBe(true);
 	});
 });
 

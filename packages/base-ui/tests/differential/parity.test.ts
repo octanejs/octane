@@ -301,8 +301,26 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	it('Popover: closed Root+Trigger renders the trigger byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'PopoverClosed', undefined, CACHE);
+		await d.step('mount (closed)', () => {});
+		d.unmount();
+	});
+
 	it('Dialog: open modal (Portal/Backdrop/Popup/Title/Description/Close) renders byte-identically', async () => {
 		const d = await mountDifferential(FIXTURE, 'DialogOpen', undefined, CACHE);
+		await d.step('mount (open)', () => {});
+		d.unmount();
+	});
+
+	it('Popover: open anchored (Portal/Backdrop/Positioner/Popup/Arrow/Title/Description/Close) renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'PopoverOpen', undefined, CACHE);
+		await d.step('mount (open)', () => {});
+		d.unmount();
+	});
+
+	it('AlertDialog: open modal (role=alertdialog, Dialog parts reused) renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'AlertDialogOpen', undefined, CACHE);
 		await d.step('mount (open)', () => {});
 		d.unmount();
 	});

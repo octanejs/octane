@@ -18,6 +18,8 @@ import { Form } from '@octanejs/base-ui/form';
 import { Input } from '@octanejs/base-ui/input';
 import { Slider } from '@octanejs/base-ui/slider';
 import { Dialog } from '@octanejs/base-ui/dialog';
+import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
+import { Popover } from '@octanejs/base-ui/popover';
 
 // Self-contained differential fixtures: the SAME source runs on octane (via
 // @octanejs/base-ui/<sub>) AND on React (the setup rewrites imports to the real
@@ -169,6 +171,104 @@ export function DialogOpen() @{
 				</Dialog.Popup>
 			</Dialog.Portal>
 		</Dialog.Root>
+	</div>
+}
+
+// Popover (CLOSED) — Root (wraps a FloatingTree) + Trigger only. Proves the Popover Store + the
+// closed-trigger path (useClick, hover-stub, trigger focus-guards) render byte-identically to real
+// Base UI while closed.
+export function PopoverClosed() @{
+	<Popover.Root>
+		<Popover.Trigger className="pop-trigger">Open</Popover.Trigger>
+	</Popover.Root>
+}
+
+// Popover (OPEN) — the full anchored-positioner path portaled into an in-fixture host div (so the
+// rig's `container.innerHTML` sees it). jsdom has zero-size rects, so `useAnchorPositioning` computes
+// deterministic default styles in BOTH octane and React — proving the Positioner (useFloating +
+// @floating-ui/dom middleware) + Popup (FloatingFocusManager) + Arrow + Backdrop + Title/Description/
+// Close render byte-for-byte identically to real Base UI, including the @floating-ui positioner
+// styles (`transform`, `--available-width/height`, `--anchor-*`, `--transform-origin`).
+//
+// `modal` disables FloatingPortal's non-modal focus-guard tabbing management (a runtime focus-event
+// side effect the differential rig is documented not to capture). Controlled-open WITHOUT a trigger
+// keeps the anchor stable: with a trigger, its `element`↔`[guard,element,guard]` shape-flip on open
+// remounts the button, which the positioner observes as a transient "trigger change" (sets
+// `data-instant`) — a mount-timing/effect-ordering artifact the rig also can't see. The trigger's
+// open/dismiss flow is covered by the behavior test on `PopoverInteractive` instead.
+export function PopoverOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Popover.Root open modal>
+			<Popover.Portal container={containerRef}>
+				<Popover.Backdrop className="pop-backdrop" />
+				<Popover.Positioner className="pop-positioner">
+					<Popover.Popup className="pop-popup">
+						<Popover.Arrow className="pop-arrow" />
+						<Popover.Title className="pop-title">Title</Popover.Title>
+						<Popover.Description className="pop-desc">Body</Popover.Description>
+						<Popover.Close className="pop-close">Close</Popover.Close>
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	</div>
+}
+
+// Popover (interactive) — a real trigger→open→dismiss flow, for behavior tests (focus/escape/close
+// aren't visible in innerHTML so they can't be differential-tested).
+export function PopoverInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="pop-host" />
+		<Popover.Root>
+			<Popover.Trigger className="pop-trigger">Open</Popover.Trigger>
+			<Popover.Portal container={hostRef}>
+				<Popover.Positioner className="pop-positioner">
+					<Popover.Popup className="pop-popup">
+						<Popover.Close className="pop-close">Close</Popover.Close>
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	</div>
+}
+
+// AlertDialog (OPEN) — a thin variant of Dialog: modal is forced, dismissal-on-outside-press is
+// disabled, and the popup gets `role="alertdialog"`. All parts are Dialog's parts reused, so the open
+// modal alert dialog must render byte-identically to real Base UI (only `role` differs from Dialog).
+export function AlertDialogOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<AlertDialog.Root defaultOpen>
+			<AlertDialog.Portal container={containerRef}>
+				<AlertDialog.Backdrop className="ad-backdrop" />
+				<AlertDialog.Popup className="ad-popup">
+					<AlertDialog.Title className="ad-title">Confirm</AlertDialog.Title>
+					<AlertDialog.Description className="ad-desc">Are you sure?</AlertDialog.Description>
+					<AlertDialog.Close className="ad-close">OK</AlertDialog.Close>
+				</AlertDialog.Popup>
+			</AlertDialog.Portal>
+		</AlertDialog.Root>
+	</div>
+}
+
+// AlertDialog (interactive) — trigger→open→dismiss for behavior tests. Outside-press dismissal is
+// disabled (disablePointerDismissal), but Escape + the Close button still dismiss.
+export function AlertDialogInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="ad-host" />
+		<AlertDialog.Root>
+			<AlertDialog.Trigger className="ad-trigger">Open</AlertDialog.Trigger>
+			<AlertDialog.Portal container={hostRef}>
+				<AlertDialog.Popup className="ad-popup">
+					<AlertDialog.Close className="ad-close">OK</AlertDialog.Close>
+				</AlertDialog.Popup>
+			</AlertDialog.Portal>
+		</AlertDialog.Root>
 	</div>
 }
 

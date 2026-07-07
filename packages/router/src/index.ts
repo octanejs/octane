@@ -10,11 +10,18 @@
 // `useStore`. The match tree renders pull-based: `RouterProvider` → first match →
 // each route's `<Outlet/>` looks up the NEXT match via `matchContext`.
 //
-// v1 scope: code-based routing (createRouter/createRootRoute/createRoute),
-// RouterProvider, Outlet, Link, Navigate, and the read hooks (useRouter,
-// useRouterState, useLocation, useParams, useSearch, useMatches, useLoaderData,
-// useNavigate). Deferred: file-based routing + codegen, devtools, search-param
-// validation/middleware, useBlocker, ScrollRestoration, Await/streaming, lazy routes.
+// Scope: code-based routing at react-router parity — RouterProvider (+
+// RouterContextProvider/Wrap/InnerWrap), the full Match pipeline (Suspense /
+// CatchBoundary / CatchNotFound per route, pending/error/redirect statuses,
+// remountDeps, shellComponent), the router event lifecycle
+// (onLoad/onBeforeRouteMount/onResolved/onRendered + resolvedLocation — scroll
+// restoration restores off it), Link with preloading/masking/active-options,
+// createLink/useLinkProps, navigation blocking (useBlocker/Block), the full
+// read-hook set (useMatch and friends, nearest-match resolution via
+// matchContext), Route/getRouteApi hook accessors, Await/useAwaited, lazy
+// routes, and search validation/middleware from core. Deferred: file-based
+// routing + codegen (`createFileRoute`, @tanstack/router-plugin), SSR entries
+// (RouterServer/RouterClient, HeadContent/Scripts), and devtools.
 export * from '@tanstack/router-core';
 export {
 	createHistory,
@@ -22,25 +29,63 @@ export {
 	createHashHistory,
 	createMemoryHistory,
 } from './history';
+// History types on the main entry (upstream parity). `NavigateOptions` is NOT
+// re-exported from history — router-core's richer NavigateOptions wins.
+export type {
+	RouterHistory,
+	HistoryLocation,
+	ParsedPath,
+	HistoryState,
+	ParsedHistoryState,
+	HistoryAction,
+	BlockerFnArgs,
+	BlockerFn,
+	NavigationBlocker,
+} from '@tanstack/history';
 
 export { createRouter, Router } from './router';
 export {
 	createRoute,
 	createRootRoute,
 	createRootRouteWithContext,
+	createRouteMask,
+	getRouteApi,
 	Route,
 	RootRoute,
+	RouteApi,
 } from './route';
 export { routerContext, getRouterContext, matchContext, useRouter } from './context';
 export { useStore } from './useStore';
 export { useRouterState } from './useRouterState';
-export { useLocation, useParams, useSearch, useLoaderData, useMatches, useNavigate } from './hooks';
+export {
+	useMatch,
+	useLocation,
+	useParams,
+	useSearch,
+	useLoaderData,
+	useLoaderDeps,
+	useRouteContext,
+	useMatches,
+	useParentMatches,
+	useChildMatches,
+	useNavigate,
+	useCanGoBack,
+} from './hooks';
 export { useAwaited } from './useAwaited';
+export { useLinkProps, createLink, linkOptions } from './link';
+export { useBlocker, Block } from './useBlocker.tsrx';
+export { useMatchRoute, MatchRoute } from './MatchRoute.tsrx';
+export { useElementScrollRestoration } from './useElementScrollRestoration';
 export { lazyRouteComponent } from './lazyRouteComponent';
 
-export { RouterProvider } from './RouterProvider.tsrx';
+export { RouterProvider, RouterContextProvider } from './RouterProvider.tsrx';
 export { Outlet } from './Outlet.tsrx';
 export { Link } from './Link.tsrx';
 export { Navigate } from './Navigate.tsrx';
 export { Await } from './Await.tsrx';
 export { ScrollRestoration } from './ScrollRestoration.tsrx';
+export { Matches } from './Matches.tsrx';
+export { Match } from './Match.tsrx';
+export { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';
+export { CatchNotFound, DefaultGlobalNotFound } from './not-found.tsrx';
+export { ClientOnly, useHydrated } from './ClientOnly.tsrx';
