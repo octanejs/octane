@@ -55,10 +55,6 @@ export function Home() @{
 					<Link to="/docs/quick-start" class="btn-primary">Get started</Link>
 					<Link to="/docs/differences-from-react" class="btn-ghost">Differences from React</Link>
 				</div>
-				<p class="hero-lineage">
-					{'Created by Dominic Gannaway, who also created Inferno, Lexical, Ripple and has worked on ' +
-						'the React and Svelte core teams.'}
-				</p>
 			</div>
 			<div class="hero-code">
 				<div class="hero-code-bar">
