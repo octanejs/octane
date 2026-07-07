@@ -3387,7 +3387,18 @@ function lowerJsxChild(child, ctx) {
 			const e = lowerJsxChild(c, ctx);
 			if (e !== null) els.push(e);
 		}
-		return { type: 'ArrayExpression', elements: els };
+		// A fragment's children are FIXED siblings (React's "static children" —
+		// `jsxs` — which React never key-warns): tag the array so the de-opt list
+		// keys it by index silently, reserving the missing-key warning for
+		// runtime-built arrays (`.map()` results). Emitted in BOTH modes — the
+		// server export is the identity (`ssrChild` just renders the array).
+		ctx.runtimeNeeded.add('positionalChildren');
+		return {
+			type: 'CallExpression',
+			callee: { type: 'Identifier', name: rtAlias('positionalChildren') },
+			arguments: [{ type: 'ArrayExpression', elements: els }],
+			optional: false,
+		};
 	}
 	return null; // Comment / unknown — drop.
 }

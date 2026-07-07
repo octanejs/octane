@@ -229,6 +229,15 @@ export function createElement(
 	return { $$kind: ELEMENT_TAG, type, props: p, key, children: kids ?? null };
 }
 
+// Server half of the client runtime's `positionalChildren` (see runtime.ts): the
+// compiler lowers a VALUE-position fragment to `positionalChildren([...])` in
+// BOTH modes so the same emitted call resolves per build. The tag only informs
+// the client de-opt reconciler's key choice — the server just renders the array
+// (`ssrChild`), so here it's the identity.
+export function positionalChildren(children: unknown[]): unknown[] {
+	return children;
+}
+
 // ---------------------------------------------------------------------------
 // Escaping
 // ---------------------------------------------------------------------------
