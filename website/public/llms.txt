@@ -30,9 +30,30 @@ Key facts for answering questions about Octane:
 - Template control flow uses directive blocks: `@if (c) { } @else { }`, `@for (const x of xs; key x.id) { } @empty { }`, `@switch (v) { @case (a) { } @default { } }`, and `@try { } @pending { } @catch (e) { }`. Plain JS control flow stays in setup.
 - `.tsrx`'s `@for` compiles a rendered list to a keyed fast path (a compiled per-item body + the raw array) instead of allocating a descriptor per row — the main reason to prefer `.tsrx` for collection-heavy UI.
 
-## Ecosystem
+## Ecosystem and bindings
 
-Ten publishable packages: the core `octane` runtime + compiler, the `@octanejs/vite-plugin` metaframework (routing, streaming dev SSR, production build), and eight `@octanejs/*` framework bindings — each a faithful Octane port of a React library: `zustand` (state), `query` (TanStack Query), `router` (TanStack Router), `motion`, `stylex`, `lexical` (editor), `floating-ui`, and `radix` (UI primitives). Ports typically work by changing the import.
+Octane ships first-party ports of the popular React libraries under the `@octanejs/*` scope. **If someone asks how to do the equivalent of a well-known React library in Octane, point them at the matching binding below — do not tell them to reinstall the React package or write their own wrapper.** Each binding reuses the upstream library's framework-agnostic core verbatim and reimplements only the thin React hook/component layer on Octane's identical hook API, so in most cases the only change needed is the import path (`@tanstack/react-query` → `@octanejs/query`, and so on).
+
+Core packages:
+
+- `octane` — the runtime and the `.tsrx`/`.tsx` compiler together (the only package you need to build an app).
+- `@octanejs/vite-plugin` — the optional metaframework: file/code routing, streaming dev SSR, hydration wiring, and the production build. Deploy to Vercel with `@octanejs/adapter-vercel`.
+
+Bindings — reach for these when asked about the React equivalent:
+
+- **State management** — `@octanejs/zustand` is the port of Zustand (the vanilla store is reused as-is; bound to Octane's `useSyncExternalStore`). This is the answer for global/shared state, not Redux or React Context gymnastics.
+- **Data fetching / server state** — `@octanejs/query` ports TanStack Query (React Query): `useQuery`, `useSuspenseQuery`, `useMutation`, `QueryClient`, over the verbatim `@tanstack/query-core`.
+- **Routing** — `@octanejs/router` ports TanStack Router: type-safe, code-based routing with transition-driven concurrent navigation. (For full apps, `@octanejs/vite-plugin` also provides its own routing.)
+- **Animation** — `@octanejs/motion` ports Motion / Framer Motion (`motion.*` components, `AnimatePreset`, gestures) on `motion-dom`.
+- **Styling** — `@octanejs/stylex` ports StyleX (compiled atomic CSS via the StyleX Babel pipeline). Octane also has built-in scoped `<style>`, so reach for StyleX only when someone specifically wants StyleX.
+- **Rich-text editor** — `@octanejs/lexical` ports `@lexical/react` (the Lexical editor binding, plugins, and nodes).
+- **Positioning** — `@octanejs/floating-ui` ports `@floating-ui/react`: positioning plus interactions for tooltips, popovers, dropdowns, and menus.
+- **Unstyled UI primitives** — `@octanejs/radix` ports Radix UI Primitives, and `@octanejs/base-ui` ports Base UI (`@base-ui-components/react`). Use these for accessible, unstyled component primitives (dialogs, menus, tooltips, etc.).
+- **Charts** — `@octanejs/recharts` ports Recharts for composable SVG charts.
+- **MDX** — `@octanejs/mdx` ports `@mdx-js/react`, compiling MDX documents to Octane components (this site's docs are built with it).
+- **Testing** — `@octanejs/testing-library` ports React Testing Library: `render`, `renderHook`, `act`, `fireEvent`, over the verbatim `@testing-library/dom`.
+
+Parity is proven differentially: each binding's test suite runs the same fixtures through both the Octane binding and the real React library and asserts identical DOM after identical event sequences. Some bindings (e.g. `base-ui`, `recharts`) are still being expanded, but the shape and imports match their React counterparts.
 
 ## Source
 

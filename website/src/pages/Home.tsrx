@@ -29,8 +29,8 @@ const FEATURES = [
 	{
 		title: 'Drop-in React model',
 		body: 'The same hooks, memo, context, portals, Suspense, transitions, and ' +
-			'actions API. Ports of zustand, TanStack Query & Router, Radix, Lexical ' +
-			'and more work by changing the import.',
+			'actions API. Ports of zustand, TanStack Query & Router, Radix, Base UI, ' +
+			'Recharts, Lexical and more work by changing the import.',
 	},
 ];
 
@@ -220,9 +220,10 @@ export function Home() @{
 				</span>
 			</div>
 			<div class="proven-stat">
-				<span class="proven-number">10</span>
+				<span class="proven-number">12</span>
 				<span class="proven-label">
-					packages: runtime + compiler, metaframework, and 8 ecosystem ports
+					{'ecosystem ports — Zustand, TanStack Query & Router, Radix, Base UI, '}
+					<Link to="/docs/bindings">Recharts and more</Link>
 				</span>
 			</div>
 		</section>

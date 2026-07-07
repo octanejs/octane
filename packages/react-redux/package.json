@@ -1,0 +1,48 @@
+{
+  "name": "@octanejs/react-redux",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "React Redux for the octane renderer — the Provider/hooks binding layer reimplemented on octane's useSyncExternalStore; works with any Redux store (Redux Toolkit included) by changing the import.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/react-redux"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "peerDependencies": {
+    "redux": "^5.0.0"
+  },
+  "devDependencies": {
+    "@reduxjs/toolkit": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-redux": "catalog:default",
+    "redux": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
