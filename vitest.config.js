@@ -90,6 +90,35 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'recharts',
+					include: ['packages/recharts/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					// Differential precompile for recharts fixtures: rewrites
+					// `@octanejs/recharts` → `recharts` so the React side runs the real
+					// recharts as the byte-for-byte SVG oracle.
+					globalSetup: ['packages/recharts/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [
+					octane({
+						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+					}),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/recharts$/,
+							replacement: resolve(import.meta.dirname, 'packages/recharts/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/recharts\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/recharts/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'router',
 					include: ['packages/router/tests/**/*.test.ts'],
 					environment: 'jsdom',

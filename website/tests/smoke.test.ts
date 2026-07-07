@@ -110,9 +110,9 @@ describe('website routes', () => {
 		const { container } = await renderRoute('/docs/differences-from-react');
 
 		expect(container.querySelector('.prose h1')?.textContent).toBe('Differences from React');
-		expect(textOf(container)).toContain('No rules of hooks');
-		expect(textOf(container)).toContain('LIS');
-		expect(textOf(container)).toContain('The differences below are deliberate');
+		expect(textOf(container)).toContain('no rules of hooks');
+		expect(textOf(container)).toContain('Hooks can go anywhere');
+		expect(textOf(container)).toContain("they're all on purpose");
 	});
 
 	it('/docs/bindings renders the bindings overview table', async () => {
