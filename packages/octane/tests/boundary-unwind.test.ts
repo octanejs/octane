@@ -4,8 +4,7 @@ import {
 	DeepThrowHost,
 	RethrowingCatch,
 	DeepSuspenseHost,
-	StoreFlipHost,
-	createMiniStore,
+	StateFlipHost,
 } from './_fixtures/boundary-unwind.tsrx';
 
 // Error/suspense unwinding through nested passthrough components + host
@@ -50,22 +49,24 @@ describe('boundary unwinding through nested components and hosts', () => {
 	});
 
 	// The router MatchInner shape: COMMITTED content re-renders into a suspension
-	// (fallback shows, try DOM soft-detached), then the external store flips so a
-	// retry no longer suspends — the boundary must reveal the fresh subtree even
-	// though the suspending promise NEVER resolves (React parity: an update to a
-	// suspended component retries the render). A store update must also never
-	// throw DOM bookkeeping errors back into the store's notifier (that stalls
-	// the caller — e.g. a router loader pipeline mid-commit).
-	it('an update inside a suspense-hidden subtree retries the boundary and reveals (resolve never called)', async () => {
-		const store = createMiniStore('done');
+	// (fallback shows, try DOM soft-detached), then a setState reaches the hidden
+	// component directly (captured setter — the event-handler/timer shape) so a
+	// retry no longer suspends. React parity: an update to a suspended component
+	// retries the boundary — it must reveal the fresh subtree even though the
+	// suspending promise NEVER resolves, and must not corrupt the detached DOM.
+	it('setState inside a suspense-hidden subtree retries the boundary and reveals (resolve never called)', async () => {
+		let setStatus: (v: string) => void = () => {};
 		const promise = new Promise<string>(() => {});
-		const r = mount(StoreFlipHost, { store, promise });
-		// Committed content — the store subscription is live.
+		const r = mount(StateFlipHost, {
+			bindSetter: (s: (v: string) => void) => (setStatus = s),
+			promise,
+		});
+		// Committed content — the setter is captured.
 		expect(r.findAll('.done').length).toBe(1);
 
 		// Flip to pending: the re-render suspends on a never-resolving promise —
 		// the fallback swaps in and the try content is soft-detached.
-		expect(() => store.set('pending')).not.toThrow();
+		expect(() => setStatus('pending')).not.toThrow();
 		await nextPaint();
 		await new Promise((res) => setTimeout(res, 0));
 		await nextPaint();
@@ -73,7 +74,7 @@ describe('boundary unwinding through nested components and hosts', () => {
 
 		// Flip to a non-suspending value: the update targets a hidden block; the
 		// boundary must retry and reveal — the promise never resolves.
-		expect(() => store.set('other')).not.toThrow();
+		expect(() => setStatus('other')).not.toThrow();
 		await nextPaint();
 		await new Promise((res) => setTimeout(res, 0));
 		await nextPaint();

@@ -5,7 +5,9 @@ import { ErrorBoundary, Suspense, use } from 'octane';
 // boundary > passthrough > host > passthrough > leaf).
 
 function Pass(props) @{
-	<>{props.children}</>
+	<>
+		{props.children}
+	</>
 }
 
 function Thrower(props) @{
@@ -76,35 +78,14 @@ export function DeepSuspenseHost(props) @{
 	</Suspense>
 }
 
-// The router MatchInner shape: a component subscribed to an external store that
-// SUSPENDS while the store says pending, and — without the promise ever
-// resolving — STOPS suspending and returns a component subtree (with a host +
-// nested @if control flow) when the store flips. The store flip re-renders the
-// SUSPENDED try body via its subscription; the body must be able to mount fresh
-// blocks even though the boundary had stashed the try DOM away.
-import { useSyncExternalStore } from 'octane';
-
-export interface MiniStore {
-	get: () => string;
-	set: (v: string) => void;
-	subscribe: (cb: () => void) => () => void;
-}
-
-export function createMiniStore(initial: string): MiniStore {
-	let value = initial;
-	const subs = new Set<() => void>();
-	return {
-		get: () => value,
-		set: (v: string) => {
-			value = v;
-			subs.forEach((cb) => cb());
-		},
-		subscribe: (cb: () => void) => {
-			subs.add(cb);
-			return () => subs.delete(cb);
-		},
-	};
-}
+// The router MatchInner shape: a COMMITTED component whose re-render SUSPENDS
+// (fallback shows, try DOM soft-detached), then a later setState — reaching the
+// hidden component directly through a captured setter, the way an event
+// handler or timer would — makes it STOP suspending and return a component
+// subtree (with a host + nested @if control flow). React parity: an update to
+// a suspended component retries the boundary; the suspending promise never
+// resolves.
+import { useState } from 'octane';
 
 function InnerContent(props) @{
 	<div class="content">
@@ -116,20 +97,21 @@ function InnerContent(props) @{
 	</div>
 }
 
-function StoreDriven(props) {
-	const status = useSyncExternalStore(props.store.subscribe, props.store.get, props.store.get);
+function StateDriven(props) {
+	const [status, setStatus] = useState('done');
+	props.bindSetter(setStatus);
 	if (status === 'pending') {
 		use(props.promise);
 	}
 	return <InnerContent tag={status} />;
 }
 
-export function StoreFlipHost(props) @{
+export function StateFlipHost(props) @{
 	<Suspense fallback={<i class="fb">{'loading'}</i>}>
 		<Pass>
 			<div class="wrap">
 				<Pass>
-					<StoreDriven store={props.store} promise={props.promise} />
+					<StateDriven bindSetter={props.bindSetter} promise={props.promise} />
 				</Pass>
 			</div>
 		</Pass>

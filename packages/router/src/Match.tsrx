@@ -39,12 +39,11 @@ export function Match(props) @{
 	const routeId = useStore(matchStore, (m) => m.routeId);
 	const route = router.routesById[routeId];
 
-	const PendingComponent =
-		route.options.pendingComponent ?? router.options.defaultPendingComponent;
+	const PendingComponent = route.options.pendingComponent ?? router.options.defaultPendingComponent;
 	const routeErrorComponent = route.options.errorComponent ?? router.options.defaultErrorComponent;
 	const routeOnCatch = route.options.onCatch ?? router.options.defaultOnCatch;
 	const routeNotFoundComponent = route.isRoot
-		? (route.options.notFoundComponent ?? router.options.notFoundRoute?.options.component)
+		? route.options.notFoundComponent ?? router.options.notFoundRoute?.options.component
 		: route.options.notFoundComponent;
 
 	// Boundary presence, per upstream MatchView. The root route only gets a
@@ -56,11 +55,10 @@ export function Match(props) @{
 			: SafeFragment;
 	const CatchWrap = routeErrorComponent ? CatchBoundary : SafeFragment;
 	const NotFoundWrap = routeNotFoundComponent ? CatchNotFound : SafeFragment;
-	const ShellComponent = route.isRoot
-		? (route.options.shellComponent ?? SafeFragment)
-		: SafeFragment;
+	const ShellComponent = route.isRoot ? route.options.shellComponent ?? SafeFragment : SafeFragment;
 
-	const pendingElement = PendingComponent ? createElement(PendingComponent, {}) : null;
+	const pendingElement =
+		PendingComponent ? createElement(PendingComponent, {}) : null;
 	const parentRouteId = route.parentRoute?.id;
 
 	<ShellComponent>
@@ -70,8 +68,6 @@ export function Match(props) @{
 					getResetKey={() => resetKey}
 					errorComponent={routeErrorComponent || ErrorComponent}
 					onCatch={(error, errorInfo) => {
-						// Forward not-found errors — they belong to CatchNotFound (or an
-						// ancestor), not the error component.
 						if (isNotFound(error)) {
 							error.routeId ??= routeId;
 							throw error;
@@ -82,12 +78,10 @@ export function Match(props) @{
 					<NotFoundWrap
 						fallback={(error) => {
 							error.routeId ??= routeId;
-							// Not ours (a deeper route's id, or no id off the root) — rethrow
-							// so the ancestor not-found boundary handles it.
+
 							if (
-								!routeNotFoundComponent ||
-								(error.routeId && error.routeId !== routeId) ||
-								(!error.routeId && !route.isRoot)
+								!routeNotFoundComponent || error.routeId && error.routeId !== routeId ||
+									!error.routeId && !route.isRoot
 							) {
 								throw error;
 							}
@@ -114,8 +108,8 @@ function MatchInner(props) {
 
 	// The live match in the router (if still mounted there) wins over the
 	// snapshot for promise lookups, per upstream getMatchPromise.
-	const getMatchPromise = (key) =>
-		router.getMatch(match.id)?._nonReactive[key] ?? match._nonReactive[key];
+	const getMatchPromise = (key) => router.getMatch(match.id)?._nonReactive[key] ??
+		match._nonReactive[key];
 
 	if (match._displayPending) {
 		use(getMatchPromise('displayPendingPromise'));
@@ -158,15 +152,17 @@ function MatchInner(props) {
 
 	const Comp = route.options.component ?? router.options.defaultComponent;
 	const remountFn = route.options.remountDeps ?? router.options.defaultRemountDeps;
-	const remountDeps = remountFn
-		? remountFn({
-				routeId,
-				loaderDeps: match.loaderDeps,
-				params: match._strictParams,
-				search: match._strictSearch,
-			})
-		: undefined;
-	const key = remountDeps ? JSON.stringify(remountDeps) : undefined;
+	const remountDeps =
+		remountFn
+			? remountFn({
+					routeId,
+					loaderDeps: match.loaderDeps,
+					params: match._strictParams,
+					search: match._strictSearch,
+				})
+			: undefined;
+	const key =
+		remountDeps ? JSON.stringify(remountDeps) : undefined;
 	if (Comp) return createElement(Comp, key !== undefined ? { key } : {});
 	return createElement(Outlet, {});
 }
@@ -190,8 +186,8 @@ function OnRendered() @{
 
 		if (
 			currentResolvedLocation &&
-			(!previousResolvedLocation ||
-				previousResolvedLocation.href !== currentResolvedLocation.href)
+				(!previousResolvedLocation ||
+					previousResolvedLocation.href !== currentResolvedLocation.href)
 		) {
 			router.emit({
 				type: 'onRendered',

@@ -6,12 +6,45 @@ is a diff against real upstream code, not just `.d.ts`):
 - `@octanejs/router` 0.1.2 vs `@tanstack/react-router` **1.170.16** (router-core 1.171.13)
 - `@octanejs/query` 0.1.2 vs `@tanstack/react-query` **5.101.0** (query-core 5.101.0)
 
-**Verdict: neither port is fully covered.** Query is close on the runtime API
-(58/58 value exports) but has zero TypeScript types, a real suspense/error-boundary
-bug, and thin tests (~27). Router implements only ~36% of the upstream binding
-surface (23/64 value exports), has silent correctness bugs (lifecycle events never
-fire → scroll restoration never restores; errored/pending matches render anyway),
-and has no differential rig despite the devDependencies for one being in place.
+> **STATUS UPDATE (2026-07-06, same day):** the router gap-closure sweep landed.
+> Everything in the router section below marked ~~closed~~ in the summary here is
+> DONE; the section is retained as the audit record. Closed: Transitioner
+> lifecycle events (onLoad/onBeforeRouteMount/onResolved/onRendered) +
+> resolvedLocation commit + canonical-URL check + SSR load guard (scroll
+> restoration now actually restores); the full Match pipeline (conditional
+> Suspense/CatchBoundary/CatchNotFound boundaries, pending/error/redirected/
+> notFound statuses, pendingMinMs, remountDeps, defaultComponent,
+> shellComponent, Wrap/InnerWrap, disableGlobalCatchBoundary + global boundary);
+> CatchBoundary/ErrorComponent/CatchNotFound/DefaultGlobalNotFound exports;
+> useMatch (nearest-match via matchContext — the leaf-match bug is fixed) +
+> useRouteContext/useLoaderDeps/useCanGoBack/useParentMatches/useChildMatches +
+> structural sharing + stable useNavigate; Route/RootRoute hook accessors +
+> getRouteApi/RouteApi + createRouteMask; Link full parity (preloading
+> intent/viewport/render + delay, mask/state/from/viewTransition/resetScroll/
+> hashScrollIntoView/ignoreBlocker forwarding, exactPathTest + deepEqual-subset
+> active matching, render-prop children, disabled semantics, external-URL +
+> dangerous-protocol handling, data-transitioning) + useLinkProps/createLink/
+> linkOptions; useBlocker/Block (incl. withResolver + legacy signatures);
+> useMatchRoute/MatchRoute; ClientOnly/useHydrated; RouterContextProvider;
+> useElementScrollRestoration; Matches/Match exports; history types on the main
+> entry; Await @pending fallback fixed; and the **differential rig** (three
+> byte-equal-DOM suites vs real @tanstack/react-router). Two octane RUNTIME bugs
+> found+fixed along the way (catch-less boundary mid-render rethrow;
+> suspense-hidden subtree update → boundary retry) plus compiler support for
+> method-style hooks (`route.useLoaderData()`); router tests went from ~20 to 60
+> (+4 octane runtime regression tests), all green, full monorepo suite green.
+> Still open for router: file-based routing/codegen, SSR entries
+> (RouterServer/HeadContent/Scripts), devtools, and the typed public surface
+> (factories/hooks are still `any` — same as query). The QUERY section's gaps
+> are all still open.
+
+**Verdict at audit time: neither port was fully covered.** Query is close on the
+runtime API (58/58 value exports) but has zero TypeScript types, a real
+suspense/error-boundary bug, and thin tests (~27). Router implemented only ~36%
+of the upstream binding surface (23/64 value exports), had silent correctness
+bugs (lifecycle events never fire → scroll restoration never restores;
+errored/pending matches render anyway), and had no differential rig despite the
+devDependencies for one being in place.
 
 ---
 
