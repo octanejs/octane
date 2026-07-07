@@ -18,6 +18,7 @@ import { Form } from '@octanejs/base-ui/form';
 import { Input } from '@octanejs/base-ui/input';
 import { Slider } from '@octanejs/base-ui/slider';
 import { Dialog } from '@octanejs/base-ui/dialog';
+import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
 
 // Self-contained differential fixtures: the SAME source runs on octane (via
@@ -231,6 +232,43 @@ export function PopoverInteractive() @{
 				</Popover.Positioner>
 			</Popover.Portal>
 		</Popover.Root>
+	</div>
+}
+
+// AlertDialog (OPEN) — a thin variant of Dialog: modal is forced, dismissal-on-outside-press is
+// disabled, and the popup gets `role="alertdialog"`. All parts are Dialog's parts reused, so the open
+// modal alert dialog must render byte-identically to real Base UI (only `role` differs from Dialog).
+export function AlertDialogOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<AlertDialog.Root defaultOpen>
+			<AlertDialog.Portal container={containerRef}>
+				<AlertDialog.Backdrop className="ad-backdrop" />
+				<AlertDialog.Popup className="ad-popup">
+					<AlertDialog.Title className="ad-title">Confirm</AlertDialog.Title>
+					<AlertDialog.Description className="ad-desc">Are you sure?</AlertDialog.Description>
+					<AlertDialog.Close className="ad-close">OK</AlertDialog.Close>
+				</AlertDialog.Popup>
+			</AlertDialog.Portal>
+		</AlertDialog.Root>
+	</div>
+}
+
+// AlertDialog (interactive) — trigger→open→dismiss for behavior tests. Outside-press dismissal is
+// disabled (disablePointerDismissal), but Escape + the Close button still dismiss.
+export function AlertDialogInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="ad-host" />
+		<AlertDialog.Root>
+			<AlertDialog.Trigger className="ad-trigger">Open</AlertDialog.Trigger>
+			<AlertDialog.Portal container={hostRef}>
+				<AlertDialog.Popup className="ad-popup">
+					<AlertDialog.Close className="ad-close">OK</AlertDialog.Close>
+				</AlertDialog.Popup>
+			</AlertDialog.Portal>
+		</AlertDialog.Root>
 	</div>
 }
 

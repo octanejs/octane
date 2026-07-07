@@ -319,6 +319,12 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	it('AlertDialog: open modal (role=alertdialog, Dialog parts reused) renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'AlertDialogOpen', undefined, CACHE);
+		await d.step('mount (open)', () => {});
+		d.unmount();
+	});
+
 	it('Slider: Root/Value/Control/Track/Indicator/Thumb render the value byte-identically', async () => {
 		const d = await mountDifferential(FIXTURE, 'SliderBasic', undefined, CACHE);
 		await d.step('mount', () => {});

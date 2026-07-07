@@ -11,7 +11,7 @@ async function flush() {
 }
 
 function armDomTraps() {
-	Error.stackTraceLimit = 60;
+	Error.stackTraceLimit = 220;
 	const origRemove = Node.prototype.removeChild;
 	const origInsert = Node.prototype.insertBefore;
 	(Node.prototype as any).removeChild = function (child: Node) {
@@ -44,7 +44,7 @@ function armDomTraps() {
 				'refParentConnected:',
 				ref?.parentNode ? (ref.parentNode as any).isConnected : null,
 			);
-			console.log((new Error('trap').stack || '').split('\n').slice(1, 8).join('\n'));
+			console.log((new Error('trap').stack || '').split('\n').slice(1, 220).join('\n'));
 			throw e;
 		}
 	};

@@ -10,6 +10,16 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3 — ALERTDIALOG COMPLETE (2026-07). Green: 58 base-ui tests (54 differential + 4 behavior),
+> full suite green.** `src/alert-dialog.ts` — a thin Dialog variant (the whole Dialog foundation
+> already supported it): `AlertDialogRoot` = `useRenderDialogRoot(props, 'alert-dialog')` (forces
+> `modal: true`, `disablePointerDismissal: true`, `role: 'alertdialog'`), and Trigger/Portal/Backdrop/
+> Popup/Title/Description/Close are Dialog's parts reused verbatim via the `Dialog` namespace.
+> `AlertDialogHandle extends DialogHandle` (enforces the alert-dialog invariants on its store).
+> Exported `useRenderDialogRoot` from `dialog.ts`. **The open modal alert dialog is byte-identical to
+> real Base UI** (only `role="alertdialog"` differs from Dialog) — differential + 2 behavior tests
+> (trigger→open→Close, Escape-still-dismisses-though-outside-press-is-disabled).
+
 > **Phase 3 — POPOVER COMPLETE: OPEN (anchored-positioner) path landed + differential-verified
 > (2026-07). Green: 55 base-ui tests (53 differential + 2 Popover behavior), full monorepo suite 2289
 > green.** Ported the anchored-positioning layer, reusing `@octanejs/floating-ui`'s positioning engine
