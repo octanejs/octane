@@ -10751,7 +10751,20 @@ export function hydrateRoot(
 	}
 	// The component's server root is the container's first node — the initial
 	// cursor position. clone() adopts it; a hole-template walk advances from here.
-	hydrateNode = container.firstChild;
+	// A STREAMED shell flushes its deduped <style data-octane> tags AHEAD of the
+	// body markup (styles must be live before painted fallbacks), so skip any
+	// leading renderer-emitted style tags: injectStyle's document-level dedupe
+	// matches them, and they are never adopted as component DOM.
+	let firstNode = container.firstChild;
+	while (
+		firstNode !== null &&
+		firstNode.nodeType === 1 &&
+		(firstNode as Element).tagName === 'STYLE' &&
+		(firstNode as Element).hasAttribute('data-octane')
+	) {
+		firstNode = firstNode.nextSibling;
+	}
+	hydrateNode = firstNode;
 	try {
 		renderBlock(rootBlock);
 	} finally {
