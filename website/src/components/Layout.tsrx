@@ -29,7 +29,7 @@ export function Layout() @{
 		</main>
 		<footer class="footer">
 			<div class="footer-inner">
-				<span>{'MIT licensed. Built with octane — this site is a .tsrx app.'}</span>
+				<span>{'MIT licensed. Built with Octane (TSRX).'}</span>
 				<a href="https://github.com/octanejs/octane" target="_blank" rel="noreferrer">
 					octanejs/octane
 				</a>
