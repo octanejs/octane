@@ -67,6 +67,28 @@ export function Boundary(props) @{
 	</div>
 }
 
+// Boundary + a scoped <style>. A STREAMED render flushes the deduped
+// <style data-octane> tags AHEAD of the body markup in the shell, so the
+// hydration container's first children are style tags — hydrateRoot must skip
+// them when positioning the adoption cursor.
+export function StyledBoundary(props) @{
+	<div id="sbox" class="frame">
+		@try {
+			const value = use(props.promise);
+			<span class="ok">
+				{value as string}
+			</span>
+		} @pending {
+			<span class="loading">{'loading'}</span>
+		}
+		<style>
+			.frame {
+				color: rgb(1, 2, 3);
+			}
+		</style>
+	</div>
+}
+
 // Nested suspense: the outer use() must resolve before the inner @try body (and
 // its own use()) is even reached — exercises the multi-pass retry loop.
 export function Nested(props) @{

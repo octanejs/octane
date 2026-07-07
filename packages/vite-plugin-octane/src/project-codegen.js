@@ -67,8 +67,9 @@ export function write_project_generated_file(viteConfig, name, source) {
  * the browser would drag the plugin (and the server adapter) — with their
  * `node:fs` imports — into the client graph and throw at module-eval. Instead
  * the server serializes everything needed into #__octane_data ({ entry,
- * exportName, layout, params }), and this entry dynamic-imports the page/layout
- * from there. (A static, build-analyzable import map is a Phase-2 concern.)
+ * exportName, layout, params, url, preHydrate }), and this entry
+ * dynamic-imports the page/layout from there. (A static, build-analyzable
+ * import map is a Phase-2 concern.)
  *
  * octane specifics:
  *   - `import { hydrateRoot } from 'octane'` (NO `mount`).
@@ -80,6 +81,10 @@ export function write_project_generated_file(viteConfig, name, source) {
  *     closure — mirroring the server `createLayoutWrapper`.
  *   - hydrateRoot() itself locates/consumes the <script data-octane-suspense>
  *     seed inside #root, so the entry does nothing special for suspense.
+ *   - `preHydrate` (config `router.preHydrate`, a Vite-root module path) is
+ *     imported and its default export awaited BEFORE hydrateRoot — the hook an
+ *     app-level client router uses to commit its match tree so the first
+ *     hydration pass adopts the same resolved tree the server rendered.
  *
  * `getComponentExport` mirrors routes.js `get_component_export` (route named
  * export > default > first PascalCase) so server and client pick the SAME
@@ -93,6 +98,13 @@ export function create_client_entry_source(_options) {
 // This file is written to Vite's cacheDir/project folder.
 
 import { hydrateRoot } from 'octane';
+
+// Dynamic import Vite's import-analysis can NOT see: its rewrite appends
+// '?import' to variable dynamic imports, and a queried URL evaluates as a
+// SECOND browser module instance — so the page (or the preHydrate hook) would
+// no longer share module singletons with statically-imported copies of the
+// same files (e.g. a client router the app also imports directly).
+const dynamicImport = new Function('specifier', 'return import(specifier)');
 
 function getComponentExport(module, exportName) {
   // Explicit export name requires an exact match; do NOT fall back, so a
@@ -110,13 +122,13 @@ function getComponentExport(module, exportName) {
       console.error('[octane] Unable to hydrate: missing #__octane_data or #root.');
       return;
     }
-    const data = JSON.parse(el.textContent || '{}'); // { entry, exportName, layout, params }
+    const data = JSON.parse(el.textContent || '{}'); // { entry, exportName, layout, params, url, preHydrate }
     if (!data.entry) {
       console.error('[octane] Unable to hydrate: no route entry in #__octane_data.');
       return;
     }
 
-    const pageMod = await import(/* @vite-ignore */ data.entry);
+    const pageMod = await dynamicImport(data.entry);
     const Component = getComponentExport(pageMod, data.exportName ?? undefined);
     if (!Component) {
       console.error('[octane] Unable to hydrate: no component export for', data.entry);
@@ -124,23 +136,34 @@ function getComponentExport(module, exportName) {
     }
 
     const params = data.params;
+    const url = data.url;
 
+    // Run the app's pre-hydrate hook (config \`router.preHydrate\`) before the
+    // first hydration render — e.g. a client router committing its match tree
+    // so hydration adopts the same resolved tree the server rendered.
+    if (data.preHydrate) {
+      const preMod = await dynamicImport(data.preHydrate);
+      const hook = preMod.default;
+      if (typeof hook === 'function') await hook({ url, params });
+    }
+
+    // Props mirror the server render exactly: { params, url }.
     if (data.layout) {
-      const layoutMod = await import(/* @vite-ignore */ data.layout);
+      const layoutMod = await dynamicImport(data.layout);
       const Layout = getComponentExport(layoutMod);
       if (Layout) {
-        // children is a ComponentBody closing over params; octane's childSlot
-        // invokes a function child PROPS-FIRST as \`({}, block, extra)\`, so we
-        // ignore the empty props and render the page with its real \`{ params }\`,
-        // threading the scope + extra — mirroring the server createLayoutWrapper
-        // (which is scope-first on the server ABI) so the markers line up.
-        const children = (_props, scope, extra) => Component({ params }, scope, extra);
-        hydrateRoot(target, Layout, { params, children });
+        // children is a ComponentBody closing over the page props; octane's
+        // childSlot invokes a function child PROPS-FIRST as \`({}, block, extra)\`,
+        // so we ignore the empty props and render the page with its real
+        // \`{ params, url }\`, threading the scope + extra — mirroring the server
+        // createLayoutWrapper so the markers line up.
+        const children = (_props, scope, extra) => Component({ params, url }, scope, extra);
+        hydrateRoot(target, Layout, { params, url, children });
         return;
       }
     }
 
-    hydrateRoot(target, Component, { params });
+    hydrateRoot(target, Component, { params, url });
   } catch (error) {
     console.error('[octane] Failed to bootstrap client hydration.', error);
   }
