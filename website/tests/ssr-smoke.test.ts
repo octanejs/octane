@@ -1,0 +1,64 @@
+// @vitest-environment node
+//
+// Production SSR smoke test — runs the REAL `vite build` (client + server
+// bundles via @octanejs/vite-plugin) and drives the built dist/server handler
+// directly: the same export api/ssr.js re-exports for Vercel and
+// `octane-preview` boots locally. Complements smoke.test.ts (client-side
+// render): this proves the DEPLOYED artifact serves every route server-side.
+import { describe, it, expect, beforeAll } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import { build } from 'vite';
+
+const websiteRoot = fileURLToPath(new URL('..', import.meta.url));
+const serverEntry = path.join(websiteRoot, 'dist/server/entry.js');
+
+let handler: (request: Request) => Promise<Response>;
+
+async function get(url: string) {
+	const response = await handler(new Request(`http://localhost${url}`));
+	return { response, html: await response.text() };
+}
+
+beforeAll(async () => {
+	await build({ root: websiteRoot, logLevel: 'silent' });
+	({ handler } = await import(pathToFileURL(serverEntry).href));
+}, 240_000);
+
+describe('built SSR handler', () => {
+	it('produced the deployable layout (assets static, template with the server)', () => {
+		expect(fs.existsSync(serverEntry)).toBe(true);
+		expect(fs.existsSync(path.join(websiteRoot, 'dist/server/index.html'))).toBe(true);
+		// index.html must NOT be a static file — it would shadow SSR at '/'.
+		expect(fs.existsSync(path.join(websiteRoot, 'dist/client/index.html'))).toBe(false);
+	});
+
+	it('server-renders the home page with the hydration payload', async () => {
+		const { response, html } = await get('/');
+		expect(response.status).toBe(200);
+		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+		expect(html).toContain('programming model, compiled');
+		// Hydration wiring: the data script names the app entry + preHydrate hook,
+		// and the template carries the built hydrate script.
+		expect(html).toContain('"entry":"/src/app/App.tsrx"');
+		expect(html).toContain('"preHydrate":"/src/app/router-client.ts"');
+		expect(html).toMatch(/<script type="module"[^>]*src="\/assets\/[^"]+\.js"/);
+	});
+
+	it('server-renders an MDX doc through the bundle (Shiki output included)', async () => {
+		const { response, html } = await get('/docs/quick-start');
+		expect(response.status).toBe(200);
+		expect(html).toContain('<h1>Quick start</h1>');
+		// Shiki splits code into per-token spans — compare tag-stripped text.
+		const text = html.replace(/<[^>]+>/g, '');
+		expect(text).toContain('pnpm add octane @octanejs/vite-plugin');
+		expect(html).toContain('class="shiki');
+	});
+
+	it('SSRs the not-found page through the catch-all with a real 404', async () => {
+		const { response, html } = await get('/definitely/not/a/page');
+		expect(response.status).toBe(404);
+		expect(html).toContain('Page not found');
+	});
+});

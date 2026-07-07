@@ -6,6 +6,7 @@ import type {
 	OctaneConfigOptions,
 	RootBoundaryOptions,
 } from '@octanejs/vite-plugin';
+import type { RenderResult, StreamOptions, RenderOptions } from 'octane/server';
 
 export function resolveOctaneConfig(
 	raw: OctaneConfigOptions,
@@ -13,45 +14,57 @@ export function resolveOctaneConfig(
 ): ResolvedOctaneConfig;
 
 export interface ClientAssetEntry {
-	/** Path to the built JS file (relative to client output dir) */
+	/** Path to the built JS file (relative to the client output dir) */
 	js: string;
-	/** Paths to the built CSS files (relative to client output dir) */
+	/** Paths to the built CSS files (relative to the client output dir) */
 	css: string[];
 }
 
 export interface ServerManifest {
 	routes: Route[];
-	components: Record<string, Function>;
-	layouts: Record<string, Function>;
+	/** RenderRoute entry module path → module namespace (export picked per-route) */
+	components: Record<string, Record<string, unknown>>;
+	/** Layout module path → module namespace */
+	layouts: Record<string, Record<string, unknown>>;
 	middlewares: Middleware[];
-	/** Map of entry path → _$_server_$_ object for RPC support */
-	rpcModules?: Record<string, Record<string, Function>>;
 	/** Trust X-Forwarded-* headers when deriving origin for RPC fetch */
 	trustProxy?: boolean;
+	/** 'streaming' (default) renders via renderToReadableStream; 'buffered' awaits everything via prerender */
+	render?: 'streaming' | 'buffered';
 	rootBoundary?: RootBoundaryOptions;
-	/** Platform-specific runtime primitives from the adapter */
-	runtime: RuntimePrimitives;
-	/** Map of route entry paths to built client asset paths (preload tags). */
+	/** config `router.preHydrate`, serialized into #__octane_data for the client entry */
+	preHydrate?: string | null;
+	/** Map of entry path → `module server` namespace for RPC support */
+	rpcModules?: Record<string, Record<string, Function>>;
+	/** Platform primitives (adapter's, or the generated entry's Node defaults) */
+	runtime?: RuntimePrimitives;
+	/** Route entry module path → built client asset paths (preload tags) */
 	clientAssets?: Record<string, ClientAssetEntry>;
 }
 
-/**
- * octane RenderResult — re-exported from 'octane/server' (the single source of
- * truth) rather than re-declared, so the shape can't silently drift. Note
- * `render()` is async and `css` is ALREADY a ready, deduped
- * `<style data-octane="hash">…</style>` string (NOT a Set<string> needing a
- * `getCss` lookup like Ripple).
- */
-export type { RenderResult } from 'octane/server';
-import type { RenderResult } from 'octane/server';
-
 export interface HandlerOptions {
-	render: (component: Function, props?: unknown) => Promise<RenderResult>;
+	/** `renderToReadableStream` from 'octane/server' (the streaming engine dev SSR uses) */
+	renderToReadableStream: (
+		component: Function,
+		props?: unknown,
+		options?: StreamOptions,
+	) => Promise<ReadableStream<Uint8Array>>;
+	/** `prerender` from 'octane/static' (the buffered await-everything fallback) */
+	prerender: (
+		component: Function,
+		props?: unknown,
+		options?: RenderOptions,
+	) => Promise<RenderResult>;
+	/** The BUILT dist client index.html (moved to dist/server by the build) */
 	htmlTemplate: string;
+	/** RPC executor from 'octane/server' */
 	executeServerFunction: (fn: Function, body: string) => Promise<string>;
 }
 
-/** Production fetch-handler factory. PHASE 2. */
+/**
+ * Production fetch-handler factory. Mirrors the dev middleware's render path
+ * byte-for-byte in everything hydration can see (see server/production.js).
+ */
 export function createHandler(
 	manifest: ServerManifest,
 	options: HandlerOptions,

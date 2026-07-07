@@ -1,3 +1,4 @@
+// @ts-check
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createLayoutWrapper, createPropsWrapper } from './component-wrappers.js';

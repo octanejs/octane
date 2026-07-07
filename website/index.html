@@ -80,10 +80,10 @@
 		<!--ssr-head-->
 	</head>
 	<body>
+		<!-- @octanejs/vite-plugin owns the client entry: dev SSR injects its
+		     hydrate script per-request, and `vite build` bundles the same entry
+		     into this template (which then ships in dist/server as the SSR
+		     template). No app-side bootstrap script belongs here. -->
 		<div id="root"><!--ssr-body--></div>
-		<!-- SPA bootstrap for the production client build (`vite build`); no-ops in
-		     dev SSR, where @octanejs/vite-plugin injects its own hydrate entry
-		     (production SSR output is the plugin's Phase 2). -->
-		<script type="module" src="/src/entry-spa.ts"></script>
 	</body>
 </html>

@@ -1769,8 +1769,20 @@ function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html')
 	// block). The server must match per form — flag value position so ssrEmitComponent
 	// emits descriptor children for `.tsx`, keeping the server/client block counts
 	// identical (a mismatch desyncs the hydration cursor). Restored after this body.
+	//
+	// SYNTHETIC subs (ssrCompileSub passes the statement ARRAY: @if/@for/@switch/@try
+	// branches and `__schildren` component children) are always TEMPLATE position —
+	// the client compiles those branches through the template walk (componentSlot +
+	// markChildrenBlock render-fns) even when the enclosing body is a `return <jsx>`
+	// value body. Resetting to value here made ssrEmitComponent take the descriptor
+	// path inside every sub, which both desynced the block count from the client AND
+	// silently DROPPED directive-block children of nested components (lowerJsxChild
+	// cannot lower an @if to a descriptor) — a `<C>@if (…) { … }</C>` nested one sub
+	// deep rendered `<C>` childless.
 	const prevValuePos = ctx._tsxValuePos;
-	ctx._tsxValuePos = !(node.body && node.body.type === 'JSXCodeBlock');
+	ctx._tsxValuePos = Array.isArray(node.body)
+		? false
+		: !(node.body && node.body.type === 'JSXCodeBlock');
 	const htmlExpr = ssrEmitNodes(bodyNodes, ctx, name, inlinedSubs, parentNs, cssHash);
 	ctx._tsxValuePos = prevValuePos;
 

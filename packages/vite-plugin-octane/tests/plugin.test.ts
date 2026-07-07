@@ -75,20 +75,23 @@ describe('octane() plugin factory', () => {
 		expect(transform.call({}, code, '/repo/src/useThing.ts')).not.toBeNull();
 	});
 
-	it("defaults appType to 'custom' for dev, but respects the user and `vite preview`", () => {
+	it("defaults appType to 'custom' for dev, but respects the user and `vite preview`", async () => {
 		const [, meta] = octane();
-		const config = meta.config as (userConfig: object, env: object) => { appType?: string };
+		const config = meta.config as (
+			userConfig: object,
+			env: object,
+		) => Promise<{ appType?: string }>;
 
-		expect(config({}, { command: 'serve', mode: 'development' }).appType).toBe('custom');
+		expect((await config({}, { command: 'serve', mode: 'development' })).appType).toBe('custom');
 		// An explicit user appType wins.
-		expect(config({ appType: 'spa' }, { command: 'serve', mode: 'development' }).appType).toBe(
-			undefined,
-		);
-		// `vite preview` serves the client build with Vite's own SPA fallback
-		// (production SSR serving is Phase 2).
-		expect(config({}, { command: 'serve', mode: 'production', isPreview: true }).appType).toBe(
-			undefined,
-		);
+		expect(
+			(await config({ appType: 'spa' }, { command: 'serve', mode: 'development' })).appType,
+		).toBe(undefined);
+		// `vite preview` serves static files with Vite's own fallback; the
+		// production SSR build is previewed with `octane-preview` instead.
+		expect(
+			(await config({}, { command: 'serve', mode: 'production', isPreview: true })).appType,
+		).toBe(undefined);
 	});
 });
 

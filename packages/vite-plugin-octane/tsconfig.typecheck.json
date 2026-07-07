@@ -13,6 +13,6 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["src/**/*", "types/**/*"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": ["src/**/*", "types/**/*", "tests/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests/_fixtures"]
 }

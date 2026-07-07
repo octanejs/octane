@@ -1120,6 +1120,40 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 	fn();
 }
 
+// flushSync — on the client this drains the update queue synchronously around
+// the callback; on the server a render IS synchronous and there is no queue,
+// so run the callback and return its result (mirrors startTransition above).
+export function flushSync<T>(fn: () => T): T {
+	return fn();
+}
+
+// Children-block tagging — same contract as the client runtime (runtime.ts):
+// the compiler tags element/text children lowered to a render function so
+// `isChildrenBlock` can tell them from a user render-prop child; both runtimes
+// use the SAME `Symbol.for` key so identity holds across mixed graphs.
+const CHILDREN_BLOCK: unique symbol = Symbol.for('octane.childrenBlock') as any;
+
+/**
+ * Compiler-emitted: tag a children-block render function so `isChildrenBlock`
+ * recognises it. Returns the function for inline use.
+ * @internal
+ */
+export function markChildrenBlock<T>(fn: T): T {
+	if (typeof fn === 'function') {
+		(fn as any)[CHILDREN_BLOCK] = true;
+	}
+	return fn;
+}
+
+/**
+ * True when `value` is a compiler-generated children-block (element/text
+ * children lowered to a render function) — as opposed to a user render-prop
+ * function or any other value. Server twin of the client helper.
+ */
+export function isChildrenBlock(value: unknown): boolean {
+	return typeof value === 'function' && (value as any)[CHILDREN_BLOCK] === true;
+}
+
 // ---------------------------------------------------------------------------
 // CSS — the compiled server body calls injectStyle(hash, css) at the top of
 // each component; we accumulate into the active render's CSS map (deduped by

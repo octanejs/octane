@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @typedef {import('@octanejs/vite-plugin').Context} Context
  * @typedef {import('@octanejs/vite-plugin').Middleware} Middleware

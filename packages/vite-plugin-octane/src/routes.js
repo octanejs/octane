@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @typedef {import('@octanejs/vite-plugin').Context} Context
  * @typedef {import('@octanejs/vite-plugin').Middleware} Middleware
@@ -68,7 +69,8 @@ export class RenderRoute {
 	/** @type {string} */
 	path;
 
-	/** @type {RenderRouteEntry | undefined} */
+	// Non-optional: the constructor throws without one (matches types/index.d.ts).
+	/** @type {RenderRouteEntry} */
 	entry;
 
 	/** @type {string | undefined} */

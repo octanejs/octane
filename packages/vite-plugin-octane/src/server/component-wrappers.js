@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Server component composition for the octane renderer.
  *
