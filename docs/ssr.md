@@ -38,7 +38,7 @@ module loading through Vite picks the server transform automatically).
 
 ## API
 
-All three buffered renderers return `RenderResult = { html, css }`:
+The three buffered renderers return `RenderResult = { html, css }`:
 
 - `html` — the rendered markup, including hydration markers and, when anything
   resolved, an inline `<script type="application/json" data-octane-suspense>`
@@ -68,6 +68,28 @@ script. For static pages / email.
 Awaits **all** data: every `use(thenable)` resolves and Suspense boundaries
 render their success arm (or route rejection to `@catch`). Use for SSG or any
 place that wants fully-resolved HTML with no client fallback.
+
+### `renderToPipeableStream(component, props?, options?)` — `octane/server`
+
+Streaming SSR over Node-style streams (React `react-dom/server` parity, Octane
+argument convention). Returns `{ pipe, abort }`; chunks buffer until
+`pipe(destination)` is called. The **shell** — the full page with `@pending`
+fallbacks for anything still suspended — flushes immediately; each Suspense
+boundary then streams **out of order** as a hidden segment plus an inline
+`$OCTRC` swap script when its data settles. Scoped styles flush with the shell
+(before the body markup) and per-wave with their segment; hoisted head elements
+render with the shell only. `hydrateRoot` on the client adopts the swapped-in
+DOM byte-for-byte, including per-boundary `use()` seeds.
+
+`StreamOptions` extends `RenderOptions` with `onShellReady()`,
+`onShellError(err)`, and `onAllReady()`.
+
+### `renderToReadableStream(component, props?, options?)` — `octane/server`
+
+The same streaming engine over web streams: resolves with a
+`ReadableStream<Uint8Array>` once the shell is ready (rejects on a shell
+error); the stream's `allReady` promise settles when every boundary has
+flushed. Same `StreamOptions`.
 
 ### `RenderOptions`
 
@@ -121,27 +143,31 @@ and the resolved server function share one SSR runtime.
 
 `@octanejs/vite-plugin` gives file-based routing plus dev-server SSR: it matches
 a route from `octane.config.ts`, loads the page module through Vite's SSR
-pipeline, calls `prerender()`, splices the result into `index.html` at
-`<!--ssr-head-->` / `<!--ssr-body-->`, and injects the hydration entry. `module
-server` functions are executed through `executeServerFunction`. For a custom
-server (see `examples/hacker-news`), write your own `entry-server.ts` around
-`prerender()` and serialize any app data (for example a dehydrated query-client
-cache) into your own inline script.
+pipeline, renders it with `renderToReadableStream()` — the shell flushes as soon
+as it is ready and suspended boundaries stream in behind it — into `index.html`
+around `<!--ssr-body-->` (`<!--ssr-head-->` receives the hydration data script;
+styles ride the stream), and injects the hydration entry. Route components
+receive `{ params, url }`, and `router.preHydrate` names a client module whose
+default export is awaited before `hydrateRoot` (e.g. an app router committing
+its match tree). `module server` functions are executed through
+`executeServerFunction`. For a custom server (see `examples/hacker-news`), write
+your own `entry-server.ts` around `prerender()` or the streaming renderers and
+serialize any app data (for example a dehydrated query-client cache) into your
+own inline script.
 
 ## Not built yet
 
 These are the known gaps between Octane SSR and a full streaming SSR stack:
 
-- **Streaming** (`renderToPipeableStream` / `renderToReadableStream`): output is
-  fully buffered; there is no shell-first flush or out-of-order Suspense boundary
-  streaming with inline replacement scripts. This is the active next milestone.
 - **Selective / progressive hydration**: `hydrateRoot` adopts the whole tree in
-  one synchronous pass.
+  one synchronous pass (and there is no synthetic event replay, by design).
+- **Streamed head hoisting**: head elements hoisted from INSIDE a streamed
+  Suspense boundary don't ship in the stream (the shell already flushed); the
+  client re-creates them on hydration.
 - **Framework-level data serialization**: only suspense seeds cross the boundary
   automatically; loader-style data APIs are app code today.
 - **Production SSR build in the Vite plugin**: dev SSR works; the production
   server entry generation is not implemented yet.
-- **Shell-ready / status callbacks**: `onError` exists, but there are no
-  shell-ready callbacks or error digests; a render error rejects the promise (or
-  lands in the nearest `@catch`/`ErrorBoundary`), and status codes are the host
-  server's job.
+- **Error digests**: `onError` and the shell callbacks exist, but there are no
+  React-style error digests; a post-shell error ends the stream with the
+  affected boundaries marked for client render.

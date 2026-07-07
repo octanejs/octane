@@ -5,7 +5,7 @@ import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../src/index.js';
 import * as ServerRT from 'octane/server';
 // CLIENT-compiled fixture (registers click delegation at import).
-import { Boundary, Siblings } from './_fixtures/ssr-suspense.tsrx';
+import { Boundary, Siblings, StyledBoundary } from './_fixtures/ssr-suspense.tsrx';
 
 // Streaming SSR — renderToPipeableStream / renderToReadableStream: shell with
 // fallbacks + <template data-oct-b> sentinels, out-of-order hidden segments
@@ -14,7 +14,10 @@ import { Boundary, Siblings } from './_fixtures/ssr-suspense.tsrx';
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/ssr-suspense.tsrx');
 
 function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'ssr-suspense.tsrx', { mode: 'server' });
+	// Compile under the SAME absolute path Vite hands the client transform: the
+	// scoped-<style> class hash is filename-derived, so server/client markup
+	// only matches (and hydration only adopts) when the ids agree.
+	let { code } = compile(readFileSync(FIXTURE, 'utf8'), FIXTURE, { mode: 'server' });
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
@@ -313,6 +316,36 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		flushSync(() => {});
 		expect(container.querySelector('.ok')).toBe(okSpan); // adopted, not rebuilt
 		expect(container.querySelector('.ok')!.textContent).toBe('streamed!');
+		expect(errSpy).not.toHaveBeenCalled();
+		errSpy.mockRestore();
+		root.unmount();
+	});
+
+	it('hydrates a shell whose leading <style data-octane> tags precede the body', async () => {
+		// The shell flushes scoped styles BEFORE the body markup (so painted
+		// fallbacks are styled) — the container's first children are <style>
+		// tags, and hydrateRoot must skip them when positioning the cursor.
+		const d = deferred<string>();
+		const c = collector();
+		const { pipe } = ServerRT.renderToPipeableStream(server.StyledBoundary, {
+			promise: d.promise,
+		});
+		pipe(c.dest);
+		d.resolve('styled!');
+		await c.ended;
+		expect(c.chunks[0].startsWith('<style data-octane=')).toBe(true);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		expect(container.firstElementChild!.tagName).toBe('STYLE');
+		expect(container.querySelector('.ok')!.textContent).toBe('styled!');
+
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const okSpan = container.querySelector('.ok');
+		const clientPending = new Promise<string>(() => {});
+		const root = hydrateRoot(container, StyledBoundary as any, { promise: clientPending });
+		flushSync(() => {});
+		expect(container.querySelector('.ok')).toBe(okSpan); // adopted, not rebuilt
 		expect(errSpy).not.toHaveBeenCalled();
 		errSpy.mockRestore();
 		root.unmount();

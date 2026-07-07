@@ -1,6 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
-import { octane as octaneMeta } from '@octanejs/vite-plugin';
-import { octane as octaneCompiler } from 'octane/compiler/vite';
+import { octane } from '@octanejs/vite-plugin';
 import { octaneMdx } from '@octanejs/mdx/vite';
 import { websiteMdxOptions } from './mdx-options.ts';
 
@@ -24,40 +23,23 @@ function octaneServerAlias(): Plugin {
 	};
 }
 
-// GAP workaround: `octane()` from @octanejs/vite-plugin returns
-// `[compilerPlugin, metaPlugin]` but forwards NO `exclude` option to the
-// compiler — and in this monorepo the @octanejs/* bindings resolve through
-// pnpm symlinks to /packages/*/src (NOT node_modules paths), so their
-// hand-slot-forwarding `.ts` sources would be double-slotted by the default
-// compiler instance. Take only the metaPlugin and pair it with our own
-// compiler instance carrying the excludes (mirrors the root vitest config).
-const [, octaneMetaPlugin] = octaneMeta();
-
 export default defineConfig({
 	plugins: [
 		octaneServerAlias(),
 		// octaneMdx() owns `.mdx` (full pipeline: @mdx-js/mdx → octane compile,
-		// with Shiki highlighting via rehype); octane compiler owns `.tsrx`/`.ts`.
+		// with Shiki highlighting via rehype); octane() owns `.tsrx`/`.ts` and the
+		// metaframework (dev SSR + routing + hydrate). `exclude` skips the
+		// hook-slotting pass for the workspace bindings' hand-slot-forwarding
+		// sources — pnpm symlinks resolve them to /packages/*/src, not
+		// node_modules (mirrors the root vitest config).
 		octaneMdx(websiteMdxOptions),
-		octaneCompiler({
+		octane({
 			exclude: ['/packages/router/src/', '/packages/mdx/src/'],
 		}),
-		octaneMetaPlugin,
-		// GAP workaround: the metaPlugin forces `appType: 'custom'`, which kills
-		// Vite's HTML fallback — correct for dev SSR routing, but it also makes
-		// `vite preview` refuse to serve the built client bundle ("Cannot GET /"),
-		// and the plugin's production SSR output is Phase 2 (not implemented). Flip
-		// back to 'spa' AFTER the metaPlugin so `vite preview` serves the SPA build
-		// (entry-spa.ts boots it); dev SSR is unaffected because the plugin's
-		// middleware answers matched routes before the SPA fallback runs.
-		{
-			name: 'website:spa-fallback',
-			config: () => ({ appType: 'spa' as const }),
-		},
 	],
 
 	// The workspace bindings ship raw TS — Vite must transform them for the SSR
-	// module graph (the metaPlugin only covers octane + @octanejs/query).
+	// module graph (the plugin only covers octane + @octanejs/query).
 	ssr: {
 		noExternal: [/^octane($|\/)/, /^@octanejs\//],
 	},
