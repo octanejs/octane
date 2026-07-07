@@ -414,7 +414,10 @@ function DialogChildren(props: any): any {
 	return props.children ?? null;
 }
 
-function useRenderDialogRoot<Payload>(props: any, mode: 'dialog' | 'drawer' | 'alert-dialog') {
+export function useRenderDialogRoot<Payload>(
+	props: any,
+	mode: 'dialog' | 'drawer' | 'alert-dialog',
+) {
 	const slot = S('DialogRoot');
 	const {
 		children,

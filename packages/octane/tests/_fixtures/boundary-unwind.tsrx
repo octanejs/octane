@@ -75,3 +75,63 @@ export function DeepSuspenseHost(props) @{
 		</Pass>
 	</Suspense>
 }
+
+// The router MatchInner shape: a component subscribed to an external store that
+// SUSPENDS while the store says pending, and — without the promise ever
+// resolving — STOPS suspending and returns a component subtree (with a host +
+// nested @if control flow) when the store flips. The store flip re-renders the
+// SUSPENDED try body via its subscription; the body must be able to mount fresh
+// blocks even though the boundary had stashed the try DOM away.
+import { useSyncExternalStore } from 'octane';
+
+export interface MiniStore {
+	get: () => string;
+	set: (v: string) => void;
+	subscribe: (cb: () => void) => () => void;
+}
+
+export function createMiniStore(initial: string): MiniStore {
+	let value = initial;
+	const subs = new Set<() => void>();
+	return {
+		get: () => value,
+		set: (v: string) => {
+			value = v;
+			subs.forEach((cb) => cb());
+		},
+		subscribe: (cb: () => void) => {
+			subs.add(cb);
+			return () => subs.delete(cb);
+		},
+	};
+}
+
+function InnerContent(props) @{
+	<div class="content">
+		@if (props.tag === 'done') {
+			<span class="done">{'done'}</span>
+		} @else {
+			<span class="other">{'other'}</span>
+		}
+	</div>
+}
+
+function StoreDriven(props) {
+	const status = useSyncExternalStore(props.store.subscribe, props.store.get, props.store.get);
+	if (status === 'pending') {
+		use(props.promise);
+	}
+	return <InnerContent tag={status} />;
+}
+
+export function StoreFlipHost(props) @{
+	<Suspense fallback={<i class="fb">{'loading'}</i>}>
+		<Pass>
+			<div class="wrap">
+				<Pass>
+					<StoreDriven store={props.store} promise={props.promise} />
+				</Pass>
+			</div>
+		</Pass>
+	</Suspense>
+}
