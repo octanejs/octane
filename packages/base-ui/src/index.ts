@@ -16,6 +16,7 @@ export { NumberField } from './number-field';
 export { Progress } from './progress';
 export { Radio } from './radio';
 export { RadioGroup } from './radio-group';
+export { Popover } from './popover';
 export { Slider } from './slider';
 export { Switch } from './switch';
 export { Toggle } from './toggle';

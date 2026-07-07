@@ -71,8 +71,15 @@ export function makeConcurrentRouter(initial: string, deferred: Deferred<string>
 		component: SlowPage,
 		pendingComponent: SlowPending,
 	});
+	// Same suspending component, but NO pendingComponent — so no Suspense boundary
+	// mounts for it and a navigation transition must hold the old page instead.
+	const slowBareRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: 'slow-bare',
+		component: SlowPage,
+	});
 	return createRouter({
-		routeTree: rootRoute.addChildren([homeRoute, slowRoute]),
+		routeTree: rootRoute.addChildren([homeRoute, slowRoute, slowBareRoute]),
 		history: createMemoryHistory({ initialEntries: [initial] }),
 	});
 }

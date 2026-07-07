@@ -9,11 +9,13 @@
 // `notFoundMode: 'root'` the root. That match still renders its own component
 // (the layout), and its `<Outlet/>` renders the not-found UI INSTEAD of a child
 // match — so the 404 lands inside the layout chrome.
-import { useContext } from 'octane';
+import { useContext, createElement, Suspense } from 'octane';
+import { rootRouteId } from '@tanstack/router-core';
 import { useStore } from './useStore.ts';
 import { useRouter, matchContext } from './context.ts';
 import { Match } from './Match.tsrx';
 import { RouteNotFound } from './RouteNotFound.tsrx';
+import { SafeFragment } from './SafeFragment.tsrx';
 
 export function Outlet() @{
 	const router = useRouter();
@@ -26,11 +28,20 @@ export function Outlet() @{
 		return i >= 0 ? ids[i + 1] : undefined;
 	});
 
+	// The root route's outlet wraps the first real match in a Suspense boundary
+	// whose fallback is the router's defaultPendingComponent (react-router's
+	// Outlet does the same) — the outermost pending UI for the initial load.
+	const DefaultPending = router.options.defaultPendingComponent;
+	const RootSuspense = parentRouteId === rootRouteId ? Suspense : SafeFragment;
+	const pendingElement = DefaultPending ? createElement(DefaultPending, {}) : null;
+
 	@if (globalNotFound) {
 		<RouteNotFound routeId={parentRouteId} />
 	} @else {
 		@if (childId) {
-			<Match matchId={childId} />
+			<RootSuspense fallback={pendingElement}>
+				<Match matchId={childId} />
+			</RootSuspense>
 		}
 	}
 }
