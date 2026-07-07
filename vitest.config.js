@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
-import { octaneMdx } from './packages/mdx/src/vite.ts';
+import { octaneMdx } from './packages/mdx/src/vite.js';
 import { stylex } from './packages/stylex/src/vite.js';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 
@@ -409,6 +409,12 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/mdx$/,
 							replacement: resolve(import.meta.dirname, 'packages/mdx/src/index.ts'),
+						},
+						{
+							// `compile`/`vite` are Node-loadable `.js` (see packages/mdx/src/vite.js);
+							// the runtime entries (`server`, …) stay `.ts`.
+							find: /^@octanejs\/mdx\/(compile|vite)$/,
+							replacement: resolve(import.meta.dirname, 'packages/mdx/src') + '/$1.js',
 						},
 						{
 							find: /^@octanejs\/mdx\/(.*)$/,

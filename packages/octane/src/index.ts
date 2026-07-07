@@ -103,6 +103,7 @@ export {
 	componentSlotLite,
 	markChildrenBlock,
 	childSlot,
+	positionalChildren,
 	textSlot,
 	textHole,
 	childTextHole,

@@ -6030,6 +6030,20 @@ function deoptKeyPositional(item: any, index: number): any {
 	return item != null && item.$$kind === ELEMENT_TAG && item.key != null ? item.key : index;
 }
 
+// Compiler contract: a VALUE-position JSX fragment (`<>…</>` in `.tsx` bodies,
+// and every MDX document root) lowers to an array literal — FIXED siblings in
+// source order, i.e. React's "static children" (`jsxs`), which React never
+// key-warns. The compiler wraps that literal in this tag so the de-opt list
+// keys it by index silently, exactly like `createElement`'s positional-children
+// arrays above. Tagged at ANY length (a fragment's lone unkeyed child — or an
+// interleaved text item like MDX's `"\n"`, which can never carry a key — must
+// not warn either); only runtime-built arrays (`.map()` results, arrays through
+// props) keep the warning.
+export function positionalChildren(children: any[]): any[] {
+	POSITIONAL_CHILDREN.add(children);
+	return children;
+}
+
 // Apply ONE host prop, reusing the same helpers the compiler emits (className/style/
 // setAttribute + `$$type` delegated-event slots + deferred ref attach).
 function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): void {

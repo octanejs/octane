@@ -13,38 +13,47 @@
  * environment consumer marks a server build (`mode: 'server'` codegen), so the
  * SAME document renders to HTML strings on the server and hydratable DOM code
  * on the client.
+ *
+ * Authored in `.js` (like octane's `compiler/vite.js` and @octanejs/stylex's
+ * vite entry) so the plugin loads when a consuming app's `vite.config.ts`
+ * pulls it in through Node's ESM loader — which resolves the on-disk file
+ * exactly as written and never applies TS-style `.js` → `.ts` mapping.
  */
-import { compileMdx, type CompileMdxOptions } from './compile.js';
+import { compileMdx } from './compile.js';
 
-export interface OctaneMdxPluginOptions extends Omit<CompileMdxOptions, 'mode' | 'hmr' | 'dev'> {
-	/**
-	 * Force the codegen target for EVERY module — `true` always server, `false`
-	 * always client. Leave unset for per-module auto-detection (standard Vite
-	 * SSR setups). Mirrors `octane/compiler/vite`'s `ssr` option.
-	 */
-	ssr?: boolean;
-	/** Also transform `.md` modules (plain-markdown format). Default `true`. */
-	md?: boolean;
-	/** octane HMR/dev metadata override; defaults to on in serve mode (client only). */
-	hmr?: boolean;
-}
+/**
+ * @typedef {Omit<import('./compile.js').CompileMdxOptions, 'mode' | 'hmr' | 'dev'> & {
+ *   ssr?: boolean,
+ *   md?: boolean,
+ *   hmr?: boolean,
+ * }} OctaneMdxPluginOptions
+ *
+ * `ssr` forces the codegen target for EVERY module — `true` always server,
+ * `false` always client. Leave unset for per-module auto-detection (standard
+ * Vite SSR setups). Mirrors `octane/compiler/vite`'s `ssr` option.
+ * `md` also transforms `.md` modules (plain-markdown format). Default `true`.
+ * `hmr` is the octane HMR/dev metadata override; defaults to on in serve mode
+ * (client only).
+ */
 
-// Structural Vite plugin type — avoids a hard type dependency on vite (this
-// package's published surface is TS source; see @octanejs/stylex's vite entry
-// for the same choice).
-interface OctaneMdxPlugin {
-	name: string;
-	enforce: 'pre';
-	configResolved(config: { command: string }): void;
-	transform(
-		this: unknown,
-		code: string,
-		id: string,
-		options?: { ssr?: boolean },
-	): Promise<{ code: string; map: unknown } | null>;
-}
+/**
+ * Structural Vite plugin type — avoids a hard type dependency on vite (this
+ * package's published surface is source; see @octanejs/stylex's vite entry for
+ * the same choice).
+ *
+ * @typedef {{
+ *   name: string,
+ *   enforce: 'pre',
+ *   configResolved(config: { command: string }): void,
+ *   transform(code: string, id: string, options?: { ssr?: boolean }): Promise<{ code: string, map: unknown } | null>,
+ * }} OctaneMdxPlugin
+ */
 
-export function octaneMdx(options: OctaneMdxPluginOptions = {}): OctaneMdxPlugin {
+/**
+ * @param {OctaneMdxPluginOptions} [options]
+ * @returns {OctaneMdxPlugin}
+ */
+export function octaneMdx(options = {}) {
 	const { ssr: forceSsr, md, hmr, ...compileOptions } = options;
 	let hmrEnabled = hmr;
 	const includeMd = md !== false;
@@ -66,9 +75,7 @@ export function octaneMdx(options: OctaneMdxPluginOptions = {}): OctaneMdxPlugin
 			const ssr =
 				forceSsr !== undefined
 					? forceSsr
-					: transformOptions?.ssr === true ||
-						(this as { environment?: { config?: { consumer?: string } } }).environment?.config
-							?.consumer === 'server';
+					: transformOptions?.ssr === true || this.environment?.config?.consumer === 'server';
 			return compileMdx(code, file, {
 				...compileOptions,
 				mode: ssr ? 'server' : 'client',

@@ -24,3 +24,16 @@ export function Nested() @{
 		<p class="z">{'z'}</p>
 	</>
 }
+
+// `return <>…</>` (React dialect, NOT `@{}`) — VALUE-lowered to a
+// positionalChildren([...]) descriptor array, the same shape every MDX document
+// root compiles to. The interleaved text item can never carry a key, so this
+// array must ride the silent positional-key path (React never key-warns static
+// JSX children).
+export function ValueFragment() {
+	return <>
+		<p class="one">{'1'}</p>
+		{'\n'}
+		<p class="two">{'2'}</p>
+	</>;
+}
