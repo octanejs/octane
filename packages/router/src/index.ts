@@ -44,3 +44,8 @@ export { Link } from './Link.tsrx';
 export { Navigate } from './Navigate.tsrx';
 export { Await } from './Await.tsrx';
 export { ScrollRestoration } from './ScrollRestoration.tsrx';
+export { Matches } from './Matches.tsrx';
+export { Match } from './Match.tsrx';
+export { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';
+export { CatchNotFound, DefaultGlobalNotFound } from './not-found.tsrx';
+export { ClientOnly, useHydrated } from './ClientOnly';
