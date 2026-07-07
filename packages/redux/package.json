@@ -1,5 +1,5 @@
 {
-  "name": "@octanejs/react-redux",
+  "name": "@octanejs/redux",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -14,7 +14,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git",
-    "directory": "packages/react-redux"
+    "directory": "packages/redux"
   },
   "main": "src/index.ts",
   "module": "src/index.ts",
