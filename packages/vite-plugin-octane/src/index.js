@@ -2,6 +2,7 @@
 /** @import {OctaneConfigOptions, ResolvedOctaneConfig, RenderRoute} from '@octanejs/vite-plugin' */
 
 import fs from 'node:fs';
+import path from 'node:path';
 import { Readable } from 'node:stream';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
@@ -47,6 +48,59 @@ const OCTANE_EXTENSIONS = ['.tsrx'];
  */
 function is_octane_module_path(file_name) {
 	return OCTANE_EXTENSIONS.some((extension) => file_name.endsWith(extension));
+}
+
+// Query params that mark a Vite transform request (`/src/x.svg?url`,
+// `/src/worker?worker`, …). `?v=`/`?t=` module URLs always carry an extension,
+// so the extension check below already covers them.
+const VITE_QUERY_MARKERS = ['import', 'direct', 'raw', 'url', 'worker', 'sharedworker', 'inline'];
+
+/**
+ * Is this a request the Vite dev server owns (module/asset/internal), as
+ * opposed to a page navigation? A catch-all RenderRoute ('/*splat') must not
+ * SSR `/@vite/client` or `/src/main.ts` — those must fall through to Vite's
+ * transform middleware. Exported for tests.
+ *
+ * A dot in the last path segment is NOT enough to claim a request: page URLs
+ * like `/docs/v2.0` or `/users/jane.doe` carry one too. So an extension only
+ * marks a Vite-owned request when the path names a REAL file under one of
+ * `fileRoots` (the Vite root + publicDir — what the dev server can actually
+ * serve). With no `fileRoots` the check stays the conservative heuristic
+ * (any extension → Vite-owned).
+ *
+ * @param {URL} url
+ * @param {string[]} [fileRoots]
+ * @returns {boolean}
+ */
+export function isViteOwnedUrl(url, fileRoots) {
+	const pathname = url.pathname;
+	// Vite-internal namespaces: /@vite/client, /@id/…, /@fs/…, /@react-refresh.
+	if (pathname.startsWith('/@')) return true;
+	// Vite/devtools internals: /__open-in-editor, /__inspect, …
+	if (pathname.startsWith('/__')) return true;
+	if (pathname.includes('/node_modules/')) return true;
+	// Vite emits its transform queries as BARE markers (`?url`, `?raw`,
+	// `?worker`, `&import`) — only an EMPTY value counts. A valued param
+	// (`/docs?url=https://example.com`) is an app query string on a page
+	// navigation, not a transform request.
+	for (const marker of VITE_QUERY_MARKERS) {
+		if (url.searchParams.get(marker) === '') return true;
+	}
+	// A file extension marks a module/asset request (/src/main.ts, /favicon.svg)
+	// — but only when a real file backs it (see above). (dot > 0 so a bare
+	// dotfile segment like '/.well-known' doesn't count.)
+	const lastSegment = pathname.slice(pathname.lastIndexOf('/') + 1);
+	if (lastSegment.lastIndexOf('.') > 0) {
+		if (fileRoots === undefined) return true;
+		let relPath;
+		try {
+			relPath = decodeURIComponent(pathname);
+		} catch {
+			relPath = pathname;
+		}
+		return fileRoots.some((root) => fs.existsSync(path.join(root, relPath)));
+	}
+	return false;
 }
 
 /** @type {import('@ripple-ts/adapter/rpc').AsyncContext | null} */
@@ -99,7 +153,7 @@ function has_route_config(config) {
  * PHASE 1 = dev SSR + routing + hydrate. Production build (buildStart /
  * closeBundle / transformIndexHtml / server-entry / adapter.serve) is Phase 2.
  *
- * @param {{ hmr?: boolean }} [inlineOptions]
+ * @param {{ hmr?: boolean, exclude?: string[] }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -118,12 +172,16 @@ export function octane(inlineOptions = {}) {
 
 		/**
 		 * @param {UserConfig} userConfig
+		 * @param {{ command: string, isPreview?: boolean }} env
 		 */
-		config(userConfig) {
+		config(userConfig, env) {
 			const exclude = userConfig.optimizeDeps?.exclude || [];
 			return {
-				// SSR owns routing; do not let Vite SPA-fallback to index.html.
-				appType: 'custom',
+				// Dev SSR owns routing, so default appType to 'custom' (no SPA HTML
+				// fallback masking SSR routes). Respect an explicit user appType, and
+				// leave `vite preview` alone: production SSR serving is Phase 2, so
+				// preview must keep Vite's own SPA fallback to serve the client build.
+				...(userConfig.appType === undefined && !env?.isPreview ? { appType: 'custom' } : {}),
 				optimizeDeps: {
 					exclude: [
 						// `@octanejs/query` ships a `.tsrx` provider component, so it must NOT
@@ -273,6 +331,22 @@ export function octane(inlineOptions = {}) {
 						return;
 					}
 
+					// A catch-all RenderRoute ('/*splat') also matches every module /
+					// asset / Vite-internal request. Those belong to Vite's transform
+					// middleware, not SSR — skip them BEFORE the (per-request) config
+					// reload below so module requests stay cheap. ServerRoutes are not
+					// filtered: an explicit '/api/data.json' endpoint is legitimate.
+					// The file roots let extension-bearing PAGE urls (/docs/v2.0,
+					// /users/jane.doe) SSR — only paths naming a real file are Vite's.
+					const fileRoots = [config.root];
+					if (typeof config.publicDir === 'string' && config.publicDir !== '') {
+						fileRoots.push(config.publicDir);
+					}
+					if (match.route.type === 'render' && isViteOwnedUrl(url, fileRoots)) {
+						next();
+						return;
+					}
+
 					try {
 						// Reload config so route edits are picked up (dev HMR for routes).
 						const previousRoutes = octaneConfig.router.routes;
@@ -362,8 +436,16 @@ export function octane(inlineOptions = {}) {
 		},
 	};
 
-	const hmr = inlineOptions.hmr;
-	return [octaneCompiler(hmr === undefined ? {} : { hmr }), metaPlugin];
+	// Forward compiler options. `exclude` lists path fragments the compiler's
+	// `.ts`/`.js` hook-slotting pass must skip — hand-slot-forwarding library
+	// sources that would otherwise be double-slotted. Published bindings live in
+	// node_modules and are skipped automatically; this matters for monorepo /
+	// aliased-to-source setups where pnpm symlinks resolve @octanejs/* imports
+	// to `packages/*/src` paths.
+	const compilerOptions = {};
+	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
+	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
+	return [octaneCompiler(compilerOptions), metaPlugin];
 }
 
 // Mainly to enforce types / DX.
