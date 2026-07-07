@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { octane, isViteOwnedUrl, resolveOctaneConfig, RenderRoute } from '../src/index.js';
+import { RESOLVED_ADAPTER_BROWSER_STUB_ID } from '../src/project-codegen.js';
 
 function url(u: string): URL {
 	return new URL(u, 'http://localhost');
@@ -123,5 +124,32 @@ describe('resolveOctaneConfig', () => {
 				router: { routes: [new RenderRoute({ path: '/', entry, status: 4.04 })] },
 			}),
 		).toThrow(/status/);
+	});
+});
+
+describe('server-only adapter browser stub', () => {
+	const [, meta] = octane();
+	const resolveId = meta.resolveId as (
+		id: string,
+		importer?: string,
+		options?: { ssr?: boolean },
+	) => Promise<string | null>;
+	const load = meta.load as (id: string) => Promise<string | undefined>;
+
+	it('client-side imports of adapter packages resolve to the stub, server gets the real one', async () => {
+		for (const id of ['@octanejs/adapter-vercel', '@ripple-ts/adapter-node']) {
+			expect(await resolveId(id, undefined, { ssr: false })).toBe(RESOLVED_ADAPTER_BROWSER_STUB_ID);
+		}
+		expect(await resolveId('@octanejs/adapter-vercel', undefined, { ssr: true })).toBe(null);
+	});
+
+	it('the stub covers the octane adapter surface with no node builtins', async () => {
+		const source = (await load(RESOLVED_ADAPTER_BROWSER_STUB_ID)) as string;
+		// The union of the listed adapters' public names — a client import of any
+		// of them must resolve (and only throw on USE).
+		for (const name of ['vercel', 'adapt', 'serve']) {
+			expect(source).toContain(`export function ${name}`);
+		}
+		expect(source).not.toContain('node:');
 	});
 });

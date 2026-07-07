@@ -172,15 +172,7 @@ export interface OctaneConfigOptions {
 		minify?: boolean;
 		target?: BuildEnvironmentOptions['target'];
 	};
-	adapter?: {
-		serve: AdapterServeFunction;
-		/**
-		 * Platform-specific runtime primitives provided by the adapter.
-		 * Required for production builds; in development the plugin falls back
-		 * to Node.js defaults if not provided.
-		 */
-		runtime: RuntimePrimitives;
-	};
+	adapter?: OctaneAdapter;
 	router?: {
 		routes: Route[];
 		/**
@@ -225,10 +217,7 @@ export interface ResolvedOctaneConfig {
 		minify?: boolean;
 		target?: BuildEnvironmentOptions['target'];
 	};
-	adapter?: {
-		serve: AdapterServeFunction;
-		runtime: RuntimePrimitives;
-	};
+	adapter?: OctaneAdapter;
 	router: {
 		routes: Route[];
 		preHydrate?: string;
@@ -246,6 +235,41 @@ export interface ResolvedOctaneConfig {
 		/** @default 'streaming' */
 		render: 'streaming' | 'buffered';
 	};
+}
+
+/**
+ * The build context @octanejs/vite-plugin passes to an adapter's `adapt()`
+ * after `vite build` produced both bundles.
+ */
+export interface AdaptContext {
+	/** Absolute project root (the Vite root). */
+	root: string;
+	/** The config `build.outDir` (relative to root, e.g. 'dist'). */
+	outDir: string;
+	/** Absolute path of the static client bundle ({outDir}/client). */
+	clientDir: string;
+	/** Absolute path of the server bundle ({outDir}/server, contains entry.js). */
+	serverDir: string;
+	/** Prefixed build logger. */
+	log: (message: string) => void;
+}
+
+/**
+ * The octane.config.ts `adapter` contract. All parts are optional and
+ * independent:
+ *
+ * - `adapt(ctx)` — post-build hook: restructure dist/client + dist/server for
+ *   a deployment target (e.g. @octanejs/adapter-vercel emits `.vercel/output`).
+ * - `serve(handler, opts)` — replaces the generated server entry's built-in
+ *   Node boot when running `node dist/server/entry.js` / `octane-preview`.
+ * - `runtime` — platform primitives (hashing, async context) replacing the
+ *   entry's Node defaults; needed on non-Node runtimes.
+ */
+export interface OctaneAdapter {
+	name?: string;
+	adapt?: (ctx: AdaptContext) => void | Promise<void>;
+	serve?: AdapterServeFunction;
+	runtime?: RuntimePrimitives;
 }
 
 export type AdapterServeFunction = (

@@ -34,22 +34,25 @@ pre-deploy verification step.
 
 ## Deploy (Vercel)
 
-Everything is configured in [vercel.json](vercel.json) + [api/ssr.js](api/ssr.js):
+Deployment is handled by `@octanejs/adapter-vercel`: `adapter: vercel()` in
+[octane.config.ts](octane.config.ts) makes `vite build` emit Vercel's
+[Build Output API](https://vercel.com/docs/build-output-api/v3) under
+`.vercel/output/` — hashed assets as static files plus one self-contained Node
+function wrapping the SSR handler, with routing/headers in its `config.json`
+(filesystem first, then every page — including the `/*splat` 404 catch-all —
+server-rendered with a real status code). Vercel picks up `.vercel/output`
+automatically after the build command; [vercel.json](vercel.json) only sets
+`buildCommand`.
 
-- `api/ssr.js` is a Vercel Node function that re-exports `nodeHandler` from
-  `dist/server/entry.js` (built before functions are bundled;
-  `includeFiles: "dist/server/**"` ships the bundle + its HTML template).
-- `outputDirectory: dist/client` serves the hashed assets statically;
-  rewrites send all remaining traffic (Vercel checks the filesystem first) to
-  `/api/ssr`, so every page — including the `/*splat` 404 catch-all — is
-  server-rendered with a real status code.
+The adapter doesn't affect local workflows: `octane-preview` still serves
+`dist/server` directly.
 
 Project settings in the Vercel dashboard:
 
 | Setting          | Value                                        |
 | ---------------- | -------------------------------------------- |
 | Root Directory   | `website` (enable "Include files outside the Root Directory" — workspace deps) |
-| Framework Preset | Other (vercel.json supplies build + output)  |
+| Framework Preset | Other (vercel.json supplies the build command) |
 | Install Command  | default (`pnpm install` at the repo root)    |
 | Node.js Version  | 20.x or later                                |
 

@@ -12,6 +12,7 @@
 // plugin skips Vite-owned requests (/@vite/client, /src/*.ts, …) before route
 // matching, so the catch-all never swallows module requests.
 import { defineConfig, RenderRoute, type Middleware } from '@octanejs/vite-plugin';
+import { vercel } from '@octanejs/adapter-vercel';
 
 // Warm the per-URL server router before the render runs. Dynamic import so
 // loading octane.config.ts itself stays cheap; it resolves to the SAME module
@@ -26,6 +27,7 @@ const warmRouter: Middleware = async (context, next) => {
 const ENTRY = ['App', '/src/app/App.tsrx'] as const;
 
 export default defineConfig({
+	adapter: vercel(),
 	router: {
 		routes: [
 			new RenderRoute({ path: '/', entry: ENTRY, before: [warmRouter] }),
