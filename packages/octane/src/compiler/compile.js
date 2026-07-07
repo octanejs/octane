@@ -1938,8 +1938,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	const tag = elementTagName(node);
 	rejectVoidElementContent(tag, node, ctx);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
-	const selfNs = nsForSelf(node, parentNs);
-	const childNs = nsForChildren(node, selfNs);
+	// NB: the ns helpers take the TAG STRING (passing the node silently returns
+	// the inherited ns — svg subtrees would never enter the svg namespace).
+	const selfNs = nsForSelf(tag, parentNs);
+	const childNs = nsForChildren(tag, selfNs);
 
 	// `parts` are JS expressions concatenated with `+`. `lit` accumulates the
 	// current static run so adjacent literals fold into one quoted chunk.
@@ -2092,7 +2094,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	}
 
 	lit += '>';
-	const normChildren = normalizeChildren(node.children || []);
+	const normChildren = normalizeChildren(node.children || [], childNs === 'svg');
 	// Only-child renderable `{expr}` → markerless `ssrChildText` (mirrors the client's
 	// markerless `childTextHole` mount: a primitive is the host's bare text, an object
 	// still gets a `<!--[-->…<!--]-->` block). Must match the client's only-child
@@ -3722,7 +3724,10 @@ function emitHeadServer(headNodes, ctx) {
  *     makeSwitchCall consume
  *   - Anything else → passed through
  */
-function normalizeChildren(nodes) {
+// `inSvg`: the children being normalized sit inside an SVG-namespace subtree.
+// SVG has its own `<title>` (the accessibility tooltip element) — it must stay
+// where it is, NOT hoist to document.head (React 19 makes the same exception).
+function normalizeChildren(nodes, inSvg = false) {
 	const out = [];
 	if (!nodes) return out;
 	for (const n of nodes) {
@@ -3791,10 +3796,10 @@ function normalizeChildren(nodes) {
 					const refInner =
 						refVal && refVal.type === 'JSXExpressionContainer' ? refVal.expression : refVal;
 					out.push({ type: 'FragmentStart', refExpr: refInner });
-					out.push(...normalizeChildren(n.children || []));
+					out.push(...normalizeChildren(n.children || [], inSvg));
 					out.push({ type: 'FragmentEnd' });
 				} else {
-					out.push(...normalizeChildren(n.children || []));
+					out.push(...normalizeChildren(n.children || [], inSvg));
 				}
 				continue;
 			}
@@ -3829,8 +3834,9 @@ function normalizeChildren(nodes) {
 			// `<title>`/`<meta>`/`<link>` → hoist to the document-head channel (NOT
 			// body DOM). Kept in `out` as a synthetic node so planJsx / ssrCompileBody
 			// can partition it out and emit it via headBlock (client) / ssrHeadEl
-			// (server). Lifted from wherever they appear in the output.
-			if (isHoistableHeadElementNode(n)) {
+			// (server). Lifted from wherever they appear in the output — EXCEPT an
+			// SVG `<title>`, which is the SVG tooltip element and stays in place.
+			if (isHoistableHeadElementNode(n) && !(inSvg && jsxTagName(n) === 'title')) {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
 			}
@@ -3844,7 +3850,7 @@ function normalizeChildren(nodes) {
 				loc: n.loc, // preserve element position for dev hydration LOC (component slots)
 			});
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
-			out.push(...normalizeChildren(n.children || []));
+			out.push(...normalizeChildren(n.children || [], inSvg));
 		} else if (n.type === 'JSXStyleElement') {
 			// Drop a `<style>` block at child position — its CSS gets registered
 			// via the @tsrx/core scoping pipeline (applyCssScoping / applyStyleMap);
@@ -3916,7 +3922,7 @@ function normalizeChildren(nodes) {
 			if (body.length === 0 && render === null) continue;
 			if (body.length === 0 && render !== null) {
 				// Recurse — render is a single JSX node, treat as a sibling child.
-				out.push(...normalizeChildren([render]));
+				out.push(...normalizeChildren([render], inSvg));
 			} else {
 				throw new Error(
 					'`@{ … }` with setup statements is not supported at JSX child position. ' +
@@ -5629,7 +5635,7 @@ function emitElementHtml(
 
 	let html = `<${tag}${attrHtml}>`;
 
-	const children = normalizeChildren(node.children || []);
+	const children = normalizeChildren(node.children || [], childNs === 'svg');
 	// Special case: a single Text child (only-child text fast path).
 	if (children.length === 1 && children[0].type === 'Text') {
 		const txtChild = children[0];
