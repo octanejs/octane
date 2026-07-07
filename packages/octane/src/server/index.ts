@@ -81,6 +81,7 @@ export {
 
 	// Compiler-emitted codegen helpers (private ABI — see module doc)
 	createElement,
+	positionalChildren,
 	escapeHtml,
 	escapeAttr,
 	ssrText,

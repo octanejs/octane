@@ -64,9 +64,11 @@ What each MDX construct becomes under octane's `.tsx` handling:
 
 ### Packages
 
-- `packages/mdx/src/compile.ts` — the pipeline (`compileMdx`/`compileMdxSync`/
-  `defaultRemarkPlugins`) + `recmaOctaneAdapter`.
-- `packages/mdx/src/vite.ts` — `octaneMdx()`: claims `.mdx`/`.md`
+- `packages/mdx/src/compile.js` — the pipeline (`compileMdx`/`compileMdxSync`/
+  `defaultRemarkPlugins`) + `recmaOctaneAdapter`. Authored in `.js` (JSDoc'd,
+  like `octane/compiler` and @octanejs/stylex's vite entry) so the vite entry's
+  import chain loads under Node's native ESM loader.
+- `packages/mdx/src/vite.js` — `octaneMdx()`: claims `.mdx`/`.md`
   (`enforce: 'pre'`), produces FINAL JS, per-module SSR auto-detection copied
   from `octane/compiler/vite` — composes with the octane plugin with no
   ordering hazard (disjoint extensions).

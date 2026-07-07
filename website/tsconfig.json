@@ -21,8 +21,7 @@
     "env.d.ts",
     "octane.config.ts",
     "vite.config.ts",
-    "mdx-options.ts",
-    "mdx-plugin.ts"
+    "mdx-options.ts"
   ],
   "exclude": ["node_modules"]
 }

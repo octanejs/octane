@@ -33,94 +33,84 @@
  * value-lowers a returned fragment through `ssrChild([...])` exactly like the
  * client's descriptor array — so `<_components.h1>` member tags and the
  * document's fragment body take the SAME shape on both sides (hydration-safe).
+ *
+ * Authored in `.js` (like octane's `compiler/vite.js` and @octanejs/stylex's
+ * vite entry) so the `…/vite` plugin — which imports this module — loads when a
+ * consuming app's `vite.config.ts` pulls it in through Node's ESM loader.
  */
 import remapping from '@jridgewell/remapping';
-import {
-	compile as mdxCompile,
-	compileSync as mdxCompileSync,
-	type CompileOptions,
-} from '@mdx-js/mdx';
+import { compile as mdxCompile, compileSync as mdxCompileSync } from '@mdx-js/mdx';
 import { compile as octaneCompile } from 'octane/compiler';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 import remarkMdxFrontmatter from 'remark-mdx-frontmatter';
 import { SourceMapGenerator } from 'source-map';
 
-export interface CompileMdxResult {
-	code: string;
-	map: unknown;
-}
+/**
+ * @typedef {object} CompileMdxResult
+ * @property {string} code
+ * @property {unknown} map
+ */
 
-export interface CompileMdxOptions {
-	/** octane codegen target: `'client'` (DOM) or `'server'` (SSR HTML strings). Default `'client'`. */
-	mode?: 'client' | 'server';
-	/** octane compiler HMR wrapping (client only; the vite plugin wires this to serve mode). */
-	hmr?: boolean;
-	/** octane compiler dev metadata (client only; same gate as `hmr`). */
-	dev?: boolean;
-	/**
-	 * Module the emitted document reads the provider mapping from
-	 * (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /
-	 * `'@octanejs/mdx/server'` (server), so each runtime reads ITS OWN context
-	 * store (they are disjoint; see src/server.ts). Pass `null` to disable the
-	 * provider wiring entirely (only `props.components` applies).
-	 */
-	providerImportSource?: string | null;
-	/** remark plugins. Defaults to `defaultRemarkPlugins` (GFM + frontmatter + frontmatter-export). */
-	remarkPlugins?: CompileOptions['remarkPlugins'];
-	rehypePlugins?: CompileOptions['rehypePlugins'];
-	/** Extra recma (ESTree) plugins, run before the octane adapter pass. */
-	recmaPlugins?: CompileOptions['recmaPlugins'];
-	/** Source syntax: `'mdx'`, plain `'md'` (no JSX/ESM/expressions), or `'detect'` by file extension. Default `'detect'`. */
-	format?: 'mdx' | 'md' | 'detect';
-	/** Escape hatch: other @mdx-js/mdx options. The pipeline owns `jsx`/`outputFormat`/the options above. */
-	mdxOptions?: Omit<
-		CompileOptions,
-		| 'jsx'
-		| 'jsxRuntime'
-		| 'jsxImportSource'
-		| 'outputFormat'
-		| 'providerImportSource'
-		| 'remarkPlugins'
-		| 'rehypePlugins'
-		| 'recmaPlugins'
-		| 'format'
-		| 'SourceMapGenerator'
-	>;
-}
+/**
+ * @typedef {object} CompileMdxOptions
+ * @property {'client' | 'server'} [mode] octane codegen target: `'client'` (DOM) or `'server'` (SSR HTML strings). Default `'client'`.
+ * @property {boolean} [hmr] octane compiler HMR wrapping (client only; the vite plugin wires this to serve mode).
+ * @property {boolean} [dev] octane compiler dev metadata (client only; same gate as `hmr`).
+ * @property {string | null} [providerImportSource]
+ *   Module the emitted document reads the provider mapping from
+ *   (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /
+ *   `'@octanejs/mdx/server'` (server), so each runtime reads ITS OWN context
+ *   store (they are disjoint; see src/server.ts). Pass `null` to disable the
+ *   provider wiring entirely (only `props.components` applies).
+ * @property {import('@mdx-js/mdx').CompileOptions['remarkPlugins']} [remarkPlugins] remark plugins. Defaults to `defaultRemarkPlugins` (GFM + frontmatter + frontmatter-export).
+ * @property {import('@mdx-js/mdx').CompileOptions['rehypePlugins']} [rehypePlugins]
+ * @property {import('@mdx-js/mdx').CompileOptions['recmaPlugins']} [recmaPlugins] Extra recma (ESTree) plugins, run before the octane adapter pass.
+ * @property {'mdx' | 'md' | 'detect'} [format] Source syntax: `'mdx'`, plain `'md'` (no JSX/ESM/expressions), or `'detect'` by file extension. Default `'detect'`.
+ * @property {Omit<import('@mdx-js/mdx').CompileOptions, 'jsx' | 'jsxRuntime' | 'jsxImportSource' | 'outputFormat' | 'providerImportSource' | 'remarkPlugins' | 'rehypePlugins' | 'recmaPlugins' | 'format' | 'SourceMapGenerator'>} [mdxOptions] Escape hatch: other @mdx-js/mdx options. The pipeline owns `jsx`/`outputFormat`/the options above.
+ */
 
 /**
  * The default remark plugin set: GitHub-flavored markdown, YAML/TOML
  * frontmatter parsing, and the `export const frontmatter = {…}` export.
  * Exported so a custom `remarkPlugins` list can extend rather than replace it.
+ *
+ * @type {import('@mdx-js/mdx').CompileOptions['remarkPlugins']}
  */
-export const defaultRemarkPlugins: CompileOptions['remarkPlugins'] = [
-	remarkGfm,
-	remarkFrontmatter,
-	remarkMdxFrontmatter,
-];
+export const defaultRemarkPlugins = [remarkGfm, remarkFrontmatter, remarkMdxFrontmatter];
 
-/** Compile MDX/markdown source to a compiled octane module (async — supports async plugins). */
-export async function compileMdx(
-	source: string,
-	id: string,
-	options: CompileMdxOptions = {},
-): Promise<CompileMdxResult> {
+/**
+ * Compile MDX/markdown source to a compiled octane module (async — supports async plugins).
+ *
+ * @param {string} source
+ * @param {string} id
+ * @param {CompileMdxOptions} [options]
+ * @returns {Promise<CompileMdxResult>}
+ */
+export async function compileMdx(source, id, options = {}) {
 	const out = await mdxCompile({ value: source, path: id }, buildMdxOptions(id, options));
 	return octaneStage(String(out.value), out.map, id, options);
 }
 
-/** Synchronous {@link compileMdx} (the default plugin set is fully sync). */
-export function compileMdxSync(
-	source: string,
-	id: string,
-	options: CompileMdxOptions = {},
-): CompileMdxResult {
+/**
+ * Synchronous {@link compileMdx} (the default plugin set is fully sync).
+ *
+ * @param {string} source
+ * @param {string} id
+ * @param {CompileMdxOptions} [options]
+ * @returns {CompileMdxResult}
+ */
+export function compileMdxSync(source, id, options = {}) {
 	const out = mdxCompileSync({ value: source, path: id }, buildMdxOptions(id, options));
 	return octaneStage(String(out.value), out.map, id, options);
 }
 
-function buildMdxOptions(id: string, options: CompileMdxOptions): CompileOptions {
+/**
+ * @param {string} id
+ * @param {CompileMdxOptions} options
+ * @returns {import('@mdx-js/mdx').CompileOptions}
+ */
+function buildMdxOptions(id, options) {
 	const format =
 		options.format && options.format !== 'detect'
 			? options.format
@@ -149,12 +139,14 @@ function buildMdxOptions(id: string, options: CompileMdxOptions): CompileOptions
 	};
 }
 
-function octaneStage(
-	jsxSource: string,
-	mdxMap: unknown,
-	id: string,
-	options: CompileMdxOptions,
-): CompileMdxResult {
+/**
+ * @param {string} jsxSource
+ * @param {unknown} mdxMap
+ * @param {string} id
+ * @param {CompileMdxOptions} options
+ * @returns {CompileMdxResult}
+ */
+function octaneStage(jsxSource, mdxMap, id, options) {
 	const mode = options.mode ?? 'client';
 	const out = octaneCompile(jsxSource, id, {
 		mode,
@@ -170,7 +162,7 @@ function octaneStage(
 	// unlike a blank map). The octane SERVER compile emits an empty-mappings map
 	// by design (SSR maps are a later octane refinement).
 	if (out.map && mdxMap) {
-		const chained = remapping([out.map as any, mdxMap as any], () => null);
+		const chained = remapping([out.map, mdxMap], () => null);
 		if (String(chained.mappings).length > 0) out.map = chained;
 	}
 	// Fast refresh for documents: octane's compiler only auto-wraps EXPORTED
@@ -203,22 +195,30 @@ function octaneStage(
 const MDX_BODY_NAME = '_createMdxContent';
 
 function recmaOctaneAdapter() {
-	return (tree: unknown): void => {
-		walkReplace(tree as EstreeNode, adaptNode);
+	/** @param {unknown} tree */
+	return (tree) => {
+		walkReplace(/** @type {EstreeNode} */ (tree), adaptNode);
 	};
 }
 
-type EstreeNode = { type: string; [key: string]: unknown };
+/** @typedef {{ type: string, [key: string]: unknown }} EstreeNode */
 
-function isNode(value: unknown): value is EstreeNode {
-	return (
-		value !== null && typeof value === 'object' && typeof (value as EstreeNode).type === 'string'
-	);
+/**
+ * @param {unknown} value
+ * @returns {value is EstreeNode}
+ */
+function isNode(value) {
+	return value !== null && typeof value === 'object' && typeof value.type === 'string';
 }
 
-// Visit `node` (post-decision, pre-recursion): return a replacement node to
-// swap in (recursed into by the caller), or null to keep the node and recurse.
-function adaptNode(node: EstreeNode): EstreeNode | null {
+/**
+ * Visit `node` (post-decision, pre-recursion): return a replacement node to
+ * swap in (recursed into by the caller), or null to keep the node and recurse.
+ *
+ * @param {EstreeNode} node
+ * @returns {EstreeNode | null}
+ */
+function adaptNode(node) {
 	// `_createMdxContent(props)` → `<_createMdxContent {...props}/>`.
 	if (
 		node.type === 'CallExpression' &&
@@ -229,14 +229,19 @@ function adaptNode(node: EstreeNode): EstreeNode | null {
 		node.arguments.length <= 1 &&
 		(node.arguments.length === 0 || isNode(node.arguments[0]))
 	) {
-		return jsxSelfClosing(MDX_BODY_NAME, (node.arguments[0] as EstreeNode) ?? null);
+		return jsxSelfClosing(MDX_BODY_NAME, node.arguments[0] ?? null);
 	}
 	return null;
 }
 
-// Depth-first walk that can REPLACE child nodes in place (arrays and single
-// node-valued keys). Skips location metadata keys.
-function walkReplace(node: EstreeNode, visit: (n: EstreeNode) => EstreeNode | null): void {
+/**
+ * Depth-first walk that can REPLACE child nodes in place (arrays and single
+ * node-valued keys). Skips location metadata keys.
+ *
+ * @param {EstreeNode} node
+ * @param {(n: EstreeNode) => EstreeNode | null} visit
+ */
+function walkReplace(node, visit) {
 	for (const key of Object.keys(node)) {
 		if (key === 'loc' || key === 'range' || key === 'position' || key === 'data') continue;
 		const value = node[key];
@@ -256,7 +261,12 @@ function walkReplace(node: EstreeNode, visit: (n: EstreeNode) => EstreeNode | nu
 	}
 }
 
-function jsxSelfClosing(name: string, spreadArgument: EstreeNode | null): EstreeNode {
+/**
+ * @param {string} name
+ * @param {EstreeNode | null} spreadArgument
+ * @returns {EstreeNode}
+ */
+function jsxSelfClosing(name, spreadArgument) {
 	return {
 		type: 'JSXElement',
 		openingElement: {

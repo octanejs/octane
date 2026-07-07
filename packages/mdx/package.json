@@ -21,13 +21,20 @@
   "types": "src/index.ts",
   "files": [
     "src",
+    "types",
     "README.md"
   ],
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server.ts",
-    "./compile": "./src/compile.ts",
-    "./vite": "./src/vite.ts"
+    "./compile": {
+      "types": "./types/compile.d.ts",
+      "default": "./src/compile.js"
+    },
+    "./vite": {
+      "types": "./types/vite.d.ts",
+      "default": "./src/vite.js"
+    }
   },
   "scripts": {
     "test": "vitest run"
