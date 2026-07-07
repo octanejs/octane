@@ -2,7 +2,7 @@
 //
 // Production SSR smoke test — runs the REAL `vite build` (client + server
 // bundles via @octanejs/vite-plugin) and drives the built dist/server handler
-// directly: the same export api/ssr.js re-exports for Vercel and
+// directly: the same export the Vercel adapter's function wraps and
 // `octane-preview` boots locally. Complements smoke.test.ts (client-side
 // render): this proves the DEPLOYED artifact serves every route server-side.
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -32,6 +32,15 @@ describe('built SSR handler', () => {
 		expect(fs.existsSync(path.join(websiteRoot, 'dist/server/index.html'))).toBe(true);
 		// index.html must NOT be a static file — it would shadow SSR at '/'.
 		expect(fs.existsSync(path.join(websiteRoot, 'dist/client/index.html'))).toBe(false);
+	});
+
+	it('ran the Vercel adapter (adapter: vercel() in octane.config → .vercel/output)', () => {
+		// The closeBundle → adapter.adapt() wiring: the build above must have
+		// emitted Build Output API v3 alongside dist/.
+		const outputDir = path.join(websiteRoot, '.vercel/output');
+		expect(fs.existsSync(path.join(outputDir, 'functions/index.func/entry.js'))).toBe(true);
+		const config = JSON.parse(fs.readFileSync(path.join(outputDir, 'config.json'), 'utf-8'));
+		expect(config.routes).toContainEqual({ handle: 'filesystem' });
 	});
 
 	it('server-renders the home page with the hydration payload', async () => {

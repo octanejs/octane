@@ -7,6 +7,9 @@ coverage
 .vite
 *.log
 
+# Vercel Build Output (@octanejs/adapter-vercel writes {root}/.vercel/output on build)
+.vercel/
+
 # Unified bench runner scratch: per-suite collected results + server logs, and the
 # non-authoritative ratio-guard suggestions file. (benchmarks/baselines/local/ and
 # benchmarks/baselines/ratios.json ARE committed — see benchmarks/baselines/README.md.)

@@ -160,7 +160,10 @@ In production, `vite build` emits both bundles: hashed client assets in
 (exports `handler`/`nodeHandler`, auto-boots under `node`; preview with
 `octane-preview`). The production handler streams through the same engine and
 emits the same hydratable shape as dev — `server.render: 'buffered'` switches
-it to the await-everything `prerender`.
+it to the await-everything `prerender`. A deploy adapter (e.g.
+`@octanejs/adapter-vercel`) can restructure the output for a host:
+`adapter: vercel()` in octane.config.ts emits Vercel's Build Output API under
+`.vercel/output` after the build.
 
 ## Not built yet
 

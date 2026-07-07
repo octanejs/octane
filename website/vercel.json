@@ -1,17 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm build",
-  "outputDirectory": "dist/client",
-  "functions": {
-    "api/ssr.js": {
-      "includeFiles": "dist/server/**"
-    }
-  },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/ssr" }],
-  "headers": [
-    {
-      "source": "/assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
-    }
-  ]
+  "buildCommand": "pnpm build"
 }

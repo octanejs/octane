@@ -95,19 +95,24 @@ export function resolveOctaneConfig(raw, options = {}) {
 		);
 	}
 
-	if (requireAdapter) {
-		if (!raw.adapter) {
+	if (requireAdapter && !raw.adapter) {
+		throw new Error(
+			'[@octanejs/vite-plugin] This build requires an `adapter` in octane.config.ts. ' +
+				'Install an adapter package (e.g. @octanejs/adapter-vercel) and set the `adapter` property.',
+		);
+	}
+
+	if (raw.adapter !== undefined) {
+		if (typeof raw.adapter !== 'object' || raw.adapter === null) {
 			throw new Error(
-				'[@octanejs/vite-plugin] Production builds require an `adapter` in octane.config.ts. ' +
-					'Install an adapter package (e.g. @ripple-ts/adapter-node) and set the `adapter` property.',
+				'[@octanejs/vite-plugin] adapter must be an adapter object (e.g. `adapter: vercel()`).',
 			);
 		}
-
-		if (!raw.adapter.runtime) {
-			throw new Error(
-				'[@octanejs/vite-plugin] The adapter in octane.config.ts is missing the `runtime` property. ' +
-					'Make sure your adapter exports runtime primitives.',
-			);
+		if (raw.adapter.adapt !== undefined && typeof raw.adapter.adapt !== 'function') {
+			throw new Error('[@octanejs/vite-plugin] adapter.adapt must be a function.');
+		}
+		if (raw.adapter.serve !== undefined && typeof raw.adapter.serve !== 'function') {
+			throw new Error('[@octanejs/vite-plugin] adapter.serve must be a function.');
 		}
 	}
 
