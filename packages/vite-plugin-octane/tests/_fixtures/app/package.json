@@ -1,0 +1,7 @@
+{
+  "name": "octane-vite-plugin-fixture-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Minimal app the production-build test builds end-to-end (node_modules is symlinked by the test setup)."
+}

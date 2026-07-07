@@ -65,7 +65,9 @@ framework bindings:
   - `src/compiler/` — the `.tsrx` compiler (`compile.js`, `vite.js`, `volar.js`).
   - `tests/` — the test suite (see Validation).
 - `packages/vite-plugin-octane/` (npm: `@octanejs/vite-plugin`) — the optional
-  metaframework plugin (dev SSR, routing, hydration wiring for full apps).
+  metaframework plugin (routing, streaming dev SSR, hydration wiring, and the
+  production build: `vite build` → static client assets + a self-contained SSR
+  server bundle; preview with `octane-preview`).
 - `packages/{zustand,query,motion,stylex,router,lexical,floating-ui,radix}/` (npm:
   `@octanejs/*`) — framework bindings, each a faithful octane port of a React library
   (state, data-fetching, animation, styling, routing, editor, positioning, UI primitives).

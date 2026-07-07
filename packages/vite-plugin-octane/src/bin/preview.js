@@ -3,11 +3,10 @@
 /**
  * octane-preview — Start the production SSR server.
  *
- * Loads octane.config.ts, reads `build.outDir`,
- * and spawns `node {outDir}/server/entry.js`.
- *
- * NOTE: the server entry it spawns is produced by the Phase 2 production
- * build. Until then this validates existence and errors clearly.
+ * Loads octane.config.ts, reads `build.outDir`, and spawns
+ * `node {outDir}/server/entry.js` — the self-contained server bundle
+ * `vite build` produced. This is the pre-deploy verification step: the exact
+ * handler + static assets a production host runs, on localhost.
  */
 
 import { spawn } from 'node:child_process';
@@ -17,6 +16,20 @@ import { loadOctaneConfig } from '../load-config.js';
 import { ENTRY_FILENAME } from '../constants.js';
 
 const projectRoot = process.cwd();
+
+// `--port <n>` / `-p <n>` sets the port (else $PORT, else the entry's 3000
+// default). `--strictPort` is accepted for `vite preview` muscle-memory and
+// ignored — the port is always exact (the entry never probes for a free one).
+/** @type {string | undefined} */
+let portArg;
+const args = process.argv.slice(2);
+for (let i = 0; i < args.length; i++) {
+	if (args[i] === '--port' || args[i] === '-p') {
+		portArg = args[++i];
+	} else if (args[i].startsWith('--port=')) {
+		portArg = args[i].slice('--port='.length);
+	}
+}
 
 try {
 	const config = await loadOctaneConfig(projectRoot);
@@ -34,6 +47,7 @@ try {
 	const child = spawn(process.execPath, [entryPath], {
 		stdio: 'inherit',
 		cwd: projectRoot,
+		env: portArg ? { ...process.env, PORT: portArg } : process.env,
 	});
 
 	child.on('close', (code) => {

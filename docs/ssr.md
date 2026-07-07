@@ -139,7 +139,7 @@ and the resolved server function share one SSR runtime.
   state around its synchronous run, so overlapping requests cannot observe each
   other.
 
-## Dev SSR via the Vite plugin
+## SSR via the Vite plugin
 
 `@octanejs/vite-plugin` gives file-based routing plus dev-server SSR: it matches
 a route from `octane.config.ts`, loads the page module through Vite's SSR
@@ -155,6 +155,13 @@ your own `entry-server.ts` around `prerender()` or the streaming renderers and
 serialize any app data (for example a dehydrated query-client cache) into your
 own inline script.
 
+In production, `vite build` emits both bundles: hashed client assets in
+`dist/client` and a self-contained SSR server at `dist/server/entry.js`
+(exports `handler`/`nodeHandler`, auto-boots under `node`; preview with
+`octane-preview`). The production handler streams through the same engine and
+emits the same hydratable shape as dev — `server.render: 'buffered'` switches
+it to the await-everything `prerender`.
+
 ## Not built yet
 
 These are the known gaps between Octane SSR and a full streaming SSR stack:
@@ -166,8 +173,6 @@ These are the known gaps between Octane SSR and a full streaming SSR stack:
   client re-creates them on hydration.
 - **Framework-level data serialization**: only suspense seeds cross the boundary
   automatically; loader-style data APIs are app code today.
-- **Production SSR build in the Vite plugin**: dev SSR works; the production
-  server entry generation is not implemented yet.
 - **Error digests**: `onError` and the shell callbacks exist, but there are no
   React-style error digests; a post-shell error ends the stream with the
   affected boundaries marked for client render.

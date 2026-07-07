@@ -2,7 +2,8 @@
 /** @import {OctaneConfigOptions, ResolvedOctaneConfig, RenderRoute} from '@octanejs/vite-plugin' */
 
 import fs from 'node:fs';
-import { Readable } from 'node:stream';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { octane as octaneCompiler } from 'octane/compiler/vite';
@@ -11,6 +12,9 @@ import { createRouter } from './server/router.js';
 import { createContext, runMiddlewareChain } from './server/middleware.js';
 import { handleRenderRoute } from './server/render-route.js';
 import { handleServerRoute } from './server/server-route.js';
+import { generateServerEntry } from './server/virtual-entry.js';
+import { nodeRequestToWebRequest, sendWebResponse } from './server/node-http.js';
+import { ENTRY_FILENAME } from './constants.js';
 import {
 	getOctaneConfigPath,
 	loadOctaneConfig,
@@ -27,6 +31,8 @@ import {
 } from './project-codegen.js';
 
 import { patch_global_fetch, is_rpc_request, handle_rpc_request } from '@ripple-ts/adapter/rpc';
+
+import { get_route_entry_path } from './routes.js';
 
 // Re-export route classes + config helpers (public API surface).
 export { RenderRoute, ServerRoute } from './routes.js';
@@ -127,8 +133,13 @@ function has_route_config(config) {
  * server body when pulled via `ssrLoadModule`). The metaPlugin owns config,
  * routing, dev SSR, the client hydrate virtual module, and dev RPC.
  *
- * PHASE 1 = dev SSR + routing + hydrate. Production build (buildStart /
- * closeBundle / transformIndexHtml / server-entry / adapter.serve) is Phase 2.
+ * PRODUCTION (`vite build`, when octane.config.ts has routes): the client
+ * build is redirected to `{outDir}/client` with a manifest, the hydrate entry
+ * is injected into index.html (so Vite bundles + hashes it), and closeBundle
+ * runs a second, `ssr: true` build of a generated server entry to
+ * `{outDir}/server/entry.js` — a self-contained module (app + octane bundled,
+ * node builtins external) exporting `handler`/`nodeHandler` and auto-booting
+ * under `node`. See server/virtual-entry.js and server/production.js.
  *
  * @param {{ hmr?: boolean, exclude?: string[] }} [inlineOptions]
  * @returns {Plugin[]}
@@ -142,6 +153,14 @@ export function octane(inlineOptions = {}) {
 	let octaneConfig = null;
 	/** @type {ReturnType<typeof createRouter> | null} */
 	let router = null;
+	/** @type {boolean} */
+	let isBuild = false;
+	/** @type {boolean} Is this the SSR sub-build closeBundle launches? */
+	let isSSRBuild = false;
+	/** @type {ResolvedOctaneConfig | null} Config loaded for the build (config hook, reused in closeBundle) */
+	let buildOctaneConfig = null;
+	/** @type {string[]} Module paths the generated client entry maps statically (build only) */
+	let staticEntries = [];
 
 	/** @type {Plugin} */
 	const metaPlugin = {
@@ -151,13 +170,16 @@ export function octane(inlineOptions = {}) {
 		 * @param {UserConfig} userConfig
 		 * @param {{ command: string, isPreview?: boolean }} env
 		 */
-		config(userConfig, env) {
+		async config(userConfig, env) {
+			isBuild = env?.command === 'build';
+			isSSRBuild = !!userConfig.build?.ssr;
+
 			const exclude = userConfig.optimizeDeps?.exclude || [];
-			return {
-				// Dev SSR owns routing, so default appType to 'custom' (no SPA HTML
+			const base = {
+				// SSR owns routing, so default appType to 'custom' (no SPA HTML
 				// fallback masking SSR routes). Respect an explicit user appType, and
-				// leave `vite preview` alone: production SSR serving is Phase 2, so
-				// preview must keep Vite's own SPA fallback to serve the client build.
+				// leave `vite preview` alone — the production SSR build is previewed
+				// with `octane-preview` (it serves dist/server), not `vite preview`.
 				...(userConfig.appType === undefined && !env?.isPreview ? { appType: 'custom' } : {}),
 				optimizeDeps: {
 					exclude: [
@@ -178,6 +200,54 @@ export function octane(inlineOptions = {}) {
 					noExternal: ['octane', 'octane/compiler', '@octanejs/query'],
 				},
 			};
+
+			// Production CLIENT build (the SSR sub-build closeBundle launches passes
+			// build.ssr, so it skips this): route the client bundle to
+			// `{outDir}/client` and emit a manifest for the server's asset map.
+			if (isBuild && !isSSRBuild) {
+				const projectRoot = userConfig.root ? path.resolve(userConfig.root) : process.cwd();
+				if (octaneConfigExists(projectRoot)) {
+					buildOctaneConfig = await loadOctaneConfig(projectRoot);
+					if (has_route_config(buildOctaneConfig)) {
+						if (!fs.existsSync(path.join(projectRoot, 'index.html'))) {
+							throw new Error(
+								'[@octanejs/vite-plugin] index.html not found — required for SSR builds with octane.config.ts routes.',
+							);
+						}
+						/** @type {import('vite').UserConfig['build']} */
+						const buildConfig = {
+							outDir: `${buildOctaneConfig.build.outDir}/client`,
+							emptyOutDir: true,
+							manifest: true,
+						};
+						if (buildOctaneConfig.build.minify !== undefined) {
+							buildConfig.minify = buildOctaneConfig.build.minify;
+						}
+						if (buildOctaneConfig.build.target !== undefined) {
+							buildConfig.target = buildOctaneConfig.build.target;
+						}
+						return { ...base, build: buildConfig };
+					}
+				}
+			}
+
+			return base;
+		},
+
+		/**
+		 * Production client build: collect every module path the server can name
+		 * in #__octane_data (page entries, layouts, the preHydrate hook) so the
+		 * generated hydrate entry maps them as STATIC dynamic imports Rollup can
+		 * chunk and hash.
+		 */
+		buildStart() {
+			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
+			const cfg = /** @type {ResolvedOctaneConfig} */ (buildOctaneConfig);
+			const entries = cfg.router.routes
+				.filter((r) => r.type === 'render')
+				.flatMap((r) => [get_route_entry_path(/** @type {RenderRoute} */ (r).entry), r.layout]);
+			if (cfg.router.preHydrate) entries.push(cfg.router.preHydrate);
+			staticEntries = [...new Set(entries.filter((e) => typeof e === 'string'))];
 		},
 
 		async configResolved(resolvedConfig) {
@@ -202,14 +272,15 @@ export function octane(inlineOptions = {}) {
 			}
 			if (id === RESOLVED_VIRTUAL_HYDRATE_ID) {
 				// Dev: dynamic import() of the route entry works through Vite, so the
-				// static import map is left empty (the codegen falls back to a dynamic
-				// import per entry). The production static map is Phase 2.
+				// static import map stays empty (the codegen falls back to a dynamic
+				// import per entry). Production builds pass the routes' module paths
+				// (collected in buildStart) so Rollup bundles them.
 				const file = write_project_generated_file(
 					config,
 					'client-entry.js',
 					create_client_entry_source({
 						configPath: to_vite_root_import(getOctaneConfigPath(root), root),
-						staticEntries: [],
+						staticEntries,
 					}),
 				);
 				return fs.readFileSync(file, 'utf-8');
@@ -405,6 +476,176 @@ export function octane(inlineOptions = {}) {
 				return [];
 			},
 		},
+
+		/**
+		 * Production client build: inject the hydrate entry into index.html so
+		 * Vite bundles it into the html chunk graph (the built template then
+		 * carries the hashed script tag — the production server injects nothing
+		 * per-request). `order: 'pre'` is required: Vite's build-html plugin
+		 * collects module scripts BEFORE default-order transforms run, so a
+		 * post-injected script would ship unbundled. Dev never runs this branch:
+		 * the dev middleware injects `/@id/virtual:octane-hydrate` itself.
+		 */
+		transformIndexHtml: {
+			order: 'pre',
+			handler(html) {
+				if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return html;
+				const hydrationScript = `<script type="module" src="${VIRTUAL_HYDRATE_ID}"></script>`;
+				return html.replace('</body>', `${hydrationScript}\n</body>`);
+			},
+		},
+
+		/**
+		 * Production: after the client build completes, build the server bundle.
+		 * Reads the client manifest into a per-route asset map, generates the
+		 * server entry (server/virtual-entry.js), and runs a second Vite build
+		 * with `ssr: true` into `{outDir}/server`. The built index.html MOVES
+		 * from dist/client to dist/server — it is the SSR template (with
+		 * unresolved `<!--ssr-*-->` placeholders), and leaving it in the static
+		 * dir would shadow the SSR handler at `/` on filesystem-first platforms.
+		 */
+		async closeBundle() {
+			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
+			const cfg = /** @type {ResolvedOctaneConfig} */ (buildOctaneConfig);
+
+			console.log('[@octanejs/vite-plugin] Client build done. Building the server bundle…');
+
+			const outDir = cfg.build.outDir;
+			const clientOutDir = path.join(root, outDir, 'client');
+			const serverOutDir = path.join(root, outDir, 'server');
+
+			// ------------------------------------------------------------------
+			// Client manifest → per-route asset map (stylesheet + modulepreload
+			// tags the production server emits for the matched route).
+			// ------------------------------------------------------------------
+			const manifestPath = path.join(clientOutDir, '.vite', 'manifest.json');
+			/** @type {Record<string, { file: string, css?: string[], imports?: string[] }>} */
+			let clientManifest = {};
+			if (fs.existsSync(manifestPath)) {
+				clientManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+			} else {
+				console.warn(
+					`[@octanejs/vite-plugin] Client manifest not found at ${manifestPath} — per-route asset preloading disabled`,
+				);
+			}
+
+			/**
+			 * All CSS a manifest entry needs, transitively (cycle-safe).
+			 * @param {string} key
+			 * @param {Set<string>} [visited]
+			 * @returns {string[]}
+			 */
+			const collectCss = (key, visited = new Set()) => {
+				if (visited.has(key)) return [];
+				visited.add(key);
+				const entry = clientManifest[key];
+				if (!entry) return [];
+				const css = [...(entry.css || [])];
+				for (const imp of entry.imports || []) css.push(...collectCss(imp, visited));
+				return css;
+			};
+
+			/** @type {Record<string, { js: string, css: string[] }>} */
+			const clientAssetMap = {};
+			for (const moduleId of staticEntries) {
+				// Manifest keys are root-relative without the leading slash.
+				const manifestKey = moduleId.startsWith('/') ? moduleId.slice(1) : moduleId;
+				const manifestEntry = clientManifest[manifestKey];
+				if (manifestEntry) {
+					clientAssetMap[moduleId] = {
+						js: manifestEntry.file,
+						css: [...new Set(collectCss(manifestKey))],
+					};
+				}
+			}
+
+			// The manifest was only needed here; leaving .vite/ in dist/client would
+			// publish source file paths through the static server.
+			fs.rmSync(path.join(clientOutDir, '.vite'), { recursive: true, force: true });
+
+			// ------------------------------------------------------------------
+			// Generate the server entry and build it (ssr: true). The build loads
+			// the app's vite.config from `root`, so the octane compiler instance
+			// there compiles .tsrx in server mode — do NOT add octane() here.
+			// ------------------------------------------------------------------
+			const serverEntryFile = write_project_generated_file(
+				config,
+				'server-entry.js',
+				generateServerEntry({
+					routes: cfg.router.routes,
+					octaneConfigPath: getOctaneConfigPath(root),
+					clientAssetMap,
+				}),
+			);
+
+			const VIRTUAL_SERVER_ENTRY_ID = 'virtual:octane-server-entry';
+			const RESOLVED_VIRTUAL_SERVER_ENTRY_ID = '\0' + VIRTUAL_SERVER_ENTRY_ID;
+			/** @type {Plugin} */
+			const virtualEntryPlugin = {
+				name: 'octane-virtual-server-entry',
+				resolveId(id) {
+					if (id === VIRTUAL_SERVER_ENTRY_ID) return RESOLVED_VIRTUAL_SERVER_ENTRY_ID;
+				},
+				load(id) {
+					if (id === RESOLVED_VIRTUAL_SERVER_ENTRY_ID) {
+						return fs.readFileSync(serverEntryFile, 'utf-8');
+					}
+				},
+			};
+
+			const { build: viteBuild } = await import('vite');
+			await viteBuild({
+				root,
+				appType: 'custom',
+				plugins: [virtualEntryPlugin],
+				resolve: {
+					alias: [
+						// octane.config.ts imports RenderRoute/defineConfig from the BARE
+						// package — alias it to the config-surface facade so the bundle
+						// carries neither the compiler nor the dev middleware. Subpaths
+						// ('/production', '/node') resolve normally and ARE bundled.
+						{
+							find: /^@octanejs\/vite-plugin$/,
+							replacement: fileURLToPath(new URL('./config-entry.js', import.meta.url)),
+						},
+					],
+				},
+				build: {
+					outDir: serverOutDir,
+					emptyOutDir: true,
+					ssr: true,
+					target: cfg.build.target,
+					minify: cfg.build.minify ?? false,
+					rollupOptions: {
+						input: VIRTUAL_SERVER_ENTRY_ID,
+						output: {
+							entryFileNames: ENTRY_FILENAME,
+							format: 'esm',
+						},
+					},
+				},
+				ssr: {
+					// Self-contained server bundle: everything except node builtins is
+					// bundled, so dist/server deploys without node_modules. 'vite'
+					// stays external as a guard — nothing should reach it (the facade
+					// alias keeps load-config's dynamic import out of the graph).
+					noExternal: true,
+					external: ['vite'],
+				},
+			});
+
+			// The built index.html is the SSR template — move it out of the static
+			// client dir (see hook doc above).
+			const clientHtml = path.join(clientOutDir, 'index.html');
+			if (fs.existsSync(clientHtml)) {
+				fs.renameSync(clientHtml, path.join(serverOutDir, 'index.html'));
+			}
+
+			console.log(`[@octanejs/vite-plugin] Server build complete: ${path.join(outDir, 'server')}`);
+			console.log(
+				`[@octanejs/vite-plugin] Start with: node ${outDir}/server/${ENTRY_FILENAME} (or octane-preview)`,
+			);
+		},
 	};
 
 	// Forward compiler options. `exclude` lists path fragments the compiler's
@@ -425,63 +666,9 @@ export function defineConfig(/** @type {OctaneConfigOptions} */ options) {
 }
 
 // ============================================================================
-// Dev-server HTTP helpers
+// Dev-server HTTP helpers — nodeRequestToWebRequest / sendWebResponse live in
+// server/node-http.js (shared with the production server + serverless wrapper).
 // ============================================================================
-
-/**
- * Convert a Node.js IncomingMessage to a Web Request.
- * @param {import('node:http').IncomingMessage} nodeRequest
- * @returns {Request}
- */
-function nodeRequestToWebRequest(nodeRequest) {
-	const host = nodeRequest.headers.host || 'localhost';
-	const url = new URL(nodeRequest.url || '/', `http://${host}`);
-
-	const headers = new Headers();
-	for (const [key, value] of Object.entries(nodeRequest.headers)) {
-		if (value == null) continue;
-		if (Array.isArray(value)) {
-			for (const v of value) headers.append(key, v);
-		} else {
-			headers.set(key, value);
-		}
-	}
-
-	const method = (nodeRequest.method || 'GET').toUpperCase();
-	/** @type {RequestInit & { duplex?: 'half' }} */
-	const init = { method, headers };
-	if (method !== 'GET' && method !== 'HEAD') {
-		init.body = Readable.toWeb(nodeRequest);
-		init.duplex = 'half';
-	}
-	return new Request(url, init);
-}
-
-/**
- * Pipe a Web Response to a Node.js ServerResponse.
- * @param {import('node:http').ServerResponse} nodeResponse
- * @param {Response} webResponse
- */
-async function sendWebResponse(nodeResponse, webResponse) {
-	nodeResponse.statusCode = webResponse.status;
-	if (webResponse.statusText) nodeResponse.statusMessage = webResponse.statusText;
-	webResponse.headers.forEach((value, key) => {
-		nodeResponse.setHeader(key, value);
-	});
-	if (webResponse.body) {
-		const reader = webResponse.body.getReader();
-		try {
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				nodeResponse.write(value);
-			}
-		} finally {
-			reader.releaseLock();
-		}
-	}
-	nodeResponse.end();
-}
 
 /**
  * Handle a dev RPC request for `module server` declarations.

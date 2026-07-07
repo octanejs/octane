@@ -199,6 +199,14 @@ export interface OctaneConfigOptions {
 		 * @default false
 		 */
 		trustProxy?: boolean;
+		/**
+		 * Production SSR mode: 'streaming' (default) flushes the shell at
+		 * first await and streams suspense segments out-of-order (same engine
+		 * as dev SSR); 'buffered' awaits everything (`prerender`) and sends
+		 * one document — for hosts that break streamed responses.
+		 * @default 'streaming'
+		 */
+		render?: 'streaming' | 'buffered';
 	};
 }
 
@@ -230,6 +238,8 @@ export interface ResolvedOctaneConfig {
 	server: {
 		/** @default false */
 		trustProxy: boolean;
+		/** @default 'streaming' */
+		render: 'streaming' | 'buffered';
 	};
 }
 
