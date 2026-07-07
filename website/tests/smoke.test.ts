@@ -45,11 +45,13 @@ describe('website routes', () => {
 		expect(container.querySelector('pre.shiki')).toBeTruthy();
 		expect(container.textContent).toContain('export function Counter(props) @{');
 
-		// Feature cards.
+		// Feature cards — including the TSRX card linking to the TSRX site.
 		const cards = container.querySelectorAll('.card');
 		expect(cards.length).toBe(4);
 		expect(container.textContent).toContain('Compiled templates');
-		expect(container.textContent).toContain('Streaming SSR');
+		expect(container.textContent).toContain('First-class TSRX');
+		const tsrxLink = container.querySelector('a.card-link') as HTMLAnchorElement;
+		expect(tsrxLink?.getAttribute('href')).toBe('https://tsrx.dev');
 
 		// Proven strip links to the differences page.
 		expect(container.textContent).toContain('2,200+');
@@ -57,6 +59,19 @@ describe('website routes', () => {
 			a.getAttribute('href')?.includes('differences-from-react'),
 		);
 		expect(provenLink).toBeTruthy();
+
+		// Benchmark section: two paired-bar SVG charts with direct value labels.
+		expect(container.textContent).toContain('Measured, not vibes');
+		const benchCharts = container.querySelectorAll('figure.bench-card svg');
+		expect(benchCharts.length).toBe(2);
+		expect(container.textContent).toContain('create 1,000 rows');
+		expect(container.querySelectorAll('.bench-card path').length).toBeGreaterThan(10);
+
+		// llms.txt is linked in the top navigation.
+		const llms = Array.from(container.querySelectorAll('.navlinks a')).find(
+			(a) => a.getAttribute('href') === '/llms.txt',
+		);
+		expect(llms).toBeTruthy();
 
 		// Top nav (root layout).
 		const nav = container.querySelector('.navlinks') as HTMLElement;

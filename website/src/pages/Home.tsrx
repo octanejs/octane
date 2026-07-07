@@ -46,17 +46,17 @@ interface BenchRow {
 const BENCH_JS_FRAMEWORK: BenchRow[] = [
 	{ op: 'create 1,000 rows', octane: 1.6, react: 17.5 },
 	{ op: 'replace all rows', octane: 3.4, react: 19.2 },
-	{ op: 'partial update', octane: 0.2, react: 20.0 },
+	{ op: 'partial update', octane: 0.2, react: 20 },
 	{ op: 'select row', octane: 0.1, react: 11.5 },
 	{ op: 'swap rows', octane: 0.3, react: 15.1 },
-	{ op: 'clear rows', octane: 18.8, react: 45.0 },
+	{ op: 'clear rows', octane: 18.8, react: 45 },
 ];
 
 const BENCH_DBMON: BenchRow[] = [
 	{ op: 'mount', octane: 3.6, react: 48.2 },
-	{ op: 'tick (all rows)', octane: 1.7, react: 12.0 },
+	{ op: 'tick (all rows)', octane: 1.7, react: 12 },
 	{ op: 'partial tick', octane: 0.8, react: 10.4 },
-	{ op: 'sort', octane: 2.0, react: 13.7 },
+	{ op: 'sort', octane: 2, react: 13.7 },
 	{ op: 'remount', octane: 4.6, react: 17.8 },
 ];
 
@@ -72,13 +72,19 @@ function barPath(y: number, w: number, h: number): string {
 		return 'M0,' + y + ' h' + Math.max(w, 2) + ' v' + h + ' h-' + Math.max(w, 2) + ' Z';
 	}
 	const r = 4;
-	return (
-		'M0,' + y + ' h' + (w - r) +
-		' a' + r + ',' + r + ' 0 0 1 ' + r + ',' + r +
-		' v' + (h - 2 * r) +
-		' a' + r + ',' + r + ' 0 0 1 -' + r + ',' + r +
-		' h-' + (w - r) + ' Z'
-	);
+	return 'M0,' + y + ' h' + (w - r) + ' a' + r + ',' + r + ' 0 0 1 ' + r + ',' + r + ' v' +
+		(h - 2 * r) +
+		' a' +
+		r +
+		',' +
+		r +
+		' 0 0 1 -' +
+		r +
+		',' +
+		r +
+		' h-' +
+		(w - r) +
+		' Z';
 }
 
 // A paired-bar chart (Octane vs React, median ms, lower is better). Every bar
@@ -109,11 +115,14 @@ function BenchChart(props: { title: string; rows: BenchRow[] }) @{
 	const height = rows.length * (groupH + GROUP_GAP) - GROUP_GAP + 4;
 
 	<figure class="bench-card">
-		<figcaption class="bench-card-title">{props.title as string}</figcaption>
+		<figcaption class="bench-card-title">
+			{props.title as string}
+		</figcaption>
 		<svg
 			viewBox={'0 0 ' + VIEW_W + ' ' + height}
 			role="img"
-			aria-label={props.title + ' — median milliseconds per operation, Octane vs React 19, lower is better'}
+			aria-label={props.title +
+				' — median milliseconds per operation, Octane vs React 19, lower is better'}
 		>
 			@for (const row of rows; key row.op) {
 				<g>
@@ -121,13 +130,17 @@ function BenchChart(props: { title: string; rows: BenchRow[] }) @{
 						{row.op as string}
 					</text>
 					<path d={barPath(row.octaneY, row.octaneW, BAR_H)} fill={OCTANE_COLOR}>
-						<title>{'Octane — ' + row.op + ': ' + row.octaneLabel + ' ms'}</title>
+						<title>
+							{'Octane — ' + row.op + ': ' + row.octaneLabel + ' ms'}
+						</title>
 					</path>
 					<text x={row.octaneW + 8} y={row.octaneY + BAR_H - 3} class="bench-val">
 						{row.octaneLabel as string}
 					</text>
 					<path d={barPath(row.reactY, row.reactW, BAR_H)} fill={REACT_COLOR}>
-						<title>{'React — ' + row.op + ': ' + row.reactLabel + ' ms'}</title>
+						<title>
+							{'React — ' + row.op + ': ' + row.reactLabel + ' ms'}
+						</title>
 					</path>
 					<text x={row.reactW + 8} y={row.reactY + BAR_H - 3} class="bench-val">
 						{row.reactLabel as string}
@@ -229,8 +242,8 @@ export function Home() @{
 				</div>
 			</div>
 			<p class="bench-sub">
-				Median milliseconds per operation — lower is better. Same apps, same
-				hardware, from the repo’s own benchmark suites.
+				Median milliseconds per operation — lower is better. Same apps, same hardware, from the
+				repo’s own benchmark suites.
 			</p>
 			<div class="bench-grid">
 				<BenchChart title="js-framework (1,000 rows)" rows={BENCH_JS_FRAMEWORK} />
