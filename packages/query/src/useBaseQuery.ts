@@ -5,15 +5,18 @@
 // distinct sub-slots for each internal base hook, the same way the zustand
 // `traditional` binding does.
 import { useState, useCallback, useSyncExternalStore, useEffect, use } from 'octane';
-import { noop, notifyManager } from '@tanstack/query-core';
+import { environmentManager, noop, notifyManager } from '@tanstack/query-core';
 import { resolveClient } from './context';
 import { useIsRestoring } from './isRestoring';
 import { useQueryErrorResetBoundary } from './errorResetBoundary';
 import {
 	ensurePreventErrorBoundaryRetry,
 	ensureSuspenseTimers,
+	fetchOptimistic,
 	getHasError,
+	shouldSuspend,
 	subSlot,
+	willFetch,
 } from './internal';
 
 export function useBaseQuery(
@@ -22,11 +25,31 @@ export function useBaseQuery(
 	queryClient: any,
 	slot: symbol | undefined,
 ): any {
+	if (process.env.NODE_ENV !== 'production') {
+		if (typeof options !== 'object' || Array.isArray(options)) {
+			throw new Error(
+				'Bad argument type. Starting with v5, only the "Object" form is allowed when calling query related functions. Please use the error stack to find the culprit call. More info here: https://tanstack.com/query/latest/docs/react/guides/migrating-to-v5#supports-a-single-signature-one-object',
+			);
+		}
+	}
+
 	const oq = (tag: string) => subSlot(slot, 'oq:' + tag);
 	const client = resolveClient(queryClient);
 	const isRestoring = useIsRestoring();
 	const errorResetBoundary = useQueryErrorResetBoundary();
 	const defaultedOptions = client.defaultQueryOptions(options);
+
+	(client.getDefaultOptions().queries as any)?._experimental_beforeQuery?.(defaultedOptions);
+
+	const query = client.getQueryCache().get(defaultedOptions.queryHash);
+
+	if (process.env.NODE_ENV !== 'production') {
+		if (!defaultedOptions.queryFn) {
+			console.error(
+				`[${defaultedOptions.queryHash}]: No queryFn was passed as an option, and no default queryFn was found. The queryFn parameter is only optional when using a default queryFn. More info here: https://tanstack.com/query/latest/docs/framework/react/guides/default-query-function`,
+			);
+		}
+	}
 
 	// `subscribed: false` makes a passive query (read the cache, never subscribe).
 	// While restoring a persisted client, queries also stay passive.
@@ -38,8 +61,6 @@ export function useBaseQuery(
 			: undefined;
 
 	ensureSuspenseTimers(defaultedOptions);
-
-	const query = client.getQueryCache().get(defaultedOptions.queryHash);
 	ensurePreventErrorBoundaryRetry(defaultedOptions, errorResetBoundary, query);
 	// Clear the reset boundary on mount (so a fresh mount can throw again).
 	useEffect(
@@ -49,6 +70,9 @@ export function useBaseQuery(
 		[errorResetBoundary],
 		oq('clr'),
 	);
+
+	// Probed BEFORE creating the Observer — the constructor can create the entry.
+	const isNewCacheEntry = !client.getQueryCache().get(defaultedOptions.queryHash);
 
 	const [observer] = useState(() => new Observer(client, defaultedOptions), oq('obs'));
 
@@ -81,12 +105,13 @@ export function useBaseQuery(
 	);
 
 	// Suspense: suspend on the in-flight promise via `use(thenable)` (octane's
-	// suspend primitive — NOT a raw `throw promise`). `.catch(noop)` makes it
-	// resolve even on error, so the replay surfaces the error through the
-	// error-boundary throw below. On replay the query isn't pending, so this is
-	// skipped.
-	if (defaultedOptions.suspense && result.isPending) {
-		use(observer.fetchOptimistic(defaultedOptions).catch(noop));
+	// suspend primitive — NOT a raw `throw promise`). fetchOptimistic clears the
+	// reset boundary on error (upstream suspense.ts), so a reset→retry that fails
+	// again re-throws to the boundary on replay instead of falling through with
+	// undefined data. The promise resolves even on error; the replay surfaces the
+	// error through the error-boundary throw below.
+	if (shouldSuspend(defaultedOptions, result)) {
+		use(fetchOptimistic(defaultedOptions, observer, errorResetBoundary));
 	}
 
 	// Error boundary: throw so the nearest @try/@catch (or <ErrorBoundary>) handles
@@ -101,6 +126,30 @@ export function useBaseQuery(
 		})
 	) {
 		throw result.error;
+	}
+
+	(client.getDefaultOptions().queries as any)?._experimental_afterQuery?.(
+		defaultedOptions,
+		result,
+	);
+
+	// experimental_prefetchInRender: kick the fetch during render so
+	// `result.promise` settles even if the component unmounts, and finalize the
+	// observer's thenable (via updateResult) when the data lands.
+	if (
+		defaultedOptions.experimental_prefetchInRender &&
+		!environmentManager.isServer() &&
+		willFetch(result, isRestoring)
+	) {
+		const promise = isNewCacheEntry
+			? // Fetch immediately on render so `.promise` resolves even on unmount.
+				fetchOptimistic(defaultedOptions, observer, errorResetBoundary)
+			: // Subscribe to the cache promise to finalize the current thenable.
+				query?.promise;
+
+		promise?.catch(noop).finally(() => {
+			observer.updateResult();
+		});
 	}
 
 	return !defaultedOptions.notifyOnChangeProps ? observer.trackResult(result) : result;
