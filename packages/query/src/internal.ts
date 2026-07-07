@@ -59,7 +59,7 @@ export function ensurePreventErrorBoundaryRetry(
 		query?.state.error && typeof options.throwOnError === 'function'
 			? shouldThrowError(options.throwOnError, [query.state.error, query])
 			: options.throwOnError;
-	if (options.suspense || throwOnError) {
+	if (options.suspense || options.experimental_prefetchInRender || throwOnError) {
 		if (!errorResetBoundary.isReset()) {
 			options.retryOnMount = false;
 		}
@@ -68,6 +68,26 @@ export function ensurePreventErrorBoundaryRetry(
 
 export const shouldSuspend = (defaultedOptions: any, result: any): boolean =>
 	defaultedOptions?.suspense && result.isPending;
+
+// A pending result that will actually fetch (not blocked by persistence restore).
+export const willFetch = (result: any, isRestoring: boolean): boolean =>
+	result.isLoading && result.isFetching && !isRestoring;
+
+// react-query's suspense fetch: kick the optimistic fetch and — CRUCIALLY — clear
+// the reset boundary on error. Without the clearReset, a boundary reset→retry
+// that fails AGAIN leaves `isReset()` true at replay, `getHasError` returns
+// false, and a suspense component falls through to render with undefined data
+// instead of re-throwing to the boundary. The returned promise resolves even on
+// error (the replay surfaces the error through the error-boundary throw).
+export function fetchOptimistic(
+	defaultedOptions: any,
+	observer: any,
+	errorResetBoundary: { clearReset: () => void },
+): Promise<unknown> {
+	return observer.fetchOptimistic(defaultedOptions).catch(() => {
+		errorResetBoundary.clearReset();
+	});
+}
 
 // react-query's getHasError: only throw if the query errored, the boundary isn't
 // reset, the query isn't refetching, and the options opt into throwing.

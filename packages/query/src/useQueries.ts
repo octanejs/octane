@@ -6,6 +6,7 @@ import { useQueryErrorResetBoundary } from './errorResetBoundary';
 import {
 	ensurePreventErrorBoundaryRetry,
 	ensureSuspenseTimers,
+	fetchOptimistic,
 	getHasError,
 	shouldSuspend,
 	splitSlot,
@@ -86,7 +87,9 @@ export function useQueries(options: any, ...rest: any[]): any {
 		const suspensePromises = optimisticResult.flatMap((result: any, index: number) => {
 			const opts = defaultedQueries[index];
 			if (opts && shouldSuspend(opts, result)) {
-				return new QueryObserver(client, opts).fetchOptimistic(opts).catch(noop);
+				// fetchOptimistic clears the reset boundary on error (upstream
+				// suspense.ts) so a reset→retry→fail-again re-throws to the boundary.
+				return fetchOptimistic(opts, new QueryObserver(client, opts), errorResetBoundary);
 			}
 			return [];
 		});
