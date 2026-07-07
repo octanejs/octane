@@ -61,6 +61,8 @@ export {
 	lazy,
 	withSlot,
 	startTransition,
+	flushSync,
+	isChildrenBlock,
 	requestFormReset,
 	preload,
 	preinit,
@@ -80,6 +82,7 @@ export {
 	type FormStatus,
 
 	// Compiler-emitted codegen helpers (private ABI — see module doc)
+	markChildrenBlock,
 	createElement,
 	positionalChildren,
 	escapeHtml,
