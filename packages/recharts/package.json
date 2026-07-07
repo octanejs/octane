@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Recharts for the octane renderer — reuses recharts' framework-agnostic core (Redux Toolkit state, reselect, d3 via victory-vendor) and swaps the React layer for octane's hooks.",
+  "description": "Recharts for the octane renderer \u2014 reuses recharts' framework-agnostic core (Redux Toolkit state, reselect, d3 via victory-vendor) and swaps the React layer for octane's hooks.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -30,6 +30,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@octanejs/redux": "workspace:*",
     "@reduxjs/toolkit": "catalog:default",
     "clsx": "catalog:default",
     "decimal.js-light": "catalog:default",

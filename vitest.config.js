@@ -90,6 +90,34 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'redux',
+					include: ['packages/redux/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					// Differential precompile: rewrites `@octanejs/redux` →
+					// `react-redux` so the React side runs the real binding.
+					globalSetup: ['packages/redux/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [
+					octane({
+						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+					}),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/redux$/,
+							replacement: resolve(import.meta.dirname, 'packages/redux/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/redux\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/redux/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'recharts',
 					include: ['packages/recharts/tests/**/*.test.ts'],
 					environment: 'jsdom',

@@ -60,6 +60,14 @@ describe('website routes', () => {
 		);
 		expect(provenLink).toBeTruthy();
 
+		// Ecosystem strip advertises the bindings and links to the bindings page.
+		expect(container.textContent).toContain('12');
+		expect(container.textContent).toContain('ecosystem ports');
+		const bindingsLink = Array.from(container.querySelectorAll('.proven a')).find(
+			(a) => a.getAttribute('href') === '/docs/bindings',
+		);
+		expect(bindingsLink).toBeTruthy();
+
 		// Benchmark section: two paired-bar SVG charts with direct value labels.
 		expect(container.textContent).toContain('Measured, not vibes');
 		const benchCharts = container.querySelectorAll('figure.bench-card svg');
@@ -128,6 +136,8 @@ describe('website routes', () => {
 			'@octanejs/lexical',
 			'@octanejs/floating-ui',
 			'@octanejs/radix',
+			'@octanejs/base-ui',
+			'@octanejs/recharts',
 			'@octanejs/mdx',
 			'@octanejs/testing-library',
 		]) {
