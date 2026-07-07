@@ -1,10 +1,7 @@
 import { createContext, useContext } from 'octane';
+import type { QueryErrorResetBoundaryValue } from './types';
 
-export interface QueryErrorResetBoundaryValue {
-	clearReset: () => void;
-	reset: () => void;
-	isReset: () => boolean;
-}
+export type { QueryErrorResetBoundaryValue };
 
 export function createValue(): QueryErrorResetBoundaryValue {
 	let isReset = false;

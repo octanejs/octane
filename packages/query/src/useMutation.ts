@@ -4,26 +4,29 @@
 // into distinct sub-slots for each internal base hook.
 import { useState, useCallback, useSyncExternalStore, useEffect } from 'octane';
 import { MutationObserver, noop, notifyManager, shouldThrowError } from '@tanstack/query-core';
+import type { DefaultError, QueryClient } from '@tanstack/query-core';
 import { resolveClient } from './context';
+import { splitSlot, subSlot as subSlotBase } from './internal';
+import type { UseMutationOptions, UseMutationResult } from './types';
 
-// Memoized — subSlot runs per hook call per render; the cache returns the
-// identical Symbol.for-interned value without the concat + registry lookup.
-const subSlotCache = new Map<symbol, Map<string, symbol>>();
-function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	if (slot === undefined) return undefined;
-	let byTag = subSlotCache.get(slot);
-	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
-	let sym = byTag.get(tag);
-	if (sym === undefined)
-		byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':om:' + tag)));
-	return sym;
-}
+// Namespaced per-hook (':om:') on top of the shared helper — the minted symbols
+// are byte-identical to the previous private copy, so slot identity is stable.
+const subSlot = (slot: symbol | undefined, tag: string) => subSlotBase(slot, 'om:' + tag);
+
+// Signature matches @tanstack/react-query's useMutation.ts.
+export function useMutation<
+	TData = unknown,
+	TError = DefaultError,
+	TVariables = void,
+	TOnMutateResult = unknown,
+>(
+	options: UseMutationOptions<TData, TError, TVariables, TOnMutateResult>,
+	queryClient?: QueryClient,
+): UseMutationResult<TData, TError, TVariables, TOnMutateResult>;
 
 export function useMutation(options: any, ...rest: any[]): any {
-	const tail = rest[rest.length - 1];
-	const slot = typeof tail === 'symbol' ? (tail as symbol) : undefined;
-	const queryClient = typeof rest[0] !== 'symbol' ? rest[0] : undefined;
-	const client = resolveClient(queryClient);
+	const [user, slot] = splitSlot(rest);
+	const client = resolveClient(user[0]);
 
 	const [observer] = useState(() => new MutationObserver(client, options), subSlot(slot, 'obs'));
 

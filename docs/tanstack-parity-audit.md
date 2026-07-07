@@ -35,8 +35,34 @@ is a diff against real upstream code, not just `.d.ts`):
 > (+4 octane runtime regression tests), all green, full monorepo suite green.
 > Still open for router: file-based routing/codegen, SSR entries
 > (RouterServer/HeadContent/Scripts), devtools, and the typed public surface
-> (factories/hooks are still `any` — same as query). The QUERY section's gaps
-> are all still open.
+> (factories/hooks are still `any` — same as query).
+>
+> **QUERY STATUS UPDATE (2026-07-06, same day):** the query gap-closure sweep
+> landed too. Closed: the suspense `clearReset` bug (fetchOptimistic now clears
+> the reset boundary on error in useBaseQuery + useQueries — the
+> reset→retry→fail-again loop re-throws correctly, with a pinning test);
+> QueryErrorResetBoundary render-prop children; HydrationBoundary full port
+> (streaming `promise`/`dehydratedAt` re-hydration + existing-query hydration
+> deferred to an effect for transition-abort safety, new queries in render);
+> `experimental_prefetchInRender` + `result.promise` finalization (+ the
+> missing condition in ensurePreventErrorBoundaryRetry); dev warnings
+> (bad-argument, no-queryFn, skipToken in useSuspenseQuery/Infinite) and the
+> `_experimental_beforeQuery`/`afterQuery` devtools hooks; the context exports
+> aligned with upstream (IsRestoringContext/QueryErrorResetBoundaryContext no
+> longer public — the export surfaces are now byte-identical BOTH directions,
+> locked by a test that diffs the full runtime surface against the real
+> react-query module); **the complete TypeScript surface** (types.ts ported 1:1
+> incl. QueriesOptions/QueriesResults + suspense variants, typed identity
+> option helpers with DataTag inference, and upstream's overload signatures on
+> every hook — package typechecks clean); and tests from ~27 → 47 incl.
+> combine, skipToken, fetchNextPage/hasNextPage, useMutationState
+> filters+select, useSuspenseInfiniteQuery, usePrefetchInfiniteQuery,
+> tracked-props render-count efficiency, isRestoring true→false, real-payload +
+> streaming hydration, and TWO new differential suites (async pending→success
+> and mutation idle→pending→success, byte-equal vs real react-query). Still
+> open for query: SSR/streaming server entries + server-render tests (deferred
+> with the router SSR entries — needs the octane-server module graph story) and
+> a @tanstack/react-query-persist-client port (out of scope for this package).
 
 **Verdict at audit time: neither port was fully covered.** Query is close on the
 runtime API (58/58 value exports) but has zero TypeScript types, a real

@@ -78,6 +78,7 @@ describe('website routes', () => {
 		const sidebarLinks = Array.from(container.querySelectorAll('a.sidebar-link'));
 		expect(sidebarLinks.map((a) => a.getAttribute('href'))).toEqual([
 			'/docs/quick-start',
+			'/docs/tsrx-vs-tsx',
 			'/docs/differences-from-react',
 			'/docs/bindings',
 		]);

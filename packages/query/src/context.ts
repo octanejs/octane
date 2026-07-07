@@ -17,6 +17,9 @@ export function resolveClient(queryClient: QueryClient | undefined): QueryClient
 	return client;
 }
 
+// Signature matches @tanstack/react-query's QueryClientProvider.tsx.
+export function useQueryClient(queryClient?: QueryClient): QueryClient;
+
 export function useQueryClient(...args: unknown[]): QueryClient {
 	// Args are `[queryClient?, slot?]`; the slot (symbol) is appended by the
 	// compiler. An explicit client is the first non-symbol arg.

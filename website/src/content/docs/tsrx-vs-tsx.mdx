@@ -1,0 +1,167 @@
+---
+title: TSRX vs TSX/JSX
+---
+
+# TSRX vs TSX/JSX
+
+Octane compiles your components ahead of time, and it can compile two dialects:
+standard **`.tsx`/`.jsx`** and Octane's own **`.tsrx`**. Both go through the same
+compiler, run against the same runtime, and share the same hooks, `memo`,
+context, portals, Suspense, and transitions. You can mix them in one app and
+import freely across the boundary — a `.tsrx` component can render a `.tsx` one
+and vice versa.
+
+The short version: **`.tsx`/`.jsx` is the familiar on-ramp, `.tsrx` is the
+recommended default.** TSX gets you running with the exact syntax you already
+know; TSRX unlocks the compiler's best output and the template-level features
+below.
+
+## When to reach for each
+
+Use **`.tsx`/`.jsx`** when you want zero new syntax — porting an existing React
+file, pasting a snippet from the React docs, or keeping a shared component that
+also has to typecheck as plain React. Everything works: hooks (including the
+conditional-hook freedom), `<Suspense>`, portals, refs-as-props.
+
+Use **`.tsrx`** for anything you're writing fresh, and especially for
+list-heavy or control-flow-heavy UI. You get better performance guarantees and
+the template directives, at the cost of a small amount of new syntax.
+
+## What TSRX adds
+
+### Compiled collections
+
+In `.tsx` a rendered list is an expression — `{items.map((i) => <Row … />)}` —
+so the runtime builds a descriptor per row on every render and reconciles that
+array. TSRX's `@for` block compiles to a keyed fast path: a compiled per-item
+body plus the raw array, with no per-row descriptor allocation. This is the
+single biggest reason to prefer `.tsrx` for anything that renders collections.
+
+```tsrx
+export function Feed(props) @{
+	<ul>
+		@for (const item of props.items; key item.id) {
+			<li>
+				{item.title as string}
+			</li>
+		} @empty {
+			<li>Nothing to show</li>
+		}
+	</ul>
+}
+```
+
+> Octane also lowers a plain `{items.map((i) => <Row key={i.id} />)}` in `.tsrx`
+> to the same `@for` fast path when the shape is simple enough, so idiomatic JSX
+> lists aren't penalized — but the explicit `@for` block is clearer and always
+> takes the fast path.
+
+### Template control flow
+
+TSRX has directive blocks for rendered control flow — `@if`/`@else`, `@for`/`@empty`,
+`@switch`/`@case`/`@default`, and `@try`/`@pending`/`@catch`. Plain JavaScript
+control flow still lives in setup code; the directives are for the output.
+
+```tsrx
+export function Greeting(props) @{
+	@if (props.name) {
+		<p>
+			{'Hello, ' + props.name}
+		</p>
+	} @else {
+		<p>Hello, stranger</p>
+	}
+}
+```
+
+In `.tsx` you write the same logic with expressions (`props.name ? … : …`,
+ternaries, `&&`), exactly as in React.
+
+### The `@{ … }` output shorthand
+
+`@{ … }` is shorthand for "return this JSX," so hooks and locals can sit next to
+the output without an explicit `return`:
+
+```tsrx
+export function Counter() @{
+	const [count, setCount] = useState(0);
+
+	<button onClick={() => setCount(count + 1)}>
+		{'Count: ' + count}
+	</button>
+}
+```
+
+The same component in `.tsx` is just the React-style explicit return:
+
+```tsx
+export function Counter() {
+	const [count, setCount] = useState(0);
+	return <button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>;
+}
+```
+
+Both compile identically. `@{ … }` is optional — any function in a `.tsrx` file
+can still use a plain `return`.
+
+### Text holes
+
+TSRX distinguishes a dynamic **text** hole from a **renderable** hole. When an
+expression is provably a string — a string/template literal, a `+`-concatenation
+involving a string, or a local the compiler tracks back to a string — you can
+write it bare; otherwise cast it with `as string`:
+
+```tsrx
+<h3>{feature.title as string}</h3>   // cast: not provably a string
+<p>{'Count: ' + count}</p>            // no cast: provably a string
+```
+
+Plain `.tsx`/`.jsx` has no such distinction — every `{expr}` is a renderable
+hole coerced at runtime, matching React.
+
+## What's identical in both
+
+These are Octane behaviors, not TSRX features — they hold in `.tsx`/`.jsx` too:
+
+- **No rules of hooks.** Hooks are tracked by compiler-assigned call-site slot,
+  so a hook can sit behind a condition, after an early return, or in a loop.
+- **Native, delegated DOM events** (`onClick`, `onInput`, `onSubmit`) — no
+  synthetic event layer.
+- **Refs as props** (`ref={cb}`, `ref={obj}`, `ref={[a, b]}`) — no `forwardRef`.
+- **`class`/`className` compose clsx-style** at every apply site.
+- Full SSR, streaming, and byte-stable hydration.
+
+## Tooling
+
+The compiler plugin handles both dialects automatically — `.tsrx` is always
+compiled, and `.tsx` outside `node_modules` is compiled the same way (a
+published dependency ships compiled `.js`, so a stray React `.tsx` in
+`node_modules` is left alone).
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { octane } from 'octane/compiler/vite';
+
+export default defineConfig({
+	plugins: [octane()],
+});
+```
+
+For editor support (hover, autocomplete, go-to-definition, diagnostics on
+`.tsrx`), the compiler ships a Volar language-service entry at
+`octane/compiler/volar`.
+
+## Recommendation
+
+Start in whichever dialect gets you moving. If you're coming from React and want
+to move fast, write `.tsx`. When you want the compiler's best output — and for
+any component that renders collections or branches — reach for `.tsrx`. TSRX is
+the spiritual successor to JSX: the same mental model, with the template-level
+handles that let the compiler do more of the work ahead of time.
+
+## Next
+
+- [Quick start](/docs/quick-start) — install, mount, and the `.tsrx` essentials.
+- [Differences from React](/docs/differences-from-react) — the deliberate
+  divergences (everything else matching React is the point).
