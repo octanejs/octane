@@ -1,3 +1,4 @@
+// @ts-check
 /** @import { ResolvedConfig } from 'vite' */
 
 import fs from 'node:fs';

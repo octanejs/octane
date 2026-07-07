@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @typedef {import('@octanejs/vite-plugin').Route} Route
  * @typedef {import('@octanejs/vite-plugin').RenderRoute} RenderRoute

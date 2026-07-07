@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Shared utility for loading and resolving octane.config.ts.
  *

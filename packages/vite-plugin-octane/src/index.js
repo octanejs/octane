@@ -1,3 +1,4 @@
+// @ts-check
 /** @import {Plugin, ResolvedConfig, ViteDevServer, UserConfig} from 'vite' */
 /** @import {OctaneConfigOptions, ResolvedOctaneConfig, RenderRoute} from '@octanejs/vite-plugin' */
 
@@ -168,7 +169,7 @@ export function octane(inlineOptions = {}) {
 
 		/**
 		 * @param {UserConfig} userConfig
-		 * @param {{ command: string, isPreview?: boolean }} env
+		 * @param {import('vite').ConfigEnv} env
 		 */
 		async config(userConfig, env) {
 			isBuild = env?.command === 'build';
@@ -180,7 +181,9 @@ export function octane(inlineOptions = {}) {
 				// fallback masking SSR routes). Respect an explicit user appType, and
 				// leave `vite preview` alone — the production SSR build is previewed
 				// with `octane-preview` (it serves dist/server), not `vite preview`.
-				...(userConfig.appType === undefined && !env?.isPreview ? { appType: 'custom' } : {}),
+				...(userConfig.appType === undefined && !env?.isPreview
+					? { appType: /** @type {const} */ ('custom') }
+					: {}),
 				optimizeDeps: {
 					exclude: [
 						// `@octanejs/query` ships a `.tsrx` provider component, so it must NOT
@@ -657,7 +660,8 @@ export function octane(inlineOptions = {}) {
 	const compilerOptions = {};
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
-	return [octaneCompiler(compilerOptions), metaPlugin];
+	// The compiler plugin is untyped JS (its `enforce` infers as `string`).
+	return [/** @type {Plugin} */ (octaneCompiler(compilerOptions)), metaPlugin];
 }
 
 // Mainly to enforce types / DX.
@@ -686,7 +690,7 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 
 		const response = await handle_rpc_request(webRequest, {
 			async resolveFunction(hash) {
-				const rpcModules = globalThis.rpc_modules;
+				const rpcModules = /** @type {any} */ (globalThis).rpc_modules;
 				if (!rpcModules) return null;
 				const moduleInfo = rpcModules.get(hash);
 				if (!moduleInfo) return null;

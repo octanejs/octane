@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Production server-entry generator.
  *

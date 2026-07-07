@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Config validation + defaults — `resolveOctaneConfig` and its validators.
  *

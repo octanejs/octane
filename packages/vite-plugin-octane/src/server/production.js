@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Production fetch-handler factory + config re-exports.
  *

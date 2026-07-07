@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Config-surface facade for the PRODUCTION server bundle.
  *

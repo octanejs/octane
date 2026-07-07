@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Node HTTP glue — shared by the dev middleware (src/index.js), the generated
  * production server entry (its `nodeHandler` export for serverless wrappers),
@@ -36,7 +37,11 @@ export function nodeRequestToWebRequest(nodeRequest) {
 	/** @type {RequestInit & { duplex?: 'half' }} */
 	const init = { method, headers };
 	if (method !== 'GET' && method !== 'HEAD') {
-		init.body = Readable.toWeb(nodeRequest);
+		// node:stream/web's ReadableStream and the DOM lib's are structurally the
+		// same at runtime; the lib types disagree on BYOB details.
+		init.body = /** @type {ReadableStream} */ (
+			/** @type {unknown} */ (Readable.toWeb(nodeRequest))
+		);
 		init.duplex = 'half';
 	}
 	return new Request(url, init);
@@ -72,6 +77,7 @@ export async function sendWebResponse(nodeResponse, webResponse) {
 
 // Static-file MIME map (the common web set; anything else falls back to
 // octet-stream, which is correct for downloads).
+/** @type {Record<string, string>} */
 const MIME_TYPES = {
 	'.html': 'text/html; charset=utf-8',
 	'.css': 'text/css; charset=utf-8',
