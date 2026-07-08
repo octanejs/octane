@@ -1,7 +1,11 @@
 // Vendored verbatim from recharts@3.9.2 es6/context/tooltipContext.js (framework-agnostic).
 // Do not edit — update by re-vendoring when the recharts devDependency moves.
 import { useAppDispatch } from '../state/hooks';
-import { mouseLeaveItem, setActiveClickItemIndex, setActiveMouseOverItemIndex } from '../state/tooltipSlice';
+import {
+	mouseLeaveItem,
+	setActiveClickItemIndex,
+	setActiveMouseOverItemIndex,
+} from '../state/tooltipSlice';
 
 /**
  * Some graphical items choose to provide more information to the tooltip
@@ -9,33 +13,43 @@ import { mouseLeaveItem, setActiveClickItemIndex, setActiveMouseOverItemIndex } 
  */
 
 export var useMouseEnterItemDispatch = (onMouseEnterFromProps, dataKey, graphicalItemId) => {
-  var dispatch = useAppDispatch();
-  return (data, index) => event => {
-    onMouseEnterFromProps === null || onMouseEnterFromProps === void 0 || onMouseEnterFromProps(data, index, event);
-    dispatch(setActiveMouseOverItemIndex({
-      activeIndex: String(index),
-      activeDataKey: dataKey,
-      activeCoordinate: data.tooltipPosition,
-      activeGraphicalItemId: graphicalItemId
-    }));
-  };
+	var dispatch = useAppDispatch();
+	return (data, index) => (event) => {
+		onMouseEnterFromProps === null ||
+			onMouseEnterFromProps === void 0 ||
+			onMouseEnterFromProps(data, index, event);
+		dispatch(
+			setActiveMouseOverItemIndex({
+				activeIndex: String(index),
+				activeDataKey: dataKey,
+				activeCoordinate: data.tooltipPosition,
+				activeGraphicalItemId: graphicalItemId,
+			}),
+		);
+	};
 };
-export var useMouseLeaveItemDispatch = onMouseLeaveFromProps => {
-  var dispatch = useAppDispatch();
-  return (data, index) => event => {
-    onMouseLeaveFromProps === null || onMouseLeaveFromProps === void 0 || onMouseLeaveFromProps(data, index, event);
-    dispatch(mouseLeaveItem());
-  };
+export var useMouseLeaveItemDispatch = (onMouseLeaveFromProps) => {
+	var dispatch = useAppDispatch();
+	return (data, index) => (event) => {
+		onMouseLeaveFromProps === null ||
+			onMouseLeaveFromProps === void 0 ||
+			onMouseLeaveFromProps(data, index, event);
+		dispatch(mouseLeaveItem());
+	};
 };
 export var useMouseClickItemDispatch = (onMouseClickFromProps, dataKey, graphicalItemId) => {
-  var dispatch = useAppDispatch();
-  return (data, index) => event => {
-    onMouseClickFromProps === null || onMouseClickFromProps === void 0 || onMouseClickFromProps(data, index, event);
-    dispatch(setActiveClickItemIndex({
-      activeIndex: String(index),
-      activeDataKey: dataKey,
-      activeCoordinate: data.tooltipPosition,
-      activeGraphicalItemId: graphicalItemId
-    }));
-  };
+	var dispatch = useAppDispatch();
+	return (data, index) => (event) => {
+		onMouseClickFromProps === null ||
+			onMouseClickFromProps === void 0 ||
+			onMouseClickFromProps(data, index, event);
+		dispatch(
+			setActiveClickItemIndex({
+				activeIndex: String(index),
+				activeDataKey: dataKey,
+				activeCoordinate: data.tooltipPosition,
+				activeGraphicalItemId: graphicalItemId,
+			}),
+		);
+	};
 };

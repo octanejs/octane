@@ -12,18 +12,18 @@
  * @returns The result array of the same type as the input array.
  */
 export function getEveryNth(array, n) {
-  if (n < 1) {
-    return [];
-  }
-  if (n === 1) {
-    return array;
-  }
-  var result = [];
-  for (var i = 0; i < array.length; i += n) {
-    var item = array[i];
-    if (item !== undefined) {
-      result.push(item);
-    }
-  }
-  return result;
+	if (n < 1) {
+		return [];
+	}
+	if (n === 1) {
+		return array;
+	}
+	var result = [];
+	for (var i = 0; i < array.length; i += n) {
+		var item = array[i];
+		if (item !== undefined) {
+			result.push(item);
+		}
+	}
+	return result;
 }

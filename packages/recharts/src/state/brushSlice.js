@@ -8,28 +8,28 @@ import { createSlice } from '@reduxjs/toolkit';
  */
 
 var initialState = {
-  x: 0,
-  y: 0,
-  width: 0,
-  height: 0,
-  padding: {
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0
-  }
+	x: 0,
+	y: 0,
+	width: 0,
+	height: 0,
+	padding: {
+		top: 0,
+		right: 0,
+		bottom: 0,
+		left: 0,
+	},
 };
 export var brushSlice = createSlice({
-  name: 'brush',
-  initialState,
-  reducers: {
-    setBrushSettings(_state, action) {
-      if (action.payload == null) {
-        return initialState;
-      }
-      return action.payload;
-    }
-  }
+	name: 'brush',
+	initialState,
+	reducers: {
+		setBrushSettings(_state, action) {
+			if (action.payload == null) {
+				return initialState;
+			}
+			return action.payload;
+		},
+	},
 });
 var setBrushSettings = brushSlice.actions.setBrushSettings;
 export { setBrushSettings };

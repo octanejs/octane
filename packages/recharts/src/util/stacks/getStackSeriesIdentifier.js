@@ -6,5 +6,5 @@
  * @return The identifier for the series in the stack
  */
 export function getStackSeriesIdentifier(graphicalItem) {
-  return graphicalItem === null || graphicalItem === void 0 ? void 0 : graphicalItem.id;
+	return graphicalItem === null || graphicalItem === void 0 ? void 0 : graphicalItem.id;
 }

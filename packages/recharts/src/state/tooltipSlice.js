@@ -57,11 +57,11 @@ import { castDraft } from 'immer';
  */
 
 export var noInteraction = {
-  active: false,
-  index: null,
-  dataKey: undefined,
-  graphicalItemId: undefined,
-  coordinate: undefined
+	active: false,
+	index: null,
+	dataKey: undefined,
+	graphicalItemId: undefined,
+	coordinate: undefined,
 };
 
 /**
@@ -73,32 +73,32 @@ export var noInteraction = {
  */
 
 export var initialState = {
-  itemInteraction: {
-    click: noInteraction,
-    hover: noInteraction
-  },
-  axisInteraction: {
-    click: noInteraction,
-    hover: noInteraction
-  },
-  keyboardInteraction: noInteraction,
-  syncInteraction: {
-    active: false,
-    index: null,
-    dataKey: undefined,
-    label: undefined,
-    coordinate: undefined,
-    sourceViewBox: undefined,
-    graphicalItemId: undefined
-  },
-  tooltipItemPayloads: [],
-  settings: {
-    shared: undefined,
-    trigger: 'hover',
-    axisId: 0,
-    active: false,
-    defaultIndex: undefined
-  }
+	itemInteraction: {
+		click: noInteraction,
+		hover: noInteraction,
+	},
+	axisInteraction: {
+		click: noInteraction,
+		hover: noInteraction,
+	},
+	keyboardInteraction: noInteraction,
+	syncInteraction: {
+		active: false,
+		index: null,
+		dataKey: undefined,
+		label: undefined,
+		coordinate: undefined,
+		sourceViewBox: undefined,
+		graphicalItemId: undefined,
+	},
+	tooltipItemPayloads: [],
+	settings: {
+		shared: undefined,
+		trigger: 'hover',
+		axisId: 0,
+		active: false,
+		defaultIndex: undefined,
+	},
 };
 
 /**
@@ -112,113 +112,126 @@ export var initialState = {
  */
 
 var tooltipSlice = createSlice({
-  name: 'tooltip',
-  initialState,
-  reducers: {
-    addTooltipEntrySettings: {
-      reducer(state, action) {
-        state.tooltipItemPayloads.push(castDraft(action.payload));
-      },
-      prepare: prepareAutoBatched()
-    },
-    replaceTooltipEntrySettings: {
-      reducer(state, action) {
-        var _action$payload = action.payload,
-          prev = _action$payload.prev,
-          next = _action$payload.next;
-        var index = current(state).tooltipItemPayloads.indexOf(castDraft(prev));
-        if (index > -1) {
-          state.tooltipItemPayloads[index] = castDraft(next);
-        }
-      },
-      prepare: prepareAutoBatched()
-    },
-    removeTooltipEntrySettings: {
-      reducer(state, action) {
-        var index = current(state).tooltipItemPayloads.indexOf(castDraft(action.payload));
-        if (index > -1) {
-          state.tooltipItemPayloads.splice(index, 1);
-        }
-      },
-      prepare: prepareAutoBatched()
-    },
-    setTooltipSettingsState(state, action) {
-      state.settings = action.payload;
-    },
-    setActiveMouseOverItemIndex(state, action) {
-      state.syncInteraction.active = false;
-      state.syncInteraction.sourceViewBox = undefined;
-      state.keyboardInteraction.active = false;
-      state.itemInteraction.hover.active = true;
-      state.itemInteraction.hover.index = action.payload.activeIndex;
-      state.itemInteraction.hover.dataKey = action.payload.activeDataKey;
-      state.itemInteraction.hover.graphicalItemId = action.payload.activeGraphicalItemId;
-      state.itemInteraction.hover.coordinate = action.payload.activeCoordinate;
-    },
-    mouseLeaveChart(state) {
-      /*
-       * Clear only the active flags. Why?
-       * 1. Keep Coordinate to preserve animation - next time the Tooltip appears, we want to render it from
-       * the last place where it was when it disappeared.
-       * 2. We want to keep all the properties anyway just in case the tooltip has `active=true` prop
-       * and continues being visible even after the mouse has left the chart.
-       */
-      state.itemInteraction.hover.active = false;
-      state.axisInteraction.hover.active = false;
-    },
-    mouseLeaveItem(state) {
-      state.itemInteraction.hover.active = false;
-    },
-    setActiveClickItemIndex(state, action) {
-      state.syncInteraction.active = false;
-      state.syncInteraction.sourceViewBox = undefined;
-      state.itemInteraction.click.active = true;
-      state.keyboardInteraction.active = false;
-      state.itemInteraction.click.index = action.payload.activeIndex;
-      state.itemInteraction.click.dataKey = action.payload.activeDataKey;
-      state.itemInteraction.click.graphicalItemId = action.payload.activeGraphicalItemId;
-      state.itemInteraction.click.coordinate = action.payload.activeCoordinate;
-    },
-    setMouseOverAxisIndex(state, action) {
-      state.syncInteraction.active = false;
-      state.syncInteraction.sourceViewBox = undefined;
-      state.axisInteraction.hover.active = true;
-      state.keyboardInteraction.active = false;
-      state.axisInteraction.hover.index = action.payload.activeIndex;
-      state.axisInteraction.hover.dataKey = action.payload.activeDataKey;
-      state.axisInteraction.hover.coordinate = action.payload.activeCoordinate;
-    },
-    setMouseClickAxisIndex(state, action) {
-      state.syncInteraction.active = false;
-      state.syncInteraction.sourceViewBox = undefined;
-      state.keyboardInteraction.active = false;
-      state.axisInteraction.click.active = true;
-      state.axisInteraction.click.index = action.payload.activeIndex;
-      state.axisInteraction.click.dataKey = action.payload.activeDataKey;
-      state.axisInteraction.click.coordinate = action.payload.activeCoordinate;
-    },
-    setSyncInteraction(state, action) {
-      state.syncInteraction = action.payload;
-    },
-    setKeyboardInteraction(state, action) {
-      state.keyboardInteraction.active = action.payload.active;
-      state.keyboardInteraction.index = action.payload.activeIndex;
-      state.keyboardInteraction.coordinate = action.payload.activeCoordinate;
-    }
-  }
+	name: 'tooltip',
+	initialState,
+	reducers: {
+		addTooltipEntrySettings: {
+			reducer(state, action) {
+				state.tooltipItemPayloads.push(castDraft(action.payload));
+			},
+			prepare: prepareAutoBatched(),
+		},
+		replaceTooltipEntrySettings: {
+			reducer(state, action) {
+				var _action$payload = action.payload,
+					prev = _action$payload.prev,
+					next = _action$payload.next;
+				var index = current(state).tooltipItemPayloads.indexOf(castDraft(prev));
+				if (index > -1) {
+					state.tooltipItemPayloads[index] = castDraft(next);
+				}
+			},
+			prepare: prepareAutoBatched(),
+		},
+		removeTooltipEntrySettings: {
+			reducer(state, action) {
+				var index = current(state).tooltipItemPayloads.indexOf(castDraft(action.payload));
+				if (index > -1) {
+					state.tooltipItemPayloads.splice(index, 1);
+				}
+			},
+			prepare: prepareAutoBatched(),
+		},
+		setTooltipSettingsState(state, action) {
+			state.settings = action.payload;
+		},
+		setActiveMouseOverItemIndex(state, action) {
+			state.syncInteraction.active = false;
+			state.syncInteraction.sourceViewBox = undefined;
+			state.keyboardInteraction.active = false;
+			state.itemInteraction.hover.active = true;
+			state.itemInteraction.hover.index = action.payload.activeIndex;
+			state.itemInteraction.hover.dataKey = action.payload.activeDataKey;
+			state.itemInteraction.hover.graphicalItemId = action.payload.activeGraphicalItemId;
+			state.itemInteraction.hover.coordinate = action.payload.activeCoordinate;
+		},
+		mouseLeaveChart(state) {
+			/*
+			 * Clear only the active flags. Why?
+			 * 1. Keep Coordinate to preserve animation - next time the Tooltip appears, we want to render it from
+			 * the last place where it was when it disappeared.
+			 * 2. We want to keep all the properties anyway just in case the tooltip has `active=true` prop
+			 * and continues being visible even after the mouse has left the chart.
+			 */
+			state.itemInteraction.hover.active = false;
+			state.axisInteraction.hover.active = false;
+		},
+		mouseLeaveItem(state) {
+			state.itemInteraction.hover.active = false;
+		},
+		setActiveClickItemIndex(state, action) {
+			state.syncInteraction.active = false;
+			state.syncInteraction.sourceViewBox = undefined;
+			state.itemInteraction.click.active = true;
+			state.keyboardInteraction.active = false;
+			state.itemInteraction.click.index = action.payload.activeIndex;
+			state.itemInteraction.click.dataKey = action.payload.activeDataKey;
+			state.itemInteraction.click.graphicalItemId = action.payload.activeGraphicalItemId;
+			state.itemInteraction.click.coordinate = action.payload.activeCoordinate;
+		},
+		setMouseOverAxisIndex(state, action) {
+			state.syncInteraction.active = false;
+			state.syncInteraction.sourceViewBox = undefined;
+			state.axisInteraction.hover.active = true;
+			state.keyboardInteraction.active = false;
+			state.axisInteraction.hover.index = action.payload.activeIndex;
+			state.axisInteraction.hover.dataKey = action.payload.activeDataKey;
+			state.axisInteraction.hover.coordinate = action.payload.activeCoordinate;
+		},
+		setMouseClickAxisIndex(state, action) {
+			state.syncInteraction.active = false;
+			state.syncInteraction.sourceViewBox = undefined;
+			state.keyboardInteraction.active = false;
+			state.axisInteraction.click.active = true;
+			state.axisInteraction.click.index = action.payload.activeIndex;
+			state.axisInteraction.click.dataKey = action.payload.activeDataKey;
+			state.axisInteraction.click.coordinate = action.payload.activeCoordinate;
+		},
+		setSyncInteraction(state, action) {
+			state.syncInteraction = action.payload;
+		},
+		setKeyboardInteraction(state, action) {
+			state.keyboardInteraction.active = action.payload.active;
+			state.keyboardInteraction.index = action.payload.activeIndex;
+			state.keyboardInteraction.coordinate = action.payload.activeCoordinate;
+		},
+	},
 });
 var _tooltipSlice$actions = tooltipSlice.actions,
-  addTooltipEntrySettings = _tooltipSlice$actions.addTooltipEntrySettings,
-  replaceTooltipEntrySettings = _tooltipSlice$actions.replaceTooltipEntrySettings,
-  removeTooltipEntrySettings = _tooltipSlice$actions.removeTooltipEntrySettings,
-  setTooltipSettingsState = _tooltipSlice$actions.setTooltipSettingsState,
-  setActiveMouseOverItemIndex = _tooltipSlice$actions.setActiveMouseOverItemIndex,
-  mouseLeaveItem = _tooltipSlice$actions.mouseLeaveItem,
-  mouseLeaveChart = _tooltipSlice$actions.mouseLeaveChart,
-  setActiveClickItemIndex = _tooltipSlice$actions.setActiveClickItemIndex,
-  setMouseOverAxisIndex = _tooltipSlice$actions.setMouseOverAxisIndex,
-  setMouseClickAxisIndex = _tooltipSlice$actions.setMouseClickAxisIndex,
-  setSyncInteraction = _tooltipSlice$actions.setSyncInteraction,
-  setKeyboardInteraction = _tooltipSlice$actions.setKeyboardInteraction;
-export { addTooltipEntrySettings, replaceTooltipEntrySettings, removeTooltipEntrySettings, setTooltipSettingsState, setActiveMouseOverItemIndex, mouseLeaveItem, mouseLeaveChart, setActiveClickItemIndex, setMouseOverAxisIndex, setMouseClickAxisIndex, setSyncInteraction, setKeyboardInteraction };
+	addTooltipEntrySettings = _tooltipSlice$actions.addTooltipEntrySettings,
+	replaceTooltipEntrySettings = _tooltipSlice$actions.replaceTooltipEntrySettings,
+	removeTooltipEntrySettings = _tooltipSlice$actions.removeTooltipEntrySettings,
+	setTooltipSettingsState = _tooltipSlice$actions.setTooltipSettingsState,
+	setActiveMouseOverItemIndex = _tooltipSlice$actions.setActiveMouseOverItemIndex,
+	mouseLeaveItem = _tooltipSlice$actions.mouseLeaveItem,
+	mouseLeaveChart = _tooltipSlice$actions.mouseLeaveChart,
+	setActiveClickItemIndex = _tooltipSlice$actions.setActiveClickItemIndex,
+	setMouseOverAxisIndex = _tooltipSlice$actions.setMouseOverAxisIndex,
+	setMouseClickAxisIndex = _tooltipSlice$actions.setMouseClickAxisIndex,
+	setSyncInteraction = _tooltipSlice$actions.setSyncInteraction,
+	setKeyboardInteraction = _tooltipSlice$actions.setKeyboardInteraction;
+export {
+	addTooltipEntrySettings,
+	replaceTooltipEntrySettings,
+	removeTooltipEntrySettings,
+	setTooltipSettingsState,
+	setActiveMouseOverItemIndex,
+	mouseLeaveItem,
+	mouseLeaveChart,
+	setActiveClickItemIndex,
+	setMouseOverAxisIndex,
+	setMouseClickAxisIndex,
+	setSyncInteraction,
+	setKeyboardInteraction,
+};
 export var tooltipReducer = tooltipSlice.reducer;

@@ -7,11 +7,11 @@ import { isCategoricalAxis } from './ChartUtils';
  * It outputs a definitive axis domain type that can be used for further processing.
  */
 export function getAxisTypeBasedOnLayout(layout, axisType, axisDomainType) {
-  if (axisDomainType !== 'auto') {
-    return axisDomainType;
-  }
-  if (layout == null) {
-    return undefined;
-  }
-  return isCategoricalAxis(layout, axisType) ? 'category' : 'number';
+	if (axisDomainType !== 'auto') {
+		return axisDomainType;
+	}
+	if (layout == null) {
+		return undefined;
+	}
+	return isCategoricalAxis(layout, axisType) ? 'category' : 'number';
 }

@@ -13,22 +13,36 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
 
-Octane is a fast, TypeScript-first UI framework. It is the successor to
-[Inferno](https://github.com/infernojs/inferno), the React-like library that set
-out to stay close to the speed of hand-written DOM code. Octane carries that
-performance-first goal forward and brings the programming model up to date. You
-get the React API you already know, a compiler that keeps the runtime small and
-fast, and hooks that no longer come with the rules of hooks.
+Octane is a fast, TypeScript-first UI framework — the successor to
+[Inferno](https://github.com/infernojs/inferno), the React-like library built to
+stay close to the speed of hand-written DOM code. Octane keeps that goal and
+modernizes everything around it: you write with the React API you already know,
+but a compiler does most of the framework's work ahead of time, so there is far
+less left to do when the page actually loads.
 
-Anyone comfortable with React can pick up Octane quickly. The familiar building
-blocks are all here and they behave the way you expect. The main difference is
-under the hood: Octane compiles your components ahead of time, so a lot of the work
-React does at runtime is already done before the page loads. Hooks are tracked by
-call site rather than call order, which is what lets you call them conditionally.
+If you know React, you already know Octane. `useState`, `useEffect`, `memo`,
+context, portals, Suspense, transitions — same API, same mental model, checked
+the boring way against 2,200+ conformance tests lifted straight from
+`facebook/react`. Your React knowledge just works.
 
-Components can be written in standard `.tsx`/`.jsx` but opting for `.tsrx` provides
-better performance guarantees, especially around collections. TSRX is the spiritual successor
-to JSX, and allows for far better composability and future optimizations.
+Speed was never going to be enough on its own, though. The reason to reach for
+Octane is the day-to-day feel:
+
+- **Write the JSX you already write.** Standard `.tsx`/`.jsx` runs out of the
+  box — paste a component from the React docs and it works, hooks and all.
+- **Or opt into `.tsrx` for more.** TSRX is the spiritual successor to JSX: the
+  same mental model, plus template directives (`@if`, `@for`, `@switch`, `@try`)
+  that compile to keyed fast paths, and an `@{ … }` shorthand that lets setup sit
+  right next to the output. Mix both dialects in one app and import freely across
+  the boundary — you choose per component.
+- **No rules of hooks.** Hooks are tracked by call site, not call order, so a
+  hook can live inside an `if`, after an early return, or in a loop. The usual
+  React footguns simply aren't there.
+- **The platform, not a reimplementation of it.** Real delegated DOM events,
+  uncontrolled inputs, and refs-as-props (`ref={cb}`, `ref={obj}`, even
+  `ref={[a, b]}`) — no synthetic layer second-guessing the browser.
+- **No virtual DOM.** Components re-render like React, but a compiled render path
+  and a LIS-based keyed reconciler keep the runtime overhead minimal.
 
 Created by [Dominic Gannaway](https://github.com/trueadm), who also created
 Inferno and has worked on React, Lexical, Ripple, and Svelte.
@@ -37,22 +51,24 @@ Inferno and has worked on React, Lexical, Ripple, and Svelte.
 
 Octane is currently in alpha development.
 
-## Highlights
+## At a glance
 
-- The React API you already know: `useState`, `useEffect`, `useMemo`, `useRef`, `useId`,
-  `useTransition`, `useDeferredValue` etc.
-- Support for JSX/TSX and TSRX, with extended performance benefits from using TSRX.
-- No rules of hooks. The compiler gives every hook call site a stable identity,
-  so order never matters.
-- No virtual DOM, no signals, components re-render like React but with minimal overhead.
-- Fully async support, including transitions, deferred values and support for `<Activity>`.
-- Support for ref array composition `<div ref={[ref1, ref2]} />`.
-  (works with spreads; SSR-rendered and hydrated).
-- Real DOM events through delegation, rather than a synthetic event layer, so
-  event behavior matches the platform.
-- Full server-side rendering support and hydration.
-- Class components and server components are not supported.
-- `<ErrorBoundary>` provided for handling of errors, or using `@try` via TSRX.
+- **The full React hook API** — `useState`, `useEffect`, `useMemo`, `useRef`,
+  `useId`, `useTransition`, `useDeferredValue`, `use`, and the rest — with the
+  same effect ordering and Suspense semantics.
+- **Fully async** — transitions, deferred values, and `<Activity>`.
+- **Streaming SSR and byte-stable hydration** — out-of-order Suspense flushing
+  over Node or web streams, or buffered/static rendering when you want it.
+- **Errors handled two ways** — the `<ErrorBoundary>` component, or `@try` /
+  `@catch` in TSRX.
+- **`class` / `className` composes clsx-style** everywhere — strings, arrays,
+  objects, and nesting, at every apply site.
+- **Refs as props**, including array composition (`ref={[a, b]}`) — no
+  `forwardRef`. Works with spreads, SSR, and hydration.
+
+Octane is deliberately narrow where React has grown wide: **no class components,
+no Server Components, no synthetic event system.** Those are choices, not gaps —
+see [Differences from React](https://octanejs.dev/docs/differences-from-react).
 
 ## Quick start
 
@@ -90,14 +106,14 @@ root.render(App, { title: 'Hello world!' });
 
 ### Server render and hydrate
 
-octane's SSR entry points mirror React's. `octane/server` is the request-time
-renderer (`react-dom/server`) — buffered (`renderToString`) or streaming
-(`renderToPipeableStream` / `renderToReadableStream`); `octane/static` is the
-static-generation renderer (`react-dom/static`). All buffered renders return
-`{ html, css }` — hoisted `<title>`/`<meta>`/`<link>` are folded into `html` (as
-in React 19), and `css` is the deduped scoped `<style>` tags (octane has scoped
-CSS; the client's `injectStyle` matches them on hydration so they cross the
-boundary once).
+Octane's SSR entry points mirror React's, so this maps onto what you already do.
+`octane/server` is the request-time renderer (React's `react-dom/server`) — pick
+buffered (`renderToString`) or streaming (`renderToPipeableStream` /
+`renderToReadableStream`); `octane/static` is the static-generation renderer
+(`react-dom/static`). Buffered renders hand back `{ html, css }` — hoisted
+`<title>`/`<meta>`/`<link>` fold into `html` (as in React 19), and `css` is the
+deduped scoped-`<style>` tags, which the client's `injectStyle` matches on
+hydration so styles cross the boundary exactly once.
 
 ```ts
 // entry-server.ts
@@ -126,12 +142,14 @@ the SSR roadmap.
 
 ### Streaming SSR
 
+This is the fast-first-paint story, and it works the way React's does.
 `renderToPipeableStream` (Node streams) and `renderToReadableStream` (web streams)
-give React-`react-dom/server`-parity out-of-order Suspense flushing. The **shell**
-— the full page with `@pending` fallbacks for anything still suspended — flushes
-immediately; each Suspense boundary then streams **out of order** as a hidden
-segment plus an inline swap script when its data settles, and `hydrateRoot` adopts
-the swapped-in DOM byte-for-byte (per-boundary `use()` seeds included).
+flush a **shell** immediately — the full page, with `@pending` fallbacks standing
+in for anything still suspended — so the browser paints without waiting on your
+slowest data. Each Suspense boundary then streams in **out of order** the moment
+its data settles, as a hidden segment plus a tiny inline swap script. When the
+client hydrates, `hydrateRoot` adopts the swapped-in DOM byte-for-byte, per-boundary
+`use()` seeds included — no re-render, no flash.
 
 ```ts
 // entry-server.ts (Node)
@@ -303,6 +321,21 @@ and client render compose byte-identically, so hydration never mismatches).
 
 > Unlike React — which coerces `className={['a', 'b']}` to the string `"a,b"` — this is
 > a deliberate Octane convenience. A plain string still takes the fast path.
+
+## Documentation
+
+The full docs live at **[octanejs.dev](https://octanejs.dev)**, a site built with
+Octane itself. Good places to start:
+
+- **[Quick start](https://octanejs.dev/docs/quick-start)** — install, mount, and
+  the `.tsrx` essentials.
+- **[TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx)** — when to reach for
+  each dialect and exactly what TSRX unlocks: compiled `@for` collections,
+  template control flow, and text holes.
+- **[Differences from React](https://octanejs.dev/docs/differences-from-react)** —
+  the deliberate divergences, and why everything else matching React is the point.
+- **[Bindings](https://octanejs.dev/docs/bindings)** — the `@octanejs/*` ports of
+  the React ecosystem.
 
 ## Packages
 

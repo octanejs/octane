@@ -8,4 +8,16 @@ import { combineActiveProps, selectOrderedTooltipTicks } from './selectors';
 import { selectPolarViewBox } from './polarAxisSelectors';
 import { selectTooltipAxisType } from './selectTooltipAxisType';
 var pickChartPointer = (_state, chartPointer) => chartPointer;
-export var selectActivePropsFromChartPointer = createSelector([pickChartPointer, selectChartLayout, selectPolarViewBox, selectTooltipAxisType, selectTooltipAxisRangeWithReverse, selectTooltipAxisTicks, selectOrderedTooltipTicks, selectChartOffsetInternal], combineActiveProps);
+export var selectActivePropsFromChartPointer = createSelector(
+	[
+		pickChartPointer,
+		selectChartLayout,
+		selectPolarViewBox,
+		selectTooltipAxisType,
+		selectTooltipAxisRangeWithReverse,
+		selectTooltipAxisTicks,
+		selectOrderedTooltipTicks,
+		selectChartOffsetInternal,
+	],
+	combineActiveProps,
+);

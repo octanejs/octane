@@ -293,6 +293,10 @@ export const ATTRIBUTE_ALIASES: Map<string, string> = new Map([
 	['xmlBase', 'xml:base'],
 	['xmlLang', 'xml:lang'],
 	['xmlSpace', 'xml:space'],
+	// React writes this via a setProp switch case rather than its aliases map;
+	// same observable output. Matters on SVG hosts (setAttribute preserves case,
+	// and `tabIndex` verbatim is not focusable).
+	['tabIndex', 'tabindex'],
 ]);
 
 /**

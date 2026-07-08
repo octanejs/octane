@@ -12,30 +12,30 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { castDraft } from 'immer';
 var initialState = {
-  xAxis: {},
-  yAxis: {}
+	xAxis: {},
+	yAxis: {},
 };
 export var renderedTicksSlice = createSlice({
-  name: 'renderedTicks',
-  initialState,
-  reducers: {
-    setRenderedTicks: (state, action) => {
-      var _action$payload = action.payload,
-        axisType = _action$payload.axisType,
-        axisId = _action$payload.axisId,
-        ticks = _action$payload.ticks;
-      state[axisType][axisId] = castDraft(ticks);
-    },
-    removeRenderedTicks: (state, action) => {
-      var _action$payload2 = action.payload,
-        axisType = _action$payload2.axisType,
-        axisId = _action$payload2.axisId;
-      delete state[axisType][axisId];
-    }
-  }
+	name: 'renderedTicks',
+	initialState,
+	reducers: {
+		setRenderedTicks: (state, action) => {
+			var _action$payload = action.payload,
+				axisType = _action$payload.axisType,
+				axisId = _action$payload.axisId,
+				ticks = _action$payload.ticks;
+			state[axisType][axisId] = castDraft(ticks);
+		},
+		removeRenderedTicks: (state, action) => {
+			var _action$payload2 = action.payload,
+				axisType = _action$payload2.axisType,
+				axisId = _action$payload2.axisId;
+			delete state[axisType][axisId];
+		},
+	},
 });
 var _renderedTicksSlice$a = renderedTicksSlice.actions,
-  setRenderedTicks = _renderedTicksSlice$a.setRenderedTicks,
-  removeRenderedTicks = _renderedTicksSlice$a.removeRenderedTicks;
+	setRenderedTicks = _renderedTicksSlice$a.setRenderedTicks,
+	removeRenderedTicks = _renderedTicksSlice$a.removeRenderedTicks;
 export { setRenderedTicks, removeRenderedTicks };
 export var renderedTicksReducer = renderedTicksSlice.reducer;

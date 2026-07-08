@@ -28,22 +28,22 @@
  */
 
 export class RequestAnimationFrameTimeoutController {
-  setTimeout(callback) {
-    var delay = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-    var startTime = performance.now();
-    var requestId = null;
-    var executeCallback = now => {
-      if (now - startTime >= delay) {
-        callback(now);
-      } else {
-        requestId = requestAnimationFrame(executeCallback);
-      }
-    };
-    requestId = requestAnimationFrame(executeCallback);
-    return () => {
-      if (requestId != null) {
-        cancelAnimationFrame(requestId);
-      }
-    };
-  }
+	setTimeout(callback) {
+		var delay = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+		var startTime = performance.now();
+		var requestId = null;
+		var executeCallback = (now) => {
+			if (now - startTime >= delay) {
+				callback(now);
+			} else {
+				requestId = requestAnimationFrame(executeCallback);
+			}
+		};
+		requestId = requestAnimationFrame(executeCallback);
+		return () => {
+			if (requestId != null) {
+				cancelAnimationFrame(requestId);
+			}
+		};
+	}
 }
