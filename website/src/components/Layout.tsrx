@@ -17,12 +17,7 @@ export function Layout() @{
 					<a class="nav-link" href="/llms.txt" target="_blank" rel="noreferrer">
 						llms.txt
 					</a>
-					<a
-						class="nav-link"
-						href="https://discord.gg/8puY9fFqd9"
-						target="_blank"
-						rel="noreferrer"
-					>
+					<a class="nav-link" href="https://discord.gg/8puY9fFqd9" target="_blank" rel="noreferrer">
 						Discord
 					</a>
 					<a
