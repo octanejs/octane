@@ -10,7 +10,9 @@
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
     "types": ["node"],
-    "strict": true
+    "strict": true,
+    "allowJs": true,
+    "checkJs": false
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]

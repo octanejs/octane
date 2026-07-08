@@ -126,6 +126,17 @@ export default defineConfig({
 					// recharts as the byte-for-byte SVG oracle.
 					globalSetup: ['packages/recharts/tests/differential/_setup.ts'],
 					globals: false,
+					// Inline the oracle so it resolves the SAME module graph a real
+					// bundled app does: recharts has no exports map, so externalized
+					// node loading takes its CJS `main` → victory-vendor's `require`
+					// condition → the vendored PRE-3.2 d3-shape build (full-precision
+					// paths). Inlined, both sides take the `import` condition →
+					// victory-vendor/es → real d3-shape@3.2 (3-digit path rounding).
+					server: {
+						deps: {
+							inline: ['recharts', 'victory-vendor'],
+						},
+					},
 				},
 				plugins: [
 					octane({
@@ -141,6 +152,14 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/recharts\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/recharts/src') + '/$1.ts',
+						},
+						{
+							// SSR resolution ignores the `module` field, so bare 'recharts'
+							// would enter through its CJS `main` even when inlined — send it
+							// to the es6 build explicitly (no exports map, deep path is legal)
+							// so the oracle runs the same ESM graph a bundled app runs.
+							find: /^recharts$/,
+							replacement: 'recharts/es6/index.js',
 						},
 					],
 				},

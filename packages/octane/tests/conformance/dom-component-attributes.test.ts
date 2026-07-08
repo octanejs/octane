@@ -143,21 +143,21 @@ describe('ReactDOMComponent — empty-string URL attributes', () => {
 
 describe('ReactDOMComponent — React-specific attribute aliases', () => {
 	// Per ReactDOMComponent-test.js:720 — React maps `acceptCharset` →
-	// `accept-charset` via its possibleStandardNames alias table (also :3457).
-	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04): octane has NO alias table —
-	// attribute names are written as authored (the platform lowercases HTML attr
-	// names, so `acceptCharset` lands as `acceptcharset`). The TSRX idiom is the
-	// NATIVE spelling: write `accept-charset={…}` — valid JSX-attribute syntax that
-	// React itself also accepts. Only React's own inventions (className, htmlFor)
-	// are aliased.
-	it('writes attribute names as authored — use the native `accept-charset` spelling', () => {
+	// `accept-charset` (also :3457). Octane applies React 19's PROD write-path
+	// `aliases` map (ATTRIBUTE_ALIASES, constants.ts) — the canonical camelCase
+	// JSX prop writes the native attribute. (Adjudication history: the 2026-07-04
+	// ruling rejected the loose possibleStandardNames DEV table — any-spelling
+	// normalization — and that part stands. The prod aliases map was adopted
+	// 2026-07-07: without it, React-ecosystem SVG libraries spread `strokeWidth`
+	// et al. onto SVG hosts as dead attributes. The alias is additive — the
+	// native hyphenated spelling still writes verbatim and stays the TSRX idiom.)
+	it('aliases `acceptCharset` → `accept-charset`; native spelling also works', () => {
 		const r = mount(FormAcceptCharset, { v: 'foo' });
 		const node = first(r);
-		// React-camelCase spelling lands verbatim (lowercased by the HTML DOM)…
-		expect(node.getAttribute('acceptcharset')).toBe('foo');
-		expect(node.hasAttribute('accept-charset')).toBe(false);
+		expect(node.getAttribute('accept-charset')).toBe('foo');
+		expect(node.hasAttribute('acceptcharset')).toBe(false);
 		r.unmount();
-		// …the native spelling is the supported idiom.
+		// The native spelling writes verbatim (not in the alias map).
 		const r2 = mount(FormAcceptCharsetNative, { v: 'foo' });
 		const node2 = first(r2);
 		expect(node2.getAttribute('accept-charset')).toBe('foo');
@@ -167,13 +167,13 @@ describe('ReactDOMComponent — React-specific attribute aliases', () => {
 	});
 
 	// Per ReactDOMComponent-test.js:768 — React maps `arabicForm` → `arabic-form`
-	// on SVG. Same INTENTIONAL DIVERGENCE as above: no alias table; SVG preserves
-	// the authored case, and the native hyphenated spelling is the idiom.
-	it('preserves SVG attribute names as authored — use the native `arabic-form` spelling', () => {
+	// on SVG. Same aliases map; matters doubly on SVG hosts, whose setAttribute
+	// preserves case (an unaliased camelCase name never styles the element).
+	it('aliases SVG `arabicForm` → `arabic-form`', () => {
 		const r = mount(SvgArabicForm, { v: 'foo' });
 		const node = first(r);
-		expect(node.getAttribute('arabicForm')).toBe('foo'); // authored camelCase, case-preserved
-		expect(node.hasAttribute('arabic-form')).toBe(false);
+		expect(node.getAttribute('arabic-form')).toBe('foo');
+		expect(node.hasAttribute('arabicForm')).toBe(false);
 		r.unmount();
 	});
 });
