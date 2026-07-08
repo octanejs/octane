@@ -11,7 +11,7 @@ import {
 	symbolWye,
 } from 'victory-vendor/d3-shape';
 import { clsx } from 'clsx';
-import { isNumber, upperFirst } from '../vendor/util/DataUtils';
+import { isNumber, upperFirst } from '../util/DataUtils';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents.ts';
 
 const symbolFactories = {

@@ -1,6 +1,8 @@
-// Vendored verbatim from recharts@3.9.2 es6/util/svgPropertiesNoEvents.js (framework-agnostic).
-// Do not edit — update by re-vendoring when the recharts devDependency moves.
-import { isValidElement } from 'react';
+// Vendored from recharts@3.9.2 es6/util/svgPropertiesNoEvents.js with ONE
+// adaptation: `isValidElement` comes from octane (this file inspects OCTANE
+// element descriptors at runtime, not React elements). Everything else is
+// verbatim — update by re-vendoring when the recharts devDependency moves.
+import { isValidElement } from 'octane';
 var SVGElementPropKeys = [
 	'aria-activedescendant',
 	'aria-atomic',

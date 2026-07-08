@@ -1,8 +1,8 @@
 // Port of shape/Dot.tsx — a circle marker.
 import { clsx } from 'clsx';
 import { adaptEventHandlers } from '../util/types.ts';
-import { svgPropertiesNoEvents } from '../vendor/util/svgPropertiesNoEvents';
-import { isNumber } from '../vendor/util/DataUtils';
+import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
+import { isNumber } from '../util/DataUtils';
 
 export function Dot(props) {
 	const { cx, cy, r, className } = props;

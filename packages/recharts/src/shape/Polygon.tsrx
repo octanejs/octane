@@ -2,7 +2,7 @@
 // PolarGrid). Path strings mirror upstream's roundTemplateLiteral output.
 import { clsx } from 'clsx';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents.ts';
-import { round } from '../vendor/util/round';
+import { round } from '../util/round';
 
 function isValidatePoint(point) {
 	return point != null && point.x === +point.x && point.y === +point.y;

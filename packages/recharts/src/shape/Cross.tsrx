@@ -1,7 +1,7 @@
 // Port of shape/Cross.tsx — the axis-cursor crosshair (a vertical + horizontal
 // line pair as one path).
 import { clsx } from 'clsx';
-import { isNumber } from '../vendor/util/DataUtils';
+import { isNumber } from '../util/DataUtils';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents.ts';
 
 function getPath(x, y, width, height, top, left) {

@@ -6,8 +6,8 @@
 // roundTemplateLiteral (every interpolated number rounded to 4dp, template
 // whitespace/newlines preserved verbatim) — mirrored exactly here.
 import { clsx } from 'clsx';
-import { resolveDefaultProps } from '../vendor/util/resolveDefaultProps';
-import { round } from '../vendor/util/round';
+import { resolveDefaultProps } from '../util/resolveDefaultProps';
+import { round } from '../util/round';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents.ts';
 
 function getRectanglePath(x, y, width, height, radius) {

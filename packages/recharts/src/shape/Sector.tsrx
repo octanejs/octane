@@ -5,11 +5,11 @@
 // template literals below reproduce upstream's exact strings including their
 // embedded newlines and indentation.
 import { clsx } from 'clsx';
-import { polarToCartesian, RADIAN } from '../vendor/util/PolarUtils';
-import { getPercentValue, mathSign } from '../vendor/util/DataUtils';
-import { resolveDefaultProps } from '../vendor/util/resolveDefaultProps';
+import { polarToCartesian, RADIAN } from '../util/PolarUtils';
+import { getPercentValue, mathSign } from '../util/DataUtils';
+import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents.ts';
-import { roundTemplateLiteral } from '../vendor/util/round';
+import { roundTemplateLiteral } from '../util/round';
 
 const getDeltaAngle = (startAngle, endAngle) => {
 	const sign = mathSign(endAngle - startAngle);

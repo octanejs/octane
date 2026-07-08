@@ -47,7 +47,6 @@ Octane is currently in alpha development.
 - No virtual DOM, no signals, components re-render like React but with minimal overhead.
 - Fully async support, including transitions, deferred values and support for `<Activity>`.
 - Support for ref array composition `<div ref={[ref1, ref2]} />`.
-- Raw HTML via React's `<div dangerouslySetInnerHTML={{ __html: markup }} />`
   (works with spreads; SSR-rendered and hydrated).
 - Real DOM events through delegation, rather than a synthetic event layer, so
   event behavior matches the platform.
@@ -92,11 +91,13 @@ root.render(App, { title: 'Hello world!' });
 ### Server render and hydrate
 
 octane's SSR entry points mirror React's. `octane/server` is the request-time
-renderer (`react-dom/server`); `octane/static` is the static-generation renderer
-(`react-dom/static`). All buffered renders return `{ html, css }` — hoisted
-`<title>`/`<meta>`/`<link>` are folded into `html` (as in React 19), and `css` is
-the deduped scoped `<style>` tags (octane has scoped CSS; the client's
-`injectStyle` matches them on hydration so they cross the boundary once).
+renderer (`react-dom/server`) — buffered (`renderToString`) or streaming
+(`renderToPipeableStream` / `renderToReadableStream`); `octane/static` is the
+static-generation renderer (`react-dom/static`). All buffered renders return
+`{ html, css }` — hoisted `<title>`/`<meta>`/`<link>` are folded into `html` (as
+in React 19), and `css` is the deduped scoped `<style>` tags (octane has scoped
+CSS; the client's `injectStyle` matches them on hydration so they cross the
+boundary once).
 
 ```ts
 // entry-server.ts
@@ -114,14 +115,50 @@ export async function renderApp() {
 | --- | --- | --- | --- |
 | `renderToString(el, props?, opts?)` | `octane/server` | no (sync) | renders its `@pending` fallback |
 | `renderToStaticMarkup(el, props?, opts?)` | `octane/server` | no (sync) | fallback; **no** hydration markers/seeds |
+| `renderToPipeableStream(el, props?, opts?)` | `octane/server` | streams | shell ships the fallback; boundary streams in when it settles |
+| `renderToReadableStream(el, props?, opts?)` | `octane/server` | streams | shell ships the fallback; boundary streams in when it settles |
 | `prerender(el, props?, opts?)` | `octane/static` | yes | awaits data, renders the success arm |
 
-All three accept a `RenderOptions` (CSP `nonce`, an `AbortSignal`, a per-render
-`timeoutMs`). See [docs/ssr.md](./docs/ssr.md) for the full server guide (Suspense
-on the server, head hoisting, `module server` RPC) and the SSR roadmap.
+The buffered/static renderers accept a `RenderOptions` (CSP `nonce`, an
+`AbortSignal`, a per-render `timeoutMs`). See [docs/ssr.md](./docs/ssr.md) for the
+full server guide (Suspense on the server, head hoisting, `module server` RPC) and
+the SSR roadmap.
 
-> Streaming (`renderToPipeableStream` / `renderToReadableStream`, React's
-> out-of-order Suspense flushing) is in progress.
+### Streaming SSR
+
+`renderToPipeableStream` (Node streams) and `renderToReadableStream` (web streams)
+give React-`react-dom/server`-parity out-of-order Suspense flushing. The **shell**
+— the full page with `@pending` fallbacks for anything still suspended — flushes
+immediately; each Suspense boundary then streams **out of order** as a hidden
+segment plus an inline swap script when its data settles, and `hydrateRoot` adopts
+the swapped-in DOM byte-for-byte (per-boundary `use()` seeds included).
+
+```ts
+// entry-server.ts (Node)
+import { renderToPipeableStream } from 'octane/server';
+import { App } from './App.tsrx';
+
+export function renderApp(res) {
+  const { pipe } = renderToPipeableStream(App, undefined, {
+    onShellReady() {
+      res.statusCode = 200;
+      res.setHeader('content-type', 'text/html');
+      pipe(res); // shell flushes now; boundaries stream in behind it
+    },
+    onShellError(err) {
+      res.statusCode = 500;
+      res.end('<!doctype html>Server error');
+    },
+  });
+}
+```
+
+`renderToReadableStream` returns a `Promise<ReadableStream<Uint8Array>>` that
+resolves once the shell is ready (rejects on a shell error); the stream carries an
+`allReady` promise that settles when every boundary has flushed. Both accept a
+`StreamOptions` (`RenderOptions` plus `onShellReady()`, `onShellError(err)`, and
+`onAllReady()`). `@octanejs/vite-plugin` renders through `renderToReadableStream`
+by default.
 
 ```ts
 // entry-client.ts

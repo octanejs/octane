@@ -20,9 +20,9 @@ import {
 } from 'victory-vendor/d3-shape';
 import { clsx } from 'clsx';
 import { adaptEventHandlers } from '../util/types.ts';
-import { isNumber, upperFirst } from '../vendor/util/DataUtils';
-import { isWellBehavedNumber } from '../vendor/util/isWellBehavedNumber';
-import { svgPropertiesNoEvents } from '../vendor/util/svgPropertiesNoEvents';
+import { isNumber, upperFirst } from '../util/DataUtils';
+import { isWellBehavedNumber } from '../util/isWellBehavedNumber';
+import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import { useChartLayout } from '../context/chartLayoutContext.ts';
 
 const CURVE_FACTORIES = {
