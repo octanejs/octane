@@ -111,6 +111,110 @@ export const BOOLEAN_DROPPED_STRING_ATTR_PROPS = new Set([
 ]);
 
 /**
+ * React 19's attribute-alias table (ReactDOMComponent.js `aliases`, verbatim)
+ * plus the namespaced camelCase props React handles as switch cases
+ * (`xlinkHref` → `xlink:href`, `xmlLang` → `xml:lang` — the prefixed form
+ * routes through the client's attrNamespace / serializes as-is on the server).
+ * camelCase JSX prop → the attribute the browser actually understands
+ * (`strokeWidth` → `stroke-width`); names not listed write verbatim — the set
+ * is an ALLOWLIST, not mechanical hyphenation (`viewBox` stays camelCase).
+ * Applied by the client's `setAttribute` (spreads / dynamic bindings / de-opt),
+ * the server's `ssrAttr`, and — DUPLICATED, keep in sync — the compiler's
+ * `normalizeJsxAttrName` (compile.js), which bakes static attributes into
+ * template/SSR markup. Custom elements are exempt everywhere (raw props).
+ */
+export const ATTRIBUTE_ALIASES: Map<string, string> = new Map([
+	['acceptCharset', 'accept-charset'],
+	['htmlFor', 'for'],
+	['httpEquiv', 'http-equiv'],
+	['crossOrigin', 'crossorigin'],
+	['accentHeight', 'accent-height'],
+	['alignmentBaseline', 'alignment-baseline'],
+	['arabicForm', 'arabic-form'],
+	['baselineShift', 'baseline-shift'],
+	['capHeight', 'cap-height'],
+	['clipPath', 'clip-path'],
+	['clipRule', 'clip-rule'],
+	['colorInterpolation', 'color-interpolation'],
+	['colorInterpolationFilters', 'color-interpolation-filters'],
+	['colorProfile', 'color-profile'],
+	['colorRendering', 'color-rendering'],
+	['dominantBaseline', 'dominant-baseline'],
+	['enableBackground', 'enable-background'],
+	['fillOpacity', 'fill-opacity'],
+	['fillRule', 'fill-rule'],
+	['floodColor', 'flood-color'],
+	['floodOpacity', 'flood-opacity'],
+	['fontFamily', 'font-family'],
+	['fontSize', 'font-size'],
+	['fontSizeAdjust', 'font-size-adjust'],
+	['fontStretch', 'font-stretch'],
+	['fontStyle', 'font-style'],
+	['fontVariant', 'font-variant'],
+	['fontWeight', 'font-weight'],
+	['glyphName', 'glyph-name'],
+	['glyphOrientationHorizontal', 'glyph-orientation-horizontal'],
+	['glyphOrientationVertical', 'glyph-orientation-vertical'],
+	['horizAdvX', 'horiz-adv-x'],
+	['horizOriginX', 'horiz-origin-x'],
+	['imageRendering', 'image-rendering'],
+	['letterSpacing', 'letter-spacing'],
+	['lightingColor', 'lighting-color'],
+	['markerEnd', 'marker-end'],
+	['markerMid', 'marker-mid'],
+	['markerStart', 'marker-start'],
+	['overlinePosition', 'overline-position'],
+	['overlineThickness', 'overline-thickness'],
+	['paintOrder', 'paint-order'],
+	['panose-1', 'panose-1'],
+	['pointerEvents', 'pointer-events'],
+	['renderingIntent', 'rendering-intent'],
+	['shapeRendering', 'shape-rendering'],
+	['stopColor', 'stop-color'],
+	['stopOpacity', 'stop-opacity'],
+	['strikethroughPosition', 'strikethrough-position'],
+	['strikethroughThickness', 'strikethrough-thickness'],
+	['strokeDasharray', 'stroke-dasharray'],
+	['strokeDashoffset', 'stroke-dashoffset'],
+	['strokeLinecap', 'stroke-linecap'],
+	['strokeLinejoin', 'stroke-linejoin'],
+	['strokeMiterlimit', 'stroke-miterlimit'],
+	['strokeOpacity', 'stroke-opacity'],
+	['strokeWidth', 'stroke-width'],
+	['textAnchor', 'text-anchor'],
+	['textDecoration', 'text-decoration'],
+	['textRendering', 'text-rendering'],
+	['transformOrigin', 'transform-origin'],
+	['underlinePosition', 'underline-position'],
+	['underlineThickness', 'underline-thickness'],
+	['unicodeBidi', 'unicode-bidi'],
+	['unicodeRange', 'unicode-range'],
+	['unitsPerEm', 'units-per-em'],
+	['vAlphabetic', 'v-alphabetic'],
+	['vHanging', 'v-hanging'],
+	['vIdeographic', 'v-ideographic'],
+	['vMathematical', 'v-mathematical'],
+	['vectorEffect', 'vector-effect'],
+	['vertAdvY', 'vert-adv-y'],
+	['vertOriginX', 'vert-origin-x'],
+	['vertOriginY', 'vert-origin-y'],
+	['wordSpacing', 'word-spacing'],
+	['writingMode', 'writing-mode'],
+	['xmlnsXlink', 'xmlns:xlink'],
+	['xHeight', 'x-height'],
+	['xlinkActuate', 'xlink:actuate'],
+	['xlinkArcrole', 'xlink:arcrole'],
+	['xlinkHref', 'xlink:href'],
+	['xlinkRole', 'xlink:role'],
+	['xlinkShow', 'xlink:show'],
+	['xlinkTitle', 'xlink:title'],
+	['xlinkType', 'xlink:type'],
+	['xmlBase', 'xml:base'],
+	['xmlLang', 'xml:lang'],
+	['xmlSpace', 'xml:space'],
+]);
+
+/**
  * The three global ENUMERATED attributes whose boolean prop forms must
  * stringify: `false` must WRITE "false" (an ABSENT attribute means "inherit /
  * UA default", a different state), and `true` writes "true". Applies on every

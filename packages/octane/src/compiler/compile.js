@@ -218,11 +218,115 @@ function jsxAttrRawName(attr) {
 	return n.name || n;
 }
 
-// `className`/`htmlFor` are React-shape JSX aliases; emit the native
-// `class`/`for` names so the browser actually applies them (and dynamic
-// bindings know which setter to pick).
-function normalizeJsxAttrName(raw) {
-	return raw === 'className' ? 'class' : raw === 'htmlFor' ? 'for' : raw;
+// React 19's attribute-alias table — camelCase JSX prop → the attribute the
+// browser actually parses (`strokeWidth` → `stroke-width`, `htmlFor` → `for`,
+// `xlinkHref` → `xlink:href`). An ALLOWLIST, not mechanical hyphenation
+// (`viewBox` stays camelCase). Keep in sync with ATTRIBUTE_ALIASES in
+// ../constants.ts — the compiler bakes these into static template/SSR markup,
+// the client/server runtimes apply the same table to dynamic bindings,
+// spreads, and de-opt props.
+const ATTRIBUTE_ALIASES = new Map([
+	['acceptCharset', 'accept-charset'],
+	['htmlFor', 'for'],
+	['httpEquiv', 'http-equiv'],
+	['crossOrigin', 'crossorigin'],
+	['accentHeight', 'accent-height'],
+	['alignmentBaseline', 'alignment-baseline'],
+	['arabicForm', 'arabic-form'],
+	['baselineShift', 'baseline-shift'],
+	['capHeight', 'cap-height'],
+	['clipPath', 'clip-path'],
+	['clipRule', 'clip-rule'],
+	['colorInterpolation', 'color-interpolation'],
+	['colorInterpolationFilters', 'color-interpolation-filters'],
+	['colorProfile', 'color-profile'],
+	['colorRendering', 'color-rendering'],
+	['dominantBaseline', 'dominant-baseline'],
+	['enableBackground', 'enable-background'],
+	['fillOpacity', 'fill-opacity'],
+	['fillRule', 'fill-rule'],
+	['floodColor', 'flood-color'],
+	['floodOpacity', 'flood-opacity'],
+	['fontFamily', 'font-family'],
+	['fontSize', 'font-size'],
+	['fontSizeAdjust', 'font-size-adjust'],
+	['fontStretch', 'font-stretch'],
+	['fontStyle', 'font-style'],
+	['fontVariant', 'font-variant'],
+	['fontWeight', 'font-weight'],
+	['glyphName', 'glyph-name'],
+	['glyphOrientationHorizontal', 'glyph-orientation-horizontal'],
+	['glyphOrientationVertical', 'glyph-orientation-vertical'],
+	['horizAdvX', 'horiz-adv-x'],
+	['horizOriginX', 'horiz-origin-x'],
+	['imageRendering', 'image-rendering'],
+	['letterSpacing', 'letter-spacing'],
+	['lightingColor', 'lighting-color'],
+	['markerEnd', 'marker-end'],
+	['markerMid', 'marker-mid'],
+	['markerStart', 'marker-start'],
+	['overlinePosition', 'overline-position'],
+	['overlineThickness', 'overline-thickness'],
+	['paintOrder', 'paint-order'],
+	['panose-1', 'panose-1'],
+	['pointerEvents', 'pointer-events'],
+	['renderingIntent', 'rendering-intent'],
+	['shapeRendering', 'shape-rendering'],
+	['stopColor', 'stop-color'],
+	['stopOpacity', 'stop-opacity'],
+	['strikethroughPosition', 'strikethrough-position'],
+	['strikethroughThickness', 'strikethrough-thickness'],
+	['strokeDasharray', 'stroke-dasharray'],
+	['strokeDashoffset', 'stroke-dashoffset'],
+	['strokeLinecap', 'stroke-linecap'],
+	['strokeLinejoin', 'stroke-linejoin'],
+	['strokeMiterlimit', 'stroke-miterlimit'],
+	['strokeOpacity', 'stroke-opacity'],
+	['strokeWidth', 'stroke-width'],
+	['textAnchor', 'text-anchor'],
+	['textDecoration', 'text-decoration'],
+	['textRendering', 'text-rendering'],
+	['transformOrigin', 'transform-origin'],
+	['underlinePosition', 'underline-position'],
+	['underlineThickness', 'underline-thickness'],
+	['unicodeBidi', 'unicode-bidi'],
+	['unicodeRange', 'unicode-range'],
+	['unitsPerEm', 'units-per-em'],
+	['vAlphabetic', 'v-alphabetic'],
+	['vHanging', 'v-hanging'],
+	['vIdeographic', 'v-ideographic'],
+	['vMathematical', 'v-mathematical'],
+	['vectorEffect', 'vector-effect'],
+	['vertAdvY', 'vert-adv-y'],
+	['vertOriginX', 'vert-origin-x'],
+	['vertOriginY', 'vert-origin-y'],
+	['wordSpacing', 'word-spacing'],
+	['writingMode', 'writing-mode'],
+	['xmlnsXlink', 'xmlns:xlink'],
+	['xHeight', 'x-height'],
+	['xlinkActuate', 'xlink:actuate'],
+	['xlinkArcrole', 'xlink:arcrole'],
+	['xlinkHref', 'xlink:href'],
+	['xlinkRole', 'xlink:role'],
+	['xlinkShow', 'xlink:show'],
+	['xlinkTitle', 'xlink:title'],
+	['xlinkType', 'xlink:type'],
+	['xmlBase', 'xml:base'],
+	['xmlLang', 'xml:lang'],
+	['xmlSpace', 'xml:space'],
+]);
+
+// `className` plus the ATTRIBUTE_ALIASES table above: emit the native
+// attribute names so the browser actually applies them (and dynamic bindings
+// know which setter to pick). Custom elements keep every name VERBATIM (raw
+// props, no alias tables) — the same gate the runtimes' setAttribute/ssrAttr
+// apply to dynamic values.
+function normalizeJsxAttrName(raw, tag) {
+	// `className` → `class` applies EVERYWHERE, custom elements included (React
+	// special-cases it in setPropOnCustomElement); only the alias table is raw.
+	if (raw === 'className') return 'class';
+	if (tag !== undefined && tag.includes('-')) return raw;
+	return ATTRIBUTE_ALIASES.get(raw) || raw;
 }
 
 // React-shape `onXxx` event-handler attribute: `on` + an uppercase letter, so
@@ -2000,13 +2104,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		// Events and refs have no server semantics — dropped.
 		if (rawAttrName === 'ref') continue;
 		if (isEventAttrName(rawAttrName)) continue;
-		// Custom elements keep `htmlFor` VERBATIM (React parity — they get raw
-		// props, no `for` alias; `className`→`class` still applies); ssrAttr
-		// applies the same gate for dynamic values.
-		const attrName =
-			rawAttrName === 'htmlFor' && tag.includes('-')
-				? rawAttrName
-				: normalizeJsxAttrName(rawAttrName);
+		// Custom elements keep names VERBATIM (React parity — they get raw props,
+		// no alias tables; `className`→`class` still applies); ssrAttr applies
+		// the same gate for dynamic values.
+		const attrName = normalizeJsxAttrName(rawAttrName, tag);
 		const val = attr.value;
 		const isAfterSpread = firstSpreadIdx !== -1 && attrI > firstSpreadIdx;
 
@@ -5430,7 +5531,7 @@ function emitElementHtml(
 			if (!isFalse) bindings.push({ id: bindings.length, kind: 'suppress', path });
 			continue;
 		}
-		const attrName = normalizeJsxAttrName(rawAttrName);
+		const attrName = normalizeJsxAttrName(rawAttrName, tag);
 
 		const val = attr.value;
 		// If this attr comes AFTER a spread, we MUST emit as a binding (later wins).

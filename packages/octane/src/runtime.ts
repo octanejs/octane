@@ -24,6 +24,7 @@ import {
 	isEnumeratedBooleanAttr,
 	UNDEFINED_SENTINEL_KEY,
 	cssStyleValue,
+	ATTRIBUTE_ALIASES,
 } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -438,6 +439,16 @@ let CURRENT_BLOCK: Block | null = null;
 const QUEUE: Block[] = [];
 let scheduled = false;
 let syncFlush = false; // flushSync sets this to drain the queue synchronously
+// True while a flush (drainQueue/commitEffects) is on the stack. A flushSync
+// that lands during it — most commonly maybeFlushDiscrete for a DISCRETE event
+// the browser dispatches SYNCHRONOUSLY inside a commit-phase DOM mutation
+// (Chrome fires `blur`/`focusout` from removeChild when the focused element's
+// subtree is torn down) — must NOT drain re-entrantly: the outer removal walk
+// holds cached sibling pointers, and a nested commit mutating the same range
+// corrupts it (removeChild: "not a child"). React's rule ("flushSync was called
+// from inside a lifecycle method… cannot flush when already rendering"): run
+// the callback, let the ambient flush pick up whatever it scheduled.
+let inFlush = false;
 
 // ---------------------------------------------------------------------------
 // Transitions — React 18 priority lanes, simplified to two levels.
@@ -815,16 +826,30 @@ function drainQueue(): { err: any } | null {
 
 function flush(): void {
 	scheduled = false;
-	// React parity: pending PASSIVE effects from an earlier commit flush BEFORE the next
-	// render begins (React's flushPassiveEffects-at-render-start). Without this, a
-	// cascade that mounts new children (e.g. a layout-effect-driven Presence reveal)
-	// merges the earlier commit's passive effects (e.g. an event dispatch) into the same
-	// drain as the new children's listener-attach effects — re-ordering them child-first
-	// and letting a child observe an event announcing its own mount.
-	if (QUEUE.length > 0) drainPassivesBeforeRender();
-	const pendingError = drainQueue();
-	commitEffects();
-	if (pendingError !== null) throw pendingError.err;
+	// Re-entrancy backstop (see `inFlush`): a flush landing inside an active
+	// flush re-arms the scheduler instead of draining over the outer walk.
+	if (inFlush) {
+		if (QUEUE.length > 0 && !scheduled) {
+			scheduled = true;
+			queueMicrotask(flush);
+		}
+		return;
+	}
+	inFlush = true;
+	try {
+		// React parity: pending PASSIVE effects from an earlier commit flush BEFORE the next
+		// render begins (React's flushPassiveEffects-at-render-start). Without this, a
+		// cascade that mounts new children (e.g. a layout-effect-driven Presence reveal)
+		// merges the earlier commit's passive effects (e.g. an event dispatch) into the same
+		// drain as the new children's listener-attach effects — re-ordering them child-first
+		// and letting a child observe an event announcing its own mount.
+		if (QUEUE.length > 0) drainPassivesBeforeRender();
+		const pendingError = drainQueue();
+		commitEffects();
+		if (pendingError !== null) throw pendingError.err;
+	} finally {
+		inFlush = false;
+	}
 }
 
 /** Drain pending passive effects ahead of a render pass (see flush()). */
@@ -840,51 +865,67 @@ function drainPassivesBeforeRender(): void {
  * click/keydown/input handlers commit before the browser regains control.
  */
 export function flushSync<T>(fn: () => T): T {
+	// Already inside a flush — a DISCRETE event the browser dispatched
+	// synchronously from a commit-phase DOM mutation (maybeFlushDiscrete), or a
+	// user flushSync inside a lifecycle. React cannot flush while already
+	// rendering: run the callback and let the AMBIENT flush drain whatever it
+	// schedules — drainQueue picks up mid-pass appends, and the microtask
+	// scheduler backstops work queued after the render pass (see `inFlush`).
+	if (inFlush) return fn();
 	const prevSync = syncFlush;
 	syncFlush = true;
 	try {
 		const result = fn();
-		// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
-		// Match React semantics: flushSync drains insertion + layout synchronously, but
-		// passive effects (useEffect) still fire AFTER paint via the regular scheduler —
-		// exactly what commitEffects already does.
-		if (QUEUE.length > 0) drainPassivesBeforeRender();
-		let pendingError = drainQueue();
-		commitEffects();
-		// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
-		// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
-		// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
-		// needed so derived layout state (e.g. a presence/exit-animation gate) is committed
-		// before flushSync returns. But octane also deliberately FORGIVES non-convergent
-		// cascades (an unstable `useSyncExternalStore` getSnapshot re-scheduling its component
-		// from every layout pass — React throws "maximum update depth"/"getSnapshot should be
-		// cached"; octane must neither hang nor burst-render). Discriminate by CONVERGENCE:
-		// keep draining while each pass schedules only blocks not yet seen in this flushSync
-		// (a finite cascade propagating through the tree — it exhausts quickly since
-		// Object.is-equal setStates bail); the moment a block re-schedules ITSELF a second
-		// time, the cascade is non-convergent — stop and hand the remainder to the async
-		// scheduler, which advances it lazily (one render per microtask), exactly the
-		// pre-existing behavior divergent stores rely on. LAYOUT_CASCADE_LIMIT backstops
-		// pathological wide-but-finite chains.
-		if (QUEUE.length > 0) {
-			const seen = new Set<Block>(QUEUE);
-			let defer = false;
-			for (let guard = 0; QUEUE.length > 0 && !defer && guard < LAYOUT_CASCADE_LIMIT; guard++) {
-				// Each convergence iteration is a new render pass — flush pending passives
-				// first (React's rule; see flush()).
-				drainPassivesBeforeRender();
-				const err = drainQueue();
-				if (err !== null && pendingError === null) pendingError = err;
-				commitEffects();
-				for (let i = 0; i < QUEUE.length; i++) {
-					const b = QUEUE[i];
-					if (seen.has(b)) {
-						defer = true;
-						break;
+		// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
+		// inside fn still flushes inline (React isn't "rendering" during the
+		// callback), while one landing inside the drain defers (guard above).
+		inFlush = true;
+		let pendingError: { err: any } | null = null;
+		try {
+			// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
+			// Match React semantics: flushSync drains insertion + layout synchronously, but
+			// passive effects (useEffect) still fire AFTER paint via the regular scheduler —
+			// exactly what commitEffects already does.
+			if (QUEUE.length > 0) drainPassivesBeforeRender();
+			pendingError = drainQueue();
+			commitEffects();
+			// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
+			// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
+			// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
+			// needed so derived layout state (e.g. a presence/exit-animation gate) is committed
+			// before flushSync returns. But octane also deliberately FORGIVES non-convergent
+			// cascades (an unstable `useSyncExternalStore` getSnapshot re-scheduling its component
+			// from every layout pass — React throws "maximum update depth"/"getSnapshot should be
+			// cached"; octane must neither hang nor burst-render). Discriminate by CONVERGENCE:
+			// keep draining while each pass schedules only blocks not yet seen in this flushSync
+			// (a finite cascade propagating through the tree — it exhausts quickly since
+			// Object.is-equal setStates bail); the moment a block re-schedules ITSELF a second
+			// time, the cascade is non-convergent — stop and hand the remainder to the async
+			// scheduler, which advances it lazily (one render per microtask), exactly the
+			// pre-existing behavior divergent stores rely on. LAYOUT_CASCADE_LIMIT backstops
+			// pathological wide-but-finite chains.
+			if (QUEUE.length > 0) {
+				const seen = new Set<Block>(QUEUE);
+				let defer = false;
+				for (let guard = 0; QUEUE.length > 0 && !defer && guard < LAYOUT_CASCADE_LIMIT; guard++) {
+					// Each convergence iteration is a new render pass — flush pending passives
+					// first (React's rule; see flush()).
+					drainPassivesBeforeRender();
+					const err = drainQueue();
+					if (err !== null && pendingError === null) pendingError = err;
+					commitEffects();
+					for (let i = 0; i < QUEUE.length; i++) {
+						const b = QUEUE[i];
+						if (seen.has(b)) {
+							defer = true;
+							break;
+						}
+						seen.add(b);
 					}
-					seen.add(b);
 				}
 			}
+		} finally {
+			inFlush = false;
 		}
 		if (QUEUE.length > 0 && !scheduled) {
 			scheduled = true;
@@ -3923,10 +3964,17 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		delete map[name];
 		// fall through: non-function value now takes plain attribute semantics
 	}
-	// React-parity alias, mirroring class/className: `htmlFor` writes the native
-	// `for`. Custom elements keep it VERBATIM (raw props, no alias tables) —
-	// parity with the server's ssrAttr gate.
-	if (name === 'htmlFor' && el.localName.indexOf('-') === -1) name = 'for';
+	// React-parity aliases (ATTRIBUTE_ALIASES, constants.ts): `htmlFor` → `for`,
+	// `strokeWidth` → `stroke-width`, `xlinkHref` → `xlink:href`, … — the JSX
+	// camelCase prop writes the attribute the browser actually understands.
+	// Matters beyond cosmetics on SVG hosts: their setAttribute does NOT
+	// lowercase, so an unaliased `strokeWidth` would land verbatim and never
+	// style the element. Custom elements keep names VERBATIM (raw props, no
+	// alias tables) — parity with the server's ssrAttr gate.
+	if (el.localName.indexOf('-') === -1) {
+		const alias = ATTRIBUTE_ALIASES.get(name);
+		if (alias !== undefined) name = alias;
+	}
 	// Coerce ONCE to the final attribute string (null = absent). The hydration
 	// compare below and the write share the result, so the compare can never
 	// disagree with what actually lands in the DOM — and the value rules mirror

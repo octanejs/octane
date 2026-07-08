@@ -37,6 +37,7 @@ import {
 	BOOLEAN_DROPPED_STRING_ATTR_PROPS,
 	isEnumeratedBooleanAttr,
 	cssStyleValue,
+	ATTRIBUTE_ALIASES,
 } from './constants.js';
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
@@ -524,9 +525,15 @@ export function ssrPortal(): string {
  */
 export function ssrAttr(name: string, v: unknown, tag?: string): string {
 	const isCustomTag = tag !== undefined && tag.indexOf('-') !== -1;
-	// React-parity alias, mirroring class/className: `htmlFor` serialises as `for`.
-	// Custom elements get their props VERBATIM (no alias tables) — React parity.
-	if (name === 'htmlFor' && !isCustomTag) name = 'for';
+	// React-parity aliases (ATTRIBUTE_ALIASES, constants.ts): `htmlFor` → `for`,
+	// `strokeWidth` → `stroke-width`, `xlinkHref` → `xlink:href`, … — serialize
+	// the attribute the browser actually parses, byte-matching the client's
+	// setAttribute writes (hydration parity). Custom elements get their props
+	// VERBATIM (no alias tables) — React parity.
+	if (!isCustomTag) {
+		const alias = ATTRIBUTE_ALIASES.get(name);
+		if (alias !== undefined) name = alias;
+	}
 	// `class` / `className` clsx-compose so arrays / objects serialise the same string
 	// the client writes (a nullish/false class still drops out; a truthy-but-empty
 	// compose emits `class=""`, matching `el.className = ''`).
