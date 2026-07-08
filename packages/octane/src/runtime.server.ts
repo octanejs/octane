@@ -239,6 +239,123 @@ export function positionalChildren(children: unknown[]): unknown[] {
 	return children;
 }
 
+function isElementDescriptor(v: any): v is ElementDescriptor {
+	return v != null && v.$$kind === ELEMENT_TAG;
+}
+
+// Server halves of the client runtime's React-compatible element utilities
+// (see runtime.ts "isValidElement / cloneElement / Children"): libraries that
+// inspect or re-project descriptor children (a Radix-style Slot, recharts'
+// axis-tick cloning) compile for BOTH modes, so the same imports must resolve
+// under `octane/server` too. Descriptors share the client shape (ELEMENT_TAG
+// is Symbol.for-keyed), so the semantics match by construction.
+
+/** True if `v` is an element descriptor from `createElement` / JSX-at-value. */
+export function isValidElement(v: unknown): v is ElementDescriptor {
+	return isElementDescriptor(v);
+}
+
+/**
+ * `cloneElement(element, config?, ...children)` — a new descriptor with
+ * `element`'s props shallow-merged under `config` (config wins), `key`
+ * overridden by `config.key`, and children replaced by any passed positionally
+ * (else the original children are kept). Mirrors the client runtime's
+ * semantics; like the server `createElement`, children ride in BOTH
+ * `props.children` (component form) and `descriptor.children` (host form).
+ */
+export function cloneElement(
+	element: ElementDescriptor,
+	config?: any,
+	...children: any[]
+): ElementDescriptor {
+	if (!isElementDescriptor(element)) {
+		throw new Error(
+			'cloneElement: the first argument must be an element (from createElement / JSX).',
+		);
+	}
+	const props: any = { ...(element.props as any) };
+	let key = element.key;
+	if (config != null) {
+		if (config.key !== undefined && config.key !== null) key = config.key;
+		for (const name in config) {
+			if (name === 'key') continue;
+			if (Object.prototype.hasOwnProperty.call(config, name)) props[name] = config[name];
+		}
+	}
+	const n = children.length;
+	let kids: any;
+	if (n === 1) {
+		kids = children[0];
+	} else if (n > 1) {
+		kids = children;
+	} else {
+		// No new children: reuse `config.children` (now merged into props) or the original.
+		kids = 'children' in props ? props.children : element.children;
+	}
+	if (kids !== undefined) props.children = kids;
+	return { $$kind: ELEMENT_TAG, type: element.type, props, key, children: kids ?? null };
+}
+
+// Visit each leaf of `children` (flattening arrays), passing empties through as
+// `null`. Matches the client runtime's `traverseChildren` (see runtime.ts).
+function traverseChildren(children: any, fn: (child: any, index: number) => void): number {
+	if (children == null) return 0;
+	let index = 0;
+	const walk = (node: any): void => {
+		if (Array.isArray(node)) {
+			for (let i = 0; i < node.length; i++) walk(node[i]);
+			return;
+		}
+		fn(node == null || typeof node === 'boolean' ? null : node, index++);
+	};
+	walk(children);
+	return index;
+}
+
+// Server half of the client runtime's React-compatible `Children` — identical
+// pure descriptor-value logic (see runtime.ts for the semantics comments).
+export const Children = {
+	forEach(children: any, fn: (child: any, index: number) => void): void {
+		traverseChildren(children, fn);
+	},
+	map<T>(children: any, fn: (child: any, index: number) => T): T[] | null | undefined {
+		if (children == null) return children as null | undefined;
+		const out: T[] = [];
+		traverseChildren(children, (child, i) => {
+			const mapped = fn(child, i);
+			if (Array.isArray(mapped)) {
+				for (const m of mapped) if (m != null && typeof m !== 'boolean') out.push(m as T);
+			} else if (mapped != null && typeof mapped !== 'boolean') {
+				out.push(mapped);
+			}
+		});
+		return out;
+	},
+	count(children: any): number {
+		return traverseChildren(children, () => {});
+	},
+	toArray(children: any): any[] {
+		const out: any[] = [];
+		traverseChildren(children, (child) => {
+			if (child != null) out.push(child);
+		});
+		return out;
+	},
+	only<T>(children: T): T {
+		if (!isElementDescriptor(children)) {
+			throw new Error('Children.only expected to receive a single element child.');
+		}
+		return children;
+	},
+};
+
+// Server half of the client runtime's `createPortal`: mints the same
+// PORTAL_TAG descriptor shape; `ssrChild` renders it as a bare site anchor
+// (portal content mounts into its client-side container on hydration).
+export function createPortal(body: unknown, target: unknown, props: any = undefined): unknown {
+	return { $$kind: PORTAL_TAG, body, target, props };
+}
+
 // ---------------------------------------------------------------------------
 // Escaping
 // ---------------------------------------------------------------------------

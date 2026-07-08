@@ -5,6 +5,7 @@
 import { createRouter, createRootRoute, createRoute } from '@octanejs/router';
 import { Layout } from '../components/Layout.tsrx';
 import { Home } from '../pages/Home.tsrx';
+import { Benchmarks } from '../pages/Benchmarks.tsrx';
 import { DocsLayout } from '../pages/DocsLayout.tsrx';
 import { DocPage } from '../pages/DocPage.tsrx';
 import { NotFound } from '../pages/NotFound.tsrx';
@@ -26,6 +27,12 @@ export function makeRouter(env: RouterEnv = {}): any {
 		getParentRoute: () => rootRoute,
 		path: '/',
 		component: Home,
+	});
+
+	const benchmarksRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: 'benchmarks',
+		component: Benchmarks,
 	});
 
 	const docsRoute = createRoute({
@@ -50,6 +57,7 @@ export function makeRouter(env: RouterEnv = {}): any {
 	return createRouter({
 		routeTree: rootRoute.addChildren([
 			indexRoute,
+			benchmarksRoute,
 			docsRoute.addChildren([docsIndexRoute, docsSlugRoute]),
 		]),
 		history: env.history,

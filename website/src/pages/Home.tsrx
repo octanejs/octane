@@ -1,8 +1,12 @@
 // Home: hero + side-by-side .tsrx sample, feature cards, and the "proven" stat
 // strip. The code sample is an .mdx module so it rides the same Shiki pipeline
-// as the docs.
+// as the docs. The bench teaser charts are @octanejs/recharts over the
+// checked-in baseline medians (content/benchmarks.ts) — the full set lives at
+// /benchmarks.
 import { Link } from '@octanejs/router';
 import CodeSample from '../content/home-sample.mdx';
+import { BenchBars } from '../components/BenchBars.tsrx';
+import { HOME_CARDS } from '../content/benchmarks.ts';
 
 const FEATURES = [
 	{
@@ -33,123 +37,6 @@ const FEATURES = [
 			'Recharts, Lexical and more work by changing the import.',
 	},
 ];
-
-// Benchmark data: median ms per operation from the repo's own suites
-// (benchmarks/results/*.json — `pnpm bench`), Octane .tsrx vs React 19.2, same
-// app implementations. Update these when the checked-in results move.
-interface BenchRow {
-	op: string;
-	octane: number;
-	react: number;
-}
-
-const BENCH_JS_FRAMEWORK: BenchRow[] = [
-	{ op: 'create 1,000 rows', octane: 1.6, react: 17.5 },
-	{ op: 'replace all rows', octane: 3.4, react: 19.2 },
-	{ op: 'partial update', octane: 0.2, react: 20 },
-	{ op: 'select row', octane: 0.1, react: 11.5 },
-	{ op: 'swap rows', octane: 0.3, react: 15.1 },
-	{ op: 'clear rows', octane: 18.8, react: 45 },
-];
-
-const BENCH_DBMON: BenchRow[] = [
-	{ op: 'mount', octane: 3.6, react: 48.2 },
-	{ op: 'tick (all rows)', octane: 1.7, react: 12 },
-	{ op: 'partial tick', octane: 0.8, react: 10.4 },
-	{ op: 'sort', octane: 2, react: 13.7 },
-	{ op: 'remount', octane: 4.6, react: 17.8 },
-];
-
-// Series colors — validated categorical pair for the site's dark surface
-// (lightness band, chroma, CVD separation, contrast): Octane = brand accent,
-// React = blue. Text/labels always use text tokens, never the series colors.
-const OCTANE_COLOR = '#ff415a';
-const REACT_COLOR = '#3d8bfd';
-
-// Horizontal bar with a 4px-rounded DATA end and a square baseline end.
-function barPath(y: number, w: number, h: number): string {
-	if (w <= 6) {
-		return 'M0,' + y + ' h' + Math.max(w, 2) + ' v' + h + ' h-' + Math.max(w, 2) + ' Z';
-	}
-	const r = 4;
-	return 'M0,' + y + ' h' + (w - r) + ' a' + r + ',' + r + ' 0 0 1 ' + r + ',' + r + ' v' +
-		(h - 2 * r) +
-		' a' +
-		r +
-		',' +
-		r +
-		' 0 0 1 -' +
-		r +
-		',' +
-		r +
-		' h-' +
-		(w - r) +
-		' Z';
-}
-
-// A paired-bar chart (Octane vs React, median ms, lower is better). Every bar
-// carries its value at the tip, so no gridlines/ticks are needed; native
-// <title> tooltips back the hover.
-function BenchChart(props: { title: string; rows: BenchRow[] }) @{
-	const VIEW_W = 460;
-	const PLOT_W = 380;
-	const LABEL_H = 18;
-	const BAR_H = 13;
-	const PAIR_GAP = 2;
-	const GROUP_GAP = 18;
-	const groupH = LABEL_H + BAR_H * 2 + PAIR_GAP;
-	const max = Math.max(...props.rows.map((r) => Math.max(r.octane, r.react)));
-	const rows = props.rows.map((r, i) => {
-		const top = i * (groupH + GROUP_GAP);
-		return {
-			op: r.op,
-			labelY: top + 12,
-			octaneY: top + LABEL_H,
-			octaneW: Math.max((r.octane / max) * PLOT_W, 2),
-			octaneLabel: r.octane.toFixed(1),
-			reactY: top + LABEL_H + BAR_H + PAIR_GAP,
-			reactW: Math.max((r.react / max) * PLOT_W, 2),
-			reactLabel: r.react.toFixed(1),
-		};
-	});
-	const height = rows.length * (groupH + GROUP_GAP) - GROUP_GAP + 4;
-
-	<figure class="bench-card">
-		<figcaption class="bench-card-title">
-			{props.title as string}
-		</figcaption>
-		<svg
-			viewBox={'0 0 ' + VIEW_W + ' ' + height}
-			role="img"
-			aria-label={props.title +
-				' — median milliseconds per operation, Octane vs React 19, lower is better'}
-		>
-			@for (const row of rows; key row.op) {
-				<g>
-					<text x="0" y={row.labelY} class="bench-op">
-						{row.op as string}
-					</text>
-					<path d={barPath(row.octaneY, row.octaneW, BAR_H)} fill={OCTANE_COLOR}>
-						<title>
-							{'Octane — ' + row.op + ': ' + row.octaneLabel + ' ms'}
-						</title>
-					</path>
-					<text x={row.octaneW + 8} y={row.octaneY + BAR_H - 3} class="bench-val">
-						{row.octaneLabel as string}
-					</text>
-					<path d={barPath(row.reactY, row.reactW, BAR_H)} fill={REACT_COLOR}>
-						<title>
-							{'React — ' + row.op + ': ' + row.reactLabel + ' ms'}
-						</title>
-					</path>
-					<text x={row.reactW + 8} y={row.reactY + BAR_H - 3} class="bench-val">
-						{row.reactLabel as string}
-					</text>
-				</g>
-			}
-		</svg>
-	</figure>
-}
 
 export function Home() @{
 	<div class="home">
@@ -231,31 +118,26 @@ export function Home() @{
 		<section class="bench" aria-labelledby="bench-heading">
 			<div class="bench-head">
 				<h2 id="bench-heading" class="bench-title">Measured, not vibes</h2>
-				<div class="bench-legend" aria-hidden="true">
-					<span class="bench-key">
-						<span class="bench-swatch bench-swatch-octane"></span>
-						Octane
-					</span>
-					<span class="bench-key">
-						<span class="bench-swatch bench-swatch-react"></span>
-						React 19
-					</span>
-				</div>
+				<Link to="/benchmarks" class="bench-all">All 12 suites →</Link>
 			</div>
 			<p class="bench-sub">
 				Median milliseconds per operation — lower is better. Same apps, same hardware, from the
-				repo’s own benchmark suites.
+				repo’s own benchmark suites — charted with @octanejs/recharts, the site’s own charting
+				binding.
 			</p>
 			<div class="bench-grid">
-				<BenchChart title="js-framework (1,000 rows)" rows={BENCH_JS_FRAMEWORK} />
-				<BenchChart title="dbmon (databases dashboard)" rows={BENCH_DBMON} />
+				@for (const card of HOME_CARDS; key card.id) {
+					<BenchBars card={card} />
+				}
 			</div>
 			<p class="bench-note">
 				{'Numbers are the checked-in medians from '}
-				<code>benchmarks/</code>
+				<code>benchmarks/baselines</code>
 				{' (Octane .tsrx vs React 19.2). Reproduce them with '}
 				<code>pnpm bench</code>
-				{'.'}
+				{', or see '}
+				<Link to="/benchmarks">every suite</Link>
+				{' — including the de-opt suites octane runs against itself.'}
 			</p>
 		</section>
 
@@ -465,28 +347,10 @@ export function Home() @{
 				font-size: 1.75rem;
 				letter-spacing: -0.02em;
 			}
-			.bench-legend {
-				display: flex;
-				gap: 1.25rem;
-			}
-			.bench-key {
-				display: inline-flex;
-				align-items: center;
-				gap: 0.45rem;
-				color: #99a1b3;
-				font-size: 0.875rem;
-			}
-			.bench-swatch {
-				width: 12px;
-				height: 12px;
-				border-radius: 3px;
-				display: inline-block;
-			}
-			.bench-swatch-octane {
-				background: #ff415a;
-			}
-			.bench-swatch-react {
-				background: #3d8bfd;
+			.bench-head :global(a.bench-all) {
+				color: #ff5d72;
+				font-weight: 600;
+				font-size: 0.9rem;
 			}
 			.bench-sub {
 				color: #99a1b3;
@@ -502,34 +366,6 @@ export function Home() @{
 				.bench-grid {
 					grid-template-columns: 1fr;
 				}
-			}
-			.bench :global(figure.bench-card) {
-				background: #2b3138;
-				border: 1px solid rgba(255, 255, 255, 0.06);
-				border-radius: 1rem;
-				padding: 1.5rem;
-				margin: 0;
-			}
-			.bench :global(figcaption.bench-card-title) {
-				color: #f4eee8;
-				font-weight: 600;
-				font-size: 0.95rem;
-				margin-bottom: 1.25rem;
-				font-family: ui-monospace, Menlo, Consolas, monospace;
-			}
-			.bench :global(figure.bench-card svg) {
-				width: 100%;
-				height: auto;
-				display: block;
-			}
-			.bench :global(text.bench-op) {
-				fill: #99a1b3;
-				font-size: 12px;
-			}
-			.bench :global(text.bench-val) {
-				fill: #f4eee8;
-				font-size: 11px;
-				font-variant-numeric: tabular-nums;
 			}
 			.bench-note {
 				color: #99a1b3;

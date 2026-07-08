@@ -33,6 +33,9 @@ export default defineConfig({
 		// sources — pnpm symlinks resolve them to /packages/*/src, not
 		// node_modules (mirrors the root vitest config).
 		octaneMdx(websiteMdxOptions),
+		// NOTE: @octanejs/recharts + @octanejs/redux are NOT excluded from the
+		// hook-slotting pass — their own test projects compile them through it
+		// (explicit subSlot tags compose with the pass), unlike router/mdx.
 		octane({
 			exclude: ['/packages/router/src/', '/packages/mdx/src/'],
 		}),
@@ -45,7 +48,14 @@ export default defineConfig({
 	},
 
 	optimizeDeps: {
-		exclude: ['octane', '@octanejs/router', '@octanejs/mdx', '@octanejs/vite-plugin'],
+		exclude: [
+			'octane',
+			'@octanejs/router',
+			'@octanejs/mdx',
+			'@octanejs/vite-plugin',
+			'@octanejs/recharts',
+			'@octanejs/redux',
+		],
 	},
 
 	server: {
