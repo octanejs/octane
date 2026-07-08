@@ -1,6 +1,9 @@
 // Vendored verbatim from recharts@3.9.2 es6/util/DataUtils.js (framework-agnostic).
 // Do not edit — update by re-vendoring when the recharts devDependency moves.
-import get from 'es-toolkit/compat/get';
+// Sanctioned deviation: es-toolkit compat imports normalized to the ESM barrel
+// ('es-toolkit/compat') — the per-function subpaths are CJS-only and break
+// consumers that compile this binding from source (vite dev prebundle).
+import { get } from 'es-toolkit/compat';
 import { round } from './round';
 export var mathSign = (value) => {
 	if (value === 0) {

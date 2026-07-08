@@ -1,5 +1,8 @@
 // Vendored verbatim from recharts@3.9.2 es6/state/selectors/axisSelectors.js (framework-agnostic).
 // Do not edit — update by re-vendoring when the recharts devDependency moves.
+// Sanctioned deviation: es-toolkit compat imports normalized to the ESM barrel
+// ('es-toolkit/compat') — the per-function subpaths are CJS-only and break
+// consumers that compile this binding from source (vite dev prebundle).
 function ownKeys(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -113,7 +116,7 @@ function _arrayWithHoles(r) {
 	if (Array.isArray(r)) return r;
 }
 import { createSelector } from 'reselect';
-import range from 'es-toolkit/compat/range';
+import { range } from 'es-toolkit/compat';
 import { selectChartLayout } from '../../context/chartLayoutContext';
 import {
 	getDomainOfStackGroups,

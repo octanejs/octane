@@ -1,5 +1,8 @@
 // Vendored verbatim from recharts@3.9.2 es6/util/ChartUtils.js (framework-agnostic).
 // Do not edit — update by re-vendoring when the recharts devDependency moves.
+// Sanctioned deviation: es-toolkit compat imports normalized to the ESM barrel
+// ('es-toolkit/compat') — the per-function subpaths are CJS-only and break
+// consumers that compile this binding from source (vite dev prebundle).
 function ownKeys(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -49,8 +52,7 @@ function _toPrimitive(t, r) {
 	}
 	return ('string' === r ? String : Number)(t);
 }
-import sortBy from 'es-toolkit/compat/sortBy';
-import get from 'es-toolkit/compat/get';
+import { get, sortBy } from 'es-toolkit/compat';
 import {
 	stack as shapeStack,
 	stackOffsetExpand,
