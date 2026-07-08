@@ -24,11 +24,28 @@ const CHARTS_FIXTURE = resolve(__dirname, '../_fixtures/charts.tsrx');
 
 // The chart pipeline is multi-pass on BOTH sides (size effect → axis/item
 // registration → offset selectors → final paint, plus a rAF for the store's
-// autoBatched notifications) — settle generously before comparing.
-async function settleCharts() {
-	for (let i = 0; i < 12; i++) {
-		await new Promise((r) => setTimeout(r, 0));
-		await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+// autoBatched notifications) — settle before comparing. A fixed round count
+// flaked on slow CI runners (the diff-assert ran mid-settle), so this settles
+// CONDITIONALLY: at least 12 rounds, then until both sides' DOM has been
+// stable for 3 consecutive rounds, bounded by a deadline (on timeout the
+// step's diff-assert reports whatever state was reached).
+async function settleCharts(
+	i: { container: HTMLElement },
+	r: { container: HTMLElement },
+): Promise<void> {
+	const deadline = Date.now() + 20_000;
+	let previousOctane = '';
+	let previousReact = '';
+	let stableRounds = 0;
+	for (let round = 0; round < 12 || stableRounds < 3; round++) {
+		await new Promise((res) => setTimeout(res, 0));
+		await new Promise((res) => requestAnimationFrame(() => res(undefined)));
+		const octane = i.container.innerHTML;
+		const react = r.container.innerHTML;
+		stableRounds = octane === previousOctane && react === previousReact ? stableRounds + 1 : 0;
+		previousOctane = octane;
+		previousReact = react;
+		if (Date.now() > deadline) break;
 	}
 }
 

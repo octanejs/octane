@@ -30,8 +30,25 @@ function fmt(value: unknown): string {
 	return n.toFixed(2);
 }
 
-export function BenchBars(props: { card: BenchCard; showValues?: boolean }) @{
+// ×-vs-Octane ratios (format: 'x'): 15.35 → "15×", 2.99 → "3.0×", 0.73 → "0.73×".
+function fmtX(value: unknown): string {
+	const n =
+		typeof value === 'number' ? value : Number(value);
+	if (!Number.isFinite(n)) return '—';
+	if (n >= 10) return Math.round(n) + '×';
+	if (n >= 1) return (n === Math.round(n) ? String(n) : n.toFixed(1)) + '×';
+	return n.toFixed(2) + '×';
+}
+
+export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?: number }) @{
 	const { card } = props;
+	const chartWidth = props.width ?? 560;
+	const format =
+		card.format === 'x' ? fmtX : fmt;
+	const tableCaption =
+		card.format === 'x'
+			? 'Data table (× vs Octane, geometric mean across operations)'
+			: 'Data table (median ms, ' + card.iterations + ' iterations)';
 	// Value labels at bar tips only where they stay readable (≤2 series);
 	// denser cards lean on the number axis + the table view instead.
 	const showValues = props.showValues ?? card.series.length <= 2;
@@ -41,7 +58,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean }) @{
 	const longestOp = Math.max(...card.rows.map((row) => String(row.op).length));
 	const categoryWidth = Math.min(170, Math.max(90, longestOp * 6.6 + 12));
 	const valueLabel = showValues
-		? { position: 'right', fill: '#99a1b3', fontSize: 11, formatter: fmt }
+		? { position: 'right', fill: '#99a1b3', fontSize: 11, formatter: format }
 		: false;
 
 	const [mounted, setMounted] = useState(false);
@@ -67,7 +84,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean }) @{
 		<div class="bench-plot">
 			@if (mounted) {
 				<BarChart
-					width={560}
+					width={chartWidth}
 					height={chartHeight}
 					data={card.rows}
 					layout="vertical"
@@ -81,7 +98,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean }) @{
 						tick={AXIS_TEXT}
 						axisLine={false}
 						tickLine={false}
-						tickFormatter={fmt}
+						tickFormatter={format}
 					/>
 					<YAxis
 						type="category"
@@ -112,7 +129,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean }) @{
 		</div>
 		<details class="bench-table">
 			<summary>
-				{'Data table (median ms, ' + card.iterations + ' iterations)'}
+				{tableCaption as string}
 			</summary>
 			<table>
 				<thead>
@@ -132,7 +149,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean }) @{
 								{row.op as string}
 							</th>
 							@for (const s of card.series; key s.key) {
-								<td>{fmt(row[s.key])}</td>
+								<td>{format(row[s.key])}</td>
 							}
 						</tr>
 					}

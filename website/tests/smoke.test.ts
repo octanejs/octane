@@ -68,11 +68,19 @@ describe('website routes', () => {
 		);
 		expect(bindingsLink).toBeTruthy();
 
-		// Benchmark section: two paired-bar SVG charts with direct value labels.
+		// Benchmark section: ONE normalized summary chart — every cross-framework
+		// suite as ×-vs-Octane geomeans, all four frameworks in the legend
+		// (Solid/Ripple labeled with the catalog versions the fixtures run).
 		expect(container.textContent).toContain('Measured, not vibes');
 		const benchCharts = container.querySelectorAll('figure.bench-card svg');
-		expect(benchCharts.length).toBe(2);
-		expect(container.textContent).toContain('create 1,000 rows');
+		expect(benchCharts.length).toBe(1);
+		for (const label of ['Octane (.tsrx)', 'React 19', 'Solid 2.0 beta', 'Ripple 0.3']) {
+			expect(container.textContent).toContain(label);
+		}
+		// Suite names ride the category axis; ratios carry the × suffix.
+		expect(container.textContent).toContain('signal-favoring');
+		expect(container.textContent).toContain('js-framework-reorder');
+		expect(textOf(container)).toMatch(/\d×/);
 		expect(container.querySelectorAll('.bench-card path').length).toBeGreaterThan(10);
 
 		// llms.txt is linked in the top navigation.
