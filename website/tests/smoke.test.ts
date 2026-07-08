@@ -96,6 +96,9 @@ describe('website routes', () => {
 		expect(within(nav).getByText('GitHub').getAttribute('href')).toContain(
 			'github.com/octanejs/octane',
 		);
+		expect(within(nav).getByText('Discord').getAttribute('href')).toBe(
+			'https://discord.gg/8puY9fFqd9',
+		);
 	});
 
 	it('/benchmarks charts every suite from the checked-in baselines', async () => {
