@@ -14,7 +14,17 @@ export function Layout() @{
 				<nav class="navlinks" aria-label="Main">
 					<Link to="/docs" activeOptions={{ exact: false }} class="nav-link">Docs</Link>
 					<Link to="/benchmarks" class="nav-link">Benchmarks</Link>
-					<a class="nav-link" href="/llms.txt">llms.txt</a>
+					<a class="nav-link" href="/llms.txt" target="_blank" rel="noreferrer">
+						llms.txt
+					</a>
+					<a
+						class="nav-link"
+						href="https://discord.gg/8puY9fFqd9"
+						target="_blank"
+						rel="noreferrer"
+					>
+						Discord
+					</a>
 					<a
 						class="nav-link"
 						href="https://github.com/octanejs/octane"
