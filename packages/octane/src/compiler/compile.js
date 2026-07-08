@@ -166,16 +166,97 @@ export const HOOK_NAMES = new Set([
 // Namespace inheritance — mirrors HTML5 foreign-content rules. The element
 // itself and its children may have *different* namespaces: <foreignObject>
 // inside SVG is still an SVG element, but its children switch back to HTML.
+// Tags that exist ONLY in the SVG namespace, so their appearance in a
+// namespace-ambiguous position — a component's ROOT template, a fragment root
+// — implies the SVG namespace without a lexical `<svg>` ancestor. A component
+// whose root is `<g>`/`<path>` must not compile to an HTML template: the
+// HTMLUnknownElement it would produce inside an `<svg>` paints nothing.
+// Ambiguous names (`a`, `title`, `script`, `style`, `font`) are deliberately
+// ABSENT — they keep the inherited namespace. Keep in sync with SVG_ONLY_TAGS
+// in ../constants.ts (the runtime's de-opt reconciler uses the same table).
+const SVG_ONLY_TAGS = new Set([
+	'altGlyph',
+	'altGlyphDef',
+	'altGlyphItem',
+	'animate',
+	'animateColor',
+	'animateMotion',
+	'animateTransform',
+	'circle',
+	'clipPath',
+	'defs',
+	'desc',
+	'ellipse',
+	'feBlend',
+	'feColorMatrix',
+	'feComponentTransfer',
+	'feComposite',
+	'feConvolveMatrix',
+	'feDiffuseLighting',
+	'feDisplacementMap',
+	'feDistantLight',
+	'feDropShadow',
+	'feFlood',
+	'feFuncA',
+	'feFuncB',
+	'feFuncG',
+	'feFuncR',
+	'feGaussianBlur',
+	'feImage',
+	'feMerge',
+	'feMergeNode',
+	'feMorphology',
+	'feOffset',
+	'fePointLight',
+	'feSpecularLighting',
+	'feSpotLight',
+	'feTile',
+	'feTurbulence',
+	'filter',
+	'foreignObject',
+	'g',
+	'glyph',
+	'glyphRef',
+	'hkern',
+	'image',
+	'line',
+	'linearGradient',
+	'marker',
+	'mask',
+	'metadata',
+	'missing-glyph',
+	'mpath',
+	'path',
+	'pattern',
+	'polygon',
+	'polyline',
+	'radialGradient',
+	'rect',
+	'set',
+	'stop',
+	'switch',
+	'symbol',
+	'text',
+	'textPath',
+	'tref',
+	'tspan',
+	'use',
+	'view',
+	'vkern',
+]);
+
 function nsForSelf(tag, parentNs) {
 	if (tag === 'svg') return 'svg';
 	if (tag === 'math') return 'mathml';
-	return parentNs; // includes <foreignObject> — itself is SVG-ns
+	if (parentNs === 'html' && SVG_ONLY_TAGS.has(tag)) return 'svg';
+	return parentNs; // includes <foreignObject> under an svg parent — itself SVG-ns
 }
 
 function nsForChildren(tag, parentNs) {
 	if (tag === 'foreignObject') return 'html';
 	if (tag === 'svg') return 'svg';
 	if (tag === 'math') return 'mathml';
+	if (parentNs === 'html' && SVG_ONLY_TAGS.has(tag)) return 'svg';
 	return parentNs;
 }
 
@@ -190,13 +271,14 @@ function elementTagName(node) {
 
 function isNonHtmlRootTag(node) {
 	const t = elementTagName(node);
-	return t === 'svg' || t === 'math';
+	return t === 'svg' || t === 'math' || (t !== null && SVG_ONLY_TAGS.has(t));
 }
 
 function nsForRootTag(node, parentNs) {
 	const t = elementTagName(node);
 	if (t === 'svg') return 'svg';
 	if (t === 'math') return 'mathml';
+	if (t !== null && SVG_ONLY_TAGS.has(t)) return 'svg';
 	return parentNs;
 }
 
@@ -4452,12 +4534,26 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		//     the inner root.
 		//   - SVG/MathML multi-root: pass ns + frag=1; runtime wraps and returns
 		//     the wrap itself (caller drains its children — no <octane-frag>).
+		// Multi-root fragments at an HTML parent imply SVG only when EVERY element
+		// root does (an all-SVG fragment — e.g. portal children `<rect/><g/>` — must
+		// parse in foreign content; a MIXED fragment can't share one wrapper, so it
+		// keeps HTML and the SVG-only roots would mis-parse — reject? No: mixed
+		// fragments at ambiguous positions are user error the browser also mangles).
+		const elementRoots = single ? null : jsxNodes.filter((n) => elementTagName(n) !== null);
+		const fragImpliesSvg =
+			!single && elementRoots.length > 0 && elementRoots.every(isNonHtmlRootTag);
 		const isHtmlNs =
 			parentNs === 'html' &&
 			(single
-				? !isNonHtmlRootTag(jsxNodes[0]) // <svg>/<math> as the root means non-HTML ns
-				: true);
-		const tplNs = isHtmlNs ? 'html' : single ? nsForRootTag(jsxNodes[0], parentNs) : parentNs;
+				? !isNonHtmlRootTag(jsxNodes[0]) // svg/math/SVG-only root means non-HTML ns
+				: !fragImpliesSvg);
+		const tplNs = isHtmlNs
+			? 'html'
+			: single
+				? nsForRootTag(jsxNodes[0], parentNs)
+				: parentNs === 'html' && fragImpliesSvg
+					? 'svg'
+					: parentNs;
 		const flag = nsFlag(tplNs);
 		const fragArg = !single && flag !== 0 ? 1 : 0;
 		const tplHtml = single || flag !== 0 ? html : `<octane-frag>${html}</octane-frag>`;

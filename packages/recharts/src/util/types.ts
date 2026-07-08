@@ -3,7 +3,7 @@
 // octane events are NATIVE delegated DOM events — handlers receive the real
 // event, matching the platform (never a synthetic wrapper).
 import { isValidElement } from 'octane';
-import { isEventKey } from '../vendor/util/excludeEventProps';
+import { isEventKey } from '../util/excludeEventProps';
 
 // Collect the event handlers off a props bag (or element), rebinding each to
 // `(e) => handler(props, e)` — recharts item components pass their own props as

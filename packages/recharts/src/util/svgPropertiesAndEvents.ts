@@ -2,8 +2,8 @@
 // valid SVG attributes + data-* attributes + event handlers. The key
 // classifiers are vendored verbatim; only the descriptor check is octane's.
 import { isValidElement } from 'octane';
-import { isEventKey } from '../vendor/util/excludeEventProps';
-import { isDataAttribute, isSvgElementPropKey } from '../vendor/util/svgPropertiesNoEvents';
+import { isEventKey } from '../util/excludeEventProps';
+import { isDataAttribute, isSvgElementPropKey } from '../util/svgPropertiesNoEvents';
 
 export function svgPropertiesAndEvents(obj: Record<string, any>): Record<string, any> {
 	const result: Record<string, any> = {};

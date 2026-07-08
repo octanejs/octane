@@ -3,9 +3,9 @@
 // and the getTotalLength entrance dash arrive with the Phase 5 animation port.
 // Path strings mirror upstream's roundTemplateLiteral output byte-for-byte.
 import { clsx } from 'clsx';
-import { resolveDefaultProps } from '../vendor/util/resolveDefaultProps';
+import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents.ts';
-import { roundTemplateLiteral } from '../vendor/util/round';
+import { roundTemplateLiteral } from '../util/round';
 
 const getTrapezoidPath = (x, y, upperWidth, lowerWidth, height) => {
 	const widthGap = upperWidth - lowerWidth;

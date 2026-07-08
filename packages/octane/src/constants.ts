@@ -111,6 +111,87 @@ export const BOOLEAN_DROPPED_STRING_ATTR_PROPS = new Set([
 ]);
 
 /**
+ * Tags that exist ONLY in the SVG namespace (no HTML element shares the name),
+ * so their appearance in a namespace-ambiguous position — a component's root
+ * template, a value-position descriptor, portal children — implies the SVG
+ * namespace without a lexical `<svg>` ancestor. Solid/Svelte ship the same
+ * inference table. Ambiguous names (`a`, `script`, `style`, `title`, `font`)
+ * are deliberately ABSENT: they stay in the inherited namespace. Shared by the
+ * runtime's de-opt reconciler and — DUPLICATED, keep in sync — the compiler's
+ * nsForSelf (compile.js), which bakes template namespaces at compile time.
+ */
+export const SVG_ONLY_TAGS: Set<string> = new Set([
+	'altGlyph',
+	'altGlyphDef',
+	'altGlyphItem',
+	'animate',
+	'animateColor',
+	'animateMotion',
+	'animateTransform',
+	'circle',
+	'clipPath',
+	'defs',
+	'desc',
+	'ellipse',
+	'feBlend',
+	'feColorMatrix',
+	'feComponentTransfer',
+	'feComposite',
+	'feConvolveMatrix',
+	'feDiffuseLighting',
+	'feDisplacementMap',
+	'feDistantLight',
+	'feDropShadow',
+	'feFlood',
+	'feFuncA',
+	'feFuncB',
+	'feFuncG',
+	'feFuncR',
+	'feGaussianBlur',
+	'feImage',
+	'feMerge',
+	'feMergeNode',
+	'feMorphology',
+	'feOffset',
+	'fePointLight',
+	'feSpecularLighting',
+	'feSpotLight',
+	'feTile',
+	'feTurbulence',
+	'filter',
+	'foreignObject',
+	'g',
+	'glyph',
+	'glyphRef',
+	'hkern',
+	'image',
+	'line',
+	'linearGradient',
+	'marker',
+	'mask',
+	'metadata',
+	'missing-glyph',
+	'mpath',
+	'path',
+	'pattern',
+	'polygon',
+	'polyline',
+	'radialGradient',
+	'rect',
+	'set',
+	'stop',
+	'switch',
+	'symbol',
+	'text',
+	'textPath',
+	'tref',
+	'tspan',
+	'use',
+	'view',
+	'vkern',
+]);
+
+/**
  * React 19's attribute-alias table (ReactDOMComponent.js `aliases`, verbatim)
  * plus the namespaced camelCase props React handles as switch cases
  * (`xlinkHref` → `xlink:href`, `xmlLang` → `xml:lang` — the prefixed form

@@ -25,6 +25,7 @@ import {
 	UNDEFINED_SENTINEL_KEY,
 	cssStyleValue,
 	ATTRIBUTE_ALIASES,
+	SVG_ONLY_TAGS,
 } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -3873,6 +3874,18 @@ const XMLNS_NS = 'http://www.w3.org/2000/xmlns/';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
+// Namespace for a de-opt host tag: `<svg>` always opens SVG; an SVG-ONLY tag
+// (`g`, `rect`, `path`, … — SVG_ONLY_TAGS in constants.ts) implies SVG when no
+// namespace was inherited (a component root, a value-position descriptor,
+// portal children). Ambiguous names (`a`, `title`, `script`, `style`) keep the
+// inherited namespace. Mirrors the compiler's nsForSelf so compiled templates
+// and de-opt descriptors namespace identically.
+function inferTagNs(tag: string, inherited: string | undefined): string | undefined {
+	if (tag === 'svg') return SVG_NS;
+	if (inherited === undefined && SVG_ONLY_TAGS.has(tag)) return SVG_NS;
+	return inherited;
+}
+
 function attrNamespace(name: string): string | null {
 	// Bare `xmlns` is the xmlns namespace itself (rare in practice).
 	if (name === 'xmlns') return XMLNS_NS;
@@ -6401,10 +6414,12 @@ function reconcileDeoptNode(
 	}
 	if (isHostDescriptor(value)) {
 		// `<svg>` opens the SVG namespace; descendants inherit it (a `foreignObject`
-		// switches ITS children back to HTML — see childNs below). Without this the
-		// de-opt path's document.createElement would mis-namespace SVG content (e.g.
-		// `<svg>`/`<path>` returned from a component via createElement).
-		const elNs = value.type === 'svg' ? SVG_NS : ns;
+		// switches ITS children back to HTML — see childNs below). SVG-ONLY tags
+		// (`g`, `rect`, `path`, … — see SVG_ONLY_TAGS) imply it with no `<svg>`
+		// ancestor. Without this the de-opt path's document.createElement would
+		// mis-namespace SVG content (e.g. `<path>` returned from a component via
+		// createElement, or portaled into an SVG target).
+		const elNs = inferTagNs(value.type, ns);
 		let el: Element;
 		if (
 			prev !== null &&
@@ -6692,10 +6707,12 @@ function descNeedsBlocks(value: any): boolean {
 // children recurse back through childSlot's host path.
 function hostElementBody(d: ElementDescriptor, block: Block): void {
 	let el = block.deoptNode as Element | null;
-	// A root `<svg>` opens the SVG namespace. (Component children inside an SVG are an
-	// uncommon case; they mount via childSlot below, which does not yet thread the SVG
-	// namespace — the pure-host SVG path through reconcileDeoptChildren does.)
-	const elNs = d.type === 'svg' ? SVG_NS : undefined;
+	// A root `<svg>` — or any SVG-ONLY tag (see SVG_ONLY_TAGS) — opens the SVG
+	// namespace. (Component children inside an SVG are an uncommon case; they
+	// mount via childSlot below, which does not yet thread the SVG namespace —
+	// the pure-host SVG path through reconcileDeoptChildren does, and SVG-only
+	// child tags self-infer through the same table.)
+	const elNs = inferTagNs(d.type as string, undefined);
 	// Hydration first render: ADOPT the server-rendered host element sitting at the
 	// cursor instead of building a fresh one (which would orphan the server node and
 	// desync the marker walk). Then point the cursor at its first child so the childSlot
@@ -6799,8 +6816,9 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 	const tag = d.type as string;
 	let el = block.deoptNode as Element | null;
-	// A root `<svg>` opens the SVG namespace (parity with hostElementBody).
-	const elNs = tag === 'svg' ? SVG_NS : undefined;
+	// A root `<svg>` or SVG-only tag opens the SVG namespace (parity with
+	// hostElementBody).
+	const elNs = inferTagNs(tag, undefined);
 	if (el === null) {
 		if (
 			hydrating &&
