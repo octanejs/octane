@@ -84,6 +84,36 @@ describe('@octanejs/radix — Checkbox', () => {
 		r.unmount();
 	});
 
+	it('initially-checked: unchecking syncs the live controlled bubble input', async () => {
+		// Regression: the pre-controlled workaround froze `checked={initial}` on the
+		// bubble input; under octane's controlled runtime that reasserted the INITIAL
+		// state on every commit/event flush, fighting the uncheck.
+		const r = mount(CheckboxApp, { defaultChecked: true });
+		const $ = inC(r.container);
+		await settle();
+		const checkbox = $('[data-testid="checkbox"]')!;
+		const form = $('[data-testid="form"]') as HTMLFormElement;
+		const input = form.querySelector('input[type="checkbox"]') as HTMLInputElement;
+		expect(checkbox.getAttribute('aria-checked')).toBe('true');
+		expect(input.checked).toBe(true);
+		expect(new FormData(form).get('notifications')).toBe('on');
+
+		click(checkbox);
+		await settle();
+		expect(checkbox.getAttribute('aria-checked')).toBe('false');
+		expect(input.checked).toBe(false);
+		expect(new FormData(form).get('notifications')).toBe(null);
+
+		// A later discrete event + commit must not restore the stale initial state.
+		click(checkbox);
+		await settle();
+		click(checkbox);
+		await settle();
+		expect(checkbox.getAttribute('aria-checked')).toBe('false');
+		expect(input.checked).toBe(false);
+		r.unmount();
+	});
+
 	it('form reset restores the initial state', async () => {
 		const r = mount(CheckboxApp);
 		const $ = inC(r.container);

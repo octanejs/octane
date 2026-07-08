@@ -239,25 +239,27 @@ describe('ReactDOMComponent — DOM mutation minimization', () => {
 	});
 
 	// Per ReactDOMComponent-test.js:1460 — React writes known boolean props
-	// (audio.muted) as DOM PROPERTIES via its property-routing table.
-	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04): octane's documented model is
-	// plain ATTRIBUTES + native DOM as the source of truth — the same §2 policy as
-	// value/checked (no controlled-component property re-assertion). `muted={bool}`
-	// writes/removes the `muted` attribute; the live `.muted` property belongs to
-	// the platform (and user refs), not the renderer.
-	it('writes muted as an attribute (plain-attributes policy), never the DOM property', () => {
+	// (audio.muted) as DOM PROPERTIES via its property-routing table. Matched
+	// since 2026-07-08 (MUST_USE_PROPERTY_PROPS in constants.ts — reverses the
+	// 2026-07-04 plain-attributes adjudication): the muted ATTRIBUTE doesn't
+	// reflect to the live property post-creation, so a dynamic write must set
+	// the property or a playing element never (un)mutes. Static literals and
+	// SSR still emit the attribute (correct initial state).
+	it('writes muted as a DOM property (mustUseProperty), never the attribute', () => {
 		const r = mount(AudioMuted, { m: true });
 		const node = first(r);
+		expect((node as HTMLMediaElement).muted).toBe(true);
+		expect(node.hasAttribute('muted')).toBe(false);
 		const setter = vi.fn();
 		Object.defineProperty(node, 'muted', {
 			get: () => true,
 			set: setter,
 			configurable: true,
 		});
-		expect(node.hasAttribute('muted')).toBe(true);
 		r.update(AudioMuted, { m: false, u: 'ok' });
-		expect(node.hasAttribute('muted')).toBe(false);
-		expect(setter).toHaveBeenCalledTimes(0); // property never touched
+		expect(setter).toHaveBeenCalledTimes(1);
+		expect(setter).toHaveBeenCalledWith(false);
+		expect(node.hasAttribute('muted')).toBe(false); // attribute untouched
 		r.unmount();
 	});
 

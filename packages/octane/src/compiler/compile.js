@@ -100,6 +100,160 @@ function rejectVoidElementContent(tag, node, ctx) {
 	);
 }
 
+// Controlled-form binding kinds: `value`/`checked`/`defaultValue`/
+// `defaultChecked` on <input>/<textarea>/<select> route to the runtime
+// property helpers (setValue & co — React-parity controlled semantics on
+// native events) instead of setAttribute. STATIC literals included: baking
+// `value="a"` into the template would freeze the attribute instead of driving
+// the property. Everything else — <option> (its `value` attribute is what the
+// select projection reads), custom elements, non-form tags — keeps plain
+// attribute semantics. Mirrors the runtime's setAttribute routing branch.
+function controlledKindFor(tag, attrName) {
+	if (tag === 'input') {
+		if (attrName === 'value') return 'value';
+		if (attrName === 'checked') return 'checked';
+		if (attrName === 'defaultValue') return 'defaultValue';
+		if (attrName === 'defaultChecked') return 'defaultChecked';
+		return null;
+	}
+	if (tag === 'textarea') {
+		if (attrName === 'value') return 'value';
+		if (attrName === 'defaultValue') return 'defaultValue';
+		return null;
+	}
+	if (tag === 'select') {
+		if (attrName === 'value') return 'selectValue';
+		if (attrName === 'defaultValue') return 'defaultValue';
+		return null;
+	}
+	return null;
+}
+
+// The `_$`-aliased runtime helper for each controlled binding kind
+// (+ autoFocus, which shares the routing but is mount-only).
+const CONTROLLED_KIND_HELPERS = {
+	value: 'setValue',
+	checked: 'setChecked',
+	selectValue: 'setSelectValue',
+	defaultValue: 'setDefaultValue',
+	defaultChecked: 'setDefaultChecked',
+	autoFocus: 'setAutoFocus',
+};
+
+// React's boolean attribute props + the mustUseProperty set — DUPLICATED from
+// src/constants.ts (keep in sync): static literals bake the canonical
+// presence form (`disabled=""`) for truthy values and DROP falsy ones,
+// matching the runtimes' dynamic writes (coerceAttrValue / ssrAttr).
+const BOOLEAN_ATTR_PROPS = new Set([
+	'allowfullscreen',
+	'async',
+	'autoplay',
+	'controls',
+	'default',
+	'defer',
+	'disabled',
+	'disablepictureinpicture',
+	'disableremoteplayback',
+	'formnovalidate',
+	'hidden',
+	'inert',
+	'itemscope',
+	'loop',
+	'nomodule',
+	'novalidate',
+	'open',
+	'playsinline',
+	'readonly',
+	'required',
+	'reversed',
+	'scoped',
+	'seamless',
+]);
+const MUST_USE_PROPERTY_PROPS = new Set(['muted', 'multiple', 'selected']);
+
+// Serialize one STATIC literal attribute value into template/SSR HTML —
+// shared by emitElementHtml and ssrEmitElement so both bakes stay identical,
+// mirroring the runtimes' dynamic coercion: aria-*/enumerated/data-* booleans
+// stringify, boolean-attr props render the canonical `attr=""` presence form
+// (falsy drops; overloaded download/capture keep string payloads), booleans
+// on non-boolean attrs DROP (React: `title={true}` never renders), everything
+// else escapes as before. Custom elements keep raw semantics.
+function bakeStaticAttr(attrName, lv, tag) {
+	if (lv == null) return '';
+	const isCustom = tag !== undefined && tag.includes('-');
+	const lower = attrName.toLowerCase();
+	if (typeof lv === 'boolean') {
+		if (attrName.startsWith('aria-') || attrName.startsWith('data-')) {
+			return ` ${attrName}="${lv}"`;
+		}
+		// Enumerated booleans stringify — "false" is a real state, absent means
+		// inherit (mirrors isEnumeratedBooleanAttr in the runtimes).
+		if (lower === 'spellcheck' || lower === 'draggable' || lower === 'contenteditable') {
+			return ` ${attrName}="${lv}"`;
+		}
+		if (isCustom) return lv ? ` ${attrName}` : '';
+		// Boolean attrs + the overloaded booleans (download/capture) + the
+		// mustUseProperty statics all take presence semantics for BOOLEAN
+		// literals; non-boolean overloaded values pass through verbatim below.
+		if (
+			BOOLEAN_ATTR_PROPS.has(lower) ||
+			MUST_USE_PROPERTY_PROPS.has(lower) ||
+			lower === 'download' ||
+			lower === 'capture'
+		) {
+			return lv ? ` ${lower}=""` : '';
+		}
+		return ''; // boolean on a non-boolean attribute never renders (React)
+	}
+	if (!isCustom && (BOOLEAN_ATTR_PROPS.has(lower) || MUST_USE_PROPERTY_PROPS.has(lower))) {
+		return lv ? ` ${lower}=""` : '';
+	}
+	if (typeof lv === 'string') return ` ${attrName}="${escapeAttr(lv)}"`;
+	if (typeof lv === 'number') return ` ${attrName}="${lv}"`;
+	return '';
+}
+
+// React contract: a `<textarea>` with a `value`/`defaultValue` prop OWNS its
+// content — children would fight the prop (React throws for defaultValue +
+// children and warns for value + children). Compile-time error on both emit
+// paths, like rejectVoidElementContent; a plain `<textarea>text</textarea>`
+// keeps its native content (that IS defaultValue semantics).
+function rejectTextareaValueChildren(tag, node, ctx) {
+	if (tag !== 'textarea') return;
+	const attrs = node.attributes || node.openingElement?.attributes || [];
+	let hasValueProp = false;
+	for (const a of attrs) {
+		if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
+		const n = jsxAttrRawName(a);
+		if (n === 'value' || n === 'defaultValue') {
+			hasValueProp = true;
+			break;
+		}
+	}
+	if (!hasValueProp) return;
+	// Renderable-children check — same lightweight scan as rejectVoidElementContent.
+	let offending = false;
+	for (const c of node.children || []) {
+		if (!c) continue;
+		if (c.type === 'JSXText') {
+			if (/^\s*$/.test(c.value)) continue;
+		} else if (c.type === 'JSXExpressionContainer') {
+			if (!c.expression || c.expression.type === 'JSXEmptyExpression') continue;
+		} else if (c.type === 'JSXStyleElement') {
+			continue;
+		}
+		offending = true;
+		break;
+	}
+	if (!offending) return;
+	const l = node.loc && node.loc.start;
+	const at = l ? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})` : '';
+	throw new Error(
+		'`<textarea>` must not have children when it uses `value` or `defaultValue` — ' +
+			`the prop owns the content. Move the text into the prop.${at}`,
+	);
+}
+
 // Compiler-generated code references runtime helpers under a collision-proof
 // `_$` alias — `import { setText as _$setText } from 'octane'` + `_$setText(…)`
 // — because generated statements are interleaved with USER statements inside
@@ -2126,6 +2280,7 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = 
 function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	const tag = elementTagName(node);
 	rejectVoidElementContent(tag, node, ctx);
+	rejectTextareaValueChildren(tag, node, ctx);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	// NB: the ns helpers take the TAG STRING (passing the node silently returns
 	// the inherited ns — svg subtrees would never enter the svg namespace).
@@ -2134,14 +2289,28 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 
 	// `parts` are JS expressions concatenated with `+`. `lit` accumulates the
 	// current static run so adjacent literals fold into one quoted chunk.
+	// `<option>` builds its ATTRS-ONLY expression here — ssrOption assembles
+	// the whole tag at runtime so an enclosing controlled `<select>` scope can
+	// mark it ` selected` (see the option branch at the bottom).
 	const parts = [];
-	let lit = '<' + tag;
+	let lit = tag === 'option' ? '' : '<' + tag;
 	const flush = () => {
 		if (lit) {
 			parts.push(JSON.stringify(lit));
 			lit = '';
 		}
 	};
+
+	// Controlled-form serialization state (mirrors the client helpers — see the
+	// controlled section of runtime.server.ts): <input> maps `defaultValue`/
+	// `defaultChecked` onto the native attrs and routes dynamic value/checked
+	// through dedicated serializers; <textarea> routes value/defaultValue into
+	// the CONTENT position; <select> feeds them to the option-projection scope
+	// (never an attribute); <option> captures its `value` for the scope compare.
+	let ctlValue = null; // textarea/select captured `value` expr
+	let ctlDefault = null; // textarea/select captured `defaultValue` expr
+	let selMultiple = 'false'; // select `multiple` expr (constant or temp)
+	let optValue = null; // option `value` expr (constant or temp); null = no value attr
 
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
@@ -2189,6 +2358,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		// Events and refs have no server semantics — dropped.
 		if (rawAttrName === 'ref') continue;
 		if (isEventAttrName(rawAttrName)) continue;
+		// `autoFocus` never serializes (React DOM server parity — the client
+		// focuses at its mount commit; custom elements keep raw props).
+		if (rawAttrName === 'autoFocus' && !tag.includes('-')) continue;
 		// Custom elements keep names VERBATIM (React parity — they get raw props,
 		// no alias tables; `className`→`class` still applies); ssrAttr applies
 		// the same gate for dynamic values.
@@ -2202,6 +2374,112 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			// element's (unescaped) inner content.
 			const obj = val.type === 'JSXExpressionContainer' ? val.expression : val;
 			htmlSources.push(printExpr(rewriteHookCalls(obj, ctx, name)));
+			continue;
+		}
+
+		// ── Controlled form props (see the state block above the loop) ──
+		if (
+			(tag === 'input' || tag === 'textarea' || tag === 'select') &&
+			(attrName === 'value' ||
+				attrName === 'defaultValue' ||
+				(tag === 'input' && (attrName === 'checked' || attrName === 'defaultChecked')))
+		) {
+			const ctlInner =
+				val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
+			if (tag === 'input') {
+				// defaultValue/defaultChecked serialize as the NATIVE attrs;
+				// dynamic value/checked go through serializers that mirror the
+				// client helpers byte-for-byte (value={false} → value="false",
+				// checked truthy → bare presence).
+				const isCheck = attrName === 'checked' || attrName === 'defaultChecked';
+				if (ctlInner === null && !isAfterSpread) {
+					// Bare boolean prop (`<input checked/>`) → static presence
+					// (`value` bare mirrors the client's String(true)).
+					lit += isCheck ? ' checked' : ' value="true"';
+					continue;
+				}
+				if (ctlInner !== null && ctlInner.type === 'Literal' && !isAfterSpread) {
+					const lv = ctlInner.value;
+					if (isCheck) {
+						if (lv != null && lv !== false) lit += ' checked';
+					} else if (lv != null) {
+						lit += ` value="${escapeAttr(String(lv))}"`;
+					}
+					continue;
+				}
+				flush();
+				const ctlExpr =
+					ctlInner === null ? 'true' : printExprWithTsrx(ctlInner, ctx, name, inlinedSubs);
+				if (isCheck) {
+					ctx.runtimeNeeded.add('ssrCheckedAttr');
+					parts.push(`_$ssrCheckedAttr(${ctlExpr})`);
+				} else {
+					ctx.runtimeNeeded.add('ssrValueAttr');
+					parts.push(`_$ssrValueAttr(${ctlExpr})`);
+				}
+				continue;
+			}
+			// textarea / select: value/defaultValue never serialize as attributes —
+			// captured for the content position (textarea) / projection scope (select).
+			const ctlExpr =
+				ctlInner === null ? 'true' : printExprWithTsrx(ctlInner, ctx, name, inlinedSubs);
+			if (attrName === 'value') ctlValue = ctlExpr;
+			else ctlDefault = ctlExpr;
+			continue;
+		}
+		if (tag === 'select' && attrName === 'multiple') {
+			// Serialize the attribute normally AND capture the value for the
+			// option-projection scope — a dynamic value binds to a temp so the
+			// expression evaluates once.
+			if (val == null) {
+				selMultiple = 'true';
+				lit += ' multiple';
+				continue;
+			}
+			const mInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
+			if (mInner.type === 'Literal' && !isAfterSpread) {
+				selMultiple = mInner.value ? 'true' : 'false';
+				if (mInner.value === true) lit += ' multiple';
+				else if (typeof mInner.value === 'string') lit += ` multiple="${escapeAttr(mInner.value)}"`;
+				else if (typeof mInner.value === 'number') lit += ` multiple="${mInner.value}"`;
+				continue;
+			}
+			const tmp = `__sp${spreadTemps.length}`;
+			spreadTemps.push({
+				tempName: tmp,
+				argExpr: printExprWithTsrx(mInner, ctx, name, inlinedSubs),
+			});
+			selMultiple = tmp;
+			flush();
+			ctx.runtimeNeeded.add('ssrAttr');
+			parts.push(`_$ssrAttr('multiple', ${tmp}, ${JSON.stringify(tag)})`);
+			continue;
+		}
+		if (tag === 'option' && attrName === 'value') {
+			// The option's value feeds BOTH the attribute and the select-scope
+			// compare — a dynamic value binds to a temp for single evaluation.
+			if (val == null) {
+				optValue = '""';
+				lit += ' value';
+				continue;
+			}
+			const oInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
+			if (oInner.type === 'Literal' && !isAfterSpread) {
+				optValue = JSON.stringify(String(oInner.value));
+				if (typeof oInner.value === 'string') lit += ` value="${escapeAttr(oInner.value)}"`;
+				else if (typeof oInner.value === 'number') lit += ` value="${oInner.value}"`;
+				else if (oInner.value === true) lit += ' value';
+				continue;
+			}
+			const tmp = `__sp${spreadTemps.length}`;
+			spreadTemps.push({
+				tempName: tmp,
+				argExpr: printExprWithTsrx(oInner, ctx, name, inlinedSubs),
+			});
+			optValue = tmp;
+			flush();
+			ctx.runtimeNeeded.add('ssrAttr');
+			parts.push(`_$ssrAttr('value', ${tmp}, ${JSON.stringify(tag)})`);
 			continue;
 		}
 
@@ -2231,15 +2509,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		}
 
 		// Static literal (and not after a spread) → inline into the tag.
+		// bakeStaticAttr applies the shared React-parity value tables (client
+		// bake stays byte-identical — hydration parity).
 		if (!isAfterSpread && inner.type === 'Literal') {
-			if (typeof inner.value === 'string') lit += ` ${attrName}="${escapeAttr(inner.value)}"`;
-			else if (typeof inner.value === 'number') lit += ` ${attrName}="${inner.value}"`;
-			else if (typeof inner.value === 'boolean' && attrName.startsWith('aria-')) {
-				// `aria-*` is ENUMERATED (React parity, mirroring ssrAttr): a boolean
-				// literal serialises as "true"/"false" — `aria-hidden={false}` must
-				// render, not drop out via the generic boolean handling.
-				lit += ` ${attrName}="${inner.value}"`;
-			} else if (inner.value === true) lit += ` ${attrName}`;
+			lit += bakeStaticAttr(attrName, inner.value, tag);
 			continue;
 		}
 
@@ -2279,7 +2552,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		return finalize();
 	}
 
-	lit += '>';
+	if (tag !== 'option') lit += '>'; // option: ssrOption assembles the tag (attrs-only here)
 	const normChildren = normalizeChildren(node.children || [], childNs === 'svg');
 	// Only-child renderable `{expr}` → markerless `ssrChildText` (mirrors the client's
 	// markerless `childTextHole` mount: a primitive is the host's bare text, an object
@@ -2311,6 +2584,40 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			cssHash,
 			nlGuardFirst,
 		);
+	}
+	// Controlled `<textarea value/defaultValue>`: the prop IS the content
+	// (children were rejected at compile time) — value wins over defaultValue,
+	// a nullish value falls through to the default (the client cascade).
+	if (tag === 'textarea' && (ctlValue !== null || ctlDefault !== null)) {
+		ctx.runtimeNeeded.add('ssrTextareaValue');
+		const src =
+			ctlValue !== null && ctlDefault !== null
+				? `(${ctlValue}) ?? (${ctlDefault})`
+				: (ctlValue ?? ctlDefault);
+		childrenExpr = `_$ssrTextareaValue(${src})`;
+	}
+	// Controlled `<select value/defaultValue>`: push the option-projection
+	// scope around the children serialization — every compiled/de-opt
+	// `<option>` inside (across component boundaries and @for bodies; SSR is a
+	// synchronous nested call tree) consults it via ssrOption.
+	if (tag === 'select' && (ctlValue !== null || ctlDefault !== null)) {
+		ctx.runtimeNeeded.add('ssrSelectScope');
+		childrenExpr = `_$ssrSelectScope(${ctlValue ?? 'void 0'}, ${ctlDefault ?? 'void 0'}, ${selMultiple}, () => (${childrenExpr}))`;
+	}
+	// `<option>`: assemble via ssrOption so an active select scope can mark it
+	// ` selected` (returns a plain `<option …>` when no scope is active).
+	if (tag === 'option') {
+		let contentExpr = childrenExpr;
+		if (htmlSources.length > 0) {
+			ctx.runtimeNeeded.add('ssrInnerHtml');
+			contentExpr = `(_$ssrInnerHtml([${htmlSources.join(', ')}]) ?? (${childrenExpr}))`;
+		}
+		flush();
+		const attrsExpr = parts.length > 0 ? parts.join(' + ') : "''";
+		parts.length = 0;
+		ctx.runtimeNeeded.add('ssrOption');
+		parts.push(`_$ssrOption(${optValue ?? 'void 0'}, ${attrsExpr}, ${contentExpr})`);
+		return finalize();
 	}
 	if (htmlSources.length > 0) {
 		// Raw HTML (explicit and/or spread-supplied) wins over children when present
@@ -4715,6 +5022,9 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		if (b.kind === 'text') ctx.runtimeNeeded.add('htextSwap');
 		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
 		if (b.kind === 'attr') ctx.runtimeNeeded.add('setAttribute');
+		if (CONTROLLED_KIND_HELPERS[b.kind] !== undefined) {
+			ctx.runtimeNeeded.add(CONTROLLED_KIND_HELPERS[b.kind]);
+		}
 		if (b.kind === 'class') {
 			if (b.ns && b.ns !== 'html') {
 				// SVG/MathML `className` is read-only — use setClassAttr, which sets the
@@ -5188,6 +5498,26 @@ function emitBindingMount(b, elVar) {
       _b._prev$${b.id} = _v;
     }`;
 		}
+		case 'value':
+		case 'checked':
+		case 'selectValue':
+		case 'defaultValue':
+		case 'defaultChecked': {
+			// Controlled form props: property helper, NO `_prev$` cache — the
+			// helper diffs against the DOM (which the user mutates), and the
+			// update must re-run every render to reassert drift (React's
+			// controlled contract). Not in DEFERRABLE_MOUNT_KINDS: the mount
+			// runs inside the hydration window and arms the element.
+			return `    {
+      _$${CONTROLLED_KIND_HELPERS[b.kind]}(${elVar}, ${E});
+      _b._el$${b.id} = ${elVar};
+    }`;
+		}
+		case 'autoFocus': {
+			// Mount-only (React ignores later autoFocus changes); the focus
+			// itself fires at commit, after the tree is connected.
+			return `    _$setAutoFocus(${elVar}, ${E});`;
+		}
 		case 'class': {
 			// On SVG/MathML hosts the `className` property is read-only — fall back
 			// to setAttribute. Compile-time choice, zero runtime branching.
@@ -5303,6 +5633,17 @@ function emitBindingUpdate(b) {
 		}
 		case 'attr': {
 			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { _$setAttribute(_b._el$${b.id}, ${JSON.stringify(b.name)}, _v); _b._prev$${b.id} = _v; } }`;
+		}
+		case 'value':
+		case 'checked':
+		case 'selectValue':
+		case 'defaultValue':
+		case 'defaultChecked': {
+			// Deliberately UNGUARDED (no `_prev$` compare): a controlled prop
+			// reasserts on every commit — the helper's DOM-diff makes an
+			// unchanged value free, and a prev-guard would skip exactly the
+			// "unrelated re-render while the DOM drifted" reassert case.
+			return `    _$${CONTROLLED_KIND_HELPERS[b.kind]}(_b._el$${b.id}, ${E});`;
 		}
 		case 'class': {
 			const setter =
@@ -5577,6 +5918,7 @@ function emitElementHtml(
 	const tag = node.id?.name || node.openingElement?.name?.name;
 	if (!tag) throw new Error('Element without tag');
 	rejectVoidElementContent(tag, node, ctx);
+	rejectTextareaValueChildren(tag, node, ctx);
 
 	// The host element's own namespace (e.g. `<svg>` is in SVG ns even if its
 	// parent context is HTML); its descendants' inherited ns may differ
@@ -5692,6 +6034,42 @@ function emitElementHtml(
 			continue;
 		}
 
+		// Controlled form props ALWAYS compile to property bindings — static
+		// literals and bare booleans (`<input checked/>`) included; nothing
+		// bakes into the template HTML (see controlledKindFor).
+		const ctlKind = controlledKindFor(tag, attrName);
+		if (ctlKind !== null) {
+			let ctlExpr;
+			if (val == null) {
+				ctlExpr = 'true';
+			} else {
+				const ctlInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
+				ctlExpr = printExprWithTsrx(ctlInner, ctx, componentName, inlinedSubs);
+			}
+			bindings.push({ id: bindings.length, kind: ctlKind, expr: ctlExpr, path, ns: hostNs });
+			continue;
+		}
+		// `autoFocus` never bakes/writes an attribute — React parity: the
+		// runtime focuses the element in its mount commit (setAutoFocus).
+		if (attrName === 'autoFocus' && !tag.includes('-')) {
+			bindings.push({
+				id: bindings.length,
+				kind: 'autoFocus',
+				expr:
+					val == null
+						? 'true'
+						: printExprWithTsrx(
+								val.type === 'JSXExpressionContainer' ? val.expression : val,
+								ctx,
+								componentName,
+								inlinedSubs,
+							),
+				path,
+				ns: hostNs,
+			});
+			continue;
+		}
+
 		if (val == null) {
 			if (isAfterSpread) {
 				// Boolean attr after spread → emit as `true` binding.
@@ -5733,19 +6111,11 @@ function emitElementHtml(
 
 		// Static literal value? Inline into HTML — UNLESS we're after a spread,
 		// in which case we MUST emit as a binding so source order is preserved.
+		// bakeStaticAttr applies the shared React-parity value tables (aria-*/
+		// enumerated/data-* booleans stringify, boolean attrs canonicalize to
+		// `attr=""`/absent, booleans on non-boolean attrs drop).
 		if (inner.type === 'Literal' && !isAfterSpread) {
-			if (typeof inner.value === 'string') {
-				attrHtml += ` ${attrName}="${escapeAttr(inner.value)}"`;
-			} else if (typeof inner.value === 'number') {
-				attrHtml += ` ${attrName}="${inner.value}"`;
-			} else if (typeof inner.value === 'boolean' && attrName.startsWith('aria-')) {
-				// `aria-*` is ENUMERATED (React parity, mirroring the runtime
-				// setAttribute / ssrAttr): a boolean literal bakes as the string
-				// "true"/"false" — `aria-hidden={false}` must render, not drop.
-				attrHtml += ` ${attrName}="${inner.value}"`;
-			} else if (inner.value === true) {
-				attrHtml += ` ${attrName}`;
-			}
+			attrHtml += bakeStaticAttr(attrName, inner.value, tag);
 			continue;
 		}
 

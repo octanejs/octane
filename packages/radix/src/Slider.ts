@@ -4,9 +4,10 @@
 // Horizontal/Vertical orientation layers translate pointer positions and step keys;
 // Impl owns pointer capture + slide events; Track/Range/Thumb render the parts (thumb
 // positions are percentage-based with an in-bounds offset). Each Thumb renders a
-// hidden native input "bubble input" inside forms (value synced via the native
-// `value` setter + a dispatched bubbling `input` event — octane's native `<form
-// onInput>` observes it directly, so no extra adaptation is needed here).
+// hidden native input "bubble input" inside forms (a live CONTROLLED `value` — octane's
+// React-parity controlled form components keep the DOM property in sync — plus a
+// dispatched bubbling `input` event, which octane's native `<form onInput>` observes
+// directly, so no extra adaptation is needed here).
 import { createElement, useEffect, useMemo, useRef, useState } from 'octane';
 
 import { createCollection } from './collection';
@@ -588,19 +589,16 @@ export function BubbleInput(props: any): any {
 	const composedRefs = useComposedRefs(ref, forwardedRef, subSlot(slot, 'refs'));
 	const prevValue = usePrevious(value, subSlot(slot, 'prev'));
 
-	// Bubble value change to parents (e.g form change event)
+	// Bubble value change to parents (e.g form change event). The controlled
+	// `value` prop below keeps the input's DOM value in sync (commit-time
+	// property write + reassert), so this effect only dispatches the event.
 	useEffect(
 		() => {
 			const input = ref.current;
 			if (!input) return;
 
-			const inputProto = window.HTMLInputElement.prototype;
-			const descriptor = Object.getOwnPropertyDescriptor(inputProto, 'value') as PropertyDescriptor;
-			const setValue = descriptor.set;
-			if (prevValue !== value && setValue) {
-				const event = new Event('input', { bubbles: true });
-				setValue.call(input, value);
-				input.dispatchEvent(event);
+			if (prevValue !== value) {
+				input.dispatchEvent(new Event('input', { bubbles: true }));
 			}
 		},
 		[prevValue, value],
@@ -610,10 +608,10 @@ export function BubbleInput(props: any): any {
 	// We purposefully do not use `type="hidden"` here otherwise forms that wrap it
 	// will not be able to access its value via the FormData API.
 	//
-	// octane: the source omits React's `value` prop (its controlled model would
-	// swallow the programmatic dispatch) and uses `defaultValue`; the octane
-	// equivalent of default-value semantics is the native `value` ATTRIBUTE, which
-	// the property setter above never touches.
+	// octane: the source uses `defaultValue` + a prototype-descriptor `value` write
+	// (React's controlled model would swallow the programmatic dispatch); octane's
+	// live CONTROLLED `value` has no such conflict — the runtime keeps the DOM
+	// property in sync and the effect above dispatches the bubbling `input` event.
 	return createElement(Primitive.input, {
 		style: { display: 'none' },
 		name,

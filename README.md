@@ -39,8 +39,10 @@ Octane is the day-to-day feel:
   hook can live inside an `if`, after an early return, or in a loop. The usual
   React footguns simply aren't there.
 - **The platform, not a reimplementation of it.** Real delegated DOM events,
-  uncontrolled inputs, and refs-as-props (`ref={cb}`, `ref={obj}`, even
-  `ref={[a, b]}`) — no synthetic layer second-guessing the browser.
+  controlled form components on native events (React's `value`/`checked`
+  semantics — `onInput` per keystroke, no synthetic `onChange`), and
+  refs-as-props (`ref={cb}`, `ref={obj}`, even `ref={[a, b]}`) — no synthetic
+  layer second-guessing the browser.
 - **No virtual DOM.** Components re-render like React, but a compiled render path
   and a LIS-based keyed reconciler keep the runtime overhead minimal.
 
@@ -65,6 +67,9 @@ Octane is currently in alpha development.
   objects, and nesting, at every apply site.
 - **Refs as props**, including array composition (`ref={[a, b]}`) — no
   `forwardRef`. Works with spreads, SSR, and hydration.
+- **Controlled form components on native events** — `value`/`checked` follow
+  React's controlled semantics exactly; `defaultValue`/`defaultChecked` opt out.
+  The per-keystroke handler is the native `onInput` (no synthetic `onChange`).
 
 Octane is deliberately narrow where React has grown wide: **no class components,
 no Server Components, no synthetic event system.** Those are choices, not gaps —

@@ -2,15 +2,14 @@
 // .radix-primitives/packages/react/checkbox/src/checkbox.tsx). A `role=checkbox` button
 // (with `indeterminate` support) that — when inside a form — renders a hidden native
 // checkbox "bubble input" so native form machinery (FormData, validation, reset,
-// change listeners) reflects the state. The bubble input is uncontrolled; state syncs
-// imperatively via the native `checked` property setter + dispatched events.
+// change listeners) reflects the state.
 //
-// octane adaptations (documented; both stem from octane's native-event /
-// no-controlled-inputs model — see docs/react-parity-migration-plan.md):
+// octane adaptations (documented; see docs/react-parity-migration-plan.md):
 // - React's synthetic `event.isPropagationStopped()` → native `event.cancelBubble`.
-// - `defaultChecked` prop → the native `checked` ATTRIBUTE (HTML's default-state
-//   semantics; live state is driven through the property setter, which never touches
-//   the attribute).
+// - The source's uncontrolled bubble input (`defaultChecked` + prototype-descriptor
+//   `checked` writes) → a live CONTROLLED `checked` prop: octane's React-parity
+//   controlled form components write the DOM property at commit and reassert it after
+//   every event flush, so the bubble effect only dispatches events.
 // - The bubble effect ALSO dispatches a native `change` event after the source's
 //   `click`: React forms observe checkbox clicks through synthetic `onChange`, which
 //   octane doesn't have — a native bubbling `change` gives octane `<form onChange>`
@@ -230,7 +229,6 @@ export function BubbleInput(props: any): any {
 		control,
 		hasConsumerStoppedPropagationRef,
 		checked,
-		defaultChecked,
 		required,
 		disabled,
 		name,
@@ -244,23 +242,18 @@ export function BubbleInput(props: any): any {
 	const prevChecked = usePrevious(checked, subSlot(slot, 'prev'));
 	const controlSize = useSize(control, subSlot(slot, 'size'));
 
-	// Bubble checked change to parents (e.g form change event)
+	// Bubble checked change to parents (e.g form change event). The controlled
+	// `checked` prop below keeps the input's DOM state in sync, so — unlike the
+	// source's uncontrolled input — this effect only dispatches the events
+	// (`indeterminate` stays imperative: it is property-only, as in the source).
 	useEffect(
 		() => {
 			const input = bubbleInput;
 			if (!input) return;
 
-			const inputProto = window.HTMLInputElement.prototype;
-			const descriptor = Object.getOwnPropertyDescriptor(
-				inputProto,
-				'checked',
-			) as PropertyDescriptor;
-			const setChecked = descriptor.set;
-
 			const bubbles = !hasConsumerStoppedPropagationRef.current;
-			if (prevChecked !== checked && setChecked) {
+			if (prevChecked !== checked) {
 				input.indeterminate = isIndeterminate(checked);
-				setChecked.call(input, isIndeterminate(checked) ? false : checked);
 				input.dispatchEvent(new Event('click', { bubbles }));
 				// octane adaptation: also fire the native `change` React's synthetic
 				// onChange would have synthesised from the click (see file header).
@@ -271,16 +264,13 @@ export function BubbleInput(props: any): any {
 		subSlot(slot, 'e:bubble'),
 	);
 
-	const defaultCheckedRef = useRef(
-		isIndeterminate(checked) ? false : checked,
-		subSlot(slot, 'default'),
-	);
 	return createElement(Primitive.input, {
 		type: 'checkbox',
 		'aria-hidden': true,
-		// octane: the native `checked` ATTRIBUTE is HTML's default-checked state (there is
-		// no `defaultChecked` prop outside React's controlled model).
-		checked: (defaultChecked ?? defaultCheckedRef.current) || undefined,
+		// Live CONTROLLED checked (octane React-parity): the runtime writes the DOM
+		// property, mirrors only the INITIAL state to the attribute, and reasserts
+		// the property on every commit / after event flushes.
+		checked: isIndeterminate(checked) ? false : checked,
 		required,
 		disabled,
 		name,

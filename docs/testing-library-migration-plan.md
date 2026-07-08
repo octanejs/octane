@@ -59,7 +59,9 @@ harness is outside the compiler:
 - `cleanup.test.ts` — cleanup.js:4/25/30 + auto-cleanup.js (global-`afterEach`
   registration exercised via `vi.resetModules()` with a stubbed hook).
 - `events.test.ts` — events.js:154/207/216, act.js:20; pins the native
-  `input`/`change` split (no synthetic onChange remap).
+  `input`/`change` split (no synthetic onChange remap — still true after the
+  2026-07-08 controlled-components reversal: `value`/`checked` are controlled
+  per React, but events stay native).
 - `renderHook.test.ts` — renderHook.js:10/24/53 + act-wrapped updates,
   cleanup-on-unmount, cross-harness state isolation.
 - `act.test.ts` — act.js:14 + error propagation.

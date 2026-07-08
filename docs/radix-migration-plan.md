@@ -283,6 +283,13 @@ Radix's components are thin; behavior lives in shared util packages.
 - `createContextScope`'s `__scope` threading → reimplemented as a factory returning octane `createContext` instances keyed by scope (API identical, internals rewritten). None missing at the primitive level.
 
 **(c) Form primitives under octane's uncontrolled-input model.**
+
+> **Reversal (2026-07-08):** octane now ships React-parity controlled components —
+> `value`/`checked` reassertion on native events (`onInput` per keystroke; still no
+> synthetic `onChange`). Form parts pass real controlled props directly; the
+> imperative property-setting adaptation below is obsolete and its workaround
+> machinery is being removed. Kept for the historical record.
+
 Radix Checkbox/Switch/RadioGroup/Slider/Select render hidden native inputs and drive `checked`/`value` via React's controlled model + synthetic `onChange` + value re-assertion. Octane has **no controlled components and no synthetic `onChange`**.
 - Component state → imperatively set the native property via `useLayoutEffect`+`ref`; read changes from native `onInput`/`onClick`. `useControllableState` stays as the *state* layer (unaffected — it's `useState`+ref, not a DOM concept).
 - No runtime work needed; this is **re-authoring** state↔DOM binding per input-bearing part, not a line-for-line port. Biggest per-component risk area — schedule deliberately, cover with dedicated tests.

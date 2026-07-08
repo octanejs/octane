@@ -8,8 +8,13 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import { render, cleanup, screen } from '@octanejs/testing-library';
-import { Counter, InputEcho } from './_fixtures/counter.tsrx';
+import { render, cleanup, fireEvent, screen } from '@octanejs/testing-library';
+import {
+	Counter,
+	InputEcho,
+	ControlledInputIgnoring,
+	ControlledInputAccepting,
+} from './_fixtures/counter.tsrx';
 
 afterEach(cleanup);
 
@@ -30,8 +35,35 @@ describe('@testing-library/user-event compatibility', () => {
 		render(InputEcho);
 		const input = screen.getByRole('textbox') as HTMLInputElement;
 		await user.type(input, 'abc');
-		// Octane inputs are uncontrolled + native: the DOM holds the typed value
-		// and the onInput-driven echo committed after each keystroke.
+		// This fixture's input is UNCONTROLLED (no `value` prop), so the typed
+		// value sticks because nothing controls it; the onInput-driven echo
+		// committed after each keystroke.
+		expect(input.value).toBe('abc');
+		expect(screen.getByTestId('echo').textContent).toBe('abc');
+	});
+
+	it('a controlled input whose handler ignores the event snaps back (React + RTL parity)', async () => {
+		const user = userEvent.setup();
+		render(ControlledInputIgnoring);
+		const input = screen.getByRole('textbox') as HTMLInputElement;
+		expect(input.value).toBe('locked');
+		// `value={state}` is live controlled and onInput never updates the state,
+		// so the runtime reasserts the rendered value after every discrete-event
+		// flush — each keystroke's edit snaps back, exactly like React + RTL.
+		await user.type(input, 'abc');
+		expect(input.value).toBe('locked');
+		// fireEvent.change (set `.value`, then dispatch) snaps back the same way.
+		fireEvent.change(input, { target: { value: 'mutated' } });
+		expect(input.value).toBe('locked');
+	});
+
+	it('a controlled input whose handler updates state accepts typing', async () => {
+		const user = userEvent.setup();
+		render(ControlledInputAccepting);
+		const input = screen.getByRole('textbox') as HTMLInputElement;
+		await user.type(input, 'abc');
+		// onInput feeds the controlling state, so the committed value matches the
+		// DOM and the reassert pass is a no-op: the typed value sticks.
 		expect(input.value).toBe('abc');
 		expect(screen.getByTestId('echo').textContent).toBe('abc');
 	});

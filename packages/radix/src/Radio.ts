@@ -1,10 +1,12 @@
 // Ported from @radix-ui/react-radio-group's internal radio (source:
 // .radix-primitives/packages/react/radio-group/src/radio.tsx). The single-radio
 // building block RadioGroup composes: a `role=radio` button + Presence indicator +
-// the hidden native-radio "bubble input" (same machinery as Checkbox). Same octane
-// adaptations as Checkbox.ts: `isPropagationStopped()` → `event.cancelBubble`;
-// `defaultChecked` → the native `checked` attribute; a native `change` dispatched
-// alongside the source's `click`.
+// the hidden native-radio "bubble input" (same machinery as Checkbox — a live
+// CONTROLLED `checked` prop keeps the DOM in sync, the bubble effect only dispatches
+// events). Same octane adaptations as Checkbox.ts: `isPropagationStopped()` →
+// `event.cancelBubble`; the source's uncontrolled input + descriptor `checked` writes
+// → octane's controlled `checked`; a native `change` dispatched alongside the
+// source's `click`.
 import { createElement, useEffect, useRef, useState } from 'octane';
 
 import { composeEventHandlers } from './compose-event-handlers';
@@ -199,22 +201,16 @@ export function RadioBubbleInput(props: any): any {
 	const prevChecked = usePrevious(checked, subSlot(slot, 'prev'));
 	const controlSize = useSize(control, subSlot(slot, 'size'));
 
-	// Bubble checked change to parents (e.g form change event)
+	// Bubble checked change to parents (e.g form change event). The controlled
+	// `checked` prop below keeps the input's DOM state in sync, so this effect
+	// only dispatches the events (see Checkbox.ts).
 	useEffect(
 		() => {
 			const input = bubbleInput;
 			if (!input) return;
 
-			const inputProto = window.HTMLInputElement.prototype;
-			const descriptor = Object.getOwnPropertyDescriptor(
-				inputProto,
-				'checked',
-			) as PropertyDescriptor;
-			const setChecked = descriptor.set;
-
 			const bubbles = !hasConsumerStoppedPropagationRef.current;
-			if (prevChecked !== checked && setChecked) {
-				setChecked.call(input, checked);
+			if (prevChecked !== checked) {
 				input.dispatchEvent(new Event('click', { bubbles }));
 				// octane adaptation: also fire the native `change` (see Checkbox.ts header).
 				input.dispatchEvent(new Event('change', { bubbles }));
@@ -224,12 +220,12 @@ export function RadioBubbleInput(props: any): any {
 		subSlot(slot, 'e:bubble'),
 	);
 
-	const defaultCheckedRef = useRef(checked, subSlot(slot, 'default'));
 	return createElement(Primitive.input, {
 		type: 'radio',
 		'aria-hidden': true,
-		// octane: native `checked` attribute = default-checked state (see Checkbox.ts).
-		checked: defaultCheckedRef.current || undefined,
+		// Live CONTROLLED checked (octane React-parity — see Checkbox.ts). The runtime's
+		// event-restore also re-syncs radio-group cousins after a dispatched `click`.
+		checked,
 		required,
 		disabled,
 		name,

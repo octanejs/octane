@@ -57,13 +57,29 @@ reshapes. A few examples:
 Everything else you rely on is native and works: `stopPropagation`, the capture
 phase, and `event.currentTarget` all behave the way the DOM defines them.
 
-## Inputs are uncontrolled
+## Controlled components, native events
 
-`value` and `checked` are ordinary attributes. Octane sets them once and then
-lets the DOM own them — there's no controlled-input loop re-asserting the value
-on every render. In practice you write inputs the way you always did; you just
-don't need the "controlled component" ceremony, and you won't fight the cursor
-jumping.
+Controlled inputs work exactly like React's. Put `value` or `checked` on an
+`<input>`, `<textarea>`, or `<select>` and the prop drives the DOM: Octane
+re-asserts it on every render and after events, so a rejected edit snaps
+straight back, radio groups stay in sync, and `<select value>` selects the
+matching option. IME composition is respected, and `defaultValue` /
+`defaultChecked` give you uncontrolled inputs, same as React.
+
+The one thing to rename: there's no synthetic `onChange`. The per-keystroke
+event is the native one, `onInput` — the native `change` event fires on blur.
+Migration is a one-word diff:
+
+```tsrx
+// React
+<input value={text} onChange={(e) => setText(e.target.value)} />
+// Octane
+<input value={text} onInput={(e) => setText(e.target.value)} />
+```
+
+If you render a controlled text input without an `onInput` handler, Octane
+warns in development — with a specific pointer when you passed `onChange`,
+since that fires on blur here, not per keystroke.
 
 Form **actions** are the modern React 19 story and match it:
 `<form action={fn}>`, `useActionState`, `useFormStatus`, `useOptimistic`, and

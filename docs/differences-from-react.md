@@ -27,26 +27,57 @@ behavior matches the platform, never React's emulation layer:
   React). A noop `onclick` is stamped on delegation roots (iOS Safari), not on
   every element.
 
-## No controlled form components
+## Controlled components, native events
 
-`value`/`checked` are plain attributes; inputs are uncontrolled and native; the
-DOM is the source of truth. There is no controlled-value re-assertion and no
-property routing (`muted` etc. stay attributes). Form **actions**
+Controlled `value`/`checked` on `<input>`/`<textarea>`/`<select>` match React
+(2026-07-08): the prop drives the DOM property and reasserts on every commit
+and after discrete events (rejected edits snap back), IME composition is
+respected, radio groups restore as a group, `<select value>` projects options
+(single + multiple), and `defaultValue`/`defaultChecked` are the uncontrolled
+escape hatch. Hydration adopts pre-hydration user input, then the first
+commit/discrete event reasserts. `<textarea>` with children AND a
+`value`/`defaultValue` prop is a compile error (the prop owns the content).
+
+What differs is the **event layer**: there is no synthetic `onChange`.
+`onInput` is the per-keystroke handler for text controls (the native `change`
+event fires on blur/commit); checkboxes/radios/selects work through native
+`change`/`click`, whose timing matches React anyway. A dev warning flags a
+controlled text control with no `onInput` (special-cased when only `onChange`
+is present). Migration is a rename:
+
+```jsx
+<input value={text} onChange={(e) => setText(e.target.value)} /> // React
+<input value={text} onInput={(e) => setText(e.target.value)} /> // Octane
+```
+
+Form **actions**
 (`<form action={fn}>`, `useActionState`, `useFormStatus`, `useOptimistic`,
 `requestFormReset`, auto-reset) match React 19; an action error does **not**
 cancel queued dispatches (octane keeps threading).
 
-## Attributes: native pass-through, no tables
+## Attributes: native names, React's value rules
 
-No `possibleStandardNames` alias table (write native spellings —
-`accept-charset`, `arabic-form`; only React's own `className`/`htmlFor` are
-aliased), no known-attribute table (`unknown={true}` → boolean presence `""`;
-`inert=""` stays present, which the platform reads as **true**; truthy strings
-on boolean attributes pass verbatim), lenient `toString()` coercion instead of
-throwing on odd objects. Shared React policies that DO apply: `aria-*` and
+Attribute **values** follow React (matched 2026-07-08): boolean attributes
+(`disabled`, `hidden`, `inert`, `readOnly`, …) normalize — any truthy value
+renders the canonical `attr=""`, falsy removes (`hidden={0}` → absent); a
+boolean on a non-boolean attribute is removed + dev-warns (`title={true}` does
+not render `title=""`); `download`/`capture` keep React's overloaded-boolean
+semantics; `muted`/`multiple`/`selected` dynamic writes set the DOM
+**property** (mustUseProperty); `autoFocus` writes no attribute — the element
+is focused in the commit phase of its mount. Also matched: `aria-*` and
 `spellcheck`/`contenteditable`/`draggable` stringify booleans; empty
 `src`/`href` are stripped (except `<a>`/`<area>`); function/symbol values are
-removed; `dangerouslySetInnerHTML` shape and children-exclusivity throw.
+removed; `dangerouslySetInnerHTML` shape and children-exclusivity throw; the
+canonical camelCase aliases (`strokeWidth` → `stroke-width`, `xlinkHref`,
+`className`/`htmlFor`) write the native attribute.
+
+What still differs: attribute **names** pass through natively — native
+spellings (`accept-charset`, `arabic-form`) are the idiom and simply work, and
+there is no exhaustive `possibleStandardNames` DEV table. Only a curated slice
+of genuinely-broken casings warns in dev (`autofocus` → `autoFocus`,
+`defaultvalue` → `defaultValue`, `defaultchecked` → `defaultChecked`,
+lowercase `on*` function props → camelCase). Odd objects coerce leniently via
+`toString()` (with a dev `[object Object]` warning) instead of throwing.
 
 ## `class`/`className` compose clsx-style
 

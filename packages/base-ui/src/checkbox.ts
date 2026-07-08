@@ -4,10 +4,11 @@
 //
 // A checkbox renders a `<span role="checkbox">` + a hidden `<input type="checkbox">`, with an
 // optional `<Checkbox.Indicator>` (transition-mounted). octane adaptations mirror Switch:
-// native events (no `.nativeEvent`); the uncontrolled-input pattern (initial checked →
-// attribute, live `input.checked` PROPERTY via the native setter, native click/change
-// dispatch); `input.indeterminate` set imperatively as a property. The CheckboxGroup /
-// parent-checkbox branches stay dormant until CheckboxGroup lands (groupContext undefined).
+// native events (no `.nativeEvent`); the hidden input takes the live `checked` prop (octane
+// inputs are CONTROLLED exactly like React's) with native click dispatch;
+// `input.indeterminate` set imperatively as a property (it has no attribute). The
+// CheckboxGroup / parent-checkbox branches stay dormant until CheckboxGroup lands
+// (groupContext undefined).
 import {
 	createContext,
 	createElement,
@@ -225,9 +226,6 @@ function CheckboxRoot(props: CheckboxRootProps): any {
 		subSlot(slot, 'checked'),
 	);
 
-	// octane: reflect the INITIAL checked as the `checked` ATTRIBUTE (see Switch).
-	const initialCheckedRef = useRef(checked, subSlot(slot, 'initialChecked'));
-
 	const computedChecked = isGroupedWithParent ? Boolean(groupChecked) : checked;
 	const computedIndeterminate = isGroupedWithParent
 		? groupIndeterminate || indeterminate
@@ -289,19 +287,13 @@ function CheckboxRoot(props: CheckboxRootProps): any {
 		subSlot(slot, 'ariaLabelledBy'),
 	);
 
-	// octane: set `checked` (property) + `indeterminate` (property) imperatively; matches
-	// React's controlled input (property-only, never a `checked` attribute beyond the initial).
+	// `indeterminate` has no attribute — set the property imperatively (per Base UI).
 	useLayoutEffect(
 		() => {
 			const input = inputRef.current;
 			if (!input) {
 				return;
 			}
-			const setNativeChecked = Object.getOwnPropertyDescriptor(
-				ownerWindow(input).HTMLInputElement.prototype,
-				'checked',
-			)?.set;
-			setNativeChecked?.call(input, checked);
 			input.indeterminate = computedIndeterminate;
 			if (checked) {
 				setFilled(true);
@@ -327,8 +319,7 @@ function CheckboxRoot(props: CheckboxRootProps): any {
 
 	const inputProps: Record<string, any> = mergeProps(
 		{
-			// octane: initial checked → attribute; live value driven via the property (above).
-			checked: initialCheckedRef.current || undefined,
+			checked,
 			disabled,
 			form,
 			name: parent ? undefined : name,

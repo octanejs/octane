@@ -743,32 +743,30 @@ describe('conformance: SSR serialization — boolean properties (Attributes)', (
 		expectCleanHydrate('Hidden', { v: false });
 	});
 
-	// Octane divergence (value, not presence): React normalizes truthy non-boolean
-	// values on boolean props to `hidden=""`; octane serializes the value as
-	// written. The PLATFORM outcome is identical — a boolean attribute is active
-	// by presence — so presence is what's asserted (Per :131/:145/:151/:157/:163).
-	it('keeps boolean prop present for truthy non-boolean values (Per :131-:166 — outcome level)', () => {
+	// React normalizes truthy non-boolean values on boolean props to the
+	// canonical `hidden=""`. Matched since 2026-07-08 (the shared boolean-attr
+	// table in constants.ts — reverses the 2026-07-04 value-as-written
+	// adjudication). Per :131/:145/:151/:157/:163.
+	it('normalizes truthy non-boolean values on boolean props to "" (Per :131-:166)', () => {
 		for (const v of ['hidden', 'foo', ['foo', 'bar'], { foo: 'bar' }, 10]) {
-			expect(parse(ssr('Hidden', { v })).querySelector('div')!.hasAttribute('hidden')).toBe(true);
+			expect(parse(ssr('Hidden', { v })).querySelector('div')!.getAttribute('hidden')).toBe('');
 		}
 	});
 
-	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04, see the inert="" test in
-	// dom-attributes.test.ts): React drops FALSY non-boolean values on boolean
-	// props (hidden={0}, hidden=""); octane writes attribute values through
-	// natively — the value serializes and PRESENCE means platform-true, exactly
-	// as hand-written markup. Pass a real boolean for JS-boolean behavior.
-	it('serializes falsy non-boolean values on boolean props natively (React drops — Per :139/:169)', () => {
+	// React drops FALSY non-boolean values on boolean props (hidden={0},
+	// hidden=""). Matched since 2026-07-08 (reverses the 2026-07-04 native-write
+	// adjudication) — the value's JS truthiness decides presence, like React.
+	it('drops falsy non-boolean values on boolean props (Per :139/:169)', () => {
 		expect(
 			parse(ssr('Hidden', { v: 0 }))
 				.querySelector('div')!
-				.getAttribute('hidden'),
-		).toBe('0');
+				.hasAttribute('hidden'),
+		).toBe(false);
 		expect(
 			parse(ssr('Hidden', { v: '' }))
 				.querySelector('div')!
-				.getAttribute('hidden'),
-		).toBe('');
+				.hasAttribute('hidden'),
+		).toBe(false);
 	});
 
 	// Function/symbol family (see string properties above).
@@ -1138,16 +1136,15 @@ describe('conformance: SSR serialization — custom elements (Attributes)', () =
 		).toBe(false);
 	});
 
-	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04, mirroring the client half
-	// in dom-attributes.test.ts): React 19 treats inert="" as false and drops
-	// it; octane serializes the empty string as written — present ⇒
-	// platform-true, per the HTML boolean-attribute rules.
-	it('keeps inert="" present (React drops — Per :757)', () => {
+	// React 19 treats inert="" as false and drops it. Matched since 2026-07-08
+	// (`inert` sits in the shared boolean-attr table — mirrors the client half
+	// in dom-attributes.test.ts; reverses the 2026-07-04 adjudication).
+	it('drops inert="" (boolean-prop coercion — Per :757)', () => {
 		expect(
 			parse(ssr('InertDiv', { v: '' }))
 				.querySelector('div')!
-				.getAttribute('inert'),
-		).toBe('');
+				.hasAttribute('inert'),
+		).toBe(false);
 	});
 
 	it('serializes attributes on is="custom-element" hosts (Per :701/:782)', () => {

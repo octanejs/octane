@@ -312,6 +312,12 @@ work around it in the binding.**
 > - **Switch** (`src/switch.ts`) — `Switch.Root` (`role="switch"` span + hidden checkbox input)
 >   + `Switch.Thumb`. Reuses `useButton`/`useControlled`.
 >
+> **Reversal (2026-07-08):** octane now ships React-parity controlled components
+> (`value`/`checked` reassertion on native events; still no synthetic `onChange` —
+> `onInput`/native `change`/`click` drive updates). The adaptation below is obsolete —
+> form controls pass real controlled props directly and the imperative
+> property-setting machinery is being removed. Kept for the historical record.
+>
 > **octane uncontrolled-input adaptation (the Phase-2 crux, reusable by Checkbox/Radio/etc.):**
 > octane inputs are UNCONTROLLED (a `checked` prop writes a `checked` ATTRIBUTE), but React's
 > controlled `<input checked>` reflects only the INITIAL checked to the attribute (as its

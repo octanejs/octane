@@ -87,6 +87,16 @@ export {
 	setStyle,
 	setSpread,
 	setFormAction,
+	// Controlled form components (value/checked/defaultValue/defaultChecked
+	// property bindings on input/textarea/select — React-parity semantics on
+	// native events).
+	setValue,
+	setChecked,
+	setSelectValue,
+	setDefaultValue,
+	setDefaultChecked,
+	// autoFocus (commit-phase focus on mount; never an attribute)
+	setAutoFocus,
 	attachRef,
 	queueRefAttach,
 	queueRefDetach,

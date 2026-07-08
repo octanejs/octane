@@ -18,13 +18,13 @@
 // - `SelectValue`'s `<React.Fragment key={placeholder|value}>` remount trick is dropped:
 //   octane's value-hole reconciliation replaces the placeholder/value content directly.
 // - The bubble `<select>`: React's `defaultValue={selectValue}` + `key={nativeSelectKey}`
-//   (re-built so the default option associates) has no octane equivalent (octane has no
-//   controlled/default-value model — inputs are native). Instead the select's `value` is
-//   synced imperatively: a silent property write whenever the rendered option set changes
-//   (mount/late option registration), while actual value CHANGES go through the native
-//   `value` setter + a dispatched bubbling `change` event (as in the source) so octane
-//   `<form onChange>` observes them. React's synthetic `onChange` on the select is the
-//   native `change` event (a `<select>` is not a text input, so no `onInput` remap).
+//   (re-built so the default option associates) → a live CONTROLLED `value` prop:
+//   octane's React-parity controlled form components re-project a select's value onto
+//   its options at every commit (so late-registering options associate without a
+//   rebuild) and restore it after event flushes. Value CHANGES additionally dispatch a
+//   bubbling native `change` event (as in the source) so octane `<form onChange>`
+//   observes them. React's synthetic `onChange` on the select is the native `change`
+//   event (a `<select>` is not a text input, so no `onInput` remap).
 // - jsdom-environment guards (same class as use-size.ts's ResizeObserver guard; no
 //   behavior change in browsers): `hasPointerCapture`/`releasePointerCapture` and
 //   `scrollIntoView` are called only when they exist.
@@ -113,7 +113,6 @@ interface SelectContextValue {
 	form?: string;
 	// Native `<option>` element descriptors registered by mounted ItemTexts.
 	nativeOptions: Set<any>;
-	nativeSelectKey: string;
 	isFormControl: boolean;
 }
 
@@ -181,14 +180,6 @@ export function Provider(props: any): any {
 	);
 	const contentId = useId(subSlot(slot, 'contentId'));
 
-	// The native `select` only associates the correct default value if the corresponding
-	// `option` is rendered as a child **at the same time** as itself. Because it might take
-	// a few renders for our items to gather the information to build the native `option`(s),
-	// this key tracks the option set (the bubble select re-syncs its value off it).
-	const nativeSelectKey = Array.from(nativeOptionsSet)
-		.map((option: any) => option?.props?.value)
-		.join(';');
-
 	const handleNativeOptionAdd = useCallback(
 		(option: any) => {
 			setNativeOptionsSet((prev: Set<any>) => new Set(prev).add(option));
@@ -229,7 +220,6 @@ export function Provider(props: any): any {
 		autoComplete,
 		form,
 		nativeOptions: nativeOptionsSet,
-		nativeSelectKey,
 		isFormControl,
 	};
 
@@ -1690,7 +1680,7 @@ export function BubbleInput(props: any): any {
 	const { __scopeSelect, ref: forwardedRef, ...selectProps } = props ?? {};
 	const context = useSelectContext(BUBBLE_INPUT_NAME, __scopeSelect);
 	const { value, onValueChange, required, disabled, name, autoComplete, form } = context;
-	const { nativeOptions, nativeSelectKey } = context;
+	const { nativeOptions } = context;
 	const ref = useRef<HTMLSelectElement | null>(null, subSlot(slot, 'ref'));
 	const composedRefs = useComposedRefs(forwardedRef, ref, subSlot(slot, 'refs'));
 	const selectValue = value ?? '';
@@ -1704,49 +1694,32 @@ export function BubbleInput(props: any): any {
 		(option: any) => (option?.props?.value ?? '') === '',
 	);
 
-	// Bubble value change to parents (e.g form change event)
+	// Bubble value change to parents (e.g form change event). The controlled
+	// `value` prop below keeps the select's DOM selection in sync (octane
+	// re-projects it at every commit, covering mount + late option registration
+	// — the source's `key={nativeSelectKey}` rebuild), so this effect only
+	// dispatches the event.
 	useEffect(
 		() => {
 			const select = ref.current;
 			if (!select) return;
 
-			const selectProto = window.HTMLSelectElement.prototype;
-			const descriptor = Object.getOwnPropertyDescriptor(
-				selectProto,
-				'value',
-			) as PropertyDescriptor;
-			const setValue = descriptor.set;
-			if (prevValue !== selectValue && setValue) {
-				const event = new Event('change', { bubbles: true });
-				setValue.call(select, selectValue);
-				select.dispatchEvent(event);
+			if (prevValue !== selectValue) {
+				select.dispatchEvent(new Event('change', { bubbles: true }));
 			}
 		},
 		[prevValue, selectValue],
 		subSlot(slot, 'e:bubble'),
 	);
 
-	// octane adaptation: React associates the default value by re-building the keyed
-	// `select` with `defaultValue` each time the option set changes; octane's native-input
-	// model has no defaultValue, so silently sync the `value` property once the rendered
-	// options can represent it (mount + whenever the option set changes).
-	useEffect(
-		() => {
-			const select = ref.current;
-			if (select && select.value !== selectValue) {
-				select.value = selectValue;
-			}
-		},
-		[nativeSelectKey, selectValue],
-		subSlot(slot, 'e:default'),
-	);
-
 	/**
 	 * We purposefully use a `select` here to support form autofill as much as
 	 * possible.
 	 *
-	 * We purposefully do not set the `value` attribute here to allow the value
-	 * to be set programmatically and bubble to any parent form `onChange` event.
+	 * The `value` is live CONTROLLED (octane React-parity): the runtime projects
+	 * it onto the options at every commit and restores it after event flushes;
+	 * value changes still bubble to any parent form `onChange` via the `change`
+	 * event dispatched above.
 	 *
 	 * We use visually hidden styles rather than `display: "none"` because
 	 * Safari autofill won't work otherwise.
@@ -1759,6 +1732,7 @@ export function BubbleInput(props: any): any {
 		autoComplete,
 		disabled,
 		form,
+		value: selectValue,
 		// React's synthetic onChange on a `<select>` is the native `change` event.
 		onChange: (event: Event) => onValueChange((event.target as HTMLSelectElement).value),
 		...selectProps,
