@@ -2,9 +2,30 @@
 // shallowEqual comes from @octanejs/redux instead of react-redux (identical
 // algorithm). Update by re-vendoring when the recharts devDependency moves.
 import { shallowEqual } from '@octanejs/redux';
-var propsToShallowCompare = new Set(['axisLine', 'tickLine', 'activeBar', 'activeDot', 'activeLabel', 'activeShape', 'allowEscapeViewBox', 'background', 'cursor', 'dot', 'label', 'line', 'margin', 'padding', 'position', 'shape', 'style', 'tick', 'wrapperStyle',
-// radius can be an array of 4 numbers, easy to compare shallowly
-'radius', 'throttledEvents']);
+var propsToShallowCompare = new Set([
+	'axisLine',
+	'tickLine',
+	'activeBar',
+	'activeDot',
+	'activeLabel',
+	'activeShape',
+	'allowEscapeViewBox',
+	'background',
+	'cursor',
+	'dot',
+	'label',
+	'line',
+	'margin',
+	'padding',
+	'position',
+	'shape',
+	'style',
+	'tick',
+	'wrapperStyle',
+	// radius can be an array of 4 numbers, easy to compare shallowly
+	'radius',
+	'throttledEvents',
+]);
 
 /**
  * When comparing two values, returns true if they are the same value or
@@ -20,19 +41,19 @@ var propsToShallowCompare = new Set(['axisLine', 'tickLine', 'activeBar', 'activ
  * return true if the same, false if different
  */
 function sameValueZero(x, y) {
-  if (x == null && y == null) {
-    /*
-     * treat null and undefined as equal. Internally in Recharts we make no difference between these two
-     * so there is no need to re-render.
-     */
-    return true;
-  }
-  if (typeof x === 'number' && typeof y === 'number') {
-    // x and y are equal (this is true for -0 and 0) or they are both NaN
-    // eslint-disable-next-line no-self-compare
-    return x === y || x !== x && y !== y;
-  }
-  return x === y;
+	if (x == null && y == null) {
+		/*
+		 * treat null and undefined as equal. Internally in Recharts we make no difference between these two
+		 * so there is no need to re-render.
+		 */
+		return true;
+	}
+	if (typeof x === 'number' && typeof y === 'number') {
+		// x and y are equal (this is true for -0 and 0) or they are both NaN
+		// eslint-disable-next-line no-self-compare
+		return x === y || (x !== x && y !== y);
+	}
+	return x === y;
 }
 
 /**
@@ -47,29 +68,29 @@ function sameValueZero(x, y) {
  * @param nextProps
  */
 export function propsAreEqual(prevProps, nextProps) {
-  var allKeys = new Set([...Object.keys(prevProps), ...Object.keys(nextProps)]);
-  for (var key of allKeys) {
-    /*
-     * If a key is on a special allowlist, go one level deeper
-     * and do a shallow comparison of the values.
-     */
-    if (propsToShallowCompare.has(key)) {
-      if (prevProps[key] == null && nextProps[key] == null) {
-        /*
-         * treat null and undefined as equal. Internally in Recharts we make no difference between these two
-         * so there is no need to re-render.
-         */
-        continue;
-      }
-      if (!shallowEqual(prevProps[key], nextProps[key])) {
-        return false;
-      }
-      /*
-       * Otherwise do a simple same-value comparison (with NaN support).
-       */
-    } else if (!sameValueZero(prevProps[key], nextProps[key])) {
-      return false;
-    }
-  }
-  return true;
+	var allKeys = new Set([...Object.keys(prevProps), ...Object.keys(nextProps)]);
+	for (var key of allKeys) {
+		/*
+		 * If a key is on a special allowlist, go one level deeper
+		 * and do a shallow comparison of the values.
+		 */
+		if (propsToShallowCompare.has(key)) {
+			if (prevProps[key] == null && nextProps[key] == null) {
+				/*
+				 * treat null and undefined as equal. Internally in Recharts we make no difference between these two
+				 * so there is no need to re-render.
+				 */
+				continue;
+			}
+			if (!shallowEqual(prevProps[key], nextProps[key])) {
+				return false;
+			}
+			/*
+			 * Otherwise do a simple same-value comparison (with NaN support).
+			 */
+		} else if (!sameValueZero(prevProps[key], nextProps[key])) {
+			return false;
+		}
+	}
+	return true;
 }

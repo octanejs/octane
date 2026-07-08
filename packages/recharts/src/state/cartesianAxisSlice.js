@@ -1,10 +1,54 @@
 // Vendored verbatim from recharts@3.9.2 es6/state/cartesianAxisSlice.js (framework-agnostic).
 // Do not edit — update by re-vendoring when the recharts devDependency moves.
-function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
-function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
-function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
-function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == typeof i ? i : i + ""; }
-function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != typeof i) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+function ownKeys(e, r) {
+	var t = Object.keys(e);
+	if (Object.getOwnPropertySymbols) {
+		var o = Object.getOwnPropertySymbols(e);
+		(r &&
+			(o = o.filter(function (r) {
+				return Object.getOwnPropertyDescriptor(e, r).enumerable;
+			})),
+			t.push.apply(t, o));
+	}
+	return t;
+}
+function _objectSpread(e) {
+	for (var r = 1; r < arguments.length; r++) {
+		var t = null != arguments[r] ? arguments[r] : {};
+		r % 2
+			? ownKeys(Object(t), !0).forEach(function (r) {
+					_defineProperty(e, r, t[r]);
+				})
+			: Object.getOwnPropertyDescriptors
+				? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t))
+				: ownKeys(Object(t)).forEach(function (r) {
+						Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
+					});
+	}
+	return e;
+}
+function _defineProperty(e, r, t) {
+	return (
+		(r = _toPropertyKey(r)) in e
+			? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 })
+			: (e[r] = t),
+		e
+	);
+}
+function _toPropertyKey(t) {
+	var i = _toPrimitive(t, 'string');
+	return 'symbol' == typeof i ? i : i + '';
+}
+function _toPrimitive(t, r) {
+	if ('object' != typeof t || !t) return t;
+	var e = t[Symbol.toPrimitive];
+	if (void 0 !== e) {
+		var i = e.call(t, r || 'default');
+		if ('object' != typeof i) return i;
+		throw new TypeError('@@toPrimitive must return a primitive value.');
+	}
+	return ('string' === r ? String : Number)(t);
+}
 import { createSlice, prepareAutoBatched } from '@reduxjs/toolkit';
 import { castDraft } from 'immer';
 
@@ -61,9 +105,9 @@ export var defaultAxisId = 0;
  */
 
 var initialState = {
-  xAxis: {},
-  yAxis: {},
-  zAxis: {}
+	xAxis: {},
+	yAxis: {},
+	zAxis: {},
 };
 
 /**
@@ -71,119 +115,142 @@ var initialState = {
  * Prefer to use this one instead of axisSlice.
  */
 var cartesianAxisSlice = createSlice({
-  name: 'cartesianAxis',
-  initialState,
-  reducers: {
-    addXAxis: {
-      reducer(state, action) {
-        state.xAxis[action.payload.id] = castDraft(action.payload);
-      },
-      prepare: prepareAutoBatched()
-    },
-    replaceXAxis: {
-      reducer(state, action) {
-        var _action$payload = action.payload,
-          prev = _action$payload.prev,
-          next = _action$payload.next;
-        if (state.xAxis[prev.id] !== undefined) {
-          if (prev.id !== next.id) {
-            delete state.xAxis[prev.id];
-          }
-          state.xAxis[next.id] = castDraft(next);
-        }
-      },
-      prepare: prepareAutoBatched()
-    },
-    removeXAxis: {
-      reducer(state, action) {
-        delete state.xAxis[action.payload.id];
-      },
-      prepare: prepareAutoBatched()
-    },
-    addYAxis: {
-      reducer(state, action) {
-        state.yAxis[action.payload.id] = castDraft(action.payload);
-      },
-      prepare: prepareAutoBatched()
-    },
-    replaceYAxis: {
-      reducer(state, action) {
-        var _action$payload2 = action.payload,
-          prev = _action$payload2.prev,
-          next = _action$payload2.next;
-        if (state.yAxis[prev.id] !== undefined) {
-          if (prev.id !== next.id) {
-            delete state.yAxis[prev.id];
-          }
-          state.yAxis[next.id] = castDraft(next);
-        }
-      },
-      prepare: prepareAutoBatched()
-    },
-    removeYAxis: {
-      reducer(state, action) {
-        delete state.yAxis[action.payload.id];
-      },
-      prepare: prepareAutoBatched()
-    },
-    addZAxis: {
-      reducer(state, action) {
-        state.zAxis[action.payload.id] = castDraft(action.payload);
-      },
-      prepare: prepareAutoBatched()
-    },
-    replaceZAxis: {
-      reducer(state, action) {
-        var _action$payload3 = action.payload,
-          prev = _action$payload3.prev,
-          next = _action$payload3.next;
-        if (state.zAxis[prev.id] !== undefined) {
-          if (prev.id !== next.id) {
-            delete state.zAxis[prev.id];
-          }
-          state.zAxis[next.id] = castDraft(next);
-        }
-      },
-      prepare: prepareAutoBatched()
-    },
-    removeZAxis: {
-      reducer(state, action) {
-        delete state.zAxis[action.payload.id];
-      },
-      prepare: prepareAutoBatched()
-    },
-    updateYAxisWidth(state, action) {
-      var _action$payload4 = action.payload,
-        id = _action$payload4.id,
-        width = _action$payload4.width;
-      var axis = state.yAxis[id];
-      if (axis) {
-        var _history$;
-        var history = axis.widthHistory || [];
-        // An oscillation is detected when the new width is the same as the width before the last one.
-        // This is a simple A -> B -> A pattern. If the next width is B, and the difference is less than 1 pixel, we ignore it.
-        if (history.length === 3 && history[0] === history[2] && width === history[1] && width !== axis.width && Math.abs(width - ((_history$ = history[0]) !== null && _history$ !== void 0 ? _history$ : 0)) <= 1) {
-          return;
-        }
-        var newHistory = [...history, width].slice(-3);
-        state.yAxis[id] = _objectSpread(_objectSpread({}, axis), {}, {
-          width,
-          widthHistory: newHistory
-        });
-      }
-    }
-  }
+	name: 'cartesianAxis',
+	initialState,
+	reducers: {
+		addXAxis: {
+			reducer(state, action) {
+				state.xAxis[action.payload.id] = castDraft(action.payload);
+			},
+			prepare: prepareAutoBatched(),
+		},
+		replaceXAxis: {
+			reducer(state, action) {
+				var _action$payload = action.payload,
+					prev = _action$payload.prev,
+					next = _action$payload.next;
+				if (state.xAxis[prev.id] !== undefined) {
+					if (prev.id !== next.id) {
+						delete state.xAxis[prev.id];
+					}
+					state.xAxis[next.id] = castDraft(next);
+				}
+			},
+			prepare: prepareAutoBatched(),
+		},
+		removeXAxis: {
+			reducer(state, action) {
+				delete state.xAxis[action.payload.id];
+			},
+			prepare: prepareAutoBatched(),
+		},
+		addYAxis: {
+			reducer(state, action) {
+				state.yAxis[action.payload.id] = castDraft(action.payload);
+			},
+			prepare: prepareAutoBatched(),
+		},
+		replaceYAxis: {
+			reducer(state, action) {
+				var _action$payload2 = action.payload,
+					prev = _action$payload2.prev,
+					next = _action$payload2.next;
+				if (state.yAxis[prev.id] !== undefined) {
+					if (prev.id !== next.id) {
+						delete state.yAxis[prev.id];
+					}
+					state.yAxis[next.id] = castDraft(next);
+				}
+			},
+			prepare: prepareAutoBatched(),
+		},
+		removeYAxis: {
+			reducer(state, action) {
+				delete state.yAxis[action.payload.id];
+			},
+			prepare: prepareAutoBatched(),
+		},
+		addZAxis: {
+			reducer(state, action) {
+				state.zAxis[action.payload.id] = castDraft(action.payload);
+			},
+			prepare: prepareAutoBatched(),
+		},
+		replaceZAxis: {
+			reducer(state, action) {
+				var _action$payload3 = action.payload,
+					prev = _action$payload3.prev,
+					next = _action$payload3.next;
+				if (state.zAxis[prev.id] !== undefined) {
+					if (prev.id !== next.id) {
+						delete state.zAxis[prev.id];
+					}
+					state.zAxis[next.id] = castDraft(next);
+				}
+			},
+			prepare: prepareAutoBatched(),
+		},
+		removeZAxis: {
+			reducer(state, action) {
+				delete state.zAxis[action.payload.id];
+			},
+			prepare: prepareAutoBatched(),
+		},
+		updateYAxisWidth(state, action) {
+			var _action$payload4 = action.payload,
+				id = _action$payload4.id,
+				width = _action$payload4.width;
+			var axis = state.yAxis[id];
+			if (axis) {
+				var _history$;
+				var history = axis.widthHistory || [];
+				// An oscillation is detected when the new width is the same as the width before the last one.
+				// This is a simple A -> B -> A pattern. If the next width is B, and the difference is less than 1 pixel, we ignore it.
+				if (
+					history.length === 3 &&
+					history[0] === history[2] &&
+					width === history[1] &&
+					width !== axis.width &&
+					Math.abs(
+						width - ((_history$ = history[0]) !== null && _history$ !== void 0 ? _history$ : 0),
+					) <= 1
+				) {
+					return;
+				}
+				var newHistory = [...history, width].slice(-3);
+				state.yAxis[id] = _objectSpread(
+					_objectSpread({}, axis),
+					{},
+					{
+						width,
+						widthHistory: newHistory,
+					},
+				);
+			}
+		},
+	},
 });
 var _cartesianAxisSlice$a = cartesianAxisSlice.actions,
-  addXAxis = _cartesianAxisSlice$a.addXAxis,
-  replaceXAxis = _cartesianAxisSlice$a.replaceXAxis,
-  removeXAxis = _cartesianAxisSlice$a.removeXAxis,
-  addYAxis = _cartesianAxisSlice$a.addYAxis,
-  replaceYAxis = _cartesianAxisSlice$a.replaceYAxis,
-  removeYAxis = _cartesianAxisSlice$a.removeYAxis,
-  addZAxis = _cartesianAxisSlice$a.addZAxis,
-  replaceZAxis = _cartesianAxisSlice$a.replaceZAxis,
-  removeZAxis = _cartesianAxisSlice$a.removeZAxis,
-  updateYAxisWidth = _cartesianAxisSlice$a.updateYAxisWidth;
-export { addXAxis, replaceXAxis, removeXAxis, addYAxis, replaceYAxis, removeYAxis, addZAxis, replaceZAxis, removeZAxis, updateYAxisWidth };
+	addXAxis = _cartesianAxisSlice$a.addXAxis,
+	replaceXAxis = _cartesianAxisSlice$a.replaceXAxis,
+	removeXAxis = _cartesianAxisSlice$a.removeXAxis,
+	addYAxis = _cartesianAxisSlice$a.addYAxis,
+	replaceYAxis = _cartesianAxisSlice$a.replaceYAxis,
+	removeYAxis = _cartesianAxisSlice$a.removeYAxis,
+	addZAxis = _cartesianAxisSlice$a.addZAxis,
+	replaceZAxis = _cartesianAxisSlice$a.replaceZAxis,
+	removeZAxis = _cartesianAxisSlice$a.removeZAxis,
+	updateYAxisWidth = _cartesianAxisSlice$a.updateYAxisWidth;
+export {
+	addXAxis,
+	replaceXAxis,
+	removeXAxis,
+	addYAxis,
+	replaceYAxis,
+	removeYAxis,
+	addZAxis,
+	replaceZAxis,
+	removeZAxis,
+	updateYAxisWidth,
+};
 export var cartesianAxisReducer = cartesianAxisSlice.reducer;

@@ -12,66 +12,72 @@ import { castDraft } from 'immer';
  */
 
 var initialState = {
-  settings: {
-    layout: 'horizontal',
-    align: 'center',
-    verticalAlign: 'bottom',
-    itemSorter: 'value'
-  },
-  size: {
-    width: 0,
-    height: 0
-  },
-  payload: []
+	settings: {
+		layout: 'horizontal',
+		align: 'center',
+		verticalAlign: 'bottom',
+		itemSorter: 'value',
+	},
+	size: {
+		width: 0,
+		height: 0,
+	},
+	payload: [],
 };
 var legendSlice = createSlice({
-  name: 'legend',
-  initialState,
-  reducers: {
-    setLegendSize(state, action) {
-      state.size.width = action.payload.width;
-      state.size.height = action.payload.height;
-    },
-    setLegendSettings(state, action) {
-      state.settings.align = action.payload.align;
-      state.settings.layout = action.payload.layout;
-      state.settings.verticalAlign = action.payload.verticalAlign;
-      state.settings.itemSorter = action.payload.itemSorter;
-    },
-    addLegendPayload: {
-      reducer(state, action) {
-        state.payload.push(castDraft(action.payload));
-      },
-      prepare: prepareAutoBatched()
-    },
-    replaceLegendPayload: {
-      reducer(state, action) {
-        var _action$payload = action.payload,
-          prev = _action$payload.prev,
-          next = _action$payload.next;
-        var index = current(state).payload.indexOf(castDraft(prev));
-        if (index > -1) {
-          state.payload[index] = castDraft(next);
-        }
-      },
-      prepare: prepareAutoBatched()
-    },
-    removeLegendPayload: {
-      reducer(state, action) {
-        var index = current(state).payload.indexOf(castDraft(action.payload));
-        if (index > -1) {
-          state.payload.splice(index, 1);
-        }
-      },
-      prepare: prepareAutoBatched()
-    }
-  }
+	name: 'legend',
+	initialState,
+	reducers: {
+		setLegendSize(state, action) {
+			state.size.width = action.payload.width;
+			state.size.height = action.payload.height;
+		},
+		setLegendSettings(state, action) {
+			state.settings.align = action.payload.align;
+			state.settings.layout = action.payload.layout;
+			state.settings.verticalAlign = action.payload.verticalAlign;
+			state.settings.itemSorter = action.payload.itemSorter;
+		},
+		addLegendPayload: {
+			reducer(state, action) {
+				state.payload.push(castDraft(action.payload));
+			},
+			prepare: prepareAutoBatched(),
+		},
+		replaceLegendPayload: {
+			reducer(state, action) {
+				var _action$payload = action.payload,
+					prev = _action$payload.prev,
+					next = _action$payload.next;
+				var index = current(state).payload.indexOf(castDraft(prev));
+				if (index > -1) {
+					state.payload[index] = castDraft(next);
+				}
+			},
+			prepare: prepareAutoBatched(),
+		},
+		removeLegendPayload: {
+			reducer(state, action) {
+				var index = current(state).payload.indexOf(castDraft(action.payload));
+				if (index > -1) {
+					state.payload.splice(index, 1);
+				}
+			},
+			prepare: prepareAutoBatched(),
+		},
+	},
 });
 var _legendSlice$actions = legendSlice.actions,
-  setLegendSize = _legendSlice$actions.setLegendSize,
-  setLegendSettings = _legendSlice$actions.setLegendSettings,
-  addLegendPayload = _legendSlice$actions.addLegendPayload,
-  replaceLegendPayload = _legendSlice$actions.replaceLegendPayload,
-  removeLegendPayload = _legendSlice$actions.removeLegendPayload;
-export { setLegendSize, setLegendSettings, addLegendPayload, replaceLegendPayload, removeLegendPayload };
+	setLegendSize = _legendSlice$actions.setLegendSize,
+	setLegendSettings = _legendSlice$actions.setLegendSettings,
+	addLegendPayload = _legendSlice$actions.addLegendPayload,
+	replaceLegendPayload = _legendSlice$actions.replaceLegendPayload,
+	removeLegendPayload = _legendSlice$actions.removeLegendPayload;
+export {
+	setLegendSize,
+	setLegendSettings,
+	addLegendPayload,
+	replaceLegendPayload,
+	removeLegendPayload,
+};
 export var legendReducer = legendSlice.reducer;

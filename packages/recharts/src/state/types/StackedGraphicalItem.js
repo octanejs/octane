@@ -12,5 +12,7 @@
  */
 
 export function isStacked(graphicalItem) {
-  return 'stackId' in graphicalItem && graphicalItem.stackId != null && graphicalItem.dataKey != null;
+	return (
+		'stackId' in graphicalItem && graphicalItem.stackId != null && graphicalItem.dataKey != null
+	);
 }

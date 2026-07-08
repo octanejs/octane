@@ -396,6 +396,9 @@ const ATTRIBUTE_ALIASES = new Map([
 	['xmlBase', 'xml:base'],
 	['xmlLang', 'xml:lang'],
 	['xmlSpace', 'xml:space'],
+	// React writes this via a setProp switch case rather than its aliases map;
+	// same observable output. Matters on SVG hosts (setAttribute preserves case).
+	['tabIndex', 'tabindex'],
 ]);
 
 // `className` plus the ATTRIBUTE_ALIASES table above: emit the native

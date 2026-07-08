@@ -9,6 +9,7 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
     "types": ["node"],
     "strict": true,
     "allowJs": true,

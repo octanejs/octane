@@ -13,19 +13,19 @@ import { useId } from './useId';
  * @returns The unique ID.
  */
 export function useUniqueId(prefix, customId) {
-  /*
-   * We have to call this hook here even if we don't use the result because
-   * rules of hooks demand that hooks are never called conditionally.
-   */
-  var generatedId = useId();
+	/*
+	 * We have to call this hook here even if we don't use the result because
+	 * rules of hooks demand that hooks are never called conditionally.
+	 */
+	var generatedId = useId();
 
-  // If a custom ID is provided, it always takes precedence.
-  if (customId) {
-    return customId;
-  }
+	// If a custom ID is provided, it always takes precedence.
+	if (customId) {
+		return customId;
+	}
 
-  // Apply the prefix if one was provided.
-  return prefix ? "".concat(prefix, "-").concat(generatedId) : generatedId;
+	// Apply the prefix if one was provided.
+	return prefix ? ''.concat(prefix, '-').concat(generatedId) : generatedId;
 }
 
 /**

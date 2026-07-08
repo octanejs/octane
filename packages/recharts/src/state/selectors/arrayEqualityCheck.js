@@ -7,11 +7,11 @@
  * @param b
  */
 export function emptyArraysAreEqualCheck(a, b) {
-  if (Array.isArray(a) && Array.isArray(b) && a.length === 0 && b.length === 0) {
-    // empty arrays are always equal, regardless of reference
-    return true;
-  }
-  return a === b;
+	if (Array.isArray(a) && Array.isArray(b) && a.length === 0 && b.length === 0) {
+		// empty arrays are always equal, regardless of reference
+		return true;
+	}
+	return a === b;
 }
 
 /**
@@ -20,13 +20,13 @@ export function emptyArraysAreEqualCheck(a, b) {
  * @param b
  */
 export function arrayContentsAreEqualCheck(a, b) {
-  if (a.length === b.length) {
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] !== b[i]) {
-        return false;
-      }
-    }
-    return true;
-  }
-  return false;
+	if (a.length === b.length) {
+		for (var i = 0; i < a.length; i++) {
+			if (a[i] !== b[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+	return false;
 }

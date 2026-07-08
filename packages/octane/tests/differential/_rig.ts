@@ -134,7 +134,9 @@ function normaliseHtml(html: string): string {
 function canonicaliseGeneratedIds(html: string): string {
 	const map = new Map<string, string>();
 	return html.replace(
-		/«[^»]{1,24}»|:r[0-9a-z]*:|:R[0-9a-zA-Z]*:|:in-[0-9a-z]+:|_r_[0-9a-z]+_/g,
+		// `recharts\\d+` covers recharts' module-counter uniqueId() (clipPath ids) —
+		// counter VALUES depend on render-pass counts, which legitimately differ.
+		/«[^»]{1,24}»|:r[0-9a-z]*:|:R[0-9a-zA-Z]*:|:in-[0-9a-z]+:|_r_[0-9a-z]+_|\brecharts\d+\b/g,
 		(token) => {
 			let placeholder = map.get(token);
 			if (placeholder === undefined) {

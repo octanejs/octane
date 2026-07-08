@@ -109,6 +109,19 @@ layer nearly free.
   reporter components, XAxis/YAxis/CartesianAxis/Text/Label, Bar/Line,
   ZIndexPortal/ZIndexLayer (SVG-g portals!), static animation shims, Cell
   introspection. Exit: differential byte-equality on Bar+Line charts with axes.
+  **Status: shipped 2026-07-07.** Notes: (1) `src/` now MIRRORS upstream's file
+  layout — 116 pure modules vendored verbatim, react-coupled files ported at
+  the same paths, so upstream relative imports resolve unchanged; `Bar.ts`/
+  `Line.ts` are extensionless-resolution shims over the `.tsrx` components for
+  the vendored selectors' `computeBarRectangles`/`computeLinePoints` imports.
+  (2) Cell introspection became Cell REGISTRATION (context/CellsContext) —
+  octane's compiled children are opaque; mount order preserves data-index
+  order. (3) The animation layer is fully ported (JavascriptAnimate/
+  AnimatedItems/controllers); Phase 1 exercises only the `isActive=false`
+  synchronous path. (4) ZIndexLayer portals into redux-registered SVG `<g>`s
+  work on octane's createPortal after the SVG-only-tag namespace inference fix
+  landed in octane itself. (5) ResponsiveContainer is context-only until
+  Phase 2.
 - **Phase 2 — Tooltip, Legend, ResponsiveContainer** (interaction +
   measurement; native-event contact points live here).
 - **Phase 3 — remaining cartesian** (Area, ComposedChart, Scatter+ZAxis,

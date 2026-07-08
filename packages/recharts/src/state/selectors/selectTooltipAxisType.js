@@ -10,16 +10,16 @@ import { selectChartLayout } from '../../context/chartLayoutContext';
  * Z axis is never displayed and so it lacks ticks and tick settings.
  */
 
-export var selectTooltipAxisType = state => {
-  var layout = selectChartLayout(state);
-  if (layout === 'horizontal') {
-    return 'xAxis';
-  }
-  if (layout === 'vertical') {
-    return 'yAxis';
-  }
-  if (layout === 'centric') {
-    return 'angleAxis';
-  }
-  return 'radiusAxis';
+export var selectTooltipAxisType = (state) => {
+	var layout = selectChartLayout(state);
+	if (layout === 'horizontal') {
+		return 'xAxis';
+	}
+	if (layout === 'vertical') {
+		return 'yAxis';
+	}
+	if (layout === 'centric') {
+		return 'angleAxis';
+	}
+	return 'radiusAxis';
 };

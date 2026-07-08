@@ -19,3 +19,29 @@ describe('differential: @octanejs/recharts vs real recharts (Phase 0 shapes)', (
 		d.unmount();
 	});
 });
+
+const CHARTS_FIXTURE = resolve(__dirname, '../_fixtures/charts.tsrx');
+
+// The chart pipeline is multi-pass on BOTH sides (size effect → axis/item
+// registration → offset selectors → final paint, plus a rAF for the store's
+// autoBatched notifications) — settle generously before comparing.
+async function settleCharts() {
+	for (let i = 0; i < 12; i++) {
+		await new Promise((r) => setTimeout(r, 0));
+		await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+	}
+}
+
+describe('differential: @octanejs/recharts vs real recharts (Phase 1 charts)', () => {
+	it('static BarChart with axes renders byte-identical SVG', async () => {
+		const d = await mountDifferential(CHARTS_FIXTURE, 'BarChartApp', undefined, CACHE);
+		await d.step('settled', settleCharts);
+		d.unmount();
+	});
+
+	it('static LineChart with axes renders byte-identical SVG', async () => {
+		const d = await mountDifferential(CHARTS_FIXTURE, 'LineChartApp', undefined, CACHE);
+		await d.step('settled', settleCharts);
+		d.unmount();
+	});
+});

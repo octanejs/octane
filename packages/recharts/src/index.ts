@@ -23,3 +23,42 @@ export { Curve } from './shape/Curve.tsrx';
 export { Sector } from './shape/Sector.tsrx';
 export { Symbols } from './shape/Symbols.tsrx';
 export { Trapezoid } from './shape/Trapezoid.tsrx';
+
+// Phase 1 — the static cartesian pipeline.
+export { BarChart } from './chart/BarChart.tsrx';
+export { LineChart } from './chart/LineChart.tsrx';
+export { CartesianChart } from './chart/CartesianChart.tsrx';
+export { Bar } from './cartesian/Bar.tsrx';
+export { Line } from './cartesian/Line.tsrx';
+export { XAxis } from './cartesian/XAxis.tsrx';
+export { YAxis } from './cartesian/YAxis.tsrx';
+export { CartesianAxis } from './cartesian/CartesianAxis.tsrx';
+export { BarStack } from './cartesian/BarStack.tsrx';
+export { LineDrawShape } from './cartesian/LineDrawShape.tsrx';
+export { Text } from './component/Text.tsrx';
+export { Label } from './component/Label.tsrx';
+export { LabelList } from './component/LabelList.tsrx';
+export { ZIndexLayer } from './zIndex/ZIndexLayer.tsrx';
+export { AnimationControllerProvider } from './animation/useAnimationController';
+export {
+	useChartWidth,
+	useChartHeight,
+	useMargin,
+	useChartLayout,
+	useCartesianChartLayout,
+	usePolarChartLayout,
+	useIsInChartContext,
+	useViewBox,
+} from './context/chartLayoutContext';
+export {
+	useXAxis,
+	useYAxis,
+	useXAxisScale,
+	useYAxisScale,
+	useXAxisInverseScale,
+	useYAxisInverseScale,
+	useOffset,
+	usePlotArea,
+	useActiveTooltipLabel,
+	useActiveTooltipDataPoints,
+} from './hooks';

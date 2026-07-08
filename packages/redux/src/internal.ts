@@ -7,8 +7,20 @@
 // Memoized: subSlot runs on EVERY hook call every render; the cache returns the
 // identical Symbol.for-interned value without the concat + registry lookup.
 const subSlotCache = new Map<symbol, Map<string, symbol>>();
-export function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	if (slot === undefined) return undefined;
+// Tag-only symbols for the slotless-caller case (see below).
+const bareTagCache = new Map<string, symbol>();
+
+export function subSlot(slot: symbol | undefined, tag: string): symbol {
+	// No inherited slot (the caller was NOT compiled — e.g. a vendored wrapper
+	// hook): return a stable TAG-ONLY symbol rather than undefined. The runtime
+	// combines it with the ambient withSlot path, so sibling base hooks inside
+	// one composed hook stay DISTINCT per tag. Returning undefined here made
+	// them all resolve to the bare path — one shared slot, state collision.
+	if (slot === undefined) {
+		let bare = bareTagCache.get(tag);
+		if (bare === undefined) bareTagCache.set(tag, (bare = Symbol.for(':' + tag)));
+		return bare;
+	}
 	let byTag = subSlotCache.get(slot);
 	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
 	let sym = byTag.get(tag);

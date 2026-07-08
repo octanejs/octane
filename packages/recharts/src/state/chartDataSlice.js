@@ -23,45 +23,45 @@ import { castDraft } from 'immer';
  */
 
 export var initialChartDataState = {
-  chartData: undefined,
-  computedData: undefined,
-  dataStartIndex: 0,
-  dataEndIndex: 0
+	chartData: undefined,
+	computedData: undefined,
+	dataStartIndex: 0,
+	dataEndIndex: 0,
 };
 var chartDataSlice = createSlice({
-  name: 'chartData',
-  initialState: initialChartDataState,
-  reducers: {
-    setChartData(state, action) {
-      state.chartData = castDraft(action.payload);
-      if (action.payload == null) {
-        state.dataStartIndex = 0;
-        state.dataEndIndex = 0;
-        return;
-      }
-      if (action.payload.length > 0 && state.dataEndIndex !== action.payload.length - 1) {
-        state.dataEndIndex = action.payload.length - 1;
-      }
-    },
-    setComputedData(state, action) {
-      state.computedData = action.payload;
-    },
-    setDataStartEndIndexes(state, action) {
-      var _action$payload = action.payload,
-        startIndex = _action$payload.startIndex,
-        endIndex = _action$payload.endIndex;
-      if (startIndex != null) {
-        state.dataStartIndex = startIndex;
-      }
-      if (endIndex != null) {
-        state.dataEndIndex = endIndex;
-      }
-    }
-  }
+	name: 'chartData',
+	initialState: initialChartDataState,
+	reducers: {
+		setChartData(state, action) {
+			state.chartData = castDraft(action.payload);
+			if (action.payload == null) {
+				state.dataStartIndex = 0;
+				state.dataEndIndex = 0;
+				return;
+			}
+			if (action.payload.length > 0 && state.dataEndIndex !== action.payload.length - 1) {
+				state.dataEndIndex = action.payload.length - 1;
+			}
+		},
+		setComputedData(state, action) {
+			state.computedData = action.payload;
+		},
+		setDataStartEndIndexes(state, action) {
+			var _action$payload = action.payload,
+				startIndex = _action$payload.startIndex,
+				endIndex = _action$payload.endIndex;
+			if (startIndex != null) {
+				state.dataStartIndex = startIndex;
+			}
+			if (endIndex != null) {
+				state.dataEndIndex = endIndex;
+			}
+		},
+	},
 });
 var _chartDataSlice$actio = chartDataSlice.actions,
-  setChartData = _chartDataSlice$actio.setChartData,
-  setDataStartEndIndexes = _chartDataSlice$actio.setDataStartEndIndexes,
-  setComputedData = _chartDataSlice$actio.setComputedData;
+	setChartData = _chartDataSlice$actio.setChartData,
+	setDataStartEndIndexes = _chartDataSlice$actio.setDataStartEndIndexes,
+	setComputedData = _chartDataSlice$actio.setComputedData;
 export { setChartData, setDataStartEndIndexes, setComputedData };
 export var chartDataReducer = chartDataSlice.reducer;
