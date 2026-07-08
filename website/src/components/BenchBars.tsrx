@@ -22,6 +22,9 @@ function fmt(value: unknown): string {
 	const n =
 		typeof value === 'number' ? value : Number(value);
 	if (!Number.isFinite(n)) return '—';
+	// A literal 0 is a sub-timer-resolution measurement — show it as plain 0,
+	// not a misleading "0.00".
+	if (n === 0) return '0';
 	if (n >= 10) return String(Math.round(n));
 	if (n >= 1) return n.toFixed(1);
 	return n.toFixed(2);
@@ -94,6 +97,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean }) @{
 							fill={s.color}
 							isAnimationActive={false}
 							radius={[0, 4, 4, 0]}
+							minPointSize={2}
 							label={valueLabel}
 						/>
 					}

@@ -1,7 +1,10 @@
 // Vendored verbatim from recharts@3.9.2 es6/state/selectors/selectors.js (framework-agnostic).
 // Do not edit — update by re-vendoring when the recharts devDependency moves.
+// Sanctioned deviation: es-toolkit compat imports normalized to the ESM barrel
+// ('es-toolkit/compat') — the per-function subpaths are CJS-only and break
+// consumers that compile this binding from source (vite dev prebundle).
 import { createSelector } from 'reselect';
-import sortBy from 'es-toolkit/compat/sortBy';
+import { sortBy } from 'es-toolkit/compat';
 import { useAppSelector } from '../hooks';
 import { calculateCartesianTooltipPos, calculatePolarTooltipPos } from '../../util/ChartUtils';
 import { selectChartDataWithIndexes } from './dataSelectors';

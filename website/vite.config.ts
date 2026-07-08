@@ -56,6 +56,23 @@ export default defineConfig({
 			'@octanejs/recharts',
 			'@octanejs/redux',
 		],
+		// Vite's dep scanner can't parse .tsrx, so the deps that
+		// @octanejs/recharts/@octanejs/redux (raw workspace TS, excluded above)
+		// pull in are only discovered at request time — pre-declare them so the
+		// first optimize pass covers everything and dev never mid-session
+		// re-optimizes under the hydrating page.
+		include: [
+			'@reduxjs/toolkit',
+			'clsx',
+			'decimal.js-light',
+			'es-toolkit/compat',
+			'eventemitter3',
+			'immer',
+			'reselect',
+			'tiny-invariant',
+			'victory-vendor/d3-scale',
+			'victory-vendor/d3-shape',
+		],
 	},
 
 	server: {

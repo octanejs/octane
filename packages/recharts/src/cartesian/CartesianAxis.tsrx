@@ -11,7 +11,7 @@ import {
 	isValidElement,
 	cloneElement,
 } from 'octane';
-import get from 'es-toolkit/compat/get';
+import { get } from 'es-toolkit/compat';
 import { clsx } from 'clsx';
 import { Layer } from '../container/Layer.tsrx';
 import { Text, isValidTextAnchor } from '../component/Text.tsrx';
