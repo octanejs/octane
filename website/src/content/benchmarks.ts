@@ -163,7 +163,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		memoWall,
 		'memo-wall',
 		'memo-wall',
-		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them.',
+		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. Solid and Ripple are deliberately absent: fine-grained frameworks have no parent re-render to absorb.',
 	),
 	frameworkCard(
 		recursiveContext,
