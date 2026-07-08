@@ -371,12 +371,6 @@ function LineWithState(props) @{
 	const activePointsClipPath = needClip
 		? 'url(#clipPath-' + (clipDot ? '' : 'dots-') + clipPathId + ')'
 		: undefined;
-	// Hoisted out of the JSX below: @tsrx/core mis-parses `/` division inside an
-	// attribute of a NESTED element within a directive block (reads it as `/>`).
-	const dotsClipX = left - dotSize / 2;
-	const dotsClipY = top - dotSize / 2;
-	const dotsClipWidth = width + dotSize;
-	const dotsClipHeight = height + dotSize;
 	<>
 		<ZIndexLayer zIndex={zIndex}>
 			<Layer className={layerClass}>
@@ -385,7 +379,12 @@ function LineWithState(props) @{
 						<GraphicalItemClipPath clipPathId={clipPathId} xAxisId={xAxisId} yAxisId={yAxisId} />
 						@if (!clipDot) {
 							<clipPath id={'clipPath-dots-' + clipPathId}>
-								<rect x={dotsClipX} y={dotsClipY} width={dotsClipWidth} height={dotsClipHeight} />
+								<rect
+									x={left - dotSize / 2}
+									y={top - dotSize / 2}
+									width={width + dotSize}
+									height={height + dotSize}
+								/>
 							</clipPath>
 						}
 					</defs>
