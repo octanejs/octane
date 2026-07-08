@@ -6,7 +6,7 @@
 import { Link } from '@octanejs/router';
 import CodeSample from '../content/home-sample.mdx';
 import { BenchBars } from '../components/BenchBars.tsrx';
-import { HOME_CARDS } from '../content/benchmarks.ts';
+import { HOME_SUMMARY } from '../content/benchmarks.ts';
 
 const FEATURES = [
 	{
@@ -121,22 +121,21 @@ export function Home() @{
 				<Link to="/benchmarks" class="bench-all">All 12 suites →</Link>
 			</div>
 			<p class="bench-sub">
-				Median milliseconds per operation — lower is better. Same apps, same hardware, from the
-				repo’s own benchmark suites — charted with @octanejs/recharts, the site’s own charting
-				binding.
+				Every benchmark suite on one scale: each framework’s cost relative to Octane (1×), lower is
+				better. Same apps, same hardware, from the repo’s own suites — charted with
+				@octanejs/recharts, the site’s own charting binding. Where a bar is shorter than Octane’s,
+				that framework wins the suite.
 			</p>
 			<div class="bench-grid">
-				@for (const card of HOME_CARDS; key card.id) {
-					<BenchBars card={card} />
-				}
+				<BenchBars card={HOME_SUMMARY} showValues={true} width={1100} />
 			</div>
 			<p class="bench-note">
-				{'Numbers are the checked-in medians from '}
+				{'Ratios are geometric means over each suite’s per-operation checked-in medians ('}
 				<code>benchmarks/baselines</code>
-				{' (Octane .tsrx vs React 19.2). Reproduce them with '}
+				{'), Octane .tsrx vs React 19.2, Solid 2.0 beta and Ripple 0.3. Reproduce with '}
 				<code>pnpm bench</code>
 				{', or see '}
-				<Link to="/benchmarks">every suite</Link>
+				<Link to="/benchmarks">absolute per-operation numbers for every suite</Link>
 				{' — including the de-opt suites octane runs against itself.'}
 			</p>
 		</section>
@@ -359,13 +358,8 @@ export function Home() @{
 			}
 			.bench-grid {
 				display: grid;
-				grid-template-columns: 1fr 1fr;
+				grid-template-columns: 1fr;
 				gap: 1.25rem;
-			}
-			@media (max-width: 900px) {
-				.bench-grid {
-					grid-template-columns: 1fr;
-				}
 			}
 			.bench-note {
 				color: #99a1b3;

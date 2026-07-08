@@ -63,18 +63,21 @@ export interface BenchCard {
 	series: SeriesDef[];
 	rows: BenchRow[];
 	iterations: number;
+	/** Value unit: absolute median milliseconds (default) or ×-vs-Octane ratio. */
+	format?: 'ms' | 'x';
 }
 
 // ---------------------------------------------------------------------------
 // Series identity — fixed hue per framework, everywhere.
 // Validated set: #ff415a #c98500 #1e93b0 #1baf7a #9085e9 (dark, on #2b3138).
 // ---------------------------------------------------------------------------
+// Versions are the pnpm-catalog pins the fixtures actually run.
 const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'octane-tsrx', label: 'Octane (.tsrx)', color: '#ff415a' },
 	{ key: 'octane-jsx', label: 'Octane (.tsx)', color: '#c98500' },
 	{ key: 'react', label: 'React 19', color: '#1e93b0' },
-	{ key: 'solid', label: 'Solid', color: '#1baf7a' },
-	{ key: 'ripple', label: 'Ripple', color: '#9085e9' },
+	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
+	{ key: 'ripple', label: 'Ripple 0.3', color: '#9085e9' },
 ];
 
 // Octane-internal variants — ordinal ramp of the brand hue, validated with
@@ -291,41 +294,47 @@ export const OCTANE_CARDS: BenchCard[] = [];
 }
 
 // ---------------------------------------------------------------------------
-// Home-page teaser — two curated suites, octane vs react, friendly op names.
+// Home-page summary — EVERY cross-framework suite on one normalized scale:
+// per suite and framework, the geometric mean of per-operation
+// (framework median ÷ octane-tsrx median). Octane is the 1× reference bar.
+// Ops without a measurement on either side — or with a sub-timer-resolution
+// 0 median — are skipped for that pair (geomean over the valid ops).
 // ---------------------------------------------------------------------------
-function pick(card: BenchCard, keys: string[], opLabels: Record<string, string>): BenchCard {
-	const series = card.series.filter((s) => keys.includes(s.key));
-	const rows = Object.keys(opLabels).map((op) => {
-		const source = card.rows.find((r) => r.op === op)!;
-		const row: BenchRow = { op: opLabels[op] };
-		for (const s of series) row[s.key] = source[s.key];
-		return row;
-	});
-	return { ...card, series, rows };
+const SUMMARY_SERIES = FRAMEWORKS.filter((f) =>
+	['octane-tsrx', 'react', 'solid', 'ripple'].includes(f.key),
+);
+
+function geomeanVsOctane(card: BenchCard, key: string): number | undefined {
+	const ratios: number[] = [];
+	for (const row of card.rows) {
+		const octane = row['octane-tsrx'];
+		const value = row[key];
+		if (typeof octane === 'number' && octane > 0 && typeof value === 'number' && value > 0) {
+			ratios.push(value / octane);
+		}
+	}
+	if (ratios.length === 0) return undefined;
+	return Math.exp(ratios.reduce((sum, r) => sum + Math.log(r), 0) / ratios.length);
 }
 
-export const HOME_CARDS: BenchCard[] = [
-	{
-		...pick(FRAMEWORK_CARDS.find((c) => c.id === 'js-framework')!, ['octane-tsrx', 'react'], {
-			run: 'create 1,000 rows',
-			replace: 'replace all rows',
-			update: 'partial update',
-			select: 'select row',
-			swap: 'swap rows',
-			clear: 'clear rows',
-		}),
-		id: 'home-js-framework',
-		title: 'js-framework (1,000 rows)',
-	},
-	{
-		...pick(FRAMEWORK_CARDS.find((c) => c.id === 'dbmon')!, ['octane-tsrx', 'react'], {
-			mount: 'mount',
-			tick: 'tick (all rows)',
-			tick_partial: 'partial tick',
-			sort: 'sort',
-			remount: 'remount',
-		}),
-		id: 'home-dbmon',
-		title: 'dbmon (databases dashboard)',
-	},
-];
+export const HOME_SUMMARY: BenchCard = (() => {
+	const rows: BenchRow[] = FRAMEWORK_CARDS.map((card) => {
+		const row: BenchRow = { op: card.id, 'octane-tsrx': 1 };
+		for (const s of SUMMARY_SERIES) {
+			if (s.key === 'octane-tsrx') continue;
+			const gm = geomeanVsOctane(card, s.key);
+			if (gm !== undefined) row[s.key] = gm;
+		}
+		return row;
+	});
+	return {
+		id: 'home-summary',
+		title: 'Every suite, normalized',
+		description:
+			'Geometric mean of per-operation medians, relative to Octane (.tsrx) = 1× — lower is better. Bars shorter than Octane’s mean the other framework wins that suite. Absolute numbers and per-operation charts are on the benchmarks page.',
+		series: SUMMARY_SERIES,
+		rows,
+		iterations: 0,
+		format: 'x',
+	};
+})();
