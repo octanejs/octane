@@ -4,10 +4,9 @@
 //
 // A switch renders a `<span role="switch">` plus a hidden `<input type="checkbox">`. octane
 // adaptations: (1) events are NATIVE — the handlers read the event directly (Base UI's
-// `event.nativeEvent`); (2) octane inputs are UNCONTROLLED (a `checked` prop would write a
-// `checked` ATTRIBUTE, which React's controlled input never does), so we DON'T pass `checked`
-// to the input and instead drive `input.checked` imperatively through the native property
-// setter in a layout effect — matching React's property-only controlled behavior. Field/Form
+// `event.nativeEvent`); (2) the hidden input takes the live `checked` prop — octane inputs
+// are CONTROLLED exactly like React's (property-driven, reasserted on every commit and after
+// discrete events; only the INITIAL checked reflects to the attribute). Field/Form
 // integration is inert when standalone (default contexts).
 import { createContext, createElement, useContext, useLayoutEffect, useMemo, useRef } from 'octane';
 
@@ -155,11 +154,6 @@ function SwitchRoot(props: SwitchRootProps): any {
 		subSlot(slot, 'checked'),
 	);
 
-	// octane: React's controlled `<input checked>` reflects the INITIAL checked to the
-	// `checked` ATTRIBUTE (its default-state), then updates only the property. Capture that
-	// initial value so the attribute matches; the property is driven by the sync effect below.
-	const initialCheckedRef = useRef(checked, subSlot(slot, 'initialChecked'));
-
 	useRegisterFieldControl(
 		switchRef,
 		id,
@@ -178,24 +172,6 @@ function SwitchRoot(props: SwitchRootProps): any {
 		},
 		[inputRef, setFilled],
 		subSlot(slot, 'e:filled'),
-	);
-
-	// octane uncontrolled-input adaptation: drive the hidden input's `checked` PROPERTY (never
-	// the attribute) through the native setter, so the DOM matches React's controlled input.
-	useLayoutEffect(
-		() => {
-			const input = inputRef.current;
-			if (!input) {
-				return;
-			}
-			const setNativeChecked = Object.getOwnPropertyDescriptor(
-				ownerWindow(input).HTMLInputElement.prototype,
-				'checked',
-			)?.set;
-			setNativeChecked?.call(input, checked);
-		},
-		[checked],
-		subSlot(slot, 'e:syncChecked'),
 	);
 
 	useValueChanged(
@@ -268,9 +244,7 @@ function SwitchRoot(props: SwitchRootProps): any {
 
 	const inputProps: Record<string, any> = mergeProps(
 		{
-			// octane: the INITIAL checked state is the `checked` ATTRIBUTE (React's
-			// default-state); the live value is driven via the property in the sync effect.
-			checked: initialCheckedRef.current || undefined,
+			checked,
 			disabled,
 			form,
 			id: hiddenInputId,

@@ -64,7 +64,7 @@ don't port:
 | Rules-of-hooks enforcement, hook-order warnings | **Intentional divergence** — Octane tracks hooks by call site; conditional hooks are legal. |
 | StrictMode double-invoke of effects/render | Octane has no StrictMode (verified: no `StrictMode`/double-invoke in runtime). |
 | Synthetic event system internals (`isPropagationStopped`, event pooling, synthetic `onChange`/`onBeforeInput`/`onComposition*`/`onSelect` polyfills) | Octane uses **real delegated DOM events**. Match user-visible OUTCOMES; the synthetic API surface diverges. |
-| **Controlled components + synthetic `onChange`** (value/checked re-asserted from a controlled prop, edits reverted, `defaultValue` mapping, `<select value>`/`<textarea value>` controlled semantics) | **Intentional divergence (decided 2026-06-24).** Octane is native-event / uncontrolled by design: `value`/`checked` are plain attributes, events are native (`onInput`), and the DOM is the source of truth. React's controlled-input contract is explicitly NOT a target. **Do NOT port `ReactDOMInput`/`Select`/`Textarea` controlled-value tests.** The *uncontrolled* DOM-attribute and event-delegation behaviors (attribute removal vs empty-string, boolean reflection, **event bubbling incl. through portals**) ARE in scope. |
+| **Controlled components + synthetic `onChange`** (value/checked re-asserted from a controlled prop, edits reverted, `defaultValue` mapping, `<select value>`/`<textarea value>` controlled semantics) | ~~**Intentional divergence (decided 2026-06-24).**~~ **REVERSED for controlled components (2026-07-08): they are now SUPPORTED** — `value`/`checked` on `<input>`/`<textarea>`/`<select>` follow React's controlled semantics exactly (prop drives the DOM property, reasserts on every commit and after discrete events, `<select value>` option projection, radio-group restore, IME-composition-safe, `defaultValue`/`defaultChecked` escape hatch), ported as `conformance/controlled-{input,select,textarea,restore}.test.ts` + `differential/controlled-forms.test.ts`. What is STILL not a target: **synthetic `onChange`** — events stay native (`onInput` per keystroke; native `change` fires on blur), with a dev warning for a controlled text control missing `onInput`. |
 | DEV-only warnings (unknown props, casing, controlled↔uncontrolled switch, nesting validation) | Octane's warning policy differs; port the functional outcome only. |
 | `class` / `className` value coercion | **Intentional divergence.** Octane composes `class`/`className` clsx-style (strings, numbers, arrays, objects, nesting; falsy drops out) at every apply site — client, spread, SVG, scoped-`<style>`, and SSR (byte-identical, so hydration matches). React coerces `className={['a','b']}` to `"a,b"`; Octane yields `"a b"`. A plain string still takes the fast path. |
 | **`useSyncExternalStore` commit-time getSnapshot re-read** (the `useSyncExternalStore-test.js` `:144` tearing check) | **Intentional divergence (decided 2026-07-03).** React's `updateSyncExternalStore` re-pushes `updateStoreInstance` whenever `inst.getSnapshot !== getSnapshot`, giving a commit-time snapshot re-read even for an unchanged value. Octane drops that: getSnapshot is refreshed in RENDER, and the commit-time store-sync (drainStoreSyncs) only runs when the read snapshot actually moved off the last-committed value (or the store was swapped) — so an unchanged snapshot with an unstable inline getSnapshot (the zustand/query pattern) enqueues nothing. Consequence: a store that mutates WITHOUT notifying in the render→commit window is no longer caught on a render where ONLY getSnapshot identity changed. Octane's synchronous renderer closes React's motivating concurrent-interleaving window, and any store that actually notifies is unaffected (onStoreChange compares against the render-fresh getSnapshot). Do NOT "fix" this back toward React's per-render commit re-read. See `useSyncExternalStore` in `runtime.ts`. |
@@ -188,6 +188,11 @@ propagation heuristics are unpinned:
 > `Textarea` *controlled-value* tests are deliberately not ported. What remains in
 > scope is the **uncontrolled** DOM-attribute matrix and **event delegation**,
 > including the portal-bubbling behavior Octane explicitly wants.
+>
+> **Scope re-correction (2026-07-08):** the controlled-components half of that ruling
+> was REVERSED — controlled `value`/`checked` are now supported and ported (see §2 and
+> the Tier 3 reversal note in §8). The synthetic-`onChange` half stands: events remain
+> native.
 
 | React file | Gap | Severity |
 |---|---|---|
@@ -235,7 +240,7 @@ and the React diff-matrix ports are now done (see below).
 | React file | Gap | Severity |
 |---|---|---|
 | ~~`ReactDOMUseId-test.js` (17)~~ **DONE (2026-06-30)** — `tests/conformance/useid-determinism.test.ts` asserts client stability (across re-renders, wrapper indirection, multiple ids per component) AND **server ≡ client byte-equality after `hydrateRoot()`**. Fixed in `hydrateRoot()`: the client `_idCounter` resets to 0 at the start of hydration so it lines up with the server's per-render reset. | ~~High~~ |
-| ~~`ReactDOMServerIntegrationUserInteraction-test.js` (14)~~ **DONE (2026-07-01)** — `tests/conformance/user-input-hydration.test.ts` (6 cases): input/range/checkbox/textarea/select, controlled + uncontrolled, keep the user's typed value across hydration (octane only ever writes ATTRIBUTES, never the dirty `.value`/`.checked` property) with no spurious mismatch warning. | ~~High~~ |
+| ~~`ReactDOMServerIntegrationUserInteraction-test.js` (14)~~ **DONE (2026-07-01)** — `tests/conformance/user-input-hydration.test.ts` (6 cases): input/range/checkbox/textarea/select, controlled + uncontrolled, keep the user's typed value across hydration (octane only ever writes ATTRIBUTES, never the dirty `.value`/`.checked` property) with no spurious mismatch warning. **Rewritten (2026-07-08)** for the controlled-components model: hydration still adopts pre-hydration user input (React parity), then the first real commit/discrete event reasserts controlled values. | ~~High~~ |
 | ~~`ReactDOMHydrationDiff-test.js` (37) + `ReactDOMServerIntegrationReconnecting-test.js` (50)~~ **DONE (2026-07-01)** — ported as `tests/conformance/hydration-mismatch.test.ts` (24 outcome-level cases). Surfaced + fixed 5 runtime bugs (clone close-marker, ifBlock/switchBlock empty-branch cursor + leftover discard, setStyle + setClassName detection). Divergences documented: octane patches attrs to client (React keeps server), warns+rebuilds in place (React throws+re-renders boundary), and function components carry hydration markers (so component-form ≠ bare-element-form). | ~~Medium~~ |
 | `ReactDOMServerIntegrationHooks-test.js` (`:606`), `…Refs-test.js` (`:41`), `ReactDOMFizzForm-test.js` (`:442,:531,:549`) | **Effects and ref callbacks do NOT run on server**; hooks render initial values; useFormStatus not-pending / useActionState+useOptimistic return initial on server. (Octane tests "effects don't run on server" partially in `ssr.test.ts`; extend to refs + form hooks.) | Medium |
 | `ReactDOMServerIntegrationElements/Attributes/Input/Select/Textarea/Fragment-test.js` | **Serialization heuristics**: text-node/whitespace separators so hydration can split adjacent text; nullish/zero/false child coercion; boolean/reserved-attribute rules; `value`→attribute (input) vs value→children (textarea) vs selected-option (select); fragment flattening. Each `itRenders` is simultaneously server-output + hydration-adopt + mismatch-recovery. | Medium |
@@ -324,7 +329,7 @@ For each React `it(...)` we port:
 | **P1** | **Tier 0** reconciler identity battery (MultiChildReconcile, Fragment, TopLevelFragment, MultiChild, ChildReconciler, Minimalism). If P0 chose to match React, land the `lastPlacedIndex` runtime change here, proven by the move harness. | P0 | Large, highest value |
 | **P2** | **Tier 1** hook heuristics + **Tier 7** error-in-effect / hook-order-after-catch / throw-during-reconcile. | P0 helpers | Medium |
 | **P3** | **Tier 2** context propagation through bailouts. | P1 (bailout semantics) | Medium |
-| **P4** | **Tier 3** controlled inputs + DOM attribute/event delegation matrix. Likely surfaces real runtime fixes. | — (independent) | Large |
+| **P4** | **Tier 3** controlled inputs + DOM attribute/event delegation matrix. Likely surfaces real runtime fixes. *(Controlled inputs were reverted 2026-06-24, then shipped for real with the 2026-07-08 reversal — see §8.)* | — (independent) | Large |
 | **P5** | **Tier 4** SSR/hydration determinism. ~~mismatch detection + recovery~~ **DONE (2026-06-30)** — detect/patch/rebuild + `suppressHydrationWarning` + dev source-LOC. Remaining: useId server≡client assertions, don't-blow-away-input, no-effects/refs-on-server, serialization matrix. | — | Medium |
 | **P6** | **Tier 5** Suspense/transition/activity timing + **Tier 6** lanes/interleaved. | P0 log helper | Medium |
 
@@ -378,6 +383,8 @@ P4 and P5 are independent of P0–P3 and can run in parallel by a second contrib
 ### Execution kickoff — RESOLVED: start **P0 + P4** in parallel.
 P0 infra (node-identity harness, effect-log helper, scaffold script) and P4
 controlled-inputs (Tier 3) begin immediately; other tiers follow per §5.
+*(The P4 controlled-input slice was later reverted on 2026-06-24, then the ruling
+itself was reversed on 2026-07-08 and controlled components shipped — see §8.)*
 
 ---
 
@@ -388,6 +395,9 @@ controlled-inputs (Tier 3) begin immediately; other tiers follow per §5.
 - Largest untested surface in Octane today: **controlled inputs** (Input 120 + Select
   62 + Textarea 60 + Option 12 ≈ 254 React `it`s, currently 0 Octane tests) and the
   **DOM event-delegation matrix** (EventPropagation 89 + EventListener 24).
+  *(Both since closed: the delegation matrix landed 2026-07-04, controlled inputs
+  landed with the 2026-07-08 reversal — `conformance/controlled-*.test.ts` +
+  `differential/controlled-forms.test.ts`.)*
 - Highest-risk *correctness* gap: **keyed-reorder move parity** (Tier 0) — silently
   divergent today because the differential rig is innerHTML-only.
 
@@ -426,6 +436,23 @@ controlled components + synthetic `onChange` are NOT a target** — they were re
 (`controlled-inputs*.test.ts` + fixtures deleted) and recorded as an intentional
 divergence in §2 / Tier 3. The valuable artifact that survived: the empirical proof
 of Octane's native/uncontrolled model, captured in §2.
+
+> **REVERSAL (2026-07-08): controlled components are now SUPPORTED.** The maintainer
+> reversed the 2026-06-24 ruling for the controlled-value half: `value`/`checked` on
+> `<input>`/`<textarea>`/`<select>` now follow React's controlled semantics exactly —
+> the prop drives the DOM property, reasserts on every commit and after discrete
+> events (rejected edits snap back), IME-composition-safe, radio groups restore as a
+> group, `<select value>` projects options (single + multiple; no match → first
+> non-disabled), number inputs use React's loose compare — with `defaultValue`/
+> `defaultChecked` as the uncontrolled escape hatch. Hydration adopts pre-hydration
+> user input (React parity), then the first commit/discrete event reasserts. Events
+> stay 100% native (that half of the ruling STANDS): no synthetic `onChange` —
+> `onInput` is the per-keystroke handler for text controls, and a dev warning flags a
+> controlled text control with no `onInput` (special-cased when only `onChange` is
+> present). The 2026-06-24 reverted test slice was NOT recoverable from git — the new
+> suites (`conformance/controlled-{input,select,textarea,restore}.test.ts`,
+> `differential/controlled-forms.test.ts`, the rewritten
+> `conformance/user-input-hydration.test.ts`) were re-authored from the React sources.
 
 ### Tier 3 — portal event bubbling (DONE, working incl. nested)
 `tests/conformance/portal-bubbling.test.ts` (+ fixture
@@ -653,6 +680,43 @@ compiles; custom elements exempt. Without it, React-ecosystem SVG libraries
 (recharts et al.) spread camelCase presentation attributes onto SVG hosts — whose
 setAttribute preserves case — as dead attributes. Additive: native spellings
 still write verbatim. This narrows the 2026-07-04 ruling to the DEV table only.
+
+**Amendment (2026-07-08):** the attribute-VALUE half of the 2026-07-04
+"native pass-through" ruling was REVERSED — these now MATCH React (the old pins in
+`dom-attributes` / `dom-component-attributes` / `ssr-serialization` were flipped):
+
+- Boolean attribute props (disabled, hidden, inert, readOnly, required, …)
+  normalize via the shared `BOOLEAN_ATTR_PROPS` table (constants.ts) on client,
+  SSR, and the compiler's static bake: any truthy value → canonical `attr=""`;
+  falsy removes (`hidden={0}`, `inert=""` → absent).
+- Booleans on NON-boolean attributes are removed + dev-warn (`title={true}` no
+  longer renders `title=""`); `download`/`capture` keep React's
+  overloaded-boolean semantics (true → presence, non-boolean → string,
+  `download={0}` → `"0"`).
+- `muted`/`multiple`/`selected` dynamic writes set the DOM PROPERTY (React's
+  mustUseProperty — a dynamic `muted={x}` actually mutes); static literals and
+  SSR still emit the attribute for initial state.
+- `autoFocus` no longer writes an attribute — the element is focused in the
+  commit phase of its mount (mount-only, like React); SSR emits nothing.
+- Client attribute-name validation is a proactive skip via the shared
+  `VALID_ATTR_NAME` regex (dev-only warning) instead of try/catch +
+  prod console.error.
+- New dev-only diagnostics: `[object Object]` attribute-coercion warning; casing
+  hints for `autofocus`→`autoFocus`, `defaultvalue`→`defaultValue`,
+  `defaultchecked`→`defaultChecked`, and lowercase `on*` function props →
+  camelCase — a deliberately CURATED slice of React's possibleStandardNames
+  (most lowercase attributes simply work natively in octane, so only the
+  genuinely-broken cases warn).
+
+New tier-2 runtime exports: `setValue`, `setChecked`, `setSelectValue`,
+`setDefaultValue`, `setDefaultChecked`, `setAutoFocus` (next to `setFormAction`);
+new server helpers: `ssrValueAttr`, `ssrCheckedAttr`, `ssrTextareaValue`,
+`ssrSelectScope`, `ssrOption`. `<textarea>` with children AND a
+`value`/`defaultValue` prop is now a COMPILE ERROR (the prop owns the content);
+plain `<textarea>text</textarea>` keeps native default-text semantics. The
+synthetic-EVENT divergences from the 2026-07-04 ruling stand unchanged (no
+ancestor re-dispatch, no enter/leave synthesis, no synthetic
+onChange/onBeforeInput/onSelect).
 
 **Still pinned (3 it.fails):** React-19 custom-element semantics (lowercase on*
 listeners + property heuristic — needs a maintainer decision) and void-element

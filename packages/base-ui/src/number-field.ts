@@ -3,10 +3,11 @@
 // decrement/NumberFieldDecrement, root/useNumberFieldButton + useNumberFieldStepperButton, and
 // utils/stateAttributesMapping — plus its `index.parts` (the `NumberField` namespace).
 //
-// octane adaptations: native events (no `.nativeEvent`); forwardRef → ref-as-prop; the
-// text-input value adaptation (initial value → the `value` ATTRIBUTE; the live value driven via
-// the `.value` PROPERTY). The scrub area + press-and-hold auto-repeat are deferred (see
-// `usePressAndHold` stub). Field/Form integration is inert when standalone.
+// octane adaptations: native events (no `.nativeEvent`); forwardRef → ref-as-prop. The visible
+// and hidden inputs take live controlled `value` props — octane inputs are CONTROLLED exactly
+// like React's (property-driven, reasserted on every commit and after discrete events). The
+// scrub area + press-and-hold auto-repeat are deferred (see `usePressAndHold` stub).
+// Field/Form integration is inert when standalone.
 import {
 	createContext,
 	createElement,
@@ -29,7 +30,7 @@ import { useValueChanged } from './utils/useValueChanged';
 import { useForcedRerendering } from './utils/useForcedRerendering';
 import { addEventListener } from './utils/addEventListener';
 import { platform } from './utils/platform';
-import { ownerDocument, ownerWindow } from './utils/owner';
+import { ownerDocument } from './utils/owner';
 import { visuallyHidden, visuallyHiddenInput } from './utils/visuallyHidden';
 import { stopEvent } from './utils/composite/list-utils';
 import { useButton } from './utils/useButton';
@@ -211,9 +212,6 @@ function NumberFieldRoot(props: any): any {
 		subSlot(slot, 'inputValue'),
 	);
 	const [inputMode, setInputMode] = useState<InputMode>('numeric', subSlot(slot, 'inputMode'));
-
-	// octane: reflect the INITIAL numeric value as the hidden input's `value` ATTRIBUTE.
-	const initialHiddenValueRef = useRef(value ?? '', subSlot(slot, 'initialHidden'));
 
 	const getAllowedNonNumericKeys = useStableCallback(
 		() => {
@@ -467,8 +465,7 @@ function NumberFieldRoot(props: any): any {
 		type: 'number',
 		form,
 		name,
-		// octane: initial value → attribute; live value driven via the property (sync effect below).
-		value: initialHiddenValueRef.current,
+		value: value ?? '',
 		min,
 		max,
 		step: stepProp,
@@ -479,21 +476,6 @@ function NumberFieldRoot(props: any): any {
 		tabIndex: -1,
 		style: name ? visuallyHiddenInput : visuallyHidden,
 	});
-
-	// octane: drive the hidden input's live `.value` PROPERTY.
-	useLayoutEffect(
-		() => {
-			const el = validation.inputRef.current ?? inputRef.current;
-			if (!el) return;
-			const setNativeValue = Object.getOwnPropertyDescriptor(
-				ownerWindow(el).HTMLInputElement.prototype,
-				'value',
-			)?.set;
-			setNativeValue?.call(el, value ?? '');
-		},
-		[value],
-		subSlot(slot, 'e:syncHidden'),
-	);
 
 	return createElement(NumberFieldRootContext.Provider, {
 		value: contextValue,
@@ -558,9 +540,6 @@ function NumberFieldInput(props: any): any {
 	const blockRevalidationRef = useRef(false, subSlot(slot, 'blockReval'));
 	const pendingCaretRef = useRef<number | null>(null, subSlot(slot, 'caret'));
 
-	// octane: reflect the INITIAL formatted text as the `value` ATTRIBUTE; live via the property.
-	const initialInputValueRef = useRef(inputValue, subSlot(slot, 'initialInput'));
-
 	useRegisterFieldControl(
 		inputRef,
 		id,
@@ -583,21 +562,6 @@ function NumberFieldInput(props: any): any {
 		subSlot(slot, 'e:caret'),
 	);
 
-	// octane: drive the visible input's live `.value` PROPERTY (matches React's controlled input).
-	useLayoutEffect(
-		() => {
-			const el = inputRef.current;
-			if (!el) return;
-			const setNativeValue = Object.getOwnPropertyDescriptor(
-				ownerWindow(el).HTMLInputElement.prototype,
-				'value',
-			)?.set;
-			setNativeValue?.call(el, inputValue);
-		},
-		[inputValue],
-		subSlot(slot, 'e:syncValue'),
-	);
-
 	useValueChanged(
 		value,
 		() => {
@@ -617,8 +581,7 @@ function NumberFieldInput(props: any): any {
 		disabled,
 		readOnly,
 		inputMode,
-		// octane: initial formatted text → attribute; live value via the property (sync effect above).
-		value: initialInputValueRef.current,
+		value: inputValue,
 		type: 'text',
 		autoComplete: 'off',
 		autoCorrect: 'off',

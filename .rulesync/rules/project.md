@@ -97,7 +97,9 @@ the runtime/compiler over patching tests or generated output.
   bare `{expr}` that isn't provably a string is a renderable hole (component /
   element descriptor / coerced primitive).
 - Events are **native, delegated** DOM events (`onClick`, `onInput`, `onSubmit`),
-  not a synthetic event layer — behavior matches the platform.
+  not a synthetic event layer — behavior matches the platform. There is no
+  synthetic `onChange`: `onInput` is the per-keystroke handler for text controls
+  (native `change` fires on blur/commit).
 - Template control flow uses directive blocks: `@if (c) { } @else { }`,
   `@for (const x of xs; key x.id) { } @empty { }`, `@switch (v) { @case (a) { } @default { } }`,
   and `@try { } @pending { } @catch (e) { }`. Plain JS control flow stays in setup.
@@ -111,9 +113,12 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
 
 - **No rules of hooks.** Hooks are tracked by compiler-assigned call-site slot, so
   a hook may sit behind a condition, after an early return, or in a loop.
-- **No controlled components / synthetic `onChange`.** `value`/`checked` are plain
-  attributes; inputs are uncontrolled and native. Do not add React's
-  controlled-input value-reassertion model.
+- **Controlled `value`/`checked` with native events.** Controlled form components
+  follow React's semantics exactly (2026-07-08) — the prop drives the DOM property
+  and reasserts on every commit and after discrete events; `defaultValue`/
+  `defaultChecked` are the uncontrolled escape hatch — but WITHOUT a synthetic
+  layer: `onInput` drives text inputs per keystroke; there is no `onChange`
+  normalization (native `change` fires on blur). Do not add a synthetic `onChange`.
 - **Keyed reconciler is LIS-based** (minimal DOM moves), not React's
   `lastPlacedIndex`. The final DOM is identical; the set of physically-moved nodes
   can differ. Survivor node identity and final order ARE guaranteed (and tested).

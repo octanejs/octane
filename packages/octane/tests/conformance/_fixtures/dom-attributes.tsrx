@@ -145,3 +145,12 @@ export function CustomElClick(props) @{
 export function CustomElChangeInput(props) @{
 	<my-custom-element id="cci" onChange={props.onChange} onInput={props.onInput} />
 }
+
+// `autoFocus` (React parity, 2026-07-08): never an attribute — the element is
+// focused in the commit phase of its mount; later changes are ignored.
+export function AutoFocusInput(props) @{
+	<input id="afi" autoFocus={props.v} />
+}
+export function AutoFocusBare(props) @{
+	<input id="afb" autoFocus />
+}

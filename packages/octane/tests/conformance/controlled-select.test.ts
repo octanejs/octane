@@ -1,0 +1,151 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { mount } from '../_helpers';
+import {
+	StaticSelect,
+	DisabledFirstSelect,
+	ForSelect,
+	MultiSelect,
+	DefaultSelect,
+} from './_fixtures/controlled-forms.tsrx';
+
+// ============================================================================
+// Controlled <select> — ports of ReactDOMSelect-test.js (React v19.2.7).
+// The projection follows React's updateOptions: single → first match wins,
+// no match → first non-disabled; multiple → per-option set membership.
+// Options built by @for land via the commit-deferred projection (binding
+// mounts run before the same render's construct calls).
+// ============================================================================
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
+
+const selected = (sel: HTMLSelectElement) =>
+	Array.from(sel.options)
+		.filter((o) => o.selected)
+		.map((o) => o.value);
+
+describe('conformance: controlled <select> (single)', () => {
+	// Per ReactDOMSelect-test.js:117 ('should allow setting `value`').
+	it('projects the value onto static options and re-projects on update', () => {
+		const r = mount(StaticSelect, { value: 'b' });
+		const sel = r.find('#ss') as HTMLSelectElement;
+		expect(sel.value).toBe('b');
+		r.update(StaticSelect, { value: 'c' });
+		expect(sel.value).toBe('c');
+		r.unmount();
+	});
+
+	// Per ReactDOMSelect-test.js:266 ('should select the first non-disabled
+	// option if the value does not match any option').
+	it('no match selects the first non-disabled option', () => {
+		const r = mount(DisabledFirstSelect, { value: 'missing' });
+		const sel = r.find('#dfs') as HTMLSelectElement;
+		expect(sel.value).toBe('y');
+		r.unmount();
+	});
+
+	// A rejected user pick snaps back after the discrete flush (the native
+	// change/input event drives the restore; no handler commits the pick).
+	it('reverts a user pick nothing committed', () => {
+		const r = mount(StaticSelect, { value: 'a' });
+		const sel = r.find('#ss') as HTMLSelectElement;
+		sel.value = 'b'; // the user's pick
+		sel.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(sel.value).toBe('a');
+		r.unmount();
+	});
+
+	it('an accepting onInput keeps the pick', () => {
+		let r = mount(StaticSelect, {
+			value: 'a',
+			onInput: (e: Event) => {
+				r.update(StaticSelect, {
+					value: (e.target as HTMLSelectElement).value,
+					onInput: () => {},
+				});
+			},
+		});
+		const sel = r.find('#ss') as HTMLSelectElement;
+		sel.value = 'b';
+		sel.dispatchEvent(new Event('input', { bubbles: true }));
+		expect(sel.value).toBe('b');
+		r.unmount();
+	});
+});
+
+describe('conformance: controlled <select> with @for options', () => {
+	// Per ReactDOMSelect-test.js:150 (value set before options exist) — the
+	// select's value binding mounts BEFORE the @for builds its options; the
+	// commit-phase projection lands the selection.
+	it('projects onto options built after the value binding', () => {
+		const r = mount(ForSelect, { value: 'two', options: ['one', 'two', 'three'] });
+		const sel = r.find('#fs') as HTMLSelectElement;
+		expect(sel.value).toBe('two');
+		r.unmount();
+	});
+
+	// New options appearing in a later render re-project at that commit.
+	it('re-projects when the matching option appears later', () => {
+		const r = mount(ForSelect, { value: 'four', options: ['one', 'two'] });
+		const sel = r.find('#fs') as HTMLSelectElement;
+		expect(sel.value).toBe('one'); // no match → first non-disabled
+		r.update(ForSelect, { value: 'four', options: ['one', 'two', 'four'] });
+		expect(sel.value).toBe('four');
+		r.unmount();
+	});
+});
+
+describe('conformance: controlled <select multiple>', () => {
+	// Per ReactDOMSelect-test.js:174 ('should allow setting `value` with
+	// `multiple`').
+	it('projects an array value as per-option membership', () => {
+		const r = mount(MultiSelect, { values: ['1', '3'] });
+		const sel = r.find('#ms') as HTMLSelectElement;
+		expect(selected(sel)).toEqual(['1', '3']);
+		r.update(MultiSelect, { values: ['2'] });
+		expect(selected(sel)).toEqual(['2']);
+		r.update(MultiSelect, { values: [] });
+		expect(selected(sel)).toEqual([]);
+		r.unmount();
+	});
+
+	// Per ReactDOMSelect-test.js:645 ('should warn if multiple is true and
+	// value is not an array') — dev-warns and skips the projection.
+	it('warns for a non-array value on a multiple select', () => {
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(MultiSelect, { values: ['1'] });
+		errSpy.mockClear();
+		r.update(MultiSelect, { values: 'nope' });
+		expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('must be an array'));
+		const sel = r.find('#ms') as HTMLSelectElement;
+		expect(selected(sel)).toEqual(['1']); // projection skipped, prior state kept
+		r.unmount();
+	});
+});
+
+describe('conformance: <select defaultValue> (uncontrolled)', () => {
+	// Per ReactDOMSelect-test.js:238 ('should allow setting `defaultValue`') —
+	// projected at commit with defaultSelected stamped.
+	it('projects defaultValue with defaultSelected', () => {
+		const r = mount(DefaultSelect, { dv: 'q' });
+		const sel = r.find('#dsl') as HTMLSelectElement;
+		expect(sel.value).toBe('q');
+		expect(sel.options[1].defaultSelected).toBe(true);
+		r.unmount();
+	});
+
+	// An UNCHANGED defaultValue on a re-render must not clobber the user's
+	// pick (the projection re-runs only when the default changes).
+	it('an unchanged defaultValue leaves the user selection alone', () => {
+		const r = mount(DefaultSelect, { dv: 'q' });
+		const sel = r.find('#dsl') as HTMLSelectElement;
+		sel.value = 'p'; // the user's pick (uncontrolled — sticks)
+		r.update(DefaultSelect, { dv: 'q' });
+		expect(sel.value).toBe('p');
+		// A CHANGED defaultValue re-selects (React re-projects on change).
+		r.update(DefaultSelect, { dv: 'p' });
+		expect(sel.value).toBe('p');
+		r.unmount();
+	});
+});

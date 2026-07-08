@@ -1,35 +1,46 @@
 // Fixtures for the "hydration must not blow away user input" conformance port
-// (ReactDOMServerIntegrationUserInteraction-test.js). Octane has no controlled components —
-// value/checked are plain native attributes — so each element type is a single native form.
-// The test types into the server-rendered field (setting its .value/.checked PROPERTY) BEFORE
-// hydrating, then asserts hydration adopts the same node and does not reset the property.
+// (ReactDOMServerIntegrationUserInteraction-test.js). Since 2026-07-08 octane
+// has REAL controlled components — `value`/`checked` on form controls are
+// controlled props (React semantics on native events) and
+// `defaultValue`/`defaultChecked` are the uncontrolled escape hatch. The
+// uncontrolled fixtures below therefore use the default* props; the
+// controlled fixtures pin the React-parity hydration policy: ADOPT the
+// server DOM without writes (pre-hydration input survives), then the first
+// real commit / first discrete event reasserts the rendered value.
 
-// Text input with a default value (Per :297 uncontrolled input).
+// Uncontrolled text input (Per :297).
 export function TextInput(props) @{
-	<input id="fi" value="Hello" />
+	<input id="fi" defaultValue="Hello" />
 }
 
-// Text input whose value is DYNAMIC (a binding runs at hydration mount).
+// CONTROLLED text input (value binding arms at hydration mount, zero writes).
 export function DynamicTextInput(props) @{
-	<input id="fi" value={props.v} />
+	<input id="fi" value={props.v} onInput={props.onInput} />
 }
 
-// Range input with a default value (Per :310).
+// Uncontrolled range input (Per :310).
 export function RangeInput(props) @{
-	<input id="fi" type="range" value="0.5" />
+	<input id="fi" type="range" defaultValue="0.5" />
 }
 
-// Checkbox, default checked (Per :333).
+// Uncontrolled checkbox (Per :333).
 export function Checkbox(props) @{
-	<input id="fi" type="checkbox" checked />
+	<input id="fi" type="checkbox" defaultChecked />
 }
 
-// Textarea with default text (Per :355).
+// CONTROLLED checkbox.
+export function ControlledCheckbox(props) @{
+	<input id="fi" type="checkbox" checked={props.c} onClick={props.onClick} />
+}
+
+// Textarea with native default text (Per :355) — plain children ARE the
+// platform's defaultValue; only value/defaultValue PROPS make it controlled.
 export function TextArea(props) @{
 	<textarea id="fi">Hello</textarea>
 }
 
-// Select with a default-selected option (Per :367).
+// Select with a default-selected option (Per :367) — uncontrolled (no value
+// prop); the static `selected` attribute is the native default.
 export function Select(props) @{
 	<select id="fi">
 		<option value="Hello" selected>Hello</option>

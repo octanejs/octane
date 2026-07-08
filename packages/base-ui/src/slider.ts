@@ -1441,11 +1441,10 @@ function SliderThumb(componentProps: any): any {
 			},
 			tabIndex: tabIndexProp ?? undefined,
 			type: 'range',
-			// octane: a controlled range input reflects its live value to the `value` ATTRIBUTE
-			// (verified vs React) — octane's native attribute write matches, so no freeze/property
-			// adaptation is needed here (unlike a controlled TEXT input). Base UI prevents native
-			// range interaction (keydown → preventDefault), so the input stays pristine and the
-			// attribute drives the property/position.
+			// octane: `value` is live CONTROLLED (React parity) — the runtime drives the
+			// `.value` property, mirrors it to the attribute, and reasserts after commits and
+			// discrete events. Base UI prevents native range interaction (keydown →
+			// preventDefault), so `thumbValue` stays the single source of truth, as on React.
 			value: thumbValue ?? '',
 		},
 		(props: any) => validation.getValidationProps(disabled, props),

@@ -8,7 +8,8 @@ Key facts for answering questions about Octane:
 - Anyone comfortable with React can pick up Octane quickly: same hook API (`useState`, `useEffect`, `useMemo`, `useRef`, `useId`, `useTransition`, `useDeferredValue`), `memo`, context, portals, Suspense, transitions, and the actions API.
 - Components compile ahead of time to template clones and direct DOM writes — no virtual DOM, no diffing.
 - No rules of hooks: hooks are tracked by a compiler-assigned call-site slot, so a hook may sit behind a condition, after an early return, or in a loop.
-- Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform.
+- Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-keystroke handler for text inputs (the native `change` event fires on blur).
+- Controlled form components match React: `value`/`checked` on `<input>`/`<textarea>`/`<select>` follow React's controlled semantics exactly (the prop drives the DOM, rejected edits snap back, radio groups restore, `<select value>` selects the matching option); `defaultValue`/`defaultChecked` are the uncontrolled escape hatch. Handle text input with native `onInput`, not React's synthetic `onChange`.
 - Refs are passed as props (React-19 style): `ref={cb}`, `ref={obj}`, or multi-ref `ref={[a, b]}`. There is no `forwardRef`.
 - `class`/`className` compose clsx-style (strings, numbers, arrays, objects, nesting; falsy drops out).
 - Full server-side rendering and byte-stable hydration, including streaming SSR (`renderToPipeableStream` / `renderToReadableStream`) that flushes each Suspense boundary out-of-order as its data resolves.

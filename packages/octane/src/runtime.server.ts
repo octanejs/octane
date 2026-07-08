@@ -34,7 +34,9 @@ import {
 	STREAM_SEED_ATTR,
 	STREAM_SEED_COMMENT,
 	POSITIVE_NUMERIC_ATTR_PROPS,
-	BOOLEAN_DROPPED_STRING_ATTR_PROPS,
+	BOOLEAN_ATTR_PROPS,
+	MUST_USE_PROPERTY_PROPS,
+	VALID_ATTR_NAME,
 	isEnumeratedBooleanAttr,
 	cssStyleValue,
 	ATTRIBUTE_ALIASES,
@@ -520,6 +522,11 @@ function ssrHostElement(
 	}
 	let attrs = '';
 	let innerHTML: unknown = undefined;
+	// Controlled form props (mirrors the compiled ssrEmitElement routing):
+	// input maps the value/defaultValue and checked/defaultChecked cascades
+	// onto the native attributes; textarea routes value/defaultValue into the
+	// CONTENT position; select feeds them to the option-projection scope.
+	const isCtlTag = tag === 'input' || tag === 'textarea' || tag === 'select';
 	if (props != null) {
 		for (const k in props) {
 			const val = props[k];
@@ -530,13 +537,35 @@ function ssrHostElement(
 				innerHTML = val == null || val.__html == null ? '' : val.__html;
 				continue;
 			}
+			if (
+				isCtlTag &&
+				(k === 'value' ||
+					k === 'defaultValue' ||
+					(tag === 'input' && (k === 'checked' || k === 'defaultChecked')))
+			) {
+				continue; // serialized from the cascade below / the content position
+			}
 			attrs += ssrAttrEntry(k, val, tag);
+		}
+		if (tag === 'input') {
+			attrs += ssrValueAttr(props.value != null ? props.value : props.defaultValue);
+			attrs += ssrCheckedAttr(props.checked != null ? props.checked : props.defaultChecked);
 		}
 	}
 	const hasChildren =
 		rawInner !== undefined
 			? rawInner !== ''
 			: children != null && children !== false && children !== true && children !== '';
+	// Controlled <textarea>: the prop IS the content — React's contract
+	// (children + defaultValue throws; children + value warns dev-side, the
+	// value wins; the compiled path rejects both at compile time).
+	if (tag === 'textarea' && props != null && (props.value != null || props.defaultValue != null)) {
+		if (hasChildren && props.value == null) {
+			throw new Error('If you supply `defaultValue` on a <textarea>, do not pass children.');
+		}
+		const inner = ssrTextareaValue(props.value != null ? props.value : props.defaultValue);
+		return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
+	}
 	if (VOID_ELEMENTS.has(tag) && !hasChildren && innerHTML === undefined) {
 		return '<' + tag + attrs + '/>';
 	}
@@ -552,9 +581,21 @@ function ssrHostElement(
 		// emit them via `ssrChild` (the server analogue of childSlot). Pure host/text
 		// children are rebuilt by the client de-opt reconciler, so they stay as plain
 		// marker-less markup via `ssrDescriptorContent`.
-		inner = serverDescNeedsBlocks(children)
-			? ssrDeoptBlockChildren(children, scope)
-			: ssrDescriptorContent(children, scope);
+		const build = () =>
+			serverDescNeedsBlocks(children)
+				? ssrDeoptBlockChildren(children, scope)
+				: ssrDescriptorContent(children, scope);
+		// A controlled <select> projects `selected` onto the options serialized
+		// inside its children (compiled options included — the scope is global).
+		inner =
+			tag === 'select' && props != null && (props.value != null || props.defaultValue != null)
+				? ssrSelectScope(props.value, props.defaultValue, !!props.multiple, build)
+				: build();
+	}
+	// <option> assembles via ssrOption so an active select scope can mark it
+	// ` selected` (its value prop already serialized as a plain attribute).
+	if (tag === 'option') {
+		return ssrOption(props != null && props.value != null ? props.value : undefined, attrs, inner);
 	}
 	return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
 }
@@ -692,10 +733,28 @@ export function ssrAttr(name: string, v: unknown, tag?: string): string {
 			return '';
 		}
 		const lower = name.toLowerCase();
-		// NOTE no boolean-prop truthiness table (React drops `hidden={0}`): the
-		// ADJUDICATED divergence (see constants.ts) writes values through natively.
-		if (t === 'boolean' && BOOLEAN_DROPPED_STRING_ATTR_PROPS.has(lower)) return '';
-		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && (t === 'boolean' || !(Number(v) >= 1))) return '';
+		// React's boolean-attr table (constants.ts): ANY truthy value serializes
+		// the canonical `attr=""` presence form, falsy drops — mirroring the
+		// client's coerceAttrValue byte-for-byte (hydration parity).
+		if (BOOLEAN_ATTR_PROPS.has(lower)) {
+			return v ? ' ' + lower + '=""' : '';
+		}
+		// The OVERLOADED booleans (download/capture): boolean values get
+		// presence semantics; everything else passes through verbatim below
+		// (`download={0}` → "0", like React).
+		if (t === 'boolean' && (lower === 'download' || lower === 'capture')) {
+			return v ? ' ' + lower + '=""' : '';
+		}
+		// mustUseProperty props serialize their INITIAL state as the attribute
+		// (the client's dynamic writes go to the property; the parser sets the
+		// property from this attribute at creation).
+		if (MUST_USE_PROPERTY_PROPS.has(lower)) {
+			return v ? ' ' + lower + '=""' : '';
+		}
+		// Booleans on non-boolean attributes never serialize (client parity:
+		// `title={true}` removes).
+		if (t === 'boolean') return '';
+		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && !(Number(v) >= 1)) return '';
 	}
 	if (v == null || v === false) return '';
 	const s = v === true ? '' : String(v);
@@ -736,10 +795,9 @@ export function ssrStyle(v: unknown): string {
 	return ' style="' + escapeAttr(css) + '"';
 }
 
-// Legal HTML attribute name: non-empty, no ASCII whitespace, `"`, `'`, `>`, `/`,
-// `=`, or control chars. Rejects spread keys that would inject markup (e.g.
-// 'x onload=alert(1)' or 'a>'); mirrors the client's setAttribute behavior.
-const VALID_ATTR_NAME = /^[^\s"'>\/=\u0000-\u001F]+$/;
+// VALID_ATTR_NAME (shared, constants.ts) rejects spread keys that would inject
+// markup (e.g. 'x onload=alert(1)' or 'a>'); the client's setAttribute applies
+// the identical gate.
 
 // Legal element tag name (React's VALID_TAG_REGEX): letters first, then
 // letters/digits/`:`/`.`/`-`/`_`. Anything else could open/close markup.
@@ -756,6 +814,8 @@ function ssrAttrEntry(k: string, v: unknown, tag?: string): string {
 	if (k === 'key' || k === 'ref' || k === 'children') return '';
 	if (k === 'suppressHydrationWarning' || k === 'suppressContentEditableWarning') return '';
 	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
+	// `autoFocus` never serializes (client focuses at its mount commit).
+	if (k === 'autoFocus' && (tag === undefined || tag.indexOf('-') === -1)) return '';
 	// Function/symbol values never serialize (client parity: setAttribute removes
 	// them) — stringifying a function would put its SOURCE into the markup.
 	if (typeof v === 'function' || typeof v === 'symbol') return '';
@@ -790,6 +850,121 @@ export function ssrInnerHtml(sources: unknown[]): string | undefined {
 		if (s != null) return s.__html == null ? '' : String(s.__html);
 	}
 	return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Controlled form serialization — the server halves of the client runtime's
+// setValue/setChecked/setSelectValue/setDefaultValue helpers (runtime.ts).
+// <input> serializes value/checked as attributes (the parser turns them into
+// the DOM defaults the client mount would have written); <textarea> emits the
+// value as its text content; <select> emits NO attribute — a scope stack lets
+// every <option> serialized inside mark itself ` selected`.
+// ---------------------------------------------------------------------------
+
+/**
+ * The `value` attribute for a controlled/default `<input>` value. Mirrors the
+ * client's toControlledString exactly — `value={false}` serializes "false"
+ * (the generic ssrAttr would DROP a false boolean); only nullish omits.
+ */
+export function ssrValueAttr(v: unknown): string {
+	if (v == null) return '';
+	return ' value="' + escapeAttr(typeof v === 'string' ? v : String(v)) + '"';
+}
+
+/** The `checked` attribute (presence semantics; mirrors setChecked's `!!v`). */
+export function ssrCheckedAttr(v: unknown): string {
+	return v == null || !v ? '' : ' checked';
+}
+
+/**
+ * Controlled `<textarea>` content: escaped text + the leading-newline guard
+ * (the parser eats a '\n' right after the opening tag — see ssrTextPre).
+ * Mirrors the client's toControlledString (booleans/numbers stringify).
+ */
+export function ssrTextareaValue(v: unknown): string {
+	if (v == null) return '';
+	const s = escapeHtml(typeof v === 'string' ? v : String(v));
+	return s.charCodeAt(0) === 10 ? '\n' + s : s;
+}
+
+// The active controlled-<select> scopes. A MODULE-LEVEL stack (not an SSRScope
+// field): SSR rendering is a synchronous nested call tree, so the stack
+// naturally survives component boundaries and @for bodies, and try/finally
+// keeps it balanced across throws/suspensions.
+interface SelectScope {
+	single: string | null;
+	multi: Set<string> | null;
+}
+const SELECT_STACK: SelectScope[] = [];
+
+/**
+ * Serialize a controlled `<select>`'s children under a projection scope:
+ * every `<option>` rendered inside (compiled or de-opt, any nesting) consults
+ * the innermost scope via ssrOption and marks itself ` selected` on match —
+ * the server analogue of the client's projectSelectValue. `value` wins over
+ * `defaultValue` (the client cascade). A no-match single select needs no
+ * server work: the parser selects the first option natively, matching the
+ * client's first-non-disabled fallback for the overwhelmingly common case.
+ */
+export function ssrSelectScope(
+	value: unknown,
+	defaultValue: unknown,
+	multiple: unknown,
+	children: () => string,
+): string {
+	const v = value != null ? value : defaultValue;
+	let frame: SelectScope;
+	if (v == null) {
+		frame = { single: null, multi: null };
+	} else if (multiple) {
+		frame = Array.isArray(v)
+			? { single: null, multi: new Set(v.map((x) => String(x))) }
+			: { single: null, multi: null };
+	} else {
+		frame = Array.isArray(v) ? { single: null, multi: null } : { single: String(v), multi: null };
+	}
+	SELECT_STACK.push(frame);
+	try {
+		return children();
+	} finally {
+		SELECT_STACK.pop();
+	}
+}
+
+// Reverse escapeHtml for an option's TEXT content — the React fallback compare
+// key when the option carries no `value` attribute. Only the entities
+// escapeHtml produces (& < >) need reversing; order matters (&amp; last).
+function unescapeOptionText(s: string): string {
+	if (s.indexOf('&') === -1) return s;
+	return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+}
+
+/**
+ * Assemble one `<option>`: `attrs` are its serialized attributes (its value
+ * attribute included when present), `content` its serialized children,
+ * `value` the RAW value prop (undefined = none → the option's flattened text
+ * is the compare key, per React). Returns a plain option when no controlled
+ * select scope is active.
+ */
+export function ssrOption(value: unknown, attrs: string, content: string): string {
+	return '<option' + attrs + ssrOptionSelected(value, content) + '>' + content + '</option>';
+}
+
+function ssrOptionSelected(value: unknown, content: string): string {
+	if (SELECT_STACK.length === 0) return '';
+	const scope = SELECT_STACK[SELECT_STACK.length - 1];
+	if (scope.single === null && scope.multi === null) return '';
+	let key: string;
+	if (value != null) {
+		key = String(value);
+	} else {
+		// Content carrying markup (nested elements / hydration markers) skips
+		// the text fallback — React flattens simple text children only.
+		if (content.indexOf('<') !== -1) return '';
+		key = unescapeOptionText(content);
+	}
+	if (scope.multi !== null) return scope.multi.has(key) ? ' selected' : '';
+	return scope.single === key ? ' selected' : '';
 }
 
 // Render a component body under an explicit frame, tracking it as the innermost

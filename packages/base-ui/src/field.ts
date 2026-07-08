@@ -4,8 +4,8 @@
 //
 // Field groups a control with its label/description/error and runs validation. The default
 // (inert) field contexts are overridden here by the real providers. octane adaptations:
-// native events; forwardRef → ref-as-prop; the text-input value adaptation (initial value →
-// the `value` ATTRIBUTE; controlled value driven via the property).
+// native events; forwardRef → ref-as-prop. The control's `value`/`defaultValue` pass straight
+// through — octane inputs are CONTROLLED exactly like React's.
 import {
 	createContext,
 	createElement,
@@ -20,7 +20,7 @@ import {
 
 import { S, subSlot } from './internal';
 import { useRenderElement, type RenderProp } from './utils/useRenderElement';
-import { ownerDocument, ownerWindow } from './utils/owner';
+import { ownerDocument } from './utils/owner';
 import { createChangeEventDetails, REASONS } from './utils/createChangeEventDetails';
 import { useControlled } from './utils/useControlled';
 import { useStableCallback } from './utils/useStableCallback';
@@ -341,32 +341,6 @@ function FieldControl(props: any): any {
 	const isControlled = valueProp !== undefined;
 	const value = isControlled ? valueUnwrapped : undefined;
 
-	// octane text-input adaptation: the INITIAL value is the `value` ATTRIBUTE; a controlled
-	// value is driven imperatively via the property.
-	const initialValueRef = useRef(
-		isControlled ? value : defaultValue,
-		subSlot(slot, 'initialValue'),
-	);
-
-	useLayoutEffect(
-		() => {
-			if (!isControlled) {
-				return;
-			}
-			const input = validation.inputRef.current;
-			if (!input) {
-				return;
-			}
-			const setNativeValue = Object.getOwnPropertyDescriptor(
-				ownerWindow(input).HTMLInputElement.prototype,
-				'value',
-			)?.set;
-			setNativeValue?.call(input, value ?? '');
-		},
-		[isControlled, value],
-		subSlot(slot, 'e:syncValue'),
-	);
-
 	const getValueFromInput = useStableCallback(
 		() => validation.inputRef.current?.value,
 		subSlot(slot, 'getValue'),
@@ -396,7 +370,7 @@ function FieldControl(props: any): any {
 					ref: validation.inputRef,
 					'aria-labelledby': labelId,
 					autoFocus: autoFocus || undefined,
-					value: initialValueRef.current,
+					...(isControlled ? { value } : { defaultValue }),
 					onChange(event: any) {
 						const inputValue = event.currentTarget.value;
 						onValueChange?.(inputValue, createChangeEventDetails(REASONS.none, event));

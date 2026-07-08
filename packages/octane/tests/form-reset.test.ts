@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { mount, flushEffects } from './_helpers';
 import { flushSync, startTransition, requestFormReset, useDebugValue } from '../src/index.js';
 import { ActionForm } from './_fixtures/actions.tsrx';
+import { ControlledForm } from './conformance/_fixtures/controlled-forms.tsrx';
 
 // React DOM's requestFormReset(form) — reset the form's uncontrolled fields
 // when the enclosing transition/action settles. Plus the trivial React-parity
@@ -83,6 +84,32 @@ describe('requestFormReset', () => {
 		await settle();
 		expect(input.value).toBe('default'); // form.reset() restored defaultValue
 		form.remove();
+	});
+
+	// Controlled components (2026-07-08): form.reset() restores DEFAULTS — for a
+	// controlled checkbox that's the INITIAL state (the checked attribute never
+	// updates) — so an octane-driven reset must reassert the rendered state
+	// afterwards, like React applying queued resets.
+	it('reasserts controlled fields after the deferred reset', async () => {
+		const r = mount(ControlledForm, { on: false, onClick: () => {} });
+		const form = r.find('form') as HTMLFormElement;
+		const input = r.find('#cf') as HTMLInputElement;
+		r.update(ControlledForm, { on: true, onClick: () => {} });
+		expect(input.checked).toBe(true);
+		expect(input.defaultChecked).toBe(false); // the reset target diverges
+
+		const d = deferred();
+		startTransition(async () => {
+			requestFormReset(form);
+			await d.promise;
+		});
+		await tick();
+		d.resolve();
+		await settle();
+		// The native reset restored the initial (unchecked) state; the
+		// controlled reassert snapped the rendered state back.
+		expect(input.checked).toBe(true);
+		r.unmount();
 	});
 
 	it('warns and resets immediately when called outside a transition or action', () => {

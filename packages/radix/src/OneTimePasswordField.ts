@@ -16,12 +16,11 @@
 //   with the corresponding user prop via `composeEventHandlers` (React fires them in that
 //   order for a native `input` event). The user's `onChange` prop is therefore folded
 //   into the `input` binding and NOT bound to native `change` (native change = commit).
-// - React's CONTROLLED `value={char}` cell has no octane equivalent (octane inputs are
-//   uncontrolled and native): the `value` prop renders as the native attribute, a layout
-//   effect imperatively syncs the DOM `.value` property whenever the cell's char state
-//   changes, and the composed input handler ends with React's controlled-value
-//   REASSERTION (restore `.value` to the state char when they diverge — e.g. an invalid
-//   character that produced no state change).
+// - React's CONTROLLED `value={char}` cell maps directly onto octane's controlled
+//   `value` prop (React-parity controlled form components): the runtime writes the DOM
+//   `.value` property at commit, reasserts it on every commit of the owning block, and
+//   restores it after each native event flush (React's controlled-value restoration —
+//   e.g. an invalid character that produced no state change snaps back automatically).
 // - The source's `unstable_createCollection` (state-backed, `.at`/`.from`/`.size`/
 //   `.indexOf`) has no shared octane port (the shared collection.ts is the legacy API,
 //   which registers items in passive effects and never re-renders consumers). Since the
@@ -638,24 +637,10 @@ export function OneTimePasswordFieldInput(props: any): any {
 		setElement,
 		subSlot(slot, 'refs'),
 	);
+	// The cell's `value={char}` is live CONTROLLED (octane React-parity): the runtime
+	// keeps the DOM `.value` in sync and restores it after event flushes — no
+	// imperative sync or post-handler reassertion needed here.
 	const char = context.value[index] ?? '';
-	// Latest char for the post-handler controlled-value reassertion (octane adaptation).
-	const charRef = useRef(char, subSlot(slot, 'char'));
-	charRef.current = char;
-
-	// octane adaptation: React's controlled `value={char}` → imperative `.value` property
-	// sync when the cell's state char changes (the attribute alone can't update a dirty
-	// input).
-	useLayoutEffect(
-		() => {
-			const input = inputRef.current;
-			if (input && input.value !== char) {
-				input.value = char;
-			}
-		},
-		[char],
-		subSlot(slot, 'e:value'),
-	);
 
 	const keyboardActionTimeoutRef = useRef<number | null>(null, subSlot(slot, 'timeout'));
 	useEffect(
@@ -807,16 +792,12 @@ export function OneTimePasswordFieldInput(props: any): any {
 					}
 				}),
 				// octane adaptation: ONE native `input` binding runs the source's onInput
-				// logic then its onChange logic (React's order for a native input event),
-				// then re-asserts the controlled value (React's controlled-input
-				// restoration, which runs regardless of handler outcomes).
+				// logic then its onChange logic (React's order for a native input event).
+				// React's controlled-input restoration is the runtime's: after the event
+				// flush, the controlled `value` snaps the DOM back to the rendered char.
 				onInput: (event: Event) => {
 					composeEventHandlers(onInputProp, handleInput)(event);
 					composeEventHandlers(onChangeProp, handleChange)(event);
-					const input = inputRef.current;
-					if (input && input.value !== charRef.current) {
-						input.value = charRef.current;
-					}
 				},
 				onKeyDown: composeEventHandlers(props?.onKeyDown, (event: KeyboardEvent) => {
 					switch (event.key) {

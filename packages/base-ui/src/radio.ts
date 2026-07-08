@@ -4,8 +4,8 @@
 //
 // A radio renders a `<span role="radio">` + a hidden `<input type="radio">` (a CompositeItem
 // for roving focus when inside a <RadioGroup>). octane adaptations mirror Switch/Checkbox:
-// native events; the uncontrolled-input pattern (initial checked → attribute, live
-// `input.checked` PROPERTY via the native setter, native click/change dispatch).
+// native events; the hidden input takes the live `checked` prop (octane inputs are CONTROLLED
+// exactly like React's) with native click dispatch.
 import { createContext, createElement, useContext, useLayoutEffect, useMemo, useRef } from 'octane';
 
 import { S, subSlot } from './internal';
@@ -138,9 +138,6 @@ function RadioRoot(props: RadioRootProps): any {
 	const radioRef = useRef<HTMLElement | null>(null, subSlot(slot, 'radioRef'));
 	const inputRef = useRef<HTMLInputElement | null>(null, subSlot(slot, 'inputRef'));
 
-	// octane: reflect the INITIAL checked as the `checked` ATTRIBUTE (see Switch).
-	const initialCheckedRef = useRef(checked, subSlot(slot, 'initialChecked'));
-
 	const handleControlRef = useStableCallback(
 		(element: HTMLElement | null) => {
 			if (!element) {
@@ -166,23 +163,6 @@ function RadioRoot(props: RadioRootProps): any {
 		},
 		[setFilled],
 		subSlot(slot, 'e:filled'),
-	);
-
-	// octane: drive `input.checked` PROPERTY imperatively (matches React's controlled input).
-	useLayoutEffect(
-		() => {
-			const input = inputRef.current;
-			if (!input) {
-				return;
-			}
-			const setNativeChecked = Object.getOwnPropertyDescriptor(
-				ownerWindow(input).HTMLInputElement.prototype,
-				'checked',
-			)?.set;
-			setNativeChecked?.call(input, checked);
-		},
-		[checked],
-		subSlot(slot, 'e:syncChecked'),
 	);
 
 	useLayoutEffect(
@@ -275,8 +255,7 @@ function RadioRoot(props: RadioRootProps): any {
 		'aria-hidden': true,
 		...(value !== undefined ? { value: serializeValue(value) } : {}),
 		disabled,
-		// octane: initial checked → attribute; live value via the property sync effect.
-		checked: initialCheckedRef.current || undefined,
+		checked,
 		required,
 		readOnly,
 		onChange(event: any) {

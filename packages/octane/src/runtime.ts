@@ -20,7 +20,8 @@ import {
 	HYDRATION_END,
 	HYDRATION_TEXT_SEP,
 	POSITIVE_NUMERIC_ATTR_PROPS,
-	BOOLEAN_DROPPED_STRING_ATTR_PROPS,
+	BOOLEAN_ATTR_PROPS,
+	VALID_ATTR_NAME,
 	isEnumeratedBooleanAttr,
 	UNDEFINED_SENTINEL_KEY,
 	cssStyleValue,
@@ -1045,6 +1046,10 @@ function blockSubtreeDisposed(block: Block | null): boolean {
 }
 
 function commitEffects(): void {
+	// Controlled-form commit work FIRST: select projections must see the
+	// options this render just built, and the dev missing-onInput check must
+	// see the element's full listener set (see drainControlledSyncs).
+	drainControlledSyncs();
 	drainPhase(INSERTION);
 	// Teardown ref detaches fire before this commit's attaches (mutation → layout),
 	// so a ref moving between elements cycles null → new-node in one commit.
@@ -1091,7 +1096,8 @@ export function hasPendingWork(): boolean {
 		effectQueues[INSERTION].length > 0 ||
 		effectQueues[LAYOUT].length > 0 ||
 		effectQueues[PASSIVE].length > 0 ||
-		storeSyncQueue.length > 0
+		storeSyncQueue.length > 0 ||
+		hasControlledSyncs()
 	);
 }
 
@@ -3951,6 +3957,69 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// Never a DOM attribute — a React warning-suppression hint (octane doesn't emit
 	// the warning, but the key must not land in the markup either).
 	if (name === 'suppressContentEditableWarning') return;
+	// Controlled form props (`value`/`checked`/`defaultValue`/`defaultChecked`
+	// on <input>/<textarea>/<select>) route to the PROPERTY helpers — this arm
+	// covers spreads, de-opt descriptors, and previously-compiled output
+	// (compiled `.tsrx` bindings call the helpers directly). Length-bucketed so
+	// non-matching names pay one integer switch — cheaper than the
+	// ATTRIBUTE_ALIASES Map lookup below. `<option value>` stays a plain
+	// attribute (it is what the select projection reads); custom elements never
+	// match the localName gate (raw semantics).
+	switch (name.length) {
+		case 5:
+			if (name === 'value') {
+				const t = el.localName;
+				if (t === 'input' || t === 'textarea') return setValue(el, value);
+				if (t === 'select') return setSelectValue(el, value);
+			} else if (name === 'muted' && el.localName.indexOf('-') === -1) {
+				// mustUseProperty (React parity): the muted ATTRIBUTE doesn't
+				// reflect to the live property post-creation — a dynamic write
+				// must set the property or a playing element never (un)mutes.
+				(el as any).muted = value && typeof value !== 'function' && typeof value !== 'symbol';
+				return;
+			}
+			break;
+		case 7:
+			if (name === 'checked' && el.localName === 'input') return setChecked(el, value);
+			break;
+		case 8:
+			if ((name === 'multiple' || name === 'selected') && el.localName.indexOf('-') === -1) {
+				// mustUseProperty like `muted`. `multiple` reflects back to the
+				// attribute; `selected` is live option state (the controlled
+				// <select> projection owns it when a select value is armed).
+				(el as any)[name] = value && typeof value !== 'function' && typeof value !== 'symbol';
+				return;
+			}
+			break;
+		case 9:
+			if (name === 'autoFocus' && el.localName.indexOf('-') === -1) {
+				// React parity: never an attribute — the element is focused in
+				// the commit phase on mount (see setAutoFocus).
+				return setAutoFocus(el, value);
+			}
+			if (name === 'autofocus' && (el as any).__oct_loc !== undefined) {
+				console.error('Invalid DOM property `autofocus`. Did you mean `autoFocus`?');
+			}
+			break;
+		case 12:
+			if (name === 'defaultValue') {
+				const t = el.localName;
+				if (t === 'input' || t === 'textarea' || t === 'select') {
+					return setDefaultValue(el, value);
+				}
+			} else if (name === 'defaultvalue' && (el as any).__oct_loc !== undefined) {
+				console.error('Invalid DOM property `defaultvalue`. Did you mean `defaultValue`?');
+			}
+			break;
+		case 14:
+			if (name === 'defaultChecked' && el.localName === 'input') {
+				return setDefaultChecked(el, value);
+			}
+			if (name === 'defaultchecked' && (el as any).__oct_loc !== undefined) {
+				console.error('Invalid DOM property `defaultchecked`. Did you mean `defaultChecked`?');
+			}
+			break;
+	}
 	// React 19 custom-element semantics: a FUNCTION-valued `on*` prop on a custom
 	// element attaches a real listener for the name after "on", verbatim
 	// (`oncustomevent={fn}` → addEventListener('customevent', fn)). This is not
@@ -4028,17 +4097,19 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		}
 		return;
 	}
-	// Guarded write: an injection-shaped/invalid attribute NAME (e.g. a hostile
-	// spread key like `'x onload=…'`) makes the platform throw InvalidCharacterError,
-	// which would crash the whole render. Report + skip instead — the SSR serializer
-	// rejects the same names via VALID_ATTR_NAME (runtime.server.ts). try/catch is
-	// free on the no-throw path, so the hot path pays nothing.
-	try {
-		if (ns) el.setAttributeNS(ns, name, next);
-		else el.setAttribute(name, next);
-	} catch (err) {
-		console.error(err);
+	// Proactive validity gate (React's isAttributeNameSafe shape): an
+	// injection-shaped/invalid attribute NAME (e.g. a hostile spread key like
+	// `'x onload=…'`) would make the platform throw InvalidCharacterError and
+	// crash the whole render. Skip it — dev-warn only — mirroring the SSR
+	// serializer's identical VALID_ATTR_NAME gate (shared in constants.ts).
+	if (!VALID_ATTR_NAME.test(name)) {
+		if ((el as any).__oct_loc !== undefined) {
+			console.error(`Invalid attribute name: \`${name}\` (skipped).`);
+		}
+		return;
 	}
+	if (ns) el.setAttributeNS(ns, name, next);
+	else el.setAttribute(name, next);
 }
 
 /**
@@ -4071,15 +4142,37 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 	// React's value-type tables — custom elements are exempt (raw semantics).
 	if (el.localName.indexOf('-') === -1) {
 		const lower = name.toLowerCase();
-		// NOTE no boolean-prop truthiness table (React drops `hidden={0}`): the
-		// ADJUDICATED divergence (see constants.ts + the inert="" test in
-		// dom-attributes.test.ts) writes values through natively.
-		// String-typed props drop meaningless booleans (`href={true}` must not
-		// become a present empty-URL link).
-		if (t === 'boolean' && BOOLEAN_DROPPED_STRING_ATTR_PROPS.has(lower)) return null;
-		// Positive-numeric props: below 1 (or a boolean) drops — `size="0"` is
-		// invalid per the HTML spec.
-		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && (t === 'boolean' || !(Number(value) >= 1))) {
+		// React's boolean-attr table (constants.ts — REVERSES the 2026-06
+		// native-write adjudication): ANY truthy value renders the canonical
+		// `attr=""` presence form (`disabled="disabled"` → `disabled=""`),
+		// falsy removes (`hidden={0}`, `inert=""` → absent).
+		if (BOOLEAN_ATTR_PROPS.has(lower)) {
+			return value ? '' : null;
+		}
+		// The OVERLOADED booleans (download/capture): boolean values get
+		// presence semantics; everything else passes through verbatim below
+		// (`download={0}` → "0", like React).
+		if (t === 'boolean' && (lower === 'download' || lower === 'capture')) {
+			return value ? '' : null;
+		}
+		// Booleans on NON-boolean attributes remove (React: `title={true}` must
+		// never render `title=""`), with the React DEV diagnostic.
+		if (t === 'boolean') {
+			if ((el as any).__oct_loc !== undefined) {
+				console.error(
+					`Received \`${value}\` for a non-boolean attribute \`${name}\`. ` +
+						(value === true
+							? `If you want to write it to the DOM, pass a string instead: ` +
+								`${name}="true" or ${name}={value.toString()}.`
+							: `If you used to conditionally omit it with ${name}={condition && value}, ` +
+								`pass ${name}={condition ? value : undefined} instead.`),
+				);
+			}
+			return null;
+		}
+		// Positive-numeric props: below 1 drops — `size="0"` is invalid per the
+		// HTML spec.
+		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && !(Number(value) >= 1)) {
 			return null;
 		}
 		// Unknown lowercase on* names never write on standard elements (an
@@ -4087,10 +4180,30 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 		// attribute); camelCase onX events compile to delegated bindings and
 		// never reach setAttribute. Custom elements keep them (raw semantics).
 		if (name.length > 2 && name.charCodeAt(0) === 111 /* o */ && name.charCodeAt(1) === 110) {
+			// DEV hint: the camelCase form is the working delegated handler.
+			if ((el as any).__oct_loc !== undefined && typeof value === 'function') {
+				console.error(
+					`Unknown event handler property \`${name}\` was dropped — did you mean ` +
+						`\`on${name.charAt(2).toUpperCase()}${name.slice(3)}\`? (lowercase on* ` +
+						'attributes never write; octane delegates camelCase handlers natively)',
+				);
+			}
 			return null;
 		}
 	}
 	if (value == null || value === false) return null;
+	// DEV: a plain object stringifies as "[object Object]" — always a bug
+	// (React's unusual-coercion check; arrays keep their join semantics).
+	if (
+		t === 'object' &&
+		(el as any).__oct_loc !== undefined &&
+		(value as object).toString === Object.prototype.toString
+	) {
+		console.error(
+			`The provided \`${name}\` attribute is an object; it will stringify to ` +
+				'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
+		);
+	}
 	const v = value === true ? '' : String(value);
 	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers will
 	// re-fetch the whole document as an image/script/stylesheet. React strips
@@ -4444,7 +4557,10 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 			(el as any)[ev.key] = v;
 			continue;
 		}
-		if (v === pv) continue;
+		// Controlled `value`/`checked` bypass the identity skip — they must
+		// reassert every commit (the DOM may have drifted; the helper's own
+		// DOM-diff makes the call cheap).
+		if (v === pv && !isControlledHostProp(el, k)) continue;
 		setAttribute(el, k, v);
 	}
 }
@@ -4916,9 +5032,14 @@ function reportListenerError(err: unknown): void {
 // inherit the outer commit window. Non-discrete events keep microtask-batched
 // semantics so they don't thrash the scheduler.
 function maybeFlushDiscrete(type: string): void {
-	if (DISCRETE_EVENTS.has(type) && _dispatchDepth === 0 && hasPendingWork()) {
-		flushSync(noop);
-	}
+	if (_dispatchDepth !== 0 || !DISCRETE_EVENTS.has(type)) return;
+	// Commit handler-scheduled work first, so the controlled restore below
+	// compares the DOM against the values the handlers just rendered.
+	if (hasPendingWork()) flushSync(noop);
+	// The restore runs even when NO work was scheduled — a rejected/unheard
+	// edit (no onInput, or an Object.is-equal setState) schedules nothing and
+	// is exactly the case that must snap back (React's restoreControlledState).
+	if (pendingRestores.length > 0) restoreControlledStates();
 }
 
 function dispatchDelegated(event: Event): void {
@@ -4926,6 +5047,7 @@ function dispatchDelegated(event: Event): void {
 	// already covers every logical ancestor across roots/portals); the rest no-op.
 	if ((event as any)[DELEGATED_DISPATCHED] === true) return;
 	(event as any)[DELEGATED_DISPATCHED] = true;
+	maybeEnqueueRestore(event);
 	const key = '$$' + event.type;
 	const targetOnly = TARGET_ONLY_DELEGATED.has(event.type);
 	_dispatchDepth++;
@@ -4978,6 +5100,7 @@ function dispatchDelegated(event: Event): void {
 function dispatchDelegatedCapture(event: Event): void {
 	if ((event as any)[CAPTURE_DISPATCHED] === true) return;
 	(event as any)[CAPTURE_DISPATCHED] = true;
+	maybeEnqueueRestore(event);
 	const key = CAPTURE_PREFIX + event.type;
 	const path: any[] = [];
 	for (let node = event.target as any; node !== null && node !== undefined; ) {
@@ -5053,6 +5176,9 @@ let PENDING_FORM_RESETS: Set<HTMLFormElement> | null = null;
 function resetFormNow(form: HTMLFormElement): void {
 	try {
 		form.reset();
+		// The native reset restored DEFAULTS; controlled fields snap back to
+		// their rendered values (React applies queued resets the same way).
+		reassertControlledIn(form);
 	} catch {
 		/* jsdom/detached form */
 	}
@@ -5169,11 +5295,13 @@ function handleFormSubmit(form: HTMLFormElement, event: Event): void {
 		if (fa.$$pendingSubmits === 0) setFormStatus(form, IDLE_FORM_STATUS);
 		// React resets a plain <form action={fn}>'s uncontrolled fields on success;
 		// useActionState-driven forms keep their values. form.reset() restores
-		// uncontrolled inputs to defaultValue; controlled inputs are re-applied by
-		// the next render's value bindings.
+		// uncontrolled inputs to defaultValue; reassertControlledIn then snaps
+		// controlled fields back to their rendered values (React parity — the
+		// reset must not clobber controlled state).
 		if (ok && !isDispatcher) {
 			try {
 				form.reset();
+				reassertControlledIn(form);
 			} catch {
 				/* jsdom/detached form */
 			}
@@ -5204,6 +5332,626 @@ function handleFormSubmit(form: HTMLFormElement, event: Event): void {
 		() => settle(true),
 		() => settle(false),
 	);
+}
+
+// ---------------------------------------------------------------------------
+// Controlled form components — React-parity `value`/`checked` semantics on
+// NATIVE events (no synthetic layer; the no-synthetic-events divergence
+// stands — see docs/react-parity-migration-plan.md §2).
+//
+// Model: the compiler routes `value`/`checked`/`defaultValue`/`defaultChecked`
+// on <input>/<textarea>/<select> to the helpers below instead of setAttribute
+// (and setAttribute routes the same names on form tags here, so spreads,
+// de-opt descriptors, and previously-compiled output get identical semantics).
+// A helper writes the DOM PROPERTY, diffs against the DOM (not a compiler
+// `_prev$` cache — the DOM is what the user mutates), and ARMS the element
+// with a `$$ctrl` state record. Two mechanisms keep the DOM equal to the last
+// RENDERED value (React's controlled contract):
+//   1. Per-commit reassert — controlled bindings re-run their helper on every
+//      render of the owning block with NO prev-value guard; the DOM-diff
+//      inside makes an unchanged value free.
+//   2. Event-side restore — the delegated dispatchers enqueue armed event
+//      targets; after the discrete flush (maybeFlushDiscrete) the restore
+//      pass reverts any DOM drift the handlers did not commit. This is
+//      React's enqueueStateRestore/restoreControlledState pair: a keystroke
+//      the handler rejects (or never hears — no onInput) snaps back before
+//      the browser regains control.
+// Direct programmatic writes (`el.value = x` outside any event) STICK until
+// the element's block next renders — same as React.
+// ---------------------------------------------------------------------------
+
+/**
+ * Sentinel for "the value prop is not controlling this element" — distinct
+ * from every real value (a nullish `value` means uncontrolled, like React).
+ */
+const UNCONTROLLED: unique symbol = Symbol('octane.uncontrolled');
+
+/**
+ * Per-element controlled state, stored as a `$$ctrl` expando (octane's slot
+ * idiom — `$$click`, `$$formAction`; a WeakMap would cost a hash lookup on
+ * every delegated event). One monomorphic shape for every control kind.
+ */
+interface ControlledState {
+	/**
+	 * Last RENDERED value, RAW — not stringified: the number-input compare
+	 * needs the raw prop (see valueNeedsWrite). UNCONTROLLED when the value
+	 * prop is absent/nullish.
+	 */
+	v: unknown;
+	/** Last rendered checked; -1 = checked is not controlled. */
+	c: boolean | -1;
+	/**
+	 * Controlled-<select> projection target (a String value, or a Set of them
+	 * for `multiple`); null = the select's value is not controlled.
+	 */
+	sv: string | Set<string> | null;
+	/** A value/checked binding has run at least once (mount discriminator +
+	 *  controlled↔uncontrolled flip detection). */
+	sawV: boolean;
+	sawC: boolean;
+	/** A <select>'s last-seen defaultValue — the projection re-runs only when
+	 *  it CHANGES (an unchanged default on an unrelated re-render must not
+	 *  clobber the user's selection; uncontrolled selects stay user-owned). */
+	dvv: unknown;
+	/** True between compositionstart and compositionend (IME) — reassert and
+	 *  restore both hold off so they can't cancel an active composition. */
+	composing: boolean;
+	/** Select re-projection already queued for the pending commit. */
+	queued: boolean;
+	/** Dev missing-onInput warning already evaluated for this element. */
+	devChecked: boolean;
+}
+
+/**
+ * Events whose dispatch can carry a user edit to a form control — React's
+ * ChangeEventPlugin extraction set. Armed elements targeted by one of these
+ * are restored after the discrete flush. `click` restores only checkables
+ * (a text input's value can't change via click, and restoring there would
+ * break "programmatic writes stick until the next render").
+ */
+const RESTORE_EVENT_LIST = ['input', 'change', 'click'];
+const RESTORE_EVENTS = /* @__PURE__ */ new Set(RESTORE_EVENT_LIST);
+
+// Armed elements an in-flight dispatch touched — drained (restored) by
+// maybeFlushDiscrete AFTER the discrete flush, so the restore compares the
+// DOM against the values the handlers just committed. Tiny array + linear
+// dedupe: one event targets one element; nesting stays single-digit.
+let pendingRestores: Element[] = [];
+let restoreMicrotaskScheduled = false;
+
+// Commit-deferred controlled work, drained at the HEAD of commitEffects:
+//  - select re-projection: compiled binding mounts run BEFORE the same
+//    render's @for/@if construct calls, so a `<select value>` binding fires
+//    while its @for options don't exist yet — the commit-phase pass
+//    re-projects once the whole tree is built (React resolves selects
+//    post-mount the same way).
+//  - select defaultValue: same ordering problem, projected with
+//    defaultSelected stamped.
+//  - dev missing-onInput checks: evaluated only after ALL of the element's
+//    bindings mounted (the onInput slot may be stamped after the value
+//    binding in source order).
+let SELECT_SYNCS: HTMLSelectElement[] = [];
+let SELECT_DEFAULT_SYNCS: { el: HTMLSelectElement; value: unknown }[] = [];
+let DEV_CTRL_CHECKS: Element[] = [];
+let AUTOFOCUS_QUEUE: Element[] = [];
+
+/** True when controlled commit work is queued (folds into hasPendingWork). */
+function hasControlledSyncs(): boolean {
+	return (
+		SELECT_SYNCS.length > 0 ||
+		SELECT_DEFAULT_SYNCS.length > 0 ||
+		DEV_CTRL_CHECKS.length > 0 ||
+		AUTOFOCUS_QUEUE.length > 0
+	);
+}
+
+/**
+ * Compiler-emitted binding for `autoFocus` (React parity): never an
+ * attribute — the element is focused ONCE, in the commit phase of its mount
+ * (after the render pass built the tree, before layout effects — so a layout
+ * effect that moves focus still wins, like React's commitMount ordering).
+ * Later updates are ignored (React treats autoFocus as mount-only).
+ */
+export function setAutoFocus(el: Element, value: unknown): void {
+	if ((el as any).$$afSeen !== undefined) return; // mount-only
+	(el as any).$$afSeen = true;
+	if (value) AUTOFOCUS_QUEUE.push(el);
+}
+
+/** Text-entry controls (IME-capable; the dev missing-onInput warning's scope). */
+function isTextEntry(el: Element): boolean {
+	if (el.localName === 'textarea') return true;
+	if (el.localName !== 'input') return false;
+	switch ((el as HTMLInputElement).type) {
+		case 'text':
+		case 'search':
+		case 'url':
+		case 'tel':
+		case 'password':
+		case 'email':
+		case 'number':
+			return true;
+	}
+	return false;
+}
+
+// IME guard — DIRECT per-element listeners (not delegation), attached once at
+// arm time: a user handler's stopPropagation can never starve the composing
+// flag, and compositionend re-enters the restore path via a microtask even
+// when the delegated dispatch was stopped. Two shared module-level handlers —
+// no per-element closures.
+function onCtrlCompositionStart(e: Event): void {
+	const ctrl = (e.currentTarget as any).$$ctrl as ControlledState | undefined;
+	if (ctrl !== undefined) ctrl.composing = true;
+}
+function onCtrlCompositionEnd(e: Event): void {
+	const el = e.currentTarget as Element;
+	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
+	if (ctrl === undefined) return;
+	ctrl.composing = false;
+	if (pendingRestores.indexOf(el) === -1) pendingRestores.push(el);
+	// The delegated compositionend dispatch normally drains this in
+	// maybeFlushDiscrete; the microtask is the un-starvable fallback.
+	if (!restoreMicrotaskScheduled) {
+		restoreMicrotaskScheduled = true;
+		queueMicrotask(() => {
+			restoreMicrotaskScheduled = false;
+			if (pendingRestores.length > 0) restoreControlledStates();
+		});
+	}
+}
+
+/** Get-or-create the element's `$$ctrl` record (first call wires listeners). */
+function armControlled(el: Element): ControlledState {
+	let ctrl = (el as any).$$ctrl as ControlledState | undefined;
+	if (ctrl === undefined) {
+		ctrl = {
+			v: UNCONTROLLED,
+			c: -1,
+			sv: null,
+			sawV: false,
+			sawC: false,
+			dvv: UNCONTROLLED,
+			composing: false,
+			queued: false,
+			devChecked: false,
+		};
+		(el as any).$$ctrl = ctrl;
+		// The restore pass rides the delegated dispatchers — an armed control
+		// must hear its native edit events even when NO component listens
+		// (React attaches root listeners eagerly; octane delegates lazily).
+		delegateEvents(RESTORE_EVENT_LIST);
+		if (isTextEntry(el)) {
+			el.addEventListener('compositionstart', onCtrlCompositionStart);
+			el.addEventListener('compositionend', onCtrlCompositionEnd);
+		}
+	}
+	return ctrl;
+}
+
+/** The controlled string for a raw rendered value (nullish never reaches here). */
+function toControlledString(v: unknown): string {
+	return typeof v === 'string' ? v : String(v);
+}
+
+/**
+ * Does the DOM value differ from the RAW rendered value? Number inputs
+ * compare LOOSELY against the raw prop (React updateInput verbatim): state
+ * `1` vs DOM "1.0" must NOT clobber (the user may be mid-edit), while `0` vs
+ * "" must write (value={0} means "show 0"). Everything else compares the
+ * exact string.
+ */
+function valueNeedsWrite(el: HTMLInputElement | HTMLTextAreaElement, raw: unknown): boolean {
+	if ((el as HTMLInputElement).type === 'number') {
+		// eslint-disable-next-line eqeqeq
+		return (raw === 0 && el.value === '') || el.value != (raw as any);
+	}
+	return el.value !== toControlledString(raw);
+}
+
+// DEV (gated on the dev-compile `__oct_loc` stamp, like the hydration
+// warnings): React's controlled↔uncontrolled flip warning.
+function devWarnControlledFlip(el: Element, toControlled: boolean): void {
+	if ((el as any).__oct_loc === undefined) return;
+	console.error(
+		`A component is changing ${toControlled ? 'an uncontrolled' : 'a controlled'} ` +
+			`${el.localName} to be ${toControlled ? 'controlled' : 'uncontrolled'}. This is likely ` +
+			`caused by the value changing from ${
+				toControlled ? 'undefined to a defined value' : 'a defined value to undefined'
+			}, which should not happen. Decide between using a controlled or uncontrolled ` +
+			`${el.localName} for the lifetime of the component (controlled: \`value\`/\`checked\`; ` +
+			'uncontrolled: `defaultValue`/`defaultChecked`).',
+	);
+}
+
+// DEV: queue the missing-onInput check for this commit (runs after all of the
+// element's bindings mounted — see drainControlledSyncs).
+function queueDevControlledCheck(el: Element, ctrl: ControlledState): void {
+	if (ctrl.devChecked || (el as any).__oct_loc === undefined) return;
+	if (!isTextEntry(el)) return;
+	DEV_CTRL_CHECKS.push(el);
+}
+
+/**
+ * Compiler-emitted binding for a controlled `value` on <input>/<textarea>
+ * (spread/de-opt/legacy-compiled writes are routed here by setAttribute).
+ * React semantics: the prop DRIVES the DOM property; a nullish value means
+ * uncontrolled (leave the DOM alone). The value ATTRIBUTE mirrors the prop
+ * (React's attribute-syncing cascade: value, else defaultValue) — an
+ * attribute write never clobbers what the user typed, and it keeps SSR
+ * output, form.reset() baselines, and differential byte-compares aligned.
+ */
+export function setValue(el: Element, value: unknown): void {
+	const input = el as HTMLInputElement | HTMLTextAreaElement;
+	const ctrl = armControlled(el);
+	const first = !ctrl.sawV;
+	ctrl.sawV = true;
+	if (value == null) {
+		if (!first && ctrl.v !== UNCONTROLLED) devWarnControlledFlip(el, false);
+		// React parity: mounting/flipping to uncontrolled leaves the DOM as-is.
+		ctrl.v = UNCONTROLLED;
+		return;
+	}
+	const s = toControlledString(value);
+	if (first) {
+		ctrl.v = value;
+		queueDevControlledCheck(el, ctrl);
+		// Hydration ADOPTS: the server already serialized this value, and
+		// pre-hydration user input survives until the element's first real
+		// commit or discrete event (React parity) — zero writes, no warnings.
+		if (hydrating) return;
+		// PROPERTY first (React initInput order): the write marks the control
+		// DIRTY, so the attribute write below — and any later defaultValue
+		// binding — can never drag the live value along.
+		if (input.value !== s) input.value = s;
+		// The value ATTRIBUTE mirrors the controlled value (React's
+		// attribute-syncing cascade: value wins over defaultValue).
+		input.defaultValue = s;
+		return;
+	}
+	if (ctrl.v === UNCONTROLLED) devWarnControlledFlip(el, true);
+	const prev = ctrl.v;
+	ctrl.v = value;
+	if (input.defaultValue !== s) input.defaultValue = s;
+	// IME: an UNCHANGED rendered value must not cancel an active composition;
+	// a genuinely changed one still wins (React: setState during composition).
+	if (ctrl.composing && Object.is(prev, value)) return;
+	if (valueNeedsWrite(input, value)) input.value = s;
+}
+
+/**
+ * Compiler-emitted binding for a controlled `checked` on <input> (checkbox /
+ * radio). Property-driven; the checked ATTRIBUTE mirrors only the INITIAL
+ * state (React with attribute-syncing never updates it afterwards).
+ */
+export function setChecked(el: Element, value: unknown): void {
+	const input = el as HTMLInputElement;
+	const ctrl = armControlled(el);
+	const first = !ctrl.sawC;
+	ctrl.sawC = true;
+	if (value == null) {
+		if (!first && ctrl.c !== -1) devWarnControlledFlip(el, false);
+		ctrl.c = -1;
+		return;
+	}
+	const b = !!value;
+	if (first) {
+		ctrl.c = b;
+		if (hydrating) return;
+		// PROPERTY first (marks checkedness dirty — see setValue), then the
+		// attribute baseline (React's cascade: checked wins over defaultChecked).
+		if (input.checked !== b) input.checked = b;
+		input.defaultChecked = b;
+		return;
+	}
+	if (ctrl.c === -1) devWarnControlledFlip(el, true);
+	ctrl.c = b;
+	if (input.checked !== b) input.checked = b;
+}
+
+/**
+ * Compiler-emitted binding for a controlled `value` on <select> (single and
+ * `multiple`). The target is stored and projected onto the options both
+ * IMMEDIATELY (idempotent) and at commit — binding mounts run before the same
+ * render's @for/@if constructs, so the commit pass is what sees @for-built
+ * options (React resolves selects post-mount the same way).
+ */
+export function setSelectValue(el: Element, value: unknown): void {
+	const sel = el as HTMLSelectElement;
+	const ctrl = armControlled(el);
+	const first = !ctrl.sawV;
+	ctrl.sawV = true;
+	if (value == null) {
+		if (!first && ctrl.sv !== null) devWarnControlledFlip(el, false);
+		ctrl.sv = null;
+		return;
+	}
+	if (!first && ctrl.sv === null) devWarnControlledFlip(el, true);
+	if (sel.multiple) {
+		if (!Array.isArray(value)) {
+			if ((el as any).__oct_loc !== undefined) {
+				console.error(
+					'The `value` prop supplied to <select> must be an array if `multiple` is true.',
+				);
+			}
+			return;
+		}
+		const set = new Set<string>();
+		for (let i = 0; i < value.length; i++) set.add(toControlledString(value[i]));
+		ctrl.sv = set;
+	} else {
+		if (Array.isArray(value)) {
+			if ((el as any).__oct_loc !== undefined) {
+				console.error(
+					'The `value` prop supplied to <select> must be a scalar value if `multiple` is false.',
+				);
+			}
+			return;
+		}
+		ctrl.sv = toControlledString(value);
+	}
+	// Hydration ADOPTS the server-emitted `selected` state — and must not
+	// enqueue the commit sync either (the post-hydration microtask commit
+	// would clobber a pre-hydration user selection).
+	if (hydrating) return;
+	projectSelectValue(sel, ctrl.sv, false);
+	if (!ctrl.queued) {
+		ctrl.queued = true;
+		SELECT_SYNCS.push(sel);
+	}
+}
+
+/**
+ * React updateOptions verbatim: multiple → per-option set membership;
+ * single → FIRST match wins (the platform deselects the rest), no match →
+ * first non-disabled option. `setDefaultSelected` additionally stamps
+ * option.defaultSelected (the mount-time defaultValue projection).
+ */
+function projectSelectValue(
+	sel: HTMLSelectElement,
+	sv: string | Set<string>,
+	setDefaultSelected: boolean,
+): void {
+	const options = sel.options;
+	if (typeof sv !== 'string') {
+		for (let i = 0; i < options.length; i++) {
+			const selected = sv.has(options[i].value);
+			if (options[i].selected !== selected) options[i].selected = selected;
+			if (setDefaultSelected) options[i].defaultSelected = selected;
+		}
+		return;
+	}
+	let defaultOption: HTMLOptionElement | null = null;
+	for (let i = 0; i < options.length; i++) {
+		if (options[i].value === sv) {
+			options[i].selected = true;
+			if (setDefaultSelected) options[i].defaultSelected = true;
+			return;
+		}
+		if (defaultOption === null && !options[i].disabled) defaultOption = options[i];
+	}
+	if (defaultOption !== null) defaultOption.selected = true;
+}
+
+/**
+ * Compiler-emitted binding for `defaultValue` — the uncontrolled escape
+ * hatch. Writes the DEFAULT (the value attribute / textarea text content /
+ * option defaultSelected), never the live value: a dirty control keeps what
+ * the user typed. Re-synced on updates (React parity; attribute-only).
+ */
+export function setDefaultValue(el: Element, value: unknown): void {
+	const ctrl = armControlled(el);
+	if (hydrating || value == null) return;
+	if (el.localName === 'select') {
+		// Commit-deferred like the controlled projection (options may not
+		// exist yet); a controlled `value` wins at drain time. Re-projected
+		// only when the default CHANGES (React re-selects on a new
+		// defaultValue; an unchanged one must not clobber the user's pick).
+		if (!Object.is(ctrl.dvv, value)) {
+			ctrl.dvv = value;
+			SELECT_DEFAULT_SYNCS.push({ el: el as HTMLSelectElement, value });
+		}
+		return;
+	}
+	// A controlled `value` OWNS the attribute (React's cascade — the value
+	// binding syncs it every commit); the default only writes when uncontrolled.
+	if (ctrl.v !== UNCONTROLLED) return;
+	const input = el as HTMLInputElement | HTMLTextAreaElement;
+	const s = toControlledString(value);
+	if (input.defaultValue !== s) input.defaultValue = s;
+}
+
+/** Compiler-emitted binding for `defaultChecked` (uncontrolled checkables). */
+export function setDefaultChecked(el: Element, value: unknown): void {
+	const ctrl = armControlled(el);
+	if (hydrating || value == null) return;
+	// A controlled `checked` owns the attribute baseline (React's cascade).
+	if (ctrl.c !== -1) return;
+	const input = el as HTMLInputElement;
+	const b = !!value;
+	if (input.defaultChecked !== b) input.defaultChecked = b;
+}
+
+/**
+ * Drain the commit-deferred controlled work — called at the head of
+ * commitEffects, i.e. after the render pass built/reconciled ALL DOM (so
+ * select projections see their @for-built options and the dev check sees the
+ * element's full listener set). Default projections run first; a controlled
+ * `value` then wins.
+ */
+function drainControlledSyncs(): void {
+	if (AUTOFOCUS_QUEUE.length > 0) {
+		const q = AUTOFOCUS_QUEUE;
+		AUTOFOCUS_QUEUE = [];
+		for (let i = 0; i < q.length; i++) {
+			// Focus only if the commit actually connected the element (a caught
+			// mount error may have torn the subtree down before this drain).
+			if (q[i].isConnected) (q[i] as HTMLElement).focus();
+		}
+	}
+	if (SELECT_DEFAULT_SYNCS.length > 0) {
+		const q = SELECT_DEFAULT_SYNCS;
+		SELECT_DEFAULT_SYNCS = [];
+		for (let i = 0; i < q.length; i++) {
+			const sel = q[i].el;
+			const ctrl = (sel as any).$$ctrl as ControlledState | undefined;
+			if (ctrl !== undefined && ctrl.sv !== null) continue; // controlled value owns the selection
+			const v = q[i].value;
+			const sv = sel.multiple
+				? Array.isArray(v)
+					? new Set<string>(v.map(toControlledString))
+					: null
+				: toControlledString(v);
+			if (sv !== null) projectSelectValue(sel, sv, true);
+		}
+	}
+	if (SELECT_SYNCS.length > 0) {
+		const q = SELECT_SYNCS;
+		SELECT_SYNCS = [];
+		for (let i = 0; i < q.length; i++) {
+			const ctrl = (q[i] as any).$$ctrl as ControlledState | undefined;
+			if (ctrl === undefined) continue;
+			ctrl.queued = false;
+			if (ctrl.sv !== null) projectSelectValue(q[i], ctrl.sv, false);
+		}
+	}
+	if (DEV_CTRL_CHECKS.length > 0) {
+		const q = DEV_CTRL_CHECKS;
+		DEV_CTRL_CHECKS = [];
+		for (let i = 0; i < q.length; i++) {
+			const el = q[i] as any;
+			const ctrl = el.$$ctrl as ControlledState | undefined;
+			if (ctrl === undefined || ctrl.devChecked) continue;
+			ctrl.devChecked = true;
+			if (ctrl.v === UNCONTROLLED) continue; // became uncontrolled before commit
+			if (el.$$input !== undefined || el['$$capture:input'] !== undefined) continue;
+			if (el.readOnly === true || el.disabled === true) continue;
+			console.error(
+				el.$$change !== undefined || el['$$capture:change'] !== undefined
+					? 'You provided a `value` prop to a form field with an `onChange` handler but no ' +
+							'`onInput`. octane events are NATIVE: `change` fires on blur/commit, not per ' +
+							'keystroke, so typing will appear to do nothing (each keystroke reverts to the ' +
+							'rendered value). Use `onInput` for per-keystroke updates, or `defaultValue` ' +
+							'for an uncontrolled field.'
+					: 'You provided a `value` prop to a form field without an `onInput` handler. This ' +
+							'will render a read-only field. If the field should be mutable use ' +
+							'`defaultValue`. Otherwise, set either `onInput` or `readOnly`.',
+			);
+		}
+	}
+}
+
+/**
+ * Restore one armed element's DOM to its last RENDERED state (value/checked/
+ * selection) — React's restoreControlledState. Composition holds the restore
+ * off (compositionend re-enqueues); a disconnected element has nothing to
+ * restore.
+ */
+function restoreControlledElement(el: Element): void {
+	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
+	if (ctrl === undefined || ctrl.composing || !el.isConnected) return;
+	if (el.localName === 'select') {
+		if (ctrl.sv !== null) projectSelectValue(el as HTMLSelectElement, ctrl.sv, false);
+		return;
+	}
+	if (ctrl.c !== -1) {
+		const input = el as HTMLInputElement;
+		if (input.checked !== ctrl.c) input.checked = ctrl.c;
+		// A radio's drift flips its GROUP cousins too (checking one unchecks
+		// another) — restore every armed cousin to ITS rendered state
+		// (React's updateNamedCousins).
+		if (input.type === 'radio' && input.name !== '') restoreRadioCousins(input);
+	}
+	if (
+		ctrl.v !== UNCONTROLLED &&
+		valueNeedsWrite(el as HTMLInputElement | HTMLTextAreaElement, ctrl.v)
+	) {
+		(el as HTMLInputElement).value = toControlledString(ctrl.v);
+	}
+}
+
+function restoreRadioCousins(input: HTMLInputElement): void {
+	const name = input.name;
+	const group: ArrayLike<Node> =
+		input.form !== null
+			? input.form.elements
+			: typeof document !== 'undefined'
+				? document.getElementsByName(name)
+				: [];
+	for (let i = 0; i < group.length; i++) {
+		const other = group[i] as HTMLInputElement;
+		if (
+			other === input ||
+			other.localName !== 'input' ||
+			other.type !== 'radio' ||
+			other.name !== name
+		) {
+			continue;
+		}
+		const octrl = (other as any).$$ctrl as ControlledState | undefined;
+		if (octrl !== undefined && octrl.c !== -1 && other.checked !== octrl.c) {
+			other.checked = octrl.c;
+		}
+	}
+}
+
+/** Drain the event-restore queue (see maybeFlushDiscrete). */
+function restoreControlledStates(): void {
+	const list = pendingRestores;
+	pendingRestores = [];
+	for (let i = 0; i < list.length; i++) restoreControlledElement(list[i]);
+}
+
+/**
+ * True when `name` is a controlled prop (`value`/`checked`) on a form tag —
+ * the prop-diff loops (setSpread / patchDeoptProps) use this to BYPASS their
+ * identity skip: controlled props must reassert on every commit even when the
+ * rendered value is unchanged (the DOM may have drifted). The helpers diff
+ * against the DOM, so the unconditional call stays cheap. The default* props
+ * don't need the bypass (attribute-only; the DOM can't drift them).
+ */
+function isControlledHostProp(el: Element, name: string): boolean {
+	switch (name.length) {
+		case 5:
+			if (name !== 'value') return false;
+			break;
+		case 7:
+			if (name !== 'checked') return false;
+			break;
+		default:
+			return false;
+	}
+	const t = el.localName;
+	return t === 'input' || t === 'textarea' || t === 'select';
+}
+
+/**
+ * Enqueue the event's target for a post-flush restore when it is an armed
+ * form control and the event can carry a user edit (see RESTORE_EVENTS).
+ * Called by both delegated dispatchers, right after their dispatch stamp.
+ */
+function maybeEnqueueRestore(event: Event): void {
+	const t = event.target as any;
+	if (t === null || t.$$ctrl === undefined || !RESTORE_EVENTS.has(event.type)) return;
+	if (event.type === 'click' && t.type !== 'checkbox' && t.type !== 'radio') return;
+	if (pendingRestores.indexOf(t) === -1) pendingRestores.push(t);
+}
+
+/**
+ * Reassert every armed control in `form` — called right after an
+ * octane-driven `form.reset()` (requestFormReset / a successful
+ * `<form action={fn}>`): the native reset restored DEFAULTS; controlled
+ * fields snap back to their rendered values (React parity). User-initiated
+ * reset BUTTONS are untouched (React doesn't restore there either; controlled
+ * values return at the next commit).
+ */
+function reassertControlledIn(form: HTMLFormElement): void {
+	const els = form.elements;
+	for (let i = 0; i < els.length; i++) {
+		if (((els[i] as any).$$ctrl as ControlledState | undefined) !== undefined) {
+			restoreControlledElement(els[i] as Element);
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -6201,7 +6949,9 @@ function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock
 				continue;
 			}
 			const nv = nextProps[name];
-			if (prevProps == null || prevProps[name] !== nv) {
+			// Controlled `value`/`checked` bypass the prev-diff skip (reassert
+			// on every commit; the helper's DOM-diff keeps the call cheap).
+			if (prevProps == null || prevProps[name] !== nv || isControlledHostProp(el, name)) {
 				// `applyDeoptProp` is the FRESH-element helper — its style arm passes
 				// prev=undefined, which on a REUSED element leaves declarations dropped
 				// from the style object stale (applyStyleValue can only remove keys it

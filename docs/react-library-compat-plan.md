@@ -127,13 +127,15 @@ getServerSnapshot, tearing prevention, store-swap re-subscription); commit/batch
 timing; effect ordering (child-first mount, parent-first deletion); useState lazy-init,
 useReducer force-update, useMemo/useCallback/useRef identity, useContext propagation,
 `use()`/Suspense throw-to-suspend+reveal, useId stability, native delegated events,
-callback-ref timing, createPortal bubble-out, and the **uncontrolled-input** model —
+callback-ref timing, createPortal bubble-out, and the form-control model
+(uncontrolled at the time; controlled `value`/`checked` shipped 2026-07-08) —
 for the cases these libraries actually depend on.
 
 **Does NOT prove:** that React **components** run unchanged (they're re-authored in
-`.tsrx`); runtime-VDOM features Octane lacks by design (controlled-input reassertion,
-synthetic `onChange`, `forwardRef`, StrictMode double-invoke, class components, RSC/
-Fizz/SuspenseList, react-dom internals/test-renderer); pixel positioning (no jsdom
+`.tsrx`); runtime-VDOM features Octane lacks by design (synthetic `onChange`,
+`forwardRef`, StrictMode double-invoke, class components, RSC/
+Fizz/SuspenseList, react-dom internals/test-renderer — controlled-input
+reassertion was on this list until the 2026-07-08 reversal shipped it); pixel positioning (no jsdom
 layout); concurrent mid-render interleaving (Octane is synchronous); and the **specific
 set of physically-moved nodes** in keyed reorders (LIS ≠ React; final DOM identical,
 move set not — `innerHTML` can't see it).

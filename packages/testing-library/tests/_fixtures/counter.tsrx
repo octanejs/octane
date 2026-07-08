@@ -32,6 +32,25 @@ export function InputEcho() @{
 	</div>
 }
 
+// Controlled-input fixtures: a `value` prop is LIVE CONTROLLED (React parity) —
+// the runtime reasserts the rendered value on every commit and after each
+// discrete-event flush. The handler here ignores the event, so edits snap back.
+export function ControlledInputIgnoring() @{
+	const [value] = useState('locked');
+	<input aria-label="locked" value={value} onInput={() => {}} />
+}
+
+// …and the accepting twin: onInput feeds the state, so typing sticks.
+export function ControlledInputAccepting() @{
+	const [value, setValue] = useState('');
+	<div>
+		<input aria-label="name" value={value} onInput={(e) => setValue(e.target.value)} />
+		<p data-testid="echo">
+			{value as string}
+		</p>
+	</div>
+}
+
 export function EventLog(props) @{
 	<input
 		aria-label="field"

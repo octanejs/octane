@@ -85,11 +85,55 @@ export const STREAM_SEED_COMMENT = 'oct-seed:';
 // Custom elements are exempt everywhere (raw attribute semantics).
 // ---------------------------------------------------------------------------
 
-// NOTE deliberately NO boolean-prop truthiness table (React coerces
-// `hidden={0}` / `inert=""` to absent): octane's ADJUDICATED divergence
-// (2026-07-04, see dom-attributes.test.ts) writes attribute values through
-// natively — a falsy non-boolean stays present exactly as hand-written markup
-// would be, and authors pass a real boolean for JS-boolean behavior.
+/**
+ * React's BOOLEAN attribute props (ReactDOMComponent's boolean arm, `inert`
+ * included): ANY truthy value renders the canonical presence form
+ * (`disabled="disabled"` → `disabled=""`, `hidden={1}` → `hidden=""`), any
+ * falsy value REMOVES (`hidden={0}`, `inert=""` → absent) — client and SSR,
+ * so differential/hydration byte-compares stay stable. This REVERSES the
+ * 2026-06 "write values through natively" adjudication (2026-07-08, the
+ * controlled-components change). `checked`/`selected`/`multiple`/`muted` are
+ * deliberately NOT here — checked routes through the controlled machinery and
+ * the other three through MUST_USE_PROPERTY_PROPS. `download`/`capture` (the
+ * OVERLOADED booleans) are handled at the boolean-TYPE branch only — their
+ * non-boolean values pass through verbatim (`download={0}` → "0", like React).
+ * Lowercased; match with name.toLowerCase(). DUPLICATED in compile.js
+ * (BOOLEAN_ATTR_PROPS — keep in sync), which bakes static literals.
+ */
+export const BOOLEAN_ATTR_PROPS = new Set([
+	'allowfullscreen',
+	'async',
+	'autoplay',
+	'controls',
+	'default',
+	'defer',
+	'disabled',
+	'disablepictureinpicture',
+	'disableremoteplayback',
+	'formnovalidate',
+	'hidden',
+	'inert',
+	'itemscope',
+	'loop',
+	'nomodule',
+	'novalidate',
+	'open',
+	'playsinline',
+	'readonly',
+	'required',
+	'reversed',
+	'scoped',
+	'seamless',
+]);
+
+/**
+ * React's mustUseProperty set minus value/checked (owned by the controlled
+ * machinery): attributes that do NOT reflect to the live DOM property after
+ * creation — a dynamic `muted={x}` written as an attribute never (un)mutes a
+ * playing element. The client writes the PROPERTY for dynamic values; static
+ * literals and SSR keep the attribute (correct initial state). Lowercased.
+ */
+export const MUST_USE_PROPERTY_PROPS = new Set(['muted', 'multiple', 'selected']);
 
 /**
  * React's POSITIVE-numeric props: values below 1 (incl. 0 and non-numeric)
@@ -98,17 +142,13 @@ export const STREAM_SEED_COMMENT = 'oct-seed:';
 export const POSITIVE_NUMERIC_ATTR_PROPS = new Set(['size', 'cols', 'rows', 'span']);
 
 /**
- * String-typed props where a boolean value is meaningless and React drops it
- * (`href={true}` must not become a present empty-URL link). `download` is NOT
- * here — it's React's overloaded boolean (true → bare attribute).
+ * Legal HTML attribute name: non-empty, no ASCII whitespace, `"`, `'`, `>`,
+ * `/`, `=`, or control chars. Rejects spread keys that would inject markup
+ * (e.g. 'x onload=alert(1)'). Shared by the SSR serializer (ssrAttrEntry) and
+ * the client's setAttribute (proactive skip — mirrors React's validity gate;
+ * the platform would throw InvalidCharacterError).
  */
-export const BOOLEAN_DROPPED_STRING_ATTR_PROPS = new Set([
-	'href',
-	'src',
-	'for',
-	'action',
-	'formaction',
-]);
+export const VALID_ATTR_NAME = /^[^\s"'>\/=\u0000-\u001F]+$/;
 
 /**
  * Tags that exist ONLY in the SVG namespace (no HTML element shares the name),

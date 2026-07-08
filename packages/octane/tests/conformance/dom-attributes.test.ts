@@ -26,6 +26,8 @@ import {
 	CustomElCustomEvent,
 	CustomElClick,
 	CustomElChangeInput,
+	AutoFocusInput,
+	AutoFocusBare,
 } from './_fixtures/dom-attributes.tsrx';
 
 // ============================================================================
@@ -34,8 +36,10 @@ import {
 // src/href/action + enumerated-attribute core from ReactDOMComponent-test.js.
 //
 // Scope notes (per docs/react-parity-migration-plan.md §2):
-//  - controlled inputs / synthetic onChange are an INTENTIONAL divergence —
-//    none of those cases are ported (see the accounting comments below).
+//  - controlled `value`/`checked` are SUPPORTED since 2026-07-08 (React
+//    semantics on native events; see tests/conformance/controlled-*.test.ts).
+//    Synthetic onChange remains an INTENTIONAL divergence — change-timing
+//    cases are not ported.
 //  - class/className composes clsx-style (intentional divergence) — React's
 //    coercion cases are not ported.
 //  - DEV-warning cases port their FUNCTIONAL outcome only.
@@ -68,16 +72,15 @@ describe('ReactDOMAttribute — unknown attributes', () => {
 	});
 
 	// Per ReactDOMAttribute-test.js:67 (true half) — React REMOVES `unknown={true}`
-	// on a non-boolean attribute via its known-attribute table (+ warns).
-	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04): octane has no known-attribute
-	// table — `attr={true}` uniformly writes boolean-attribute PRESENCE (`attr=""`),
-	// exactly what that markup means in raw HTML, which is also what custom-element
-	// consumers want. `false`/null/undefined still remove (asserted above).
-	it('renders an unknown attribute set to true as boolean presence (native pass-through)', () => {
+	// on a non-boolean attribute (+ dev-warns "Received `true` for a non-boolean
+	// attribute"). Matched since 2026-07-08 (the controlled-components change
+	// reversed the 2026-07-04 native-pass-through adjudication): booleans never
+	// write on non-boolean attributes; boolean attrs keep presence semantics.
+	it('removes an unknown attribute set to true (dev-warns)', () => {
 		const r = mount(UnknownAttr, { value: 'something' });
 		const el = r.find('#u');
 		r.update(UnknownAttr, { value: true });
-		expect(el.getAttribute('unknown')).toBe('');
+		expect(el.hasAttribute('unknown')).toBe(false);
 		r.unmount();
 	});
 
@@ -104,15 +107,13 @@ describe('ReactDOMAttribute — unknown attributes', () => {
 	});
 
 	// Per ReactDOMAttribute-test.js:106 — React coerces `inert=""` to FALSE (its
-	// boolean-prop JS semantics) and removes the attribute.
-	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04): octane writes attribute
-	// values through natively — `inert=""` stays present, and per the HTML boolean-
-	// attribute rules PRESENCE means TRUE, exactly as if you had written the markup
-	// by hand. NOTE the semantic flip vs React for this edge: pass a real boolean
-	// (`inert={cond}`) for JS-boolean behavior; `false` removes as expected.
-	it('passes `inert=""` through natively (present ⇒ platform-true)', () => {
+	// boolean-prop JS semantics) and removes the attribute. Matched since
+	// 2026-07-08 (reverses the 2026-07-04 native-write adjudication): `inert`
+	// sits in the shared boolean-attr table (constants.ts), so any falsy value
+	// ('' included) removes and any truthy value renders `inert=""`.
+	it('inert="" removes the attribute (boolean-prop coercion)', () => {
 		const r = mount(BoolInert, { v: '' });
-		expect(r.find('#bi').getAttribute('inert')).toBe('');
+		expect(r.find('#bi').hasAttribute('inert')).toBe(false);
 		r.unmount();
 	});
 
@@ -264,15 +265,13 @@ describe('DOMPropertyOperations — attributes and reflected properties', () => 
 
 	// Per DOMPropertyOperations-test.js:76 (string half) — React normalizes
 	// `disabled="disabled"` to the canonical empty-string attribute via its
-	// known-attribute table.
-	// INTENTIONAL DIVERGENCE (adjudicated 2026-07-04): octane writes the string
-	// verbatim — `disabled="disabled"` — which is a FUNCTIONALLY IDENTICAL DOM
-	// state (any value = true for a boolean attribute) and exactly what the
-	// hand-written markup would contain. No normalization table by design.
-	it('passes a truthy string on a boolean attribute through verbatim', () => {
+	// boolean-attr table. Matched since 2026-07-08 (reverses the 2026-07-04
+	// verbatim-write adjudication): any truthy value on a boolean attribute
+	// renders `disabled=""` — client, SSR, and static bake agree byte-for-byte.
+	it('normalizes a truthy string on a boolean attribute to ""', () => {
 		const r = mount(BoolDisabled, { v: 'disabled' });
 		const el = r.find('#bd') as HTMLButtonElement;
-		expect(el.getAttribute('disabled')).toBe('disabled');
+		expect(el.getAttribute('disabled')).toBe('');
 		expect(el.disabled).toBe(true); // same platform state React produces
 		r.unmount();
 	});
@@ -283,8 +282,9 @@ describe('DOMPropertyOperations — attributes and reflected properties', () => 
 	// docs/react-parity-migration-plan.md §2; pinned in tests/clsx-class.test.ts.
 
 	// Per DOMPropertyOperations-test.js:124 — should not remove empty attributes
-	// for special input properties. Uncontrolled half only (§2): the `value=""`
-	// ATTRIBUTE stays present and the DOM property reads ''.
+	// for special input properties. `value=""` is CONTROLLED (2026-07-08): the
+	// mount syncs the value ATTRIBUTE from the prop (React's attribute-syncing
+	// cascade), so it stays present and the DOM property reads ''.
 	it('input value="" keeps the empty attribute', () => {
 		const r = mount(InputEmptyValue, { v: '' });
 		const el = r.find('#iv') as HTMLInputElement;
@@ -675,6 +675,30 @@ describe('enumerated + overloaded boolean attributes', () => {
 		expect(el.hasAttribute('download')).toBe(false);
 		r.update(DownloadAttr, { v: 'file.txt' });
 		expect(el.getAttribute('download')).toBe('file.txt');
+		r.unmount();
+	});
+});
+
+describe('autoFocus — commit-phase focus, never an attribute (React parity, 2026-07-08)', () => {
+	// Per ReactDOMComponent's autoFocus handling: React writes NO attribute and
+	// calls .focus() at commitMount. octane queues the focus into the commit
+	// (drained before layout effects, so a layout effect moving focus wins).
+	it('focuses the element at mount commit and writes no attribute', () => {
+		const r = mount(AutoFocusBare);
+		const el = r.find('#afb') as HTMLInputElement;
+		expect(el.hasAttribute('autofocus')).toBe(false);
+		expect(document.activeElement).toBe(el);
+		r.unmount();
+	});
+
+	it('a falsy autoFocus neither focuses nor writes', () => {
+		const r = mount(AutoFocusInput, { v: false });
+		const el = r.find('#afi') as HTMLInputElement;
+		expect(el.hasAttribute('autofocus')).toBe(false);
+		expect(document.activeElement).not.toBe(el);
+		// autoFocus is mount-only (React ignores later changes).
+		r.update(AutoFocusInput, { v: true });
+		expect(document.activeElement).not.toBe(el);
 		r.unmount();
 	});
 });

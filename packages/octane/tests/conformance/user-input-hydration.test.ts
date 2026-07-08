@@ -11,11 +11,13 @@ import * as ServerRT from 'octane/server';
 // form field BEFORE the client hydrates (setting its `.value`/`.checked` PROPERTY), hydration
 // must adopt the SAME node and must NOT reset the property back to the server value.
 //
-// Octane has no controlled components — `value`/`checked`/`selected` are plain native
-// attributes (static values live in the template; dynamic ones are written with
-// `setAttribute`, which touches the ATTRIBUTE, not the dirty `.value`/`.checked` property).
-// So React's controlled/uncontrolled split collapses: each element type is ported once as a
-// native field. React's `testUserInteractionBeforeClientRender` is mirrored below.
+// Since 2026-07-08 octane has REAL controlled components (React semantics on native
+// events). The hydration policy is React parity: a controlled binding ADOPTS + ARMS
+// during hydration with ZERO writes and no warnings — so pre-hydration input survives
+// adoption — and the rendered value is then reasserted at the element's first real
+// commit or first discrete edit event. Uncontrolled fields (defaultValue/defaultChecked
+// or native content) keep the user's input indefinitely, exactly like React.
+// React's `testUserInteractionBeforeClientRender` is mirrored below.
 
 const FIX = join(
 	process.cwd(),
@@ -92,8 +94,11 @@ describe('conformance: hydration must not blow away user input (ReactDOMServerIn
 	it('uncontrolled text input (Per :297)', () =>
 		preserveUserInput('TextInput', 'value', 'Hello', 'Goodbye'));
 
-	it('a dynamic-value text input (binding runs at mount) (Per :300)', () =>
-		preserveUserInput('DynamicTextInput', 'value', 'Hello', 'Goodbye', { v: 'Hello' }));
+	it('CONTROLLED text input adopts without writes (Per :300)', () =>
+		preserveUserInput('DynamicTextInput', 'value', 'Hello', 'Goodbye', {
+			v: 'Hello',
+			onInput: () => {},
+		}));
 
 	it('uncontrolled range input (Per :310)', () =>
 		preserveUserInput('RangeInput', 'value', '0.5', '1'));
@@ -101,9 +106,48 @@ describe('conformance: hydration must not blow away user input (ReactDOMServerIn
 	it('uncontrolled checkbox (Per :333)', () =>
 		preserveUserInput('Checkbox', 'checked', true, false));
 
+	it('CONTROLLED checkbox adopts without writes', () =>
+		preserveUserInput('ControlledCheckbox', 'checked', true, false, {
+			c: true,
+			onClick: () => {},
+		}));
+
 	it('uncontrolled textarea (Per :355)', () =>
 		preserveUserInput('TextArea', 'value', 'Hello', 'Goodbye'));
 
 	it('uncontrolled select (Per :367)', () =>
 		preserveUserInput('Select', 'value', 'Hello', 'Goodbye'));
+});
+
+describe('conformance: controlled fields reassert AFTER adoption (React parity)', () => {
+	// The adopted pre-hydration value survives only until the element's first
+	// real commit — a post-hydration re-render reasserts the rendered value.
+	it('the first post-hydration commit reasserts the rendered value', async () => {
+		const props = { v: 'Hello', onInput: () => {} };
+		const { html } = await ServerRT.renderToString(server.DynamicTextInput, props);
+		container.innerHTML = html;
+		const field = container.querySelector('#fi') as HTMLInputElement;
+		field.value = 'Goodbye'; // pre-hydration typing
+		const root = hydrateRoot(container, client.DynamicTextInput, props);
+		flushSync(() => {});
+		expect(field.value).toBe('Goodbye'); // adoption preserved it
+		root.render(client.DynamicTextInput, props); // first real commit
+		flushSync(() => {});
+		expect(field.value).toBe('Hello'); // reasserted
+		root.unmount();
+	});
+
+	// …or its first discrete edit event (the restore pass).
+	it('the first discrete edit event restores the rendered value', async () => {
+		const props = { v: 'Hello', onInput: () => {} };
+		const { html } = await ServerRT.renderToString(server.DynamicTextInput, props);
+		container.innerHTML = html;
+		const field = container.querySelector('#fi') as HTMLInputElement;
+		field.value = 'Goodbye';
+		const root = hydrateRoot(container, client.DynamicTextInput, props);
+		flushSync(() => {});
+		field.dispatchEvent(new Event('input', { bubbles: true }));
+		expect(field.value).toBe('Hello');
+		root.unmount();
+	});
 });
