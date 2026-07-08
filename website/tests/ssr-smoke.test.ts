@@ -65,6 +65,23 @@ describe('built SSR handler', () => {
 		expect(html).toContain('class="shiki');
 	});
 
+	it('server-renders /benchmarks: table data SSRs, charts are client-mounted shells', async () => {
+		const { response, html } = await get('/benchmarks');
+		expect(response.status).toBe(200);
+		const text = html.replace(/<[^>]+>/g, '');
+		expect(text).toContain('Benchmarks');
+		expect(text).toContain('Octane vs the field');
+		expect(text).toContain('The authoring cliff');
+		// The SSR/no-JS content is the data tables — every card ships one with
+		// the real checked-in medians (13 cards).
+		expect((html.match(/Data table \(median ms/g) ?? []).length).toBe(13);
+		expect(html).toContain('<th scope="row"');
+		// The charts themselves mount client-side (recharts' store populates via
+		// layout effects): SSR renders same-height shells, never an <svg>.
+		expect((html.match(/bench-plot-shell/g) ?? []).length).toBeGreaterThanOrEqual(13);
+		expect(html).not.toContain('<svg');
+	});
+
 	it('SSRs the not-found page through the catch-all with a real 404', async () => {
 		const { response, html } = await get('/definitely/not/a/page');
 		expect(response.status).toBe(404);

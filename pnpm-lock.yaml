@@ -1676,6 +1676,9 @@ importers:
       '@octanejs/mdx':
         specifier: workspace:*
         version: link:../packages/mdx
+      '@octanejs/recharts':
+        specifier: workspace:*
+        version: link:../packages/recharts
       '@octanejs/router':
         specifier: workspace:*
         version: link:../packages/router

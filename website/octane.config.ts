@@ -31,6 +31,7 @@ export default defineConfig({
 	router: {
 		routes: [
 			new RenderRoute({ path: '/', entry: ENTRY, before: [warmRouter] }),
+			new RenderRoute({ path: '/benchmarks', entry: ENTRY, before: [warmRouter] }),
 			new RenderRoute({ path: '/docs', entry: ENTRY, before: [warmRouter] }),
 			new RenderRoute({ path: '/docs/:slug', entry: ENTRY, before: [warmRouter] }),
 			new RenderRoute({ path: '/*splat', entry: ENTRY, before: [warmRouter], status: 404 }),

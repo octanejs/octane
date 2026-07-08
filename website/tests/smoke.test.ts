@@ -84,9 +84,43 @@ describe('website routes', () => {
 		// Top nav (root layout).
 		const nav = container.querySelector('.navlinks') as HTMLElement;
 		expect(within(nav).getByText('Docs').getAttribute('href')).toBe('/docs');
+		expect(within(nav).getByText('Benchmarks').getAttribute('href')).toBe('/benchmarks');
 		expect(within(nav).getByText('GitHub').getAttribute('href')).toContain(
 			'github.com/octanejs/octane',
 		);
+	});
+
+	it('/benchmarks charts every suite from the checked-in baselines', async () => {
+		const { container } = await renderRoute('/benchmarks');
+		// The recharts store settles over microtask/raf rounds (autoBatch) —
+		// give charts the same generous settle the binding's own tests use.
+		for (let round = 0; round < 12; round++) {
+			await new Promise((r) => setTimeout(r, 0));
+			await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+		}
+
+		expect(container.querySelector('.benchpage-title')?.textContent).toBe('Benchmarks');
+		expect(textOf(container)).toContain('Octane vs the field');
+		expect(textOf(container)).toContain('The authoring cliff');
+
+		// 10 cross-framework cards + 3 octane-internal cards, each with real
+		// @octanejs/recharts bars and a data-table fallback.
+		const cards = Array.from(container.querySelectorAll('figure.bench-card'));
+		expect(cards.length).toBe(13);
+		for (const card of cards) {
+			expect(
+				card.querySelectorAll('.recharts-bar .recharts-bar-rectangle').length,
+				card.querySelector('.bench-card-title')?.textContent ?? 'card',
+			).toBeGreaterThan(0);
+			expect(card.querySelector('details.bench-table table')).toBeTruthy();
+		}
+
+		// Series identity: octane keeps the brand hue (#ff415a) on every chart
+		// (the style attribute round-trips through cssText as rgb()).
+		const octaneSwatches = Array.from(container.querySelectorAll('.bench-swatch')).filter((s) =>
+			(s.getAttribute('style') ?? '').replace(/\s/g, '').includes('rgb(255,65,90)'),
+		);
+		expect(octaneSwatches.length).toBe(13);
 	});
 
 	it('/docs/quick-start renders the quick-start document with the sidebar', async () => {

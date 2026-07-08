@@ -13,6 +13,7 @@
     "octane": "workspace:*",
     "@octanejs/adapter-vercel": "workspace:*",
     "@octanejs/mdx": "workspace:*",
+    "@octanejs/recharts": "workspace:*",
     "@octanejs/router": "workspace:*",
     "@octanejs/vite-plugin": "workspace:*"
   },

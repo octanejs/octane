@@ -13,6 +13,7 @@ export function Layout() @{
 				</Link>
 				<nav class="navlinks" aria-label="Main">
 					<Link to="/docs" activeOptions={{ exact: false }} class="nav-link">Docs</Link>
+					<Link to="/benchmarks" class="nav-link">Benchmarks</Link>
 					<a class="nav-link" href="/llms.txt">llms.txt</a>
 					<a
 						class="nav-link"
