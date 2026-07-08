@@ -9,8 +9,7 @@ import { subSlot } from '../internal';
 const objectIs: (x: unknown, y: unknown) => boolean =
 	typeof Object.is === 'function'
 		? Object.is
-		: (x: any, y: any) =>
-				(x === y && (x !== 0 || 1 / x === 1 / y)) || (x !== x && y !== y);
+		: (x: any, y: any) => (x === y && (x !== 0 || 1 / x === 1 / y)) || (x !== x && y !== y);
 
 export function useSyncExternalStoreWithSelector<Snapshot, Selection>(
 	subscribe: (onStoreChange: () => void) => () => void,

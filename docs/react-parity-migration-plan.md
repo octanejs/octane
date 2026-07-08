@@ -641,9 +641,18 @@ event system, no known-attribute tables):** no ancestor re-dispatch of non-bubbl
 events; no enter/leave synthesis (real native events); no synthetic onChange/
 onBeforeInput/onSelect polyfills; unknown={true} → boolean presence; inert="" stays
 (platform-true); verbatim boolean-attr strings; lenient toString() coercion; no
-possibleStandardNames alias table (native spellings are the idiom); muted stays a
-plain attribute (no property routing). Each is a positive platform-contract test
-citing the React line.
+possibleStandardNames DEV table (any-spelling normalization — native spellings
+remain the idiom); muted stays a plain attribute (no property routing). Each is a
+positive platform-contract test citing the React line.
+
+**Amendment (2026-07-07):** React 19's PROD write-path `aliases` map WAS adopted
+(ATTRIBUTE_ALIASES in constants.ts, mirrored in compile.js) — canonical camelCase
+props write the native attribute (`strokeWidth` → `stroke-width`, `acceptCharset`
+→ `accept-charset`, `xlinkHref` → `xlink:href`) on client, SSR, and static
+compiles; custom elements exempt. Without it, React-ecosystem SVG libraries
+(recharts et al.) spread camelCase presentation attributes onto SVG hosts — whose
+setAttribute preserves case — as dead attributes. Additive: native spellings
+still write verbatim. This narrows the 2026-07-04 ruling to the DEV table only.
 
 **Still pinned (3 it.fails):** React-19 custom-element semantics (lowercase on*
 listeners + property heuristic — needs a maintainer decision) and void-element

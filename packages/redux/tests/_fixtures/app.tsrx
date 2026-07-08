@@ -18,19 +18,25 @@ export const renders = { a: 0, b: 0 };
 function SliceA() @{
 	renders.a++;
 	const a = useSelector((s: any) => s.a);
-	<span id="a">{'a=' + a}</span>
+	<span id="a">
+		{'a=' + a}
+	</span>
 }
 
 function SliceB() @{
 	renders.b++;
 	const b = useSelector((s: any) => s.b);
-	<span id="b">{'b=' + b}</span>
+	<span id="b">
+		{'b=' + b}
+	</span>
 }
 
 function EqualityReader() @{
 	// Fresh object every call — only shallowEqual keeps it from re-rendering.
 	const pair = useSelector((s: any) => ({ a: s.a }), shallowEqual);
-	<span id="pair">{'pair=' + pair.a}</span>
+	<span id="pair">
+		{'pair=' + pair.a}
+	</span>
 }
 
 export function SlicesApp(props: { store: unknown }) @{
