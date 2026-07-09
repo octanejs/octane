@@ -26,6 +26,7 @@
     "@shikijs/rehype": "catalog:default",
     "@tsrx/core": "catalog:default",
     "esrap": "catalog:default",
+    "playwright": "catalog:default",
     "typescript": "catalog:default",
     "vite": "catalog:default"
   }

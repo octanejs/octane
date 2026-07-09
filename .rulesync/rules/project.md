@@ -159,9 +159,23 @@ The test suite (`packages/octane/tests/`) is organized as:
   fixture through both Octane and `@tsrx/react`, drives identical events, and
   asserts byte-equal `innerHTML` after each step. Note it compares only final HTML,
   so it cannot see DOM move patterns, effect timing, or focus.
-- `hydration/` — server-render → `hydrateRoot()` adoption tests.
+- `hydration/` — server-render → `hydrateRoot()` adoption tests (including
+  `prod-mode-hydrate.test.ts`, which compiles with EXPLICIT prod options).
 - `_fixtures/` — shared `.tsrx` fixtures; helpers live in `tests/_helpers.ts`
   (`mount`, `act`, `flushEffects`, `createLog`) and `tests/conformance/_helpers/`.
+
+Two regression layers beyond the octane project:
+
+- **`octane-prod` vitest project** — re-runs the SAME octane test files with the
+  plugin forced to `hmr: false` (production compile: no HMR wrapper, no dev LOC
+  metadata, `Symbol("<hash>#<n>")` hook slots). Vitest otherwise compiles
+  everything in serve mode, so without this the prod compile branch has no
+  runtime coverage. Tests asserting DEV-ONLY warnings conditionalize on
+  `process.env.OCTANE_TEST_COMPILE_MODE === 'prod'`.
+- **`website/tests/ssr-hydration.e2e.test.ts`** — boots the REAL vite dev server
+  and the production `octane-preview` server and drives every route in headless
+  Chromium, failing on hydration-mismatch warnings or page errors. Skips itself
+  (loudly) when Chromium isn't installed; CI installs it (ci.yml).
 
 `scripts/scaffold-react-port.mjs` turns a React test file into a triaged port
 skeleton (in-scope `it.todo`s + out-of-scope reasons).

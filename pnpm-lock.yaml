@@ -1801,6 +1801,9 @@ importers:
       esrap:
         specifier: ^2.2.9
         version: 2.2.11
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
       typescript:
         specifier: catalog:default
         version: 5.9.3

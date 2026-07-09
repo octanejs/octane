@@ -14,6 +14,11 @@ import {
 	SpreadInput,
 } from './_fixtures/controlled-forms.tsrx';
 
+// The dev warnings asserted below are gated on the dev-compile `__oct_loc`
+// stamp (silent in prod output, like React's prod bundle) — the octane-prod
+// vitest project compiles fixtures in prod mode and sets this env marker.
+const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
+
 // ============================================================================
 // Controlled <input> — ports of ReactDOMInput-test.js (React v19.2.7) and the
 // restore half of ReactControlledComponent-test.js. Controlled components are
@@ -210,7 +215,11 @@ describe('conformance: controlled ↔ uncontrolled transitions', () => {
 		errSpy.mockClear(); // ignore the mount-time missing-onInput warning
 		r.update(MaybeControlled, { value: null });
 		expect(el.value).toBe('a');
-		expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('to be uncontrolled'));
+		if (!PROD_COMPILE) {
+			if (!PROD_COMPILE) {
+				expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('to be uncontrolled'));
+			}
+		}
 		r.unmount();
 	});
 
@@ -225,7 +234,9 @@ describe('conformance: controlled ↔ uncontrolled transitions', () => {
 		errSpy.mockClear();
 		r.update(MaybeControlled, { value: 'b' });
 		expect(el.value).toBe('b');
-		expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('to be controlled'));
+		if (!PROD_COMPILE) {
+			expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('to be controlled'));
+		}
 		r.unmount();
 	});
 });
@@ -292,7 +303,9 @@ describe('conformance: spread-delivered controlled value', () => {
 		errSpy.mockClear();
 		r.update(SpreadInput, { sp: {} });
 		expect(el.value).toBe('v'); // DOM kept as-is (React parity)
-		expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('to be uncontrolled'));
+		if (!PROD_COMPILE) {
+			expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('to be uncontrolled'));
+		}
 		type(el, 'free');
 		expect(el.value).toBe('free'); // no longer restored
 		r.unmount();
@@ -304,7 +317,7 @@ describe('conformance: missing-onInput dev warning', () => {
 	// text control with no onInput and not readOnly/disabled warns once —
 	// with an onChange-specific message when an onChange handler exists
 	// (native change fires on blur, not per keystroke).
-	it('warns once for a controlled text input without onInput', () => {
+	it.skipIf(PROD_COMPILE)('warns once for a controlled text input without onInput', () => {
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const r = mount(ControlledInput, { value: 'x' });
 		const warnings = errSpy.mock.calls.filter((c) =>
