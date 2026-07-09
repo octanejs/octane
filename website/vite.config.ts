@@ -62,6 +62,17 @@ export default defineConfig({
 		// first optimize pass covers everything and dev never mid-session
 		// re-optimizes under the hydrating page.
 		include: [
+			// Playground editor stack + the octane compiler's deps ('octane' is
+			// excluded above, so imports from octane/compiler surface at request
+			// time) — all reached only through the playground page's dynamic
+			// imports, which the scanner can't see either.
+			'@codemirror/commands',
+			'@codemirror/state',
+			'@codemirror/view',
+			'shiki',
+			'@tsrx/core',
+			'esrap',
+			'esrap/languages/tsx',
 			'@reduxjs/toolkit',
 			'clsx',
 			'decimal.js-light',

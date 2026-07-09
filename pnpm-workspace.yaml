@@ -63,6 +63,10 @@ catalogs:
     '@jridgewell/trace-mapping': ^0.3.31
     '@mdx-js/mdx': ^3.1.1
     '@shikijs/rehype': ^3.0.0
+    shiki: ^3.0.0
+    '@codemirror/commands': ^6.9.1
+    '@codemirror/state': ^6.5.2
+    '@codemirror/view': ^6.38.6
     'source-map': ^0.7.6
     'remark-frontmatter': ^5.0.0
     'remark-gfm': ^4.0.1
