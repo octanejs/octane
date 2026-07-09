@@ -6,33 +6,33 @@
       "name": "octane-tsrx",
       "ops": {
         "js_raw": {
-          "median": 81068,
-          "min": 81068,
+          "median": 78828,
+          "min": 78828,
           "samples": 1
         },
         "js_gzip": {
-          "median": 26509,
-          "min": 26509,
+          "median": 26374,
+          "min": 26374,
           "samples": 1
         },
         "js_brotli": {
-          "median": 23397,
-          "min": 23397,
+          "median": 23278,
+          "min": 23278,
           "samples": 1
         },
         "app_raw": {
-          "median": 11297,
-          "min": 11297,
+          "median": 9057,
+          "min": 9057,
           "samples": 1
         },
         "app_gzip": {
-          "median": 3247,
-          "min": 3247,
+          "median": 3112,
+          "min": 3112,
           "samples": 1
         },
         "app_brotli": {
-          "median": 2690,
-          "min": 2690,
+          "median": 2571,
+          "min": 2571,
           "samples": 1
         },
         "fw_raw": {
@@ -59,9 +59,9 @@
             "bytes": 69771
           },
           {
-            "file": "assets/index-Dxisu5rU.js",
+            "file": "assets/index-BalgmNNm.js",
             "bucket": "app",
-            "bytes": 11297
+            "bytes": 9057
           }
         ]
       }
@@ -70,33 +70,33 @@
       "name": "octane-jsx",
       "ops": {
         "js_raw": {
-          "median": 78443,
-          "min": 78443,
+          "median": 78229,
+          "min": 78229,
           "samples": 1
         },
         "js_gzip": {
-          "median": 26234,
-          "min": 26234,
+          "median": 26161,
+          "min": 26161,
           "samples": 1
         },
         "js_brotli": {
-          "median": 23175,
-          "min": 23175,
+          "median": 23116,
+          "min": 23116,
           "samples": 1
         },
         "app_raw": {
-          "median": 8472,
-          "min": 8472,
+          "median": 8258,
+          "min": 8258,
           "samples": 1
         },
         "app_gzip": {
-          "median": 2885,
-          "min": 2885,
+          "median": 2812,
+          "min": 2812,
           "samples": 1
         },
         "app_brotli": {
-          "median": 2441,
-          "min": 2441,
+          "median": 2382,
+          "min": 2382,
           "samples": 1
         },
         "fw_raw": {
@@ -123,9 +123,9 @@
             "bytes": 69971
           },
           {
-            "file": "assets/index-db_GCzav.js",
+            "file": "assets/index-Dg-yVRGQ.js",
             "bucket": "app",
-            "bytes": 8472
+            "bytes": 8258
           }
         ]
       }
