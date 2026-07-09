@@ -90,11 +90,11 @@ export default defineConfig({
 				resolve: {
 					alias: [
 						{
-							find: /^@octanejs\/query$/,
+							find: /^@octanejs\/tanstack-query$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src/index.ts'),
 						},
 						{
-							find: /^@octanejs\/query\/(.*)$/,
+							find: /^@octanejs\/tanstack-query\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src') + '/$1.ts',
 						},
 					],
@@ -212,11 +212,11 @@ export default defineConfig({
 				resolve: {
 					alias: [
 						{
-							find: /^@octanejs\/router$/,
+							find: /^@octanejs\/tanstack-router$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
 						},
 						{
-							find: /^@octanejs\/router\/(.*)$/,
+							find: /^@octanejs\/tanstack-router\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src') + '/$1.ts',
 						},
 					],

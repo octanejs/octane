@@ -47,7 +47,7 @@ function compileOne(srcPath: string): void {
 	}
 	const rewritten = transformed.code
 		.replace(
-			/from\s+["']@octanejs\/query(\/[^"']*)?["']/g,
+			/from\s+["']@octanejs\/tanstack-query(\/[^"']*)?["']/g,
 			(_m, sub) => `from "@tanstack/react-query${sub || ''}"`,
 		)
 		.replace(/from\s+["']octane["']/g, 'from "react"');
