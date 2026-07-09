@@ -6,6 +6,7 @@ import { createRouter, createRootRoute, createRoute } from '@octanejs/tanstack-r
 import { Layout } from '../components/Layout.tsrx';
 import { Home } from '../pages/Home.tsrx';
 import { Benchmarks } from '../pages/Benchmarks.tsrx';
+import { Playground } from '../pages/Playground.tsrx';
 import { DocsLayout } from '../pages/DocsLayout.tsrx';
 import { DocPage } from '../pages/DocPage.tsrx';
 import { NotFound } from '../pages/NotFound.tsrx';
@@ -35,6 +36,12 @@ export function makeRouter(env: RouterEnv = {}): any {
 		component: Benchmarks,
 	});
 
+	const playgroundRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: 'playground',
+		component: Playground,
+	});
+
 	const docsRoute = createRoute({
 		getParentRoute: () => rootRoute,
 		path: 'docs',
@@ -58,6 +65,7 @@ export function makeRouter(env: RouterEnv = {}): any {
 		routeTree: rootRoute.addChildren([
 			indexRoute,
 			benchmarksRoute,
+			playgroundRoute,
 			docsRoute.addChildren([docsIndexRoute, docsSlugRoute]),
 		]),
 		history: env.history,

@@ -3,11 +3,14 @@
 // components, so their classes are styled through :global() descendant holes.
 // Below 720px the link row collapses behind a hamburger into a dropdown panel.
 import { useState } from 'octane';
-import { Link, Outlet } from '@octanejs/tanstack-router';
+import { Link, Outlet, useLocation } from '@octanejs/tanstack-router';
 import logoUrl from '../assets/octane-logo.svg';
 
 export function Layout() @{
 	const [menuOpen, setMenuOpen] = useState(false);
+	// The playground fills the viewport below the nav — no footer under it.
+	const pathname = useLocation({ select: (l: any) => l.pathname });
+	const showFooter = pathname !== '/playground';
 	<div class="shell">
 		<header class="topnav">
 			<div class="topnav-inner">
@@ -48,6 +51,7 @@ export function Layout() @{
 				>
 					<Link to="/docs" activeOptions={{ exact: false }} class="nav-link">Docs</Link>
 					<Link to="/benchmarks" class="nav-link">Benchmarks</Link>
+					<Link to="/playground" class="nav-link">Playground</Link>
 					<a class="nav-link" href="/llms.txt" target="_blank" rel="noreferrer">
 						llms.txt
 					</a>
@@ -68,14 +72,16 @@ export function Layout() @{
 		<main class="main">
 			<Outlet />
 		</main>
-		<footer class="footer">
-			<div class="footer-inner">
-				<span>{'MIT licensed. Built with Octane (TSRX).'}</span>
-				<a href="https://github.com/octanejs/octane" target="_blank" rel="noreferrer">
-					octanejs/octane
-				</a>
-			</div>
-		</footer>
+		@if (showFooter) {
+			<footer class="footer">
+				<div class="footer-inner">
+					<span>{'MIT licensed. Built with Octane (TSRX).'}</span>
+					<a href="https://github.com/octanejs/octane" target="_blank" rel="noreferrer">
+						octanejs/octane
+					</a>
+				</div>
+			</footer>
+		}
 		<style>
 			.shell {
 				min-height: 100vh;
