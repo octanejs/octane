@@ -240,6 +240,25 @@ const SUITES = [
 		],
 	},
 	{
+		// Async data-loading model (10 nested async levels, 16ms simulated latency
+		// per level): React/Octane nested `use()` serializes the fetches (the
+		// suspense waterfall — expected ≈10× the latency floor) while Solid 2.0 /
+		// ripple start all levels in parallel (≈1×). Exists to pin the waterfall
+		// BEFORE octane's compiler-parallelized `use` work lands
+		// (docs/suspense-parallel-use-plan.md) — don't guard octane against the
+		// fine-grained frameworks until then.
+		name: 'async-waterfall',
+		cwd: 'async-waterfall',
+		servers: [
+			{ filter: 'octane-tsrx-async-bench', port: 5216 },
+			{ filter: 'react-async-bench', port: 5217 },
+			{ filter: 'solid-async-bench', port: 5218 },
+			{ filter: 'ripple-async-bench', port: 5219 },
+		],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Compiled-output size (Node-only, seconds-fast): compiles a fixed
 		// .tsrx/.tsx corpus through octane/compiler with prod settings and reports
 		// raw/minified/gzip bytes as `source` vs `compiled` targets — the per-commit
