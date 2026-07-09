@@ -8,14 +8,16 @@ import { compile } from 'octane/compiler';
 // diff on re-render. Identical args skip the property reassignment
 // entirely — load-bearing for the js-framework-benchmark swap-rows row.
 //
-// Audited path: compile.js detectStableEventBundle (~lines 423-440),
-// emitBindingMount/emitBindingUpdate "event-bundle" branches
-// (~lines 1580-1656). Slot shape:
+// Audited path: compile.js detectStableEventBundle,
+// emitBindingMount/emitBindingUpdate "event-bundle" branches. Slot shape
+// (bag fields are compiler-assigned 1-char names; mount fills `_mN` locals
+// that the bag factory receives positionally):
 //
-//   mount:  _b._fn$N = (callee); _b._a$N$0 = (arg0); _b._a$N$1 = (arg1);
-//           el["$$click"] = { fn: _b._fn$N, args: [_b._a$N$0, _b._a$N$1] };
+//   mount:  _mI = (callee); _mJ = (arg0); _mK = (arg1);
+//           el["$$click"] = { fn: _mI, args: [_mJ, _mK] };
+//           _b = _$bagN(__s, _root, …, _mI, _mJ, _mK, …);
 //   update: const _fn = (callee); const _a0 = (arg0); const _a1 = (arg1);
-//           if (_b._fn$N !== _fn || _b._a$N$0 !== _a0 || …) { …reassign… }
+//           if (_b.x !== _fn || _b.y !== _a0 || …) { …reassign… }
 
 const c = (src: string): string => compile(src, 'eb.tsrx').code;
 
@@ -26,12 +28,12 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         <button onClick={() => doSomething()}>{'go'}</button>
       }
     `);
-		// Mount: _fn slot present, NO _a slot.
-		expect(code).toMatch(/_b\._fn\$\d+\s*=\s*\(doSomething\)/);
-		expect(code).toMatch(/\["\$\$click"\]\s*=\s*\{\s*fn:\s*_b\._fn\$\d+,\s*args:\s*\[\s*\]\s*\}/);
-		// Update: fn-only compare; no _a slot churn.
+		// Mount: fn local present, bundle with empty args.
+		expect(code).toMatch(/_m\d+\s*=\s*\(doSomething\)/);
+		expect(code).toMatch(/\["\$\$click"\]\s*=\s*\{\s*fn:\s*_m\d+,\s*args:\s*\[\s*\]\s*\}/);
+		// Update: fn-only compare; no arg-slot churn.
 		expect(code).toMatch(/const\s+_fn\s*=\s*\(doSomething\)/);
-		expect(code).not.toMatch(/_b\._a\$\d+\$0/);
+		expect(code).not.toMatch(/!==\s*_a0/);
 	});
 
 	it('multi-arg bundle: per-arg slots + OR-chain identity diff on update', () => {
@@ -40,16 +42,14 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         <button onClick={() => fn(props.a, props.b, props.c)}>{'go'}</button>
       }
     `);
-		expect(code).toMatch(/_b\._a\$\d+\$0\s*=\s*\(props\.a\)/);
-		expect(code).toMatch(/_b\._a\$\d+\$1\s*=\s*\(props\.b\)/);
-		expect(code).toMatch(/_b\._a\$\d+\$2\s*=\s*\(props\.c\)/);
+		expect(code).toMatch(/_m\d+\s*=\s*\(props\.a\)/);
+		expect(code).toMatch(/_m\d+\s*=\s*\(props\.b\)/);
+		expect(code).toMatch(/_m\d+\s*=\s*\(props\.c\)/);
 		// Bundle exposes all three args.
+		expect(code).toMatch(/args:\s*\[\s*_m\d+\s*,\s*_m\d+\s*,\s*_m\d+\s*\]/);
+		// Update: 4-way OR chain (fn + 3 args) against the 1-char bag fields.
 		expect(code).toMatch(
-			/args:\s*\[\s*_b\._a\$\d+\$0\s*,\s*_b\._a\$\d+\$1\s*,\s*_b\._a\$\d+\$2\s*\]/,
-		);
-		// Update: 4-way OR chain (fn + 3 args).
-		expect(code).toMatch(
-			/_b\._fn\$\d+\s*!==\s*_fn\s*\|\|\s*_b\._a\$\d+\$0\s*!==\s*_a0\s*\|\|\s*_b\._a\$\d+\$1\s*!==\s*_a1\s*\|\|\s*_b\._a\$\d+\$2\s*!==\s*_a2/,
+			/_b\.\w+\s*!==\s*_fn\s*\|\|\s*_b\.\w+\s*!==\s*_a0\s*\|\|\s*_b\.\w+\s*!==\s*_a1\s*\|\|\s*_b\.\w+\s*!==\s*_a2/,
 		);
 	});
 
@@ -63,10 +63,8 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         </ul>
       }
     `);
-		expect(code).toMatch(/_b\._a\$\d+\$0\s*=\s*\(item\)/);
-		expect(code).toMatch(
-			/\["\$\$click"\]\s*=\s*\{\s*fn:\s*_b\._fn\$\d+,\s*args:\s*\[\s*_b\._a\$\d+\$0\s*\]\s*\}/,
-		);
+		expect(code).toMatch(/_m\d+\s*=\s*\(item\)/);
+		expect(code).toMatch(/\["\$\$click"\]\s*=\s*\{\s*fn:\s*_m\d+,\s*args:\s*\[\s*_m\d+\s*\]\s*\}/);
 	});
 
 	it('bailout: arrow with a param falls through to plain event binding', () => {
@@ -75,7 +73,7 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         <button onClick={(e) => fn(e)}>{'go'}</button>
       }
     `);
-		expect(code).not.toMatch(/_b\._fn\$\d+/);
+		expect(code).not.toMatch(/\{\s*fn:/);
 		expect(code).toMatch(/\["\$\$click"\]\s*=\s*\([\s\S]*?=>/);
 	});
 
@@ -85,7 +83,7 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         <button onClick={props.handler}>{'go'}</button>
       }
     `);
-		expect(code).not.toMatch(/_b\._fn\$\d+/);
+		expect(code).not.toMatch(/\{\s*fn:/);
 		expect(code).toMatch(/\["\$\$click"\]\s*=\s*\(props\.handler\)/);
 	});
 
@@ -95,7 +93,7 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         <button onClick={() => fn(...props.rest)}>{'go'}</button>
       }
     `);
-		expect(code).not.toMatch(/_b\._fn\$\d+/);
+		expect(code).not.toMatch(/\{\s*fn:/);
 	});
 
 	it('bailout: multi-statement block body falls through', () => {
@@ -104,7 +102,7 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         <button onClick={() => { a(); b(); }}>{'go'}</button>
       }
     `);
-		expect(code).not.toMatch(/_b\._fn\$\d+/);
+		expect(code).not.toMatch(/\{\s*fn:/);
 	});
 
 	it('bailout: non-CallExpression body (binary op) falls through', () => {
@@ -113,7 +111,7 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         <button onClick={() => props.x + 1}>{'go'}</button>
       }
     `);
-		expect(code).not.toMatch(/_b\._fn\$\d+/);
+		expect(code).not.toMatch(/\{\s*fn:/);
 	});
 
 	it('concise body vs block-with-return: emits the same bundle shape', () => {
@@ -142,7 +140,7 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         <button onClick={() => props.obj.method(props.x)}>{'go'}</button>
       }
     `);
-		expect(code).not.toMatch(/_b\._fn\$\d+\s*=\s*\(props\.obj\.method\)/);
+		expect(code).not.toMatch(/\{\s*fn:/); // no bundle: the method is never extracted bare
 		expect(code).toMatch(/\$\$click.*=/); // still an event handler, as a closure
 	});
 });

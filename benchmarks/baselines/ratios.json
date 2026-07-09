@@ -92,24 +92,24 @@
     "op": "gzip",
     "target": "compiled",
     "reference": "source",
-    "maxRatio": 1.25,
-    "note": "gzip(minified compiled corpus) vs gzip(source corpus) (measured 1.19x on record 2026-07-08). Catches codegen bloat without a browser or build."
+    "maxRatio": 1.18,
+    "note": "gzip(minified compiled corpus) vs gzip(source corpus). Phase 1 (bag factories, 1-char fields) landed 2026-07-08: 1.19x -> 1.13x measured; ceiling ratcheted 1.25 -> 1.18. Catches codegen bloat without a browser or build."
   },
   {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 1.5,
-    "note": "APP-CODE-ONLY gzip vs ripple, same app (measured 1.43x on record 2026-07-08). The number that scales with app size - user code eclipses the runtime in real apps. Primary ratchet for docs/compiled-output-optimization-plan.md."
+    "maxRatio": 1.45,
+    "note": "APP-CODE-ONLY gzip vs ripple, same app, normalized minify. Phase 1 measured 1.40x (was 1.43x); ceiling ratcheted 1.5 -> 1.45. The number that scales with app size - primary ratchet for docs/compiled-output-optimization-plan.md."
   },
   {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.75,
-    "note": "APP-CODE-ONLY gzip vs solid, same app (measured 1.66x on record 2026-07-08). Ratchet down with the compiled-output plan."
+    "maxRatio": 1.7,
+    "note": "APP-CODE-ONLY gzip vs solid, same app, normalized minify. Phase 1 measured 1.63x (was 1.66x); ceiling ratcheted 1.75 -> 1.70."
   },
   {
     "suite": "async-waterfall",

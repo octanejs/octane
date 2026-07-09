@@ -85,12 +85,12 @@ describe('helper shadowing — user bindings named after runtime helpers', () =>
 		const { code } = compile(src, 'shadow-emit.tsrx');
 		// Generated references use the alias…
 		expect(code).toMatch(/import\s*\{[^}]*setText as _\$setText[^}]*\}\s*from\s*['"]octane['"]/);
-		expect(code).toMatch(/_\$setText\(_b\._txt\$\d+, _v\)/);
+		expect(code).toMatch(/_\$setText\(_b\.\w+, _v\)/);
 		// …while the user's names (including their rename) stay bare.
 		expect(code).toMatch(/import\s*\{[^}]*flushSync as fs[^}]*\}/);
 		expect(code).toMatch(/import\s*\{[^}]*\buseState\b[^}]*\}/);
 		// The generated text-update call must NOT be the bare (shadowable) name.
-		expect(code).not.toMatch(/[^$\w.]setText\(_b\._txt/);
+		expect(code).not.toMatch(/[^$\w.]setText\(_b\./);
 
 		const server = compile(src, 'shadow-emit.tsrx', { mode: 'server' }).code;
 		expect(server).toMatch(

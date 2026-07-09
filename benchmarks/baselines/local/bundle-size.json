@@ -6,62 +6,62 @@
       "name": "octane-tsrx",
       "ops": {
         "js_raw": {
-          "median": 82156,
-          "min": 82156,
+          "median": 81068,
+          "min": 81068,
           "samples": 1
         },
         "js_gzip": {
-          "median": 26465,
-          "min": 26465,
+          "median": 26509,
+          "min": 26509,
           "samples": 1
         },
         "js_brotli": {
-          "median": 23260,
-          "min": 23260,
+          "median": 23397,
+          "min": 23397,
           "samples": 1
         },
         "app_raw": {
-          "median": 12654,
-          "min": 12654,
+          "median": 11297,
+          "min": 11297,
           "samples": 1
         },
         "app_gzip": {
-          "median": 3313,
-          "min": 3313,
+          "median": 3247,
+          "min": 3247,
           "samples": 1
         },
         "app_brotli": {
-          "median": 2683,
-          "min": 2683,
+          "median": 2690,
+          "min": 2690,
           "samples": 1
         },
         "fw_raw": {
-          "median": 69502,
-          "min": 69502,
+          "median": 69771,
+          "min": 69771,
           "samples": 1
         },
         "fw_gzip": {
-          "median": 23152,
-          "min": 23152,
+          "median": 23262,
+          "min": 23262,
           "samples": 1
         },
         "fw_brotli": {
-          "median": 20577,
-          "min": 20577,
+          "median": 20707,
+          "min": 20707,
           "samples": 1
         }
       },
       "meta": {
         "files": [
           {
-            "file": "assets/framework-DJb-j4J_.js",
+            "file": "assets/framework-QAOP_air.js",
             "bucket": "fw",
-            "bytes": 69502
+            "bytes": 69771
           },
           {
-            "file": "assets/index-B9rAAReH.js",
+            "file": "assets/index-Dxisu5rU.js",
             "bucket": "app",
-            "bytes": 12654
+            "bytes": 11297
           }
         ]
       }
@@ -70,62 +70,62 @@
       "name": "octane-jsx",
       "ops": {
         "js_raw": {
-          "median": 79097,
-          "min": 79097,
+          "median": 78443,
+          "min": 78443,
           "samples": 1
         },
         "js_gzip": {
-          "median": 26219,
-          "min": 26219,
+          "median": 26234,
+          "min": 26234,
           "samples": 1
         },
         "js_brotli": {
-          "median": 23110,
-          "min": 23110,
+          "median": 23175,
+          "min": 23175,
           "samples": 1
         },
         "app_raw": {
-          "median": 9407,
-          "min": 9407,
+          "median": 8472,
+          "min": 8472,
           "samples": 1
         },
         "app_gzip": {
-          "median": 2982,
-          "min": 2982,
+          "median": 2885,
+          "min": 2885,
           "samples": 1
         },
         "app_brotli": {
-          "median": 2487,
-          "min": 2487,
+          "median": 2441,
+          "min": 2441,
           "samples": 1
         },
         "fw_raw": {
-          "median": 69690,
-          "min": 69690,
+          "median": 69971,
+          "min": 69971,
           "samples": 1
         },
         "fw_gzip": {
-          "median": 23237,
-          "min": 23237,
+          "median": 23349,
+          "min": 23349,
           "samples": 1
         },
         "fw_brotli": {
-          "median": 20623,
-          "min": 20623,
+          "median": 20734,
+          "min": 20734,
           "samples": 1
         }
       },
       "meta": {
         "files": [
           {
-            "file": "assets/framework-D_TmAYTz.js",
+            "file": "assets/framework-CqmNNQta.js",
             "bucket": "fw",
-            "bytes": 69690
+            "bytes": 69971
           },
           {
-            "file": "assets/index-DuDseS_m.js",
+            "file": "assets/index-db_GCzav.js",
             "bucket": "app",
-            "bytes": 9407
+            "bytes": 8472
           }
         ]
       }

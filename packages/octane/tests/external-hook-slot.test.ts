@@ -79,8 +79,9 @@ describe('slotHooks surgical pass', () => {
 		// custom-hook calls are NOT wrapped here (the .tsrx/.tsx caller does that)
 		expect(code).not.toContain('withSlot(');
 		// purely additive: stripping the injected slots restores the original source
+		// (default = no hmr → plain Symbol() decls; Symbol.for is dev-serve only)
 		const stripped = code
-			.replace(/^const _h\$\d+ = Symbol\.for\("[^"]*"\);\n/gm, '')
+			.replace(/^const _h\$\d+ = Symbol\(\);\n/gm, '')
 			.replace(/, _h\$\d+(?=[),])/g, '');
 		expect(stripped).toBe(SRC);
 	});

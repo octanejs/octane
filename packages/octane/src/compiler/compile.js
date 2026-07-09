@@ -1549,6 +1549,7 @@ export function compile(source, filename, options) {
 		filename,
 		mode,
 		dev: devEnabled,
+		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		hoistedTemplates: [], // { name, html }
@@ -1942,6 +1943,7 @@ function compileServer(source, filename, options) {
 	const ctx = {
 		filename,
 		mode: 'server',
+		hmr: false, // SSR never hot-swaps in place — hook slots are plain Symbol()s
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		hoistedHelpers: [],
@@ -4044,14 +4046,23 @@ function jsxElementToCreateElement(node, ctx) {
 function allocHookSymbol(ctx, debugName) {
 	const id = ctx.nextHookSymId++;
 	const name = `_h$${id}`;
-	// Use Symbol.for(stableKey) so re-imports under HMR produce the SAME Symbol
-	// identity, which keeps the existing hooks Map keys valid across body
-	// swaps. The stable key embeds the source filename so symbols don't
-	// collide across modules. `debugName` includes the component name + hook
-	// name + call-site index — stable provided the user doesn't reorder hooks
-	// between renders (which would violate React's rules anyway).
-	const stableKey = `octane:${ctx.filename || '<anon>'}:${debugName}`;
-	ctx.hoistedHelpers.push(`const ${name} = Symbol.for(${JSON.stringify(stableKey)});`);
+	if (ctx.hmr) {
+		// HMR (dev serve): Symbol.for(stableKey) so re-imports produce the SAME
+		// Symbol identity, which keeps the existing hooks Map keys valid across
+		// body swaps. The stable key embeds the source filename so symbols don't
+		// collide across modules. `debugName` includes the component name + hook
+		// name + call-site index — stable provided the user doesn't reorder hooks
+		// between renders (which would violate React's rules anyway).
+		const stableKey = `octane:${ctx.filename || '<anon>'}:${debugName}`;
+		ctx.hoistedHelpers.push(`const ${name} = Symbol.for(${JSON.stringify(stableKey)});`);
+	} else {
+		// No HMR (prod builds, SSR, tests): nothing ever re-imports the module
+		// expecting registry identity, so a plain Symbol() suffices — module-
+		// instance-stable, ~80-120 fewer chars per hook, and it keeps the source
+		// FILE PATH (vite passes the absolute module id as `filename`) out of
+		// shipped bundles.
+		ctx.hoistedHelpers.push(`const ${name} = Symbol();`);
+	}
 	return name;
 }
 
@@ -4821,15 +4832,19 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	const noTemplate = html === '';
 
 	const mountLines = [];
-	// Initialize `_b` as a LOCAL only — commit to `__s.slots[0]` at the
-	// VERY END of the mount path. If anything thrown mid-mount (e.g. a `use()`
-	// call suspending or a child render throwing), the scope's binding bag
-	// stays `undefined` and the next attempt re-enters the mount branch from
-	// scratch instead of mistakenly hitting the update branch with a half-
-	// populated bag (which would crash setText / setAttribute on undefined
-	// slot references).
-	// Control-flow-only bodies carry no bag, so skip its allocation/commit entirely.
-	if (!noTemplate) mountLines.push(`    _b = {};`);
+	// The binding bag is allocated in ONE shot at the very END of the mount path
+	// by a shared runtime arity factory (`_$bagN(__s, root, v0, v1, …)` — see
+	// makeBag): the mount statements fill pre-declared LOCALS (`_m0, _m1, …`,
+	// declared by the placeholder below once the field count is known), and the
+	// factory builds the object literal from the real values (final hidden class
+	// + real field representations at allocation), inserts the root, and commits
+	// `__s.slots[0]` — commit LAST, so a throw mid-mount (a `use()` suspending, a
+	// child render throwing) leaves the bag `undefined` and the next attempt
+	// re-enters the mount branch instead of updating a half-populated bag.
+	// Control-flow-only bodies carry no bag, so all of it is skipped.
+	const bag = makeBag();
+	const BAG_LOCALS_PLACEHOLDER = `    /*__bagLocals__*/`;
+	if (!noTemplate) mountLines.push(BAG_LOCALS_PLACEHOLDER);
 
 	let elementVars;
 	let ensureVar;
@@ -5055,8 +5070,8 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			b.endElVar = ensureVar(b.endPath);
 		}
 		// `htextSwap` (sibling text hole) detaches its `<!>`; defer it past all walks (see above).
-		if (b.kind === 'text') deferredTextMounts.push(emitBindingMount(b, elVar));
-		else mountLines.push(emitBindingMount(b, elVar));
+		if (b.kind === 'text') deferredTextMounts.push(emitBindingMount(b, elVar, bag));
+		else mountLines.push(emitBindingMount(b, elVar, bag));
 	}
 	// Shared construct mount-loop (@for/@if/component/@try/@switch/portal):
 	// resolve each record's host element, stash it on the bag under the
@@ -5070,12 +5085,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		for (const c of list) {
 			const elVar = ensureVar(c.hostPath || []);
 			c.elVar = elVar;
-			if (!noTemplate) mountLines.push(`    _b._${hostKey}$${c.id} = ${elVar};`);
+			if (!noTemplate) mountLines.push(`    ${bag.local(`_${hostKey}$${c.id}`)} = ${elVar};`);
 			if (!noTemplate && stampLoc) stampHostLoc(elVar, c.hostPath, c.loc);
 			if (anchorKey !== null && c.anchorPath) {
 				const anchorVar = ensureVar(c.anchorPath);
 				c.anchorVar = anchorVar;
-				mountLines.push(`    _b._${anchorKey}$${c.id} = ${anchorVar};`);
+				mountLines.push(`    ${bag.local(`_${anchorKey}$${c.id}`)} = ${anchorVar};`);
 			}
 			if (each) each(c);
 		}
@@ -5087,11 +5102,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		each: (cc) => {
 			// A renderable `{expr}` child in a TEMPLATE body (has a bag) uses the inline
 			// text-hole fast path — cache its text node (`_chv`) + last value (`_chp`) on
-			// the bag so updates do a direct `setText` like a `.tsrx` text binding. Init
-			// in the mount branch so the bag shape stays monomorphic.
+			// the bag so updates do a direct `setText` like a `.tsrx` text binding.
+			// Const-seeded straight into the bag factory args — no mount statement.
 			if (cc.isChild && !noTemplate) {
-				mountLines.push(`    _b._chv$${cc.id} = null;`);
-				mountLines.push(`    _b._chp$${cc.id} = undefined;`);
+				bag.constField(`_chv$${cc.id}`, 'null');
+				bag.constField(`_chp$${cc.id}`, 'undefined');
 			}
 		},
 	});
@@ -5107,21 +5122,44 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	for (const line of deferredTextMounts) mountLines.push(line);
 
 	if (!noTemplate) {
-		if (single) {
-			mountLines.push(`    __block.parentNode.insertBefore(_root, __block.endMarker);`);
-		} else {
+		// Allocate + insert + commit in ONE shared-factory call, LAST — see the
+		// matching comment at the bag-locals placeholder above. `_$bagN(__s, root,
+		// v0, …)` builds `{a: v0, b: v1, …}` (final hidden class + real values at
+		// allocation), inserts `root` before the block's end marker (skipped for
+		// the multi-root null-root form — drainFrag placed the content), commits
+		// `__s.slots[0]`, and returns the bag for the after-lines below.
+		if (!single) {
 			// Multi-root: drain the <octane-frag> wrapper's children into the live
 			// parent via the runtime helper — a hydration-aware no-op when clone()
 			// adopted the server content in place (virtual wrapper).
 			ctx.runtimeNeeded.add('drainFrag');
 			mountLines.push(`    _$drainFrag(_root, __block.parentNode, __block.endMarker);`);
 		}
+		const rootArg = single ? '_root' : 'null';
+		const args = bag.fields.map((f) => f.constExpr ?? f.local);
+		if (!bag.hasNamed() && bag.fields.length <= BAG_FACTORY_MAX) {
+			ctx.runtimeNeeded.add(`bag${bag.fields.length}`);
+			mountLines.push(
+				`    _b = _$bag${bag.fields.length}(__s, ${rootArg}${args.length ? ', ' + args.join(', ') : ''});`,
+			);
+		} else {
+			// Spill path — beyond the shared-factory arities, OR the body carries
+			// ref/spread/fragmentRef fields whose LONG names the runtime's
+			// suspense-hide key scan needs (see makeBag): one inline literal
+			// (still real values, single allocation) through the generic commit.
+			ctx.runtimeNeeded.add('bagOf');
+			mountLines.push(
+				`    _b = _$bagOf(__s, ${rootArg}, { ${bag.fields.map((f) => `${f.name}: ${f.constExpr ?? f.local}`).join(', ')} });`,
+			);
+		}
+		// Declare the mount locals the factory args read — patched into the
+		// placeholder now that the field set is complete.
+		const locals = bag.fields.filter((f) => f.local !== null).map((f) => f.local);
+		const init = mountLines.indexOf(BAG_LOCALS_PLACEHOLDER);
+		if (init === -1) throw new Error('octane compiler: bag locals placeholder missing');
+		if (locals.length > 0) mountLines[init] = `    let ${locals.join(', ')};`;
+		else mountLines.splice(init, 1);
 	}
-	// Commit the binding bag to the scope LAST — see the matching comment at
-	// the `_b = {}` initialization above. Reaching here means every binding
-	// and the DOM range have been successfully constructed, so future
-	// renders can safely take the update branch keyed on `__s.slots[0]`.
-	if (!noTemplate) mountLines.push(`    __s.slots[0] = _b;`);
 
 	// Update. Deferred property-writes run their diff EVERY render (it does the
 	// mount-time write too); everything else diffs only on re-render (the `else`
@@ -5130,7 +5168,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	const updateLines = [];
 	const everyRenderLines = [];
 	for (const b of elementBindings) {
-		const code = emitBindingUpdate(b);
+		const code = emitBindingUpdate(b, bag);
 		if (!code) continue;
 		if (b.deferred) everyRenderLines.push(code);
 		else updateLines.push(code);
@@ -5188,18 +5226,23 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	//     and content never lands after later siblings).
 	//   - The host is a real in-template element: no anchor — append into it
 	//     (insertBefore(_, null) === appendChild).
-	// Returns the anchor EXPRESSION, or null for the append case.
+	// Returns the anchor EXPRESSION, or null for the append case. The after-lines
+	// run right after the mount/update branches where `_b` holds the committed
+	// bag, so bag reads go through `_b.<letter>` (shorter than `__s.slots[0].…`).
 	const anchorExprFor = (c, anchorKey) =>
 		c.anchorVar
-			? `__s.slots[0]._${anchorKey}$${c.id}`
+			? `_b.${bag.letter(`_${anchorKey}$${c.id}`)}`
 			: !isElHost(c.elVar)
 				? '__block.endMarker'
 				: null;
+	// Host expression for a construct's slot call — the bag-stashed host element,
+	// or the block's own parentNode for bagless (control-flow-only) bodies.
+	const hostExprFor = (key) => (noTemplate ? '__block.parentNode' : `_b.${bag.letter(key)}`);
 	for (const fc of forCalls) {
 		ctx.runtimeNeeded.add('forBlock');
 		const slotIndex = fc.slotIndex;
 		// Control-flow-only bodies have no bag: the host is __block.parentNode directly.
-		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._for$' + fc.id;
+		const hostExpr = hostExprFor(`_for$${fc.id}`);
 		// flags: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item markers),
 		//        bit 2 = depEligible (runtime compares deps array, upgrades to pure
 		//        for survivors when deps unchanged this render),
@@ -5234,7 +5277,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	}
 	for (const ic of ifCalls) {
 		const slotIndex = ic.slotIndex;
-		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._ifHost$' + ic.id;
+		const hostExpr = hostExprFor(`_ifHost$${ic.id}`);
 		// Anchor selection — see anchorExprFor.
 		const ifAnchor = anchorExprFor(ic, 'ifAnchor');
 		const anchorArg = ifAnchor ? `, ${ifAnchor}` : '';
@@ -5255,7 +5298,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	}
 	for (const cc of compCalls) {
 		const slotIndex = cc.slotIndex;
-		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._compHost$' + cc.id;
+		const hostExpr = hostExprFor(`_compHost$${cc.id}`);
 		// Renderable `{expr}` hole — dispatch the value at runtime (component /
 		// element → block; primitive → text; nullish/boolean/'' → nothing). Shares
 		// the host/`<!>`-anchor resolution + hole-aware hydration walk with real
@@ -5268,9 +5311,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			if (cc.onlyChildText && !noTemplate) {
 				ctx.runtimeNeeded.add('setText');
 				ctx.runtimeNeeded.add('childTextHole');
+				const chp = `_b.${bag.letter(`_chp$${cc.id}`)}`;
+				const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
 				pushAfter(
 					cc.id,
-					`  { const _v = (${cc.valueExpr}); if (_b._chp$${cc.id} !== _v) { _b._chp$${cc.id} = _v; const _t = _b._chv$${cc.id}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') _$setText(_t, _v); else _b._chv$${cc.id} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); } }`,
+					`  { const _v = (${cc.valueExpr}); if (${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') _$setText(_t, _v); else ${chv} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); } }`,
 				);
 				continue;
 			}
@@ -5299,9 +5344,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			// When the slot has its OWN `<!>` placeholder, tell textHole/childSlot to
 			// reuse it as the end marker (no second comment minted) — `ownEnd`.
 			const ownEndArg = cc.anchorVar ? ', true' : '';
+			const chp = `_b.${bag.letter(`_chp$${cc.id}`)}`;
+			const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
 			pushAfter(
 				cc.id,
-				`  { const _v = (${cc.valueExpr}); if (_b._chp$${cc.id} !== _v) { _b._chp$${cc.id} = _v; const _t = _b._chv$${cc.id}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') _$setText(_t, _v); else _b._chv$${cc.id} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}); } }`,
+				`  { const _v = (${cc.valueExpr}); if (${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') _$setText(_t, _v); else ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}); } }`,
 			);
 			continue;
 		}
@@ -5352,7 +5399,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	}
 	for (const pc of ctx._portalCalls) {
 		const slotIndex = pc.slotIndex;
-		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._portalHost$' + pc.id;
+		const hostExpr = hostExprFor(`_portalHost$${pc.id}`);
 		ctx.runtimeNeeded.add('portal');
 		pushAfter(
 			pc.id,
@@ -5363,7 +5410,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	ctx._portalCalls = _prevPortalCalls;
 	for (const tc of tryCalls) {
 		const slotIndex = tc.slotIndex;
-		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._tryHost$' + tc.id;
+		const hostExpr = hostExprFor(`_tryHost$${tc.id}`);
 		ctx.runtimeNeeded.add('tryBlock');
 		// Anchor selection — see anchorExprFor (mirrors ifBlock, including the
 		// __block.endMarker fallback for a body that is ONLY a @try).
@@ -5376,7 +5423,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	}
 	for (const sc of ctx._switchCalls) {
 		const slotIndex = sc.slotIndex;
-		const hostExpr = noTemplate ? '__block.parentNode' : '__s.slots[0]._switchHost$' + sc.id;
+		const hostExpr = hostExprFor(`_switchHost$${sc.id}`);
 		ctx.runtimeNeeded.add('switchBlock');
 		// Anchor selection — see anchorExprFor (mirrors ifBlock, including the
 		// __block.endMarker fallback for a body that is ONLY a @switch).
@@ -5404,37 +5451,6 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		.sort((a, b) => a.id - b.id || a.i - b.i)
 		.map((c) => c.line)
 		.join('\n');
-
-	// V8 shape stability: the mount path fills the bag with one property write
-	// per field, which would grow a bare `{}` through a hidden-class transition
-	// per add — every bag instance re-walks the transition chain, and the final
-	// map is only reached after the last write. Pre-shape it instead: collect
-	// every `_b.<field> =` assignment this body ever emits (mount, update,
-	// every-render diffs, and the per-render slot calls) and allocate the bag as
-	// ONE full-shape literal. The literal's boilerplate gives every instance the
-	// final map at birth (fields in-object), so each later write — mount fill
-	// and update diff alike — is a monomorphic in-place store. Field names all
-	// start with `_` and only compiler-emitted code references `_b`, so a text
-	// scan over the emitted lines is exact (reads like `_b._prev$0 !== _v` and
-	// element writes like `_b._el$0["$$click"] = …` don't match the `=` guard).
-	if (!noTemplate) {
-		const bagFields = [];
-		const seenFields = new Set();
-		const FIELD_WRITE_RE = /\b_b\.(_[A-Za-z0-9_$]+)\s*=(?!=)/g;
-		for (const src of [mountLines.join('\n'), updateJoined, everyRenderJoined, afterJoined]) {
-			for (const m of src.matchAll(FIELD_WRITE_RE)) {
-				if (!seenFields.has(m[1])) {
-					seenFields.add(m[1]);
-					bagFields.push(m[1]);
-				}
-			}
-		}
-		if (bagFields.length > 0) {
-			const init = mountLines.indexOf('    _b = {};');
-			if (init === -1) throw new Error('octane compiler: bag init line not found');
-			mountLines[init] = `    _b = { ${bagFields.map((f) => `${f}: undefined`).join(', ')} };`;
-		}
-	}
 
 	return {
 		// Does this body carry a binding bag (`__s.slots[0]`)? Control-flow-only
@@ -5471,20 +5487,87 @@ function buildLocsLiteral(constructs) {
 // event-bundle "stable bundle" hoisting is a separate, guarded optimization).
 const DEFERRABLE_MOUNT_KINDS = new Set(['attr', 'class', 'style', 'formAction', 'htmlOnlyChild']);
 
+// Per-body binding-bag registry. Fields are keyed by the historical long name
+// (`_el$3`, `_prev$3`, …) but EMIT as single characters (`a`, `b`, …) — bag
+// field names are object properties, so unlike locals a minifier can never
+// shorten them; 1-char names are the shipped-bytes win. Each field is either
+// LOCAL-backed (the mount path assigns a pre-declared `_mN` local; the runtime
+// bag factory receives it positionally) or CONST-seeded (`null`/`undefined`
+// seeds pass straight to the factory — no local, no mount statement).
+// Registration order = mount-write order = the factory's positional args =
+// the letter sequence, so `_$bagN(s, root, v0, v1, …)` builds `{a: v0, b: v1,
+// …}` with every field carrying its REAL mount value. `letter()` throws for a
+// field that was never mount-registered — an update/slot-call line referencing
+// an unmounted field is a compiler bug, surfaced at compile time.
+const BAG_LC = 'abcdefghijklmnopqrstuvwxyz';
+const BAG_UC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+// Highest shared-factory arity (bag0..bag16 in the runtime); bigger bags fall
+// back to `bagOf(__s, root, { … })` with an inline literal of real values.
+const BAG_FACTORY_MAX = 16;
+function bagLetter(i) {
+	if (i < 26) return BAG_LC[i];
+	if (i < 52) return BAG_UC[i - 26];
+	return `f${i}`;
+}
+function makeBag() {
+	const fields = [];
+	const byKey = new Map();
+	let namedCount = 0;
+	const reg = (key, constExpr, keepName) => {
+		let r = byKey.get(key);
+		if (r === undefined) {
+			const i = fields.length;
+			r = {
+				key,
+				// Ref-carrying kinds (ref/spread/fragmentRef + their `_el$` partners)
+				// KEEP the long historical name: the runtime's suspense-hide walk
+				// (detachSubtreeRefs) discovers them by key prefix and pairs
+				// `_ref$N`/`_sp$N` with `_el$N`. Everything else gets a letter.
+				name: keepName ? key : bagLetter(i),
+				local: constExpr === undefined ? `_m${i}` : null,
+				constExpr: constExpr === undefined ? null : constExpr,
+			};
+			if (keepName) namedCount++;
+			fields.push(r);
+			byKey.set(key, r);
+		}
+		return r;
+	};
+	return {
+		/** Mount-write target for `key` — the pre-declared local. */
+		local: (key) => reg(key, undefined, false).local,
+		/** Like local(), but the bag property keeps `key` as its name (see reg). */
+		localNamed: (key) => reg(key, undefined, true).local,
+		/** Seed `key` with a constant expression (no local, no mount write). */
+		constField: (key, expr) => {
+			reg(key, expr, false);
+		},
+		/** Emitted bag property name for `key` (update/slot-call reads+writes). */
+		letter: (key) => {
+			const r = byKey.get(key);
+			if (r === undefined) throw new Error(`octane compiler: bag field ${key} never mounted`);
+			return r.name;
+		},
+		/** Any long-named fields? → the positional arity factories can't apply. */
+		hasNamed: () => namedCount > 0,
+		fields,
+	};
+}
+
 // Mount for a DEFERRED property-write binding: store the element ref + seed the
 // diff field to `undefined`. The every-render diff then performs the actual
 // write — including on the first render, since the `undefined` seed makes its
 // `_prev !== _v` guard fire, and `setAttribute(el, name, undefined)` /
 // `setClassName(el, undefined)` no-op on a freshly-cloned element (so the output
 // is byte-identical to the old unconditional mount write).
-function emitDeferredMount(b, elVar) {
+function emitDeferredMount(b, elVar, bag) {
 	// `style` diffs on `_sty`; attr / class / formAction / htmlOnlyChild on `_prev`.
-	const field = b.kind === 'style' ? `_sty$${b.id}` : `_prev$${b.id}`;
-	return `    { _b._el$${b.id} = ${elVar}; _b.${field} = undefined; }`;
+	bag.constField(b.kind === 'style' ? `_sty$${b.id}` : `_prev$${b.id}`, 'undefined');
+	return `    ${bag.local(`_el$${b.id}`)} = ${elVar};`;
 }
 
-function emitBindingMount(b, elVar) {
-	if (b.deferred) return emitDeferredMount(b, elVar);
+function emitBindingMount(b, elVar, bag) {
+	if (b.deferred) return emitDeferredMount(b, elVar, bag);
 	// `suppressHydrationWarning`: stamp a JS flag (NOT a DOM attribute) the runtime reads to
 	// keep the server value + skip the warning on a hydration mismatch for this element.
 	if (b.kind === 'suppress') return `    ${elVar}.__oct_suppress = true;`;
@@ -5498,8 +5581,8 @@ function emitBindingMount(b, elVar) {
 			// hydration mismatch re-render).
 			return `    {
       const _v = ${E};
-      _b._txt$${b.id} = _$htext(${elVar}, _v);
-      _b._prev$${b.id} = _v;
+      ${bag.local(`_txt$${b.id}`)} = _$htext(${elVar}, _v);
+      ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
 		}
 		case 'htmlOnlyChild': {
@@ -5507,8 +5590,8 @@ function emitBindingMount(b, elVar) {
 			return `    {
       const _v = ${E};
       ${elVar}.innerHTML = (_v == null ? '' : ${coerce});
-      _b._el$${b.id} = ${elVar};
-      _b._prev$${b.id} = _v;
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
+      ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
 		}
 		case 'text': {
@@ -5521,16 +5604,16 @@ function emitBindingMount(b, elVar) {
 			// htextSwap coerces the value itself, so the mount is a bare call.
 			return `    {
       const _v = ${E};
-      _b._txt$${b.id} = _$htextSwap(${elVar}, _v);
-      _b._prev$${b.id} = _v;
+      ${bag.local(`_txt$${b.id}`)} = _$htextSwap(${elVar}, _v);
+      ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
 		}
 		case 'attr': {
 			return `    {
       const _v = ${E};
       _$setAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
-      _b._el$${b.id} = ${elVar};
-      _b._prev$${b.id} = _v;
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
+      ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
 		}
 		case 'value':
@@ -5545,7 +5628,7 @@ function emitBindingMount(b, elVar) {
 			// runs inside the hydration window and arms the element.
 			return `    {
       _$${CONTROLLED_KIND_HELPERS[b.kind]}(${elVar}, ${E});
-      _b._el$${b.id} = ${elVar};
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
     }`;
 		}
 		case 'autoFocus': {
@@ -5561,16 +5644,16 @@ function emitBindingMount(b, elVar) {
 			return `    {
       const _v = ${E};
       ${setter};
-      _b._el$${b.id} = ${elVar};
-      _b._prev$${b.id} = _v;
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
+      ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
 		}
 		case 'style': {
 			return `    {
       const _v = ${E};
       _$setStyle(${elVar}, _v, undefined);
-      _b._el$${b.id} = ${elVar};
-      _b._sty$${b.id} = _v;
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
+      ${bag.local(`_sty$${b.id}`)} = _v;
     }`;
 		}
 		case 'spread': {
@@ -5581,16 +5664,19 @@ function emitBindingMount(b, elVar) {
 			// (queueRefDetach: unmount cleanups run mid-render, and a state-setter
 			// ref firing null synchronously can render before a replacement
 			// element's deferred attach — commit-phase detach batches the two).
+			// The cleanup closure reads the bag through the captured `_b` — the bag
+			// exists by the time any cleanup runs (committed at mount end), and the
+			// `_sp$` field is re-written by updates, so the read must be live.
 			return `    {
       const _v = ${E};
       _$setSpread(${elVar}, _v, undefined, __s);
-      _b._el$${b.id} = ${elVar};
-      _b._sp$${b.id} = _v;
-      __s.cleanups.push(() => { const _sp = _b._sp$${b.id}; if (_sp != null && _sp.ref != null) _$queueRefDetach(_sp.ref, _b._el$${b.id}); });
+      ${bag.localNamed(`_el$${b.id}`)} = ${elVar};
+      ${bag.localNamed(`_sp$${b.id}`)} = _v;
+      __s.cleanups.push(() => { const _sp = _b.${bag.letter(`_sp$${b.id}`)}; if (_sp != null && _sp.ref != null) _$queueRefDetach(_sp.ref, _b.${bag.letter(`_el$${b.id}`)}); });
     }`;
 		}
 		case 'event': {
-			return `    _b._el$${b.id} = ${elVar};
+			return `    ${bag.local(`_el$${b.id}`)} = ${elVar};
     ${elVar}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
 		}
 		case 'formAction': {
@@ -5600,20 +5686,21 @@ function emitBindingMount(b, elVar) {
 			return `    {
       const _v = ${E};
       _$setFormAction(${elVar}, ${JSON.stringify(b.name)}, _v, undefined);
-      _b._el$${b.id} = ${elVar};
-      _b._prev$${b.id} = _v;
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
+      ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
 		}
 		case 'event-bundle': {
 			// Build a `{ fn, args }` bundle and stash fn + each arg in slots so the
 			// update path can identity-diff and skip the reassignment on no-op.
-			const argSlots = b.argExprs.map((_e, i) => `_b._a$${b.id}$${i}`);
-			const argInit = b.argExprs.map((e, i) => `_b._a$${b.id}$${i} = (${e});`).join(' ');
+			const fnLocal = bag.local(`_fn$${b.id}`);
+			const argLocals = b.argExprs.map((_e, i) => bag.local(`_a$${b.id}$${i}`));
+			const argInit = b.argExprs.map((e, i) => `${argLocals[i]} = (${e});`).join(' ');
 			return `    {
-      _b._el$${b.id} = ${elVar};
-      _b._fn$${b.id} = (${b.fnExpr});
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
+      ${fnLocal} = (${b.fnExpr});
       ${argInit}
-      ${elVar}[${JSON.stringify(b.slotKey)}] = { fn: _b._fn$${b.id}, args: [${argSlots.join(', ')}] };
+      ${elVar}[${JSON.stringify(b.slotKey)}] = { fn: ${fnLocal}, args: [${argLocals.join(', ')}] };
     }`;
 		}
 		case 'ref': {
@@ -5631,12 +5718,14 @@ function emitBindingMount(b, elVar) {
 			// bound element rides along as the cleanup target, so a callback ref
 			// shared across elements (ref={registerItem} on every @for row)
 			// releases ITS row's React-19 cleanup, not another row's.
+			// Both deferred closures read through the captured `_b` (committed by the
+			// time attach/cleanup run); `_ref$` must be a LIVE read — updates re-point it.
 			return `    {
       const _r = (${b.expr});
-      _b._ref$${b.id} = _r;
-      _b._el$${b.id} = ${elVar};
-      _$queueRefAttach(__s, () => _$attachRef(_r, _b._el$${b.id}));
-      __s.cleanups.push(() => _$queueRefDetach(_b._ref$${b.id}, _b._el$${b.id}));
+      ${bag.localNamed(`_ref$${b.id}`)} = _r;
+      ${bag.localNamed(`_el$${b.id}`)} = ${elVar};
+      _$queueRefAttach(__s, () => _$attachRef(_r, _b.${bag.letter(`_el$${b.id}`)}));
+      __s.cleanups.push(() => _$queueRefDetach(_b.${bag.letter(`_ref$${b.id}`)}, _b.${bag.letter(`_el$${b.id}`)}));
     }`;
 		}
 		case 'fragmentRef': {
@@ -5648,26 +5737,29 @@ function emitBindingMount(b, elVar) {
 			// the ref + destroys the instance on unmount.
 			return `    {
       const _r = (${b.expr});
-      _b._fi$${b.id} = _$mountFragmentRef(__s, ${elVar}, ${b.endElVar}, _r);
+      ${bag.localNamed(`_fi$${b.id}`)} = _$mountFragmentRef(__s, ${elVar}, ${b.endElVar}, _r);
     }`;
 		}
 	}
 	return '';
 }
 
-function emitBindingUpdate(b) {
+function emitBindingUpdate(b, bag) {
 	const E = `(${b.expr})`;
+	// 1-char bag field names (see makeBag) — resolved from the same registry the
+	// mount pass registered them in; an unmounted field throws at compile time.
+	const F = (prefix) => `_b.${bag.letter(`${prefix}$${b.id}`)}`;
 	switch (b.kind) {
 		case 'textOnlyChild':
 		case 'text': {
-			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { _$setText(_b._txt$${b.id}, _v); _b._prev$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setText(${F('_txt')}, _v); ${F('_prev')} = _v; } }`;
 		}
 		case 'htmlOnlyChild': {
 			const coerce = b.knownString ? '_v' : 'String(_v)';
-			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { _b._el$${b.id}.innerHTML = (_v == null ? '' : ${coerce}); _b._prev$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { ${F('_el')}.innerHTML = (_v == null ? '' : ${coerce}); ${F('_prev')} = _v; } }`;
 		}
 		case 'attr': {
-			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { _$setAttribute(_b._el$${b.id}, ${JSON.stringify(b.name)}, _v); _b._prev$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
 		}
 		case 'value':
 		case 'checked':
@@ -5678,20 +5770,20 @@ function emitBindingUpdate(b) {
 			// reasserts on every commit — the helper's DOM-diff makes an
 			// unchanged value free, and a prev-guard would skip exactly the
 			// "unrelated re-render while the DOM drifted" reassert case.
-			return `    _$${CONTROLLED_KIND_HELPERS[b.kind]}(_b._el$${b.id}, ${E});`;
+			return `    _$${CONTROLLED_KIND_HELPERS[b.kind]}(${F('_el')}, ${E});`;
 		}
 		case 'class': {
 			const setter =
 				b.ns && b.ns !== 'html'
-					? `_$setClassAttr(_b._el$${b.id}, _v)`
-					: `_$setClassName(_b._el$${b.id}, _v)`;
-			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { ${setter}; _b._prev$${b.id} = _v; } }`;
+					? `_$setClassAttr(${F('_el')}, _v)`
+					: `_$setClassName(${F('_el')}, _v)`;
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { ${setter}; ${F('_prev')} = _v; } }`;
 		}
 		case 'style': {
 			// Object styles need per-prop diffing — call setStyle even when the
 			// reference is unchanged it'd just no-op via the internal diff. We DO
 			// skip identity matches to avoid the call overhead.
-			return `    { const _v = ${E}; if (_b._sty$${b.id} !== _v) { _$setStyle(_b._el$${b.id}, _v, _b._sty$${b.id}); _b._sty$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (${F('_sty')} !== _v) { _$setStyle(${F('_el')}, _v, ${F('_sty')}); ${F('_sty')} = _v; } }`;
 		}
 		case 'spread': {
 			// setSpread does its own per-key diffing internally and handles cleanup
@@ -5700,13 +5792,13 @@ function emitBindingUpdate(b) {
 			// `__s` rides along on updates too so a spread-supplied ref's attach is
 			// deferred to commit (after all queued detaches) — same phasing as the
 			// direct `ref` binding above.
-			return `    { const _v = ${E}; if (_b._sp$${b.id} !== _v) { _$setSpread(_b._el$${b.id}, _v, _b._sp$${b.id}, __s); _b._sp$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (${F('_sp')} !== _v) { _$setSpread(${F('_el')}, _v, ${F('_sp')}, __s); ${F('_sp')} = _v; } }`;
 		}
 		case 'event': {
-			return `    _b._el$${b.id}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
+			return `    ${F('_el')}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
 		}
 		case 'formAction': {
-			return `    { const _v = ${E}; if (_b._prev$${b.id} !== _v) { _$setFormAction(_b._el$${b.id}, ${JSON.stringify(b.name)}, _v, _b._prev$${b.id}); _b._prev$${b.id} = _v; } }`;
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setFormAction(${F('_el')}, ${JSON.stringify(b.name)}, _v, ${F('_prev')}); ${F('_prev')} = _v; } }`;
 		}
 		case 'event-bundle': {
 			// Diff fn + each arg against the per-slot cache. Only rebuild + assign
@@ -5714,16 +5806,18 @@ function emitBindingUpdate(b) {
 			// unchanged item refs skip everything.
 			const fnVar = `_fn`,
 				argVars = b.argExprs.map((_e, i) => `_a${i}`);
+			const fnField = `_b.${bag.letter(`_fn$${b.id}`)}`;
+			const argFields = b.argExprs.map((_e, i) => `_b.${bag.letter(`_a$${b.id}$${i}`)}`);
 			const reads =
 				`const ${fnVar} = (${b.fnExpr}); ` +
 				b.argExprs.map((e, i) => `const ${argVars[i]} = (${e});`).join(' ');
-			const cmps = [`_b._fn$${b.id} !== ${fnVar}`]
-				.concat(b.argExprs.map((_e, i) => `_b._a$${b.id}$${i} !== ${argVars[i]}`))
+			const cmps = [`${fnField} !== ${fnVar}`]
+				.concat(b.argExprs.map((_e, i) => `${argFields[i]} !== ${argVars[i]}`))
 				.join(' || ');
-			const writes = [`_b._fn$${b.id} = ${fnVar};`]
-				.concat(b.argExprs.map((_e, i) => `_b._a$${b.id}$${i} = ${argVars[i]};`))
+			const writes = [`${fnField} = ${fnVar};`]
+				.concat(b.argExprs.map((_e, i) => `${argFields[i]} = ${argVars[i]};`))
 				.concat([
-					`_b._el$${b.id}[${JSON.stringify(b.slotKey)}] = { fn: ${fnVar}, args: [${argVars.join(', ')}] };`,
+					`${F('_el')}[${JSON.stringify(b.slotKey)}] = { fn: ${fnVar}, args: [${argVars.join(', ')}] };`,
 				])
 				.join(' ');
 			return `    { ${reads} if (${cmps}) { ${writes} } }`;
@@ -5744,11 +5838,11 @@ function emitBindingUpdate(b) {
 			// callback ref.
 			return `    {
       const _r = (${b.expr});
-      if (_r !== _b._ref$${b.id}) {
-        const _old = _b._ref$${b.id};
-        if (_old != null) _$queueRefDetach(_old, _b._el$${b.id});
-        if (_r != null) _$queueRefAttach(__s, () => _$attachRef(_r, _b._el$${b.id}));
-        _b._ref$${b.id} = _r;
+      if (_r !== ${F('_ref')}) {
+        const _old = ${F('_ref')};
+        if (_old != null) _$queueRefDetach(_old, ${F('_el')});
+        if (_r != null) _$queueRefAttach(__s, () => _$attachRef(_r, ${F('_el')}));
+        ${F('_ref')} = _r;
       }
     }`;
 		}
@@ -5761,7 +5855,7 @@ function emitBindingUpdate(b) {
 			// detaches the new ref.
 			return `    {
       const _r = (${b.expr});
-      const _fi = _b._fi$${b.id};
+      const _fi = ${F('_fi')};
       if (_fi && _r !== _fi._currentRef) {
         if (_fi._currentRef != null) _$queueRefDetach(_fi._currentRef, _fi);
         if (_r != null) _$queueRefAttach(__s, () => _$attachRef(_r, _fi));

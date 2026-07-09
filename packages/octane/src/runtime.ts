@@ -3074,6 +3074,49 @@ export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
 }
 
 /**
+ * Binding-bag arity factories (`bag0`…`bag16`, spill `bagOf`) — the compiled
+ * mount path's SINGLE allocation+insert+commit call. Each body's mount fills
+ * locals, then calls `_$bagN(__s, root, v0, v1, …)`; the factory builds
+ * `{ a: v0, b: v1, … }` as one literal (final hidden class + real field values
+ * at allocation — no per-field map transitions, and every bag of arity N
+ * shares ONE hot allocation site), inserts `root` before the block's end
+ * marker (`null` root = a multi-root body whose drainFrag already placed the
+ * content), and commits `scope.slots[0]` LAST — a throw anywhere in the mount
+ * path (a suspending `use()`, a child render throwing) happens BEFORE this
+ * call, so the bag stays undefined and the next attempt re-mounts. Field names
+ * are single characters because a minifier can never shorten object property
+ * names — this is the compiled-output size contract with the compiler
+ * (compile.js makeBag). Bodies with more than 16 fields pass one inline
+ * literal (still real values, 1-char keys) through `bagOf`.
+ */
+function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
+	if (root !== null) {
+		const block = scope.block;
+		block.parentNode.insertBefore(root, block.endMarker);
+	}
+	scope.slots[0] = bag;
+	return bag;
+}
+/* prettier-ignore */ export function bag0(s: Scope, r: Node | null): any { return commitBag(s, r, {}); }
+/* prettier-ignore */ export function bag1(s: Scope, r: Node | null, a: any): any { return commitBag(s, r, { a }); }
+/* prettier-ignore */ export function bag2(s: Scope, r: Node | null, a: any, b: any): any { return commitBag(s, r, { a, b }); }
+/* prettier-ignore */ export function bag3(s: Scope, r: Node | null, a: any, b: any, c: any): any { return commitBag(s, r, { a, b, c }); }
+/* prettier-ignore */ export function bag4(s: Scope, r: Node | null, a: any, b: any, c: any, d: any): any { return commitBag(s, r, { a, b, c, d }); }
+/* prettier-ignore */ export function bag5(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any): any { return commitBag(s, r, { a, b, c, d, e }); }
+/* prettier-ignore */ export function bag6(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any): any { return commitBag(s, r, { a, b, c, d, e, f }); }
+/* prettier-ignore */ export function bag7(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any): any { return commitBag(s, r, { a, b, c, d, e, f, g }); }
+/* prettier-ignore */ export function bag8(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h }); }
+/* prettier-ignore */ export function bag9(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i }); }
+/* prettier-ignore */ export function bag10(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j }); }
+/* prettier-ignore */ export function bag11(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k }); }
+/* prettier-ignore */ export function bag12(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l }); }
+/* prettier-ignore */ export function bag13(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m }); }
+/* prettier-ignore */ export function bag14(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n }); }
+/* prettier-ignore */ export function bag15(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o }); }
+/* prettier-ignore */ export function bag16(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any, p: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p }); }
+/* prettier-ignore */ export function bagOf(s: Scope, r: Node | null, bag: any): any { return commitBag(s, r, bag); }
+
+/**
  * Text-binding coercion, shared by htext / htextSwap / setText: null/undefined/
  * false render as '' and everything else stringifies (string fast path first —
  * `{x as string}` holes are overwhelmingly already strings). NOTE this is NOT

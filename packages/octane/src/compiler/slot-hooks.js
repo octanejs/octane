@@ -67,8 +67,12 @@ function walk(node, fnName, st) {
 		if (imported && HOOK_NAMES.has(imported)) {
 			const id = st.nextId++;
 			const sym = `_h$${id}`;
-			const key = `octane:${st.filename}:${fnName}.${local}#${id}`;
-			st.decls.push(`const ${sym} = Symbol.for(${JSON.stringify(key)});`);
+			if (st.hmr) {
+				const key = `octane:${st.filename}:${fnName}.${local}#${id}`;
+				st.decls.push(`const ${sym} = Symbol.for(${JSON.stringify(key)});`);
+			} else {
+				st.decls.push(`const ${sym} = Symbol();`);
+			}
 			if (node.arguments.length === 0) {
 				// `useId()` → `useId(_h$N)` (insert before the closing paren).
 				st.edits.push({ pos: node.end - 1, text: sym });
@@ -94,9 +98,13 @@ function walk(node, fnName, st) {
  *
  * @param {string} source raw module text
  * @param {string} id     module id (embedded in the stable Symbol.for key)
+ * @param {{ hmr?: boolean }} [options] `hmr: true` (dev serve) emits
+ *   `Symbol.for(stableKey)` so a re-imported module resolves the same hook
+ *   slots (state survives HMR); off (prod builds, SSR) emits plain `Symbol()`
+ *   — module-instance-stable, smaller, and no module path in the output.
  * @returns {{ code: string, map: null } | null}
  */
-export function slotHooks(source, id) {
+export function slotHooks(source, id, options) {
 	let ast;
 	try {
 		ast = parseModule(source, id);
@@ -106,7 +114,14 @@ export function slotHooks(source, id) {
 	const locals = octaneHookLocals(ast);
 	if (locals === null) return null;
 
-	const st = { locals, filename: id, nextId: 0, edits: [], decls: [] };
+	const st = {
+		locals,
+		filename: id,
+		hmr: !!(options && options.hmr),
+		nextId: 0,
+		edits: [],
+		decls: [],
+	};
 	for (const node of ast.body || []) walk(node, 'module', st);
 	if (st.edits.length === 0) return null;
 
