@@ -14,7 +14,7 @@
 // runtime import is needed: base hooks are already imported by the user.
 
 import { parseModule } from '@tsrx/core';
-import { HOOK_NAMES } from './compile.js';
+import { HOOK_NAMES, hookSlotHash } from './compile.js';
 
 // Build local-name → imported-name for hooks imported from 'octane' (handles
 // `import { useState as s }`). Namespace imports (`import * as o`) are ignored —
@@ -71,7 +71,12 @@ function walk(node, fnName, st) {
 				const key = `octane:${st.filename}:${fnName}.${local}#${id}`;
 				st.decls.push(`const ${sym} = Symbol.for(${JSON.stringify(key)});`);
 			} else {
-				st.decls.push(`const ${sym} = Symbol();`);
+				// The description must be UNIQUE and non-empty: the runtime composes
+				// custom-hook slot paths from slot DESCRIPTIONS (resolveSlot) — a bare
+				// Symbol() collapses those paths and collides state across call sites.
+				// Short filename hash + index; no module path in the output (see
+				// compile.js hookSlotHash for the full rationale).
+				st.decls.push(`const ${sym} = Symbol(${JSON.stringify(`${st.hash}#${id}`)});`);
 			}
 			if (node.arguments.length === 0) {
 				// `useId()` → `useId(_h$N)` (insert before the closing paren).
@@ -100,8 +105,10 @@ function walk(node, fnName, st) {
  * @param {string} id     module id (embedded in the stable Symbol.for key)
  * @param {{ hmr?: boolean }} [options] `hmr: true` (dev serve) emits
  *   `Symbol.for(stableKey)` so a re-imported module resolves the same hook
- *   slots (state survives HMR); off (prod builds, SSR) emits plain `Symbol()`
- *   — module-instance-stable, smaller, and no module path in the output.
+ *   slots (state survives HMR); off (prod builds, SSR) emits
+ *   `Symbol("<filenameHash>#<n>")` — module-instance-stable, smaller, no
+ *   module path in the output, and the description stays unique (the runtime
+ *   composes custom-hook slot paths from descriptions).
  * @returns {{ code: string, map: null } | null}
  */
 export function slotHooks(source, id, options) {
@@ -118,6 +125,7 @@ export function slotHooks(source, id, options) {
 		locals,
 		filename: id,
 		hmr: !!(options && options.hmr),
+		hash: hookSlotHash(id),
 		nextId: 0,
 		edits: [],
 		decls: [],

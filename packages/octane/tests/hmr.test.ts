@@ -162,10 +162,14 @@ describe('hmr — runtime wrapper', () => {
 		expect(code).not.toMatch(/import\.meta\.hot/);
 	});
 
-	it('hmr option off → hook slots are plain Symbol(), no registry key, no file path', async () => {
+	it('hmr option off → hook slots are Symbol("<hash>#<n>"), no registry key, no file path', async () => {
 		// Only HMR's re-import needs Symbol.for's registry identity; prod output
-		// uses bare Symbol() — smaller, and the module id (an ABSOLUTE path under
-		// vite) never leaks into shipped bundles.
+		// uses plain Symbol with a SHORT UNIQUE description — smaller, and the
+		// module id (an ABSOLUTE path under vite) never leaks into shipped
+		// bundles. The description must NOT be empty: the runtime composes
+		// custom-hook slot paths from slot descriptions (resolveSlot), and bare
+		// Symbol() collapsed those paths — custom-hook state collided across call
+		// sites (broke the router's useStore → website-wide hydration mismatch).
 		const { compile } = await import('octane/compiler');
 		const src =
 			"import { useState } from 'octane';\n" +
@@ -174,7 +178,8 @@ describe('hmr — runtime wrapper', () => {
 			'  <button onClick={() => setN(n + 1)}>{n as string}</button>\n' +
 			'}\n';
 		const { code } = compile(src, '/abs/path/to/file.tsrx'); // no { hmr: true }
-		expect(code).toMatch(/const _h\$0 = Symbol\(\);/);
+		expect(code).toMatch(/const _h\$0 = Symbol\("[a-z0-9]+#0"\);/);
+		expect(code).not.toMatch(/Symbol\(\)/); // description is load-bearing
 		expect(code).not.toMatch(/Symbol\.for/);
 		expect(code).not.toMatch(/abs\/path/);
 	});
@@ -190,7 +195,7 @@ describe('hmr — runtime wrapper', () => {
 		const dev = slotHooks(src, '/abs/custom.ts', { hmr: true });
 		expect(dev?.code).toMatch(/Symbol\.for\("octane:\/abs\/custom\.ts:useCounter\.useState#0"\)/);
 		const prod = slotHooks(src, '/abs/custom.ts');
-		expect(prod?.code).toMatch(/const _h\$0 = Symbol\(\);/);
-		expect(prod?.code).not.toMatch(/Symbol\.for|abs\/custom/);
+		expect(prod?.code).toMatch(/const _h\$0 = Symbol\("[a-z0-9]+#0"\);/);
+		expect(prod?.code).not.toMatch(/Symbol\(\)|Symbol\.for|abs\/custom/);
 	});
 });
