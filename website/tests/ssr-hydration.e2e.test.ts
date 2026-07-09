@@ -14,12 +14,27 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { rmSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { join } from 'node:path';
 
 const WEBSITE = join(process.cwd(), 'website');
 const ROUTES = ['/', '/docs', '/benchmarks', '/playground'];
-const DEV_PORT = 5299;
-const PREVIEW_PORT = 5300;
+
+// A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a
+// leftover server from an earlier run (or another checkout) already listening
+// there makes the spawned `--strictPort` server die instantly while
+// waitForHttp happily connects to the imposter — and the suite silently
+// asserts against foreign code. That exact failure mode shipped a red main.
+function getFreePort(): Promise<number> {
+	return new Promise((resolve, reject) => {
+		const srv = createServer();
+		srv.once('error', reject);
+		srv.listen(0, '127.0.0.1', () => {
+			const { port } = srv.address() as import('node:net').AddressInfo;
+			srv.close(() => resolve(port));
+		});
+	});
+}
 
 // One shared browser; `null` means Chromium isn't available → tests skip.
 let chromium: typeof import('playwright').chromium | null = null;
@@ -43,31 +58,75 @@ afterAll(async () => {
 	await browser?.close();
 });
 
-function waitForHttp(url: string, timeoutMs: number): Promise<void> {
+// Spawn a server in its OWN process group so stop() can kill the whole tree.
+// `pnpm exec …` is a wrapper: signalling just the wrapper can orphan the real
+// node server underneath, which then squats the port for every later run.
+function spawnServer(args: string[]): ChildProcess {
+	return spawn('pnpm', args, { cwd: WEBSITE, stdio: 'ignore', detached: true });
+}
+
+// Wait until the SPAWNED server answers. Rejects the moment the child exits —
+// without that, a startup death (port conflict, build error) is invisible and
+// the probe loop can end up talking to some other process entirely.
+function waitForServer(child: ChildProcess, url: string, timeoutMs: number): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
 	return new Promise((resolve, reject) => {
+		let settled = false;
+		const onExit = (code: number | null) => {
+			settled = true;
+			reject(new Error(`server for ${url} exited with code ${code} before listening`));
+		};
+		child.once('exit', onExit);
 		const probe = async () => {
+			if (settled) return;
 			try {
 				const res = await fetch(url);
-				if (res.status < 500) return resolve();
+				if (res.status < 500) {
+					// An HTTP answer proves something listens on the port — not that
+					// it's OUR child: it may have died mid-fetch with its 'exit'
+					// dispatch still queued while a foreign process answers. Give the
+					// exit event a beat to land, then require the child to be alive.
+					await new Promise((r) => setTimeout(r, 50));
+					if (settled) return; // onExit rejected meanwhile
+					if (child.exitCode !== null || child.signalCode !== null) {
+						settled = true;
+						child.off('exit', onExit);
+						return reject(new Error(`server at ${url} answered but the spawned process is dead`));
+					}
+					settled = true;
+					child.off('exit', onExit);
+					return resolve();
+				}
 			} catch {
 				// not up yet
 			}
-			if (Date.now() > deadline) return reject(new Error(`server at ${url} never came up`));
+			if (Date.now() > deadline) {
+				settled = true;
+				child.off('exit', onExit);
+				return reject(new Error(`server at ${url} never came up`));
+			}
 			setTimeout(probe, 250);
 		};
 		probe();
 	});
 }
 
+// Kill the child's whole process group (see spawnServer), SIGKILL fallback.
 async function stop(child: ChildProcess | undefined): Promise<void> {
-	if (!child || child.exitCode !== null) return;
-	child.kill('SIGTERM');
+	if (!child || child.pid === undefined || child.exitCode !== null) return;
+	const signalGroup = (sig: NodeJS.Signals) => {
+		try {
+			process.kill(-child.pid!, sig);
+		} catch {
+			child.kill(sig); // group already gone — signal the child directly
+		}
+	};
+	signalGroup('SIGTERM');
 	await new Promise((r) => {
 		child.once('exit', r);
 		setTimeout(r, 3000);
 	});
-	if (child.exitCode === null) child.kill('SIGKILL');
+	if (child.exitCode === null) signalGroup('SIGKILL');
 }
 
 // Load `path`, collecting console errors + page errors; returns the filtered
@@ -87,17 +146,16 @@ async function loadRoute(base: string, path: string) {
 
 describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	let server: ChildProcess;
+	let DEV_PORT: number;
 
 	beforeAll(async () => {
 		if (!browser) return;
+		DEV_PORT = await getFreePort();
 		// Fresh optimize-deps cache → deterministic cold start (the warmup pass
 		// below absorbs the one-time "Outdated Optimize Dep" reload).
 		rmSync(join(WEBSITE, 'node_modules/.vite'), { recursive: true, force: true });
-		server = spawn('pnpm', ['exec', 'vite', '--port', String(DEV_PORT), '--strictPort'], {
-			cwd: WEBSITE,
-			stdio: 'ignore',
-		});
-		await waitForHttp(`http://localhost:${DEV_PORT}/`, 60_000);
+		server = spawnServer(['exec', 'vite', '--port', String(DEV_PORT), '--strictPort']);
+		await waitForServer(server, `http://localhost:${DEV_PORT}/`, 60_000);
 		// Warmup pass: let vite discover + optimize every route's deps so the
 		// assertion pass sees steady-state dev behavior.
 		for (const route of ROUTES) {
@@ -131,20 +189,19 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 
 describe.sequential('website production build → hydration (octane-preview)', () => {
 	let server: ChildProcess;
+	let PREVIEW_PORT: number;
 
 	beforeAll(async () => {
 		if (!browser) return;
+		PREVIEW_PORT = await getFreePort();
 		await new Promise<void>((resolve, reject) => {
 			const build = spawn('pnpm', ['exec', 'vite', 'build'], { cwd: WEBSITE, stdio: 'ignore' });
 			build.once('exit', (code) =>
 				code === 0 ? resolve() : reject(new Error(`vite build exited ${code}`)),
 			);
 		});
-		server = spawn('pnpm', ['exec', 'octane-preview', '--port', String(PREVIEW_PORT)], {
-			cwd: WEBSITE,
-			stdio: 'ignore',
-		});
-		await waitForHttp(`http://localhost:${PREVIEW_PORT}/`, 30_000);
+		server = spawnServer(['exec', 'octane-preview', '--port', String(PREVIEW_PORT)]);
+		await waitForServer(server, `http://localhost:${PREVIEW_PORT}/`, 30_000);
 	}, 180_000);
 
 	afterAll(async () => {
