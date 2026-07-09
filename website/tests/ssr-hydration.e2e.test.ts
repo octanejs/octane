@@ -20,6 +20,18 @@ import { join } from 'node:path';
 const WEBSITE = join(process.cwd(), 'website');
 const ROUTES = ['/', '/docs', '/benchmarks', '/playground'];
 
+// M0 of docs/comment-marker-elision-plan.md: per-route comment-node ceilings
+// (~15% above 2026-07-09 measurements: / 2,123 · /docs 379 · /benchmarks
+// 17,381 (the 12 recharts cards — the de-opt childSlot weight M2 targets) ·
+// /playground 185). This is the CI-enforced DOM-weight ratchet — tighten as
+// the elision phases land, and treat a breach as a marker-minting regression.
+const COMMENT_CEILINGS: Record<string, number> = {
+	'/': 2450,
+	'/docs': 450,
+	'/benchmarks': 20000,
+	'/playground': 250,
+};
+
 // A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a
 // leftover server from an earlier run (or another checkout) already listening
 // there makes the spawned `--strictPort` server die instantly while
@@ -141,7 +153,13 @@ async function loadRoute(base: string, path: string) {
 	await page.goto(base + path, { waitUntil: 'networkidle' });
 	await page.waitForTimeout(400); // hydration commit + recovery warnings
 	const main = (await page.evaluate(() => document.querySelector('main')?.textContent)) ?? '';
-	return { page, errors, main };
+	const comments = await page.evaluate(() => {
+		const w = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
+		let n = 0;
+		while (w.nextNode()) n++;
+		return n;
+	});
+	return { page, errors, main, comments };
 }
 
 describe.sequential('website dev-SSR → hydration (real browser)', () => {
@@ -173,13 +191,18 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		{ timeout: 30_000 },
 		async (route, ctx) => {
 			if (!browser) return ctx.skip();
-			const { page, errors, main } = await loadRoute(`http://localhost:${DEV_PORT}`, route);
+			const { page, errors, main, comments } = await loadRoute(
+				`http://localhost:${DEV_PORT}`,
+				route,
+			);
 			try {
 				// Dev-compiled client warns on ANY hydration mismatch (recovery
 				// rebuilds silently otherwise) — zero tolerance here.
 				const real = errors.filter((e) => !e.includes('Failed to load resource'));
 				expect(real).toEqual([]);
 				expect(main.length).toBeGreaterThan(0);
+				// DOM-weight ratchet (see COMMENT_CEILINGS).
+				expect(comments).toBeLessThanOrEqual(COMMENT_CEILINGS[route]);
 			} finally {
 				await page.close();
 			}
