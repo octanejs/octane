@@ -8,6 +8,11 @@ import {
 	DefaultSelect,
 } from './_fixtures/controlled-forms.tsrx';
 
+// The dev warnings asserted below are gated on the dev-compile `__oct_loc`
+// stamp (silent in prod output, like React's prod bundle) — the octane-prod
+// vitest project compiles fixtures in prod mode and sets this env marker.
+const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
+
 // ============================================================================
 // Controlled <select> — ports of ReactDOMSelect-test.js (React v19.2.7).
 // The projection follows React's updateOptions: single → first match wins,
@@ -117,7 +122,9 @@ describe('conformance: controlled <select multiple>', () => {
 		const r = mount(MultiSelect, { values: ['1'] });
 		errSpy.mockClear();
 		r.update(MultiSelect, { values: 'nope' });
-		expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('must be an array'));
+		if (!PROD_COMPILE) {
+			expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('must be an array'));
+		}
 		const sel = r.find('#ms') as HTMLSelectElement;
 		expect(selected(sel)).toEqual(['1']); // projection skipped, prior state kept
 		r.unmount();

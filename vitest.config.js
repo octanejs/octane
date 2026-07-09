@@ -31,6 +31,38 @@ export default defineConfig({
 				],
 			},
 			{
+				// The SAME octane test files compiled in PRODUCTION mode (`hmr: false`
+				// → no HMR wrapper, no dev LOC metadata, plain Symbol("<hash>#<n>")
+				// hook slots). Vitest runs the plugin in serve mode, so without this
+				// project the prod compile branch has ZERO runtime coverage — which is
+				// how the 2026-07-08 bare-Symbol() slot regression shipped past 2,400
+				// green tests and broke website hydration on every route. Any test
+				// that specifically asserts DEV-ONLY plugin output belongs in the
+				// exclude list below (tests that call compile() with explicit flags
+				// are unaffected — they control their own options).
+				test: {
+					name: 'octane-prod',
+					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/octane/tests/differential/_setup.ts'],
+					globals: false,
+					// Mode probe for the handful of tests that assert DEV-ONLY runtime
+					// warnings (gated on the dev-compile __oct_loc stamp — silent in
+					// prod, like React's prod bundle): they conditionalize on this.
+					env: { OCTANE_TEST_COMPILE_MODE: 'prod' },
+				},
+				plugins: [
+					octane({
+						hmr: false,
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/tanstack-query/src/',
+							'/packages/motion/src/',
+						],
+					}),
+				],
+			},
+			{
 				test: {
 					name: 'zustand',
 					include: ['packages/zustand/tests/**/*.test.ts'],
