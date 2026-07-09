@@ -111,8 +111,14 @@ the runtime/compiler over patching tests or generated output.
 Octane is React-shaped but deliberately differs in a few places. Do **not** "fix"
 these toward React without checking `docs/react-parity-migration-plan.md`:
 
-- **No rules of hooks.** Hooks are tracked by compiler-assigned call-site slot, so
-  a hook may sit behind a condition, after an early return, or in a loop.
+- **No rules of hooks — except plain JS loops.** Hooks are tracked by
+  compiler-assigned call-site slot, so a hook may sit behind a condition or after
+  an early return. A slot-keyed hook in a plain JS loop is a **compile error**
+  (every iteration would share the one call-site slot — state/memo/effect entries
+  would silently collide); loop with the keyed `@for` template directive or
+  extract a child component — each item then renders in its own scope. `use()`
+  and `useContext` are exempt (call-order / context-identity keyed, not
+  slot-keyed).
 - **Controlled `value`/`checked` with native events.** Controlled form components
   follow React's semantics exactly (2026-07-08) — the prop drives the DOM property
   and reasserts on every commit and after discrete events; `defaultValue`/

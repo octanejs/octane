@@ -3282,8 +3282,128 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 // Hook-call rewriting
 // ===========================================================================
 
+// Plain JS loop statements (display word for the diagnostic). A TEMPLATE `@for`
+// also parses to a ForOfStatement — told apart by its JSX body, the same
+// classification isJsxNode uses — and is the SUPPORTED way to loop hooks: each
+// item renders in its own block scope (mountItem → renderBlock swaps
+// CURRENT_SCOPE per item), so per-item hooks get per-item state.
+const JS_LOOP_WORD = {
+	ForStatement: 'for',
+	ForInStatement: 'for…in',
+	ForOfStatement: 'for…of',
+	WhileStatement: 'while',
+	DoWhileStatement: 'do…while',
+};
+
+// A SLOT-KEYED hook call: a builtin base hook, or a custom hook by the
+// `use[A-Z]` convention (identifier or method form) — the same match
+// rewriteHookCalls slots below. `useContext` (keyed by context identity) and
+// bare `use` (keyed by per-render call order — `block.__thenableIdx` on the
+// client, the frame occurrence counter in runtime.server.ts) are NOT
+// slot-keyed, so they genuinely work in loops and are exempt.
+function slotKeyedHookName(n) {
+	if (n.type !== 'CallExpression') return null;
+	if (n.callee.type === 'Identifier') {
+		const name = n.callee.name;
+		if (HOOK_NAMES.has(name)) return name;
+		if (/^use[A-Z]/.test(name) && name !== 'useContext') return name;
+		return null;
+	}
+	if (
+		!n.optional &&
+		n.callee.type === 'MemberExpression' &&
+		!n.callee.computed &&
+		n.callee.property.type === 'Identifier' &&
+		/^use[A-Z]/.test(n.callee.property.name) &&
+		n.callee.property.name !== 'useContext'
+	) {
+		return n.callee.property.name;
+	}
+	return null;
+}
+
+// REJECT a slot-keyed hook lexically inside a plain JS loop. Hooks are keyed by
+// a per-call-site symbol, so every iteration of the loop would hit the ONE slot
+// assigned to that call site: useState/useReducer would share a single state
+// cell across all iterations, useMemo would recompute every iteration (each
+// iteration's deps overwrite the previous entry, only the last survives), and
+// slot-keyed effects would collide the same way — all silently. The scan skips
+// nested FUNCTION boundaries (a function declared in the loop may be a local
+// component or a deferred callback — each component instance gets its own
+// scope) and template directive constructs (their bodies compile to helpers
+// that render in their own block scopes).
+function rejectHookInJsLoop(loop, ctx, componentName) {
+	const seen = new WeakSet();
+	function walk(n) {
+		if (!n) return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (typeof n !== 'object') return;
+		const t = n.type;
+		if (!t || seen.has(n)) return;
+		seen.add(n);
+		if (
+			t === 'FunctionDeclaration' ||
+			t === 'FunctionExpression' ||
+			t === 'ArrowFunctionExpression'
+		)
+			return;
+		// Template directives — new JSX-expression forms are always template; the
+		// old statement forms are template exactly when their bodies hold JSX.
+		if (
+			t === 'JSXIfExpression' ||
+			t === 'JSXForExpression' ||
+			t === 'JSXTryExpression' ||
+			t === 'JSXSwitchExpression' ||
+			t === 'ActivityStatement'
+		)
+			return;
+		if (
+			(t === 'IfStatement' ||
+				t === 'ForOfStatement' ||
+				t === 'TryStatement' ||
+				t === 'SwitchStatement') &&
+			n !== loop &&
+			isJsxNode(n)
+		)
+			return;
+		const hook = slotKeyedHookName(n);
+		if (hook !== null) {
+			const l = (n.loc && n.loc.start) || (loop.loc && loop.loc.start);
+			const at = l
+				? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})`
+				: '';
+			throw new Error(
+				`\`${hook}\` is called inside a \`${JS_LOOP_WORD[loop.type]}\` loop in ${componentName}. ` +
+					`Hooks are keyed by call site, so every iteration would share this call site's ONE ` +
+					`hook slot — state, memo, and effect entries would silently collide across ` +
+					`iterations. Loop in the template with the keyed \`@for\` directive instead (each ` +
+					`item renders in its own scope, so per-item hooks get per-item state), or extract ` +
+					`the loop body into a child component. \`use()\` and \`useContext\` are exempt ` +
+					`(call-order / context-identity keyed, not slot-keyed).${at}`,
+			);
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+	walk(loop);
+}
+
 function rewriteHookCalls(node, ctx, componentName) {
 	return mapAst(node, (n) => {
+		// A plain JS loop must not contain slot-keyed hook calls — reject before
+		// slotting. (A template `@for` is also a ForOfStatement; its JSX body tells
+		// it apart, and it is the supported way to loop hooks.)
+		if (
+			JS_LOOP_WORD[n.type] !== undefined &&
+			!(n.type === 'ForOfStatement' && bodyContainsJsx(n.body))
+		) {
+			rejectHookInJsLoop(n, ctx, componentName);
+		}
 		if (n.type === 'CallExpression' && n.callee.type === 'Identifier') {
 			const name = n.callee.name;
 			// Three kinds of call get a trailing per-call-site slot symbol:
@@ -3298,7 +3418,8 @@ function rewriteHookCalls(node, ctx, componentName) {
 			// (or the same hook twice) stay independent.
 			//
 			// NB: a `use*` NAME is reserved for hooks (React's convention) — a non-hook
-			// function named like one gets a harmless extra trailing argument.
+			// function named like one gets a harmless extra trailing argument (though
+			// inside a plain JS loop the convention is enforced: rejectHookInJsLoop).
 			const isBuiltin = HOOK_NAMES.has(name);
 			const isCustom = /^use[A-Z]/.test(name) && name !== 'useContext';
 			const isServerUse = name === 'use' && ctx.mode === 'server';

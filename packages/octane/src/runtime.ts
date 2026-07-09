@@ -1974,8 +1974,10 @@ function missingSlot(name: string): never {
 // bindings that read the slot off their last argument keep working. BASE hooks keep
 // the plain trailing-slot form (`useState(0, sym)`); inside a wrapper, resolveSlot
 // folds the path in. Two calls to the same custom hook push DIFFERENT call-site
-// symbols → different paths → independent state; a hook in a loop repeats one
-// call-site symbol, which the compiler rejects.
+// symbols → different paths → independent state; a hook in a plain JS loop would
+// repeat one call-site symbol, so the compiler rejects it (rejectHookInJsLoop in
+// compile.js — the keyed `@for` template block is the supported loop: each item
+// renders in its own scope).
 const slotStack: symbol[] = [];
 export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T {
 	slotStack.push(sym);
