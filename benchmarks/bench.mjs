@@ -241,12 +241,12 @@ const SUITES = [
 	},
 	{
 		// Async data-loading model (10 nested async levels, 16ms simulated latency
-		// per level): React/Octane nested `use()` serializes the fetches (the
-		// suspense waterfall — expected ≈10× the latency floor) while Solid 2.0 /
-		// ripple start all levels in parallel (≈1×). Exists to pin the waterfall
-		// BEFORE octane's compiler-parallelized `use` work lands
-		// (docs/suspense-parallel-use-plan.md) — don't guard octane against the
-		// fine-grained frameworks until then.
+		// per level): React's nested `use()` serializes the fetches (the suspense
+		// waterfall, ≈10-19× the latency floor). Octane compiles the SAME idiomatic
+		// nested-use code with the parallelUse pipeline (memoized creations +
+		// batched unwrap + fetch-tree warming — docs/suspense-parallel-use-plan.md)
+		// and lands at the parallel floor alongside Solid 2.0 / ripple (≈1.2×).
+		// Guarded both ways: ≤0.25× React, ≤1.5× solid/ripple.
 		name: 'async-waterfall',
 		cwd: 'async-waterfall',
 		servers: [

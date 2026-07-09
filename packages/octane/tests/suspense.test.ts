@@ -16,6 +16,7 @@ import {
 	SiblingBoundaries,
 	ParallelInOneBoundary,
 	WaterfallBody,
+	ReplayChurnBody,
 } from './_fixtures/suspense.tsrx';
 
 interface Deferred<T> {
@@ -371,19 +372,14 @@ describe('Suspense — parallel boundaries (no waterfall)', () => {
 		r.unmount();
 	});
 
-	it('WITHOUT useMemo, sequential use() inside one body waterfalls (documents the gotcha)', async () => {
-		// KNOWN DIVERGENCE FROM REACT: this is a regression-pin for octane-
-		// next's current sequential-replay strategy — NOT a React-canonical
-		// contract. React's runtime would also waterfall in this pattern (the
-		// first use() must resolve before the body re-runs past it), so the
-		// shape of the divergence is more about octane's per-replay
-		// call counts than about user-visible behavior. See
-		// SUSPENSE_DIVERGENCE.md for the full picture.
-		//
-		// This test exists to make the waterfall explicit so future contributors
-		// understand the constraint — and so any future optimization that
-		// accidentally fixes it (e.g. running siblings speculatively) will fail
-		// this test and force a conscious decision.
+	it('sequential use() inside one body starts both fetches in parallel (parallelUse transform)', async () => {
+		// INTENTIONAL DIVERGENCE FROM REACT (docs/suspense-parallel-use-plan.md):
+		// this used to be the waterfall regression-pin — the first use() threw
+		// before startB() ever ran. The parallelUse pipeline memoizes both
+		// creations, hoists them above the first unwrap, and batches the
+		// suspension, so BOTH fetches start in the first attempt and each
+		// factory runs exactly once (memo deps [props.startA]/[props.startB]).
+		// React waterfalls here; Octane deliberately does not.
 		let aStarts = 0,
 			bStarts = 0;
 		const da = deferred<string>(),
@@ -398,25 +394,73 @@ describe('Suspense — parallel boundaries (no waterfall)', () => {
 		};
 
 		const r = mount(WaterfallBody, { startA, startB });
-		// First render: startA() called (suspends), startB() never reached.
+		// First render: BOTH creations ran before the batch suspended.
 		expect(aStarts).toBe(1);
-		expect(bStarts).toBe(0); // waterfall — B not started
+		expect(bStarts).toBe(1);
 		expect(r.find('.fallback').textContent).toBe('loading');
 
-		// Resolve A → replay starts. On replay startA() is called again (returns
-		// the SAME pending promise so use() reads its cached fulfilled value),
-		// and NOW startB() is reached for the first time.
+		// Resolving only A does not replay — the batch waits for the stratum.
 		await act(() => {
 			da.resolve('A');
 		});
-		expect(aStarts).toBe(2);
-		expect(bStarts).toBe(1); // only NOW does B start
-		expect(r.find('.fallback').textContent).toBe('loading'); // still suspended on B
+		expect(r.find('.fallback').textContent).toBe('loading');
+		expect(aStarts).toBe(1); // memo held — no refetch on any attempt
+		expect(bStarts).toBe(1);
 
 		await act(() => {
 			db.resolve('B');
 		});
 		expect(r.find('.both').textContent).toBe('A/B');
+		expect(aStarts).toBe(1);
+		expect(bStarts).toBe(1);
+		r.unmount();
+	});
+
+	it('batched unwrap: one replay per suspension episode, not one per promise', async () => {
+		// The flipped Phase 3 target of docs/suspense-parallel-use-plan.md
+		// (formerly the replay-churn pin: 3 attempts per episode). Both promises
+		// pre-exist (props); the batch suspends ONCE on the whole stratum, the
+		// boundary retries when all members settle, so each episode costs
+		// exactly two attempts: the suspending one + the committing replay.
+		let attempts = 0;
+		const onAttempt = () => {
+			attempts++;
+		};
+		const da = deferred<string>();
+		const db = deferred<string>();
+		const r = mount(ReplayChurnBody, { a: da.promise, b: db.promise, onAttempt });
+		expect(attempts).toBe(1); // attempt 1: batch suspends on {a, b}
+		expect(r.find('.fallback').textContent).toBe('loading');
+
+		await act(() => {
+			da.resolve('A');
+		});
+		// No replay for a partial stratum — the batch waits for b too.
+		expect(attempts).toBe(1);
+		expect(r.find('.fallback').textContent).toBe('loading');
+
+		await act(() => {
+			db.resolve('B');
+		});
+		expect(attempts).toBe(2); // attempt 2 commits
+		expect(r.find('.both').textContent).toBe('A/B');
+
+		// Update with FRESH pending promises: same two-attempt shape again.
+		const dc = deferred<string>();
+		const dd = deferred<string>();
+		r.update(ReplayChurnBody, { a: dc.promise, b: dd.promise, onAttempt });
+		expect(attempts).toBe(3); // attempt 3: batch suspends on {new a, new b}
+
+		await act(() => {
+			dc.resolve('C');
+		});
+		expect(attempts).toBe(3); // still waiting on new b — no churn replay
+
+		await act(() => {
+			dd.resolve('D');
+		});
+		expect(attempts).toBe(4); // attempt 4 commits
+		expect(r.find('.both').textContent).toBe('C/D');
 		r.unmount();
 	});
 });

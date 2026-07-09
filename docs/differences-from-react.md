@@ -109,6 +109,31 @@ time-slicing, expiration, or selective hydration. Consequences:
   unchanged values (the concurrent-interleaving window it guards doesn't exist
   here).
 
+## Parallel `use()`: no suspense waterfalls (opt-in `parallelUse`)
+
+With the compiler's `parallelUse` option (off by default while it soaks;
+docs/suspense-parallel-use-plan.md), idiomatic sequential `use()` code stops
+waterfalling — React runs the same code serially:
+
+- **Creations are memoized per call site**: `use(fetchA(id))` compiles to a
+  slot-keyed memo with member-path deps (`[fetchA, id]`), so replays never mint
+  fresh promises and refetch happens exactly when inputs change.
+- **Independent creations start together**: provably-independent `use()`
+  arguments in one body are hoisted above the first unwrap and the boundary
+  suspends ONCE on the whole stratum (one replay per settled batch, not one per
+  promise). True data dependencies (`use(f(a))`) stay sequential.
+- **Fetch trees warm across components**: a suspended body prefetches
+  descendants whose reachability and props are provably independent of the
+  suspended data (compiled `__warm` plans, depth-capped recursion), so a nested
+  async chain loads in max(latency), not levels × latency —
+  `benchmarks/async-waterfall`: 20.1ms vs React's 307.3ms on a 10-level chain.
+- Unwrap order, hydration-seed order, rejection routing (`@catch` receives the
+  first-in-order reason), and `@pending`/transition semantics are unchanged.
+- Runtime safety nets (React parity, always on, flag or no flag): a replay that
+  creates a fresh promise for a slot that already holds one reuses the stored
+  thenable ("uncached promise" dev warning), and a replay that discovers a new
+  pending `use()` behind a data dependency gets a dev waterfall diagnostic.
+
 ## Errors: `@try` / `@catch`, not class boundaries
 
 `@catch (err, reset)` (and the JSX `<ErrorBoundary>`) replaces class

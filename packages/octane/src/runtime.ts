@@ -1516,9 +1516,29 @@ export function renderBlock(block: Block): void {
 	// at the TOP so a re-entrant setState during this render re-queues correctly.
 	block.pending = false;
 	// Reset the per-render `use(thenable)` call-order counter. Cached entries
-	// in __thenables persist so that earlier use() calls return synchronously
-	// on replay-after-resolve (matches React's thenableState[index] scheme).
+	// in __thenables persist ONLY across the failed attempts of ONE suspension
+	// episode: earlier use() calls return synchronously on replay-after-resolve
+	// (React's thenableState[index] scheme), and the resume-replay reuse
+	// leniency may consult them. They die on (a) any NON-replay render — a
+	// fresh episode with possibly-new promises — and (b) the render after a
+	// COMPLETED body (React parity: thenableState is cleared by
+	// finishRenderingHooks), so a child whose entries date from a previously
+	// committed episode can never shadow a legitimately new promise arriving
+	// mid-resume via changed props. (The resolved-value cache itself lives on
+	// each thenable's status/value expandos, not in this array, so dropping
+	// entries loses nothing.)
 	block.__thenableIdx = 0;
+	{
+		const tState = (block as any).__thenables as unknown[] | undefined;
+		if (
+			tState !== undefined &&
+			tState.length !== 0 &&
+			(!RESUME_REPLAY || (block as any).__thenableDone === true)
+		) {
+			tState.length = 0;
+		}
+		(block as any).__thenableDone = false;
+	}
 	// Clear last render's recorded context dependencies; this render repopulates
 	// them (its own reads + descendant reads propagated up). Only memo blocks
 	// ever hold a non-null map, so this is a no-op for the common case.
@@ -1593,6 +1613,9 @@ export function renderBlock(block: Block): void {
 			}
 		}
 		if (!block.mounted) block.mounted = true;
+		// Body completed without suspending: its use() episode is over — the
+		// next render (replay or not) must not reuse these entries.
+		(block as any).__thenableDone = true;
 	} finally {
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
@@ -2175,6 +2198,17 @@ export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[], slot?: 
 	const prev = scope.hooks?.get(s) as { deps: any[] | undefined; value: T } | undefined;
 	// deps === undefined → recompute every render (React parity for omitted deps).
 	if (prev && d !== undefined && !depsChanged(prev.deps, d)) return prev.value;
+	// Parallel-use warming: before recomputing, adopt a prefetched creation for
+	// this slot (started by warmMemo during a suspended ancestor's warm walk) —
+	// the fetch is already in flight. Only compiler-warmed slots can hit;
+	// WARM_EVER keeps the ancestor walk off apps that never warm.
+	if (WARM_EVER && d !== undefined) {
+		const adopted = adoptWarmValue(s, d);
+		if (adopted !== WARM_MISS) {
+			ensureHooks(scope).set(s, { deps: d, value: adopted });
+			return adopted as T;
+		}
+	}
 	// Spread deps as positional args (superset of React — see PendingEffect.args):
 	// a factory written as a pure function of its deps is hoistable. Zero-arg
 	// React-style factories ignore the extra args.
@@ -2808,24 +2842,277 @@ function useThenable<T>(thenable: TrackedThenable<T>): T {
 		throw new SuspenseException(thenable);
 	}
 
+	// Resume-replay leniency (React parity: ReactFiberThenable's "reuse the
+	// previous thenable, and drop the new one"): the body is replaying after a
+	// resolution, and an UNMEMOIZED creation minted a fresh promise for a slot
+	// that already holds one. Components are assumed idempotent — keep the
+	// stored thenable; the fresh one's fetch already fired (that duplicate
+	// request is exactly what the compiler's use()-argument memoization
+	// eliminates). Without this, a fresh promise per replay re-suspends
+	// forever. Normal renders (updates with genuinely new promises) take the
+	// replacement path below unchanged.
+	if (stored !== undefined && RESUME_REPLAY) {
+		warnUncachedUsePromise(block);
+		if (stored.status === 'fulfilled') return stored.value as T;
+		if (stored.status === 'rejected') throw stored.reason;
+		throw new SuspenseException(stored);
+	}
+
 	// New thenable at this slot — tag status if untracked, attach listeners.
 	state[idx] = thenable;
+	trackThenable(thenable);
 	if (thenable.status === 'fulfilled') return thenable.value as T;
 	if (thenable.status === 'rejected') throw thenable.reason;
-	if (thenable.status !== 'pending') {
-		thenable.status = 'pending';
-		thenable.then(
-			(v) => {
-				thenable.status = 'fulfilled';
-				thenable.value = v;
-			},
-			(e) => {
-				thenable.status = 'rejected';
-				thenable.reason = e;
-			},
-		);
-	}
+	// Waterfall diagnostic: a replay reached a use() slot this body had never
+	// executed before (earlier slots have history, this one doesn't) and it is
+	// pending — a sequential dependency the parallel-start transform could not
+	// hoist. Informational, dev-compiled output only.
+	if (RESUME_REPLAY && idx > 0 && state[idx - 1] !== undefined) warnUseWaterfall(block, idx);
 	throw new SuspenseException(thenable);
+}
+
+// Tag a thenable's `status`/`value`/`reason` expandos and attach the settle
+// listeners exactly once (a thenable that already carries a status — React 19
+// cache() shape, or one we tagged earlier — is left untouched).
+function trackThenable(thenable: TrackedThenable<any>): void {
+	if (thenable.status !== undefined) return;
+	thenable.status = 'pending';
+	thenable.then(
+		(v) => {
+			thenable.status = 'fulfilled';
+			thenable.value = v;
+		},
+		(e) => {
+			thenable.status = 'rejected';
+			thenable.reason = e;
+		},
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Parallel use() — batched unwrap + fetch-tree warming.
+// (docs/suspense-parallel-use-plan.md; emitted by the compiler's parallelUse
+// pipeline as _$useBatch / _$warmMemo / _$warmChild.)
+// ---------------------------------------------------------------------------
+
+/**
+ * True while commitResume replays a try body after a resolution. Gates the
+ * fresh-thenable reuse leniency and the waterfall diagnostic in useThenable —
+ * both are replay-only semantics; ordinary updates must keep replacing.
+ */
+let RESUME_REPLAY = false;
+
+/** Dev gate, matching the hydration-warning convention: source-location
+ * metadata (`__s.locs` / `__s.locFile`) exists only in dev-compiled output,
+ * so prod stays silent while the recovery behavior itself runs everywhere. */
+function devHintsEnabled(): boolean {
+	const s = CURRENT_SCOPE as any;
+	return s != null && (s.locs !== undefined || s.locFile !== undefined);
+}
+const warnedUncached = new WeakSet<Block>();
+function warnUncachedUsePromise(block: Block): void {
+	if (!devHintsEnabled() || warnedUncached.has(block)) return;
+	warnedUncached.add(block);
+	console.error(
+		'A component was suspended by an uncached promise: a replay created a fresh ' +
+			'promise for a use() slot that already had one, so the stored promise was ' +
+			'reused and the fresh request was wasted. Create the promise outside the ' +
+			'component, cache it, or enable the compiler`s parallelUse transform ' +
+			'(which memoizes use() arguments per call site).',
+	);
+}
+const warnedWaterfall = new WeakSet<Block>();
+function warnUseWaterfall(block: Block, idx: number): void {
+	if (!devHintsEnabled() || warnedWaterfall.has(block)) return;
+	warnedWaterfall.add(block);
+	console.error(
+		`use() waterfall: a replay discovered a new pending promise at call index ${idx} ` +
+			'that only starts after the earlier use() resolved. If it does not depend on ' +
+			'the earlier value, restructure so both promises are created before the first ' +
+			'use() (the parallelUse compiler transform does this automatically for ' +
+			'independent arguments).',
+	);
+}
+
+/**
+ * Batched unwrap for a stratum of use() promises (compiler-emitted before the
+ * unwrap statements). Tags every thenable, skips non-thenables (Contexts pass
+ * through untouched), and — if any are still pending — throws ONE
+ * SuspenseException whose thenable settles when ALL members fulfil or the
+ * FIRST member rejects. One boundary retry per stratum instead of one per
+ * promise; the unwraps then read settled values from the thenable expandos in
+ * their original (hydration-seed-preserving) order.
+ *
+ * `warm` is the compiler-built fetch-tree thunk: invoked only on the throwing
+ * path (a resolved batch costs nothing), it prefetches provably-independent
+ * descendant fetches via warmChild/warmMemo so the whole tree loads in
+ * max(depth-of-true-dependencies) rounds instead of one round per component.
+ */
+export function useBatch(items: any[], warm?: () => void): void {
+	// Hydrating: every use() adopts a server seed synchronously — nothing to
+	// batch, and warming would duplicate fetches the server already resolved.
+	if (hydrating && hydrationSeeds !== null) return;
+	let pending: TrackedThenable<any>[] | null = null;
+	for (let i = 0; i < items.length; i++) {
+		const it = items[i];
+		if (it == null || typeof it.then !== 'function') continue; // Context / non-thenable
+		trackThenable(it);
+		// A rejected member ends the batch AT ITS POSITION (sequential
+		// semantics): earlier pendings still gate (suspend on them), but later
+		// members must not — the unwraps need to run so this rejection reaches
+		// its use() and routes to @catch instead of re-suspending forever.
+		if (it.status === 'rejected') break;
+		if (it.status === 'pending') (pending ??= []).push(it);
+	}
+	if (pending === null) return;
+	if (warm !== undefined) runWarm(warm);
+	// Single pending member: suspend on it DIRECTLY — semantics (and microtask
+	// hop count) identical to a plain use() suspension, and attachResume's
+	// pendingThenable dedup keeps working on the stable promise identity.
+	if (pending.length === 1) throw new SuspenseException(pending[0]);
+	const members = pending;
+	let remaining = members.length;
+	const combined: TrackedThenable<void> = new Promise<void>((resolve, reject) => {
+		for (let i = 0; i < members.length; i++) {
+			members[i].then(() => {
+				if (--remaining === 0) resolve();
+			}, reject);
+		}
+	});
+	throw new SuspenseException(combined);
+}
+
+// ── Fetch-tree warming ──────────────────────────────────────────────────────
+//
+// A warm cache is a per-block Map<slot, Array<{deps, value}>> populated by
+// warmMemo during a suspended body's warm walk and consumed by useMemo when
+// the real descendant mounts (adoption = transfer, so entries don't outlive
+// their one use). The cache lives on the block that ran the batch — every
+// descendant mounts inside it, so adoption walks parentBlock links. Orphans
+// (warmed but never adopted, e.g. a guard flipped) are bounded by the
+// per-slot FIFO cap and die with the block.
+
+interface WarmEntry {
+	deps: any[];
+	value: any;
+}
+let CURRENT_WARM: Map<symbol, WarmEntry[]> | null = null;
+/** Flips true forever on first warm — gates useMemo's ancestor walk so apps
+ * that never warm never pay for it. */
+let WARM_EVER = false;
+let WARM_DEPTH = 0;
+const WARM_DEPTH_CAP = 64;
+const WARM_SLOT_CAP = 64;
+const WARM_MISS = Symbol('octane.warm.miss');
+
+function runWarm(fn: () => void): void {
+	// Reuse the nearest ancestor's cache when one exists: a descendant that
+	// suspends mid-cascade re-warms its own subtree, and its entries must
+	// dedup against what the ancestor's walk already started (one cache per
+	// warming subtree, not per suspending block).
+	let cache: Map<symbol, WarmEntry[]> | undefined;
+	for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
+		cache = (b as any).__warmCache;
+		if (cache !== undefined) break;
+	}
+	if (cache === undefined) {
+		cache = new Map();
+		(CURRENT_BLOCK! as any).__warmCache = cache;
+	}
+	WARM_EVER = true;
+	const prev = CURRENT_WARM;
+	CURRENT_WARM = cache;
+	try {
+		fn();
+	} catch {
+		// Warming is speculative — it must never break the render that
+		// triggered it. A throwing warm plan just means fewer prefetches.
+	} finally {
+		CURRENT_WARM = prev;
+	}
+}
+
+/**
+ * Start (and cache) one prefetched creation. Dedups on (slot, deps) so
+ * re-warming during a second attempt never double-starts a fetch. The value
+ * is status-tagged immediately so the real use() unwrap reads it directly.
+ */
+export function warmMemo(compute: () => any, deps: any[], slot: symbol): void {
+	const cache = CURRENT_WARM;
+	if (cache === null) return;
+	let list = cache.get(slot);
+	if (list !== undefined) {
+		for (let i = 0; i < list.length; i++) {
+			if (!depsChanged(list[i].deps, deps)) return; // already warmed
+		}
+	}
+	let value: any;
+	try {
+		value = compute();
+	} catch {
+		return; // speculative — a throwing creation is simply not warmed
+	}
+	if (value != null && typeof value.then === 'function') trackThenable(value);
+	if (list === undefined) {
+		list = [];
+		cache.set(slot, list);
+	}
+	list.push({ deps, value });
+	if (list.length > WARM_SLOT_CAP) list.shift();
+}
+
+/**
+ * Recurse the warm walk into a child component's compiled fetch plan
+ * (`Comp.__warm`, emitted by the compiler when the child's reachability and
+ * props are provably independent of suspended values). No-ops for components
+ * without a plan. Depth-capped as a backstop for recursion the compiler
+ * cannot prove finite.
+ */
+export function warmChild(comp: any, props: any): void {
+	if (CURRENT_WARM === null || comp == null) return;
+	const plan = comp.__warm;
+	if (typeof plan !== 'function') return;
+	if (WARM_DEPTH >= WARM_DEPTH_CAP) {
+		if (devHintsEnabled()) {
+			console.error(
+				`warmChild: fetch-tree warm walk exceeded ${WARM_DEPTH_CAP} levels — ` +
+					'stopping speculative prefetch here (rendering is unaffected). ' +
+					'Is a recursive component missing its termination guard?',
+			);
+		}
+		return;
+	}
+	WARM_DEPTH++;
+	try {
+		plan(props);
+	} catch {
+		// Speculative — ignore.
+	} finally {
+		WARM_DEPTH--;
+	}
+}
+
+/** Adoption lookup for useMemo: nearest ancestor warm cache entry for this
+ * slot with matching deps. Transfer semantics — the entry is removed. */
+function adoptWarmValue(slot: symbol, deps: any[]): any {
+	let b: Block | null = CURRENT_BLOCK;
+	while (b !== null) {
+		const cache: Map<symbol, WarmEntry[]> | undefined = (b as any).__warmCache;
+		if (cache !== undefined) {
+			const list = cache.get(slot);
+			if (list !== undefined) {
+				for (let i = 0; i < list.length; i++) {
+					if (!depsChanged(list[i].deps, deps)) {
+						const value = list[i].value;
+						list.splice(i, 1);
+						return value;
+					}
+				}
+			}
+		}
+		b = b.parentBlock;
+	}
+	return WARM_MISS;
 }
 
 // ---------------------------------------------------------------------------
@@ -8529,6 +8816,8 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			// raw fn — otherwise we'd nest wrappers on each edit.
 			const incomingMeta = (incoming as any)[HMR] as HmrMeta | undefined;
 			meta.fn = incomingMeta ? incomingMeta.fn : incoming;
+			// Keep the forwarded fetch plan in sync with the swapped body.
+			(wrapper as any).__warm = (meta.fn as any).__warm;
 			// Mutate every live block's body in place and schedule a re-render.
 			// The hook map persists (stable Symbol.for-based keys), so useState/
 			// useEffect/etc. pick up their existing slots on the next render.
@@ -8553,6 +8842,10 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 		return meta.fn(props as any, scope, extra);
 	}
 	(wrapper as HmrWrapper)[HMR] = meta;
+	// Forward the parallel-use fetch plan (docs/suspense-parallel-use-plan.md):
+	// the compiler attaches `__warm` to the INNER function; cross-module
+	// consumers hold this wrapper, so warmChild must find the plan here too.
+	if ((fn as any).__warm !== undefined) (wrapper as any).__warm = (fn as any).__warm;
 	return wrapper as ComponentBody<P>;
 }
 
@@ -9144,6 +9437,11 @@ function commitResume(state: TrySlot): void {
 			// Reveal: clear the hidden-subtree inactive flag (set on hide) so its effects
 			// re-enqueue + re-fire (recreate) during this resume render.
 			state.tryBlock.inactive = false;
+			// Mark the replay window: useThenable's fresh-thenable reuse leniency
+			// and the waterfall diagnostic apply only while a resolved suspension
+			// is being replayed (ordinary updates must keep replacing thenables).
+			const prevReplay = RESUME_REPLAY;
+			RESUME_REPLAY = true;
 			try {
 				renderBlock(state.tryBlock);
 				state.hasResolved = true;
@@ -9159,6 +9457,8 @@ function commitResume(state: TrySlot): void {
 			} catch (err) {
 				if (isSuspenseException(err)) handleSuspense(state, err.thenable, state.tryBlock!);
 				else switchToCatch(state, err);
+			} finally {
+				RESUME_REPLAY = prevReplay;
 			}
 		} else {
 			mountTry(state);
