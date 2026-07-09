@@ -54,8 +54,6 @@ describe('/playground route', () => {
 	it('renders the shell: mode switch, view switch, and both panels', async () => {
 		const { container } = await renderRoute('/playground');
 
-		expect(container.querySelector('.pg-title')?.textContent).toBe('Playground');
-
 		// Source-language switch (disabled until the editor stack boots).
 		const langGroup = container.querySelector('[aria-label="Source language"]');
 		const langButtons = Array.from(langGroup?.querySelectorAll('button') ?? []);

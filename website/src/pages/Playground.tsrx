@@ -69,13 +69,23 @@ export function Playground() @{
 		let hashDebounceId = 0;
 
 		(async () => {
-			const [stateMod, commandsMod, viewMod, shikiMod, pg] = await Promise.all([
-				import('@codemirror/state'),
-				import('@codemirror/commands'),
-				import('@codemirror/view'),
-				import('../lib/shiki-codemirror.ts'),
-				import('../lib/playground.ts'),
-			]);
+			let stateMod: any, commandsMod: any, viewMod: any, shikiMod: any, pg: any;
+			try {
+				[stateMod, commandsMod, viewMod, shikiMod, pg] = await Promise.all([
+					import('@codemirror/state'),
+					import('@codemirror/commands'),
+					import('@codemirror/view'),
+					import('../lib/shiki-codemirror.ts'),
+					import('../lib/playground.ts'),
+				]);
+			} catch (bootError) {
+				// A load failure after unmount (e.g. a test env torn down mid-import)
+				// must not become an unhandled rejection; while mounted, surface it.
+				if (!disposed) {
+					setError(bootError instanceof Error ? bootError.message : String(bootError));
+				}
+				return;
+			}
 			if (disposed) return;
 
 			const { EditorState, Compartment } = stateMod;
@@ -350,11 +360,6 @@ export function Playground() @{
 				display: flex;
 				align-items: center;
 				gap: 1rem;
-			}
-			.pg-title {
-				margin: 0;
-				font-size: 1.15rem;
-				color: #f4eee8;
 			}
 			.pg-seg {
 				display: inline-flex;
