@@ -14,6 +14,10 @@
  *     per-module auto-detection above. Useful for a dedicated server build.
  *   - `hmr`: defaults to on in serve mode and is always off for SSR; pass
  *     `true`/`false` to override the client default.
+ *   - `parallelUse`: enable the parallel-`use()` pipeline (auto-memoized
+ *     creations, hoisted parallel starts, batched unwrap, fetch-tree warming
+ *     — docs/suspense-parallel-use-plan.md). Off by default while the
+ *     feature soaks; client mode only.
  */
 import { compile } from './compile.js';
 import { slotHooks } from './slot-hooks.js';
@@ -54,6 +58,7 @@ export function octane(options = {}) {
 					// Dev-only hydration source-LOC metadata — same serve+client gate as HMR.
 					// Off in SSR + prod builds, so production output is byte-identical.
 					dev: !ssr && !!hmrEnabled,
+					parallelUse: !!options.parallelUse,
 				});
 				return { code: out.code, map: out.map };
 			}

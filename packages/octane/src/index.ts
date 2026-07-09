@@ -141,6 +141,11 @@ export {
 	renderBlock,
 	portal,
 	withSlot,
+	// Parallel use() (compiler parallelUse pipeline): batched stratum unwrap +
+	// fetch-tree warming (docs/suspense-parallel-use-plan.md).
+	useBatch,
+	warmMemo,
+	warmChild,
 	provideContext,
 	mountFragmentRef,
 	FragmentInstance,

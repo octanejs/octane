@@ -12,31 +12,33 @@ its child.
 
 ## What it demonstrates
 
-- **octane / React** (`use(fetch)` under `<Suspense>`, `startTransition`
-  updates): level N+1 doesn't mount — and doesn't *start fetching* — until
-  level N's promise resolved, so the fetches **serialize**: init/update land
-  near the waterfall floor of `LEVELS × DELAY` (~160ms). This is idiomatic
-  nested `use`, deliberately NOT hand-hoisted — the suite pins the model cost.
+- **octane** (`use(fetch)` under `<Suspense>`, `startTransition` updates,
+  compiled with the `parallelUse` pipeline — see the app's vite config and
+  docs/suspense-parallel-use-plan.md): the code is idiomatic nested `use`,
+  deliberately NOT hand-hoisted — the COMPILER memoizes each level's fetch
+  creation, batches the suspension, and warm-walks the child chain
+  (`Level.__warm`), so **every level's fetch starts in the first attempt**:
+  init/update land near the `DELAY` parallel floor (~19-20ms).
+- **React** (same idiomatic nested `use`): level N+1 doesn't mount — and
+  doesn't *start fetching* — until level N's promise resolved, so the fetches
+  **serialize** near (init: roughly double, via retry scheduling) the
+  `LEVELS × DELAY` waterfall floor.
 - **Solid 2.0** (async memos: a memo whose compute returns a promise
   auto-unwraps and throws `NotReadyError` into a per-level
   `createLoadingBoundary`) and **ripple** (per-level tracked value filled by an
-  effect-driven fetch): the whole tree is created immediately, all fetches
-  start in **parallel** — init/update land near the `DELAY` floor (~16-18ms),
-  and updates are fine-grained writes with no re-render cascade.
+  effect-driven fetch): parallel by model — the whole tree is created
+  immediately; init/update land near the `DELAY` floor.
 
-Recorded medians (2026-07-08): octane-tsrx init 174.8ms (10.9× floor) /
-update 172.4ms; React init 305.1ms (19.1× — its suspense retry scheduling
-roughly doubles its own waterfall) / update 173.9ms; solid 18.4/17.6ms;
-ripple 18.2/17.6ms.
+Recorded medians (2026-07-09, parallelUse on): octane-tsrx init 20.1ms
+(1.3× floor) / update 19.1ms; React init 307.3ms (19.2×) / update 190.1ms;
+solid 19.0/18.6ms; ripple 19.2/17.5ms. (Pre-pipeline, 2026-07-08: octane was
+174.8/172.4ms — 10.9× the floor, the waterfall this suite existed to pin.)
 
 ## Guards
 
-Only octane-vs-React is ratio-guarded (both are waterfall-by-model; octane
-must stay at-or-under React). Octane is deliberately NOT guarded against
-solid/ripple: the ~10× gap is the model, and closing it is planned work —
-compiler-parallelized `use` (docs/suspense-parallel-use-plan.md). When that
-lands, tighten the guards and add octane-vs-solid/ripple ceilings so the win
-can't regress.
+Octane is ratio-guarded on BOTH sides now: ≤0.25× React (a regression back
+toward per-level rounds fails loudly) and ≤1.5× solid/ripple on init+update
+(the parallel-floor win the parallelUse pipeline earned must not regress).
 
 ## Running
 

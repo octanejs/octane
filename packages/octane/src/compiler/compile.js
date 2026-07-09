@@ -1544,11 +1544,17 @@ export function compile(source, filename, options) {
 	// name), used by hydration-mismatch warnings and reusable by a future Chrome-DevTools
 	// element→source layer. Strictly dev-gated so PROD output is byte-identical (zero cost).
 	const devEnabled = !!(options && options.dev);
+	// parallelUse: the parallel-`use()` transform pipeline (auto-memoized
+	// creations → hoisted parallel starts → batched unwrap → __warm fetch
+	// plans; docs/suspense-parallel-use-plan.md). Opt-in while it lands
+	// phase-by-phase; output MUST stay byte-identical with the flag off.
+	const parallelUseEnabled = !!(options && options.parallelUse);
 
 	const ctx = {
 		filename,
 		mode,
 		dev: devEnabled,
+		parallelUse: parallelUseEnabled,
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
@@ -1560,6 +1566,8 @@ export function compile(source, filename, options) {
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
 		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
 		nextHookSymId: 0,
+		nextPuId: 0, // parallel-use `__pu$N` hoisted-creation temps
+		_pendingWarm: null, // `X.__warm = …` source, set by compileFunctionBody, drained by compileComponent
 		nextFragId: 0,
 		nextTemplateId: 0,
 		nextHelperId: 0,
@@ -3108,12 +3116,20 @@ function compileComponent(node, ctx, options) {
 		ctx.knownStringLocals = prevKnownStr;
 	}
 
+	// parallelUse warm plan: attached to the INNER function object (not the
+	// module const) so the component's own body — where the function-
+	// expression name shadows the const — resolves `_$warmChild(Self, …)` to
+	// an object that carries the plan. hmr() forwards `__warm` from the
+	// wrapped fn onto its wrapper for cross-module references.
+	const warmedFn = ctx._pendingWarm ? `Object.assign(${fn}, { __warm: ${ctx._pendingWarm} })` : fn;
+	ctx._pendingWarm = null;
+
 	// HMR-wrap exported components inline so the binding stays a `const` (no
 	// reassignment dance needed). The wrapper preserves the user-facing
 	// function-name identity by NAMING the inner FunctionExpression — `hmr`
 	// returns a wrapper that delegates to whatever fn is currently committed,
 	// and `module.Foo[HMR].update(...)` swaps it on each accept.
-	const valueExpr = hmrWrap && isExported ? `_$hmr(${fn})` : fn;
+	const valueExpr = hmrWrap && isExported ? `_$hmr(${warmedFn})` : warmedFn;
 	if (isDefault) {
 		return `const ${name} = ${valueExpr};\nexport default ${name};`;
 	}
@@ -3181,6 +3197,29 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		workingStatements = statements.map((s) =>
 			rewriteAutoCallback(s, stableSet, ctx.currentComponentLocals, ctx),
 		);
+	}
+
+	// parallelUse: the parallel-`use()` pipeline (docs/suspense-parallel-use-plan.md)
+	// slots in HERE — after autoCallback (so memoized creations aren't re-wrapped),
+	// before rewriteHookCalls (so the _$useMemo/_$useBatch calls it emits are
+	// compiler-aliased, not user identifiers). Top-level component bodies run the
+	// full pipeline: Pass A memoizes creations across the body AND the directive
+	// arms of the render tree (arms hoist into sub-bodies later, already
+	// transformed), the warm plan is derived from that same analysis, and Pass B
+	// hoists+batches. Sub-bodies (hoisted @try/@if arms via hoistBodyHelper's
+	// legacy path) arrive pre-memoized and run Pass B only.
+	if (ctx.parallelUse) {
+		let warmThunk = null;
+		if (options && options.autoCallback) {
+			const creations = [];
+			const warmChildren = [];
+			workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
+			jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
+			const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
+			warmThunk = warm.thunk;
+			ctx._pendingWarm = warm.warmSrc;
+		}
+		workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
 	}
 
 	// Rewrite hook calls and `<tsrx>` blocks in statements before printing them.
@@ -3276,6 +3315,661 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// `App(props)` binds `props`, while compiled bodies still read `__s` by name.
 	const sig = params ? `${params}, __s, __extra` : `__props, __s, __extra`;
 	return `function ${name}(${sig}) {\n  const __block = __s.block;\n${lines.join('\n')}\n}`;
+}
+
+// ===========================================================================
+// Parallel use() — docs/suspense-parallel-use-plan.md
+// ===========================================================================
+
+// The parallel-`use()` pipeline (gated on ctx.parallelUse). Three cooperating
+// transforms reconstruct Solid/Ripple's "fetch starts at creation, suspension
+// happens at read" property for React-shaped `use()` code:
+//
+//   Pass A (top-level component bodies, incl. directive-arm bodies BEFORE
+//     they're hoisted): wrap each non-trivial `use(<expr>)` argument in a
+//     slot-keyed `_$useMemo(() => <expr>, [deps], _h$N)` creation. Deps are
+//     one-level member paths of the expression's free variables (props.id,
+//     fetchFn), so refetch happens exactly when inputs change and a replay
+//     can never mint a fresh promise. Loops and nested functions are NOT
+//     entered: loop iterations share one slot symbol, so a memoized creation
+//     there would fresh-promise every render and re-suspend forever.
+//
+//   Pass B (every function body): find maximal runs of `use()` declaration
+//     statements (const/let interleaves only, taint-tracked), hoist each
+//     run's creations into `__pu$N` temps above the first unwrap, and emit
+//     `_$useBatch([...temps], warmThunk?)` so the boundary suspends ONCE on
+//     the whole stratum instead of once per promise. Unwrap order (and with
+//     it hydration-seed order) is preserved.
+//
+//   Warm plan (top-level bodies): from the SAME analysis, child component
+//     slots whose reachability guards and props are provably independent of
+//     every non-param local become `_$warmChild` calls in the first batch's
+//     warm thunk, and the component gets a compiled `Comp.__warm` fetch plan
+//     (its own warm-safe creations + guarded child warm calls) so warming
+//     recurses down the tree — the whole descendant fetch tree starts in the
+//     first attempt.
+//
+// With the flag off, output is byte-identical (pinned by
+// tests/compile-parallel-use.test.ts).
+
+// Names bound by a binding pattern (params, declarator ids). Mirrors the
+// pattern handling of collectFreeIdentifiers' collectBindings.
+function collectPatternNames(pat, into) {
+	if (!pat) return into;
+	switch (pat.type) {
+		case 'Identifier':
+			into.add(pat.name);
+			break;
+		case 'ObjectPattern':
+			for (const p of pat.properties || []) {
+				if (p.type === 'RestElement') collectPatternNames(p.argument, into);
+				else collectPatternNames(p.value, into);
+			}
+			break;
+		case 'ArrayPattern':
+			for (const el of pat.elements || []) collectPatternNames(el, into);
+			break;
+		case 'AssignmentPattern':
+			collectPatternNames(pat.left, into);
+			break;
+		case 'RestElement':
+			collectPatternNames(pat.argument, into);
+			break;
+	}
+	return into;
+}
+
+// Strip TS value-preserving wrappers (`x as T`, `x!`, `<T>x`, `x satisfies T`).
+function unwrapTsExpr(n) {
+	while (
+		n &&
+		(n.type === 'TSAsExpression' ||
+			n.type === 'TSNonNullExpression' ||
+			n.type === 'TSTypeAssertion' ||
+			n.type === 'TSSatisfiesExpression' ||
+			n.type === 'ParenthesizedExpression')
+	) {
+		n = n.expression;
+	}
+	return n;
+}
+
+// Dep extraction for a memoized creation: one-level member paths for free
+// identifiers used as `obj.prop` (→ `props.id`, so a fresh props OBJECT with
+// unchanged fields doesn't refetch), bare identifiers otherwise. Scope-aware:
+// identifiers bound inside nested functions don't become deps.
+function collectDepPaths(expr) {
+	const deps = [];
+	const seen = new Set();
+	const push = (node, key) => {
+		if (seen.has(key)) return;
+		seen.add(key);
+		deps.push(node);
+	};
+	walk(expr, new Set());
+	return deps;
+
+	function walk(n, bound) {
+		if (!n || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x, bound);
+			return;
+		}
+		switch (n.type) {
+			case 'Identifier':
+				if (!bound.has(n.name)) push({ type: 'Identifier', name: n.name }, n.name);
+				return;
+			case 'MemberExpression':
+				if (!n.computed && n.object.type === 'Identifier' && n.property.type === 'Identifier') {
+					if (!bound.has(n.object.name)) {
+						const key = n.object.name + '.' + n.property.name;
+						push(
+							{
+								type: 'MemberExpression',
+								object: { type: 'Identifier', name: n.object.name },
+								property: { type: 'Identifier', name: n.property.name },
+								computed: false,
+								optional: false,
+							},
+							key,
+						);
+					}
+					return;
+				}
+				walk(n.object, bound);
+				if (n.computed) walk(n.property, bound);
+				return;
+			case 'FunctionExpression':
+			case 'ArrowFunctionExpression': {
+				const inner = new Set(bound);
+				for (const p of n.params || []) collectPatternNames(p, inner);
+				walk(n.body, inner);
+				return;
+			}
+			case 'Property':
+				if (n.computed) walk(n.key, bound);
+				walk(n.value, bound);
+				return;
+			case 'VariableDeclarator':
+				walk(n.init, bound);
+				return;
+			default:
+				for (const k in n) {
+					if (k === 'loc' || k === 'start' || k === 'end' || k === 'metadata') continue;
+					walk(n[k], bound);
+				}
+		}
+	}
+}
+
+// A `use()` argument that needs no memoization: already-stable references
+// (identifiers, static member chains) and literals.
+function isTrivialUseArg(n) {
+	n = unwrapTsExpr(n);
+	if (!n) return true;
+	if (n.type === 'Identifier' || n.type === 'Literal') return true;
+	if (n.type === 'MemberExpression' && !n.computed) return isTrivialUseArg(n.object);
+	return false;
+}
+
+const LOOP_TYPES = new Set([
+	'ForStatement',
+	'ForOfStatement',
+	'ForInStatement',
+	'WhileStatement',
+	'DoWhileStatement',
+]);
+const FN_TYPES = new Set(['FunctionExpression', 'FunctionDeclaration', 'ArrowFunctionExpression']);
+
+// Is this statement a `const/let x = use(<arg>)` declaration (or a bare
+// `use(<arg>)` expression statement)? Returns the use CallExpression or null.
+function useCallOfStatement(stmt) {
+	let call = null;
+	if (
+		stmt.type === 'VariableDeclaration' &&
+		(stmt.kind === 'const' || stmt.kind === 'let') &&
+		stmt.declarations &&
+		stmt.declarations.length === 1
+	) {
+		call = unwrapTsExpr(stmt.declarations[0].init);
+	} else if (stmt.type === 'ExpressionStatement') {
+		call = unwrapTsExpr(stmt.expression);
+	}
+	if (
+		call &&
+		call.type === 'CallExpression' &&
+		call.callee.type === 'Identifier' &&
+		call.callee.name === 'use' &&
+		call.arguments.length >= 1
+	) {
+		return call;
+	}
+	return null;
+}
+
+// ── Pass A: memoize use() argument creations ───────────────────────────────
+//
+// Walks a statement array (recursing into if/blocks, NOT into loops or nested
+// functions), rewriting each non-trivial `use(<expr>)` argument to
+// `_$useMemo(() => <expr>, [deps], _h$N)` in place. Records every creation
+// with its guard chain for the warm plan. Returns a new array.
+function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, locals) {
+	return stmts.map((stmt) => rewriteStmt(stmt));
+
+	function rewriteStmt(stmt) {
+		if (!stmt || typeof stmt !== 'object') return stmt;
+		if (LOOP_TYPES.has(stmt.type) || FN_TYPES.has(stmt.type)) return stmt;
+		const call = useCallOfStatement(stmt);
+		if (call) {
+			const rewritten = rewriteUseCall(call);
+			if (rewritten === call) return stmt;
+			if (stmt.type === 'VariableDeclaration') {
+				return {
+					...stmt,
+					declarations: [{ ...stmt.declarations[0], init: rewritten }],
+				};
+			}
+			return { ...stmt, expression: rewritten };
+		}
+		if (stmt.type === 'IfStatement') {
+			return {
+				...stmt,
+				consequent: rewriteStmt(stmt.consequent),
+				alternate: stmt.alternate ? rewriteStmt(stmt.alternate) : stmt.alternate,
+			};
+		}
+		if (stmt.type === 'BlockStatement') {
+			return {
+				...stmt,
+				body: parallelUseMemoizePass(stmt.body, ctx, componentName, creations, guards, locals),
+			};
+		}
+		return stmt;
+	}
+
+	function rewriteUseCall(call) {
+		const arg = unwrapTsExpr(call.arguments[0]);
+		if (isTrivialUseArg(arg)) return call;
+		const symVar = allocHookSymbol(ctx, `${componentName}.use.memo#${ctx.nextHookSymId}`);
+		const deps = collectDepPaths(arg);
+		ctx.runtimeNeeded.add('useMemo');
+		creations.push({ symVar, expr: arg, deps, guards: [...guards], locals });
+		const memoCall = {
+			type: 'CallExpression',
+			callee: { type: 'Identifier', name: '_$useMemo' },
+			arguments: [
+				{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: arg },
+				{ type: 'ArrayExpression', elements: deps },
+				{ type: 'Identifier', name: symVar },
+			],
+			optional: false,
+		};
+		return { ...call, arguments: [memoCall, ...call.arguments.slice(1)] };
+	}
+}
+
+// Pass A over the RENDER tree: memoize statements inside directive-arm bodies
+// (they hoist into sub-bodies later, already transformed) and collect
+// child-component warm candidates with their guard chains. Recursion stops at
+// @for/@switch arms (v1) and does not enter component children. `locals`
+// accumulates arm-scoped bindings (e.g. `const a = use(…)` inside a @try
+// body) so warm-safety can see them — they are NOT in
+// ctx.currentComponentLocals, which only covers the top body.
+function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, guards, locals) {
+	return nodes.map((n) => walkNode(n));
+
+	function walkNode(node) {
+		if (!node || typeof node !== 'object') return node;
+		switch (node.type) {
+			case 'JSXElement': {
+				const nameNode = node.openingElement && node.openingElement.name;
+				const isComponent =
+					nameNode && nameNode.type === 'JSXIdentifier' && /^[A-Z]/.test(nameNode.name);
+				if (isComponent) {
+					collectWarmChild(node, nameNode.name);
+					return node; // component children render inside the child — don't descend
+				}
+				return {
+					...node,
+					children: parallelUseWalkJsx(
+						node.children || [],
+						ctx,
+						componentName,
+						creations,
+						warmChildren,
+						guards,
+						locals,
+					),
+				};
+			}
+			case 'JSXFragment':
+				return {
+					...node,
+					children: parallelUseWalkJsx(
+						node.children || [],
+						ctx,
+						componentName,
+						creations,
+						warmChildren,
+						guards,
+						locals,
+					),
+				};
+			case 'JSXIfExpression': {
+				const not = (e) => ({ type: 'UnaryExpression', operator: '!', prefix: true, argument: e });
+				const consequent = walkArm(node.consequent, [...guards, node.test]);
+				const alternate = node.alternate
+					? walkArm(node.alternate, [...guards, not(node.test)])
+					: node.alternate;
+				return { ...node, consequent, alternate };
+			}
+			case 'JSXTryExpression': {
+				// The try arm renders whenever the component renders — no extra
+				// guard. @pending/@catch arms are exceptional paths: no warming.
+				const out = { ...node };
+				if (node.block) out.block = walkArm(node.block, guards);
+				return out;
+			}
+			default:
+				// @for / @switch arms: v1 — no memoization, no warming (loop slot
+				// sharing; switch guards deferred). Everything else is inert.
+				return node;
+		}
+	}
+
+	function walkArm(arm, armGuards) {
+		if (!arm || arm.type !== 'BlockStatement') return arm;
+		// Arm-scoped bindings become visible to warm-safety for everything in
+		// this arm (conservatively hoisted: order within the arm is ignored).
+		const armLocals = new Set(locals);
+		for (const entry of arm.body) {
+			if (entry.type === 'VariableDeclaration') {
+				for (const d of entry.declarations || []) collectPatternNames(d.id, armLocals);
+			}
+		}
+		// Arm bodies interleave statements and JSX nodes; route each entry to
+		// the right walker.
+		const body = arm.body.map((entry) => {
+			if (
+				entry.type === 'JSXElement' ||
+				entry.type === 'JSXFragment' ||
+				entry.type === 'JSXIfExpression' ||
+				entry.type === 'JSXTryExpression'
+			) {
+				return parallelUseWalkJsx(
+					[entry],
+					ctx,
+					componentName,
+					creations,
+					warmChildren,
+					armGuards,
+					armLocals,
+				)[0];
+			}
+			return parallelUseMemoizePass(
+				[entry],
+				ctx,
+				componentName,
+				creations,
+				armGuards,
+				armLocals,
+			)[0];
+		});
+		return { ...arm, body };
+	}
+
+	function collectWarmChild(node, compName) {
+		const attrs = node.openingElement.attributes || [];
+		if ((node.children || []).length > 0) return; // children render inside the child — skip
+		const props = [];
+		for (const a of attrs) {
+			if (a.type !== 'JSXAttribute' || a.name.type !== 'JSXIdentifier') return; // spread etc.
+			const key = a.name.name;
+			if (key === 'ref' || key === 'key') return; // instance-wired props — skip this slot
+			let value;
+			if (a.value == null) value = { type: 'Literal', value: true, raw: 'true' };
+			else if (a.value.type === 'JSXExpressionContainer') value = a.value.expression;
+			else value = a.value; // Literal
+			props.push({ key, value });
+		}
+		warmChildren.push({ compName, props, guards: [...guards], locals });
+	}
+}
+
+// Does this expression subtree contain JSX (or a TSRX directive)? Such
+// expressions cannot be re-printed into a warm plan — they only exist in
+// lowered form inside the real render path.
+function containsJsxNode(n) {
+	if (!n || typeof n !== 'object') return false;
+	if (Array.isArray(n)) return n.some(containsJsxNode);
+	if (typeof n.type === 'string' && n.type.startsWith('JSX')) return true;
+	for (const k in n) {
+		if (k === 'loc' || k === 'start' || k === 'end' || k === 'metadata') continue;
+		if (containsJsxNode(n[k])) return true;
+	}
+	return false;
+}
+
+// Warm-safety: every free identifier of the expression is a component param
+// or module-scope (NOT a non-param local — component-body OR directive-arm
+// scoped; those may not exist or may be suspended-data-derived at warm time),
+// and the expression is plain JS (no JSX — descriptors only exist lowered).
+function isWarmSafeExpr(expr, paramNames, componentLocals, armLocals) {
+	if (containsJsxNode(expr)) return false;
+	const free = collectFreeIdentifiers(expr, []);
+	for (const id of free) {
+		if (paramNames.has(id)) continue;
+		if (componentLocals && componentLocals.has(id)) return false;
+		if (armLocals && armLocals.has(id)) return false;
+	}
+	return true;
+}
+
+// ── Pass B: run detection + hoist + batch ───────────────────────────────────
+function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
+	let firstBatch = true;
+	return transformList(statements);
+
+	function transformList(stmts) {
+		const out = [];
+		let run = null; // { members: [{stmt, call?, creation?}], names: Set }
+		const flush = () => {
+			if (!run) return;
+			emitRun(run, out);
+			run = null;
+		};
+		for (const stmt of stmts) {
+			const call = stmt && typeof stmt === 'object' ? useCallOfStatement(stmt) : null;
+			if (call) {
+				const creation = unwrapTsExpr(call.arguments[0]);
+				const free = collectFreeIdentifiers(creation, []);
+				let conflict = false;
+				if (run) {
+					for (const id of free) {
+						if (run.names.has(id)) {
+							conflict = true;
+							break;
+						}
+					}
+				}
+				if (conflict) flush();
+				if (!run) run = { members: [], names: new Set() };
+				run.members.push({ stmt, call, creation });
+				if (stmt.type === 'VariableDeclaration') {
+					collectPatternNames(stmt.declarations[0].id, run.names);
+				}
+				continue;
+			}
+			if (
+				run &&
+				stmt &&
+				stmt.type === 'VariableDeclaration' &&
+				(stmt.kind === 'const' || stmt.kind === 'let')
+			) {
+				// Interleaved declaration: allowed in a run, but its bindings join
+				// the no-hoist-past set (a later creation referencing them cannot
+				// hoist above this statement).
+				run.members.push({ stmt });
+				for (const d of stmt.declarations || []) collectPatternNames(d.id, run.names);
+				continue;
+			}
+			flush();
+			// Recurse into conditional blocks so a guarded use() run batches
+			// within its own block (loops/functions stay untouched).
+			if (stmt && stmt.type === 'IfStatement') {
+				out.push({
+					...stmt,
+					consequent: transformStmtBlock(stmt.consequent),
+					alternate: stmt.alternate ? transformStmtBlock(stmt.alternate) : stmt.alternate,
+				});
+				continue;
+			}
+			if (stmt && stmt.type === 'BlockStatement') {
+				out.push({ ...stmt, body: transformList(stmt.body) });
+				continue;
+			}
+			out.push(stmt);
+		}
+		flush();
+		return out;
+	}
+
+	function transformStmtBlock(s) {
+		if (!s) return s;
+		if (s.type === 'BlockStatement') return { ...s, body: transformList(s.body) };
+		return s;
+	}
+
+	function emitRun(run, out) {
+		const uses = run.members.filter((m) => m.call);
+		if (uses.length === 0) {
+			for (const m of run.members) out.push(m.stmt);
+			return;
+		}
+		// Hoist each creation into a temp, batch, then re-emit the original
+		// statements with creations swapped for the temps. Unwrap order (and
+		// hydration-seed order with it) is untouched.
+		const temps = [];
+		const tempOf = new Map();
+		for (const m of uses) {
+			const name = `__pu$${ctx.nextPuId++}`;
+			temps.push({ name, init: m.creation });
+			tempOf.set(m.call, name);
+		}
+		for (const t of temps) {
+			out.push({
+				type: 'VariableDeclaration',
+				kind: 'const',
+				declarations: [
+					{
+						type: 'VariableDeclarator',
+						id: { type: 'Identifier', name: t.name },
+						init: t.init,
+					},
+				],
+			});
+		}
+		ctx.runtimeNeeded.add('useBatch');
+		const batchArgs = [
+			{
+				type: 'ArrayExpression',
+				elements: temps.map((t) => ({ type: 'Identifier', name: t.name })),
+			},
+		];
+		if (firstBatch && warmThunk) batchArgs.push(warmThunk);
+		firstBatch = false;
+		out.push({
+			type: 'ExpressionStatement',
+			expression: {
+				type: 'CallExpression',
+				callee: { type: 'Identifier', name: '_$useBatch' },
+				arguments: batchArgs,
+				optional: false,
+			},
+		});
+		for (const m of run.members) {
+			if (!m.call) {
+				out.push(m.stmt);
+				continue;
+			}
+			const tempId = { type: 'Identifier', name: tempOf.get(m.call) };
+			const newCall = { ...m.call, arguments: [tempId, ...m.call.arguments.slice(1)] };
+			if (m.stmt.type === 'VariableDeclaration') {
+				out.push({
+					...m.stmt,
+					declarations: [{ ...m.stmt.declarations[0], init: newCall }],
+				});
+			} else {
+				out.push({ ...m.stmt, expression: newCall });
+			}
+		}
+	}
+}
+
+// Build the warm thunk AST (child warm calls for the first in-body batch) +
+// the `Comp.__warm` source (creations + child calls) for a top-level body.
+function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
+	const paramNames = new Set();
+	for (const p of node.params || []) collectPatternNames(p, paramNames);
+	const locals = ctx.currentComponentLocals;
+
+	const guardOk = (guards, armLocals) =>
+		guards.every((g) => isWarmSafeExpr(g, paramNames, locals, armLocals));
+	const andChain = (guards) =>
+		guards.length === 0
+			? null
+			: guards.reduce(
+					(acc, g) =>
+						acc ? { type: 'LogicalExpression', operator: '&&', left: acc, right: g } : g,
+					null,
+				);
+
+	const warmMemos = creations.filter(
+		(c) => guardOk(c.guards, c.locals) && isWarmSafeExpr(c.expr, paramNames, locals, c.locals),
+	);
+	const warmKids = warmChildren.filter(
+		(w) =>
+			guardOk(w.guards, w.locals) &&
+			!paramNames.has(w.compName) &&
+			!(locals && locals.has(w.compName)) &&
+			!(w.locals && w.locals.has(w.compName)) &&
+			w.props.every((p) => isWarmSafeExpr(p.value, paramNames, locals, w.locals)),
+	);
+	if (warmKids.length === 0 && warmMemos.length === 0) return { thunk: null, warmSrc: null };
+
+	const stmtFor = (guards, callExpr) => {
+		const g = andChain(guards);
+		const call = { type: 'ExpressionStatement', expression: callExpr };
+		return g ? { type: 'IfStatement', test: g, consequent: call, alternate: null } : call;
+	};
+	const memoCall = (c) => ({
+		type: 'CallExpression',
+		callee: { type: 'Identifier', name: '_$warmMemo' },
+		arguments: [
+			{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: c.expr },
+			{ type: 'ArrayExpression', elements: c.deps },
+			{ type: 'Identifier', name: c.symVar },
+		],
+		optional: false,
+	});
+	const childCall = (w) => ({
+		type: 'CallExpression',
+		callee: { type: 'Identifier', name: '_$warmChild' },
+		arguments: [
+			{ type: 'Identifier', name: w.compName },
+			{
+				type: 'ObjectExpression',
+				properties: w.props.map((p) => ({
+					type: 'Property',
+					key: { type: 'Identifier', name: p.key },
+					value: p.value,
+					kind: 'init',
+					method: false,
+					shorthand: false,
+					computed: false,
+				})),
+			},
+		],
+		optional: false,
+	});
+
+	if (warmMemos.length > 0) ctx.runtimeNeeded.add('warmMemo');
+	if (warmKids.length > 0) ctx.runtimeNeeded.add('warmChild');
+
+	// In-body warm thunk: children only — the body's own creations already ran
+	// as real memos by the time the batch throws.
+	const thunk =
+		warmKids.length === 0
+			? null
+			: {
+					type: 'ArrowFunctionExpression',
+					params: [],
+					expression: false,
+					async: false,
+					body: {
+						type: 'BlockStatement',
+						body: warmKids.map((w) => stmtFor(w.guards, childCall(w))),
+					},
+				};
+
+	// The hoisted fetch plan: creations + child calls, params destructured
+	// from the incoming props object. Single-param components only (the norm).
+	// Returned as a bare arrow — compileComponent attaches it to the INNER
+	// function object via Object.assign, so the component's own body (where
+	// the function-expression name shadows the module const) sees it too;
+	// hmr() forwards it from the wrapped fn onto the HMR wrapper.
+	let warmSrc = null;
+	if ((node.params || []).length <= 1 && (warmMemos.length > 0 || warmKids.length > 0)) {
+		const bodyStmts = [
+			...warmMemos.map((c) => stmtFor(c.guards, memoCall(c))),
+			...warmKids.map((w) => stmtFor(w.guards, childCall(w))),
+		];
+		const destructure =
+			node.params.length === 1 ? `\tconst ${printNode(node.params[0])} = __wp;\n` : '';
+		const body = bodyStmts.map((s) => '\t' + printNode(s).replace(/\n/g, '\n\t')).join('\n');
+		warmSrc = `(__wp) => {\n${destructure}${body}\n}`;
+	}
+	return { thunk, warmSrc };
 }
 
 // ===========================================================================

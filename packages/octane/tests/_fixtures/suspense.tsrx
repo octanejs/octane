@@ -301,16 +301,37 @@ export function ParallelInOneBoundary(props) @{
 	</>
 }
 
-// Negative case: WITHOUT useMemo, the two fetches happen in sequence
-// because the body is re-entered from scratch on each replay attempt.
-// On render 1: startA() called, throws. startB() not called.
-// On render 2 (after A resolves): startA() returns cached, startB() called.
-// We expose call counters so the test can prove the waterfall happened.
+// Sequential use() WITHOUT hand-written useMemo. Under the parallelUse
+// pipeline (the test-suite default) the compiler memoizes both creations,
+// hoists them above the first unwrap, and batches the suspension — both
+// fetches start in the first attempt and each factory runs exactly once.
+// (Pre-pipeline this was the waterfall regression-pin: startB() never ran
+// until startA() resolved.) Call counters let the test prove the parallelism.
 export function WaterfallBody(props) @{
 	<>
 		@try {
 			const a = use(props.startA());
 			const b = use(props.startB());
+			<div class="both">
+				{a + '/' + b as string}
+			</div>
+		} @pending {
+			<div class="fallback">{'loading'}</div>
+		}
+	</>
+}
+
+// Batched-unwrap coverage (docs/suspense-parallel-use-plan.md, Phase 3).
+// Both promises PRE-EXIST as props; the compiler's batch suspends once on the
+// whole stratum and the boundary replays once when all members settle — two
+// attempts per suspension episode. onAttempt counts body entries so the test
+// can pin that count (it was 1 + one-replay-per-promise before the pipeline).
+export function ReplayChurnBody(props) @{
+	<>
+		@try {
+			props.onAttempt();
+			const a = use(props.a);
+			const b = use(props.b);
 			<div class="both">
 				{a + '/' + b as string}
 			</div>

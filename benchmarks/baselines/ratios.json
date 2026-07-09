@@ -116,15 +116,47 @@
     "op": "init",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 1.2,
-    "note": "10-level nested-use() init waterfall vs React 19 (measured 0.57x on record 2026-07-08 - React's suspense retry scheduling nearly doubles its own floor). Octane must stay at-or-under React. NO guard vs solid/ripple: they are parallel by model (~1x floor vs ~11x) until compiler-parallelized use lands (docs/suspense-parallel-use-plan.md) - add those guards WITH that feature."
+    "maxRatio": 0.25,
+    "note": "10-level nested-use() init vs React 19. Compiler-parallelized use (parallelUse pipeline, docs/suspense-parallel-use-plan.md, recorded 2026-07-09) collapses the waterfall to the parallel floor: measured 0.065x (20.1ms vs 307.3ms). Guard at 0.25x so a regression back toward per-level rounds fails loudly."
   },
   {
     "suite": "async-waterfall",
     "op": "update",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 1.2,
-    "note": "transition-driven refetch waterfall vs React 19 (measured 0.99x on record 2026-07-08)."
+    "maxRatio": 0.25,
+    "note": "transition-driven refetch vs React 19 (measured 0.10x on record 2026-07-09 - 19.1ms vs 190.1ms, parallel refetch via warm adoption)."
+  },
+  {
+    "suite": "async-waterfall",
+    "op": "init",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.5,
+    "note": "init vs Solid 2.0 (parallel by model): measured 1.06x on record 2026-07-09 (20.1ms vs 19.0ms). The win the parallelUse pipeline earned - must not regress."
+  },
+  {
+    "suite": "async-waterfall",
+    "op": "init",
+    "target": "octane-tsrx",
+    "reference": "ripple",
+    "maxRatio": 1.5,
+    "note": "init vs ripple (parallel by model): measured 1.05x on record 2026-07-09 (20.1ms vs 19.2ms)."
+  },
+  {
+    "suite": "async-waterfall",
+    "op": "update",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.5,
+    "note": "update vs Solid 2.0: measured 1.03x on record 2026-07-09."
+  },
+  {
+    "suite": "async-waterfall",
+    "op": "update",
+    "target": "octane-tsrx",
+    "reference": "ripple",
+    "maxRatio": 1.5,
+    "note": "update vs ripple: measured 1.09x on record 2026-07-09."
   }
 ]
