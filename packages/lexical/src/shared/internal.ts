@@ -1,5 +1,5 @@
 // Slot mechanics shared by the binding's plain-`.ts` hooks (copied from
-// @octanejs/router / @octanejs/query). The octane compiler injects a per-call-site
+// @octanejs/tanstack-router / @octanejs/tanstack-query). The octane compiler injects a per-call-site
 // Symbol slot into every hook call in `.tsrx`/`.tsx`, but these binding files are
 // NOT compiled — so a hook here receives the caller's slot as its trailing argument
 // and derives a distinct sub-slot for each base hook it composes.

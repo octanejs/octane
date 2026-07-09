@@ -1,6 +1,6 @@
 import * as stylex from '@octanejs/stylex';
-import { useParams, Link } from '@octanejs/router';
-import { useSuspenseQuery } from '@octanejs/query';
+import { useParams, Link } from '@octanejs/tanstack-router';
+import { useSuspenseQuery } from '@octanejs/tanstack-query';
 import { Suspense } from 'octane';
 import { itemQuery } from '../shared/queries.js';
 import { styles } from '../shared/styles.js';

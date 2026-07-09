@@ -3,7 +3,7 @@
 // as the docs. The bench teaser charts are @octanejs/recharts over the
 // checked-in baseline medians (content/benchmarks.ts) — the full set lives at
 // /benchmarks.
-import { Link } from '@octanejs/router';
+import { Link } from '@octanejs/tanstack-router';
 import CodeSample from '../content/home-sample.mdx';
 import { BenchBars } from '../components/BenchBars.tsrx';
 import { HOME_SUMMARY } from '../content/benchmarks.ts';

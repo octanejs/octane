@@ -74,7 +74,7 @@ future optimization can't accidentally change it without a deliberate decision.
 [differential/transition-swap-suspend.test.ts](__tests__/differential/transition-swap-suspend.test.ts),
 [differential/transition-swap-child.test.ts](__tests__/differential/transition-swap-child.test.ts),
 [conformance/entangled-commit.test.ts](__tests__/conformance/entangled-commit.test.ts),
-and `@octanejs/router`'s concurrent-navigation hold.
+and `@octanejs/tanstack-router`'s concurrent-navigation hold.
 
 **React behavior:** A transition renders the ENTIRE work-in-progress tree off the
 current one and commits it atomically. If one transition fans out to several

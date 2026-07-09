@@ -983,7 +983,7 @@ number of renders to prevent an infinite loop.` after 25 same-block re-renders i
 
 - aafaaa9: SSR: support the router `Match` boundary shape (`@try { <Component/> } @pending { … }`) end-to-end.
 
-  - `octane/server` now exports `withSlot` and `startTransition`. A server build of a `.tsrx` that defines/uses a custom hook (whose inner hook calls the compiler lowers through `withSlot`) or calls `startTransition` — exactly what the `@octanejs/router` bindings emit — previously failed to resolve those imports from `octane/server`. The server `withSlot` invokes the wrapped hook with its args (no per-call-site slot tracking is needed in a single synchronous render pass); the server `startTransition` runs its callback synchronously, matching the existing server no-op transition hooks.
+  - `octane/server` now exports `withSlot` and `startTransition`. A server build of a `.tsrx` that defines/uses a custom hook (whose inner hook calls the compiler lowers through `withSlot`) or calls `startTransition` — exactly what the `@octanejs/tanstack-router` bindings emit — previously failed to resolve those imports from `octane/server`. The server `withSlot` invokes the wrapped hook with its args (no per-call-site slot tracking is needed in a single synchronous render pass); the server `startTransition` runs its callback synchronously, matching the existing server no-op transition hooks.
   - Hydration of a `@try`/Suspense boundary whose success-arm body is a COMPONENT (the router `Match` shape) now ADOPTS the server DOM instead of throwing. The component-block adoption paths (`componentSlot`, `componentSlotLite`, `forBlock`) now adopt the server's `<!--[-->…<!--]-->` range from the parked hydration cursor when the slot is the sole hole of a control-flow arm — so its anchor is the arm's end marker rather than a block-open — mirroring the cursor-based adopt branch `childSlot` already had. Previously the cursor stayed parked on the component's open marker, so the inner mount cloned a comment node and dereferenced `firstChild`/`appendChild` on it (`TypeError`/`DOMException`), forcing the boundary to its `@catch`/rebuild path.
 
 - 1987bd7: SSR Suspense: collapse the per-pass full-tree re-render for waterfalls.
@@ -1153,7 +1153,7 @@ number of renders to prevent an infinite loop.` after 25 same-block re-renders i
 
   Previously the hold only fired while the re-suspending render was at transition
   priority. But a held boundary's content can re-suspend at urgent priority — e.g.
-  `@octanejs/query`'s `useSuspenseQuery` observer notifies on a `setTimeout(0)`
+  `@octanejs/tanstack-query`'s `useSuspenseQuery` observer notifies on a `setTimeout(0)`
   macrotask, AFTER octane's transition window has closed, so the re-render (and its
   re-suspend on the new in-flight fetch) is urgent. `handleSuspense` then took the
   softDetach + fallback path and the fallback flashed. It now continues the hold
@@ -1176,7 +1176,7 @@ number of renders to prevent an infinite loop.` after 25 same-block re-renders i
   torn down; if it suspends, the partial is discarded and the suspend is re-thrown so the
   enclosing `@try` boundary's existing transition hold keeps the OLD content live and resumes
   - commits once the data resolves. Urgent (non-transition) and hydration renders keep the
-    existing clear-then-render path. This also closes the `@octanejs/router` gap where a
+    existing clear-then-render path. This also closes the `@octanejs/tanstack-router` gap where a
     concurrent navigation to a slow route briefly blanked instead of holding the current page.
 
   Note: this is per-swap/per-boundary off-screen rendering, not a full double-buffered tree —

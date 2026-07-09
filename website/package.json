@@ -14,7 +14,7 @@
     "@octanejs/adapter-vercel": "workspace:*",
     "@octanejs/mdx": "workspace:*",
     "@octanejs/recharts": "workspace:*",
-    "@octanejs/router": "workspace:*",
+    "@octanejs/tanstack-router": "workspace:*",
     "@octanejs/vite-plugin": "workspace:*"
   },
   "devDependencies": {

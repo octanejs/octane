@@ -34,7 +34,11 @@ export default defineConfig({
 		// hook slots themselves). The shared app `.ts` files (hooks/routes) are NOT
 		// excluded, so their octane hook call-sites still get slotted.
 		octane({
-			exclude: ['/packages/router/src/', '/packages/stylex/src/', '/packages/query/src/'],
+			exclude: [
+				'/packages/tanstack-router/src/',
+				'/packages/stylex/src/',
+				'/packages/tanstack-query/src/',
+			],
 		}),
 		stylex(),
 	],
@@ -49,7 +53,12 @@ export default defineConfig({
 	optimizeDeps: {
 		// All workspace:* pointing at raw TS sources — pre-bundling would snapshot
 		// stale output and demand `vite --force` on every workspace edit.
-		exclude: ['octane', '@octanejs/router', '@octanejs/stylex', '@octanejs/query'],
+		exclude: [
+			'octane',
+			'@octanejs/tanstack-router',
+			'@octanejs/stylex',
+			'@octanejs/tanstack-query',
+		],
 	},
 
 	build: {

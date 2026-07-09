@@ -1,10 +1,10 @@
-# TanStack Parity Audit — `@octanejs/router` & `@octanejs/query`
+# TanStack Parity Audit — `@octanejs/tanstack-router` & `@octanejs/tanstack-query`
 
 Audited 2026-07-06 against the installed upstream sources (npm ships `src/`, so this
 is a diff against real upstream code, not just `.d.ts`):
 
-- `@octanejs/router` 0.1.2 vs `@tanstack/react-router` **1.170.16** (router-core 1.171.13)
-- `@octanejs/query` 0.1.2 vs `@tanstack/react-query` **5.101.0** (query-core 5.101.0)
+- `@octanejs/tanstack-router` 0.1.2 vs `@tanstack/react-router` **1.170.16** (router-core 1.171.13)
+- `@octanejs/tanstack-query` 0.1.2 vs `@tanstack/react-query` **5.101.0** (query-core 5.101.0)
 
 > **STATUS UPDATE (2026-07-06, same day):** the router gap-closure sweep landed.
 > Everything in the router section below marked ~~closed~~ in the summary here is
@@ -74,7 +74,7 @@ devDependencies for one being in place.
 
 ---
 
-# `@octanejs/query` — GAP REPORT
+# `@octanejs/tanstack-query` — GAP REPORT
 
 **TL;DR:** The runtime value surface is **complete — 58/58 upstream runtime exports
 are available** (35 via `export * from '@tanstack/query-core'` + all 23
@@ -324,7 +324,7 @@ Per file:
 | `differential/parity.test.ts` | 1 | One fixture (`cached-diff.tsrx`): synchronous `initialData` + `staleTime:Infinity` query, single mount step, byte-equal rendered result shape vs real React+react-query |
 
 **Differential rig** (`differential/_setup.ts`): compiles the same `.tsrx` via
-`@tsrx/react`, rewrites `@octanejs/query`→`@tanstack/react-query` and
+`@tsrx/react`, rewrites `@octanejs/tanstack-query`→`@tanstack/react-query` and
 `octane`→`react`, and compares `innerHTML` per step. What it proves: the octane
 binding produces the identical *result-object shape* as react-query for the
 covered fixture. What it **cannot** see: anything async-timed (it currently only
@@ -391,7 +391,7 @@ a React behavior most ports never verify.
 
 ---
 
-# `@octanejs/router` — GAP REPORT
+# `@octanejs/tanstack-router` — GAP REPORT
 
 **Headline: 23 of 64 upstream binding-level value exports are implemented
 (~36%).** Of the 41 missing, 5 are deprecated upstream and 2 are React-internal
@@ -424,7 +424,7 @@ upstream deliberately hides. History values (`createHistory`,
 `createBrowserHistory`, `createHashHistory`, `createMemoryHistory`) are
 re-exported (index.ts:19-24). **Gap:** history *types* (`RouterHistory`,
 `HistoryLocation`, `HistoryState`, `BlockerFn`, `ParsedPath`) are only on the
-`@octanejs/router/history` subpath (src/history.ts:10), not the main entry as
+`@octanejs/tanstack-router/history` subpath (src/history.ts:10), not the main entry as
 upstream has them.
 
 ### 1b. Present (23)
@@ -607,7 +607,7 @@ emulates `useSyncExternalStoreWithSelector`.
   state, useParams, nested Outlet chain (5 its).
 - `parity.test.ts` — **dialect** parity: the same octane app authored `.tsrx` vs
   React-style `.tsx` (fixtures `basic.tsrx` / `basic-react.tsx` — both import
-  `@octanejs/router`). This is *not* a comparison against real TanStack Router.
+  `@octanejs/tanstack-router`). This is *not* a comparison against real TanStack Router.
 - `not-found.test.ts` — the strongest file: root/route/default/generic fallback,
   fuzzy vs root mode, loader `notFound()` with data, unknown→known round-trip
   (7 its).
@@ -640,14 +640,14 @@ pattern in `packages/octane/tests`; router has none).
 
 ### Differential rig: absent — flag
 
-`packages/router/tests/` contains only `conformance/`, `_fixtures/`,
+`packages/tanstack-router/tests/` contains only `conformance/`, `_fixtures/`,
 `_helpers.ts`. There is **no `differential/` rig** running the same fixture
 through octane and real `@tanstack/react-router` with byte-equal HTML assertions,
 even though (a) the repo's gold-standard pattern exists at
 `packages/base-ui/tests/differential/parity.test.ts` (and
-`packages/query/tests/differential`), and (b) `@tanstack/react-router`, `react`,
+`packages/tanstack-query/tests/differential`), and (b) `@tanstack/react-router`, `react`,
 `react-dom`, and `@tsrx/react` are already declared in
-`packages/router/package.json` devDependencies — strongly suggesting the rig was
+`packages/tanstack-router/package.json` devDependencies — strongly suggesting the rig was
 planned but never built. The existing `parity.test.ts` name is misleading: it
 proves tsrx/tsx *authoring* equivalence, not upstream behavioral parity. Given how
 many Link/Match behaviors diverge (§2), a differential rig would immediately

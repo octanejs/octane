@@ -3,7 +3,7 @@ import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 
 // Dynamic JSX tags (`<Wrap/>` where Wrap is a local binding) whose RUNTIME value
-// is a COMPONENT FUNCTION — the shape @octanejs/router's Match pipeline uses for
+// is a COMPONENT FUNCTION — the shape @octanejs/tanstack-router's Match pipeline uses for
 // its conditional boundaries (`const SuspenseWrap = cond ? Suspense : SafeFragment;
 // <SuspenseWrap fallback=…>…</SuspenseWrap>`). The host-STRING case is covered by
 // ssr-host-string-tags.test.ts; these pin the function case, with children.
@@ -50,7 +50,7 @@ const mod = evalServer(
 		return <Wrap fallback={null}><span>dynamic-choice</span></Wrap>;
 	}
 
-	// REGRESSION (@octanejs/router Match pipeline): a nested component whose
+	// REGRESSION (@octanejs/tanstack-router Match pipeline): a nested component whose
 	// children are a DIRECTIVE BLOCK, one sub deep — ssrCompileBody used to reset
 	// synthetic subs (@if branches, __schildren) to VALUE position, where
 	// lowerJsxChild cannot lower an @if, so the nested component rendered

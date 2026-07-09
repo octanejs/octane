@@ -1,8 +1,8 @@
-// The site's route tree — @octanejs/router (TanStack Router port). One tree,
+// The site's route tree — @octanejs/tanstack-router (TanStack Router port). One tree,
 // two environments: the server builds a per-request router over a memory
 // history (see router-server.ts), the client builds a singleton over the
 // browser history (router-client.ts).
-import { createRouter, createRootRoute, createRoute } from '@octanejs/router';
+import { createRouter, createRootRoute, createRoute } from '@octanejs/tanstack-router';
 import { Layout } from '../components/Layout.tsrx';
 import { Home } from '../pages/Home.tsrx';
 import { Benchmarks } from '../pages/Benchmarks.tsrx';

@@ -1,4 +1,4 @@
-import { Link } from '@octanejs/router';
+import { Link } from '@octanejs/tanstack-router';
 
 export function NotFound() @{
 	<div class="notfound">

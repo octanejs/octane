@@ -1,7 +1,12 @@
 // Shared route STRUCTURE. Both apps call createAppRouter with their own view
 // components (the only thing that differs between the .tsx and .tsrx versions);
 // the route tree, paths, and params are identical.
-import { createRouter, createRootRoute, createRoute, createMemoryHistory } from '@octanejs/router';
+import {
+	createRouter,
+	createRootRoute,
+	createRoute,
+	createMemoryHistory,
+} from '@octanejs/tanstack-router';
 import type { Feed } from './api.js';
 import { storiesQuery, pageItemsQuery, itemQuery, userQuery } from './queries.js';
 

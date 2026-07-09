@@ -1,5 +1,5 @@
 import * as stylex from '@octanejs/stylex';
-import { Outlet, Link, useRouterState } from '@octanejs/router';
+import { Outlet, Link, useRouterState } from '@octanejs/tanstack-router';
 import { ErrorBoundary } from 'octane';
 import { styles } from '../shared/styles.js';
 import { ErrorFallback } from './Pending.js';

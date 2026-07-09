@@ -10,10 +10,10 @@ of bridging by hand:
 | React package | Octane binding |
 | --- | --- |
 | `zustand` | `@octanejs/zustand` |
-| `@tanstack/react-query` | `@octanejs/query` |
+| `@tanstack/react-query` | `@octanejs/tanstack-query` |
 | `framer-motion` / `motion` | `@octanejs/motion` |
 | `@stylexjs/stylex` | `@octanejs/stylex` |
-| `react-router` / `react-router-dom` | `@octanejs/router` |
+| `react-router` / `react-router-dom` | `@octanejs/tanstack-router` |
 | `@lexical/react` | `@octanejs/lexical` |
 | `@floating-ui/react` | `@octanejs/floating-ui` |
 | `radix-ui` | `@octanejs/radix` |

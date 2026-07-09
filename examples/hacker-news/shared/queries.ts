@@ -1,7 +1,7 @@
 // Shared query-option factories over shared/api.ts. Framework-agnostic and
 // imported verbatim by BOTH the React (.tsx) and TSRX apps. Each returns a plain
 // options object — `queryKey` + `queryFn` — that a component passes to
-// `useSuspenseQuery` (from '@octanejs/query'), which suspends while the query
+// `useSuspenseQuery` (from '@octanejs/tanstack-query'), which suspends while the query
 // loads and returns `{ data }`.
 import { stories, item, user } from './api.js';
 import type { Feed } from './api.js';

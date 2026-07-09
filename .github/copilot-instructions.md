@@ -65,7 +65,7 @@ framework bindings:
   production build: `vite build` → static client assets + a self-contained SSR
   server bundle; preview with `octane-preview`); `packages/adapter-vercel`
   deploys it to Vercel (Build Output API).
-- `packages/{zustand,query,motion,stylex,router,lexical,floating-ui,radix}/` (npm:
+- `packages/{zustand,tanstack-query,motion,stylex,tanstack-router,lexical,floating-ui,radix}/` (npm:
   `@octanejs/*`) — framework bindings, each a faithful octane port of a React library
   (state, data-fetching, animation, styling, routing, editor, positioning, UI primitives).
 

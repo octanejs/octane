@@ -22,7 +22,11 @@ export default defineConfig({
 				},
 				plugins: [
 					octane({
-						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/tanstack-query/src/',
+							'/packages/motion/src/',
+						],
 					}),
 				],
 			},
@@ -38,7 +42,11 @@ export default defineConfig({
 				},
 				plugins: [
 					octane({
-						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/tanstack-query/src/',
+							'/packages/motion/src/',
+						],
 					}),
 				],
 				// `@octanejs/zustand` is the package under test; alias the public name
@@ -61,29 +69,33 @@ export default defineConfig({
 			},
 			{
 				test: {
-					name: 'query',
-					include: ['packages/query/tests/**/*.test.ts'],
+					name: 'tanstack-query',
+					include: ['packages/tanstack-query/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					// Differential precompile for query fixtures: rewrites
-					// `@octanejs/query` → `@tanstack/react-query` so the React side runs
+					// `@octanejs/tanstack-query` → `@tanstack/react-query` so the React side runs
 					// real react-query.
-					globalSetup: ['packages/query/tests/differential/_setup.ts'],
+					globalSetup: ['packages/tanstack-query/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [
 					octane({
-						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/tanstack-query/src/',
+							'/packages/motion/src/',
+						],
 					}),
 				],
 				resolve: {
 					alias: [
 						{
 							find: /^@octanejs\/query$/,
-							replacement: resolve(import.meta.dirname, 'packages/query/src/index.ts'),
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src/index.ts'),
 						},
 						{
 							find: /^@octanejs\/query\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/query/src') + '/$1.ts',
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src') + '/$1.ts',
 						},
 					],
 				},
@@ -100,7 +112,11 @@ export default defineConfig({
 				},
 				plugins: [
 					octane({
-						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/tanstack-query/src/',
+							'/packages/motion/src/',
+						],
 					}),
 				],
 				resolve: {
@@ -144,7 +160,11 @@ export default defineConfig({
 				},
 				plugins: [
 					octane({
-						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/tanstack-query/src/',
+							'/packages/motion/src/',
+						],
 					}),
 				],
 				resolve: {
@@ -170,22 +190,22 @@ export default defineConfig({
 			},
 			{
 				test: {
-					name: 'router',
-					include: ['packages/router/tests/**/*.test.ts'],
+					name: 'tanstack-router',
+					include: ['packages/tanstack-router/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					// Differential precompile for router fixtures: rewrites
-					// `@octanejs/router` → `@tanstack/react-router` so the React side
+					// `@octanejs/tanstack-router` → `@tanstack/react-router` so the React side
 					// runs real react-router.
-					globalSetup: ['packages/router/tests/differential/_setup.ts'],
+					globalSetup: ['packages/tanstack-router/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [
 					octane({
 						exclude: [
 							'/packages/zustand/src/',
-							'/packages/query/src/',
+							'/packages/tanstack-query/src/',
 							'/packages/motion/src/',
-							'/packages/router/src/',
+							'/packages/tanstack-router/src/',
 						],
 					}),
 				],
@@ -193,11 +213,11 @@ export default defineConfig({
 					alias: [
 						{
 							find: /^@octanejs\/router$/,
-							replacement: resolve(import.meta.dirname, 'packages/router/src/index.ts'),
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
 						},
 						{
 							find: /^@octanejs\/router\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/router/src') + '/$1.ts',
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src') + '/$1.ts',
 						},
 					],
 				},
@@ -211,7 +231,11 @@ export default defineConfig({
 				},
 				plugins: [
 					octane({
-						exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/tanstack-query/src/',
+							'/packages/motion/src/',
+						],
 					}),
 				],
 				resolve: {
@@ -241,7 +265,7 @@ export default defineConfig({
 					octane({
 						exclude: [
 							'/packages/zustand/src/',
-							'/packages/query/src/',
+							'/packages/tanstack-query/src/',
 							'/packages/motion/src/',
 							'/packages/lexical/src/',
 							// @octanejs/floating-ui's hooks forward the caller's slot via subSlot;
@@ -290,7 +314,7 @@ export default defineConfig({
 					octane({
 						exclude: [
 							'/packages/zustand/src/',
-							'/packages/query/src/',
+							'/packages/tanstack-query/src/',
 							'/packages/motion/src/',
 							'/packages/stylex/src/',
 						],
@@ -327,7 +351,7 @@ export default defineConfig({
 					octane({
 						exclude: [
 							'/packages/zustand/src/',
-							'/packages/query/src/',
+							'/packages/tanstack-query/src/',
 							'/packages/motion/src/',
 							'/packages/floating-ui/src/',
 						],
@@ -364,7 +388,7 @@ export default defineConfig({
 					octane({
 						exclude: [
 							'/packages/zustand/src/',
-							'/packages/query/src/',
+							'/packages/tanstack-query/src/',
 							'/packages/motion/src/',
 							'/packages/radix/src/',
 							'/packages/floating-ui/src/',
@@ -405,7 +429,7 @@ export default defineConfig({
 					octane({
 						exclude: [
 							'/packages/zustand/src/',
-							'/packages/query/src/',
+							'/packages/tanstack-query/src/',
 							'/packages/motion/src/',
 							'/packages/base-ui/src/',
 							'/packages/floating-ui/src/',
@@ -444,7 +468,7 @@ export default defineConfig({
 					octane({
 						exclude: [
 							'/packages/zustand/src/',
-							'/packages/query/src/',
+							'/packages/tanstack-query/src/',
 							'/packages/motion/src/',
 							'/packages/testing-library/src/',
 						],
@@ -481,7 +505,7 @@ export default defineConfig({
 					octane({
 						exclude: [
 							'/packages/zustand/src/',
-							'/packages/query/src/',
+							'/packages/tanstack-query/src/',
 							'/packages/motion/src/',
 							'/packages/mdx/src/',
 							'/packages/testing-library/src/',
@@ -551,13 +575,13 @@ export default defineConfig({
 				// octane() compiles the .tsrx pages and slots hooks in app .ts files.
 				// The bindings' own `.ts` sources hand-forward slots, so they are
 				// excluded from the auto-slotting pass (same reasoning as the projects
-				// above). Package imports (@octanejs/router, octane, …) resolve through
+				// above). Package imports (@octanejs/tanstack-router, octane, …) resolve through
 				// website/node_modules workspace links — no aliases needed.
 				plugins: [
 					octaneMdx(websiteMdxOptions),
 					octane({
 						exclude: [
-							'/packages/router/src/',
+							'/packages/tanstack-router/src/',
 							'/packages/mdx/src/',
 							'/packages/testing-library/src/',
 						],

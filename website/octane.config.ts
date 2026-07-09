@@ -1,5 +1,5 @@
 // @octanejs/vite-plugin config. The plugin owns dev SSR + hydration; page
-// routing INSIDE the app is @octanejs/router (a TanStack Router port), so every
+// routing INSIDE the app is @octanejs/tanstack-router (a TanStack Router port), so every
 // site URL funnels into the same App component, which reads the request `url`
 // prop the plugin passes to RenderRoute entries. The `before` middleware
 // pre-loads a per-URL server-side router (memory history at the request URL) so

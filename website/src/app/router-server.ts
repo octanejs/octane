@@ -1,5 +1,5 @@
 // Per-URL SERVER routers. octane's prerender() calls the App component
-// synchronously, but @octanejs/router resolves its match tree through the async
+// synchronously, but @octanejs/tanstack-router resolves its match tree through the async
 // `router.load()` — so the loaded router has to exist BEFORE the component
 // render reaches <RouterProvider/>. Two cooperating paths:
 //
@@ -13,7 +13,7 @@
 // Routers are cached per normalized pathname: this site's routes are static
 // (no loaders, no per-request data), so reusing a loaded router across
 // requests for the same URL is sound.
-import { createMemoryHistory } from '@octanejs/router';
+import { createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from './router.ts';
 
 export interface ServerRouterEntry {

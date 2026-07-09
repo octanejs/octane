@@ -1075,15 +1075,15 @@ importers:
 
   examples/hacker-news:
     dependencies:
-      '@octanejs/query':
-        specifier: workspace:*
-        version: link:../../packages/query
-      '@octanejs/router':
-        specifier: workspace:*
-        version: link:../../packages/router
       '@octanejs/stylex':
         specifier: workspace:*
         version: link:../../packages/stylex
+      '@octanejs/tanstack-query':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-query
+      '@octanejs/tanstack-router':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-router
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -1391,34 +1391,6 @@ importers:
         specifier: catalog:default
         version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
 
-  packages/query:
-    dependencies:
-      '@tanstack/query-core':
-        specifier: catalog:default
-        version: 5.101.0
-      octane:
-        specifier: workspace:*
-        version: link:../octane
-    devDependencies:
-      '@tanstack/react-query':
-        specifier: catalog:default
-        version: 5.101.0(react@19.2.7)
-      '@tsrx/react':
-        specifier: catalog:default
-        version: 0.2.37(react@19.2.7)
-      esbuild:
-        specifier: catalog:default
-        version: 0.28.1
-      react:
-        specifier: catalog:default
-        version: 19.2.7
-      react-dom:
-        specifier: catalog:default
-        version: 19.2.7(react@19.2.7)
-      vitest:
-        specifier: catalog:default
-        version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
-
   packages/radix:
     dependencies:
       '@octanejs/floating-ui':
@@ -1536,7 +1508,60 @@ importers:
         specifier: catalog:default
         version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
 
-  packages/router:
+  packages/stylex:
+    dependencies:
+      '@babel/core':
+        specifier: catalog:default
+        version: 7.29.7
+      '@stylexjs/babel-plugin':
+        specifier: catalog:default
+        version: 0.19.0
+      '@stylexjs/stylex':
+        specifier: catalog:default
+        version: 0.19.0
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+    devDependencies:
+      '@types/babel__core':
+        specifier: catalog:default
+        version: 7.20.5
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
+  packages/tanstack-query:
+    dependencies:
+      '@tanstack/query-core':
+        specifier: catalog:default
+        version: 5.101.0
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+    devDependencies:
+      '@tanstack/react-query':
+        specifier: catalog:default
+        version: 5.101.0(react@19.2.7)
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.37(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
+  packages/tanstack-router:
     dependencies:
       '@tanstack/history':
         specifier: catalog:default
@@ -1566,31 +1591,6 @@ importers:
       react-dom:
         specifier: catalog:default
         version: 19.2.7(react@19.2.7)
-      vitest:
-        specifier: catalog:default
-        version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
-
-  packages/stylex:
-    dependencies:
-      '@babel/core':
-        specifier: catalog:default
-        version: 7.29.7
-      '@stylexjs/babel-plugin':
-        specifier: catalog:default
-        version: 0.19.0
-      '@stylexjs/stylex':
-        specifier: catalog:default
-        version: 0.19.0
-      octane:
-        specifier: workspace:*
-        version: link:../octane
-    devDependencies:
-      '@types/babel__core':
-        specifier: catalog:default
-        version: 7.20.5
-      vite:
-        specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
         version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
@@ -1679,9 +1679,9 @@ importers:
       '@octanejs/recharts':
         specifier: workspace:*
         version: link:../packages/recharts
-      '@octanejs/router':
+      '@octanejs/tanstack-router':
         specifier: workspace:*
-        version: link:../packages/router
+        version: link:../packages/tanstack-router
       '@octanejs/vite-plugin':
         specifier: workspace:*
         version: link:../packages/vite-plugin-octane

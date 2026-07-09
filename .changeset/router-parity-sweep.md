@@ -2,7 +2,7 @@
 'octane': patch
 ---
 
-Runtime: two error/suspense boundary fixes surfaced by the @octanejs/router
+Runtime: two error/suspense boundary fixes surfaced by the @octanejs/tanstack-router
 parity work. (1) A catch-less `tryBlock` that receives an error mid-render now
 RETHROWS instead of synchronously delegating to the parent boundary's handler —
 delegation let the frames between the throw site and the outer boundary keep

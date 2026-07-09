@@ -526,7 +526,7 @@ ref buffer, wired into all four swap sites (`componentSlot`, `childSlot`, `ifBlo
 `switchBlock`). On a transition swap the new subtree renders off-screen (effects
 captured); completes → atomic commit + tear down old; suspends → discard partial +
 re-throw so the enclosing `@try`'s EXISTING transition hold keeps the old content live
-and resumes. Urgent + hydration keep the legacy path. This closed the `@octanejs/router`
+and resumes. Urgent + hydration keep the legacy path. This closed the `@octanejs/tanstack-router`
 concurrent-navigation gap (its `it.fails` flipped to passing). Validated by differential
 (React-oracle) tests for childSlot + ifBlock + nested-Suspense, and direct tests for
 switchBlock + componentSlot(router) + portal-in-WIP. Documented scope: per-swap, not a

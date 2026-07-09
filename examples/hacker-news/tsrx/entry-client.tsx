@@ -9,7 +9,7 @@
 //    we createRoot().render() a fresh tree — the original client-only behavior.
 import 'virtual:stylex.css';
 import { createRoot, hydrateRoot } from 'octane';
-import { QueryClient, hydrate } from '@octanejs/query';
+import { QueryClient, hydrate } from '@octanejs/tanstack-query';
 import { makeRouter } from './routes.js';
 import { App } from './App.tsrx';
 

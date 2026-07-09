@@ -3,7 +3,7 @@
 // components, so their classes are styled through :global() descendant holes.
 // Below 720px the link row collapses behind a hamburger into a dropdown panel.
 import { useState } from 'octane';
-import { Link, Outlet } from '@octanejs/router';
+import { Link, Outlet } from '@octanejs/tanstack-router';
 import logoUrl from '../assets/octane-logo.svg';
 
 export function Layout() @{

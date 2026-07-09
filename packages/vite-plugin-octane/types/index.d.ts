@@ -14,7 +14,7 @@ export interface OctanePluginOptions {
 	 * double-slotted. Published bindings live in node_modules and are skipped
 	 * automatically; set this for monorepo / aliased-to-source setups where
 	 * pnpm symlinks resolve `@octanejs/*` imports to `packages/*\/src` paths
-	 * (e.g. `['/packages/router/src/']`).
+	 * (e.g. `['/packages/tanstack-router/src/']`).
 	 */
 	exclude?: string[];
 }

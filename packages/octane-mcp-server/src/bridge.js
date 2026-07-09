@@ -3,12 +3,12 @@ import { join, resolve } from 'node:path';
 
 export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
-	'@tanstack/react-query': '@octanejs/query',
+	'@tanstack/react-query': '@octanejs/tanstack-query',
 	'framer-motion': '@octanejs/motion',
 	motion: '@octanejs/motion',
 	'@stylexjs/stylex': '@octanejs/stylex',
-	'react-router': '@octanejs/router',
-	'react-router-dom': '@octanejs/router',
+	'react-router': '@octanejs/tanstack-router',
+	'react-router-dom': '@octanejs/tanstack-router',
 	'@lexical/react': '@octanejs/lexical',
 	'@floating-ui/react': '@octanejs/floating-ui',
 	'radix-ui': '@octanejs/radix',
