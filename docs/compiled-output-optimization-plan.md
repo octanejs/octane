@@ -1,9 +1,9 @@
 # Compiled Output Optimization Plan — size, allocation, and closure churn
 
-Status: Phase 0 LANDED (2026-07-08) — `codegen-size` + `bundle-size` suites,
-baselines recorded, ratio guards active (see below). Phases 1–3 proposed.
-Author context: follow-up to the binding-bag pre-shape change (superseded by
-Phase 1 below).
+Status: Phases 0 + 1 LANDED (2026-07-08) — measurement suites + guards, and
+the bag-factory codegen (see the LANDED notes in each phase). Phases 2–3
+proposed. Author context: follow-up to the binding-bag pre-shape change
+(superseded by Phase 1).
 
 ## 1. Problem statement
 
@@ -67,11 +67,13 @@ These were audited before writing the plan (file:line refs are 2026-07-08):
   forwards `block.extra` as the third body arg (runtime.ts:1545); `createBlock`
   accepts it (1485-1504); no call site passes it today. It is a ready-made
   channel for captured values — no body-signature change needed.
-- **Bag fields are compiler-private.** runtime.ts never reads `slots[0]` fields
-  by name; the compiled-code ↔ runtime property contract is only `__s.block/
-  slots/cleanups`, `__block.parentNode/endMarker`, element `$$<event>` keys,
-  the `{fn, args}` descriptor, and dev-only `__oct_loc`/`locs`/`__oct_suppress`.
-  We can rename every bag field freely.
+- **Bag fields are compiler-private — with ONE exception found during Phase 1.**
+  The suspense-hide path (`detachSubtreeRefs`, runtime.ts ~10378) discovers
+  refs by scanning `slots[0]` keys by PREFIX: `_ref$N`/`_sp$N`/`_fi$N` paired
+  with `_el$N`. Those fields therefore keep their long names (and force the
+  `bagOf` spill — named keys can't ride positional factories); everything else
+  renames freely. Phase 3 candidate: replace the key scan with a compiler-
+  emitted ref manifest so these fields can shorten too.
 - **Event descriptors are read at dispatch time** (`fireEventSlot`,
   runtime.ts:4971-5000, reads `node[key]` per event). A helper may mutate the
   descriptor in place instead of re-assigning a new object.
@@ -206,6 +208,24 @@ __s.slots[0] = _b;
 *Expected effect: mount block shrinks from ~2 lines/field + literal to one
 call; update lines shrink via 1-char fields. Estimate on Counter sample:
 mount 14 lines → 5; measured target from 0b before landing.*
+
+**LANDED 2026-07-08.** Implemented as designed with two deviations:
+(1) mount values fill pre-declared `_mN` LOCALS (minifier-mangled to 1 char)
+that the factory receives positionally — inlining every value expression into
+the call would have broken the per-binding `{ const _v = …; helper(); }`
+grouping and DOM-op ordering; the locals preserve statement order exactly and
+cost nothing post-minify. (2) ref/spread/fragmentRef fields keep long names +
+`bagOf` spill (see the corrected constraint above — the runtime's suspense-hide
+key scan reads them; a ref manifest is now a Phase 3 item). Runtime gained
+`bag0`…`bag16` + `bagOf` (tier-2 exports, +110 B gzip). Two compiled-output
+shape tests (event-bundle, helper-shadowing) updated to the new emission.
+Measured: codegen-size corpus raw −10.9%, **minified −17.6%** (75,909 →
+62,522 B), gzip −5.5% (expansion 1.19× → **1.13×**); bundle-size app-chunk
+gzip −2.0% tsrx / −3.3% jsx (app/ripple **1.40×**, app/solid 1.63×). Perf:
+same-session A/B on js-framework/dbmon/effectful-list neutral within noise
+(the flagged `clear` +11% did not reproduce — that op swings ±1.5ms with GC
+timing). Guards ratcheted: codegen gzip 1.25→1.18, app/ripple 1.5→1.45,
+app/solid 1.75→1.70; baselines re-recorded.
 
 ---
 

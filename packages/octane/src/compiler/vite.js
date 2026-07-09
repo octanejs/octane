@@ -68,7 +68,13 @@ export function octane(options = {}) {
 				if (/\/\/\s*octane-no-slot\b/.test(code)) return null;
 				if (excludePaths.some((p) => file.includes(p))) return null;
 				if (!/from\s*['"]octane['"]/.test(code)) return null;
-				return slotHooks(code, id);
+				// Same HMR gate as the full compiler: dev serve gets Symbol.for
+				// (registry identity survives re-import), builds/SSR get Symbol().
+				const ssr =
+					forceSsr !== undefined
+						? forceSsr
+						: transformOptions?.ssr === true || this.environment?.config?.consumer === 'server';
+				return slotHooks(code, id, { hmr: !ssr && !!hmrEnabled });
 			}
 
 			return null;

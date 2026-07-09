@@ -40,6 +40,16 @@ settles. That structure has two distinct costs:
 Both costs bite hardest **on updates**, where new promises arrive via changed
 props/state and the boundary re-suspends.
 
+3. **Nested-component waterfalls (the typical real-world shape — and what
+   `benchmarks/async-waterfall` actually measures).** Routes render layouts
+   render cards, each with its own `use()`. A parent's suspension aborts its
+   render *before the child slot is created*, so the child — whose props are
+   often provably independent of the parent's data (`<Level level={level + 1}
+   version={version}/>` in the bench fixture) — never mounts and never starts
+   fetching. Costs 1–2 are intra-body; this one crosses component boundaries,
+   and no intra-body transform touches it: Phases 1–3 alone leave the bench at
+   ~10.9× the latency floor. Phase 4 exists to close it.
+
 ## Current mechanics (what the fix must integrate with)
 
 Runtime (`packages/octane/src/runtime.ts`):
@@ -152,10 +162,11 @@ assumption React already bakes into `use()` replay.
 
 | Option | Verdict |
 |---|---|
-| Runtime-only speculative execution past the throw (poisoned sentinel to discover later `use()` calls) | Rejected as primary mechanism. Crom-style speculation; unsound without purity proofs; React's far weaker prewarming already caused ecosystem double-fetch pain. Kept as optional Phase 5 research, compiler-gated. |
+| Runtime-only speculative execution past the throw (poisoned sentinel, arbitrary user code re-run blindly) | Rejected. Crom-style speculation; unsound without purity proofs; React's far weaker prewarming already caused ecosystem double-fetch pain. The *proof-carrying* variant — compiler-sliced warm functions that never run arbitrary user code — IS viable and is Phase 4. Blind speculation for unprovable cases stays parked (Phase 6). |
+| Full speculative render of suspended subtrees (render children into detached blocks, adopt on resume) | Rejected. Needs adoption/teardown machinery, effect suppression, and re-imports React-prewarm double-execution hazards. Warming only needs fetches *started*, not DOM built — the sliced warm plan gets the same network behavior with none of the commit risk. |
 | Ripple-style continuation compilation of `@try` bodies | Rejected for this problem. Continuations fix *replay cost*, not waterfalls — Ripple's own body-`await` is sequential by design and routes parallelism through eager creation. Would be a major departure (hook/effect timing, sync-render guarantees, hydration) for no waterfall benefit. |
 | `useAll([...])` / `use(Promise.all(...))` sugar | Rejected as the mechanism (all-or-nothing readiness, coupled rejection, per-value reveal lost). The runtime wakeup below borrows the shape while keeping per-value unwrapping. |
-| Compiler preload transform + batched boundary wakeup | **Chosen.** Phases below. |
+| Compiler preload transform + batched boundary wakeup + compiler-sliced cross-component warming | **Chosen.** Phases below. |
 
 ## The plan
 
@@ -218,7 +229,7 @@ const c = use(useMemo(() => fetchC(a.ref), [fetchC, a], _h$2)); // stays put
 - **Semantic license:** evaluating `fetchB(id)` before A's unwrap reorders
   user-visible side effects of render code. This is the same idempotence
   assumption React states in `trackUsedThenable` and Svelte applies to template
-  expressions. Document as an intentional divergence (see Phase 4): *Octane
+  expressions. Document as an intentional divergence (see Phase 5): *Octane
   starts independent `use()` fetches in parallel; React waterfalls.*
 - Multi-level chains shrink to their true dependency depth: each replay
   discovers (and batch-starts) the next *stratum* of creations, so a
@@ -259,7 +270,94 @@ single composite promise:
 - This phase alone fixes replay churn for the pre-existing-promises case
   (`use(ThingPromise); use(OtherThingPromise)`): one retry, one replay.
 
-### Phase 4 — Diagnostics, SSR, docs, tests
+### Phase 4 — Cross-component fetch-tree warming (closes the benchmark)
+
+The headline phase: extract, at compile time, each component's **fetch tree**
+and walk it ahead of rendering, so a nested chain's fetches all start in the
+first render tick. Conceptually this is Relay's "parallel data tree" — but
+*derived automatically from component code* instead of authored as colocated
+GraphQL fragments.
+
+**Emit.** Alongside each compiled component, the compiler emits a warm
+function containing only the compiler-sliced *fetch plan*:
+
+```js
+// function Level({ level, version }) @{
+//   const data = use(fetchData(level, version));
+//   ... @if (level < LEVELS - 1) { <Level level={level+1} version={version}/> } ...
+Level.__warm = (props, w) => {
+	_$warmMemo(w, () => fetchData(props.level, props.version),
+		[fetchData, props.level, props.version], _h$0);
+	if (props.level < LEVELS - 1) {
+		_$warmChild(w, Level, { level: props.level + 1, version: props.version }, _h$c0);
+	}
+};
+```
+
+The parent's compiled body invokes warm calls for provably-reachable child
+component slots **before its first unwrap** (alongside the Phase 2 hoists), and
+`_$warmChild` recurses — the entire descendant fetch tree is walked
+synchronously in the initial attempt. Warming is therefore not triggered *by*
+suspension; it happens whether or not the parent suspends, and on transition
+updates it re-runs with the new props, so `update` parallelizes identically.
+
+**Slicing rules (what may appear in a warm function).** The slice for a
+component includes only the statements transitively needed to compute
+(a) memoized `use()` creations, (b) child-slot reachability conditions, and
+(c) child prop expressions — and only when every ingredient is *warm-safe*:
+
+- expression evaluation, `const`/`let` declarations, ternaries/logical ops;
+- **ghost hooks**: `useMemo` creations execute into the warm cache; `useState`
+  resolves to its *initializer value only* (no state registered — the real
+  mount owns state); `use(Context)`/`useContext` reads resolve against the
+  live parent scope (warming runs under the real parent block, so providers
+  are visible);
+- a child slot enters the plan only when its reachability condition AND all
+  its prop expressions are independent of every not-yet-unwrapped `use()`
+  result on the path (same `collectFreeIdentifiers` legality as Phase 2).
+
+Anything outside this set (assignments to outer scope, arbitrary calls other
+than the fetch creations themselves, refs, effect-dependent values,
+unprovable conditions) **cuts the slice at that edge at compile time**. The
+plan is best-effort and always sound: warm less = slower but never wrong.
+No DOM is created, no effects run, no state registers, nothing commits —
+mis-speculation can only ever waste a fetch, never corrupt behavior.
+
+**Warm cache.** A per-root map keyed by (call-site slot symbol path, dep
+values). `_$warmMemo` dedups on that key, so re-warming (a second render
+attempt before resume) never double-starts a fetch. When the real child
+mounts, its `useMemo` initializer consults the warm cache first and *adopts*
+the entry into the real hook slot (transfer, not copy). Dep mismatch (props
+drifted between warm time and mount) is a plain miss: the real mount fetches
+fresh — a wasted prefetch, correct behavior; the orphan is evicted on
+boundary commit (and aborted, if the Phase 5 AbortSignal lands).
+
+**Recursion and lists.** Reachability conditions in the plan are evaluable at
+warm time (they were proven independent), so recursive components terminate
+exactly where the real render would (`level < LEVELS - 1`). A runtime depth
+cap (Decision point 6) plus a dev warning backstops chains the compiler
+cannot prove finite. `@for` child slots enter the plan only when the list
+source itself is warm-available (not gated behind a pending `use()` in the
+same body — often it IS the suspended data, in which case that edge cuts,
+correctly: those children are data-dependent, a true waterfall).
+
+**SSR.** The same warm walk in `runtime.server.ts` collapses server-side
+nested-fetch depth to true dependency depth — directly measurable today via
+`ssr-throughput`'s `waterfall-d1/d2/d4` ops, in addition to the client suite.
+
+**Result on `benchmarks/async-waterfall`:** all 10 levels' fetches start in
+the first tick; init and update land near the parallel floor (~1.1–1.3×,
+solid/ripple territory) instead of 10.9×. Ship-time: tighten `ratios.json` —
+keep octane-vs-react ≤1.2, add octane-vs-solid and octane-vs-ripple ceilings
+(~1.5× to absorb replay overhead) so the win cannot regress.
+
+**Cost to watch:** warm functions are extra compiled output. The
+`codegen-size` and `bundle-size` suites guard this — emit warm functions only
+for components that (transitively) contain `use()` creations or async
+descendants, and skip emit entirely for leaf/sync components so the tax is
+proportional to actual async surface.
+
+### Phase 5 — Diagnostics, SSR, docs, tests
 
 - **Dev waterfall warning** (à la Svelte's `await_waterfall`): when a replay
   reaches a `use()` at a new index whose creation could not be hoisted, log the
@@ -289,14 +387,16 @@ single composite promise:
   change (Ripple's `abort(TRACKED_UPDATED)` analogue). API-surface decision —
   not core to this plan.
 
-### Phase 5 (research, optional) — Speculative discovery
+### Phase 6 (research, optional) — Blind speculative discovery
 
-For patterns the static analysis cannot prove (a `use()` behind a condition
-that reads an earlier result), a compiler-*gated* speculative pass could warm
-fetches — only where the compiler proves the intervening code pure. Prior art
-says the edges are sharp (React prewarming double-fetches; Crom,
+For the residue Phase 4's proofs cannot reach (a `use()` or child slot gated
+on a condition that genuinely reads an earlier result, fetch args flowing
+through un-sliceable code), a *blind* speculative pass could re-run user code
+with placeholder values to discover fetches. Prior art says the edges are
+sharp (React prewarming double-fetches; Crom,
 https://www.usenix.org/legacy/event/nsdi10/tech/full_papers/mickens-crom.pdf).
-Park until Phases 1–3 ship and real-world gaps justify it.
+Park until Phases 1–4 ship and real-world gaps justify it — the expectation
+is that Phase 4's coverage makes this unnecessary.
 
 ## Edge cases and rules
 

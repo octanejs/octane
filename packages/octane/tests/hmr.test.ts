@@ -161,4 +161,36 @@ describe('hmr — runtime wrapper', () => {
 		expect(code).not.toMatch(/hmr\(/);
 		expect(code).not.toMatch(/import\.meta\.hot/);
 	});
+
+	it('hmr option off → hook slots are plain Symbol(), no registry key, no file path', async () => {
+		// Only HMR's re-import needs Symbol.for's registry identity; prod output
+		// uses bare Symbol() — smaller, and the module id (an ABSOLUTE path under
+		// vite) never leaks into shipped bundles.
+		const { compile } = await import('octane/compiler');
+		const src =
+			"import { useState } from 'octane';\n" +
+			'export function Foo() @{\n' +
+			'  const [n, setN] = useState(0);\n' +
+			'  <button onClick={() => setN(n + 1)}>{n as string}</button>\n' +
+			'}\n';
+		const { code } = compile(src, '/abs/path/to/file.tsrx'); // no { hmr: true }
+		expect(code).toMatch(/const _h\$0 = Symbol\(\);/);
+		expect(code).not.toMatch(/Symbol\.for/);
+		expect(code).not.toMatch(/abs\/path/);
+	});
+
+	it('slotHooks (plain .ts pass) follows the same gate', async () => {
+		const { slotHooks } = await import('../src/compiler/slot-hooks.js');
+		const src =
+			"import { useState } from 'octane';\n" +
+			'export function useCounter() {\n' +
+			'  const [n, setN] = useState(0);\n' +
+			'  return [n, setN];\n' +
+			'}\n';
+		const dev = slotHooks(src, '/abs/custom.ts', { hmr: true });
+		expect(dev?.code).toMatch(/Symbol\.for\("octane:\/abs\/custom\.ts:useCounter\.useState#0"\)/);
+		const prod = slotHooks(src, '/abs/custom.ts');
+		expect(prod?.code).toMatch(/const _h\$0 = Symbol\(\);/);
+		expect(prod?.code).not.toMatch(/Symbol\.for|abs\/custom/);
+	});
 });
