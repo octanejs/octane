@@ -29,7 +29,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.6,
-    "note": "rotate-backward is the LIS-vs-lastPlacedIndex differentiator: octane moves 1 node, React moves all survivors (known ~12x faster → 0.08x). Guard 0.6 leaves huge headroom while still catching a fast-path break."
+    "note": "rotate-backward is the LIS-vs-lastPlacedIndex differentiator: octane moves 1 node, React moves all survivors (known ~12x faster \u2192 0.08x). Guard 0.6 leaves huge headroom while still catching a fast-path break."
   },
   {
     "suite": "memo-wall",
@@ -61,7 +61,7 @@
     "target": "news-50/octane-tsrx",
     "reference": "news-50/react",
     "maxRatio": 1.2,
-    "note": "octane server render() vs react-dom renderToString at 50 cards (known ~0.6x → octane faster). Guard 1.2 tolerates noise but catches an octane SSR regression."
+    "note": "octane server render() vs react-dom renderToString at 50 cards (known ~0.6x \u2192 octane faster). Guard 1.2 tolerates noise but catches an octane SSR regression."
   },
   {
     "suite": "ssr-throughput",
@@ -69,6 +69,46 @@
     "target": "deopt-page/octane-deopt",
     "reference": "deopt-page/octane-fast",
     "maxRatio": 4.0,
-    "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio→1) or a runaway deopt (ratio>4) both surface."
+    "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio\u21921) or a runaway deopt (ratio>4) both surface."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "js_gzip",
+    "target": "octane-tsrx",
+    "reference": "ripple",
+    "maxRatio": 2.2,
+    "note": "shipped gzip bytes vs ripple, same app, normalized minify (measured 2.09x on record 2026-07-08). RATCHET DOWN as the compiled-output plan phases land (docs/compiled-output-optimization-plan.md)."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "js_gzip",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.9,
+    "note": "shipped gzip bytes vs solid, same app, normalized minify (measured 1.80x on record 2026-07-08). Ratchet down with the compiled-output plan."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "compiled",
+    "reference": "source",
+    "maxRatio": 1.25,
+    "note": "gzip(minified compiled corpus) vs gzip(source corpus) (measured 1.19x on record 2026-07-08). Catches codegen bloat without a browser or build."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "app_gzip",
+    "target": "octane-tsrx",
+    "reference": "ripple",
+    "maxRatio": 1.5,
+    "note": "APP-CODE-ONLY gzip vs ripple, same app (measured 1.43x on record 2026-07-08). The number that scales with app size - user code eclipses the runtime in real apps. Primary ratchet for docs/compiled-output-optimization-plan.md."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "app_gzip",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.75,
+    "note": "APP-CODE-ONLY gzip vs solid, same app (measured 1.66x on record 2026-07-08). Ratchet down with the compiled-output plan."
   }
 ]

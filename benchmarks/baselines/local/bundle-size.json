@@ -1,0 +1,332 @@
+{
+  "suite": "bundle-size",
+  "iterations": 1,
+  "targets": [
+    {
+      "name": "octane-tsrx",
+      "ops": {
+        "js_raw": {
+          "median": 82156,
+          "min": 82156,
+          "samples": 1
+        },
+        "js_gzip": {
+          "median": 26465,
+          "min": 26465,
+          "samples": 1
+        },
+        "js_brotli": {
+          "median": 23260,
+          "min": 23260,
+          "samples": 1
+        },
+        "app_raw": {
+          "median": 12654,
+          "min": 12654,
+          "samples": 1
+        },
+        "app_gzip": {
+          "median": 3313,
+          "min": 3313,
+          "samples": 1
+        },
+        "app_brotli": {
+          "median": 2683,
+          "min": 2683,
+          "samples": 1
+        },
+        "fw_raw": {
+          "median": 69502,
+          "min": 69502,
+          "samples": 1
+        },
+        "fw_gzip": {
+          "median": 23152,
+          "min": 23152,
+          "samples": 1
+        },
+        "fw_brotli": {
+          "median": 20577,
+          "min": 20577,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-DJb-j4J_.js",
+            "bucket": "fw",
+            "bytes": 69502
+          },
+          {
+            "file": "assets/index-B9rAAReH.js",
+            "bucket": "app",
+            "bytes": 12654
+          }
+        ]
+      }
+    },
+    {
+      "name": "octane-jsx",
+      "ops": {
+        "js_raw": {
+          "median": 79097,
+          "min": 79097,
+          "samples": 1
+        },
+        "js_gzip": {
+          "median": 26219,
+          "min": 26219,
+          "samples": 1
+        },
+        "js_brotli": {
+          "median": 23110,
+          "min": 23110,
+          "samples": 1
+        },
+        "app_raw": {
+          "median": 9407,
+          "min": 9407,
+          "samples": 1
+        },
+        "app_gzip": {
+          "median": 2982,
+          "min": 2982,
+          "samples": 1
+        },
+        "app_brotli": {
+          "median": 2487,
+          "min": 2487,
+          "samples": 1
+        },
+        "fw_raw": {
+          "median": 69690,
+          "min": 69690,
+          "samples": 1
+        },
+        "fw_gzip": {
+          "median": 23237,
+          "min": 23237,
+          "samples": 1
+        },
+        "fw_brotli": {
+          "median": 20623,
+          "min": 20623,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-D_TmAYTz.js",
+            "bucket": "fw",
+            "bytes": 69690
+          },
+          {
+            "file": "assets/index-DuDseS_m.js",
+            "bucket": "app",
+            "bytes": 9407
+          }
+        ]
+      }
+    },
+    {
+      "name": "react",
+      "ops": {
+        "js_raw": {
+          "median": 197487,
+          "min": 197487,
+          "samples": 1
+        },
+        "js_gzip": {
+          "median": 62236,
+          "min": 62236,
+          "samples": 1
+        },
+        "js_brotli": {
+          "median": 53647,
+          "min": 53647,
+          "samples": 1
+        },
+        "app_raw": {
+          "median": 5829,
+          "min": 5829,
+          "samples": 1
+        },
+        "app_gzip": {
+          "median": 2160,
+          "min": 2160,
+          "samples": 1
+        },
+        "app_brotli": {
+          "median": 1922,
+          "min": 1922,
+          "samples": 1
+        },
+        "fw_raw": {
+          "median": 191658,
+          "min": 191658,
+          "samples": 1
+        },
+        "fw_gzip": {
+          "median": 60076,
+          "min": 60076,
+          "samples": 1
+        },
+        "fw_brotli": {
+          "median": 51725,
+          "min": 51725,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-BR0vhF23.js",
+            "bucket": "fw",
+            "bytes": 191658
+          },
+          {
+            "file": "assets/index-CvkyhRLc.js",
+            "bucket": "app",
+            "bytes": 5742
+          },
+          {
+            "file": "assets/rolldown-runtime-B8sk0Y4v.js",
+            "bucket": "app",
+            "bytes": 87
+          }
+        ]
+      }
+    },
+    {
+      "name": "ripple",
+      "ops": {
+        "js_raw": {
+          "median": 33627,
+          "min": 33627,
+          "samples": 1
+        },
+        "js_gzip": {
+          "median": 12814,
+          "min": 12814,
+          "samples": 1
+        },
+        "js_brotli": {
+          "median": 11449,
+          "min": 11449,
+          "samples": 1
+        },
+        "app_raw": {
+          "median": 7209,
+          "min": 7209,
+          "samples": 1
+        },
+        "app_gzip": {
+          "median": 2312,
+          "min": 2312,
+          "samples": 1
+        },
+        "app_brotli": {
+          "median": 1999,
+          "min": 1999,
+          "samples": 1
+        },
+        "fw_raw": {
+          "median": 26418,
+          "min": 26418,
+          "samples": 1
+        },
+        "fw_gzip": {
+          "median": 10502,
+          "min": 10502,
+          "samples": 1
+        },
+        "fw_brotli": {
+          "median": 9450,
+          "min": 9450,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-DarL4GwF.js",
+            "bucket": "fw",
+            "bytes": 26418
+          },
+          {
+            "file": "assets/index-eiUDtehh.js",
+            "bucket": "app",
+            "bytes": 7209
+          }
+        ]
+      }
+    },
+    {
+      "name": "solid",
+      "ops": {
+        "js_raw": {
+          "median": 38531,
+          "min": 38531,
+          "samples": 1
+        },
+        "js_gzip": {
+          "median": 14732,
+          "min": 14732,
+          "samples": 1
+        },
+        "js_brotli": {
+          "median": 13339,
+          "min": 13339,
+          "samples": 1
+        },
+        "app_raw": {
+          "median": 6375,
+          "min": 6375,
+          "samples": 1
+        },
+        "app_gzip": {
+          "median": 1991,
+          "min": 1991,
+          "samples": 1
+        },
+        "app_brotli": {
+          "median": 1757,
+          "min": 1757,
+          "samples": 1
+        },
+        "fw_raw": {
+          "median": 32156,
+          "min": 32156,
+          "samples": 1
+        },
+        "fw_gzip": {
+          "median": 12741,
+          "min": 12741,
+          "samples": 1
+        },
+        "fw_brotli": {
+          "median": 11582,
+          "min": 11582,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-Bk-7v061.js",
+            "bucket": "fw",
+            "bytes": 32156
+          },
+          {
+            "file": "assets/index-CLV2OaAt.js",
+            "bucket": "app",
+            "bytes": 6375
+          }
+        ]
+      }
+    }
+  ],
+  "harnessExit": 0
+}

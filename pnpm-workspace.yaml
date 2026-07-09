@@ -20,6 +20,8 @@ packages:
   - benchmarks/ssr-throughput/*
   - benchmarks/streaming-ssr
   - benchmarks/streaming-ssr/*
+  - benchmarks/codegen-size
+  - benchmarks/bundle-size
   - playground/*
   - examples/*
   - website

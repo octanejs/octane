@@ -267,6 +267,15 @@ single composite promise:
   (fetch-start timing + single-replay batching); README note under the `.tsrx`
   authoring section ("you do not need to pre-create promises; the compiler
   parallelizes independent `use()` calls").
+- **Website:** update the homepage "Compiled templates" feature block
+  (`website/src/pages/Home.tsrx`) to call out waterfall removal, once the
+  transform is on by default (do not advertise before it ships). Draft copy,
+  replacing the current body:
+
+  > Components compile ahead of time to template clones and direct DOM
+  > writes — no virtual DOM, no diffing. The compiler even removes suspense
+  > waterfalls, proving which `use()` fetches are independent and starting
+  > them together.
 - **Changeset:** patch (0.x alpha track), covering compiler + runtime.
 - Optional nice-to-have (separate decision): expose an `AbortSignal` to
   memoized creations so superseded in-flight fetches can be cancelled on dep
