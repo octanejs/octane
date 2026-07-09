@@ -239,6 +239,27 @@ const SUITES = [
 			},
 		],
 	},
+	{
+		// Compiled-output size (Node-only, seconds-fast): compiles a fixed
+		// .tsrx/.tsx corpus through octane/compiler with prod settings and reports
+		// raw/minified/gzip bytes as `source` vs `compiled` targets — the per-commit
+		// codegen-size regression signal. Deterministic; the iteration knob is unused.
+		name: 'codegen-size',
+		cwd: 'codegen-size',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Shipped-bytes comparison (Node-only): production `vite build` of each
+		// js-framework app with ONE normalized minify setting, reporting raw/gzip/
+		// brotli JS bytes per framework. Deterministic; the iteration knob is unused.
+		name: 'bundle-size',
+		cwd: 'bundle-size',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
 ];
 
 const SUITE_BY_NAME = new Map(SUITES.map((s) => [s.name, s]));

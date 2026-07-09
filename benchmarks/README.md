@@ -115,6 +115,24 @@ internally, get their own baseline and guard namespace.
 | `streaming-ssr` | streaming-ssr | none (Node-only) | streaming shell TTFB, stream totals, chunking |
 | `dbmon-deopt` | dbmon | octane-tsrx + octane-deopt | tuned vs plain-.ts cliff |
 | `js-framework-deopt` | js-framework | octane-tsrx + naive triplet | tuned vs naive-authoring cliff |
+| `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
+| `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production build of each js-framework app, normalized minify, raw/gzip/brotli |
+
+The two size suites measure **bytes, not milliseconds** (deterministic —
+`median === min`, and ratio guards on them are exact, hardware-independent
+numbers). They are the regression gates for
+`docs/compiled-output-optimization-plan.md`: `codegen-size` is the seconds-fast
+per-commit signal (its corpus is FIXED — editing the corpus list invalidates the
+baseline, re-record when you change it), `bundle-size` is the cross-framework
+comparison (all targets built with one normalized minify so solid's
+`minify:false` dev config and octane's terser passes don't skew the compare).
+
+`bundle-size` splits every build into an `app` chunk (modules under the app's
+own src/) and a `framework` chunk (node_modules + the octane workspace runtime
++ virtual helpers) and reports both, plus totals: `app_*` / `fw_*` / `js_*` ×
+raw/gzip/brotli. The `app_*` ops are the primary ratchet — in real apps user
+code eclipses the framework runtime, so the per-component codegen share is
+what must scale; `fw_*` tracks the one-time runtime cost separately.
 
 ## Adding a suite
 

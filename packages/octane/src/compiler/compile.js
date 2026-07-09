@@ -5397,19 +5397,54 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// Restore the outer plan's per-element LOC map — pairs with the save at planJsx top.
 	ctx._elemLocs = _prevElemLocs;
 
+	const updateJoined = updateLines.join('\n');
+	const everyRenderJoined = everyRenderLines.join('\n');
+	const afterJoined = afterCalls
+		.map((c, i) => ({ ...c, i }))
+		.sort((a, b) => a.id - b.id || a.i - b.i)
+		.map((c) => c.line)
+		.join('\n');
+
+	// V8 shape stability: the mount path fills the bag with one property write
+	// per field, which would grow a bare `{}` through a hidden-class transition
+	// per add — every bag instance re-walks the transition chain, and the final
+	// map is only reached after the last write. Pre-shape it instead: collect
+	// every `_b.<field> =` assignment this body ever emits (mount, update,
+	// every-render diffs, and the per-render slot calls) and allocate the bag as
+	// ONE full-shape literal. The literal's boilerplate gives every instance the
+	// final map at birth (fields in-object), so each later write — mount fill
+	// and update diff alike — is a monomorphic in-place store. Field names all
+	// start with `_` and only compiler-emitted code references `_b`, so a text
+	// scan over the emitted lines is exact (reads like `_b._prev$0 !== _v` and
+	// element writes like `_b._el$0["$$click"] = …` don't match the `=` guard).
+	if (!noTemplate) {
+		const bagFields = [];
+		const seenFields = new Set();
+		const FIELD_WRITE_RE = /\b_b\.(_[A-Za-z0-9_$]+)\s*=(?!=)/g;
+		for (const src of [mountLines.join('\n'), updateJoined, everyRenderJoined, afterJoined]) {
+			for (const m of src.matchAll(FIELD_WRITE_RE)) {
+				if (!seenFields.has(m[1])) {
+					seenFields.add(m[1]);
+					bagFields.push(m[1]);
+				}
+			}
+		}
+		if (bagFields.length > 0) {
+			const init = mountLines.indexOf('    _b = {};');
+			if (init === -1) throw new Error('octane compiler: bag init line not found');
+			mountLines[init] = `    _b = { ${bagFields.map((f) => `${f}: undefined`).join(', ')} };`;
+		}
+	}
+
 	return {
 		// Does this body carry a binding bag (`__s.slots[0]`)? Control-flow-only
 		// bodies don't → no `let _b … if (undefined) … else {}` wrapper in the
 		// assembled body (the slot calls use __block.parentNode directly).
 		hasBag: !noTemplate,
 		mount: mountLines.join('\n'),
-		update: updateLines.join('\n'),
-		everyRender: everyRenderLines.join('\n'),
-		after: afterCalls
-			.map((c, i) => ({ ...c, i }))
-			.sort((a, b) => a.id - b.id || a.i - b.i)
-			.map((c) => c.line)
-			.join('\n'),
+		update: updateJoined,
+		everyRender: everyRenderJoined,
+		after: afterJoined,
 		head: headEmit,
 		// DEV ONLY (`''` in prod → no body emission, byte-identical output): a structured
 		// `{ slotIndex: [line, column] }` literal for hydration-mismatch warnings + a future

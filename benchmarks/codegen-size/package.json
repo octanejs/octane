@@ -1,0 +1,14 @@
+{
+  "name": "octane-codegen-size-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Compiled-output size benchmark - compiles a fixed TSRX/TSX corpus through octane/compiler with production settings and reports raw / minified / gzip bytes. No browser, no servers; the per-commit regression signal for codegen size.",
+  "scripts": {
+    "bench": "node run.mjs"
+  },
+  "dependencies": {
+    "esbuild": "catalog:default",
+    "octane": "workspace:*"
+  }
+}

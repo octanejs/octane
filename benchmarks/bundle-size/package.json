@@ -1,0 +1,13 @@
+{
+  "name": "octane-bundle-size-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Bundle-size benchmark - production vite build of each js-framework app with ONE normalized minify setting, reporting raw / gzip / brotli JS bytes per framework. The cross-framework shipped-bytes comparison (octane vs react/ripple/solid).",
+  "scripts": {
+    "bench": "node run.mjs"
+  },
+  "dependencies": {
+    "vite": "catalog:default"
+  }
+}
