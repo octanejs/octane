@@ -1,7 +1,7 @@
 /**
- * Vitest globalSetup for the `react-redux` project — the differential
- * precompile. Compiles every `.tsrx` fixture under
- * packages/react-redux/tests/_fixtures through `@tsrx/react` + esbuild and
+ * Vitest globalSetup for the `@octanejs/redux` differential project — the
+ * differential precompile. Compiles every `.tsrx` fixture under
+ * packages/redux/tests/_fixtures through `@tsrx/react` + esbuild and
  * writes the React-runtime JS into THIS package's cache, rewriting
  * `@octanejs/redux` → `react-redux` (and `octane` → `react`) so the
  * React side runs the real react-redux binding (the byte-for-byte oracle).

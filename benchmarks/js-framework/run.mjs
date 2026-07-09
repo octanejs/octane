@@ -147,6 +147,19 @@ async function runTarget(t) {
 		results[op.name] = { median, min, samples };
 	}
 
+	// M0 of docs/comment-marker-elision-plan.md: comment-node DOM weight at
+	// steady state (1,000 rows mounted). Deterministic per framework build
+	// (median === min), and cross-framework comparable — solid/ripple anchor
+	// dynamic positions on comments too. Ratchets down as elision phases land.
+	await ensureState(page, 'rows');
+	const comments = await page.evaluate(() => {
+		const w = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
+		let n = 0;
+		while (w.nextNode()) n++;
+		return n;
+	});
+	results.comments_1k = { median: comments, min: comments, samples: [comments] };
+
 	await browser.close();
 	return results;
 }
@@ -169,6 +182,11 @@ async function runTarget(t) {
 			const r = all[c][op.name];
 			row.push(`${r.median.toFixed(2)} (min ${r.min.toFixed(2)})`.padEnd(W));
 		}
+		console.log(row.join('| '));
+	}
+	{
+		const row = ['#cmnts'.padEnd(8)];
+		for (const c of cols) row.push(String(all[c].comments_1k.median).padEnd(W));
 		console.log(row.join('| '));
 	}
 
@@ -200,10 +218,10 @@ async function runTarget(t) {
 			targets: TARGETS.map((t) => ({
 				name: t.name,
 				ops: Object.fromEntries(
-					OPS.map((op) => {
-						const r = all[t.name][op.name];
-						return [op.name, { median: r.median, min: r.min, samples: r.samples.length }];
-					}),
+					Object.entries(all[t.name]).map(([name, r]) => [
+						name,
+						{ median: r.median, min: r.min, samples: r.samples.length },
+					]),
 				),
 			})),
 		};
