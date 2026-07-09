@@ -311,17 +311,31 @@ Independent, individually-measurable items, roughly by value:
   no new divergence class; tests compile with hmr off and rely only on
   module-instance stability, which `Symbol()` preserves.
 
-  **LANDED 2026-07-08.** `ctx.hmr` gates `allocHookSymbol` (server codegen
-  always off); `slotHooks(source, id, { hmr })` gets the same gate from the
-  vite plugin (per-module SSR-aware). Verified zero path strings in a fresh
-  production build (the framework chunk's remaining `Symbol.for` uses are the
-  runtime's own well-known tags — intended). Pinned by hmr.test.ts (both
-  modes, both passes). Measured on top of Phase 1: corpus minified 62,522 →
-  **54,453 B**, gzip 20,628 → 19,604 (expansion **1.07×**); app-chunk gzip
-  tsrx 3,247 → **3,112 B** (app/ripple **1.35×**, app/solid 1.56×).
-  Cumulative Phase 1 + 3c vs baseline: **minified −28.3%, gzip −10.2%**,
-  app/ripple 1.43× → 1.35×. Guards ratcheted: codegen gzip → 1.12,
-  app/ripple → 1.40, app/solid → 1.65.
+  **LANDED 2026-07-08 — twice.** `ctx.hmr` gates `allocHookSymbol` (server
+  codegen always off); `slotHooks(source, id, { hmr })` gets the same gate
+  from the vite plugin (per-module SSR-aware). **The first cut emitted BARE
+  `Symbol()` and broke the website**: the description is load-bearing — the
+  runtime composes custom-hook slot paths by CONCATENATING slot descriptions
+  (`resolveSlot`/`currentPathSlot`, runtime.ts ~1988-2010), so description-less
+  slots collapsed every composed path to `"undefined|undefined"` keys and
+  collided custom-hook state across call sites (the router's `useStore` →
+  hydration mismatch on every route; server compiles prod-mode in dev SSR
+  while the browser compiles dev-mode, so the two sides rendered different
+  trees). Fixed: `Symbol("<djb2(filename)>#<n>")` — unique, ~10 chars, no
+  path. **Why the suite missed it:** vitest runs the plugin in serve mode, so
+  every fixture compiled hmr:true and the prod branch had zero runtime
+  coverage — closed by `tests/hydration/prod-mode-hydrate.test.ts`, which
+  compiles a custom-hook + `@if` fixture with EXPLICIT prod options, SSRs it,
+  and hydrates with both a dev-compiled and a prod-compiled client (adoption
+  identity + value correctness + call-site state independence; verified to
+  fail 2/4 against the bare-Symbol() bug). Also pinned by hmr.test.ts (both
+  modes, both passes). Verified zero path strings in a fresh production build
+  and clean hydration on all website routes, dev AND `octane-preview` prod.
+  Measured on top of Phase 1: corpus minified 62,522 → **55,179 B**, gzip
+  20,628 → 19,869 (expansion **1.08×**); app-chunk gzip tsrx 3,247 →
+  **3,172 B** (app/ripple **1.37×**, app/solid 1.59×). Cumulative Phase 1 +
+  3c vs baseline: **minified −27.3%, gzip −9.0%**, app/ripple 1.43× → 1.37×.
+  Guards: codegen gzip → 1.12, app/ripple → 1.40, app/solid → 1.65.
 - **3d. Emit `const __block = __s.block;` only when referenced** (today
   unconditional, compile.js:3276; Phase 1 factories remove most uses).
 - **3e. Deferred-mount seeds** (`{ _b._el$N = el; _b._prev$N = undefined; }`)
