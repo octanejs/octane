@@ -1546,9 +1546,11 @@ export function compile(source, filename, options) {
 	const devEnabled = !!(options && options.dev);
 	// parallelUse: the parallel-`use()` transform pipeline (auto-memoized
 	// creations → hoisted parallel starts → batched unwrap → __warm fetch
-	// plans; docs/suspense-parallel-use-plan.md). Opt-in while it lands
-	// phase-by-phase; output MUST stay byte-identical with the flag off.
-	const parallelUseEnabled = !!(options && options.parallelUse);
+	// plans; docs/suspense-parallel-use-plan.md). ON by default — pass
+	// `parallelUse: false` to opt out (React-timing waterfall semantics).
+	// Output is byte-identical with the flag off, and the pipeline is a no-op
+	// for use()-free modules either way.
+	const parallelUseEnabled = !(options && options.parallelUse === false);
 
 	const ctx = {
 		filename,

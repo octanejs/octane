@@ -12,8 +12,9 @@ const FEATURES = [
 	{
 		title: 'Compiled templates',
 		body: 'Components compile ahead of time to template clones and direct DOM ' +
-			'writes — no virtual DOM, no diffing, most of React’s runtime work ' +
-			'already done before the page loads.',
+			'writes — no virtual DOM, no diffing. The compiler even removes suspense ' +
+			'waterfalls, proving which use() fetches are independent and starting ' +
+			'them together.',
 	},
 	{
 		title: 'Native events',

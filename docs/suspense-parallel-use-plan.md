@@ -8,11 +8,14 @@
 > drift; function names are the stable anchors.
 >
 > **Status: EXECUTED 2026-07-09 (Phases 0–4 + Phase 5 minus the SSR mirror),
-> opt-in via the `parallelUse` compile option.** See the execution record below
-> for where the implementation deviated from this plan. Result on
-> `benchmarks/async-waterfall`: octane 174.8ms → **20.1ms init / 19.1ms update
-> (1.2–1.3× the 16ms parallel floor, Solid 2.0/Ripple territory)** vs React
-> 307.3/190.1ms, ratio-guarded both ways (≤0.25× React, ≤1.5× solid/ripple).
+> and the pipeline is ON BY DEFAULT (same day) — `parallelUse: false` opts out
+> (Decision point 1 resolved: the flag-on soak was the whole octane suite; the
+> homepage "Compiled templates" copy shipped with the flip).** See the
+> execution record below for where the implementation deviated from this plan.
+> Result on `benchmarks/async-waterfall`: octane 174.8ms → **20.1ms init /
+> 19.1ms update (1.2–1.3× the 16ms parallel floor, Solid 2.0/Ripple
+> territory)** vs React 307.3/190.1ms, ratio-guarded both ways (≤0.25× React,
+> ≤1.5× solid/ripple).
 
 ## Execution record (2026-07-09)
 
@@ -62,12 +65,17 @@ What shipped, and where it deviates from the phases as written:
   system makes deep waterfalls ~2 full passes + D cheap subtree re-runs — the
   remaining gap is that nested chains stay round-serial at the NETWORK level.
   Mirroring memoize/hoist/batch/warm into `compileServer` is its own project.
-  Homepage copy stays parked until the default flips (Decision point 1).
-- **Decision points resolved:** (1) shipped opt-in, default flip pending a
-  soak period; (2) loops excluded — mandatory (Phase 0); (3) member-path deps;
-  (4) AbortSignal not shipped; (5) `useBatch`/`warmMemo`/`warmChild` exported
-  tier 2; (6) depth cap 64; (7) ghost-hook scope v1 = none (params+module
-  only).
+- **Default flipped 2026-07-09** (same day, after the full-suite soak):
+  `parallelUse` defaults to true in `compile()` and the vite plugin;
+  `parallelUse: false` opts out (pinned inert in
+  `tests/compile-parallel-use.test.ts`). The homepage "Compiled templates"
+  copy and the RuleSync intentional-divergence entry (AGENTS/CLAUDE/etc.)
+  shipped with the flip.
+- **Decision points resolved:** (1) DEFAULT-ON, opt-out via
+  `parallelUse: false`; (2) loops excluded — mandatory (Phase 0); (3)
+  member-path deps; (4) AbortSignal not shipped; (5)
+  `useBatch`/`warmMemo`/`warmChild` exported tier 2; (6) depth cap 64; (7)
+  ghost-hook scope v1 = none (params+module only).
 >
 > **Measurement harness exists (2026-07-08):** `benchmarks/async-waterfall` —
 > 10 nested `use()` levels, init + transition update, vs React 19 / Solid 2.0 /

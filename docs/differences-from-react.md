@@ -109,11 +109,12 @@ time-slicing, expiration, or selective hydration. Consequences:
   unchanged values (the concurrent-interleaving window it guards doesn't exist
   here).
 
-## Parallel `use()`: no suspense waterfalls (opt-in `parallelUse`)
+## Parallel `use()`: no suspense waterfalls (default; opt out with `parallelUse: false`)
 
-With the compiler's `parallelUse` option (off by default while it soaks;
-docs/suspense-parallel-use-plan.md), idiomatic sequential `use()` code stops
-waterfalling — React runs the same code serially:
+The compiler's parallel-`use()` pipeline is ON by default
+(docs/suspense-parallel-use-plan.md; pass `parallelUse: false` to compile/the
+vite plugin for React-timing waterfall semantics). Idiomatic sequential
+`use()` code stops waterfalling — React runs the same code serially:
 
 - **Creations are memoized per call site**: `use(fetchA(id))` compiles to a
   slot-keyed memo with member-path deps (`[fetchA, id]`), so replays never mint
