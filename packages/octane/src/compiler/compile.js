@@ -4043,6 +4043,22 @@ function jsxElementToCreateElement(node, ctx) {
 	};
 }
 
+// Short, unique, path-free slot description for non-HMR output: a djb2 hash of
+// the module filename + the per-module hook index. The DESCRIPTION is
+// load-bearing beyond debugging: resolveSlot/currentPathSlot (runtime) compose
+// a base hook's effective slot inside custom hooks by CONCATENATING slot
+// descriptions into a Symbol.for key — a bare `Symbol()` (description
+// undefined) collapses every composed path to "undefined|undefined" and
+// collides custom-hook state across call sites (broke the router's useStore →
+// website hydration). So every emitted slot must carry a unique description;
+// this one is ~10 chars and keeps the absolute module path out of bundles.
+export function hookSlotHash(filename) {
+	const src = filename || '<anon>';
+	let h = 5381;
+	for (let i = 0; i < src.length; i++) h = (Math.imul(h, 33) + src.charCodeAt(i)) | 0;
+	return (h >>> 0).toString(36);
+}
+
 function allocHookSymbol(ctx, debugName) {
 	const id = ctx.nextHookSymId++;
 	const name = `_h$${id}`;
@@ -4056,12 +4072,12 @@ function allocHookSymbol(ctx, debugName) {
 		const stableKey = `octane:${ctx.filename || '<anon>'}:${debugName}`;
 		ctx.hoistedHelpers.push(`const ${name} = Symbol.for(${JSON.stringify(stableKey)});`);
 	} else {
-		// No HMR (prod builds, SSR, tests): nothing ever re-imports the module
-		// expecting registry identity, so a plain Symbol() suffices — module-
-		// instance-stable, ~80-120 fewer chars per hook, and it keeps the source
-		// FILE PATH (vite passes the absolute module id as `filename`) out of
-		// shipped bundles.
-		ctx.hoistedHelpers.push(`const ${name} = Symbol();`);
+		// No HMR (prod builds, SSR, tests): nothing re-imports the module
+		// expecting registry identity, so a plain Symbol suffices — but it MUST
+		// carry a unique description (see hookSlotHash above). ~10 chars vs the
+		// ~100-char registry key, and no file path in shipped bundles.
+		if (ctx._hookHash === undefined) ctx._hookHash = hookSlotHash(ctx.filename);
+		ctx.hoistedHelpers.push(`const ${name} = Symbol(${JSON.stringify(`${ctx._hookHash}#${id}`)});`);
 	}
 	return name;
 }
