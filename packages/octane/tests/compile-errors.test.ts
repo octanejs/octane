@@ -208,6 +208,75 @@ describe('compile errors — slot-keyed hooks in plain JS loops', () => {
 		expect(() => compile(src, 'custom-hook-loop.tsrx')).toThrow(/`useState`.*`for` loop.*useMany/);
 	});
 
+	it('rejects a hook behind a directive-shaped statement inside a plain loop', () => {
+		// A bare-JSX `if` (or a directive-shaped `for…of`) nested in a plain JS
+		// loop is NOT a template position — the construct's own per-call-site slot
+		// repeats each iteration exactly like a hook slot, so hooks reached through
+		// it collide all the same. The walker must not treat these as template
+		// directives and skip them (found by review on the initial guard).
+		const ifSrc = `
+      import { useMemo } from 'octane';
+      export function C(props) @{
+        for (let i = 0; i < props.n; i++) {
+          if (props.flag) {
+            <div>{useMemo(() => i, [i])}</div>
+          }
+        }
+        <div>{'x'}</div>
+      }
+    `;
+		expect(() => compile(ifSrc, 'if-jsx-loop.tsrx')).toThrow(/`useMemo`.*`for` loop/);
+		expect(() => compile(ifSrc, 'if-jsx-loop.tsrx', { mode: 'server' })).toThrow(/`for` loop/);
+		const forOfSrc = `
+      import { useState } from 'octane';
+      export function C(props) @{
+        for (let i = 0; i < props.n; i++) {
+          for (const x of props.items) {
+            <li>{useState(0)[0] + ''}</li>
+          }
+        }
+        <div>{'x'}</div>
+      }
+    `;
+		expect(() => compile(forOfSrc, 'forof-jsx-loop.tsrx')).toThrow(/`useState`.*`for` loop/);
+	});
+
+	it('rejects a plain JS loop with a hook inside a template @for item body', () => {
+		// The @for item body gets a per-item scope, but WITHIN one item render the
+		// inner plain loop still repeats the hook's slot every pass.
+		const src = `
+      import { useState } from 'octane';
+      export function C(props) @{
+        <ul>
+          @for (const item of props.items; key item.id) {
+            const xs = [];
+            for (let i = 0; i < 3; i++) xs.push(useState(0));
+            <li>{xs.length + ''}</li>
+          }
+        </ul>
+      }
+    `;
+		expect(() => compile(src, 'loop-in-for-item.tsrx')).toThrow(/`useState`.*`for` loop/);
+		expect(() => compile(src, 'loop-in-for-item.tsrx', { mode: 'server' })).toThrow(/`for` loop/);
+	});
+
+	it('allows a template @if with a hook inside a template @for body', () => {
+		const src = `
+      import { useState } from 'octane';
+      export function C(props) @{
+        <ul>
+          @for (const item of props.items; key item.id) {
+            @if (item.flag) {
+              <li>{useState(0)[0] + ''}</li>
+            }
+          }
+        </ul>
+      }
+    `;
+		expect(() => compile(src, 'if-in-for-hooks.tsrx')).not.toThrow();
+		expect(() => compile(src, 'if-in-for-hooks.tsrx', { mode: 'server' })).not.toThrow();
+	});
+
 	it('rejects a hook inside a loop in a useMemo factory (runs during render)', () => {
 		const src = `
       import { useMemo, useState } from 'octane';

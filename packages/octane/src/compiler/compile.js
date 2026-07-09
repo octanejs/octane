@@ -3328,10 +3328,16 @@ function slotKeyedHookName(n) {
 // cell across all iterations, useMemo would recompute every iteration (each
 // iteration's deps overwrite the previous entry, only the last survives), and
 // slot-keyed effects would collide the same way — all silently. The scan skips
-// nested FUNCTION boundaries (a function declared in the loop may be a local
-// component or a deferred callback — each component instance gets its own
-// scope) and template directive constructs (their bodies compile to helpers
-// that render in their own block scopes).
+// ONLY nested FUNCTION boundaries (a function declared in the loop may be a
+// local component or a deferred callback — each component instance gets its
+// own scope). Directive constructs inside the loop subtree are NOT exempt:
+// their bodies do compile to helper render fns, but the construct's own
+// per-call-site slot (ifBlock/forBlock state on `scope.slots`) repeats each
+// iteration exactly like a hook slot does, so hooks reached through them
+// collide all the same. Every LEGIT template directive is protected before
+// the scan starts — the guard in rewriteHookCalls fires only on plain-JS loop
+// statements, and a template `@for` (ForOfStatement with a JSX body) is
+// excluded there, so hooks in template positions never reach this walker.
 function rejectHookInJsLoop(loop, ctx, componentName) {
 	const seen = new WeakSet();
 	function walk(n) {
@@ -3348,25 +3354,6 @@ function rejectHookInJsLoop(loop, ctx, componentName) {
 			t === 'FunctionDeclaration' ||
 			t === 'FunctionExpression' ||
 			t === 'ArrowFunctionExpression'
-		)
-			return;
-		// Template directives — new JSX-expression forms are always template; the
-		// old statement forms are template exactly when their bodies hold JSX.
-		if (
-			t === 'JSXIfExpression' ||
-			t === 'JSXForExpression' ||
-			t === 'JSXTryExpression' ||
-			t === 'JSXSwitchExpression' ||
-			t === 'ActivityStatement'
-		)
-			return;
-		if (
-			(t === 'IfStatement' ||
-				t === 'ForOfStatement' ||
-				t === 'TryStatement' ||
-				t === 'SwitchStatement') &&
-			n !== loop &&
-			isJsxNode(n)
 		)
 			return;
 		const hook = slotKeyedHookName(n);
