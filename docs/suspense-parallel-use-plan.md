@@ -405,8 +405,14 @@ is that Phase 4's coverage makes this unnecessary.
 | `use(context)` | Untouched: trivial args skip Phase 1; `_$useBatch` skips `$$kind === CONTEXT_TAG` entries at runtime. |
 | `use()` behind `@if` / plain `if` / early-return guard | Batched only within its own block; slot symbols are already conditional-safe. Never lift a creation out of its guarding condition. |
 | `use()` in loops | Excluded from Phases 1–2 pending Decision point 2 (per-call-site symbols collide across iterations for base hooks — verify how `useMemo` behaves in a loop before including). |
-| Dependent creations (`use(f(a))`) | Not hoisted; on replay they join the pending set (Phase 3); dev warning explains the chain (Phase 4). |
+| Dependent creations (`use(f(a))`) | Not hoisted; on replay they join the pending set (Phase 3); dev warning explains the chain (Phase 5). |
 | Interleaved non-declaration statements | Terminate the batch run (v1 conservatism). |
+| Child props depend on suspended data (`<Detail item={data.first}/>`) | Correctly excluded from the warm plan — a true data dependency; that child's fetches start on resume (dependency-depth behavior). |
+| Recursive warm chains | Reachability conditions evaluated at warm time bound the walk; runtime depth cap + dev warning backstops unprovable recursion (Decision point 6). |
+| Warm/mount prop drift (state changed between warm and commit) | Dep-keyed warm cache misses → real mount fetches fresh; orphan evicted on boundary commit. A stale warm entry can never be adopted. |
+| Re-warm before resume (second update while pending) | `_$warmMemo` dedups on (slot path, deps) — no double-started fetches; superseded generation's orphans evicted. |
+| Component identity at warm time (`<Dynamic is={X}/>`, component from suspended data) | Warm requires a statically-resolvable component binding with a `__warm` emit; dynamic/component-valued props cut the edge. |
+| Warm emit size | Emit `__warm` only for components with `use()` creations or async descendants; guarded by `codegen-size`/`bundle-size` suites. |
 | Hydration | Seed adoption is keyed to `use()` call order, which the transform preserves. Add an explicit hydration test with a batched pair. |
 | Transitions | The pending set replaces the single `pendingThenable` inside the existing `handleSuspense`/`STAGED_REVEALS` flow; entangled-boundary commit barriers unchanged. Add a transition test with a batched pair inside one boundary plus a sibling boundary. |
 | Rejection while batch partially pending | Wake on first rejection; replay unwraps in textual order; earlier-pending members re-enroll. |
@@ -436,10 +442,25 @@ in `tests/suspense.test.ts` (and a server twin):
 10. Transition entanglement: batched boundary + sibling boundary commit
     atomically.
 11. Compiler-output assertions for the emit shape (memo wrap, hoist order,
-    `_$useBatch` placement), in the existing compiler-test style.
+    `_$useBatch` placement, `__warm` slicing), in the existing compiler-test
+    style.
+12. Nested chain (3-level `Level`-style fixture): all levels' fetch counters
+    hit 1 in the first attempt; init resolves in ~1 latency unit, not 3; same
+    via a transition update.
+13. Warm-cache adoption: real mount's `useMemo` adopts the warmed promise
+    (same instance, fetch counter stays 1); prop drift between warm and mount
+    → miss, fresh fetch, orphan evicted.
+14. Warm exclusion: child whose props read suspended data does NOT prefetch;
+    ghost `useState` sees initializer only; dynamic component slot cuts the
+    warm edge.
+15. Bench: `async-waterfall` init/update land near the parallel floor;
+    tighten `ratios.json` (keep react ≤1.2, add solid/ripple ceilings) and
+    re-record; `ssr-throughput` `waterfall-d*` ops improve with the SSR warm
+    walk.
 
 Gates per phase: full `pnpm test`, `pnpm typecheck`, `pnpm format:check`;
-`tests/differential/` + `tests/conformance/` after Phases 2 and 3.
+`tests/differential/` + `tests/conformance/` after Phases 2–4;
+`node benchmarks/bench.mjs async-waterfall --compare` after Phase 4.
 
 ## Decision points (maintainer input wanted before executing)
 
@@ -455,7 +476,13 @@ Gates per phase: full `pnpm test`, `pnpm typecheck`, `pnpm format:check`;
    Member-path avoids over-refetching on unrelated prop changes;
    recommendation: member-path where the analysis is certain, falling back to
    the base identifier.
-4. **AbortSignal for superseded fetches** (Phase 4 nice-to-have): worth an API
+4. **AbortSignal for superseded fetches** (Phase 5 nice-to-have): worth an API
    surface now, or wait for demand?
-5. **`_$useBatch` visibility tier**: semi-public compiler-emit (index.ts tier 2)
-   per the established convention — confirm.
+5. **`_$useBatch`/`_$warmMemo`/`_$warmChild` visibility tier**: semi-public
+   compiler-emit (index.ts tier 2) per the established convention — confirm.
+6. **Warm depth cap** for recursion the compiler can't prove finite:
+   recommend 64 with a dev warning naming the component chain.
+7. **Ghost-hook scope in warm slices**: v1 = `useMemo` creations + `useState`
+   initializer values + context reads. Anything more (e.g. evaluating custom
+   hooks' pure prefixes) expands coverage but multiplies proof surface —
+   recommend deferring until real components show the need.

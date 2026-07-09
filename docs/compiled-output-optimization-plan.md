@@ -1,6 +1,6 @@
 # Compiled Output Optimization Plan — size, allocation, and closure churn
 
-Status: Phases 0 + 1 LANDED (2026-07-08) — measurement suites + guards, and
+Status: Phases 0 + 1 + 3c LANDED (2026-07-08) — measurement suites + guards, and
 the bag-factory codegen (see the LANDED notes in each phase). Phases 2–3
 proposed. Author context: follow-up to the binding-bag pre-shape change
 (superseded by Phase 1).
@@ -310,6 +310,18 @@ Independent, individually-measurable items, roughly by value:
   unchanged. Note in docs that dev≠prod output already (locs/hmr), so this adds
   no new divergence class; tests compile with hmr off and rely only on
   module-instance stability, which `Symbol()` preserves.
+
+  **LANDED 2026-07-08.** `ctx.hmr` gates `allocHookSymbol` (server codegen
+  always off); `slotHooks(source, id, { hmr })` gets the same gate from the
+  vite plugin (per-module SSR-aware). Verified zero path strings in a fresh
+  production build (the framework chunk's remaining `Symbol.for` uses are the
+  runtime's own well-known tags — intended). Pinned by hmr.test.ts (both
+  modes, both passes). Measured on top of Phase 1: corpus minified 62,522 →
+  **54,453 B**, gzip 20,628 → 19,604 (expansion **1.07×**); app-chunk gzip
+  tsrx 3,247 → **3,112 B** (app/ripple **1.35×**, app/solid 1.56×).
+  Cumulative Phase 1 + 3c vs baseline: **minified −28.3%, gzip −10.2%**,
+  app/ripple 1.43× → 1.35×. Guards ratcheted: codegen gzip → 1.12,
+  app/ripple → 1.40, app/solid → 1.65.
 - **3d. Emit `const __block = __s.block;` only when referenced** (today
   unconditional, compile.js:3276; Phase 1 factories remove most uses).
 - **3e. Deferred-mount seeds** (`{ _b._el$N = el; _b._prev$N = undefined; }`)
