@@ -6,6 +6,13 @@
 > `main`, Solid 2.0, Ripple, Svelte async, Vue, Qwik, Marko, Relay, and userland
 > patterns). Status: **PLANNED, not built.** Line references are against the
 > 2026-07-08 working tree and will drift; function names are the stable anchors.
+>
+> **Measurement harness exists (2026-07-08):** `benchmarks/async-waterfall` —
+> 10 nested `use()` levels, init + transition update, vs React 19 / Solid 2.0 /
+> ripple. Recorded: octane 10.9× the 16ms latency floor (React 19.1× on init),
+> solid/ripple ≈1.1× (parallel by model). That ~10× is the number this plan
+> exists to close; when it lands, add octane-vs-solid/ripple ratio guards so
+> the win can't regress (only octane-vs-react is guarded today).
 
 ## The problem
 

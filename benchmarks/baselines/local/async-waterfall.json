@@ -1,0 +1,83 @@
+{
+  "suite": "async-waterfall",
+  "iterations": 10,
+  "targets": [
+    {
+      "name": "octane-tsrx",
+      "ops": {
+        "init": {
+          "median": 175.70000004768372,
+          "min": 172,
+          "samples": 10
+        },
+        "update": {
+          "median": 173.30000001192093,
+          "min": 169,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "levels": 10,
+        "delayMs": 16
+      }
+    },
+    {
+      "name": "react",
+      "ops": {
+        "init": {
+          "median": 305.5,
+          "min": 304.69999998807907,
+          "samples": 10
+        },
+        "update": {
+          "median": 174.60000002384186,
+          "min": 172.5,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "levels": 10,
+        "delayMs": 16
+      }
+    },
+    {
+      "name": "solid",
+      "ops": {
+        "init": {
+          "median": 18.399999976158142,
+          "min": 18.099999964237213,
+          "samples": 10
+        },
+        "update": {
+          "median": 17.600000023841858,
+          "min": 17.099999964237213,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "levels": 10,
+        "delayMs": 16
+      }
+    },
+    {
+      "name": "ripple",
+      "ops": {
+        "init": {
+          "median": 18.5,
+          "min": 17.69999998807907,
+          "samples": 10
+        },
+        "update": {
+          "median": 16.899999976158142,
+          "min": 16.69999998807907,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "levels": 10,
+        "delayMs": 16
+      }
+    }
+  ],
+  "harnessExit": 0
+}

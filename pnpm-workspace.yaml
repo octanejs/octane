@@ -22,6 +22,8 @@ packages:
   - benchmarks/streaming-ssr/*
   - benchmarks/codegen-size
   - benchmarks/bundle-size
+  - benchmarks/async-waterfall
+  - benchmarks/async-waterfall/*
   - playground/*
   - examples/*
   - website

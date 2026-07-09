@@ -115,6 +115,7 @@ internally, get their own baseline and guard namespace.
 | `streaming-ssr` | streaming-ssr | none (Node-only) | streaming shell TTFB, stream totals, chunking |
 | `dbmon-deopt` | dbmon | octane-tsrx + octane-deopt | tuned vs plain-.ts cliff |
 | `js-framework-deopt` | js-framework | octane-tsrx + naive triplet | tuned vs naive-authoring cliff |
+| `async-waterfall` | async-waterfall | octane-tsrx, react, solid, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
 | `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production build of each js-framework app, normalized minify, raw/gzip/brotli |
 

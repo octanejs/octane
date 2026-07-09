@@ -110,5 +110,21 @@
     "reference": "solid",
     "maxRatio": 1.75,
     "note": "APP-CODE-ONLY gzip vs solid, same app (measured 1.66x on record 2026-07-08). Ratchet down with the compiled-output plan."
+  },
+  {
+    "suite": "async-waterfall",
+    "op": "init",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.2,
+    "note": "10-level nested-use() init waterfall vs React 19 (measured 0.57x on record 2026-07-08 - React's suspense retry scheduling nearly doubles its own floor). Octane must stay at-or-under React. NO guard vs solid/ripple: they are parallel by model (~1x floor vs ~11x) until compiler-parallelized use lands (docs/suspense-parallel-use-plan.md) - add those guards WITH that feature."
+  },
+  {
+    "suite": "async-waterfall",
+    "op": "update",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.2,
+    "note": "transition-driven refetch waterfall vs React 19 (measured 0.99x on record 2026-07-08)."
   }
 ]
