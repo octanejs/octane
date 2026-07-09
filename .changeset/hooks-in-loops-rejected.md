@@ -12,5 +12,8 @@ rejected; the check now exists, with a diagnostic pointing at the supported
 forms: the keyed `@for` template directive (each item renders in its own scope,
 so per-item hooks get per-item state) or extracting the loop body into a child
 component. `use()` and `useContext` are exempt (call-order / context-identity
-keyed, not slot-keyed) and keep working in loops, as do hooks behind a nested
-function boundary (local components, deferred callbacks).
+keyed, not slot-keyed) and keep working in loops, as do hooks behind a
+DEFERRED nested function boundary (local components, stored callbacks).
+Closures that execute during the iteration itself — IIFEs and inline callbacks
+to synchronous array-iteration methods (`.map`, `.forEach`, …) — are treated
+as inline and rejected too.

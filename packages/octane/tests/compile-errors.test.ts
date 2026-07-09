@@ -334,6 +334,62 @@ describe('compile errors — slot-keyed hooks in plain JS loops', () => {
 		expect(() => compile(src, 'for-directive-hooks.tsrx', { mode: 'server' })).not.toThrow();
 	});
 
+	it('rejects a hook in a closure that executes during the iteration (IIFE, sync callbacks)', () => {
+		// A function boundary only exempts DEFERRED bodies. An IIFE and an inline
+		// callback to a synchronous array-iteration method run during the loop
+		// iteration itself, so their hooks repeat the one call-site slot exactly
+		// like inline calls (found by review on the initial guard).
+		const iifeSrc = `
+      import { useMemo } from 'octane';
+      export function C(props) @{
+        const out = [];
+        for (let i = 0; i < props.n; i++) {
+          out.push((() => useMemo(() => i, [i]))());
+        }
+        <div>{out.length + ''}</div>
+      }
+    `;
+		expect(() => compile(iifeSrc, 'iife-loop.tsrx')).toThrow(/`useMemo`.*`for` loop/);
+		expect(() => compile(iifeSrc, 'iife-loop.tsrx', { mode: 'server' })).toThrow(/`for` loop/);
+		const mapSrc = `
+      export function C(props) @{
+        const out = [];
+        for (const group of props.groups) {
+          out.push(group.items.map((x) => useThing(x)));
+        }
+        <div>{out.length + ''}</div>
+      }
+    `;
+		expect(() => compile(mapSrc, 'map-cb-loop.tsrx')).toThrow(/`useThing`.*`for…of` loop/);
+		const forEachSrc = `
+      import { useRef } from 'octane';
+      export function C(props) @{
+        for (const g of props.groups) {
+          g.items.forEach(() => { useRef(null); });
+        }
+        <div>{'x'}</div>
+      }
+    `;
+		expect(() => compile(forEachSrc, 'foreach-cb-loop.tsrx')).toThrow(/`useRef`.*`for…of` loop/);
+	});
+
+	it('allows a hook behind a deferred arrow inside an IIFE inside a loop', () => {
+		// The IIFE body executes per iteration, but the hook sits behind a FURTHER
+		// (deferred) function boundary inside it — still exempt.
+		const src = `
+      import { useState } from 'octane';
+      export function C(props) @{
+        const out = [];
+        for (const k of props.keys) {
+          out.push((() => { const f = () => useState(0); return f; })());
+        }
+        <div>{out.length + ''}</div>
+      }
+    `;
+		expect(() => compile(src, 'iife-deferred.tsrx')).not.toThrow();
+		expect(() => compile(src, 'iife-deferred.tsrx', { mode: 'server' })).not.toThrow();
+	});
+
 	it('allows hooks behind a nested function boundary inside a loop', () => {
 		// A function declared in the loop may be a local component (each instance
 		// renders in its own scope) or a deferred callback — not this render's

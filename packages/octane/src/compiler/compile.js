@@ -3328,18 +3328,52 @@ function slotKeyedHookName(n) {
 // cell across all iterations, useMemo would recompute every iteration (each
 // iteration's deps overwrite the previous entry, only the last survives), and
 // slot-keyed effects would collide the same way — all silently. The scan skips
-// ONLY nested FUNCTION boundaries (a function declared in the loop may be a
-// local component or a deferred callback — each component instance gets its
-// own scope). Directive constructs inside the loop subtree are NOT exempt:
-// their bodies do compile to helper render fns, but the construct's own
-// per-call-site slot (ifBlock/forBlock state on `scope.slots`) repeats each
-// iteration exactly like a hook slot does, so hooks reached through them
-// collide all the same. Every LEGIT template directive is protected before
-// the scan starts — the guard in rewriteHookCalls fires only on plain-JS loop
-// statements, and a template `@for` (ForOfStatement with a JSX body) is
-// excluded there, so hooks in template positions never reach this walker.
+// ONLY nested DEFERRED function boundaries (a function declared in the loop may
+// be a local component or a deferred callback — each component instance gets
+// its own scope). A function that provably EXECUTES during the iteration is
+// walked into: an IIFE callee (incl. `.call`/`.apply` on a function
+// expression) and an inline callback to a known synchronous array-iteration
+// method (`.map`, `.forEach`, …) — its hooks run once per iteration and
+// collide exactly like inline ones. Directive constructs inside the loop
+// subtree are NOT exempt either: their bodies do compile to helper render fns,
+// but the construct's own per-call-site slot (ifBlock/forBlock state on
+// `scope.slots`) repeats each iteration exactly like a hook slot does, so
+// hooks reached through them collide all the same. Every LEGIT template
+// directive is protected before the scan starts — the guard in
+// rewriteHookCalls fires only on plain-JS loop statements, and a template
+// `@for` (ForOfStatement with a JSX body) is excluded there, so hooks in
+// template positions (including `.map()`-to-`@for` children) never reach this
+// walker.
+const SYNC_ITERATION_METHODS = new Set([
+	'map',
+	'forEach',
+	'filter',
+	'flatMap',
+	'reduce',
+	'reduceRight',
+	'some',
+	'every',
+	'find',
+	'findIndex',
+	'findLast',
+	'findLastIndex',
+	'sort',
+	'toSorted',
+]);
+function isFunctionNode(n) {
+	return (
+		n &&
+		(n.type === 'FunctionDeclaration' ||
+			n.type === 'FunctionExpression' ||
+			n.type === 'ArrowFunctionExpression')
+	);
+}
 function rejectHookInJsLoop(loop, ctx, componentName) {
 	const seen = new WeakSet();
+	// Function nodes that run during the loop iteration itself — marked when
+	// their enclosing CallExpression is visited (parents visit before children),
+	// so the boundary check below can let the walk continue into their bodies.
+	const syncInvoked = new WeakSet();
 	function walk(n) {
 		if (!n) return;
 		if (Array.isArray(n)) {
@@ -3350,12 +3384,29 @@ function rejectHookInJsLoop(loop, ctx, componentName) {
 		const t = n.type;
 		if (!t || seen.has(n)) return;
 		seen.add(n);
-		if (
-			t === 'FunctionDeclaration' ||
-			t === 'FunctionExpression' ||
-			t === 'ArrowFunctionExpression'
-		)
-			return;
+		if (t === 'CallExpression') {
+			// IIFE: `(() => …)()` — the callee body executes in place.
+			if (isFunctionNode(n.callee)) syncInvoked.add(n.callee);
+			if (n.callee.type === 'MemberExpression' && !n.callee.computed) {
+				const prop = n.callee.property;
+				// `(function () { … }).call(this)` / `.apply(...)` — IIFE variants.
+				if (
+					prop.type === 'Identifier' &&
+					(prop.name === 'call' || prop.name === 'apply') &&
+					isFunctionNode(n.callee.object)
+				) {
+					syncInvoked.add(n.callee.object);
+				}
+				// `xs.map(cb)` and friends — the callback runs synchronously, once
+				// per element, during this iteration. (Template-position `.map()`
+				// children never sit inside a plain JS loop, so the legit
+				// map-to-`@for` pattern can't reach here.)
+				if (prop.type === 'Identifier' && SYNC_ITERATION_METHODS.has(prop.name)) {
+					for (const a of n.arguments) if (isFunctionNode(a)) syncInvoked.add(a);
+				}
+			}
+		}
+		if (isFunctionNode(n) && !syncInvoked.has(n)) return;
 		const hook = slotKeyedHookName(n);
 		if (hook !== null) {
 			const l = (n.loc && n.loc.start) || (loop.loc && loop.loc.start);
