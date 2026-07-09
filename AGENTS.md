@@ -119,6 +119,14 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
 - **Keyed reconciler is LIS-based** (minimal DOM moves), not React's
   `lastPlacedIndex`. The final DOM is identical; the set of physically-moved nodes
   can differ. Survivor node identity and final order ARE guaranteed (and tested).
+- **Parallel `use()` — no suspense waterfalls.** The compiler (ON by default;
+  `parallelUse: false` opts out) memoizes `use()` argument creations per call
+  site, starts provably-independent ones together, suspends ONCE per stratum,
+  and prefetches independent descendant fetch trees (`__warm` plans). React
+  runs the same code as a serial waterfall — do not "fix" fetch-start timing,
+  batch replay counts, or prefetch behavior toward React
+  (docs/suspense-parallel-use-plan.md). True data dependencies stay sequential;
+  unwrap order, hydration-seed order, and rejection routing match React.
 - **`class` / `className` compose clsx-style.** Strings, numbers, arrays, objects,
   and nesting all compose into a class string (falsy drops out), at every apply site
   (client, spread, SVG, scoped `<style>`, SSR) via `normalizeClass`. React coerces an

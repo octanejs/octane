@@ -23,10 +23,8 @@ export default defineConfig({
 				plugins: [
 					octane({
 						// The parallel-use pipeline (memoized creations, batched unwrap,
-						// fetch-tree warming) runs FLAG-ON for the whole octane suite —
-						// the pre-default-flip soak. Tests that pin the flag-OFF output
-						// call compile() directly with their own options.
-						parallelUse: true,
+						// fetch-tree warming) runs at its DEFAULT (on). Tests that pin
+						// the opt-out output call compile() with `parallelUse: false`.
 						exclude: [
 							'/packages/zustand/src/',
 							'/packages/tanstack-query/src/',
@@ -59,7 +57,6 @@ export default defineConfig({
 				plugins: [
 					octane({
 						hmr: false,
-						parallelUse: true,
 						exclude: [
 							'/packages/zustand/src/',
 							'/packages/tanstack-query/src/',

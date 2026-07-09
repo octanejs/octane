@@ -2,10 +2,11 @@ import { defineConfig } from 'vite';
 import { octane } from 'octane/compiler/vite';
 
 export default defineConfig({
-	// parallelUse: the compiler's parallel-`use()` pipeline (memoized creations,
-	// batched unwrap, fetch-tree warming) — the feature this suite measures.
-	// The fixture stays idiomatic nested use(); the compiler does the hoisting.
-	plugins: [octane({ parallelUse: true })],
+	// The compiler's parallel-`use()` pipeline (memoized creations, batched
+	// unwrap, fetch-tree warming) is ON by default — the feature this suite
+	// measures. The fixture stays idiomatic nested use(); the compiler does
+	// the hoisting.
+	plugins: [octane()],
 	optimizeDeps: {
 		exclude: ['octane', 'octane/compiler'],
 	},

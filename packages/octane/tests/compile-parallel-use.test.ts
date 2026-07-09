@@ -4,11 +4,12 @@ import { compile } from 'octane/compiler';
 // Compiler-emit shape of the parallel-`use()` pipeline
 // (docs/suspense-parallel-use-plan.md): Pass A memoizes creations, Pass B
 // hoists them into __pu$ temps + emits _$useBatch, the warm plan emits
-// Comp.__warm and the in-body warm thunk. The flag-OFF output stays exactly
-// as before the feature (no pipeline artifacts, `use()` untouched).
+// Comp.__warm and the in-body warm thunk. The pipeline is ON BY DEFAULT;
+// `parallelUse: false` opts out and restores the pre-feature output (no
+// pipeline artifacts, `use()` untouched).
 
-const off = (src: string): string => compile(src, 'App.tsrx').code;
-const on = (src: string): string => compile(src, 'App.tsrx', { parallelUse: true }).code;
+const off = (src: string): string => compile(src, 'App.tsrx', { parallelUse: false }).code;
+const on = (src: string): string => compile(src, 'App.tsrx').code;
 
 const TWO_USES = `import { use } from 'octane';
 export function App(props) @{
@@ -56,8 +57,8 @@ export function App(props) @{
   <div>{out.join(',') as string}</div>
 }`;
 
-describe('parallelUse — flag off is inert', () => {
-	it('emits no pipeline artifacts and leaves use() untouched', () => {
+describe('parallelUse — opt-out is inert', () => {
+	it('parallelUse: false emits no pipeline artifacts and leaves use() untouched', () => {
 		const code = off(TWO_USES);
 		expect(code).not.toContain('_$useBatch');
 		expect(code).not.toContain('_$useMemo');
@@ -66,8 +67,9 @@ describe('parallelUse — flag off is inert', () => {
 		expect(code).toContain('use(props.startA())');
 	});
 
-	it('omitted and explicit-false agree byte-for-byte', () => {
-		expect(compile(TWO_USES, 'App.tsrx', { parallelUse: false }).code).toBe(off(TWO_USES));
+	it('the pipeline is the DEFAULT: omitted and explicit-true agree byte-for-byte', () => {
+		expect(compile(TWO_USES, 'App.tsrx', { parallelUse: true }).code).toBe(on(TWO_USES));
+		expect(on(TWO_USES)).toContain('_$useBatch');
 	});
 });
 
