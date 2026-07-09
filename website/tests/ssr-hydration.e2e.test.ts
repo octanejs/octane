@@ -82,6 +82,17 @@ function waitForServer(child: ChildProcess, url: string, timeoutMs: number): Pro
 			try {
 				const res = await fetch(url);
 				if (res.status < 500) {
+					// An HTTP answer proves something listens on the port — not that
+					// it's OUR child: it may have died mid-fetch with its 'exit'
+					// dispatch still queued while a foreign process answers. Give the
+					// exit event a beat to land, then require the child to be alive.
+					await new Promise((r) => setTimeout(r, 50));
+					if (settled) return; // onExit rejected meanwhile
+					if (child.exitCode !== null || child.signalCode !== null) {
+						settled = true;
+						child.off('exit', onExit);
+						return reject(new Error(`server at ${url} answered but the spawned process is dead`));
+					}
 					settled = true;
 					child.off('exit', onExit);
 					return resolve();
