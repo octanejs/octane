@@ -47,7 +47,7 @@ function compileOne(srcPath: string): void {
 	}
 	const rewritten = transformed.code
 		.replace(
-			/from\s+["']@octanejs\/router(\/[^"']*)?["']/g,
+			/from\s+["']@octanejs\/tanstack-router(\/[^"']*)?["']/g,
 			(_m, sub) => `from "@tanstack/react-router${sub || ''}"`,
 		)
 		.replace(/from\s+["']octane["']/g, 'from "react"');
