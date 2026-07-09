@@ -8,7 +8,7 @@
 // runs — so the first client pass renders the same resolved match tree the
 // server did and hydration adopts cleanly.
 import { use } from 'octane';
-import { RouterProvider } from '@octanejs/router';
+import { RouterProvider } from '@octanejs/tanstack-router';
 import { getServerRouterEntry } from './router-server.ts';
 import { clientRouter } from './router-client.ts';
 

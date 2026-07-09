@@ -1,11 +1,11 @@
 // Website smoke tests — render the site's routes through the REAL app stack
-// (@octanejs/router match tree + the compiled .tsrx pages + the compiled .mdx
+// (@octanejs/tanstack-router match tree + the compiled .tsrx pages + the compiled .mdx
 // documents with Shiki highlighting) and assert the key content of each page.
 // Client-side render via @octanejs/testing-library; the dev-SSR path
 // (@octanejs/vite-plugin prerender + hydrate) is exercised by `pnpm dev`.
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup, within } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/router';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
 
 afterEach(cleanup);
@@ -179,8 +179,8 @@ describe('website routes', () => {
 		expect(container.querySelector('.prose h1')?.textContent).toBe('Bindings');
 		for (const pkg of [
 			'@octanejs/zustand',
-			'@octanejs/query',
-			'@octanejs/router',
+			'@octanejs/tanstack-query',
+			'@octanejs/tanstack-router',
 			'@octanejs/motion',
 			'@octanejs/stylex',
 			'@octanejs/lexical',

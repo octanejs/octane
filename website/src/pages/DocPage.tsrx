@@ -2,7 +2,7 @@
 // compiled MDX document. The markdown-generated elements belong to the MDX
 // component, so the typography is applied through :global() descendant holes
 // under the scoped .prose wrapper.
-import { useParams } from '@octanejs/router';
+import { useParams } from '@octanejs/tanstack-router';
 import { findDoc } from '../content/docs.ts';
 
 export function DocPage() @{

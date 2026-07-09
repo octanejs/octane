@@ -208,13 +208,13 @@ export function octane(inlineOptions = {}) {
 					: {}),
 				optimizeDeps: {
 					exclude: [
-						// `@octanejs/query` ships a `.tsrx` provider component, so it must NOT
+						// `@octanejs/tanstack-query` ships a `.tsrx` provider component, so it must NOT
 						// be esbuild-prebundled — the octane transform owns `.tsrx` compilation.
 						...new Set([
 							...exclude,
 							'octane',
 							'octane/compiler',
-							'@octanejs/query',
+							'@octanejs/tanstack-query',
 							...SERVER_ONLY_ADAPTER_IDS,
 						]),
 					],
@@ -222,7 +222,7 @@ export function octane(inlineOptions = {}) {
 				// Workspace packages with TS source must be transformed by Vite's SSR
 				// pipeline (not require()'d raw) so ssrLoadModule gets transpiled code.
 				ssr: {
-					noExternal: ['octane', 'octane/compiler', '@octanejs/query'],
+					noExternal: ['octane', 'octane/compiler', '@octanejs/tanstack-query'],
 				},
 			};
 

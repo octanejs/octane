@@ -6,7 +6,7 @@
 // QueryClient (it awaits suspended queries, bounded by the suspense timeout).
 // dehydrate(qc) serializes that cache so the client can seed it (no refetch).
 import { prerender } from 'octane/static';
-import { QueryClient, dehydrate } from '@octanejs/query';
+import { QueryClient, dehydrate } from '@octanejs/tanstack-query';
 import { loadServerRouter } from '../shared/routes.js';
 import { makeRouter } from './routes.js';
 import { App } from './App.tsrx';

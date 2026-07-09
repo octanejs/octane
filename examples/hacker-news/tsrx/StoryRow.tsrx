@@ -1,5 +1,5 @@
 import * as stylex from '@octanejs/stylex';
-import { Link } from '@octanejs/router';
+import { Link } from '@octanejs/tanstack-router';
 import { styles } from '../shared/styles.js';
 import { relativeTime, hostname, pluralize } from '../shared/format.js';
 import type { Story } from '../shared/types.js';

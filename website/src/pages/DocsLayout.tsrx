@@ -1,6 +1,6 @@
 // Docs section shell: sidebar of documents (from the registry) + the routed
 // document via <Outlet/>.
-import { Link, Outlet } from '@octanejs/router';
+import { Link, Outlet } from '@octanejs/tanstack-router';
 import { docs } from '../content/docs.ts';
 
 export function DocsLayout() @{

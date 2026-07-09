@@ -16,9 +16,9 @@ apps.
 
 ## Stack
 
-- **[@octanejs/router](../../packages/router)** — `Link` / `Outlet` /
+- **[@octanejs/tanstack-router](../../packages/tanstack-router)** — `Link` / `Outlet` /
   `useParams`; concurrent navigation driven by transitions.
-- **[@octanejs/query](../../packages/query)** — `useSuspenseQuery` over plain
+- **[@octanejs/tanstack-query](../../packages/tanstack-query)** — `useSuspenseQuery` over plain
   query-option factories.
 - **[octane](../../packages/octane) Suspense** — each story row and each comment
   is its own Suspense unit, so a slow item never blocks the list.
@@ -102,7 +102,7 @@ shared/        # IDENTICAL for both apps — the entire "core"
   api.ts       #   HN Firebase client: topStories(), item(id), user(id)
   types.ts     #   API shapes
   format.ts    #   relativeTime / hostname / pluralize
-  queries.ts   #   @octanejs/query option factories
+  queries.ts   #   @octanejs/tanstack-query option factories
   styles.ts    #   StyleX styles
   routes.ts    #   createAppRouter(views) — the route tree / paths / params
 

@@ -37,12 +37,12 @@ export default defineConfig({
 		// hook-slotting pass — their own test projects compile them through it
 		// (explicit subSlot tags compose with the pass), unlike router/mdx.
 		octane({
-			exclude: ['/packages/router/src/', '/packages/mdx/src/'],
+			exclude: ['/packages/tanstack-router/src/', '/packages/mdx/src/'],
 		}),
 	],
 
 	// The workspace bindings ship raw TS — Vite must transform them for the SSR
-	// module graph (the plugin only covers octane + @octanejs/query).
+	// module graph (the plugin only covers octane + @octanejs/tanstack-query).
 	ssr: {
 		noExternal: [/^octane($|\/)/, /^@octanejs\//],
 	},
@@ -50,7 +50,7 @@ export default defineConfig({
 	optimizeDeps: {
 		exclude: [
 			'octane',
-			'@octanejs/router',
+			'@octanejs/tanstack-router',
 			'@octanejs/mdx',
 			'@octanejs/vite-plugin',
 			'@octanejs/recharts',

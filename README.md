@@ -354,9 +354,9 @@ metaframework plugin, and eight framework bindings:
 - [`@octanejs/vite-plugin`](./packages/vite-plugin-octane) is the optional metaframework
   plugin, with dev SSR, routing, and hydration wiring for full apps.
 - The `@octanejs/*` framework bindings — each a faithful octane port of a React library:
-  [`zustand`](./packages/zustand), [`query`](./packages/query),
+  [`zustand`](./packages/zustand), [`query`](./packages/tanstack-query),
   [`motion`](./packages/motion), [`stylex`](./packages/stylex),
-  [`router`](./packages/router), [`lexical`](./packages/lexical),
+  [`router`](./packages/tanstack-router), [`lexical`](./packages/lexical),
   [`floating-ui`](./packages/floating-ui), and [`radix`](./packages/radix).
 
 ## Development

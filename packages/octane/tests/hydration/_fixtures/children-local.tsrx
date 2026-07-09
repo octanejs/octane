@@ -1,7 +1,7 @@
 import { isChildrenBlock } from 'octane';
 
 // Children forwarded through a LOCAL const (with a render-prop check) before
-// rendering — the @octanejs/router Link shape. The SSR emitter must render the
+// rendering — the @octanejs/tanstack-router Link shape. The SSR emitter must render the
 // children block as MARKUP here exactly like a direct `{props.children}` hole
 // (regression: it HTML-escaped the child's serialized markup into a text node
 // and the client saw text where it expected the <img>).

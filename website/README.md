@@ -1,7 +1,7 @@
 # Octane website
 
 The official Octane site — an octane app built on `@octanejs/vite-plugin`
-(SSR + routing + hydration), `@octanejs/router` (in-app routing), and
+(SSR + routing + hydration), `@octanejs/tanstack-router` (in-app routing), and
 `@octanejs/mdx` (the docs content, Shiki-highlighted at build time).
 
 ## Develop

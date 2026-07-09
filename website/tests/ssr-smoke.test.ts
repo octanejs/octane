@@ -77,9 +77,11 @@ describe('built SSR handler', () => {
 		expect((html.match(/Data table \(median ms/g) ?? []).length).toBe(13);
 		expect(html).toContain('<th scope="row"');
 		// The charts themselves mount client-side (recharts' store populates via
-		// layout effects): SSR renders same-height shells, never an <svg>.
+		// layout effects): SSR renders same-height shells, never a chart <svg>
+		// (the nav's inline menu icon is the only svg on the page).
 		expect((html.match(/bench-plot-shell/g) ?? []).length).toBeGreaterThanOrEqual(13);
-		expect(html).not.toContain('<svg');
+		expect(html).not.toContain('recharts-surface');
+		expect((html.match(/<svg/g) ?? []).length).toBe(1);
 	});
 
 	it('SSRs the not-found page through the catch-all with a real 404', async () => {

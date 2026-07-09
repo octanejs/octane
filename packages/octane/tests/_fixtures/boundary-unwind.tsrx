@@ -1,7 +1,7 @@
 import { ErrorBoundary, Suspense, use } from 'octane';
 
 // Regression fixtures for error/suspense unwinding through NESTED passthrough
-// components and host elements (the @octanejs/router Match pipeline shape:
+// components and host elements (the @octanejs/tanstack-router Match pipeline shape:
 // boundary > passthrough > host > passthrough > leaf).
 
 function Pass(props) @{

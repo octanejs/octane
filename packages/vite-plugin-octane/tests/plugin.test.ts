@@ -64,14 +64,14 @@ describe('isViteOwnedUrl', () => {
 
 describe('octane() plugin factory', () => {
 	it('forwards `exclude` to the bundled compiler (hook-slotting skip)', () => {
-		const [compiler] = octane({ exclude: ['/packages/router/src/'] });
+		const [compiler] = octane({ exclude: ['/packages/tanstack-router/src/'] });
 		const code =
 			"import { useState } from 'octane';\nexport function useThing() { return useState(0); }\n";
 		const transform = compiler.transform as (code: string, id: string) => unknown;
 
 		// A pnpm-symlinked binding source resolves to /packages/*/src — excluded,
 		// so the hand-slot-forwarding file passes through untouched.
-		expect(transform.call({}, code, '/repo/packages/router/src/useRouter.ts')).toBeNull();
+		expect(transform.call({}, code, '/repo/packages/tanstack-router/src/useRouter.ts')).toBeNull();
 		// App code is still slotted.
 		expect(transform.call({}, code, '/repo/src/useThing.ts')).not.toBeNull();
 	});

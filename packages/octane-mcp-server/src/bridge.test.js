@@ -141,10 +141,10 @@ describe('KNOWN_BINDINGS', () => {
 		expect(new Set(Object.values(KNOWN_BINDINGS))).toEqual(
 			new Set([
 				'@octanejs/zustand',
-				'@octanejs/query',
+				'@octanejs/tanstack-query',
 				'@octanejs/motion',
 				'@octanejs/stylex',
-				'@octanejs/router',
+				'@octanejs/tanstack-router',
 				'@octanejs/lexical',
 				'@octanejs/floating-ui',
 				'@octanejs/radix',

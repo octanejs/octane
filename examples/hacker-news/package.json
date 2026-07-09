@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "octane": "workspace:*",
-    "@octanejs/query": "workspace:*",
-    "@octanejs/router": "workspace:*",
+    "@octanejs/tanstack-query": "workspace:*",
+    "@octanejs/tanstack-router": "workspace:*",
     "@octanejs/stylex": "workspace:*"
   },
   "devDependencies": {

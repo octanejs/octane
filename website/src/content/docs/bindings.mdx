@@ -12,8 +12,8 @@ is reimplemented on octane's hooks — so most code works by changing the import
 | Package                     | Ports                 | One-liner                                                                   |
 | --------------------------- | --------------------- | --------------------------------------------------------------------------- |
 | `@octanejs/zustand`         | zustand               | The bear-necessities state store, bound to octane's `useSyncExternalStore`. |
-| `@octanejs/query`           | TanStack Query        | `useQuery`/`useSuspenseQuery` data fetching over the verbatim query-core.   |
-| `@octanejs/router`          | TanStack Router       | Code-based routing with concurrent, transition-driven navigation.           |
+| `@octanejs/tanstack-query`  | TanStack Query        | `useQuery`/`useSuspenseQuery` data fetching over the verbatim query-core.   |
+| `@octanejs/tanstack-router` | TanStack Router       | Code-based routing with concurrent, transition-driven navigation.           |
 | `@octanejs/motion`          | Motion (Framer)       | Animation primitives on motion-dom.                                         |
 | `@octanejs/stylex`          | StyleX                | Compiled atomic CSS via the StyleX babel pipeline.                          |
 | `@octanejs/lexical`         | @lexical/react        | The Lexical editor binding.                                                 |
@@ -45,7 +45,7 @@ Every binding follows the same plan (documented per-package in the repo):
 ## Using a binding
 
 ```tsrx
-import { useQuery, QueryClient, QueryClientProvider } from '@octanejs/query';
+import { useQuery, QueryClient, QueryClientProvider } from '@octanejs/tanstack-query';
 
 function Repos() @{
 	const { data, isPending } = useQuery({
