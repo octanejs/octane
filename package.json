@@ -23,7 +23,9 @@
     "changeset:publish": "pnpm changeset:check && changeset publish",
     "prepare": "rulesync generate || true",
     "rules:generate": "rulesync generate",
-    "rules:check": "rulesync generate --check"
+    "rules:check": "rulesync generate --check",
+    "parity:gaps": "node scripts/generate-parity-gaps.mjs",
+    "parity:gaps:check": "node scripts/generate-parity-gaps.mjs --check"
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:default",

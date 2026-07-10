@@ -22,7 +22,10 @@ code and READMEs:
   keyed reconciler, scheduler, events, context, Suspense). It is large and heavily
   commented; the comments are the design spec.
 - `packages/octane/src/runtime.server.ts` + `packages/octane/src/server/index.ts` —
-  SSR (`render()` → `{ head, body, css }`; see `docs/ssr.md`).
+  SSR. The public surface is `renderToString` / `renderToStaticMarkup` /
+  `renderToPipeableStream` / `renderToReadableStream` under `octane/server` and
+  `prerender` under `octane/static`; buffered results are `{ html, css }`
+  (see `docs/ssr.md`).
 - `packages/octane/src/compiler/` — the TSRX→Octane compiler (exposed as
   `octane/compiler`, `octane/compiler/vite`, `octane/compiler/volar`).
 - `packages/octane/src/index.ts` / `constants.ts` — the public client API surface.
@@ -55,9 +58,10 @@ pnpm rules:generate
 
 ## Repo Map
 
-This is a pnpm monorepo with eleven publishable packages — the core `octane`
-runtime+compiler, the `@octanejs/vite-plugin` metaframework, and nine `@octanejs/*`
-framework bindings:
+This is a pnpm monorepo with eighteen publishable packages — the core `octane`
+runtime+compiler, the `@octanejs/vite-plugin` metaframework (plus its
+`@octanejs/adapter-vercel` deploy adapter), the `@octanejs/mcp-server` MCP
+server, and fourteen `@octanejs/*` framework bindings:
 
 - `packages/octane/` (npm: `octane`) — the runtime **and** the compiler together.
   - `src/runtime.ts` — client runtime.
@@ -69,9 +73,14 @@ framework bindings:
   production build: `vite build` → static client assets + a self-contained SSR
   server bundle; preview with `octane-preview`); `packages/adapter-vercel`
   deploys it to Vercel (Build Output API).
-- `packages/{zustand,tanstack-query,motion,stylex,tanstack-router,lexical,floating-ui,radix,hook-form}/` (npm:
-  `@octanejs/*`) — framework bindings, each a faithful octane port of a React library
-  (state, data-fetching, animation, styling, routing, editor, positioning, UI primitives, forms).
+- `packages/octane-mcp-server/` (npm: `@octanejs/mcp-server`) — an MCP server
+  exposing octane docs/compile tooling to AI agents.
+- `packages/{zustand,tanstack-query,motion,stylex,tanstack-router,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/`
+  (npm: `@octanejs/*`) — framework bindings, each an octane port of a React
+  library (state, data-fetching, animation, styling, routing, editor,
+  positioning, UI primitives, forms, charts, testing, MDX). Parity varies by
+  package — some are behaviorally complete ports, others are explicitly
+  partial or alpha; each package's README states its current scope.
 
 `benchmarks/`, `playground/`, and `scripts/` hold local examples, perf harnesses,
 and tooling. Route a change to the package that owns the behavior; prefer editing
@@ -165,7 +174,9 @@ The test suite (`packages/octane/tests/`) is organized as:
 - `conformance/` — ports of `facebook/react` behaviors; each `it` cites the source
   like `// Per ReactHooksWithNoopRenderer-test.js:1885`. Genuine Octane divergences
   are pinned with `it.fails(...)` + a `// GAP` note so the suite stays green and the
-  test auto-flips when the runtime is fixed.
+  test auto-flips when the runtime is fixed. `docs/parity-gaps.md` is the generated
+  index of the executable pins (`pnpm parity:gaps`; checked in CI) — it, not the
+  many historical `// GAP` comments, is the live parity backlog.
 - `differential/` — the gold-standard parity proof: `_rig.ts` runs the SAME `.tsrx`
   fixture through both Octane and `@tsrx/react`, drives identical events, and
   asserts byte-equal `innerHTML` after each step. Note it compares only final HTML,

@@ -61,6 +61,29 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      # Two-layer sync check for the RuleSync-generated agent files. The root
+      # `prepare` script already re-ran `rulesync generate || true` during
+      # install, so if the committed files were stale they are now MODIFIED in
+      # the working tree — `git diff` is what actually catches that. The
+      # explicit `rules:check` still matters for the case where prepare's
+      # rulesync invocation failed silently (it is `|| true` by design).
+      - name: Check AI rule files are in sync
+        run: |
+          pnpm rules:check
+          git diff --exit-code -- AGENTS.md CLAUDE.md GEMINI.md .github/copilot-instructions.md .cursor/rules/
+
+      # 0.x alpha: changesets must stay on the patch track. release/publish
+      # already enforce this, but checking on PRs surfaces a stray major/minor
+      # bump at review time instead of at release time.
+      - name: Disallow major and minor bumps in changesets
+        run: pnpm changeset:check
+
+      # docs/parity-gaps.md is generated from the executable it.fails pins in
+      # the conformance suite. Fixing a gap flips its pin to a plain `it`, so
+      # this check forces the index to be regenerated in the same change.
+      - name: Check parity-gap index is current
+        run: pnpm parity:gaps:check
+
   typecheck:
     runs-on: ubuntu-latest
 

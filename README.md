@@ -347,20 +347,30 @@ Octane itself. Good places to start:
 
 ## Packages
 
-This is a pnpm monorepo with ten publishable packages — the core runtime+compiler, the
-metaframework plugin, and eight framework bindings:
+This is a pnpm monorepo with eighteen publishable packages — the core
+runtime+compiler, the metaframework plugin (and its Vercel adapter), an MCP
+server, and fourteen framework bindings:
 
 - [`octane`](./packages/octane) is the runtime and the compiler together. It covers
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
   and the compiler itself, which is exposed at `octane/compiler` (and
   `octane/compiler/vite` for the build transform).
 - [`@octanejs/vite-plugin`](./packages/vite-plugin-octane) is the optional metaframework
-  plugin, with dev SSR, routing, and hydration wiring for full apps.
-- The `@octanejs/*` framework bindings — each a faithful octane port of a React library:
+  plugin, with dev SSR, routing, and hydration wiring for full apps;
+  [`@octanejs/adapter-vercel`](./packages/adapter-vercel) deploys its build
+  output to Vercel.
+- [`@octanejs/mcp-server`](./packages/octane-mcp-server) exposes octane docs and
+  compile tooling to AI agents over MCP.
+- The `@octanejs/*` framework bindings — each an octane port of a React library:
   [`zustand`](./packages/zustand), [`query`](./packages/tanstack-query),
   [`motion`](./packages/motion), [`stylex`](./packages/stylex),
   [`router`](./packages/tanstack-router), [`lexical`](./packages/lexical),
-  [`floating-ui`](./packages/floating-ui), and [`radix`](./packages/radix).
+  [`floating-ui`](./packages/floating-ui), [`radix`](./packages/radix),
+  [`hook-form`](./packages/hook-form), [`base-ui`](./packages/base-ui),
+  [`recharts`](./packages/recharts), [`redux`](./packages/redux),
+  [`testing-library`](./packages/testing-library), and [`mdx`](./packages/mdx).
+  Parity varies by package — some are behaviorally complete, others are
+  explicitly partial or alpha; each package's README states its current scope.
 
 ## Development
 
