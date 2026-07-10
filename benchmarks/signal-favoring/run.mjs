@@ -28,6 +28,7 @@
 //   pnpm --filter solid-signal-bench dev        # :5191
 //   pnpm --filter react-signal-bench dev        # :5192
 //   pnpm --filter ripple-signal-bench dev       # :5193
+//   pnpm --filter vue-vapor-signal-bench dev    # :5183
 //   node benchmarks/signal-favoring/run.mjs [iter]   # default 20
 
 import { chromium } from 'playwright';
@@ -45,17 +46,22 @@ const TARGETS = process.env.TARGETS
 			{ name: 'solid', url: 'http://localhost:5191/' },
 			{ name: 'react', url: 'http://localhost:5192/' },
 			{ name: 'ripple', url: 'http://localhost:5193/' },
+			{ name: 'vue-vapor', url: 'http://localhost:5183/' },
 		];
 
 const YIELD_MS = 5; // breathe between samples: let paint settle, don't block the page
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// All ops mutate the DOM SYNCHRONOUSLY inside the adapter call (ripple /
-// octane / react via flushSync, solid via flush()), so we time ONLY the
-// synchronous op and force a GC right before each timed sample. This isolates
-// framework JS work from browser paint + GC jitter — the prior rAF + task wait
-// added ~16ms of frame latency that swamped the sub-ms signal and made medians
-// swing run-to-run. See recursive-context/run.mjs for the same methodology.
+// All ops mutate the DOM inside the adapter call — synchronously where the
+// framework allows it (ripple / octane / react via flushSync, solid via
+// flush()); an adapter with no public sync flush (vue-vapor) returns a
+// thenable (nextTick(), settling after Vue's flushJobs) and the timed window
+// extends until it settles — awaited BETWEEN reps so bumps can't coalesce
+// into one commit. Either way we time ONLY the framework's work and force a
+// GC right before each timed sample. This isolates framework JS work from
+// browser paint + GC jitter — the prior rAF + task wait added ~16ms of frame
+// latency that swamped the sub-ms signal and made medians swing run-to-run.
+// See recursive-context/run.mjs for the same methodology.
 
 async function freshPage(browser, url) {
 	const ctx = await browser.newContext();
@@ -117,7 +123,10 @@ async function measureBump(browser, url, idx) {
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
 				const t0 = performance.now();
-				for (let k = 0; k < REPS; k++) fn();
+				for (let k = 0; k < REPS; k++) {
+					const r = fn();
+					if (r && typeof r.then === 'function') await r;
+				}
 				const dt = (performance.now() - t0) / REPS;
 				if (i >= WARMUP) out.push(dt);
 				await new Promise((r) => setTimeout(r, YIELD_MS));
@@ -160,12 +169,17 @@ async function measureSweep(browser, url, batchFn) {
 				const t0 = performance.now();
 				for (let k = 0; k < REPEAT; k++) {
 					if (sweep) {
-						sweep();
+						const r = sweep();
+						if (r && typeof r.then === 'function') await r;
 					} else {
 						for (const idx of indices) {
 							const fn = window['__bumpAt' + idx];
 							if (typeof fn !== 'function') throw new Error('missing __bumpAt' + idx);
-							fn();
+							// An async-commit bump (vue-vapor) is awaited per change —
+							// that IS the "flush on every change" mode for a microtask
+							// scheduler (each await lets flushJobs run before the next).
+							const r = fn();
+							if (r && typeof r.then === 'function') await r;
 						}
 					}
 				}

@@ -16,6 +16,8 @@ benchmarks/recursive-context/
 ├── solid/             # Vite app, dev :5187 (Solid 2.0 beta)
 ├── react/             # Vite app, dev :5186 (React 19)
 ├── ripple/            # Vite app, dev :5184
+├── vue-vapor/         # Vite app, dev :5189 — Vue 3.6 Vapor: provide/inject shallowRefs;
+│                      #   update ops return nextTick() (no public sync flush)
 ├── run.mjs            # Playwright harness — drives all adapters
 ├── package.json       # umbrella: `pnpm bench`
 └── README.md
@@ -26,6 +28,15 @@ syntax: `@if/@else`, `class`) and React-style `.tsx` (JS control flow, `classNam
 Both compile to working blocks over the same runtime, so the two octane columns
 are a like-for-like read on the JSX backwards-compat path's cost for this
 recursive-tree + Context workload.
+
+Context maps to each framework's native mechanism: octane/React `createContext`
++ `useContext`, Solid `createContext` + `useContext` (signal getters as the
+context value), Vue `provide`/`inject` (shallowRefs as the provided values —
+leaves read them in their text expression, so updates re-fire only leaf text
+renderEffects; non-Mid leaves get the non-reactive inject default `0` and never
+subscribe). Vue has no public synchronous flush, so the vue-vapor update ops
+return `nextTick()` and the harness awaits the thenable inside the timed
+window.
 
 ## Shape
 
@@ -79,6 +90,7 @@ pnpm --filter octane-jsx-recursive-bench dev    # :5188
 pnpm --filter solid-recursive-bench dev         # :5187
 pnpm --filter react-recursive-bench dev         # :5186
 pnpm --filter ripple-recursive-bench dev        # :5184
+pnpm --filter vue-vapor-recursive-bench dev     # :5189
 
 # 3. Run the harness:
 pnpm --filter @benchmarks/recursive-context bench
