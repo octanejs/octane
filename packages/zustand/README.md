@@ -84,3 +84,9 @@ const { a } = useStore((s) => ({ a: s.a })); // bails out via shallow
 ```
 
 For most object-slice selections, prefer `useShallow` — the v5-recommended approach.
+
+## Status
+
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

@@ -370,7 +370,10 @@ server, and fourteen framework bindings:
   [`recharts`](./packages/recharts), [`redux`](./packages/redux),
   [`testing-library`](./packages/testing-library), and [`mdx`](./packages/mdx).
   Parity varies by package — some are behaviorally complete, others are
-  explicitly partial or alpha; each package's README states its current scope.
+  explicitly partial or alpha. [`docs/bindings-status.md`](./docs/bindings-status.md)
+  is the generated per-package status table (upstream version, supported
+  surface, known divergences, SSR/hydration, last parity verification), sourced
+  from each package's `status.json` and checked in CI.
 
 ## Development
 

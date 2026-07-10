@@ -54,3 +54,9 @@ DOM against the real react-hook-form.
 MIT — contains source derived from
 [react-hook-form](https://github.com/react-hook-form/react-hook-form)
 (MIT, © Beier (Bill) Luo), adapted for octane.
+
+## Status
+
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

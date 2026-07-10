@@ -87,3 +87,9 @@ contains every rule regardless of module/transform order.
   (which is also StyleX's own recommended pattern).
 - The plugin runs the StyleX compiler on octane's _output_, so StyleX's own
   source-scanning tools (the PostCSS plugin) are not used and not needed.
+
+## Status
+
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

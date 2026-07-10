@@ -1,0 +1,10 @@
+{
+  "upstream": { "package": "react-redux", "version": "9.3.0" },
+  "surface": "The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Export parity is pinned by test.",
+  "divergences": [
+    "`connect()` (the legacy HOC surface) intentionally throws — the hooks API is the supported surface.",
+    "Error messages are octane-branded."
+  ],
+  "ssr": "No SSR-specific surface; no dedicated SSR tests.",
+  "verified": "2026-07-08"
+}

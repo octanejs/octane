@@ -98,3 +98,9 @@ Remaining (documented in
 coverage for the overlay/portal components and Phase-5 polish. The port surfaced —
 and fixed, in octane itself — fourteen runtime/compiler parity bugs along the way;
 each is pinned by an octane regression test and a changeset.
+
+## Status
+
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

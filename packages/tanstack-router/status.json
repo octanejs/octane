@@ -1,0 +1,14 @@
+{
+  "upstream": { "package": "@tanstack/react-router", "version": "1.170.16" },
+  "surface": "Code-based routing at full binding parity (2026-07-06 gap-closure sweep): the full Match pipeline, router lifecycle events, the complete read-hook family, full-parity `Link` (preloading, masking, `activeProps`), `useBlocker`/`Block`, `Await`/`defer`, scroll restoration, lazy routes, not-found handling, and search-param validation/middleware — differential-verified byte-equal vs the real `@tanstack/react-router`.",
+  "divergences": [
+    "Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop.",
+    "No `flushSync` in the `Link` click handler; navigation state updates run synchronously."
+  ],
+  "ssr": "SSR entries (`RouterServer`/`RouterClient`, `HeadContent`/`Scripts`) not yet ported; no SSR tests.",
+  "verified": "2026-07-06",
+  "notes": [
+    "Still open: file-based routing + the codegen plugin, devtools, and the typed public surface (factories/hooks are still `any`)."
+  ],
+  "docs": ["docs/tanstack-parity-audit.md"]
+}

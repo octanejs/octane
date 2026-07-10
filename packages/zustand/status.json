@@ -1,0 +1,9 @@
+{
+  "upstream": { "package": "zustand", "version": "5.0.14" },
+  "surface": "Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).",
+  "divergences": [
+    "Unstable selectors (a new reference every render) settle after a bounded number of re-renders instead of hitting React's `useSyncExternalStore` warning loop — still prefer `useShallow`."
+  ],
+  "ssr": "No SSR-specific surface; no dedicated SSR tests.",
+  "verified": "2026-07-06"
+}

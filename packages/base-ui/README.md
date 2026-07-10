@@ -31,3 +31,9 @@ Every component takes Base UI's universal composition props — `render` (a JSX 
 - **ref-as-prop.** No `forwardRef`; `ref` is a normal prop (React-19 shape).
 - **`className` composition** follows octane's `normalizeClass` at the apply site; the
   `render`-prop merge concatenates strings exactly like Base UI.
+
+## Status
+
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

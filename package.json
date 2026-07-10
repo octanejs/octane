@@ -25,7 +25,9 @@
     "rules:generate": "rulesync generate",
     "rules:check": "rulesync generate --check",
     "parity:gaps": "node scripts/generate-parity-gaps.mjs",
-    "parity:gaps:check": "node scripts/generate-parity-gaps.mjs --check"
+    "parity:gaps:check": "node scripts/generate-parity-gaps.mjs --check",
+    "bindings:status": "node scripts/generate-bindings-status.mjs",
+    "bindings:status:check": "node scripts/generate-bindings-status.mjs --check"
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:default",

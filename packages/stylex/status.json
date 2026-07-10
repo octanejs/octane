@@ -1,0 +1,10 @@
+{
+  "upstream": { "package": "@stylexjs/stylex", "version": "0.19.0" },
+  "surface": "Full compile-time integration: re-exports the StyleX runtime API (`create`, `props`, `attrs`, `keyframes`, `defineVars`, `createTheme`) and registers as an import source; the `/vite` plugin runs the StyleX compiler over octane's compiled output and emits one static atomic stylesheet (`virtual:stylex.css`) with zero StyleX runtime in the bundle.",
+  "divergences": [
+    "The `sx` JSX prop is not supported — spread `{...stylex.props(...)}` instead.",
+    "The compiler runs over octane's compiled output rather than source, so StyleX's own PostCSS source-scanning setup is unused."
+  ],
+  "ssr": "Works under SSR — the stylesheet is static and server markup carries the final class names; no dedicated SSR test files.",
+  "verified": "2026-07-09"
+}

@@ -1,0 +1,13 @@
+{
+  "upstream": { "package": "recharts", "version": "3.9.2" },
+  "surface": "Partial (phases 0–1 of 5): the static `BarChart`/`LineChart` pipeline end-to-end (`isAnimationActive={false}`), byte-identical to upstream in the differential rig; the Redux/RTK state layer, `Surface`/`Layer`, and the pure shape set are in place.",
+  "divergences": [
+    "Chart events coordinate through octane's native delegated events rather than React's synthetic layer."
+  ],
+  "ssr": "Untested; text measurement (`getStringSize`) returns 0×0 under SSR.",
+  "verified": "2026-07-07",
+  "notes": [
+    "Planned next (phases 2–5): `Tooltip`/`Legend`/`ResponsiveContainer`, the remaining cartesian charts, polar charts, and animation + chart sync. Target surface: 97 runtime + 78 type exports."
+  ],
+  "docs": ["docs/recharts-port-plan.md"]
+}

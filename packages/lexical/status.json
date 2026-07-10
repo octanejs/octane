@@ -1,0 +1,13 @@
+{
+  "upstream": { "package": "@lexical/react", "version": "0.46.0" },
+  "surface": "35 of 39 `@lexical/react` modules ported: composer + contexts, the editable surface, plain/rich text, and the full plugin/menu set (history, lists + check-list, links, tables, markdown shortcuts, the typeahead/node-menu/context-menu family, draggable-block, character-limit, …) plus the `useLexical*` hooks.",
+  "divergences": [
+    "Positioning uses `@floating-ui/dom` instead of `@floating-ui/react`.",
+    "The class-based `LexicalErrorBoundary` becomes an octane error boundary; `forwardRef` becomes ref-as-prop."
+  ],
+  "ssr": "No dedicated SSR/hydration tests.",
+  "verified": "2026-07-09",
+  "notes": [
+    "Not ported (4 modules, with reasons): `LexicalCollaborationPlugin` (real-time Yjs collaboration needs a two-peer harness), `LexicalExtensionComposer`/`LexicalExtensionEditorComposer` (the newer extension API wraps a React-only subsystem), and `LexicalTreeView` (wraps the `@lexical/devtools-core` React component)."
+  ]
+}
