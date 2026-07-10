@@ -76,16 +76,16 @@
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 2.2,
-    "note": "shipped gzip bytes vs ripple, same app, normalized minify (measured 2.09x on record 2026-07-08). RATCHET DOWN as the compiled-output plan phases land (docs/compiled-output-optimization-plan.md)."
+    "maxRatio": 2.05,
+    "note": "shipped TOTAL gzip vs ripple, same app, normalized minify. Build-time dev gating landed 2026-07-09 (fw chunk -6.9%): measured 1.94x; ceiling ratcheted 2.2 -> 2.05."
   },
   {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.9,
-    "note": "shipped gzip bytes vs solid, same app, normalized minify (measured 1.80x on record 2026-07-08). Ratchet down with the compiled-output plan."
+    "maxRatio": 1.8,
+    "note": "shipped TOTAL gzip vs solid, same app, normalized minify. Measured 1.68x after dev gating (2026-07-09); ceiling ratcheted 1.9 -> 1.8."
   },
   {
     "suite": "codegen-size",

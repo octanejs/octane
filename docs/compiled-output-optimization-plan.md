@@ -345,6 +345,18 @@ Independent, individually-measurable items, roughly by value:
   lines are the per-render hot path; with 1-char fields they're already small,
   and a helper adds a call to every diff on every render. Only take this if 0b
   shows the bytes matter and the A/B shows no regression.
+- **3h. Build-time dev gating — LANDED 2026-07-09.** All dev-only runtime
+  diagnostics (hydration-mismatch warns, controlled-input/select warnings,
+  the act() environment warning, DOM-prop hints, unkeyed-child warning,
+  use() waterfall hints) now sit behind inline
+  `process.env.NODE_ENV !== 'production'` (the ecosystem-standard token: the
+  transpile-only dist build preserves it; consumer bundlers fold it; bare-Node
+  SSR never crashes, unlike `import.meta.env`). Whole-dev functions use a
+  build-time early return; scattered sites are wrapped inline (a module-level
+  const would defeat esbuild's DCE). Verified all target strings absent from
+  a production build. Measured: framework chunk **23,262 → 21,648 B gzip
+  (−6.9%)**, totals 26.4 → 24.8 KB (octane/ripple total 2.06× → **1.94×**).
+  Guards ratcheted: total js_gzip vs ripple 2.2 → 2.05, vs solid 1.9 → 1.8.
 - **3g. Runtime property names (`parentNode`, `endMarker`) — REJECTED for
   renaming.** They're public Block fields used across runtime.ts; compiled
   code's remaining references after 1+3a are few (noTemplate hosts, anchor

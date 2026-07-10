@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { createRoot, hydrateRoot } from '../src/index.js';
 import * as ServerRT from 'octane/server';
-import { Chain, ListSingle, ListMulti, Branch, Deopt } from './_fixtures/marker-shape.tsrx';
+import { Chain, ChainX, ListSingle, ListMulti, Branch, Deopt } from './_fixtures/marker-shape.tsrx';
 
 // M0 of docs/comment-marker-elision-plan.md — STRUCTURAL PINS for comment-
 // marker minting. Each case renders a representative fixture three ways and
@@ -22,17 +22,25 @@ const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/marker-shap
 
 // Server module via explicit server-mode compile (the established evalModule
 // technique from the hydration suites).
-function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'marker-shape.tsrx', { mode: 'server' });
+function evalServer(file: string, extra?: Record<string, any>): Record<string, any> {
+	let { code } = compile(readFileSync(file, 'utf8'), file.split('/').pop()!, { mode: 'server' });
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
+	// Cross-module fixture import → destructure from the pre-evaluated module.
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]\.\/marker-shape-ext\.tsrx['"];?/g,
+		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __ext;`,
+	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(ServerRT, {});
+	const fn = new Function('__rt', '__exports', '__ext', code + '\nreturn __exports;');
+	return fn(ServerRT, {}, extra ?? {});
 }
-const server = serverModule();
+const serverExt = evalServer(
+	join(process.cwd(), 'packages/octane/tests/_fixtures/marker-shape-ext.tsrx'),
+);
+const server = evalServer(FIXTURE, serverExt);
 
 let container: HTMLElement;
 beforeEach(() => {
@@ -76,6 +84,15 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 		// (inherited ranges); cross-module chains (the router) get NO client
 		// elision today — that's M1/M3.
 		expect(counts('Chain', Chain, {})).toEqual({ client: 2, ssr: 4, hydrate: 4 });
+	});
+
+	it('(a2) CROSS-MODULE sole child: the $$singleRoot stamp elides the slot pair (M1)', () => {
+		// ChainX → ExtLeaf (another module). Client: the call site's `2` sentinel
+		// resolves the callee's definition-site stamp → markerless singleRoot
+		// mount = 0 comments. SSR still frames the child component = 1 pair = 2;
+		// hydration adopts it = 2 (client-mount elision only — the forBlock
+		// singleRoot precedent).
+		expect(counts('ChainX', ChainX, {})).toEqual({ client: 0, ssr: 2, hydrate: 2 });
 	});
 
 	it('(b) keyed @for, single-root items: client elides item pairs, SSR keeps them', () => {

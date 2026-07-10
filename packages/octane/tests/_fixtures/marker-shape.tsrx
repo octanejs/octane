@@ -1,4 +1,5 @@
 import { useState, createElement } from 'octane';
+import { ExtLeaf } from './marker-shape-ext.tsrx';
 
 // Marker-shape corpus (M0 of docs/comment-marker-elision-plan.md): one
 // representative per marker-minting regime, so marker-shape.test.ts can pin
@@ -21,6 +22,14 @@ function Mid() @{
 export function Chain() @{
 	const [y] = useState(2);
 	<Mid data-y={y} />
+}
+
+// (a2) CROSS-MODULE sole child — ExtLeaf lives in marker-shape-ext.tsrx; the
+// call site emits the `2` sentinel and the runtime elides iff the callee's
+// definition-site $$singleRoot stamp is present (M1).
+export function ChainX() @{
+	const [z] = useState(3);
+	<ExtLeaf data-z={z} />
 }
 
 // (b) Keyed @for with a SINGLE-root item body (client-mount item markers are
