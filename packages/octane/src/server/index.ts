@@ -113,4 +113,7 @@ export {
 	ssrPortal,
 	injectStyle,
 	ssrHeadEl,
+	// SSR parallel-use mirror (compiler targets — see suspense-parallel-use plan).
+	puMemo,
+	puBatch,
 } from '../runtime.server.js';

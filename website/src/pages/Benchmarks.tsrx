@@ -28,8 +28,8 @@ export function Benchmarks() @{
 		<section class="benchpage-section" aria-labelledby="bench-frameworks">
 			<h2 id="bench-frameworks" class="benchpage-h2">Octane vs the field</h2>
 			<p class="benchpage-note">
-				Octane compiled from .tsrx and .tsx, against React 19, Solid and Ripple — each framework’s
-				fixture written the way its docs recommend.
+				Octane compiled from .tsrx and .tsx, against React 19, Solid, Ripple and Vue Vapor — each
+				framework’s fixture written the way its docs recommend.
 			</p>
 			<div class="benchpage-grid">
 				@for (const card of FRAMEWORK_CARDS; key card.id) {

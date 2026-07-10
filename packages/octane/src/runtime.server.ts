@@ -126,7 +126,7 @@ interface Job {
 	frame: Frame;
 }
 let SUSPENDED: { promise: PromiseLike<unknown>; key: string }[] | null = null;
-let RESOLVED: Map<string, { value: unknown } | { reason: unknown }> | null = null;
+let RESOLVED: ResolvedMap | null = null;
 let SERIAL: unknown[] | null = null;
 // The active component frame (see Frame). Never null during a render pass —
 // render() installs a root frame before invoking the component.
@@ -1225,6 +1225,22 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: string | s
 	}
 	const key = prefix + '|' + base + '#' + n;
 
+	// SSR parallel-use mirror: a BATCH-registered creation resolves by THENABLE
+	// IDENTITY (puMemo keeps the instance stable across passes; puBatch can't
+	// know this unwrap's string key). resolvedT holds ONLY batch-registered
+	// outcomes, so plain use() sites keep their exact pre-mirror string-key
+	// semantics — and the occurrence bump above ALWAYS runs, keeping per-frame
+	// occ indices in sync across passes whichever path resolves a site (an
+	// identity hit that skipped the bump would shift every later same-base
+	// site onto its predecessor's key — @for iterations share the frame).
+	if (RESOLVED !== null) {
+		const entryT = RESOLVED.pu.resolvedT.get(usable as PromiseLike<unknown>);
+		if (entryT !== undefined) {
+			if ('reason' in entryT) throw entryT.reason;
+			if (SERIAL !== null) SERIAL.push(entryT.value);
+			return entryT.value as T;
+		}
+	}
 	const resolved = RESOLVED;
 	if (resolved !== null && resolved.has(key)) {
 		const entry = resolved.get(key)!;
@@ -1242,6 +1258,102 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: string | s
 	// component/pass), so render() can re-render just this subtree next round
 	// instead of the whole tree. A bare use() at the root captures the root
 	// component (CURRENT_COMP set by render()).
+	if (DEFERRED !== null && CURRENT_COMP !== null && frame !== null && !frame.deferred) {
+		frame.deferred = true;
+		DEFERRED.push({
+			comp: CURRENT_COMP,
+			props: CURRENT_PROPS,
+			parentScope: CURRENT_PARENT_SCOPE,
+			frame,
+		});
+	}
+	throw SSR_SUSPENSE;
+}
+
+// ---------------------------------------------------------------------------
+// SSR parallel-use mirror (docs/suspense-parallel-use-plan.md Phase 5) — the
+// server twins of the client's useMemo/useBatch emit. The compiler hoists
+// memoized use() creations above their unwraps and registers each run in one
+// batch, so a body stratum of independent fetches costs ONE network round
+// instead of one per use(), and re-runs (discovery rounds, later passes)
+// reuse the SAME thenable instances instead of re-firing the fetches.
+// ---------------------------------------------------------------------------
+
+// Element-wise Object.is — the client useMemo's deps contract.
+function puDepsEqual(a: unknown[], b: unknown[]): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+	return true;
+}
+
+// Synthetic SUSPENDED keys for batch registrations — their outcomes are
+// consumed via resolvedT identity, never via this key; it only needs to be
+// unique so the settle loops' per-key dedupe doesn't conflate entries.
+let PU_ID = 0;
+
+/**
+ * Cross-pass creation cache. Keyed like use(): frame path + compiler site key
+ * + per-frame occurrence, so the key is identical between the pass a boundary
+ * first renders, its discovery re-runs, and the final full pass. A hit with
+ * equal deps returns the PRIOR pass's value — for a fetch creation that means
+ * the same in-flight/settled promise instance, which is what lets puBatch and
+ * use() resolve by identity and what stops re-runs duplicating network calls.
+ */
+export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: string | symbol): T {
+	const res = RESOLVED as ResolvedMap | null;
+	if (res === null) return fn();
+	const base =
+		siteKey === undefined
+			? '@pu'
+			: typeof siteKey === 'symbol'
+				? (siteKey as symbol).toString()
+				: String(siteKey);
+	const frame = FRAME;
+	let n = 0;
+	let prefix = '';
+	if (frame !== null) {
+		if (frame.occ === null) frame.occ = new Map();
+		n = frame.occ.get(base) ?? 0;
+		frame.occ.set(base, n + 1);
+		prefix = framePath(frame);
+	}
+	const key = prefix + '|' + base + '#' + n;
+	const hit = res.pu.created.get(key);
+	if (hit !== undefined && puDepsEqual(hit.deps, deps)) return hit.value as T;
+	const value = fn();
+	res.pu.created.set(key, { deps, value });
+	return value;
+}
+
+/**
+ * Register every unresolved thenable of a hoisted-creation run with the render
+ * loop, then suspend ONCE — the loop awaits them together and records their
+ * outcomes by identity (resolvedT), so the next pass's use() unwraps all
+ * succeed in one go. Already-registered-but-unsettled thenables (streaming
+ * re-passes render between waves) still force the suspend but are not pushed
+ * again. Falls through silently when everything is already resolved.
+ */
+export function puBatch(thenables: unknown[]): void {
+	const res = RESOLVED as ResolvedMap | null;
+	const pu = res !== null ? res.pu : null;
+	let pending = false;
+	for (let i = 0; i < thenables.length; i++) {
+		const t = thenables[i] as PromiseLike<unknown> | null | undefined;
+		if (t == null || typeof (t as any).then !== 'function') continue;
+		if (pu !== null && pu.resolvedT.has(t)) continue;
+		pending = true;
+		// Re-registering a still-pending thenable on a later pass is deliberate:
+		// the STREAMING loop awaits each pass's SUSPENDED list, so dropping a
+		// pending entry would strand its boundary. Duplicate registrations are
+		// harmless — synthetic keys are unique, and awaiting a promise twice
+		// just records the same outcome twice.
+		if (SUSPENDED !== null) SUSPENDED.push({ promise: t, key: '|pu#' + PU_ID++ });
+	}
+	if (!pending) return;
+	// Same discovery-job bookkeeping as a suspending use(): register the
+	// innermost enclosing component so the render loop can re-run just this
+	// subtree next round.
+	const frame = FRAME;
 	if (DEFERRED !== null && CURRENT_COMP !== null && frame !== null && !frame.deferred) {
 		frame.deferred = true;
 		DEFERRED.push({
@@ -1641,7 +1753,29 @@ function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
  * resolved value is appended as an inline data `<script>` for the client to seed.
  */
 type SuspendedList = { promise: PromiseLike<unknown>; key: string }[];
-type ResolvedMap = Map<string, { value: unknown } | { reason: unknown }>;
+type SuspenseOutcome = { value: unknown } | { reason: unknown };
+// The render-local suspense cache. `pu` carries the SSR parallel-use mirror's
+// state (docs/suspense-parallel-use-plan.md Phase 5), hung off the SAME object
+// so every existing threading path — pass functions, discovery rounds, both
+// settle loops, ambient save/restore — carries it with no extra parameters:
+//   created:   keyed CROSS-PASS creation cache (puMemo) — the same fetch
+//              expression yields the SAME thenable instance on every pass, so
+//              re-runs never duplicate network calls;
+//   resolvedT: outcomes keyed by THENABLE IDENTITY — how batch-registered
+//              thenables resolve at their later `use()` unwrap sites (a batch
+//              can't know the unwraps' string keys, but puMemo makes instance
+//              identity stable across passes);
+type ResolvedMap = Map<string, SuspenseOutcome> & {
+	pu: {
+		created: Map<string, { deps: unknown[]; value: unknown }>;
+		resolvedT: Map<PromiseLike<unknown>, SuspenseOutcome>;
+	};
+};
+function newResolvedMap(): ResolvedMap {
+	const m = new Map() as ResolvedMap;
+	m.pu = { created: new Map(), resolvedT: new Map() };
+	return m;
+}
 
 interface FullPassResult {
 	body: string;
@@ -1871,13 +2005,22 @@ async function settleSuspended(
 	timeoutMs: number,
 	signal: AbortSignal | undefined,
 ): Promise<void> {
+	const pu = (resolved as ResolvedMap).pu;
 	const settleAll = Promise.all(
 		suspended.map(async ({ promise, key }) => {
 			if (resolved.has(key)) return;
+			// Batch registrations ('|pu#…' synthetic keys) resolve at their unwrap
+			// sites by IDENTITY; plain use() entries stay string-key-only so their
+			// occurrence-keyed semantics are untouched by the mirror.
+			const isPu = key.charCodeAt(0) === 124 /* '|' */ && key.startsWith('|pu#');
 			try {
-				resolved.set(key, { value: await promise });
+				const outcome = { value: await promise };
+				resolved.set(key, outcome);
+				if (isPu) pu.resolvedT.set(promise, outcome);
 			} catch (reason) {
-				resolved.set(key, { reason });
+				const outcome = { reason };
+				resolved.set(key, outcome);
+				if (isPu) pu.resolvedT.set(promise, outcome);
 			}
 		}),
 	);
@@ -1910,16 +2053,20 @@ async function settleFirstOfWave(
 	timeoutMs: number,
 	signal: AbortSignal | undefined,
 ): Promise<void> {
+	const pu = (resolved as ResolvedMap).pu;
 	const recorders: Promise<void>[] = [];
 	for (const { promise, key } of suspended) {
 		if (resolved.has(key)) continue;
+		const isPu = key.startsWith('|pu#');
 		recorders.push(
 			(async () => {
 				try {
 					const value = await promise;
 					if (!resolved.has(key)) resolved.set(key, { value });
+					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, { value });
 				} catch (reason) {
 					if (!resolved.has(key)) resolved.set(key, { reason });
+					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, { reason });
 				}
 			})(),
 		);
@@ -1960,7 +2107,7 @@ async function runBuffered(
 	const signal = options?.signal;
 	// The suspense cache persists across this render's passes; it is render-local
 	// (never a module global) so concurrent renders can't share it.
-	const resolved: ResolvedMap = new Map();
+	const resolved: ResolvedMap = newResolvedMap();
 	let attempt = 0;
 	for (;;) {
 		// Bail before doing pass work if the request already died.
@@ -2042,7 +2189,7 @@ export function renderToString(
 ): RenderResult {
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
-	const resolved: ResolvedMap = new Map();
+	const resolved: ResolvedMap = newResolvedMap();
 	let pass: FullPassResult;
 	try {
 		pass = runFullFramedPass(component, props, resolved, nonceAttr);
@@ -2065,7 +2212,7 @@ export function renderToStaticMarkup(
 ): RenderResult {
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
-	const resolved: ResolvedMap = new Map();
+	const resolved: ResolvedMap = newResolvedMap();
 	const prevMarkers = MARKERS;
 	MARKERS = false;
 	let pass: FullPassResult;
@@ -2344,7 +2491,7 @@ async function runStream(
 	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
 	const signal = options?.signal;
 	const nonceAttr = nonceAttrOf(options);
-	const resolved: ResolvedMap = new Map();
+	const resolved: ResolvedMap = newResolvedMap();
 	const stream: StreamState = { boundaries: new Map(), nextId: 0 };
 	const emittedCss = new Set<string>();
 	const flushedSegments = new Set<number>();

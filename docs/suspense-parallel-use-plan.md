@@ -65,6 +65,36 @@ What shipped, and where it deviates from the phases as written:
   system makes deep waterfalls ~2 full passes + D cheap subtree re-runs — the
   remaining gap is that nested chains stay round-serial at the NETWORK level.
   Mirroring memoize/hoist/batch/warm into `compileServer` is its own project.
+- **SSR mirror LANDED 2026-07-09.** The same Pass A (memoize) + Pass B
+  (hoist/batch) run in `ssrCompileBody` — top bodies AND every synthetic sub
+  (@try/@if arms), before `rewriteHookCalls` so the rewritten `use(__pu$N)`
+  unwraps get their server site keys like hand-written calls — emitting the
+  server twins `_$puMemo`/`_$puBatch` (same `parallelUse: false` opt-out):
+  - `puMemo`: keyed CROSS-PASS creation cache (frame path + site + per-frame
+    occurrence, hung off the render-local ResolvedMap as `resolved.pu` so
+    every existing threading path carries it) — re-runs and the final
+    canonical pass reuse the SAME thenable instance; the discovery suite's
+    D=3 waterfall creator count dropped 3 → 1.
+  - `puBatch`: registers every unresolved thenable of a hoisted run with the
+    render loop (synthetic `|pu#N` keys) and suspends ONCE — a K-independent
+    body stratum costs ONE network round. Measured by the new
+    `ssr-throughput` `parallel-k4/k8` ops: p50 ~4.7ms FLAT across k (one
+    ~4ms-latency round), where serial registration costs ~k×4ms.
+  - Unwraps resolve batch-registered thenables by INSTANCE IDENTITY
+    (`resolved.pu.resolvedT`, written by both settle loops for `|pu#` keys
+    only). Two sharp edges found and pinned: (1) the identity check must run
+    AFTER the per-frame occurrence bump, or a hit desyncs occ and shifts
+    every later same-base site onto its predecessor's key (@for iterations
+    share the frame — caught by the @for keying test as crossed values);
+    (2) still-pending thenables must RE-REGISTER on streaming re-passes
+    (the wave loop awaits each pass's SUSPENDED list — a dedupe guard
+    starved boundaries; caught by the streaming wave test).
+  - Seed order (use()-call order), rejection routing to @catch,
+    renderToString single-pass @pending, and true-dependency sequencing are
+    pinned in `tests/ssr-parallel-use.test.ts`. The descendant WARM walk
+    (prefetching child components' fetch trees before their bodies run)
+    remains future work — same-body strata are parallel now; cross-component
+    independent chains still cost one round per component depth.
 - **Default flipped 2026-07-09** (same day, after the full-suite soak):
   `parallelUse` defaults to true in `compile()` and the vite plugin;
   `parallelUse: false` opts out (pinned inert in

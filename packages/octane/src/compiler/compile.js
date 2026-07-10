@@ -2100,6 +2100,14 @@ function compileServer(source, filename, options) {
 		filename,
 		mode: 'server',
 		hmr: false, // SSR never hot-swaps in place — hook slots are plain Symbol()s
+		// SSR MIRROR of the parallel-`use()` pipeline (docs/suspense-parallel-use-
+		// plan.md Phase 5): the same memoize (Pass A) + hoist/batch (Pass B)
+		// transforms run on server bodies, emitting `_$puMemo`/`_$puBatch` — the
+		// server-runtime twins with cross-pass creation identity — so independent
+		// fetches REGISTER before the first suspend and a body stratum costs ONE
+		// network round instead of one per use(). Same opt-out flag as the client.
+		parallelUse: !(options && options.parallelUse === false),
+		nextPuId: 0, // parallel-use `__pu$N` hoisted-creation temps
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		hoistedHelpers: [],
@@ -2255,7 +2263,20 @@ function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html')
 	}
 
 	const inlinedSubs = [];
-	const rewritten = statements
+	// SSR parallel-use mirror: memoize + hoist/batch BEFORE rewriteHookCalls —
+	// the rewritten `use(__pu$N)` unwraps then get their server site keys from
+	// rewriteHookCalls exactly like hand-written use() calls, and the
+	// `_$puMemo`/`_$puBatch` helper calls it emits are compiler-aliased names it
+	// leaves alone. Runs for TOP bodies and every synthetic sub (@try/@if arms
+	// compile through here with their own statement lists), so a `use()` run
+	// inside a boundary arm batches too. Loops/functions are excluded by the
+	// pass itself (same rules as the client).
+	let workingStatements = statements;
+	if (ctx.parallelUse) {
+		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, [], [], null);
+		workingStatements = rewriteParallelUse(workingStatements, ctx, name, null);
+	}
+	const rewritten = workingStatements
 		.map((s) => rewriteHookCalls(s, ctx, name))
 		.map((s) => rewriteJsxValues(s, ctx));
 	const setupCode = rewritten.map((s) => '  ' + printNode(s).replace(/\n/g, '\n  ')).join('\n');
@@ -3728,11 +3749,14 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 		if (isTrivialUseArg(arg)) return call;
 		const symVar = allocHookSymbol(ctx, `${componentName}.use.memo#${ctx.nextHookSymId}`);
 		const deps = collectDepPaths(arg);
-		ctx.runtimeNeeded.add('useMemo');
+		// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
+		// SSRScope per pass makes client useMemo semantics useless there).
+		const memoHelper = ctx.mode === 'server' ? 'puMemo' : 'useMemo';
+		ctx.runtimeNeeded.add(memoHelper);
 		creations.push({ symVar, expr: arg, deps, guards: [...guards], locals });
 		const memoCall = {
 			type: 'CallExpression',
-			callee: { type: 'Identifier', name: '_$useMemo' },
+			callee: { type: 'Identifier', name: `_$${memoHelper}` },
 			arguments: [
 				{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: arg },
 				{ type: 'ArrayExpression', elements: deps },
@@ -4005,7 +4029,11 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 				],
 			});
 		}
-		ctx.runtimeNeeded.add('useBatch');
+		// Server mirror: `puBatch` registers every unresolved thenable of the run
+		// with the render loop and suspends ONCE (identity-resolved on the next
+		// pass — see runtime.server.ts).
+		const batchHelper = ctx.mode === 'server' ? 'puBatch' : 'useBatch';
+		ctx.runtimeNeeded.add(batchHelper);
 		const batchArgs = [
 			{
 				type: 'ArrayExpression',
@@ -4018,7 +4046,7 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 			type: 'ExpressionStatement',
 			expression: {
 				type: 'CallExpression',
-				callee: { type: 'Identifier', name: '_$useBatch' },
+				callee: { type: 'Identifier', name: `_$${batchHelper}` },
 				arguments: batchArgs,
 				optional: false,
 			},

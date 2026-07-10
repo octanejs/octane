@@ -91,11 +91,13 @@ describe('SSR suspense — discovery re-render (subtree-scoped passes)', () => {
 		expect(ticks).toBe(2);
 		expect(bigs).toBe(4);
 
-		// The outermost level's thenable creator fires 3x (pass 1, the single
-		// discovery round that re-runs Chain#0, and the final pass) — a CONSTANT,
-		// not depth+1 = 4x. Deep waterfalls therefore stop re-firing shallow creators.
-		expect(makeCounts[1]).toBe(3);
-		expect(makeCounts[1]).toBeLessThan(4);
+		// The outermost level's thenable creator fires exactly ONCE: the SSR
+		// parallel-use mirror memoizes creations across passes (puMemo's keyed
+		// cross-pass cache), so the discovery round and the final canonical pass
+		// REUSE pass 1's thenable instead of re-firing the fetch. (Pre-mirror
+		// this was 3 — once per pass/round — itself down from depth+1 on the old
+		// full-retry loop.)
+		expect(makeCounts[1]).toBe(1);
 
 		// And the body is fully resolved (every @pending gone, final chain present).
 		expect(out.html).not.toContain('loading');

@@ -1,5 +1,6 @@
 import { prerender } from 'octane/static';
 import { WaterfallApp } from './Waterfall.tsrx';
+import { ParallelApp } from './Parallel.tsrx';
 import { DeoptPageFast } from './DeoptFast.tsrx';
 import { DeoptPagePlain } from './deopt-plain';
 import { EscapeApp } from './Escape.tsrx';
@@ -10,6 +11,7 @@ import { EscapeApp } from './Escape.tsrx';
 // Everything the harness gates need (expected chain value, escape probe) is
 // re-exported so the analytic expectations live next to the fixture data.
 export { expectedChainValue } from './waterfall-data';
+export { expectedParallelSum, PAR_LATENCY_MS } from './parallel-data';
 export { ESCAPE_PROBE } from './escape-data';
 
 // The harness reads `.body`; prerender returns { html, css } (head folded into
@@ -19,6 +21,10 @@ const toBody = (r: { html: string; css: string }): BodyResult => ({ body: r.html
 
 export async function renderWaterfall(depth: number): Promise<BodyResult> {
 	return toBody(await prerender(WaterfallApp, { depth }));
+}
+
+export async function renderParallel(k: number): Promise<BodyResult> {
+	return toBody(await prerender(ParallelApp, { k }));
 }
 
 export async function renderDeoptFast(): Promise<BodyResult> {
