@@ -30,17 +30,14 @@ export function normalizeClass(value: unknown): string {
 	return str;
 }
 
+import { hyphenateStyleName } from './dom-tables.js';
+
 /**
  * Normalize a style-object key to a CSS property name CSSOM accepts. Supports
  * BOTH kebab-case (`font-size`) and React-style camelCase (`fontSize`) keys —
- * the latter is converted to kebab. Mirrors React's hyphenateStyleName:
- *   fontSize        → font-size
- *   backgroundColor → background-color
- *   WebkitTransform → -webkit-transform   (leading uppercase = vendor prefix)
- *   msFilter        → -ms-filter          (the `ms` prefix gets a leading dash)
- * Custom properties (`--myVar`) and already-hyphenated names (anything starting
- * with `-`) pass through verbatim — custom properties are case-sensitive and
- * must NOT be hyphenated. No regex (char-walk) to avoid backtracking concerns.
+ * the latter is converted to kebab by `hyphenateStyleName` (dom-tables.js —
+ * shared with the compiler's static-object bake so a baked style produces the
+ * same CSS a dynamic one would).
  *
  * Memoized: the key universe is bounded (CSS property names), and style-object
  * diffing hits this per key per write — at animation frequency the camelCase
@@ -54,36 +51,4 @@ export function styleName(name: string): string {
 	const result = hyphenateStyleName(name);
 	styleNameCache.set(name, result);
 	return result;
-}
-
-function hyphenateStyleName(name: string): string {
-	// `--custom-prop` and pre-hyphenated `-webkit-…` keys: leave untouched.
-	if (name.charCodeAt(0) === 45 /* - */) return name;
-	// Fast path: no uppercase → already kebab (the common case), no allocation.
-	let hasUpper = false;
-	for (let i = 0; i < name.length; i++) {
-		const c = name.charCodeAt(i);
-		if (c >= 65 && c <= 90) {
-			hasUpper = true;
-			break;
-		}
-	}
-	if (!hasUpper) return name;
-	let out = '';
-	for (let i = 0; i < name.length; i++) {
-		const c = name.charCodeAt(i);
-		// Uppercase → `-` + lowercase. A leading uppercase therefore yields the
-		// leading dash a vendor prefix needs (`WebkitX` → `-webkit-x`).
-		if (c >= 65 && c <= 90) out += '-' + String.fromCharCode(c + 32);
-		else out += name[i];
-	}
-	// React parity: `msFoo` → `ms-foo` (above) → `-ms-foo`.
-	if (
-		out.charCodeAt(0) === 109 /* m */ &&
-		out.charCodeAt(1) === 115 /* s */ &&
-		out.charCodeAt(2) === 45
-	) {
-		out = '-' + out;
-	}
-	return out;
 }
