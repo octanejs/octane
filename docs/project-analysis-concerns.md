@@ -4,6 +4,20 @@ Status: source-backed audit snapshot from 2026-07-09 at `d3cf678`. This is a
 risk register, not a claim that every item is a confirmed bug. Re-check the
 owning source before acting because Octane is moving quickly.
 
+> **Remediation status (2026-07-09):** the immediate + mechanical items are
+> DONE — §1 playground execution now runs in a sandboxed opaque-origin iframe
+> (no-network CSP) with an explicit Run gate for hash payloads; §2 doc drift
+> fixed at the RuleSync source + README/.ai/testing-library/MCP maps, with
+> `rules:check` (+ generated-file `git diff`), `changeset:check`, and
+> `parity:gaps:check` added to PR CI; §3 has a generated executable-pin index
+> (`docs/parity-gaps.md`, `pnpm parity:gaps`); §10 website builds are
+> file-serial by contract (`fileParallelism: false`); §12 harness gate
+> failures are fatal unless waived with a reason + expiry in
+> `benchmarks/bench.mjs`; §11 has a generated, CI-checked binding-status
+> table (`docs/bindings-status.md`, `pnpm bindings:status`). Still open: the
+> five runtime parity gaps themselves, §5/§6 structural centralization, and
+> the §13 Node-20/packed-tarball release checks.
+
 The repository is unusually good at preserving design reasoning in source
 comments and parity tests. The main concern is not a lack of documentation; it
 is that several generations of otherwise-useful documentation now coexist and
@@ -247,6 +261,21 @@ The `octane-prod` project is an excellent regression layer. The remaining
 improvement is to make hand-slot-forwarding self-declarative (package metadata,
 a source pragma, or a plugin option exported by the binding) and consume one
 shared exclusion definition in tests, website, examples, and builds.
+
+**Resolved (2026-07-10):** hand-slot-forwarding is now self-declarative. Each
+such binding carries `"octane": { "hookSlots": { "manual": ["src"] } }` in its own
+`package.json`; the compiler plugin's surgical pass walks to the nearest
+manifest and skips files under the declared directories automatically (cached
+per directory), so the trait travels with the package into every consumer. The
+scope is a directory list — not the whole package — because a binding's own
+test files must stay auto-slotted. All repeated `exclude`
+path lists were deleted from the root Vitest projects, `website/vite.config.ts`,
+and the examples; the option survives only as an ad-hoc escape hatch.
+`packages/octane/tests/external-hook-slot.test.ts` pins the declaration
+registry (currently: base-ui, floating-ui, lexical, mdx, motion, radix, stylex,
+tanstack-query, tanstack-router, testing-library, zustand — redux/recharts/
+hook-form are auto-slotted by design) and covers the skip/slot behavior in both
+dev and prod compile modes via the `octane-prod` project.
 
 ## 7. Marker protocol remains a major complexity center
 

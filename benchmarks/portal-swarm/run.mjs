@@ -65,6 +65,7 @@ const BASE_URLS = {
 	'octane-tsrx': 'http://localhost:5210/',
 	react: 'http://localhost:5211/',
 	solid: 'http://localhost:5212/',
+	'vue-vapor': 'http://localhost:5181/',
 };
 
 const TARGETS = process.env.TARGETS
@@ -73,6 +74,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'octane-tsrx', url: BASE_URLS['octane-tsrx'] },
 			{ name: 'react', url: BASE_URLS.react },
 			{ name: 'solid', url: BASE_URLS.solid },
+			{ name: 'vue-vapor', url: BASE_URLS['vue-vapor'] },
 		];
 
 const OPS = [
@@ -216,16 +218,20 @@ async function verifyTarget(browser, url) {
 
 // ── Timed ops ─────────────────────────────────────────────────────────────────
 
-// MOUNT — fresh page per sample (quiescent start); time the synchronous
-// __mount() with a freshly-collected heap. All portals closed.
+// MOUNT — fresh page per sample (quiescent start); time __mount() with a
+// freshly-collected heap. All portals closed. An adapter whose commit is
+// scheduler-deferred returns a thenable (vue-vapor's update ops do — see its
+// main.js); every timed window below extends until it settles, so the
+// scheduling cost stays inside the measurement.
 async function measureMountClosed(browser, url) {
 	const samples = [];
 	for (let i = 0; i < WARMUP + ITER; i++) {
 		const { ctx, page } = await freshPage(browser, url);
-		const dt = await page.evaluate(() => {
+		const dt = await page.evaluate(async () => {
 			(window.gc || (() => {}))();
 			const t0 = performance.now();
-			window.__mount();
+			const r = window.__mount();
+			if (r && typeof r.then === 'function') await r;
 			return performance.now() - t0;
 		});
 		if (i >= WARMUP) samples.push(dt);
@@ -249,7 +255,8 @@ async function measureOpenAll(browser, url) {
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 				gc();
 				const t0 = performance.now();
-				window.__openAll();
+				const r = window.__openAll();
+				if (r && typeof r.then === 'function') await r;
 				const dt = performance.now() - t0;
 				const tips = document.querySelectorAll('.tip').length;
 				if (tips !== want) throw new Error(`open_all sample gate: ${tips} tips, want ${want}`);
@@ -286,7 +293,12 @@ async function measureRerender(browser, url, sec, tipSel) {
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
 				const t0 = performance.now();
-				for (let k = 0; k < REPS; k++) rerender();
+				// Async-commit targets await the flush BETWEEN reps — without it the
+				// REPS tick bumps would coalesce into a single commit.
+				for (let k = 0; k < REPS; k++) {
+					const r = rerender();
+					if (r && typeof r.then === 'function') await r;
+				}
 				const dt = (performance.now() - t0) / REPS;
 				const tips = document.querySelectorAll(tipSel).length;
 				if (tips !== N) throw new Error(`rerender_${sec} sample gate: ${tips} tips, want ${N}`);
@@ -318,9 +330,13 @@ async function measureCycle(browser, url, distinct) {
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
 				const t0 = performance.now();
+				// Async-commit targets await after EACH half of the pair — an open
+				// and close coalesced into one flush would be a no-op commit.
 				for (let k = 0; k < REPS; k++) {
-					window.__openAll();
-					window.__closeAll();
+					const ro = window.__openAll();
+					if (ro && typeof ro.then === 'function') await ro;
+					const rc = window.__closeAll();
+					if (rc && typeof rc.then === 'function') await rc;
 				}
 				const dt = (performance.now() - t0) / REPS;
 				const tips = document.querySelectorAll('.tip').length;

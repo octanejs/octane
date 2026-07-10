@@ -42,8 +42,9 @@ Octane hooks are keyed by compiler-assigned call-site slots, and a plain-`.ts`
 harness is outside the compiler:
 
 - the harness component's own hooks use **explicit `Symbol.for` slots**, and the
-  package's `src/` is **excluded from the auto-slotting pass** in
-  `vitest.config.js` (published node_modules are skipped automatically);
+  package **declares `"octane": { "hookSlots": { "manual": ["src"] } }` in its package.json**
+  so the auto-slotting pass skips its sources everywhere (published
+  node_modules are skipped automatically);
 - the user's hook callback is invoked through **`withSlot`**, so a slotless
   binding hook (`renderHook(() => useStore(api))`) resolves an identity via the
   path stack; callbacks the compiler did slot fold their explicit slots into the

@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
   "description": "MDX for the octane renderer — compiles .mdx/.md through @mdx-js/mdx to JSX source and then through octane/compiler, so documents render as real compiled octane components (templates, not runtime descriptors); ships the @mdx-js/react provider layer (MDXProvider/useMDXComponents) ported onto octane context.",
   "author": {
     "name": "Dominic Gannaway",

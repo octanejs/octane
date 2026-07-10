@@ -1,7 +1,61 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, type Plugin, type ResolvedConfig } from 'vite';
+import { createRequire } from 'node:module';
 import { octane } from '@octanejs/vite-plugin';
 import { octaneMdx } from '@octanejs/mdx/vite';
 import { websiteMdxOptions } from './mdx-options.ts';
+
+// The playground executes user code in a sandboxed iframe with an OPAQUE
+// origin (src/lib/playground-sandbox.ts). That iframe can't import the site's
+// bundled octane (blob URLs are origin-bound and cross-origin module fetches
+// need CORS), so the parent hands it the runtime as TEXT — which requires a
+// SELF-CONTAINED single-file ESM bundle of the octane client runtime. This
+// plugin builds one with esbuild: served on demand in dev, emitted as a
+// stable-named client asset in the production build.
+function playgroundRuntime(): Plugin {
+	const RUNTIME_PATH = '/playground-runtime.mjs'; // = RUNTIME_MODULE_PATH in playground-sandbox.ts
+	let config: ResolvedConfig;
+
+	async function bundle(): Promise<string> {
+		const esbuild = await import('esbuild');
+		// Workspace link: website/node_modules/octane → packages/octane, whose
+		// exports map points "." at src/index.ts (raw TS — esbuild handles it).
+		const entry = createRequire(import.meta.url).resolve('octane');
+		const out = await esbuild.build({
+			entryPoints: [entry],
+			bundle: true,
+			format: 'esm',
+			minify: true,
+			write: false,
+			define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+		});
+		return out.outputFiles[0].text;
+	}
+
+	return {
+		name: 'octane-playground-runtime',
+		configResolved(resolved) {
+			config = resolved;
+		},
+		configureServer(server) {
+			server.middlewares.use(RUNTIME_PATH, (_req, res, next) => {
+				// Rebuilt per request — esbuild bundles the runtime in ~15ms, and
+				// this way dev never serves a stale runtime after octane edits.
+				bundle().then((code) => {
+					res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+					res.end(code);
+				}, next);
+			});
+		},
+		async generateBundle() {
+			if (config.build.ssr) return; // client build only
+			this.emitFile({
+				type: 'asset',
+				fileName: RUNTIME_PATH.slice(1),
+				source: await bundle(),
+			});
+		},
+	};
+}
 
 // SSR alias: on the server, bare `import … from 'octane'` must resolve to the
 // SERVER runtime (`octane/server`), never the client runtime (which touches
@@ -26,19 +80,19 @@ function octaneServerAlias(): Plugin {
 export default defineConfig({
 	plugins: [
 		octaneServerAlias(),
+		playgroundRuntime(),
 		// octaneMdx() owns `.mdx` (full pipeline: @mdx-js/mdx → octane compile,
 		// with Shiki highlighting via rehype); octane() owns `.tsrx`/`.ts` and the
-		// metaframework (dev SSR + routing + hydrate). `exclude` skips the
-		// hook-slotting pass for the workspace bindings' hand-slot-forwarding
-		// sources — pnpm symlinks resolve them to /packages/*/src, not
-		// node_modules (mirrors the root vitest config).
+		// metaframework (dev SSR + routing + hydrate). The workspace bindings'
+		// hand-slot-forwarding sources (pnpm symlinks resolve them to
+		// /packages/*/src, not node_modules) declare
+		// `"octane": { "hookSlots": { "manual": ["src"] } }` in their package.json, so the
+		// hook-slotting pass skips them automatically — no exclude list needed.
+		// @octanejs/recharts + @octanejs/redux carry no declaration and DO compile
+		// through the pass (explicit subSlot tags compose with it), unlike
+		// router/mdx.
 		octaneMdx(websiteMdxOptions),
-		// NOTE: @octanejs/recharts + @octanejs/redux are NOT excluded from the
-		// hook-slotting pass — their own test projects compile them through it
-		// (explicit subSlot tags compose with the pass), unlike router/mdx.
-		octane({
-			exclude: ['/packages/tanstack-router/src/', '/packages/mdx/src/'],
-		}),
+		octane(),
 	],
 
 	// The workspace bindings ship raw TS — Vite must transform them for the SSR

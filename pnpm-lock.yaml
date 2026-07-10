@@ -850,6 +850,41 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  benchmarks/memo-wall/solid:
+    dependencies:
+      '@solidjs/web':
+        specifier: catalog:default
+        version: 2.0.0-beta.14(solid-js@2.0.0-beta.14)
+      solid-js:
+        specifier: catalog:default
+        version: 2.0.0-beta.14
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite-plugin-solid:
+        specifier: catalog:default
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
+  benchmarks/memo-wall/vue-vapor:
+    dependencies:
+      '@vue/runtime-dom':
+        specifier: catalog:default
+        version: 3.6.0-beta.17
+      '@vue/runtime-vapor':
+        specifier: catalog:default
+        version: 3.6.0-beta.17(@vue/runtime-dom@3.6.0-beta.17)
+      vue:
+        specifier: catalog:default
+        version: 3.6.0-beta.17(typescript@5.9.3)
+    devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: catalog:default
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   benchmarks/news:
     dependencies:
       playwright:
@@ -1008,6 +1043,25 @@ importers:
       vite-plugin-solid:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
+  benchmarks/portal-swarm/vue-vapor:
+    dependencies:
+      '@vue/runtime-dom':
+        specifier: catalog:default
+        version: 3.6.0-beta.17
+      '@vue/runtime-vapor':
+        specifier: catalog:default
+        version: 3.6.0-beta.17(@vue/runtime-dom@3.6.0-beta.17)
+      vue:
+        specifier: catalog:default
+        version: 3.6.0-beta.17(typescript@5.9.3)
+    devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: catalog:default
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/recursive-context:
     dependencies:
@@ -1206,6 +1260,9 @@ importers:
       vite:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vue:
+        specifier: catalog:default
+        version: 3.6.0-beta.17(typescript@5.9.3)
 
   benchmarks/ssr-throughput/fixtures:
     dependencies:
@@ -1298,6 +1355,95 @@ importers:
       vite-plugin-solid:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
+  benchmarks/todomvc:
+    dependencies:
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
+
+  benchmarks/todomvc/octane-tsrx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  benchmarks/todomvc/react:
+    dependencies:
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: catalog:default
+        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  benchmarks/todomvc/ripple:
+    dependencies:
+      ripple:
+        specifier: catalog:default
+        version: 0.3.86
+    devDependencies:
+      '@ripple-ts/vite-plugin':
+        specifier: catalog:default
+        version: 0.3.86
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  benchmarks/todomvc/solid:
+    dependencies:
+      '@solidjs/web':
+        specifier: catalog:default
+        version: 2.0.0-beta.14(solid-js@2.0.0-beta.14)
+      solid-js:
+        specifier: catalog:default
+        version: 2.0.0-beta.14
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite-plugin-solid:
+        specifier: catalog:default
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
+  benchmarks/todomvc/vue-vapor:
+    dependencies:
+      '@vue/runtime-dom':
+        specifier: catalog:default
+        version: 3.6.0-beta.17
+      '@vue/runtime-vapor':
+        specifier: catalog:default
+        version: 3.6.0-beta.17(@vue/runtime-dom@3.6.0-beta.17)
+      vue:
+        specifier: catalog:default
+        version: 3.6.0-beta.17(typescript@5.9.3)
+    devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: catalog:default
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
   examples/hacker-news:
     dependencies:

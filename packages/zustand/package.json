@@ -3,6 +3,13 @@
   "version": "0.1.2",
   "license": "MIT",
   "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
   "description": "zustand bindings for the octane renderer — reuses zustand's framework-agnostic vanilla store and swaps the React binding for octane's useSyncExternalStore.",
   "author": {
     "name": "Dominic Gannaway",

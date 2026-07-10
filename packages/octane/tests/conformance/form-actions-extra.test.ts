@@ -16,10 +16,11 @@ import {
 //     START until the previous one finishes) and error handling (@try/@catch is
 //     octane's error boundary; an errored action does NOT cancel the queue —
 //     octane divergence, pinned in actions.test.ts for sync throws).
-//   * the useFormStatus ACTIVATION rule — in octane, pending is published ONLY by
-//     the intercepted `<form action={fn}>` submit path (handleFormSubmit in
-//     runtime.ts); React additionally activates it for a startTransition inside a
-//     preventDefault-ed onSubmit.
+//   * the useFormStatus ACTIVATION rule — pending is published by the intercepted
+//     `<form action={fn}>` submit path (handleFormSubmit in runtime.ts) AND, like
+//     React, for a startTransition inside a preventDefault-ed onSubmit
+//     (publishManualFormPending); never for a plain async handler or a
+//     non-prevented submit.
 //
 // Covered by existing suites (not re-ported):
 //   * basic dispatch/pending/state commit + sequential threading —
@@ -203,46 +204,33 @@ describe('conformance: useActionState error handling (ReactDOMForm)', () => {
 });
 
 describe('conformance: useFormStatus activation rule (ReactDOMForm)', () => {
-	// GAP: Per ReactDOMForm-test.js:2021/:2078 — React ACTIVATES useFormStatus
-	// when startTransition is called inside a preventDefault-ed submit event
-	// (the manual-action idiom). In octane, form status is published ONLY by the
-	// intercepted `<form action={fn}>` path (handleFormSubmit → setFormStatus in
-	// runtime.ts); a transition started during a submit event dispatch never
-	// reaches the form. Likely fix: handleFormSubmit-adjacent tracking — when a
-	// transition starts synchronously during a form's submit dispatch whose
-	// default was prevented, publish pending status to that form until it settles.
-	it.fails(
-		'activates for startTransition inside a preventDefault-ed submit (Per :2021/:2078)',
-		async () => {
-			const gate = deferred();
-			const r = mount(ManualTransitionForm as any, {
-				value: 'Initial',
-				wait: () => gate.promise,
-			});
-			try {
-				flushSync(() => {});
-				expect(r.find('#out').textContent).toBe('Initial');
+	// Per ReactDOMForm-test.js:2021/:2078 — React ACTIVATES useFormStatus when
+	// startTransition is called inside a preventDefault-ed submit event (the
+	// manual-action idiom). Octane matches: a transition started synchronously
+	// during a form's submit dispatch whose default was prevented publishes
+	// pending status to that form until the transition settles
+	// (publishManualFormPending in runtime.ts).
+	it('activates for startTransition inside a preventDefault-ed submit (Per :2021/:2078)', async () => {
+		const gate = deferred();
+		const r = mount(ManualTransitionForm as any, {
+			value: 'Initial',
+			wait: () => gate.promise,
+		});
+		flushSync(() => {});
+		expect(r.find('#out').textContent).toBe('Initial');
 
-				submit(r.container);
-				await Promise.resolve();
-				await Promise.resolve();
-				flushSync(() => {});
-				// React: the form switches into a pending state.
-				expect(r.find('#out').textContent).toBe('Initial (pending...)');
+		submit(r.container);
+		await Promise.resolve();
+		await Promise.resolve();
+		flushSync(() => {});
+		// React: the form switches into a pending state.
+		expect(r.find('#out').textContent).toBe('Initial (pending...)');
 
-				gate.resolve();
-				await settle();
-				expect(r.find('#out').textContent).toBe('Initial');
-			} finally {
-				// This test is expected to fail mid-flight (see the GAP note) — the
-				// in-flight transition and mounted form MUST still be drained, or the
-				// leaked async-transition window corrupts the tests that follow.
-				gate.resolve();
-				await settle();
-				r.unmount();
-			}
-		},
-	);
+		gate.resolve();
+		await settle();
+		expect(r.find('#out').textContent).toBe('Initial');
+		r.unmount();
+	});
 
 	// Per :2089/:2146 — a plain async event handler (no transition) never
 	// activates useFormStatus. Octane matches.
