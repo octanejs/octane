@@ -1,6 +1,6 @@
 # Comment-Marker Elision Plan — fewer `<!--[-->`s when they carry no information
 
-Status: M0 LANDED (2026-07-09); M1-M3 proposed. Follow-up to the website Elements-panel report
+Status: M0 + M1 LANDED (2026-07-09); M2-M3 proposed. Follow-up to the website Elements-panel report
 (a 40-deep run of `<!--[-->` before `.shell`, ~2,100 comment nodes on the home
 page). Companion to docs/compiled-output-optimization-plan.md — this is the
 DOM-weight axis of the same verbosity problem.
@@ -139,6 +139,21 @@ Wins: client-rendered subtrees everywhere (post-navigation route content, the
 playground, client-only apps). Does NOT change SSR'd pages (adoption keeps
 server pairs) — that's M3. Bindings shipping plain `.ts` (recharts) don't get
 stamps — that's M2.
+
+**M1 LANDED 2026-07-09.** The compiler stamps `Comp.$$singleRoot = true` on
+every same-module component whose body renders one plain element (emitted at
+the module tail, so it lands on the final binding incl. the hmr() wrapper);
+call sites whose callee is an IMPORTED bare identifier (no key/spread/
+children) emit a `2` sentinel and `componentSlot` resolves it against the
+stamp at mount. **Sharp edge found by the suite:** the sentinel initially
+fired for ANY unknown bare identifier — including per-render local variables
+(`const Comp = cond ? A : B`), whose identity changes across renders while
+the markerless regime is pinned at first mount (broke the transition-swap
+probe test). Restricted to imported bindings (immutable identity). SSR and
+hydration unchanged by design. Pinned by marker-shape case (a2): cross-module
+sole child = client 0 / ssr 2 / hydrate 2. Website home steady-state client
+render: 1,996 → **1,900** comments (−5% — as projected, M2/M3 carry the bulk).
+Perf: same-session A/B neutral within noise.
 
 ### M2 — De-opt single-child anchoring (the 1,674-comment chart)
 

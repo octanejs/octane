@@ -6,62 +6,62 @@
       "name": "octane-tsrx",
       "ops": {
         "js_raw": {
-          "median": 79038,
-          "min": 79038,
+          "median": 74943,
+          "min": 74943,
           "samples": 1
         },
         "js_gzip": {
-          "median": 26434,
-          "min": 26434,
+          "median": 24843,
+          "min": 24843,
           "samples": 1
         },
         "js_brotli": {
-          "median": 23320,
-          "min": 23320,
+          "median": 21974,
+          "min": 21974,
           "samples": 1
         },
         "app_raw": {
-          "median": 9267,
-          "min": 9267,
+          "median": 9286,
+          "min": 9286,
           "samples": 1
         },
         "app_gzip": {
-          "median": 3172,
-          "min": 3172,
+          "median": 3184,
+          "min": 3184,
           "samples": 1
         },
         "app_brotli": {
-          "median": 2613,
-          "min": 2613,
+          "median": 2656,
+          "min": 2656,
           "samples": 1
         },
         "fw_raw": {
-          "median": 69771,
-          "min": 69771,
+          "median": 65657,
+          "min": 65657,
           "samples": 1
         },
         "fw_gzip": {
-          "median": 23262,
-          "min": 23262,
+          "median": 21659,
+          "min": 21659,
           "samples": 1
         },
         "fw_brotli": {
-          "median": 20707,
-          "min": 20707,
+          "median": 19318,
+          "min": 19318,
           "samples": 1
         }
       },
       "meta": {
         "files": [
           {
-            "file": "assets/framework-QAOP_air.js",
+            "file": "assets/framework-CMpP7VtH.js",
             "bucket": "fw",
-            "bytes": 69771
+            "bytes": 65657
           },
           {
-            "file": "assets/index-LzB4QpAA.js",
+            "file": "assets/index-CUR1zNGg.js",
             "bucket": "app",
-            "bytes": 9267
+            "bytes": 9286
           }
         ]
       }
@@ -70,18 +70,18 @@
       "name": "octane-jsx",
       "ops": {
         "js_raw": {
-          "median": 78249,
-          "min": 78249,
+          "median": 73788,
+          "min": 73788,
           "samples": 1
         },
         "js_gzip": {
-          "median": 26172,
-          "min": 26172,
+          "median": 24465,
+          "min": 24465,
           "samples": 1
         },
         "js_brotli": {
-          "median": 23132,
-          "min": 23132,
+          "median": 21709,
+          "min": 21709,
           "samples": 1
         },
         "app_raw": {
@@ -90,40 +90,40 @@
           "samples": 1
         },
         "app_gzip": {
-          "median": 2823,
-          "min": 2823,
+          "median": 2824,
+          "min": 2824,
           "samples": 1
         },
         "app_brotli": {
-          "median": 2398,
-          "min": 2398,
+          "median": 2390,
+          "min": 2390,
           "samples": 1
         },
         "fw_raw": {
-          "median": 69971,
-          "min": 69971,
+          "median": 65510,
+          "min": 65510,
           "samples": 1
         },
         "fw_gzip": {
-          "median": 23349,
-          "min": 23349,
+          "median": 21641,
+          "min": 21641,
           "samples": 1
         },
         "fw_brotli": {
-          "median": 20734,
-          "min": 20734,
+          "median": 19319,
+          "min": 19319,
           "samples": 1
         }
       },
       "meta": {
         "files": [
           {
-            "file": "assets/framework-CqmNNQta.js",
+            "file": "assets/framework-BMyj-Lp8.js",
             "bucket": "fw",
-            "bytes": 69971
+            "bytes": 65510
           },
           {
-            "file": "assets/index-BKvLzdxS.js",
+            "file": "assets/index-DUGtm4U4.js",
             "bucket": "app",
             "bytes": 8278
           }

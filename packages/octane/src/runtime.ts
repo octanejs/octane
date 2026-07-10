@@ -185,6 +185,7 @@ function warnHydrationValueMismatch(
 	serverVal: unknown,
 	clientVal: unknown,
 ): void {
+	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	if (!loc) return;
 	console.error(
 		`Octane hydration mismatch at ${loc}: server rendered ${what} ` +
@@ -219,6 +220,7 @@ function warnHydrationStructuralMismatch(
 	expected: string,
 	actual: string,
 ): void {
+	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	if (!loc) return;
 	console.error(
 		`Octane hydration mismatch at ${loc}: the client expected ${expected} but the server ` +
@@ -666,7 +668,12 @@ function scheduleRender(block: Block): void {
 	// Test-env warning: a state update happened with no flushSync or act()
 	// scope around it. The test will likely assert on stale DOM and fail
 	// confusingly; surface the cause directly.
-	if (IS_OCTANE_ACT_ENVIRONMENT && actScopeDepth === 0 && !syncFlush) {
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		IS_OCTANE_ACT_ENVIRONMENT &&
+		actScopeDepth === 0 &&
+		!syncFlush
+	) {
 		// eslint-disable-next-line no-console
 		console.error(
 			'An update to a component was not wrapped in act(...).\n\n' +
@@ -2913,6 +2920,7 @@ function devHintsEnabled(): boolean {
 }
 const warnedUncached = new WeakSet<Block>();
 function warnUncachedUsePromise(block: Block): void {
+	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	if (!devHintsEnabled() || warnedUncached.has(block)) return;
 	warnedUncached.add(block);
 	console.error(
@@ -2925,6 +2933,7 @@ function warnUncachedUsePromise(block: Block): void {
 }
 const warnedWaterfall = new WeakSet<Block>();
 function warnUseWaterfall(block: Block, idx: number): void {
+	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	if (!devHintsEnabled() || warnedWaterfall.has(block)) return;
 	warnedWaterfall.add(block);
 	console.error(
@@ -3075,7 +3084,7 @@ export function warmChild(comp: any, props: any): void {
 	const plan = comp.__warm;
 	if (typeof plan !== 'function') return;
 	if (WARM_DEPTH >= WARM_DEPTH_CAP) {
-		if (devHintsEnabled()) {
+		if (process.env.NODE_ENV !== 'production' && devHintsEnabled()) {
 			console.error(
 				`warmChild: fetch-tree warm walk exceeded ${WARM_DEPTH_CAP} levels — ` +
 					'stopping speculative prefetch here (rendering is unaffected). ' +
@@ -4329,7 +4338,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				// the commit phase on mount (see setAutoFocus).
 				return setAutoFocus(el, value);
 			}
-			if (name === 'autofocus' && (el as any).__oct_loc !== undefined) {
+			if (
+				process.env.NODE_ENV !== 'production' &&
+				name === 'autofocus' &&
+				(el as any).__oct_loc !== undefined
+			) {
 				console.error('Invalid DOM property `autofocus`. Did you mean `autoFocus`?');
 			}
 			break;
@@ -4339,7 +4352,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				if (t === 'input' || t === 'textarea' || t === 'select') {
 					return setDefaultValue(el, value);
 				}
-			} else if (name === 'defaultvalue' && (el as any).__oct_loc !== undefined) {
+			} else if (
+				process.env.NODE_ENV !== 'production' &&
+				name === 'defaultvalue' &&
+				(el as any).__oct_loc !== undefined
+			) {
 				console.error('Invalid DOM property `defaultvalue`. Did you mean `defaultValue`?');
 			}
 			break;
@@ -4347,7 +4364,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 			if (name === 'defaultChecked' && el.localName === 'input') {
 				return setDefaultChecked(el, value);
 			}
-			if (name === 'defaultchecked' && (el as any).__oct_loc !== undefined) {
+			if (
+				process.env.NODE_ENV !== 'production' &&
+				name === 'defaultchecked' &&
+				(el as any).__oct_loc !== undefined
+			) {
 				console.error('Invalid DOM property `defaultchecked`. Did you mean `defaultChecked`?');
 			}
 			break;
@@ -4435,7 +4456,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// crash the whole render. Skip it — dev-warn only — mirroring the SSR
 	// serializer's identical VALID_ATTR_NAME gate (shared in constants.ts).
 	if (!VALID_ATTR_NAME.test(name)) {
-		if ((el as any).__oct_loc !== undefined) {
+		if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
 			console.error(`Invalid attribute name: \`${name}\` (skipped).`);
 		}
 		return;
@@ -4490,7 +4511,7 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 		// Booleans on NON-boolean attributes remove (React: `title={true}` must
 		// never render `title=""`), with the React DEV diagnostic.
 		if (t === 'boolean') {
-			if ((el as any).__oct_loc !== undefined) {
+			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
 				console.error(
 					`Received \`${value}\` for a non-boolean attribute \`${name}\`. ` +
 						(value === true
@@ -4513,7 +4534,11 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 		// never reach setAttribute. Custom elements keep them (raw semantics).
 		if (name.length > 2 && name.charCodeAt(0) === 111 /* o */ && name.charCodeAt(1) === 110) {
 			// DEV hint: the camelCase form is the working delegated handler.
-			if ((el as any).__oct_loc !== undefined && typeof value === 'function') {
+			if (
+				process.env.NODE_ENV !== 'production' &&
+				(el as any).__oct_loc !== undefined &&
+				typeof value === 'function'
+			) {
 				console.error(
 					`Unknown event handler property \`${name}\` was dropped — did you mean ` +
 						`\`on${name.charAt(2).toUpperCase()}${name.slice(3)}\`? (lowercase on* ` +
@@ -4527,6 +4552,7 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 	// DEV: a plain object stringifies as "[object Object]" — always a bug
 	// (React's unusual-coercion check; arrays keep their join semantics).
 	if (
+		process.env.NODE_ENV !== 'production' &&
 		t === 'object' &&
 		(el as any).__oct_loc !== undefined &&
 		(value as object).toString === Object.prototype.toString
@@ -5309,11 +5335,12 @@ function fireEventSlot(slot: HandlerBundle | ((e: Event) => any), event: Event):
 		const fn = slot.fn as unknown;
 		if (typeof fn !== 'function') {
 			// React parity outcome: a non-function listener is reported and ignored;
-			// it never blocks sibling/ancestor handlers.
-			console.error(
-				'Expected an event listener to be a function, instead got a value of type ' +
-					typeof (fn ?? slot),
-			);
+			// it never blocks sibling/ancestor handlers. (Report is dev-only.)
+			if (process.env.NODE_ENV !== 'production')
+				console.error(
+					'Expected an event listener to be a function, instead got a value of type ' +
+						typeof (fn ?? slot),
+				);
 			return;
 		}
 		const a = slot.args;
@@ -5533,10 +5560,11 @@ export function requestFormReset(form: HTMLFormElement): void {
 		(PENDING_FORM_RESETS ??= new Set()).add(form);
 		return;
 	}
-	console.error(
-		'requestFormReset was called outside a transition or action. To fix, move to ' +
-			'an action, or wrap with startTransition.',
-	);
+	if (process.env.NODE_ENV !== 'production')
+		console.error(
+			'requestFormReset was called outside a transition or action. To fix, move to ' +
+				'an action, or wrap with startTransition.',
+		);
 	resetFormNow(form);
 }
 
@@ -5884,6 +5912,7 @@ function valueNeedsWrite(el: HTMLInputElement | HTMLTextAreaElement, raw: unknow
 // DEV (gated on the dev-compile `__oct_loc` stamp, like the hydration
 // warnings): React's controlled↔uncontrolled flip warning.
 function devWarnControlledFlip(el: Element, toControlled: boolean): void {
+	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	if ((el as any).__oct_loc === undefined) return;
 	console.error(
 		`A component is changing ${toControlled ? 'an uncontrolled' : 'a controlled'} ` +
@@ -5899,6 +5928,7 @@ function devWarnControlledFlip(el: Element, toControlled: boolean): void {
 // DEV: queue the missing-onInput check for this commit (runs after all of the
 // element's bindings mounted — see drainControlledSyncs).
 function queueDevControlledCheck(el: Element, ctrl: ControlledState): void {
+	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	if (ctrl.devChecked || (el as any).__oct_loc === undefined) return;
 	if (!isTextEntry(el)) return;
 	DEV_CTRL_CHECKS.push(el);
@@ -6001,7 +6031,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 	if (!first && ctrl.sv === null) devWarnControlledFlip(el, true);
 	if (sel.multiple) {
 		if (!Array.isArray(value)) {
-			if ((el as any).__oct_loc !== undefined) {
+			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
 				console.error(
 					'The `value` prop supplied to <select> must be an array if `multiple` is true.',
 				);
@@ -6013,7 +6043,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 		ctrl.sv = set;
 	} else {
 		if (Array.isArray(value)) {
-			if ((el as any).__oct_loc !== undefined) {
+			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
 				console.error(
 					'The `value` prop supplied to <select> must be a scalar value if `multiple` is false.',
 				);
@@ -6147,7 +6177,7 @@ function drainControlledSyncs(): void {
 			if (ctrl.sv !== null) projectSelectValue(q[i], ctrl.sv, false);
 		}
 	}
-	if (DEV_CTRL_CHECKS.length > 0) {
+	if (process.env.NODE_ENV !== 'production' && DEV_CTRL_CHECKS.length > 0) {
 		const q = DEV_CTRL_CHECKS;
 		DEV_CTRL_CHECKS = [];
 		for (let i = 0; i < q.length; i++) {
@@ -6705,7 +6735,12 @@ export function componentSlot(
 	props: any,
 	anchor?: Node | null,
 	key?: any,
-	singleRoot?: boolean,
+	// true = the compiler PROVED the callee renders one element (same-module
+	// analysis); 2 = the call site qualifies syntactically (bare identifier, no
+	// key/spread/children) but the callee is cross-module — elide iff the
+	// callee carries the compiler's `$$singleRoot` definition-site stamp
+	// (docs/comment-marker-elision-plan.md M1).
+	singleRoot?: boolean | 2,
 ): void {
 	const parentBlock = parentScope.block;
 	// A STRING comp: a dynamic JSX tag — `<props.parts.title>`, `<Tag/>` with
@@ -6757,9 +6792,11 @@ export function componentSlot(
 			start = open as Comment;
 			end = matchingClose(open);
 			hydrateNode = start.nextSibling;
-		} else if (singleRoot) {
+		} else if (singleRoot === true || (singleRoot === 2 && (comp as any).$$singleRoot === true)) {
 			// Client singleRoot: NO markers — the component's single root element
 			// self-delimits (set as block.startMarker/endMarker after render below).
+			// The `2` form resolves cross-module callees by their definition-site
+			// stamp; a string tag or unstamped component falls through to markers.
 			start = null;
 			end = null;
 		} else {
@@ -7159,7 +7196,7 @@ function deoptKey(item: any, index: number): any {
 	if (item != null && item.$$kind === ELEMENT_TAG && item.key != null) return item.key;
 	// React parity: unkeyed array children fall back to the index, with a one-time
 	// dev warning. (Suppressed during hydration adoption — markers drive matching.)
-	if (!_deoptKeyWarned && !hydrating) {
+	if (process.env.NODE_ENV !== 'production' && !_deoptKeyWarned && !hydrating) {
 		_deoptKeyWarned = true;
 		console.warn(
 			'Octane: each element in an array child should have a unique "key" prop ' +

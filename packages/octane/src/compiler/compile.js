@@ -1585,6 +1585,19 @@ export function compile(source, filename, options) {
 		// the top-level (autoCallback) pass and drained per component below.
 		_setupMaps: null,
 	};
+	// Imported local bindings (any source). Used by the M1 cross-module
+	// singleRoot sentinel: only an IMPORTED identifier is a stable component
+	// identity for the lifetime of a slot — a local `const Comp = cond ? A : B`
+	// re-resolves per render, and a markerless slot regime must never be chosen
+	// off an identity that can change (see makeCompCall).
+	ctx.importedNames = new Set();
+	for (const node of ast.body) {
+		if (node.type !== 'ImportDeclaration') continue;
+		for (const sp of node.specifiers || []) {
+			if (sp.local && sp.local.name) ctx.importedNames.add(sp.local.name);
+		}
+	}
+
 	// List of exported components needing HMR wrapping. Each entry: { name,
 	// exportKind: 'default' | 'named' }. We emit the `Comp = hmr(Comp)` lines
 	// and the `import.meta.hot.accept` block after walking the body, so the
@@ -1899,6 +1912,22 @@ export function compile(source, filename, options) {
 			'}\n';
 	}
 
+	// Cross-module singleRoot stamps (docs/comment-marker-elision-plan.md M1):
+	// a component whose body provably renders ONE plain element carries the
+	// marker on its BINDING, so a `componentSlot(…, 2)` call site in ANOTHER
+	// module can take the markerless singleRoot path at mount. Emitted at the
+	// module tail so it lands on the final binding (incl. the hmr() wrapper —
+	// the stamp goes on what importers see). Also feeds the runtime's existing
+	// value-position `$$singleRoot` descriptor check.
+	let stampBlock = '';
+	if (ctx.componentInfo) {
+		const stamps = [];
+		for (const [name, info] of ctx.componentInfo) {
+			if (info.singleRoot === true) stamps.push(`${name}.$$singleRoot = true;`);
+		}
+		if (stamps.length > 0) stampBlock = stamps.join('\n') + '\n';
+	}
+
 	// Built after HMR wiring so the import list includes `hmr`/`HMR` when needed.
 	const finalRuntimeImport = buildRuntimeImport(ctx, 'octane');
 
@@ -1914,7 +1943,7 @@ export function compile(source, filename, options) {
 	}));
 
 	return {
-		code: prelude + body + hmrBlock,
+		code: prelude + body + stampBlock + hmrBlock,
 		map: buildSourceMap(source, ctx.mapSourceName, segments),
 	};
 }
@@ -6257,11 +6286,13 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			keyArg = `, (${cc.keyExpr})`;
 		}
 		// singleRoot is the 8th positional arg (after anchor, key). It's gated on
-		// no-key, so backfill anchor + key placeholders to land it in the right slot.
+		// no-key, so backfill anchor + key placeholders to land it in the right
+		// slot. `true` = proven same-module single-element root; `2` = the
+		// cross-module sentinel (runtime checks the callee's $$singleRoot stamp).
 		let singleRootArg = '';
-		if (cc.singleRoot) {
+		if (cc.singleRoot || cc.maybeSingleRoot) {
 			if (anchorArg === '') anchorArg = ', undefined';
-			singleRootArg = ', undefined, true';
+			singleRootArg = cc.singleRoot ? ', undefined, true' : ', undefined, 2';
 		}
 		pushAfter(
 			cc.id,
@@ -7900,18 +7931,29 @@ function makeCompCall(
 	// client mount — no `comp`/`/comp` markers. (Lite components are already
 	// markerless, so this only matters for the full path.)
 	let singleRoot = false;
+	// maybeSingleRoot: the call site qualifies syntactically but the callee is
+	// CROSS-MODULE (not in componentInfo) — emit the `2` sentinel so the runtime
+	// elides iff the callee carries the definition-site `$$singleRoot` stamp
+	// (docs/comment-marker-elision-plan.md M1).
+	let maybeSingleRoot = false;
 	if (ctx.componentInfo && keyExpr == null) {
 		const tagName = node.openingElement?.name || node.id || node.name;
 		const isBareIdent =
 			tagName && (tagName.type === 'Identifier' || tagName.type === 'JSXIdentifier');
 		if (isBareIdent) {
+			const hasSpread = propParts.some((p) => p.startsWith('...'));
+			const hasChildrenProp = propParts.some((p) => p.startsWith('"children":'));
+			const callSiteOk = !hasSpread && !hasChildrenProp;
 			const calleeInfo = ctx.componentInfo.get(compExpr);
 			if (calleeInfo) {
-				const hasSpread = propParts.some((p) => p.startsWith('...'));
-				const hasChildrenProp = propParts.some((p) => p.startsWith('"children":'));
-				const callSiteOk = !hasSpread && !hasChildrenProp;
 				if (calleeInfo.eligible) liteEligible = callSiteOk;
 				else if (calleeInfo.singleRoot) singleRoot = callSiteOk;
+			} else if (ctx.importedNames !== undefined && ctx.importedNames.has(compExpr)) {
+				// IMPORTED bindings only: immutable identity for the slot's whole
+				// life. A local variable callee (`const Comp = cond ? A : B`) can
+				// change identity per render — the markerless regime must not be
+				// pinned to whichever component happened to mount first.
+				maybeSingleRoot = callSiteOk;
 			}
 		}
 	}
@@ -7924,6 +7966,7 @@ function makeCompCall(
 		keyExpr,
 		liteEligible,
 		singleRoot,
+		maybeSingleRoot,
 		loc: devLoc(ctx, node),
 	};
 }
