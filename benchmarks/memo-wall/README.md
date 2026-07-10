@@ -1,4 +1,4 @@
-# memo-wall bench — octane (TSRX vs JSX) vs react
+# memo-wall bench — octane (TSRX vs JSX) vs react vs solid vs vue-vapor
 
 A benchmark adjacent to [`js-framework`](../js-framework/), [`dbmon`](../dbmon/)
 and [`recursive-context`](../recursive-context/). Where those measure list
@@ -14,9 +14,16 @@ NOT duplicate them. A bad number here points at `tryMemoBail` (both arms),
 `shallowEqualProps`'s key walk, `useContextInternal`'s memo-ancestor stamping,
 or the `refreshContextConsumers` / `refreshBlockForContext` descent.
 
-Solid and ripple are omitted deliberately: parent re-renders don't exist in
-fine-grained frameworks, so a "wall of memo boundaries absorbing a parent
-re-render" has no equivalent to measure.
+**Fine-grained columns (solid / vue-vapor).** Parent re-renders don't exist in
+fine-grained frameworks, so there is no memo wall to absorb one — their
+`parent_rerender_equal_*` numbers are near-zero BY MODEL (a tick bump updates
+one header text node), which is exactly what these columns are here to show.
+Their probes count the fine-grained equivalents: component CREATIONS for
+Row/Inner, leaf TEXT-EFFECT re-runs for Leaf (the analog of a Leaf re-render),
+with the keyed lists keyed by row-object identity so `one_change_*` recreates
+exactly one row. The same exact-count gates hold with the same expectations.
+Ripple is still omitted (nothing it would measure differently from solid here,
+and its portal/context coverage lives in the other suites).
 
 ## Layout
 
@@ -25,6 +32,8 @@ benchmarks/memo-wall/
 ├── octane-tsrx/   # Vite app, dev :5206 — octane authored in .tsrx
 ├── octane-jsx/    # Vite app, dev :5207 — same app authored in React-style .tsx
 ├── react/         # Vite app, dev :5208 (React 19, production mode)
+├── solid/         # Vite app, dev :5182 (Solid 2.0 — no wall; fine-grained probes)
+├── vue-vapor/     # Vite app, dev :5223 (Vue 3.6 Vapor — no wall; fine-grained probes)
 ├── run.mjs        # Playwright harness — drives all targets, enforces the gates
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md

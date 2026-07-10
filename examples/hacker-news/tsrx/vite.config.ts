@@ -29,17 +29,13 @@ export default defineConfig({
 
 	plugins: [
 		octaneServerAlias(),
-		// Full-compile the app's `.tsx`/`.tsrx`, but DON'T re-slot the binding
-		// packages' hand-written slot-forwarding `.ts` sources (they already forward
-		// hook slots themselves). The shared app `.ts` files (hooks/routes) are NOT
-		// excluded, so their octane hook call-sites still get slotted.
-		octane({
-			exclude: [
-				'/packages/tanstack-router/src/',
-				'/packages/stylex/src/',
-				'/packages/tanstack-query/src/',
-			],
-		}),
+		// Full-compile the app's `.tsx`/`.tsrx`. The binding packages'
+		// hand-written slot-forwarding `.ts` sources declare
+		// `"octane": { "hookSlots": { "manual": ["src"] } }` in their package.json, so the
+		// plugin skips re-slotting them automatically. The shared app `.ts` files
+		// (hooks/routes) carry no declaration, so their octane hook call-sites
+		// still get slotted.
+		octane(),
 		stylex(),
 	],
 
