@@ -24,6 +24,10 @@ packages:
   - benchmarks/bundle-size
   - benchmarks/async-waterfall
   - benchmarks/async-waterfall/*
+  - benchmarks/todomvc
+  - benchmarks/todomvc/*
+  - benchmarks/chat-stream
+  - benchmarks/chat-stream/*
   - playground/*
   - examples/*
   - website

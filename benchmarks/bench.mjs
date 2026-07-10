@@ -95,6 +95,32 @@ const SUITES = [
 		runs: [{ script: 'run-reorder.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		name: 'todomvc',
+		cwd: 'todomvc',
+		servers: [
+			{ filter: 'octane-tsrx-todomvc', port: 5240 },
+			{ filter: 'react-todomvc', port: 5241 },
+			{ filter: 'solid-todomvc', port: 5242 },
+			{ filter: 'ripple-todomvc', port: 5243 },
+			{ filter: 'vue-vapor-todomvc', port: 5244 },
+		],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		name: 'chat-stream',
+		cwd: 'chat-stream',
+		servers: [
+			{ filter: 'octane-tsrx-chat-stream', port: 5250 },
+			{ filter: 'react-chat-stream', port: 5251 },
+			{ filter: 'solid-chat-stream', port: 5252 },
+			{ filter: 'ripple-chat-stream', port: 5253 },
+			{ filter: 'vue-vapor-chat-stream', port: 5254 },
+		],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		name: 'dbmon',
 		cwd: 'dbmon',
 		servers: [
@@ -171,6 +197,8 @@ const SUITES = [
 			{ filter: 'octane-tsrx-memowall-bench', port: 5206 },
 			{ filter: 'octane-jsx-memowall-bench', port: 5207 },
 			{ filter: 'react-memowall-bench', port: 5208 },
+			{ filter: 'solid-memowall-bench', port: 5182 },
+			{ filter: 'vue-vapor-memowall-bench', port: 5223 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -182,6 +210,7 @@ const SUITES = [
 			{ filter: 'octane-tsrx-portal-swarm-bench', port: 5210 },
 			{ filter: 'react-portal-swarm-bench', port: 5211 },
 			{ filter: 'solid-portal-swarm-bench', port: 5212 },
+			{ filter: 'vue-vapor-portal-swarm-bench', port: 5181 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -509,8 +538,8 @@ async function runSuite(suite) {
 // ── baseline compare (noise-aware) ────────────────────────────────────────────
 
 // Regression iff median > base.median*1.15 AND min > base.min*1.10. For ops with
-// base.median < 0.2ms, additionally require an absolute excess > 0.1ms so timer
-// noise on sub-ms ops can't trip a false regression.
+// base.median < 1ms, additionally require an absolute excess > 0.1ms so timer
+// granularity (0.1ms in Chromium) on sub-ms ops can't trip a false regression.
 function compareResult(result, baseline) {
 	const rows = [];
 	const baseTargets = new Map((baseline.targets || []).map((t) => [t.name, t]));
@@ -522,7 +551,7 @@ function compareResult(result, baseline) {
 			if (!b) continue;
 			const medOver = r.median > b.median * 1.15;
 			const minOver = r.min > b.min * 1.1;
-			const smallOk = b.median < 0.2 ? r.median - b.median > 0.1 : true;
+			const smallOk = b.median < 1 ? r.median - b.median > 0.1 : true;
 			const regressed = medOver && minOver && smallOk;
 			rows.push({
 				target: t.name,

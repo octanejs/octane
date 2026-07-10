@@ -1911,6 +1911,9 @@ export function componentSlotLite<P>(
 	anchor?: Node,
 ): void {
 	let scope = parentScope.slots[slotKey] as Scope | undefined;
+	// The server `<!--]-->` this call adopted as its range end (hydration first
+	// render only) — consumed by the post-body cursor advance below.
+	let adoptedClose: Node | null = null;
 	if (scope === undefined) {
 		scope = new ScopeImpl(parentScope, parentScope.block);
 		// Lite scope's `block` exposes the host/anchor as the body's DOM context
@@ -1926,6 +1929,7 @@ export function componentSlotLite<P>(
 			// use `<!--]-->` as the insert anchor so the body's
 			// `insertBefore(content, endMarker)` is a no-op (content already there).
 			endMarker = matchingClose(anchor as Node);
+			adoptedClose = endMarker;
 			hydrateNode = (anchor as Node).nextSibling;
 		} else if (hydrating && !isBlockOpen(anchor ?? null)) {
 			// Anchor-less (appended) component — the compiler dropped the `<!>`
@@ -1941,6 +1945,7 @@ export function componentSlotLite<P>(
 			if (open === null || open.parentNode !== host) open = host.firstChild;
 			if (open !== null && isBlockOpen(open)) {
 				endMarker = matchingClose(open);
+				adoptedClose = endMarker;
 				hydrateNode = open.nextSibling;
 			}
 		}
@@ -1960,6 +1965,13 @@ export function componentSlotLite<P>(
 	} finally {
 		CURRENT_SCOPE = prevScope;
 	}
+	// Hydration: advance the cursor PAST this component's adopted range so the
+	// next SIBLING slot adopts from its own `<!--[-->`. The body leaves the
+	// cursor ON its adopted root (clone() parks it there), so without this a
+	// following sibling lite slot sees a non-marker node, adopts no range, and
+	// its commitBag insert MOVES the previous sibling's root to the shared
+	// anchor. Mirrors componentSlot's post-render advance.
+	if (hydrating && adoptedClose !== null) hydrateNode = adoptedClose.nextSibling;
 }
 
 // ── Teardown error routing (React's captureCommitPhaseError for deletions) ──
@@ -5710,6 +5722,21 @@ function dispatchDelegated(event: Event): void {
 	const targetOnly = TARGET_ONLY_DELEGATED.has(event.type);
 	_dispatchDepth++;
 	let node = event.target as any;
+	// A submit dispatch targeting a form opens the manual-action useFormStatus
+	// window (see publishManualFormPending): handlers' startTransition calls
+	// register on the record; the walk's end decides whether to publish.
+	const prevSubmitRec = ACTIVE_SUBMIT_DISPATCH;
+	const submitRec: SubmitDispatchRec | null =
+		event.type === 'submit' && node != null && node.nodeName === 'FORM'
+			? {
+					form: node as HTMLFormElement,
+					event: event as SubmitEvent,
+					transitions: 0,
+					published: false,
+					intercepted: false,
+				}
+			: null;
+	if (submitRec !== null) ACTIVE_SUBMIT_DISPATCH = submitRec;
 	try {
 		// CAPTURE_DELEGATED types have BOTH dispatchers attached as capture-phase
 		// listeners on the same root, so same-node registration ORDER — not phase —
@@ -5744,6 +5771,12 @@ function dispatchDelegated(event: Event): void {
 			}
 		}
 	} finally {
+		if (submitRec !== null) {
+			ACTIVE_SUBMIT_DISPATCH = prevSubmitRec;
+			// Before the depth drop + discrete flush, so a published pending status
+			// commits in this event's flush window (like handleFormSubmit's does).
+			publishManualFormPending(submitRec);
+		}
 		clearCurrentTarget(event);
 		_dispatchDepth--;
 		maybeFlushDiscrete(event.type);
@@ -5825,6 +5858,68 @@ function setFormStatus(form: HTMLFormElement, status: FormStatus): void {
 	FORM_STATUS.set(form, status);
 	const ls = FORM_STATUS_LISTENERS.get(form);
 	if (ls) for (const l of ls) l();
+}
+
+// ---------------------------------------------------------------------------
+// Manual-action useFormStatus activation (React parity — FormActionEventPlugin):
+// besides the intercepted `<form action={fn}>` path, React publishes pending
+// status when startTransition is called synchronously during a form's submit
+// dispatch whose default was prevented (the `onSubmit={e => { e.preventDefault();
+// startTransition(async () => …) }}` idiom). React entangles the pending state
+// with the transitions the event scheduled (currentEventTransitionLane);
+// octane's equivalent is a per-dispatch record: dispatchDelegated opens it for
+// a submit event targeting a form, startTransition registers on it, and when
+// the walk ends with the default prevented (and the intercepted path didn't
+// claim the submit) pending status is published until every registered
+// transition settles. Shares handleFormSubmit's `$$pendingSubmits` counter so
+// overlapping manual and intercepted submissions coalesce to one idle flip.
+// ---------------------------------------------------------------------------
+
+interface SubmitDispatchRec {
+	form: HTMLFormElement;
+	event: SubmitEvent;
+	/** Transitions started synchronously during this dispatch, not yet settled. */
+	transitions: number;
+	/** Pending status was published for this dispatch (manual-action path). */
+	published: boolean;
+	/** handleFormSubmit ran for this dispatch — status is its responsibility. */
+	intercepted: boolean;
+}
+
+let ACTIVE_SUBMIT_DISPATCH: SubmitDispatchRec | null = null;
+
+// Runs when the submit dispatch's handler walk finishes (dispatchDelegated).
+function publishManualFormPending(rec: SubmitDispatchRec): void {
+	if (rec.intercepted || rec.transitions === 0 || !rec.event.defaultPrevented) return;
+	const form = rec.form;
+	let data: FormData | null = null;
+	try {
+		data = new FormData(form);
+		const submitter = rec.event.submitter as HTMLInputElement | null;
+		if (submitter && submitter.name) data.append(submitter.name, submitter.value ?? '');
+	} catch {
+		/* jsdom quirks — status still activates with data: null */
+	}
+	const fa = form as any;
+	fa.$$pendingSubmits = (fa.$$pendingSubmits || 0) + 1;
+	rec.published = true;
+	setFormStatus(form, {
+		pending: true,
+		data,
+		method: form.method || 'get',
+		// React reports the form's action PROP here; octane's equivalents are the
+		// intercept function ($$formAction) or the plain attribute.
+		action: (fa.$$formAction as FormStatus['action']) ?? form.getAttribute('action'),
+	});
+}
+
+// Runs once per registered transition, on settle (fulfil, reject, or sync throw).
+function settleSubmitTransition(rec: SubmitDispatchRec): void {
+	rec.transitions--;
+	if (rec.transitions !== 0 || !rec.published) return;
+	const fa = rec.form as any;
+	fa.$$pendingSubmits = Math.max(0, (fa.$$pendingSubmits || 1) - 1);
+	if (fa.$$pendingSubmits === 0) setFormStatus(rec.form, IDLE_FORM_STATUS);
 }
 
 // Forms whose reset was requested during a transition/action window, applied
@@ -5926,6 +6021,11 @@ function handleFormSubmit(form: HTMLFormElement, event: Event): void {
 		(submitter && (submitter as any).$$formAction) || ((form as any).$$formAction as unknown);
 	if (typeof action !== 'function') return; // native submit / no function action
 	event.preventDefault();
+	// This submit is the intercepted-action path's responsibility — suppress the
+	// manual startTransition activation for the same dispatch (the action's own
+	// transition would otherwise double-publish through the record).
+	if (ACTIVE_SUBMIT_DISPATCH !== null && ACTIVE_SUBMIT_DISPATCH.form === form)
+		ACTIVE_SUBMIT_DISPATCH.intercepted = true;
 
 	const data = new FormData(form);
 	// Include the activating submitter's name/value (FormData(form, submitter)
@@ -10478,6 +10578,12 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 	// Bump the priority flag FIRST so any scheduleRender calls fired by the
 	// listener notification (and by fn itself) are tagged as transition.
 	TRANSITION_DEPTH++;
+	// A transition started synchronously during a form's submit dispatch
+	// entangles with that form's status (manual-action useFormStatus activation —
+	// see publishManualFormPending). Registered here; every settle path below
+	// notifies the record exactly once.
+	const submitRec = ACTIVE_SUBMIT_DISPATCH;
+	if (submitRec !== null) submitRec.transitions++;
 	let result: unknown;
 	try {
 		tickTransitionCount(+1);
@@ -10488,6 +10594,7 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 		}
 	} catch (err) {
 		tickTransitionCount(-1);
+		if (submitRec !== null) settleSubmitTransition(submitRec);
 		// Don't strand resets queued before the throw — they'd fire on an unrelated
 		// later transition's settle otherwise. (flushFormResets self-guards if an
 		// outer transition window is still open.)
@@ -10510,6 +10617,7 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 			settled = true;
 			ASYNC_TRANSITION_COUNT--;
 			tickTransitionCount(-1);
+			if (submitRec !== null) settleSubmitTransition(submitRec);
 			// The action window (may have) closed — apply queued requestFormReset()s.
 			flushFormResets();
 		};
@@ -10521,6 +10629,7 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 		// count themselves via handleSuspense, so the net count stays > 0.
 		queueMicrotask(() => {
 			tickTransitionCount(-1);
+			if (submitRec !== null) settleSubmitTransition(submitRec);
 			flushFormResets();
 		});
 	}

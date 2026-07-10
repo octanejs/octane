@@ -68,6 +68,16 @@ layout, per TanStack's fuzzy/root boundary rules), plus the full
 `@tanstack/router-core` re-export (`redirect`, `notFound`, history, search helpers,
 types).
 
+The 2026-07-06 gap-closure sweep (see `docs/tanstack-parity-audit.md`) additionally
+landed the full Match pipeline (per-route Suspense/CatchBoundary/CatchNotFound,
+pending/error/redirected/notFound statuses), router lifecycle events, `useBlocker`/
+`Block`, the complete read-hook family (`useMatch`, `useRouteContext`,
+`useLoaderDeps`, `useParentMatches`/`useChildMatches`, …), `getRouteApi`/
+`createRouteMask`, `useMatchRoute`/`MatchRoute`, `ClientOnly`, search-param
+validation/middleware, and full `Link` parity (preloading, masking,
+`activeProps`/`inactiveProps`) — differential-verified byte-equal against the real
+`@tanstack/react-router`.
+
 ```tsx
 // streaming a deferred loader value
 <Await promise={data.slow} fallback={'loading…'}>
@@ -81,8 +91,13 @@ types).
 createRoute({ path: 'item/$id', component: lazyRouteComponent(() => import('./Item')) })
 ```
 
-Deferred: file-based routing + the codegen plugin, devtools, search-param
-validation/middleware, `useBlocker`, SSR head/scripts.
+Deferred: file-based routing + the codegen plugin, devtools, the SSR entries
+(`RouterServer`/`RouterClient`, `HeadContent`/`Scripts`), and the typed public
+surface (factories/hooks are still `any`).
+
+Current scope, divergences, and verification status are tracked in the generated
+[bindings status table](../../docs/bindings-status.md) (sourced from this
+package's `status.json`).
 
 ## Divergences from `@tanstack/react-router`
 
@@ -90,5 +105,3 @@ validation/middleware, `useBlocker`, SSR head/scripts.
   prop.
 - **No `flushSync`** in the `Link` click handler (the one hard `react-dom`
   coupling) — navigation state updates run synchronously in v1.
-- `Link` v1 reflects active state via `data-status="active"` + `aria-current`; the
-  `activeProps`/`inactiveProps` className-merge API is a follow-up.

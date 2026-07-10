@@ -530,19 +530,16 @@ describe('conformance: SSR serialization — component hierarchies (Elements)', 
 		}
 		expect(e.tagName).toBe('DIV');
 		expect(e.querySelectorAll('div').length).toBe(0);
-		expectContentHydrate('SingleHier');
+		expectCleanHydrate('SingleHier');
 	});
 
-	// GAP: hydrating nested `{children}` component chains is not byte-stable —
-	// at depth >= 2 the SERVER collapses the children-fn block and the nested
-	// component's block into ONE `<!--[-->…<!--]-->` range, while the client
-	// layers a childSlot AND a componentSlot; the inner componentSlot finds no
-	// second range to adopt and mints fresh `<!--comp-->` markers. Elements,
-	// text, and warnings are all clean (see the content-level assertions above)
-	// — only the marker topology diverges. Fix needs the client componentSlot
-	// to BORROW its childSlot's adopted markers when the server emitted a
-	// single collapsed range (or the server to stop collapsing).
-	it.fails('hydrates component hierarchies byte-stably (Per :657/:677)', () => {
+	// Nested `{children}` component chains hydrate byte-stably: the server emits
+	// one `<!--[-->…<!--]-->` range per layer (children-fn block AND nested
+	// component block), the client childSlot/componentSlot/componentSlotLite each
+	// adopt their own range, and every slot advances the hydration cursor past
+	// its adopted close marker so SIBLING slots (MultiHier) adopt the right range
+	// instead of re-adopting a previous sibling's root.
+	it('hydrates component hierarchies byte-stably (Per :657/:677)', () => {
 		const one = hydrate('SingleHier');
 		expect(one.after).toBe(one.before);
 		const multi = hydrate('MultiHier');
@@ -562,7 +559,7 @@ describe('conformance: SSR serialization — component hierarchies (Elements)', 
 				expect(grandchild.children.length).toBe(0);
 			}
 		}
-		expectContentHydrate('MultiHier');
+		expectCleanHydrate('MultiHier');
 	});
 
 	it('renders a div with a child (Per :705)', () => {

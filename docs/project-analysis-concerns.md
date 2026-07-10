@@ -4,6 +4,20 @@ Status: source-backed audit snapshot from 2026-07-09 at `d3cf678`. This is a
 risk register, not a claim that every item is a confirmed bug. Re-check the
 owning source before acting because Octane is moving quickly.
 
+> **Remediation status (2026-07-09):** the immediate + mechanical items are
+> DONE — §1 playground execution now runs in a sandboxed opaque-origin iframe
+> (no-network CSP) with an explicit Run gate for hash payloads; §2 doc drift
+> fixed at the RuleSync source + README/.ai/testing-library/MCP maps, with
+> `rules:check` (+ generated-file `git diff`), `changeset:check`, and
+> `parity:gaps:check` added to PR CI; §3 has a generated executable-pin index
+> (`docs/parity-gaps.md`, `pnpm parity:gaps`); §10 website builds are
+> file-serial by contract (`fileParallelism: false`); §12 harness gate
+> failures are fatal unless waived with a reason + expiry in
+> `benchmarks/bench.mjs`; §11 has a generated, CI-checked binding-status
+> table (`docs/bindings-status.md`, `pnpm bindings:status`). Still open: the
+> five runtime parity gaps themselves, §5/§6 structural centralization, and
+> the §13 Node-20/packed-tarball release checks.
+
 The repository is unusually good at preserving design reasoning in source
 comments and parity tests. The main concern is not a lack of documentation; it
 is that several generations of otherwise-useful documentation now coexist and
@@ -111,20 +125,21 @@ Recommended correction strategy:
 ## 3. Active React-parity gaps
 
 Severity: mixed. These are confirmed and pinned by five real `it.fails` cases
-under `packages/octane/tests/conformance/`.
+under `packages/octane/tests/conformance/` (four since 2026-07-10 — the
+hydration marker-topology pin below is resolved and flipped to a plain `it`).
 
 ### Hydration marker topology
 
-Nested `{children}` component hierarchies render correct elements and text but
-do not hydrate byte-stably. The server collapses a children-function block and
-nested component into one marker range while the client expects layered
-`childSlot` and `componentSlot` ranges, then mints fresh markers. See
-[`ssr-serialization.test.ts`](../packages/octane/tests/conformance/ssr-serialization.test.ts).
-
-This belongs near the top of the parity backlog because marker ownership also
-affects teardown, movement, Suspense, and the proposed M3 marker-elision work.
-It should be resolved as part of one coherent range-borrowing design, not by
-loosening the byte-stability assertion.
+RESOLVED 2026-07-10. Nested `{children}` component hierarchies now hydrate
+byte-stably: the server emits one `<!--[-->…<!--]-->` range per layer
+(children-fn block and nested component block — the collapse this snapshot
+described was removed by the M3 inherit-range work), and each client slot
+adopts its own range. The last defect was `componentSlotLite` not advancing
+the hydration cursor past its adopted close marker, which desynced SIBLING
+lite slots (multi-child hierarchies) — fixed symmetrically with
+`componentSlot`'s post-render advance. The pin in
+[`ssr-serialization.test.ts`](../packages/octane/tests/conformance/ssr-serialization.test.ts)
+is now a plain byte-stability assertion.
 
 ### Effect teardown and update choreography
 
@@ -247,6 +262,21 @@ The `octane-prod` project is an excellent regression layer. The remaining
 improvement is to make hand-slot-forwarding self-declarative (package metadata,
 a source pragma, or a plugin option exported by the binding) and consume one
 shared exclusion definition in tests, website, examples, and builds.
+
+**Resolved (2026-07-10):** hand-slot-forwarding is now self-declarative. Each
+such binding carries `"octane": { "hookSlots": { "manual": ["src"] } }` in its own
+`package.json`; the compiler plugin's surgical pass walks to the nearest
+manifest and skips files under the declared directories automatically (cached
+per directory), so the trait travels with the package into every consumer. The
+scope is a directory list — not the whole package — because a binding's own
+test files must stay auto-slotted. All repeated `exclude`
+path lists were deleted from the root Vitest projects, `website/vite.config.ts`,
+and the examples; the option survives only as an ad-hoc escape hatch.
+`packages/octane/tests/external-hook-slot.test.ts` pins the declaration
+registry (currently: base-ui, floating-ui, lexical, mdx, motion, radix, stylex,
+tanstack-query, tanstack-router, testing-library, zustand — redux/recharts/
+hook-form are auto-slotted by design) and covers the skip/slot behavior in both
+dev and prod compile modes via the `octane-prod` project.
 
 ## 7. Marker protocol remains a major complexity center
 
@@ -376,6 +406,14 @@ version, supported surface, known divergences, SSR/hydration status, and last
 parity verification. Link every package README and the website bindings page to
 that table. This would make strong claims precise without underselling the
 packages that are genuinely near-complete.
+
+> **Resolved (2026-07-10):** `docs/bindings-status.md` is now that table —
+> generated by `pnpm bindings:status` from a machine-readable
+> `packages/<name>/status.json` in each binding and kept current by
+> `pnpm bindings:status:check` in CI (same pattern as `docs/parity-gaps.md`).
+> Every binding README (three were created for packages that had none) and the
+> website bindings page link to it, and the TanStack Router README's drifted
+> deferred list was re-synced with `src/`.
 
 ## 12. Benchmark gates do not make every failure fatal
 

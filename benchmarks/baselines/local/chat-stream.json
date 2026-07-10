@@ -1,0 +1,182 @@
+{
+  "suite": "chat-stream",
+  "iterations": 8,
+  "targets": [
+    {
+      "name": "octane-tsrx",
+      "ops": {
+        "streamFine": {
+          "median": 2.399999976158142,
+          "min": 1.100000023841858,
+          "samples": 8
+        },
+        "streamCoarse": {
+          "median": 0.800000011920929,
+          "min": 0.5,
+          "samples": 8
+        },
+        "appendHistory": {
+          "median": 2.100000023841858,
+          "min": 1.699999988079071,
+          "samples": 8
+        },
+        "switchConv": {
+          "median": 5,
+          "min": 4.100000023841858,
+          "samples": 8
+        },
+        "type160": {
+          "median": 1.899999976158142,
+          "min": 1.5,
+          "samples": 8
+        },
+        "comments_conv": {
+          "median": 78,
+          "min": 78,
+          "samples": 1
+        }
+      }
+    },
+    {
+      "name": "react",
+      "ops": {
+        "streamFine": {
+          "median": 28.5,
+          "min": 25.100000023841858,
+          "samples": 8
+        },
+        "streamCoarse": {
+          "median": 21.600000023841858,
+          "min": 6.100000023841858,
+          "samples": 8
+        },
+        "appendHistory": {
+          "median": 38,
+          "min": 35.59999996423721,
+          "samples": 8
+        },
+        "switchConv": {
+          "median": 11.899999976158142,
+          "min": 9.399999976158142,
+          "samples": 8
+        },
+        "type160": {
+          "median": 19.19999998807907,
+          "min": 16.700000047683716,
+          "samples": 8
+        },
+        "comments_conv": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        }
+      }
+    },
+    {
+      "name": "solid",
+      "ops": {
+        "streamFine": {
+          "median": 4.199999988079071,
+          "min": 2.400000035762787,
+          "samples": 8
+        },
+        "streamCoarse": {
+          "median": 1.199999988079071,
+          "min": 1.0999999642372131,
+          "samples": 8
+        },
+        "appendHistory": {
+          "median": 1.600000023841858,
+          "min": 1.4000000357627869,
+          "samples": 8
+        },
+        "switchConv": {
+          "median": 6.0,
+          "min": 4.6,
+          "samples": 8
+        },
+        "type160": {
+          "median": 1.100000023841858,
+          "min": 0.699999988079071,
+          "samples": 8
+        },
+        "comments_conv": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        }
+      }
+    },
+    {
+      "name": "ripple",
+      "ops": {
+        "streamFine": {
+          "median": 2.100000023841858,
+          "min": 1.0999999642372131,
+          "samples": 8
+        },
+        "streamCoarse": {
+          "median": 0.699999988079071,
+          "min": 0.5999999642372131,
+          "samples": 8
+        },
+        "appendHistory": {
+          "median": 1.800000011920929,
+          "min": 1.699999988079071,
+          "samples": 8
+        },
+        "switchConv": {
+          "median": 4.5,
+          "min": 4,
+          "samples": 8
+        },
+        "type160": {
+          "median": 1.4000000357627869,
+          "min": 1.199999988079071,
+          "samples": 8
+        },
+        "comments_conv": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        }
+      }
+    },
+    {
+      "name": "vue-vapor",
+      "ops": {
+        "streamFine": {
+          "median": 1.7000000476837158,
+          "min": 1.300000011920929,
+          "samples": 8
+        },
+        "streamCoarse": {
+          "median": 0.800000011920929,
+          "min": 0.6000000238418579,
+          "samples": 8
+        },
+        "appendHistory": {
+          "median": 1.699999988079071,
+          "min": 1.399999976158142,
+          "samples": 8
+        },
+        "switchConv": {
+          "median": 3.899999976158142,
+          "min": 3.699999988079071,
+          "samples": 8
+        },
+        "type160": {
+          "median": 0.7999999523162842,
+          "min": 0.699999988079071,
+          "samples": 8
+        },
+        "comments_conv": {
+          "median": 33,
+          "min": 33,
+          "samples": 1
+        }
+      }
+    }
+  ],
+  "harnessExit": 0
+}
