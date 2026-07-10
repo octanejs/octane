@@ -45,38 +45,27 @@ describe('conformance: useInsertionEffect ordering (ReactHooksWithNoopRenderer-t
 		r.unmount();
 	});
 
-	it.fails(
-		'on unmount, destroys insertion effects before layout effects, and passive effects after the sync phase',
-		() => {
-			// Per ReactHooksWithNoopRenderer-test.js:2626 (unmount section) — React
-			// destroys the deleted component's effects phase-ordered: insertion
-			// cleanup, then layout cleanup (both in the mutation phase), and the
-			// passive cleanup later, in the deferred passive flush.
-			//
-			// GAP: octane's unmountScope unwinds ONE scope.cleanups list in reverse
-			// registration order — and effects register in phase-EXECUTION order
-			// (insertion → layout → passive) — so unmount fires passive → layout →
-			// insertion, all synchronously. Matching React needs a per-phase unmount
-			// walk (insertion+layout cleanups sync, passive cleanup deferred to the
-			// passive flush). tests/effect-timing.test.ts pins the current reverse
-			// order; this pin flips (and that test needs revisiting) if the unmount
-			// path is rebuilt phase-ordered.
-			const log = createLog();
-			const shared = { text: '(empty)' };
-			const r = mount(InsertionValueThreading, { count: 0, shared, log: log.push });
-			flushEffects();
-			log.clear();
-			r.unmount();
-			const syncEntries = log.drain();
-			flushEffects();
-			const deferredEntries = log.drain();
-			expect(syncEntries).toEqual([
-				'Destroy insertion [current: 0]',
-				'Destroy layout [current: 0]',
-			]);
-			expect(deferredEntries).toEqual(['Destroy passive [current: 0]']);
-		},
-	);
+	it('on unmount, destroys insertion effects before layout effects, and passive effects after the sync phase', () => {
+		// Per ReactHooksWithNoopRenderer-test.js:2626 (unmount section) — React
+		// destroys the deleted component's effects phase-ordered: insertion
+		// cleanup, then layout cleanup (both in the mutation phase), and the
+		// passive cleanup later, in the deferred passive flush. octane matches:
+		// unmountScope walks the scope's effect slots in hook declaration order
+		// (React's forward effect-list walk in commitDeletionEffectsOnFiber),
+		// firing insertion+layout destroys synchronously and deferring passive
+		// destroys to the passive flush.
+		const log = createLog();
+		const shared = { text: '(empty)' };
+		const r = mount(InsertionValueThreading, { count: 0, shared, log: log.push });
+		flushEffects();
+		log.clear();
+		r.unmount();
+		const syncEntries = log.drain();
+		flushEffects();
+		const deferredEntries = log.drain();
+		expect(syncEntries).toEqual(['Destroy insertion [current: 0]', 'Destroy layout [current: 0]']);
+		expect(deferredEntries).toEqual(['Destroy passive [current: 0]']);
+	});
 
 	it('force flushes passive effects before firing new insertion effects', () => {
 		// Per ReactHooksWithNoopRenderer-test.js:2676 — "force flushes passive
@@ -135,58 +124,46 @@ describe('conformance: useInsertionEffect ordering (ReactHooksWithNoopRenderer-t
 		r.unmount();
 	});
 
-	it.fails(
-		'fires all insertion effects (interleaved) before firing any layout effects — update choreography',
-		() => {
-			// Per ReactHooksWithNoopRenderer-test.js:2741 (update section) — on
-			// update, React's mutation-phase walk runs PER FIBER: destroy all of A's
-			// insertion effects, create all of A's insertion effects, destroy A's
-			// layout effects — then the same for B — and only then creates layout
-			// effects (A, then B) in the layout phase.
-			//
-			// GAP: octane drains effects per PHASE across the whole commit
-			// (drainPhase(INSERTION): ALL cleanups commit-wide, then ALL bodies;
-			// then drainPhase(LAYOUT) the same way). So octane emits
-			// A.ins1⁻ A.ins2⁻ B.ins1⁻ B.ins2⁻ · A.ins1⁺ A.ins2⁺ B.ins1⁺ B.ins2⁺ ·
-			// A.lay1⁻ A.lay2⁻ B.lay1⁻ B.lay2⁻ · A.lay1⁺ … — insertion-before-layout
-			// still holds (stronger, commit-wide), but React's per-fiber
-			// destroy-all/create-all grouping and its mutation-walk interleaving
-			// (A's layout destroys BEFORE B's insertion work; B's insertion cleanups
-			// AFTER A's insertion bodies) do not. Matching exactly would need a
-			// per-scope mutation walk over insertion+layout cleanups.
-			const log = createLog();
-			const state = { A: '(empty)', B: '(empty)' };
-			const read = () => `[A: ${state.A}, B: ${state.B}]`;
-			const writeA = (v: string) => (state.A = v);
-			const writeB = (v: string) => (state.B = v);
-			const r = mount(InterleavedPair, { count: 0, read, writeA, writeB, log: log.push });
-			flushEffects();
-			log.clear();
-			r.update(InterleavedPair, { count: 1, read, writeA, writeB, log: log.push });
-			const entries = log.drain();
-			const committed = [state.A, state.B];
-			r.unmount();
-			expect(committed).toEqual(['1', '1']);
-			expect(entries).toEqual([
-				'Destroy Insertion 1 for Component A [A: 0, B: 0]',
-				'Destroy Insertion 2 for Component A [A: 0, B: 0]',
-				'Create Insertion 1 for Component A [A: 0, B: 0]',
-				'Create Insertion 2 for Component A [A: 1, B: 0]',
-				'Destroy Layout 1 for Component A [A: 1, B: 0]',
-				'Destroy Layout 2 for Component A [A: 1, B: 0]',
-				'Destroy Insertion 1 for Component B [A: 1, B: 0]',
-				'Destroy Insertion 2 for Component B [A: 1, B: 0]',
-				'Create Insertion 1 for Component B [A: 1, B: 0]',
-				'Create Insertion 2 for Component B [A: 1, B: 1]',
-				'Destroy Layout 1 for Component B [A: 1, B: 1]',
-				'Destroy Layout 2 for Component B [A: 1, B: 1]',
-				'Create Layout 1 for Component A [A: 1, B: 1]',
-				'Create Layout 2 for Component A [A: 1, B: 1]',
-				'Create Layout 1 for Component B [A: 1, B: 1]',
-				'Create Layout 2 for Component B [A: 1, B: 1]',
-			]);
-		},
-	);
+	it('fires all insertion effects (interleaved) before firing any layout effects — update choreography', () => {
+		// Per ReactHooksWithNoopRenderer-test.js:2741 (update section) — on
+		// update, React's mutation-phase walk runs PER FIBER: destroy all of A's
+		// insertion effects, create all of A's insertion effects, destroy A's
+		// layout effects — then the same for B — and only then creates layout
+		// effects (A, then B) in the layout phase. octane matches via
+		// drainMutationEffects' per-scope walk over the merged insertion+layout
+		// queues; layout bodies run afterwards in runLayoutEffects.
+		const log = createLog();
+		const state = { A: '(empty)', B: '(empty)' };
+		const read = () => `[A: ${state.A}, B: ${state.B}]`;
+		const writeA = (v: string) => (state.A = v);
+		const writeB = (v: string) => (state.B = v);
+		const r = mount(InterleavedPair, { count: 0, read, writeA, writeB, log: log.push });
+		flushEffects();
+		log.clear();
+		r.update(InterleavedPair, { count: 1, read, writeA, writeB, log: log.push });
+		const entries = log.drain();
+		const committed = [state.A, state.B];
+		r.unmount();
+		expect(committed).toEqual(['1', '1']);
+		expect(entries).toEqual([
+			'Destroy Insertion 1 for Component A [A: 0, B: 0]',
+			'Destroy Insertion 2 for Component A [A: 0, B: 0]',
+			'Create Insertion 1 for Component A [A: 0, B: 0]',
+			'Create Insertion 2 for Component A [A: 1, B: 0]',
+			'Destroy Layout 1 for Component A [A: 1, B: 0]',
+			'Destroy Layout 2 for Component A [A: 1, B: 0]',
+			'Destroy Insertion 1 for Component B [A: 1, B: 0]',
+			'Destroy Insertion 2 for Component B [A: 1, B: 0]',
+			'Create Insertion 1 for Component B [A: 1, B: 0]',
+			'Create Insertion 2 for Component B [A: 1, B: 1]',
+			'Destroy Layout 1 for Component B [A: 1, B: 1]',
+			'Destroy Layout 2 for Component B [A: 1, B: 1]',
+			'Create Layout 1 for Component A [A: 1, B: 1]',
+			'Create Layout 2 for Component A [A: 1, B: 1]',
+			'Create Layout 1 for Component B [A: 1, B: 1]',
+			'Create Layout 2 for Component B [A: 1, B: 1]',
+		]);
+	});
 });
 
 // ============================================================================
@@ -200,19 +177,18 @@ describe('conformance: useInsertionEffect ordering (ReactHooksWithNoopRenderer-t
 //        tests/effect-timing.test.ts ('phase order on re-render', 'all phases
 //        fire cleanup on unmount').
 //   :2626 "fires insertion effects before layout effects" — PORTED as two
-//        tests: mount+update value threading (passes); the unmount section is
-//        it.fails (// GAP: reverse-registration unmount order + synchronous
-//        passive cleanup vs React's insertion→layout sync, passive deferred).
+//        tests: mount+update value threading, and the unmount section (both
+//        pass: unmount destroys insertion→layout sync, passive deferred).
 //   :2676 "force flushes passive effects before firing new insertion effects"
 //        — PORTED (passes; octane adaptation drives the second commit with a
 //        sync update instead of a transition — the pending-passive-flush-
 //        before-render rule is the behavior under test, and octane applies it
 //        on every render pass).
 //   :2741 "fires all insertion effects (interleaved) before firing any layout
-//        effects" — PORTED as two tests: mount choreography (passes, exact
-//        React log); update choreography is it.fails (// GAP: per-phase commit
-//        drain vs React's per-fiber mutation walk). The unmount tail of the
-//        React test repeats the :2626 unmount gap and is not re-pinned.
+//        effects" — PORTED as two tests: mount and update choreography (both
+//        pass with the exact React log — the mutation drain walks per scope).
+//        The unmount tail of the React test repeats the :2626 unmount
+//        behavior and is not re-pinned.
 //   :2907 "assumes insertion effect destroy function is either a function or
 //        undefined" — N/A: DEV-warning policy (octane's warning policy
 //        differs; per plan §2, functional outcome only).

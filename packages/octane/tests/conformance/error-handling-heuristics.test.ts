@@ -281,6 +281,9 @@ describe('unmount-phase errors', () => {
 		expect(log.drain()).toContain('child effect');
 
 		r.unmount();
+		// The throwing cleanup is passive — its destroy runs in the deferred
+		// passive flush (React's commitPassiveUnmountEffects), not synchronously.
+		flushEffects();
 
 		const entries = log.drain();
 		// The throwing cleanup ran…

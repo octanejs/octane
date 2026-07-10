@@ -53,6 +53,17 @@ export interface Scope {
 	hooks: Map<symbol, any> | null;
 	cleanups: Cleanup[];
 	/**
+	 * This scope's effect slots in hook DECLARATION order (first-enqueue order —
+	 * the order the hooks ran in the scope's first render). unmountScope walks it
+	 * to reproduce React's deletion contract (commitDeletionEffectsOnFiber's
+	 * forward effect-list walk): insertion + layout destroys fire synchronously in
+	 * the declared interleaving, passive destroys are DEFERRED to the passive
+	 * flush. A flat array (not the hooks Map) so teardown is an indexed walk with
+	 * no iterator allocation and no filtering past state/memo/ref slots. Null on
+	 * effect-less scopes — the common case on mass-mount paths.
+	 */
+	effectSlots: EffectSlot[] | null;
+	/**
 	 * Per-call-site child scopes, stored as `[key, scope]` pairs in a flat array
 	 * (NOT a Map): iteration is a plain indexed for-loop, and lookups are linear
 	 * scans — faster than `Map.get` for the typical N ≤ 8 case (most components
@@ -406,14 +417,6 @@ interface EffectSlot {
 	 * must persist — only a real unmount cleans them up.
 	 */
 	phase: Phase;
-	/**
-	 * True once a per-slot finalizer has been registered in scope.cleanups (on the
-	 * slot's first body run, in drainPhase). The finalizer fires slot.cleanup
-	 * exactly once at unmount; registering on first RUN (not slot creation) keeps
-	 * scope.cleanups ordered by phase-execution order (insertion→layout→passive)
-	 * so unmount tears down in the correct reverse order.
-	 */
-	finalized?: boolean;
 }
 
 interface PendingEffect {
@@ -430,8 +433,15 @@ interface PendingEffect {
 	 */
 	args: any[] | undefined;
 	/**
+	 * The effect's phase, copied from its slot. The mutation-phase drain merges
+	 * the INSERTION and LAYOUT queues into one per-scope walk (see
+	 * drainMutationEffects) and needs the phase per entry without a hooks-map
+	 * lookup.
+	 */
+	phase: Phase;
+	/**
 	 * Monotonic enqueue sequence (DFS pre-order, since rendering is top-down). Used
-	 * by drainPhase to reconstruct React's exact commit order: TRUE post-order —
+	 * by the commit drains to reconstruct React's exact commit order: TRUE post-order —
 	 * descendant-before-ancestor (via the parentBlock chain), and disjoint subtrees
 	 * in enqueue order. A plain depth sort fires deepest-first GLOBALLY, which gets
 	 * the parent/child relationship right but mis-orders a shallow node in an earlier
@@ -557,7 +567,7 @@ let commitSeq = 0;
 // this by pushing the fiber onto a per-root store-consistency list drained after
 // the layout effects (updateStoreInstance); we mirror it with a dedicated,
 // SORT-FREE queue instead of routing each consumer through the generic layout
-// effect (enqueueEffect → depsChanged → PendingEffect alloc → drainPhase's
+// effect (enqueueEffect → depsChanged → PendingEffect alloc → the commit drain's
 // post-order sort + per-entry hooks-map/cleanup/finalizer bookkeeping).
 //
 // The win is twofold: (1) the entries carry no cleanup and never reorder, so the
@@ -584,7 +594,7 @@ interface StoreInst<T> {
 	/** Stable notify handler handed to subscribe(); re-renders iff the snapshot
 	 *  changed (Object.is dedup). Stable across re-subscribes by design. */
 	onStoreChange: () => void;
-	/** Owning block — drainStoreSyncs skips disposed/hidden blocks like drainPhase. */
+	/** Owning block — drainStoreSyncs skips disposed/hidden blocks like the effect drains. */
 	block: Block;
 	/** True while this inst sits in the sync queue — prevents a second push when a
 	 *  block renders twice before its single commit (last render's `pending` wins). */
@@ -592,7 +602,7 @@ interface StoreInst<T> {
 }
 
 // Pending store-syncs to reconcile at the next commit (drained in commitEffects
-// after drainPhase(LAYOUT)). Populated at RENDER time, so — like effects — pushes
+// after runLayoutEffects). Populated at RENDER time, so — like effects — pushes
 // during an off-screen (WIP) render are redirected into WIP_CAPTURE.stores and
 // spliced back only if that render commits (see renderOffscreen/commitOffscreen).
 const storeSyncQueue: StoreInst<any>[] = [];
@@ -878,7 +888,7 @@ function flush(): void {
 
 /** Drain pending passive effects ahead of a render pass (see flush()). */
 function drainPassivesBeforeRender(): void {
-	if (effectQueues[PASSIVE].length > 0) drainPassiveEffects();
+	if (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) drainPassiveEffects();
 }
 
 /**
@@ -1072,25 +1082,40 @@ function commitEffects(): void {
 	// options this render just built, and the dev missing-onInput check must
 	// see the element's full listener set (see drainControlledSyncs).
 	drainControlledSyncs();
-	drainPhase(INSERTION);
+	// Mutation phase (React's commitMutationEffects): a per-scope walk over the
+	// merged insertion+layout queues — each scope's insertion destroys, insertion
+	// bodies, then its layout DESTROYS. Layout bodies wait for the layout phase
+	// below; the returned batch carries them across the ref work.
+	const mutationBatch = drainMutationEffects();
 	// Teardown ref detaches fire before this commit's attaches (mutation → layout),
 	// so a ref moving between elements cycles null → new-node in one commit.
 	drainRefDetaches();
 	drainRefAttaches();
 	reapplyFragmentBindings();
-	drainPhase(LAYOUT);
+	// Layout phase (React's commitLayoutEffects): bodies only — every layout
+	// cleanup already fired in the mutation walk, ref attaches just landed, so a
+	// layout body sees populated refs and connected DOM.
+	if (mutationBatch !== null) runLayoutEffects(mutationBatch);
 	// After layout effects (so a sibling layout effect that mutates+notifies the
 	// store has already run), reconcile each uSES consumer's committed snapshot
 	// against the store and re-render any that tore. Mirrors React draining its
 	// store-consistency checks right after commitLayoutEffects.
 	drainStoreSyncs();
-	if (effectQueues[PASSIVE].length && !passiveScheduled) {
-		passiveScheduled = true;
-		schedulePostPaint(() => {
-			passiveScheduled = false;
-			drainPhase(PASSIVE);
-		});
+	if (
+		(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
+		!passiveScheduled
+	) {
+		schedulePassiveFlush();
 	}
+}
+
+/** Arm the post-paint passive drain. Callers check `passiveScheduled` first. */
+function schedulePassiveFlush(): void {
+	passiveScheduled = true;
+	schedulePostPaint(() => {
+		passiveScheduled = false;
+		drainPassivePhase();
+	});
 }
 
 /**
@@ -1102,7 +1127,7 @@ export function drainPassiveEffects(): void {
 	// Cancel any scheduler-side passive drain that hadn't fired yet — we're
 	// about to drain inline.
 	passiveScheduled = false;
-	drainPhase(PASSIVE);
+	drainPassivePhase();
 }
 
 /**
@@ -1118,6 +1143,7 @@ export function hasPendingWork(): boolean {
 		effectQueues[INSERTION].length > 0 ||
 		effectQueues[LAYOUT].length > 0 ||
 		effectQueues[PASSIVE].length > 0 ||
+		pendingPassiveUnmounts.length > 0 ||
 		storeSyncQueue.length > 0 ||
 		hasControlledSyncs()
 	);
@@ -1241,77 +1267,173 @@ function compareEffectPostOrder(a: PendingEffect, b: PendingEffect): number {
 	return comparePostOrder(a.scope.block, a.seq, b.scope.block, b.seq);
 }
 
-function drainPhase(phase: Phase): void {
-	const pending = effectQueues[phase];
-	if (pending.length === 0) return;
-	// Take ownership of the current batch UP-FRONT (React's flushPassiveEffects nulls
-	// rootWithPendingPassiveEffects before running any effect): an effect body may
-	// synchronously dispatch a DISCRETE event (e.g. Radix's form bubble inputs
-	// dispatching `click`) whose handler flushes and re-enters drainPhase. A live-array
-	// walk would let that re-entrant call re-run entries the outer walk already
-	// executed — double-firing effects, unboundedly when the effect re-dispatches.
-	// With a snapshot, the re-entrant call sees only effects enqueued DURING this
-	// drain (nested-update work, which it runs like React's nested passive flush);
-	// anything enqueued later re-arms via the normal commit scheduling.
-	const q = pending.splice(0);
+/** Fire (and clear) the CURRENT cleanup of the slot behind a queued effect. */
+function fireEffectCleanup(e: PendingEffect): void {
+	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
+	if (slot && slot.cleanup) {
+		const cleanup = slot.cleanup;
+		slot.cleanup = undefined;
+		try {
+			cleanup();
+		} catch (err) {
+			console.error(err);
+		}
+	}
+}
+
+/** Run a queued effect's body and stash its returned cleanup on the slot. */
+function runEffectBody(e: PendingEffect): void {
+	let cleanup: void | Cleanup;
+	try {
+		// Spread deps as positional args (see PendingEffect.args). A no-deps
+		// effect has args === undefined, so the body is called with zero args.
+		// eslint-disable-next-line prefer-spread
+		cleanup = e.fn.apply(null, (e.args ?? []) as []);
+	} catch (err) {
+		// Route effect errors to the nearest enclosing tryBlock, if any.
+		const handler = findTryHandler(e.scope.block);
+		if (handler) handler(err);
+		else console.error(err);
+		return;
+	}
+	if (typeof cleanup === 'function') {
+		const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
+		// The slot owns its LATEST cleanup: unmountScope's effect-slot walk (and
+		// deactivateScope's hide walk) read + clear it, so a dep-changed effect's
+		// stale cleanup can never replay at teardown.
+		if (slot) slot.cleanup = cleanup;
+	}
+}
+
+/**
+ * Mutation phase — React's commitMutationEffects, reconstructed from the flat
+ * queues. Merges the INSERTION and LAYOUT queues into one post-order batch and
+ * walks it PER SCOPE (React walks per fiber — commitMutationEffectsOnFiber,
+ * FunctionComponent): destroy ALL of the scope's insertion effects, create ALL
+ * of them, destroy ALL of its layout effects — then the next scope. So a
+ * sibling's layout destroys land BEFORE a later sibling's insertion work, and
+ * insertion destroy/create pairs group per component — observable to CSS-in-JS
+ * (a component's style teardown/re-injection completes before its own layout
+ * cleanup measures) and pinned by conformance/insertion-effect-order.test.ts.
+ * Layout BODIES do not run here — commitEffects runs them in the layout phase
+ * (runLayoutEffects), after ref detach/attach — so the returned batch hands
+ * them across.
+ *
+ * Same-scope entries are contiguous after the sort: a scope's hooks all run in
+ * its setup (before any child renders), so its seqs are consecutive, and
+ * comparePostOrder only reorders across ancestor chains.
+ *
+ * Both queues are snapshotted UP-FRONT (React's flushPassiveEffects nulls
+ * rootWithPendingPassiveEffects before running any effect): an effect body may
+ * synchronously dispatch a DISCRETE event (e.g. Radix's form bubble inputs
+ * dispatching `click`) whose handler flushes and re-enters the drains. A
+ * live-array walk would let that re-entrant call re-run entries the outer walk
+ * already executed — double-firing effects, unboundedly when the effect
+ * re-dispatches. With a snapshot, the re-entrant call sees only effects
+ * enqueued DURING this drain (nested-update work, which it runs like React's
+ * nested flush); anything enqueued later re-arms via normal commit scheduling.
+ *
+ * Skip entries whose subtree was hidden by <Activity> after they were queued
+ * but before this drain: deactivateScope already fired their cleanups, and the
+ * body must not run while hidden (it re-enqueues on reveal). See
+ * inInactiveSubtree. INSERTION entries are exempt — they stay connected and
+ * keep firing while hidden (deactivateScope spares them too).
+ */
+function drainMutationEffects(): PendingEffect[] | null {
+	const ins = effectQueues[INSERTION];
+	const lay = effectQueues[LAYOUT];
+	if (ins.length === 0 && lay.length === 0) return null;
+	const q =
+		ins.length === 0
+			? lay.splice(0)
+			: lay.length === 0
+				? ins.splice(0)
+				: ins.splice(0).concat(lay.splice(0));
 	// React parity: fire in post-order (child-before-parent, siblings in tree order).
 	// Stable sort preserves enqueue order for entries the comparator treats as equal.
 	q.sort(compareEffectPostOrder);
-	// Cleanups first (in registration order), then bodies. React's contract.
-	// Skip entries whose subtree was hidden by <Activity> after they were queued
-	// but before this drain: deactivateScope already fired their cleanups, and the
-	// body must not run while hidden (it re-enqueues on reveal). See
-	// inInactiveSubtree. INSERTION entries are exempt — they stay connected and
-	// keep firing while hidden (deactivateScope spares them too).
-	const skipInactive = phase !== INSERTION;
+	const n = q.length;
+	let i = 0;
+	while (i < n) {
+		const scope = q[i].scope;
+		let end = i + 1;
+		while (end < n && q[end].scope === scope) end++;
+		for (let k = i; k < end; k++) {
+			const e = q[k];
+			if (e.phase === INSERTION && !e.scope.block.disposed) fireEffectCleanup(e);
+		}
+		for (let k = i; k < end; k++) {
+			const e = q[k];
+			if (e.phase === INSERTION && !e.scope.block.disposed) runEffectBody(e);
+		}
+		for (let k = i; k < end; k++) {
+			const e = q[k];
+			if (e.phase === LAYOUT && !e.scope.block.disposed && !inInactiveSubtree(e.scope.block))
+				fireEffectCleanup(e);
+		}
+		i = end;
+	}
+	return q;
+}
+
+/**
+ * Layout phase — run the layout BODIES of a mutation batch (their cleanups
+ * already fired in drainMutationEffects' walk), in the batch's post-order.
+ * Guards re-checked per entry: a mutation-walk effect (or the ref work in
+ * between) may have unmounted or hidden a later entry's subtree.
+ */
+function runLayoutEffects(q: PendingEffect[]): void {
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
-		if (e.scope.block.disposed || (skipInactive && inInactiveSubtree(e.scope.block))) continue;
-		const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
-		if (slot && slot.cleanup) {
-			try {
-				slot.cleanup();
-			} catch (err) {
-				console.error(err);
-			}
-			slot.cleanup = undefined;
-		}
+		if (e.phase !== LAYOUT) continue;
+		if (e.scope.block.disposed || inInactiveSubtree(e.scope.block)) continue;
+		runEffectBody(e);
+	}
+}
+
+/**
+ * Passive phase — React's flushPassiveEffects: first the DEFERRED destroys of
+ * unmounted scopes (commitPassiveUnmountEffects processes deletions in the
+ * same pass), then commit-wide cleanups-before-bodies over the queued entries.
+ * Snapshot-and-splice up front for the same re-entrancy contract as
+ * drainMutationEffects (see its comment).
+ */
+function drainPassivePhase(): void {
+	drainDeferredPassiveUnmounts();
+	const pending = effectQueues[PASSIVE];
+	if (pending.length === 0) return;
+	const q = pending.splice(0);
+	q.sort(compareEffectPostOrder);
+	for (let i = 0; i < q.length; i++) {
+		const e = q[i];
+		if (e.scope.block.disposed || inInactiveSubtree(e.scope.block)) continue;
+		fireEffectCleanup(e);
 	}
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
-		if (e.scope.block.disposed || (skipInactive && inInactiveSubtree(e.scope.block))) continue;
-		let cleanup: void | Cleanup;
+		if (e.scope.block.disposed || inInactiveSubtree(e.scope.block)) continue;
+		runEffectBody(e);
+	}
+}
+
+// Passive destroys of DELETED scopes, deferred past the sync phase (React
+// defers them to flushPassiveEffects — commitPassiveUnmountEffects). Flat
+// [cleanup, boundary-handler] pairs, pushed by unmountScope's effect-slot walk
+// in deletion-walk order (parent→child, declaration order within a scope);
+// the captured handler routes a late throw to the try boundary that enclosed
+// the deletion — the same routing reportTeardownError gave the sync destroys.
+const pendingPassiveUnmounts: Array<Cleanup | ((err: any) => void) | null> = [];
+
+function drainDeferredPassiveUnmounts(): void {
+	if (pendingPassiveUnmounts.length === 0) return;
+	const q = pendingPassiveUnmounts.splice(0);
+	for (let i = 0; i < q.length; i += 2) {
 		try {
-			// Spread deps as positional args (see PendingEffect.args). A no-deps
-			// effect has args === undefined, so the body is called with zero args.
-			// eslint-disable-next-line prefer-spread
-			cleanup = e.fn.apply(null, (e.args ?? []) as []);
+			(q[i] as Cleanup)();
 		} catch (err) {
-			// Route effect errors to the nearest enclosing tryBlock, if any.
-			const handler = findTryHandler(e.scope.block);
-			if (handler) handler(err);
+			const handler = q[i + 1] as ((err: any) => void) | null;
+			if (handler !== null) handler(err);
 			else console.error(err);
-			continue;
-		}
-		const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
-		if (slot) {
-			if (typeof cleanup === 'function') slot.cleanup = cleanup;
-			// Register ONE stable finalizer per effect slot, on its FIRST run, in
-			// phase-execution order. The finalizer fires the slot's CURRENT cleanup
-			// once at unmount. Registering here (not on each drain) is what stops
-			// the old double-fire bug: previously every returned cleanup was pushed
-			// into scope.cleanups, so a dep-changed effect's stale cleanups replayed
-			// at unmount. The slot owns its latest cleanup; the finalizer reads it.
-			if (!slot.finalized) {
-				slot.finalized = true;
-				e.scope.cleanups.push(() => {
-					const c = slot.cleanup;
-					if (c) {
-						slot.cleanup = undefined;
-						c();
-					}
-				});
-			}
 		}
 	}
 }
@@ -1329,15 +1451,15 @@ function checkStoreChanged(inst: StoreInst<any>): boolean {
 }
 
 // Commit-phase drain of the uSES store-sync queue (see storeSyncQueue). Runs in
-// commitEffects AFTER drainPhase(LAYOUT). For each queued consumer: promote the
+// commitEffects AFTER runLayoutEffects. For each queued consumer: promote the
 // render-read snapshot to the committed `value`, then tear-check against the store
 // as of NOW — if a mutation slipped into the render→commit window (e.g. a sibling
 // layout effect that mutated+notified), force a re-render so the DOM catches up.
 // No sort (order is irrelevant: each entry only touches its own inst) and no
-// cleanup bookkeeping — the whole point of not routing these through drainPhase.
+// cleanup bookkeeping — the whole point of not routing these through the effect drains.
 function drainStoreSyncs(): void {
 	if (storeSyncQueue.length === 0) return;
-	// Snapshot-and-clear up front (like drainPhase): a forced re-render below could
+	// Snapshot-and-clear up front (like the effect drains): a forced re-render below could
 	// synchronously re-enter this drain; it must see only entries queued AFTER this
 	// point, never re-process the batch we already own.
 	const q = storeSyncQueue.splice(0);
@@ -1345,7 +1467,7 @@ function drainStoreSyncs(): void {
 		const inst = q[i];
 		inst.queued = false;
 		// Skip a consumer whose block was unmounted, or hidden by <Activity>, between
-		// enqueue and now — same guards drainPhase applies to effects.
+		// enqueue and now — same guards the effect drains apply to effects.
 		if (inst.block.disposed || inInactiveSubtree(inst.block)) continue;
 		inst.value = inst.pending;
 		if (checkStoreChanged(inst)) inst.forceUpdate();
@@ -1416,6 +1538,7 @@ class BlockImpl {
 	// Hooks + cleanups (per-block state).
 	hooks: Map<symbol, any> | null;
 	cleanups: Cleanup[];
+	effectSlots: EffectSlot[] | null;
 	children: ChildScope[];
 	_slots: any[] | null;
 	refFields: string[] | null;
@@ -1494,6 +1617,7 @@ class BlockImpl {
 		this.inactive = false;
 		this.hooks = null;
 		this.cleanups = [];
+		this.effectSlots = null;
 		this.children = [];
 		this._slots = null;
 		this.refFields = null;
@@ -1533,6 +1657,7 @@ class ScopeImpl {
 	parent: Scope | null;
 	hooks: Map<symbol, any> | null;
 	cleanups: Cleanup[];
+	effectSlots: EffectSlot[] | null;
 	children: ChildScope[];
 	_slots: any[] | null;
 	refFields: string[] | null;
@@ -1549,6 +1674,7 @@ class ScopeImpl {
 		this.parent = parent;
 		this.hooks = null;
 		this.cleanups = [];
+		this.effectSlots = null;
 		this.children = [];
 		this._slots = null;
 		this.refFields = null;
@@ -1946,14 +2072,45 @@ function registerSlot(scope: Scope, slot: any): void {
 }
 
 function unmountScope(scope: Scope, detachDom: boolean = true): void {
-	// Fire THIS scope's cleanups BEFORE recursing into children, so deletion
+	// Fire THIS scope's teardown BEFORE recursing into children, so deletion
 	// cleanups run parent → child — matching React's commitDeletionEffects
-	// pre-order walk (ReactEffectOrdering-test.js:37/:64). Within the scope they
-	// still fire in REVERSE-mount order (last useEffect's cleanup first). The DOM
-	// range is still attached here (unmountBlock removes it after this returns),
-	// so a parent layout-effect cleanup can still observe its children's nodes —
-	// exactly as in React, where the parent's destroy runs while the subtree is
-	// still mounted.
+	// pre-order walk (ReactEffectOrdering-test.js:37/:64). The DOM range is
+	// still attached here (unmountBlock removes it after this returns), so a
+	// layout-effect cleanup can still observe its children's nodes — exactly as
+	// in React, where the destroy runs while the subtree is still mounted.
+	//
+	// Effect destroys first, PHASE-CORRECT (React's commitDeletionEffectsOnFiber,
+	// FunctionComponent): walk the scope's effect slots in hook DECLARATION order
+	// — React's forward effect-list walk, so insertion and layout destroys fire
+	// synchronously in their declared interleaving — and DEFER passive destroys
+	// to the passive flush (React runs those in commitPassiveUnmountEffects,
+	// after the sync phase). scope.effectSlots, not scope.cleanups: cleanups
+	// registration is phase-EXECUTION order, which loses the declared order and
+	// can't tell a passive destroy from a ref teardown.
+	const effects = scope.effectSlots;
+	if (effects !== null) {
+		for (let i = 0; i < effects.length; i++) {
+			const slot = effects[i];
+			const cleanup = slot.cleanup;
+			if (cleanup === undefined) continue;
+			slot.cleanup = undefined;
+			if (slot.phase === PASSIVE) {
+				pendingPassiveUnmounts.push(cleanup, TEARDOWN_HANDLER);
+				// Arm the post-paint drain for unmounts OUTSIDE a commit
+				// (root.unmount()); a commit-driven unmount would re-arm in
+				// commitEffects anyway, deduped by the flag.
+				if (!passiveScheduled) schedulePassiveFlush();
+			} else {
+				try {
+					cleanup();
+				} catch (err) {
+					reportTeardownError(err);
+				}
+			}
+		}
+	}
+	// Then the scope's remaining cleanups (ref detaches, listener teardown, slot
+	// state) in REVERSE registration order.
 	const c = scope.cleanups;
 	// Suppress queued ref detaches while unwinding an ABORTED mount (the scope's
 	// render never completed — `mounted` is only set at the successful end of
@@ -2226,7 +2383,7 @@ function depsChanged(prev: any[] | undefined, next: any[] | undefined): boolean 
 // True if `block` or any ancestor is in a hidden <Activity> subtree. Effects
 // must not run inside such a subtree — neither freshly (enqueueEffect skips
 // registration) NOR via an entry already sitting in a phase queue when the
-// Activity hides between enqueue and drain (drainPhase skips execution). On
+// Activity hides between enqueue and drain (the effect drains skip execution). On
 // reveal, deactivateScope has cleared each effect slot's deps, so the
 // re-render re-enqueues and the effect finally fires.
 function inInactiveSubtree(block: Block | null): boolean {
@@ -2249,13 +2406,18 @@ function enqueueEffect(slot: symbol, fn: EffectFn, deps: any[] | undefined, phas
 	const prev = scope.hooks?.get(slot) as EffectSlot | undefined;
 	if (prev && !depsChanged(prev.deps, deps)) return;
 	if (!prev) {
-		ensureHooks(scope).set(slot, { deps, cleanup: undefined, effect: true, phase });
+		const slotObj: EffectSlot = { deps, cleanup: undefined, effect: true, phase };
+		ensureHooks(scope).set(slot, slotObj);
+		// Parallel flat list in declaration order — unmountScope's phase-correct
+		// deletion walk reads it (see Scope.effectSlots).
+		if (scope.effectSlots === null) scope.effectSlots = [slotObj];
+		else scope.effectSlots.push(slotObj);
 	} else {
 		prev.deps = deps;
 	}
-	// Tag with the enqueue sequence (DFS pre-order). drainPhase turns this + the
-	// parentBlock chain into React's post-order commit order — see PendingEffect.seq.
-	const entry = { scope, slot, fn, args: deps, seq: commitSeq++ };
+	// Tag with the enqueue sequence (DFS pre-order). The commit drains turn this +
+	// the parentBlock chain into React's post-order commit order — see PendingEffect.seq.
+	const entry = { scope, slot, fn, args: deps, phase, seq: commitSeq++ };
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.effects[phase] : effectQueues[phase]).push(entry);
 }
 
@@ -2450,7 +2612,7 @@ function enqueueStoreSync(
 }
 
 // Passive-phase subscription body for uSES, written as a DEPS-AS-ARGS function
-// (drainPhase applies the deps array positionally — a Ripple superset, see
+// (the effect drains apply the deps array positionally — a Ripple superset, see
 // PendingEffect.args) so it lives at module scope with zero per-render capture.
 // The PARAMETER ORDER MUST MATCH the deps array `[inst, subscribe]` at the call
 // site — reordering the deps silently mis-binds these arguments. Re-fires only
@@ -2491,7 +2653,7 @@ function subscribeToStore(
  * (the cell, in the hooks map) and `<slot>:uses:effect` (the passive subscribe
  * effect). The value-sync that reconciles the render-read snapshot at commit does
  * NOT go through a layout effect — it rides the dedicated, sort-free
- * `storeSyncQueue` (drainStoreSyncs, run after drainPhase(LAYOUT)). Two payoffs:
+ * `storeSyncQueue` (drainStoreSyncs, run after the layout phase). Two payoffs:
  *
  *  1. The commit-sync entry carries no cleanup and never reorders, so the generic
  *     effect machinery (deps compare, PendingEffect alloc, post-order sort,
@@ -2575,7 +2737,7 @@ export function useSyncExternalStore<T>(
 	// cleanup (re-subscribe on store swap, unsubscribe on unmount) a bare queue
 	// entry can't carry. inst is identity-stable, so the deps `[inst, subscribe]`
 	// fire exactly when the old `[subscribe]` deps did. Body is the module-level
-	// deps-as-args fn (cast: EffectFn is nominally zero-arg, but drainPhase applies
+	// deps-as-args fn (cast: EffectFn is nominally zero-arg, but the effect drain applies
 	// the deps positionally — see subscribeToStore).
 	useEffect(subscribeToStore as unknown as EffectFn, [inst, subscribe], subs.effect);
 
@@ -10073,7 +10235,7 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
  *     with null), recreated on reveal — React cycles refs across a suspend like
  *     layout effects. Only on the FIRST hide; a re-suspend during a partial
  *     resolve must not re-detach.
- *  4. Mark the hidden subtree inactive (the <Activity> mechanism) so drainPhase
+ *  4. Mark the hidden subtree inactive (the <Activity> mechanism) so the drains
  *     SKIPS any effects the just-aborted (re-)suspending render enqueued for it —
  *     otherwise a boundary that re-suspends DURING a resume (e.g. one of several
  *     promises resolves but another is still pending) leaves stale layout effects
@@ -10218,7 +10380,7 @@ function commitResume(state: TrySlot): void {
 		// microtask, outside the normal flush): a full reveal RECREATES the destroyed
 		// layout effects (ReactSuspenseEffectsSemantics); a re-suspend (one of several
 		// promises resolved, another still pending) enqueued effects for the now-hidden
-		// subtree that drainPhase must SKIP (inactive) and CLEAR — without draining here
+		// subtree that the effect drains must SKIP (inactive) and CLEAR — without draining here
 		// the LAYOUT queue stays non-empty and the scheduler never goes quiescent.
 		commitEffects();
 	} finally {
@@ -11596,12 +11758,12 @@ function deactivateScope(scope: Scope): void {
 				// Activity-test.js:1428): no cleanup on hide, deps kept so the
 				// reveal re-render doesn't re-fire them. They own injected styles
 				// that must persist while a tree is merely hidden; only a real
-				// unmount (the scope.cleanups finalizer) tears them down.
+				// unmount (unmountScope's effect-slot walk) tears them down.
 				if (e.phase === INSERTION) continue;
 				if (typeof e.cleanup === 'function') {
 					const cleanup = e.cleanup;
-					// Clear it BEFORE firing so the per-slot unmount finalizer (still
-					// registered in scope.cleanups) sees no cleanup and won't re-run it.
+					// Clear it BEFORE firing so unmountScope's effect-slot walk sees
+					// no cleanup and won't re-run it.
 					e.cleanup = undefined;
 					try {
 						cleanup();

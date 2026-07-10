@@ -282,8 +282,9 @@ describe('<Activity> — insertion effects stay connected while hidden (conforma
 		t.setMode('visible');
 		expect(t.log).toEqual(['layout mount']); // insertion not re-fired
 		t.r.unmount();
-		// A real unmount DOES tear the insertion effect down.
-		expect(t.log).toEqual(['layout mount', 'layout cleanup', 'insertion cleanup 0']);
+		// A real unmount DOES tear the insertion effect down — destroys fire in
+		// hook declaration order (insertion is declared before layout).
+		expect(t.log).toEqual(['layout mount', 'insertion cleanup 0', 'layout cleanup']);
 	});
 
 	// Per Activity-test.js:1428 — an update WHILE hidden still fires the
