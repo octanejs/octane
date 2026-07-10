@@ -627,6 +627,25 @@ importers:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
 
+  benchmarks/effectful-list/vue-vapor:
+    dependencies:
+      '@vue/runtime-dom':
+        specifier: catalog:default
+        version: 3.6.0-beta.17
+      '@vue/runtime-vapor':
+        specifier: catalog:default
+        version: 3.6.0-beta.17(@vue/runtime-dom@3.6.0-beta.17)
+      vue:
+        specifier: catalog:default
+        version: 3.6.0-beta.17(typescript@5.9.3)
+    devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: catalog:default
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   benchmarks/js-framework:
     dependencies:
       playwright:
@@ -902,6 +921,25 @@ importers:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
 
+  benchmarks/news/vue-vapor:
+    dependencies:
+      '@vue/runtime-dom':
+        specifier: catalog:default
+        version: 3.6.0-beta.17
+      '@vue/runtime-vapor':
+        specifier: catalog:default
+        version: 3.6.0-beta.17(@vue/runtime-dom@3.6.0-beta.17)
+      vue:
+        specifier: catalog:default
+        version: 3.6.0-beta.17(typescript@5.9.3)
+    devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: catalog:default
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   benchmarks/portal-swarm:
     dependencies:
       playwright:
@@ -1030,6 +1068,25 @@ importers:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
 
+  benchmarks/recursive-context/vue-vapor:
+    dependencies:
+      '@vue/runtime-dom':
+        specifier: catalog:default
+        version: 3.6.0-beta.17
+      '@vue/runtime-vapor':
+        specifier: catalog:default
+        version: 3.6.0-beta.17(@vue/runtime-dom@3.6.0-beta.17)
+      vue:
+        specifier: catalog:default
+        version: 3.6.0-beta.17(typescript@5.9.3)
+    devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: catalog:default
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   benchmarks/signal-favoring:
     dependencies:
       playwright:
@@ -1100,6 +1157,25 @@ importers:
       vite-plugin-solid:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
+  benchmarks/signal-favoring/vue-vapor:
+    dependencies:
+      '@vue/runtime-dom':
+        specifier: catalog:default
+        version: 3.6.0-beta.17
+      '@vue/runtime-vapor':
+        specifier: catalog:default
+        version: 3.6.0-beta.17(@vue/runtime-dom@3.6.0-beta.17)
+      vue:
+        specifier: catalog:default
+        version: 3.6.0-beta.17(typescript@5.9.3)
+    devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: catalog:default
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/ssr-throughput:
     dependencies:

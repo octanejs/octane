@@ -1,5 +1,5 @@
 // effectful-list bench harness — drives octane-tsrx / octane-jsx / react /
-// solid / ripple via Playwright.
+// solid / ripple / vue-vapor via Playwright.
 //
 // Where js-framework measures raw keyed-list DOM throughput on effect-free
 // rows, this suite makes every row LIFECYCLE-BEARING: a cross-module Row
@@ -11,13 +11,18 @@
 // Object.is churn — costs js-framework's effect-free rows never touch.
 //
 // Methodology mirrors the sibling benches: every op commits its DOM mutation
-// AND its effect dispatch synchronously inside the adapter call (octane:
-// flushSync + drainPassiveEffects; react: flushSync — React 19 flushes
-// passives synchronously at the tail of a sync-lane commit; solid: flush();
-// ripple: flushSync), so we time ONLY the framework's JS work, with a forced
-// GC before each timed sample. Sub-millisecond ops (update_nodeps /
-// update_deps on the fine-grained targets) loop N times inside the timed
-// window and divide, to beat timer quantization.
+// AND its effect dispatch inside the adapter call — synchronously where the
+// framework allows it (octane: flushSync + drainPassiveEffects; react:
+// flushSync — React 19 flushes passives synchronously at the tail of a
+// sync-lane commit; solid: flush(); ripple: flushSync); an adapter with no
+// public sync flush (vue-vapor) returns a thenable and the timed window
+// extends until it settles (nextTick resolves after Vue's flushJobs — DOM
+// mutated and post-flush watchers drained). Either way we time ONLY the
+// framework's JS work, with a forced GC before each timed sample.
+// Sub-millisecond ops (update_nodeps / update_deps on the fine-grained
+// targets) loop N times inside the timed window and divide, to beat timer
+// quantization — awaiting BETWEEN iterations on async-commit targets so the
+// N state changes can't coalesce into one commit.
 //
 // CORRECTNESS GATE (load-bearing): before timing each op, the harness resets
 // the fixture's window.__fx counters, applies the op once, and asserts the
@@ -43,6 +48,7 @@
 //   pnpm --filter react-effectful-list-bench       preview   # :5203
 //   pnpm --filter solid-effectful-list-bench       preview   # :5204
 //   pnpm --filter ripple-effectful-list-bench      preview   # :5205
+//   pnpm --filter vue-vapor-effectful-list-bench   preview   # :5221
 // (swap `preview` → `dev` for the unminified dev build).
 //
 // Usage:  node run.mjs [iter]   # default 30
@@ -64,6 +70,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'react', url: 'http://localhost:5203/' },
 			{ name: 'solid', url: 'http://localhost:5204/' },
 			{ name: 'ripple', url: 'http://localhost:5205/' },
+			{ name: 'vue-vapor', url: 'http://localhost:5221/' },
 		];
 
 // perSamplePre: the op consumes its pre-state (empty / fresh 1k), so the pre
@@ -195,7 +202,11 @@ async function gateCheck(page, op) {
 
 // Timed loop, entirely in-page: (optional per-sample pre) → gc() → inner×op →
 // divide. Yields a macrotask between samples so the page stays responsive and
-// deferred work can't bleed into the next sample.
+// deferred work can't bleed into the next sample. An op that returns a
+// thenable (vue-vapor — no public sync flush; see the methodology note) is
+// awaited BETWEEN inner iterations, so each iteration commits — the inner
+// state changes would otherwise coalesce into one commit and the sample
+// would time a single net update instead of `inner` full ones.
 async function measureOp(page, op) {
 	const samples = await page.evaluate(
 		async ({ preName, opName, perSamplePre, inner, WARMUP, ITER, YIELD_MS }) => {
@@ -215,7 +226,10 @@ async function measureOp(page, op) {
 				}
 				gc();
 				const t0 = performance.now();
-				for (let k = 0; k < inner; k++) fn();
+				for (let k = 0; k < inner; k++) {
+					const r = fn();
+					if (r && typeof r.then === 'function') await r;
+				}
 				const dt = (performance.now() - t0) / inner;
 				if (i >= WARMUP) out.push(dt);
 				await yieldTask();

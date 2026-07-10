@@ -12,7 +12,7 @@
 //                      the production client bundle loaded.
 //
 // Run:  node benchmarks/news/run.mjs [target] [iterations] [--no-build]
-//         target ∈ {octane, solid, react}  (default octane)
+//         target ∈ TARGET_PORTS below  (default octane-tsrx)
 //         --no-build  reuse the existing dist/ (skip the rebuild for fast re-runs)
 //       node run.mjs 20    (back-compat: a bare number = iterations → octane)
 
@@ -34,6 +34,7 @@ const TARGET_PORTS = {
 	solid: 5192,
 	react: 5193,
 	ripple: 5194,
+	'vue-vapor': 5222,
 };
 const args = process.argv.slice(2);
 const noBuild = args.includes('--no-build');

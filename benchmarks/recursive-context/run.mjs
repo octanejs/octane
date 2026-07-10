@@ -1,13 +1,15 @@
-// recursive-context bench harness — drives octane / solid / react / ripple
-// via Playwright.
+// recursive-context bench harness — drives octane / solid / react / ripple /
+// vue-vapor via Playwright.
 //
 // Methodology: every op (mount, update_root, update_partial, partial_unmount /
-// remount, unmount) mutates the DOM SYNCHRONOUSLY inside its adapter call — all
-// four adapters flush synchronously (ripple / octane / react via `flushSync`,
-// solid via `flush()`). So we time ONLY the synchronous op (the framework's JS
-// work) and force a GC right before each timed sample, so a surprise mid-sample
-// collection can't inflate it. This isolates framework cost from browser paint
-// and GC jitter and yields low-variance medians.
+// remount, unmount) mutates the DOM inside its adapter call — synchronously
+// where the framework allows it (ripple / octane / react via `flushSync`,
+// solid via `flush()`); an adapter with no public sync flush (vue-vapor)
+// returns a thenable (nextTick(), settling after Vue's flushJobs) and the
+// timed window extends until it settles. Either way we time ONLY the op (the
+// framework's JS work) and force a GC right before each timed sample, so a
+// surprise mid-sample collection can't inflate it. This isolates framework
+// cost from browser paint and GC jitter and yields low-variance medians.
 //
 // (The previous harness awaited a `requestAnimationFrame` + task after each op;
 // that ~16ms frame wait + paint + non-deterministic GC swamped the ~1–4ms of
@@ -16,7 +18,8 @@
 // cost, not the browser's paint cycle.)
 //
 // NOTE: this measures framework JS work, not pixels-on-screen latency. Adapters
-// MUST flush their DOM mutations synchronously within the op call.
+// MUST either flush their DOM mutations synchronously within the op call or
+// return a thenable that settles once the mutation has landed.
 //
 // Usage:
 //   node run.mjs [iter]   # default 20 (bench:long passes 40)
@@ -36,6 +39,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'solid', url: 'http://localhost:5187/' },
 			{ name: 'react', url: 'http://localhost:5186/' },
 			{ name: 'ripple', url: 'http://localhost:5184/' },
+			{ name: 'vue-vapor', url: 'http://localhost:5189/' },
 		];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -93,7 +97,8 @@ async function measureLoop(browser, url, op) {
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
 				const t0 = performance.now();
-				fn();
+				const r = fn();
+				if (r && typeof r.then === 'function') await r;
 				const dt = performance.now() - t0;
 				if (i >= WARMUP) out.push(dt);
 				await new Promise((r) => setTimeout(r, YIELD_MS));
@@ -147,12 +152,14 @@ async function measurePartialUnmountRemount(browser, url) {
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
 				let t0 = performance.now();
-				window.__partialUnmount();
+				const ru = window.__partialUnmount();
+				if (ru && typeof ru.then === 'function') await ru;
 				const du = performance.now() - t0;
 				await new Promise((res) => setTimeout(res, YIELD_MS));
 				gc();
 				t0 = performance.now();
-				window.__partialRemount();
+				const rr = window.__partialRemount();
+				if (rr && typeof rr.then === 'function') await rr;
 				const dr = performance.now() - t0;
 				if (i >= WARMUP) {
 					u.push(du);

@@ -105,6 +105,7 @@ const SUITES = [
 			{ filter: 'react-recursive-bench', port: 5186 },
 			{ filter: 'solid-recursive-bench', port: 5187 },
 			{ filter: 'octane-jsx-recursive-bench', port: 5188 },
+			{ filter: 'vue-vapor-recursive-bench', port: 5189 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -118,6 +119,7 @@ const SUITES = [
 			{ filter: 'react-signal-bench', port: 5192 },
 			{ filter: 'ripple-signal-bench', port: 5193 },
 			{ filter: 'octane-jsx-signal-bench', port: 5194 },
+			{ filter: 'vue-vapor-signal-bench', port: 5183 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -130,7 +132,7 @@ const SUITES = [
 		cwd: 'news',
 		servers: [],
 		iter: { normal: 20, quick: 3 },
-		runs: ['octane-tsrx', 'octane-jsx', 'react', 'ripple', 'solid'].map((target) => ({
+		runs: ['octane-tsrx', 'octane-jsx', 'react', 'ripple', 'solid', 'vue-vapor'].map((target) => ({
 			label: target,
 			script: 'run.mjs',
 			args: (n) => [target, String(n)],
@@ -145,6 +147,7 @@ const SUITES = [
 			{ filter: 'react-effectful-list-bench', port: 5203 },
 			{ filter: 'solid-effectful-list-bench', port: 5204 },
 			{ filter: 'ripple-effectful-list-bench', port: 5205 },
+			{ filter: 'vue-vapor-effectful-list-bench', port: 5221 },
 		],
 		iter: { normal: 30, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],

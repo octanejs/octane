@@ -1,4 +1,4 @@
-# effectful-list bench — octane (TSRX vs JSX) vs react vs solid vs ripple
+# effectful-list bench — octane (TSRX vs JSX) vs react vs solid vs ripple vs vue-vapor
 
 A sibling of [`js-framework`](../js-framework/) and [`dbmon`](../dbmon/) that
 measures what those suites deliberately avoid: **the per-row effect/ref
@@ -52,12 +52,14 @@ benchmarks/effectful-list/
 │                  #   IDENTICAL to octane-jsx's (only the import source differs)
 ├── solid/         # Vite app, dev :5204 — Solid 2.0: createStore + reconcile + <For>
 ├── ripple/        # Vite app, dev :5205 — ripple: track + keyed @for + effect()
+├── vue-vapor/     # Vite app, dev :5221 — Vue 3.6 Vapor: keyed v-for + onMounted/
+│                  #   onUnmounted/watchPostEffect; ops return nextTick() (no sync flush)
 ├── run.mjs        # Playwright harness — gates + timings
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
 ```
 
-All five apps share the same `data.js` (seeded mulberry32 item factory) and
+All six apps share the same `data.js` (seeded mulberry32 item factory) and
 `ops.js` (module-scope current-array driver) verbatim, so every target renders
 byte-identical content for the same op sequence.
 
@@ -119,10 +121,10 @@ cleanup **and** a ref cleanup.
   and the gates deterministic. Solid ops call `flush()`; ripple ops go through
   `flushSync`.
 - `update_nodeps` is **meaningfully octane-vs-react only**: fine-grained
-  frameworks (solid, ripple) don't re-render row bodies on an unrelated parent
-  signal, so their column is ~the cost of one text-node update. It's kept for
-  all five targets because the gate (zero effect fires) is still a correctness
-  statement about each framework.
+  frameworks (solid, ripple, vue-vapor) don't re-render row bodies on an
+  unrelated parent signal, so their column is ~the cost of one text-node
+  update. It's kept for all six targets because the gate (zero effect fires)
+  is still a correctness statement about each framework.
 - Sub-millisecond ops (`update_nodeps`, `update_deps`) run a ×10 inner loop
   inside the timed window and divide, to beat timer quantization.
 - Framework-equivalence adaptations (all preserve the analytic counter
@@ -144,10 +146,21 @@ cleanup **and** a ref cleanup.
     returned teardown is the cleanup), and the layout-read effect depends on
     the row's `item` binding, which the ops driver only replaces when `value`
     actually changes. Ripple function refs support the cleanup-return.
+  - **vue-vapor** has no public synchronous flush — every op returns
+    `nextTick()` (settles after `flushJobs`: DOM mutated AND the post-flush
+    `watchPostEffect`s drained) and the harness awaits the thenable inside the
+    timed window, between inner-loop iterations. `onMounted`/`onUnmounted` are
+    the mount/cleanup pair; `watchPostEffect` tracking the reactive `item`
+    prop is the layout-effect slot (post-DOM, pre-paint). Vue function refs
+    have no cleanup-return protocol AND vapor re-invokes a dynamic `:ref` with
+    the SAME element when a keyed row's item updates, so the shared `rowRef`
+    counts transitions only: first-attach per element → `refs`, the
+    null-on-unmount call → `refCleanups` (verified by the `update_deps` and
+    `remove_100_scattered` gates).
 
 ## Running
 
-Start the five preview servers (production builds), then run the harness:
+Start the six preview servers (production builds), then run the harness:
 
 ```bash
 # build + preview each (production); run from the repo root
@@ -156,6 +169,7 @@ pnpm --filter octane-jsx-effectful-list-bench  build && pnpm --filter octane-jsx
 pnpm --filter react-effectful-list-bench       build && pnpm --filter react-effectful-list-bench       preview &
 pnpm --filter solid-effectful-list-bench       build && pnpm --filter solid-effectful-list-bench       preview &
 pnpm --filter ripple-effectful-list-bench      build && pnpm --filter ripple-effectful-list-bench      preview &
+pnpm --filter vue-vapor-effectful-list-bench   build && pnpm --filter vue-vapor-effectful-list-bench   preview &
 
 # then, from benchmarks/effectful-list:
 pnpm bench           # 30 timed iterations (+10 warmup) per op

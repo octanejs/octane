@@ -1,0 +1,19 @@
+{
+  "name": "vue-vapor-news-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "news-site SSR+hydration bench fixture for Vue Vapor (3.6 vapor mode: server renders via the regular ssrRender path, client adopts with createVaporSSRApp).",
+  "scripts": {
+    "dev": "vite --host --port 5222 --strictPort"
+  },
+  "dependencies": {
+    "vue": "catalog:default",
+    "@vue/runtime-dom": "catalog:default",
+    "@vue/runtime-vapor": "catalog:default"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "catalog:default",
+    "vite": "catalog:default"
+  }
+}
