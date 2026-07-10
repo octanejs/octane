@@ -10,8 +10,10 @@
  *
  * Scope: static markup, dynamic text holes, attributes (incl. class / style /
  * spread), control flow (@if/@for/@switch/@try), nested components, scoped CSS
- * collection, Suspense, and the leaf hooks (state returns its initial value,
- * effects no-op, memo runs once, ids are deterministic). Every dynamic site is
+ * collection, Suspense, and the leaf hooks (state renders its initial value —
+ * re-invoking the body for render-phase dispatches until it settles, as React's
+ * server renderer does — effects no-op, memo runs once, ids are deterministic).
+ * Every dynamic site is
  * wrapped in the hydration markers (`constants.ts`) the client `hydrateRoot`
  * cursor adopts. Events and refs are dropped (no DOM on the server); `<Activity>`
  * and fragment refs (`<Fragment ref={…}>`) are rejected by the compiler in
@@ -950,6 +952,167 @@ function ssrOptionSelected(value: unknown, content: string): string {
 	return scope.single === key ? ' selected' : '';
 }
 
+// ---------------------------------------------------------------------------
+// Render-phase state updates. React's server renderer PROCESSES a useState/
+// useReducer dispatch fired while its own component is rendering: the update is
+// queued and the body re-invokes until a pass fires no dispatch (Fizz's
+// `didScheduleRenderPhaseUpdate` loop, capped at 25). Dispatches from anywhere
+// else — after the pass, or from a different component — are inert, exactly like
+// Fizz's `componentIdentity` gate. State lives only for the enclosing body
+// invocation (a suspense retry pass re-initializes, as in Fizz).
+//
+// Hook records are keyed by the compiler-injected call-site slot plus a per-pass
+// occurrence index (the client's slot-keyed model — hooks may sit behind
+// conditions, so call ORDER can differ between passes but a slot cannot). A
+// custom-hook body's slot-less calls key off the enclosing `withSlot` symbol,
+// and plain slot-less calls fall back to bare call order — both disambiguated
+// by the occurrence index.
+// ---------------------------------------------------------------------------
+
+interface HookRec {
+	value: unknown;
+	/** Actions queued by render-phase dispatches, folded by the NEXT pass's hook call. */
+	queue: unknown[];
+	/** Stable dispatch identity across the re-render passes (as on the client). */
+	dispatch: (action: unknown) => void;
+}
+interface HookPass {
+	/** Slot → occurrence-indexed records, persisting across this body's passes. */
+	hooks: Map<symbol | string, HookRec[]>;
+	/** Per-pass occurrence counters (fresh each pass, like Frame.occ). */
+	occ: Map<symbol | string, number>;
+	/** A dispatch fired during the current pass → re-invoke the body. */
+	update: boolean;
+}
+// The hook pass of the INNERMOST component body currently executing. Installed /
+// restored synchronously around each body invocation, so a captured dispatch can
+// tell "my component, mid-render" (queue) from anything else (inert).
+let HOOK_PASS: HookPass | null = null;
+// The `withSlot` call-site symbol, ambient while the wrapped custom hook runs —
+// its slot-less useState/useReducer calls adopt it as their key.
+let PENDING_SLOT: symbol | string | undefined;
+// Key for slot-less hook calls outside any withSlot (plain call-order keying).
+const NO_SLOT = '@state';
+
+// React's cap (and message shape): a dispatch that fires unconditionally during
+// render never converges — fail loudly instead of hanging the render.
+const MAX_RENDER_PHASE_PASSES = 25;
+
+function basicStateReducer(s: unknown, a: unknown): unknown {
+	return typeof a === 'function' ? (a as (v: unknown) => unknown)(s) : a;
+}
+
+// The shared useState/useReducer server cell. First pass creates the record
+// (running the lazy initializer once); a re-render pass folds any queued
+// render-phase actions with THIS pass's reducer (Fizz applies the latest
+// reducer closure, not the one that queued).
+function stateHook<S, A>(
+	reducer: (s: S, a: A) => S,
+	create: () => S,
+	slot: unknown,
+): [S, (action: A) => void] {
+	const hp = HOOK_PASS;
+	// Defensive: a hook invoked outside any component body — single-pass shape.
+	if (hp === null) return [create(), NOOP];
+	const key: symbol | string =
+		typeof slot === 'symbol' || typeof slot === 'string' ? slot : (PENDING_SLOT ?? NO_SLOT);
+	const n = hp.occ.get(key) ?? 0;
+	hp.occ.set(key, n + 1);
+	let list = hp.hooks.get(key);
+	if (list === undefined) hp.hooks.set(key, (list = []));
+	let rec = list[n];
+	if (rec === undefined) {
+		const r: HookRec = {
+			value: create(),
+			queue: [],
+			dispatch: (action: unknown): void => {
+				// Only while OUR body is the one rendering (Fizz's componentIdentity
+				// gate) — a dispatch invoked after the pass, or from a descendant's
+				// render, is inert on the server.
+				if (hp !== HOOK_PASS) return;
+				r.queue.push(action);
+				hp.update = true;
+			},
+		};
+		list[n] = rec = r;
+	} else if (rec.queue.length > 0) {
+		let v = rec.value as S;
+		const q = rec.queue;
+		for (let i = 0; i < q.length; i++) v = reducer(v, q[i] as A);
+		rec.queue = [];
+		rec.value = v;
+	}
+	return [rec.value as S, rec.dispatch as (action: A) => void];
+}
+
+// Invoke a component body, re-invoking while render-phase dispatches fired
+// (bounded). Each retry REWINDS everything the discarded pass emitted into the
+// ambient pass state — useId numbering, suspense seed order (SERIAL), suspense
+// registrations + discovery jobs, hoisted head markup, and the frame's child-seg
+// / occurrence counters — so the pass that converges is byte-identical to a
+// single pass rendered directly with the settled state. A suspension or real
+// error propagates as before (the discarded updates die with the pass; the
+// suspense retry re-runs the initializers, exactly like Fizz).
+function invokeComponentBody(
+	comp: ServerComponent,
+	props: any,
+	scope: SSRScope,
+	frame: Frame | null,
+): unknown {
+	const prevHP = HOOK_PASS;
+	const hp: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+	// Entry watermarks for the rewind, taken BEFORE the first pass. Every rewound
+	// structure is append-only within a pass (ID_COUNTER / nextChild increment,
+	// the buffers push), so truncating back to these restores the entry state.
+	const id0 = ID_COUNTER;
+	const head = HEAD;
+	const headLen = head !== null ? head.html.length : 0;
+	const serial = SERIAL;
+	const serialLen = serial !== null ? serial.length : 0;
+	const susp = SUSPENDED;
+	const suspLen = susp !== null ? susp.length : 0;
+	const jobs = DEFERRED;
+	const jobsLen = jobs !== null ? jobs.length : 0;
+	const ctx0 = scope.$$ctxValues;
+	let deferred0 = false;
+	let nextChild0 = 0;
+	let occ0: Map<string, number> | null = null;
+	if (frame !== null) {
+		deferred0 = frame.deferred;
+		nextChild0 = frame.nextChild;
+		occ0 = frame.occ === null ? null : new Map(frame.occ);
+	}
+	HOOK_PASS = hp;
+	try {
+		let out = comp(props ?? {}, scope, undefined);
+		let passes = 1;
+		while (hp.update) {
+			if (++passes > MAX_RENDER_PHASE_PASSES) {
+				throw new Error(
+					'Too many re-renders. Octane limits the number of renders to prevent an infinite loop.',
+				);
+			}
+			hp.update = false;
+			hp.occ = new Map();
+			ID_COUNTER = id0;
+			if (head !== null) head.html = head.html.slice(0, headLen);
+			if (serial !== null) serial.length = serialLen;
+			if (susp !== null) susp.length = suspLen;
+			if (jobs !== null) jobs.length = jobsLen;
+			scope.$$ctxValues = ctx0;
+			if (frame !== null) {
+				frame.deferred = deferred0;
+				frame.nextChild = nextChild0;
+				frame.occ = occ0 === null ? null : new Map(occ0);
+			}
+			out = comp(props ?? {}, scope, undefined);
+		}
+		return out;
+	} finally {
+		HOOK_PASS = prevHP;
+	}
+}
+
 // Render a component body under an explicit frame, tracking it as the innermost
 // component (so a suspending use() inside it captures it as a discovery job). The
 // output shape is byte-identical to a bare invocation: the body's HTML wrapped in
@@ -985,7 +1148,7 @@ function renderComponentFramed(
 		// instead, mirroring the client where such a return flows through the block's
 		// childSlot. Normalize it the same way (ssrChild = the server childSlot), or it
 		// would stringify to `[object Object]`.
-		const out = comp(props ?? {}, scope, undefined);
+		const out = invokeComponentBody(comp, props, scope, frame);
 		const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, scope);
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
@@ -1518,22 +1681,37 @@ export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
 
 // ---------------------------------------------------------------------------
 // Hooks — server semantics. All accept the compiler-injected trailing slot
-// symbol (ignored: a server render is single-pass with no re-render).
+// symbol. Most ignore it (a server render has no cross-render tracking), but
+// useState/useReducer key their render-phase-update records by it (see the
+// stateHook machinery above renderComponentFramed).
 // ---------------------------------------------------------------------------
 
-export function useState<T>(initial: T | (() => T)): [T, (next: any) => void] {
-	const value = typeof initial === 'function' ? (initial as () => T)() : initial;
-	return [value, NOOP];
+export function useState<T>(
+	initial: T | (() => T),
+	slot?: symbol | string,
+): [T, (next: any) => void] {
+	return stateHook<T, any>(
+		basicStateReducer as (s: T, a: any) => T,
+		() => (typeof initial === 'function' ? (initial as () => T)() : initial),
+		slot,
+	);
 }
 
 export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
-	initOrSlot?: ((arg: I) => S) | symbol,
+	// With a lazy init the slot trails it (`useReducer(r, arg, init, slot)`);
+	// without one the slot itself sits third (`useReducer(r, arg, slot)`).
+	initOrSlot?: ((arg: I) => S) | symbol | string,
+	maybeSlot?: symbol | string,
 ): [S, (action: A) => void] {
 	const init = typeof initOrSlot === 'function' ? initOrSlot : undefined;
-	const value = init ? init(initialArg) : (initialArg as unknown as S);
-	return [value, NOOP];
+	const slot = init !== undefined ? maybeSlot : initOrSlot;
+	return stateHook<S, A>(
+		reducer,
+		() => (init ? init(initialArg) : (initialArg as unknown as S)),
+		slot,
+	);
 }
 
 export function useEffect(): void {}
@@ -1621,12 +1799,19 @@ export function memo<P>(component: P): P {
 // Custom-hook wrapper. The compiler emits each hook call reached THROUGH a custom
 // hook as `withSlot(sym, hook, ...args)` (see runtime.ts) in BOTH modes, so the
 // server build of a `.tsrx` that defines/uses custom hooks must resolve `withSlot`
-// from here. On the server there is no per-call-site slot tracking (a render is a
-// single synchronous pass with no re-render), so we just invoke the wrapped hook
-// with its args, dropping the call-site symbol. Signature-compatible with the
-// client so the same lowered call resolves to either per build.
-export function withSlot<T>(_sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T {
-	return fn(...args);
+// from here. The call-site symbol is held ambient while the wrapped hook runs so
+// the custom hook's slot-less useState/useReducer calls key their render-phase
+// records off it (occurrence-indexed — two cells in one custom hook stay
+// distinct). Signature-compatible with the client so the same lowered call
+// resolves to either per build.
+export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T {
+	const prev = PENDING_SLOT;
+	PENDING_SLOT = sym;
+	try {
+		return fn(...args);
+	} finally {
+		PENDING_SLOT = prev;
+	}
 }
 
 // startTransition — on the client this bumps a priority flag and schedules
@@ -1961,7 +2146,7 @@ function runFullFramedPass(
 		// components: a compiled component returns its HTML string, but a plain
 		// `.ts` root (the shape every @octanejs binding produces) returns a
 		// createElement descriptor that must render through ssrChild.
-		const out = component(props ?? {}, root, undefined);
+		const out = invokeComponentBody(component, props, root, FRAME);
 		body = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, root);
 	} catch (err) {
 		// A suspension with no enclosing @try unwinds to here; its thenable is

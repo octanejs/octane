@@ -9,11 +9,18 @@
 //   2. The compiler is already plain `.js` (its only deps are `@tsrx/core` + `esrap`) — copy
 //      it verbatim.
 //   3. Type declarations (`tsc --emitDeclarationOnly`) alongside the JS.
+//
+// Entry points are GLOBBED from `src/`, not hand-listed — a hand-maintained list
+// silently drifted before (css.ts, server/rpc.ts, static/index.ts were missing and
+// dist shipped with unresolvable imports). verify-dist.mjs backstops the build:
+// every emitted module's relative imports must resolve, every publishConfig export
+// must exist, and every entry point must import cleanly in plain Node.
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
-import { cpSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { cpSync, readdirSync, rmSync } from 'node:fs';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { smokeDist, verifyDist } from './verify-dist.mjs';
 
 const pkgDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const root = join(pkgDir, '..', '..');
@@ -22,21 +29,19 @@ const dist = join(pkgDir, 'dist');
 
 rmSync(dist, { recursive: true, force: true });
 
+// Every .ts module plus any shared plain-JS modules, except the compiler dir
+// (already plain .js — copied verbatim below).
+const entryPoints = readdirSync(src, { recursive: true })
+	.filter(
+		(f) =>
+			(f.endsWith('.ts') || f.endsWith('.js')) &&
+			!f.endsWith('.d.ts') &&
+			!f.startsWith(`compiler${sep}`),
+	)
+	.map((f) => join(src, f));
+
 await build({
-	entryPoints: [
-		join(src, 'index.ts'),
-		join(src, 'runtime.ts'),
-		join(src, 'runtime.server.ts'),
-		join(src, 'constants.ts'),
-		join(src, 'css.ts'),
-		// Already plain JS (the DOM truth tables the verbatim-copied compiler also
-		// imports, as `../dom-tables.js`) — esbuild passes it through so it lands
-		// next to constants.js, where both dist consumers resolve it.
-		join(src, 'dom-tables.js'),
-		join(src, 'server/index.ts'),
-		join(src, 'server/rpc.ts'),
-		join(src, 'static/index.ts'),
-	],
+	entryPoints,
 	outdir: dist,
 	outbase: src,
 	format: 'esm',
@@ -54,4 +59,7 @@ execFileSync(join(root, 'node_modules/.bin/tsc'), ['-p', join(pkgDir, 'tsconfig.
 	stdio: 'inherit',
 });
 
-console.log('octane: built dist/ (runtime JS + .d.ts + compiler)');
+await verifyDist(pkgDir);
+smokeDist(pkgDir);
+
+console.log('octane: built dist/ (runtime JS + .d.ts + compiler) — imports verified');
