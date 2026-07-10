@@ -7,12 +7,6 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": [
-    "./src/index.ts",
-    "./src/runtime.ts",
-    "./src/runtime.server.ts",
-    "./src/constants.ts",
-    "./src/server/index.ts"
-  ],
+  "include": ["./src/**/*.ts"],
   "exclude": ["node_modules", "tests", "dist"]
 }
