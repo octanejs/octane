@@ -23,6 +23,8 @@ benchmarks/signal-favoring/
 ├── solid/             # Vite app, dev :5191 (Solid 2.0 beta)
 ├── react/             # Vite app, dev :5192 (React 19)
 ├── ripple/            # Vite app, dev :5193
+├── vue-vapor/         # Vite app, dev :5183 — Vue 3.6 Vapor: 100 SFCs, one per chain
+│                      #   link (Vue is one component per SFC); bumps return nextTick()
 ├── gen.mjs            # Source generator for the App fixtures (scaffold; see note below)
 ├── run.mjs            # Playwright harness — drives all adapters
 ├── package.json       # umbrella: `pnpm bench`
@@ -50,10 +52,16 @@ Each stateful component owns its own counter via the framework's native primitiv
 | **react**        | `useState`               | re-render of `CN`, cascade through `CN+1 .. C100`                      |
 | **solid**      | `createSignal`           | re-evaluate the `{v()}` text expression in `CN`; descendants untouched |
 | **ripple**     | `track()`                | re-evaluate the `{v}` text expression in `CN`; descendants untouched   |
+| **vue-vapor**  | `shallowRef`             | re-run the `{{ v }}` text renderEffect in `CN`; descendants untouched  |
 
 Generator-driven so the chain length, stateful spacing, and per-component shape
 stay consistent across frameworks. Edit `gen.mjs` and re-run `node gen.mjs` to
 regenerate the App fixtures (octane-tsrx, octane-jsx, ripple, react, solid).
+The vue-vapor chain is the same shape spread over 100 SFC files (Vue is one
+component per SFC), with the stateful links registering their bump closures in
+`src/bumps.js`; Vue has no public synchronous flush, so every `__bumpAtN`
+returns `nextTick()` and the harness awaits it inside the timed window (and
+between reps, so bumps can't coalesce into one commit).
 
 > **Note:** `gen.mjs` scaffolds each target's `App.*` and `main.*`, but the
 > `main.*` files are then hand-finished with the `__sweepBatched` /
@@ -112,6 +120,7 @@ pnpm --filter octane-jsx-signal-bench dev    # :5194
 pnpm --filter solid-signal-bench dev         # :5191
 pnpm --filter react-signal-bench dev         # :5192
 pnpm --filter ripple-signal-bench dev        # :5193
+pnpm --filter vue-vapor-signal-bench dev     # :5183
 
 # 4. Run the harness:
 pnpm --filter @benchmarks/signal-favoring bench

@@ -2,14 +2,14 @@
 
 A large "news site" document (header + a feed of article cards, lorem ipsum) that
 measures, per target (**octane-tsrx**, **octane-jsx**, **ripple**, **Solid 2.0**,
-**React 19**):
+**React 19**, **Vue 3.6 Vapor**):
 
 - **SSR render time** — the built `renderApp()` → HTML string, in Node, warm.
 - **Hydration time** — the SYNCHRONOUS hydration work in a headless browser, on a
   fresh page whose `#app` already holds the server-rendered DOM (timed in
   isolation via a deferred `window.__hydrate()`), with the production client
   bundle loaded. All targets commit hydration synchronously inside `__hydrate()` —
-  octane and React via `flushSync`, Solid is synchronous — so this is the
+  octane and React via `flushSync`, Solid and Vue Vapor are synchronous — so this is the
   hydration _work_, not frame-scheduling latency. (React's `hydrateRoot` is
   concurrent and would otherwise defer the work out of the measured window,
   reading as near-zero; `flushSync` forces it to commit so the comparison is
@@ -43,9 +43,18 @@ two dialects over one core):
   `renderToString` + `hydrate`, a hydratable two-build Vite drives per-request).
 - **React 19** — `@tsrx/react` (`react-dom/server` `renderToString` +
   `react-dom/client` `hydrateRoot`; one JSX transform serves both, no two-build).
+- **Vue 3.6 Vapor** — `<script setup vapor>` SFCs (not `.tsrx`; Vue's own SFC
+  compiler is the authoring model). Two builds like Solid: the SSR bundle
+  compiles the vapor SFCs to the regular `ssrRender` string codegen (vapor has
+  no server codegen in 3.6) and renders via `vue/server-renderer`
+  `renderToString`; the client bundle compiles them to vapor code and adopts
+  the markup with `createVaporSSRApp().mount()` (synchronous vapor hydration).
+  The client aliases `vue` to a vapor-inclusive shim (`src/vue-shim.js`); the
+  SSR build uses the real `vue` entry (see `vue-vapor/vite.config.js`).
 
 Reactive state is authored per target (the one real authoring difference):
-octane/React `useState`, Solid `createSignal`, original Ripple `track`.
+octane/React `useState`, Solid `createSignal`, original Ripple `track`, Vue
+`shallowRef`.
 
 This bench exercises octane's cursor-based hydration of **control flow +
 nested components** (the `@for` feed adopts each item's `<!--[-->…<!--]-->` range;
@@ -62,11 +71,12 @@ node benchmarks/news/run.mjs octane-jsx 20   # same app authored in React-style 
 node benchmarks/news/run.mjs ripple 20       # original Ripple, 20 iterations (+5 warmup)
 node benchmarks/news/run.mjs solid 20        # Solid 2.0
 node benchmarks/news/run.mjs react 20        # React 19
+node benchmarks/news/run.mjs vue-vapor 20    # Vue 3.6 Vapor
 node benchmarks/news/run.mjs react 20 --no-build   # reuse the existing dist/ (skip rebuild)
 ```
 
 `run.mjs [target] [iterations] [--no-build]` — `target` ∈
-`{octane-tsrx, octane-jsx, ripple, solid, react}` (default `octane-tsrx`; a bare
+`{octane-tsrx, octane-jsx, ripple, solid, react, vue-vapor}` (default `octane-tsrx`; a bare
 number is treated as iterations for back-compat). Each run rebuilds the target's
 production client + SSR bundles unless `--no-build` is passed. Build output goes to
 `<target>/dist/` (git-ignored). `octane-tsrx` and `octane-jsx` are the same app
