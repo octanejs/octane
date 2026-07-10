@@ -112,6 +112,22 @@
     "note": "APP-CODE-ONLY gzip vs solid, same app, normalized minify. Phases 1+3c measured 1.56x (was 1.66x); ceiling ratcheted to 1.65."
   },
   {
+    "suite": "bundle-size",
+    "op": "todo_app_gzip",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.8,
+    "note": "TodoMVC APP-CODE gzip vs solid (compiled-framework peer), normalized minify. Measured 1.69x at suite creation (2026-07-10, 2184 vs 1292) - form/conditional-heavy shapes expand worse than the rows app (1.37x vs ripple there); this is the compiled-output plan's next ratchet surface."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "todo_app_gzip",
+    "target": "octane-tsrx",
+    "reference": "ripple",
+    "maxRatio": 1.4,
+    "note": "TodoMVC APP-CODE gzip vs ripple, normalized minify. Measured 1.29x at suite creation (2026-07-10, 2184 vs 1696)."
+  },
+  {
     "suite": "async-waterfall",
     "op": "init",
     "target": "octane-tsrx",

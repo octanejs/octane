@@ -24,6 +24,8 @@ packages:
   - benchmarks/bundle-size
   - benchmarks/async-waterfall
   - benchmarks/async-waterfall/*
+  - benchmarks/todomvc
+  - benchmarks/todomvc/*
   - playground/*
   - examples/*
   - website

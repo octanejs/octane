@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
   "description": "React Testing Library for the octane renderer — reuses the framework-agnostic @testing-library/dom verbatim and ports only react-testing-library's thin React layer (render/cleanup/renderHook) onto octane's createRoot + act.",
   "author": {
     "name": "Dominic Gannaway",

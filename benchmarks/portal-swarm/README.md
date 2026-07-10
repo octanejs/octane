@@ -33,6 +33,7 @@ benchmarks/portal-swarm/
 ├── octane-tsrx/   # Vite app, dev :5210 — octane authored in .tsrx (+ a plain-.ts portal helper)
 ├── react/         # Vite app, dev :5211 (React 19, production mode)
 ├── solid/         # Vite app, dev :5212 (Solid 2.0, hand-rolled portal — see caveats)
+├── vue-vapor/     # Vite app, dev :5181 (Vue 3.6 Vapor, VaporTeleport)
 ├── run.mjs        # Playwright harness — gates + timings
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
@@ -73,8 +74,13 @@ collapse (a portal is its only mechanism), and its fine-grained model means
 `rerender_open_*` updates one text node without touching portals — that
 near-zero IS Solid's honest number for the op, not a fixture bug. The Solid
 fixture hand-rolls its portal because `@solidjs/web@2.0.0-beta.14`'s built-in
-`<Portal>` crashes under a `render()` root — see caveats. **Ripple is omitted**:
-its portal support is unverified.
+`<Portal>` crashes under a `render()` root — see caveats. For **Vue Vapor** all
+three sections likewise collapse (`VaporTeleport` is its only mechanism) and
+`rerender_open_*` is the same fine-grained one-text-node bypass; Vue commits on
+a microtask with no public sync flush, so its adapters return `nextTick()`
+thenables the harness awaits inside each timed window (awaiting BETWEEN the
+open/close halves of a cycle rep — coalesced they'd be a no-op commit).
+**Ripple is omitted**: its portal support is unverified.
 
 ## Ops
 
@@ -91,9 +97,10 @@ its portal support is unverified.
 
 `dispatch_through_portal` handlers only bump a `window.__hits` counter — **no
 setState** — so the timed window is pure event dispatch (delegation lookup +
-portal bubble hop) with discrete-flush work excluded. All ops commit
-synchronously (octane/react `flushSync`, solid `flush()`), GC is forced before
-every sample, and sub-ms ops loop-and-divide.
+portal bubble hop) with discrete-flush work excluded. All ops commit inside the
+timed adapter call — synchronously where the framework allows it (octane/react
+`flushSync`, solid `flush()`); vue-vapor returns a thenable the harness awaits —
+GC is forced before every sample, and sub-ms ops loop-and-divide.
 
 The harness also prints a `distinct/shared` cycle ratio (the per-target attach
 cost) and a `B_stable/B` rerender ratio (lower = the unchanged-portal bail

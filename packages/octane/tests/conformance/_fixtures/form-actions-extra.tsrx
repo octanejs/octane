@@ -37,8 +37,8 @@ function StatusOut(props) @{
 	</span>
 }
 
-// Manual onSubmit: preventDefault + startTransition(async). React activates
-// useFormStatus for this shape; the octane port pins the current behavior.
+// Manual onSubmit: preventDefault + startTransition(async). Activates
+// useFormStatus (React parity — the manual-action idiom).
 export function ManualTransitionForm(props) @{
 	const [, startFormTransition] = useTransition();
 	<form
