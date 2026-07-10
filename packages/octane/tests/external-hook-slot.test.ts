@@ -100,7 +100,7 @@ describe('slotHooks surgical pass', () => {
 });
 
 describe('vite plugin gate routing', () => {
-	const plugin = octane({ exclude: ['/packages/zustand/src/'] });
+	const plugin = octane({ exclude: ['/packages/zustand/src/'] }) as any;
 	// the transform doesn't need a real plugin `this` for the client paths
 	const run = (code: string, id: string) => (plugin.transform as any).call({}, code, id);
 	const HOOK = `import { useState } from 'octane';\nexport const f = () => useState(0);`;
@@ -132,5 +132,16 @@ describe('vite plugin gate routing', () => {
 	it('honors the // octane-no-slot opt-out and skips non-octane files', () => {
 		expect(run(`// octane-no-slot\n${HOOK}`, '/app/binding.ts')).toBeNull();
 		expect(run(`export const x = 1;`, '/app/plain.ts')).toBeNull();
+	});
+});
+
+describe('vite compatibility composition', () => {
+	it('keeps the zero-compat return lean and inserts adapters after the compiler', () => {
+		const core = octane() as any;
+		const adapter = { name: 'test-compat' };
+		const composed = octane({ compat: [adapter] }) as any[];
+
+		expect(Array.isArray(core)).toBe(false);
+		expect(composed.map((plugin) => plugin.name)).toEqual(['octane', 'test-compat']);
 	});
 });

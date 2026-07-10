@@ -1,22 +1,46 @@
 {
   "name": "@octanejs/react-compat",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "POC: a deterministic (non-AI) source-level bridger that detects React↔Octane differences and auto-applies the mechanical fixes, leaving the semantic residual to the MCP.",
+  "description": "React runtime compatibility layer for Octane, including automatic JSX, hook dispatch and Vite aliases.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/react-compat"
+  },
   "main": "src/shim.ts",
+  "module": "src/shim.ts",
+  "types": "src/shim.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
   "exports": {
     ".": "./src/shim.ts",
+    "./client": "./src/dom.ts",
     "./dom": "./src/dom.ts",
     "./jsx-runtime": "./src/jsx-runtime.ts",
-    "./jsx-dev-runtime": "./src/jsx-runtime.ts"
-  },
-  "bin": {
-    "octane-bridge": "./bin/bridge.mjs"
+    "./jsx-dev-runtime": "./src/jsx-runtime.ts",
+    "./server": "./src/server-shim.ts",
+    "./server-dom": "./src/server-dom.ts",
+    "./server-jsx-runtime": "./src/server-jsx-runtime.ts",
+    "./server-renderer": "./src/server-renderer.ts",
+    "./server-use-sync-external-store": "./src/server-use-sync-external-store.ts",
+    "./server-use-sync-external-store/with-selector": "./src/server-use-sync-external-store-with-selector.ts",
+    "./test-utils": "./src/test-utils.ts",
+    "./use-sync-external-store": "./src/use-sync-external-store.ts",
+    "./use-sync-external-store/with-selector": "./src/use-sync-external-store-with-selector.ts",
+    "./vite": "./src/vite.js"
   },
   "scripts": {
-    "bridge": "node bin/bridge.mjs",
     "test": "vitest run"
   },
   "dependencies": {
@@ -24,8 +48,14 @@
   },
   "devDependencies": {
     "esbuild": "catalog:default",
+    "jotai": "^2.20.1",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "react-error-boundary": "^6.1.2",
+    "react-hook-form": "^7.81.0",
+    "react-redux": "^9.3.0",
+    "redux": "^5.0.1",
+    "tailwindcss": "^4.3.2",
     "vitest": "catalog:default"
   }
 }

@@ -1,4 +1,4 @@
-/** @import {Plugin, ResolvedConfig, ViteDevServer, UserConfig} from 'vite' */
+/** @import {Plugin, PluginOption, ResolvedConfig, ViteDevServer, UserConfig} from 'vite' */
 /** @import {OctaneConfigOptions, ResolvedOctaneConfig, RenderRoute} from '@octanejs/vite-plugin' */
 
 import fs from 'node:fs';
@@ -99,8 +99,8 @@ function has_route_config(config) {
  * PHASE 1 = dev SSR + routing + hydrate. Production build (buildStart /
  * closeBundle / transformIndexHtml / server-entry / adapter.serve) is Phase 2.
  *
- * @param {{ hmr?: boolean }} [inlineOptions]
- * @returns {Plugin[]}
+ * @param {{ hmr?: boolean, compat?: PluginOption[] }} [inlineOptions]
+ * @returns {PluginOption[]}
  */
 export function octane(inlineOptions = {}) {
 	/** @type {ResolvedConfig} */
@@ -363,7 +363,11 @@ export function octane(inlineOptions = {}) {
 	};
 
 	const hmr = inlineOptions.hmr;
-	return [octaneCompiler(hmr === undefined ? {} : { hmr }), metaPlugin];
+	const compiler = octaneCompiler({
+		...(hmr === undefined ? {} : { hmr }),
+		compat: inlineOptions.compat,
+	});
+	return Array.isArray(compiler) ? [...compiler, metaPlugin] : [compiler, metaPlugin];
 }
 
 // Mainly to enforce types / DX.

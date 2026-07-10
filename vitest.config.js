@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
 import { stylex } from './packages/stylex/src/vite.js';
+import { react } from './packages/react-compat/src/vite.js';
 
 export default defineConfig({
 	test: {
@@ -310,40 +311,38 @@ export default defineConfig({
 					globals: false,
 				},
 			},
-				{
-					test: {
-						name: 'react-compat',
-						include: ['packages/react-compat/tests/**/*.test.ts'],
-						environment: 'jsdom',
-						// Bridges the unmodified-React examples/*.tsx (codemod) into
-						// tests/.bridged/*.tsx before the run; octane() then compiles those.
-						globalSetup: ['packages/react-compat/tests/_setup.mjs'],
-						globals: false,
-					},
-					plugins: [
-						octane({
-							exclude: ['/packages/zustand/src/', '/packages/query/src/', '/packages/motion/src/'],
-						}),
-					],
-					// A bridged package imports from '@octanejs/react-compat' — resolve it to
-					// the compat shim source, exactly as a consumer's alias would.
-					resolve: {
-						alias: [
-							{
-								find: /^@octanejs\/react-compat$/,
-								replacement: resolve(import.meta.dirname, 'packages/react-compat/src/shim.ts'),
+			{
+				root: resolve(import.meta.dirname, 'packages/react-compat'),
+				test: {
+					name: 'react-compat-native',
+					include: ['tests/native-packages.test.ts', 'tests/edge-cases.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+					deps: {
+						optimizer: {
+							client: {
+								enabled: true,
+								include: ['jotai', 'react-error-boundary', 'react-hook-form', 'react-redux'],
 							},
-							{
-								find: /^@octanejs\/react-compat\/dom$/,
-								replacement: resolve(import.meta.dirname, 'packages/react-compat/src/dom.ts'),
-							},
-							{
-								find: /^@octanejs\/react-compat\/jsx-runtime$/,
-								replacement: resolve(import.meta.dirname, 'packages/react-compat/src/jsx-runtime.ts'),
-							},
-						],
+						},
 					},
 				},
+				plugins: [
+					octane({
+						exclude: ['/src/', '/tests/'],
+						compat: [react()],
+					}),
+				],
+			},
+			{
+				test: {
+					name: 'react-compat-ssr',
+					include: ['packages/react-compat/tests/native-ssr.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [react()],
+			},
 		],
 	},
 });

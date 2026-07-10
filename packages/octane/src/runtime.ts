@@ -1602,6 +1602,41 @@ function missingSlot(name: string): never {
 	);
 }
 
+const COMPAT_HOOK_SLOTS: symbol[] = [];
+const COMPAT_HOOK_STATE = new WeakMap<Scope, { index: number; count: number }>();
+
+export function beginCompatHookRender(): void {
+	const scope = CURRENT_SCOPE;
+	if (scope === null) throw new Error('Invalid React compatibility render.');
+	const state = COMPAT_HOOK_STATE.get(scope);
+	if (state) state.index = 0;
+	else COMPAT_HOOK_STATE.set(scope, { index: 0, count: -1 });
+}
+
+export function finishCompatHookRender(): void {
+	const state = CURRENT_SCOPE === null ? undefined : COMPAT_HOOK_STATE.get(CURRENT_SCOPE);
+	if (!state) return;
+	if (state.count >= 0 && state.count !== state.index) {
+		throw new Error(
+			'Rendered a different number of React compatibility hooks than during the previous render. ' +
+				'Components loaded through @octanejs/react-compat must follow the Rules of Hooks.',
+		);
+	}
+	state.count = state.index;
+}
+
+export function nextCompatHookSlot(): symbol {
+	const scope = CURRENT_SCOPE;
+	const state = scope === null ? undefined : COMPAT_HOOK_STATE.get(scope);
+	if (!state) {
+		throw new Error(
+			'Invalid hook call. React compatibility hooks can only run while Octane is rendering a component.',
+		);
+	}
+	const index = state.index++;
+	return (COMPAT_HOOK_SLOTS[index] ??= Symbol.for(`octane.react-compat.hook.${index}`));
+}
+
 // withSlot — establishes hook call-site identity via a per-render PATH STACK, so a
 // hook reached THROUGH a custom-hook wrapper combines the wrapper's call-site symbol
 // with its own. The compiler wraps CUSTOM hook calls only, as
@@ -2307,6 +2342,18 @@ class SuspenseException {
 
 function isSuspenseException(x: any): x is SuspenseException {
 	return x !== null && typeof x === 'object' && (x as any).__isSuspense === true;
+}
+
+// React ecosystem libraries (notably query/data routers) may suspend by
+// throwing a Promise directly instead of calling use(thenable). Normalize both
+// shapes at boundary catch sites while preserving Octane's internal sentinel.
+function suspenseThenable(x: any): TrackedThenable<any> | null {
+	if (isSuspenseException(x)) return x.thenable;
+	return x !== null &&
+		(typeof x === 'object' || typeof x === 'function') &&
+		typeof x.then === 'function'
+		? (x as TrackedThenable<any>)
+		: null;
 }
 
 function useThenable<T>(thenable: TrackedThenable<T>): T {
@@ -4953,7 +5000,8 @@ function renderOffscreen(
 	try {
 		renderBlock(block);
 	} catch (err) {
-		if (isSuspenseException(err)) suspended = (err as SuspenseException).thenable;
+		const thenable = suspenseThenable(err);
+		if (thenable !== null) suspended = thenable;
 		else error = err;
 	} finally {
 		WIP_CAPTURE = prev;
@@ -5071,13 +5119,70 @@ function deoptKeyPositional(item: any, index: number): any {
 
 // Apply ONE host prop, reusing the same helpers the compiler emits (className/style/
 // setAttribute + `$$type` delegated-event slots + deferred ref attach).
-function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): void {
+function setDeoptDomProperty(el: Element, name: string, value: any): boolean {
+	if (el.namespaceURI !== HTML_NS) return false;
+	if (
+		name !== 'value' &&
+		name !== 'checked' &&
+		name !== 'defaultValue' &&
+		name !== 'defaultChecked' &&
+		name !== 'selected' &&
+		name !== 'multiple' &&
+		name !== 'muted'
+	) {
+		return false;
+	}
+	if (!(name in (el as any))) return false;
+	if (
+		name === 'checked' ||
+		name === 'defaultChecked' ||
+		name === 'selected' ||
+		name === 'multiple' ||
+		name === 'muted'
+	) {
+		(el as any)[name] = value != null && value !== false;
+	} else {
+		(el as any)[name] = value == null ? '' : String(value);
+	}
+	return true;
+}
+
+function syncDeoptControlledProps(el: Element, props: any): void {
+	if (props?.[REACT_COMPAT_PROPS] !== true) return;
+	// React reasserts controlled properties on every commit, even when the prop
+	// value is referentially unchanged and the user/browser mutated the DOM in
+	// between. Run after children so <select value> sees its final <option> set.
+	if ('value' in props) setDeoptDomProperty(el, 'value', props.value);
+	if ('checked' in props) setDeoptDomProperty(el, 'checked', props.checked);
+	if ('selected' in props) setDeoptDomProperty(el, 'selected', props.selected);
+	if ('multiple' in props) setDeoptDomProperty(el, 'multiple', props.multiple);
+	if ('muted' in props) setDeoptDomProperty(el, 'muted', props.muted);
+}
+
+const REACT_COMPAT_PROPS = Symbol.for('octane.react-compat.props');
+const DEOPT_REF_ATTACHED = Symbol('octane.deoptRefAttached');
+
+function applyDeoptProp(
+	el: Element,
+	name: string,
+	v: any,
+	ownerBlock: Block,
+	reactCompat: boolean = false,
+): void {
 	if (name === 'ref') {
-		if (v != null) queueRefAttach(ownerBlock, () => attachRef(v, el));
+		if (v != null)
+			queueRefAttach(ownerBlock, () => {
+				attachRef(v, el);
+				(el as any)[DEOPT_REF_ATTACHED] = true;
+			});
 	} else if (name === 'className' || name === 'class') {
 		setDeoptClass(el, v);
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, v, undefined);
+	} else if (reactCompat && setDeoptDomProperty(el, name, v)) {
+		// ReactDOM writes form/media state as DOM properties. This is intentionally
+		// limited to descriptor rendering used by react-compat; native compiled
+		// Octane templates retain their documented uncontrolled-attribute model.
 	} else {
 		// eventSlot returns non-null exactly for `on<Upper>` delegated-handler names
 		// (the same classification setSpread/applyHostProps use).
@@ -5104,6 +5209,7 @@ function hasDangerHTML(props: any): boolean {
 // Route a host descriptor's props onto a FRESH element (first build).
 function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 	if (props == null) return;
+	const reactCompat = props[REACT_COMPAT_PROPS] === true;
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
 		// `suppressHydrationWarning`: a JS flag (read by the hydration-mismatch paths), never
@@ -5112,7 +5218,19 @@ function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 			(el as any).__oct_suppress = props[name] !== false;
 			continue;
 		}
-		applyDeoptProp(el, name, props[name], ownerBlock);
+		applyDeoptProp(el, name, props[name], ownerBlock, reactCompat);
+	}
+	// Pure-host descriptors do not own a child Block, so root teardown cannot
+	// discover their ref through scope children. Register one cleanup per fresh
+	// element; it reads the latest stamped descriptor so swapped refs detach once.
+	if (props.ref != null) {
+		ownerBlock.cleanups.push(() => {
+			const ref = getDeoptDesc(el)?.props?.ref;
+			if (ref != null && (el as any)[DEOPT_REF_ATTACHED] === true) {
+				(el as any)[DEOPT_REF_ATTACHED] = false;
+				attachRef(ref, null, el);
+			}
+		});
 	}
 }
 
@@ -5120,6 +5238,8 @@ function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 // disappeared, set new/changed ones. Unchanged props are skipped, so an unchanged
 // `ref` is not re-attached and an unchanged handler is not re-bound.
 function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock: Block): void {
+	const prevReactCompat = prevProps?.[REACT_COMPAT_PROPS] === true;
+	const nextReactCompat = nextProps?.[REACT_COMPAT_PROPS] === true;
 	// ref lifecycle on a REUSED node: detach the previous ref if it was removed or its identity
 	// changed (the apply loop below re-attaches a changed one via applyDeoptProp). Without this a
 	// removed/swapped `ref={obj}` keeps pointing at this element. The prev-loop below skips
@@ -5127,14 +5247,20 @@ function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock
 	// element so a callback ref shared across elements releases its per-element cleanup).
 	const prevRef = prevProps != null ? prevProps.ref : undefined;
 	const nextRef = nextProps != null ? nextProps.ref : undefined;
-	if (prevRef != null && prevRef !== nextRef) attachRef(prevRef, null, el);
+	if (prevRef != null && prevRef !== nextRef) {
+		(el as any)[DEOPT_REF_ATTACHED] = false;
+		attachRef(prevRef, null, el);
+	}
 	if (prevProps != null) {
 		for (const name in prevProps) {
 			// `ref` was handled above; everything else routes through the shared removal
 			// path — including `suppressHydrationWarning`, whose disappearance must reset
 			// the element's `__oct_suppress` flag (parity with applyHostProps' prev-loop).
 			if (name === 'key' || name === 'children' || name === 'ref') continue;
-			if (nextProps == null || !(name in nextProps)) removeHostProp(el, name, prevProps[name]);
+			if (nextProps == null || !(name in nextProps)) {
+				if (!(prevReactCompat && setDeoptDomProperty(el, name, null)))
+					removeHostProp(el, name, prevProps[name]);
+			}
 		}
 	}
 	if (nextProps != null) {
@@ -5153,7 +5279,7 @@ function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock
 				if (name === 'style') {
 					setStyle(el as HTMLElement, nv, prevProps != null ? prevProps.style : undefined);
 				} else {
-					applyDeoptProp(el, name, nv, ownerBlock);
+					applyDeoptProp(el, name, nv, ownerBlock, nextReactCompat);
 				}
 			}
 		}
@@ -5311,7 +5437,10 @@ function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 // No-op for nodes without a de-opt descriptor or without a ref (adopted/text/plain nodes).
 function detachDeoptRef(node: Node): void {
 	const ref = getDeoptDesc(node)?.props?.ref;
-	if (ref != null) attachRef(ref, null, node as Element);
+	if (ref != null && (node as any)[DEOPT_REF_ATTACHED] === true) {
+		(node as any)[DEOPT_REF_ATTACHED] = false;
+		attachRef(ref, null, node as Element);
+	}
 }
 
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
@@ -5378,6 +5507,7 @@ function reconcileDeoptNode(
 			const childNs = elNs === SVG_NS && value.type !== 'foreignObject' ? SVG_NS : undefined;
 			reconcileDeoptChildren(el, value.children, ownerBlock, childNs);
 		}
+		syncDeoptControlledProps(el, value.props);
 		return el;
 	}
 	// A component descriptor must not reach here — the de-opt callers gate on
@@ -6546,7 +6676,8 @@ export function tryBlock(
 			releaseHeldTransition(s);
 			s.pendingThenable = null;
 		} catch (err) {
-			if (isSuspenseException(err)) handleSuspense(s, err.thenable, s.tryBlock);
+			const thenable = suspenseThenable(err);
+			if (thenable !== null) handleSuspense(s, thenable, s.tryBlock);
 			else switchToCatch(s, err);
 		}
 	} else if (s.tryBlock && s.savedDom) {
@@ -6618,8 +6749,9 @@ function mountTry(state: TrySlot): void {
 		renderBlock(b);
 		state.hasResolved = true;
 	} catch (err) {
-		if (isSuspenseException(err)) {
-			handleSuspense(state, err.thenable, b);
+		const thenable = suspenseThenable(err);
+		if (thenable !== null) {
+			handleSuspense(state, thenable, b);
 		} else {
 			if (state.tryBlock) {
 				unmountBlock(state.tryBlock);
@@ -6943,7 +7075,8 @@ function commitResume(state: TrySlot): void {
 					for (let i = 0; i < refs.length; i++) attachRef(refs[i].ref, refs[i].el);
 				}
 			} catch (err) {
-				if (isSuspenseException(err)) handleSuspense(state, err.thenable, state.tryBlock!);
+				const thenable = suspenseThenable(err);
+				if (thenable !== null) handleSuspense(state, thenable, state.tryBlock!);
 				else switchToCatch(state, err);
 			}
 		} else {
@@ -7569,12 +7702,13 @@ function findTryHandler(block: Block | null): ((err: any) => void) | null {
  * which surfaces to the scheduler's caller (matches the prior behavior).
  */
 function handleRenderError(block: Block, err: any): void {
-	if (isSuspenseException(err)) {
+	const thenable = suspenseThenable(err);
+	if (thenable !== null) {
 		let b: Block | null = block;
 		while (b) {
 			const h = (b as any).__suspenseHandler;
 			if (h) {
-				h(err.thenable, block);
+				h(thenable, block);
 				return;
 			}
 			b = b.parentBlock;

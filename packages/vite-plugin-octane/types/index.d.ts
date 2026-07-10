@@ -1,4 +1,4 @@
-import type { Plugin, BuildEnvironmentOptions, ViteDevServer } from 'vite';
+import type { PluginOption, BuildEnvironmentOptions, ViteDevServer } from 'vite';
 import type { RuntimePrimitives } from '@ripple-ts/adapter';
 
 // ============================================================================
@@ -8,6 +8,8 @@ import type { RuntimePrimitives } from '@ripple-ts/adapter';
 export interface OctanePluginOptions {
 	/** Override the client HMR default (on in serve mode, off for SSR). */
 	hmr?: boolean;
+	/** Compatibility plugins placed immediately after the Octane compiler. */
+	compat?: PluginOption[];
 }
 
 /**
@@ -15,7 +17,7 @@ export interface OctanePluginOptions {
  * `[octane(), metaPlugin]` — the first compiles `.tsrx`, the second owns
  * config / routing / dev SSR / hydrate.
  */
-export function octane(options?: OctanePluginOptions): Plugin[];
+export function octane(options?: OctanePluginOptions): PluginOption[];
 export function defineConfig(options: OctaneConfigOptions): OctaneConfigOptions;
 export function resolveOctaneConfig(
 	raw: OctaneConfigOptions,

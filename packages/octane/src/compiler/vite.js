@@ -14,12 +14,14 @@
  *     per-module auto-detection above. Useful for a dedicated server build.
  *   - `hmr`: defaults to on in serve mode and is always off for SSR; pass
  *     `true`/`false` to override the client default.
+ *   - `compat`: compatibility plugins placed immediately after the compiler.
  */
 import { compile } from './compile.js';
 import { slotHooks } from './slot-hooks.js';
 
 export function octane(options = {}) {
 	let hmrEnabled = options.hmr;
+	const compat = options.compat ?? [];
 	// An explicit override of the per-module SSR auto-detection (true → always
 	// server, false → always client). `undefined` keeps auto-detection.
 	const forceSsr = options.ssr;
@@ -28,7 +30,7 @@ export function octane(options = {}) {
 	// otherwise be double-slotted). In a real app these live in node_modules and
 	// are skipped automatically; this is for monorepo / aliased-to-source setups.
 	const excludePaths = options.exclude ?? [];
-	return {
+	const plugin = {
 		name: 'octane',
 		enforce: 'pre',
 		configResolved(config) {
@@ -74,4 +76,5 @@ export function octane(options = {}) {
 			return null;
 		},
 	};
+	return compat.length === 0 ? plugin : [plugin, ...compat];
 }

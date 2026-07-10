@@ -66,7 +66,7 @@ export const REACT_API_MAP = {
 	flushSync: { status: 'same', note: 'Supported (import from octane, not react-dom).' },
 	createElement: {
 		status: 'partial',
-		note: 'Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.',
+		note: 'Supported by react-compat for nested classic-runtime trees; an Octane-native entry still uses flat descriptors and compiler output.',
 	},
 	cloneElement: { status: 'partial', note: 'Works on Octane element descriptors only.' },
 	isValidElement: { status: 'same', note: 'Supported for Octane descriptors.' },
@@ -83,17 +83,20 @@ export const REACT_API_MAP = {
 	hydrateRoot: { status: 'same', note: 'Supported (import from octane, not react-dom/client).' },
 	forwardRef: {
 		status: 'rewrite',
-		note: 'No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.',
+		note: 'Supported by react-compat as a refs-as-props wrapper; rewrite it away in an Octane-native entry.',
 	},
 	useDebugValue: { status: 'rewrite', note: 'Not present. Shim as a no-op.' },
-	lazy: { status: 'rewrite', note: 'Not present. Use dynamic import plus use()/Suspense.' },
+	lazy: {
+		status: 'rewrite',
+		note: 'Supported by react-compat; native entries use dynamic import plus use()/Suspense.',
+	},
 	Component: {
-		status: 'unsupported',
-		note: 'No class components. Rewrite as a function component.',
+		status: 'partial',
+		note: 'react-compat supports state, commit lifecycles, refs, contextType and Error Boundaries; legacy pre-render lifecycles are unsupported.',
 	},
 	PureComponent: {
-		status: 'unsupported',
-		note: 'No class components. Rewrite as a function component with memo.',
+		status: 'partial',
+		note: 'Loads through the class adapter, but PureComponent/shouldComponentUpdate bailout timing is not emulated.',
 	},
 	StrictMode: {
 		status: 'rewrite',
@@ -116,7 +119,7 @@ export const REACT_API_MAP = {
 	},
 	onChange: {
 		status: 'rewrite',
-		note: 'Events are native and delegated; there is no synthetic onChange firing per keystroke. Use onInput for text inputs.',
+		note: 'react-compat translates text onChange and exposes SyntheticEvent helpers; native entries should use onInput.',
 	},
 	defaultProps: {
 		status: 'rewrite',

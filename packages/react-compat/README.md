@@ -1,94 +1,145 @@
-# @octanejs/react-compat (POC)
+# @octanejs/react-compat
 
-A **deterministic, non-AI** source-level bridger that detects React↔Octane
-differences by static analysis and auto-applies the mechanical fixes, leaving
-only the semantic residual to the MCP. It answers the question: _how much of
-"install a React package and use it as-is" can we do without an agent?_
+Compatibility layer that lets already-compiled React packages run on Octane
+without porting their source. Package code continues to import `react`,
+`react/jsx-runtime` and `react-dom`; the Vite plugin resolves those imports to
+small Octane facades.
 
-> **Scope.** This bridges React **source** (first-party, monorepo, untranspiled
-> libraries, or the vanilla-core + thin-binding split). It does **not** run
-> already-compiled npm packages: those ship `jsx()` calls + slotless
-> `useState()`, and Octane slots hooks in its **compiler over source**, not at
-> runtime (see `docs/react-library-compat-plan.md`). That's the wall, by design.
+## Usage
 
-## Why it's viable, and where it stops
+```js
+import { defineConfig } from 'vite';
+import { octane } from 'octane/compiler/vite';
+import { react } from '@octanejs/react-compat/vite';
 
-Three facts about Octane shape the whole thing:
-
-1. **Hooks are slotted by compiler call-site, not call order.** A builtin hook
-   call auto-injects `import { useState } from 'octane'` (`compile.js:2580`),
-   which collides with a package's own `import { useState } from 'react'`. The
-   one required mechanical fix is reconciling that import.
-2. **The compiler slots by hook _name_, regardless of import source**
-   (`compile.js:2576`), so React source that calls `useState(0)` gets slotted
-   for free once Octane compiles the `.tsx`.
-3. **Everything else React re-homes to a runtime shim** — `forwardRef` →
-   refs-as-props, `useDebugValue` → no-op, `react-dom` → `octane`. So the
-   codemod collapses to _import reconciliation only_ (no body rewriting).
-
-What can't be shimmed (controlled inputs, class components, synthetic events,
-react internals) is **flagged, never silently passed**, and routed to the MCP.
-
-## The three layers
-
-| Layer | File | Role |
-|-------|------|------|
-| **Shim** | `src/shim.ts`, `src/dom.ts`, `src/jsx-runtime.ts` | the `react` / `react-dom` a bridged package resolves to; absorbs the shimmable divergences at runtime |
-| **Codemod** | `src/codemod.mjs` | flat, extensible `transforms[]` — reconciles imports so Octane's compiler owns the hooks |
-| **Detector** | `src/detect.mjs` | flat, extensible `rules[]` + the `REACT_API_MAP`/`HOOK_NAMES` surface diff; classifies `bridgeable → needs-rework` and emits the MCP work-list |
-
-Both registries are **single-source-of-truth**: they import `REACT_API_MAP`
-from the MCP (`octane-mcp-server/src/bridge.js`) and `HOOK_NAMES` from the
-compiler, so they can't drift from what the runtime actually supports. Adding a
-capability = pushing one object onto `rules` or `transforms`.
-
-## Graduated examples — easy → the wall
-
-| # | `examples/…` | React APIs | Verdict | Proves |
-|---|-------------|-----------|---------|--------|
-| E1 | `e1-counter.tsx` | `useState` | `bridgeable-autofix` | pure-logic hook runs on Octane |
-| E2 | `e2-context.tsx` | `createContext`/`useContext`/`useReducer`/`useEffect`/`useRef`/`useMemo` | `bridgeable-autofix` | context propagation + reducer + memo |
-| E3 | `e3-store.tsx` | `useSyncExternalStore`/`memo`/custom hook/`useDebugValue` | `bridgeable-autofix` | external-store binding (the zustand shape) |
-| E4 | `e4-hard.tsx` | `forwardRef` + controlled `<input>` + class component | `needs-rework` | **the wall**: block class, flag controlled input, autofix `forwardRef` |
-| E5 | `e5-portal.tsx` | `createPortal` (react-dom) + `useState` | `bridgeable-autofix` | `react-dom` → octane re-home; portal into a host |
-| E6 | `e6-imperative.tsx` | `forwardRef` + `useImperativeHandle` + `useState` | `bridgeable-autofix` | the forwardRef shim works at runtime (ref-as-prop → imperative handle) |
-| E7 | `e7-suspense.tsx` | `Suspense` + `use(promise)` | `bridgeable-autofix` | async throw-to-suspend + reveal |
-| E8 | `e8-store-app.tsx` | `createContext`/`useReducer`/`useContext`/`useMemo`/`useCallback` + keyed `.map` | `bridgeable-autofix` | composed reducer-store app + keyed-list reconciler |
-
-`tests/run.test.ts` bridges E1–E3 and E5–E8 (unmodified React source → codemod →
-Octane compiler → mount) and asserts they render and update; it also pins the
-detector classification for the whole set. E4 is analyzed only (it's the wall).
-
-`tests/differential.test.ts` is the **parity oracle**: it mounts each example
-twice from the same source — the bridged version on Octane and the *original* on
-**real React** (esbuild's automatic runtime) — drives an identical event
-sequence, and asserts **byte-equal** `innerHTML` at every step (normalised the
-same way as the repo's own differential rig). So these aren't just "it renders" —
-they're "it renders *what React renders*", including the keyed list, the portal
-host, the imperative handle, and the Suspense fallback→reveal.
-
-## Run it
-
-```bash
-# static report + codemod preview for any React source
-node packages/react-compat/bin/bridge.mjs packages/react-compat/examples/*.tsx
-
-# the end-to-end proof (bridge → compile → mount on Octane)
-./node_modules/.bin/vitest run --project react-compat
+export default defineConfig({
+  plugins: [octane({ compat: [react()] })],
+});
 ```
 
-## Honest limits
+This is the complete setup. There is no codemod, bridge command, transformed
+copy of a dependency, or per-library configuration. Octane remains the main
+plugin; the compatibility entry resolves React ecosystem imports to the client
+or SSR facade as appropriate.
 
-- Regex over import statements, not a real AST — fine for a POC (imports have a
-  fixed grammar); a production version swaps each `apply`/`detect` body for
-  ts-morph node-matching, same registry shape.
-- Static analysis can't prove behavioural equivalence. The oracle for that is
-  the differential rig + the library's own test suite (both already in-repo).
-- **Compiler bug found while building E5** (`@tsrx/core` parser, upstream of
-  octane). It throws `Unexpected token` on the exact JSX shape Prettier emits: a
-  child-hole **conditional** whose **parenthesized multi-line** branch contains a
-  **non-self-closing child element on its own line** (depth ≥ 2). Any single
-  change — inner self-closing, inner text, inner on the same line, depth-1,
-  single-line branch, or no parens — parses fine. Minimal runnable repro:
-  `node packages/react-compat/known-issues/tsrx-conditional-jsx-parse.mjs`. This
-  is a real hazard (Prettier produces it), and warrants an upstream parser fix.
+The metaframework plugin accepts the same option:
+
+```js
+import { octane } from '@octanejs/vite-plugin';
+import { react } from '@octanejs/react-compat/vite';
+
+export default { plugins: [octane({ compat: [react()] })] };
+```
+
+Application `.tsrx` components still compile through Octane's fast static path.
+Only components received from React packages use the generic descriptor path.
+Their state, effects, context and subscriptions still live in Octane scopes and
+use the Octane scheduler.
+
+## How it works
+
+- React's automatic `jsx`/`jsxs` output becomes an Octane element descriptor;
+  the third `key` argument and fragments are retained.
+- Facade hooks allocate stable Octane slots by React's per-component call order.
+  Native Octane hooks keep compiler-assigned slots, so both models coexist.
+- `react-dom/client` accepts any React node at the root and portals are routed to
+  Octane.
+- Text-input `onChange` is translated to the native `input` event and receives a
+  lightweight SyntheticEvent-compatible facade.
+- Controlled `value`/`checked` props use DOM properties on the compat descriptor
+  path. This does not change Octane's native uncontrolled-input semantics.
+- Directly thrown Promises are routed to Octane Suspense boundaries.
+- `use-sync-external-store/with-selector` is implemented on the facade to avoid
+  a bundled second copy of React in state libraries.
+- Vite resolves SSR module loads to a separate `octane/server` facade; React
+  packages can therefore participate in Octane SSR without loading client hooks.
+- React class components are adapted for state, refs, `contextType`, class
+  `defaultProps`, commit lifecycles, and class Error Boundaries. Boundary errors
+  thrown by descendants and rejected lazy imports route through Octane's native
+  error machinery.
+- A machine-readable `octaneCompatibility` export lists supported, partial, and
+  unsupported contracts for diagnostics and ecosystem tooling.
+
+## Verified published packages
+
+The test suite imports the unmodified npm builds, not local ports:
+
+| Package | Verified path |
+| --- | --- |
+| `react-redux` | hooks, `connect()`, external-store updates, and SSR |
+| `jotai` | `Provider`, atoms, `useAtom`, consumer updates |
+| `react-hook-form` | `useForm`, `register`, `watch`, text-input change semantics |
+| `react-error-boundary` | class boundary catch, callback and imperative reset |
+| `tailwindcss` v4 | real utility compilation and unchanged class names in Octane JSX |
+
+Run the proof with:
+
+```bash
+pnpm exec vitest run --project react-compat-native
+pnpm exec vitest run --project react-compat-ssr
+```
+
+## Edge-case contract
+
+The dedicated edge suite pins behavior that often breaks renderer shims:
+
+| Area | Verified contract |
+| --- | --- |
+| Error Boundaries | `getDerivedStateFromError`, `componentDidCatch`, setState-only boundaries, nested fallback errors, own-render exclusion, lazy rejection |
+| Classes | state callbacks, mount/update/unmount, `contextType`, `defaultProps`, instance refs; rejected legacy lifecycles produce targeted errors |
+| Hooks | uncompiled call-order state, changed hook-count diagnostics, external-store subscribe/unsubscribe |
+| Suspense | raw thrown Promise, `lazy()` caching/reveal/rejection, Error Boundary handoff |
+| Forms | text `onChange`, controlled input/checkbox/textarea/select reassertion, React Hook Form register and Controller |
+| Events | `nativeEvent`, prevention/propagation helpers, `currentTarget`, portal bubbling; event errors intentionally bypass boundaries |
+| Identity | automatic-runtime keys, keyed state across reorder, fragments, primitive/array roots, clone/Children helpers |
+| Refs | object/callback refs, forwardRef, imperative handles, unmount cleanup—including pure host roots |
+| Context/portals | direct React 19 providers, Consumer render props, memo invalidation, portal context and cleanup |
+| SSR/hydration | class and classic-runtime SSR, server snapshots, no server effects, context, useId-stable hydration and updates |
+
+These unsupported contracts fail or disclose themselves explicitly instead of
+silently approximating React:
+
+- legacy/`UNSAFE_` pre-render class lifecycles and `getSnapshotBeforeUpdate`,
+- StrictMode development double render/effect/ref cycles,
+- synchronous and streaming `react-dom/server` entry points,
+- React Suspense's server-render-error fallback/retry behavior,
+- React Server Components and private renderer internals.
+
+## Native performance entry
+
+Compatibility is the fallback, not the performance ceiling. A library can add an
+Octane-native export later while keeping the same public API:
+
+```json
+{
+  "exports": {
+    ".": {
+      "octane": "./dist/octane.js",
+      "import": "./dist/react.js"
+    }
+  }
+}
+```
+
+That entry can use compiled `.tsrx`, conditional hooks and Octane's smallest
+rendering path. Consumers without it continue to use the React build through the
+compatibility layer.
+
+## Remaining boundaries
+
+- Class support is deliberately a compatibility subset. `PureComponent` and
+  `shouldComponentUpdate` bailout timing are not emulated, and
+  `componentDidCatch` receives an empty `componentStack` because Octane has no
+  React Fiber stack.
+- The event facade covers the common SyntheticEvent contract and text-input
+  `onChange`; obscure event plugins and React private internals need individual
+  validation.
+- Controlled properties are enforced, but React's development-only warnings for
+  controlled/uncontrolled switches are not reproduced.
+- React Server Components and React's private renderer internals are out of scope.
+- ReactDOM's synchronous `renderToString` API is not emulated; application SSR
+  continues to use `render()` from `octane/server`. React dependencies loaded
+  inside that render are supported by the server facade.
+- React can turn some server render errors inside Suspense into fallback HTML and
+  retry on the client. Octane SSR currently reports a targeted compatibility
+  error instead.
