@@ -21,14 +21,15 @@ const WEBSITE = join(process.cwd(), 'website');
 const ROUTES = ['/', '/docs', '/benchmarks', '/playground'];
 
 // M0 of docs/comment-marker-elision-plan.md: per-route comment-node ceilings
-// (~15% above 2026-07-09 measurements: / 2,123 · /docs 379 · /benchmarks
-// 17,381 (the 12 recharts cards — the de-opt childSlot weight M2 targets) ·
-// /playground 185). This is the CI-enforced DOM-weight ratchet — tighten as
-// the elision phases land, and treat a breach as a marker-minting regression.
+// (~15% above post-M2 2026-07-09 measurements: / 1,783 · /docs 379 ·
+// /benchmarks 14,793 (the 12 recharts cards — the de-opt childSlot weight M2
+// trimmed) · /playground 185). This is the CI-enforced DOM-weight ratchet —
+// tighten as the elision phases land, and treat a breach as a marker-minting
+// regression.
 const COMMENT_CEILINGS: Record<string, number> = {
-	'/': 2450,
+	'/': 2050,
 	'/docs': 450,
-	'/benchmarks': 20000,
+	'/benchmarks': 17000,
 	'/playground': 250,
 };
 

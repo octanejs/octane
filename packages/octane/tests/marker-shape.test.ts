@@ -135,13 +135,12 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 
 	it('(e) de-opt descriptor tree: hostElementBody + nested childSlot pairs', () => {
 		// The value hole renders a host tree containing a component descriptor —
-		// the @octanejs/recharts shape. Client 12: value-slot + hostElementBody
-		// child slots + the component-bearing section's nested childSlot pairs
-		// (the M2 target — this is the number that multiplies to 17k on the
-		// website /benchmarks page). SSR 14 (ssrChild + ssrDeoptBlockChildren
-		// per-child pairs). Hydrate 11: adoption consumes/discards some server
-		// pairs while re-anchoring (fewer than SSR, more than a pure client
-		// mount would need).
-		expect(counts('Deopt', Deopt, {})).toEqual({ client: 12, ssr: 14, hydrate: 11 });
+		// the @octanejs/recharts shape. M2 (owns-parent child slots + item-range
+		// borrowing) landed 2026-07-09: client 12 → 8, hydrate 11 → 9 (de-opt
+		// hosts hand their whole content to one childSlot that owns the element —
+		// no end anchor, no lazy start; component-bearing list items borrow their
+		// own <!--it--> pair instead of nesting a second one). SSR unchanged at 14
+		// (server emission untouched by design).
+		expect(counts('Deopt', Deopt, {})).toEqual({ client: 8, ssr: 14, hydrate: 9 });
 	});
 });
