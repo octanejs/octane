@@ -13,10 +13,13 @@ owning source before acting because Octane is moving quickly.
 > (`docs/parity-gaps.md`, `pnpm parity:gaps`); §10 website builds are
 > file-serial by contract (`fileParallelism: false`); §12 harness gate
 > failures are fatal unless waived with a reason + expiry in
-> `benchmarks/bench.mjs`; §11 has a generated, CI-checked binding-status
+> `benchmarks/bench.mjs`; §5/§6 structural centralization DONE 2026-07-10 —
+> truth tables single-sourced in `packages/octane/src/dom-tables.js` and
+> hand-slot-forwarding self-declarative via package manifests (see the per-
+> section resolution notes); §11 has a generated, CI-checked binding-status
 > table (`docs/bindings-status.md`, `pnpm bindings:status`). Still open: the
-> five runtime parity gaps themselves, §5/§6 structural centralization, and
-> the §13 Node-20/packed-tarball release checks.
+> remaining runtime parity gaps themselves and the §13 Node-20/packed-tarball
+> release checks.
 
 The repository is unusually good at preserving design reasoning in source
 comments and parity tests. The main concern is not a lack of documentation; it
@@ -230,6 +233,23 @@ time, but hand-maintaining copies is risky. A generated module, shared data
 source, or build-time parity assertion would preserve fast local lookups without
 making comments the only synchronization mechanism. Tests should compare the
 tables directly, not only representative behavior.
+
+**Resolved (2026-07-10):** the tables now live in one shared plain-JS module,
+`packages/octane/src/dom-tables.js` (plain JS so the verbatim-shipped compiler
+can import it directly; `constants.ts` re-exports with type annotations for the
+runtimes and the public `octane/constants` surface). Covers the boolean/
+must-use-property sets, attribute aliases, SVG-only tags, unitless style props,
+void elements (previously triplicated with no central copy), style-value
+coercion, and style-key hyphenation. Lookup shapes are unchanged — the same
+`Set`/`Map` instances, imported instead of copied. The member-level audit found
+zero drift in the data tables and ONE behavioral drift in the wrapped logic:
+the compiler's private `cssStyleValueStatic` didn't trim string style values
+while the runtimes' `cssStyleValue` does; static bakes now use the shared
+function. `tests/dom-tables.test.ts` pins the wiring itself (re-export
+identity, a mutate-the-shared-Set compiler probe, and per-category bake
+assertions). Controlled-form routing remains split logic (compile.js
+`controlledKindFor` vs per-kind runtime helpers) — it is behavior, not a
+table, and stays covered by the controlled-form suites.
 
 The compiler-emitted/runtime helper ABI is also broad. It includes template and
 slot helpers, binding-bag arity factories, form bindings, control-flow blocks,

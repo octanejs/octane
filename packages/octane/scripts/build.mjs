@@ -51,6 +51,9 @@ await build({
 });
 
 cpSync(join(src, 'compiler'), join(dist, 'compiler'), { recursive: true });
+// Hand-written declarations for the plain-JS dom-tables module (tsc only emits
+// declarations for the .ts sources).
+cpSync(join(src, 'dom-tables.d.ts'), join(dist, 'dom-tables.d.ts'));
 
 execFileSync(join(root, 'node_modules/.bin/tsc'), ['-p', join(pkgDir, 'tsconfig.build.json')], {
 	stdio: 'inherit',

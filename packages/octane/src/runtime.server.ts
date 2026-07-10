@@ -42,6 +42,9 @@ import {
 	isEnumeratedBooleanAttr,
 	cssStyleValue,
 	ATTRIBUTE_ALIASES,
+	// No end tag, no children — `ssrChild` descriptor serialization matches the
+	// static-markup emission of `ssrEmitElement`.
+	VOID_ELEMENTS,
 } from './constants.js';
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
@@ -163,26 +166,6 @@ const ELEMENT_TAG = Symbol.for('octane.element');
 // a portal flowing through props/children to `ssrChild` leaves its site anchor
 // instead of tripping the plain-object child throw.
 const PORTAL_TAG = Symbol.for('octane.portal');
-
-// Void (self-closing) HTML elements — no end tag, no children. Mirrors the
-// compiler's VOID_ELEMENTS so a host descriptor serialized by `ssrChild`
-// matches the static-markup emission of `ssrEmitElement`.
-const VOID_ELEMENTS = new Set([
-	'area',
-	'base',
-	'br',
-	'col',
-	'embed',
-	'hr',
-	'img',
-	'input',
-	'link',
-	'meta',
-	'param',
-	'source',
-	'track',
-	'wbr',
-]);
 
 interface ElementDescriptor {
 	$$kind: typeof ELEMENT_TAG;
