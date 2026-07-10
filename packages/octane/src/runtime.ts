@@ -7794,6 +7794,30 @@ function liveOwnedChildAt(el: Element, index: number): Node | null {
 // childSlot so their subtrees get real, reconcilable Blocks.
 function deoptItemBody(item: any, scope: Scope): void {
 	const block = scope.block;
+	// Marker-elision M4: a SELF-MARKED item (mounted while its value was a pure
+	// single-element host descriptor — startMarker === endMarker === that
+	// element, see mountItem's `2` sentinel) whose NEW value no longer fits one
+	// raw element (null / primitive / component-bearing) PROMOTES one-way to a
+	// real `it` pair minted around the current node, so the pure/Blocks paths
+	// below — and reorder/teardown — keep a live range. Client-only by
+	// construction (hydrated items always adopt the server's pair).
+	const needsBlocks = descNeedsBlocks(item);
+	const sm = block.startMarker;
+	if (
+		sm !== null &&
+		sm === block.endMarker &&
+		sm.nodeType !== 8 /* COMMENT_NODE — i.e. self-marked, not a pair */ &&
+		sm.parentNode !== null &&
+		(needsBlocks || !isHostDescriptor(item))
+	) {
+		const p = sm.parentNode;
+		const s = document.createComment('it');
+		const e = document.createComment('/it');
+		p.insertBefore(s, sm);
+		p.insertBefore(e, sm.nextSibling);
+		block.startMarker = s;
+		block.endMarker = e;
+	}
 	// An item whose subtree contains a COMPONENT descriptor (a bare `<Comp/>`, or a
 	// host element with component children like `<li><Comp/></li>`) needs real Blocks
 	// for hooks/reconciliation, which the raw host reconciler can't give it. Delegate to a
@@ -7805,7 +7829,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 	// key and flips between a component descriptor (Blocks) and null/text/pure-host
 	// (raw) — so each branch tears down the other's residue on a switch (previously
 	// the pure path left a toggled-off component's Blocks + DOM in the range forever).
-	if (descNeedsBlocks(item)) {
+	if (needsBlocks) {
 		// Switching pure → Blocks: drop the raw node the pure path left in the range.
 		const stale = block.deoptNode;
 		if (stale != null) {
@@ -7893,13 +7917,25 @@ function deoptItemBody(item: any, scope: Scope): void {
 	}
 	const node = reconcileDeoptNode(prev, item, block);
 	if (node !== prev) {
-		// Built a fresh node (first mount, or a tag/type change) — drop the old one
-		// and insert the new node into the item's range.
+		// Built a fresh node (first mount, or a tag/type change) — insert it at
+		// the old node's position, THEN drop the old one. Insert-before-remove
+		// matters for a SELF-MARKED item (M4): there `prev` IS the block's end
+		// marker, so removing it first would leave `endM` detached and the
+		// insert would throw.
 		if (prev != null && prev !== node && prev.parentNode === block.parentNode) {
+			if (node !== null) block.parentNode.insertBefore(node, prev);
 			detachDeoptTreeRefs(prev, null);
 			block.parentNode.removeChild(prev);
+		} else if (node !== null) {
+			block.parentNode.insertBefore(node, endM);
 		}
-		if (node !== null) block.parentNode.insertBefore(node, endM);
+		// Self-marked item rebuilt: the replaced element WAS the range — re-point
+		// both markers at the replacement. (A non-host new value never reaches
+		// here self-marked — the promotion above minted a pair first.)
+		if (prev !== null && block.startMarker === prev) {
+			block.startMarker = node;
+			block.endMarker = node;
+		}
 	}
 	block.deoptNode = node;
 }
@@ -8373,7 +8409,10 @@ export function childSlot(
 				break;
 			}
 		}
-		reconcileKeyed(parentBlock, state.forSlot, items, keyFn, deoptItemBody as any, false, false);
+		// singleRoot=2 (marker-elision M4): pure single-element items self-mark —
+		// no `it` pair per item — resolved per item value in mountItem; shape
+		// flips promote to a minted pair in place (deoptItemBody).
+		reconcileKeyed(parentBlock, state.forSlot, items, keyFn, deoptItemBody as any, false, 2);
 		return;
 	}
 	// Value is NOT an array — if we were in array mode, tear the list down first.
@@ -8724,13 +8763,17 @@ export function childTextHole(
 		domParent.appendChild(tn);
 		return tn;
 	}
-	// Object/function value (or already in slot mode): hand off to childSlot, which
-	// owns the markers + state. On a pure-text → object switch, drop the markerless
-	// text node first. While hydrating, point the cursor at the host's first child
-	// (the server's `<!--[-->`) so childSlot adopts the range.
+	// Object/function value (or already in slot mode): hand off to childSlot in
+	// OWNS-PARENT mode (marker-elision M4) — the hole is the host's SOLE child,
+	// which is exactly the ownerHost invariant, so component/element/array values
+	// render with NO markers at all (M2's de-opt host regime; arrays still mint
+	// their ForSlot pair lazily). On a pure-text → object switch, drop the
+	// markerless text node first. While hydrating, point the cursor at the host's
+	// first child (the server's `<!--[-->`) so childSlot adopts the range —
+	// ownsHost is ignored under hydration (server-pair adoption wins, as in M2).
 	if (state === undefined && cachedNode !== null) cachedNode.remove();
 	if (hydrating && state === undefined) hydrateNode = domParent.firstChild;
-	childSlot(parentScope, slotKey, domParent, value, null);
+	childSlot(parentScope, slotKey, domParent, value, null, false, domParent as Element);
 	const s = parentScope.slots[slotKey] as ChildSlot;
 	return s.block === null && s.forSlot === null && s.hostNode === null ? s.text : null;
 }
@@ -11410,7 +11453,9 @@ function reconcileKeyed<T>(
 	getKey: (item: T, index: number) => any,
 	itemBody: (item: T, scope: Scope) => void,
 	pure: boolean,
-	singleRoot: boolean,
+	// true / false = compiler-static (compiled @for); 2 = de-opt per-item
+	// self-marking sentinel, resolved by mountItem against each item VALUE.
+	singleRoot: boolean | 2,
 	lite: boolean = false,
 	indexIndependent: boolean = false,
 ): void {
@@ -11909,7 +11954,13 @@ function mountItem<T>(
 	index: number,
 	body: (item: T, s: Scope) => void,
 	forSlot: ForSlot,
-	singleRoot: boolean,
+	// true = compiler-proven single-element item body (compiled @for). 2 = the
+	// DE-OPT sentinel (marker-elision M4): decide PER ITEM at mount — a pure
+	// single-element host descriptor self-marks like the compiled path (its one
+	// rendered element becomes both markers); anything else (null / primitive /
+	// component-bearing) keeps the `it` pair. A later shape flip promotes the
+	// self-marked block to a minted pair in place (see deoptItemBody).
+	singleRoot: boolean | 2,
 ): Block {
 	if (hydrating) {
 		// Hydration: the server wrapped EVERY item in its own `<!--[-->…<!--]-->`
@@ -11957,12 +12008,18 @@ function mountItem<T>(
 		hydrateNode = itemEnd.nextSibling;
 		return block;
 	}
-	if (singleRoot) {
-		// Compiler verified the body emits exactly one Element root — skip the
-		// per-item Comment markers and use the inserted element as both start
-		// and end. For a 1000-row table that means 2000 fewer DOM nodes inside
-		// <tbody>, which the browser's layout/paint walks every time. Big paint
-		// win when the slowdown is "tbody has 3000 children" not "JS is slow".
+	if (
+		singleRoot === true ||
+		(singleRoot === 2 && isHostDescriptor(item) && !descNeedsBlocks(item))
+	) {
+		// Compiler verified the body emits exactly one Element root (true) — or,
+		// on the de-opt sentinel (2), the ITEM VALUE is a pure single-element
+		// host descriptor, which deoptItemBody's raw path always renders as
+		// exactly one node. Skip the per-item Comment markers and use the
+		// inserted element as both start and end. For a 1000-row table that
+		// means 2000 fewer DOM nodes inside <tbody>, which the browser's
+		// layout/paint walks every time. Big paint win when the slowdown is
+		// "tbody has 3000 children" not "JS is slow".
 		const block = createBlock(
 			'control-flow',
 			parentBlock,

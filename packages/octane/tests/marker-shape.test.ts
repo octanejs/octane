@@ -272,11 +272,15 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 	it('(e) de-opt descriptor tree: hostElementBody + nested childSlot pairs', () => {
 		// The value hole renders a host tree containing a component descriptor —
 		// the @octanejs/recharts shape. M2 (owns-parent child slots + item-range
-		// borrowing) landed 2026-07-09: client 12 → 8, hydrate 11 → 9 (de-opt
-		// hosts hand their whole content to one childSlot that owns the element —
-		// no end anchor, no lazy start; component-bearing list items borrow their
-		// own <!--it--> pair instead of nesting a second one). SSR unchanged at 14
-		// (server emission untouched by design).
-		expect(counts('Deopt', Deopt, {})).toEqual({ client: 8, ssr: 14, hydrate: 9 });
+		// borrowing): client 12 → 8, hydrate 11 → 9 (de-opt hosts hand their whole
+		// content to one childSlot that owns the element — no end anchor, no lazy
+		// start; component-bearing list items borrow their own <!--it--> pair
+		// instead of nesting a second one). M4: the `{tree}` SOLE-CHILD hole takes
+		// the owns-parent regime too (childTextHole's object fallback, −2), and
+		// the PURE single-element list item (section.s1) SELF-MARKS instead of
+		// minting an `it` pair (−2; the component-bearing s0 keeps + borrows its
+		// pair) — client 8 → 4. SSR unchanged at 14 (server emission untouched
+		// by design).
+		expect(counts('Deopt', Deopt, {})).toEqual({ client: 4, ssr: 14, hydrate: 9 });
 	});
 });
