@@ -3,6 +3,13 @@
   "version": "0.1.2",
   "license": "MIT",
   "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
   "description": "Floating UI bindings for the octane renderer — a port of @floating-ui/react (positioning + interactions + focus management) on top of the framework-agnostic @floating-ui/dom.",
   "author": {
     "name": "Dominic Gannaway",

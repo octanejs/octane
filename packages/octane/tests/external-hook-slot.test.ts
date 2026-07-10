@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { mount } from './_helpers';
 import { slotHooks } from '../src/compiler/slot-hooks.js';
@@ -133,5 +133,71 @@ describe('vite plugin gate routing', () => {
 	it('honors the // octane-no-slot opt-out and skips non-octane files', () => {
 		expect(run(`// octane-no-slot\n${HOOK}`, '/app/binding.ts')).toBeNull();
 		expect(run(`export const x = 1;`, '/app/plain.ts')).toBeNull();
+	});
+});
+
+describe('manifest-declared manual hook slots', () => {
+	// Bindings whose `.ts` sources hand-forward hook slots declare
+	// `"octane": { "hookSlots": { "manual": ["src"] } }` in their OWN
+	// package.json; the plugin finds the nearest manifest and skips the surgical
+	// pass for files under the declared directories — no per-config `exclude`
+	// lists. These transforms use REAL workspace paths so the walk hits the
+	// actual manifests.
+	const plugin = octane();
+	const run = (code: string, id: string) => (plugin.transform as any).call({}, code, id);
+	const HOOK = `import { useState } from 'octane';\nexport const f = () => useState(0);`;
+
+	it('skips files under a directory declared manual', () => {
+		const id = join(process.cwd(), 'packages/zustand/src/__probe__.ts');
+		expect(run(HOOK, id)).toBeNull();
+	});
+
+	it("still slots the declaring package's OWN test files (scope is src, not the package)", () => {
+		// Inline hook callbacks in a binding's tests rely on call-site slots —
+		// the declaration must not swallow the whole package directory.
+		const id = join(process.cwd(), 'packages/testing-library/tests/__probe__.ts');
+		expect(run(HOOK, id)?.code).toMatch(/useState\(0, _h\$\d+\)/);
+	});
+
+	it('still slots packages without the declaration (redux is auto-slotted)', () => {
+		const id = join(process.cwd(), 'packages/redux/src/__probe__.ts');
+		expect(run(HOOK, id)?.code).toMatch(/useState\(0, _h\$\d+\)/);
+	});
+
+	it('still slots app files outside any declaring package', () => {
+		const id = join(process.cwd(), 'packages/octane/tests/_fixtures/__probe__.ts');
+		expect(run(HOOK, id)?.code).toMatch(/useState\(0, _h\$\d+\)/);
+	});
+
+	it('the declaration registry matches the hand-slot-forwarding bindings exactly', () => {
+		// The definitive list. Adding a binding here without the manifest flag (or
+		// removing the flag from a listed one) means its sources double-slot the
+		// moment ANOTHER project imports them — the exact drift the declaration
+		// exists to prevent. Auto-slotted by design (no flag): redux, recharts,
+		// hook-form.
+		const packagesDir = join(process.cwd(), 'packages');
+		const declared = readdirSync(packagesDir)
+			.filter((dir) => {
+				try {
+					const pkg = JSON.parse(readFileSync(join(packagesDir, dir, 'package.json'), 'utf8'));
+					return Array.isArray(pkg.octane?.hookSlots?.manual);
+				} catch {
+					return false;
+				}
+			})
+			.sort();
+		expect(declared).toEqual([
+			'base-ui',
+			'floating-ui',
+			'lexical',
+			'mdx',
+			'motion',
+			'radix',
+			'stylex',
+			'tanstack-query',
+			'tanstack-router',
+			'testing-library',
+			'zustand',
+		]);
 	});
 });

@@ -261,6 +261,21 @@ improvement is to make hand-slot-forwarding self-declarative (package metadata,
 a source pragma, or a plugin option exported by the binding) and consume one
 shared exclusion definition in tests, website, examples, and builds.
 
+**Resolved (2026-07-10):** hand-slot-forwarding is now self-declarative. Each
+such binding carries `"octane": { "hookSlots": { "manual": ["src"] } }` in its own
+`package.json`; the compiler plugin's surgical pass walks to the nearest
+manifest and skips files under the declared directories automatically (cached
+per directory), so the trait travels with the package into every consumer. The
+scope is a directory list — not the whole package — because a binding's own
+test files must stay auto-slotted. All repeated `exclude`
+path lists were deleted from the root Vitest projects, `website/vite.config.ts`,
+and the examples; the option survives only as an ad-hoc escape hatch.
+`packages/octane/tests/external-hook-slot.test.ts` pins the declaration
+registry (currently: base-ui, floating-ui, lexical, mdx, motion, radix, stylex,
+tanstack-query, tanstack-router, testing-library, zustand — redux/recharts/
+hook-form are auto-slotted by design) and covers the skip/slot behavior in both
+dev and prod compile modes via the `octane-prod` project.
+
 ## 7. Marker protocol remains a major complexity center
 
 Severity: medium; current work is measured and well tested.

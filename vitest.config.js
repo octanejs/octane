@@ -21,16 +21,17 @@ export default defineConfig({
 					globals: false,
 				},
 				plugins: [
-					octane({
-						// The parallel-use pipeline (memoized creations, batched unwrap,
-						// fetch-tree warming) runs at its DEFAULT (on). Tests that pin
-						// the opt-out output call compile() with `parallelUse: false`.
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-						],
-					}),
+					// The parallel-use pipeline (memoized creations, batched unwrap,
+					// fetch-tree warming) runs at its DEFAULT (on). Tests that pin
+					// the opt-out output call compile() with `parallelUse: false`.
+					//
+					// No `exclude` lists anywhere in this config: bindings whose `.ts`
+					// sources hand-forward hook slots declare
+					// `"octane": { "hookSlots": { "manual": ["src"] } }` in their own package.json and
+					// the plugin skips them automatically (nearest-manifest lookup) — the
+					// same declaration covers every project below, the website, examples,
+					// and builds.
+					octane(),
 				],
 			},
 			{
@@ -54,16 +55,7 @@ export default defineConfig({
 					// prod, like React's prod bundle): they conditionalize on this.
 					env: { OCTANE_TEST_COMPILE_MODE: 'prod' },
 				},
-				plugins: [
-					octane({
-						hmr: false,
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-						],
-					}),
-				],
+				plugins: [octane({ hmr: false })],
 			},
 			{
 				test: {
@@ -75,15 +67,7 @@ export default defineConfig({
 					globalSetup: ['packages/zustand/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-						],
-					}),
-				],
+				plugins: [octane()],
 				// `@octanejs/zustand` is the package under test; alias the public name
 				// (and its subpaths) to source so fixtures import it exactly as a consumer
 				// would (and the differential React side rewrites the same specifiers to
@@ -113,15 +97,7 @@ export default defineConfig({
 					globalSetup: ['packages/tanstack-query/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-						],
-					}),
-				],
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -145,15 +121,7 @@ export default defineConfig({
 					globalSetup: ['packages/redux/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-						],
-					}),
-				],
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -191,17 +159,9 @@ export default defineConfig({
 				},
 				// hook-form's `.ts` hooks are auto-slotted (same as redux); the
 				// testing-library the ported suite mounts through is NOT (its harness
-				// calls hooks with explicit slot symbols).
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-							'/packages/testing-library/src/',
-						],
-					}),
-				],
+				// calls hooks with explicit slot symbols — declared in its package.json,
+				// so the plugin skips it automatically).
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -234,15 +194,7 @@ export default defineConfig({
 					environment: 'node',
 					globals: false,
 				},
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-						],
-					}),
-				],
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -292,15 +244,7 @@ export default defineConfig({
 						},
 					},
 				},
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-						],
-					}),
-				],
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -333,16 +277,7 @@ export default defineConfig({
 					globalSetup: ['packages/tanstack-router/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-							'/packages/tanstack-router/src/',
-						],
-					}),
-				],
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -363,15 +298,7 @@ export default defineConfig({
 					environment: 'jsdom',
 					globals: false,
 				},
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-						],
-					}),
-				],
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -395,20 +322,7 @@ export default defineConfig({
 					globalSetup: ['packages/lexical/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-							'/packages/lexical/src/',
-							// @octanejs/floating-ui's hooks forward the caller's slot via subSlot;
-							// like its own project, they must skip the auto-slotting pass when a
-							// lexical .tsrx (e.g. LexicalNodeContextMenuPlugin) imports them.
-							'/packages/floating-ui/src/',
-						],
-					}),
-				],
+				plugins: [octane()],
 				resolve: {
 					// `.tsrx` is added so extensionless subpath imports
 					// (`@octanejs/lexical/LexicalComposer`) resolve to a `.tsrx` component
@@ -444,17 +358,7 @@ export default defineConfig({
 				// octane() compiles the `.tsrx` fixtures; stylex() (enforce:'post') then
 				// runs the StyleX compiler over that output, replacing stylex.* calls with
 				// atomic class names. `dev:false` keeps class names deterministic for tests.
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-							'/packages/stylex/src/',
-						],
-					}),
-					stylex({ dev: false }),
-				],
+				plugins: [octane(), stylex({ dev: false })],
 				resolve: {
 					alias: [
 						{
@@ -478,19 +382,11 @@ export default defineConfig({
 					environment: 'jsdom',
 					globals: false,
 				},
-				// floating-ui's `.ts` hooks forward the caller's slot via subSlot, so they
-				// must be EXCLUDED from the auto-slotting pass (the `.tsx` fixtures that call
-				// them are full-compiled and inject the trailing slot).
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-							'/packages/floating-ui/src/',
-						],
-					}),
-				],
+				// floating-ui's `.ts` hooks forward the caller's slot via subSlot — its
+				// package.json declares manual hook slots, so the auto-slotting pass skips
+				// them (the `.tsx` fixtures that call them are full-compiled and inject the
+				// trailing slot).
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -514,21 +410,12 @@ export default defineConfig({
 					globalSetup: ['packages/radix/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				// radix's `.ts` foundation forwards the caller's slot via subSlot, so it must
-				// be EXCLUDED from the auto-slotting pass (the `.tsx` fixtures that call it are
-				// full-compiled and inject the trailing slot) — as must @octanejs/floating-ui,
-				// which radix's Popper builds on.
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-							'/packages/radix/src/',
-							'/packages/floating-ui/src/',
-						],
-					}),
-				],
+				// radix's `.ts` foundation forwards the caller's slot via subSlot (as does
+				// @octanejs/floating-ui, which radix's Popper builds on) — both declare
+				// manual hook slots in their package.json, so the auto-slotting pass skips
+				// them (the `.tsx` fixtures that call them are full-compiled and inject the
+				// trailing slot).
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -556,20 +443,11 @@ export default defineConfig({
 					globalSetup: ['packages/base-ui/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				// base-ui's `.ts` foundation forwards the caller's slot via subSlot, so it must
-				// be EXCLUDED from the auto-slotting pass — as must @octanejs/floating-ui, which
-				// base-ui's overlays build on.
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-							'/packages/base-ui/src/',
-							'/packages/floating-ui/src/',
-						],
-					}),
-				],
+				// base-ui's `.ts` foundation forwards the caller's slot via subSlot (as does
+				// @octanejs/floating-ui, which base-ui's overlays build on) — both declare
+				// manual hook slots in their package.json, so the auto-slotting pass skips
+				// them.
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -595,19 +473,10 @@ export default defineConfig({
 					globals: false,
 				},
 				// The binding's `.ts` sources call hooks with EXPLICIT slot symbols
-				// (renderHook's harness component), so they must be EXCLUDED from the
-				// auto-slotting pass; the test files themselves stay included so hook
-				// callbacks written inline in tests get their call-site slots.
-				plugins: [
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-							'/packages/testing-library/src/',
-						],
-					}),
-				],
+				// (renderHook's harness component) — declared in its package.json, so the
+				// auto-slotting pass skips them; the test files themselves stay included so
+				// hook callbacks written inline in tests get their call-site slots.
+				plugins: [octane()],
 				resolve: {
 					alias: [
 						{
@@ -631,21 +500,11 @@ export default defineConfig({
 				// octaneMdx() owns `.mdx`/`.md` (it runs the FULL pipeline — @mdx-js/mdx →
 				// octane compile — and returns final JS); octane() compiles the `.tsrx`
 				// fixtures embedded in documents and the test files. The binding's own
-				// `.ts` sources call hooks with EXPLICIT slot symbols, so they are
-				// excluded from the auto-slotting pass — as is @octanejs/testing-library,
-				// which the tests mount through.
-				plugins: [
-					octaneMdx(),
-					octane({
-						exclude: [
-							'/packages/zustand/src/',
-							'/packages/tanstack-query/src/',
-							'/packages/motion/src/',
-							'/packages/mdx/src/',
-							'/packages/testing-library/src/',
-						],
-					}),
-				],
+				// `.ts` sources call hooks with EXPLICIT slot symbols (as does
+				// @octanejs/testing-library, which the tests mount through) — both declare
+				// manual hook slots in their package.json, so the auto-slotting pass skips
+				// them.
+				plugins: [octaneMdx(), octane()],
 				resolve: {
 					alias: [
 						{
@@ -715,20 +574,11 @@ export default defineConfig({
 				// The website app stack: octaneMdx() compiles the site's .mdx documents
 				// (same shared options — Shiki + tsrx langAlias — the app itself uses);
 				// octane() compiles the .tsrx pages and slots hooks in app .ts files.
-				// The bindings' own `.ts` sources hand-forward slots, so they are
-				// excluded from the auto-slotting pass (same reasoning as the projects
-				// above). Package imports (@octanejs/tanstack-router, octane, …) resolve through
-				// website/node_modules workspace links — no aliases needed.
-				plugins: [
-					octaneMdx(websiteMdxOptions),
-					octane({
-						exclude: [
-							'/packages/tanstack-router/src/',
-							'/packages/mdx/src/',
-							'/packages/testing-library/src/',
-						],
-					}),
-				],
+				// The bindings' own hand-slot-forwarding `.ts` sources are skipped via
+				// their package.json declarations. Package imports (@octanejs/tanstack-router,
+				// octane, …) resolve through website/node_modules workspace links — no
+				// aliases needed.
+				plugins: [octaneMdx(websiteMdxOptions), octane()],
 			},
 		],
 	},
