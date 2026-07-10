@@ -3,6 +3,13 @@
   "version": "0.1.2",
   "license": "MIT",
   "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
   "description": "TanStack Router bindings for the octane renderer — reuses @tanstack/router-core and swaps the React binding for octane's hooks.",
   "author": {
     "name": "Dominic Gannaway",
