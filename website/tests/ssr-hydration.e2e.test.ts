@@ -21,16 +21,17 @@ const WEBSITE = join(process.cwd(), 'website');
 const ROUTES = ['/', '/docs', '/benchmarks', '/playground'];
 
 // M0 of docs/comment-marker-elision-plan.md: per-route comment-node ceilings
-// (~15% above post-M2 2026-07-09 measurements: / 1,783 · /docs 379 ·
-// /benchmarks 14,793 (the 12 recharts cards — the de-opt childSlot weight M2
-// trimmed) · /playground 185). This is the CI-enforced DOM-weight ratchet —
-// tighten as the elision phases land, and treat a breach as a marker-minting
-// regression.
+// (~15% above post-M3 2026-07-09 measurements: / 1,743 · /docs 361 ·
+// /benchmarks 14,447 · /playground 169). What remains on / is chart-INTERNAL
+// client minting (~1,250 empty anchors + `it` pairs inside the recharts SVG —
+// the next elision target), not SSR pairs (188). This is the CI-enforced
+// DOM-weight ratchet — tighten as the elision phases land, and treat a breach
+// as a marker-minting regression.
 const COMMENT_CEILINGS: Record<string, number> = {
-	'/': 2050,
-	'/docs': 450,
-	'/benchmarks': 17000,
-	'/playground': 250,
+	'/': 2000,
+	'/docs': 415,
+	'/benchmarks': 16600,
+	'/playground': 195,
 };
 
 // A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a

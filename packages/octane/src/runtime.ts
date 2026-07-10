@@ -6701,6 +6701,17 @@ interface CompSlot {
 	/** singleRoot client mount: insert anchor for the self-marked element. */
 	anchor: Node | null;
 	singleRoot: boolean;
+	/**
+	 * M3 inherit-range (docs/comment-marker-elision-plan.md): start/end are
+	 * BORROWED from the parent block — the call site is the sole root of its
+	 * `@{}` body, so the body block's range IS this slot's range (both null =
+	 * whole-container mode under a root / owns-parent parent). The slot never
+	 * owns markers: teardown sweeps between them (block.exclusiveMarkers) or
+	 * clears the container; identity swaps re-render in place; transitions take
+	 * the probe path (a marker-pair WIP commit would change the parent's
+	 * shape); hydration adopts NOTHING (the server skipped the frame pair).
+	 */
+	inherited: boolean;
 	block: Block | null;
 	// The component identity last rendered: a ComponentBody, or a host tag STRING
 	// (a dynamic JSX tag that resolved to e.g. 'h1' — see the string-comp branch
@@ -6741,6 +6752,12 @@ export function componentSlot(
 	// callee carries the compiler's `$$singleRoot` definition-site stamp
 	// (docs/comment-marker-elision-plan.md M1).
 	singleRoot?: boolean | 2,
+	// M3 inherit-range: the call site is the SOLE root of its `@{}` body —
+	// borrow the parent block's marker range instead of minting/adopting; the
+	// server skipped the child's frame pair at this site (inheritSoleCompRoot
+	// in the compiler stamps both sides from the same AST). Declined at
+	// runtime when the parent block has no coherent borrowable regime.
+	inherit?: boolean,
 ): void {
 	const parentBlock = parentScope.block;
 	// A STRING comp: a dynamic JSX tag — `<props.parts.title>`, `<Tag/>` with
@@ -6768,17 +6785,48 @@ export function componentSlot(
 	}
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
 	if (state === undefined) {
-		let start: Comment | null;
-		let end: Comment | null;
+		let start: Comment | null = null;
+		let end: Comment | null = null;
+		let inherited = false;
+		// M3 inherit-range: borrow the parent block's range — this site is the
+		// sole root of its body, so the body block's range IS the slot's range.
+		// Resolved BEFORE the hydration probes: the server emitted NO frame pair
+		// here, and cursor-probing would misadopt the child's own first content
+		// marker. Borrow only a coherent regime — a real Block (LiteBlockImpl
+		// carries no startMarker) whose markers are BOTH comments (a marked
+		// range) or BOTH null (root / owns-parent whole-container). Anything
+		// else declines into the regular regimes below; declines are
+		// compile-time unreachable under hydration (bodies with an inherit root
+		// are stamped lite-ineligible, and element-marked singleRoot parents
+		// can't own a noTemplate body).
+		// Boundary builtins decline by IDENTITY (covers member/aliased/dynamic
+		// tags the compile-time name check can't see — `<octane.Suspense>`,
+		// `const S = Suspense`): their pairs are load-bearing for streaming.
+		// ssrComponent declines on the same identities, so the server emitted a
+		// pair exactly where this falls through to the adoption regimes below.
+		if (inherit === true && (comp === Suspense || comp === ErrorBoundary)) inherit = false;
+		if (inherit === true && parentBlock !== null) {
+			const ps = (parentBlock as { startMarker?: Node | null }).startMarker;
+			const pe = (parentBlock as { endMarker?: Node | null }).endMarker;
+			if (ps != null && pe != null && ps !== pe && ps.nodeType === 8 && pe.nodeType === 8) {
+				start = ps as Comment;
+				end = pe as Comment;
+				inherited = true;
+			} else if (ps === null && pe === null) {
+				// Whole-container mode: the parent block owns everything under
+				// `domParent` (a root block, or an owns-parent childSlot block).
+				inherited = true;
+			}
+		}
 		// Resolve the server's `<!--[-->` to adopt: directly when anchored, or — for
 		// an appended (anchor-less, all-component-children) child, OR a sole-hole
 		// child whose anchor is its body's end marker (a `@try { <Comp/> }` arm) —
 		// by consulting the parked cursor (host.firstChild for the first appended
 		// child; the cursor is already on the open marker otherwise).
 		let open: Node | null = null;
-		if (hydrating && isBlockOpen(anchor ?? null)) {
+		if (!inherited && hydrating && isBlockOpen(anchor ?? null)) {
 			open = anchor as Node;
-		} else if (hydrating && !isBlockOpen(anchor ?? null)) {
+		} else if (!inherited && hydrating && !isBlockOpen(anchor ?? null)) {
 			// The anchor is null (appended child) or a non-open marker (the slot is the
 			// sole hole of a control-flow arm, so its anchor is the arm's end marker).
 			// In both cases mountTry/renderBlock parked the cursor on the server range's
@@ -6787,7 +6835,10 @@ export function componentSlot(
 			if (c === null || c.parentNode !== domParent) c = domParent.firstChild;
 			if (c !== null && isBlockOpen(c)) open = c;
 		}
-		if (open !== null) {
+		if (inherited) {
+			// Borrowed range resolved above; hydration adopts NOTHING — the cursor
+			// already sits on this component's first content node.
+		} else if (open !== null) {
 			// Adopt the server range: its comments become our markers, cursor → content.
 			start = open as Comment;
 			end = matchingClose(open);
@@ -6813,7 +6864,8 @@ export function componentSlot(
 			start,
 			end,
 			anchor: anchor ?? null,
-			singleRoot: start === null,
+			singleRoot: start === null && !inherited,
+			inherited,
 			block: null,
 			currentComp: null,
 			prevKey: NO_KEY,
@@ -6838,7 +6890,7 @@ export function componentSlot(
 		// on screen + resumes (the resume re-renders the boundary, re-driving this swap).
 		// Urgent + hydration keep the legacy path.
 		if (state.block !== null && !hydrating && parentBlock.currentRenderMode === 'transition') {
-			if (!state.singleRoot && state.end !== null) {
+			if (!state.singleRoot && !state.inherited && state.end !== null) {
 				// COMMIT the WIP (no double render): the off-screen block already owns a
 				// `<!--wip-->`/`<!--/wip-->` pair, which is EXACTLY componentSlot's non-
 				// singleRoot regime (the slot's start/end ARE the block's owned markers,
@@ -6866,11 +6918,15 @@ export function componentSlot(
 				spliceWipCapture(r.wip);
 				return;
 			}
-			// singleRoot slots keep the PROBE + discard double render: they self-mark with
-			// a single root element (no comment markers), so committing a comment-marked
-			// WIP block would change the DOM shape and break the self-marking cascade an
-			// enclosing @if relies on. Probe off-screen to surface a suspend/error, discard,
-			// then fall through to the legacy singleRoot swap below.
+			// singleRoot + INHERITED slots keep the PROBE + discard double render:
+			// singleRoot self-marks with a single root element (no comment markers), so
+			// committing a comment-marked WIP block would change the DOM shape and break
+			// the self-marking cascade an enclosing @if relies on; an inherited slot's
+			// markers BELONG to the parent block, so adopting a wip pair would change
+			// the parent's range shape. Probe off-screen to surface a suspend/error,
+			// discard, then fall through to the legacy swap below. (An inherited slot's
+			// probe anchor is the borrowed end marker — the wip renders after it,
+			// outside the parent's range, and is disposed before the swap.)
 			const probeAfter = state.end ?? state.anchor;
 			if (probeAfter !== null) {
 				const r = renderOffscreen(parentBlock, domParent, probeAfter, body, renderProps);
@@ -6880,7 +6936,19 @@ export function componentSlot(
 			}
 		}
 		if (state.block) {
-			if (state.singleRoot) {
+			if (state.inherited) {
+				// Borrowed range (M3): the markers belong to the PARENT block —
+				// unmountBlock sweeps BETWEEN them (the block was created with
+				// exclusiveMarkers=true) and leaves them in place; whole-container
+				// mode (null markers) clears the container the parent owns (the
+				// root-block precedent — unmountBlock removes no DOM for a
+				// null-marker dynamic block). Never mint replacements: the remount
+				// below re-renders into the same borrowed range.
+				unmountBlock(state.block);
+				if (state.start === null) {
+					while (domParent.firstChild) domParent.removeChild(domParent.firstChild);
+				}
+			} else if (state.singleRoot) {
 				// Self-marked block — unmountBlock removes exactly the root element
 				// (block.startMarker === endMarker === it); nothing to recreate.
 				unmountBlock(state.block);
@@ -6941,6 +7009,9 @@ export function componentSlot(
 				body,
 				renderProps,
 			);
+			// Borrowed range (M3): teardown must sweep BETWEEN the parent's
+			// markers, never remove them (the branch-block precedent).
+			if (state.inherited) b.exclusiveMarkers = true;
 			state.block = b;
 			renderBlock(b);
 		}
@@ -6959,7 +7030,9 @@ export function componentSlot(
 	// the component's own `<!--]-->` and the following sibling desyncs. Mirrors
 	// forBlock's `hydrateNode = state.end.nextSibling`. (singleRoot is client-only —
 	// during hydration the server always wraps the output, so state.end is set.)
-	if (hydrating && state.end !== null) hydrateNode = state.end.nextSibling;
+	// An INHERITED slot adopted nothing: its end is the PARENT's marker and it has
+	// no following sibling (sole root) — leave the cursor where the body put it.
+	if (hydrating && !state.inherited && state.end !== null) hydrateNode = state.end.nextSibling;
 }
 
 // ---------------------------------------------------------------------------

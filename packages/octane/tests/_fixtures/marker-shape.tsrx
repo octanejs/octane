@@ -1,4 +1,4 @@
-import { useState, createElement } from 'octane';
+import { useState, createElement, createContext, useContext, Suspense } from 'octane';
 import { ExtLeaf } from './marker-shape-ext.tsrx';
 
 // Marker-shape corpus (M0 of docs/comment-marker-elision-plan.md): one
@@ -26,10 +26,86 @@ export function Chain() @{
 
 // (a2) CROSS-MODULE sole child — ExtLeaf lives in marker-shape-ext.tsrx; the
 // call site emits the `2` sentinel and the runtime elides iff the callee's
-// definition-site $$singleRoot stamp is present (M1).
+// definition-site $$singleRoot stamp is present (M1). Since M3 the site is
+// ALSO inherit-stamped (a call-site property — module-independent), which
+// supersedes the sentinel.
 export function ChainX() @{
 	const [z] = useState(3);
 	<ExtLeaf data-z={z} />
+}
+
+// (a3) KEYED sole child — `key=` is excluded from M3 inherit (key-driven
+// identity forces the slot to own its range), so this site keeps its pair on
+// all three sides while the layer BELOW it (Mid → Leaf) still inherits.
+export function ChainKeyed(props: { k: string }) @{
+	const [w] = useState(4);
+	<Mid key={props.k} data-w={w} />
+}
+
+// (a4) Sole-root identity SWAP — the tag is a per-render LOCAL, so the same
+// inherit-stamped site alternates component identity across renders. This
+// exercises the borrowed-range teardown (sweep BETWEEN the parent's markers,
+// never remove them) + in-place remount, the riskiest M3 runtime path.
+// (M1's singleRoot sentinel must NOT fire here — local callee — but inherit
+// legitimately does: the slot owns the range regardless of identity.)
+function SwapA() @{
+	const [a] = useState('A');
+	<ins class="sa">
+		{'v:' + a}
+	</ins>
+}
+function SwapB() @{
+	const [b] = useState('B');
+	<>
+		<del class="sb">
+			{'v:' + b}
+		</del>
+		<del class="sb2">tail</del>
+	</>
+}
+export function SwapInherit(props: { useA: boolean }) @{
+	const Comp = props.useA ? SwapA : SwapB;
+	<Comp />
+}
+
+// (a4b) The same swap site nested under an element, so SwapInherit's own slot
+// mints a real `comp`/`/comp` pair — its INNER `<Comp/>` site then borrows
+// that pair (the borrowed-COMMENT-pair regime, vs (a4)'s whole-container
+// regime at the root). The pair must survive every swap.
+export function WrapSwap(props: { useA: boolean }) @{
+	<section class="ws">
+		<SwapInherit useA={props.useA} />
+	</section>
+}
+
+// (a8) MEMBER-TAG sole root — `<Ctx.Provider>` is the router/binding wrapper
+// stack's shape (tanstack-router nests one context provider per route level).
+// Member tags inherit too; boundary builtins are declined at RUNTIME by
+// identity instead of by tag name.
+const Theme = createContext('d');
+function ThemedLeaf() @{
+	const v = useContext(Theme);
+	<b class="tl">
+		{'t:' + v}
+	</b>
+}
+export function Provided() @{
+	const [p] = useState(0);
+	<Theme.Provider value={'v' + p}>
+		<ThemedLeaf />
+	</Theme.Provider>
+}
+
+// (a9) ALIASED boundary builtin — the compile-time name exclusion can't see
+// through `const S = Suspense`, so the site IS inherit-stamped; the runtime
+// identity decline (componentSlot + ssrComponent, same identities) must keep
+// the frame pair on BOTH sides or hydration desyncs.
+const S = Suspense;
+export function AliasSusp() @{
+	const [q] = useState(5);
+	<S fallback="…">
+		<Leaf data-q={q} />
+	</S>
 }
 
 // (b) Keyed @for with a SINGLE-root item body (client-mount item markers are

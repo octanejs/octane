@@ -1,10 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { createRoot, hydrateRoot } from '../src/index.js';
+import { createRoot, hydrateRoot, flushSync } from '../src/index.js';
 import * as ServerRT from 'octane/server';
-import { Chain, ChainX, ListSingle, ListMulti, Branch, Deopt } from './_fixtures/marker-shape.tsrx';
+import {
+	Chain,
+	ChainX,
+	ChainKeyed,
+	SwapInherit,
+	WrapSwap,
+	Provided,
+	AliasSusp,
+	ListSingle,
+	ListMulti,
+	Branch,
+	Deopt,
+} from './_fixtures/marker-shape.tsrx';
 
 // M0 of docs/comment-marker-elision-plan.md — STRUCTURAL PINS for comment-
 // marker minting. Each case renders a representative fixture three ways and
@@ -75,24 +87,148 @@ function counts(name: string, clientComp: any, props: any) {
 }
 
 describe('marker-shape pins (M0) — exact comment counts per minting regime', () => {
-	it('(a) sole-child wrapper chain: one pair per non-elided layer', () => {
-		// Chain → Mid → Leaf. Client: Mid's slot mints a pair (its root is a
-		// COMPONENT, not an element) = 2; Leaf's slot already elides via the
-		// same-module componentSlot singleRoot path (its body is one element)
-		// = 0. SSR: renderComponentFramed wraps BOTH child layers = 2 pairs = 4;
-		// hydration adopts all server pairs = 4. M3 target: client 0, ssr 0
-		// (inherited ranges); cross-module chains (the router) get NO client
-		// elision today — that's M1/M3.
-		expect(counts('Chain', Chain, {})).toEqual({ client: 2, ssr: 4, hydrate: 4 });
+	it('(a) sole-child wrapper chain: inherited ranges collapse every layer (M3)', () => {
+		// Chain → Mid → Leaf. Each body's sole output is one component call, so
+		// every call site INHERITS its parent block's range (M3): the client
+		// borrows instead of minting (Chain: the root block's whole-container
+		// range; Mid: the same), the server skips renderComponentFramed's pair
+		// at both flagged sites, and hydration adopts nothing. Pre-M3 this was
+		// client 2 / ssr 4 / hydrate 4.
+		expect(counts('Chain', Chain, {})).toEqual({ client: 0, ssr: 0, hydrate: 0 });
 	});
 
-	it('(a2) CROSS-MODULE sole child: the $$singleRoot stamp elides the slot pair (M1)', () => {
-		// ChainX → ExtLeaf (another module). Client: the call site's `2` sentinel
-		// resolves the callee's definition-site stamp → markerless singleRoot
-		// mount = 0 comments. SSR still frames the child component = 1 pair = 2;
-		// hydration adopts it = 2 (client-mount elision only — the forBlock
-		// singleRoot precedent).
-		expect(counts('ChainX', ChainX, {})).toEqual({ client: 0, ssr: 2, hydrate: 2 });
+	it('(a2) CROSS-MODULE sole child: inherit-range works on imported callees (M3)', () => {
+		// ChainX → ExtLeaf (another module). The inherit stamp is a CALL-SITE
+		// property (sole root of the body) — no same-module analysis needed, so
+		// the cross-module chain elides on all three sides too. Pre-M3: client 0
+		// (via the M1 `$$singleRoot` stamp) / ssr 2 / hydrate 2; the M1 sentinel
+		// is now superseded by inherit at this site.
+		expect(counts('ChainX', ChainX, {})).toEqual({ client: 0, ssr: 0, hydrate: 0 });
+	});
+
+	it('(a3) KEYED sole child keeps its pair; the layer below still inherits (M3)', () => {
+		// `key=` is excluded from inherit — ChainKeyed's site mints/adopts its own
+		// pair (client 2 / ssr 2 / hydrate 2) while Mid → Leaf below it still
+		// inherits (0). Also proves the exclusion agrees across all three sides.
+		expect(counts('ChainKeyed', ChainKeyed, { k: 'k1' })).toEqual({
+			client: 2,
+			ssr: 2,
+			hydrate: 2,
+		});
+	});
+
+	it('(a4) inherited identity swap, whole-container regime (root)', () => {
+		// SwapInherit's sole-root tag is a per-render LOCAL — the inherit-stamped
+		// site swaps identity across renders. At the root the borrow is
+		// whole-container (null markers): teardown clears the container, the
+		// remount re-renders in place, zero comments throughout — including a
+		// MULTI-root replacement body (SwapB), which singleRoot could never hold.
+		const root = createRoot(container);
+		root.render(SwapInherit, { useA: true });
+		expect(container.innerHTML).toBe('<ins class="sa">v:A</ins>');
+		expect(domComments(container)).toBe(0);
+		flushSync(() => root.render(SwapInherit, { useA: false })); // scheduled otherwise
+		expect(container.innerHTML).toBe('<del class="sb">v:B</del><del class="sb2">tail</del>');
+		expect(domComments(container)).toBe(0);
+		flushSync(() => root.render(SwapInherit, { useA: true }));
+		expect(container.innerHTML).toBe('<ins class="sa">v:A</ins>');
+		root.unmount();
+		expect(container.innerHTML).toBe('');
+	});
+
+	it('(a4b) inherited identity swap, borrowed-pair regime: the parent pair survives', () => {
+		// Nested under an element, SwapInherit's own slot mints a real pair; the
+		// inner `<Comp/>` site borrows it (exclusiveMarkers teardown). The pair
+		// must survive every swap — a removed marker would strand the slot.
+		const root = createRoot(container);
+		root.render(WrapSwap, { useA: true });
+		const sec = container.querySelector('section.ws')!;
+		expect(domComments(sec)).toBe(2);
+		expect(sec.innerHTML).toContain('<ins class="sa">v:A</ins>');
+		flushSync(() => root.render(WrapSwap, { useA: false }));
+		expect(domComments(sec)).toBe(2);
+		expect(sec.innerHTML).toContain('<del class="sb">v:B</del><del class="sb2">tail</del>');
+		expect(sec.querySelector('.sa')).toBeNull();
+		flushSync(() => root.render(WrapSwap, { useA: true }));
+		expect(domComments(sec)).toBe(2);
+		expect(sec.innerHTML).toContain('<ins class="sa">v:A</ins>');
+		expect(sec.querySelector('.sb')).toBeNull();
+		root.unmount();
+	});
+
+	it('(a8) MEMBER-TAG sole root (`<Ctx.Provider>`) inherits — the router-stack shape', () => {
+		// The Provider's own frame pair is gone on all three sides; what remains
+		// is the children render-fn's block pair on the server (the client mounts
+		// the children markerless, hydration adopts the server's pair — the
+		// ListSingle-style asymmetry).
+		expect(counts('Provided', Provided, {})).toEqual({ client: 0, ssr: 2, hydrate: 2 });
+	});
+
+	it('(a9) ALIASED boundary builtin declines at RUNTIME on both sides', () => {
+		// `const S = Suspense` dodges the compile-time name exclusion — the site
+		// is stamped, and componentSlot + ssrComponent both decline by identity,
+		// keeping the frame pair (and Suspense's own boundary bookkeeping) on
+		// both sides. A one-sided decline would desync hydration here; hydrate
+		// matching ssr proves the pairs adopted cleanly.
+		expect(counts('AliasSusp', AliasSusp, {})).toEqual({ client: 6, ssr: 8, hydrate: 8 });
+	});
+
+	it('(a5) chain hydration ADOPTS the server DOM (same node, no mismatch)', () => {
+		const { html } = ServerRT.renderToString(server.Chain, {});
+		container.innerHTML = html;
+		const serverLeaf = container.querySelector('div.leaf');
+		expect(serverLeaf).not.toBeNull();
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const root = hydrateRoot(container, Chain, {});
+			// Adoption, not rebuild: the very node the server rendered survives.
+			expect(container.querySelector('div.leaf')).toBe(serverLeaf);
+			expect(container.textContent).toBe('n:0');
+			expect(errSpy).not.toHaveBeenCalled();
+			root.unmount();
+		} finally {
+			errSpy.mockRestore();
+		}
+	});
+
+	it('(a6) LEGACY server HTML (pre-M3 frame pairs) still recovers to correct content', () => {
+		// Old server output wrapped each chain layer in a frame pair; the new
+		// client adopts nothing at inherit sites. Hydrating legacy HTML must fall
+		// into mismatch RECOVERY (client re-render), ending with correct content —
+		// the plan's server-has-pair/client-expects-none case.
+		const { html } = ServerRT.renderToString(server.Chain, {});
+		container.innerHTML = '<!--[--><!--[-->' + html + '<!--]--><!--]-->';
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		try {
+			const root = hydrateRoot(container, Chain, {});
+			expect(container.querySelector('div.leaf')).not.toBeNull();
+			expect(container.textContent).toBe('n:0');
+			root.unmount();
+		} finally {
+			errSpy.mockRestore();
+			warnSpy.mockRestore();
+		}
+	});
+
+	it('(a7) boundary builtins + positive control: inherit stamping at compile time', () => {
+		// Suspense (aliased or not) is EXCLUDED — its pairs are load-bearing for
+		// streaming. Both compile modes must agree.
+		const excl =
+			`import { Suspense } from 'octane';\n` +
+			`function Inner() @{ <p>i</p> }\n` +
+			`export function Page() @{ <Suspense fallback={'f'}><Inner/></Suspense> }\n`;
+		expect(compile(excl, 'x.tsrx').code).not.toMatch(/componentSlot\([^)]*, true\);/);
+		expect(compile(excl, 'x.tsrx', { mode: 'server' }).code).not.toMatch(
+			/_\$ssrComponent\(__s, Suspense, [^)]*, true\)/,
+		);
+		// Positive control — a plain sole comp root IS stamped on both sides (so
+		// the negative assertions above aren't vacuous).
+		const pos = `function Inner() @{ <p>i</p> }\nexport function Page() @{ <Inner/> }\n`;
+		expect(compile(pos, 'y.tsrx').code).toMatch(/componentSlot\([^)]*, true\);/);
+		expect(compile(pos, 'y.tsrx', { mode: 'server' }).code).toMatch(
+			/_\$ssrComponent\(__s, Inner, \{\s*\}, true\)/,
+		);
 	});
 
 	it('(b) keyed @for, single-root items: client elides item pairs, SSR keeps them', () => {

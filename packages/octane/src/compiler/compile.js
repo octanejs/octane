@@ -296,6 +296,66 @@ function addUserImportSpecifiers(ctx, node) {
 	}
 }
 
+// M3 marker elision (docs/comment-marker-elision-plan.md): a component body
+// whose ENTIRE output is one component call spans its own block's range by
+// construction, so the call site can INHERIT the parent block's markers on the
+// client and the server can skip the child's frame pair — collapsing sole-child
+// wrapper chains (incl. `<ctx.Provider>` router/binding stacks) to the
+// outermost pair. The predicate must be computed from the same AST by BOTH
+// compile modes (client stamp ↔ server pair-skip ↔ hydration adopt-nothing
+// agree by construction). Exclusions:
+//   - `key=` (key-driven identity forces the slot to own its range),
+//   - the octane boundary builtins (Suspense / ErrorBoundary / Activity —
+//     their pairs are load-bearing for streaming). Direct imported names are
+//     excluded here (collectOctaneBoundaryNames); member/dynamic/aliased tags
+//     that RESOLVE to a boundary builtin are declined at RUNTIME by identity —
+//     componentSlot and ssrComponent both check the resolved comp against the
+//     builtins, so the two sides always agree.
+// `bodyNodes` is the normalized, HeadHoist-filtered root list of a `@{ … }`
+// (JSXCodeBlock) body — callers gate on the body form.
+function inheritSoleCompRoot(bodyNodes, ctx) {
+	if (bodyNodes.length !== 1) return false;
+	const n = bodyNodes[0];
+	if (n.type !== 'Element' || !isComponentTag(n)) return false;
+	const id = n.openingElement?.name || n.id;
+	if (!id) return false;
+	if (
+		(id.type === 'Identifier' || id.type === 'JSXIdentifier') &&
+		typeof id.name === 'string' &&
+		ctx._octaneBoundaryNames &&
+		ctx._octaneBoundaryNames.has(id.name)
+	) {
+		return false;
+	}
+	const attrs = n.attributes || n.openingElement?.attributes || [];
+	for (const a of attrs) {
+		if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
+		const name = a.name && (a.name.name || a.name);
+		if (name === 'key') return false;
+	}
+	return true;
+}
+
+// Collect the LOCAL names bound to the octane boundary builtins (see
+// inheritSoleCompRoot) from a module's import declarations. Aliased imports
+// (`import { Suspense as S }`) are matched by their local binding.
+function collectOctaneBoundaryNames(astBody) {
+	const names = new Set();
+	for (const node of astBody) {
+		if (node.type !== 'ImportDeclaration' || node.source.value !== 'octane') continue;
+		for (const sp of node.specifiers || []) {
+			const imported = sp.imported?.name;
+			if (
+				(imported === 'Suspense' || imported === 'ErrorBoundary' || imported === 'Activity') &&
+				sp.local?.name
+			) {
+				names.add(sp.local.name);
+			}
+		}
+	}
+	return names;
+}
+
 export const HOOK_NAMES = new Set([
 	'useState',
 	'useReducer',
@@ -1597,6 +1657,8 @@ export function compile(source, filename, options) {
 			if (sp.local && sp.local.name) ctx.importedNames.add(sp.local.name);
 		}
 	}
+	// M3 inherit-range exclusion set (see inheritSoleCompRoot).
+	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
 
 	// List of exported components needing HMR wrapping. Each entry: { name,
 	// exportKind: 'default' | 'named' }. We emit the `Comp = hmr(Comp)` lines
@@ -1699,6 +1761,19 @@ export function compile(source, filename, options) {
 				return false;
 			})(root);
 			if (reject) eligible = false;
+		}
+		// M3 inherit-range: a body whose sole output is one component call BORROWS
+		// its own block's marker range at that site (see inheritSoleCompRoot), so
+		// callers must give it a real Block with a coherent range — a
+		// componentSlotLite invocation (LiteBlockImpl: no startMarker, endMarker =
+		// the call-site anchor) has nothing to borrow, and under HYDRATION the
+		// declined borrow would probe for a child pair the server never emitted.
+		// Reject lite for such callees.
+		if (eligible && compNode.body && compNode.body.type === 'JSXCodeBlock') {
+			const bodyNodes = normalizeChildren(
+				compNode.body.render ? [compNode.body.render] : [],
+			).filter((n) => n.type !== 'HeadHoist');
+			if (inheritSoleCompRoot(bodyNodes, ctx)) eligible = false;
 		}
 		info.eligible = eligible;
 		// Single-ELEMENT-root output: the component's body renders exactly one plain
@@ -1997,6 +2072,9 @@ function compileServer(source, filename, options) {
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		_setupMaps: null,
 	};
+	// M3 inherit-range exclusion set — must match the client compile's
+	// (see inheritSoleCompRoot; both modes read the same import declarations).
+	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
 
 	let body = '';
 	for (const node of ast.body) {
@@ -2167,7 +2245,19 @@ function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html')
 	ctx._tsxValuePos = Array.isArray(node.body)
 		? false
 		: !(node.body && node.body.type === 'JSXCodeBlock');
+	// M3 inherit-range (mirror of the client's planJsx stamp — the SAME
+	// inheritSoleCompRoot predicate over the same normalized roots, so the
+	// client slot borrows exactly where the server skips the frame pair):
+	// a `@{}` body whose sole output is one component call emits that call
+	// with `inherit=true` → ssrComponent skips the `<!--[-->…<!--]-->` frame
+	// wrap (the parent's own pair already bounds it). Synthetic sub-bodies
+	// (statement arrays) never qualify. Consumed by ssrEmitComponent at the
+	// root emit, before it recurses into props/children.
+	const prevInheritRoot = ctx._ssrInheritRoot;
+	ctx._ssrInheritRoot =
+		!!(node.body && node.body.type === 'JSXCodeBlock') && inheritSoleCompRoot(bodyNodes, ctx);
 	const htmlExpr = ssrEmitNodes(bodyNodes, ctx, name, inlinedSubs, parentNs, cssHash);
+	ctx._ssrInheritRoot = prevInheritRoot;
 	ctx._tsxValuePos = prevValuePos;
 
 	let cssLines = '';
@@ -2676,6 +2766,12 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 }
 
 function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
+	// M3 inherit-range: consume the body-root flag ONCE, before this component's
+	// props/children compile below (they recurse into ssrEmitNodes/ssrCompileSub
+	// and must not inherit it). Set by ssrCompileBody only for the sole
+	// comp-call root of a `@{}` body — which is exactly this emit.
+	const inherit = ctx._ssrInheritRoot === true;
+	ctx._ssrInheritRoot = false;
 	const compExpr = tagExpr(node);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const propParts = [];
@@ -2752,7 +2848,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 		}
 	}
 	ctx.runtimeNeeded.add('ssrComponent');
-	return `_$ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} })`;
+	return `_$ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} }${inherit ? ', true' : ''})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -3296,7 +3392,14 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	const prevFDC = ctx._foldedDirectiveCalls;
 	if (node.body && node.body.foldedDirectives)
 		ctx._foldedDirectiveCalls = node.body.foldedDirectives;
+	// M3 inherit-range: only a real `@{ … }` (JSXCodeBlock) component body spans
+	// its block's whole range — synthetic sub-bodies (@if/@for/@try arms,
+	// children render-fns) pass statement arrays and stay unflagged. planJsx
+	// consumes the flag once (nested planJsx calls see it cleared).
+	const prevInheritBody = ctx._inheritBody;
+	ctx._inheritBody = !!(node.body && node.body.type === 'JSXCodeBlock');
 	const plan = planJsx(jsxNodes, ctx, name, inlinedSubs, parentNs, cssHash);
+	ctx._inheritBody = prevInheritBody;
 	ctx._foldedDirectiveCalls = prevFDC;
 
 	const lines = [];
@@ -5653,6 +5756,13 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// through the wrapper path; HTML-contributing nodes are at `_root.childNodes[i]`.
 	const single =
 		jsxNodes.length === 1 && jsxNodes[0].type === 'Element' && !isComponentTag(jsxNodes[0]);
+	// M3 inherit-range: consume the caller's body-form flag ONCE — nested planJsx
+	// runs (directive arm bodies compiled during this walk) must not see it. The
+	// sole-comp-root predicate is shared with the server compile
+	// (inheritSoleCompRoot), so the client stamp and the server pair-skip agree
+	// by construction; the stamped cc emits componentSlot(..., inherit=true).
+	const inheritRoot = ctx._inheritBody === true && inheritSoleCompRoot(jsxNodes, ctx);
+	ctx._inheritBody = false;
 	// Top-level control-flow directives (@if/@for/@switch/@try/<Activity>). In a
 	// body that ALSO has static template roots, each construct emits a `<!>`
 	// anchor at its child index (mirroring the in-element mixed-children path)
@@ -5718,6 +5828,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			}
 		}
 		partsHtml.push(part);
+		// M3 inherit-range: stamp the sole comp-call root's cc. Its own entry is
+		// the LAST one its emitNodeHtml pushed (nested children/prop ccs are
+		// pushed first, before makeCompCall returns to the root push).
+		if (inheritRoot && compCalls.length > 0) {
+			compCalls[compCalls.length - 1].inheritRange = true;
+		}
 		// Advance the child index only when the node actually contributed template
 		// HTML (an element / text / `<!>` anchor). Component calls and un-anchored
 		// constructs contribute none — advancing for them would shift every later
@@ -6249,6 +6365,24 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			pushAfter(
 				cc.id,
 				`  { const _v = (${cc.valueExpr}); if (${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') _$setText(_t, _v); else ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}); } }`,
+			);
+			continue;
+		}
+		// M3 inherit-range: the sole comp-call root of a `@{}` body — the slot
+		// BORROWS the enclosing block's marker range (10th positional arg), so it
+		// mints nothing and the server skips the child's frame pair at the same
+		// site (ssrEmitComponent reads the same predicate). Supersedes lite (the
+		// borrow needs a real Block behind the slot) and singleRoot (the borrow
+		// already elides every marker, and hydration must NOT expect a server
+		// pair). The anchor stays: it is the runtime's fallback insert position
+		// when the borrow is declined (incoherent parent regime) and the probe
+		// anchor for transition swaps.
+		if (cc.inheritRange) {
+			ctx.runtimeNeeded.add('componentSlot');
+			const inheritAnchor = anchorExprFor(cc, 'compAnchor') ?? 'undefined';
+			pushAfter(
+				cc.id,
+				`  _$componentSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}, ${inheritAnchor}, undefined, undefined, true);`,
 			);
 			continue;
 		}
