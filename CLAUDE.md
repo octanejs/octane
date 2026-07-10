@@ -51,8 +51,8 @@ pnpm rules:generate
 
 ## Repo Map
 
-This is a pnpm monorepo with ten publishable packages — the core `octane`
-runtime+compiler, the `@octanejs/vite-plugin` metaframework, and eight `@octanejs/*`
+This is a pnpm monorepo with eleven publishable packages — the core `octane`
+runtime+compiler, the `@octanejs/vite-plugin` metaframework, and nine `@octanejs/*`
 framework bindings:
 
 - `packages/octane/` (npm: `octane`) — the runtime **and** the compiler together.
@@ -65,9 +65,9 @@ framework bindings:
   production build: `vite build` → static client assets + a self-contained SSR
   server bundle; preview with `octane-preview`); `packages/adapter-vercel`
   deploys it to Vercel (Build Output API).
-- `packages/{zustand,tanstack-query,motion,stylex,tanstack-router,lexical,floating-ui,radix}/` (npm:
+- `packages/{zustand,tanstack-query,motion,stylex,tanstack-router,lexical,floating-ui,radix,hook-form}/` (npm:
   `@octanejs/*`) — framework bindings, each a faithful octane port of a React library
-  (state, data-fetching, animation, styling, routing, editor, positioning, UI primitives).
+  (state, data-fetching, animation, styling, routing, editor, positioning, UI primitives, forms).
 
 `benchmarks/`, `playground/`, and `scripts/` hold local examples, perf harnesses,
 and tooling. Route a change to the package that owns the behavior; prefer editing

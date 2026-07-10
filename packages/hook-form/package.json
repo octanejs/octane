@@ -1,0 +1,46 @@
+{
+  "name": "@octanejs/hook-form",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "React Hook Form for the octane renderer — the full react-hook-form 7.81.0 source ported onto octane's hooks: performant, flexible forms with native-event validation (onInput), field arrays, and schema resolvers.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/hook-form"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-hook-form": "catalog:default",
+    "vitest": "catalog:default",
+    "zod": "catalog:default"
+  }
+}

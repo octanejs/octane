@@ -5758,7 +5758,21 @@ const TS_TYPE_PROPS = [
 function stripTsOnlyWrappers(node) {
 	if (node === null || typeof node !== 'object') return node;
 	if (Array.isArray(node)) {
-		for (let i = 0; i < node.length; i++) node[i] = stripTsOnlyWrappers(node[i]);
+		for (let i = node.length - 1; i >= 0; i--) {
+			// Type-only STATEMENTS nested below module scope (a `type X = …` or
+			// `interface I {}` inside a function body) never hit the top-level
+			// `ast.body` filter, and stripping their annotations below would
+			// leave esrap an alias with a nulled typeAnnotation (crash) — drop
+			// the whole statement here instead. The matched node types are
+			// statement-only, so pruning from any AST array is safe (sparse
+			// ArrayExpression holes are `null` and isTypeOnlyStatement keeps
+			// them). Checked BEFORE the per-node strip so `declare` is intact.
+			if (isTypeOnlyStatement(node[i])) {
+				node.splice(i, 1);
+			} else {
+				node[i] = stripTsOnlyWrappers(node[i]);
+			}
+		}
 		return node;
 	}
 	if (

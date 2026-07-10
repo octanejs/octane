@@ -1123,36 +1123,88 @@ export function hasPendingWork(): boolean {
 
 /**
  * React-parity `act(...)`. Wrap test code that triggers updates so all of
- * the scheduled work commits before the assertion phase runs. Always returns
- * a Promise — `await` is mandatory regardless of whether the callback itself
- * is sync or async. This matches the *async* model React tests use; the
- * promise resolves only after the scheduler is quiescent (renders +
- * INSERTION/LAYOUT/PASSIVE effects + microtask chains from `use(promise)`
- * and transition retries).
+ * the scheduled work commits before the assertion phase runs.
+ *
+ * TWO modes, matching React exactly:
+ *  - SYNC callback → all scheduled work (renders + INSERTION/LAYOUT/PASSIVE
+ *    effects) is flushed SYNCHRONOUSLY before act returns, so
+ *    `act(() => setState(...)); expect(...)` works WITHOUT awaiting — the
+ *    dominant pattern in ported React test suites. The returned (already
+ *    resolved) promise still carries the callback's result; a callback throw
+ *    REJECTS the promise rather than throwing synchronously (React's act is
+ *    a thenable with the same contract).
+ *  - ASYNC callback (returns a thenable) → awaited, then the scheduler is
+ *    drained across microtask ticks until quiescent (renders, effects, and
+ *    microtask chains from `use(promise)` / transition retries).
  *
  * While the act() scope is active, scheduleRender's "update outside act(...)"
  * dev warning is suppressed (see `IS_OCTANE_ACT_ENVIRONMENT` and
  * `setIsOctaneActEnvironment`).
  *
- * The double-loop (5 microtask ticks × up to 50 outer iterations) drains
- * cascades like `use(promise)` → status flip → retry → renderBlock that
- * wouldn't settle in a single tick.
+ * The async double-loop (5 microtask ticks × up to 50 outer iterations)
+ * drains cascades like `use(promise)` → status flip → retry → renderBlock
+ * that wouldn't settle in a single tick.
  */
-export async function act<T>(fn: () => T | Promise<T>): Promise<T> {
+export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 	actScopeDepth++;
+	let result: T | Promise<T>;
 	try {
-		const result = await Promise.resolve(fn());
-		for (let i = 0; i < 50; i++) {
-			for (let j = 0; j < 5; j++) await Promise.resolve();
-			drainPassiveEffects();
-			if (!hasPendingWork()) return result;
-		}
-		throw new Error(
-			'act(): scheduler did not stabilize after 50 iterations — likely an infinite render loop',
-		);
-	} finally {
+		result = fn();
+	} catch (err) {
 		actScopeDepth--;
+		return Promise.reject(err);
 	}
+	if (result !== null && typeof result === 'object' && typeof (result as any).then === 'function') {
+		return (async () => {
+			try {
+				const value = await (result as Promise<T>);
+				for (let i = 0; i < 50; i++) {
+					for (let j = 0; j < 5; j++) await Promise.resolve();
+					drainPassiveEffects();
+					if (!hasPendingWork()) return value;
+				}
+				throw new Error(
+					'act(): scheduler did not stabilize after 50 iterations — likely an infinite render loop',
+				);
+			} finally {
+				actScopeDepth--;
+			}
+		})();
+	}
+	// Sync callback: flush synchronously BEFORE returning (flushSync drains the
+	// render queue + commit-phase effects; drainPassiveEffects the post-paint
+	// queue) so assertions immediately after a non-awaited act() observe
+	// committed state — React's sync-act contract. Work driven by MICROTASKS
+	// the callback queued (an in-flight thenable from `use(promise)`, an
+	// awaited async validation) can't be reached synchronously; the returned
+	// promise continues the async drain for callers that DO await.
+	for (let i = 0; i < 50; i++) {
+		flushSync(() => {});
+		drainPassiveEffects();
+		if (!hasPendingWork()) break;
+		if (i === 49) {
+			actScopeDepth--;
+			return Promise.reject(
+				new Error(
+					'act(): scheduler did not stabilize after 50 iterations — likely an infinite render loop',
+				),
+			);
+		}
+	}
+	return (async () => {
+		try {
+			for (let i = 0; i < 50; i++) {
+				for (let j = 0; j < 5; j++) await Promise.resolve();
+				drainPassiveEffects();
+				if (!hasPendingWork()) return result as T;
+			}
+			throw new Error(
+				'act(): scheduler did not stabilize after 50 iterations — likely an infinite render loop',
+			);
+		} finally {
+			actScopeDepth--;
+		}
+	})();
 }
 
 /** True if `anc` is a STRICT ancestor of `node` in the Block tree. */
@@ -2067,6 +2119,15 @@ export function useState<T>(
 	initial: T | (() => T),
 	slot?: symbol,
 ): [T, (next: T | ((prev: T) => T)) => void] {
+	// ABI: the compiler appends the slot as the LAST argument, so a zero-arg
+	// `useState()` (state starts undefined — React parity) arrives as
+	// `useState(slot)` with the symbol in the initial-value position. Same
+	// trailing-symbol reinterpretation as resolveHookArgs. Unambiguous: a
+	// symbol-valued initial from compiled code always arrives WITH a slot arg.
+	if (slot === undefined && typeof initial === 'symbol') {
+		slot = initial as unknown as symbol;
+		initial = undefined as T;
+	}
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useState');
 	const scope = CURRENT_SCOPE!;
@@ -2267,6 +2328,12 @@ export function useCallback<F extends (...args: any[]) => any>(
 }
 
 export function useRef<T>(initial: T, slot?: symbol): { current: T } {
+	// Zero-arg `useRef()` — same compiler-ABI trailing-symbol reinterpretation
+	// as useState above.
+	if (slot === undefined && typeof initial === 'symbol') {
+		slot = initial as unknown as symbol;
+		initial = undefined as T;
+	}
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useRef');
 	const scope = CURRENT_SCOPE!;
@@ -5835,9 +5902,16 @@ interface ControlledState {
 /**
  * Events whose dispatch can carry a user edit to a form control — React's
  * ChangeEventPlugin extraction set. Armed elements targeted by one of these
- * are restored after the discrete flush. `click` restores only checkables
- * (a text input's value can't change via click, and restoring there would
- * break "programmatic writes stick until the next render").
+ * are restored after the discrete flush. `click` is delegated (a checkable's
+ * edit STARTS there) but never ARMS the restore itself: the platform toggles
+ * a checkable before its click dispatch, then fires `input`/`change` AFTER
+ * it (activation post-steps) — and octane handlers are native, so they run
+ * in those later dispatches. Restoring after the click flush would revert
+ * the toggle before any handler could read or commit it (React avoids this
+ * only because its synthetic onChange runs during the click); the follow-up
+ * input/change arms the restore at the right time, and a NON-toggling click
+ * (preventDefault, re-clicking a checked radio) fires no follow-up and
+ * leaves no drift to restore.
  */
 const RESTORE_EVENT_LIST = ['input', 'change', 'click'];
 const RESTORE_EVENTS = /* @__PURE__ */ new Set(RESTORE_EVENT_LIST);
@@ -6365,7 +6439,10 @@ function isControlledHostProp(el: Element, name: string): boolean {
 function maybeEnqueueRestore(event: Event): void {
 	const t = event.target as any;
 	if (t === null || t.$$ctrl === undefined || !RESTORE_EVENTS.has(event.type)) return;
-	if (event.type === 'click' && t.type !== 'checkbox' && t.type !== 'radio') return;
+	// A checkable's click never arms — its `input`/`change` follow-ups do
+	// (see the RESTORE_EVENT_LIST comment: restoring after the click flush
+	// would revert the toggle before the native handlers run).
+	if (event.type === 'click') return;
 	if (pendingRestores.indexOf(t) === -1) pendingRestores.push(t);
 }
 
@@ -7676,6 +7753,37 @@ function flattenChildItems(out: any[], v: any[]): void {
 	}
 }
 
+// Flatten a MIXED children array (fragment leaves + nested `.map()` arrays)
+// into sibling items WITH React's identity semantics: each top-level position
+// is its own reconciliation slot, and a nested array's leaves are keyed WITHIN
+// that slot (compound `<pos>:<innerKey>` keys, like React's `.$` implicit-key
+// prefixes). Without this, flat positional indices shift every sibling's
+// implicit key when a nested list changes length — remounting stable siblings
+// React would keep (e.g. `<>{items.map(...)}<button/></>`: the button must not
+// remount on append). Empties are kept as items (see the childSlot array-path
+// comment). Keys land in `outKeys`, parallel to `outItems`.
+function flattenChildItemsKeyed(
+	outItems: any[],
+	outKeys: any[],
+	v: any[],
+	keyFn: (item: any, index: number) => any,
+	prefix: string,
+): void {
+	for (let i = 0; i < v.length; i++) {
+		const item = v[i];
+		if (Array.isArray(item)) {
+			// A nested array is a `.map()` result (or fragment) — its OWN slot.
+			// Inner unkeyed leaves fall back to their index within the array
+			// (deoptKey's warning already fired at the outer level if relevant).
+			flattenChildItemsKeyed(outItems, outKeys, item, deoptKeyPositional, prefix + i + ':');
+		} else {
+			outItems.push(item);
+			const k = keyFn(item, i);
+			outKeys.push(prefix === '' ? k : prefix + String(k));
+		}
+	}
+}
+
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
 // `createElement` collapses positional children and `.map()` results into arrays)
 // into a flat list of renderable values, dropping empties (null/undefined/false/
@@ -7687,6 +7795,38 @@ function flattenDeoptChildren(out: any[], v: any): void {
 		return;
 	}
 	out.push(v);
+}
+
+// flattenDeoptChildren + a parallel SLOT-SCOPED position key per kept child
+// (React identity semantics, same compound scheme as flattenChildItemsKeyed):
+// a child keeps its top-level position as its implicit key even when EMPTY
+// siblings (`{cond && <input/>}` flipped off) render nothing — so a hole
+// going falsy never shifts the following siblings onto different DOM nodes
+// (the old compact-then-match-in-order behavior morphed them: inputs swapped
+// values, a clicked button could morph into a submit button MID-DISPATCH and
+// fire a phantom form submission). Nested arrays key within their slot;
+// explicit keys ride inside the same scheme.
+function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefix: string): void {
+	if (v == null || v === false || v === true || v === '') return;
+	if (Array.isArray(v)) {
+		for (let i = 0; i < v.length; i++) {
+			const item = v[i];
+			if (Array.isArray(item)) {
+				flattenDeoptChildrenKeyed(outVals, outKeys, item, prefix + i + ':');
+			} else if (item == null || item === false || item === true || item === '') {
+				// empty — consumes its position, emits nothing
+			} else {
+				outVals.push(item);
+				const k = item.$$kind === ELEMENT_TAG && item.key != null ? item.key : i;
+				outKeys.push(prefix === '' ? k : prefix + String(k));
+			}
+		}
+		return;
+	}
+	outVals.push(v);
+	outKeys.push(
+		prefix === '' ? (v?.$$kind === ELEMENT_TAG && v.key != null ? v.key : 0) : prefix + '0',
+	);
 }
 
 // Reconcile a runtime value into a DOM node, REUSING `prev` when it's compatible
@@ -7766,7 +7906,8 @@ function reconcileDeoptChildren(
 	childNs?: string,
 ): void {
 	const next: any[] = [];
-	flattenDeoptChildren(next, children);
+	const nextKeys: any[] = [];
+	flattenDeoptChildrenKeyed(next, nextKeys, children, '');
 	const existing = el.childNodes;
 	// Fresh element (first build / fresh client mount) — nothing to reconcile against,
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
@@ -7774,7 +7915,10 @@ function reconcileDeoptChildren(
 	if (existing.length === 0) {
 		for (let i = 0; i < next.length; i++) {
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
-			if (node !== null) el.appendChild(node);
+			if (node !== null) {
+				(node as any).$$deoptKey = nextKeys[i];
+				el.appendChild(node);
+			}
 		}
 		return;
 	}
@@ -7795,37 +7939,40 @@ function reconcileDeoptChildren(
 		owned.push(scan);
 		scan = scan.nextSibling;
 	}
-	// Partition current children: keyed (by stamped descriptor key) vs the rest
-	// (unkeyed elements + text/adopted nodes), which are reused in document order.
+	// Partition current children by their stamped SLOT KEY (position-scoped —
+	// see flattenDeoptChildrenKeyed; explicit keys ride the same scheme). Nodes
+	// without a stamp (server-adopted on the first post-hydration reconcile)
+	// fall back to document-order reuse, and get stamped below for next time.
 	let byKey: Map<any, Node> | null = null;
-	const unkeyed: Node[] = [];
+	const unstamped: Node[] = [];
 	for (let i = 0; i < owned.length; i++) {
 		const n = owned[i];
-		const k = getDeoptDesc(n)?.key;
+		const k = (n as any).$$deoptKey ?? getDeoptDesc(n)?.key;
 		if (k != null) {
 			if (byKey === null) byKey = new Map();
-			byKey.set(k, n);
-		} else {
-			unkeyed.push(n);
+			if (!byKey.has(k)) {
+				byKey.set(k, n);
+				continue;
+			}
 		}
+		unstamped.push(n);
 	}
 	let up = 0;
 	const result: Node[] = [];
 	for (let i = 0; i < next.length; i++) {
 		const child = next[i];
-		const key =
-			child != null && child.$$kind === ELEMENT_TAG && child.key != null ? child.key : null;
+		const key = nextKeys[i];
 		let prev: Node | null = null;
-		if (key != null) {
-			if (byKey !== null) {
-				prev = byKey.get(key) ?? null;
-				if (prev !== null) byKey.delete(key);
-			}
-		} else {
-			prev = up < unkeyed.length ? unkeyed[up++] : null;
+		if (byKey !== null) {
+			prev = byKey.get(key) ?? null;
+			if (prev !== null) byKey.delete(key);
 		}
+		if (prev === null && up < unstamped.length) prev = unstamped[up++];
 		const node = reconcileDeoptNode(prev, child, ownerBlock, childNs);
-		if (node !== null) result.push(node);
+		if (node !== null) {
+			(node as any).$$deoptKey = key;
+			result.push(node);
+		}
 	}
 	// Remove OWNED children not reused (foreign portal ranges stay untouched).
 	const keep = result.length > 0 ? new Set<Node>(result) : null;
@@ -7919,10 +8066,25 @@ function deoptItemBody(item: any, scope: Scope): void {
 	// (raw) — so each branch tears down the other's residue on a switch (previously
 	// the pure path left a toggled-off component's Blocks + DOM in the range forever).
 	if (needsBlocks) {
-		// Switching pure → Blocks: drop the raw node the pure path left in the range.
+		// Switching pure → Blocks. If the raw node the pure path left in the range
+		// is a SAME-TAG element for the incoming host-with-components descriptor,
+		// don't drop it — TRANSFER it to the nested childSlot as its pure-host
+		// reuse candidate, so childSlot's pure-host → blocks upgrade branch adopts
+		// the element (and, recursively, its children) in place. Anything else
+		// (tag change, non-element, or an already-established nested slot) keeps
+		// the old teardown.
 		const stale = block.deoptNode;
+		let transfer: Node | null = null;
 		if (stale != null) {
-			if (stale.parentNode === block.parentNode) {
+			if (
+				scope.slots[0] === undefined &&
+				stale.nodeType === 1 /* Element */ &&
+				isHostDescriptor(item) &&
+				(stale as Element).localName === item.type &&
+				stale.parentNode === block.parentNode
+			) {
+				transfer = stale;
+			} else if (stale.parentNode === block.parentNode) {
 				detachDeoptTreeRefs(stale, null);
 				block.parentNode.removeChild(stale);
 			}
@@ -7979,11 +8141,18 @@ function deoptItemBody(item: any, scope: Scope): void {
 				currentComp: null,
 				currentIsBodyFn: false,
 				forSlot: null,
-				hostNode: null,
+				// Pure → Blocks transfer: the raw element becomes the slot's reuse
+				// candidate — childSlot's upgrade branch adopts it in place.
+				hostNode: transfer,
 				portal: null,
 			};
 			scope.slots[0] = borrowed;
 			registerSlot(scope, borrowed);
+		} else if (transfer !== null && transfer.parentNode !== null) {
+			// The borrowed-slot preconditions didn't hold (no marker pair) — the
+			// transfer has no receiving slot; fall back to the old teardown.
+			detachDeoptTreeRefs(transfer, null);
+			transfer.parentNode.removeChild(transfer);
 		}
 		childSlot(scope, 0, block.parentNode, item, block.endMarker);
 		return;
@@ -8305,6 +8474,56 @@ function teardownChildForSlot(state: ChildSlot): void {
 	state.forSlot = null;
 }
 
+// One-shot handoff for the pure-host → blocks upgrade (see childSlot's upgrade
+// branch): set around the upgraded block's renderBlock so the block's
+// owns-parent childSlot (hostElementBody's single children slot) knows to ADOPT
+// the element's existing raw children instead of mounting fresh. `children` is
+// the OLD descriptor's children (pre-upgrade), used to key the existing nodes.
+let DEOPT_UPGRADE: { block: Block; children: any } | null = null;
+
+// Build the adoption queue for an upgraded element: pair each existing raw
+// child node (strictly between `start` and `end`, in DOM order) with the key
+// its OLD child value carries under the same keying scheme the incoming items
+// will use. Empty old values (null/false/'' — the raw path rendered nothing
+// for them) occupy a key slot but get no node. Stops pairing at the first
+// node/value mismatch (defensive; unpaired nodes are swept after the render).
+function buildDeoptAdoptQueue(
+	oldChildren: any,
+	start: Comment,
+	end: Comment,
+): Array<{ key: any; node: Node }> {
+	const oldArr = Array.isArray(oldChildren) ? oldChildren : [oldChildren];
+	const keyFn = !Array.isArray(oldChildren)
+		? deoptKeyPositional
+		: POSITIONAL_CHILDREN.has(oldChildren as object)
+			? deoptKeyPositional
+			: deoptKey;
+	// SAME flatten + keying as the childSlot array path (incl. compound
+	// slot-scoped keys for nested arrays) — the queue's keys must match the
+	// keys the incoming items will get, or nothing adopts.
+	const items: any[] = [];
+	const keys: any[] = [];
+	flattenChildItemsKeyed(items, keys, oldArr, keyFn, '');
+	const queue: Array<{ key: any; node: Node }> = [];
+	let cursor: Node | null = start.nextSibling;
+	for (let i = 0; i < items.length; i++) {
+		const v = items[i];
+		if (v == null || v === false || v === true || v === '') continue; // rendered nothing
+		if (cursor === null || cursor === end) break;
+		const t = typeof v;
+		const isText = t === 'string' || t === 'number' || t === 'bigint';
+		const compatible = isText
+			? cursor.nodeType === 3
+			: isHostDescriptor(v)
+				? cursor.nodeType === 1 && (cursor as Element).localName === v.type
+				: false;
+		if (!compatible) break;
+		queue.push({ key: keys[i], node: cursor });
+		cursor = cursor.nextSibling;
+	}
+	return queue;
+}
+
 export function childSlot(
 	parentScope: Scope,
 	slotKey: number,
@@ -8393,6 +8612,21 @@ export function childSlot(
 		registerSlot(parentScope, state);
 	}
 
+	// Consume the pure-host → blocks upgrade handoff: this is the upgraded
+	// block's owns-parent children slot (its FIRST render), and the element's
+	// existing raw children must be adopted rather than mounted fresh. One-shot.
+	let upgradeChildren: any = undefined;
+	let upgradeArmed = false;
+	if (
+		DEOPT_UPGRADE !== null &&
+		DEOPT_UPGRADE.block === parentScope.block &&
+		ownsHost !== undefined
+	) {
+		upgradeChildren = DEOPT_UPGRADE.children;
+		upgradeArmed = true;
+		DEOPT_UPGRADE = null;
+	}
+
 	// ANCHORLESS → marked promotion: the slot was created markerless for a lone
 	// pure-host value (init above). The moment a render flips the value to
 	// anything else (component / array / portal / text / null), mint the marker
@@ -8453,8 +8687,10 @@ export function childSlot(
 			// server emitted one `<!--[-->…<!--]-->` range per item between our adopted
 			// markers and `reconcileKeyed`/`mountItem` ADOPT those ranges off the
 			// cursor. Sweeping here would delete the very item DOM (and break the
-			// hydrateNode chain) the de-opt list is about to adopt.
-			if (!hydrating) clearChildContent(state);
+			// hydrateNode chain) the de-opt list is about to adopt. The pure-host →
+			// blocks upgrade adopts the SAME way (the element's raw children ARE the
+			// incoming items), so it must not sweep either.
+			if (!hydrating && !upgradeArmed) clearChildContent(state);
 			if (state.end === null) {
 				// OWNS-PARENT slot entering array mode: ForSlot requires a real
 				// marker pair (reconcileKeyed anchors on it) — mint it lazily,
@@ -8464,7 +8700,10 @@ export function childSlot(
 			}
 			if (state.start === null) {
 				state.start = document.createComment('');
-				domParent.insertBefore(state.start, state.end);
+				// Upgrade adoption: the element's existing raw children must sit
+				// INSIDE [start, end] (they become the items) — mint start before
+				// the first of them, not at the tail.
+				domParent.insertBefore(state.start, upgradeArmed ? domParent.firstChild : state.end);
 			}
 			state.forSlot = {
 				__kind: 'forBlockSlot',
@@ -8478,7 +8717,11 @@ export function childSlot(
 				cachedDeps: null,
 				emptyBlock: null,
 				env: undefined,
+				adopt: null,
 			};
+			if (upgradeArmed) {
+				state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
+			}
 		}
 		// A NESTED array member is a fragment (React parity): its leaves render as
 		// SIBLING items of this list, one item per leaf. Flatten before keying —
@@ -8491,22 +8734,68 @@ export function childSlot(
 		// the ORIGINAL array — the flattened copy is a fresh, untagged allocation.
 		const keyFn = POSITIONAL_CHILDREN.has(value as object) ? deoptKeyPositional : deoptKey;
 		let items: any[] = value;
+		let flatKeys: any[] | null = null;
 		for (let i = 0; i < items.length; i++) {
 			if (Array.isArray(items[i])) {
-				const flat: any[] = [];
-				flattenChildItems(flat, value);
-				items = flat;
+				// Compound slot-scoped keys (React identity semantics): the nested
+				// array's leaves key WITHIN their top-level position, so a length
+				// change in one list never shifts a SIBLING's implicit key (which
+				// would remount it) — see flattenChildItemsKeyed.
+				const fi: any[] = [];
+				const fk: any[] = [];
+				flattenChildItemsKeyed(fi, fk, value, keyFn, '');
+				items = fi;
+				flatKeys = fk;
 				break;
 			}
 		}
+		const getKey = flatKeys === null ? keyFn : (_item: any, i: number) => flatKeys[i];
 		// singleRoot=2 (marker-elision M4): pure single-element items self-mark —
 		// no `it` pair per item — resolved per item value in mountItem; shape
 		// flips promote to a minted pair in place (deoptItemBody).
-		reconcileKeyed(parentBlock, state.forSlot, items, keyFn, deoptItemBody as any, false, 2);
+		reconcileKeyed(parentBlock, state.forSlot, items, getKey, deoptItemBody as any, false, 2);
+		// Upgrade adoption: nodes the empty→fill mount didn't consume (old
+		// children whose keys have no new item) are orphans inside the range —
+		// sweep them now.
+		if (state.forSlot.adopt !== null) {
+			const leftovers = state.forSlot.adopt;
+			for (let i = 0; i < leftovers.length; i++) {
+				const n = leftovers[i].node;
+				if (n.parentNode !== null) {
+					detachDeoptTreeRefs(n, null);
+					n.parentNode.removeChild(n);
+				}
+			}
+			state.forSlot.adopt = null;
+		}
 		return;
 	}
 	// Value is NOT an array — if we were in array mode, tear the list down first.
 	if (state.forSlot !== null) teardownChildForSlot(state);
+	// Upgrade adoption, single-child form: the new children value is a lone
+	// renderable. Adopt the element's sole existing raw node as the slot's
+	// pure-host reuse candidate (the classifier paths below patch it in place,
+	// or the nested upgrade branch takes it over for host-with-components).
+	// Multiple or incompatible leftover raw children can't be adopted by a
+	// single-value slot — sweep them so the fresh mount starts clean.
+	if (upgradeArmed && state.hostNode === null && state.block === null) {
+		const first = domParent.firstChild;
+		if (
+			first !== null &&
+			first.nextSibling === null &&
+			(first.nodeType === 1 || first.nodeType === 3)
+		) {
+			state.hostNode = first;
+		} else {
+			let n: Node | null = domParent.firstChild;
+			while (n !== null) {
+				const next: Node | null = n.nextSibling;
+				detachDeoptTreeRefs(n, null);
+				domParent.removeChild(n);
+				n = next;
+			}
+		}
+	}
 	// Classify the value. A host descriptor whose subtree contains component
 	// descendants can't be a raw rebuild (its components need reconcilable Blocks) →
 	// route it through the component path below with the stable `hostElementBody`
@@ -8641,6 +8930,47 @@ export function childSlot(
 			state.block = r.wip.block;
 			state.currentComp = comp;
 			state.currentIsBodyFn = isBodyFn;
+			return;
+		}
+		// PURE-HOST → BLOCKS UPGRADE (adopt, don't rebuild): the slot's last render
+		// was a raw pure-host tree (state.hostNode), and this render the SAME-TAG
+		// host descriptor now carries component descendants (e.g. a
+		// `{cond && <Comp/>}` child flipped on, or a `.map()` hole filled with
+		// component items) — descNeedsBlocks reclassified it through
+		// hostElementBody. Tearing the raw tree down would recreate every sibling
+		// host node; React preserves them (only the flipped position mounts). So
+		// ADOPT: hand the existing element to the new block as its deoptNode
+		// (hostElementBody's reuse branch patches props in place) and arm the
+		// one-shot child-adoption handoff so the block's owns-parent childSlot
+		// wraps the existing raw children into item ranges instead of mounting
+		// fresh (see the DEOPT_UPGRADE consumption sites).
+		if (
+			!hydrating &&
+			comp === (hostElementBody as unknown as ComponentBody) &&
+			state.block === null &&
+			state.hostNode !== null &&
+			state.hostNode.nodeType === 1 /* Element */ &&
+			(state.hostNode as Element).localName === (props as ElementDescriptor).type &&
+			(state.hostNode as Element).namespaceURI ===
+				(inferTagNs((props as ElementDescriptor).type as string, undefined) ?? HTML_NS) &&
+			!hasDangerHTML((props as ElementDescriptor).props) &&
+			!hasDangerHTML(getDeoptDesc(state.hostNode)?.props ?? null)
+		) {
+			const el = state.hostNode as Element;
+			state.hostNode = null;
+			state.currentComp = comp;
+			state.currentIsBodyFn = false;
+			const b = createBlock('dynamic', parentBlock, domParent, state.start, state.end, comp, props);
+			b.$$implicitBail = true;
+			b.memoInChain = true;
+			b.deoptNode = el;
+			state.block = b;
+			DEOPT_UPGRADE = { block: b, children: getDeoptDesc(el)?.children };
+			try {
+				renderBlock(b);
+			} finally {
+				DEOPT_UPGRADE = null;
+			}
 			return;
 		}
 		// New component (first render, or identity swap from text / another comp).
@@ -11294,6 +11624,13 @@ interface ForSlot {
 	// forBlock every parent render and stamped as `block.extra` on every item
 	// block (mount + survivor re-render) and on the @empty block.
 	env: any[] | undefined;
+	// One-shot adoption queue for the pure-host → blocks upgrade (see childSlot's
+	// upgrade branch): the adopted element's existing raw child nodes in DOM
+	// order, each pre-keyed like the incoming items, so reconcileKeyed's
+	// empty→fill mount wraps them in item ranges IN PLACE (node identity,
+	// focus, input state survive — React parity) instead of rebuilding.
+	// Consumed and nulled within the same render.
+	adopt: Array<{ key: any; node: Node }> | null;
 }
 
 export function forBlock<T>(
@@ -11356,6 +11693,7 @@ export function forBlock<T>(
 			cachedDeps: null,
 			emptyBlock: null,
 			env: undefined,
+			adopt: null,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -11634,19 +11972,34 @@ function reconcileKeyed<T>(
 	// Fast path: empty → fill. Append each new block to the tail of the (empty) list.
 	if (oldSize === 0) {
 		if (newLen === 0) return;
+		// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
+		// element's existing raw children, keyed like the incoming items. An item
+		// whose key matches the queue FRONT adopts that node in place (mountItem
+		// wraps it in the item's markers and seeds block.deoptNode); other items
+		// mount fresh BEFORE the next unconsumed node so DOM order tracks list
+		// order. Non-front key matches (a reorder in the very same render) mount
+		// fresh — the unconsumed nodes are swept by the caller.
+		const adopt = state.adopt;
 		let prev: Block | null = null;
 		for (let i = 0; i < newLen; i++) {
 			const item = items[i];
 			const key = getKey(item, i);
+			let adoptNode: Node | null = null;
+			let anchor: Node = state.end;
+			if (adopt !== null && adopt.length !== 0) {
+				if (adopt[0].key === key) adoptNode = adopt.shift()!.node;
+				else anchor = adopt[0].node;
+			}
 			const block = mountItem(
 				parentBlock,
 				parentNode,
-				state.end,
+				anchor,
 				item,
 				i,
 				itemBody,
 				state,
 				singleRoot,
+				adoptNode,
 			);
 			oldItems.set(key, block);
 			block.key = key;
@@ -12146,6 +12499,11 @@ function mountItem<T>(
 	// component-bearing) keeps the `it` pair. A later shape flip promotes the
 	// self-marked block to a minted pair in place (see deoptItemBody).
 	singleRoot: boolean | 2,
+	// Pure-host → blocks upgrade adoption: an existing raw child node this item
+	// should take over IN PLACE (self-marked directly, or markers minted around
+	// it, seeded as the item block's deoptNode so the body's pure path patches
+	// instead of rebuilding).
+	adoptNode: Node | null = null,
 ): Block {
 	if (hydrating) {
 		// Hydration: the server wrapped EVERY item in its own `<!--[-->…<!--]-->`
@@ -12206,6 +12564,28 @@ function mountItem<T>(
 		// means 2000 fewer DOM nodes inside <tbody>, which the browser's
 		// layout/paint walks every time. Big paint win when the slowdown is
 		// "tbody has 3000 children" not "JS is slow".
+		if (adoptNode !== null) {
+			// Upgrade adoption on the self-marked path: the adopted raw node IS
+			// the item's single element, already in position — no markers, no
+			// insert. Seed it as both markers AND the block's deoptNode so the
+			// body's raw path patches it in place (the queue only pairs
+			// tag-compatible nodes, so the reuse branch always hits).
+			const block = createBlock(
+				'control-flow',
+				parentBlock,
+				parentNode,
+				adoptNode,
+				adoptNode,
+				body as ComponentBody,
+				item,
+				forSlot.env,
+			);
+			block.forSlot = forSlot;
+			block.itemIndex = index;
+			block.deoptNode = adoptNode;
+			renderBlock(block);
+			return block;
+		}
 		const block = createBlock(
 			'control-flow',
 			parentBlock,
@@ -12231,8 +12611,16 @@ function mountItem<T>(
 	}
 	const start = document.createComment('it');
 	const end = document.createComment('/it');
-	parentNode.insertBefore(start, anchor);
-	parentNode.insertBefore(end, anchor);
+	if (adoptNode !== null) {
+		// Adoption: wrap the existing raw node in this item's markers where it
+		// already sits (identity/focus/input state survive) instead of building
+		// at the anchor.
+		parentNode.insertBefore(start, adoptNode);
+		parentNode.insertBefore(end, adoptNode.nextSibling);
+	} else {
+		parentNode.insertBefore(start, anchor);
+		parentNode.insertBefore(end, anchor);
+	}
 	const block = createBlock(
 		'control-flow',
 		parentBlock,
@@ -12245,6 +12633,7 @@ function mountItem<T>(
 	);
 	block.forSlot = forSlot;
 	block.itemIndex = index;
+	if (adoptNode !== null) block.deoptNode = adoptNode;
 	renderBlock(block);
 	return block;
 }
