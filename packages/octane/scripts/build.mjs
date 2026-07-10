@@ -28,7 +28,14 @@ await build({
 		join(src, 'runtime.ts'),
 		join(src, 'runtime.server.ts'),
 		join(src, 'constants.ts'),
+		join(src, 'css.ts'),
+		// Already plain JS (the DOM truth tables the verbatim-copied compiler also
+		// imports, as `../dom-tables.js`) — esbuild passes it through so it lands
+		// next to constants.js, where both dist consumers resolve it.
+		join(src, 'dom-tables.js'),
 		join(src, 'server/index.ts'),
+		join(src, 'server/rpc.ts'),
+		join(src, 'static/index.ts'),
 	],
 	outdir: dist,
 	outbase: src,
@@ -39,6 +46,9 @@ await build({
 });
 
 cpSync(join(src, 'compiler'), join(dist, 'compiler'), { recursive: true });
+// Hand-written declarations for the plain-JS dom-tables module (tsc only emits
+// declarations for the .ts sources).
+cpSync(join(src, 'dom-tables.d.ts'), join(dist, 'dom-tables.d.ts'));
 
 execFileSync(join(root, 'node_modules/.bin/tsc'), ['-p', join(pkgDir, 'tsconfig.build.json')], {
 	stdio: 'inherit',

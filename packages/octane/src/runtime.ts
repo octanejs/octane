@@ -27,6 +27,8 @@ import {
 	cssStyleValue,
 	ATTRIBUTE_ALIASES,
 	SVG_ONLY_TAGS,
+	// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
+	VOID_ELEMENTS,
 } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -4328,25 +4330,6 @@ function attrNamespace(name: string): string | null {
 	if (prefix === 'xmlns') return XMLNS_NS;
 	return null;
 }
-
-// HTML void elements (no content model) — mirrors the compiler's VOID_ELEMENTS.
-// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
-const VOID_ELEMENTS = new Set([
-	'area',
-	'base',
-	'br',
-	'col',
-	'embed',
-	'hr',
-	'img',
-	'input',
-	'link',
-	'meta',
-	'param',
-	'source',
-	'track',
-	'wbr',
-]);
 
 export function setAttribute(el: Element, name: string, value: any): void {
 	// React-style `dangerouslySetInnerHTML={{__html}}` is a PROPERTY write, not an

@@ -216,6 +216,23 @@ source, or build-time parity assertion would preserve fast local lookups without
 making comments the only synchronization mechanism. Tests should compare the
 tables directly, not only representative behavior.
 
+**Resolved (2026-07-10):** the tables now live in one shared plain-JS module,
+`packages/octane/src/dom-tables.js` (plain JS so the verbatim-shipped compiler
+can import it directly; `constants.ts` re-exports with type annotations for the
+runtimes and the public `octane/constants` surface). Covers the boolean/
+must-use-property sets, attribute aliases, SVG-only tags, unitless style props,
+void elements (previously triplicated with no central copy), style-value
+coercion, and style-key hyphenation. Lookup shapes are unchanged — the same
+`Set`/`Map` instances, imported instead of copied. The member-level audit found
+zero drift in the data tables and ONE behavioral drift in the wrapped logic:
+the compiler's private `cssStyleValueStatic` didn't trim string style values
+while the runtimes' `cssStyleValue` does; static bakes now use the shared
+function. `tests/dom-tables.test.ts` pins the wiring itself (re-export
+identity, a mutate-the-shared-Set compiler probe, and per-category bake
+assertions). Controlled-form routing remains split logic (compile.js
+`controlledKindFor` vs per-kind runtime helpers) — it is behavior, not a
+table, and stays covered by the controlled-form suites.
+
 The compiler-emitted/runtime helper ABI is also broad. It includes template and
 slot helpers, binding-bag arity factories, form bindings, control-flow blocks,
 parallel-`use()` helpers, HMR, and binding infrastructure. Because
