@@ -36,8 +36,11 @@ Octane is the day-to-day feel:
   right next to the output. Mix both dialects in one app and import freely across
   the boundary — you choose per component.
 - **No rules of hooks.** Hooks are tracked by call site, not call order, so a
-  hook can live inside an `if`, after an early return, or in a loop. The usual
-  React footguns simply aren't there.
+  hook can live inside an `if` or after an early return — the usual React
+  footguns simply aren't there. The one rule that remains is enforced for you:
+  a hook in a plain JS loop is a compile error (every iteration would share one
+  call-site slot) — loop with the keyed `@for` directive instead, where each
+  item gets its own hook state.
 - **The platform, not a reimplementation of it.** Real delegated DOM events,
   controlled form components on native events (React's `value`/`checked`
   semantics — `onInput` per keystroke, no synthetic `onChange`), and

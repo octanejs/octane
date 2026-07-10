@@ -21,9 +21,9 @@ you'll never actually feel. We've said which is which.
 ## Hooks can go anywhere
 
 **This one you'll notice, and you'll like it.** There are no rules of hooks in
-Octane. A hook can sit inside an `if`, after an early return, or in a loop — the
-compiler tracks each hook by its position in the source, not by the order it
-runs, so the usual React footguns just aren't there.
+Octane. A hook can sit inside an `if` or after an early return — the compiler
+tracks each hook by its position in the source, not by the order it runs, so
+the usual React footguns just aren't there.
 
 ```tsrx
 function Profile(props) {
@@ -35,6 +35,13 @@ function Profile(props) {
 	};
 }
 ```
+
+The exception is a plain JS loop. One call site means one hook slot, so every
+iteration of a loop would share the same state — instead of letting that fail
+silently, the compiler rejects it at build time. Loop in the template with the
+keyed `@for` directive (each item renders in its own scope, so per-item hooks
+get per-item state), or extract the loop body into a child component. `use()`
+and `useContext` do work inside loops — they aren't slot-keyed.
 
 ## Events are just DOM events
 
