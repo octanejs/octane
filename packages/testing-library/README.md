@@ -62,9 +62,11 @@ React-specific remappings:
   In octane `onChange` means the platform `change` event (fires on
   commit/blur), and `onInput` fires per keystroke — port such tests to
   `fireEvent.input` (or better, `@testing-library/user-event`, which emits
-  real event sequences). There are **no controlled components**: `value` is a
-  plain attribute and inputs are native/uncontrolled, so there's no React-style
-  value re-assertion after events.
+  real event sequences). Controlled components ARE supported (2026-07-08):
+  a `value`/`checked` prop drives the DOM property and reasserts on every
+  commit and after discrete events, exactly like React — only the synthetic
+  `onChange` normalization is absent, so a controlled text input updates its
+  state from `onInput`.
 - **No enter/leave/focus double-dispatch.** RTL's `fireEvent.mouseEnter` also
   fires `mouseover` (and `focus` fires `focusin`, `select` fires `keyup`, …)
   purely to feed React's plugin system, which listens to different native

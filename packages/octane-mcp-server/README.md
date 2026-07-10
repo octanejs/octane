@@ -73,7 +73,11 @@ exists, an overall verdict (`bridgeable`, `bridgeable-with-rewrites`,
 ### `octane_bindings`
 
 Returns the map of React packages with maintained `@octanejs/*` ports
-(zustand, query, motion, stylex, router, lexical, floating-ui, radix).
+(zustand, tanstack-query, motion, stylex, tanstack-router, lexical,
+floating-ui, radix, hook-form, base-ui, recharts, redux, testing-library,
+mdx). The map lives in `src/bridge.js` (`KNOWN_BINDINGS`) and its tests derive
+the expected set from the workspace manifests, so it cannot silently drift from
+the published bindings.
 
 ### `octane_skill`
 

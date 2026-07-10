@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { bridgeReport, detectVanillaCore, scanSource, KNOWN_BINDINGS } from './bridge.js';
@@ -137,18 +138,34 @@ describe('bridgeReport', () => {
 });
 
 describe('KNOWN_BINDINGS', () => {
-	it('covers every published @octanejs binding', () => {
-		expect(new Set(Object.values(KNOWN_BINDINGS))).toEqual(
-			new Set([
-				'@octanejs/zustand',
-				'@octanejs/tanstack-query',
-				'@octanejs/motion',
-				'@octanejs/stylex',
-				'@octanejs/tanstack-router',
-				'@octanejs/lexical',
-				'@octanejs/floating-ui',
-				'@octanejs/radix',
-			]),
-		);
+	it('covers every published @octanejs binding (derived from workspace manifests)', async () => {
+		// The expected set is DERIVED from packages/*/package.json rather than
+		// hand-maintained, so publishing a new binding without registering it in
+		// KNOWN_BINDINGS fails here. Only genuinely-not-a-binding packages (the
+		// core runtime, build/deploy infrastructure, this MCP server) are
+		// excluded by name.
+		const NON_BINDINGS = new Set([
+			'octane',
+			'@octanejs/vite-plugin',
+			'@octanejs/adapter-vercel',
+			'@octanejs/mcp-server',
+		]);
+		const packagesRoot = fileURLToPath(new URL('../..', import.meta.url));
+		const bindings = [];
+		for (const entry of await readdir(packagesRoot, { withFileTypes: true })) {
+			if (!entry.isDirectory()) continue;
+			let manifest;
+			try {
+				manifest = JSON.parse(
+					await readFile(join(packagesRoot, entry.name, 'package.json'), 'utf8'),
+				);
+			} catch {
+				continue; // not a package dir
+			}
+			if (manifest.private || NON_BINDINGS.has(manifest.name)) continue;
+			bindings.push(manifest.name);
+		}
+		expect(bindings.length).toBeGreaterThan(0);
+		expect(new Set(Object.values(KNOWN_BINDINGS))).toEqual(new Set(bindings));
 	});
 });

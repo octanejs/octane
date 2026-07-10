@@ -6,10 +6,17 @@ portals, Suspense, transitions, actions, and SSR/streaming APIs — verified by
 `react-parity-migration-plan.md` for the proof). The differences below are
 **deliberate**. Everything not listed here is a bug: file it.
 
-## No rules of hooks
+## No rules of hooks (except plain JS loops)
 
 Hooks are tracked by compiler-assigned call-site slot, not call order. A hook
-may sit behind a condition, after an early return, or in a loop.
+may sit behind a condition or after an early return. The one exception is a
+plain JS loop: a slot-keyed hook inside `for`/`while` is a **compile error**,
+because every iteration would share the one call-site slot and its
+state/memo/effect entries would silently collide. Loop with the keyed `@for`
+template directive or extract a child component instead — each item then
+renders in its own scope. `use()` and `useContext` are exempt (they are
+call-order / context-identity keyed, not slot-keyed), so they may sit in plain
+loops.
 
 ## Native events, no synthetic event system
 

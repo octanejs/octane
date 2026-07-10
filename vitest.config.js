@@ -703,6 +703,14 @@ export default defineConfig({
 					include: ['website/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					globals: false,
+					// ssr-smoke and ssr-hydration.e2e both run a REAL production
+					// `vite build` into the same output roots (website/dist,
+					// website/.vercel/output) and the e2e file then serves that
+					// output with octane-preview. Running the files in parallel
+					// would let one build delete/rewrite artifacts the other is
+					// building or serving, so this project is file-serial by
+					// contract, not by timing.
+					fileParallelism: false,
 				},
 				// The website app stack: octaneMdx() compiles the site's .mdx documents
 				// (same shared options — Shiki + tsrx langAlias — the app itself uses);

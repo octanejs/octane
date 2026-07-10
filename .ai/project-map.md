@@ -21,9 +21,11 @@ Always prefer current source over summaries:
 
 - `packages/octane/` (`octane`) — core runtime, compiler, SSR, tests.
 - `packages/vite-plugin-octane/` (`@octanejs/vite-plugin`) — optional metaframework/plugin surface.
-- `packages/{zustand,query,motion,stylex,router,lexical,floating-ui,radix}/` — Octane ports/bindings for React ecosystem libraries.
+- `packages/{zustand,tanstack-query,motion,stylex,tanstack-router,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/` — Octane ports/bindings for React ecosystem libraries (parity varies; see each README).
+- `packages/adapter-vercel/` (`@octanejs/adapter-vercel`) — Vercel deploy adapter for the vite-plugin build output.
 - `packages/octane-mcp-server/` (`@octanejs/mcp-server`) — MCP server: user-facing bridge/migration/SSR skills plus repo automation tools.
-- `benchmarks/` — perf harnesses: news, js-framework, recursive-context, signal-favoring, dbmon.
+- `benchmarks/` — unified perf harnesses under `benchmarks/bench.mjs` (js-framework, dbmon, news, signal-favoring, recursive-context, async-waterfall, SSR/streaming, size suites, …).
+- `website/` — the octanejs.dev app (docs, playground, benchmarks pages).
 - `examples/`, `playground/` — runnable apps and manual validation.
 - `scripts/scaffold-react-port.mjs` — creates React test-port skeletons with in/out-of-scope triage.
 
@@ -49,9 +51,9 @@ Run targeted package tests by project/file, e.g.:
 ## Core invariants
 
 - Octane is React-shaped, not React-cloned. Check documented intentional divergences before changing behavior.
-- Hooks use compiler-injected call-site slots; conditional/loop hooks are valid.
-- Events are native delegated DOM events, not React synthetic events.
-- No controlled-input reassertion model; `value`/`checked` are attributes.
+- Hooks use compiler-injected call-site slots; conditional and early-return hooks are valid. Slot-keyed hooks in plain JS loops are a compile error — use the keyed `@for` directive or a child component (`use()`/`useContext` are exempt).
+- Events are native delegated DOM events, not React synthetic events. There is no synthetic `onChange` normalization: `onInput` is the per-keystroke handler; native `change` fires on blur/commit.
+- Controlled `value`/`checked` match React (2026-07-08): the prop drives the DOM property and reasserts on every commit and after discrete events; `defaultValue`/`defaultChecked` are the uncontrolled escape hatch.
 - Keyed reconciliation is LIS-based; final DOM and node identity matter more than matching React's move set.
 - `class`/`className` compose clsx-style.
 - No class components, StrictMode double invoke, Server Components, or React synthetic event layer.

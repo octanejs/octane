@@ -1,6 +1,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
+// React package → maintained @octanejs binding. bridge.test.js derives the
+// expected value set from the workspace manifests, so publishing a new binding
+// without registering it here fails the mcp-server tests.
 export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
@@ -12,6 +15,12 @@ export const KNOWN_BINDINGS = {
 	'@lexical/react': '@octanejs/lexical',
 	'@floating-ui/react': '@octanejs/floating-ui',
 	'radix-ui': '@octanejs/radix',
+	'react-hook-form': '@octanejs/hook-form',
+	'@base-ui-components/react': '@octanejs/base-ui',
+	recharts: '@octanejs/recharts',
+	'react-redux': '@octanejs/redux',
+	'@testing-library/react': '@octanejs/testing-library',
+	'@mdx-js/react': '@octanejs/mdx',
 };
 
 export const KNOWN_VANILLA_CORES = {

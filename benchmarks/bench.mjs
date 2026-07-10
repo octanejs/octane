@@ -53,6 +53,18 @@ const BENCH = __dirname;
 
 const url = (port) => `http://localhost:${port}/`;
 
+// Harness gate (correctness) failures are fatal unless the suite has an ACTIVE
+// waiver here. A waiver needs a reason (ideally an issue link) and an expiry
+// date — when it lapses the failure becomes fatal again and must be re-triaged,
+// so a known-bug exemption cannot quietly become permanent.
+const HARNESS_FAILURE_ALLOWLIST = {
+	'js-framework-reorder': {
+		reason: "ripple's keyed reorder drops row identity — upstream ripple bug, not octane",
+		expires: '2026-10-01',
+	},
+};
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
 const SUITES = [
 	{
 		name: 'js-framework',
@@ -667,8 +679,10 @@ function checkRatios(resultsBySuite, guards) {
 	// ── exit policy ──────────────────────────────────────────────────────────
 	// Hard errors (a server never came up, a suite produced no numbers) always
 	// fail. --compare fails on regressions; --ratios fails on breaches. A harness
-	// gate failure (harnessExit != 0, e.g. a known-octane-bug suite) is surfaced
-	// but does NOT by itself fail the run — the ratio/compare checks are the gate.
+	// gate failure (harnessExit != 0) is a CORRECTNESS failure and is fatal by
+	// default — performance ratios may be tolerant, correctness may not. A suite
+	// with a known upstream bug can be allowlisted below, but only with a reason
+	// and an expiry date so the exemption cannot silently outlive the bug.
 	let exit = 0;
 	if (hardErrors.length) {
 		console.error(`\n✗ ${hardErrors.length} hard error(s):`);
@@ -686,11 +700,21 @@ function checkRatios(resultsBySuite, guards) {
 	const gateFails = [...resultsBySuite.values()].filter(
 		(r) => r.harnessExit && r.harnessExit !== 0,
 	);
-	if (gateFails.length) {
-		console.error(
-			`\n! ${gateFails.length} suite(s) reported a harness gate failure (not fatal on its own): ` +
-				gateFails.map((r) => r.suite).join(', '),
-		);
+	for (const r of gateFails) {
+		const waiver = HARNESS_FAILURE_ALLOWLIST[r.suite];
+		const active = waiver && todayISO() <= waiver.expires;
+		if (active) {
+			console.error(
+				`\n! ${r.suite}: harness gate failure waived until ${waiver.expires} — ${waiver.reason}` +
+					(r.failed ? ` (${r.failed})` : ''),
+			);
+		} else {
+			console.error(
+				`\n✗ ${r.suite}: harness gate failure${r.failed ? ` (${r.failed})` : ''}` +
+					(waiver ? ` — waiver expired ${waiver.expires} (${waiver.reason})` : ''),
+			);
+			exit = 1;
+		}
 	}
 	process.exit(exit);
 })().catch((e) => {

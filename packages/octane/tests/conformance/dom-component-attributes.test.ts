@@ -584,7 +584,12 @@ describe('ReactDOMComponent — attribute-name injection (client)', () => {
  *   :3832 adds onclick handler to a portal root                    → ported* (events — same, portal target)
  *   :3851 no onclick handler on the React root in legacy mode      → skipped (§2 — legacy/sync mode; octane is concurrent-root only)
  *
- * Totals: 95 ported — 15 tests pinned it.fails covering 23 case-lines marked
- * ported* plus the partial arms of :63 and :437 — 5 covered-by-existing
- * (:1538 :1861 :1870 :3136 :3168), 63 skipped.
+ * Totals: 95 ported — the 23 case-lines marked ported* (plus the partial arms
+ * of :63 and :437) were ORIGINALLY pinned as it.fails across 15 tests; those
+ * gaps have since been fixed and every pin flipped to a plain `it`, so the
+ * ported* markers are a historical record of which cases once diverged, not a
+ * live gap list (this family currently has zero it.fails) — 5
+ * covered-by-existing (:1538 :1861 :1870 :3136 :3168), 63 skipped.
+ * The live parity backlog is generated into docs/parity-gaps.md
+ * (`pnpm parity:gaps`).
  * ========================================================================== */

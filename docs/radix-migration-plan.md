@@ -1,5 +1,14 @@
 # Octane UI-Library Port Plan: Radix UI Primitives
 
+> **⚠️ Historical record.** This is an execution plan, kept as a record of the
+> reasoning at the time it was written — parts of its premise have since been
+> superseded by the live implementation. In particular, octane now ships
+> React-parity **controlled components** (2026-07-08; see the reversal note in
+> the form-primitives section), so any "octane has no controlled inputs"
+> adaptation described below is obsolete. For current behavior, trust
+> `packages/octane/src/runtime.ts`, `docs/differences-from-react.md`, and the
+> `@octanejs/radix` sources/tests over this document.
+
 > Recommendation + phased plan from a research pass that evaluated **Base UI**, **Radix UI**,
 > and **React Aria** against octane's actual runtime/compiler source and the existing
 > `@octanejs/floating-ui` port. Radix won on fit × value × effort.
