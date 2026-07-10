@@ -696,12 +696,12 @@ export function octane(inlineOptions = {}) {
 		},
 	};
 
-	// Forward compiler options. `exclude` lists path fragments the compiler's
-	// `.ts`/`.js` hook-slotting pass must skip — hand-slot-forwarding library
-	// sources that would otherwise be double-slotted. Published bindings live in
-	// node_modules and are skipped automatically; this matters for monorepo /
-	// aliased-to-source setups where pnpm symlinks resolve @octanejs/* imports
-	// to `packages/*/src` paths.
+	// Forward compiler options. `exclude` lists ad-hoc path fragments the
+	// compiler's `.ts`/`.js` hook-slotting pass must skip. Hand-slot-forwarding
+	// bindings should not need it: they declare
+	// `"octane": { "hookSlots": { "manual": ["src"] } }` in their own package.json and the
+	// compiler plugin skips them via a nearest-manifest lookup (published
+	// bindings live in node_modules and are skipped outright).
 	const compilerOptions = {};
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;

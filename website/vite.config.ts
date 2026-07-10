@@ -83,17 +83,16 @@ export default defineConfig({
 		playgroundRuntime(),
 		// octaneMdx() owns `.mdx` (full pipeline: @mdx-js/mdx → octane compile,
 		// with Shiki highlighting via rehype); octane() owns `.tsrx`/`.ts` and the
-		// metaframework (dev SSR + routing + hydrate). `exclude` skips the
-		// hook-slotting pass for the workspace bindings' hand-slot-forwarding
-		// sources — pnpm symlinks resolve them to /packages/*/src, not
-		// node_modules (mirrors the root vitest config).
+		// metaframework (dev SSR + routing + hydrate). The workspace bindings'
+		// hand-slot-forwarding sources (pnpm symlinks resolve them to
+		// /packages/*/src, not node_modules) declare
+		// `"octane": { "hookSlots": { "manual": ["src"] } }` in their package.json, so the
+		// hook-slotting pass skips them automatically — no exclude list needed.
+		// @octanejs/recharts + @octanejs/redux carry no declaration and DO compile
+		// through the pass (explicit subSlot tags compose with it), unlike
+		// router/mdx.
 		octaneMdx(websiteMdxOptions),
-		// NOTE: @octanejs/recharts + @octanejs/redux are NOT excluded from the
-		// hook-slotting pass — their own test projects compile them through it
-		// (explicit subSlot tags compose with the pass), unlike router/mdx.
-		octane({
-			exclude: ['/packages/tanstack-router/src/', '/packages/mdx/src/'],
-		}),
+		octane(),
 	],
 
 	// The workspace bindings ship raw TS — Vite must transform them for the SSR

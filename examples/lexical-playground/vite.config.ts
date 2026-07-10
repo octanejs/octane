@@ -3,9 +3,11 @@ import { octane } from 'octane/compiler/vite';
 
 export default defineConfig({
 	// The octane plugin compiles `.tsrx` everywhere EXCEPT @octanejs/lexical's own
-	// `.ts` hooks (which forward hook slots manually — same exclude the vitest config
-	// uses). The package's `.tsrx` components still compile.
-	plugins: [octane({ exclude: ['/packages/lexical/src/'] })],
+	// `.ts` hooks — they forward hook slots manually, declared via
+	// `"octane": { "hookSlots": { "manual": ["src"] } }` in the package's package.json, so the
+	// plugin skips them automatically. The package's `.tsrx` components still
+	// compile.
+	plugins: [octane()],
 	optimizeDeps: { exclude: ['octane', 'octane/compiler', '@octanejs/lexical'] },
 	resolve: {
 		// Resolve @octanejs/lexical's per-subpath `.tsrx`/`.ts` modules (mirrors the

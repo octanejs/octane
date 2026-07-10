@@ -3,6 +3,13 @@
   "version": "0.1.2",
   "license": "MIT",
   "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
   "description": "StyleX bindings for the octane renderer — reuses StyleX's framework-agnostic compiler core and routes the generated atomic CSS through octane's stylesheet channel (client dedupe + SSR render().css).",
   "author": {
     "name": "Dominic Gannaway",

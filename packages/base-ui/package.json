@@ -3,6 +3,13 @@
   "version": "0.1.1",
   "license": "MIT",
   "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
   "description": "Base UI (@base-ui/react) for the octane renderer — headless, accessible, unstyled UI primitives ported from base-ui.com at full fidelity.",
   "author": {
     "name": "Dominic Gannaway",

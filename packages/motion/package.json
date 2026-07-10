@@ -3,6 +3,13 @@
   "version": "0.1.2",
   "license": "MIT",
   "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
   "description": "Framer Motion bindings for the octane renderer — reuses motion-dom's animation engine, swaps the React components for octane host components.",
   "author": {
     "name": "Dominic Gannaway",
