@@ -976,6 +976,12 @@ function renderComponentFramed(
 	props: any,
 	parent: SSRScope | null,
 	frame: Frame,
+	// M3 inherit-range (docs/comment-marker-elision-plan.md): the call site is
+	// the sole root of its parent's `@{}` body, whose own pair already bounds
+	// this output — skip the frame's `<!--[-->…<!--]-->` wrap. The FRAME itself
+	// is still created (use() path keys / seed order unchanged); the client's
+	// componentSlot(inherit) borrows the parent range instead of adopting.
+	inherit?: boolean,
 ): string {
 	const prevScope = CURRENT_SCOPE;
 	const prevFrame = FRAME;
@@ -1002,7 +1008,9 @@ function renderComponentFramed(
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
 		// become the slot's start/end markers, exactly like control-flow blocks).
 		// `renderToStaticMarkup` sets MARKERS=false — no hydration, so no markers.
-		return MARKERS ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
+		// An inherit-range site (M3) skips the wrap: the parent's own pair bounds
+		// this output, and the client borrows it instead of adopting.
+		return MARKERS && !inherit ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
 	} finally {
 		CURRENT_SCOPE = prevScope;
 		FRAME = prevFrame;
@@ -1012,8 +1020,23 @@ function renderComponentFramed(
 	}
 }
 
-/** Render a child component into the string: fresh scope + frame, body → HTML. */
-export function ssrComponent(parent: SSRScope, comp: ServerComponent | string, props: any): string {
+/**
+ * Render a child component into the string: fresh scope + frame, body → HTML.
+ * `inherit` (M3): the compiled call site is the sole root of its parent's
+ * `@{}` body — emit WITHOUT the surrounding `<!--[-->…<!--]-->` pair (the
+ * parent's own range bounds it; the client borrows that range). Applies to
+ * both the component branch (frame wrap) and the string-tag branch (ssrBlock).
+ */
+export function ssrComponent(
+	parent: SSRScope,
+	comp: ServerComponent | string,
+	props: any,
+	inherit?: boolean,
+): string {
+	// Boundary builtins decline inherit by IDENTITY — mirrors componentSlot's
+	// client-side decline exactly (member/aliased/dynamic tags resolving to
+	// Suspense/ErrorBoundary keep their pair; both sides agree by identity).
+	if (inherit === true && (comp === Suspense || comp === ErrorBoundary)) inherit = false;
 	// A member/dynamic tag (`<obj.tag/>`, `<{expr}/>`) can resolve to a host tag
 	// STRING at runtime (e.g. MDX's `_components.h1` mapping, unoverridden). The
 	// client renders these — a value-lowered `createElement(obj.tag, …)` routes
@@ -1040,9 +1063,11 @@ export function ssrComponent(parent: SSRScope, comp: ServerComponent | string, p
 			// like renderComponentFramed normalizes a de-opt body's return.
 			const out = (kids as any)(undefined, parent);
 			const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, parent);
-			return ssrBlock(ssrHostElement(comp, props, null, parent, inner));
+			const html = ssrHostElement(comp, props, null, parent, inner);
+			return inherit ? html : ssrBlock(html);
 		}
-		return ssrBlock(ssrHostElement(comp, props, kids, parent));
+		const html = ssrHostElement(comp, props, kids, parent);
+		return inherit ? html : ssrBlock(html);
 	}
 	const pf = FRAME;
 	// A fresh child frame: its `seg` is the parent's next child index (built into
@@ -1053,7 +1078,7 @@ export function ssrComponent(parent: SSRScope, comp: ServerComponent | string, p
 		pf === null
 			? { parent: null, seg: 0, nextChild: 0, occ: null, path: null, deferred: false }
 			: { parent: pf, seg: pf.nextChild++, nextChild: 0, occ: null, path: null, deferred: false };
-	return renderComponentFramed(comp, props, parent, frame);
+	return renderComponentFramed(comp, props, parent, frame, inherit);
 }
 
 // A component's children reach the server body as a render FUNCTION (the

@@ -1,6 +1,7 @@
 # Comment-Marker Elision Plan — fewer `<!--[-->`s when they carry no information
 
-Status: M0 + M1 + M2 LANDED (2026-07-09); M3 proposed. Follow-up to the website Elements-panel report
+Status: M0-M3 LANDED (2026-07-09; M3 = the sole-COMPONENT-root scope — see its
+note for what remains). Follow-up to the website Elements-panel report
 (a 40-deep run of `<!--[-->` before `.shell`, ~2,100 comment nodes on the home
 page). Companion to docs/compiled-output-optimization-plan.md — this is the
 DOM-weight axis of the same verbosity problem.
@@ -240,6 +241,63 @@ The compile-time condition is exact: a construct that is the SOLE root of a
 
 This is the biggest blast radius (three layers must agree) and lands LAST,
 gated on the M0 pins + the full hydration/e2e/prod-mode suites.
+
+**M3 LANDED 2026-07-09 — the sole-COMPONENT-root scope.** What shipped:
+
+- **The predicate** (`inheritSoleCompRoot`, compile.js — shared verbatim by
+  both compile modes so client stamp ↔ server pair-skip ↔ hydration
+  adopt-nothing agree by construction): a `@{}` (JSXCodeBlock) body whose
+  normalized, head-filtered output is exactly ONE component-tag root without
+  `key=`. Identifier, member (`<ctx.Provider>` — the router/binding wrapper
+  stack), and dynamic tags all qualify. Synthetic sub-bodies (@if/@for/@try
+  arms, children render-fns — statement arrays) never do.
+- **Client** (`componentSlot(..., inherit)`): borrows the parent block's
+  marker pair with `exclusiveMarkers=true` (the branch-block precedent), or
+  enters whole-container mode when the parent's markers are both null (root /
+  owns-parent parents). Identity swaps sweep BETWEEN the borrowed markers and
+  remount in place (multi-root replacement bodies included — singleRoot could
+  never hold those); transitions take the singleRoot-style PROBE path (a wip
+  pair commit would change the parent's range shape); the borrow declines to
+  the normal regimes when the parent has no coherent range (LiteBlockImpl),
+  and bodies containing an inherit root are stamped lite-INELIGIBLE as
+  callees so the decline is unreachable under hydration.
+- **Server** (`ssrComponent(..., inherit)` → `renderComponentFramed`): skips
+  the `<!--[-->…<!--]-->` frame wrap (string-tag branch included); the FRAME
+  itself is still created — use() path keys and seed order are unchanged.
+- **Boundary builtins** (Suspense / ErrorBoundary / Activity): excluded at
+  compile time by imported name, AND declined at RUNTIME by identity on both
+  sides (componentSlot + ssrComponent check the resolved comp), which is what
+  makes member/aliased/dynamic tags safe to stamp.
+- **Hydration**: inherit sites adopt nothing (resolved before the cursor
+  probes — probing would misread the child's own first marker); legacy
+  pair-ful server HTML falls into mismatch RECOVERY and re-renders to correct
+  content (pinned).
+- **Divergence erased**: component-form ↔ bare-form of the same markup now
+  serialize identically and cross-reconnect CLEAN — the
+  hydration-mismatch conformance divergence pin (Reconnecting:76/:91) flipped
+  to a React-parity pass.
+- **Pins** (marker-shape): Chain 2/4/4 → **0/0/0**; ChainX 0/2/2 → **0/0/0**;
+  keyed keeps 2/2/2; `<Ctx.Provider>` root 0/2/2; aliased-Suspense 6/8/8
+  symmetric decline; swap-in-place both regimes; adoption-identity + recovery.
+- **Website reality check** (dev-SSR e2e): `/` 1,783 → 1,743, `/benchmarks`
+  14,793 → 14,447 — modest, and the profile explains it: the home page's
+  weight is chart-INTERNAL client minting (~872 empty anchors + 382 `it`
+  pairs inside the recharts SVG), not wrapper pairs (SSR pairs total 188; the
+  40-deep root prefix is already 0). Ceilings ratcheted to 2,000 / 415 /
+  16,600 / 195.
+- **Perf**: same-session js-framework A/B neutral within noise (the one extra
+  `inherit` check sits on the slot-mount cold path); ratio guards pass.
+
+**Still open (the M3 sketch's remaining scope, now the next targets):**
+
+1. Sole-root @if/@switch constructs (`ssrEmitIf/Switch` outer-pair skip +
+   client construct-slot inherit) — small website impact (4 `if` pairs on
+   home), moderate blast radius.
+2. Children-render-fn and value-position (`.tsx` return) sole roots.
+3. **Chart-internal anchors — the real remaining weight**: value-hole end
+   anchors (`childSlot`'s one-comment regime) and keyed-item `it` pairs
+   inside owns-parent hosts. New analysis needed; this is where the next
+   1,200 comments on the home page live.
 
 ### Ordering & expected effect
 

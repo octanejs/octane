@@ -268,17 +268,20 @@ describe('conformance: hydration mismatch (ReactDOMHydrationDiff + ReactDOMServe
 			expect(before).toBe(container.innerHTML);
 		});
 
-		// INTENTIONAL DIVERGENCE (Per Reconnecting:76/:91 Bare↔Pure): React treats component
-		// boundaries as DOM-invisible, so a component-form and a bare-element-form of the same
-		// markup reconnect clean. Octane function components leave hydration block markers
-		// (`<!--[-->…<!--]-->`) that a bare element lacks, so cross-reconnecting the two is a
-		// STRUCTURAL mismatch octane detects + rebuilds. The normal case (same authoring form on
-		// both sides — the two tests above) is clean; only mixing forms across the SSR boundary
-		// (unusual) diverges. Final DOM is still correct.
-		it('component-form ↔ bare-form is a structural mismatch in octane (divergence, Per :76)', async () => {
+		// Per Reconnecting:76/:91 (Bare↔Pure): React treats component boundaries as
+		// DOM-invisible, so a component-form and a bare-element-form of the same
+		// markup reconnect clean. This WAS an intentional octane divergence (function
+		// components left `<!--[-->…<!--]-->` frame pairs a bare element lacks) until
+		// marker-elision M3 (2026-07-09): CompForm's `<Leaf/>` is the sole root of
+		// its body, so the server skips the frame pair and the client inherits the
+		// parent range — the two forms now serialize identically and cross-reconnect
+		// CLEAN, matching React. (A component that is NOT its body's sole root still
+		// carries a pair and still structurally diverges — marker-shape.test.ts pins
+		// where pairs remain.)
+		it('component-form ↔ bare-form reconnects clean since M3 (Per :76)', async () => {
 			await crossReconnect('CompForm', 'BareForm', {});
 			expect(container.querySelector('#leaf.leaf')!.textContent).toBe('ok');
-			expect(warns().length).toBeGreaterThanOrEqual(1);
+			expect(warns()).toEqual([]);
 		});
 
 		// Octane's defining divergence: on a mismatch it does NOT throw/unwind — hydration
