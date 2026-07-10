@@ -21,16 +21,16 @@ const WEBSITE = join(process.cwd(), 'website');
 const ROUTES = ['/', '/docs', '/benchmarks', '/playground'];
 
 // M0 of docs/comment-marker-elision-plan.md: per-route comment-node ceilings
-// (~15% above post-M3 2026-07-09 measurements: / 1,743 · /docs 361 ·
-// /benchmarks 14,447 · /playground 169). What remains on / is chart-INTERNAL
-// client minting (~1,250 empty anchors + `it` pairs inside the recharts SVG —
-// the next elision target), not SSR pairs (188). This is the CI-enforced
-// DOM-weight ratchet — tighten as the elision phases land, and treat a breach
-// as a marker-minting regression.
+// (~15% above post-M4 2026-07-09 measurements: / 1,463 · /docs 361 ·
+// /benchmarks 12,061 · /playground 169). What remains on / is multi-hole host
+// anchors (684 empties — order-bearing, can't elide without sibling
+// bookkeeping) + component-bearing `it` pairs (145 — borrow ranges, required)
+// + 187 SSR pairs. This is the CI-enforced DOM-weight ratchet — tighten as
+// the elision phases land, and treat a breach as a marker-minting regression.
 const COMMENT_CEILINGS: Record<string, number> = {
-	'/': 2000,
+	'/': 1680,
 	'/docs': 415,
-	'/benchmarks': 16600,
+	'/benchmarks': 13800,
 	'/playground': 195,
 };
 

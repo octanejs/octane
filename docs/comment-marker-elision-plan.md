@@ -1,7 +1,7 @@
 # Comment-Marker Elision Plan — fewer `<!--[-->`s when they carry no information
 
-Status: M0-M3 LANDED (2026-07-09; M3 = the sole-COMPONENT-root scope — see its
-note for what remains). Follow-up to the website Elements-panel report
+Status: M0-M4 LANDED (2026-07-09; see each phase's note). Follow-up to the
+website Elements-panel report
 (a 40-deep run of `<!--[-->` before `.shell`, ~2,100 comment nodes on the home
 page). Companion to docs/compiled-output-optimization-plan.md — this is the
 DOM-weight axis of the same verbosity problem.
@@ -288,16 +288,45 @@ gated on the M0 pins + the full hydration/e2e/prod-mode suites.
 - **Perf**: same-session js-framework A/B neutral within noise (the one extra
   `inherit` check sits on the slot-mount cold path); ratio guards pass.
 
-**Still open (the M3 sketch's remaining scope, now the next targets):**
+**M4 LANDED 2026-07-09 — the chart-internal weight (client-mount only, like
+M2; SSR emission and hydration adoption untouched):**
 
-1. Sole-root @if/@switch constructs (`ssrEmitIf/Switch` outer-pair skip +
-   client construct-slot inherit) — small website impact (4 `if` pairs on
-   home), moderate blast radius.
-2. Children-render-fn and value-position (`.tsx` return) sole roots.
-3. **Chart-internal anchors — the real remaining weight**: value-hole end
-   anchors (`childSlot`'s one-comment regime) and keyed-item `it` pairs
-   inside owns-parent hosts. New analysis needed; this is where the next
-   1,200 comments on the home page live.
+- **Sole-child hole → owns-parent** (`childTextHole`'s object fallback,
+  runtime.ts): a `{expr}` hole that is its element's SOLE child hands the
+  element to the M2 owns-parent childSlot — component/element/array values
+  render with NO anchor comment (arrays still mint their ForSlot pair
+  lazily). One-line change; the sole-child invariant IS the ownerHost
+  invariant. Primitive values were already markerless (`childTextHole`).
+- **De-opt item self-marking** (`reconcileKeyed`'s `2` sentinel → resolved
+  per item VALUE in `mountItem`): a pure single-element host-descriptor item
+  self-marks — its rendered element is start === end (the forBlock-singleRoot
+  regime) — so value-position `.map()` lists pay NO `<!--it-->` pair for
+  pure items. Component-bearing / null / primitive items keep their pair.
+  Two sharp edges handled: (1) a self-marked item whose value stops fitting
+  one raw element (null / primitive / component) PROMOTES one-way to a pair
+  minted around the current node in place (`deoptItemBody` — the keyed Map,
+  reorder anchoring, and the M2 borrow all survive); (2) the pure-path
+  rebuild now inserts-before-removing — the old element IS the end marker,
+  so remove-first would detach the insert anchor (and the markers re-point
+  to the replacement).
+- Pins: Deopt client 8 → **4** (hole −2, item pair −2);
+  `deopt-item-selfmark.test.ts` covers mount elision, reorder identity,
+  tag-change rebuild, both promotion flips (component + positional-null),
+  and teardown incl. the needs-blocks → pure whole-tree flip.
+- Website (dev-SSR e2e): `/` 1,743 → **1,463**, `/benchmarks` 14,447 →
+  **12,061**. Cumulative from the 2,122 / 17,381 start: **−31%** on both.
+  Ceilings ratcheted to 1,680 / 415 / 13,800 / 195.
+
+**Still open (small or order-constrained — diminishing returns):**
+
+1. Multi-hole hosts: the remaining ~684 empty anchors on `/` are
+   order-bearing (`<g>{a}{b}</g>` — siblings need stable positions); eliding
+   them needs per-hole neighbor bookkeeping. Biggest remaining bucket.
+2. Component-bearing `it` pairs (145 on `/`) — required borrow ranges today.
+3. Sole-root @if/@switch construct inherit + children-render-fn /
+   value-position sole roots (M3 leftovers; 4 `if` pairs on home).
+4. SSR-side symmetry for the M2/M4 owns-parent regimes (hydrated pages keep
+   server pairs the client mount wouldn't mint).
 
 ### Ordering & expected effect
 
