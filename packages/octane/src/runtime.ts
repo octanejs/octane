@@ -7007,6 +7007,14 @@ interface ChildSlot {
 	 * regime (and always after hydration).
 	 */
 	end: Comment | null;
+	/**
+	 * OWNS-PARENT mode (marker-elision M2): the slot exclusively owns ALL
+	 * children of this element (a de-opt host handed its entire content to one
+	 * childSlot). No markers are ever minted — inserts append (null anchor) and
+	 * clears remove every child of the element. Mutually exclusive with the
+	 * marked regime; hydration never enters it (adoption wins at mount).
+	 */
+	ownerHost: Element | null;
 	block: Block | null;
 	text: Text | null;
 	currentComp: ComponentBody | null;
@@ -7136,7 +7144,19 @@ function clearChildContent(state: ChildSlot): void {
 		unmountBlock(state.block, false);
 		state.block = null;
 	}
-	if (state.start !== null) {
+	if (state.ownerHost !== null) {
+		// OWNS-PARENT: the slot owns every child of the element — remove them all.
+		// (Block cleanups already ran above; detach refs only on the blockless
+		// path, mirroring the marker-range sweep below.)
+		const host = state.ownerHost;
+		let n: Node | null = host.firstChild;
+		while (n !== null) {
+			const next: Node | null = n.nextSibling;
+			if (!hadBlock) detachDeoptTreeRefs(n, null);
+			host.removeChild(n);
+			n = next;
+		}
+	} else if (state.start !== null) {
 		// Component (or hydrated) range: sweep everything between the markers —
 		// covers a multi-node component body as well as any leftover text node.
 		// Block teardown above already detached every de-opt ref it owns
@@ -7337,7 +7357,8 @@ function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock
 
 interface HostComponentSlot {
 	el: Element;
-	anchor: Comment;
+	/** Legacy child anchor — null since the owns-parent childSlot (M2). */
+	anchor: Comment | null;
 	ref: any;
 	// The props applied last render — diffed against the next render so props/events that
 	// DISAPPEARED get removed (not left stale on the reused element).
@@ -7370,11 +7391,9 @@ export function hostComponent(
 	let state = scope.slots[slot] as HostComponentSlot | undefined;
 	if (state === undefined) {
 		const el = document.createElement(tag);
-		// A comment anchor INSIDE the element gives childSlot a stable insertion
-		// point for the children (mirrors the `<!>` placeholder the compiler emits).
-		const childAnchor = document.createComment('');
-		el.appendChild(childAnchor);
-		state = { el, anchor: childAnchor, ref: undefined };
+		// The children childSlot exclusively OWNS `el`'s content (owns-parent
+		// mode) — no `<!---->` insertion anchor needed (marker-elision M2).
+		state = { el, anchor: null, ref: undefined };
 		scope.slots[slot] = state;
 		// Children render into a dedicated sub-scope (registered on `scope.children` so
 		// unmountScope walks into it), keeping the children's slot off `scope` itself.
@@ -7396,7 +7415,7 @@ export function hostComponent(
 		if (state.body === undefined) {
 			state.body = ((...args: any[]) => (state!.latest as any)(...args)) as ComponentBody;
 		}
-		childSlot(state.childScope!, 0, el, state.body, state.anchor);
+		childSlot(state.childScope!, 0, el, state.body, null, false, el);
 	}
 	return el;
 }
@@ -7736,6 +7755,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 				__kind: 'childSlot',
 				start: block.startMarker as Comment,
 				end: block.endMarker as Comment,
+				ownerHost: null,
 				block: null,
 				text: null,
 				currentComp: null,
@@ -7746,6 +7766,38 @@ function deoptItemBody(item: any, scope: Scope): void {
 			};
 			scope.slots[0] = seeded;
 			registerSlot(scope, seeded);
+		}
+		// Marker-elision M2: on a CLIENT mount, the nested childSlot BORROWS the
+		// item block's own `<!--it-->` pair as its range instead of minting a
+		// second inner pair (end anchor + lazy start) — the item's markers bound
+		// exactly the content this slot manages. clearChildContent sweeps BETWEEN
+		// markers (never removes them), and the item block still OWNS the pair
+		// (teardown removes it inclusive). Only when the item is comment-marked —
+		// a de-opt list always is (reconcileKeyed runs with singleRoot=false).
+		if (
+			!hydrating &&
+			scope.slots[0] === undefined &&
+			block.startMarker !== null &&
+			block.endMarker !== null &&
+			block.startMarker !== block.endMarker &&
+			block.startMarker.nodeType === 8 /* COMMENT_NODE */ &&
+			block.endMarker.nodeType === 8
+		) {
+			const borrowed: ChildSlot = {
+				__kind: 'childSlot',
+				start: block.startMarker as Comment,
+				end: block.endMarker as Comment,
+				ownerHost: null,
+				block: null,
+				text: null,
+				currentComp: null,
+				currentIsBodyFn: false,
+				forSlot: null,
+				hostNode: null,
+				portal: null,
+			};
+			scope.slots[0] = borrowed;
+			registerSlot(scope, borrowed);
 		}
 		childSlot(scope, 0, block.parentNode, item, block.endMarker);
 		return;
@@ -7853,7 +7905,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		const savedCursor = hydrateNode.nextSibling;
 		if (!hasDangerHTML(d.props)) {
 			hydrateNode = el.firstChild;
-			childSlot(block, 0, el, d.children, null);
+			childSlot(block, 0, el, d.children, null, false, el);
 		}
 		hydrateNode = savedCursor;
 		return;
@@ -7889,7 +7941,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		if (!hasDangerHTML(d.props)) {
 			const saved = hydrating;
 			hydrating = false;
-			childSlot(block, 0, el, d.children, null);
+			childSlot(block, 0, el, d.children, null, false, el);
 			hydrating = saved;
 		}
 		return;
@@ -7913,7 +7965,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	// reconciles a single child (component/host/text) or an array (keyed list) and
 	// recurses into nested host-with-components subtrees uniformly. Skipped when
 	// dangerouslySetInnerHTML owns the content (see hasDangerHTML).
-	if (!hasDangerHTML(d.props)) childSlot(block, 0, el, d.children, null);
+	if (!hasDangerHTML(d.props)) childSlot(block, 0, el, d.children, null, false, el);
 }
 
 // Stable render body for a componentSlot whose comp resolved to a HOST tag
@@ -8038,7 +8090,7 @@ function renderHostTagChildren(d: ElementDescriptor, block: Block, el: Element):
 		renderBlock(state.block);
 		return;
 	}
-	childSlot(block, 1, el, kids, null);
+	childSlot(block, 1, el, kids, null, false, el);
 }
 
 // Tear down a childSlot's de-opt keyed list when the slot leaves array mode (a
@@ -8066,6 +8118,11 @@ export function childSlot(
 	// marker instead of minting a second comment. Content still inserts before it.
 	// Only valid for a placeholder exclusive to this slot, NOT a shared end-marker.
 	ownEnd?: boolean,
+	// OWNS-PARENT mode (marker-elision M2): this slot exclusively owns ALL of
+	// `ownsHost`'s children — mint no markers at all (append inserts, whole-
+	// element clears). De-opt hosts (hostElementBody/hostComponent) pass their
+	// element here; ignored under hydration (server-pair adoption wins).
+	ownsHost?: Element,
 ): void {
 	const parentBlock = parentScope.block;
 	// A LONE PURE-HOST descriptor (host/text-only subtree — no components, no
@@ -8099,6 +8156,11 @@ export function childSlot(
 			// insertBefore per `{expr}` hole (no separate end marker minted).
 			start = null;
 			end = anchor as Comment;
+		} else if (!hydrating && ownsHost !== undefined) {
+			// OWNS-PARENT: no markers in any value regime — the element's child
+			// list IS the slot's range (see ChildSlot.ownerHost).
+			start = null;
+			end = null;
 		} else if (!hydrating && pureHost) {
 			// ANCHORLESS client mount: the value is a lone pure-host descriptor, so
 			// the element self-delimits — mint NO markers at all (mirrors
@@ -8120,6 +8182,7 @@ export function childSlot(
 			__kind: 'childSlot',
 			start,
 			end,
+			ownerHost: (!hydrating ? (ownsHost ?? null) : null) as Element | null,
 			block: null,
 			text: null,
 			currentComp: null,
@@ -8138,7 +8201,7 @@ export function childSlot(
 	// pair on demand around the current host node, so every path below sees the
 	// normal marked regime — the childSlot analogue of the singleRoot shape-flip
 	// handling in disposeReturnSlot. One-way: once marked, the slot stays marked.
-	if (state.end === null && !pureHost) {
+	if (state.end === null && !pureHost && state.ownerHost === null) {
 		const start = document.createComment('');
 		const end = document.createComment('');
 		const host = state.hostNode;
@@ -8194,6 +8257,13 @@ export function childSlot(
 			// cursor. Sweeping here would delete the very item DOM (and break the
 			// hydrateNode chain) the de-opt list is about to adopt.
 			if (!hydrating) clearChildContent(state);
+			if (state.end === null) {
+				// OWNS-PARENT slot entering array mode: ForSlot requires a real
+				// marker pair (reconcileKeyed anchors on it) — mint it lazily,
+				// appended at the element's tail. One-way, like the promotion above.
+				state.end = document.createComment('');
+				domParent.insertBefore(state.end, null);
+			}
 			if (state.start === null) {
 				state.start = document.createComment('');
 				domParent.insertBefore(state.start, state.end);
@@ -8341,9 +8411,15 @@ export function childSlot(
 		// one off-screen and HOLD the old until it's ready, instead of clearing the old
 		// before the new suspends (which would blank the boundary). Only when there's
 		// committed old content to hold; urgent + hydration keep the legacy path below.
-		// (`state.end` is non-null on this path: a live block implies the marked
-		// regime — anchorless slots never hold a Block.)
-		if (state.block !== null && !hydrating && parentBlock.currentRenderMode === 'transition') {
+		// (`state.end` is non-null on this path for marked slots; an OWNS-PARENT
+		// slot has none — it takes the legacy swap below, like singleRoot
+		// componentSlots.)
+		if (
+			state.block !== null &&
+			state.end !== null &&
+			!hydrating &&
+			parentBlock.currentRenderMode === 'transition'
+		) {
 			const r = renderOffscreen(parentBlock, domParent, state.end!, comp, props);
 			if (r.suspended || r.error) {
 				// Discard the partial; the OLD content was never touched, so it stays live.
@@ -8375,9 +8451,10 @@ export function childSlot(
 		if (!hydrating) clearChildContent(state);
 		state.currentComp = comp;
 		state.currentIsBodyFn = isBodyFn;
-		if (state.start === null) {
+		if (state.start === null && state.ownerHost === null) {
 			// First component in this slot — mint the lower-bound marker now so
 			// clearChildContent can sweep a (possibly multi-node) component body.
+			// (An OWNS-PARENT slot needs neither bound: clears sweep the element.)
 			state.start = document.createComment('');
 			domParent.insertBefore(state.start, state.end);
 		}

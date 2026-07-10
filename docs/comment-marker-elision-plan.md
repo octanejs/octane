@@ -1,6 +1,6 @@
 # Comment-Marker Elision Plan — fewer `<!--[-->`s when they carry no information
 
-Status: M0 + M1 LANDED (2026-07-09); M2-M3 proposed. Follow-up to the website Elements-panel report
+Status: M0 + M1 + M2 LANDED (2026-07-09); M3 proposed. Follow-up to the website Elements-panel report
 (a 40-deep run of `<!--[-->` before `.shell`, ~2,100 comment nodes on the home
 page). Companion to docs/compiled-output-optimization-plan.md — this is the
 DOM-weight axis of the same verbosity problem.
@@ -172,6 +172,40 @@ Runtime-dynamic (no compiler involvement), extending the lazy-marker regime:
 
 Sharp edges: `clearChildContent`/reorder on self-marked slots (hostNode
 tracking exists); kind-flips between regimes must keep the promotion one-way.
+
+**M2 LANDED 2026-07-09** — as an OWNS-PARENT childSlot mode, stronger than the
+single-descriptor sketch above:
+
+- `ChildSlot.ownerHost`: a de-opt host (`hostElementBody` children,
+  `renderHostTagChildren`, `hostComponent` — whose inner `<!---->` child
+  anchor is gone entirely) hands its element to `childSlot`, which then owns
+  ALL of the element's children — NO markers in ANY value regime (component,
+  text, null), not just pureHost. Inserts append (null anchor); clears remove
+  every child of the element (`clearChildContent`'s first branch, with the
+  same blockless `detachDeoptTreeRefs` sweep as the marked path). One-way
+  exceptions that still mint lazily, appended at the element tail: array mode
+  (ForSlot anchors reconcileKeyed on a real pair). Owns-parent slots skip the
+  off-screen transition swap (no `end` to commit at) and take the legacy
+  swap, like singleRoot componentSlots. Hydration never enters the mode
+  (server-pair adoption wins at mount).
+- `deoptItemBody` component-bearing items: on client mount the nested
+  childSlot BORROWS the item block's own `<!--it-->` pair as its range
+  (pre-seeded slot state, the hydration-seed precedent) instead of minting an
+  inner end-anchor + lazy start. The item block still owns the pair
+  (inclusive teardown); `clearChildContent` sweeps between markers only.
+- Pinned by marker-shape case (e): Deopt client 12 → **8**, hydrate 11 → **9**
+  (SSR unchanged at 14 by design). Website (dev-SSR e2e measurement):
+  `/` 2,030 → **1,783**, `/benchmarks` 17,381 → **14,793** — e2e ceilings
+  ratcheted to 2,050 / 17,000 (~15% headroom).
+- Validation: full suite green in both compile modes (octane + octane-prod
+  projects), hydration suites, website dev+preview e2e. A brand-new lexical
+  typeahead-menu port test flaked twice under full-suite load during the
+  landing (real-timer `settle()` races) — it passes 20+ consecutive runs on
+  both pre- and post-M2 runtimes in isolation and in its project; not an M2
+  regression.
+- Perf: same-session js-framework A/B neutral within noise (run/replace/
+  runlots/clear marginally better, sub-ms ops at timer granularity); ratio
+  guards pass.
 
 ### M3 — Inherited ranges for sole-child wrappers (the 40-chain) + SSR symmetry
 
