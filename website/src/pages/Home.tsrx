@@ -119,7 +119,7 @@ export function Home() @{
 		<section class="bench" aria-labelledby="bench-heading">
 			<div class="bench-head">
 				<h2 id="bench-heading" class="bench-title">Measured, not vibes</h2>
-				<Link to="/benchmarks" class="bench-all">All 12 suites →</Link>
+				<Link to="/benchmarks" class="bench-all">All suites →</Link>
 			</div>
 			<p class="bench-sub">
 				Every benchmark suite on one scale: each framework’s cost relative to Octane (1×), lower is
@@ -133,7 +133,7 @@ export function Home() @{
 			<p class="bench-note">
 				{'Ratios are geometric means over each suite’s per-operation checked-in medians ('}
 				<code>benchmarks/baselines</code>
-				{'), Octane .tsrx vs React 19.2, Solid 2.0 beta and Ripple 0.3. Reproduce with '}
+				{'), Octane .tsrx vs React 19.2, Solid 2.0 beta, Ripple 0.3 and Vue Vapor 3.6 beta. Reproduce with '}
 				<code>pnpm bench</code>
 				{', or see '}
 				<Link to="/benchmarks">absolute per-operation numbers for every suite</Link>

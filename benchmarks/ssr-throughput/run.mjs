@@ -74,6 +74,10 @@ const CONFIG_FILTER = process.env.CONFIGS
 const NEWS_TARGETS = ['octane-tsrx', 'react', 'solid'];
 const CARD_COUNTS = quick ? [50] : [50, 500];
 const WATERFALL_DEPTHS = quick ? [1, 2] : [1, 2, 4];
+// parallel-k*: K INDEPENDENT ~4ms fetches in one body (Parallel.tsrx). The SSR
+// parallel-use mirror batches them into ONE await round, so p50 stays ~flat
+// across k; serial registration costs ~k*4ms (linear = regression).
+const PARALLEL_KS = quick ? [4] : [4, 8];
 const WATERFALL_CONCURRENCY = 32;
 
 // ── build phase ───────────────────────────────────────────────────────────────
@@ -227,6 +231,23 @@ for (const size of CARD_COUNTS) {
 			},
 		});
 	}
+}
+
+for (const k of PARALLEL_KS) {
+	configs.push({
+		name: `parallel-k${k}`,
+		group: 'waterfall',
+		entry: FIXTURE_ENTRY,
+		fn: (mod) => () => mod.renderParallel(k),
+		verify: async (mod) => {
+			const { body } = await mod.renderParallel(k);
+			const expected = `sum = ${mod.expectedParallelSum(k)}`;
+			if (!body.includes(expected)) throw new Error(`parallel sum "${expected}" missing`);
+			if (body.includes('PARALLEL-PENDING'))
+				throw new Error('pending fallback leaked into the final body');
+			return bodyMeta(body);
+		},
+	});
 }
 
 for (const depth of WATERFALL_DEPTHS) {

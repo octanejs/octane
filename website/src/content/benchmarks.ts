@@ -69,7 +69,10 @@ export interface BenchCard {
 
 // ---------------------------------------------------------------------------
 // Series identity — fixed hue per framework, everywhere.
-// Validated set: #ff415a #c98500 #1e93b0 #1baf7a #9085e9 (dark, on #2b3138).
+// Validated set: #ff415a #c98500 #1e93b0 #1baf7a #9085e9 #e06ec4 (dark, on
+// #2b3138). Vue can't wear its brand green — it collapses into Solid's under
+// tritan simulation (ΔE 3) — so it wears orchid: inside the palette's L 56-64
+// band, 4.5:1 on the panel, min pairwise ΔE 13 across protan/deutan/tritan.
 // ---------------------------------------------------------------------------
 // Versions are the pnpm-catalog pins the fixtures actually run.
 const FRAMEWORKS: SeriesDef[] = [
@@ -78,6 +81,7 @@ const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'react', label: 'React 19', color: '#1e93b0' },
 	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
 	{ key: 'ripple', label: 'Ripple 0.3', color: '#9085e9' },
+	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 beta', color: '#e06ec4' },
 ];
 
 // Octane-internal variants — ordinal ramp of the brand hue, validated with
@@ -301,7 +305,7 @@ export const OCTANE_CARDS: BenchCard[] = [];
 // 0 median — are skipped for that pair (geomean over the valid ops).
 // ---------------------------------------------------------------------------
 const SUMMARY_SERIES = FRAMEWORKS.filter((f) =>
-	['octane-tsrx', 'react', 'solid', 'ripple'].includes(f.key),
+	['octane-tsrx', 'react', 'solid', 'ripple', 'vue-vapor'].includes(f.key),
 );
 
 function geomeanVsOctane(card: BenchCard, key: string): number | undefined {
