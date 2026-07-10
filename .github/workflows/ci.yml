@@ -84,6 +84,14 @@ jobs:
       - name: Check parity-gap index is current
         run: pnpm parity:gaps:check
 
+      # The publish build otherwise only runs at prepack, so a broken dist
+      # (an entry point missing from the build, an unresolvable relative
+      # import in dist/ or the verbatim-copied compiler/) would ship silently.
+      # build.mjs ends with verify-dist.mjs: every emitted module's imports
+      # must resolve and every publishConfig export must import in plain Node.
+      - name: Build octane package and verify dist
+        run: pnpm build
+
   typecheck:
     runs-on: ubuntu-latest
 
