@@ -6143,6 +6143,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		}
 		if (b.kind === 'style') ctx.runtimeNeeded.add('setStyle');
 		if (b.kind === 'formAction') ctx.runtimeNeeded.add('setFormAction');
+		if (b.kind === 'event-bundle') {
+			// 3b: mount builds the descriptor via evtN, update mutates via evtNu.
+			const arity = b.argExprs.length <= 2 ? String(b.argExprs.length) : 'N';
+			ctx.runtimeNeeded.add(`evt${arity}`);
+			ctx.runtimeNeeded.add(`evt${arity}u`);
+		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
 			ctx.runtimeNeeded.add('queueRefDetach'); // unmount-detach of a spread-supplied ref
@@ -6231,20 +6237,42 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		}
 		const rootArg = single ? '_root' : 'null';
 		const args = bag.fields.map((f) => f.constExpr ?? f.local);
-		if (!bag.hasNamed() && bag.fields.length <= BAG_FACTORY_MAX) {
+		if (bag.fields.length <= BAG_FACTORY_MAX) {
 			ctx.runtimeNeeded.add(`bag${bag.fields.length}`);
 			mountLines.push(
 				`    _b = _$bag${bag.fields.length}(__s, ${rootArg}${args.length ? ', ' + args.join(', ') : ''});`,
 			);
 		} else {
-			// Spill path — beyond the shared-factory arities, OR the body carries
-			// ref/spread/fragmentRef fields whose LONG names the runtime's
-			// suspense-hide key scan needs (see makeBag): one inline literal
+			// Spill path — beyond the shared-factory arities: one inline literal
 			// (still real values, single allocation) through the generic commit.
 			ctx.runtimeNeeded.add('bagOf');
 			mountLines.push(
 				`    _b = _$bagOf(__s, ${rootArg}, { ${bag.fields.map((f) => `${f.name}: ${f.constExpr ?? f.local}`).join(', ')} });`,
 			);
+		}
+		// REF MANIFEST (compiled-output plan, ref-manifest phase): bodies with
+		// ref-carrying bindings stamp a module-scope constant on the scope so the
+		// runtime's suspense-hide walk (detachSubtreeRefs) finds the bag fields
+		// WITHOUT a key scan — flat [kind, field, elField] triads ('r' element
+		// ref / 's' spread / 'f' fragment ref, whose third slot is unused).
+		{
+			const rm = [];
+			for (const b of elementBindings) {
+				if (b.kind === 'ref') {
+					rm.push('r', bag.letter(`_ref$${b.id}`), bag.letter(`_el$${b.id}`));
+				} else if (b.kind === 'spread') {
+					rm.push('s', bag.letter(`_sp$${b.id}`), bag.letter(`_el$${b.id}`));
+				} else if (b.kind === 'fragmentRef') {
+					rm.push('f', bag.letter(`_fi$${b.id}`), '');
+				}
+			}
+			if (rm.length > 0) {
+				const rmName = `_rm$${ctx.nextHelperId++}`;
+				ctx.hoistedHelpers.push(
+					`const ${rmName} = [${rm.map((x) => JSON.stringify(x)).join(', ')}];`,
+				);
+				mountLines.push(`    __s.refFields = ${rmName};`);
+			}
 		}
 		// Declare the mount locals the factory args read — patched into the
 		// placeholder now that the field set is complete.
@@ -6644,22 +6672,20 @@ function bagLetter(i) {
 function makeBag() {
 	const fields = [];
 	const byKey = new Map();
-	let namedCount = 0;
-	const reg = (key, constExpr, keepName) => {
+	const reg = (key, constExpr) => {
 		let r = byKey.get(key);
 		if (r === undefined) {
 			const i = fields.length;
 			r = {
 				key,
-				// Ref-carrying kinds (ref/spread/fragmentRef + their `_el$` partners)
-				// KEEP the long historical name: the runtime's suspense-hide walk
-				// (detachSubtreeRefs) discovers them by key prefix and pairs
-				// `_ref$N`/`_sp$N` with `_el$N`. Everything else gets a letter.
-				name: keepName ? key : bagLetter(i),
+				// Every field gets a letter — incl. ref-carrying kinds since the
+				// ref-manifest phase: the runtime's suspense-hide walk discovers
+				// them through the compiled `__s.refFields` manifest, not by key
+				// prefix, so nothing needs a long name anymore.
+				name: bagLetter(i),
 				local: constExpr === undefined ? `_m${i}` : null,
 				constExpr: constExpr === undefined ? null : constExpr,
 			};
-			if (keepName) namedCount++;
 			fields.push(r);
 			byKey.set(key, r);
 		}
@@ -6667,12 +6693,10 @@ function makeBag() {
 	};
 	return {
 		/** Mount-write target for `key` — the pre-declared local. */
-		local: (key) => reg(key, undefined, false).local,
-		/** Like local(), but the bag property keeps `key` as its name (see reg). */
-		localNamed: (key) => reg(key, undefined, true).local,
+		local: (key) => reg(key, undefined).local,
 		/** Seed `key` with a constant expression (no local, no mount write). */
 		constField: (key, expr) => {
-			reg(key, expr, false);
+			reg(key, expr);
 		},
 		/** Emitted bag property name for `key` (update/slot-call reads+writes). */
 		letter: (key) => {
@@ -6680,8 +6704,6 @@ function makeBag() {
 			if (r === undefined) throw new Error(`octane compiler: bag field ${key} never mounted`);
 			return r.name;
 		},
-		/** Any long-named fields? → the positional arity factories can't apply. */
-		hasNamed: () => namedCount > 0,
 		fields,
 	};
 }
@@ -6802,8 +6824,8 @@ function emitBindingMount(b, elVar, bag) {
 			return `    {
       const _v = ${E};
       _$setSpread(${elVar}, _v, undefined, __s);
-      ${bag.localNamed(`_el$${b.id}`)} = ${elVar};
-      ${bag.localNamed(`_sp$${b.id}`)} = _v;
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
+      ${bag.local(`_sp$${b.id}`)} = _v;
       __s.cleanups.push(() => { const _sp = _b.${bag.letter(`_sp$${b.id}`)}; if (_sp != null && _sp.ref != null) _$queueRefDetach(_sp.ref, _b.${bag.letter(`_el$${b.id}`)}); });
     }`;
 		}
@@ -6823,17 +6845,17 @@ function emitBindingMount(b, elVar, bag) {
     }`;
 		}
 		case 'event-bundle': {
-			// Build a `{ fn, args }` bundle and stash fn + each arg in slots so the
-			// update path can identity-diff and skip the reassignment on no-op.
-			const fnLocal = bag.local(`_fn$${b.id}`);
-			const argLocals = b.argExprs.map((_e, i) => bag.local(`_a$${b.id}$${i}`));
-			const argInit = b.argExprs.map((e, i) => `${argLocals[i]} = (${e});`).join(' ');
-			return `    {
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      ${fnLocal} = (${b.fnExpr});
-      ${argInit}
-      ${elVar}[${JSON.stringify(b.slotKey)}] = { fn: ${fnLocal}, args: [${argLocals.join(', ')}] };
-    }`;
+			// 3b (docs/compiled-output-optimization-plan.md): ONE shared-helper call
+			// builds the `{ fn, args }` descriptor, assigns the element's event slot,
+			// and returns the descriptor — the ONLY bag field this binding needs (the
+			// update path mutates the descriptor in place; dispatch reads `el[key]`
+			// per event, so the mutation is observed without re-assignment).
+			const n = b.argExprs.length;
+			const argsPart = b.argExprs.map((e) => `, (${e})`).join('');
+			if (n <= 2) {
+				return `    ${bag.local(`_ev$${b.id}`)} = _$evt${n}(${elVar}, ${JSON.stringify(b.slotKey)}, (${b.fnExpr})${argsPart});`;
+			}
+			return `    ${bag.local(`_ev$${b.id}`)} = _$evtN(${elVar}, ${JSON.stringify(b.slotKey)}, (${b.fnExpr}), [${b.argExprs.map((e) => `(${e})`).join(', ')}]);`;
 		}
 		case 'ref': {
 			// attachRef handles all three supported shapes: callback (function),
@@ -6854,8 +6876,8 @@ function emitBindingMount(b, elVar, bag) {
 			// time attach/cleanup run); `_ref$` must be a LIVE read — updates re-point it.
 			return `    {
       const _r = (${b.expr});
-      ${bag.localNamed(`_ref$${b.id}`)} = _r;
-      ${bag.localNamed(`_el$${b.id}`)} = ${elVar};
+      ${bag.local(`_ref$${b.id}`)} = _r;
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
       _$queueRefAttach(__s, () => _$attachRef(_r, _b.${bag.letter(`_el$${b.id}`)}));
       __s.cleanups.push(() => _$queueRefDetach(_b.${bag.letter(`_ref$${b.id}`)}, _b.${bag.letter(`_el$${b.id}`)}));
     }`;
@@ -6869,7 +6891,7 @@ function emitBindingMount(b, elVar, bag) {
 			// the ref + destroys the instance on unmount.
 			return `    {
       const _r = (${b.expr});
-      ${bag.localNamed(`_fi$${b.id}`)} = _$mountFragmentRef(__s, ${elVar}, ${b.endElVar}, _r);
+      ${bag.local(`_fi$${b.id}`)} = _$mountFragmentRef(__s, ${elVar}, ${b.endElVar}, _r);
     }`;
 		}
 	}
@@ -6933,26 +6955,16 @@ function emitBindingUpdate(b, bag) {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setFormAction(${F('_el')}, ${JSON.stringify(b.name)}, _v, ${F('_prev')}); ${F('_prev')} = _v; } }`;
 		}
 		case 'event-bundle': {
-			// Diff fn + each arg against the per-slot cache. Only rebuild + assign
-			// the bundle when something actually changed — keyed-list survivors with
-			// unchanged item refs skip everything.
-			const fnVar = `_fn`,
-				argVars = b.argExprs.map((_e, i) => `_a${i}`);
-			const fnField = `_b.${bag.letter(`_fn$${b.id}`)}`;
-			const argFields = b.argExprs.map((_e, i) => `_b.${bag.letter(`_a$${b.id}$${i}`)}`);
-			const reads =
-				`const ${fnVar} = (${b.fnExpr}); ` +
-				b.argExprs.map((e, i) => `const ${argVars[i]} = (${e});`).join(' ');
-			const cmps = [`${fnField} !== ${fnVar}`]
-				.concat(b.argExprs.map((_e, i) => `${argFields[i]} !== ${argVars[i]}`))
-				.join(' || ');
-			const writes = [`${fnField} = ${fnVar};`]
-				.concat(b.argExprs.map((_e, i) => `${argFields[i]} = ${argVars[i]};`))
-				.concat([
-					`${F('_el')}[${JSON.stringify(b.slotKey)}] = { fn: ${fnVar}, args: [${argVars.join(', ')}] };`,
-				])
-				.join(' ');
-			return `    { ${reads} if (${cmps}) { ${writes} } }`;
+			// 3b: mutate the mount-built descriptor in place — branch-free (two
+			// plain field writes cost less than the old compare + rebuild +
+			// re-assign, and keyed-list survivors were already skipped one level
+			// up by the pure/deps short-circuit).
+			const n = b.argExprs.length;
+			const argsPart = b.argExprs.map((e) => `, (${e})`).join('');
+			if (n <= 2) {
+				return `    _$evt${n}u(${F('_ev')}, (${b.fnExpr})${argsPart});`;
+			}
+			return `    _$evtNu(${F('_ev')}, (${b.fnExpr}), [${b.argExprs.map((e) => `(${e})`).join(', ')}]);`;
 		}
 		case 'ref': {
 			// Ref expression identity may change across renders. React 19: detach

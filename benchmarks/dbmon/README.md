@@ -20,6 +20,7 @@ benchmarks/dbmon/
 ├── react/         # Vite app, dev :5198 (React 19, production mode)
 ├── ripple/        # Vite app, dev :5199 (Ripple — track + @for)
 ├── solid/         # Vite app, dev :5200 (Solid 2.0 — createStore + reconcile + <For>)
+├── vue-vapor/     # Vite app, dev :5220 (Vue 3.6 Vapor — shallowRef + keyed v-for)
 ├── run.mjs        # Playwright harness — drives all adapters
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
@@ -34,8 +35,11 @@ canonical VDOM baseline, and Ripple (`let &[items] = track(...)` + a keyed
 exact same immutable-newArray + keyed-reconcile model. Solid is the fine-grained
 foil: a plain `createStore` of the rows with `reconcile` on each tick (the
 [solid-dbmon](https://github.com/ryansolid/solid-dbmon) pattern), so unchanged
-rows never re-render and only changed leaf signals update. All five render
-identical DOM from the same seeded data.
+rows never re-render and only changed leaf signals update. Vue Vapor (3.6,
+`<script setup vapor>` — no VDOM) holds the rows in a `shallowRef` replaced
+wholesale each tick, so it shares the immutable-newArray + keyed-reconcile
+model while its per-cell vapor renderEffects do the cell diffing. All six
+render identical DOM from the same seeded data.
 
 > dbmon is a deliberate worst case for fine-grained reactivity: every tick is a
 > fresh, non-reference-checkable object graph, so `reconcile` must deep-diff the
@@ -63,19 +67,25 @@ framework renders identical data each frame — an apples-to-apples comparison.
 | `sort`         | toggle order — worst-case keyed reorder (LIS moves)                     |
 | `unmount`      | tear the whole table down                                              |
 
-All ops flush synchronously, so the harness times only framework JS work (GC
-forced before each sample). The harness also prints a `tick_partial / tick`
-diff-skip ratio — low means the per-binding diff is skipping unchanged cells.
+All ops flush inside the timed adapter call — synchronously where the framework
+allows it; vue-vapor (microtask scheduler, no public sync flush) returns a
+thenable that the harness awaits inside the timed window — so the harness times
+only framework JS work (GC forced before each sample). The harness also prints
+a `tick_partial / tick` diff-skip ratio — low means the per-binding diff is
+skipping unchanged cells.
 
 ## Running
 
-Start the three preview servers (production builds), then run the harness:
+Start the preview servers (production builds), then run the harness:
 
 ```bash
 # build + preview each (production); run from the repo root
 pnpm --filter octane-tsrx-dbmon-bench build && pnpm --filter octane-tsrx-dbmon-bench preview &
 pnpm --filter octane-jsx-dbmon-bench  build && pnpm --filter octane-jsx-dbmon-bench  preview &
 pnpm --filter react-dbmon-bench       build && pnpm --filter react-dbmon-bench       preview &
+pnpm --filter ripple-dbmon-bench      build && pnpm --filter ripple-dbmon-bench      preview &
+pnpm --filter solid-dbmon-bench       build && pnpm --filter solid-dbmon-bench       preview &
+pnpm --filter vue-vapor-dbmon-bench   build && pnpm --filter vue-vapor-dbmon-bench   preview &
 
 # then, from benchmarks/dbmon:
 pnpm bench           # 30 timed iterations (+10 warmup) per op

@@ -3,21 +3,19 @@ import { compile } from 'octane/compiler';
 
 // Pin the stable event-bundle optimization: when an event handler arrow
 // has the shape `onClick={() => fn(a, b, c)}` (zero params, single
-// CallExpression body, no spread args), the compiler hoists the callee
-// and each arg into per-binding slots and emits an OR-chain identity
-// diff on re-render. Identical args skip the property reassignment
-// entirely — load-bearing for the js-framework-benchmark swap-rows row.
+// CallExpression body, no spread args), the compiler lowers it to a
+// `{ fn, args }` descriptor built ONCE by an arity helper (3b of
+// docs/compiled-output-optimization-plan.md) and mutated IN PLACE on
+// update — dispatch reads `el[key]` per event, so the mutation is
+// observed with no compare, no rebuild, and no property re-assignment.
 //
 // Audited path: compile.js detectStableEventBundle,
 // emitBindingMount/emitBindingUpdate "event-bundle" branches. Slot shape
-// (bag fields are compiler-assigned 1-char names; mount fills `_mN` locals
-// that the bag factory receives positionally):
+// (ONE bag field per binding — the descriptor):
 //
-//   mount:  _mI = (callee); _mJ = (arg0); _mK = (arg1);
-//           el["$$click"] = { fn: _mI, args: [_mJ, _mK] };
-//           _b = _$bagN(__s, _root, …, _mI, _mJ, _mK, …);
-//   update: const _fn = (callee); const _a0 = (arg0); const _a1 = (arg1);
-//           if (_b.x !== _fn || _b.y !== _a0 || …) { …reassign… }
+//   mount:  _mI = _$evt1(el, "$$click", (callee), (arg0));
+//           _b = _$bagN(__s, _root, …, _mI, …);
+//   update: _$evt1u(_b.x, (callee), (arg0));
 
 const c = (src: string): string => compile(src, 'eb.tsrx').code;
 
@@ -28,12 +26,11 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         <button onClick={() => doSomething()}>{'go'}</button>
       }
     `);
-		// Mount: fn local present, bundle with empty args.
-		expect(code).toMatch(/_m\d+\s*=\s*\(doSomething\)/);
-		expect(code).toMatch(/\["\$\$click"\]\s*=\s*\{\s*fn:\s*_m\d+,\s*args:\s*\[\s*\]\s*\}/);
-		// Update: fn-only compare; no arg-slot churn.
-		expect(code).toMatch(/const\s+_fn\s*=\s*\(doSomething\)/);
-		expect(code).not.toMatch(/!==\s*_a0/);
+		// Mount: arity-0 helper builds + assigns the descriptor; one bag field.
+		expect(code).toMatch(/_m\d+\s*=\s*_\$evt0\(\w+,\s*"\$\$click",\s*\(doSomething\)\)/);
+		// Update: in-place fn mutation, no compare, no re-assignment.
+		expect(code).toMatch(/_\$evt0u\(_b\.\w+,\s*\(doSomething\)\)/);
+		expect(code).not.toMatch(/!==/);
 	});
 
 	it('multi-arg bundle: per-arg slots + OR-chain identity diff on update', () => {
@@ -42,15 +39,15 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         <button onClick={() => fn(props.a, props.b, props.c)}>{'go'}</button>
       }
     `);
-		expect(code).toMatch(/_m\d+\s*=\s*\(props\.a\)/);
-		expect(code).toMatch(/_m\d+\s*=\s*\(props\.b\)/);
-		expect(code).toMatch(/_m\d+\s*=\s*\(props\.c\)/);
-		// Bundle exposes all three args.
-		expect(code).toMatch(/args:\s*\[\s*_m\d+\s*,\s*_m\d+\s*,\s*_m\d+\s*\]/);
-		// Update: 4-way OR chain (fn + 3 args) against the 1-char bag fields.
+		// >2 args → the rest-fallback helper with an args array, still one field.
 		expect(code).toMatch(
-			/_b\.\w+\s*!==\s*_fn\s*\|\|\s*_b\.\w+\s*!==\s*_a0\s*\|\|\s*_b\.\w+\s*!==\s*_a1\s*\|\|\s*_b\.\w+\s*!==\s*_a2/,
+			/_m\d+\s*=\s*_\$evtN\(\w+,\s*"\$\$click",\s*\(fn\),\s*\[\(props\.a\),\s*\(props\.b\),\s*\(props\.c\)\]\)/,
 		);
+		// Update: in-place mutation with a fresh args array, no compare chain.
+		expect(code).toMatch(
+			/_\$evtNu\(_b\.\w+,\s*\(fn\),\s*\[\(props\.a\),\s*\(props\.b\),\s*\(props\.c\)\]\)/,
+		);
+		expect(code).not.toMatch(/!==\s*_a0/);
 	});
 
 	it('per-row @for body: each row gets its own bundle capturing the iterated value', () => {
@@ -63,8 +60,9 @@ describe('event-bundle optimization — {fn, args} hoisting + identity diff', ()
         </ul>
       }
     `);
-		expect(code).toMatch(/_m\d+\s*=\s*\(item\)/);
-		expect(code).toMatch(/\["\$\$click"\]\s*=\s*\{\s*fn:\s*_m\d+,\s*args:\s*\[\s*_m\d+\s*\]\s*\}/);
+		// Row bundle: arity-1 helper with the iterated value as the arg.
+		expect(code).toMatch(/_m\d+\s*=\s*_\$evt1\(\w+,\s*"\$\$click",\s*\(fn\),\s*\(item\)\)/);
+		expect(code).toMatch(/_\$evt1u\(_b\.\w+,\s*\(fn\),\s*\(item\)\)/);
 	});
 
 	it('bailout: arrow with a param falls through to plain event binding', () => {

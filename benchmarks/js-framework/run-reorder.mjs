@@ -40,6 +40,8 @@
 //   pnpm --filter octane-jsx-jsbench dev    # :5177
 //   pnpm --filter react-jsbench dev         # :5175
 //   pnpm --filter ripple-jsbench dev        # :5178
+//   pnpm --filter solid-jsbench dev         # :5179
+//   pnpm --filter vue-vapor-jsbench dev     # :5180
 //   node benchmarks/js-framework/run-reorder.mjs [iterations]   # default 8
 //   BENCH_JSON=results/reorder.json node run-reorder.mjs        # machine-readable copy
 //
@@ -60,6 +62,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'react', url: 'http://localhost:5175/', ready: '#run' },
 			{ name: 'ripple', url: 'http://localhost:5178/', ready: '#run' },
 			{ name: 'solid', url: 'http://localhost:5179/', ready: '#run' },
+			{ name: 'vue-vapor', url: 'http://localhost:5180/', ready: '#run' },
 		];
 
 // ── Fixture-shared shuffle machinery, replayed for the identity gate ───────
@@ -141,12 +144,15 @@ function summarize(samples) {
 	};
 }
 
-// Reset to a fresh 1k table. Every target commits synchronously on the
-// discrete click (octane flushes on the event; react/ripple wrap in
-// flushSync), so the count is checkable immediately after evaluate returns.
+// Reset to a fresh 1k table. Every target either commits synchronously on the
+// discrete click (octane flushes on the event; react/ripple wrap in flushSync;
+// solid calls flush()) or exposes `window.__benchFlush` (vue-vapor — microtask
+// scheduler, no public sync flush; see run.mjs's timeClick note), so the count
+// is checkable once the evaluate resolves.
 async function resetRows(page) {
-	const cnt = await page.evaluate(() => {
+	const cnt = await page.evaluate(async () => {
 		document.getElementById('run').click();
+		if (window.__benchFlush) await window.__benchFlush();
 		return document.querySelectorAll('tbody tr').length;
 	});
 	if (cnt !== ROW_COUNT) {
@@ -172,8 +178,9 @@ async function identityGate(page, op, ctx, targetName) {
 		throw new Error(`[${targetName}/${op.name}] identity gate: bad pre state (${preIds.length})`);
 	}
 	const expected = op.expected(preIds, ctx);
-	const post = await page.evaluate((sel) => {
+	const post = await page.evaluate(async (sel) => {
 		document.querySelector(sel).click();
+		if (window.__benchFlush) await window.__benchFlush();
 		return Array.from(document.querySelectorAll('tbody tr'), (tr) => ({
 			id: tr.firstElementChild.textContent,
 			stamp: typeof tr.__benchId === 'string' ? tr.__benchId : null,
@@ -214,14 +221,26 @@ async function identityGate(page, op, ctx, targetName) {
 
 // Timed sample: REPS clicks inside one performance.now() window, divided.
 // gc() immediately before keeps a surprise collection out of the window.
+// Async-commit targets (window.__benchFlush — see run.mjs's timeClick note)
+// await the scheduler flush BETWEEN clicks: without it the REPS state changes
+// would coalesce into one commit and the sample would time a single net
+// permutation instead of REPS full commits.
 async function timeSample(page, sel, reps) {
 	return await page.evaluate(
-		({ sel, reps }) => {
+		async ({ sel, reps }) => {
 			const el = document.querySelector(sel);
 			if (!el) throw new Error('selector not found: ' + sel);
+			const flush = window.__benchFlush;
 			(window.gc || (() => {}))();
 			const t0 = performance.now();
-			for (let k = 0; k < reps; k++) el.click();
+			if (flush) {
+				for (let k = 0; k < reps; k++) {
+					el.click();
+					await flush();
+				}
+			} else {
+				for (let k = 0; k < reps; k++) el.click();
+			}
 			return (performance.now() - t0) / reps;
 		},
 		{ sel, reps },
