@@ -27,8 +27,12 @@ const ROUTES = ['/', '/docs', '/benchmarks', '/playground'];
 // bookkeeping) + component-bearing `it` pairs (145 — borrow ranges, required)
 // + 187 SSR pairs. This is the CI-enforced DOM-weight ratchet — tighten as
 // the elision phases land, and treat a breach as a marker-minting regression.
+//
+// `/` re-based 2026-07-10 (measured 1,733): the home summary chart gained a
+// sixth framework series (Vue Vapor) and memo-wall/portal-swarm/ssr-throughput
+// gained Solid/Vue bars — real content growth, not marker minting.
 const COMMENT_CEILINGS: Record<string, number> = {
-	'/': 1680,
+	'/': 1995,
 	'/docs': 415,
 	'/benchmarks': 13800,
 	'/playground': 195,

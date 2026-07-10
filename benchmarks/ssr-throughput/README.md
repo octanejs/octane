@@ -18,16 +18,19 @@ benchmarks/ssr-throughput/
 ├── fixtures/       # octane-only SSR fixtures (waterfall / deopt-page / escape-heavy)
 │   └── src/        # .tsrx + plain-.ts twins + deterministic seeded data modules
 ├── run.mjs         # builds bundles into dist/, times them, prints tables + BENCH_JSON
-├── package.json    # harness deps (vite + react/solid — see note below)
+├── package.json    # harness deps (vite + react/solid/vue — see note below)
 └── README.md
 ```
 
-## Part 1 — news-page throughput (octane vs React 19 vs Solid 2.0)
+## Part 1 — news-page throughput (octane vs React 19 vs Solid 2.0 vs Vue 3.6)
 
 Reuses the news app fixtures and build methodology verbatim: `news/gen.mjs` is
 invoked as a child process at 50 and then 500 cards, each target's SSR bundle
 (`octane-tsrx` `render()` from `octane/server`, react `react-dom/server`
-`renderToString`, solid `@solidjs/web` `renderToString`) is `vite build`-t with
+`renderToString`, solid `@solidjs/web` `renderToString`, vue-vapor
+`vue/server-renderer` `renderToString` — on the server a vapor SFC compiles to
+the regular `ssrRender` string codegen, so this measures Vue's standard
+compiled SSR) is `vite build`-t with
 an outDir override into `dist/news-{50,500}/<target>` here — **nothing under
 `benchmarks/news/` is modified** (its `src/data.js` is regenerated back to the
 tracked count-50 dataset afterwards; the generator is seeded, so the bytes are
