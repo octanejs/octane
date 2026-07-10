@@ -108,6 +108,19 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		name: 'chat-stream',
+		cwd: 'chat-stream',
+		servers: [
+			{ filter: 'octane-tsrx-chat-stream', port: 5250 },
+			{ filter: 'react-chat-stream', port: 5251 },
+			{ filter: 'solid-chat-stream', port: 5252 },
+			{ filter: 'ripple-chat-stream', port: 5253 },
+			{ filter: 'vue-vapor-chat-stream', port: 5254 },
+		],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		name: 'dbmon',
 		cwd: 'dbmon',
 		servers: [
@@ -525,8 +538,8 @@ async function runSuite(suite) {
 // ── baseline compare (noise-aware) ────────────────────────────────────────────
 
 // Regression iff median > base.median*1.15 AND min > base.min*1.10. For ops with
-// base.median < 0.2ms, additionally require an absolute excess > 0.1ms so timer
-// noise on sub-ms ops can't trip a false regression.
+// base.median < 1ms, additionally require an absolute excess > 0.1ms so timer
+// granularity (0.1ms in Chromium) on sub-ms ops can't trip a false regression.
 function compareResult(result, baseline) {
 	const rows = [];
 	const baseTargets = new Map((baseline.targets || []).map((t) => [t.name, t]));
@@ -538,7 +551,7 @@ function compareResult(result, baseline) {
 			if (!b) continue;
 			const medOver = r.median > b.median * 1.15;
 			const minOver = r.min > b.min * 1.1;
-			const smallOk = b.median < 0.2 ? r.median - b.median > 0.1 : true;
+			const smallOk = b.median < 1 ? r.median - b.median > 0.1 : true;
 			const regressed = medOver && minOver && smallOk;
 			rows.push({
 				target: t.name,

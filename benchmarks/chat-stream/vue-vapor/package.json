@@ -1,0 +1,21 @@
+{
+  "name": "vue-vapor-chat-stream",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Streaming-chat fixture for Vue Vapor (3.6 vapor mode) - the Vue column for the deterministic token-stream ops.",
+  "scripts": {
+    "dev": "vite --host --port 5254 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5254 --strictPort"
+  },
+  "dependencies": {
+    "vue": "catalog:default",
+    "@vue/runtime-dom": "catalog:default",
+    "@vue/runtime-vapor": "catalog:default"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "catalog:default",
+    "vite": "catalog:default"
+  }
+}
