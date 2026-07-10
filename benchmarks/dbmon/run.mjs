@@ -5,10 +5,13 @@
 // bulk create/clear and recursive-context measures deep Context fan-out, this
 // isolates per-cell diff throughput + bulk keyed remount.
 //
-// Methodology mirrors the sibling benches: every op mutates the DOM
-// SYNCHRONOUSLY inside its adapter call (octane/react via flushSync), so we time
-// ONLY the framework's JS work, and force a GC right before each timed sample so
-// a stray collection can't inflate it. Medians are framework cost, not paint.
+// Methodology mirrors the sibling benches: every op mutates the DOM inside its
+// adapter call — synchronously where the framework allows it (octane/react via
+// flushSync, solid via flush()); an adapter with no public sync flush
+// (vue-vapor) returns a thenable and the timed window extends until it settles.
+// Either way we time ONLY the framework's JS work, and force a GC right before
+// each timed sample so a stray collection can't inflate it. Medians are
+// framework cost, not paint.
 //
 // Ops:
 //   mount        — render the full table (DB_COUNT rows).
@@ -26,6 +29,7 @@
 //   pnpm --filter react-dbmon-bench       preview   # :5198
 //   pnpm --filter ripple-dbmon-bench      preview   # :5199
 //   pnpm --filter solid-dbmon-bench       preview   # :5200
+//   pnpm --filter vue-vapor-dbmon-bench   preview   # :5220
 // (swap `preview` → `dev` for the unminified dev build).
 //
 // Usage:  node run.mjs [iter]   # default 30
@@ -45,6 +49,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'ripple', url: 'http://localhost:5199/' },
 			{ name: 'solid', url: 'http://localhost:5200/' },
 			{ name: 'react', url: 'http://localhost:5198/' },
+			{ name: 'vue-vapor', url: 'http://localhost:5220/' },
 		];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -70,16 +75,20 @@ async function freshPage(browser, url) {
 	return { ctx, page };
 }
 
-// MOUNT — fresh page per sample (quiescent start); time the synchronous
-// __mount() with a freshly-collected heap.
+// MOUNT — fresh page per sample (quiescent start); time __mount() with a
+// freshly-collected heap. An adapter whose commit is scheduler-deferred
+// returns a thenable (vue-vapor's update ops do; see its main.js) — the timed
+// window extends until it settles, so the scheduling cost stays inside the
+// measurement.
 async function measureMount(browser, url) {
 	const samples = [];
 	for (let i = 0; i < WARMUP + ITER; i++) {
 		const { ctx, page } = await freshPage(browser, url);
-		const dt = await page.evaluate(() => {
+		const dt = await page.evaluate(async () => {
 			(window.gc || (() => {}))();
 			const t0 = performance.now();
-			window.__mount();
+			const r = window.__mount();
+			if (r && typeof r.then === 'function') await r;
 			return performance.now() - t0;
 		});
 		if (i >= WARMUP) samples.push(dt);
@@ -102,7 +111,8 @@ async function measureLoop(browser, url, op) {
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
 				const t0 = performance.now();
-				fn();
+				const r = fn();
+				if (r && typeof r.then === 'function') await r;
 				const dt = performance.now() - t0;
 				if (i >= WARMUP) out.push(dt);
 				await new Promise((r) => setTimeout(r, YIELD_MS));
@@ -128,7 +138,8 @@ async function measureUnmount(browser, url) {
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 				gc();
 				const t0 = performance.now();
-				window.__unmount();
+				const r = window.__unmount();
+				if (r && typeof r.then === 'function') await r;
 				const dt = performance.now() - t0;
 				window.__reset();
 				if (i >= WARMUP) out.push(dt);

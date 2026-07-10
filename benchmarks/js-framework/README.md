@@ -19,6 +19,8 @@ benchmarks/js-framework/
 ├── octane-jsx/     # Vite app, dev server on :5177 — same app authored in React-style .tsx
 ├── react/          # Vite app, dev server on :5175 — canonical keyed react-hooks
 ├── ripple/         # Vite app, dev server on :5178 — keyed ripple (ported to current syntax)
+├── solid/          # Vite app, dev server on :5179 — Solid 2.0 (keyed <For>, production build)
+├── vue-vapor/      # Vite app, dev server on :5180 — Vue 3.6 Vapor (<script setup vapor> SFC)
 ├── run.mjs             # Playwright harness — the canonical krausest ops
 ├── run-reorder.mjs     # Playwright harness — the keyed-reorder matrix (see below)
 ├── package.json        # umbrella; depends on playwright
@@ -26,9 +28,8 @@ benchmarks/js-framework/
 └── README.md           # this file
 ```
 
-There is **no solid fixture** in this suite (ripple is the fine-grained foil
-here); both harnesses compare octane-tsrx / octane-jsx / react / ripple, with
-octane-tsrx as the ratio baseline.
+Both harnesses compare octane-tsrx / octane-jsx / react / ripple / solid /
+vue-vapor, with octane-tsrx as the ratio baseline.
 
 The octane app is authored **twice** over the same octane core — once in `.tsrx`
 (directive syntax) and once in React-style `.tsx` (JSX). Both emit the same DOM
@@ -49,9 +50,26 @@ and expose the same button + table contract:
   syntax (`function … @{}`, `@for (…; key)`, `{expr}`). A fine-grained foil: each
   row's `label` is a `Tracked<string>`, so `update` mutates labels in place. Its
   handlers are wrapped in `flushSync` for the same sync-commit reason as react.
+- **`solid`** — Solid 2.0 (keyed `<For>` over a `createSignal` row array); each
+  handler calls `flush()` after the signal set for the same sync-commit reason.
+- **`vue-vapor`** — the official [keyed vue-vapor][vv] implementation (Vue 3.6
+  Vapor mode: a `<script setup vapor>` SFC, no VDOM), copied verbatim and
+  extended with the reorder matrix. Its authoring model is fine-grained like
+  ripple's: rows are a `shallowRef` array mutated in place + `triggerRef` for
+  add/remove/swap, and each row's `label` is its own `shallowRef`, so `update`
+  mutates labels per-cell with no array diff. Two suite-local adaptations:
+  (1) Vue flushes on a microtask with **no public sync flush**, so the fixture
+  exposes `window.__benchFlush = () => nextTick()` and both harnesses extend
+  the timed click window until it resolves (the scheduling hop is Vue's own
+  commit cost); (2) the official entry pins `vue@3.6.0-alpha.2` (when vapor
+  still shipped in the main entry) — we track the current 3.6 beta, where the
+  default bundler entry has no vapor runtime, so `vue` is aliased to a small
+  shim over `@vue/runtime-vapor` + `@vue/runtime-dom`
+  (see `vue-vapor/src/vue-shim.js`).
 
 [rh]: https://github.com/krausest/js-framework-benchmark/tree/master/frameworks/keyed/react-hooks
 [rp]: https://github.com/krausest/js-framework-benchmark/tree/master/frameworks/keyed/ripple
+[vv]: https://github.com/krausest/js-framework-benchmark/tree/master/frameworks/keyed/vue-vapor
 
 ## Quick start
 
@@ -65,6 +83,8 @@ pnpm --filter octane-tsrx-jsbench dev   # :5176
 pnpm --filter octane-jsx-jsbench dev    # :5177
 pnpm --filter react-jsbench dev         # :5175
 pnpm --filter ripple-jsbench dev        # :5178
+pnpm --filter solid-jsbench dev         # :5179
+pnpm --filter vue-vapor-jsbench dev     # :5180
 
 # 3. Run the harness (another terminal). By default it drives octane-tsrx,
 #    octane-jsx and react, with octane-tsrx as the ratio baseline:

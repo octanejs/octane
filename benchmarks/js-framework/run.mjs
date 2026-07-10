@@ -41,6 +41,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'react', url: 'http://localhost:5175/', ready: '#run' },
 			{ name: 'ripple', url: 'http://localhost:5178/', ready: '#run' },
 			{ name: 'solid', url: 'http://localhost:5179/', ready: '#run' },
+			{ name: 'vue-vapor', url: 'http://localhost:5180/', ready: '#run' },
 		];
 
 const OPS = [
@@ -97,19 +98,27 @@ async function ensureState(page, pre) {
 	await sleep(20);
 }
 
-// Time ONLY the synchronous click handler: the target commits its DOM mutation
+// Time ONLY the click handler's commit: the target commits its DOM mutation
 // synchronously on the discrete click (octane flushes on the event), so the
 // post-click rAF + task wait was pure noise — ~16ms of frame latency + the paint
 // of up to 10K rows, which swamped and destabilised the real JS work. A gc()
 // right before each sample keeps a surprise collection from inflating it.
-// (Any TARGETS added here must likewise commit synchronously on click.)
+//
+// Any TARGETS added here must either commit synchronously on click
+// (react/ripple flushSync, solid flush()) or — for frameworks with no public
+// sync flush (vue-vapor) — expose `window.__benchFlush = () => <promise that
+// resolves once the scheduler has flushed>`; the timed window then extends
+// until that promise settles, so the framework's own microtask scheduling cost
+// stays inside the measurement.
 async function timeClick(page, sel) {
-	return await page.evaluate((sel) => {
+	return await page.evaluate(async (sel) => {
 		const el = document.querySelector(sel);
 		if (!el) throw new Error('selector not found: ' + sel);
+		const flush = window.__benchFlush;
 		(window.gc || (() => {}))();
 		const t0 = performance.now();
 		el.click();
+		if (flush) await flush();
 		return performance.now() - t0;
 	}, sel);
 }

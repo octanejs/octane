@@ -211,5 +211,3 @@ pnpm changeset
 - Keep `.tsrx` fixtures minimal and focused on the asserted behavior.
 - Match nearby naming, file layout, and test style; keep documentation updates short
   and durable.
-
-## Imported Claude Cowork project instructions

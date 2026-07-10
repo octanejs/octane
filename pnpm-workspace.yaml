@@ -151,6 +151,14 @@ catalogs:
     typescript: ^5.9.3
     vite: ^8.0.16
     vite-plugin-solid: '3.0.0-next.5'
+    # Vue Vapor (vapor-mode benchmark fixtures) — 3.6 is the first line with
+    # vapor; pinned to a beta the way solid-js pins its 2.0 beta. The fixtures
+    # alias `vue` to a shim over @vue/runtime-dom + @vue/runtime-vapor (see
+    # their vite.config.js), so those are direct deps at the same pin.
+    vue: 3.6.0-beta.17
+    '@vue/runtime-dom': 3.6.0-beta.17
+    '@vue/runtime-vapor': 3.6.0-beta.17
+    '@vitejs/plugin-vue': ^6.0.7
     vitest: ^4.1.9
     yjs: ^13.6.0
     zustand: ^5.0.0

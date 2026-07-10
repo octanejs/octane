@@ -1,6 +1,6 @@
 # Compiled Output Optimization Plan — size, allocation, and closure churn
 
-Status: Phases 0 + 1 + 2 + 3c + 3h LANDED (2026-07-08/09) — measurement suites + guards, and
+Status: Phases 0 + 1 + 2 + 3b + 3c + 3h LANDED (2026-07-08/09) — measurement suites + guards, and
 the bag-factory codegen (see the LANDED notes in each phase). Phases 2–3
 proposed. Author context: follow-up to the binding-bag pre-shape change
 (superseded by Phase 1).
@@ -74,6 +74,20 @@ These were audited before writing the plan (file:line refs are 2026-07-08):
   `bagOf` spill — named keys can't ride positional factories); everything else
   renames freely. Phase 3 candidate: replace the key scan with a compiler-
   emitted ref manifest so these fields can shorten too.
+  **RESOLVED — ref manifest LANDED 2026-07-09.** The compiler emits a
+  module-scope constant per ref-bearing body (`const _rm$N = ['r','a','b',
+  's','c','d','f','e','']` — flat [kind, field, elField] triads; 'r' element
+  ref / 's' spread / 'f' fragment ref) and stamps it once after the bag
+  commit (`__s.refFields = _rm$N` — the field is pre-declared on ScopeImpl +
+  BlockImpl so the stamp never transitions a hidden class). detachSubtreeRefs
+  walks the manifest with indexed reads instead of the `for-in` key scan;
+  detach/re-attach TIMING is untouched (discovery changed, not semantics —
+  pinned by conformance/suspense-refs.test.ts, which cycles all three kinds
+  plus de-opt descriptor refs across a suspend). makeBag's `localNamed`/
+  `hasNamed` machinery is deleted — every field is lettered and every body
+  ≤16 fields rides the arity factories. Corpus size ~flat (the corpus is
+  ref-light); the win is ref-heavy code (bindings) + monomorphic bag shapes
+  + a cheaper hide walk.
 - **Event descriptors are read at dispatch time** (`fireEventSlot`,
   runtime.ts:4971-5000, reads `node[key]` per event). A helper may mutate the
   descriptor in place instead of re-assigning a new object.
@@ -338,7 +352,17 @@ Independent, individually-measurable items, roughly by value:
 - **3a. Mount commit fusion** — covered by Phase 1's factory (insert + commit
   + allocation in one call). For `_b = {}` static-template bodies, a paired
   `_$b0(__s, _root)` keeps them one line too.
-- **3b. Event helper with in-place descriptor mutation.**
+- **3b. Event helper with in-place descriptor mutation — LANDED 2026-07-09.**
+  As designed, with one refinement: the update helpers are BRANCH-FREE
+  (`d.fn = fn; d.args[0] = a0;`) — two plain field writes cost less than the
+  old compare + rebuild + re-assign, and keyed-list survivors were already
+  skipped a level up by the pure/deps short-circuit, so the compare bought
+  nothing. Arity family `evt0/1/2` + `evtN` rest fallback (args array),
+  matching fireEventSlot's dispatch switch; arity-0 descriptors share one
+  empty args array. One bag field per binding (`_ev$N`, lettered) instead of
+  el + fn + each arg. Registered in the runtimeNeeded loop (the emit fns
+  don't see ctx). Shape pins updated in event-bundle.test.ts.
+  Original design:
   Mount: `_b.c = _$evt1(_el0, "$$click", setN, n + 1)` — helper builds
   `{ fn, args }`, assigns `el[key]`, returns the descriptor.
   Update: `_$evt1u(_b.c, setN, n + 1)` — compares `fn`/`args[i]`, mutates the

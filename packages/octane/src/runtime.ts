@@ -67,6 +67,19 @@ export interface Scope {
 	 */
 	_slots: any[] | null;
 	/**
+	 * Compiled REF MANIFEST (compiled-output plan, ref-manifest phase): a
+	 * module-scope constant the mount path stamps when the body has ref-carrying
+	 * bindings — flat triads of [kind, bagField, elBagField]: 'r' = element ref
+	 * (`ref={…}`), 's' = spread (its committed object may carry a ref), 'f' =
+	 * `<Fragment ref>` (the FragmentInstance field; third slot unused). The
+	 * suspense-hide walk (detachSubtreeRefs) reads slots[0] through it — which
+	 * is what lets ref-carrying bag fields take 1-char names and ride the
+	 * positional arity factories (previously they kept long `_ref$N` names for
+	 * a key-prefix scan, forcing the whole bag onto the bagOf spill). Null on
+	 * ref-less bodies — the common case.
+	 */
+	refFields: string[] | null;
+	/**
 	 * Per-scope context Provider map. Pre-initialised to null on both Scope
 	 * and Block so the field's hidden-class position is stable across all
 	 * instances — Provider stamping was previously a late `??=` add that
@@ -1351,6 +1364,7 @@ class BlockImpl {
 	cleanups: Cleanup[];
 	children: ChildScope[];
 	_slots: any[] | null;
+	refFields: string[] | null;
 	$$ctxValues: Map<Context<any>, any> | null;
 	// Contexts whose value this block's subtree consumes — stamped on this block
 	// AND its memo ancestors by useContextInternal. The TRANSITIVE signal: a
@@ -1428,6 +1442,7 @@ class BlockImpl {
 		this.cleanups = [];
 		this.children = [];
 		this._slots = null;
+		this.refFields = null;
 		this.$$ctxValues = null;
 		this.$$ctxReads = null;
 		this.$$ctxDirect = null;
@@ -1466,6 +1481,7 @@ class ScopeImpl {
 	cleanups: Cleanup[];
 	children: ChildScope[];
 	_slots: any[] | null;
+	refFields: string[] | null;
 	$$ctxValues: Map<Context<any>, any> | null;
 	$$ctxReads: Map<Context<any>, any> | null;
 	$$ctxCache: Map<Context<any>, any> | null;
@@ -1481,6 +1497,7 @@ class ScopeImpl {
 		this.cleanups = [];
 		this.children = [];
 		this._slots = null;
+		this.refFields = null;
 		this.slots = [];
 		this.$$ctxValues = null;
 		this.$$ctxReads = null;
@@ -5051,6 +5068,59 @@ interface HandlerBundle {
 	args: any[];
 }
 type EventSlot = ((event: Event) => any) | HandlerBundle | null | undefined;
+
+// ---------------------------------------------------------------------------
+// Event bundle helpers (compiled-output plan 3b) — compiler targets for the
+// `() => fn(arg, …)` bundle optimization. Mount (`evtN`): build the
+// `{ fn, args }` descriptor ONCE, assign it to the element's event slot, and
+// return it for the binding bag (one field instead of el + fn + each arg).
+// Update (`evtNu`): mutate the SAME descriptor in place — dispatch reads
+// `el[key]` at fire time and the slot still points at this object, so the
+// mutation is observed with no compare, no rebuild, and no re-assignment.
+// Arity variants mirror fireEventSlot's dispatch switch; `evtN`/`evtNu` are
+// the rest fallbacks. Arity-0 descriptors share one empty args array
+// (dispatch only reads it; the arity-0 update never writes args).
+// ---------------------------------------------------------------------------
+
+const EMPTY_ARGS: any[] = [];
+
+export function evt0(el: Element, key: string, fn: any): HandlerBundle {
+	const d: HandlerBundle = { fn, args: EMPTY_ARGS };
+	(el as any)[key] = d;
+	return d;
+}
+export function evt0u(d: HandlerBundle, fn: any): void {
+	d.fn = fn;
+}
+export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle {
+	const d: HandlerBundle = { fn, args: [a0] };
+	(el as any)[key] = d;
+	return d;
+}
+export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
+	d.fn = fn;
+	d.args[0] = a0;
+}
+export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
+	const d: HandlerBundle = { fn, args: [a0, a1] };
+	(el as any)[key] = d;
+	return d;
+}
+export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
+	d.fn = fn;
+	const a = d.args;
+	a[0] = a0;
+	a[1] = a1;
+}
+export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBundle {
+	const d: HandlerBundle = { fn, args };
+	(el as any)[key] = d;
+	return d;
+}
+export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
+	d.fn = fn;
+	d.args = args;
+}
 
 // Delegated event names registered by compiled modules' `delegateEvents([...])`
 // calls. Listeners are NOT attached at module-eval time — they're attached to
@@ -10982,16 +11052,50 @@ function forEachSubtreeChild(scope: Scope, visit: (child: Scope) => void): void 
 // null), collecting {ref, el} for later re-attach. Used ONLY by the suspense-hide path
 // (NOT by <Activity>, which intentionally keeps refs) so React's "refs cycle null→node
 // across a suspend, like layout effects" contract holds even though octane preserves the
-// DOM node. The compiler stores host refs as `slot._ref$N` paired with `slot._el$N` in a
-// component's local `scope.slots`; de-opt host slots store `state.ref` + the node. We
-// walk component-local slots for refs and recurse through children + control-flow slots
-// via forEachSubtreeChild (the same walk deactivateScope uses).
+// DOM node. Compiled bodies with ref-carrying bindings stamp a REF MANIFEST on their
+// scope (`scope.refFields` — see the Scope interface): flat [kind, field, elField]
+// triads naming the binding-bag fields directly, so discovery is an indexed walk over
+// slots[0] (no key scan, and the fields take normal 1-char names). De-opt host slots
+// store `state.ref` + the node. We recurse through children + control-flow slots via
+// forEachSubtreeChild (the same walk deactivateScope uses).
 function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 	// A block managing a de-opt host subtree (deoptItemBody / pure-host items):
 	// every node the de-opt reconciler built carries its descriptor (DEOPT_DESC),
 	// whose props may hold a ref — walk the DOM subtree for them.
 	const deoptRoot = (scope as any).deoptNode as Node | null | undefined;
 	if (deoptRoot != null) detachDeoptTreeRefs(deoptRoot, out);
+	const rm = scope.refFields;
+	if (rm !== null) {
+		const bag = scope.slots[0];
+		if (bag != null) {
+			for (let j = 0, n = rm.length; j < n; j += 3) {
+				const kind = rm[j];
+				if (kind === 'r') {
+					// Element ref binding: field holds the ref, partner holds the element.
+					const ref = bag[rm[j + 1]];
+					if (ref == null) continue;
+					const el = bag[rm[j + 2]];
+					out.push({ ref, el });
+					attachRef(ref, null, el);
+				} else if (kind === 's') {
+					// Spread binding: the committed spread object may carry a ref.
+					const ref = bag[rm[j + 1]]?.ref;
+					if (ref == null) continue;
+					const el = bag[rm[j + 2]];
+					if (el == null) continue;
+					out.push({ ref, el });
+					attachRef(ref, null, el);
+				} else {
+					// 'f' — <Fragment ref>: detach the FragmentInstance's current ref;
+					// reveal re-attaches the same instance.
+					const fi = bag[rm[j + 1]];
+					if (fi == null || fi._currentRef == null) continue;
+					out.push({ ref: fi._currentRef, el: fi });
+					attachRef(fi._currentRef, null, fi);
+				}
+			}
+		}
+	}
 	const slots = scope.slots;
 	for (let i = 0, n = slots.length; i < n; i++) {
 		const s = slots[i];
@@ -11004,43 +11108,6 @@ function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 		// childSlot managing a pure-host de-opt node — same DEOPT_DESC walk.
 		if (s.__kind === 'childSlot' && s.hostNode != null) {
 			detachDeoptTreeRefs(s.hostNode, out);
-		}
-		for (const k in s) {
-			const c0 = k.charCodeAt(0);
-			if (c0 !== 95 /* '_' */) continue;
-			const c1 = k.charCodeAt(1);
-			// `_ref$N` (compiled template host ref). 'r'=114.
-			if (c1 === 114 && k.charCodeAt(4) === 36) {
-				const ref = s[k];
-				if (ref == null) continue;
-				const el = s['_el$' + k.slice(5)];
-				out.push({ ref, el });
-				attachRef(ref, null, el);
-			} else if (
-				c1 === 115 /* 's' */ &&
-				k.charCodeAt(2) === 112 /* 'p' */ &&
-				k.charCodeAt(3) === 36
-			) {
-				// `_sp$N` (compiled spread binding): the committed spread object may
-				// carry a ref; the element lives in the paired `_el$N`.
-				const ref = s[k]?.ref;
-				if (ref == null) continue;
-				const el = s['_el$' + k.slice(4)];
-				if (el == null) continue;
-				out.push({ ref, el });
-				attachRef(ref, null, el);
-			} else if (
-				c1 === 102 /* 'f' */ &&
-				k.charCodeAt(2) === 105 /* 'i' */ &&
-				k.charCodeAt(3) === 36
-			) {
-				// `_fi$N` (<Fragment ref>): detach the FragmentInstance's current ref;
-				// reveal re-attaches the same instance.
-				const fi = s[k];
-				if (fi == null || fi._currentRef == null) continue;
-				out.push({ ref: fi._currentRef, el: fi });
-				attachRef(fi._currentRef, null, fi);
-			}
 		}
 	}
 	forEachSubtreeChild(scope, (child) => detachSubtreeRefs(child, out));
