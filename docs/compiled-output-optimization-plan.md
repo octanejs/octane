@@ -1,6 +1,6 @@
 # Compiled Output Optimization Plan — size, allocation, and closure churn
 
-Status: Phases 0 + 1 + 3c LANDED (2026-07-08) — measurement suites + guards, and
+Status: Phases 0 + 1 + 2 + 3c + 3h LANDED (2026-07-08/09) — measurement suites + guards, and
 the bag-factory codegen (see the LANDED notes in each phase). Phases 2–3
 proposed. Author context: follow-up to the binding-bag pre-shape change
 (superseded by Phase 1).
@@ -282,6 +282,52 @@ Route `hoistBodyHelper` output to `ctx.hoistedHelpers` (where `_frag$N`,
 runtime entry points). Land behind exhaustive differential runs; the item-body
 capture analysis is the sharp edge (destructured params, shadowing — reuse the
 row-body rules at compile.js:7224-7238).*
+
+**LANDED 2026-07-09.** As designed, with these findings:
+
+- `helperCaptures`/`unionEnv` (compile.js): free identifiers ∩ the locals
+  visible at the call site, per construct. A construct's helpers share ONE
+  env tuple (block.extra is per block; then+else / all cases / try+pending+
+  catch / item+empty each destructure the same sorted union — unused names
+  are harmless consts). `__pu$N` parallel-use temps are matched by name shape
+  (they're minted after collectComponentLocals runs).
+- **Sharp edge found: JSX tag references.** `collectFreeIdentifiers` never
+  visited tag positions (the @for dep analysis never needed them — bodies
+  with component tags are already non-depEligible), so `const C = props.comp;
+  <C/>` silently dropped `C` from the env and every such helper broke at
+  module scope. The walker now collects component-shaped identifier tags,
+  member-tag ROOT objects, and dynamic `<{expr}/>` expressions; host tag and
+  attribute names stay static. (This also makes @for's deps see component
+  tags — moot for promotion, since such bodies aren't depEligible.)
+- **Nesting**: hoistBodyHelper extends `ctx.currentComponentLocals` with the
+  helper's own params/env/locals for the duration of its compile, so a nested
+  construct's env resolves at ITS call site (inside this helper's body) —
+  captures propagate outward transitively because the free-identifier walk
+  sees through nested construct bodies.
+- **@for**: the deps array IS the env tuple (the plan's "fold if trivial") —
+  emitted whenever the item/@empty helpers capture anything, not only for
+  dep-pure promotion; flags bit 2 still gates the promotion compare. The
+  union may widen deps with @empty-only captures (conservative). A deps arg
+  now forces the flags placeholder (positional alignment).
+- **Folded fragments** (`extractFragment`): the env tuple threads as ONE
+  ArrayExpression `props.hN` hole (built component-side, read renderer-side)
+  for if/switch/try; @for reuses the existing per-dep hole threading with the
+  depEligible guard relaxed.
+- **Runtime**: ifBlock/switchBlock (via renderBranchSlot), tryBlock (env on
+  the TrySlot — the arms mount from stored state), activityBlock, forBlock
+  (env on the ForSlot; mountItem stamps item blocks, updateSurvivor refreshes
+  survivors and passes it as the lite path's third arg), portal, and
+  renderOffscreen (transition WIPs — a capturing helper's destructure throws
+  off-screen without it). block.extra persists, so a branch re-rendering on
+  its own reads last parent render's tuple — the closure staleness, verbatim.
+- **`__children$N` stays inline** — invoked through props (childrenAsBody /
+  render-prop checks), no construct block to carry the tuple. Candidate for a
+  later pass (attach env to the fn, thread through the children invoke sites).
+- Validation: full suite green (616 files / 4,569 tests, both compile modes),
+  website dev+preview e2e, codegen-size + bundle-size `--compare` clean
+  (size ~neutral — code moved to module scope, small env boilerplate ↔
+  removed closure boilerplate). Same-session js-framework A/B: neutral with
+  `runlots` (allocation-heavy) improving ~8% (13.9 → 12.8ms).
 
 ---
 

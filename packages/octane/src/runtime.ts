@@ -6342,6 +6342,9 @@ export function portal(
 	body: ComponentBody,
 	props: any,
 	host?: Node,
+	// Hoisted-helper env tuple (compiled-output Phase 2): the `__portal$N`
+	// body's captured parent locals — stamped as block.extra below.
+	env?: any[],
 ): void {
 	const prev = parentScope.slots[slotKey] as PortalSlot | undefined;
 	const state = renderPortalState(
@@ -6354,6 +6357,7 @@ export function portal(
 		// createPortal call — the natural "logical parent" for event bubbling. When
 		// the portal is at top level the compiler passes the block's parentNode.
 		host || parentScope.block.parentNode,
+		env,
 	);
 	// Register on first creation (or after a target-change rebuild) so the slot is
 	// torn down with its parent scope.
@@ -6378,6 +6382,7 @@ function renderPortalState(
 	rawBody: ComponentBody | unknown,
 	rawProps: any,
 	host: Node,
+	env?: any[],
 ): PortalSlot {
 	const norm = normalizePortalBody(rawBody, rawProps);
 	let state = prev;
@@ -6397,7 +6402,16 @@ function renderPortalState(
 		// unmountBlock removes them WITH the content — toggling a portal on/off never
 		// leaves orphan `<!--portal-->` comments in a persistent target (e.g.
 		// document.body across menu open/close cycles).
-		const block = createBlock('portal', parentBlock, target, start, end, norm.body, norm.props);
+		const block = createBlock(
+			'portal',
+			parentBlock,
+			target,
+			start,
+			end,
+			norm.body,
+			norm.props,
+			env,
+		);
 		state = { __kind: 'portalSlotSlot', block, target, start, end };
 		// Portal target hosts handlers stamped via the same `el.$$click = …`
 		// mechanism as the main tree, so it needs the delegated event listeners too.
@@ -6408,6 +6422,7 @@ function renderPortalState(
 	} else {
 		state.block!.body = norm.body;
 		state.block!.props = norm.props;
+		state.block!.extra = env;
 		renderBlock(state.block!);
 	}
 	// Stamp `$$portalParent` on every direct child the portal placed between its
@@ -7146,6 +7161,10 @@ function renderOffscreen(
 	// this is DOM-shape fidelity (branch commits pass 'control-flow' to mirror their
 	// in-place blocks), not correctness — 'dynamic' works for every non-root caller.
 	kind: BlockKind = 'dynamic',
+	// Hoisted-helper env tuple (compiled-output Phase 2): a branch-swap WIP whose
+	// body is a CAPTURING hoisted helper destructures `__extra` — the wip block
+	// must carry the construct's env or that destructure throws off-screen.
+	env?: any[],
 ): { wip: OffscreenWip; suspended: any; error: any } {
 	const start = document.createComment('wip');
 	const end = document.createComment('/wip');
@@ -7155,7 +7174,7 @@ function renderOffscreen(
 	const capture: OffscreenCapture = { effects: [[], [], []], refs: [], stores: [] };
 	const prev = WIP_CAPTURE;
 	WIP_CAPTURE = capture;
-	const block = createBlock(kind, parentBlock, domParent, start, end, body, props);
+	const block = createBlock(kind, parentBlock, domParent, start, end, body, props, env);
 	let suspended: any = null;
 	let error: any = null;
 	try {
@@ -8388,6 +8407,7 @@ export function childSlot(
 				size: 0,
 				cachedDeps: null,
 				emptyBlock: null,
+				env: undefined,
 			};
 		}
 		// A NESTED array member is a fragment (React parity): its leaves render as
@@ -9130,6 +9150,13 @@ interface TrySlot {
 	catchBody: ComponentBody | null;
 	pendingBody: ComponentBody | null;
 	/**
+	 * Hoisted-helper env tuple (compiled-output Phase 2): the construct's
+	 * captured parent locals, shared by the try/pending/catch helpers and
+	 * refreshed by the compiled call site every parent render. Stamped as
+	 * `block.extra` wherever an arm block is created or re-rendered.
+	 */
+	env: any[] | undefined;
+	/**
 	 * True once the try body has committed at least once. Load-bearing: gates
 	 * the transition-hold path in handleSuspense — a boundary with no committed
 	 * content must show @pending, not hold prior DOM it never had.
@@ -9175,6 +9202,8 @@ export function tryBlock(
 	catchBody: ComponentBody | null,
 	pendingBody: ComponentBody | null,
 	anchor?: Node | null,
+	// Hoisted-helper env tuple (compiled-output Phase 2) — see TrySlot.env.
+	env?: any[],
 ): void {
 	const parentBlock = parentScope.block;
 	let state = parentScope.slots[slotKey] as TrySlot | undefined;
@@ -9212,6 +9241,7 @@ export function tryBlock(
 			tryBody,
 			catchBody,
 			pendingBody,
+			env,
 			hasResolved: false,
 			err: null,
 			pendingThenable: null,
@@ -9228,12 +9258,14 @@ export function tryBlock(
 		state.tryBody = tryBody;
 		state.catchBody = catchBody;
 		state.pendingBody = pendingBody;
+		state.env = env;
 	}
 	const s = state;
 	if (s.branch === 0) {
 		// Already showing catch — re-render with current err (props identity unchanged).
 		s.block!.body = s.catchBody!;
 		s.block!.props = { err: s.err, reset: () => requestReset(s) };
+		s.block!.extra = s.env;
 		renderBlock(s.block!);
 	} else if (s.branch === 2) {
 		// Already pending — no work; will be swapped when thenable resolves.
@@ -9242,6 +9274,7 @@ export function tryBlock(
 		// down its DOM. If the re-render suspends, handleSuspense decides
 		// whether to preserve the DOM (keep) or swap to pending (default).
 		s.tryBlock.body = s.tryBody;
+		s.tryBlock.extra = s.env;
 		try {
 			renderBlock(s.tryBlock);
 			// Successful commit — this supersedes any in-flight transition
@@ -9261,6 +9294,7 @@ export function tryBlock(
 		// resolved). This entry point is hit when the surrounding component
 		// re-renders for an unrelated reason while we're suspended.
 		s.tryBlock.body = s.tryBody;
+		s.tryBlock.extra = s.env;
 		try {
 			renderBlock(s.tryBlock);
 		} catch {
@@ -9332,6 +9366,7 @@ function mountTry(state: TrySlot): void {
 		bEnd,
 		state.tryBody,
 		undefined,
+		state.env,
 	);
 	(b as any).__trySlot = state;
 	// Register handlers so descendant effect/render errors can find us.
@@ -9604,6 +9639,7 @@ function hideTryContentAndMountPending(state: TrySlot): boolean {
 			bEnd,
 			state.pendingBody,
 			undefined,
+			state.env,
 		);
 		(b as any).__trySlot = state;
 		state.block = b;
@@ -10422,6 +10458,7 @@ function switchToCatch(state: TrySlot, err: any): void {
 		bEnd,
 		state.catchBody,
 		{ err, reset },
+		state.env,
 	);
 	state.block = b;
 	try {
@@ -10515,6 +10552,13 @@ function renderBranchSlot(
 	next: number,
 	body: ComponentBody | null,
 	marker: string,
+	// Hoisted-helper env tuple (compiled-output Phase 2): the construct's
+	// captured parent locals, refreshed by the compiled call site every parent
+	// render. Stamped as `block.extra` on every branch block (and WIP) so
+	// renderBlock forwards it as the body's third arg — a branch re-rendering
+	// on its OWN reads the block's stored tuple (last parent render's values,
+	// the same staleness a per-render closure had).
+	env?: any[],
 ): void {
 	const parentBlock = parentScope.block;
 	if (next !== state.branch) {
@@ -10548,6 +10592,7 @@ function renderBranchSlot(
 					body,
 					undefined,
 					'control-flow',
+					env,
 				);
 				if (r.suspended || r.error) {
 					disposeWip(r.wip);
@@ -10619,6 +10664,7 @@ function renderBranchSlot(
 					bEnd,
 					body,
 					undefined,
+					env,
 				);
 				if (borrowed) b.exclusiveMarkers = true;
 				state.block = b;
@@ -10640,7 +10686,16 @@ function renderBranchSlot(
 		} else if (firstMount && body) {
 			// First client mount — pick the boundary by what the branch renders.
 			const before = after ? after.previousSibling : domParent.lastChild;
-			const b = createBlock('control-flow', parentBlock, domParent, null, after, body, undefined);
+			const b = createBlock(
+				'control-flow',
+				parentBlock,
+				domParent,
+				null,
+				after,
+				body,
+				undefined,
+				env,
+			);
 			state.block = b;
 			renderBlock(b);
 			const first = before ? before.nextSibling : domParent.firstChild;
@@ -10674,15 +10729,16 @@ function renderBranchSlot(
 			state.start = s;
 			state.end = e;
 			if (body) {
-				const b = createBlock('control-flow', parentBlock, domParent, s, e, body, undefined);
+				const b = createBlock('control-flow', parentBlock, domParent, s, e, body, undefined, env);
 				b.exclusiveMarkers = true;
 				state.block = b;
 				renderBlock(b);
 			}
 		}
 	} else if (state.block) {
-		// Same branch — re-render in place.
+		// Same branch — re-render in place with this render's env snapshot.
 		state.block.body = body!;
+		state.block.extra = env;
 		renderBlock(state.block);
 	}
 }
@@ -10714,6 +10770,8 @@ export function ifBlock(
 	thenBody: ComponentBody | null,
 	elseBody: ComponentBody | null,
 	anchor?: Node | null,
+	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
+	env?: any[],
 ): void {
 	let state = parentScope.slots[slotKey] as IfSlot | undefined;
 	if (state === undefined) {
@@ -10734,7 +10792,16 @@ export function ifBlock(
 		registerSlot(parentScope, state);
 	}
 	const next: 0 | 1 = cond ? 1 : 0;
-	renderBranchSlot(parentScope, slotKey, state, domParent, next, next ? thenBody : elseBody, 'if');
+	renderBranchSlot(
+		parentScope,
+		slotKey,
+		state,
+		domParent,
+		next,
+		next ? thenBody : elseBody,
+		'if',
+		env,
+	);
 }
 
 // ---------------------------------------------------------------------------
@@ -10802,6 +10869,8 @@ export function activityBlock(
 	mode: 'visible' | 'hidden' | string,
 	body: ComponentBody,
 	anchor?: Node | null,
+	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
+	env?: any[],
 ): void {
 	const parentBlock = parentScope.block;
 	const wantHidden = mode === 'hidden';
@@ -10812,7 +10881,16 @@ export function activityBlock(
 		const bEnd = document.createComment('/activity');
 		domParent.insertBefore(bStart, anchor ?? null);
 		domParent.insertBefore(bEnd, anchor ?? null);
-		const b = createBlock('control-flow', parentBlock, domParent, bStart, bEnd, body, undefined);
+		const b = createBlock(
+			'control-flow',
+			parentBlock,
+			domParent,
+			bStart,
+			bEnd,
+			body,
+			undefined,
+			env,
+		);
 		state = {
 			__kind: 'activityBlockSlot',
 			block: b,
@@ -10837,6 +10915,7 @@ export function activityBlock(
 
 	const b = state.block!;
 	b.body = body;
+	b.extra = env;
 
 	if (wantHidden) {
 		if (!state.hidden) {
@@ -11080,6 +11159,8 @@ export function switchBlock(
 	cases: ReadonlyArray<readonly [test: any, body: ComponentBody]>,
 	defaultBody: ComponentBody | null,
 	anchor?: Node | null,
+	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
+	env?: any[],
 ): void {
 	let state = parentScope.slots[slotKey] as SwitchSlot | undefined;
 	if (state === undefined) {
@@ -11113,7 +11194,7 @@ export function switchBlock(
 			break;
 		}
 	}
-	renderBranchSlot(parentScope, slotKey, state, domParent, nextIdx, body, 'switch');
+	renderBranchSlot(parentScope, slotKey, state, domParent, nextIdx, body, 'switch', env);
 }
 
 // ---------------------------------------------------------------------------
@@ -11141,6 +11222,11 @@ interface ForSlot {
 	// forBlock as the trailing `emptyBody` arg; we mount it on the transition
 	// `items.length > 0 → 0` and unmount on `0 → >0`.
 	emptyBlock: Block | null;
+	// Hoisted-helper env tuple (compiled-output Phase 2): the `deps` array
+	// doubles as the item/empty helpers' captured-locals tuple — refreshed by
+	// forBlock every parent render and stamped as `block.extra` on every item
+	// block (mount + survivor re-render) and on the @empty block.
+	env: any[] | undefined;
 }
 
 export function forBlock<T>(
@@ -11202,10 +11288,15 @@ export function forBlock<T>(
 			size: 0,
 			cachedDeps: null,
 			emptyBlock: null,
+			env: undefined,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
+	// The env tuple refreshes every parent render (the compiled call site
+	// re-evaluates the captured values); item/empty blocks pick it up at
+	// mount and at every survivor re-render below.
+	state.env = deps;
 	// `@empty` arm: when `items.length === 0` and the compiler emitted an
 	// empty-body helper, mount that body in place of the (empty) item list. We
 	// also tear down any previously-mounted items so transitioning items → 0 →
@@ -11220,6 +11311,7 @@ export function forBlock<T>(
 			// keep the existing empty branch mounted, but re-render in case the
 			// body closes over parent state that changed this render.
 			state.emptyBlock.body = emptyBody;
+			state.emptyBlock.extra = state.env;
 			renderBlock(state.emptyBlock);
 		} else {
 			const bStart = document.createComment('empty');
@@ -11260,6 +11352,7 @@ export function forBlock<T>(
 				bEnd,
 				emptyBody,
 				undefined,
+				state.env,
 			);
 			state.emptyBlock = b;
 			const savedHydrating = hydrating;
@@ -11426,6 +11519,10 @@ function updateSurvivor<T>(
 	pure: boolean,
 	lite: boolean,
 	indexIndependent: boolean,
+	// Hoisted-helper env tuple (compiled-output Phase 2) — this render's
+	// captured values; stamped/passed so the body's `__extra` destructure
+	// reads current values (a per-render closure saw the same).
+	env: any[] | undefined,
 ): void {
 	// Pure short-circuit: skip the body when the item ref is unchanged AND either
 	// the body can't observe position (indexIndependent — the common index-less
@@ -11438,8 +11535,11 @@ function updateSurvivor<T>(
 		block.props = newItem;
 		block.body = itemBody as ComponentBody;
 		block.itemIndex = newIdx;
+		block.extra = env;
 		if (lite) {
-			(itemBody as any)(newItem, block);
+			// Lite survivors bypass renderBlock — pass the tuple directly as the
+			// body's third arg (the same slot renderBlock forwards block.extra to).
+			(itemBody as any)(newItem, block, env);
 		} else {
 			renderBlock(block);
 		}
@@ -11509,7 +11609,16 @@ function reconcileKeyed<T>(
 		const newKey = getKey(items[prefixLen], prefixLen);
 		if (oldFirst.key !== newKey) break;
 		const block = oldFirst;
-		updateSurvivor(block, items[prefixLen], prefixLen, itemBody, pure, lite, indexIndependent);
+		updateSurvivor(
+			block,
+			items[prefixLen],
+			prefixLen,
+			itemBody,
+			pure,
+			lite,
+			indexIndependent,
+			state.env,
+		);
 		oldFirst = block.nextSibling!;
 		prefixLen++;
 	}
@@ -11525,7 +11634,7 @@ function reconcileKeyed<T>(
 		const newKey = getKey(items[newEnd], newEnd);
 		if (oldLast.key !== newKey) break;
 		const block = oldLast;
-		updateSurvivor(block, items[newEnd], newEnd, itemBody, pure, lite, indexIndependent);
+		updateSurvivor(block, items[newEnd], newEnd, itemBody, pure, lite, indexIndependent, state.env);
 		oldLast = block.prevSibling!;
 		newEnd--;
 		oldRemain--;
@@ -11678,7 +11787,16 @@ function reconcileKeyed<T>(
 			else lastIdx = newRelIdx;
 			patched++;
 			const newIdx = prefixLen + newRelIdx;
-			updateSurvivor(cur!, items[newIdx], newIdx, itemBody, pure, lite, indexIndependent);
+			updateSurvivor(
+				cur!,
+				items[newIdx],
+				newIdx,
+				itemBody,
+				pure,
+				lite,
+				indexIndependent,
+				state.env,
+			);
 		}
 		cur = next;
 		oldIdx++;
@@ -12001,6 +12119,7 @@ function mountItem<T>(
 			itemEnd,
 			body as ComponentBody,
 			item,
+			forSlot.env,
 		);
 		block.forSlot = forSlot;
 		block.itemIndex = index;
@@ -12028,6 +12147,7 @@ function mountItem<T>(
 			anchor,
 			body as ComponentBody,
 			item,
+			forSlot.env,
 		);
 		block.forSlot = forSlot;
 		block.itemIndex = index;
@@ -12054,6 +12174,7 @@ function mountItem<T>(
 		end,
 		body as ComponentBody,
 		item,
+		forSlot.env,
 	);
 	block.forSlot = forSlot;
 	block.itemIndex = index;
