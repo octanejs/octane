@@ -60,6 +60,13 @@ export function ReducerText(p) @{
 	const [count] = useReducer((s, a) => (a === 'increment' ? s + 1 : s), p.initial);
 	<span>{'Count: ' + count}</span>
 }
+export function RenderPhaseReducer() @{
+	const [count, dispatch] = useReducer((s, a) => (a === 'increment' ? s + 1 : s), 0);
+	if (count < 3) {
+		dispatch('increment');
+	}
+	<span>{'Count: ' + count}</span>
+}
 export function LazyReducer(p) @{
 	const [count] = useReducer((s) => s, p.initial, (x) => {
 		p.onInit(x);
@@ -199,20 +206,14 @@ describe('conformance: SSR server semantics — useState (Hooks)', () => {
 		let capturedSet: any;
 		const html = ssr('StateText', { captureSet: (s: any) => (capturedSet = s) });
 		expect(html).toContain('Count: 0');
-		// The server dispatch is inert — invoking it after the pass must neither
-		// throw nor affect a subsequent render.
+		// A dispatch invoked OUTSIDE the render is inert (only render-phase
+		// dispatches re-invoke) — calling it after the pass must neither throw
+		// nor affect a subsequent render.
 		expect(() => capturedSet(1)).not.toThrow();
 		expect(ssr('StateText')).toContain('Count: 0');
 	});
 
-	// GAP: React's server renderer processes RENDER-PHASE state updates — a
-	// `setCount` during render loops the component until it converges, so React
-	// serializes 'Count: 3' (Hooks :156/:171; same family: useReducer render-phase
-	// dispatch :234/:263). Octane's server useState returns a NOOP dispatch and a
-	// render is strictly single-pass, so it serializes the initial 'Count: 0'.
-	// Likely fix: a render-phase update loop in runtime.server.ts's useState/
-	// useReducer + ssrComponent (re-invoke the body while dispatches fired).
-	it.fails('re-renders on render-phase updates until settled (Per :156/:171)', () => {
+	it('re-renders on render-phase updates until settled (Per :156/:171)', () => {
 		expect(ssr('RenderPhaseState')).toContain('Count: 3');
 	});
 });
@@ -220,6 +221,10 @@ describe('conformance: SSR server semantics — useState (Hooks)', () => {
 describe('conformance: SSR server semantics — useReducer / useMemo / useRef (Hooks)', () => {
 	it('renders useReducer initial state (Per :200)', () => {
 		expect(ssr('ReducerText', { initial: 0 })).toContain('Count: 0');
+	});
+
+	it('re-renders on render-phase useReducer dispatches until settled (Per :234/:263)', () => {
+		expect(ssr('RenderPhaseReducer')).toContain('Count: 3');
 	});
 
 	it('runs useReducer lazy initialization (Per :217)', () => {

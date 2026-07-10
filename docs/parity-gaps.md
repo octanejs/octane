@@ -12,7 +12,7 @@ converted to a plain `it`, and this index must be regenerated
 since-fixed behavior or intentional platform differences. Only the pins below
 are live gaps.
 
-**4 active pin(s).**
+**3 active pin(s).**
 
 ## packages/octane/tests/conformance/insertion-effect-order.test.ts
 
@@ -23,8 +23,3 @@ are live gaps.
 
 - **hydrates component hierarchies byte-stably (Per :657/:677)**
   - GAP: hydrating nested `{children}` component chains is not byte-stable — at depth >= 2 the SERVER collapses the children-fn block and the nested component's block into ONE `<!--[-->…<!--]-->` range, while the client layers a childSlot AND a componentSlot; the inner componentSlot finds no second range to adopt and mints fresh `<!--comp-->` markers. Elements, text, and warnings are all clean (see the content-level assertions above) — only the marker topology diverges. Fix needs the client componentSlot to BORROW its childSlot's adopted markers when the server emitted a single collapsed range (or the server to stop collapsing).
-
-## packages/octane/tests/conformance/ssr-server-semantics.test.ts
-
-- **re-renders on render-phase updates until settled (Per :156/:171)**
-  - GAP: React's server renderer processes RENDER-PHASE state updates — a `setCount` during render loops the component until it converges, so React serializes 'Count: 3' (Hooks :156/:171; same family: useReducer render-phase dispatch :234/:263). Octane's server useState returns a NOOP dispatch and a render is strictly single-pass, so it serializes the initial 'Count: 0'. Likely fix: a render-phase update loop in runtime.server.ts's useState/ useReducer + ssrComponent (re-invoke the body while dispatches fired).
