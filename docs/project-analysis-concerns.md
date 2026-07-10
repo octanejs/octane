@@ -111,20 +111,21 @@ Recommended correction strategy:
 ## 3. Active React-parity gaps
 
 Severity: mixed. These are confirmed and pinned by five real `it.fails` cases
-under `packages/octane/tests/conformance/`.
+under `packages/octane/tests/conformance/` (four since 2026-07-10 — the
+hydration marker-topology pin below is resolved and flipped to a plain `it`).
 
 ### Hydration marker topology
 
-Nested `{children}` component hierarchies render correct elements and text but
-do not hydrate byte-stably. The server collapses a children-function block and
-nested component into one marker range while the client expects layered
-`childSlot` and `componentSlot` ranges, then mints fresh markers. See
-[`ssr-serialization.test.ts`](../packages/octane/tests/conformance/ssr-serialization.test.ts).
-
-This belongs near the top of the parity backlog because marker ownership also
-affects teardown, movement, Suspense, and the proposed M3 marker-elision work.
-It should be resolved as part of one coherent range-borrowing design, not by
-loosening the byte-stability assertion.
+RESOLVED 2026-07-10. Nested `{children}` component hierarchies now hydrate
+byte-stably: the server emits one `<!--[-->…<!--]-->` range per layer
+(children-fn block and nested component block — the collapse this snapshot
+described was removed by the M3 inherit-range work), and each client slot
+adopts its own range. The last defect was `componentSlotLite` not advancing
+the hydration cursor past its adopted close marker, which desynced SIBLING
+lite slots (multi-child hierarchies) — fixed symmetrically with
+`componentSlot`'s post-render advance. The pin in
+[`ssr-serialization.test.ts`](../packages/octane/tests/conformance/ssr-serialization.test.ts)
+is now a plain byte-stability assertion.
 
 ### Effect teardown and update choreography
 
