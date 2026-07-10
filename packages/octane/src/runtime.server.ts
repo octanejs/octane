@@ -1320,6 +1320,24 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: string | symbo
 	const key = prefix + '|' + base + '#' + n;
 	const hit = res.pu.created.get(key);
 	if (hit !== undefined && puDepsEqual(hit.deps, deps)) return hit.value as T;
+	// Warm adoption: a parent's warm walk may have prefetched this creation
+	// (keyed by the shared slot symbol). Deps must match — a drift between the
+	// warm-time and render-time props is a clean miss (the orphaned entry dies
+	// with the render). TRANSFER: the entry moves into the frame-keyed created
+	// cache so later passes hit it directly.
+	if (siteKey !== undefined) {
+		const wlist = res.pu.warm.get(siteKey);
+		if (wlist !== undefined) {
+			for (let i = 0; i < wlist.length; i++) {
+				if (puDepsEqual(wlist[i].deps, deps)) {
+					const value = wlist[i].value;
+					wlist.splice(i, 1);
+					res.pu.created.set(key, { deps, value });
+					return value as T;
+				}
+			}
+		}
+	}
 	const value = fn();
 	res.pu.created.set(key, { deps, value });
 	return value;
@@ -1333,7 +1351,7 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: string | symbo
  * re-passes render between waves) still force the suspend but are not pushed
  * again. Falls through silently when everything is already resolved.
  */
-export function puBatch(thenables: unknown[]): void {
+export function puBatch(thenables: unknown[], warm?: () => void): void {
 	const res = RESOLVED as ResolvedMap | null;
 	const pu = res !== null ? res.pu : null;
 	let pending = false;
@@ -1350,6 +1368,19 @@ export function puBatch(thenables: unknown[]): void {
 		if (SUSPENDED !== null) SUSPENDED.push({ promise: t, key: '|pu#' + PU_ID++ });
 	}
 	if (!pending) return;
+	// About to suspend — run the warm walk first (the compiler passes the thunk
+	// on the FIRST in-body batch): descendant components' independent creations
+	// start AND register with this round via warmMemo, so their data resolves
+	// before their bodies ever run — component depth collapses to true
+	// data-dependency depth. Speculative: a throwing plan just means fewer
+	// prefetches.
+	if (warm !== undefined) {
+		try {
+			warm();
+		} catch {
+			/* speculative */
+		}
+	}
 	// Same discovery-job bookkeeping as a suspending use(): register the
 	// innermost enclosing component so the render loop can re-run just this
 	// subtree next round.
@@ -1364,6 +1395,74 @@ export function puBatch(thenables: unknown[]): void {
 		});
 	}
 	throw SSR_SUSPENSE;
+}
+
+// Warm-walk recursion depth cap — a backstop for recursive components the
+// compiler cannot prove finite (mirrors the client's cap).
+let WARM_DEPTH = 0;
+const WARM_DEPTH_CAP = 64;
+const WARM_SLOT_CAP = 64;
+
+/**
+ * Start (and cache) one prefetched creation from a component's compiled fetch
+ * plan (`Comp.__warm`). Dedups on (slot, deps) so a re-warm during a later
+ * suspending pass never double-starts a fetch. The resulting thenable is
+ * REGISTERED with the render loop so the current round awaits it — that is
+ * the whole point: the descendant's data settles before its body runs, and
+ * its unwraps then resolve by identity (resolvedT). Speculative: a throwing
+ * creation is simply not warmed.
+ */
+export function warmMemo(compute: () => unknown, deps: unknown[], slot: symbol | string): void {
+	const res = RESOLVED;
+	if (res === null) return;
+	const warm = res.pu.warm;
+	let list = warm.get(slot);
+	if (list !== undefined) {
+		for (let i = 0; i < list.length; i++) {
+			if (puDepsEqual(list[i].deps, deps)) return; // already warmed
+		}
+	}
+	let value: unknown;
+	try {
+		value = compute();
+	} catch {
+		return;
+	}
+	if (list === undefined) {
+		list = [];
+		warm.set(slot, list);
+	}
+	list.push({ deps, value });
+	if (list.length > WARM_SLOT_CAP) list.shift();
+	if (
+		value != null &&
+		typeof (value as any).then === 'function' &&
+		!res.pu.resolvedT.has(value as PromiseLike<unknown>)
+	) {
+		if (SUSPENDED !== null)
+			SUSPENDED.push({ promise: value as PromiseLike<unknown>, key: '|pu#' + PU_ID++ });
+	}
+}
+
+/**
+ * Recurse the warm walk into a child component's compiled fetch plan
+ * (`Comp.__warm`, attached by compileServerComponent when the child's
+ * reachability and props are provably independent of suspended values).
+ * No-ops for components without a plan.
+ */
+export function warmChild(comp: any, props: any): void {
+	if (comp == null) return;
+	const plan = comp.__warm;
+	if (typeof plan !== 'function') return;
+	if (WARM_DEPTH >= WARM_DEPTH_CAP) return;
+	WARM_DEPTH++;
+	try {
+		plan(props);
+	} catch {
+		/* speculative */
+	} finally {
+		WARM_DEPTH--;
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1769,11 +1868,15 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	pu: {
 		created: Map<string, { deps: unknown[]; value: unknown }>;
 		resolvedT: Map<PromiseLike<unknown>, SuspenseOutcome>;
+		// Warm-walk prefetches (warmMemo), keyed by the creation's SLOT symbol —
+		// deps-matched, TRANSFER semantics: the descendant's real puMemo adopts
+		// (and removes) its entry, so a warmed fetch is consumed exactly once.
+		warm: Map<symbol | string, { deps: unknown[]; value: unknown }[]>;
 	};
 };
 function newResolvedMap(): ResolvedMap {
 	const m = new Map() as ResolvedMap;
-	m.pu = { created: new Map(), resolvedT: new Map() };
+	m.pu = { created: new Map(), resolvedT: new Map(), warm: new Map() };
 	return m;
 }
 

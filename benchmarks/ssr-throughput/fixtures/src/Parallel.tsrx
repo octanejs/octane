@@ -36,6 +36,36 @@ export function ParallelBody(props: { k: number }) @{
 	</section>
 }
 
+// Nested-INDEPENDENT variant: one ~4ms fetch per component level, each level
+// a separate component whose props are warm-safe (level arithmetic only). The
+// warm walk (Level's first suspending batch → Level.__warm recursion) starts
+// every level's fetch in pass 1 — p50 ≈ 1×latency regardless of depth; without
+// it each level costs its own round (≈ depth×latency).
+export function NestedLevel(props: { level: number; depth: number }) @{
+	const v = use(parStep(props.level, true));
+	<div class="nlvl">
+		<span class="nval">
+			{'L' + props.level + '=' + v}
+		</span>
+		@if (props.level < props.depth) {
+			<NestedLevel level={props.level + 1} depth={props.depth} />
+		}
+	</div>
+}
+
+export function NestedApp(props: { depth: number }) @{
+	<div class="page">
+		<h1 class="head">
+			{'SSR nested parallel - depth ' + props.depth}
+		</h1>
+		@try {
+			<NestedLevel level={1} depth={props.depth} />
+		} @pending {
+			<p class="waiting">NESTED-PENDING</p>
+		}
+	</div>
+}
+
 export function ParallelApp(props: { k: number }) @{
 	<div class="page">
 		<h1 class="head">

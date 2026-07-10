@@ -250,6 +250,24 @@ for (const k of PARALLEL_KS) {
 	});
 }
 
+for (const depth of quick ? [4] : [4, 8]) {
+	configs.push({
+		name: `parallel-nested-d${depth}`,
+		group: 'waterfall',
+		entry: FIXTURE_ENTRY,
+		fn: (mod) => () => mod.renderNested(depth),
+		verify: async (mod) => {
+			const { body } = await mod.renderNested(depth);
+			for (let l = 1; l <= depth; l++) {
+				if (!body.includes(`L${l}=${l * 101}`)) throw new Error(`level ${l} value missing`);
+			}
+			if (body.includes('NESTED-PENDING'))
+				throw new Error('pending fallback leaked into the final body');
+			return bodyMeta(body);
+		},
+	});
+}
+
 for (const depth of WATERFALL_DEPTHS) {
 	configs.push({
 		name: `waterfall-d${depth}`,
