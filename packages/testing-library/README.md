@@ -126,3 +126,9 @@ better fit than React, where it relies on the synthetic layer picking natives
 up). Install it alongside this package and use it unchanged; the pairing is
 pinned by `tests/user-event.test.ts` (click, `type()` per-keystroke `onInput`,
 `keyboard()`).
+
+## Status
+
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

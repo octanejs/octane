@@ -1787,6 +1787,9 @@ export function componentSlotLite<P>(
 	anchor?: Node,
 ): void {
 	let scope = parentScope.slots[slotKey] as Scope | undefined;
+	// The server `<!--]-->` this call adopted as its range end (hydration first
+	// render only) — consumed by the post-body cursor advance below.
+	let adoptedClose: Node | null = null;
 	if (scope === undefined) {
 		scope = new ScopeImpl(parentScope, parentScope.block);
 		// Lite scope's `block` exposes the host/anchor as the body's DOM context
@@ -1802,6 +1805,7 @@ export function componentSlotLite<P>(
 			// use `<!--]-->` as the insert anchor so the body's
 			// `insertBefore(content, endMarker)` is a no-op (content already there).
 			endMarker = matchingClose(anchor as Node);
+			adoptedClose = endMarker;
 			hydrateNode = (anchor as Node).nextSibling;
 		} else if (hydrating && !isBlockOpen(anchor ?? null)) {
 			// Anchor-less (appended) component — the compiler dropped the `<!>`
@@ -1817,6 +1821,7 @@ export function componentSlotLite<P>(
 			if (open === null || open.parentNode !== host) open = host.firstChild;
 			if (open !== null && isBlockOpen(open)) {
 				endMarker = matchingClose(open);
+				adoptedClose = endMarker;
 				hydrateNode = open.nextSibling;
 			}
 		}
@@ -1836,6 +1841,13 @@ export function componentSlotLite<P>(
 	} finally {
 		CURRENT_SCOPE = prevScope;
 	}
+	// Hydration: advance the cursor PAST this component's adopted range so the
+	// next SIBLING slot adopts from its own `<!--[-->`. The body leaves the
+	// cursor ON its adopted root (clone() parks it there), so without this a
+	// following sibling lite slot sees a non-marker node, adopts no range, and
+	// its commitBag insert MOVES the previous sibling's root to the shared
+	// anchor. Mirrors componentSlot's post-render advance.
+	if (hydrating && adoptedClose !== null) hydrateNode = adoptedClose.nextSibling;
 }
 
 // ── Teardown error routing (React's captureCommitPhaseError for deletions) ──
