@@ -1,0 +1,25 @@
+// Ported from react-hook-form@7.81.0 src/__tests__/utils/isFunction.test.ts (jest → vitest, octane runtime).
+import { describe, expect, it } from 'vitest';
+import isFunction from '../../../src/utils/isFunction';
+
+describe('isFunction', () => {
+	it('should return true when value is a function', () => {
+		expect(isFunction(() => null)).toBeTruthy();
+		expect(
+			isFunction(function foo() {
+				return null;
+			}),
+		).toBeTruthy();
+	});
+
+	it('should return false when value is not a function', () => {
+		expect(isFunction(null)).toBeFalsy();
+		expect(isFunction(undefined)).toBeFalsy();
+		expect(isFunction(-1)).toBeFalsy();
+		expect(isFunction(0)).toBeFalsy();
+		expect(isFunction(1)).toBeFalsy();
+		expect(isFunction('')).toBeFalsy();
+		expect(isFunction({})).toBeFalsy();
+		expect(isFunction([])).toBeFalsy();
+	});
+});
