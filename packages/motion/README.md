@@ -86,3 +86,9 @@ FLIPs). Also drag momentum/elastic physics, reduced-motion enforcement, and
 Stagger specifics: `when: 'beforeChildren' | 'afterChildren'` parent/child sequencing
 is not implemented, and a child's stagger index is fixed at registration order (a
 keyed reorder does not re-stagger).
+
+## Status
+
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

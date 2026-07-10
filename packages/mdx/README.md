@@ -127,3 +127,9 @@ async — it works in the vite plugin and `compileMdx`, not `compileMdxSync`.
   export in octane's runtime `hmr()` and self-accepts, so live mounts re-render
   the new body in place (no page reload; the vite plugin enables this in serve
   mode automatically).
+
+## Status
+
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

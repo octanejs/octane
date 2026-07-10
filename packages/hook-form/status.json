@@ -1,0 +1,11 @@
+{
+  "upstream": { "package": "react-hook-form", "version": "7.81.0" },
+  "surface": "Complete port of react-hook-form 7.81.0 (upstream commit b7df98c2) with the upstream test suite ported: `useForm`, `useController`, `useFieldArray`, `useFormState`, `useWatch`, `useFormContext`/`FormProvider`, schema resolvers, and all validation modes.",
+  "divergences": [
+    "`register()` returns `onInput` (octane's native per-keystroke event) instead of React's synthetic `onChange`; mode names and `register` option keys keep the upstream spelling.",
+    "Eight ported tests are pinned `it.fails` on octane-wide design differences (microtask-flush commit granularity, eager `Object.is` setState bailout, native input-event delivery React swallows)."
+  ],
+  "ssr": "Supported and tested — the upstream `*.server.test.tsx` suite runs via `octane/server` with byte-identical markup.",
+  "verified": "2026-07-09",
+  "docs": ["docs/octanejs-hook-form-plan.md"]
+}

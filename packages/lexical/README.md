@@ -65,3 +65,9 @@ directly. Only `@lexical/react`'s components/hooks are reimplemented — transla
 React hooks to octane's (1:1 in nearly all cases), `forwardRef` to octane's
 ref-as-prop, `@floating-ui/react` to `@floating-ui/dom`, and the class-based
 `LexicalErrorBoundary` to octane's `<ErrorBoundary>`.
+
+## Status
+
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).
