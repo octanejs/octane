@@ -104,7 +104,7 @@ export function Home() @{
 			<div class="proven-stat">
 				<span class="proven-number">0</span>
 				<span class="proven-label">
-					rules of hooks — conditions, early returns and loops are fine
+					rules of hooks — conditions and early returns are fine
 				</span>
 			</div>
 			<div class="proven-stat">

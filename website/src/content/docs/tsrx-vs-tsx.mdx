@@ -124,7 +124,10 @@ hole coerced at runtime, matching React.
 These are Octane behaviors, not TSRX features — they hold in `.tsx`/`.jsx` too:
 
 - **No rules of hooks.** Hooks are tracked by compiler-assigned call-site slot,
-  so a hook can sit behind a condition, after an early return, or in a loop.
+  so a hook can sit behind a condition or after an early return. (A hook in a
+  plain JS loop is a compile error — every iteration would share one slot; loop
+  with the keyed `@for` directive or a keyed `.map()` child instead, where each
+  item gets its own hook state.)
 - **Native, delegated DOM events** (`onClick`, `onInput`, `onSubmit`) — no
   synthetic event layer.
 - **Refs as props** (`ref={cb}`, `ref={obj}`, `ref={[a, b]}`) — no `forwardRef`.
