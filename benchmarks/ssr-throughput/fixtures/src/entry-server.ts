@@ -1,6 +1,6 @@
 import { prerender } from 'octane/static';
 import { WaterfallApp } from './Waterfall.tsrx';
-import { ParallelApp } from './Parallel.tsrx';
+import { ParallelApp, NestedApp } from './Parallel.tsrx';
 import { DeoptPageFast } from './DeoptFast.tsrx';
 import { DeoptPagePlain } from './deopt-plain';
 import { EscapeApp } from './Escape.tsrx';
@@ -25,6 +25,10 @@ export async function renderWaterfall(depth: number): Promise<BodyResult> {
 
 export async function renderParallel(k: number): Promise<BodyResult> {
 	return toBody(await prerender(ParallelApp, { k }));
+}
+
+export async function renderNested(depth: number): Promise<BodyResult> {
+	return toBody(await prerender(NestedApp, { depth }));
 }
 
 export async function renderDeoptFast(): Promise<BodyResult> {

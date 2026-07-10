@@ -165,6 +165,108 @@ describe('SSR parallel use() — the server mirror', () => {
 		expect(out.html).toContain('<i>w</i>');
 	});
 
+	// ── Warm walk: nested INDEPENDENT components collapse to one round ──
+	const NESTED = `
+		export function Level(p) @{
+			const v = use(p.make('L' + p.level));
+			<div class="lvl">
+				{'' + v}
+				@if (p.level < p.depth) {
+					<Level level={p.level + 1} depth={p.depth} make={p.make} />
+				}
+			</div>
+		}
+		export function Root(p) @{
+			<main>
+				@try {
+					<Level level={1} depth={p.depth} make={p.make} />
+				} @pending { <i>w</i> }
+			</main>
+		}
+	`;
+
+	it('warm walk: a depth-4 chain of INDEPENDENT fetches starts them all in pass 1', async () => {
+		const mod = evalServer(NESTED, 'nested.tsrx');
+		const started: string[] = [];
+		const defs = new Map<string, ReturnType<typeof deferred<string>>>();
+		const make = (name: string) => {
+			started.push(name);
+			const d = deferred<string>();
+			defs.set(name, d);
+			return d.promise;
+		};
+		const done = prerender(mod.Root, { depth: 4, make });
+		await drain();
+		// Level 1's batch suspends and its warm thunk recurses Level.__warm down
+		// the chain — every level's fetch is in flight before ANY resolves.
+		// Serial SSR discovers one level per round (started would be ['L1']).
+		expect(started).toEqual(['L1', 'L2', 'L3', 'L4']);
+		for (let i = 1; i <= 4; i++) defs.get('L' + i)!.resolve('v' + i);
+		const out = await done;
+		for (let i = 1; i <= 4; i++) expect(out.html).toContain('v' + i);
+		expect(out.html).not.toContain('<i>w</i>');
+		// Adoption identity: each level's creation fired exactly once — the real
+		// render adopted the warmed promise instead of re-fetching.
+		expect(started).toEqual(['L1', 'L2', 'L3', 'L4']);
+	});
+
+	it('warm walk: child props that read SUSPENDED data cut the warm edge', async () => {
+		const mod = evalServer(
+			`export function Kid(p) @{
+				const k = use(p.make('k:' + p.tag));
+				<b>{'' + k}</b>
+			}
+			export function Root(p) @{
+				<main>
+					@try {
+						const a = use(p.make('a'));
+						<section>
+							{'' + a}
+							<Kid tag={a} make={p.make} />
+						</section>
+					} @pending { <i>w</i> }
+				</main>
+			}`,
+			'cut.tsrx',
+		);
+		const started: string[] = [];
+		const defs = new Map<string, ReturnType<typeof deferred<string>>>();
+		const make = (name: string) => {
+			started.push(name);
+			const d = deferred<string>();
+			defs.set(name, d);
+			return d.promise;
+		};
+		const done = prerender(mod.Root, { make });
+		await drain();
+		// Kid's `tag` prop reads a's RESOLVED value — a true data dependency; the
+		// warm edge must be cut, so Kid's fetch has not started.
+		expect(started).toEqual(['a']);
+		defs.get('a')!.resolve('A');
+		await drain();
+		expect(started).toEqual(['a', 'k:A']);
+		defs.get('k:A')!.resolve('K');
+		const out = await done;
+		expect(out.html).toContain('K');
+	});
+
+	it('warm walk: seeds still serialize in use()-call order', async () => {
+		const mod = evalServer(NESTED, 'nestedseed.tsrx');
+		const out = await prerender(mod.Root, {
+			depth: 3,
+			make: (name: string) => Promise.resolve(name.toUpperCase()),
+		});
+		const seed = out.html.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+		expect(seed).not.toBeNull();
+		const payload = seed![1];
+		const i1 = payload.indexOf('"L1"');
+		const i2 = payload.indexOf('"L2"');
+		const i3 = payload.indexOf('"L3"');
+		expect(i1).toBeGreaterThanOrEqual(0);
+		expect(i2).toBeGreaterThan(i1);
+		expect(i3).toBeGreaterThan(i2);
+	});
+
 	it('parallelUse: false opts the server out (serial registration)', async () => {
 		let { code } = compile(INDEPENDENT, 'opt.tsrx', { mode: 'server', parallelUse: false });
 		expect(code).not.toContain('puMemo');

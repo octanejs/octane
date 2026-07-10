@@ -2108,6 +2108,7 @@ function compileServer(source, filename, options) {
 		// network round instead of one per use(). Same opt-out flag as the client.
 		parallelUse: !(options && options.parallelUse === false),
 		nextPuId: 0, // parallel-use `__pu$N` hoisted-creation temps
+		_pendingWarm: null, // `X.__warm = …` source, set by ssrCompileBody, drained by compileServerComponent
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		hoistedHelpers: [],
@@ -2210,9 +2211,16 @@ function compileServerComponent(node, ctx) {
 		ctx.knownStringLocals = prevKnownStr;
 	}
 
-	if (isDefault) return `const ${name} = ${fn};\nexport default ${name};`;
-	if (isExported) return `export const ${name} = ${fn};`;
-	return `const ${name} = ${fn};`;
+	// SSR parallel-use mirror: attach the compiled fetch plan so a PARENT's warm
+	// walk (`_$warmChild(Comp, props)` from its first suspending batch) can start
+	// this component's independent creations before its body ever runs.
+	const warmSrc = ctx._pendingWarm;
+	ctx._pendingWarm = null;
+	const warmTail = warmSrc ? `\n${name}.__warm = ${warmSrc};` : '';
+
+	if (isDefault) return `const ${name} = ${fn};${warmTail}\nexport default ${name};`;
+	if (isExported) return `export const ${name} = ${fn};${warmTail}`;
+	return `const ${name} = ${fn};${warmTail}`;
 }
 
 function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html') {
@@ -2267,14 +2275,28 @@ function ssrCompileBody(node, ctx, name, cssHash, cssEntries, parentNs = 'html')
 	// the rewritten `use(__pu$N)` unwraps then get their server site keys from
 	// rewriteHookCalls exactly like hand-written use() calls, and the
 	// `_$puMemo`/`_$puBatch` helper calls it emits are compiler-aliased names it
-	// leaves alone. Runs for TOP bodies and every synthetic sub (@try/@if arms
-	// compile through here with their own statement lists), so a `use()` run
-	// inside a boundary arm batches too. Loops/functions are excluded by the
-	// pass itself (same rules as the client).
+	// leaves alone. Mirrors the client pipeline shape exactly: TOP bodies run
+	// Pass A on setup statements + the WalkJsx transform over the render tree
+	// (directive-arm statements memoize HERE; the transformed nodes flow into
+	// ssrEmitNodes below, so ssrCompileSub receives arms PRE-memoized and runs
+	// Pass B only) + the warm artifacts (`Comp.__warm` fetch plan + the first
+	// batch's warm thunk — see runtime.server.ts warmMemo/warmChild); synthetic
+	// subs (statement arrays) run Pass B only. Loops/functions are excluded by
+	// the passes themselves (same rules as the client).
 	let workingStatements = statements;
 	if (ctx.parallelUse) {
-		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, [], [], null);
-		workingStatements = rewriteParallelUse(workingStatements, ctx, name, null);
+		let warmThunk = null;
+		const isTopBody = !Array.isArray(node.body);
+		if (isTopBody) {
+			const creations = [];
+			const warmChildren = [];
+			workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
+			jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
+			const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
+			warmThunk = warm.thunk;
+			ctx._pendingWarm = warm.warmSrc;
+		}
+		workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
 	}
 	const rewritten = workingStatements
 		.map((s) => rewriteHookCalls(s, ctx, name))

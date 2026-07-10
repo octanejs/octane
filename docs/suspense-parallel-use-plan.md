@@ -91,10 +91,26 @@ What shipped, and where it deviates from the phases as written:
     starved boundaries; caught by the streaming wave test).
   - Seed order (use()-call order), rejection routing to @catch,
     renderToString single-pass @pending, and true-dependency sequencing are
-    pinned in `tests/ssr-parallel-use.test.ts`. The descendant WARM walk
-    (prefetching child components' fetch trees before their bodies run)
-    remains future work — same-body strata are parallel now; cross-component
-    independent chains still cost one round per component depth.
+    pinned in `tests/ssr-parallel-use.test.ts`.
+- **SSR warm walk LANDED 2026-07-09** (same day, completing the mirror): the
+  server pipeline now mirrors the client's warm architecture verbatim — TOP
+  bodies run Pass A + the WalkJsx transform (arm statements memoize there;
+  the transformed nodes flow into ssrEmitNodes, so ssrCompileSub receives
+  arms PRE-memoized and runs Pass B only, exactly the client's sub-body
+  contract) + `buildWarmArtifacts`, attaching `Comp.__warm` to server
+  components and threading the warm thunk into the first in-body `puBatch`.
+  Runtime: `warmMemo` caches prefetches on `resolved.pu.warm` (slot-keyed,
+  deps-matched, FIFO-capped) AND registers each thenable with the render
+  loop so the CURRENT round awaits it; `warmChild` recurses child plans
+  (depth-capped); `puMemo` adopts warm entries by slot + deps with TRANSFER
+  semantics before computing. Depth collapses to true dependency depth:
+  `parallel-nested-d4/d8` p50 ~4.6ms FLAT (one ~4ms round; serial would be
+  depth×4ms), and the depth-4 test pins every fetch in flight during pass 1
+  with each creation fired exactly once. Warm-unsafe edges (child props
+  reading suspended data) are cut — pinned. Client-parity limitation shared
+  deliberately: warm thunks fire on TOP-BODY batches only; a component whose
+  only use() lives inside its own @try arm warms its descendants only via
+  its parent's plan (same as the client).
 - **Default flipped 2026-07-09** (same day, after the full-suite soak):
   `parallelUse` defaults to true in `compile()` and the vite plugin;
   `parallelUse: false` opts out (pinned inert in

@@ -116,4 +116,6 @@ export {
 	// SSR parallel-use mirror (compiler targets — see suspense-parallel-use plan).
 	puMemo,
 	puBatch,
+	warmMemo,
+	warmChild,
 } from '../runtime.server.js';
