@@ -169,6 +169,105 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'hook-form',
+					include: [
+						'packages/hook-form/tests/**/*.test.ts',
+						'packages/hook-form/tests/**/*.test.tsx',
+					],
+					exclude: [...configDefaults.exclude, 'packages/hook-form/tests/**/*.server.test.tsx'],
+					environment: 'jsdom',
+					// Differential precompile: rewrites `@octanejs/hook-form` →
+					// `react-hook-form` so the React side runs the real binding.
+					globalSetup: ['packages/hook-form/tests/differential/_setup.ts'],
+					// The ported upstream suite uses @testing-library/jest-dom matchers
+					// (toBeVisible, toBeInTheDocument, …) — same as react-hook-form's own
+					// jest setup. clear/reset/restore mirror upstream's jest config so
+					// spy state never leaks between ported tests.
+					setupFiles: ['packages/hook-form/tests/_setup.ts'],
+					clearMocks: true,
+					mockReset: true,
+					restoreMocks: true,
+					globals: false,
+				},
+				// hook-form's `.ts` hooks are auto-slotted (same as redux); the
+				// testing-library the ported suite mounts through is NOT (its harness
+				// calls hooks with explicit slot symbols).
+				plugins: [
+					octane({
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/tanstack-query/src/',
+							'/packages/motion/src/',
+							'/packages/testing-library/src/',
+						],
+					}),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/hook-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/hook-form/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/hook-form\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/hook-form/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// react-hook-form's own jest config runs `*.server.test.tsx` in a
+				// node environment; same split here — node transform mode also makes
+				// the octane plugin compile in `mode: 'server'`, which the server
+				// renderer (renderToStaticMarkup) requires.
+				test: {
+					name: 'hook-form-server',
+					include: ['packages/hook-form/tests/**/*.server.test.tsx'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [
+					octane({
+						exclude: [
+							'/packages/zustand/src/',
+							'/packages/tanstack-query/src/',
+							'/packages/motion/src/',
+						],
+					}),
+				],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/hook-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/hook-form/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/hook-form\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/hook-form/src') + '/$1.ts',
+						},
+						{
+							// The binding's plain `.ts` sources import hooks from 'octane'
+							// (the CLIENT runtime). Under this node/SSR project the server
+							// renderer drives the components, so those imports must resolve
+							// to the SERVER runtime's hook implementations — same module
+							// instance the server-compiled .tsrx components use
+							// ('octane/server' emissions are untouched by this bare alias).
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'recharts',
 					include: ['packages/recharts/tests/**/*.test.ts'],
 					environment: 'jsdom',
