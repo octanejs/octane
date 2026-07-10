@@ -128,6 +128,22 @@
     "note": "TodoMVC APP-CODE gzip vs ripple, normalized minify. Measured 1.29x at suite creation (2026-07-10, 2184 vs 1696)."
   },
   {
+    "suite": "bundle-size",
+    "op": "chat_app_gzip",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.4,
+    "note": "chat-stream APP-CODE gzip vs solid, normalized minify. Measured 1.24x at suite creation (2026-07-10, 2602 vs 2103) - list/text-heavy shapes sit far closer than TodoMVC's form-heavy 1.69x."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "chat_app_gzip",
+    "target": "octane-tsrx",
+    "reference": "ripple",
+    "maxRatio": 1.3,
+    "note": "chat-stream APP-CODE gzip vs ripple, normalized minify. Measured 1.11x at suite creation (2026-07-10, 2602 vs 2336)."
+  },
+  {
     "suite": "async-waterfall",
     "op": "init",
     "target": "octane-tsrx",

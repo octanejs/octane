@@ -29,6 +29,7 @@ const CORPUS = [
 	// Real bench apps (the sizes that show up in js-framework bundles).
 	'benchmarks/js-framework/octane-tsrx/src/Main.tsrx',
 	'benchmarks/todomvc/octane-tsrx/src/Main.tsrx',
+	'benchmarks/chat-stream/octane-tsrx/src/Main.tsrx',
 	'benchmarks/js-framework/octane-jsx/src/Main.tsx',
 	'benchmarks/js-framework/octane-tsrx-naive/src/Main.tsrx',
 	'benchmarks/js-framework/octane-tsrx-naive/src/Row.tsrx',

@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JS_FRAMEWORK = path.resolve(__dirname, '../js-framework');
 const TODOMVC = path.resolve(__dirname, '../todomvc');
+const CHAT_STREAM = path.resolve(__dirname, '../chat-stream');
 const OUT_ROOT = path.join(__dirname, 'dist'); // gitignored (root .gitignore: dist)
 
 // Two app sets: the js-framework-benchmark rows apps (the original 0a set) and
@@ -50,6 +51,11 @@ const SETS = [
 	{
 		root: TODOMVC,
 		prefix: 'todo_',
+		targets: ['octane-tsrx', 'react', 'solid', 'ripple', 'vue-vapor'],
+	},
+	{
+		root: CHAT_STREAM,
+		prefix: 'chat_',
 		targets: ['octane-tsrx', 'react', 'solid', 'ripple', 'vue-vapor'],
 	},
 ];
@@ -77,7 +83,8 @@ for (const set of SETS)
 		const appRoot = path.join(set.root, name);
 		const appSrc = path.join(appRoot, 'src') + path.sep;
 		const outDir = path.join(OUT_ROOT, set.prefix + name);
-		console.log(`building ${set.prefix ? 'todomvc/' : ''}${name} (production, normalized minify)…`);
+		const setLabel = set.prefix ? path.basename(set.root) + '/' : '';
+		console.log(`building ${setLabel}${name} (production, normalized minify)…`);
 		await build({
 			root: appRoot,
 			logLevel: 'warn',
@@ -140,7 +147,7 @@ for (const set of SETS)
 			process.exit(1);
 		}
 		console.log(
-			`  ${set.prefix ? 'todomvc/' : ''}${name}: total gz ${total.gzip}  app gz ${sums.app.gzip}  fw gz ${sums.fw.gzip}`,
+			`  ${setLabel}${name}: total gz ${total.gzip}  app gz ${sums.app.gzip}  fw gz ${sums.fw.gzip}`,
 		);
 		let entry = byName.get(name);
 		if (entry === undefined) {

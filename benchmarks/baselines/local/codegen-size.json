@@ -6,13 +6,13 @@
       "name": "source",
       "ops": {
         "raw": {
-          "median": 58913,
-          "min": 58913,
+          "median": 62871,
+          "min": 62871,
           "samples": 1
         },
         "gzip": {
-          "median": 20157,
-          "min": 20157,
+          "median": 21941,
+          "min": 21941,
           "samples": 1
         }
       }
@@ -21,18 +21,18 @@
       "name": "compiled",
       "ops": {
         "raw": {
-          "median": 111929,
-          "min": 111929,
+          "median": 118529,
+          "min": 118529,
           "samples": 1
         },
         "minified": {
-          "median": 58592,
-          "min": 58592,
+          "median": 61921,
+          "min": 61921,
           "samples": 1
         },
         "gzip": {
-          "median": 21278,
-          "min": 21278,
+          "median": 22849,
+          "min": 22849,
           "samples": 1
         }
       },
@@ -49,6 +49,12 @@
             "source": 4929,
             "compiled": 10068,
             "minGz": 2195
+          },
+          {
+            "file": "benchmarks/chat-stream/octane-tsrx/src/Main.tsrx",
+            "source": 3958,
+            "compiled": 6600,
+            "minGz": 1571
           },
           {
             "file": "benchmarks/js-framework/octane-jsx/src/Main.tsx",
