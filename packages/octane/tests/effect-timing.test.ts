@@ -41,20 +41,22 @@ describe('effect timing', () => {
 		r.unmount();
 	});
 
-	it('all phases fire cleanup on unmount in reverse-mount order', async () => {
-		// Cleanups fire in REVERSE-mount order to match React's per-fiber
-		// finalizer walk: the LAST effect to register (here useEffect, in the
-		// passive phase) has its cleanup run first. Since the PhaseOrder fixture
-		// declares useEffect → useLayoutEffect → useInsertionEffect in source
-		// order, and the cleanups array is populated in execution order
-		// (insertion → layout → passive), unwinding in reverse yields
-		// passive → layout → insertion. Same order as React.
+	it('unmount destroys insertion+layout in declaration order sync; passive deferred', async () => {
+		// React's deletion contract (commitDeletionEffectsOnFiber): the deleted
+		// fiber's effect list is walked FORWARD (hook declaration order), firing
+		// insertion and layout destroys synchronously in their declared
+		// interleaving; passive destroys are deferred to the passive flush
+		// (commitPassiveUnmountEffects). The PhaseOrder fixture declares
+		// useEffect → useLayoutEffect → useInsertionEffect, so the sync walk
+		// yields layout → insertion, and the passive cleanup lands post-paint.
 		const log: string[] = [];
 		const r = mount(PhaseOrder, { tick: 0, log });
 		await nextPaint();
 		log.length = 0;
 		r.unmount();
-		expect(log).toEqual(['eff:cleanup', 'lay:cleanup', 'ins:cleanup']);
+		expect(log).toEqual(['lay:cleanup', 'ins:cleanup']);
+		await nextPaint();
+		expect(log).toEqual(['lay:cleanup', 'ins:cleanup', 'eff:cleanup']);
 	});
 
 	it('useLayoutEffect can read the committed DOM synchronously', () => {
@@ -99,14 +101,15 @@ describe('effect timing', () => {
 		r.unmount();
 	});
 
-	it('within a single phase, cleanups fire in REVERSE-mount order on unmount', async () => {
-		// Mirrors React's per-fiber unmount-cleanup contract: when a component
-		// declares multiple effects within the SAME phase (here, three
-		// useEffects), unmounting fires their cleanup functions in the REVERSE
-		// of their registration order — last-declared cleanup runs first. This
-		// matches React's depth-first finalizer walk over the fiber's effect
-		// chain and lets later effects depend on resources set up by earlier
-		// ones without racing the cleanup teardown.
+	it('within a single phase, cleanups fire in declaration order on unmount (deferred for passive)', async () => {
+		// Mirrors React's per-fiber unmount-cleanup contract: the fiber's effect
+		// list is walked FORWARD on deletion (commitHookEffectListUnmount starts
+		// at firstEffect), so multiple effects in the same phase destroy in
+		// declaration order — first-declared cleanup runs first (per
+		// ReactHooksWithNoopRenderer-test.js "unmounts all previous effects
+		// before creating any new ones": Unmount A before Unmount B). These are
+		// passive effects, so the destroys fire in the deferred passive flush,
+		// not synchronously at unmount.
 		const log: string[] = [];
 		const r = mount(ManyPassiveEffects, { log });
 		await nextPaint();
@@ -114,6 +117,8 @@ describe('effect timing', () => {
 
 		log.length = 0;
 		r.unmount();
-		expect(log).toEqual(['C:cleanup', 'B:cleanup', 'A:cleanup']);
+		expect(log).toEqual([]);
+		await nextPaint();
+		expect(log).toEqual(['A:cleanup', 'B:cleanup', 'C:cleanup']);
 	});
 });

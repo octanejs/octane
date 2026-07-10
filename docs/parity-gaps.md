@@ -12,9 +12,4 @@ converted to a plain `it`, and this index must be regenerated
 since-fixed behavior or intentional platform differences. Only the pins below
 are live gaps.
 
-**2 active pin(s).**
-
-## packages/octane/tests/conformance/insertion-effect-order.test.ts
-
-- **on unmount, destroys insertion effects before layout effects, and passive effects after the sync phase**
-- **fires all insertion effects (interleaved) before firing any layout effects — update choreography**
+**0 active pin(s).**

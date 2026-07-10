@@ -98,6 +98,8 @@ describe('useEffect', () => {
 		expect(onMount).toHaveBeenCalledTimes(1);
 		expect(onUnmount).toHaveBeenCalledTimes(0);
 		r.unmount();
+		// Passive destroys defer to the passive flush (React parity).
+		await nextPaint();
 		expect(onUnmount).toHaveBeenCalledTimes(1);
 	});
 

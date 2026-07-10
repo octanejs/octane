@@ -70,6 +70,9 @@ describe('useEffectEvent', () => {
 		fire.handler();
 		expect(tickLog).toEqual(['subscribe', 'count=3', 'count=5']);
 		r.unmount();
+		// The passive unsubscribe cleanup is deferred to the passive flush (React
+		// defers deletion passive destroys past the sync phase).
+		await nextPaint();
 		expect(tickLog).toEqual(['subscribe', 'count=3', 'count=5', 'unsubscribe']);
 	});
 });

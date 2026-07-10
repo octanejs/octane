@@ -29,8 +29,11 @@ describe('#1 effect cleanup lifecycle', () => {
 		flushEffects();
 		expect(log).toEqual(['setup:0', 'cleanup:0', 'setup:1']);
 
-		// Unmount: the CURRENT cleanup fires exactly once — no stale 'cleanup:0' replay.
+		// Unmount: the CURRENT cleanup fires exactly once — no stale 'cleanup:0'
+		// replay. Passive destroys are deferred to the passive flush (React defers
+		// deletion passive destroys past the sync phase).
 		r.unmount();
+		flushEffects();
 		expect(log).toEqual(['setup:0', 'cleanup:0', 'setup:1', 'cleanup:1']);
 	});
 });

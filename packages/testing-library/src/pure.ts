@@ -285,6 +285,9 @@ export function render<P = any>(ui: OctaneUI<P>, options: RenderOptions<P> = {})
 			flushSync(() => {
 				root.unmount();
 			});
+			// Deletion passive destroys are DEFERRED to the passive flush (React
+			// parity); RTL's unmount is act-wrapped, so it observes them flushed.
+			drainPassiveEffects();
 		},
 		rerender: (rerenderUi?: OctaneUI | { props?: any }, rerenderOptions?: { props?: any }) => {
 			// Normalize the three forms (see RenderResult.rerender) to one element.
@@ -316,6 +319,9 @@ export function cleanup(): void {
 		flushSync(() => {
 			root.unmount();
 		});
+		// See RenderResult.unmount — deletion passive destroys flush here too
+		// (RTL's auto-cleanup is act-wrapped).
+		drainPassiveEffects();
 		if (container.parentNode === document.body) {
 			document.body.removeChild(container);
 		}

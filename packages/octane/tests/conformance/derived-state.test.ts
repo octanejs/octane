@@ -144,7 +144,11 @@ describe('useEffect — closure freshness across a dep-change commit', () => {
 		flushEffects();
 		expect(log.drain()).toEqual(['cleanup:1', 'setup:2']);
 
+		// Unmount passive destroys are deferred to the passive flush (React
+		// commitPassiveUnmountEffects); the cleanup still closes over the last
+		// committed render's value.
 		r.unmount();
+		flushEffects();
 		expect(log.drain()).toEqual(['cleanup:2']);
 	});
 });

@@ -38,6 +38,9 @@ describe('useTransform', () => {
 		const r = mount(TransformBox, { onReady: (o: any) => (v = o) });
 		await nextPaint();
 		r.unmount();
+		// The subscription destroy is a passive cleanup — deferred to the passive
+		// flush (React defers deletion passive destroys past the sync phase).
+		await nextPaint();
 		v.x.set(999);
 		await flushFrames();
 		expect(v.doubled.get()).toBe(100); // unchanged — subscription destroyed

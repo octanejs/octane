@@ -39,6 +39,9 @@ describe('useAnimate', () => {
 		const ctrl = animateFn(scope.current, { x: 100 });
 		expect(scope.animations).toContain(ctrl);
 		r.unmount();
+		// The stop-all teardown is a passive cleanup — deferred to the passive
+		// flush (React defers deletion passive destroys past the sync phase).
+		await nextPaint();
 		expect(ctrl.stop).toHaveBeenCalled();
 	});
 });

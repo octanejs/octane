@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mount, act, createLog } from './_helpers';
+import { mount, act, createLog, flushEffects } from './_helpers';
 import {
 	NestedHeldBoundary,
 	ErrorWhileHeld,
@@ -333,7 +333,9 @@ describe('(f) effects/cleanup ordering on the eventual commit', () => {
 		expect(entries).not.toContain('mount-2');
 		expect(entries).not.toContain('cleanup-2');
 		r.unmount();
-		// Unmount cleanup fires for the live value (3) exactly once.
+		// Unmount cleanup fires for the live value (3) exactly once — in the
+		// deferred passive flush (React defers deletion passive destroys).
+		flushEffects();
 		expect(log.drain()).toEqual(['cleanup-3']);
 	});
 });
