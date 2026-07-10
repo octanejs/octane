@@ -997,6 +997,48 @@ function collectFreeIdentifiers(root, initiallyBound) {
 			return;
 		}
 
+		// JSX tag position: a COMPONENT tag is a real identifier reference — a
+		// per-body local (`const C = props.comp`) used as `<C/>` must show up as
+		// free, or a hoisted helper (Phase 2) would silently drop it from its
+		// env tuple. Host tag names ('div') and attribute NAMES are static —
+		// only component-shaped identifier tags (isCompatTag rule), member-tag
+		// ROOT objects, and dynamic `<{expr}/>` expressions count.
+		if (t === 'Element' || t === 'JSXElement') {
+			const tag = n.openingElement?.name || n.id;
+			if (tag) {
+				if (
+					(tag.type === 'Identifier' || tag.type === 'JSXIdentifier') &&
+					typeof tag.name === 'string'
+				) {
+					if (!/^[a-z]/.test(tag.name) && !tag.name.includes('-') && !scope.has(tag.name)) {
+						free.add(tag.name);
+					}
+				} else if (tag.type === 'MemberExpression' || tag.type === 'JSXMemberExpression') {
+					let o = tag;
+					while (o && (o.type === 'MemberExpression' || o.type === 'JSXMemberExpression')) {
+						o = o.object;
+					}
+					if (
+						o &&
+						(o.type === 'Identifier' || o.type === 'JSXIdentifier') &&
+						typeof o.name === 'string' &&
+						!scope.has(o.name)
+					) {
+						free.add(o.name);
+					}
+				} else if (tag.type === 'JSXExpressionContainer') {
+					walk(tag.expression, scope);
+				}
+			}
+			const attrs = n.attributes || n.openingElement?.attributes || [];
+			for (const a of attrs) {
+				if (a.type === 'Attribute' || a.type === 'JSXAttribute') walk(a.value, scope);
+				else walk(a.argument ?? a, scope); // spread attribute
+			}
+			walk(n.children, scope);
+			return;
+		}
+
 		// Member access — `obj.prop`: prop is a static name, not a binding ref.
 		if (t === 'MemberExpression' && !n.computed) {
 			walk(n.object, scope);
@@ -4641,6 +4683,19 @@ function extractFragment(node, ctx, holeProps) {
 			ic.condExpr = `props.${condHole}`;
 			ic.thenHelper = `props.${thenHole}`;
 			ic.elseHelper = elseHoleName ? `props.${elseHoleName}` : null;
+			// Phase 2: the hoisted helpers' env values are COMPONENT-scope
+			// identifiers — thread the whole tuple as one array hole so the
+			// renderer-side call passes current values (same as deps for @for).
+			if (ic.envNames && ic.envNames.length) {
+				const envHole = `h${holeProps.length}`;
+				holeProps.push(
+					objectProp(envHole, {
+						type: 'ArrayExpression',
+						elements: ic.envNames.map((n) => ({ type: 'Identifier', name: n })),
+					}),
+				);
+				ic.envExpr = `props.${envHole}`;
+			}
 			fc.directiveCalls.ifCalls.push(ic);
 			newChildren.push({
 				type: 'FoldedDirective',
@@ -4681,9 +4736,10 @@ function extractFragment(node, ctx, holeProps) {
 				holeProps.push(objectProp(emptyHole, { type: 'Identifier', name: rec.emptyHelper }));
 				rec.emptyHelper = `props.${emptyHole}`;
 			}
-			if (rec.depEligible && rec.depNames.length) {
+			if (rec.depNames.length) {
 				// Thread each dep value as its own hole so the reconciler's deps-equality
-				// check sees the component-scope values, not undefined renderer locals.
+				// check (and the Phase 2 env stamp — deps doubles as the helpers' env
+				// tuple) sees the component-scope values, not undefined renderer locals.
 				rec.depNames = rec.depNames.map((dn) => {
 					const depHole = `h${holeProps.length}`;
 					holeProps.push(objectProp(depHole, { type: 'Identifier', name: dn }));
@@ -4731,6 +4787,17 @@ function extractFragment(node, ctx, holeProps) {
 				holeProps.push(objectProp(defHole, { type: 'Identifier', name: rec.defaultHelper }));
 				rec.defaultHelper = `props.${defHole}`;
 			}
+			// Phase 2: env tuple hole (see the @if fold above).
+			if (rec.envNames && rec.envNames.length) {
+				const envHole = `h${holeProps.length}`;
+				holeProps.push(
+					objectProp(envHole, {
+						type: 'ArrayExpression',
+						elements: rec.envNames.map((n) => ({ type: 'Identifier', name: n })),
+					}),
+				);
+				rec.envExpr = `props.${envHole}`;
+			}
 			fc.directiveCalls.switchCalls.push(rec);
 			newChildren.push({
 				type: 'FoldedDirective',
@@ -4766,6 +4833,17 @@ function extractFragment(node, ctx, holeProps) {
 				const pendHole = `h${holeProps.length}`;
 				holeProps.push(objectProp(pendHole, { type: 'Identifier', name: rec.pendingHelper }));
 				rec.pendingHelper = `props.${pendHole}`;
+			}
+			// Phase 2: env tuple hole (see the @if fold above).
+			if (rec.envNames && rec.envNames.length) {
+				const envHole = `h${holeProps.length}`;
+				holeProps.push(
+					objectProp(envHole, {
+						type: 'ArrayExpression',
+						elements: rec.envNames.map((n) => ({ type: 'Identifier', name: n })),
+					}),
+				);
+				rec.envExpr = `props.${envHole}`;
 			}
 			fc.directiveCalls.tryCalls.push(rec);
 			newChildren.push({
@@ -6254,6 +6332,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// Host expression for a construct's slot call — the bag-stashed host element,
 	// or the block's own parentNode for bagless (control-flow-only) bodies.
 	const hostExprFor = (key) => (noTemplate ? '__block.parentNode' : `_b.${bag.letter(key)}`);
+	// Phase 2: a construct's env argument — the captured-locals tuple its
+	// hoisted helpers destructure from `__extra`. Folded records carry a
+	// pre-built `props.hN` expression (the fold threads the values through the
+	// fragment renderer's props); inline records emit the identifier array.
+	const envExprFor = (c) =>
+		c.envExpr ?? (c.envNames && c.envNames.length ? `[${c.envNames.join(', ')}]` : null);
 	for (const fc of forCalls) {
 		ctx.runtimeNeeded.add('forBlock');
 		const slotIndex = fc.slotIndex;
@@ -6278,8 +6362,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const anchorExpr = anchorExprFor(fc, 'forAnchor');
 		const hasAnchor = anchorExpr !== null;
 		const hasEmpty = fc.emptyHelper && fc.emptyHelper !== 'null';
-		const flagsPart = flags || hasEmpty || hasAnchor ? ', ' + (flags || 0) : '';
-		const depsPart = fc.depEligible
+		// deps doubles as the Phase 2 env tuple — emitted whenever the item/empty
+		// helpers captured anything, not only for the dep-pure promotion. A deps
+		// arg forces the flags placeholder too (positional alignment).
+		const hasDeps = fc.depNames.length > 0;
+		const flagsPart = flags || hasDeps || hasEmpty || hasAnchor ? ', ' + (flags || 0) : '';
+		const depsPart = hasDeps
 			? `, [${fc.depNames.join(', ')}]`
 			: hasEmpty || hasAnchor
 				? ', undefined'
@@ -6297,11 +6385,14 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// Anchor selection — see anchorExprFor.
 		const ifAnchor = anchorExprFor(ic, 'ifAnchor');
 		const anchorArg = ifAnchor ? `, ${ifAnchor}` : '';
+		const ifEnv = envExprFor(ic);
+		// env is positional AFTER anchor — backfill an `undefined` anchor slot.
+		const ifEnvArg = ifEnv ? (anchorArg ? `, ${ifEnv}` : `, undefined, ${ifEnv}`) : '';
 		if (ic.activity) {
 			ctx.runtimeNeeded.add('activityBlock');
 			pushAfter(
 				ic.id,
-				`  _$activityBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.modeExpr}), ${ic.thenHelper}${anchorArg});`,
+				`  _$activityBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.modeExpr}), ${ic.thenHelper}${anchorArg}${ifEnvArg});`,
 			);
 			continue;
 		}
@@ -6309,7 +6400,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const elseArg = ic.elseHelper || 'null';
 		pushAfter(
 			ic.id,
-			`  _$ifBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.condExpr}), ${ic.thenHelper}, ${elseArg}${anchorArg});`,
+			`  _$ifBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.condExpr}), ${ic.thenHelper}, ${elseArg}${anchorArg}${ifEnvArg});`,
 		);
 	}
 	for (const cc of compCalls) {
@@ -6437,9 +6528,10 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		const slotIndex = pc.slotIndex;
 		const hostExpr = hostExprFor(`_portalHost$${pc.id}`);
 		ctx.runtimeNeeded.add('portal');
+		const portalEnv = envExprFor(pc);
 		pushAfter(
 			pc.id,
-			`  _$portal(__s, ${slotIndex}, ${pc.targetExpr}, ${pc.bodyExpr}, ${pc.propsExpr}, ${hostExpr});`,
+			`  _$portal(__s, ${slotIndex}, ${pc.targetExpr}, ${pc.bodyExpr}, ${pc.propsExpr}, ${hostExpr}${portalEnv ? `, ${portalEnv}` : ''});`,
 		);
 	}
 	// Restore the outer plan's portal-call list — pairs with the save above.
@@ -6452,9 +6544,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// __block.endMarker fallback for a body that is ONLY a @try).
 		const tryAnchor = anchorExprFor(tc, 'tryAnchor');
 		const tryAnchorArg = tryAnchor ? `, ${tryAnchor}` : '';
+		const tryEnv = envExprFor(tc);
+		const tryEnvArg = tryEnv ? (tryAnchorArg ? `, ${tryEnv}` : `, undefined, ${tryEnv}`) : '';
 		pushAfter(
 			tc.id,
-			`  _$tryBlock(__s, ${slotIndex}, ${hostExpr}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg});`,
+			`  _$tryBlock(__s, ${slotIndex}, ${hostExpr}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg}${tryEnvArg});`,
 		);
 	}
 	for (const sc of ctx._switchCalls) {
@@ -6465,9 +6559,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// __block.endMarker fallback for a body that is ONLY a @switch).
 		const switchAnchor = anchorExprFor(sc, 'switchAnchor');
 		const anchorArg = switchAnchor ? `, ${switchAnchor}` : '';
+		const swEnv = envExprFor(sc);
+		const swEnvArg = swEnv ? (anchorArg ? `, ${swEnv}` : `, undefined, ${swEnv}`) : '';
 		pushAfter(
 			sc.id,
-			`  _$switchBlock(__s, ${slotIndex}, ${hostExpr}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg});`,
+			`  _$switchBlock(__s, ${slotIndex}, ${hostExpr}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg}${swEnvArg});`,
 		);
 	}
 	// Restore the outer plan's switch-call list — pairs with the save above.
@@ -7735,9 +7831,21 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 	// block, so it must be hoisted here — otherwise the raw JSX would be
 	// printed verbatim into the emitted portal() call (invalid output).
 	let bodyExpr;
+	let envNames = null;
 	const bt = bodyArg ? bodyArg.type : null;
 	if (bt === 'Element' || bt === 'Fragment' || bt === 'JSXElement' || bt === 'JSXFragment') {
-		bodyExpr = hoistBodyHelper(ctx, inlinedSubs, '__portal', [bodyArg], [], parentNs, cssHash);
+		// Phase 2: hoisted portal body + env tuple (see hoistBodyHelper).
+		envNames = unionEnv(ctx, [{ stmts: [bodyArg], params: [] }]);
+		bodyExpr = hoistBodyHelper(
+			ctx,
+			inlinedSubs,
+			'__portal',
+			[bodyArg],
+			[],
+			parentNs,
+			cssHash,
+			envNames,
+		);
 	} else {
 		bodyExpr = printExprWithTsrx(bodyArg, ctx, componentName, inlinedSubs);
 	}
@@ -7746,28 +7854,118 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, callNode),
+		envNames,
 		bodyExpr,
 		targetExpr,
 		propsExpr,
 	};
 }
 
+// Phase 2 (docs/compiled-output-optimization-plan.md): captured parent locals
+// for a construct body helper about to be HOISTED to module scope — the free
+// identifiers of the body (its own params/locals excluded by the scope-aware
+// walker) intersected with the locals visible at the call site: the enclosing
+// component's locals, extended per enclosing hoisted helper (see
+// hoistBodyHelper). `__pu$N` parallel-use temps are compiler-generated
+// component-body locals minted AFTER collectComponentLocals ran, so they are
+// matched by name shape. Returns null when there is no component context —
+// the caller then keeps the legacy inline (closure) placement.
+function helperCaptures(ctx, stmts, params) {
+	if (!ctx.currentComponentLocals) return null;
+	const scope = new Set();
+	for (const p of params || []) collectBindings(p, scope);
+	const free = collectFreeIdentifiers({ type: 'BlockStatement', body: stmts }, scope);
+	const env = [];
+	for (const n of free) {
+		if (ctx.currentComponentLocals.has(n) || /^__pu\$\d+$/.test(n)) env.push(n);
+	}
+	env.sort();
+	return env;
+}
+
+// A construct's helpers (then+else, all switch cases, try+pending+catch,
+// item+empty) share ONE env tuple — `block.extra` is per construct block and
+// every helper destructures the same layout — so the emitted array is the
+// sorted UNION of each body's captures. Null propagates (no component
+// context → all of the construct's helpers stay inline).
+function unionEnv(ctx, bodies) {
+	let all = null;
+	for (const b of bodies) {
+		if (!b) continue;
+		const c = helperCaptures(ctx, b.stmts, b.params);
+		if (c === null) return null;
+		if (all === null) all = new Set();
+		for (const n of c) all.add(n);
+	}
+	return all === null ? null : [...all].sort();
+}
+
 // Hoist a construct sub-body (an @if/@else branch, an `<Activity>`/@try/
-// @pending/@catch/@switch-case body, component children, a @for item/@empty
-// body) as an inlined helper: wrap the statements in the legacy synthetic
-// `Component` shape compileFunctionBody understands, compile it, and push the
-// result into the surrounding component's `inlinedSubs` — the helper is
-// emitted INSIDE the component function, so its closures capture the parent's
-// locals. Returns the generated helper name.
-function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssHash) {
+// @pending/@catch/@switch-case body, a @for item/@empty body, a portal body)
+// as a helper. Phase 2: with `envNames` (the construct's shared env union,
+// possibly empty) the helper is hoisted to MODULE scope — zero per-render
+// closure allocations — and captured parent locals arrive through the
+// `__extra` ABI slot (renderBlock forwards `block.extra` as the third body
+// arg; the compiled call site passes the current values every parent render):
+//
+//   function __then$0(__props, __s, __extra) { const [label] = __extra; … }
+//
+// `envNames: null` keeps the legacy placement — the helper is emitted INSIDE
+// the component function so its closures capture the parent's locals
+// lexically (component children `__children$N` still use this: they are
+// invoked through props, not through a construct block, so there is no
+// block.extra channel to ride).
+function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssHash, envNames) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
+	let bodyStmts = stmts;
+	if (envNames && envNames.length > 0) {
+		// Destructure the construct's shared env tuple. The layout is the UNION
+		// across the construct's helpers, so every helper destructures the same
+		// slots (names a body doesn't use are harmless consts).
+		bodyStmts = [
+			{
+				type: 'VariableDeclaration',
+				kind: 'const',
+				declarations: [
+					{
+						type: 'VariableDeclarator',
+						id: {
+							type: 'ArrayPattern',
+							elements: envNames.map((n) => ({ type: 'Identifier', name: n })),
+						},
+						init: { type: 'Identifier', name: '__extra' },
+					},
+				],
+			},
+			...stmts,
+		];
+	}
 	const fake = {
 		type: 'Component',
 		id: { type: 'Identifier', name: helperName },
 		params: params || [],
-		body: stmts,
+		body: bodyStmts,
 	};
-	inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash) + ';');
+	if (envNames == null) {
+		inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash) + ';');
+		return helperName;
+	}
+	// Module-scope placement. Nested constructs compiled INSIDE this body
+	// compute THEIR captures against the names visible at their call sites —
+	// which live in THIS compiled body: the component's locals extended with
+	// this helper's params, env destructure, and body-level locals. (A nested
+	// helper's env values are emitted as plain identifiers at its call site.)
+	const prevLocals = ctx.currentComponentLocals;
+	const extended = new Set(prevLocals);
+	for (const n of collectComponentLocals(fake)) extended.add(n);
+	ctx.currentComponentLocals = extended;
+	let code;
+	try {
+		code = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash);
+	} finally {
+		ctx.currentComponentLocals = prevLocals;
+	}
+	ctx.hoistedHelpers.push(code + ';');
 	return helperName;
 }
 
@@ -7781,6 +7979,16 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 
 	const thenStmts =
 		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
+	const elseStmts = node.alternate
+		? node.alternate.type === 'BlockStatement'
+			? node.alternate.body
+			: [node.alternate]
+		: null;
+	// Phase 2: one shared env tuple for both branches (see unionEnv).
+	const envNames = unionEnv(ctx, [
+		{ stmts: thenStmts, params: [] },
+		elseStmts && { stmts: elseStmts, params: [] },
+	]);
 	const thenHelperName = hoistBodyHelper(
 		ctx,
 		inlinedSubs,
@@ -7789,13 +7997,21 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		[],
 		parentNs,
 		cssHash,
+		envNames,
 	);
 
 	let elseHelperName = null;
-	if (node.alternate) {
-		const elseStmts =
-			node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
-		elseHelperName = hoistBodyHelper(ctx, inlinedSubs, '__else', elseStmts, [], parentNs, cssHash);
+	if (elseStmts) {
+		elseHelperName = hoistBodyHelper(
+			ctx,
+			inlinedSubs,
+			'__else',
+			elseStmts,
+			[],
+			parentNs,
+			cssHash,
+			envNames,
+		);
 	}
 
 	return {
@@ -7803,6 +8019,7 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		loc: devLoc(ctx, node),
 		condExpr,
 		condTest: node.test, // raw test AST — the fold threads it as a `props.hN` hole
+		envNames,
 		thenHelper: thenHelperName,
 		elseHelper: elseHelperName,
 		hostPath: null,
@@ -7816,6 +8033,8 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 // every parent render (like ifBlock's cond); a missing mode defaults to visible.
 function makeActivityCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	const modeExpr = node.mode ? printExpr(node.mode) : "'visible'";
+	// Phase 2: hoisted body + env tuple (see hoistBodyHelper).
+	const envNames = unionEnv(ctx, [{ stmts: node.children, params: [] }]);
 	const bodyHelperName = hoistBodyHelper(
 		ctx,
 		inlinedSubs,
@@ -7824,12 +8043,14 @@ function makeActivityCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = n
 		[],
 		parentNs,
 		cssHash,
+		envNames,
 	);
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
 		activity: true,
 		modeExpr,
+		envNames,
 		thenHelper: bodyHelperName,
 		elseHelper: null,
 		hostPath: null,
@@ -8033,6 +8254,9 @@ function makeCompCall(
 		// Compile children as a render function: (scope) => { renders JSX into scope }.
 		// The function is inlined inside the parent component body so its closures
 		// capture the parent's locals (props, state, etc.).
+		// Phase 2 NOTE: children render-fns stay INLINE (envNames=null) — they are
+		// invoked through props (childrenAsBody / render-prop checks), not through
+		// a construct block, so there is no block.extra channel for captures.
 		const childrenHelperName = hoistBodyHelper(
 			ctx,
 			inlinedSubs,
@@ -8041,6 +8265,7 @@ function makeCompCall(
 			[],
 			parentNs,
 			cssHash,
+			null,
 		);
 		// Tag the children-block render fn so a consumer can tell it from a render-prop
 		// function child (`<C>{(x) => …}</C>`, passed RAW above) — both are `typeof === 'function'`,
@@ -8112,31 +8337,16 @@ function makeCompCall(
 function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	// node.block = try BlockStatement, node.handler = CatchClause (param, resetParam, body),
 	// node.pending = optional BlockStatement (TSRX `pending { ... }`)
-	const tryHelperName = hoistBodyHelper(
-		ctx,
-		inlinedSubs,
-		'__try',
-		node.block.body,
-		[],
-		parentNs,
-		cssHash,
-	);
+	//
+	// Phase 2: one shared env tuple for try/pending/catch (see unionEnv). The
+	// catch body's `err`/`reset` destructure (from its own `__props` param) is
+	// built FIRST and included in its analyzed statements, so those bind as
+	// locals, not captures.
+	const tryStmts = node.block.body;
+	const pendingStmts =
+		node.pending && node.pending.body && node.pending.body.length > 0 ? node.pending.body : null;
 
-	// Optional `pending { ... }` arm — compiled like any sub-body.
-	let pendingHelperName = 'null';
-	if (node.pending && node.pending.body && node.pending.body.length > 0) {
-		pendingHelperName = hoistBodyHelper(
-			ctx,
-			inlinedSubs,
-			'__pending',
-			node.pending.body,
-			[],
-			parentNs,
-			cssHash,
-		);
-	}
-
-	let catchHelperName = 'null';
+	let catchBodyStmts = null;
 	if (node.handler) {
 		const handler = node.handler;
 		const errName = handler.param?.name || '_err';
@@ -8179,19 +8389,58 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 				},
 			],
 		};
+		catchBodyStmts = [destructure, ...catchStmts];
+	}
+
+	const catchParams = [{ type: 'Identifier', name: '__props' }];
+	const envNames = unionEnv(ctx, [
+		{ stmts: tryStmts, params: [] },
+		pendingStmts && { stmts: pendingStmts, params: [] },
+		catchBodyStmts && { stmts: catchBodyStmts, params: catchParams },
+	]);
+
+	const tryHelperName = hoistBodyHelper(
+		ctx,
+		inlinedSubs,
+		'__try',
+		tryStmts,
+		[],
+		parentNs,
+		cssHash,
+		envNames,
+	);
+
+	let pendingHelperName = 'null';
+	if (pendingStmts) {
+		pendingHelperName = hoistBodyHelper(
+			ctx,
+			inlinedSubs,
+			'__pending',
+			pendingStmts,
+			[],
+			parentNs,
+			cssHash,
+			envNames,
+		);
+	}
+
+	let catchHelperName = 'null';
+	if (catchBodyStmts) {
 		catchHelperName = hoistBodyHelper(
 			ctx,
 			inlinedSubs,
 			'__catch',
-			[destructure, ...catchStmts],
-			[{ type: 'Identifier', name: '__props' }],
+			catchBodyStmts,
+			catchParams,
 			parentNs,
 			cssHash,
+			envNames,
 		);
 	}
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
+		envNames,
 		tryHelper: tryHelperName,
 		catchHelper: catchHelperName,
 		pendingHelper: pendingHelperName,
@@ -8213,6 +8462,11 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 	const discExpr = printExpr(node.discriminant);
 	const caseRecords = [];
 	let defaultHelper = 'null';
+	// Phase 2: one shared env tuple across every case + default (see unionEnv).
+	const envNames = unionEnv(
+		ctx,
+		(node.cases || []).map((c) => ({ stmts: c.consequent || [], params: [] })),
+	);
 	for (const c of node.cases || []) {
 		const stmts = c.consequent || [];
 		const isDefault = c.test == null;
@@ -8224,6 +8478,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 			[],
 			parentNs,
 			cssHash,
+			envNames,
 		);
 		if (isDefault) {
 			defaultHelper = helperName;
@@ -8238,6 +8493,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		loc: devLoc(ctx, node),
 		discExpr,
 		discNode: node.discriminant, // AST — the fold threads it as a `props.hN` hole
+		envNames,
 		casesArrayExpr,
 		caseRecords, // { testNode, helper } per case — the fold builds the cases hole
 		defaultHelper,
@@ -8270,11 +8526,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// items.length === 0 the runtime mounts the empty branch in place of the
 	// (empty) item list; transitioning items → 0 unmounts the chain and mounts
 	// the empty body, and 0 → items does the reverse.
-	let emptyHelperName = 'null';
-	if (node.empty) {
-		const stmts = node.empty.type === 'BlockStatement' ? node.empty.body : [node.empty];
-		emptyHelperName = hoistBodyHelper(ctx, inlinedSubs, '__empty', stmts, [], parentNs, cssHash);
-	}
+	const emptyStmts = node.empty
+		? node.empty.type === 'BlockStatement'
+			? node.empty.body
+			: [node.empty]
+		: null;
 	const leftDeclId = node.left.declarations[0].id;
 	const isDestructured = leftDeclId.type !== 'Identifier';
 	// `itemName` is the identifier used in the body signature + keyFn. For a
@@ -8420,14 +8676,39 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		depNames.sort();
 	}
 
+	// Phase 2: ONE env tuple shared by the item + @empty helpers — it IS the
+	// forBlock `deps` array (deps was already the captured-locals snapshot for
+	// dep-pure promotion; the runtime additionally stamps it as `block.extra`
+	// on every item/empty block). The union may widen deps with @empty-only
+	// captures — a conservative, correct deps for promotion purposes.
+	const itemAllStmts = [...indexInjection, ...destructureInjection, ...subStmts];
+	const itemParams = [{ type: 'Identifier', name: itemName }];
+	const envNames = unionEnv(ctx, [
+		{ stmts: itemAllStmts, params: itemParams },
+		emptyStmts && { stmts: emptyStmts, params: [] },
+	]);
+	let emptyHelperName = 'null';
+	if (emptyStmts) {
+		emptyHelperName = hoistBodyHelper(
+			ctx,
+			inlinedSubs,
+			'__empty',
+			emptyStmts,
+			[],
+			parentNs,
+			cssHash,
+			envNames,
+		);
+	}
 	const itemHelperName = hoistBodyHelper(
 		ctx,
 		inlinedSubs,
 		'__item',
-		[...indexInjection, ...destructureInjection, ...subStmts],
-		[{ type: 'Identifier', name: itemName }],
+		itemAllStmts,
+		itemParams,
 		parentNs,
 		cssHash,
+		envNames,
 	);
 
 	// Single-root detection: when the body emits exactly one Element root and
@@ -8457,11 +8738,12 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		bodyHelper: itemHelperName,
 		pure,
 		singleRoot,
-		// DEP-PURE candidates emit `[dep0, dep1, ...]` as the deps arg in the
-		// forBlock call. Reconciler compares to its cached deps; if unchanged
-		// this render, treats the body as PURE for the survivor short-circuit.
+		// The env union doubles as the deps array: emitted whenever the helpers
+		// capture anything (Phase 2 — the runtime stamps it as block.extra), and
+		// ALSO compared for the dep-pure survivor short-circuit when depEligible.
+		// depNames must be exactly the tuple layout the helpers destructure.
 		depEligible,
-		depNames,
+		depNames: envNames || depNames,
 		// True only when the header binds NO `index <name>` — the body then can't
 		// observe an item's position, so a pure reorder (same item ref, position
 		// changed) need not re-render the survivor. Conservative: an index binding
