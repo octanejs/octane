@@ -6,6 +6,8 @@ import { useMenuAnchorRef } from './shared/useMenuAnchorRef';
 import { $getNodeByKey, COMMAND_PRIORITY_LOW } from 'lexical';
 import { startTransition, useCallback, useEffect, useState } from 'octane';
 
+export { MenuOption } from './shared/menuShared';
+
 export function LexicalNodeMenuPlugin(props) {
 	const options = props.options;
 	const nodeKey = props.nodeKey;

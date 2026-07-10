@@ -16,6 +16,8 @@ import { startTransition, useCallback, useEffect, useState } from 'octane';
 export { useBasicTypeaheadTriggerMatch, PUNCTUATION } from './typeaheadShared';
 export { MenuOption, SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND } from './shared/menuShared';
 export { useDynamicPositioning } from './shared/useDynamicPositioning';
+// Upstream re-exports @lexical/utils' getScrollParent from this module.
+export { getScrollParent } from '@lexical/utils';
 
 export function LexicalTypeaheadMenuPlugin(props) {
 	const options = props.options;
