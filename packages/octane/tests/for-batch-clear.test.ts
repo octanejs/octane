@@ -26,6 +26,9 @@ describe('forBlock — batch-clear disposal', () => {
 
 		r.click('#clear');
 		expect(r.findAll('li')).toHaveLength(0);
+		// Passive destroys of the cleared rows defer to the passive flush
+		// (React defers deletion passive destroys past the sync phase).
+		flushEffects();
 		expect(log.filter((l) => l.startsWith('cleanup:')).sort()).toEqual([
 			'cleanup:1',
 			'cleanup:2',

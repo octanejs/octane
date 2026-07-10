@@ -12,17 +12,12 @@ converted to a plain `it`, and this index must be regenerated
 since-fixed behavior or intentional platform differences. Only the pins below
 are live gaps.
 
-**5 active pin(s).**
+**3 active pin(s).**
 
 ## packages/octane/tests/conformance/form-actions-extra.test.ts
 
 - **activates for startTransition inside a preventDefault-ed submit (Per :2021/:2078)**
   - GAP: Per ReactDOMForm-test.js:2021/:2078 — React ACTIVATES useFormStatus when startTransition is called inside a preventDefault-ed submit event (the manual-action idiom). In octane, form status is published ONLY by the intercepted `<form action={fn}>` path (handleFormSubmit → setFormStatus in runtime.ts); a transition started during a submit event dispatch never reaches the form. Likely fix: handleFormSubmit-adjacent tracking — when a transition starts synchronously during a form's submit dispatch whose default was prevented, publish pending status to that form until it settles.
-
-## packages/octane/tests/conformance/insertion-effect-order.test.ts
-
-- **on unmount, destroys insertion effects before layout effects, and passive effects after the sync phase**
-- **fires all insertion effects (interleaved) before firing any layout effects — update choreography**
 
 ## packages/octane/tests/conformance/ssr-serialization.test.ts
 

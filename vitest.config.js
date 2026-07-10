@@ -18,6 +18,9 @@ export default defineConfig({
 					// test loads — runs in pure Node so esbuild's TextEncoder requirements
 					// are satisfied (jsdom's TextEncoder breaks esbuild's binary protocol).
 					globalSetup: ['packages/octane/tests/differential/_setup.ts'],
+					// Drains DEFERRED unmount passive destroys after each test so they
+					// can't leak into the next test's first flush (see the file).
+					setupFiles: ['packages/octane/tests/_per-test-setup.ts'],
 					globals: false,
 				},
 				plugins: [
@@ -48,6 +51,7 @@ export default defineConfig({
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					globalSetup: ['packages/octane/tests/differential/_setup.ts'],
+					setupFiles: ['packages/octane/tests/_per-test-setup.ts'],
 					globals: false,
 					// Mode probe for the handful of tests that assert DEV-ONLY runtime
 					// warnings (gated on the dev-compile __oct_loc stamp — silent in
