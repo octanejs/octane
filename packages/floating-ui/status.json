@@ -1,0 +1,8 @@
+{
+  "upstream": { "package": "@floating-ui/react", "version": "0.27.19" },
+  "surface": "Positioning (`useFloating`, ref-aware `arrow`, the `@floating-ui/dom` middleware re-exports, the floating tree), the full interaction-hook set (`useInteractions`, `useHover` + `safePolygon`, `useClick`, `useFocus`, `useDismiss`, `useRole`, `useClientPoint`, `useListNavigation`, `useTypeahead`), the component layer (`FloatingPortal`, `FloatingOverlay`, `FloatingFocusManager`, `FloatingArrow`, `FloatingList`, `Composite`), and transitions + `FloatingDelayGroup`.",
+  "divergences": ["`forwardRef` becomes octane's ref-as-prop."],
+  "ssr": "No dedicated SSR/hydration tests.",
+  "verified": "2026-07-05",
+  "notes": ["Not yet ported: the `inner`/`useInnerOffset` middleware pair."]
+}

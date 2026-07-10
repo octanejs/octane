@@ -79,3 +79,9 @@ restored, and `QueryErrorResetBoundary` / `useQueryErrorResetBoundary` coordinat
 error-boundary retries with `@catch` / `<ErrorBoundary>` — call the boundary's
 `reset()` alongside `useQueryErrorResetBoundary().reset()` so a `throwOnError` query
 refetches instead of immediately re-throwing.
+
+## Status
+
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).
