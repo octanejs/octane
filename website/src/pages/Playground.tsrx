@@ -1,15 +1,22 @@
 // /playground — write TSRX (or TSX) on the left, and on the right either the
 // LIVE rendered app or the compiled octane output, switchable with a tab. The
 // whole pipeline runs in the browser: `octane/compiler` compiles on a debounce,
-// the compiled module executes against the site's own octane runtime (see
-// src/lib/playground.ts), and CodeMirror highlights through Shiki with the real
-// TSRX TextMate grammar (src/lib/shiki-codemirror.ts).
+// the compiled module executes inside a SANDBOXED IFRAME with an opaque origin
+// (see src/lib/playground.ts + playground-sandbox.ts — never in this page),
+// and CodeMirror highlights through Shiki with the real TSRX TextMate grammar
+// (src/lib/shiki-codemirror.ts).
 //
 // Everything editor-related boots in an effect (dynamic imports), so SSR
 // renders just the static shell and hydration stays clean. The source for each
 // language mode is kept in its own buffer — switching modes round-trips your
 // edits. The current source + mode also persist into `location.hash` (debounced)
 // so playground states are shareable links.
+//
+// Shared links are UNTRUSTED input: a hash payload is decoded into the editor
+// and compiled (source + compiled output are safe to display), but it does NOT
+// execute — even in the sandbox — until the visitor explicitly presses "Run"
+// on the consent overlay. Your own edits from the default sources auto-run as
+// before.
 import { useState, useRef, useEffect } from 'octane';
 import type { PlaygroundLang } from '../lib/playground.ts';
 
@@ -46,13 +53,21 @@ export function Playground() @{
 	const [pane, setPane] = useState<'editor' | 'result'>('editor');
 	const [error, setError] = useState('');
 	const [ready, setReady] = useState(false);
+	// True while a hash-shared payload is loaded but not yet approved to run.
+	const [gated, setGated] = useState(false);
 
 	const sourceHostRef = useRef<HTMLDivElement | null>(null);
 	const outputHostRef = useRef<HTMLDivElement | null>(null);
 	const previewHostRef = useRef<HTMLDivElement | null>(null);
 	// Imperative bridge into the boot closure below — populated once the editor
-	// stack has loaded; the mode buttons call through it.
-	const controllerRef = useRef<{ switchLang?: (next: PlaygroundLang) => void }>({});
+	// stack has loaded; the mode buttons (and the consent overlay's Run button)
+	// call through it.
+	const controllerRef = useRef<
+		{
+			switchLang?: (next: PlaygroundLang) => void;
+			approveRun?: () => void;
+		}
+	>({});
 
 	useEffect(() => {
 		const sourceHost = sourceHostRef.current;
@@ -99,9 +114,18 @@ export function Playground() @{
 				tsrx: pg.DEFAULT_SOURCES.tsrx,
 				tsx: pg.DEFAULT_SOURCES.tsx,
 			};
+			// A hash payload is someone else's code — display + compile it, but
+			// gate EXECUTION behind the consent overlay's Run button. A payload
+			// byte-equal to the default source carries nothing new, so it stays
+			// ungated.
+			let executionGated = false;
 			if (initial) {
 				buffers[currentLang] = initial.source;
 				setLang(currentLang);
+				if (initial.source !== pg.DEFAULT_SOURCES[currentLang]) {
+					executionGated = true;
+					setGated(true);
+				}
 			}
 
 			const sourceLangCompartment = new Compartment();
@@ -158,6 +182,9 @@ export function Playground() @{
 				}
 				setError('');
 				replaceDoc(outputView, result.code);
+				// While a shared payload is gated, everything except EXECUTION
+				// happens — the visitor can inspect source and compiled output.
+				if (executionGated) return;
 				void preview!.run(result.code).then((r) => {
 					if (!disposed && r.error) setError(r.error);
 				});
@@ -229,6 +256,14 @@ export function Playground() @{
 				updateHash(buffers[next]);
 			};
 
+			controllerRef.current.approveRun = () => {
+				if (disposed || !executionGated) return;
+				executionGated = false;
+				setGated(false);
+				buffers[currentLang] = sourceView.state.doc.toString();
+				compileAndRun(buffers[currentLang]);
+			};
+
 			compileAndRun(buffers[currentLang]);
 			setReady(true);
 		})();
@@ -236,6 +271,7 @@ export function Playground() @{
 		return () => {
 			disposed = true;
 			controllerRef.current.switchLang = undefined;
+			controllerRef.current.approveRun = undefined;
 			window.clearTimeout(compileDebounceId);
 			window.clearTimeout(hashDebounceId);
 			sourceView?.destroy();
@@ -316,7 +352,28 @@ export function Playground() @{
 						{view === 'preview' ? 'Live preview' : 'Compiled for the octane runtime'}
 					</span>
 				</div>
-				<div class={['pg-preview', view !== 'preview' && 'hidden']} ref={previewHostRef} />
+				<div class={['pg-result', view !== 'preview' && 'hidden']}>
+					<div class="pg-preview" ref={previewHostRef} />
+					@if (gated) {
+						<div class="pg-consent" role="alertdialog" aria-label="Run shared code?">
+							<div class="pg-consent-card">
+								<strong>This link contains shared code.</strong>
+								<p>
+									It was written by whoever sent you this link. Review it in the editor (and the
+									compiled output) — it runs in a sandbox, but only after you choose to run it.
+								</p>
+								<button
+									type="button"
+									class="pg-consent-run"
+									disabled={!ready}
+									onClick={() => controllerRef.current.approveRun?.()}
+								>
+									Run code
+								</button>
+							</div>
+						</div>
+					}
+				</div>
 				<div class={['pg-editor', view !== 'compiled' && 'hidden']} ref={outputHostRef} />
 			</section>
 		</div>
@@ -442,7 +499,7 @@ export function Playground() @{
 				min-height: 0;
 			}
 			.pg-editor.hidden,
-			.pg-preview.hidden {
+			.pg-result.hidden {
 				display: none;
 			}
 			.pg-grid:not(.ready) :global(.cm-editor) {
@@ -451,13 +508,57 @@ export function Playground() @{
 			.pg-editor :global(.cm-editor) {
 				height: 100%;
 			}
+			.pg-result {
+				position: relative;
+				display: flex;
+				flex: 1;
+				min-height: 0;
+			}
+			/* The preview is a sandboxed iframe (opaque origin) — the content's
+			   background/padding live in its srcdoc, not here. */
 			.pg-preview {
 				flex: 1;
 				min-height: 0;
-				overflow: auto;
+				background: #16181d;
+			}
+			.pg-consent {
+				position: absolute;
+				inset: 0;
+				display: grid;
+				place-items: center;
 				padding: 1.25rem;
+				background: rgba(13, 17, 23, 0.72);
+				backdrop-filter: blur(6px);
+			}
+			.pg-consent-card {
+				max-width: 26rem;
+				display: grid;
+				gap: 0.6rem;
+				justify-items: start;
+				padding: 1.1rem 1.25rem;
+				border-radius: 12px;
+				border: 1px solid rgba(255, 255, 255, 0.12);
 				background: #16181d;
 				color: #f4eee8;
+				font-size: 0.9rem;
+			}
+			.pg-consent-card p {
+				margin: 0;
+				color: #99a1b3;
+			}
+			.pg-consent-run {
+				font: inherit;
+				font-weight: 600;
+				padding: 0.45rem 1.1rem;
+				border-radius: 8px;
+				border: 1px solid rgba(255, 93, 114, 0.5);
+				background: rgba(255, 65, 90, 0.14);
+				color: #ff5d72;
+				cursor: pointer;
+			}
+			.pg-consent-run:disabled {
+				opacity: 0.5;
+				cursor: default;
 			}
 			@media (max-width: 980px) {
 				.pg-toolbar {

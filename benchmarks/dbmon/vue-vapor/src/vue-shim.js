@@ -7,4 +7,19 @@
 // a single shared @vue/reactivity instance. The explicit re-exports win over
 // any overlapping names in the star export, per ES module semantics.
 export * from '@vue/runtime-vapor';
-export { ref, shallowRef, triggerRef, nextTick, toDisplayString } from '@vue/runtime-dom';
+export {
+	ref,
+	shallowRef,
+	unref,
+	triggerRef,
+	nextTick,
+	toDisplayString,
+	onMounted,
+	onUnmounted,
+	watch,
+	watchEffect,
+	watchPostEffect,
+	useTemplateRef,
+	provide,
+	inject,
+} from '@vue/runtime-dom';

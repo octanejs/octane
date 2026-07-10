@@ -6,13 +6,13 @@
       "name": "source",
       "ops": {
         "raw": {
-          "median": 53984,
-          "min": 53984,
+          "median": 58913,
+          "min": 58913,
           "samples": 1
         },
         "gzip": {
-          "median": 18321,
-          "min": 18321,
+          "median": 20157,
+          "min": 20157,
           "samples": 1
         }
       }
@@ -21,18 +21,18 @@
       "name": "compiled",
       "ops": {
         "raw": {
-          "median": 111137,
-          "min": 111137,
+          "median": 111929,
+          "min": 111929,
           "samples": 1
         },
         "minified": {
-          "median": 57659,
-          "min": 57659,
+          "median": 58592,
+          "min": 58592,
           "samples": 1
         },
         "gzip": {
-          "median": 20476,
-          "min": 20476,
+          "median": 21278,
+          "min": 21278,
           "samples": 1
         }
       },
@@ -41,26 +41,32 @@
           {
             "file": "benchmarks/js-framework/octane-tsrx/src/Main.tsrx",
             "source": 11022,
-            "compiled": 17029,
-            "minGz": 3178
+            "compiled": 14114,
+            "minGz": 2798
+          },
+          {
+            "file": "benchmarks/todomvc/octane-tsrx/src/Main.tsrx",
+            "source": 4929,
+            "compiled": 10068,
+            "minGz": 2195
           },
           {
             "file": "benchmarks/js-framework/octane-jsx/src/Main.tsx",
             "source": 11975,
-            "compiled": 14457,
-            "minGz": 2837
+            "compiled": 14052,
+            "minGz": 2762
           },
           {
             "file": "benchmarks/js-framework/octane-tsrx-naive/src/Main.tsrx",
             "source": 9487,
-            "compiled": 15484,
-            "minGz": 2965
+            "compiled": 13058,
+            "minGz": 2628
           },
           {
             "file": "benchmarks/js-framework/octane-tsrx-naive/src/Row.tsrx",
             "source": 1756,
-            "compiled": 2360,
-            "minGz": 710
+            "compiled": 2353,
+            "minGz": 701
           },
           {
             "file": "packages/octane/tests/_fixtures/basic.tsrx",
@@ -71,14 +77,14 @@
           {
             "file": "packages/octane/tests/_fixtures/control.tsrx",
             "source": 2396,
-            "compiled": 8292,
-            "minGz": 1380
+            "compiled": 7353,
+            "minGz": 1245
           },
           {
             "file": "packages/octane/tests/_fixtures/attrs-events.tsrx",
             "source": 1221,
-            "compiled": 5420,
-            "minGz": 1011
+            "compiled": 5008,
+            "minGz": 947
           },
           {
             "file": "packages/octane/tests/_fixtures/capture-events.tsrx",
@@ -89,20 +95,20 @@
           {
             "file": "packages/octane/tests/_fixtures/components.tsrx",
             "source": 2356,
-            "compiled": 8594,
-            "minGz": 1596
+            "compiled": 8212,
+            "minGz": 1535
           },
           {
             "file": "packages/octane/tests/_fixtures/context.tsrx",
             "source": 5032,
-            "compiled": 16150,
-            "minGz": 2162
+            "compiled": 15517,
+            "minGz": 2036
           },
           {
             "file": "packages/octane/tests/_fixtures/clsx-class.tsrx",
             "source": 2339,
-            "compiled": 5402,
-            "minGz": 927
+            "compiled": 5224,
+            "minGz": 899
           },
           {
             "file": "packages/octane/tests/_fixtures/boundary.tsrx",
@@ -113,14 +119,14 @@
           {
             "file": "packages/octane/tests/_fixtures/conditional-hooks.tsrx",
             "source": 1286,
-            "compiled": 3141,
-            "minGz": 789
+            "compiled": 2547,
+            "minGz": 685
           },
           {
             "file": "packages/octane/tests/_fixtures/controlled-forms-diff.tsrx",
             "source": 2533,
-            "compiled": 6301,
-            "minGz": 1044
+            "compiled": 5916,
+            "minGz": 970
           }
         ]
       }

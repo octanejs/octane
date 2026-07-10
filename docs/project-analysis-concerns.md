@@ -4,6 +4,19 @@ Status: source-backed audit snapshot from 2026-07-09 at `d3cf678`. This is a
 risk register, not a claim that every item is a confirmed bug. Re-check the
 owning source before acting because Octane is moving quickly.
 
+> **Remediation status (2026-07-09):** the immediate + mechanical items are
+> DONE — §1 playground execution now runs in a sandboxed opaque-origin iframe
+> (no-network CSP) with an explicit Run gate for hash payloads; §2 doc drift
+> fixed at the RuleSync source + README/.ai/testing-library/MCP maps, with
+> `rules:check` (+ generated-file `git diff`), `changeset:check`, and
+> `parity:gaps:check` added to PR CI; §3 has a generated executable-pin index
+> (`docs/parity-gaps.md`, `pnpm parity:gaps`); §10 website builds are
+> file-serial by contract (`fileParallelism: false`); §12 harness gate
+> failures are fatal unless waived with a reason + expiry in
+> `benchmarks/bench.mjs`. Still open: the five runtime parity gaps themselves,
+> §5/§6 structural centralization, the §11 binding-status matrix, and the §13
+> Node-20/packed-tarball release checks.
+
 The repository is unusually good at preserving design reasoning in source
 comments and parity tests. The main concern is not a lack of documentation; it
 is that several generations of otherwise-useful documentation now coexist and

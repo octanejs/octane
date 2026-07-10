@@ -1,0 +1,21 @@
+{
+  "name": "vue-vapor-todomvc",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "TodoMVC fixture for Vue Vapor (3.6 vapor mode) - the Vue column for the app-shaped scripted ops + app-code bundle size.",
+  "scripts": {
+    "dev": "vite --host --port 5244 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5244 --strictPort"
+  },
+  "dependencies": {
+    "vue": "catalog:default",
+    "@vue/runtime-dom": "catalog:default",
+    "@vue/runtime-vapor": "catalog:default"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

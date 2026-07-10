@@ -95,6 +95,19 @@ const SUITES = [
 		runs: [{ script: 'run-reorder.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		name: 'todomvc',
+		cwd: 'todomvc',
+		servers: [
+			{ filter: 'octane-tsrx-todomvc', port: 5240 },
+			{ filter: 'react-todomvc', port: 5241 },
+			{ filter: 'solid-todomvc', port: 5242 },
+			{ filter: 'ripple-todomvc', port: 5243 },
+			{ filter: 'vue-vapor-todomvc', port: 5244 },
+		],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		name: 'dbmon',
 		cwd: 'dbmon',
 		servers: [
@@ -171,6 +184,8 @@ const SUITES = [
 			{ filter: 'octane-tsrx-memowall-bench', port: 5206 },
 			{ filter: 'octane-jsx-memowall-bench', port: 5207 },
 			{ filter: 'react-memowall-bench', port: 5208 },
+			{ filter: 'solid-memowall-bench', port: 5182 },
+			{ filter: 'vue-vapor-memowall-bench', port: 5223 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -182,6 +197,7 @@ const SUITES = [
 			{ filter: 'octane-tsrx-portal-swarm-bench', port: 5210 },
 			{ filter: 'react-portal-swarm-bench', port: 5211 },
 			{ filter: 'solid-portal-swarm-bench', port: 5212 },
+			{ filter: 'vue-vapor-portal-swarm-bench', port: 5181 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],

@@ -22,10 +22,20 @@
 // this suite into a full-re-render measurement. Any gate failure → exit 1
 // (BENCH_JSON is still written, with a top-level `failed` field).
 //
-// Methodology mirrors the sibling benches: ops commit synchronously (flushSync
-// inside the window.__op hooks), gc() is forced before every timed sample, and
-// sub-millisecond ops loop `reps` invocations inside the timed window and
-// divide (performance.now() would otherwise quantize a 1000-bail sweep to ~0).
+// Methodology mirrors the sibling benches: ops commit inside the timed hook —
+// synchronously where the framework allows it (react flushSync, solid flush());
+// vue-vapor's hooks return a nextTick() thenable the harness awaits inside the
+// timed window — gc() is forced before every timed sample, and sub-millisecond
+// ops loop `reps` invocations inside the timed window and divide
+// (performance.now() would otherwise quantize a 1000-bail sweep to ~0).
+//
+// FINE-GRAINED COLUMNS (solid / vue-vapor): there is no memo wall — component
+// bodies run once, so the probes count CREATIONS plus leaf TEXT-EFFECT re-runs
+// (the fine-grained analog of a Leaf re-render), and the keyed lists key by
+// row-object identity so one_change_* recreates exactly one row. The exact-
+// count gates hold with the same expectations; parent_rerender_equal_* being
+// near-zero for them is the honest model number (nothing to bail), not a bug —
+// see their fixture comments.
 //
 // Servers must be running first (production preview recommended):
 //   pnpm --filter octane-tsrx-memowall-bench preview   # :5206
@@ -51,6 +61,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'octane-tsrx', url: 'http://localhost:5206/' },
 			{ name: 'octane-jsx', url: 'http://localhost:5207/' },
 			{ name: 'react', url: 'http://localhost:5208/' },
+			{ name: 'solid', url: 'http://localhost:5182/' },
+			{ name: 'vue-vapor', url: 'http://localhost:5223/' },
 		];
 
 const Z = { rowA: 0, innerA: 0, leafA: 0, rowB: 0, innerB: 0, leafB: 0 };
@@ -131,19 +143,21 @@ async function measureMount(browser, url) {
 	const samples = [];
 	for (let i = 0; i < WARMUP + ITER; i++) {
 		const { ctx, page } = await freshPage(browser, url);
-		const dt = await page.evaluate(() => {
+		const dt = await page.evaluate(async () => {
 			(window.gc || (() => {}))();
 			const t0 = performance.now();
-			window.__mount();
+			const r = window.__mount();
+			if (r && typeof r.then === 'function') await r;
 			return performance.now() - t0;
 		});
 		if (i >= WARMUP) samples.push(dt);
 		await ctx.close();
 	}
 	const { ctx, page } = await freshPage(browser, url);
-	const verify = await page.evaluate(() => {
+	const verify = await page.evaluate(async () => {
 		window.__resetRenders();
-		window.__mount();
+		const r = window.__mount();
+		if (r && typeof r.then === 'function') await r;
 		const state = window.__state();
 		const t = (s) => {
 			const el = document.querySelector(s);
@@ -181,14 +195,23 @@ async function measureLoop(browser, url, op) {
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
 				const t0 = performance.now();
-				for (let k = 0; k < reps; k++) fn();
+				// Async-commit targets (vue-vapor — hooks return a nextTick()
+				// thenable; see its main.js) await the flush BETWEEN reps so the
+				// reps don't coalesce into one commit; sync targets are unchanged.
+				for (let k = 0; k < reps; k++) {
+					const r = fn();
+					if (r && typeof r.then === 'function') await r;
+				}
 				const dt = (performance.now() - t0) / reps;
 				if (i >= WARMUP) out.push(dt);
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 			}
 			const loop = { ...window.__renders };
 			window.__resetRenders();
-			fn();
+			{
+				const r = fn();
+				if (r && typeof r.then === 'function') await r;
+			}
 			const delta = { ...window.__renders };
 			const state = window.__state();
 			const t = (s) => {

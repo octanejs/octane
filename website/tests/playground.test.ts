@@ -1,12 +1,14 @@
 // Playground tests — the in-browser compile pipeline (the same
-// `octane/compiler` call the page makes) plus the /playground route's static
-// shell. The full editor/preview stack (CodeMirror + Shiki + blob-module
-// execution) is browser-only and is exercised by the dev-SSR path, not jsdom.
+// `octane/compiler` call the page makes), the sandbox boundary's static shape,
+// and the /playground route's static shell. The full editor/preview stack
+// (CodeMirror + Shiki + sandboxed-iframe execution) is browser-only and is
+// exercised by the dev-SSR path, not jsdom.
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
-import { compilePlayground, DEFAULT_SOURCES } from '../src/lib/playground.ts';
+import { compilePlayground, createPreview, DEFAULT_SOURCES } from '../src/lib/playground.ts';
+import { sandboxSrcdoc } from '../src/lib/playground-sandbox.ts';
 
 afterEach(cleanup);
 
@@ -50,6 +52,41 @@ describe('playground compile pipeline', () => {
 	});
 });
 
+describe('playground sandbox boundary', () => {
+	it('srcdoc pins the security posture: opaque-origin CSP, no network, no form submission', () => {
+		const srcdoc = sandboxSrcdoc();
+		// One CSP meta owning the whole document.
+		const csp = srcdoc.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1];
+		expect(csp).toBeTruthy();
+		// default-src 'none' is the deny-all baseline — user code can neither
+		// fetch nor exfiltrate; blob: + inline scripts are the only execution.
+		expect(csp).toContain("default-src 'none'");
+		expect(csp).toContain("script-src 'unsafe-inline' blob:");
+		expect(csp).toContain("form-action 'none'");
+		expect(csp).toContain("base-uri 'none'");
+	});
+
+	it('createPreview mounts a sandboxed iframe WITHOUT allow-same-origin', () => {
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const preview = createPreview(host, () => {});
+		try {
+			const iframe = host.querySelector('iframe');
+			expect(iframe).toBeTruthy();
+			const sandbox = iframe!.getAttribute('sandbox') ?? '';
+			// allow-scripts is required to run user code; allow-same-origin would
+			// nullify the boundary entirely and must never appear.
+			expect(sandbox.split(/\s+/)).toContain('allow-scripts');
+			expect(sandbox).not.toContain('allow-same-origin');
+			expect(iframe!.getAttribute('srcdoc')).toContain('Content-Security-Policy');
+		} finally {
+			preview.destroy();
+			host.remove();
+		}
+		expect(host.querySelector('iframe')).toBeNull();
+	});
+});
+
 describe('/playground route', () => {
 	it('renders the shell: mode switch, view switch, and both panels', async () => {
 		const { container } = await renderRoute('/playground');
@@ -66,7 +103,7 @@ describe('/playground route', () => {
 
 		// Both panels exist; preview is the visible one by default.
 		expect(container.querySelector('.pg-preview')).toBeTruthy();
-		expect(container.querySelector('.pg-preview')?.classList.contains('hidden')).toBe(false);
+		expect(container.querySelector('.pg-result')?.classList.contains('hidden')).toBe(false);
 		expect(container.querySelectorAll('.pg-editor').length).toBe(2);
 
 		// The mobile pane toggle exists (CSS shows it only under 980px).

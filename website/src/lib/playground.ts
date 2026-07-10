@@ -2,27 +2,18 @@
 // `octane/compiler` (it's pure JS: @tsrx/core parser + esrap printer, no Node
 // APIs) and executes the compiled module for the live preview.
 //
-// Execution model: the compiled code's `import … from 'octane'` is rewritten to
-// a blob-URL "provider" module that re-exports the site's own bundled octane
-// runtime (exposed via a global — a blob can't import a bundled module by
-// name), then the user module itself is imported as a blob URL and its exported
-// component is rendered into the preview container with `createRoot`.
+// Execution model: compilation happens here (pure parsing, no authority), but
+// the compiled module EXECUTES inside a sandboxed iframe with an opaque origin
+// (see playground-sandbox.ts) — never in the website's own page. Hash-shared
+// playground links carry arbitrary code, so the page it runs in must have no
+// same-origin storage, cookies, or DOM to steal. The parent fetches the
+// self-contained octane runtime bundle (served by the playgroundRuntime()
+// vite plugin) as text and hands it to the iframe, which builds blob modules
+// on its own side of the boundary.
 //
 // Client-only: load via dynamic import from an effect (never during SSR).
 import { compile } from 'octane/compiler';
-import type { Root } from 'octane';
-
-// The CLIENT runtime, loaded lazily. A static `import * as … from 'octane'`
-// would resolve to `octane/server` in the SSR module graph (vite.config.ts
-// aliases it) and trip rollup's missing-export analysis for `createRoot` —
-// this module never RUNS on the server, but it is bundled there. The dynamic
-// form keeps both graphs happy and still lands on the same client instance.
-type OctaneRuntime = typeof import('octane');
-
-let octanePromise: Promise<OctaneRuntime> | null = null;
-function getOctane(): Promise<OctaneRuntime> {
-	return (octanePromise ??= import('octane'));
-}
+import { sandboxSrcdoc, RUNTIME_MODULE_PATH, PROTOCOL_KEY } from './playground-sandbox.ts';
 
 export type PlaygroundLang = 'tsrx' | 'tsx';
 
@@ -49,40 +40,7 @@ export function compilePlayground(
 	}
 }
 
-// ── Module execution ────────────────────────────────────────────────────────
-
-let providerUrl: string | null = null;
-
-// A blob module re-exporting every octane runtime export from a global. Built
-// once — the export list is static for the life of the bundle.
-function getRuntimeProviderUrl(octane: OctaneRuntime): string {
-	if (!providerUrl) {
-		(globalThis as any).__OCTANE_PLAYGROUND_RUNTIME__ = octane;
-		const source =
-			'const m = globalThis.__OCTANE_PLAYGROUND_RUNTIME__;\n' +
-			Object.keys(octane)
-				.map((name) => `export const ${name} = m.${name};`)
-				.join('\n');
-		providerUrl = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
-	}
-	return providerUrl;
-}
-
-// Vite appends `?import` to variable dynamic imports, which corrupts blob:
-// URLs — hide the import from the transform. (import() of a template string is
-// rewritten even in plain .ts modules.)
-const importModule: (url: string) => Promise<any> = new Function('u', 'return import(u);') as (
-	url: string,
-) => Promise<any>;
-
-function findComponent(mod: Record<string, unknown>): ((...args: any[]) => unknown) | null {
-	if (typeof mod.default === 'function') return mod.default as any;
-	if (typeof mod.App === 'function') return mod.App as any;
-	for (const key of Object.keys(mod)) {
-		if (typeof mod[key] === 'function') return mod[key] as any;
-	}
-	return null;
-}
+// ── Sandboxed execution ─────────────────────────────────────────────────────
 
 export interface Preview {
 	/** Execute compiled playground code and render its component. Never throws. */
@@ -91,94 +49,114 @@ export interface Preview {
 }
 
 /**
- * A live preview bound to `container`. `onRuntimeError` reports errors thrown
- * AFTER the initial render resolves (effects, event handlers — caught by the
- * ErrorBoundary the preview wraps around the user component).
+ * A live preview bound to `container` — creates the sandboxed iframe and
+ * drives the postMessage protocol (see playground-sandbox.ts for the boundary
+ * design). `onRuntimeError` reports errors thrown AFTER the initial render
+ * resolves (effects, event handlers — caught by the ErrorBoundary the sandbox
+ * wraps around the user component).
  */
 export function createPreview(
 	container: Element,
 	onRuntimeError: (message: string) => void,
 ): Preview {
-	let root: Root | null = null;
-	let generation = 0;
+	const doc = container.ownerDocument;
+	const win = doc.defaultView!;
 
-	const teardown = () => {
-		try {
-			root?.unmount();
-		} catch {
-			// A broken user component may throw during cleanup — never let that
-			// wedge the playground.
-		}
-		root = null;
-		container.innerHTML = '';
+	const iframe = doc.createElement('iframe');
+	// allow-scripts WITHOUT allow-same-origin: the sandbox document gets an
+	// opaque origin — no cookies, storage, or parent DOM. allow-forms only
+	// lets submit events fire (the srcdoc CSP still blocks real submission).
+	iframe.setAttribute('sandbox', 'allow-scripts allow-forms');
+	iframe.setAttribute('title', 'Playground preview');
+	iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;';
+	iframe.srcdoc = sandboxSrcdoc();
+	container.appendChild(iframe);
+
+	let destroyed = false;
+	let generation = 0;
+	const pending = new Map<number, (r: { error: string | null }) => void>();
+	const send = (msg: Record<string, unknown>) => {
+		iframe.contentWindow?.postMessage({ [PROTOCOL_KEY]: true, ...msg }, '*');
 	};
+
+	// Resolves once the sandbox has imported the runtime bundle; resolves with
+	// an error string when it can't (fetch failed, srcdoc scripts unsupported —
+	// e.g. jsdom — so run() reports instead of hanging).
+	let cleanupListener: (() => void) | undefined;
+	const ready = new Promise<string | null>((resolve) => {
+		const fail = (message: string) => resolve(message);
+		const bootTimeout = win.setTimeout(
+			() => fail('Preview sandbox failed to boot (iframe scripts unavailable?).'),
+			10_000,
+		);
+		const onMessage = (event: MessageEvent) => {
+			if (destroyed || event.source !== iframe.contentWindow) return;
+			const msg = event.data;
+			if (!msg || msg[PROTOCOL_KEY] !== true) return;
+			switch (msg.type) {
+				case 'boot':
+					// Sandbox is listening — hand it the runtime bundle as text (it
+					// cannot fetch same-origin resources itself; see sandbox notes).
+					fetch(RUNTIME_MODULE_PATH)
+						.then((res) => {
+							if (!res.ok) throw new Error(`${RUNTIME_MODULE_PATH} → HTTP ${res.status}`);
+							return res.text();
+						})
+						.then((runtime) => send({ type: 'init', runtime }))
+						.catch((error) =>
+							fail(
+								'Failed to load the preview runtime: ' +
+									(error instanceof Error ? error.message : String(error)),
+							),
+						);
+					break;
+				case 'ready':
+					win.clearTimeout(bootTimeout);
+					resolve(typeof msg.error === 'string' ? msg.error : null);
+					break;
+				case 'result': {
+					const resolvePending = pending.get(msg.gen);
+					pending.delete(msg.gen);
+					resolvePending?.({ error: typeof msg.error === 'string' ? msg.error : null });
+					break;
+				}
+				case 'runtime-error':
+					if (typeof msg.error === 'string') onRuntimeError(msg.error);
+					break;
+			}
+		};
+		win.addEventListener('message', onMessage);
+		cleanupListener = () => {
+			win.clearTimeout(bootTimeout);
+			win.removeEventListener('message', onMessage);
+		};
+	});
 
 	return {
 		async run(code) {
 			const gen = ++generation;
-			const octane = await getOctane();
+			const readyError = await ready;
+			if (destroyed || gen !== generation) return { error: null }; // superseded
+			if (readyError) return { error: readyError };
 
-			// The provider handles 'octane'; any other bare specifier can't resolve
-			// inside a blob module — fail with a clear message instead of a cryptic
-			// network error from the import.
-			const rewritten = code.replace(
-				/(\bfrom\s*)(['"])octane\2/g,
-				(_m, from, _q) => `${from}${JSON.stringify(getRuntimeProviderUrl(octane))}`,
-			);
-			const leftover = rewritten
-				.match(/\bfrom\s*['"]([^'"]+)['"]/g)
-				?.find((clause) => !clause.includes('blob:'));
-			if (leftover) {
-				return { error: `Only imports from 'octane' are supported in the playground.` };
+			// A newer run supersedes any still-pending one — resolve it quietly so
+			// the caller's error handling never fires for stale results.
+			for (const [staleGen, resolveStale] of pending) {
+				pending.delete(staleGen);
+				resolveStale({ error: null });
 			}
-
-			let moduleUrl: string;
-			try {
-				moduleUrl = URL.createObjectURL(new Blob([rewritten], { type: 'text/javascript' }));
-			} catch (error) {
-				// e.g. an environment without createObjectURL (jsdom) — report, never throw.
-				return { error: error instanceof Error ? error.message : String(error) };
-			}
-			let mod: Record<string, unknown>;
-			try {
-				mod = await importModule(moduleUrl);
-			} catch (error) {
-				return { error: error instanceof Error ? error.message : String(error) };
-			} finally {
-				URL.revokeObjectURL(moduleUrl);
-			}
-			if (gen !== generation) return { error: null }; // superseded by a newer run
-
-			const component = findComponent(mod);
-			if (!component) {
-				return {
-					error: 'Export a component to render — e.g. `export default function App() @{ … }`.',
-				};
-			}
-
-			teardown();
-			root = octane.createRoot(container);
-			try {
-				root.render(
-					octane.createElement(
-						octane.ErrorBoundary,
-						{
-							fallback: (error: unknown) => {
-								onRuntimeError(error instanceof Error ? error.message : String(error));
-								return null;
-							},
-							// createElement's extra-children form fills this in at runtime.
-						} as any,
-						octane.createElement(component as any),
-					),
-				);
-			} catch (error) {
-				teardown();
-				return { error: error instanceof Error ? error.message : String(error) };
-			}
-			return { error: null };
+			return new Promise((resolve) => {
+				pending.set(gen, resolve);
+				send({ type: 'run', code, gen });
+			});
 		},
-		destroy: teardown,
+		destroy() {
+			destroyed = true;
+			cleanupListener?.();
+			for (const [, resolveStale] of pending) resolveStale({ error: null });
+			pending.clear();
+			iframe.remove();
+		},
 	};
 }
 

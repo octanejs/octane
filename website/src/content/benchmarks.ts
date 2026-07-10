@@ -167,7 +167,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		memoWall,
 		'memo-wall',
 		'memo-wall',
-		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. Solid and Ripple are deliberately absent: fine-grained frameworks have no parent re-render to absorb.',
+		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. Solid and Vue Vapor have no parent re-render to absorb, so their near-zero wall ops are the fine-grained model’s honest number.',
 	),
 	frameworkCard(
 		recursiveContext,
