@@ -1281,6 +1281,13 @@ export function ViewTransition(props: { children?: unknown }, scope: SSRScope): 
 }
 
 /**
+ * Server no-op twin of the client `addTransitionType` — transition types only
+ * affect client-side view-transition class resolution/callbacks; a shared
+ * component calling it during SSR is legal and inert.
+ */
+export function addTransitionType(_type: string): void {}
+
+/**
  * `<ErrorBoundary fallback={…}>…</ErrorBoundary>` — the JSX built-in mirror of
  * `@try { … } @catch (e) { fallback }`. `fallback` is a renderable or a
  * `(error, reset) => renderable` render prop (react-error-boundary style). A real

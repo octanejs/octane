@@ -588,16 +588,47 @@ export interface ViewTransitionProps {
 }
 
 /**
- * The instance handed to on* callbacks. Phase 1 carries the resolved
- * view-transition-name; the pseudo-element animation handles (`old`, `new`,
- * `group`, `imagePair`) land with the full callback contract in Phase 2.
+ * Animation handle for one of a boundary's view-transition pseudo-elements —
+ * the objects on {@link ViewTransitionInstance}. `animate()`/`getAnimations()`
+ * target the pseudo-element via the Web Animations `pseudoElement` option on
+ * the document element (React's ViewTransitionPseudoElement shape).
+ */
+export class ViewTransitionPseudoElement {
+	/** The pseudo-element selector, e.g. `::view-transition-new(hero)`. */
+	readonly selector: string;
+	constructor(pseudo: string, name: string) {
+		this.selector = '::view-transition-' + pseudo + '(' + name + ')';
+	}
+	animate(
+		keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
+		options?: number | KeyframeAnimationOptions,
+	): Animation {
+		const opts: KeyframeAnimationOptions =
+			typeof options === 'number' ? { duration: options } : { ...(options ?? {}) };
+		(opts as { pseudoElement?: string }).pseudoElement = this.selector;
+		return document.documentElement.animate(keyframes, opts);
+	}
+	getAnimations(): Animation[] {
+		const all = document.documentElement.getAnimations?.() ?? [];
+		const out: Animation[] = [];
+		for (const a of all) {
+			const effect = a.effect as { pseudoElement?: string } | null;
+			if (effect !== null && effect.pseudoElement === this.selector) out.push(a);
+		}
+		return out;
+	}
+}
+
+/**
+ * The instance handed to on* callbacks: the resolved view-transition-name plus
+ * `.animate()`-capable handles for the boundary's four pseudo-elements.
  */
 export interface ViewTransitionInstance {
 	name: string;
-	group: null;
-	imagePair: null;
-	old: null;
-	new: null;
+	group: ViewTransitionPseudoElement;
+	imagePair: ViewTransitionPseudoElement;
+	old: ViewTransitionPseudoElement;
+	new: ViewTransitionPseudoElement;
 }
 
 interface VTHandle {
@@ -615,8 +646,10 @@ interface VtRec {
 	els: Element[];
 	rect: { x: number; y: number; width: number; height: number } | null;
 	name: string;
+	/** The view-transition-class currently applied to els ('' = none applied). */
+	cls: string;
 }
-type VtActivationKind = 'enter' | 'exit' | 'update';
+type VtActivationKind = 'enter' | 'exit' | 'update' | 'share';
 
 /** Sticky "this app uses ViewTransition" flag — the zero-cost guard. */
 let VT_SEEN = false;
@@ -637,6 +670,23 @@ let VT_HANDLE: VTHandle | null = null;
 let VT_NAME_SEQ = 0;
 /** Per-boundary callback cleanups (returned by on*), run before the next fire. */
 const VT_CLEANUPS = new WeakMap<Block, () => void>();
+/**
+ * Transition types staged by addTransitionType() for the CURRENT transition
+ * batch — captured (and reset) by the flush that commits the batch, whether
+ * wrapped (vtFlush hands them to class resolution + callbacks) or not.
+ */
+let VT_PENDING_TYPES: string[] = [];
+
+/**
+ * React's `addTransitionType` (experimental `unstable_addTransitionType`):
+ * tags the current transition with a type. ViewTransition class props given as
+ * per-type maps resolve against the batch's types, and the types array reaches
+ * every on* callback. Types reset when the batch commits.
+ */
+export function addTransitionType(type: string): void {
+	VT_SEEN = true;
+	if (VT_PENDING_TYPES.indexOf(type) === -1) VT_PENDING_TYPES.push(type);
+}
 
 /**
  * Compiler module-load hint: emitted once per client module that imports
@@ -675,26 +725,102 @@ function vtRangeElements(block: Block): Element[] {
 	return els;
 }
 
-/** Assign the boundary's view-transition-name to its top-level elements. */
-function vtAssignNames(rec: VtRec): void {
+/**
+ * Resolve a class-prop value for one activation kind against the batch's
+ * transition types: `'auto'` (browser default), `'none'` (deactivate), a class
+ * string, or a per-type map (`{ 'nav-back': 'slide-right', default: 'auto' }`
+ * — first matching type wins, then the map's `default`, then `'auto'`).
+ * A missing kind prop falls back to the boundary's `default` prop.
+ */
+function vtResolveClass(
+	props: ViewTransitionProps | null,
+	kind: VtActivationKind,
+	types: string[],
+): string {
+	if (props === null) return 'auto';
+	let v =
+		kind === 'enter'
+			? props.enter
+			: kind === 'exit'
+				? props.exit
+				: kind === 'update'
+					? props.update
+					: props.share;
+	if (v == null) v = props.default;
+	if (v == null) return 'auto';
+	if (typeof v === 'string') return v;
+	for (const t of types) {
+		const hit = v[t];
+		if (hit != null) return hit;
+	}
+	return v.default != null ? v.default : 'auto';
+}
+
+/**
+ * Pre-drain class resolution for an ALREADY-MOUNTED boundary, before its fate
+ * (exit / update / share) is known — React resolves per-kind because it
+ * renders first; octane picks the boundary's most specific declared intent:
+ * share (named boundaries pair by name and share wins over exit) → exit →
+ * update → default. Also the "fully inert" gate: a boundary whose exit,
+ * update, AND share all resolve 'none' can't animate this flush at all, so it
+ * is not pre-named (the correct suppression — a name in the old capture
+ * would animate regardless).
+ */
+function vtPreClass(props: ViewTransitionProps | null, types: string[]): string {
+	if (props === null) return 'auto';
+	if (props.share != null && typeof props.name === 'string')
+		return vtResolveClass(props, 'share', types);
+	if (props.exit != null) return vtResolveClass(props, 'exit', types);
+	if (props.update != null) return vtResolveClass(props, 'update', types);
+	return vtResolveClass(props, 'update', types); // → default chain
+}
+
+function vtAllNone(props: ViewTransitionProps | null, types: string[]): boolean {
+	return (
+		vtResolveClass(props, 'exit', types) === 'none' &&
+		vtResolveClass(props, 'update', types) === 'none' &&
+		vtResolveClass(props, 'share', types) === 'none'
+	);
+}
+
+/**
+ * Assign the boundary's view-transition-name (+ view-transition-class when the
+ * resolved class is a real class string) to its top-level elements.
+ */
+function vtApplyStyles(rec: VtRec, cls: string): void {
 	const props = rec.block.vt;
 	if (rec.name === '') {
 		rec.name =
 			props !== null && typeof props.name === 'string' ? props.name : '‹vt' + ++VT_NAME_SEQ + '›';
 	}
+	rec.cls = cls === 'auto' || cls === 'none' ? '' : cls;
 	for (let i = 0; i < rec.els.length; i++) {
 		// Multiple top-level children: suffix to keep names unique (React rule).
 		const n = i === 0 ? rec.name : rec.name + '-' + i;
-		(rec.els[i] as HTMLElement).style?.setProperty?.('view-transition-name', n);
+		const style = (rec.els[i] as HTMLElement).style;
+		if (style === undefined) continue;
+		style.setProperty('view-transition-name', n);
+		if (rec.cls !== '') style.setProperty('view-transition-class', rec.cls);
 	}
 }
 
 function vtRevertNames(recs: VtRec[]): void {
 	for (const rec of recs) {
 		for (const el of rec.els) {
-			(el as HTMLElement).style?.removeProperty?.('view-transition-name');
+			const style = (el as HTMLElement).style;
+			if (style === undefined) continue;
+			style.removeProperty('view-transition-name');
+			if (rec.cls !== '') style.removeProperty('view-transition-class');
 		}
 	}
+}
+
+/** Does a rect intersect the viewport? (Share pairs decay when either side is off-screen.) */
+function vtInViewport(rect: { x: number; y: number; width: number; height: number }): boolean {
+	if (typeof window === 'undefined') return true;
+	const iw = window.innerWidth,
+		ih = window.innerHeight;
+	return rect.x < iw && rect.y < ih && rect.x + rect.width > 0 && rect.y + rect.height > 0;
 }
 
 function vtRectChanged(rec: VtRec): boolean {
@@ -711,10 +837,17 @@ function vtRectChanged(rec: VtRec): boolean {
 }
 
 /** Fire a boundary's activation callback (after the transition's `ready`). */
-function vtFireCallback(kind: VtActivationKind, rec: VtRec): void {
+function vtFireCallback(kind: VtActivationKind, rec: VtRec, types: string[]): void {
 	const props = rec.block.vt;
 	if (props === null) return;
-	const cb = kind === 'enter' ? props.onEnter : kind === 'exit' ? props.onExit : props.onUpdate;
+	const cb =
+		kind === 'enter'
+			? props.onEnter
+			: kind === 'exit'
+				? props.onExit
+				: kind === 'update'
+					? props.onUpdate
+					: props.onShare;
 	if (typeof cb !== 'function') return;
 	const prevCleanup = VT_CLEANUPS.get(rec.block);
 	if (prevCleanup !== undefined) {
@@ -727,13 +860,13 @@ function vtFireCallback(kind: VtActivationKind, rec: VtRec): void {
 	}
 	const instance: ViewTransitionInstance = {
 		name: rec.name,
-		group: null,
-		imagePair: null,
-		old: null,
-		new: null,
+		group: new ViewTransitionPseudoElement('group', rec.name),
+		imagePair: new ViewTransitionPseudoElement('image-pair', rec.name),
+		old: new ViewTransitionPseudoElement('old', rec.name),
+		new: new ViewTransitionPseudoElement('new', rec.name),
 	};
 	try {
-		const cleanup = cb(instance, []);
+		const cleanup = cb(instance, types);
 		if (typeof cleanup === 'function') VT_CLEANUPS.set(rec.block, cleanup);
 	} catch (err) {
 		console.error(err);
@@ -1127,6 +1260,20 @@ function flush(): void {
  */
 function flushWork(): void {
 	inFlush = true;
+	// addTransitionType types belong to the transition batch this drain commits:
+	// an UNWRAPPED drain (no boundary, no startViewTransition, flushSync) that
+	// contains transition work consumes them too — they must not leak into a
+	// later, unrelated wrapped flush. (vtFlush captures them before its update
+	// callback runs flushWork, so the wrapped path never reaches this.)
+	let clearTypes = false;
+	if (VT_PENDING_TYPES.length !== 0) {
+		for (let i = 0; i < QUEUE.length; i++) {
+			if (QUEUE[i].pendingMode === 'transition') {
+				clearTypes = true;
+				break;
+			}
+		}
+	}
 	try {
 		// React parity: pending PASSIVE effects from an earlier commit flush BEFORE the next
 		// render begins (React's flushPassiveEffects-at-render-start). Without this, a
@@ -1140,6 +1287,7 @@ function flushWork(): void {
 		if (pendingError !== null) throw pendingError.err;
 	} finally {
 		inFlush = false;
+		if (clearTypes) VT_PENDING_TYPES = [];
 	}
 }
 
@@ -1152,22 +1300,31 @@ function flushWork(): void {
  * boundary, the transition is skipped (mutations still applied, no animation).
  */
 function vtFlush(): void {
+	// The batch's transition types (addTransitionType) — captured for class
+	// resolution + callbacks, reset for the next batch.
+	const types = VT_PENDING_TYPES;
+	VT_PENDING_TYPES = [];
 	// Pre-drain: collect live boundaries, pre-name them (the OLD capture must
-	// see the names — exits/updates animate from these snapshots), and measure
-	// rects for update detection.
+	// see the names — exits/updates/share animate from these snapshots), and
+	// measure rects for update detection. A boundary whose exit/update/share
+	// classes ALL resolve 'none' is left unnamed — the correct deactivation
+	// (a name in the old capture animates regardless).
 	const recs: VtRec[] = [];
 	for (const b of VT_REGISTRY) {
 		if (b.disposed) {
 			VT_REGISTRY.delete(b);
 			continue;
 		}
+		if (vtAllNone(b.vt, types)) continue;
 		const els = vtRangeElements(b);
-		const rec: VtRec = { block: b, els, rect: null, name: '' };
+		const rec: VtRec = { block: b, els, rect: null, name: '', cls: '' };
 		if (els.length > 0 && typeof els[0].getBoundingClientRect === 'function') {
 			const r = els[0].getBoundingClientRect();
 			rec.rect = { x: r.x, y: r.y, width: r.width, height: r.height };
 		}
-		vtAssignNames(rec);
+		// Kind is unknown pre-drain — apply the boundary's most specific declared
+		// intent (see vtPreClass); enter boundaries resolve exactly, post-drain.
+		vtApplyStyles(rec, vtPreClass(b.vt, types));
 		recs.push(rec);
 	}
 	VT_ENTERED = [];
@@ -1187,26 +1344,79 @@ function vtFlush(): void {
 			VT_DRAIN = false;
 		}
 		// Resolve activations from what the drain did.
+		const exits: VtRec[] = [];
 		for (const rec of recs) {
 			if (rec.block.disposed) {
-				acts.push({ kind: 'exit', rec });
+				exits.push(rec);
 			} else {
 				// The drain may have replaced the boundary's elements — re-enumerate
 				// and re-assert the SAME name so the new capture pairs with the old.
 				const before = rec.els;
 				rec.els = vtRangeElements(rec.block);
 				const changed = VT_DIRTY.has(rec.block) || vtRectChanged(rec);
-				vtAssignNames(rec);
-				if (changed || before.length !== rec.els.length) acts.push({ kind: 'update', rec });
+				vtApplyStyles(rec, rec.cls === '' ? 'auto' : rec.cls);
+				if (
+					(changed || before.length !== rec.els.length) &&
+					vtResolveClass(rec.block.vt, 'update', types) !== 'none'
+				) {
+					acts.push({ kind: 'update', rec });
+				}
 			}
 		}
+		// Entered boundaries: named post-drain (they exist only in the NEW
+		// capture). Collected before share pairing so exits can find them.
+		const enters: VtRec[] = [];
 		for (const b of VT_ENTERED) {
 			if (b.disposed) continue;
-			const rec: VtRec = { block: b, els: vtRangeElements(b), rect: null, name: '' };
-			// Enter names exist only in the NEW capture — assigned post-drain.
-			vtAssignNames(rec);
+			const rec: VtRec = { block: b, els: vtRangeElements(b), rect: null, name: '', cls: '' };
+			const cls = vtResolveClass(b.vt, 'enter', types);
+			// An explicit name always applies (it may pair a share); an unnamed
+			// 'none' enter is fully inert — skip naming and activation.
+			if (cls !== 'none' || typeof b.vt?.name === 'string') vtApplyStyles(rec, cls);
 			recs.push(rec);
-			acts.push({ kind: 'enter', rec });
+			enters.push(rec);
+			if (cls !== 'none') acts.push({ kind: 'enter', rec });
+		}
+		// Shared-element pairing: an exiting NAMED boundary whose name also
+		// appears on an entering boundary in the same commit shares — one
+		// activation, fired on the EXITING side (its onExit and the entering
+		// side's onEnter are suppressed). Both sides must be in-viewport or the
+		// pair decays to separate exit/enter (React's rule).
+		for (const exitRec of exits) {
+			const nm = exitRec.block.vt !== null ? exitRec.block.vt.name : undefined;
+			let paired: VtRec | null = null;
+			if (typeof nm === 'string') {
+				for (const enterRec of enters) {
+					if (enterRec.block.vt !== null && enterRec.block.vt.name === nm) {
+						paired = enterRec;
+						break;
+					}
+				}
+			}
+			if (paired !== null) {
+				const exitVisible = exitRec.rect === null || vtInViewport(exitRec.rect);
+				let enterVisible = true;
+				if (paired.els.length > 0 && typeof paired.els[0].getBoundingClientRect === 'function') {
+					const r = paired.els[0].getBoundingClientRect();
+					enterVisible = vtInViewport({ x: r.x, y: r.y, width: r.width, height: r.height });
+				}
+				if (exitVisible && enterVisible) {
+					if (vtResolveClass(exitRec.block.vt, 'share', types) !== 'none') {
+						acts.push({ kind: 'share', rec: exitRec });
+					}
+					// Suppress the entering side's own enter activation.
+					for (let i = 0; i < acts.length; i++) {
+						if (acts[i].rec === paired && acts[i].kind === 'enter') {
+							acts.splice(i, 1);
+							break;
+						}
+					}
+					continue;
+				}
+			}
+			if (vtResolveClass(exitRec.block.vt, 'exit', types) !== 'none') {
+				acts.push({ kind: 'exit', rec: exitRec });
+			}
 		}
 		VT_STATE = VT_ANIMATING;
 		if (acts.length === 0) skipRequested = true;
@@ -1233,7 +1443,7 @@ function vtFlush(): void {
 	vt.ready.then(
 		() => {
 			vtRevertNames(recs);
-			for (const a of acts) vtFireCallback(a.kind, a.rec);
+			for (const a of acts) vtFireCallback(a.kind, a.rec, types);
 		},
 		() => {
 			// Skipped or interrupted: no animation ran, so no callbacks — but the

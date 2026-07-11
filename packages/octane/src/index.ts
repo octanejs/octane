@@ -59,9 +59,12 @@ export {
 	ErrorBoundary,
 	Activity,
 	ViewTransition,
+	addTransitionType,
 	// React ships View Transitions on the experimental channel as unstable_-
 	// prefixed exports — alias them so React-experimental code ports unchanged.
 	ViewTransition as unstable_ViewTransition,
+	addTransitionType as unstable_addTransitionType,
+	ViewTransitionPseudoElement,
 	type ViewTransitionProps,
 	type ViewTransitionInstance,
 	Fragment,

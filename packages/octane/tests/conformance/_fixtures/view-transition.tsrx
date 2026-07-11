@@ -49,3 +49,20 @@ export function PlainApp(props) @{
 		}
 	</>
 }
+
+// Per ReactDOMViewTransition-test.js:368 — two same-named boundaries swap in
+// one transition (React uses key="a"/"b" remounts; distinct @if arms are
+// octane's equivalent teardown+remount). onShare fires on the EXITING side.
+export function ShareApp(props) @{
+	<>
+		@if (props.page === 'a') {
+			<ViewTransition name="hero" onShare={props.onShareA} onExit={props.onExitA}>
+				<div>{'Page A'}</div>
+			</ViewTransition>
+		} @else {
+			<ViewTransition name="hero" onShare={props.onShareB} onEnter={props.onEnterB}>
+				<div>{'Page B'}</div>
+			</ViewTransition>
+		}
+	</>
+}

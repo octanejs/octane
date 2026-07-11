@@ -22,7 +22,7 @@ import {
 	installViewTransitionMocks,
 	type ViewTransitionMocks,
 } from './_helpers/view-transition-mocks';
-import { EnterApp, ExitApp, UpdateApp, PlainApp } from './_fixtures/view-transition.tsrx';
+import { EnterApp, ExitApp, UpdateApp, PlainApp, ShareApp } from './_fixtures/view-transition.tsrx';
 
 describe('ReactDOMViewTransition (ported)', () => {
 	// Harness pin (not a React port): the mock helper installs the exact
@@ -164,6 +164,53 @@ describe('ReactDOMViewTransition (ported)', () => {
 			expect(container.textContent).toBe('Much longer content here');
 		});
 
+		// Per ReactDOMViewTransition-test.js:362
+		it('fires onShare for paired named transitions instead of onEnter/onExit', async () => {
+			let sharesA = 0,
+				exitsA = 0,
+				sharesB = 0,
+				entersB = 0;
+			const props = {
+				page: 'a',
+				onShareA: () => {
+					sharesA++;
+				},
+				onExitA: () => {
+					exitsA++;
+				},
+				onShareB: () => {
+					sharesB++;
+				},
+				onEnterB: () => {
+					entersB++;
+				},
+			};
+
+			// Render page A.
+			await act(() => {
+				startTransition(() => {
+					root.render(ShareApp, props);
+				});
+			});
+			// Clear any enter callbacks from the initial mount.
+			sharesA = exitsA = sharesB = entersB = 0;
+
+			// Switch from page A to page B inside startTransition.
+			await act(() => {
+				startTransition(() => {
+					root.render(ShareApp, { ...props, page: 'b' });
+				});
+			});
+
+			// onShare fires on the exiting side (page A).
+			expect(sharesA).toBe(1);
+			// onExit does NOT fire when share takes precedence.
+			expect(exitsA).toBe(0);
+			// onEnter does NOT fire on the entering side when paired.
+			expect(entersB).toBe(0);
+			expect(container.textContent).toBe('Page B');
+		});
+
 		// Per ReactDOMViewTransition-test.js:1211
 		it('enters without props and does not fire handlers', async () => {
 			await act(() => {
@@ -200,9 +247,6 @@ describe('ReactDOMViewTransition (ported)', () => {
 			expect(container.textContent).toBe('');
 		});
 	});
-
-	// ReactDOMViewTransition-test.js:362
-	it.todo('fires onShare for paired named transitions instead of onEnter/onExit');
 
 	// ── Suspense + nested-unit semantics (Phase 3) ────────────────────────────
 	// ReactDOMViewTransition-test.js:422
