@@ -31,10 +31,14 @@ const ROUTES = ['/', '/docs', '/benchmarks', '/playground'];
 // `/` re-based 2026-07-10 (measured 1,733): the home summary chart gained a
 // sixth framework series (Vue Vapor) and memo-wall/portal-swarm/ssr-throughput
 // gained Solid/Vue bars — real content growth, not marker minting.
+//
+// `/benchmarks` re-based 2026-07-11 (measured 14,101): memo-wall/portal-swarm/
+// ssr-throughput gained Ripple bars + table columns — real content growth, not
+// marker minting.
 const COMMENT_CEILINGS: Record<string, number> = {
 	'/': 1995,
 	'/docs': 415,
-	'/benchmarks': 13800,
+	'/benchmarks': 14400,
 	'/playground': 195,
 };
 
