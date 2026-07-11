@@ -3,12 +3,14 @@
 //
 // Part 1 — news-page throughput: reuses benchmarks/news's production-build
 // methodology (vite build the SSR bundle, import the built entry-server, time
-// renderApp()) for four targets — octane render() ('octane/server'), React 19
-// react-dom/server renderToString, Solid 2.0 @solidjs/web renderToString, and
-// Vue 3.6 vue/server-renderer renderToString (a vapor SFC compiles to the
-// regular ssrRender codegen on the server — vapor has no server codegen in
-// 3.6; the vapor part is client-side adoption, which this Node-only suite
-// never runs) — at 50 and 500 article cards. benchmarks/news is NEVER modified beyond its own
+// renderApp()) for five targets — octane render() ('octane/server'), React 19
+// react-dom/server renderToString, Solid 2.0 @solidjs/web renderToString,
+// Ripple 'ripple/server' render (bundled in by its app's ssr.noExternal, so
+// the built entry is self-contained), and Vue 3.6 vue/server-renderer
+// renderToString (a vapor SFC compiles to the regular ssrRender codegen on
+// the server — vapor has no server codegen in 3.6; the vapor part is
+// client-side adoption, which this Node-only suite never runs) — at 50 and
+// 500 article cards. benchmarks/news is NEVER modified beyond its own
 // gen.mjs re-writing src/data.js (invoked as a child process, deterministic,
 // restored to the tracked count-50 dataset afterwards); every build lands in
 // THIS suite's dist/ via an outDir override, so news's own dist is untouched.
@@ -74,7 +76,7 @@ const CONFIG_FILTER = process.env.CONFIGS
 			.filter(Boolean)
 	: null;
 
-const NEWS_TARGETS = ['octane-tsrx', 'react', 'solid', 'vue-vapor'];
+const NEWS_TARGETS = ['octane-tsrx', 'react', 'solid', 'ripple', 'vue-vapor'];
 const CARD_COUNTS = quick ? [50] : [50, 500];
 const WATERFALL_DEPTHS = quick ? [1, 2] : [1, 2, 4];
 // parallel-k*: K INDEPENDENT ~4ms fetches in one body (Parallel.tsrx). The SSR

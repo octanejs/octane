@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "Node-only SSR throughput bench - ops/sec + latency percentiles + memory growth for octane render() vs react-dom/server vs @solidjs/web on the news page, plus octane-only waterfall / deopt-page / escape-heavy fixtures.",
+  "description": "Node-only SSR throughput bench - ops/sec + latency percentiles + memory growth for octane render() vs react-dom/server vs @solidjs/web vs ripple/server vs vue/server-renderer on the news page, plus octane-only waterfall / deopt-page / escape-heavy fixtures.",
   "scripts": {
     "bench": "node run.mjs",
     "bench:smoke": "node run.mjs 2"

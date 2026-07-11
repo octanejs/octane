@@ -22,8 +22,10 @@ Their probes count the fine-grained equivalents: component CREATIONS for
 Row/Inner, leaf TEXT-EFFECT re-runs for Leaf (the analog of a Leaf re-render),
 with the keyed lists keyed by row-object identity so `one_change_*` recreates
 exactly one row. The same exact-count gates hold with the same expectations.
-Ripple is still omitted (nothing it would measure differently from solid here,
-and its portal/context coverage lives in the other suites).
+Ripple uses the same
+mapping (bodies count creations; the leaf probe lives in the reactive text
+expression; `@for` keyed by row-object identity; the theme context carries a
+stable accessor over the wall's tracked theme).
 
 ## Layout
 
