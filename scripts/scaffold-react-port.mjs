@@ -53,7 +53,7 @@ const OUT_OF_SCOPE_RULES = [
 		/fizz|renderto(pipeable|readable)stream|streaming|shell hydrat|selective hydrat|progressive/,
 		'Fizz streaming (Octane SSR is non-streaming)',
 	],
-	[/viewtransition|view transition/, 'ViewTransitions (not supported)'],
+	// ViewTransitions rule removed 2026-07-11 — now planned (docs/view-transitions-plan.md).
 	[/float|preinit|preload|hoistable|singleton resource/, 'Float / resource hoisting (out)'],
 	[
 		/cpu[- ]?bound|expectedloadtime|suspensey|avoidthisfallback|suspensecallback/,
