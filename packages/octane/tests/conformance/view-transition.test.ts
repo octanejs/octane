@@ -4,16 +4,16 @@
  * two "intermediate class is none" cases are CSS animation-class semantics
  * (the scaffolder's class-COMPONENT rule misfired), so they are in scope.
  *
- * 25 in-scope cases. Porting lands by phase of docs/view-transitions-plan.md:
- *   - core callbacks + Suspense reveal (source :252-:466) — Phases 1-3.
- *   - the onParentEnter/onParentExit relay cluster (:529-:1315) sits behind
- *     React's `enableViewTransitionParentEnterExit` flag — Phase 4 decides
- *     ship vs pin based on where that flag stands.
+ * 25 in-scope cases — ALL PORTED (view-transitions plan Phases 1-4):
+ *   - core callbacks + share + Suspense reveal + nested-unit (:252-:466).
+ *   - the onParentEnter/onParentExit relay cluster (:529-:1315): React gates
+ *     it behind `enableViewTransitionParentEnterExit`, which is ON in the
+ *     experimental channel (where ViewTransition ships) — octane ships the
+ *     behavior.
  *
  * The jsdom environment for these ports is _helpers/view-transition-mocks.ts
- * (React's own mock recipe, source :188-249); the one live test below pins
- * that harness contract itself so the helper stays honest until Phase 1
- * starts flipping todos.
+ * (React's own mock recipe, source :188-249); the one live harness-pin test
+ * below keeps the helper honest.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { act } from '../_helpers';
@@ -30,6 +30,23 @@ import {
 	ShareApp,
 	SuspenseRevealApp,
 	NestedUnitApp,
+	ParentExitApp,
+	ParentEnterApp,
+	ChainBreakApp,
+	NoneBreakExitApp,
+	NoneBreakEnterApp,
+	KindMismatchApp,
+	ShareNoRelayApp,
+	ShareNoEnterRelayApp,
+	NoneAncestorExitApp,
+	NoneAncestorEnterApp,
+	UnstyledRelayApp,
+	HandlerOnlyExitApp,
+	HandlerOnlyEnterApp,
+	NoneEnterHandlerOnlyApp,
+	DivsChainApp,
+	NoPropsAncestorEnterApp,
+	NoPropsAncestorExitApp,
 } from './_fixtures/view-transition.tsrx';
 
 describe('ReactDOMViewTransition (ported)', () => {
@@ -343,42 +360,192 @@ describe('ReactDOMViewTransition (ported)', () => {
 		});
 	});
 
-	// ── onParentEnter/onParentExit relays (Phase 4 — behind React's
-	//    enableViewTransitionParentEnterExit flag; ship vs pin decided there) ──
-	// ReactDOMViewTransition-test.js:529
-	it.todo('fires onParentExit when ancestor ViewTransition exits');
-	// ReactDOMViewTransition-test.js:577
-	it.todo('fires onParentEnter when ancestor ViewTransition enters');
-	// ReactDOMViewTransition-test.js:625
-	it.todo('breaks parentExit chain when intermediate ViewTransition lacks parentExit');
-	// ReactDOMViewTransition-test.js:681
-	it.todo('stops the parentExit relay when an intermediate class is "none"');
-	// ReactDOMViewTransition-test.js:735
-	it.todo('stops the parentEnter relay when an intermediate class is "none"');
-	// ReactDOMViewTransition-test.js:785
-	it.todo('does not fire onParentEnter when ancestor exits');
-	// ReactDOMViewTransition-test.js:827
-	it.todo('does not fire onParentExit when ancestor shares instead of exiting');
-	// ReactDOMViewTransition-test.js:876
-	it.todo('does not fire onParentEnter when ancestor shares instead of entering');
-	// ReactDOMViewTransition-test.js:924
-	it.todo('does not fire onParentExit when ancestor exit is none');
-	// ReactDOMViewTransition-test.js:961
-	it.todo('does not fire onParentEnter when ancestor enter is none');
-	// ReactDOMViewTransition-test.js:999
-	it.todo('relays parentExit chain through unstyled parentExit');
-	// ReactDOMViewTransition-test.js:1041
-	it.todo('fires onParentExit when ancestor ViewTransition exits with handler only');
-	// ReactDOMViewTransition-test.js:1087
-	it.todo('fires onParentEnter when ancestor ViewTransition enters with handler only');
-	// ReactDOMViewTransition-test.js:1132
-	it.todo('does not fire onParentEnter when ancestor enter is none with handler only');
-	// ReactDOMViewTransition-test.js:1168
-	it.todo('relays parentEnter chain to handler-only child through intermediate divs');
-	// ReactDOMViewTransition-test.js:1277
-	it.todo('fires onParentEnter when ancestor ViewTransition has no props');
-	// ReactDOMViewTransition-test.js:1315
-	it.todo('fires onParentExit when ancestor ViewTransition has no props');
+	// ── onParentEnter/onParentExit relays (Phase 4) ───────────────────────────
+	// React gates these behind enableViewTransitionParentEnterExit, which is ON
+	// in the experimental channel (the channel ViewTransition ships in) — so
+	// octane SHIPS the behavior rather than pinning. Each test drives a fixture
+	// twin of the React inline App through show/page transitions and counts
+	// callback fires; `relay()` is the shared show:false→true→false (or reverse)
+	// driver.
+	describe('parent enter/exit relays', () => {
+		let vt: ViewTransitionMocks;
+		let container: HTMLElement;
+		let root: Root;
+
+		beforeEach(() => {
+			vt = installViewTransitionMocks();
+			container = document.createElement('div');
+			document.body.appendChild(container);
+			root = createRoot(container);
+		});
+		afterEach(() => {
+			root.unmount();
+			container.remove();
+			vt.restore();
+			void vt;
+		});
+
+		/** Mount at `from`, transition to `to` — counters read after. */
+		async function drive(app: any, props: Record<string, unknown>, from: any, to: any) {
+			await act(() => {
+				startTransition(() => {
+					root.render(app, { ...props, ...from });
+				});
+			});
+			for (const k of Object.keys(counters)) counters[k] = 0;
+			await act(() => {
+				startTransition(() => {
+					root.render(app, { ...props, ...to });
+				});
+			});
+		}
+		/** Named counters + matching callback props for a fixture. */
+		let counters: Record<string, number>;
+		function cbs(...names: string[]): Record<string, unknown> {
+			counters = {};
+			const props: Record<string, unknown> = {};
+			for (const n of names) {
+				counters[n] = 0;
+				props[n] = () => {
+					counters[n]++;
+				};
+			}
+			return props;
+		}
+
+		// Per ReactDOMViewTransition-test.js:529
+		it('fires onParentExit when ancestor ViewTransition exits', async () => {
+			const props = cbs('onParentExit', 'onNestedExit', 'onParentExitNested');
+			await drive(ParentExitApp, props, { show: true }, { show: false });
+			expect(counters.onParentExit).toBe(1);
+			expect(counters.onNestedExit).toBe(0);
+			expect(counters.onParentExitNested).toBe(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:577
+		it('fires onParentEnter when ancestor ViewTransition enters', async () => {
+			const props = cbs('onParentEnter', 'onNestedEnter', 'onParentEnterNested');
+			await drive(ParentEnterApp, props, { show: false }, { show: true });
+			expect(counters.onParentEnter).toBe(1);
+			expect(counters.onNestedEnter).toBe(0);
+			expect(counters.onParentEnterNested).toBe(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:625
+		it('breaks parentExit chain when intermediate ViewTransition lacks parentExit', async () => {
+			const props = cbs('onParentExit1', 'onParentExit2');
+			await drive(ChainBreakApp, props, { show: true }, { show: false });
+			expect(counters.onParentExit1).toBe(0);
+			expect(counters.onParentExit2).toBe(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:681
+		it('stops the parentExit relay when an intermediate class is "none"', async () => {
+			const props = cbs('onDeep', 'onSibling');
+			await drive(NoneBreakExitApp, props, { show: true }, { show: false });
+			expect(counters.onDeep).toBe(0);
+			expect(counters.onSibling).toBe(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:735
+		it('stops the parentEnter relay when an intermediate class is "none"', async () => {
+			const props = cbs('onDeep', 'onSibling');
+			await drive(NoneBreakEnterApp, props, { show: false }, { show: true });
+			expect(counters.onDeep).toBe(0);
+			expect(counters.onSibling).toBe(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:785
+		it('does not fire onParentEnter when ancestor exits', async () => {
+			const props = cbs('onParentEnter');
+			await drive(KindMismatchApp, props, { show: true }, { show: false });
+			expect(counters.onParentEnter).toBe(0);
+		});
+
+		// Per ReactDOMViewTransition-test.js:827
+		it('does not fire onParentExit when ancestor shares instead of exiting', async () => {
+			const props = cbs('onShare', 'onParentExit');
+			await drive(ShareNoRelayApp, props, { page: 'a' }, { page: 'b' });
+			expect(counters.onShare).toBe(1);
+			expect(counters.onParentExit).toBe(0);
+		});
+
+		// Per ReactDOMViewTransition-test.js:876
+		it('does not fire onParentEnter when ancestor shares instead of entering', async () => {
+			const props = cbs('onShare', 'onParentEnter');
+			await drive(ShareNoEnterRelayApp, props, { page: 'a' }, { page: 'b' });
+			expect(counters.onShare).toBe(1);
+			expect(counters.onParentEnter).toBe(0);
+		});
+
+		// Per ReactDOMViewTransition-test.js:924
+		it('does not fire onParentExit when ancestor exit is none', async () => {
+			const props = cbs('onParentExit');
+			await drive(NoneAncestorExitApp, props, { show: true }, { show: false });
+			expect(counters.onParentExit).toBe(0);
+		});
+
+		// Per ReactDOMViewTransition-test.js:961
+		it('does not fire onParentEnter when ancestor enter is none', async () => {
+			const props = cbs('onParentEnter');
+			await drive(NoneAncestorEnterApp, props, { show: false }, { show: true });
+			expect(counters.onParentEnter).toBe(0);
+		});
+
+		// Per ReactDOMViewTransition-test.js:999
+		it('relays parentExit chain through unstyled parentExit', async () => {
+			const props = cbs('onParentExit');
+			await drive(UnstyledRelayApp, props, { show: true }, { show: false });
+			expect(counters.onParentExit).toBe(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:1041
+		it('fires onParentExit when ancestor ViewTransition exits with handler only', async () => {
+			const props = cbs('onParentExit', 'onRelayParentExit', 'onParentExitDeep');
+			await drive(HandlerOnlyExitApp, props, { show: true }, { show: false });
+			expect(counters.onParentExit).toBe(1);
+			expect(counters.onRelayParentExit).toBe(1);
+			expect(counters.onParentExitDeep).toBe(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:1087
+		it('fires onParentEnter when ancestor ViewTransition enters with handler only', async () => {
+			const props = cbs('onParentEnter', 'onRelayParentEnter', 'onParentEnterDeep');
+			await drive(HandlerOnlyEnterApp, props, { show: false }, { show: true });
+			expect(counters.onParentEnter).toBe(1);
+			expect(counters.onRelayParentEnter).toBe(1);
+			expect(counters.onParentEnterDeep).toBe(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:1132
+		it('does not fire onParentEnter when ancestor enter is none with handler only', async () => {
+			const props = cbs('onParentEnter');
+			await drive(NoneEnterHandlerOnlyApp, props, { show: false }, { show: true });
+			expect(counters.onParentEnter).toBe(0);
+		});
+
+		// Per ReactDOMViewTransition-test.js:1168
+		it('relays parentEnter chain to handler-only child through intermediate divs', async () => {
+			const props = cbs('onParentEnter', 'onParentEnterNested');
+			await drive(DivsChainApp, props, { show: false }, { show: true });
+			expect(counters.onParentEnter).toBe(1);
+			expect(counters.onParentEnterNested).toBe(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:1277
+		it('fires onParentEnter when ancestor ViewTransition has no props', async () => {
+			const props = cbs('onParentEnter');
+			await drive(NoPropsAncestorEnterApp, props, { show: false }, { show: true });
+			expect(counters.onParentEnter).toBe(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:1315
+		it('fires onParentExit when ancestor ViewTransition has no props', async () => {
+			const props = cbs('onParentExit');
+			await drive(NoPropsAncestorExitApp, props, { show: true }, { show: false });
+			expect(counters.onParentExit).toBe(1);
+		});
+	});
 });
 
 /* Out of scope — intentionally NOT ported:
