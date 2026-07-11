@@ -1,6 +1,22 @@
 # View Transitions — React-parity plan
 
-Status: Phases 0+1 LANDED 2026-07-11. Phase 0: conformance skeletons
+Status: Phases 0+1+2 LANDED 2026-07-11. Phase 2: shared-element pairing
+(same-named exit+enter in one commit → ONE `share` activation fired on the
+EXITING side, suppressing its exit and the enter side's enter; viewport decay
+via pre-drain exit rect + post-drain enter rect), `addTransitionType` (+
+`unstable_` alias; types captured per batch by vtFlush, cleared by unwrapped
+transition drains too), class resolution (`string | 'auto' | 'none' |
+per-type map` against batch types; applied as `view-transition-class`
+alongside the name; `'none'` suppresses activation — fully-inert boundaries
+skip pre-naming, which is the only capture-correct suppression), and the full
+callback contract (`(instance, types)`, instance = name + `.animate()`-capable
+`old`/`new`/`group`/`imagePair` `ViewTransitionPseudoElement` handles; a
+returned cleanup runs before the boundary's next activation). Phase-2 note:
+pre-drain class application resolves kind-agnostically (share→exit→update→
+default chain) because a live boundary's fate is unknown until the drain runs
+— per-kind exactness for exits/updates in the OLD capture is a render-first
+luxury; documented, revisit only if a test pins it. Phase 0: conformance
+skeletons
 (`tests/conformance/view-transition.test.ts` + `view-transition-ssr.test.ts`)
 + the jsdom mock helper. Phase 1: the core runtime — `ViewTransition` builtin
 (tier-1 export + `unstable_ViewTransition` alias), boundary registry +

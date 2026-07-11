@@ -80,6 +80,8 @@ export {
 	// behavior; SSR annotations are view-transitions plan Phase 5).
 	ViewTransition,
 	ViewTransition as unstable_ViewTransition,
+	addTransitionType,
+	addTransitionType as unstable_addTransitionType,
 
 	// Context
 	createContext,
