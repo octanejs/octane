@@ -65,6 +65,7 @@ const BASE_URLS = {
 	'octane-tsrx': 'http://localhost:5210/',
 	react: 'http://localhost:5211/',
 	solid: 'http://localhost:5212/',
+	ripple: 'http://localhost:5224/',
 	'vue-vapor': 'http://localhost:5181/',
 };
 
@@ -74,6 +75,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'octane-tsrx', url: BASE_URLS['octane-tsrx'] },
 			{ name: 'react', url: BASE_URLS.react },
 			{ name: 'solid', url: BASE_URLS.solid },
+			{ name: 'ripple', url: BASE_URLS.ripple },
 			{ name: 'vue-vapor', url: BASE_URLS['vue-vapor'] },
 		];
 

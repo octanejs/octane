@@ -22,13 +22,15 @@ benchmarks/ssr-throughput/
 └── README.md
 ```
 
-## Part 1 — news-page throughput (octane vs React 19 vs Solid 2.0 vs Vue 3.6)
+## Part 1 — news-page throughput (octane vs React 19 vs Solid 2.0 vs Ripple vs Vue 3.6)
 
 Reuses the news app fixtures and build methodology verbatim: `news/gen.mjs` is
 invoked as a child process at 50 and then 500 cards, each target's SSR bundle
 (`octane-tsrx` `render()` from `octane/server`, react `react-dom/server`
-`renderToString`, solid `@solidjs/web` `renderToString`, vue-vapor
-`vue/server-renderer` `renderToString` — on the server a vapor SFC compiles to
+`renderToString`, solid `@solidjs/web` `renderToString`, ripple
+`ripple/server` `render` — bundled in by its app's `ssr.noExternal`, so the
+built entry is self-contained — and vue-vapor `vue/server-renderer`
+`renderToString` — on the server a vapor SFC compiles to
 the regular `ssrRender` string codegen, so this measures Vue's standard
 compiled SSR) is `vite build`-t with
 an outDir override into `dist/news-{50,500}/<target>` here — **nothing under

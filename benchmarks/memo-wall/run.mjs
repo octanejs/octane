@@ -62,6 +62,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'octane-jsx', url: 'http://localhost:5207/' },
 			{ name: 'react', url: 'http://localhost:5208/' },
 			{ name: 'solid', url: 'http://localhost:5182/' },
+			{ name: 'ripple', url: 'http://localhost:5225/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5223/' },
 		];
 

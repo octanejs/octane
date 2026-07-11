@@ -1,4 +1,4 @@
-# portal-swarm bench — octane vs react vs solid
+# portal-swarm bench — octane vs react vs solid vs ripple vs vue-vapor
 
 A sibling of [`js-framework`](../js-framework/), [`dbmon`](../dbmon/),
 [`recursive-context`](../recursive-context/) and
@@ -80,7 +80,13 @@ three sections likewise collapse (`VaporTeleport` is its only mechanism) and
 a microtask with no public sync flush, so its adapters return `nextTick()`
 thenables the harness awaits inside each timed window (awaiting BETWEEN the
 open/close halves of a cycle rep — coalesced they'd be a no-op commit).
-**Ripple is omitted**: its portal support is unverified.
+For Ripple the
+three sections likewise collapse (its built-in `<Portal>` — `{ target,
+children }` — is its only mechanism); the correctness gates verified it end to
+end (600 portals, shared + distinct targets, teardown, dispatch). Portal wires
+root-event delegation onto its target, and 200 portals sharing one target
+register the same module-level dispatcher, which `addEventListener` dedupes —
+a tooltip click bumps `__hits` exactly once.
 
 ## Ops
 
