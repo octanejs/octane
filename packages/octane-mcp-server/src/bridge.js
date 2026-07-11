@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 // without registering it here fails the mcp-server tests.
 export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
+	jotai: '@octanejs/jotai',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
 	'framer-motion': '@octanejs/motion',
 	motion: '@octanejs/motion',

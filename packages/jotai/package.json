@@ -1,0 +1,56 @@
+{
+  "name": "@octanejs/jotai",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "jotai bindings for the octane renderer — reuses jotai's framework-agnostic vanilla atoms/store and swaps the React binding for an octane port of jotai/react.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/jotai"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./vanilla": "./src/vanilla.ts",
+    "./vanilla/utils": "./src/vanilla/utils.ts",
+    "./vanilla/internals": "./src/vanilla/internals.ts",
+    "./react": "./src/react.ts",
+    "./react/utils": "./src/react/utils.ts",
+    "./utils": "./src/utils.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jotai": "catalog:default",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
