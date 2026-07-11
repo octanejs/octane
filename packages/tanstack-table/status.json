@@ -1,0 +1,12 @@
+{
+  "upstream": { "package": "@tanstack/react-table", "version": "8.21.3" },
+  "surface": "Complete 1:1 port: the framework-agnostic `@tanstack/table-core` (createTable + all feature row models) is reused verbatim; the ~100-line React adapter (`useReactTable`, `flexRender`) is transcribed onto octane hooks, preserving upstream's useState-based state wiring.",
+  "divergences": [
+    "`flexRender`'s class-component and `react.memo`/`forwardRef` exotic-component branches are dropped — octane has no class components or forwardRef, and octane's `memo()` returns a plain function, so `typeof === 'function'` covers every component."
+  ],
+  "ssr": "No SSR-specific surface; table-core is pure computation.",
+  "notes": [
+    "Column sizing/resizing and pinning/ordering drag interactions are untested-by-interaction (the differential rig has no mousemove driver); their state APIs are table-core computation reused verbatim."
+  ],
+  "verified": "2026-07-11"
+}

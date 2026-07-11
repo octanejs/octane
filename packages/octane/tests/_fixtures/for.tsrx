@@ -109,6 +109,29 @@ export function setExternal(v) {
 	EXTERNAL = v;
 }
 
+// A render-time CALL in the body defeats the survivor short-circuit entirely:
+// `item.read()` reads mutable state through a STABLE item ref (the TanStack
+// Table header pattern — `header.column.getIsSorted()` flips while the header
+// object stays memoized), so the body must re-run on every parent render,
+// React-parity. Contrast DepPureList below: a bare module-var READ stays
+// eligible (documented at-your-own-risk), a call does not.
+const callItems = [
+	{ id: 1, read: () => 'r1:' + EXTERNAL },
+	{ id: 2, read: () => 'r2:' + EXTERNAL },
+];
+
+export function CallBodyList() @{
+	const [, setN] = useState(0);
+	<div>
+		<button id="cb-rerender" onClick={() => setN((n) => n + 1)}>{'go'}</button>
+		<ul>
+			@for (const item of callItems; key item.id) {
+				<li class="cb-row">{item.read()}</li>
+			}
+		</ul>
+	</div>
+}
+
 export function DepPureList() @{
 	const [marker, setMarker] = useState(0);
 	const [items] = useState([{ id: 1 }, { id: 2 }]);

@@ -6,6 +6,7 @@ import {
 	ListWithEmpty,
 	ToggleableEmpty,
 	DepPureList,
+	CallBodyList,
 	setExternal,
 } from './_fixtures/for.tsrx';
 
@@ -147,6 +148,23 @@ describe('forBlock — @empty branch', () => {
 		expect(r.findAll('.empty')).toHaveLength(0);
 		expect(r.findAll('.row').map((li) => li.textContent)).toEqual(['x', 'y']);
 		r.unmount();
+	});
+});
+
+describe('forBlock — render-time calls defeat the survivor short-circuit', () => {
+	it('a body calling an item method re-runs on every parent render (React parity)', () => {
+		// The TanStack Table header pattern: stable item refs whose methods read
+		// mutable state (`header.column.getIsSorted()`). Neither the item ref nor
+		// any dep changes, so a PURE/DEP-PURE skip would freeze the output — the
+		// compiler must classify call-bearing bodies as NORMAL.
+		const r = mount(CallBodyList);
+		expect(r.findAll('.cb-row').map((li) => li.textContent)).toEqual(['r1:tick0', 'r2:tick0']);
+
+		setExternal('tick1');
+		r.click('#cb-rerender');
+		expect(r.findAll('.cb-row').map((li) => li.textContent)).toEqual(['r1:tick1', 'r2:tick1']);
+		r.unmount();
+		setExternal('tick0'); // reset the module-level fixture state
 	});
 });
 

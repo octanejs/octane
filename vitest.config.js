@@ -122,6 +122,35 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-table',
+					include: ['packages/tanstack-table/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					// Same differential precompile, but for table fixtures: also rewrites
+					// `@octanejs/tanstack-table` → `@tanstack/react-table` so the React side
+					// runs the real react-table adapter over the SAME table-core.
+					globalSetup: ['packages/tanstack-table/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				// `@octanejs/tanstack-table` is the package under test; alias the public
+				// name (and subpaths) to source so fixtures import it exactly as a
+				// consumer would (and the differential React side rewrites the same
+				// specifiers to `@tanstack/react-table`).
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-table$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-table/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-table\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-table/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-query',
 					include: ['packages/tanstack-query/tests/**/*.test.ts'],
 					environment: 'jsdom',
