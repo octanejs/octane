@@ -15,8 +15,14 @@
  * that harness contract itself so the helper stays honest until Phase 1
  * starts flipping todos.
  */
-import { describe, it, expect } from 'vitest';
-import { installViewTransitionMocks } from './_helpers/view-transition-mocks';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { act } from '../_helpers';
+import { createRoot, startTransition, type Root } from '../../src/index.js';
+import {
+	installViewTransitionMocks,
+	type ViewTransitionMocks,
+} from './_helpers/view-transition-mocks';
+import { EnterApp, ExitApp, UpdateApp, PlainApp } from './_fixtures/view-transition.tsrx';
 
 describe('ReactDOMViewTransition (ported)', () => {
 	// Harness pin (not a React port): the mock helper installs the exact
@@ -56,18 +62,147 @@ describe('ReactDOMViewTransition (ported)', () => {
 	});
 
 	// ── Core activation + callbacks (Phases 1-2) ──────────────────────────────
-	// ReactDOMViewTransition-test.js:252
-	it.todo('fires onEnter when a ViewTransition mounts');
-	// ReactDOMViewTransition-test.js:289
-	it.todo('fires onExit when a ViewTransition unmounts');
-	// ReactDOMViewTransition-test.js:324
-	it.todo('fires onUpdate when content inside a ViewTransition changes');
+	describe('core activation callbacks', () => {
+		let vt: ViewTransitionMocks;
+		let container: HTMLElement;
+		let root: Root;
+
+		beforeEach(() => {
+			vt = installViewTransitionMocks();
+			container = document.createElement('div');
+			document.body.appendChild(container);
+			root = createRoot(container);
+		});
+		afterEach(() => {
+			root.unmount();
+			container.remove();
+			vt.restore();
+		});
+
+		// Per ReactDOMViewTransition-test.js:252
+		it('fires onEnter when a ViewTransition mounts', async () => {
+			const enters: unknown[] = [];
+			const onEnter = (i: unknown) => {
+				enters.push(i);
+			};
+
+			// Initial render without the ViewTransition.
+			await act(() => {
+				root.render(EnterApp, { show: false, onEnter });
+			});
+			expect(enters.length).toBe(0);
+			expect(vt.calls.length).toBe(0);
+
+			// Mount the ViewTransition inside startTransition.
+			await act(() => {
+				startTransition(() => {
+					root.render(EnterApp, { show: true, onEnter });
+				});
+			});
+
+			expect(vt.calls.length).toBeGreaterThan(0);
+			expect(enters.length).toBe(1);
+			expect(container.textContent).toBe('Hello');
+		});
+
+		// Per ReactDOMViewTransition-test.js:289
+		it('fires onExit when a ViewTransition unmounts', async () => {
+			const exits: unknown[] = [];
+			const onExit = (i: unknown) => {
+				exits.push(i);
+			};
+
+			// Initial render WITH the ViewTransition (inside startTransition).
+			await act(() => {
+				startTransition(() => {
+					root.render(ExitApp, { show: true, onExit });
+				});
+			});
+			expect(exits.length).toBe(0);
+
+			// Unmount the ViewTransition inside startTransition.
+			await act(() => {
+				startTransition(() => {
+					root.render(ExitApp, { show: false, onExit });
+				});
+			});
+
+			expect(exits.length).toBe(1);
+			expect(container.textContent).toBe('');
+		});
+
+		// Per ReactDOMViewTransition-test.js:324
+		it('fires onUpdate when content inside a ViewTransition changes', async () => {
+			let updates = 0;
+			let entersAfterMount = 0;
+			const onUpdate = () => {
+				updates++;
+			};
+			const onEnter = () => {
+				entersAfterMount++;
+			};
+
+			await act(() => {
+				startTransition(() => {
+					root.render(UpdateApp, { text: 'Short', onUpdate, onEnter });
+				});
+			});
+			entersAfterMount = 0; // mockClear() — enter on the initial transition mount is fine
+			expect(updates).toBe(0);
+
+			// Update content inside startTransition (different text length produces
+			// different getBoundingClientRect values in the mock).
+			await act(() => {
+				startTransition(() => {
+					root.render(UpdateApp, { text: 'Much longer content here', onUpdate, onEnter });
+				});
+			});
+
+			expect(updates).toBe(1);
+			// onEnter should NOT fire on an update.
+			expect(entersAfterMount).toBe(0);
+			expect(container.textContent).toBe('Much longer content here');
+		});
+
+		// Per ReactDOMViewTransition-test.js:1211
+		it('enters without props and does not fire handlers', async () => {
+			await act(() => {
+				root.render(PlainApp, { show: false });
+			});
+			expect(vt.calls.length).toBe(0);
+
+			await act(() => {
+				startTransition(() => {
+					root.render(PlainApp, { show: true });
+				});
+			});
+
+			expect(vt.calls.length).toBeGreaterThan(0);
+			expect(container.textContent).toBe('Hello');
+		});
+
+		// Per ReactDOMViewTransition-test.js:1243
+		it('exits without props and does not fire handlers', async () => {
+			await act(() => {
+				startTransition(() => {
+					root.render(PlainApp, { show: true });
+				});
+			});
+			vt.calls.length = 0; // mockClear()
+
+			await act(() => {
+				startTransition(() => {
+					root.render(PlainApp, { show: false });
+				});
+			});
+
+			expect(vt.calls.length).toBeGreaterThan(0);
+			expect(container.textContent).toBe('');
+		});
+	});
+
 	// ReactDOMViewTransition-test.js:362
 	it.todo('fires onShare for paired named transitions instead of onEnter/onExit');
-	// ReactDOMViewTransition-test.js:1211
-	it.todo('enters without props and does not fire handlers');
-	// ReactDOMViewTransition-test.js:1243
-	it.todo('exits without props and does not fire handlers');
 
 	// ── Suspense + nested-unit semantics (Phase 3) ────────────────────────────
 	// ReactDOMViewTransition-test.js:422

@@ -354,6 +354,13 @@ export interface Block extends Scope {
 	/** Cached key for this item Block. null on non-item blocks. */
 	key: any;
 	/**
+	 * Set on a `<ViewTransition>` component's block: the boundary's current
+	 * props (docs/view-transitions-plan.md). Null on every other block —
+	 * declared everywhere so the shape stays monomorphic; the field gates the
+	 * nearest-boundary dirty walk and the unmount unregister.
+	 */
+	vt: ViewTransitionProps | null;
+	/**
 	 * Render priority for the next scheduled render: 'transition' (queued from
 	 * inside startTransition — suspending shouldn't swap to fallback if prior
 	 * UI is committed) or 'urgent' (default). Read & cleared when the render
@@ -533,6 +540,230 @@ const TRANSITION_LISTENERS = new Set<() => void>();
 const HELD_TRANSITIONS = new Set<TrySlot>();
 const STAGED_REVEALS = new Set<TrySlot>();
 let flushingStagedReveals = false;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// View Transitions (docs/view-transitions-plan.md, Phase 1).
+//
+// Octane renders AND mutates in one eager walk (flush → drainQueue) — there is
+// no separate mutation-commit phase to wrap. So when a transition-lane flush
+// may involve a `<ViewTransition>` boundary, the WHOLE drain runs inside
+// `document.startViewTransition`'s update callback: the browser snapshots the
+// old state first, our render+mutate work happens inside the callback, and the
+// browser animates old→new. INTENTIONAL DIVERGENCE from React (which renders
+// concurrently BEFORE the snapshot and wraps only its commit phase): the
+// snapshot-hold window includes octane's render pass. Do not "fix" this by
+// inventing a staged-mutation reconciler mode.
+//
+// Activation model (resolved at the end of the wrapped drain):
+//   enter  — a boundary block REGISTERED during the drain (subtree inserted).
+//   exit   — a pre-drain boundary block DISPOSED by the drain (subtree removed).
+//   update — a surviving boundary that was dirtied by a tracked mutation
+//            (setText under the boundary) or whose first element's rect moved.
+// Names: every pre-drain boundary is pre-named before the snapshot (a superset
+// of React's "affected only" naming — an unaffected named pair snapshots into
+// an identical old/new image, which is visually inert), entered boundaries are
+// named inside the callback (they exist only in the new capture), and all
+// names revert once the transition's `ready` promise settles.
+//
+// Zero-cost guard: everything below is gated on `VT_SEEN`, a sticky flag set
+// by the compiler's module-load hint (`__vtSeen`, emitted when a module
+// imports ViewTransition from 'octane') and by the boundary body itself.
+// Apps that never use ViewTransition never take any of these branches.
+
+/** Animation class value: a class string, 'auto', 'none', or a per-type map. */
+type ViewTransitionClassValue = string | Record<string, string>;
+
+export interface ViewTransitionProps {
+	name?: string;
+	enter?: ViewTransitionClassValue;
+	exit?: ViewTransitionClassValue;
+	update?: ViewTransitionClassValue;
+	share?: ViewTransitionClassValue;
+	default?: ViewTransitionClassValue;
+	onEnter?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
+	onExit?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
+	onUpdate?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
+	onShare?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
+	children?: unknown;
+}
+
+/**
+ * The instance handed to on* callbacks. Phase 1 carries the resolved
+ * view-transition-name; the pseudo-element animation handles (`old`, `new`,
+ * `group`, `imagePair`) land with the full callback contract in Phase 2.
+ */
+export interface ViewTransitionInstance {
+	name: string;
+	group: null;
+	imagePair: null;
+	old: null;
+	new: null;
+}
+
+interface VTHandle {
+	ready: Promise<void>;
+	finished: Promise<void>;
+	skipTransition: () => void;
+}
+type VTDocument = Document & {
+	startViewTransition?: (opts: { update: () => void }) => VTHandle;
+};
+
+/** One tracked boundary for the current wrapped flush. */
+interface VtRec {
+	block: Block;
+	els: Element[];
+	rect: { x: number; y: number; width: number; height: number } | null;
+	name: string;
+}
+type VtActivationKind = 'enter' | 'exit' | 'update';
+
+/** Sticky "this app uses ViewTransition" flag — the zero-cost guard. */
+let VT_SEEN = false;
+/** Mounted boundary blocks; pruned lazily (disposed) + on unmount. */
+const VT_REGISTRY = new Set<Block>();
+/** Boundary blocks registered during the CURRENT wrapped drain (→ enter). */
+let VT_ENTERED: Block[] = [];
+/** Boundaries dirtied by tracked mutations during the current wrapped drain. */
+const VT_DIRTY = new Set<Block>();
+/** True while the wrapped drain (the update callback's flushWork) runs. */
+let VT_DRAIN = false;
+/** Controller state: idle → pending (update not yet run) → animating. */
+const VT_IDLE = 0,
+	VT_PENDING_UPDATE = 1,
+	VT_ANIMATING = 2;
+let VT_STATE: 0 | 1 | 2 = VT_IDLE;
+let VT_HANDLE: VTHandle | null = null;
+let VT_NAME_SEQ = 0;
+/** Per-boundary callback cleanups (returned by on*), run before the next fire. */
+const VT_CLEANUPS = new WeakMap<Block, () => void>();
+
+/**
+ * Compiler module-load hint: emitted once per client module that imports
+ * ViewTransition from 'octane', so the very first transition flush that MOUNTS
+ * a boundary is already wrapped (the runtime otherwise learns "this app uses
+ * VT" only mid-drain — too late to have snapshotted). Semi-public (tier 2).
+ */
+export function __vtSeen(): void {
+	VT_SEEN = true;
+}
+
+/** Nearest enclosing ViewTransition boundary of the currently rendering block. */
+function vtMarkDirtyFromCurrentBlock(): void {
+	for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
+		if (b.vt !== null) {
+			// Innermost boundary only (React's rule) — stop at the first hit.
+			if (!b.disposed) VT_DIRTY.add(b);
+			return;
+		}
+	}
+}
+
+/** Top-level ELEMENT nodes of a boundary block's DOM range. */
+function vtRangeElements(block: Block): Element[] {
+	const els: Element[] = [];
+	if (block.startMarker !== null && block.endMarker !== null) {
+		for (let n = block.startMarker.nextSibling; n !== null && n !== block.endMarker; ) {
+			if (n.nodeType === 1) els.push(n as Element);
+			n = n.nextSibling;
+		}
+	} else {
+		// Whole-container regime (root / owns-parent): every element child.
+		const kids = (block.parentNode as Element).children;
+		for (let i = 0; i < kids.length; i++) els.push(kids[i]);
+	}
+	return els;
+}
+
+/** Assign the boundary's view-transition-name to its top-level elements. */
+function vtAssignNames(rec: VtRec): void {
+	const props = rec.block.vt;
+	if (rec.name === '') {
+		rec.name =
+			props !== null && typeof props.name === 'string' ? props.name : '‹vt' + ++VT_NAME_SEQ + '›';
+	}
+	for (let i = 0; i < rec.els.length; i++) {
+		// Multiple top-level children: suffix to keep names unique (React rule).
+		const n = i === 0 ? rec.name : rec.name + '-' + i;
+		(rec.els[i] as HTMLElement).style?.setProperty?.('view-transition-name', n);
+	}
+}
+
+function vtRevertNames(recs: VtRec[]): void {
+	for (const rec of recs) {
+		for (const el of rec.els) {
+			(el as HTMLElement).style?.removeProperty?.('view-transition-name');
+		}
+	}
+}
+
+function vtRectChanged(rec: VtRec): boolean {
+	if (rec.rect === null || rec.els.length === 0) return false;
+	const el = rec.els[0];
+	if (typeof el.getBoundingClientRect !== 'function') return false;
+	const r = el.getBoundingClientRect();
+	return (
+		r.x !== rec.rect.x ||
+		r.y !== rec.rect.y ||
+		r.width !== rec.rect.width ||
+		r.height !== rec.rect.height
+	);
+}
+
+/** Fire a boundary's activation callback (after the transition's `ready`). */
+function vtFireCallback(kind: VtActivationKind, rec: VtRec): void {
+	const props = rec.block.vt;
+	if (props === null) return;
+	const cb = kind === 'enter' ? props.onEnter : kind === 'exit' ? props.onExit : props.onUpdate;
+	if (typeof cb !== 'function') return;
+	const prevCleanup = VT_CLEANUPS.get(rec.block);
+	if (prevCleanup !== undefined) {
+		VT_CLEANUPS.delete(rec.block);
+		try {
+			prevCleanup();
+		} catch (err) {
+			console.error(err);
+		}
+	}
+	const instance: ViewTransitionInstance = {
+		name: rec.name,
+		group: null,
+		imagePair: null,
+		old: null,
+		new: null,
+	};
+	try {
+		const cleanup = cb(instance, []);
+		if (typeof cleanup === 'function') VT_CLEANUPS.set(rec.block, cleanup);
+	} catch (err) {
+		console.error(err);
+	}
+}
+
+/** Is every queued block scheduled at transition priority? (Empty → false.) */
+function queueAllTransition(): boolean {
+	if (QUEUE.length === 0) return false;
+	for (let i = 0; i < QUEUE.length; i++) {
+		if (QUEUE[i].pendingMode !== 'transition') return false;
+	}
+	return true;
+}
+
+/**
+ * Would the next drain be routed through document.startViewTransition?
+ * Shared by flush() and act()'s synchronous drain loop (which otherwise
+ * drains via flushSync — the urgent path that deliberately skips wrapping).
+ */
+function vtWouldWrap(): boolean {
+	return (
+		VT_SEEN &&
+		VT_STATE === VT_IDLE &&
+		!hydrating &&
+		queueAllTransition() &&
+		typeof document !== 'undefined' &&
+		(document as VTDocument).startViewTransition !== undefined
+	);
+}
 
 function tickTransitionCount(delta: number): void {
 	TRANSITION_PENDING_COUNT += delta;
@@ -869,6 +1100,32 @@ function flush(): void {
 		}
 		return;
 	}
+	// View-transition routing (zero-cost when the app never uses ViewTransition).
+	if (VT_SEEN) {
+		if (VT_STATE !== VT_IDLE) {
+			// A view transition is in flight. Transition-lane work waits: work
+			// arriving before the update callback runs is drained BY that callback
+			// (it drains whatever is queued — React's A→B then B→D batching);
+			// work arriving mid-animation is re-armed by the `finished` handler.
+			if (queueAllTransition()) return;
+			// Urgent work interrupts: kill the animation and drain synchronously
+			// (matching React's flushSync-mid-transition rule). The pending update
+			// callback later drains an empty queue — a no-op.
+			if (QUEUE.length > 0 && VT_HANDLE !== null) VT_HANDLE.skipTransition();
+		} else if (vtWouldWrap()) {
+			vtFlush();
+			return;
+		}
+	}
+	flushWork();
+}
+
+/**
+ * The flush body proper — render+mutate drain plus the effect commit. Shared
+ * verbatim by the plain flush() path and the view-transition update callback
+ * (vtFlush), so both drain with identical semantics.
+ */
+function flushWork(): void {
 	inFlush = true;
 	try {
 		// React parity: pending PASSIVE effects from an earlier commit flush BEFORE the next
@@ -884,6 +1141,130 @@ function flush(): void {
 	} finally {
 		inFlush = false;
 	}
+}
+
+/**
+ * A transition-lane flush routed through `document.startViewTransition` —
+ * see the View Transitions block above for the full model. The browser
+ * snapshots the current state, the whole drain runs inside the update
+ * callback, activations resolve from what the drain did, and callbacks fire
+ * once the transition is `ready`. When the drain turns out to touch no
+ * boundary, the transition is skipped (mutations still applied, no animation).
+ */
+function vtFlush(): void {
+	// Pre-drain: collect live boundaries, pre-name them (the OLD capture must
+	// see the names — exits/updates animate from these snapshots), and measure
+	// rects for update detection.
+	const recs: VtRec[] = [];
+	for (const b of VT_REGISTRY) {
+		if (b.disposed) {
+			VT_REGISTRY.delete(b);
+			continue;
+		}
+		const els = vtRangeElements(b);
+		const rec: VtRec = { block: b, els, rect: null, name: '' };
+		if (els.length > 0 && typeof els[0].getBoundingClientRect === 'function') {
+			const r = els[0].getBoundingClientRect();
+			rec.rect = { x: r.x, y: r.y, width: r.width, height: r.height };
+		}
+		vtAssignNames(rec);
+		recs.push(rec);
+	}
+	VT_ENTERED = [];
+	VT_DIRTY.clear();
+	VT_STATE = VT_PENDING_UPDATE;
+	VT_HANDLE = null;
+	let acts: Array<{ kind: VtActivationKind; rec: VtRec }> = [];
+	let skipRequested = false;
+	const update = (): void => {
+		VT_DRAIN = true;
+		let pendingError: { err: any } | null = null;
+		try {
+			flushWork();
+		} catch (err) {
+			pendingError = { err };
+		} finally {
+			VT_DRAIN = false;
+		}
+		// Resolve activations from what the drain did.
+		for (const rec of recs) {
+			if (rec.block.disposed) {
+				acts.push({ kind: 'exit', rec });
+			} else {
+				// The drain may have replaced the boundary's elements — re-enumerate
+				// and re-assert the SAME name so the new capture pairs with the old.
+				const before = rec.els;
+				rec.els = vtRangeElements(rec.block);
+				const changed = VT_DIRTY.has(rec.block) || vtRectChanged(rec);
+				vtAssignNames(rec);
+				if (changed || before.length !== rec.els.length) acts.push({ kind: 'update', rec });
+			}
+		}
+		for (const b of VT_ENTERED) {
+			if (b.disposed) continue;
+			const rec: VtRec = { block: b, els: vtRangeElements(b), rect: null, name: '' };
+			// Enter names exist only in the NEW capture — assigned post-drain.
+			vtAssignNames(rec);
+			recs.push(rec);
+			acts.push({ kind: 'enter', rec });
+		}
+		VT_STATE = VT_ANIMATING;
+		if (acts.length === 0) skipRequested = true;
+		// Surface a drain error through the caller (mock/sync path) or the
+		// transition's rejection (real async path — see finished.catch below).
+		if (pendingError !== null) throw pendingError.err;
+	};
+	let vt: VTHandle;
+	try {
+		vt = (document as VTDocument).startViewTransition!({ update });
+	} catch (err) {
+		// Synchronous-update path (the conformance mock): the drain threw inside
+		// startViewTransition. Clean up and surface to the flush caller.
+		VT_STATE = VT_IDLE;
+		vtRevertNames(recs);
+		if (QUEUE.length > 0 && !scheduled) {
+			scheduled = true;
+			queueMicrotask(flush);
+		}
+		throw err;
+	}
+	VT_HANDLE = vt;
+	if (skipRequested) vt.skipTransition();
+	vt.ready.then(
+		() => {
+			vtRevertNames(recs);
+			for (const a of acts) vtFireCallback(a.kind, a.rec);
+		},
+		() => {
+			// Skipped or interrupted: no animation ran, so no callbacks — but the
+			// names still need reverting.
+			vtRevertNames(recs);
+		},
+	);
+	vt.finished.then(
+		() => {
+			VT_STATE = VT_IDLE;
+			VT_HANDLE = null;
+			if (QUEUE.length > 0 && !scheduled) {
+				scheduled = true;
+				queueMicrotask(flush);
+			}
+		},
+		(err: unknown) => {
+			VT_STATE = VT_IDLE;
+			VT_HANDLE = null;
+			if (QUEUE.length > 0 && !scheduled) {
+				scheduled = true;
+				queueMicrotask(flush);
+			}
+			// A REAL async update callback that threw rejects `finished` — surface
+			// it (the mock's synchronous path already threw through vtFlush, and a
+			// skipTransition() rejects only `ready`, never `finished`).
+			queueMicrotask(() => {
+				throw err;
+			});
+		},
+	);
 }
 
 /** Drain pending passive effects ahead of a render pass (see flush()). */
@@ -906,6 +1287,10 @@ export function flushSync<T>(fn: () => T): T {
 	// schedules — drainQueue picks up mid-pass appends, and the microtask
 	// scheduler backstops work queued after the render pass (see `inFlush`).
 	if (inFlush) return fn();
+	// flushSync mid-view-transition skips the animation (React's rule): the
+	// sync drain below applies everything now; the pending update callback
+	// later drains an empty queue.
+	if (VT_SEEN && VT_STATE !== VT_IDLE && VT_HANDLE !== null) VT_HANDLE.skipTransition();
 	const prevSync = syncFlush;
 	syncFlush = true;
 	try {
@@ -1207,7 +1592,14 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 	// awaited async validation) can't be reached synchronously; the returned
 	// promise continues the async drain for callers that DO await.
 	for (let i = 0; i < 50; i++) {
-		flushSync(() => {});
+		// A transition-lane drain that would be wrapped in a view transition must
+		// route through flush() — flushSync is the urgent path and deliberately
+		// SKIPS the wrap. Under the test mock, startViewTransition runs its update
+		// callback synchronously, so this stays a synchronous drain; a REAL async
+		// startViewTransition under sync act() cannot be awaited here (use the
+		// async act form, which drains through the scheduled microtask flush).
+		if (vtWouldWrap()) flush();
+		else flushSync(() => {});
 		drainPassiveEffects();
 		if (!hasPendingWork()) break;
 		if (i === 49) {
@@ -1577,6 +1969,8 @@ class BlockImpl {
 	prevSibling: Block | null;
 	nextSibling: Block | null;
 	key: any;
+	// ViewTransition boundary props (null on every other block — see Block).
+	vt: ViewTransitionProps | null;
 	// Scope contract: a Block is its own scope.
 	parent: Scope | null;
 	block: Block;
@@ -1635,6 +2029,7 @@ class BlockImpl {
 		this.prevSibling = null;
 		this.nextSibling = null;
 		this.key = null;
+		this.vt = null;
 		this.parent = null;
 		this.block = this as unknown as Block;
 		this.kind = kind;
@@ -2017,6 +2412,9 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 
 function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
+	// ViewTransition boundary: unregister eagerly (vtFlush also prunes lazily —
+	// the `disposed` stamp above is what exit detection reads).
+	if (block.vt !== null) VT_REGISTRY.delete(block);
 	// De-opt-managed host subtree (deoptItemBody item / hostElementBody element):
 	// detach its stamped refs so a `ref={obj}` / callback ref doesn't keep pointing
 	// at the removed node. Runs even when detachDom is false — those callers
@@ -2915,6 +3313,31 @@ export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBo
 		pendingBody,
 		block.endMarker,
 	);
+};
+
+/**
+ * `<ViewTransition>` — a transparent boundary that opts its subtree into
+ * browser View Transitions on transition-lane commits (enter on insert, exit
+ * on delete, update on inner mutation — see the View Transitions block above
+ * and docs/view-transitions-plan.md). Renders its children unchanged; all
+ * animation machinery lives in the flush controller. Identity-checked like
+ * Suspense/ErrorBoundary (M3 inherit-decline), so its block always owns an
+ * exact DOM range.
+ */
+export const ViewTransition: ComponentBody<ViewTransitionProps> = (props, scope) => {
+	VT_SEEN = true;
+	const block = scope.block;
+	if (block.vt === null) {
+		// First render = mount. Registration during a WRAPPED drain is an enter
+		// activation; during any other flush (initial urgent render, no
+		// startViewTransition, hydration) it just joins the registry.
+		block.vt = props;
+		VT_REGISTRY.add(block);
+		if (VT_DRAIN) VT_ENTERED.push(block);
+	} else {
+		block.vt = props;
+	}
+	childSlot(scope, 0, block.parentNode, props.children, block.endMarker);
 };
 
 /**
@@ -3904,6 +4327,12 @@ export function setText(node: Text, value: any): void {
 	// `_prev` — an internal recheck is provably always true. Skipping it avoids a
 	// text-getter read, which materializes a fresh JS string from the DOM on every
 	// call (a measurable cost + GC pressure on text-heavy updates).
+	//
+	// View-transition dirty tracking: setText is the compiler's single text-
+	// mutation choke point AND is prev-guarded (only ACTUAL changes reach it), so
+	// one predictable branch marks the innermost enclosing boundary. VT_DRAIN is
+	// true only inside a wrapped transition drain — zero cost everywhere else.
+	if (VT_DRAIN) vtMarkDirtyFromCurrentBlock();
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
@@ -7211,7 +7640,11 @@ export function componentSlot(
 		// `const S = Suspense`): their pairs are load-bearing for streaming.
 		// ssrComponent declines on the same identities, so the server emitted a
 		// pair exactly where this falls through to the adoption regimes below.
-		if (inherit === true && (comp === Suspense || comp === ErrorBoundary)) inherit = false;
+		if (
+			inherit === true &&
+			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition)
+		)
+			inherit = false;
 		if (inherit === true && parentBlock !== null) {
 			const ps = (parentBlock as { startMarker?: Node | null }).startMarker;
 			const pe = (parentBlock as { endMarker?: Node | null }).endMarker;

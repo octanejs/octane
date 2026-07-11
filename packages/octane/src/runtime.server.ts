@@ -1181,8 +1181,10 @@ export function ssrComponent(
 ): string {
 	// Boundary builtins decline inherit by IDENTITY — mirrors componentSlot's
 	// client-side decline exactly (member/aliased/dynamic tags resolving to
-	// Suspense/ErrorBoundary keep their pair; both sides agree by identity).
-	if (inherit === true && (comp === Suspense || comp === ErrorBoundary)) inherit = false;
+	// Suspense/ErrorBoundary/ViewTransition keep their pair; both sides agree
+	// by identity).
+	if (inherit === true && (comp === Suspense || comp === ErrorBoundary || comp === ViewTransition))
+		inherit = false;
 	// A member/dynamic tag (`<obj.tag/>`, `<{expr}/>`) can resolve to a host tag
 	// STRING at runtime (e.g. MDX's `_components.h1` mapping, unoverridden). The
 	// client renders these — a value-lowered `createElement(obj.tag, …)` routes
@@ -1263,6 +1265,19 @@ export function Suspense(
 		(_arg, s) => ssrChild(props.fallback, s),
 		null,
 	);
+}
+
+/**
+ * `<ViewTransition>` — the server twin of the client boundary builtin
+ * (docs/view-transitions-plan.md). View transitions are a CLIENT concern:
+ * the server renders the children transparently, in the same nested-block
+ * byte shape the client produces (componentSlot's comp pair around the body's
+ * childSlot pair — renderComponentFramed adds the outer frame, the explicit
+ * ssrBlock below is the inner childSlot range), so hydration adopts cleanly.
+ * SSR activation annotations are Phase 5.
+ */
+export function ViewTransition(props: { children?: unknown }, scope: SSRScope): string {
+	return ssrBlock(ssrChildrenHtml(props.children, scope));
 }
 
 /**

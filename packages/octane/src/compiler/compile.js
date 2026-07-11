@@ -313,7 +313,11 @@ function collectOctaneBoundaryNames(astBody) {
 		for (const sp of node.specifiers || []) {
 			const imported = sp.imported?.name;
 			if (
-				(imported === 'Suspense' || imported === 'ErrorBoundary' || imported === 'Activity') &&
+				(imported === 'Suspense' ||
+					imported === 'ErrorBoundary' ||
+					imported === 'Activity' ||
+					imported === 'ViewTransition' ||
+					imported === 'unstable_ViewTransition') &&
 				sp.local?.name
 			) {
 				names.add(sp.local.name);
@@ -321,6 +325,23 @@ function collectOctaneBoundaryNames(astBody) {
 		}
 	}
 	return names;
+}
+
+// Does this module import ViewTransition from 'octane' (any local alias)?
+// Drives the client prelude's `_$vtSeen()` module-load hint: the runtime's
+// view-transition machinery is gated on a sticky VT_SEEN flag, and without
+// the hint the very FIRST transition flush that mounts a boundary would only
+// learn "this app uses ViewTransition" mid-drain — after the chance to
+// snapshot the old state has passed (docs/view-transitions-plan.md).
+function moduleImportsViewTransition(astBody) {
+	for (const node of astBody) {
+		if (node.type !== 'ImportDeclaration' || node.source.value !== 'octane') continue;
+		for (const sp of node.specifiers || []) {
+			const imported = sp.imported?.name;
+			if (imported === 'ViewTransition' || imported === 'unstable_ViewTransition') return true;
+		}
+	}
+	return false;
 }
 
 export const HOOK_NAMES = new Set([
@@ -1418,6 +1439,8 @@ export function compile(source, filename, options) {
 	}
 	// M3 inherit-range exclusion set (see inheritSoleCompRoot).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
+	// Client prelude `_$vtSeen()` module-load hint (view-transitions plan).
+	ctx._usesViewTransition = moduleImportsViewTransition(ast.body);
 
 	// List of exported components needing HMR wrapping. Each entry: { name,
 	// exportKind: 'default' | 'named' }. We emit the `Comp = hmr(Comp)` lines
@@ -1762,12 +1785,21 @@ export function compile(source, filename, options) {
 		if (stamps.length > 0) stampBlock = stamps.join('\n') + '\n';
 	}
 
+	// Module-load ViewTransition hint (see moduleImportsViewTransition) —
+	// registered before the import list is built so `__vtSeen` gets aliased in.
+	let vtHintBlock = '';
+	if (ctx._usesViewTransition) {
+		ctx.runtimeNeeded.add('__vtSeen');
+		vtHintBlock = rtAlias('__vtSeen') + '();\n';
+	}
+
 	// Built after HMR wiring so the import list includes `hmr`/`HMR` when needed.
 	const finalRuntimeImport = buildRuntimeImport(ctx, 'octane');
 
 	// Everything before `body` in the output — shifts every body segment's
 	// generated line down by the prelude's line count.
-	const prelude = finalRuntimeImport + delegateCall + styleBlock + templatesBlock + helpersBlock;
+	const prelude =
+		finalRuntimeImport + vtHintBlock + delegateCall + styleBlock + templatesBlock + helpersBlock;
 	const preludeLines = countNewlines(prelude);
 	const segments = bodySegments.map((s) => ({
 		genLine: s.genLine + preludeLines,

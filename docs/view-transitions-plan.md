@@ -1,13 +1,23 @@
 # View Transitions — React-parity plan
 
-Status: Phase 0 LANDED 2026-07-11 (conformance skeletons
-`tests/conformance/view-transition.test.ts` [25 todos + 1 live harness pin] +
-`view-transition-ssr.test.ts` [4 todos], mock helper
-`tests/conformance/_helpers/view-transition-mocks.ts`, scaffolder's
-ViewTransitions out-of-scope rule removed). Phases 1-5 pending. Owner doc for
-`<ViewTransition>` / `addTransitionType` support; read with
-`docs/react-parity-migration-plan.md` (its ViewTransitions row now points
-here).
+Status: Phases 0+1 LANDED 2026-07-11. Phase 0: conformance skeletons
+(`tests/conformance/view-transition.test.ts` + `view-transition-ssr.test.ts`)
++ the jsdom mock helper. Phase 1: the core runtime — `ViewTransition` builtin
+(tier-1 export + `unstable_ViewTransition` alias), boundary registry +
+enter/exit/update activation, setText dirty tracking + rect diffing, the
+`vtFlush` controller wrapping transition drains in
+`document.startViewTransition` (sync fallback, `flushSync` skip, one-at-a-time
+batching), auto name assignment/revert, `onEnter`/`onExit`/`onUpdate`
+callbacks, the compiler's `_$vtSeen()` module-load hint + boundary-name M3
+exclusion, and the transparent SSR twin with both-sides inherit-decline. Five
+conformance ports flipped from todo. Phases 2-5 pending. Phase-1 notes:
+`act()`'s sync drain loop routes through `flush()` when a wrap is due
+(flushSync is the urgent path and skips); the root's FIRST `render()` is
+synchronous (never queued), so an initial-transition root mount doesn't
+enter-animate — the ported tests don't assert it (React's do via mockClear
+patterns); revisit if a real test pins it. Owner doc for `<ViewTransition>` /
+`addTransitionType` support; read with `docs/react-parity-migration-plan.md`
+(its ViewTransitions row now points here).
 
 ## 1. What React ships (the parity target)
 
