@@ -22,7 +22,15 @@ import {
 	installViewTransitionMocks,
 	type ViewTransitionMocks,
 } from './_helpers/view-transition-mocks';
-import { EnterApp, ExitApp, UpdateApp, PlainApp, ShareApp } from './_fixtures/view-transition.tsrx';
+import {
+	EnterApp,
+	ExitApp,
+	UpdateApp,
+	PlainApp,
+	ShareApp,
+	SuspenseRevealApp,
+	NestedUnitApp,
+} from './_fixtures/view-transition.tsrx';
 
 describe('ReactDOMViewTransition (ported)', () => {
 	// Harness pin (not a React port): the mock helper installs the exact
@@ -246,15 +254,94 @@ describe('ReactDOMViewTransition (ported)', () => {
 			expect(vt.calls.length).toBeGreaterThan(0);
 			expect(container.textContent).toBe('');
 		});
-	});
 
-	// ── Suspense + nested-unit semantics (Phase 3) ────────────────────────────
-	// ReactDOMViewTransition-test.js:422
-	it.todo('fires onEnter when Suspense content resolves');
-	// ReactDOMViewTransition-test.js:466
-	it.todo(
-		'does not fire onExit/onEnter on nested ViewTransition when the subtree is removed as one unit',
-	);
+		// ── Suspense + nested-unit semantics (Phase 3) ──────────────────────────
+
+		// Per ReactDOMViewTransition-test.js:422
+		it('fires onEnter when Suspense content resolves', async () => {
+			let enters = 0;
+			const onEnter = () => {
+				enters++;
+			};
+			let resolve!: (v: string) => void;
+			const promise = new Promise<string>((r) => {
+				resolve = r;
+			});
+
+			// Initial render — content suspends, the fallback commits under the
+			// wrapped transition flush.
+			await act(() => {
+				startTransition(() => {
+					root.render(SuspenseRevealApp, { onEnter, promise });
+				});
+			});
+			expect(container.textContent).toBe('Loading...');
+			// onEnter fires for the fallback appearing.
+			const entersAfterFallback = enters;
+			enters = 0;
+
+			// Resolve the suspended content.
+			await act(async () => {
+				resolve('Loaded');
+				await promise;
+			});
+
+			expect(container.textContent).toBe('Loaded');
+			// The reveal (or the initial fallback mount) triggered enter — React's
+			// own assertion is this lenient sum (see the source test).
+			expect(enters + entersAfterFallback).toBeGreaterThanOrEqual(1);
+		});
+
+		// Per ReactDOMViewTransition-test.js:466
+		it('does not fire onExit/onEnter on nested ViewTransition when the subtree is removed as one unit', async () => {
+			let parentEnters = 0,
+				parentExits = 0,
+				nestedEnters = 0,
+				nestedExits = 0;
+			const props = {
+				show: false,
+				onParentEnter: () => {
+					parentEnters++;
+				},
+				onParentExit: () => {
+					parentExits++;
+				},
+				onNestedEnter: () => {
+					nestedEnters++;
+				},
+				onNestedExit: () => {
+					nestedExits++;
+				},
+			};
+
+			await act(() => {
+				startTransition(() => {
+					root.render(NestedUnitApp, props);
+				});
+			});
+			parentEnters = nestedEnters = 0;
+
+			await act(() => {
+				startTransition(() => {
+					root.render(NestedUnitApp, { ...props, show: true });
+				});
+			});
+
+			expect(parentEnters).toBe(1);
+			expect(nestedEnters).toBe(0);
+
+			parentExits = nestedExits = 0;
+
+			await act(() => {
+				startTransition(() => {
+					root.render(NestedUnitApp, { ...props, show: false });
+				});
+			});
+
+			expect(parentExits).toBe(1);
+			expect(nestedExits).toBe(0);
+		});
+	});
 
 	// ── onParentEnter/onParentExit relays (Phase 4 — behind React's
 	//    enableViewTransitionParentEnterExit flag; ship vs pin decided there) ──

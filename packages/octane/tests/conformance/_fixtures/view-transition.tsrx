@@ -1,4 +1,4 @@
-import { ViewTransition } from 'octane';
+import { ViewTransition, use } from 'octane';
 
 // Fixtures for conformance/view-transition.test.ts — ports of facebook/react
 // ReactDOMViewTransition-test.js (see the test file for per-`it` citations).
@@ -45,6 +45,51 @@ export function PlainApp(props) @{
 		@if (props.show) {
 			<ViewTransition>
 				<div>{'Hello'}</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+// Per ReactDOMViewTransition-test.js:425 — a ViewTransition around a Suspense
+// boundary (@try/@pending is octane's directive form of the same tryBlock).
+// The initial transition render suspends → the fallback commits under the
+// wrapped flush (enter); the resolve commits the reveal through the
+// controller (update on the wrapping boundary).
+export function SuspenseRevealApp(props) @{
+	<ViewTransition onEnter={props.onEnter}>
+		<>
+			@try {
+				<div>
+					{use(props.promise) as string}
+				</div>
+			} @pending {
+				<div>{'Loading...'}</div>
+			}
+		</>
+	</ViewTransition>
+}
+
+// Per ReactDOMViewTransition-test.js:472 — nested boundaries inserted/removed
+// as ONE unit: only the OUTERMOST fires enter/exit; nested ones stay silent.
+export function NestedUnitApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition
+				exit="page-exit"
+				enter="page-enter"
+				onExit={props.onParentExit}
+				onEnter={props.onParentEnter}
+			>
+				<div>
+					<ViewTransition
+						exit="nested-exit"
+						enter="nested-enter"
+						onExit={props.onNestedExit}
+						onEnter={props.onNestedEnter}
+					>
+						<div>{'Item'}</div>
+					</ViewTransition>
+				</div>
 			</ViewTransition>
 		}
 	</>
