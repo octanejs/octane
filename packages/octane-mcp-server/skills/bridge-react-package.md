@@ -12,6 +12,7 @@ of bridging by hand:
 | `zustand` | `@octanejs/zustand` |
 | `jotai` | `@octanejs/jotai` |
 | `@tanstack/react-query` | `@octanejs/tanstack-query` |
+| `@tanstack/react-table` | `@octanejs/tanstack-table` |
 | `framer-motion` / `motion` | `@octanejs/motion` |
 | `@stylexjs/stylex` | `@octanejs/stylex` |
 | `react-router` / `react-router-dom` | `@octanejs/tanstack-router` |
