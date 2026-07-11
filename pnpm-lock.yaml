@@ -160,8 +160,8 @@ catalogs:
       specifier: ^0.1.37
       version: 0.1.37
     '@tsrx/prettier-plugin':
-      specifier: ^0.3.91
-      version: 0.3.91
+      specifier: ^0.3.95
+      version: 0.3.95
     '@tsrx/react':
       specifier: ^0.2.37
       version: 0.2.37
@@ -335,7 +335,6 @@ overrides:
 
 patchedDependencies:
   '@tsrx/core@0.1.37': 0b7535578a1327e33019974cc015cbaafbd88bc4a1f60997c23bfb979cd7a081
-  '@tsrx/prettier-plugin': de964d887c8dfdf8fd33f3218edc80bd421c1a1856e7e0ce5684d48684f5f54f
 
 importers:
 
@@ -352,7 +351,7 @@ importers:
         version: 2.31.0(@types/node@24.13.2)
       '@tsrx/prettier-plugin':
         specifier: catalog:default
-        version: 0.3.91(patch_hash=de964d887c8dfdf8fd33f3218edc80bd421c1a1856e7e0ce5684d48684f5f54f)(prettier@3.8.4)
+        version: 0.3.95(prettier@3.8.4)
       '@types/node':
         specifier: catalog:default
         version: 24.13.2
@@ -4002,8 +4001,11 @@ packages:
   '@tsrx/core@0.1.37':
     resolution: {integrity: sha512-slL2jcSqJ6nbsAA/dOAkp/1+QQiVViq54WilX7E/rJeBtFRMVBmmLM2q2HFLMu9IC1iJq8ch67fGsqmyYXsTBA==}
 
-  '@tsrx/prettier-plugin@0.3.91':
-    resolution: {integrity: sha512-Pf48IwdnmkKQoaTKjWjE3r0yRAXp2Tb4GCYn7VBIhgTQnxWLf7QVG+Yxp+nQe5J/HaPcrTNR5nMW7yKwGSs2eg==}
+  '@tsrx/core@0.1.38':
+    resolution: {integrity: sha512-yQRYnWEkFDflXBe62qkIqskf2yVrPvC8HmXZXvmrPYzIne5AGNFDVw4VdE0C8iRr2GTW9s7c97goee359c56+g==}
+
+  '@tsrx/prettier-plugin@0.3.95':
+    resolution: {integrity: sha512-GjGaeDD2buU/bUNzOF14rsQhqklrHZAZ4TdULftuZdS8qpQMxiJu4XW9DbL7MC4DX0hia2PJhtnFXCzxZ1DSwg==}
     peerDependencies:
       prettier: '>=2.0.0'
 
@@ -8490,9 +8492,24 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/prettier-plugin@0.3.91(patch_hash=de964d887c8dfdf8fd33f3218edc80bd421c1a1856e7e0ce5684d48684f5f54f)(prettier@3.8.4)':
+  '@tsrx/core@0.1.38':
     dependencies:
-      '@tsrx/core': 0.1.37(patch_hash=0b7535578a1327e33019974cc015cbaafbd88bc4a1f60997c23bfb979cd7a081)
+      '@jridgewell/sourcemap-codec': 1.5.5
+      '@noble/hashes': 2.2.0
+      '@sveltejs/acorn-typescript': 1.0.10(acorn@8.17.0)
+      '@types/estree': 1.0.9
+      '@types/estree-jsx': 1.0.5
+      acorn: 8.17.0
+      esrap: 2.2.11
+      is-reference: 3.0.3
+      magic-string: 0.30.21
+      zimmerframe: 1.1.4
+    transitivePeerDependencies:
+      - '@typescript-eslint/types'
+
+  '@tsrx/prettier-plugin@0.3.95(prettier@3.8.4)':
+    dependencies:
+      '@tsrx/core': 0.1.38
       prettier: 3.8.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
