@@ -222,6 +222,9 @@ catalogs:
     immer:
       specifier: ^11.1.8
       version: 11.1.11
+    jotai:
+      specifier: ^2.20.1
+      version: 2.20.1
     jsdom:
       specifier: ^29.0.2
       version: 29.1.1
@@ -332,6 +335,7 @@ overrides:
 
 patchedDependencies:
   '@tsrx/core@0.1.37': 0b7535578a1327e33019974cc015cbaafbd88bc4a1f60997c23bfb979cd7a081
+  '@tsrx/prettier-plugin': de964d887c8dfdf8fd33f3218edc80bd421c1a1856e7e0ce5684d48684f5f54f
 
 importers:
 
@@ -348,7 +352,7 @@ importers:
         version: 2.31.0(@types/node@24.13.2)
       '@tsrx/prettier-plugin':
         specifier: catalog:default
-        version: 0.3.91(prettier@3.8.4)
+        version: 0.3.91(patch_hash=de964d887c8dfdf8fd33f3218edc80bd421c1a1856e7e0ce5684d48684f5f54f)(prettier@3.8.4)
       '@types/node':
         specifier: catalog:default
         version: 24.13.2
@@ -1735,6 +1739,31 @@ importers:
       zod:
         specifier: catalog:default
         version: 3.25.76
+
+  packages/jotai:
+    dependencies:
+      jotai:
+        specifier: catalog:default
+        version: 2.20.1(@babel/core@7.29.7)(@babel/template@7.29.7)(react@19.2.7)
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+    devDependencies:
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.37(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
 
   packages/lexical:
     dependencies:
@@ -5163,6 +5192,24 @@ packages:
   jose@6.2.3:
     resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
 
+  jotai@2.20.1:
+    resolution: {integrity: sha512-dnuKfU/GLi8B28RRMjQ3AfoN7kfzP8o41+AX2FmITZqEMY8PHnjABq+VkEooomLwYaGjda+pgy0yFSjaHX/ZPg==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@babel/core': '>=7.0.0'
+      '@babel/template': '>=7.0.0'
+      '@types/react': '>=17.0.0'
+      react: '>=17.0.0'
+    peerDependenciesMeta:
+      '@babel/core':
+        optional: true
+      '@babel/template':
+        optional: true
+      '@types/react':
+        optional: true
+      react:
+        optional: true
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -8443,7 +8490,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/prettier-plugin@0.3.91(prettier@3.8.4)':
+  '@tsrx/prettier-plugin@0.3.91(patch_hash=de964d887c8dfdf8fd33f3218edc80bd421c1a1856e7e0ce5684d48684f5f54f)(prettier@3.8.4)':
     dependencies:
       '@tsrx/core': 0.1.37(patch_hash=0b7535578a1327e33019974cc015cbaafbd88bc4a1f60997c23bfb979cd7a081)
       prettier: 3.8.4
@@ -9725,6 +9772,12 @@ snapshots:
   isomorphic.js@0.2.5: {}
 
   jose@6.2.3: {}
+
+  jotai@2.20.1(@babel/core@7.29.7)(@babel/template@7.29.7)(react@19.2.7):
+    optionalDependencies:
+      '@babel/core': 7.29.7
+      '@babel/template': 7.29.7
+      react: 19.2.7
 
   js-tokens@4.0.0: {}
 
