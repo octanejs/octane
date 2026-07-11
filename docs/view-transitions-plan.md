@@ -1,6 +1,21 @@
 # View Transitions — React-parity plan
 
-Status: Phases 0+1+2 LANDED 2026-07-11. Phase 2: shared-element pairing
+Status: Phases 0-3 LANDED 2026-07-11. Phase 3: Suspense reveal commits
+(standalone `commitResume` + the entangled `flushStagedReveals` batch, which
+animates as ONE transition) route through the controller via `vtFlush(work)`;
+nested-unit suppression (only the OUTERMOST of boundaries inserted/removed
+together fires — nearest-boundary-ancestor walks against the entered set /
+the disposed flag; share pairing gets first claim on named nested exits);
+`render()` inside a transition schedules at transition priority instead of
+committing synchronously (closing the Phase-1 root-mount gap — boundaries
+mounting with initial content enter-animate, which is what makes the
+Suspense-reveal conformance test's fallback-enter arm hold); passive effects
+scheduled mid-animation defer to `finished` (scheduled path only — direct
+test-harness drains stay ungated); update detection compares element
+IDENTITY (a fallback→content swap of same-count elements activates). A
+reveal that mounts the app's first-ever boundary is a documented miss
+(vtWouldWrapResume gates on VT_REGISTRY.size > 0). Phase 2: shared-element
+pairing
 (same-named exit+enter in one commit → ONE `share` activation fired on the
 EXITING side, suppressing its exit and the enter side's enter; viewport decay
 via pre-drain exit rect + post-drain enter rect), `addTransitionType` (+

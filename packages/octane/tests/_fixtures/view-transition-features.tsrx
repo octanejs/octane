@@ -1,4 +1,4 @@
-import { ViewTransition } from 'octane';
+import { ViewTransition, use } from 'octane';
 
 // Fixtures for ../view-transition.test.ts (Phase 2 feature coverage:
 // addTransitionType + per-type class maps, 'none' deactivation, share
@@ -46,5 +46,21 @@ export function CleanupApp(props) @{
 		<div>
 			{props.text as string}
 		</div>
+	</ViewTransition>
+}
+
+// Standalone Suspense reveal: the boundary update-activates when the resolve
+// swaps the fallback for content (commitResume routed through the controller).
+export function RevealApp(props) @{
+	<ViewTransition onUpdate={props.onUpdate}>
+		<>
+			@try {
+				<div>
+					{use(props.promise) as string}
+				</div>
+			} @pending {
+				<div>{'Loading...'}</div>
+			}
+		</>
 	</ViewTransition>
 }

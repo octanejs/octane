@@ -668,6 +668,8 @@ const VT_IDLE = 0,
 let VT_STATE: 0 | 1 | 2 = VT_IDLE;
 let VT_HANDLE: VTHandle | null = null;
 let VT_NAME_SEQ = 0;
+/** A scheduled passive drain deferred until the transition's `finished`. */
+let VT_PASSIVES_HELD = false;
 /** Per-boundary callback cleanups (returned by on*), run before the next fire. */
 const VT_CLEANUPS = new WeakMap<Block, () => void>();
 /**
@@ -823,6 +825,23 @@ function vtInViewport(rect: { x: number; y: number; width: number; height: numbe
 	return rect.x < iw && rect.y < ih && rect.x + rect.width > 0 && rect.y + rect.height > 0;
 }
 
+/** The nearest ANCESTOR ViewTransition boundary of a boundary block. */
+function vtNearestBoundaryAncestor(b: Block): Block | null {
+	for (let p = b.parentBlock; p !== null; p = p.parentBlock) {
+		if (p.vt !== null) return p;
+	}
+	return null;
+}
+
+/** Did a boundary's top-level element list change across the drain? */
+function vtElsChanged(before: Element[], after: Element[]): boolean {
+	if (before.length !== after.length) return true;
+	for (let i = 0; i < before.length; i++) {
+		if (before[i] !== after[i]) return true;
+	}
+	return false;
+}
+
 function vtRectChanged(rec: VtRec): boolean {
 	if (rec.rect === null || rec.els.length === 0) return false;
 	const el = rec.els[0];
@@ -893,6 +912,25 @@ function vtWouldWrap(): boolean {
 		VT_STATE === VT_IDLE &&
 		!hydrating &&
 		queueAllTransition() &&
+		typeof document !== 'undefined' &&
+		(document as VTDocument).startViewTransition !== undefined
+	);
+}
+
+/**
+ * Same question for a Suspense reveal commit (commitResume /
+ * flushStagedReveals — they run OUTSIDE the flush, in thenable microtasks).
+ * Gated on a mounted boundary existing: a reveal whose content mounts the
+ * app's first-ever boundary is a documented miss (unknowable pre-snapshot).
+ */
+function vtWouldWrapResume(): boolean {
+	return (
+		VT_SEEN &&
+		VT_STATE === VT_IDLE &&
+		!hydrating &&
+		!inFlush &&
+		!VT_DRAIN &&
+		VT_REGISTRY.size > 0 &&
 		typeof document !== 'undefined' &&
 		(document as VTDocument).startViewTransition !== undefined
 	);
@@ -1299,7 +1337,7 @@ function flushWork(): void {
  * once the transition is `ready`. When the drain turns out to touch no
  * boundary, the transition is skipped (mutations still applied, no animation).
  */
-function vtFlush(): void {
+function vtFlush(work: () => void = flushWork): void {
 	// The batch's transition types (addTransitionType) — captured for class
 	// resolution + callbacks, reset for the next batch.
 	const types = VT_PENDING_TYPES;
@@ -1337,7 +1375,7 @@ function vtFlush(): void {
 		VT_DRAIN = true;
 		let pendingError: { err: any } | null = null;
 		try {
-			flushWork();
+			work();
 		} catch (err) {
 			pendingError = { err };
 		} finally {
@@ -1356,7 +1394,7 @@ function vtFlush(): void {
 				const changed = VT_DIRTY.has(rec.block) || vtRectChanged(rec);
 				vtApplyStyles(rec, rec.cls === '' ? 'auto' : rec.cls);
 				if (
-					(changed || before.length !== rec.els.length) &&
+					(changed || vtElsChanged(before, rec.els)) &&
 					vtResolveClass(rec.block.vt, 'update', types) !== 'none'
 				) {
 					acts.push({ kind: 'update', rec });
@@ -1365,9 +1403,15 @@ function vtFlush(): void {
 		}
 		// Entered boundaries: named post-drain (they exist only in the NEW
 		// capture). Collected before share pairing so exits can find them.
+		// A boundary whose nearest ANCESTOR boundary also entered this drain is
+		// part of a subtree inserted as ONE unit — only the outermost animates
+		// (React's rule); nested ones are fully silent (no name, no callback).
+		const enteredSet = new Set(VT_ENTERED);
 		const enters: VtRec[] = [];
 		for (const b of VT_ENTERED) {
 			if (b.disposed) continue;
+			const anc = vtNearestBoundaryAncestor(b);
+			if (anc !== null && enteredSet.has(anc)) continue;
 			const rec: VtRec = { block: b, els: vtRangeElements(b), rect: null, name: '', cls: '' };
 			const cls = vtResolveClass(b.vt, 'enter', types);
 			// An explicit name always applies (it may pair a share); an unnamed
@@ -1414,6 +1458,12 @@ function vtFlush(): void {
 					continue;
 				}
 			}
+			// Subtree removed as ONE unit: a nested boundary whose nearest ancestor
+			// boundary was also disposed this drain stays silent — only the
+			// outermost fires (React's rule). Share pairing above still gets first
+			// claim (a named nested boundary may pair out of a removed unit).
+			const anc = vtNearestBoundaryAncestor(exitRec.block);
+			if (anc !== null && anc.disposed) continue;
 			if (vtResolveClass(exitRec.block.vt, 'exit', types) !== 'none') {
 				acts.push({ kind: 'exit', rec: exitRec });
 			}
@@ -1451,30 +1501,29 @@ function vtFlush(): void {
 			vtRevertNames(recs);
 		},
 	);
-	vt.finished.then(
-		() => {
-			VT_STATE = VT_IDLE;
-			VT_HANDLE = null;
-			if (QUEUE.length > 0 && !scheduled) {
-				scheduled = true;
-				queueMicrotask(flush);
-			}
-		},
-		(err: unknown) => {
-			VT_STATE = VT_IDLE;
-			VT_HANDLE = null;
-			if (QUEUE.length > 0 && !scheduled) {
-				scheduled = true;
-				queueMicrotask(flush);
-			}
-			// A REAL async update callback that threw rejects `finished` — surface
-			// it (the mock's synchronous path already threw through vtFlush, and a
-			// skipTransition() rejects only `ready`, never `finished`).
-			queueMicrotask(() => {
-				throw err;
-			});
-		},
-	);
+	const settle = (): void => {
+		VT_STATE = VT_IDLE;
+		VT_HANDLE = null;
+		// Passive effects held back during the animation (React parity: useEffect
+		// waits for `finished`) drain now.
+		if (VT_PASSIVES_HELD) {
+			VT_PASSIVES_HELD = false;
+			if (!passiveScheduled) schedulePassiveFlush();
+		}
+		if (QUEUE.length > 0 && !scheduled) {
+			scheduled = true;
+			queueMicrotask(flush);
+		}
+	};
+	vt.finished.then(settle, (err: unknown) => {
+		settle();
+		// A REAL async update callback that threw rejects `finished` — surface
+		// it (the mock's synchronous path already threw through vtFlush, and a
+		// skipTransition() rejects only `ready`, never `finished`).
+		queueMicrotask(() => {
+			throw err;
+		});
+	});
 }
 
 /** Drain pending passive effects ahead of a render pass (see flush()). */
@@ -1708,6 +1757,14 @@ function commitEffects(): void {
 function schedulePassiveFlush(): void {
 	passiveScheduled = true;
 	schedulePostPaint(() => {
+		// View-transition ordering (React parity): passive effects wait for the
+		// transition's `finished` — the vtFlush finished handler re-arms this
+		// drain. Direct test-harness drains (drainPassiveEffects) stay ungated.
+		if (VT_STATE === VT_ANIMATING) {
+			passiveScheduled = false;
+			VT_PASSIVES_HELD = true;
+			return;
+		}
 		passiveScheduled = false;
 		drainPassivePhase();
 	});
@@ -10967,7 +11024,22 @@ function swapToPendingFallback(state: TrySlot): void {
 // try body, re-attach host refs, and drain its effects. Runs in a thenable microtask
 // (outside the normal flush) OR from the entangled-batch flush. Releases the transition
 // hold; a re-suspend during the re-render re-acquires it via handleSuspense.
+//
+// View transitions: a standalone reveal (fallback → content swap) is exactly
+// the commit a `<ViewTransition>` around/inside a Suspense boundary animates —
+// route it through the controller (the wrapping boundary update-activates on
+// the swap; boundaries INSIDE the revealed content enter). The entangled batch
+// wraps ONCE at flushStagedReveals (flushingStagedReveals gates the per-
+// boundary wrap here).
 function commitResume(state: TrySlot): void {
+	if (!flushingStagedReveals && vtWouldWrapResume()) {
+		vtFlush(() => commitResumeInner(state));
+		return;
+	}
+	commitResumeInner(state);
+}
+
+function commitResumeInner(state: TrySlot): void {
 	const wasHeld = state.transitionHeld;
 	if (wasHeld) state.transitionHeld = false;
 	// Leave the coordination sets — this boundary is committing now (a re-suspend
@@ -11142,14 +11214,21 @@ function flushStagedReveals(): void {
 	if (flushingStagedReveals) return; // re-entrancy guard (a reveal may abandon a sibling)
 	flushingStagedReveals = true;
 	try {
-		const batch = [...STAGED_REVEALS];
-		STAGED_REVEALS.clear();
-		for (const s of batch) {
-			// A prior reveal in this batch may have torn down a later one (a boundary that
-			// renders a sibling boundary). Skip any that were disposed meanwhile.
-			if (s.tryBlock !== null && s.tryBlock.disposed) continue;
-			commitResume(s);
-		}
+		const run = (): void => {
+			const batch = [...STAGED_REVEALS];
+			STAGED_REVEALS.clear();
+			for (const s of batch) {
+				// A prior reveal in this batch may have torn down a later one (a boundary that
+				// renders a sibling boundary). Skip any that were disposed meanwhile.
+				if (s.tryBlock !== null && s.tryBlock.disposed) continue;
+				commitResume(s);
+			}
+		};
+		// The entangled batch reveals atomically — and animates as ONE view
+		// transition (the per-boundary wrap in commitResume is gated off by
+		// flushingStagedReveals while inside this).
+		if (vtWouldWrapResume()) vtFlush(run);
+		else run();
 	} finally {
 		flushingStagedReveals = false;
 	}
@@ -13661,6 +13740,20 @@ function makeRoot(
 			while (container.firstChild) container.removeChild(container.firstChild);
 			rootBlock = createBlock('root', null, container, null, null, body, props);
 			currentBody = body;
+			// React parity: render() inside a transition never commits synchronously
+			// — schedule at transition priority so the commit is view-transition-
+			// wrappable (boundaries mounting WITH the initial content enter-animate,
+			// e.g. a Suspense fallback appearing under a <ViewTransition>).
+			if (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0) {
+				rootBlock.pending = true;
+				rootBlock.pendingMode = 'transition';
+				QUEUE.push(rootBlock);
+				if (!syncFlush && !scheduled) {
+					scheduled = true;
+					queueMicrotask(flush);
+				}
+				return;
+			}
 			renderBlock(rootBlock);
 			// First render commits effects on next microtask flush.
 			if (!syncFlush && !scheduled) {

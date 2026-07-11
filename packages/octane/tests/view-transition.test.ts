@@ -18,6 +18,7 @@ import {
 	NoneMapApp,
 	NamedShareApp,
 	CleanupApp,
+	RevealApp,
 } from './_fixtures/view-transition-features.tsrx';
 
 describe('ViewTransition features', () => {
@@ -164,6 +165,38 @@ describe('ViewTransition features', () => {
 		expect(shares).toBe(0);
 		expect(exits).toBe(1);
 		expect(enters).toBe(1);
+	});
+
+	it('routes a standalone Suspense reveal through startViewTransition (boundary updates)', async () => {
+		let updates = 0;
+		let resolve!: (v: string) => void;
+		const promise = new Promise<string>((r) => {
+			resolve = r;
+		});
+		const props = {
+			promise,
+			onUpdate: () => {
+				updates++;
+			},
+		};
+
+		// Initial mount OUTSIDE a transition: fallback shows, nothing wrapped.
+		await act(() => {
+			root.render(RevealApp, props);
+		});
+		expect(container.textContent).toBe('Loading...');
+		expect(vt.calls.length).toBe(0);
+
+		// The resolve commits the reveal via commitResume — wrapped, and the
+		// boundary update-activates on the fallback → content element swap.
+		await act(async () => {
+			resolve('Loaded');
+			await promise;
+		});
+
+		expect(container.textContent).toBe('Loaded');
+		expect(vt.calls.length).toBeGreaterThan(0);
+		expect(updates).toBe(1);
 	});
 
 	it('runs the previous callback cleanup before the next activation fires', async () => {
