@@ -579,11 +579,23 @@ export interface ViewTransitionProps {
 	exit?: ViewTransitionClassValue;
 	update?: ViewTransitionClassValue;
 	share?: ViewTransitionClassValue;
+	/**
+	 * Parent enter/exit relays (React's enableViewTransitionParentEnterExit —
+	 * experimental-channel behavior): a nested boundary inside a unit that
+	 * entered/exited as a whole activates its parentEnter/parentExit when every
+	 * strict intermediate boundary also relays (declares parentEnter/parentExit
+	 * or the matching handler, not resolving 'none') and the unit's outermost
+	 * boundary genuinely enters/exits (not 'none', not consumed by a share).
+	 */
+	parentEnter?: ViewTransitionClassValue;
+	parentExit?: ViewTransitionClassValue;
 	default?: ViewTransitionClassValue;
 	onEnter?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
 	onExit?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
 	onUpdate?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
 	onShare?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
+	onParentEnter?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
+	onParentExit?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
 	children?: unknown;
 }
 
@@ -649,7 +661,7 @@ interface VtRec {
 	/** The view-transition-class currently applied to els ('' = none applied). */
 	cls: string;
 }
-type VtActivationKind = 'enter' | 'exit' | 'update' | 'share';
+type VtActivationKind = 'enter' | 'exit' | 'update' | 'share' | 'parent-enter' | 'parent-exit';
 
 /** Sticky "this app uses ViewTransition" flag — the zero-cost guard. */
 let VT_SEEN = false;
@@ -747,7 +759,11 @@ function vtResolveClass(
 				? props.exit
 				: kind === 'update'
 					? props.update
-					: props.share;
+					: kind === 'share'
+						? props.share
+						: kind === 'parent-enter'
+							? props.parentEnter
+							: props.parentExit;
 	if (v == null) v = props.default;
 	if (v == null) return 'auto';
 	if (typeof v === 'string') return v;
@@ -773,6 +789,7 @@ function vtPreClass(props: ViewTransitionProps | null, types: string[]): string 
 	if (props.share != null && typeof props.name === 'string')
 		return vtResolveClass(props, 'share', types);
 	if (props.exit != null) return vtResolveClass(props, 'exit', types);
+	if (props.parentExit != null) return vtResolveClass(props, 'parent-exit', types);
 	if (props.update != null) return vtResolveClass(props, 'update', types);
 	return vtResolveClass(props, 'update', types); // → default chain
 }
@@ -781,8 +798,46 @@ function vtAllNone(props: ViewTransitionProps | null, types: string[]): boolean 
 	return (
 		vtResolveClass(props, 'exit', types) === 'none' &&
 		vtResolveClass(props, 'update', types) === 'none' &&
-		vtResolveClass(props, 'share', types) === 'none'
+		vtResolveClass(props, 'share', types) === 'none' &&
+		(!vtRelayParticipates(props, 'parent-exit') ||
+			vtResolveClass(props, 'parent-exit', types) === 'none')
 	);
+}
+
+/** Does a boundary opt into the parent enter/exit relay (class prop or handler)? */
+function vtRelayParticipates(
+	props: ViewTransitionProps | null,
+	kind: 'parent-enter' | 'parent-exit',
+): boolean {
+	if (props === null) return false;
+	return kind === 'parent-exit'
+		? props.parentExit != null || typeof props.onParentExit === 'function'
+		: props.parentEnter != null || typeof props.onParentEnter === 'function';
+}
+
+/**
+ * The OUTERMOST boundary of the entered/removed unit containing `b`, or null
+ * when `b` IS the outermost or a strict intermediate breaks the relay chain
+ * (doesn't participate, or its relay class resolves 'none'). Plain DOM/blocks
+ * between boundaries never break the chain — only boundaries do.
+ */
+function vtRelayOutermost(
+	b: Block,
+	kind: 'parent-enter' | 'parent-exit',
+	inUnit: (x: Block) => boolean,
+	types: string[],
+): Block | null {
+	let outer = vtNearestBoundaryAncestor(b);
+	if (outer === null || !inUnit(outer)) return null; // b is the unit's outermost
+	while (true) {
+		const up = vtNearestBoundaryAncestor(outer);
+		if (up === null || !inUnit(up)) return outer;
+		// `outer` is a strict intermediate — it must relay through.
+		if (!vtRelayParticipates(outer.vt, kind) || vtResolveClass(outer.vt, kind, types) === 'none') {
+			return null;
+		}
+		outer = up;
+	}
 }
 
 /**
@@ -866,7 +921,11 @@ function vtFireCallback(kind: VtActivationKind, rec: VtRec, types: string[]): vo
 				? props.onExit
 				: kind === 'update'
 					? props.onUpdate
-					: props.onShare;
+					: kind === 'share'
+						? props.onShare
+						: kind === 'parent-enter'
+							? props.onParentEnter
+							: props.onParentExit;
 	if (typeof cb !== 'function') return;
 	const prevCleanup = VT_CLEANUPS.get(rec.block);
 	if (prevCleanup !== undefined) {
@@ -1405,13 +1464,18 @@ function vtFlush(work: () => void = flushWork): void {
 		// capture). Collected before share pairing so exits can find them.
 		// A boundary whose nearest ANCESTOR boundary also entered this drain is
 		// part of a subtree inserted as ONE unit — only the outermost animates
-		// (React's rule); nested ones are fully silent (no name, no callback).
+		// (React's rule); nested ones stay silent unless they opt into the
+		// parent-enter relay (resolved after share pairing below).
 		const enteredSet = new Set(VT_ENTERED);
 		const enters: VtRec[] = [];
+		const nestedEntered: Block[] = [];
 		for (const b of VT_ENTERED) {
 			if (b.disposed) continue;
 			const anc = vtNearestBoundaryAncestor(b);
-			if (anc !== null && enteredSet.has(anc)) continue;
+			if (anc !== null && enteredSet.has(anc)) {
+				nestedEntered.push(b);
+				continue;
+			}
 			const rec: VtRec = { block: b, els: vtRangeElements(b), rect: null, name: '', cls: '' };
 			const cls = vtResolveClass(b.vt, 'enter', types);
 			// An explicit name always applies (it may pair a share); an unnamed
@@ -1426,6 +1490,7 @@ function vtFlush(work: () => void = flushWork): void {
 		// activation, fired on the EXITING side (its onExit and the entering
 		// side's onEnter are suppressed). Both sides must be in-viewport or the
 		// pair decays to separate exit/enter (React's rule).
+		const sharedBlocks = new Set<Block>();
 		for (const exitRec of exits) {
 			const nm = exitRec.block.vt !== null ? exitRec.block.vt.name : undefined;
 			let paired: VtRec | null = null;
@@ -1445,6 +1510,8 @@ function vtFlush(work: () => void = flushWork): void {
 					enterVisible = vtInViewport({ x: r.x, y: r.y, width: r.width, height: r.height });
 				}
 				if (exitVisible && enterVisible) {
+					sharedBlocks.add(exitRec.block);
+					sharedBlocks.add(paired.block);
 					if (vtResolveClass(exitRec.block.vt, 'share', types) !== 'none') {
 						acts.push({ kind: 'share', rec: exitRec });
 					}
@@ -1467,6 +1534,35 @@ function vtFlush(work: () => void = flushWork): void {
 			if (vtResolveClass(exitRec.block.vt, 'exit', types) !== 'none') {
 				acts.push({ kind: 'exit', rec: exitRec });
 			}
+		}
+		// Parent enter/exit relays (React's enableViewTransitionParentEnterExit):
+		// a nested boundary inside a unit that exited/entered as a whole
+		// activates its parentExit/parentEnter when the chain up to the unit's
+		// outermost boundary relays (vtRelayOutermost) and that outermost
+		// genuinely exits/enters — not 'none', not consumed by a share pair.
+		for (const rec of exits) {
+			const vt = rec.block.vt;
+			if (!vtRelayParticipates(vt, 'parent-exit')) continue;
+			// A boundary consumed by a share pair never also parent-relays.
+			if (sharedBlocks.has(rec.block)) continue;
+			const outer = vtRelayOutermost(rec.block, 'parent-exit', (x) => x.disposed, types);
+			if (outer === null || sharedBlocks.has(outer)) continue;
+			if (vtResolveClass(outer.vt, 'exit', types) === 'none') continue;
+			const cls = vtResolveClass(vt, 'parent-exit', types);
+			if (cls === 'none') continue;
+			acts.push({ kind: 'parent-exit', rec });
+		}
+		for (const b of nestedEntered) {
+			if (!vtRelayParticipates(b.vt, 'parent-enter')) continue;
+			const outer = vtRelayOutermost(b, 'parent-enter', (x) => enteredSet.has(x), types);
+			if (outer === null || sharedBlocks.has(outer)) continue;
+			if (vtResolveClass(outer.vt, 'enter', types) === 'none') continue;
+			const cls = vtResolveClass(b.vt, 'parent-enter', types);
+			if (cls === 'none') continue;
+			const rec: VtRec = { block: b, els: vtRangeElements(b), rect: null, name: '', cls: '' };
+			vtApplyStyles(rec, cls);
+			recs.push(rec);
+			acts.push({ kind: 'parent-enter', rec });
 		}
 		VT_STATE = VT_ANIMATING;
 		if (acts.length === 0) skipRequested = true;

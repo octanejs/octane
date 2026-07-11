@@ -1,6 +1,19 @@
 # View Transitions — React-parity plan
 
-Status: Phases 0-3 LANDED 2026-07-11. Phase 3: Suspense reveal commits
+Status: Phases 0-4 LANDED 2026-07-11 — every in-scope ReactDOMViewTransition
+test (25) is ported and passing; Phase 5 (SSR annotations + docs + demo)
+remains. Phase 4: parent enter/exit relays SHIPPED (React's
+`enableViewTransitionParentEnterExit` is ON in the experimental channel, so
+this is live behavior, not a pin): `parentEnter`/`parentExit` class props +
+`onParentEnter`/`onParentExit` callbacks; a nested boundary in a unit that
+entered/exited as a whole relays when every STRICT intermediate boundary
+participates (relay prop or handler, not resolving 'none' — a prop-less
+intermediate breaks the chain, plain DOM never does) and the unit's outermost
+genuinely activates (not 'none', not share-consumed; share also wins over the
+nested boundary's own relay). Exit-side relays reuse the pre-drain recs
+(pre-named); enter-side relays mint recs post-drain. vtPreClass gained
+parentExit in its chain and vtAllNone counts parentExit participation.
+Phase 3: Suspense reveal commits
 (standalone `commitResume` + the entangled `flushStagedReveals` batch, which
 animates as ONE transition) route through the controller via `vtFlush(work)`;
 nested-unit suppression (only the OUTERMOST of boundaries inserted/removed

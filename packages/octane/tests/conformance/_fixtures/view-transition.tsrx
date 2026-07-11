@@ -95,6 +95,306 @@ export function NestedUnitApp(props) @{
 	</>
 }
 
+// ── Parent enter/exit relay fixtures (React's enableViewTransitionParentEnterExit;
+//    per-`it` citations live in the test file) ─────────────────────────────────
+
+// :534 — nested boundary with parentExit + onParentExit inside an exiting unit.
+export function ParentExitApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition exit="page-exit" onExit={props.onParentExit}>
+				<div>
+					<ViewTransition
+						exit="nested-exit"
+						onExit={props.onNestedExit}
+						parentExit="nested-parent-exit"
+						onParentExit={props.onParentExitNested}
+					>
+						<div>{'Item'}</div>
+					</ViewTransition>
+				</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :582 — the enter-side mirror.
+export function ParentEnterApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition enter="page-enter" onEnter={props.onParentEnter}>
+				<div>
+					<ViewTransition
+						enter="nested-enter"
+						onEnter={props.onNestedEnter}
+						parentEnter="nested-parent-enter"
+						onParentEnter={props.onParentEnterNested}
+					>
+						<div>{'Item'}</div>
+					</ViewTransition>
+				</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :629 — a prop-less intermediate breaks the chain to Deep; Shallow (direct)
+// still relays.
+export function ChainBreakApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition exit="page-exit">
+				<div>
+					<ViewTransition parentExit="relay-exit">
+						<div>
+							<ViewTransition>
+								<div>
+									<ViewTransition parentExit="nested-exit" onParentExit={props.onParentExit1}>
+										<div>{'Deep'}</div>
+									</ViewTransition>
+								</div>
+							</ViewTransition>
+						</div>
+					</ViewTransition>
+					<ViewTransition parentExit="nested-exit" onParentExit={props.onParentExit2}>
+						<div>{'Shallow'}</div>
+					</ViewTransition>
+				</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :685 / :739 — an intermediate whose relay class is "none" stops the chain;
+// a sibling outside it still relays. `kind` picks the exit or enter shape.
+export function NoneBreakExitApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition exit="page-exit">
+				<div>
+					<ViewTransition parentExit="none">
+						<div>
+							<ViewTransition parentExit="nested-exit" onParentExit={props.onDeep}>
+								<div>{'Deep'}</div>
+							</ViewTransition>
+						</div>
+					</ViewTransition>
+					<ViewTransition parentExit="nested-exit" onParentExit={props.onSibling}>
+						<div>{'Shallow'}</div>
+					</ViewTransition>
+				</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+export function NoneBreakEnterApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition enter="page-enter">
+				<div>
+					<ViewTransition parentEnter="none">
+						<div>
+							<ViewTransition parentEnter="nested-enter" onParentEnter={props.onDeep}>
+								<div>{'Deep'}</div>
+							</ViewTransition>
+						</div>
+					</ViewTransition>
+					<ViewTransition parentEnter="nested-enter" onParentEnter={props.onSibling}>
+						<div>{'Shallow'}</div>
+					</ViewTransition>
+				</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :788 — kind mismatch: the ancestor EXITS; a nested onParentEnter stays silent.
+export function KindMismatchApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition exit="page-exit">
+				<div>
+					<ViewTransition parentExit="relay-exit">
+						<ViewTransition parentEnter="nested-enter" onParentEnter={props.onParentEnter}>
+							<div>{'Item'}</div>
+						</ViewTransition>
+					</ViewTransition>
+				</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :831 / :880 — the ancestor SHARES instead of exiting/entering: no relay.
+export function ShareNoRelayApp(props) @{
+	<>
+		@if (props.page === 'a') {
+			<ViewTransition name="hero" onShare={props.onShare}>
+				<ViewTransition parentExit="child-parent-exit" onParentExit={props.onParentExit}>
+					<div>{'Page A'}</div>
+				</ViewTransition>
+			</ViewTransition>
+		} @else {
+			<ViewTransition name="hero">
+				<ViewTransition parentExit="child-parent-exit" onParentExit={props.onParentExit}>
+					<div>{'Page B'}</div>
+				</ViewTransition>
+			</ViewTransition>
+		}
+	</>
+}
+
+export function ShareNoEnterRelayApp(props) @{
+	<>
+		@if (props.page === 'a') {
+			<ViewTransition name="hero" onShare={props.onShare}>
+				<ViewTransition parentEnter="child-parent-enter" onParentEnter={props.onParentEnter}>
+					<div>{'Page A'}</div>
+				</ViewTransition>
+			</ViewTransition>
+		} @else {
+			<ViewTransition name="hero">
+				<ViewTransition parentEnter="child-parent-enter" onParentEnter={props.onParentEnter}>
+					<div>{'Page B'}</div>
+				</ViewTransition>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :927 / :964 — the ancestor's own exit/enter resolves "none": no relay.
+export function NoneAncestorExitApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition exit="none">
+				<ViewTransition parentExit="nested-parent-exit" onParentExit={props.onParentExit}>
+					<div>{'Item'}</div>
+				</ViewTransition>
+			</ViewTransition>
+		}
+	</>
+}
+
+export function NoneAncestorEnterApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition enter="none">
+				<ViewTransition parentEnter="nested-parent-enter" onParentEnter={props.onParentEnter}>
+					<div>{'Item'}</div>
+				</ViewTransition>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :1002 — parentExit="auto" intermediate relays through.
+export function UnstyledRelayApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition exit="page-exit">
+				<div>
+					<ViewTransition parentExit="auto">
+						<ViewTransition parentExit="nested-exit" onParentExit={props.onParentExit}>
+							<div>{'Item'}</div>
+						</ViewTransition>
+					</ViewTransition>
+				</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :1046 / :1092 — handler-only boundaries: the outermost has only onExit/
+// onEnter; intermediates and leaves relay with handlers alone.
+export function HandlerOnlyExitApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition onExit={props.onParentExit}>
+				<div>
+					<ViewTransition onParentExit={props.onRelayParentExit}>
+						<ViewTransition onParentExit={props.onParentExitDeep}>
+							<div>{'Item'}</div>
+						</ViewTransition>
+					</ViewTransition>
+				</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+export function HandlerOnlyEnterApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition onEnter={props.onParentEnter}>
+				<div>
+					<ViewTransition onParentEnter={props.onRelayParentEnter}>
+						<ViewTransition onParentEnter={props.onParentEnterDeep}>
+							<div>{'Item'}</div>
+						</ViewTransition>
+					</ViewTransition>
+				</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :1135 — outermost enter="none" with a handler-only nested: no relay.
+export function NoneEnterHandlerOnlyApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition enter="none">
+				<ViewTransition onParentEnter={props.onParentEnter}>
+					<div>{'Item'}</div>
+				</ViewTransition>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :1172 — plain divs between boundaries never break the chain.
+export function DivsChainApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition onEnter={props.onParentEnter}>
+				<div>
+					<div>
+						<ViewTransition onParentEnter={props.onParentEnterNested}>
+							<div>{'Item'}</div>
+						</ViewTransition>
+					</div>
+				</div>
+			</ViewTransition>
+		}
+	</>
+}
+
+// :1280 / :1318 — a completely prop-less ancestor still relays (its enter/exit
+// resolves 'auto').
+export function NoPropsAncestorEnterApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition>
+				<ViewTransition parentEnter="nested-parent-enter" onParentEnter={props.onParentEnter}>
+					<div>{'Item'}</div>
+				</ViewTransition>
+			</ViewTransition>
+		}
+	</>
+}
+
+export function NoPropsAncestorExitApp(props) @{
+	<>
+		@if (props.show) {
+			<ViewTransition>
+				<ViewTransition parentExit="nested-parent-exit" onParentExit={props.onParentExit}>
+					<div>{'Item'}</div>
+				</ViewTransition>
+			</ViewTransition>
+		}
+	</>
+}
+
 // Per ReactDOMViewTransition-test.js:368 — two same-named boundaries swap in
 // one transition (React uses key="a"/"b" remounts; distinct @if arms are
 // octane's equivalent teardown+remount). onShare fires on the EXITING side.
