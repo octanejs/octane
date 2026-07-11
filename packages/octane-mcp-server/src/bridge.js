@@ -8,6 +8,7 @@ export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
 	jotai: '@octanejs/jotai',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
+	'@tanstack/react-table': '@octanejs/tanstack-table',
 	'framer-motion': '@octanejs/motion',
 	motion: '@octanejs/motion',
 	'@stylexjs/stylex': '@octanejs/stylex',

@@ -197,6 +197,7 @@ describe('manifest-declared manual hook slots', () => {
 			'stylex',
 			'tanstack-query',
 			'tanstack-router',
+			'tanstack-table',
 			'testing-library',
 			'zustand',
 		]);

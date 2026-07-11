@@ -921,6 +921,54 @@ function containsComponentCallOrControlFlow(stmts) {
 }
 
 /**
+ * True when the keyed-item body executes any call DURING render:
+ * CallExpression / NewExpression / TaggedTemplateExpression in render-value
+ * position (holes, attribute values, locals). Such a call can read mutable
+ * state that neither the item reference nor the deps tuple changes with —
+ * e.g. `header.column.getIsSorted()` on a memoized table-core header — so the
+ * PURE/DEP-PURE survivor short-circuit (see the body analysis in makeForCall)
+ * would freeze its output where React re-runs the body unconditionally.
+ *
+ * Calls nested inside FUNCTION VALUES (event-handler arrows, function
+ * expressions) are deferred to invoke time and close over the same ref-stable
+ * item/deps a skipped survivor would have, so they can't go stale at render
+ * time — the walk does not descend into function bodies or parameters.
+ */
+function containsRenderCall(stmts) {
+	let found = false;
+	const seen = new WeakSet();
+	function walk(n) {
+		if (found || !n) return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (typeof n !== 'object') return;
+		const t = n.type;
+		if (!t) return;
+		if (seen.has(n)) return;
+		seen.add(n);
+		if (
+			t === 'ArrowFunctionExpression' ||
+			t === 'FunctionExpression' ||
+			t === 'FunctionDeclaration'
+		) {
+			return; // deferred — runs at event/invoke time, not during render
+		}
+		if (t === 'CallExpression' || t === 'NewExpression' || t === 'TaggedTemplateExpression') {
+			found = true;
+			return;
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+	for (const s of stmts) walk(s);
+	return found;
+}
+
+/**
  * `() => fn(a, b, …)` — a zero-param arrow whose body is a single
  * function call. Returns `{ callee, args }` if so, else null. Used to compile
  * event handlers to the runtime's `{ fn, args }` bundle form so the
@@ -8496,8 +8544,15 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			}
 		}
 		const hasNestedComp = containsComponentCallOrControlFlow(subStmts);
-		pure = !hasParentClosure && !hasHook && !hasNestedComp;
-		depEligible = !pure && hasParentClosure && !hasHook && !hasNestedComp;
+		// A render-time CALL disqualifies the survivor short-circuit entirely: the
+		// call can read state neither the item ref nor the deps tuple witnesses
+		// (`header.column.getIsSorted()` flips while `header` stays the memoized
+		// object), so a skipped body would render stale output — React re-runs
+		// bodies unconditionally. Property reads stay eligible (the measured
+		// js-framework-benchmark/dbmon wins are read-only bodies).
+		const hasRenderCall = containsRenderCall(subStmts);
+		pure = !hasParentClosure && !hasHook && !hasNestedComp && !hasRenderCall;
+		depEligible = !pure && hasParentClosure && !hasHook && !hasNestedComp && !hasRenderCall;
 		depNames.sort();
 	}
 
