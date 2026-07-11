@@ -74,7 +74,8 @@ don't port:
 | `SuspenseList` (`revealOrder`/`tail`) | Not in Octane's component set (verify, then skip the whole `ReactSuspenseList-test.js`, the SuspenseList parts of `ReactDOMUseId`/`ReactContextPropagation`). |
 | CPU Suspense (`unstable_expectedLoadTime`), Suspensey commit phase (suspend-on-resource-load during commit), `unstable_avoidThisFallback`, `unstable_suspenseCallback` | Unstable/unsupported APIs. |
 | Profiler (`actualDuration`/`treeBaseDuration`), DevTools component-stack/displayName | Not supported. |
-| ViewTransitions, Float/resource hoisting (`ReactDOMFloat`) | Out (Octane has limited head-singleton support only). |
+| ViewTransitions | **Planned** — see `docs/view-transitions-plan.md` (conformance skeleton landed; phases pending). |
+| Float/resource hoisting (`ReactDOMFloat`) | Out (Octane has limited head-singleton support only). |
 | `React.Children.*` utilities (`ReactChildren-test.js`) | Octane uses `@for`. Only the missing-key-warning *policy* is conceptually portable. |
 
 **Verify-existence flags** before porting their files: `useEffectEvent` (exists —
