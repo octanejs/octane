@@ -58,6 +58,12 @@ export {
 	Suspense,
 	ErrorBoundary,
 	Activity,
+	ViewTransition,
+	// React ships View Transitions on the experimental channel as unstable_-
+	// prefixed exports — alias them so React-experimental code ports unchanged.
+	ViewTransition as unstable_ViewTransition,
+	type ViewTransitionProps,
+	type ViewTransitionInstance,
 	Fragment,
 	createPortal,
 	type PortalDescriptor,
@@ -72,6 +78,8 @@ export {
 
 	// ── 2. Semi-public: compiler-emitted / binding-infrastructure helpers ─────
 	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)
+	// Module-load "this module uses <ViewTransition>" hint (view-transitions plan).
+	__vtSeen,
 	template,
 	clone,
 	drainFrag,
