@@ -10,6 +10,7 @@ of bridging by hand:
 | React package | Octane binding |
 | --- | --- |
 | `zustand` | `@octanejs/zustand` |
+| `jotai` | `@octanejs/jotai` |
 | `@tanstack/react-query` | `@octanejs/tanstack-query` |
 | `framer-motion` / `motion` | `@octanejs/motion` |
 | `@stylexjs/stylex` | `@octanejs/stylex` |

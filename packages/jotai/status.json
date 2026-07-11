@@ -1,0 +1,7 @@
+{
+  "upstream": { "package": "jotai", "version": "2.20.1" },
+  "surface": "Complete 1:1 port: the framework-agnostic vanilla core (`jotai/vanilla`, `/vanilla/utils`, `/vanilla/internals`) is reused verbatim; the React layer (`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`) and `react/utils` (`useResetAtom`, `useReducerAtom`, `useAtomCallback`, `useHydrateAtoms`) are ported onto octane hooks, preserving upstream's useReducer force-update + effect-subscription implementation, async atoms via octane's `use()`.",
+  "divergences": ["`jotai/babel/*` (React-specific compile-time plugins) is not shipped."],
+  "ssr": "No SSR-specific surface; `useHydrateAtoms` is ported and usable for hydration seeding; no dedicated SSR tests.",
+  "verified": "2026-07-11"
+}
