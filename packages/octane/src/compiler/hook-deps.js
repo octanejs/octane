@@ -155,12 +155,12 @@ function isFunction(node) {
 	);
 }
 
-function isCallbackReference(node) {
+function callbackReferenceRoot(node) {
 	const value = unwrapValue(node);
-	if (value?.type === 'Identifier') return true;
-	if (value?.type === 'ChainExpression') return isCallbackReference(value.expression);
-	if (value?.type === 'MemberExpression') return isCallbackReference(value.object);
-	return false;
+	if (value?.type === 'Identifier') return value;
+	if (value?.type === 'ChainExpression') return callbackReferenceRoot(value.expression);
+	if (value?.type === 'MemberExpression') return callbackReferenceRoot(value.object);
+	return null;
 }
 
 function unwrapValue(node) {
@@ -227,6 +227,26 @@ function buildScopes(ast, onlyImported) {
 			declarePattern(node.param, catchScope);
 			walkPatternDefaults(node.param, catchScope);
 			walk(node.body, catchScope);
+			return;
+		}
+
+		if (node.type === 'SwitchStatement') {
+			// A switch body is one lexical scope shared by every unbraced case.
+			// Predeclare the direct case statements together so let/const/function
+			// captures resolve even when their declaration appears in a case list
+			// rather than a BlockStatement body.
+			const switchScope = createScope(scope, 'block');
+			const statements = [];
+			for (const switchCase of node.cases || []) {
+				statements.push(...(switchCase.consequent || []));
+			}
+			predeclareDirect(statements, switchScope);
+			walk(node.discriminant, scope);
+			for (const switchCase of node.cases || []) {
+				nodeScopes.set(switchCase, switchScope);
+				walk(switchCase.test, switchScope);
+				for (const statement of switchCase.consequent || []) walk(statement, switchScope);
+			}
 			return;
 		}
 
@@ -580,6 +600,21 @@ function collectDependencies(expression, callbackScope, analysis) {
 	return dependencies;
 }
 
+function collectCallbackReference(expression, analysis) {
+	const root = callbackReferenceRoot(expression);
+	if (root === null) return null;
+	const scope = analysis.nodeScopes.get(root);
+	const binding = scope ? resolveBinding(scope, root.name) : null;
+	const value = unwrapValue(expression);
+	if (binding === null || binding.imported || (value.type === 'Identifier' && binding.stable)) {
+		return [];
+	}
+	// A referenced callback is itself the scheduled value. Preserve its complete
+	// member/optional/computed path instead of applying the one-level receiver
+	// truncation used for reads inside an inline callback.
+	return [{ node: value, key: `b${binding.id}:callback`, binding }];
+}
+
 function cloneDependency(node) {
 	if (node.type === 'Identifier') return { ...node };
 	if (node.type === 'ChainExpression') {
@@ -616,14 +651,15 @@ export function analyzeHookDependencies(ast, options = {}) {
 				analysis.functionScopes.get(callback) || null,
 				analysis,
 			);
-		} else if (isCallbackReference(callback)) {
-			dependencies = collectDependencies(callback, null, analysis);
 		} else {
-			const loc = candidate.call.loc?.start;
-			const at = loc ? ` at ${options.filename || 'source'}:${loc.line}:${loc.column}` : '';
-			throw new Error(
-				`Cannot infer dependencies for ${candidate.name}${at}: the callback must be an inline function or a stable reference. Pass an explicit dependency array, or \`null\` to run on every render.`,
-			);
+			dependencies = collectCallbackReference(callback, analysis);
+			if (dependencies === null) {
+				const loc = candidate.call.loc?.start;
+				const at = loc ? ` at ${options.filename || 'source'}:${loc.line}:${loc.column}` : '';
+				throw new Error(
+					`Cannot infer dependencies for ${candidate.name}${at}: the callback must be an inline function or a stable reference. Pass an explicit dependency array, or \`null\` to run on every render.`,
+				);
+			}
 		}
 		inferred.set(candidate.call, {
 			name: candidate.name,

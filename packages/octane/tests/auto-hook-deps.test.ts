@@ -75,6 +75,25 @@ describe('automatic hook dependencies — full compiler', () => {
 		expect(code).toMatch(/useEffect\([\s\S]*?,\s*\[local, outer, props\.log\],\s*_h\$\d+\s*\)/);
 	});
 
+	it('tracks lexical bindings declared directly in switch cases', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      export function App(props) @{
+        switch (props.kind) {
+          case 'selected':
+            const selected = props.value;
+            useEffect(() => props.log(selected));
+            break;
+          default:
+            break;
+        }
+        <div />
+      }
+    `);
+
+		expect(code).toMatch(/useEffect\([^;]+\[props\.log, selected\]/);
+	});
+
 	it('tracks one-level receivers for deep reads and method calls', () => {
 		const code = c(`
       import { useEffect } from 'octane';
@@ -147,13 +166,18 @@ describe('automatic hook dependencies — full compiler', () => {
 
 	it('uses a referenced callback identity and rejects opaque callback creation', () => {
 		const referenced = c(`
-      import { useEffect } from 'octane';
+      import { useEffect, useRef } from 'octane';
       export function App(props) @{
-		useEffect(props?.onCommit);
+		const ref = useRef(props.onCommit);
+		useEffect(props?.api?.run);
+		useEffect(ref.current);
         <div />
       }
     `);
-		expect(referenced).toMatch(/useEffect\(props\?\.onCommit, \[props\?\.onCommit\], _h\$\d+\)/);
+		expect(referenced).toMatch(
+			/useEffect\(props\?\.api\?\.run, \[props\?\.api\?\.run\], _h\$\d+\)/,
+		);
+		expect(referenced).toMatch(/useEffect\(ref\.current, \[ref\.current\], _h\$\d+\)/);
 
 		for (const callback of [
 			'props.makeEffect()',
@@ -216,5 +240,16 @@ export function useThing<T extends { deep?: { name?: string } }>(value: T) {
 		expect(code).toMatch(
 			/memo\(\(\) => \[importedValue, moduleValue, value\?\.deep\?\.name\], \[moduleValue, value\?\.deep\], _h\$\d+\)/,
 		);
+	});
+
+	it('preserves complete referenced callback paths', () => {
+		const source = `
+import { useEffect as effect } from 'octane';
+export function useThing(props: { api?: { run?: () => void } }) {
+  effect(props?.api?.run);
+}
+`;
+		const code = slotHooks(source, 'use-thing.ts')!.code;
+		expect(code).toMatch(/effect\(props\?\.api\?\.run, \[props\?\.api\?\.run\], _h\$\d+\)/);
 	});
 });
