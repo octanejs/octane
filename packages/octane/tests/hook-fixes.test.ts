@@ -38,8 +38,8 @@ describe('#1 effect cleanup lifecycle', () => {
 	});
 });
 
-describe('#2 omitted deps', () => {
-	it('useEffect(fn) / useMemo(fn) without a deps array run every commit (no throw)', () => {
+describe('#2 explicit every-render deps', () => {
+	it('useEffect(fn, null) / useMemo(fn, null) run every commit', () => {
 		const log: string[] = [];
 		const push = (s: string) => log.push(s);
 		const r = mount(NoDeps, { log: push });
@@ -51,7 +51,7 @@ describe('#2 omitted deps', () => {
 		log.length = 0;
 		r.click('#bump');
 		flushEffects();
-		// Both re-run because neither declared deps.
+		// Both re-run because `null` disables dependency tracking.
 		expect(log).toContain('memo');
 		expect(log).toContain('effect:1');
 		r.unmount();

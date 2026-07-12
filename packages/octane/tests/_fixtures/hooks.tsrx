@@ -43,10 +43,10 @@ export function Tally() @{
 // useRef(N) returns { current: N } — the runtime wraps.
 export function MemoTest(props) @{
 	const computeCount = useRef(0);
-	const doubled = useMemo((x) => {
+	const doubled = useMemo(() => {
 		computeCount.current++;
-		return x * 2;
-	}, [props.n]);
+		return props.n * 2;
+	});
 	<div>
 		<span class="val">
 			{doubled as string}
@@ -59,7 +59,7 @@ export function MemoTest(props) @{
 
 // useCallback — stable identity per deps
 export function CbTest(props) @{
-	const cb = useCallback(() => props.label, [props.label]);
+	const cb = useCallback(() => props.label);
 	<span>
 		{props.label as string}
 	</span>
@@ -81,20 +81,20 @@ export function RefTest() @{
 
 // useEffect — fires after commit; cleanup on unmount
 export function EffectMount(props) @{
-	useEffect((onMount, onUnmount) => {
-		onMount();
+	useEffect(() => {
+		props.onMount();
 		return () => {
-			onUnmount();
+			props.onUnmount();
 		};
-	}, [props.onMount, props.onUnmount]);
+	});
 	<div>{'mounted'}</div>
 }
 
 // useEffect with deps — re-fires when deps change
 export function EffectDeps(props) @{
-	useEffect((cb, dep) => {
-		cb(dep);
-	}, [props.cb, props.n]);
+	useEffect(() => {
+		props.cb(props.n);
+	});
 	<span>
 		{props.n as string}
 	</span>
@@ -102,14 +102,23 @@ export function EffectDeps(props) @{
 
 // useLayoutEffect runs synchronously (before passive useEffect)
 export function LayoutVsEffect(props) @{
-	useEffect((order) => {
-		order.push('e');
-	}, [props.order]);
-	useLayoutEffect((order) => {
-		order.push('l');
-	}, [props.order]);
-	useInsertionEffect((order) => {
-		order.push('i');
-	}, [props.order]);
+	useEffect(() => {
+		props.order.push('e');
+	});
+	useLayoutEffect(() => {
+		props.order.push('l');
+	});
+	useInsertionEffect(() => {
+		props.order.push('i');
+	});
 	<div>{'x'}</div>
+}
+
+// `null` is the explicit every-render escape hatch now that omission means
+// compiler-inferred dependencies.
+export function EffectAlways(props) @{
+	useEffect(() => props.cb(props.n), null);
+	<span>
+		{props.n as string}
+	</span>
 }
