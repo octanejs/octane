@@ -10,6 +10,16 @@ Each suite has its own `README.md` describing what it measures and which octane
 subsystem a bad number points at. This file documents the **runner and the
 result contract**.
 
+The comparative suites include native Preact and Svelte 5 fixtures alongside
+the existing React, Solid, Ripple, and Vue Vapor references. Preact fixtures use
+`preact`/`preact/hooks` directly (with `preact/compat` only for APIs such as
+portals, Suspense, and `flushSync`); Svelte fixtures use runes, keyed `#each`,
+modern event attributes, and the public imperative APIs. Framework-specific
+capability gaps stay explicit: Svelte's public server renderer is buffered, so
+`streaming-ssr` reports no Svelte target rather than wrapping buffered HTML in a
+fake stream. `codegen-size`, `dbmon-deopt`, and `js-framework-deopt` remain
+Octane-only by design.
+
 ## Quick start
 
 ```bash
@@ -124,20 +134,22 @@ internally, get their own baseline and guard namespace.
 
 | manifest name | dir | servers | notes |
 | --- | --- | --- | --- |
-| `js-framework` | js-framework | react, octane-tsrx/jsx, ripple | krausest ops incl. `add` |
-| `js-framework-reorder` | js-framework | (same 4) | keyed reorder matrix (LIS vs lastPlacedIndex) |
-| `dbmon` | dbmon | octane-tsrx/jsx, react, ripple, solid | per-cell update churn |
-| `recursive-context` | recursive-context | ripple, octane-tsrx/jsx, react, solid | context fan-out |
-| `signal-favoring` | signal-favoring | octane-tsrx/jsx, solid, react, ripple | cascade vs targeted |
+| `js-framework` | js-framework | Octane + reference frameworks | krausest ops incl. `add` |
+| `js-framework-reorder` | js-framework | same fixtures | keyed reorder matrix (LIS vs lastPlacedIndex) |
+| `todomvc` | todomvc | Octane + reference frameworks | Speedometer-style TodoMVC interactions |
+| `chat-stream` | chat-stream | Octane + reference frameworks | deterministic token streaming + conversation switches |
+| `dbmon` | dbmon | Octane + reference frameworks | per-cell update churn |
+| `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
+| `signal-favoring` | signal-favoring | Octane + reference frameworks | cascade vs targeted |
 | `news` | news | none (builds) | SSR + hydration, per-target |
-| `effectful-list` | effectful-list | octane-tsrx/jsx, react, solid, ripple | effect/ref cleanup churn |
-| `memo-wall` | memo-wall | octane-tsrx/jsx, react | memo bail + context walk |
-| `portal-swarm` | portal-swarm | octane-tsrx, react, solid | portal render/dispatch |
-| `ssr-throughput` | ssr-throughput | none (Node-only) | SSR ops/sec, waterfall, deopt, escape |
-| `streaming-ssr` | streaming-ssr | none (Node-only) | streaming shell TTFB, stream totals, chunking |
+| `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |
+| `memo-wall` | memo-wall | Octane + reference frameworks | memo bail + context walk |
+| `portal-swarm` | portal-swarm | Octane + reference frameworks | portal render/dispatch |
+| `ssr-throughput` | ssr-throughput | none (Node-only) | comparative news SSR + Octane-only stress fixtures |
+| `streaming-ssr` | streaming-ssr | none (Node-only) | streaming targets incl. Preact; Svelte N/A |
 | `dbmon-deopt` | dbmon | octane-tsrx + octane-deopt | tuned vs plain-.ts cliff |
 | `js-framework-deopt` | js-framework | octane-tsrx + naive triplet | tuned vs naive-authoring cliff |
-| `async-waterfall` | async-waterfall | octane-tsrx, react, solid, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
+| `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
 | `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production build of each js-framework app, normalized minify, raw/gzip/brotli |
 

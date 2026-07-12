@@ -93,14 +93,14 @@ function buildData(count) {
 	return data;
 }
 
-// ── Deterministic shuffle machinery (identical in all four bench fixtures,
+// ── Deterministic shuffle machinery (identical across all eight targets,
 // replayed by ../../run-reorder.mjs for its identity gate) ──────────────────
 // Every #shuffle click derives a fresh 32-bit seed from a module-level
 // mulberry32 stream with a FIXED seed, then runs Fisher–Yates with a PRNG
 // seeded by it. The seed stream advances exactly once per click — in the
 // click handler, never inside the state updater — so a framework that
 // re-invokes updaters/reducers cannot skew the sequence. Identical clicks
-// therefore produce identical permutations across all four targets.
+// therefore produce identical permutations across all eight targets.
 function mulberry32(seed) {
 	return () => {
 		seed |= 0;

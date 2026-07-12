@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "Bundle-size benchmark - production vite build of each js-framework app with ONE normalized minify setting, reporting raw / gzip / brotli JS bytes per framework. The cross-framework shipped-bytes comparison (octane vs react/ripple/solid).",
+  "description": "Normalized production bundle-size comparison across the js-framework, TodoMVC, and chat-stream framework fixtures.",
   "scripts": {
     "bench": "node run.mjs"
   },

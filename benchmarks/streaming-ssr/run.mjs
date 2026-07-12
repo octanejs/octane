@@ -1,8 +1,10 @@
 // streaming-ssr bench harness — Node-only streaming SSR (NO browser, NO ports,
-// NO Playwright). Times the BUILT production SSR bundles of four targets —
+// NO Playwright). Times the BUILT production SSR bundles of five targets —
 // octane renderToPipeableStream ('octane/server'), React 19 Fizz
-// (react-dom/server), Solid 2.0 renderToStream ('@solidjs/web'), Ripple's
-// stream-mode render ('ripple/server') — rendering the SAME product page: a
+// (react-dom/server), Preact's renderToPipeableStream
+// ('preact-render-to-string/stream-node'), Solid 2.0 renderToStream
+// ('@solidjs/web'), and Ripple's stream-mode render ('ripple/server') —
+// rendering the SAME product page: a
 // synchronous shell (~50 elements) + 10 Suspense-boundary cards (~20 elements
 // each) whose data promises resolve on a deterministic setTimeout schedule.
 //
@@ -57,6 +59,7 @@ const WARMUP = Math.min(5, ITER);
 const TARGETS = [
 	{ name: 'octane-tsrx', dir: 'octane' },
 	{ name: 'react', dir: 'react' },
+	{ name: 'preact', dir: 'preact' },
 	{ name: 'solid', dir: 'solid' },
 	{ name: 'ripple', dir: 'ripple' },
 ];
