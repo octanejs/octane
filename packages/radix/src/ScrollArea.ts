@@ -249,7 +249,7 @@ function useStateMachine(
 	machine: Record<string, Record<string, string>>,
 	slot: symbol | undefined,
 ): [string, (event: string) => void] {
-	return useReducer(
+	const [state, dispatch] = useReducer(
 		(state: string, event: string): string => {
 			const nextState = machine[state][event];
 			return nextState ?? state;
@@ -257,6 +257,7 @@ function useStateMachine(
 		initialState,
 		slot,
 	);
+	return [state, dispatch];
 }
 
 function ScrollbarScroll(props: any): any {

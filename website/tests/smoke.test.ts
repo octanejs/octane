@@ -153,12 +153,25 @@ describe('website routes', () => {
 		const sidebarLinks = Array.from(container.querySelectorAll('a.sidebar-link'));
 		expect(sidebarLinks.map((a) => a.getAttribute('href'))).toEqual([
 			'/docs/quick-start',
+			'/docs/core-apis',
 			'/docs/tsrx-vs-tsx',
 			'/docs/differences-from-react',
 			'/docs/bindings',
 		]);
 		const active = sidebarLinks.filter((a) => a.getAttribute('data-status') === 'active');
 		expect(active.map((a) => a.textContent?.trim())).toEqual(['Quick start']);
+	});
+
+	it('/docs/core-apis documents the public surfaces and state getters', async () => {
+		const { container } = await renderRoute('/docs/core-apis');
+
+		expect(container.querySelector('.prose h1')?.textContent).toBe('Core APIs');
+		const text = textOf(container);
+		expect(text).toContain('Roots and rendering');
+		expect(text).toContain('useState');
+		expect(text).toContain('useReducer');
+		expect(text).toContain('getState');
+		expect(text).toContain('Server and static rendering');
 	});
 
 	it('/docs (index) renders the default document (quick-start)', async () => {
@@ -172,6 +185,8 @@ describe('website routes', () => {
 		expect(container.querySelector('.prose h1')?.textContent).toBe('Differences from React');
 		expect(textOf(container)).toContain('no rules of hooks');
 		expect(textOf(container)).toContain('Hooks can go anywhere');
+		expect(textOf(container)).toContain('State hooks have a current-state getter');
+		expect(textOf(container)).toContain('getDraft');
 		expect(textOf(container)).toContain("they're all on purpose");
 		// Controlled form components (2026-07-08): React's value/checked semantics
 		// on native events — onInput per keystroke, no synthetic onChange.

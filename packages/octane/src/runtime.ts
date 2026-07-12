@@ -3045,12 +3045,14 @@ function resolveSlot(slot: symbol | undefined): symbol | undefined {
 interface StateSlot<T> {
 	value: T;
 	setter: (next: T | ((prev: T) => T)) => void;
+	/** Allocated only for compiler-proven third-tuple consumers. */
+	getter?: () => T;
 }
 
-export function useState<T>(
-	initial: T | (() => T),
-	slot?: symbol,
-): [T, (next: T | ((prev: T) => T)) => void] {
+type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
+type StateTuple<T> = [T, StateSetter<T>, () => T];
+
+export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
 	// ABI: the compiler appends the slot as the LAST argument, so a zero-arg
 	// `useState()` (state starts undefined — React parity) arrives as
 	// `useState(slot)` with the symbol in the initial-value position. Same
@@ -3078,15 +3080,44 @@ export function useState<T>(
 		};
 		ensureHooks(scope).set(slot, s);
 	}
-	return [s.value, s.setter];
+	// Source-level useState returns a third `getState` tuple member. The compiler
+	// keeps this lean two-item path only when it can prove index 2 is unobserved;
+	// observable/escaping tuples are lowered to __useStateWithGetter below.
+	return [s.value, s.setter] as unknown as StateTuple<T>;
 }
+
+/** Compiler-emitted useState variant for a tuple whose third member is observed. */
+export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
+	// Mirror useState's zero-argument trailing-slot ABI before delegating so we
+	// can look the resulting cell up by the same effective slot afterwards.
+	if (slot === undefined && typeof initial === 'symbol') {
+		slot = initial as unknown as symbol;
+		initial = undefined as T;
+	}
+	const pair = useState(initial, slot);
+	const resolved = resolveSlot(slot);
+	if (resolved === undefined) missingSlot('useState');
+	const s = CURRENT_SCOPE!.hooks!.get(resolved) as StateSlot<T>;
+	const getter = s.getter ?? (s.getter = () => s.value);
+	return [pair[0], pair[1], getter];
+}
+
+interface ReducerSlot<S, A> {
+	value: S;
+	dispatch: (action: A) => void;
+	reducer: (state: S, action: A) => S;
+	/** Allocated only for compiler-proven third-tuple consumers. */
+	getter?: () => S;
+}
+
+type ReducerTuple<S, A> = [S, (action: A) => void, () => S];
 
 export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
 	slot?: symbol,
-): [S, (action: A) => void] {
+): ReducerTuple<S, A> {
 	// The compiler appends the hook slot symbol as the final argument. So the
 	// React 2-arg form `useReducer(reducer, initialState)` arrives as
 	// `(reducer, initialState, slot)` and the lazy 3-arg form
@@ -3103,9 +3134,7 @@ export function useReducer<S, A, I = S>(
 	if (slot === undefined) missingSlot('useReducer');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
-	let s = scope.hooks?.get(slot) as
-		| { value: S; dispatch: (a: A) => void; reducer: (s: S, a: A) => S }
-		| undefined;
+	let s = scope.hooks?.get(slot) as ReducerSlot<S, A> | undefined;
 	if (s === undefined) {
 		// React parity: the initial state is `initialArg` used AS-IS. Lazy
 		// initialization happens ONLY when the third `init` argument is supplied
@@ -3129,7 +3158,25 @@ export function useReducer<S, A, I = S>(
 		// Allow reducer reference to update across renders.
 		s.reducer = reducer;
 	}
-	return [s.value, s.dispatch];
+	// See useState: the compiler selects __useReducerWithGetter whenever the
+	// source can observe the third tuple member.
+	return [s.value, s.dispatch] as unknown as ReducerTuple<S, A>;
+}
+
+/** Compiler-emitted useReducer variant for a tuple whose third member is observed. */
+export function __useReducerWithGetter<S, A, I = S>(
+	reducer: (s: S, a: A) => S,
+	initialArg: I,
+	initOrSlot?: ((arg: I) => S) | symbol,
+	slot?: symbol,
+): ReducerTuple<S, A> {
+	const resolvedInput = typeof initOrSlot === 'symbol' ? initOrSlot : slot;
+	const pair = useReducer(reducer, initialArg, initOrSlot, slot);
+	const resolved = resolveSlot(resolvedInput);
+	if (resolved === undefined) missingSlot('useReducer');
+	const s = CURRENT_SCOPE!.hooks!.get(resolved) as ReducerSlot<S, A>;
+	const getter = s.getter ?? (s.getter = () => s.value);
+	return [pair[0], pair[1], getter];
 }
 
 function depsChanged(prev: any[] | undefined, next: any[] | undefined): boolean {

@@ -37,6 +37,80 @@ function octaneHookLocals(ast) {
 	return importsHook ? locals : null;
 }
 
+const STATE_GETTER_HELPERS = {
+	useState: '__useStateWithGetter',
+	useReducer: '__useReducerWithGetter',
+};
+
+function arrayPatternObservesStateGetter(pattern) {
+	const elements = pattern.elements || [];
+	if (elements[2] != null) return true;
+	for (let i = 0; i <= 2 && i < elements.length; i++) {
+		if (elements[i]?.type === 'RestElement') return true;
+	}
+	return false;
+}
+
+function isTransparentStateTupleWrapper(node, child) {
+	return (
+		(node?.type === 'TSAsExpression' ||
+			node?.type === 'TSTypeAssertion' ||
+			node?.type === 'TSNonNullExpression' ||
+			node?.type === 'ParenthesizedExpression' ||
+			node?.type === 'ChainExpression') &&
+		node.expression === child
+	);
+}
+
+// Mark base-hook calls whose source tuple can observe index 2. Direct fixed
+// destructures that omit it keep the existing two-item runtime path; escaped or
+// otherwise ambiguous tuples conservatively receive the full getter-enabled shape.
+function collectStateGetterCalls(ast, locals) {
+	const calls = new WeakSet();
+	const ancestors = [];
+	function walk(node) {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (node.type === 'CallExpression' && node.callee?.type === 'Identifier') {
+			const imported = locals.get(node.callee.name);
+			if (STATE_GETTER_HELPERS[imported]) {
+				let child = node;
+				let i = ancestors.length - 1;
+				while (i >= 0 && isTransparentStateTupleWrapper(ancestors[i], child)) {
+					child = ancestors[i--];
+				}
+				const parent = i >= 0 ? ancestors[i] : null;
+				let observed = true;
+				if (parent?.type === 'VariableDeclarator' && parent.init === child) {
+					observed =
+						parent.id.type !== 'ArrayPattern' || arrayPatternObservesStateGetter(parent.id);
+				} else if (parent?.type === 'AssignmentExpression' && parent.right === child) {
+					observed =
+						parent.left.type !== 'ArrayPattern' || arrayPatternObservesStateGetter(parent.left);
+				} else if (parent?.type === 'MemberExpression' && parent.object === child) {
+					const p = parent.property;
+					const index = parent.computed && p?.type === 'Literal' ? Number(p.value) : NaN;
+					observed = index !== 0 && index !== 1;
+				} else if (parent?.type === 'ExpressionStatement') {
+					observed = false;
+				}
+				if (observed) calls.add(node);
+			}
+		}
+		ancestors.push(node);
+		for (const key in node) {
+			if (key === 'type' || key === 'start' || key === 'end' || key === 'loc') continue;
+			walk(node[key]);
+		}
+		ancestors.pop();
+	}
+	walk(ast);
+	return calls;
+}
+
 // DFS in SOURCE ORDER, allocating a hook's slot id BEFORE descending into its args
 // — identical pre-order to rewriteHookCalls, so a base hook nested as an argument
 // (e.g. in a deps array) gets its own stable id. Collects insertion edits + the
@@ -86,6 +160,17 @@ function walk(node, fnName, st) {
 				// trailing commas / whitespace before `)` stay valid.
 				st.edits.push({ pos: node.arguments[node.arguments.length - 1].end, text: ', ' + sym });
 			}
+			if (st.getterCalls.has(node) && STATE_GETTER_HELPERS[imported]) {
+				let helper = st.getterHelpers.get(imported);
+				if (helper === undefined) {
+					const base = `_$${STATE_GETTER_HELPERS[imported]}`;
+					helper = base;
+					let suffix = 0;
+					while (st.source.includes(helper)) helper = `${base}$${++suffix}`;
+					st.getterHelpers.set(imported, helper);
+				}
+				st.edits.push({ pos: node.callee.start, end: node.callee.end, text: helper });
+			}
 		}
 	}
 
@@ -123,6 +208,9 @@ export function slotHooks(source, id, options) {
 
 	const st = {
 		locals,
+		source,
+		getterCalls: collectStateGetterCalls(ast, locals),
+		getterHelpers: new Map(),
 		filename: id,
 		hmr: !!(options && options.hmr),
 		hash: hookSlotHash(id),
@@ -136,7 +224,9 @@ export function slotHooks(source, id, options) {
 	// Apply insertions right-to-left so earlier offsets stay valid.
 	st.edits.sort((a, b) => b.pos - a.pos);
 	let code = source;
-	for (const e of st.edits) code = code.slice(0, e.pos) + e.text + code.slice(e.pos);
+	for (const e of st.edits) {
+		code = code.slice(0, e.pos) + e.text + code.slice(e.end === undefined ? e.pos : e.end);
+	}
 
 	// APPEND the slot consts (rather than prepend) so every original line number
 	// stays put — this pass emits no source map, so aligned lines are what keep
@@ -144,7 +234,13 @@ export function slotHooks(source, id, options) {
 	// side-effect-free and the consts are read only inside function bodies (which
 	// run after the module is fully evaluated, including cross-module imports), so
 	// trailing placement has no TDZ hazard for any valid hook usage.
-	const block = st.decls.join('\n') + '\n';
+	const helperImport =
+		st.getterHelpers.size === 0
+			? ''
+			: `import { ${[...st.getterHelpers]
+					.map(([hook, local]) => `${STATE_GETTER_HELPERS[hook]} as ${local}`)
+					.join(', ')} } from 'octane';\n`;
+	const block = helperImport + st.decls.join('\n') + '\n';
 	code = code.endsWith('\n') ? code + block : code + '\n' + block;
 	return { code, map: null };
 }

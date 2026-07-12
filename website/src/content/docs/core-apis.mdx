@@ -1,0 +1,205 @@
+---
+title: Core APIs
+---
+
+# Core APIs
+
+Octane deliberately keeps the React programming model: components are functions,
+state lives in hooks, context and Suspense compose the tree, and roots mount or
+hydrate it. This page is the practical map of the APIs exported by `octane`,
+`octane/server`, and `octane/static`.
+
+If you already know React, most names mean the same thing. The Octane-specific
+behavior worth learning is called out where it matters.
+
+## Roots and rendering
+
+Create a client root and render either a component plus props or a JSX element:
+
+```ts
+import { createRoot } from 'octane';
+import { App } from './App.tsrx';
+
+const root = createRoot(document.getElementById('root')!);
+root.render(App, { title: 'Hello' });
+
+// Later:
+root.render(App, { title: 'Updated' });
+root.unmount();
+```
+
+Use `hydrateRoot(container, App, props)` for server-rendered HTML. The compiled
+client adopts the existing DOM, attaches events and bindings, and returns the
+same `Root` interface.
+
+- `createRoot` — create an empty client root.
+- `hydrateRoot` — adopt server-rendered markup as a live root.
+- `flushSync` — run an update and synchronously drain renders and layout work.
+- `act` — flush updates and effects in tests.
+
+## Components and composition
+
+A component is any function rendered at a component site. It may return JSX, a
+primitive, an array, or `null`; `.tsrx`'s `@{ ... }` form is shorthand for a
+function body whose final node is returned.
+
+The main composition APIs are:
+
+- `memo(Component, compare?)` — skip a component render when its props compare
+  equal.
+- `lazy(load)` — load a component through Suspense.
+- `Fragment` — group output without a host wrapper.
+- `createPortal(children, target)` — render into another DOM container while
+  preserving the logical event and context tree.
+- `createElement`, `cloneElement`, `isValidElement`, and `Children` — the
+  React-shaped descriptor utilities used by JSX interop and libraries.
+
+Refs are props, including multiple refs:
+
+```tsrx
+function Field(props) @{
+	<input ref={[props.ref, props.measureRef]} />
+}
+```
+
+There is no `forwardRef`; accept `ref` like any other prop.
+
+## State
+
+### `useState`
+
+```tsrx
+const [count, setCount] = useState(0);
+setCount(1);
+setCount((previous) => previous + 1);
+```
+
+The initial value may be a lazy initializer. The setter accepts a value or a
+functional update and stays stable for the hook's lifetime.
+
+Octane also provides an optional third tuple member, a stable thunk that reads
+the latest state cell:
+
+```tsrx
+const [draft, setDraft, getDraft] = useState('');
+
+const saveWhenReady = async () => {
+	await waitForConnection();
+	await save(getDraft());
+};
+```
+
+`getDraft()` avoids synchronizing a ref just to escape a stale render closure.
+It reads the latest scheduled value and does not subscribe or trigger a render,
+so during pending work it can be newer than the currently committed DOM.
+
+This is compiler-driven: when tuple index 2 cannot be observed, ordinary
+`[state, setState]` destructuring uses the existing two-item runtime path and
+allocates no getter. Escaped or ambiguous tuples conservatively receive the
+complete three-item shape.
+
+### `useReducer`
+
+```tsrx
+const [state, dispatch, getState] = useReducer(reducer, initialArg, init);
+```
+
+`useReducer` has the same reducer, initial argument, and optional lazy `init`
+call signature as React. Its optional third **tuple member** is the same stable
+latest-state getter as `useState`; the third **call argument** remains the lazy
+initializer.
+
+## Effects, refs, and stable functions
+
+- `useEffect(setup, deps?)` — passive work after paint.
+- `useLayoutEffect(setup, deps?)` — synchronous layout work after DOM commit.
+- `useInsertionEffect(setup, deps?)` — insertion-phase work before layout
+  effects.
+- `useRef(initial)` — a stable `{ current }` object.
+- `useImperativeHandle(ref, create, deps?)` — expose an imperative ref value.
+- `useMemo(create, deps?)` and `useCallback(fn, deps?)` — memoized values and
+  functions.
+- `useEffectEvent(fn)` — a stable function that calls the latest implementation
+  without making the surrounding effect reactive to it.
+- `useId()` — an identifier stable across server rendering and hydration.
+
+Octane keys hooks by compiler-assigned call site, so hooks may appear behind a
+condition or after an early return. Plain JavaScript loops are rejected because
+iterations would share one call-site slot; use a keyed template `@for` or a child
+component instead.
+
+## Context, data, and boundaries
+
+Create context with `createContext(defaultValue)`, provide it with
+`<Context.Provider value={value}>`, and read it with `use(Context)` or
+`useContext(Context)`.
+
+`use(value)` also unwraps thenables. A pending thenable suspends into the nearest
+`Suspense` or `@try`/`@pending` boundary; a rejection routes to `ErrorBoundary`
+or `@catch`. Independent `use()` calls are parallelized by the compiler by
+default, avoiding serial Suspense waterfalls.
+
+Boundary components include:
+
+- `Suspense` — show fallback content while descendants wait.
+- `ErrorBoundary` — component form of the `.tsrx` `@try`/`@catch` behavior.
+- `Activity` — hide and prerender a subtree while suppressing its effects.
+- `ViewTransition` — coordinate browser View Transitions; pair with
+  `addTransitionType` when selecting transition styles.
+
+## Transitions and deferred work
+
+- `startTransition(fn)` — mark updates inside `fn` as transition work.
+- `useTransition()` — returns `[isPending, startTransition]` for a component.
+- `useDeferredValue(value)` — keep displaying an earlier value while the new
+  render suspends.
+
+Octane renders synchronously to completion, but transition priority still
+controls the important visible behavior: suspended transition work holds the
+previous UI until the replacement can commit.
+
+## Stores and actions
+
+- `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot?)` — subscribe
+  to external stores with SSR support.
+- `useActionState(action, initialState, permalink?)` — action state, dispatch,
+  and pending status.
+- `useFormStatus()` — status for the nearest active form action.
+- `useOptimistic(state, reducer?)` — optimistic state during an action.
+- `requestFormReset(form)` — reset an uncontrolled form after an action.
+
+For established ecosystem libraries, prefer the matching
+[`@octanejs/*` binding](/docs/bindings) rather than adapting the React package at
+runtime.
+
+## Native events
+
+Event props use native delegated DOM events: `onClick`, `onInput`, `onSubmit`,
+and their capture forms. There is no synthetic `onChange`; use `onInput` for
+per-keystroke text updates. Controlled `value` and `checked` behavior still
+matches React.
+
+## Server and static rendering
+
+Server entry points live under `octane/server`:
+
+```ts
+import {
+	renderToString,
+	renderToStaticMarkup,
+	renderToPipeableStream,
+	renderToReadableStream,
+} from 'octane/server';
+```
+
+Buffered results are `{ html, css }`; `css` contains deduplicated scoped styles.
+`renderToString` performs a synchronous pass, while the stream APIs progressively
+flush Suspense boundaries. For an async build-time render that waits for all
+data, use `prerender` from `octane/static`.
+
+## Next
+
+- [Quick start](/docs/quick-start) — build and mount your first component.
+- [Differences from React](/docs/differences-from-react) — the deliberate
+  behavioral differences, including state getters and native events.
+- [Bindings](/docs/bindings) — first-party ports of the React ecosystem.

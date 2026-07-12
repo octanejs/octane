@@ -65,6 +65,15 @@ describe('built SSR handler', () => {
 		expect(html).toContain('class="shiki');
 	});
 
+	it('server-renders the core APIs document', async () => {
+		const { response, html } = await get('/docs/core-apis');
+		expect(response.status).toBe(200);
+		expect(html).toContain('<h1>Core APIs</h1>');
+		const text = html.replace(/<[^>]+>/g, '');
+		expect(text).toContain('getState');
+		expect(text).toContain('Server and static rendering');
+	});
+
 	it('server-renders /benchmarks: table data SSRs, charts are client-mounted shells', async () => {
 		const { response, html } = await get('/benchmarks');
 		expect(response.status).toBe(200);

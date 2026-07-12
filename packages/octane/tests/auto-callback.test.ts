@@ -36,6 +36,19 @@ describe('auto-callback transform — stable-closure arrows wrap in useCallback'
 		expect(code).toMatch(/import\s*\{[^}]*useCallback[^}]*\}\s*from\s*['"]octane['"]/);
 	});
 
+	it('stable arrow over a state getter wraps and includes the getter in deps', () => {
+		const code = c(`
+      import { useState } from 'octane';
+      export function Counter() @{
+        const [count, setCount, getCount] = useState(0);
+        const read = () => getCount();
+        <button onClick={read}>{count as string}</button>
+      }
+    `);
+		expect(code).toMatch(/const\s+read\s*=\s*_\$useCallback\s*\(/);
+		expect(code).toMatch(/_\$useCallback\s*\([\s\S]*?,\s*\[\s*getCount\s*\]/);
+	});
+
 	it('arrow that closes only over a prop is NOT rewrapped', () => {
 		const code = c(`
       export function Hi(props) @{

@@ -18,6 +18,20 @@ renders in its own scope. `use()` and `useContext` are exempt (they are
 call-order / context-identity keyed, not slot-keyed), so they may sit in plain
 loops.
 
+## `useState` / `useReducer` current-state getters
+
+Both state hooks have an Octane-only third tuple member: a stable zero-argument
+function that reads the hook's latest state (`const [state, update, getState] =
+useState(initial)`). This replaces the common React pattern of synchronizing a
+ref solely so delayed or async callbacks can avoid a stale render closure.
+
+The getter reads the latest scheduled hook-cell value and does not subscribe or
+render. During pending work it can therefore be newer than the currently
+committed DOM. The compiler removes the getter entirely when it can prove tuple
+index 2 is unobserved, so ordinary two-item destructuring retains the existing
+runtime path and allocation profile. Escaped or ambiguous tuples conservatively
+receive the complete three-item shape.
+
 ## Native events, no synthetic event system
 
 Events are real, delegated DOM events (`onClick`, `onInput`, `onSubmit`) —
