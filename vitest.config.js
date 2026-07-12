@@ -151,6 +151,49 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'remix-router',
+					include: [
+						'packages/remix-router/tests/conformance/**/*.test.ts',
+						'packages/remix-router/tests/differential/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					// Same differential precompile, but for router fixtures: also rewrites
+					// `@octanejs/remix-router` → `react-router` so the React side runs the
+					// real react-router adapter over the SAME (vendored-equal) core.
+					globalSetup: ['packages/remix-router/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				// `@octanejs/remix-router` is the package under test; alias the public
+				// name (and subpaths — `/dom` → src/dom.ts) to source so fixtures import
+				// it exactly as a consumer would (and the differential React side
+				// rewrites the same specifiers to `react-router`).
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/remix-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/remix-router/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/remix-router\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/remix-router/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// The vendored react-router core's own upstream unit tests — a
+				// VENDOR-INTEGRITY gate (loaders/redirects/interruptions driven with
+				// zero React/octane involved). Pure node environment; no octane plugin.
+				test: {
+					name: 'remix-router-core',
+					include: ['packages/remix-router/tests/vendored-core/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-virtual',
 					include: ['packages/tanstack-virtual/tests/**/*.test.ts'],
 					environment: 'jsdom',

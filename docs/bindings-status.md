@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 17 `@octanejs/*` framework bindings.
+The central status table for the 18 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -28,6 +28,7 @@ upstream version.
 | [`@octanejs/radix`](#octanejsradix) | `radix-ui@1.6.1` | Complete against the unified `radix-ui@1.6.1` component surface — all primitives (incl. Dialog, the Menu/DropdownMenu/ContextMenu family, Popover, Tooltip, Select, NavigationMenu, Toast, Menubar, Slider, the form controls, and OneTimePasswordField/PasswordToggleField) plus the composition/state/overlay foundations — verified by a differential suite (same fixtures through octane and the real radix-ui, byte-identical DOM). | `Slot`/`asChild` compose element descriptors (prop-position JSX, `createElement`, `.map()` returns), not children-position JSX; `forwardRef` becomes octane's ref-as-prop | SSR/hydration coverage for the overlay/portal components is still open (tracked in the migration plan). | 2026-07-08 |
 | [`@octanejs/recharts`](#octanejsrecharts) | `recharts@3.9.2` | Partial (phases 0–1 of 5): the static `BarChart`/`LineChart` pipeline end-to-end (`isAnimationActive={false}`), byte-identical to upstream in the differential rig; the Redux/RTK state layer, `Surface`/`Layer`, and the pure shape set are in place. | Chart events coordinate through octane's native delegated events rather than React's synthetic layer | Untested; text measurement (`getStringSize`) returns 0×0 under SSR. | 2026-07-07 |
 | [`@octanejs/redux`](#octanejsredux) | `react-redux@9.3.0` | The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Export parity is pinned by test. | `connect()` (the legacy HOC surface) intentionally throws — the hooks API is the supported surface; Error messages are octane-branded | No SSR-specific surface; no dedicated SSR tests. | 2026-07-08 |
+| [`@octanejs/remix-router`](#octanejsremix-router) | `react-router@7.18.1` | Phased port (Phase 0 + A + Link shipped): the framework-agnostic router core (lib/router/* + framework-free helpers, ~12k lines) is vendored byte-close and validated by 161 of upstream's own router unit tests; the data-mode React layer (createMemoryRouter, RouterProvider incl. the /dom flushSync variant, Outlet, Await, RenderErrorBoundary/errorElement, Link + useLinkClickHandler, and the full read-hook family) is transcribed onto octane and differential-verified byte-identical against real react-router. | Refs are props (octane has no forwardRef) — Link's forwardRef becomes a `ref` prop; Error-boundary reset on location change / revalidation-idle happens in a layout effect one commit after upstream's render-phase derivation — same observable outcome; octane's flushSync inside an ambient flush degrades to a plain call drained at that flush's boundary (sync scroll/navigation notifies from within event handlers land at the flush boundary instead of nested) — consumer-invisible, conformance-pinned | Not yet ported: StaticRouter/StaticRouterProvider/createStaticHandler/createStaticRouter (Phase F, on octane/server). | 2026-07-12 |
 | [`@octanejs/stylex`](#octanejsstylex) | `@stylexjs/stylex@0.19.0` | Full compile-time integration: re-exports the StyleX runtime API (`create`, `props`, `attrs`, `keyframes`, `defineVars`, `createTheme`) and registers as an import source; the `/vite` plugin runs the StyleX compiler over octane's compiled output and emits one static atomic stylesheet (`virtual:stylex.css`) with zero StyleX runtime in the bundle. | The `sx` JSX prop is not supported — spread `{...stylex.props(...)}` instead; The compiler runs over octane's compiled output rather than source, so StyleX's own PostCSS source-scanning setup is unused | Works under SSR — the stylesheet is static and server markup carries the final class names; no dedicated SSR test files. | 2026-07-09 |
 | [`@octanejs/tanstack-query`](#octanejstanstack-query) | `@tanstack/react-query@5.101.0` | Complete: 58/58 runtime exports plus the full TypeScript surface; the export surface is byte-identical to upstream in both directions (locked by test), and `@tanstack/query-core` is re-exported verbatim. | Suspense integrates via octane's `use(thenable)` rather than throwing a promise (observable behavior matches) | `HydrationBoundary` fully ported (incl. streaming `promise`/`dehydratedAt` re-hydration); the SSR/streaming server entries and server-render tests are still open. | 2026-07-06 |
 | [`@octanejs/tanstack-router`](#octanejstanstack-router) | `@tanstack/react-router@1.170.16` | Code-based routing at full binding parity (2026-07-06 gap-closure sweep): the full Match pipeline, router lifecycle events, the complete read-hook family, full-parity `Link` (preloading, masking, `activeProps`), `useBlocker`/`Block`, `Await`/`defer`, scroll restoration, lazy routes, not-found handling, and search-param validation/middleware — differential-verified byte-equal vs the real `@tanstack/react-router`. | Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop; No `flushSync` in the `Link` click handler; navigation state updates run synchronously | SSR entries (`RouterServer`/`RouterClient`, `HeadContent`/`Scripts`) not yet ported; no SSR tests. | 2026-07-06 |
@@ -179,6 +180,24 @@ Known divergences:
 - Error messages are octane-branded.
 
 SSR / hydration: No SSR-specific surface; no dedicated SSR tests.
+
+## @octanejs/remix-router
+
+[`packages/remix-router`](../packages/remix-router) `0.1.0` — ports `react-router@7.18.1`. Status data: [`packages/remix-router/status.json`](../packages/remix-router/status.json).
+
+Phased port (Phase 0 + A + Link shipped): the framework-agnostic router core (lib/router/* + framework-free helpers, ~12k lines) is vendored byte-close and validated by 161 of upstream's own router unit tests; the data-mode React layer (createMemoryRouter, RouterProvider incl. the /dom flushSync variant, Outlet, Await, RenderErrorBoundary/errorElement, Link + useLinkClickHandler, and the full read-hook family) is transcribed onto octane and differential-verified byte-identical against real react-router.
+
+Known divergences:
+
+- Refs are props (octane has no forwardRef) — Link's forwardRef becomes a `ref` prop.
+- Error-boundary reset on location change / revalidation-idle happens in a layout effect one commit after upstream's render-phase derivation — same observable outcome.
+- octane's flushSync inside an ambient flush degrades to a plain call drained at that flush's boundary (sync scroll/navigation notifies from within event handlers land at the flush boundary instead of nested) — consumer-invisible, conformance-pinned.
+
+SSR / hydration: Not yet ported: StaticRouter/StaticRouterProvider/createStaticHandler/createStaticRouter (Phase F, on octane/server).
+
+- Not ported yet (phased — docs/remix-router-port-plan.md): declarative <Routes>/<Route>/MemoryRouter/Navigate (Phase B), browser/hash routers + NavLink + useSearchParams (C), Form/useSubmit/useFetcher(s) (D), useBlocker/usePrompt/ScrollRestoration/useBeforeUnload/useViewTransitionState (E), static SSR + framework stubs + full export parity (F). Never: framework mode (needs @react-router/dev), RSC. tests/conformance/parity.test.ts pins the exact per-phase boundary.
+
+See also: [`docs/remix-router-port-plan.md`](remix-router-port-plan.md)
 
 ## @octanejs/stylex
 
