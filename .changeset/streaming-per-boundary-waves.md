@@ -1,5 +1,0 @@
----
-'octane': patch
----
-
-Streaming SSR now delivers each Suspense boundary's segment at its OWN resolve time. The round loop in `renderToPipeableStream` / `renderToReadableStream` used to settle a round with `Promise.all` over every suspended thenable, so on a staggered data schedule the earliest boundary's HTML was held until the slowest sibling landed (one giant tail chunk). Rounds are now WAVES: await the first unresolved settle, coalesce everything else that lands in the same event-loop turn (one `setImmediate`/`setTimeout(0)` yield plus microtask drains), re-pass, flush newly-done segments, repeat — so simultaneous resolutions still share a single re-pass (the all-fast case stays at ~2 passes) while staggered boundaries stream as they arrive. `MAX_SUSPENSE_PASSES` accordingly now bounds CONSECUTIVE passes that complete no boundary (one pass per resolution wave is legitimate, not a runaway); waterfall-depth and nondeterministic-key runaways still trip it. Buffered `prerender` settling is unchanged.

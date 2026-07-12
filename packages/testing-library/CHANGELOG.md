@@ -1,0 +1,60 @@
+# @octanejs/testing-library
+
+## 0.1.1
+
+### Patch Changes
+
+- 7e84258: React-parity effect commit + deletion ordering — the last two `useInsertionEffect` parity gaps. The commit now mirrors React's per-fiber mutation walk (`commitMutationEffectsOnFiber`): per component in tree post-order, destroy ALL of its insertion effects, create ALL of them, then destroy its layout effects — so a sibling's layout cleanups land before a later sibling's insertion work, and insertion destroy/create pairs group per component (matters to CSS-in-JS style recycling); layout bodies still run afterwards in the layout phase, after ref attach. Unmount is now phase-correct too (`commitDeletionEffectsOnFiber`): a deleted component's insertion + layout cleanups fire synchronously in hook DECLARATION order (React's forward effect-list walk — previously one reverse-registration unwind), and passive (`useEffect`) cleanups are DEFERRED to the passive flush (React's `commitPassiveUnmountEffects`) instead of running synchronously at unmount, with errors still routed to the try boundary enclosing the deletion.
+
+  **Observable change:** `useEffect` cleanups no longer run synchronously during unmount — they fire in the next passive flush (post-paint, or `drainPassiveEffects()`/`act()` in tests). `@octanejs/testing-library`'s `unmount()`/`cleanup()` flush them for you (RTL's act-wrapped contract).
+
+- Updated dependencies [05fdef8]
+- Updated dependencies [e9ebfbf]
+- Updated dependencies [4ac4c98]
+- Updated dependencies [c2129eb]
+- Updated dependencies [4ac4c98]
+- Updated dependencies [8a44bb5]
+- Updated dependencies [6b0c244]
+- Updated dependencies [d3cf678]
+- Updated dependencies [05fdef8]
+- Updated dependencies [d19d4f3]
+- Updated dependencies [7e84258]
+- Updated dependencies [2f8c6ed]
+- Updated dependencies [8de4584]
+- Updated dependencies [9be6ba5]
+- Updated dependencies [db409de]
+- Updated dependencies [4f3c6c8]
+- Updated dependencies [62c3c4e]
+- Updated dependencies [3c56d95]
+- Updated dependencies [4c5b1d0]
+- Updated dependencies [b732399]
+- Updated dependencies [6d27cb0]
+- Updated dependencies [a3784b1]
+- Updated dependencies [fa77edf]
+- Updated dependencies [f5c9dba]
+- Updated dependencies [12d5410]
+- Updated dependencies [d71f1fc]
+- Updated dependencies [2f8c6ed]
+- Updated dependencies [63e51e8]
+- Updated dependencies [6d3b269]
+- Updated dependencies [b171c6d]
+- Updated dependencies [7f3d9c9]
+- Updated dependencies [820baaf]
+- Updated dependencies [c36cb32]
+- Updated dependencies [c33f409]
+- Updated dependencies [63e51e8]
+- Updated dependencies [8fc8554]
+- Updated dependencies [569daad]
+- Updated dependencies [6b7b727]
+- Updated dependencies [2ce7bc5]
+- Updated dependencies [c6a23f5]
+- Updated dependencies [c93aad5]
+- Updated dependencies [2942afb]
+- Updated dependencies [388b23c]
+- Updated dependencies [352cff1]
+- Updated dependencies [c7989eb]
+- Updated dependencies [dda2854]
+- Updated dependencies [dda2854]
+- Updated dependencies [3a9d855]
+- Updated dependencies [1f85217]
+  - octane@0.1.4

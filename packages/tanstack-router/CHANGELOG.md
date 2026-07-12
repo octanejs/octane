@@ -1,5 +1,61 @@
 # @octanejs/tanstack-router
 
+## 0.1.3
+
+### Patch Changes
+
+- 6fd3ebb: Not-found rendering, per TanStack Router semantics. An unknown URL now renders the not-found UI inside the layout chrome: router-core flags one match `globalNotFound` (the deepest fuzzy-matched route with children by default, the root with `notFoundMode: 'root'`), that route's component still renders, and its `<Outlet/>` renders the not-found UI instead of a child match. A loader/beforeLoad that throws `notFound()` renders the boundary route's not-found UI in place of its component (`status === 'notFound'`), with the NotFoundError spread onto it (`notFound({ data })` arrives as the `data` prop). Component resolution matches react-router's `renderRouteNotFound`: route `notFoundComponent` → router `defaultNotFoundComponent` → the generic `<p>Not Found</p>`. Previously `notFoundComponent` was accepted but never rendered — an unknown URL showed the layout with an empty outlet.
+- Updated dependencies [05fdef8]
+- Updated dependencies [e9ebfbf]
+- Updated dependencies [4ac4c98]
+- Updated dependencies [c2129eb]
+- Updated dependencies [4ac4c98]
+- Updated dependencies [8a44bb5]
+- Updated dependencies [6b0c244]
+- Updated dependencies [d3cf678]
+- Updated dependencies [05fdef8]
+- Updated dependencies [d19d4f3]
+- Updated dependencies [7e84258]
+- Updated dependencies [2f8c6ed]
+- Updated dependencies [8de4584]
+- Updated dependencies [9be6ba5]
+- Updated dependencies [db409de]
+- Updated dependencies [4f3c6c8]
+- Updated dependencies [62c3c4e]
+- Updated dependencies [3c56d95]
+- Updated dependencies [4c5b1d0]
+- Updated dependencies [b732399]
+- Updated dependencies [6d27cb0]
+- Updated dependencies [a3784b1]
+- Updated dependencies [fa77edf]
+- Updated dependencies [f5c9dba]
+- Updated dependencies [12d5410]
+- Updated dependencies [d71f1fc]
+- Updated dependencies [2f8c6ed]
+- Updated dependencies [63e51e8]
+- Updated dependencies [6d3b269]
+- Updated dependencies [b171c6d]
+- Updated dependencies [7f3d9c9]
+- Updated dependencies [820baaf]
+- Updated dependencies [c36cb32]
+- Updated dependencies [c33f409]
+- Updated dependencies [63e51e8]
+- Updated dependencies [8fc8554]
+- Updated dependencies [569daad]
+- Updated dependencies [6b7b727]
+- Updated dependencies [2ce7bc5]
+- Updated dependencies [c6a23f5]
+- Updated dependencies [c93aad5]
+- Updated dependencies [2942afb]
+- Updated dependencies [388b23c]
+- Updated dependencies [352cff1]
+- Updated dependencies [c7989eb]
+- Updated dependencies [dda2854]
+- Updated dependencies [dda2854]
+- Updated dependencies [3a9d855]
+- Updated dependencies [1f85217]
+  - octane@0.1.4
+
 ## 0.1.2
 
 ### Patch Changes
