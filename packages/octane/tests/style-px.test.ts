@@ -51,9 +51,11 @@ describe('numeric style px — dynamic (runtime)', () => {
 describe('numeric style px — static (compile-time bake)', () => {
 	it('bakes the style attribute with px + unitless + kebab, matching the dynamic path', () => {
 		const r = mount(StaticStyle);
-		// Static object styles are serialized into the template `style="…"` attribute.
+		// Static object styles are serialized into the template `style="…"` attribute
+		// in CSSOM shape (declarations TERMINATED with `;`) so a baked style is
+		// byte-identical to the same style written through el.style.
 		expect((r.find('#s') as HTMLElement).getAttribute('style')).toBe(
-			'width: 100px; opacity: 0.5; line-height: 2; margin-top: 0; z-index: 3; background-color: red',
+			'width: 100px; opacity: 0.5; line-height: 2; margin-top: 0; z-index: 3; background-color: red;',
 		);
 		r.unmount();
 	});
@@ -95,7 +97,7 @@ describe('numeric style px — SSR', () => {
 	it('static object style serialises identically to the client bake', async () => {
 		const { html } = await ServerRT.renderToString(server.StaticStyle, {});
 		expect(html).toContain(
-			'style="width: 100px; opacity: 0.5; line-height: 2; margin-top: 0; z-index: 3; background-color: red"',
+			'style="width: 100px; opacity: 0.5; line-height: 2; margin-top: 0; z-index: 3; background-color: red;"',
 		);
 	});
 });

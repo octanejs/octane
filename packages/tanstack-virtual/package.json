@@ -1,0 +1,51 @@
+{
+  "name": "@octanejs/tanstack-virtual",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "TanStack Virtual bindings for the octane renderer — reuses the framework-agnostic @tanstack/virtual-core and swaps the React adapter (useVirtualizer, useWindowVirtualizer) for an octane port.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/tanstack-virtual"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tanstack/virtual-core": "catalog:default",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tanstack/react-virtual": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
