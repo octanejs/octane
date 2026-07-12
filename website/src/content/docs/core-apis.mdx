@@ -123,6 +123,11 @@ initializer.
   without making the surrounding effect reactive to it.
 - `useId()` — an identifier stable across server rendering and hydration.
 
+For every dependency-taking hook above, omission asks the compiler to infer the
+list from lexical captures. It omits values whose identity is provably stable,
+including setters, dispatchers, refs, state getters, and effect events. Explicit
+arrays remain authoritative; pass `null` to run or recompute after every render.
+
 Octane keys hooks by compiler-assigned call site, so hooks may appear behind a
 condition or after an early return. Plain JavaScript loops are rejected because
 iterations would share one call-site slot; use a keyed template `@for` or a child

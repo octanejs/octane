@@ -54,10 +54,10 @@ pnpm rules:generate
 
 ## Repo Map
 
-This is a pnpm monorepo with eighteen publishable packages — the core `octane`
+This is a pnpm monorepo with twenty-one publishable packages — the core `octane`
 runtime+compiler, the `@octanejs/vite-plugin` metaframework (plus its
 `@octanejs/adapter-vercel` deploy adapter), the `@octanejs/mcp-server` MCP
-server, and fourteen `@octanejs/*` framework bindings:
+server, and seventeen `@octanejs/*` framework bindings:
 
 - `packages/octane/` (npm: `octane`) — the runtime **and** the compiler together.
   - `src/runtime.ts` — client runtime.
@@ -71,7 +71,7 @@ server, and fourteen `@octanejs/*` framework bindings:
   deploys it to Vercel (Build Output API).
 - `packages/octane-mcp-server/` (npm: `@octanejs/mcp-server`) — an MCP server
   exposing octane docs/compile tooling to AI agents.
-- `packages/{zustand,tanstack-query,motion,stylex,tanstack-router,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/`
+- `packages/{zustand,jotai,tanstack-query,motion,stylex,tanstack-router,tanstack-table,tanstack-virtual,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/`
   (npm: `@octanejs/*`) — framework bindings, each an octane port of a React
   library (state, data-fetching, animation, styling, routing, editor,
   positioning, UI primitives, forms, charts, testing, MDX). Parity varies by

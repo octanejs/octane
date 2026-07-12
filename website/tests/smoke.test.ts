@@ -37,7 +37,7 @@ describe('website routes', () => {
 		expect(container.querySelector('.hero-title')?.textContent).toContain(
 			'programming model, compiled',
 		);
-		expect(textOf(container)).toContain('No virtual DOM. No rules of hooks.');
+		expect(textOf(container)).toContain('No hand-maintained dependency arrays');
 		const cta = container.querySelector('a.btn-primary') as HTMLAnchorElement;
 		expect(cta?.getAttribute('href')).toBe('/docs/quick-start');
 
@@ -48,12 +48,13 @@ describe('website routes', () => {
 		// Feature cards — including the TSRX card linking to the TSRX site.
 		const cards = container.querySelectorAll('.card');
 		expect(cards.length).toBe(4);
-		expect(container.textContent).toContain('Compiled templates');
-		expect(container.textContent).toContain('First-class TSRX');
+		expect(container.textContent).toContain('Hooks without the homework');
+		expect(container.textContent).toContain('No virtual DOM. No diff tax.');
 		const tsrxLink = container.querySelector('a.card-link') as HTMLAnchorElement;
 		expect(tsrxLink?.getAttribute('href')).toBe('https://tsrx.dev');
 
 		// Proven strip links to the differences page.
+		expect(container.textContent).toContain('6,000+');
 		expect(container.textContent).toContain('2,200+');
 		const provenLink = Array.from(container.querySelectorAll('.proven a')).find((a) =>
 			a.getAttribute('href')?.includes('differences-from-react'),
@@ -61,7 +62,7 @@ describe('website routes', () => {
 		expect(provenLink).toBeTruthy();
 
 		// Ecosystem strip advertises the bindings and links to the bindings page.
-		expect(container.textContent).toContain('12');
+		expect(container.textContent).toContain('17');
 		expect(container.textContent).toContain('ecosystem ports');
 		const bindingsLink = Array.from(container.querySelectorAll('.proven a')).find(
 			(a) => a.getAttribute('href') === '/docs/bindings',

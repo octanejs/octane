@@ -17,8 +17,8 @@ Octane is a fast, TypeScript-first UI framework — the successor to
 [Inferno](https://github.com/infernojs/inferno), the React-like library built to
 stay close to the speed of hand-written DOM code. Octane keeps that goal and
 modernizes everything around it: you write with the React API you already know,
-but a compiler does most of the framework's work ahead of time, so there is far
-less left to do when the page actually loads.
+but a compiler removes the virtual DOM, Suspense waterfalls, rules-of-hooks
+bookkeeping, and hand-maintained dependency arrays before your app ships.
 
 If you know React, you already know Octane. `useState`, `useEffect`, `memo`,
 context, portals, Suspense, transitions — same API, same mental model, checked
@@ -35,6 +35,13 @@ Octane is the day-to-day feel:
   that compile to keyed fast paths, and an `@{ … }` shorthand that lets setup sit
   right next to the output. Mix both dialects in one app and import freely across
   the boundary — you choose per component.
+- **Write the closure, not its dependency list.** Omit the array from
+  `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`,
+  or `useImperativeHandle` and the compiler derives it from lexical captures,
+  including knowledge of stable setters, dispatchers, refs, state getters, and
+  effect events. It is the no-bookkeeping dependency DX associated with signal
+  frameworks, while keeping the hooks model you already know. Explicit arrays
+  remain authoritative; pass `null` when you intentionally want every render.
 - **No rules of hooks.** Hooks are tracked by call site, not call order, so a
   hook can live inside an `if` or after an early return — the usual React
   footguns simply aren't there. The one rule that remains is enforced for you:
@@ -60,7 +67,8 @@ Octane is currently in alpha development.
 
 - **The full React hook API** — `useState`, `useEffect`, `useMemo`, `useRef`,
   `useId`, `useTransition`, `useDeferredValue`, `use`, and the rest — with the
-  same effect ordering and Suspense semantics.
+  same effect ordering and Suspense semantics, plus compiler-inferred dependency
+  lists when you omit them.
 - **Fully async** — transitions, deferred values, and `<Activity>`.
 - **Streaming SSR and byte-stable hydration** — out-of-order Suspense flushing
   over Node or web streams, or buffered/static rendering when you want it.
@@ -386,9 +394,9 @@ Octane itself. Good places to start:
 
 ## Packages
 
-This is a pnpm monorepo with eighteen publishable packages — the core
+This is a pnpm monorepo with twenty-one publishable packages — the core
 runtime+compiler, the metaframework plugin (and its Vercel adapter), an MCP
-server, and fourteen framework bindings:
+server, and seventeen framework bindings:
 
 - [`octane`](./packages/octane) is the runtime and the compiler together. It covers
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
@@ -401,13 +409,15 @@ server, and fourteen framework bindings:
 - [`@octanejs/mcp-server`](./packages/octane-mcp-server) exposes octane docs and
   compile tooling to AI agents over MCP.
 - The `@octanejs/*` framework bindings — each an octane port of a React library:
-  [`zustand`](./packages/zustand), [`query`](./packages/tanstack-query),
-  [`motion`](./packages/motion), [`stylex`](./packages/stylex),
-  [`router`](./packages/tanstack-router), [`lexical`](./packages/lexical),
-  [`floating-ui`](./packages/floating-ui), [`radix`](./packages/radix),
-  [`hook-form`](./packages/hook-form), [`base-ui`](./packages/base-ui),
-  [`recharts`](./packages/recharts), [`redux`](./packages/redux),
-  [`testing-library`](./packages/testing-library), and [`mdx`](./packages/mdx).
+  [`zustand`](./packages/zustand), [`jotai`](./packages/jotai),
+  [`query`](./packages/tanstack-query), [`motion`](./packages/motion),
+  [`stylex`](./packages/stylex), [`router`](./packages/tanstack-router),
+  [`table`](./packages/tanstack-table), [`virtual`](./packages/tanstack-virtual),
+  [`lexical`](./packages/lexical), [`floating-ui`](./packages/floating-ui),
+  [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
+  [`base-ui`](./packages/base-ui), [`recharts`](./packages/recharts),
+  [`redux`](./packages/redux), [`testing-library`](./packages/testing-library),
+  and [`mdx`](./packages/mdx).
   Parity varies by package — some are behaviorally complete, others are
   explicitly partial or alpha. [`docs/bindings-status.md`](./docs/bindings-status.md)
   is the generated per-package status table (upstream version, supported
