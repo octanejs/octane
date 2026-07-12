@@ -9,6 +9,7 @@ import {
 	RefTest,
 	EffectMount,
 	EffectDeps,
+	EffectAlways,
 	LayoutVsEffect,
 } from './_fixtures/hooks.tsrx';
 
@@ -116,6 +117,17 @@ describe('useEffect', () => {
 		await nextPaint();
 		expect(cb).toHaveBeenCalledTimes(2);
 		expect(cb).toHaveBeenLastCalledWith(2);
+		r.unmount();
+	});
+
+	it('accepts null as the explicit every-render form', async () => {
+		const cb = vi.fn();
+		const r = mount(EffectAlways, { cb, n: 1 });
+		await nextPaint();
+		expect(cb).toHaveBeenCalledTimes(1);
+		r.update(EffectAlways, { cb, n: 1 });
+		await nextPaint();
+		expect(cb).toHaveBeenCalledTimes(2);
 		r.unmount();
 	});
 });

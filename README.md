@@ -244,10 +244,26 @@ export function Timer() @{
   useEffect(() => {
     const id = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(id);
-  }, []);
+  });
 
   <p>{'Elapsed: ' + seconds}</p>
 }
+```
+
+Dependency arrays are optional in Octane. When one is omitted from
+`useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`,
+or `useImperativeHandle`, the compiler derives it from the callback's reactive
+captures. It understands member reads and stable hook results such as state
+setters, reducer dispatchers, refs, state getters, and `useEffectEvent`.
+
+Explicit arrays keep their React meaning and are never rewritten. Pass `null`
+for the uncommon every-render form:
+
+```jsx
+useEffect(() => sync(room.id)); // inferred from the closure
+useEffect(() => initialize(), []); // explicitly mount/reconnect only
+useEffect(() => sync(room.id), [room.id]); // explicit dependencies
+useEffect(() => measure(), null); // explicitly after every commit
 ```
 
 `useState` and `useReducer` also expose an optional third tuple member: a stable
@@ -289,7 +305,7 @@ export function Panel(props) @{
 
   useEffect(() => {
     console.log('n changed:', n);
-  }, [n]);
+  });
 
   <button onClick={() => setN(n + 1)}>{'count: ' + n}</button>
 }

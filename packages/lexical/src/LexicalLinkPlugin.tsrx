@@ -10,12 +10,12 @@ export function LinkPlugin(props) {
 	const validateUrl = props.validateUrl;
 	const attributes = props.attributes;
 
-	// No deps — runs every render (matches @lexical/react).
+	// Explicit every-render check (matches @lexical/react).
 	useEffect(() => {
 		if (!editor.hasNodes([LinkNode])) {
 			throw new Error('LinkPlugin: LinkNode not registered on editor');
 		}
-	});
+	}, null);
 
 	useEffect(() => registerLink(editor, namedSignals({ attributes, validateUrl })), [
 		editor,

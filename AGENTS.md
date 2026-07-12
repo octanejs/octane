@@ -129,6 +129,13 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   extract a child component — each item then renders in its own scope. `use()`
   and `useContext` are exempt (call-order / context-identity keyed, not
   slot-keyed).
+- **Dependency arrays are compiler-inferred when omitted.** This applies to
+  `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`,
+  and `useImperativeHandle`. The compiler derives dependencies from lexical
+  captures and omits proven-stable hook results (state setters/dispatchers,
+  refs, state getters, and `useEffectEvent`). Explicit arrays retain React's
+  exact behavior and are never rewritten; `null` explicitly means run or
+  recompute after every render.
 - **State hooks expose a compiler-driven current-state getter.** `useState` and
   `useReducer` have a stable third tuple member (`[state, update, getState]`) that
   reads the latest scheduled hook-cell value. The compiler emits its specialized
