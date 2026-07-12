@@ -149,21 +149,27 @@ describe('automatic hook dependencies — full compiler', () => {
 		const referenced = c(`
       import { useEffect } from 'octane';
       export function App(props) @{
-        useEffect(props.onCommit);
+		useEffect(props?.onCommit);
         <div />
       }
     `);
-		expect(referenced).toMatch(/useEffect\(props\.onCommit, \[props\.onCommit\], _h\$\d+\)/);
+		expect(referenced).toMatch(/useEffect\(props\?\.onCommit, \[props\?\.onCommit\], _h\$\d+\)/);
 
-		expect(() =>
-			c(`
+		for (const callback of [
+			'props.makeEffect()',
+			'props.makeEffect?.()',
+			'props.makeEffect().run',
+		]) {
+			expect(() =>
+				c(`
         import { useEffect } from 'octane';
         export function App(props) @{
-          useEffect(props.makeEffect());
+					useEffect(${callback});
           <div />
         }
       `),
-		).toThrow(/Cannot infer dependencies.*explicit dependency array.*`null`/);
+			).toThrow(/Cannot infer dependencies.*explicit dependency array.*`null`/);
+		}
 	});
 
 	it('applies the same inference during server compilation', () => {

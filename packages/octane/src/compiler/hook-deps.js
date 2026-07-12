@@ -155,6 +155,14 @@ function isFunction(node) {
 	);
 }
 
+function isCallbackReference(node) {
+	const value = unwrapValue(node);
+	if (value?.type === 'Identifier') return true;
+	if (value?.type === 'ChainExpression') return isCallbackReference(value.expression);
+	if (value?.type === 'MemberExpression') return isCallbackReference(value.object);
+	return false;
+}
+
 function unwrapValue(node) {
 	while (node && TS_VALUE_WRAPPERS.has(node.type)) node = node.expression;
 	return node;
@@ -608,11 +616,7 @@ export function analyzeHookDependencies(ast, options = {}) {
 				analysis.functionScopes.get(callback) || null,
 				analysis,
 			);
-		} else if (
-			callback?.type === 'Identifier' ||
-			callback?.type === 'MemberExpression' ||
-			callback?.type === 'ChainExpression'
-		) {
+		} else if (isCallbackReference(callback)) {
 			dependencies = collectDependencies(callback, null, analysis);
 		} else {
 			const loc = candidate.call.loc?.start;
