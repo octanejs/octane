@@ -263,11 +263,9 @@ describe.sequential('website production build → hydration (octane-preview)', (
 			await page.waitForFunction(() => location.pathname === '/benchmarks', null, {
 				timeout: 10_000,
 			});
-			await page.waitForFunction(
-				() => (document.querySelector('main')?.textContent ?? '').includes('Benchmarks'),
-				null,
-				{ timeout: 10_000 },
-			);
+			await page.waitForFunction(() => document.querySelector('main .benchpage') !== null, null, {
+				timeout: 10_000,
+			});
 			expect(errors).toEqual([]);
 		} finally {
 			await page.close();

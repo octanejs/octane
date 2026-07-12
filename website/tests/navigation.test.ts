@@ -30,7 +30,10 @@ describe('client-side navigation', () => {
 
 			await waitFor(
 				() => {
-					if (!(utils.container.textContent ?? '').includes('Differences from React')) {
+					const activeDoc = utils.container.querySelector(
+						'a.sidebar-link[href="/docs/differences-from-react"][data-status="active"]',
+					);
+					if (!utils.container.querySelector('.prose') || !activeDoc) {
 						throw new Error('docs page not committed');
 					}
 					if (utils.container.querySelector('.hero-actions')) {

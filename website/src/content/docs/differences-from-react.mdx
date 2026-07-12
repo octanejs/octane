@@ -68,26 +68,24 @@ observed. Ordinary `[state, setState]` and `[state, dispatch]` destructures keep
 the existing two-item runtime path and allocate no getter; escaped or ambiguous
 tuples conservatively receive the full three-item shape.
 
-## Events are just DOM events
+## Native event objects, no synthetic event layer
 
-Octane doesn't have React's synthetic event system. `onClick`, `onInput`,
-`onSubmit` and friends are real, delegated browser events, so what you get is
-whatever the platform does — no wrapper layer second-guessing it.
+Event propagation itself matches React and is **no longer a difference**.
+Ordinary bubbling and capture, `stopPropagation`, logical propagation through
+portals, and native non-bubbling events such as `toggle`, dialog
+`cancel`/`close`, media events, and `load`/`error` all reach the same logical
+ancestors React does.
 
-For most apps this is invisible: click, input, and submit behave exactly as
-you'd expect. Octane also matches the propagation behavior component authors
-rely on while preserving the native `Event` object:
+What remains different is the event API and synthesis layer:
 
-- Events that don't bubble in the DOM — `toggle`, dialog `cancel`/`close`,
-  media events, and `load`/`error` — are capture-delegated and delivered through
-  logical ancestors like React. That logical path continues across portals.
+- `onClick`, `onInput`, `onSubmit`, and friends receive the browser's actual
+  `Event` object rather than a React `SyntheticEvent` wrapper.
 - `mouseEnter`/`pointerEnter` are the browser's own per-element events, not
   events synthesized from `mouseover`/`mouseout`.
 - There's no synthetic `onChange`, `onBeforeInput`, or `onSelect` polyfill. Use
   the corresponding native event — `onInput` for per-keystroke text changes.
 
-There is no event pooling. `stopPropagation`, the capture phase, and
-`event.currentTarget` work with the real DOM event and the handler's element.
+There is no event pooling, and `event.currentTarget` is the handler's element.
 
 ## Controlled components, native events
 
