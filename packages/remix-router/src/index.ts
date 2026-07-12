@@ -138,9 +138,18 @@ export {
 	useRoutes,
 } from './lib/hooks';
 
-// ── DOM layer (Phase A ships Link; the rest lands in Phases C–E) ───────────
+// ── DOM layer (Phases A + C; Form/fetchers land in D, guards/VT in E) ──────
 export { Link } from './lib/dom/Link.tsrx';
 export { useLinkClickHandler } from './lib/dom/hooks';
+export { NavLink } from './lib/dom/NavLink.tsrx';
+export type { NavLinkRenderProps } from './lib/dom/NavLink.tsrx';
+export {
+	BrowserRouter,
+	HashRouter,
+	HistoryRouter as unstable_HistoryRouter,
+} from './lib/dom/routers.tsrx';
+export { createBrowserRouter, createHashRouter, useSearchParams } from './lib/dom/lib';
+export type { DOMRouterOpts, SetURLSearchParams } from './lib/dom/lib';
 
 // ── UNSAFE_ surface (shipped subset) ────────────────────────────────────────
 export {

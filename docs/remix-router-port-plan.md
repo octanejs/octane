@@ -99,11 +99,17 @@ dispatch to childSlot, so context consumers below a stable `{children}`
 passthrough refresh when a provider re-renders (the navigation-re-render bug
 this phase surfaced).
 
-### Phase C — DOM entry + links
-`createBrowserRouter`/`createHashRouter`, `BrowserRouter`/`HashRouter`/
-`unstable_HistoryRouter`, `NavLink` (render-prop className/style/children),
-`useSearchParams`. *Exit criterion:* NavLink active-state differential
-byte-parity; searchParams round-trips; browser/hash history smoke in jsdom.
+### Phase C — DOM entry + links — SHIPPED (PR 1)
+`createBrowserRouter`/`createHashRouter` (incl. `__staticRouterHydrationData`
+parsing + error deserialization), `BrowserRouter`/`HashRouter`/
+`unstable_HistoryRouter`, `NavLink` (render-prop className/style/children,
+isActive/isPending/isTransitioning), `useSearchParams`. `useViewTransitionState`
+is implemented internally (NavLink's isTransitioning consumes it) — its public
+export ships with the rest of the VT surface in Phase E. *Exit criterion
+(met):* NavLink active states + useSearchParams differential byte-parity vs
+real react-router; searchParams defaultInit/set/clear round-trips; browser,
+hash, and provided-history routers + createBrowserRouter data mode green in
+jsdom smokes (real window.history / location.hash assertions).
 
 ### Phase D — mutations
 `Form`, fetcher forms, `useSubmit`, `useFormAction`, `useFetcher`/`useFetchers`

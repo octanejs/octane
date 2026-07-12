@@ -9,9 +9,10 @@ running against the vendored copy) and transcribes the React layer onto
 octane's hooks. The shipped surface matches react-router 1:1 — existing code
 works by changing the import.
 
-**This is a phased port.** Shipped today: the data-mode core and declarative
-mode (`MemoryRouter`, `<Routes>`/`<Route>`, `<Navigate>`). The full roadmap
-(browser/hash routers + NavLink, Form/fetchers,
+**This is a phased port.** Shipped today: the data-mode core, declarative
+mode (`MemoryRouter`, `<Routes>`/`<Route>`, `<Navigate>`), and the DOM entry
+points (`BrowserRouter`/`HashRouter`, `createBrowserRouter`/`createHashRouter`,
+`NavLink`, `useSearchParams`). The full roadmap (Form/fetchers,
 blockers/scroll/view-transitions, static SSR) lives in
 [docs/remix-router-port-plan.md](../../docs/remix-router-port-plan.md), and
 `tests/conformance/parity.test.ts` pins exactly which upstream exports each
@@ -20,10 +21,10 @@ phase still owes.
 ```tsx
 // before
 import { createBrowserRouter, RouterProvider, Link, useLoaderData } from 'react-router';
-// after (Phase A: createMemoryRouter; createBrowserRouter lands in Phase C)
-import { createMemoryRouter, RouterProvider, Link, useLoaderData } from '@octanejs/remix-router';
+// after
+import { createBrowserRouter, RouterProvider, Link, useLoaderData } from '@octanejs/remix-router';
 
-const router = createMemoryRouter([
+const router = createBrowserRouter([
   {
     path: '/',
     Component: Layout,
@@ -48,7 +49,7 @@ function User() @{
 
 | import | what you get | notes |
 | --- | --- | --- |
-| `@octanejs/remix-router` | the vendored core surface (matchPath, redirect, data, …) + `createMemoryRouter`, `RouterProvider`, `Outlet`, `Await`, `Link`, `useLinkClickHandler`, the full read-hook family (`useLoaderData`, `useNavigate`, `useNavigation`, `useRouteError`, …), and declarative mode (`MemoryRouter`, `Routes`/`Route`, `Navigate`, `createRoutesFromChildren`/`Elements`) | Phases 0 + A + B + Link |
+| `@octanejs/remix-router` | the vendored core surface (matchPath, redirect, data, …) + `createMemoryRouter`, `RouterProvider`, `Outlet`, `Await`, `Link`, `useLinkClickHandler`, the full read-hook family (`useLoaderData`, `useNavigate`, `useNavigation`, `useRouteError`, …), declarative mode (`MemoryRouter`, `Routes`/`Route`, `Navigate`, `createRoutesFromChildren`/`Elements`), and the DOM layer (`createBrowserRouter`/`createHashRouter`, `BrowserRouter`/`HashRouter`/`unstable_HistoryRouter`, `NavLink`, `useSearchParams`) | Phases 0 + A + B + C |
 | `@octanejs/remix-router/dom` | `RouterProvider` with octane's `flushSync` wired in | mirror of `react-router/dom` |
 
 ## How it works

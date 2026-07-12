@@ -18,14 +18,6 @@ import * as port from '@octanejs/remix-router';
 import * as portDom from '@octanejs/remix-router/dom';
 
 const EXPECTED_MISSING = new Set([
-	// Phase C — DOM entry + links
-	'createBrowserRouter',
-	'createHashRouter',
-	'BrowserRouter',
-	'HashRouter',
-	'unstable_HistoryRouter',
-	'NavLink',
-	'useSearchParams',
 	// Phase D — mutations
 	'Form',
 	'useSubmit',

@@ -16,6 +16,7 @@ const LOADER = resolve(__dirname, '../_fixtures/loader-redirect-error-diff.tsrx'
 const AWAIT = resolve(__dirname, '../_fixtures/await-deferred-diff.tsrx');
 const PENDING = resolve(__dirname, '../_fixtures/pending-navigation-diff.tsrx');
 const DECLARATIVE = resolve(__dirname, '../_fixtures/declarative-diff.tsrx');
+const NAVLINK = resolve(__dirname, '../_fixtures/navlink-diff.tsrx');
 // React fixtures are precompiled into THIS package's cache (see differential
 // _setup.ts) so the React side resolves react-router from here.
 const CACHE = resolve(__dirname, '.react-cache');
@@ -118,6 +119,41 @@ describe('differential: @octanejs/remix-router vs real react-router', () => {
 		const d = await mountDifferential(DECLARATIVE, 'NavigateDiffApp', undefined, CACHE);
 		await d.step('mount (redirected to /new)', async () => {
 			await settle(60);
+		});
+		d.unmount();
+	});
+
+	it('NavLinkDiffApp: NavLink active states + useSearchParams, byte-identical', async () => {
+		// Phase C: default `active` class, `end`, className/children render props,
+		// aria-current across navigations; useSearchParams defaults + set/clear.
+		const d = await mountDifferential(NAVLINK, 'NavLinkDiffApp', undefined, CACHE);
+		await d.step('mount (home active)', async () => {
+			await settle();
+		});
+		await d.step('to /users (parent + child-fn links flip)', async (i, r) => {
+			await i.click('#nl-users');
+			await r.click('#nl-users');
+			await settle();
+		});
+		await d.step('to /users/7 (parent stays active, end variant not)', async (i, r) => {
+			await i.click('#nl-user-7');
+			await r.click('#nl-user-7');
+			await settle();
+		});
+		await d.step('to /search (className fn + default merge)', async (i, r) => {
+			await i.click('#nl-fn');
+			await r.click('#nl-fn');
+			await settle();
+		});
+		await d.step('set search param', async (i, r) => {
+			await i.click('#set-q');
+			await r.click('#set-q');
+			await settle();
+		});
+		await d.step('clear search params', async (i, r) => {
+			await i.click('#clear-q');
+			await r.click('#clear-q');
+			await settle();
 		});
 		d.unmount();
 	});
