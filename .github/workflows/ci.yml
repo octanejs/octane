@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [22, 24]
+        node-version: [24, 26]
         # Keep the full supported-Node coverage while splitting the large
         # Vitest suite across runners. Four shards cuts the CI critical path
         # substantially without letting repeated global setup dominate.
@@ -48,14 +48,16 @@ jobs:
   # above. `always()` makes a failed shard produce a failed required check
   # instead of leaving it skipped.
   test:
-    name: test (${{ matrix.node-version }})
+    name: test (${{ matrix.required-context }})
     needs: test_shard
     if: ${{ always() }}
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [22, 24]
+        # `test (22)` is a temporary status-only alias for the current branch
+        # protection rule. Remove it after the required contexts move to 24/26.
+        required-context: [22, 24, 26]
 
     steps:
       - name: Verify all test shards passed
