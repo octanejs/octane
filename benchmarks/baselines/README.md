@@ -5,17 +5,19 @@ kinds of data live here, and they are enforced very differently:
 
 ## `ratios.json` — hardware-independent ratio guards (the CI gate)
 
-A flat array of guards, each `{ suite, op, target, reference, maxRatio, note }`.
-For a given suite result the runner computes `target.median / reference.median`
-(both measured on the **same machine in the same run**, so the number is
-hardware-independent) and **fails if it exceeds `maxRatio`**. Only guards whose
-both sides actually ran are checked.
+A flat array of guards, each
+`{ suite, op, target, reference, maxRatio?, minRatio?, note }`. For a given
+suite result the runner computes `target.median / reference.median` (both
+measured on the **same machine in the same run**, so the number is
+hardware-independent) and **fails if it exceeds `maxRatio` or falls below
+`minRatio`**. Only guards whose both sides actually ran are checked.
 
 This is the check `.github/workflows/bench.yml` enforces (`--ratios`). It is safe
 to enforce on any runner from day one because it is a ratio, not an absolute
-time. `maxRatio` values are seeded with generous headroom over the known numbers
-(see each guard's `note`) so ordinary run-to-run noise never trips them — they
-catch a *structural* regression (e.g. octane falling off a fast path).
+time. Ratio bounds are seeded with generous headroom over the known numbers (see
+each guard's `note`) so ordinary run-to-run noise never trips them — they catch a
+*structural* regression (e.g. octane falling off a fast path, or a deopt cliff
+collapsing because the fast path stopped being fast).
 
 To propose refreshed guard values from a real run:
 
@@ -23,10 +25,11 @@ To propose refreshed guard values from a real run:
 node benchmarks/bench.mjs --record --ratios <suites…>
 ```
 
-This writes `ratios.suggested.json` (observed ratio × 1.5, rounded) **without**
-touching `ratios.json`. Review it and hand-copy any values you want — never
-auto-overwrite the committed guards, or you will ratchet the gate toward whatever
-the last machine happened to measure.
+This writes `ratios.suggested.json` (upper bounds at observed ratio × 1.5, lower
+bounds at observed ratio / 1.5, rounded) **without** touching `ratios.json`.
+Review it and hand-copy any values you want — never auto-overwrite the committed
+guards, or you will ratchet the gate toward whatever the last machine happened to
+measure.
 
 ## `local/<suite>.json` — absolute baselines (LOCAL-ONLY)
 

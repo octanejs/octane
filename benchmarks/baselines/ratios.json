@@ -68,6 +68,7 @@
     "op": "render",
     "target": "deopt-page/octane-deopt",
     "reference": "deopt-page/octane-fast",
+    "minRatio": 1.2,
     "maxRatio": 4.0,
     "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio\u21921) or a runaway deopt (ratio>4) both surface."
   },
