@@ -9,6 +9,7 @@ export const KNOWN_BINDINGS = {
 	jotai: '@octanejs/jotai',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
 	'@tanstack/react-table': '@octanejs/tanstack-table',
+	'@tanstack/react-virtual': '@octanejs/tanstack-virtual',
 	'framer-motion': '@octanejs/motion',
 	motion: '@octanejs/motion',
 	'@stylexjs/stylex': '@octanejs/stylex',

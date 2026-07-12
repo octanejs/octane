@@ -486,7 +486,11 @@ function objectExprIsStaticLiteral(obj) {
 // time. `hyphenateStyleName` + `cssStyleValue` come from ../dom-tables.js —
 // the SAME key normalization and px/unitless/trim coercion the runtimes apply
 // to dynamic style objects — so a STATIC baked object style produces the same
-// CSS a dynamic one would.
+// CSS a dynamic one would. The string is CSSOM-serialization-shaped
+// (`prop: value; prop2: value2;` — declarations TERMINATED, not separated):
+// that's what the same element's style attribute reads back as once anything
+// touches el.style, and what React's CSSOM writes serialize to — so baked and
+// dynamic styles are byte-identical in innerHTML.
 function staticObjectToCssString(obj) {
 	const parts = [];
 	for (const p of obj.properties || []) {
@@ -494,9 +498,9 @@ function staticObjectToCssString(obj) {
 		const value = p.value.value;
 		if (value == null || value === false || value === '') continue;
 		const cssValue = value === true ? '' : cssStyleValue(name, value);
-		parts.push(`${hyphenateStyleName(name)}: ${cssValue}`);
+		parts.push(`${hyphenateStyleName(name)}: ${cssValue};`);
 	}
-	return parts.join('; ');
+	return parts.join(' ');
 }
 
 // ===========================================================================
