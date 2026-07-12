@@ -122,21 +122,21 @@ export function Home() @{
 				<Link to="/benchmarks" class="bench-all">All suites →</Link>
 			</div>
 			<p class="bench-sub">
-				Every benchmark suite on one scale: each framework’s cost relative to Octane (1×), lower is
-				better. Same apps, same hardware, from the repo’s own suites — charted with
-				@octanejs/recharts, the site’s own charting binding. Where a bar is shorter than Octane’s,
-				that framework wins the suite.
+				Cross-framework browser, SSR, async and shipped-bytes suites on one scale: each framework’s
+				cost relative to Octane (1×), lower is better. Same apps, same hardware, from production
+				builds or production preview servers — charted with @octanejs/recharts, the site’s own
+				charting binding. Where a bar is shorter than Octane’s, that framework wins the suite.
 			</p>
 			<div class="bench-grid">
 				<BenchBars card={HOME_SUMMARY} showValues={true} width={1100} />
 			</div>
 			<p class="bench-note">
 				{'Ratios are geometric means over each suite’s per-operation checked-in medians ('}
-				<code>benchmarks/baselines</code>
+				<code>benchmarks/baselines/local</code>
 				{'), Octane .tsrx vs React 19.2, Solid 2.0 beta, Ripple 0.3 and Vue Vapor 3.6 beta. Reproduce with '}
-				<code>pnpm bench</code>
+				<code>pnpm bench:all -- --quick --ratios</code>
 				{', or see '}
-				<Link to="/benchmarks">absolute per-operation numbers for every suite</Link>
+				<Link to="/benchmarks">absolute per-operation numbers for the charted suites</Link>
 				{' — including the de-opt suites octane runs against itself.'}
 			</p>
 		</section>

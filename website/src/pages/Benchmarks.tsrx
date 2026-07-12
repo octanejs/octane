@@ -1,8 +1,8 @@
-// /benchmarks — every suite from benchmarks/baselines/local/, charted with
-// @octanejs/recharts (the site dogfoods its own charting binding). Two
+// /benchmarks — the checked-in runtime, SSR, async and size baselines, charted
+// with @octanejs/recharts (the site dogfoods its own charting binding). Two
 // sections: cross-framework comparisons, then the octane-internal de-opt
-// ("authoring cliff") suites. All numbers are the checked-in medians; the
-// page cannot drift from the repo because the JSON is imported at build time.
+// ("authoring cliff") suites. All numbers are the checked-in medians; the page
+// cannot drift from the repo because the JSON is imported at build time.
 import { BenchBars } from '../components/BenchBars.tsrx';
 import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../content/benchmarks.ts';
 
@@ -14,7 +14,7 @@ export function Benchmarks() @{
 				{'Median milliseconds per operation — lower is better. Every chart is the ' +
 					'checked-in baseline from the repo’s own suites: same apps, same hardware, ' +
 					'same run. Reproduce them with '}
-				<code>pnpm bench</code>
+				<code>pnpm bench:all</code>
 				{', and see '}
 				<a
 					href="https://github.com/octanejs/octane/tree/main/benchmarks"

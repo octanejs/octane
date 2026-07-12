@@ -1,10 +1,10 @@
 // Benchmark data for the site's charts — the CHECKED-IN medians from
 // `benchmarks/baselines/local/` (recorded by `node benchmarks/bench.mjs
-// --record`, reproduced with `pnpm bench`), imported at build time so the site
-// can never drift from the repo's numbers. This module massages the baseline
-// shape ({ suite, targets: [{ name, ops }] }) into per-chart card descriptors:
-// rows keyed by operation with one column per series, plus the series' fixed
-// identity colors.
+// --record`, reproduced with `pnpm bench:all`), imported at build time so the
+// site can never drift from the repo's numbers. This module massages the
+// baseline shape ({ suite, targets: [{ name, ops }] }) into per-chart card
+// descriptors: rows keyed by operation with one column per series, plus the
+// series' fixed identity colors.
 //
 // Colors are validated for the site's dark panel surface (#2b3138) with the
 // dataviz six-checks validator (lightness band, chroma floor, adjacent-pair
@@ -14,6 +14,9 @@
 // brand red = the tuned fixture.
 import dbmonDeopt from '../../../benchmarks/baselines/local/dbmon-deopt.json';
 import dbmon from '../../../benchmarks/baselines/local/dbmon.json';
+import asyncWaterfall from '../../../benchmarks/baselines/local/async-waterfall.json';
+import bundleSize from '../../../benchmarks/baselines/local/bundle-size.json';
+import chatStream from '../../../benchmarks/baselines/local/chat-stream.json';
 import effectfulList from '../../../benchmarks/baselines/local/effectful-list.json';
 import jsFrameworkDeopt from '../../../benchmarks/baselines/local/js-framework-deopt.json';
 import jsFrameworkReorder from '../../../benchmarks/baselines/local/js-framework-reorder.json';
@@ -24,6 +27,7 @@ import portalSwarm from '../../../benchmarks/baselines/local/portal-swarm.json';
 import recursiveContext from '../../../benchmarks/baselines/local/recursive-context.json';
 import signalFavoring from '../../../benchmarks/baselines/local/signal-favoring.json';
 import ssrThroughput from '../../../benchmarks/baselines/local/ssr-throughput.json';
+import todoMvc from '../../../benchmarks/baselines/local/todomvc.json';
 
 // Only `median` is charted; the other stats vary by suite (some harnesses
 // don't record p95/sd), so they stay optional.
@@ -63,8 +67,8 @@ export interface BenchCard {
 	series: SeriesDef[];
 	rows: BenchRow[];
 	iterations: number;
-	/** Value unit: absolute median milliseconds (default) or ×-vs-Octane ratio. */
-	format?: 'ms' | 'x';
+	/** Value unit: absolute median milliseconds (default), bytes, or ×-vs-Octane ratio. */
+	format?: 'ms' | 'bytes' | 'x';
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +126,8 @@ function frameworkCard(
 	title: string,
 	description: string,
 	opLabels?: Record<string, string>,
+	ops?: string[],
+	format?: BenchCard['format'],
 ): BenchCard {
 	const b = baseline as SuiteBaseline;
 	const series = seriesFor(b, FRAMEWORKS);
@@ -130,8 +136,9 @@ function frameworkCard(
 		title,
 		description,
 		series,
-		rows: rowsFor(b, series, opLabels),
+		rows: rowsFor(b, series, opLabels, ops),
 		iterations: b.iterations,
+		format,
 	};
 }
 
@@ -144,6 +151,46 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		'js-framework',
 		'js-framework',
 		'krausest-style table operations over 1,000 rows — create, replace, partial update, select, swap, remove, clear.',
+	),
+	frameworkCard(
+		todoMvc,
+		'todomvc',
+		'todomvc',
+		'TodoMVC workflows — add, complete, filter, edit, clear and destroy items, with native form/input events in the loop.',
+		{
+			add100: 'add 100',
+			toggleAllOn: 'toggle all on',
+			toggleAllOff: 'toggle all off',
+			complete25: 'complete 25',
+			filterCycle: 'filter cycle',
+			edit10: 'edit 10',
+			clearCompleted: 'clear completed',
+			destroy25: 'destroy 25',
+		},
+		[
+			'add100',
+			'toggleAllOn',
+			'toggleAllOff',
+			'complete25',
+			'filterCycle',
+			'edit10',
+			'clearCompleted',
+			'destroy25',
+		],
+	),
+	frameworkCard(
+		chatStream,
+		'chat-stream',
+		'chat-stream',
+		'Chat UI workloads — token streaming, coarse updates, history append, conversation switches and text input.',
+		{
+			streamFine: 'fine stream',
+			streamCoarse: 'coarse stream',
+			appendHistory: 'append history',
+			switchConv: 'switch conversation',
+			type160: 'type 160 chars',
+		},
+		['streamFine', 'streamCoarse', 'appendHistory', 'switchConv', 'type160'],
 	),
 	frameworkCard(
 		jsFrameworkReorder,
@@ -188,6 +235,12 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		'Many portals mounting, opening, closing and re-rendering — dispatching through portal boundaries.',
 	),
 	frameworkCard(
+		asyncWaterfall,
+		'async-waterfall',
+		'async-waterfall',
+		'Ten nested async levels with 16ms simulated latency — Octane’s compiled parallel-use path versus React’s nested-use waterfall and signal-first models.',
+	),
+	frameworkCard(
 		news,
 		'news',
 		'news',
@@ -196,6 +249,20 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 			ssr_render: 'SSR render',
 			hydrate: 'hydrate',
 		},
+	),
+	frameworkCard(
+		bundleSize,
+		'bundle-size',
+		'bundle-size',
+		'Production shipped JavaScript bytes with normalized minification — total gzip and app-code gzip across the rows, TodoMVC and chat fixtures.',
+		{
+			js_gzip: 'rows total gzip',
+			app_gzip: 'rows app gzip',
+			todo_app_gzip: 'Todo app gzip',
+			chat_app_gzip: 'chat app gzip',
+		},
+		['js_gzip', 'app_gzip', 'todo_app_gzip', 'chat_app_gzip'],
+		'bytes',
 	),
 ];
 

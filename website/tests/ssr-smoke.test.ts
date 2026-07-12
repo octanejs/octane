@@ -73,13 +73,14 @@ describe('built SSR handler', () => {
 		expect(text).toContain('Octane vs the field');
 		expect(text).toContain('The authoring cliff');
 		// The SSR/no-JS content is the data tables — every card ships one with
-		// the real checked-in medians (13 cards).
-		expect((html.match(/Data table \(median ms/g) ?? []).length).toBe(13);
+		// the real checked-in medians (16 timing cards + one bytes card).
+		expect((html.match(/Data table \(median ms/g) ?? []).length).toBe(16);
+		expect((html.match(/Data table \(production build bytes\)/g) ?? []).length).toBe(1);
 		expect(html).toContain('<th scope="row"');
 		// The charts themselves mount client-side (recharts' store populates via
 		// layout effects): SSR renders same-height shells, never a chart <svg>
 		// (the nav's inline menu icon is the only svg on the page).
-		expect((html.match(/bench-plot-shell/g) ?? []).length).toBeGreaterThanOrEqual(13);
+		expect((html.match(/bench-plot-shell/g) ?? []).length).toBeGreaterThanOrEqual(17);
 		expect(html).not.toContain('recharts-surface');
 		expect((html.match(/<svg/g) ?? []).length).toBe(1);
 	});
