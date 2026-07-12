@@ -24,6 +24,7 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '10', 10);
 const LEVELS = 10;
@@ -36,13 +37,14 @@ const TARGETS = process.env.TARGETS
 			{ name: 'react', url: 'http://localhost:5217/' },
 			{ name: 'solid', url: 'http://localhost:5218/' },
 			{ name: 'ripple', url: 'http://localhost:5219/' },
+			{ name: 'preact', url: 'http://localhost:5269/' },
+			{ name: 'svelte', url: 'http://localhost:5280/' },
 		];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const summarize = (samples) => {
-	const s = [...samples].sort((a, b) => a - b);
-	return { median: s[s.length >> 1], min: s[0], samples: s.length };
+const summarize = (samples, options) => {
+	return summarizeSamples(samples, options);
 };
 
 async function runTarget(t) {
@@ -64,7 +66,12 @@ async function runTarget(t) {
 	}
 
 	await browser.close();
-	return { init: summarize(initSamples), update: summarize(updateSamples) };
+	return {
+		// Each init and paired first-update sample comes from an independent fresh
+		// page, not an ordered JIT warmup sequence. Score both full populations.
+		init: summarize(initSamples, { scoreMode: 'mean' }),
+		update: summarize(updateSamples, { scoreMode: 'mean' }),
+	};
 }
 
 (async () => {
@@ -80,14 +87,14 @@ async function runTarget(t) {
 	);
 	console.log();
 	console.log(
-		'Op     | ' + TARGETS.map((t) => t.name.padEnd(26)).join('| ') + '| (median ms, ×DELAY)',
+		'Op     | ' + TARGETS.map((t) => t.name.padEnd(26)).join('| ') + '| (score ms, ×DELAY)',
 	);
 	console.log('-------+-' + TARGETS.map(() => '-'.repeat(26)).join('+-'));
 	for (const op of ['init', 'update']) {
 		const row = [op.padEnd(6)];
 		for (const t of TARGETS) {
 			const r = all[t.name][op];
-			row.push(`${r.median.toFixed(1)} (${(r.median / DELAY).toFixed(1)}x)`.padEnd(26));
+			row.push(`${r.score.toFixed(1)} (${(r.score / DELAY).toFixed(1)}x)`.padEnd(26));
 		}
 		console.log(row.join('| '));
 	}
@@ -98,7 +105,9 @@ async function runTarget(t) {
 			iterations: ITER,
 			targets: TARGETS.map((t) => ({
 				name: t.name,
-				ops: all[t.name],
+				ops: Object.fromEntries(
+					Object.entries(all[t.name]).map(([op, r]) => [op, timingStatForJson(r)]),
+				),
 				meta: { levels: LEVELS, delayMs: DELAY },
 			})),
 		};

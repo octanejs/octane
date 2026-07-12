@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "Portal-swarm bench. A 200-item list where every item conditionally portals a 3-element tooltip (compiled child-position portals, value-position descriptor portals, a reference-stable descriptor variant, shared vs 200-distinct targets); harness measures mount/open/rerender/toggle/dispatch across octane-tsrx, react and solid.",
+  "description": "200-item portal lifecycle benchmark across Octane, React, Preact, Solid, Svelte, Ripple, and Vue Vapor.",
   "scripts": {
     "bench": "node run.mjs",
     "bench:long": "node run.mjs 40"

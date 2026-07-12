@@ -1,4 +1,4 @@
-// TodoMVC benchmark runner — drives all five framework columns through the
+// TodoMVC benchmark runner — drives all seven framework columns through the
 // SAME Speedometer-style scripted interactions via Playwright and times each
 // op. Unlike the js-framework suite's single-click ops, every TodoMVC op is a
 // BATCH of real DOM interactions (dispatched events on the app's actual
@@ -9,15 +9,16 @@
 // Timing protocol (shared with ../js-framework/run.mjs): interactions run
 // inside one page.evaluate, `performance.now()` around the batch. Frameworks
 // that commit synchronously on the dispatched event (octane native flush,
-// react/ripple flushSync in handlers, solid flush()) are fully measured by the
-// synchronous window; vue-vapor exposes `window.__benchFlush = () => nextTick()`
+// react/preact/ripple/Svelte flushSync in handlers, solid flush()) are fully
+// measured by the synchronous window; vue-vapor exposes
+// `window.__benchFlush = () => nextTick()`
 // and the loop awaits it after EACH interaction — one scheduler flush per
 // user action, matching how real input arrives (discrete tasks), with Vue's
 // own scheduling cost inside the measurement.
 //
 // The `.new-todo` / `.edit` inputs are uncontrolled in every app: the driver
 // sets `input.value` directly and dispatches `keydown` (Enter/Escape) — the
-// handlers read `e.target.value`, identical semantics across all five.
+// handlers read `e.target.value`, identical semantics across all seven.
 //
 // Usage:
 //   node benchmarks/todomvc/run.mjs [iterations]        # default 8
@@ -26,6 +27,7 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
 const N = 100; // todos per populated state
@@ -38,6 +40,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'solid', url: 'http://localhost:5242/' },
 			{ name: 'ripple', url: 'http://localhost:5243/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5244/' },
+			{ name: 'preact', url: 'http://localhost:5261/' },
+			{ name: 'svelte', url: 'http://localhost:5272/' },
 		];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -273,8 +277,7 @@ async function runTarget(t) {
 			samples.push(await timeOp(page, op));
 			await sleep(40);
 		}
-		samples.sort((a, b) => a - b);
-		results[op.name] = { median: samples[samples.length >> 1], min: samples[0], samples };
+		results[op.name] = summarizeSamples(samples);
 	}
 
 	// DOM-weight tripwire at steady state (100 todos mounted) — comparable
@@ -329,7 +332,9 @@ async function runTarget(t) {
 				ops: Object.fromEntries(
 					Object.entries(all[t.name]).map(([name, r]) => [
 						name,
-						{ median: r.median, min: r.min, samples: r.samples.length },
+						r.score == null
+							? { median: r.median, min: r.min, samples: r.samples.length }
+							: timingStatForJson(r),
 					]),
 				),
 			})),

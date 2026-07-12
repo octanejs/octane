@@ -78,6 +78,8 @@ const SUITES = [
 			{ filter: 'ripple-jsbench', port: 5178 },
 			{ filter: 'solid-jsbench', port: 5179 },
 			{ filter: 'vue-vapor-jsbench', port: 5180 },
+			{ filter: 'preact-jsbench', port: 5260 },
+			{ filter: 'svelte-jsbench', port: 5271 },
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -92,6 +94,8 @@ const SUITES = [
 			{ filter: 'ripple-jsbench', port: 5178 },
 			{ filter: 'solid-jsbench', port: 5179 },
 			{ filter: 'vue-vapor-jsbench', port: 5180 },
+			{ filter: 'preact-jsbench', port: 5260 },
+			{ filter: 'svelte-jsbench', port: 5271 },
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run-reorder.mjs', args: (n) => [String(n)] }],
@@ -105,6 +109,8 @@ const SUITES = [
 			{ filter: 'solid-todomvc', port: 5242 },
 			{ filter: 'ripple-todomvc', port: 5243 },
 			{ filter: 'vue-vapor-todomvc', port: 5244 },
+			{ filter: 'preact-todomvc', port: 5261 },
+			{ filter: 'svelte-todomvc', port: 5272 },
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -118,6 +124,8 @@ const SUITES = [
 			{ filter: 'solid-chat-stream', port: 5252 },
 			{ filter: 'ripple-chat-stream', port: 5253 },
 			{ filter: 'vue-vapor-chat-stream', port: 5254 },
+			{ filter: 'preact-chat-stream', port: 5262 },
+			{ filter: 'svelte-chat-stream', port: 5273 },
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -132,6 +140,8 @@ const SUITES = [
 			{ filter: 'ripple-dbmon-bench', port: 5199 },
 			{ filter: 'solid-dbmon-bench', port: 5200 },
 			{ filter: 'vue-vapor-dbmon-bench', port: 5220 },
+			{ filter: 'preact-dbmon-bench', port: 5263 },
+			{ filter: 'svelte-dbmon-bench', port: 5274 },
 		],
 		iter: { normal: 30, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -146,6 +156,8 @@ const SUITES = [
 			{ filter: 'solid-recursive-bench', port: 5187 },
 			{ filter: 'octane-jsx-recursive-bench', port: 5188 },
 			{ filter: 'vue-vapor-recursive-bench', port: 5189 },
+			{ filter: 'preact-recursive-bench', port: 5264 },
+			{ filter: 'svelte-recursive-bench', port: 5275 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -160,6 +172,8 @@ const SUITES = [
 			{ filter: 'ripple-signal-bench', port: 5193 },
 			{ filter: 'octane-jsx-signal-bench', port: 5194 },
 			{ filter: 'vue-vapor-signal-bench', port: 5183 },
+			{ filter: 'preact-signal-bench', port: 5265 },
+			{ filter: 'svelte-signal-bench', port: 5276 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -172,7 +186,16 @@ const SUITES = [
 		cwd: 'news',
 		servers: [],
 		iter: { normal: 20, quick: 3 },
-		runs: ['octane-tsrx', 'octane-jsx', 'react', 'ripple', 'solid', 'vue-vapor'].map((target) => ({
+		runs: [
+			'octane-tsrx',
+			'octane-jsx',
+			'react',
+			'preact',
+			'ripple',
+			'solid',
+			'svelte',
+			'vue-vapor',
+		].map((target) => ({
 			label: target,
 			script: 'run.mjs',
 			args: (n) => [target, String(n)],
@@ -188,6 +211,8 @@ const SUITES = [
 			{ filter: 'solid-effectful-list-bench', port: 5204 },
 			{ filter: 'ripple-effectful-list-bench', port: 5205 },
 			{ filter: 'vue-vapor-effectful-list-bench', port: 5221 },
+			{ filter: 'preact-effectful-list-bench', port: 5266 },
+			{ filter: 'svelte-effectful-list-bench', port: 5277 },
 		],
 		iter: { normal: 30, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -202,6 +227,8 @@ const SUITES = [
 			{ filter: 'solid-memowall-bench', port: 5182 },
 			{ filter: 'ripple-memowall-bench', port: 5225 },
 			{ filter: 'vue-vapor-memowall-bench', port: 5223 },
+			{ filter: 'preact-memowall-bench', port: 5267 },
+			{ filter: 'svelte-memowall-bench', port: 5278 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -215,6 +242,8 @@ const SUITES = [
 			{ filter: 'solid-portal-swarm-bench', port: 5212 },
 			{ filter: 'ripple-portal-swarm-bench', port: 5224 },
 			{ filter: 'vue-vapor-portal-swarm-bench', port: 5181 },
+			{ filter: 'preact-portal-swarm-bench', port: 5268 },
+			{ filter: 'svelte-portal-swarm-bench', port: 5279 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -231,8 +260,9 @@ const SUITES = [
 	{
 		// Node-only streaming SSR (no servers, no browser): shell TTFB, stream-end
 		// total, chunk framing + all-fast throughput for octane
-		// renderToPipeableStream vs React Fizz vs Solid renderToStream vs Ripple's
-		// stream mode. Iteration-counted (renders per target per scenario).
+		// renderToPipeableStream vs React/Preact pipeable streams, Solid
+		// renderToStream, and Ripple's stream mode. Svelte is N/A because its public
+		// renderer is buffered. Iteration-counted (renders per target per scenario).
 		name: 'streaming-ssr',
 		cwd: 'streaming-ssr',
 		servers: [],
@@ -305,6 +335,8 @@ const SUITES = [
 			{ filter: 'react-async-bench', port: 5217 },
 			{ filter: 'solid-async-bench', port: 5218 },
 			{ filter: 'ripple-async-bench', port: 5219 },
+			{ filter: 'preact-async-bench', port: 5269 },
+			{ filter: 'svelte-async-bench', port: 5280 },
 		],
 		iter: { normal: 10, quick: 2 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -566,9 +598,12 @@ async function runSuite(suite) {
 
 // ── baseline compare (noise-aware) ────────────────────────────────────────────
 
-// Regression iff median > base.median*1.15 AND min > base.min*1.10. For ops with
-// base.median < 1ms, additionally require an absolute excess > 0.1ms so timer
+const scoreOf = (stat) => stat?.score ?? stat?.median;
+
+// Regression iff score > base.score*1.15 AND min > base.min*1.10. For ops with
+// base score < 1ms, additionally require an absolute excess > 0.1ms so timer
 // granularity (0.1ms in Chromium) on sub-ms ops can't trip a false regression.
+// Older baselines do not have `score`; they transparently fall back to median.
 function compareResult(result, baseline) {
 	const rows = [];
 	const baseTargets = new Map((baseline.targets || []).map((t) => [t.name, t]));
@@ -578,13 +613,17 @@ function compareResult(result, baseline) {
 		for (const [op, r] of Object.entries(t.ops)) {
 			const b = bt.ops[op];
 			if (!b) continue;
-			const medOver = r.median > b.median * 1.15;
+			const score = scoreOf(r);
+			const baseScore = scoreOf(b);
+			const scoreOver = score > baseScore * 1.15;
 			const minOver = r.min > b.min * 1.1;
-			const smallOk = b.median < 1 ? r.median - b.median > 0.1 : true;
-			const regressed = medOver && minOver && smallOk;
+			const smallOk = baseScore < 1 ? score - baseScore > 0.1 : true;
+			const regressed = scoreOver && minOver && smallOk;
 			rows.push({
 				target: t.name,
 				op,
+				score,
+				baseScore,
 				median: r.median,
 				baseMedian: b.median,
 				min: r.min,
@@ -604,12 +643,12 @@ function printCompareTable(suiteName, rows) {
 		return 0;
 	}
 	console.log(
-		'  target                    op                        median  (base)     min  (base)',
+		'  target                    op                         score  (base)     min  (base)',
 	);
 	for (const r of regs) {
 		console.log(
 			`  REGRESSION ${r.target.padEnd(16)} ${r.op.padEnd(24)} ` +
-				`${r.median.toFixed(3)} (${r.baseMedian.toFixed(3)})  ${r.min.toFixed(3)} (${r.baseMin.toFixed(3)})`,
+				`${r.score.toFixed(3)} (${r.baseScore.toFixed(3)})  ${r.min.toFixed(3)} (${r.baseMin.toFixed(3)})`,
 		);
 	}
 	return regs.length;
@@ -629,26 +668,27 @@ function loadRatios() {
 }
 
 // For a set of collected suite results, check every guard whose (suite, target,
-// reference, op) all ran. ratio = target.median / reference.median; a breach is
-// ratio > maxRatio or, for cliff/advantage guards, ratio < minRatio. Returns
-// { checked, breaches[], suggestions[] }.
+// reference, op) all ran. ratio = target score / reference score; a breach is
+// ratio > maxRatio or, for cliff/advantage guards, ratio < minRatio. Existing
+// median-only baselines fall back to median. Returns { checked, breaches[],
+// suggestions[] }.
 function checkRatios(resultsBySuite, guards) {
 	const breaches = [];
 	const suggestions = [];
 	let checked = 0;
-	const opMed = (suite, targetName, op) => {
+	const opScore = (suite, targetName, op) => {
 		const res = resultsBySuite.get(suite);
 		if (!res) return null;
 		const t = res.targets.find((x) => x.name === targetName);
 		if (!t || !t.ops[op]) return null;
-		return t.ops[op].median;
+		return scoreOf(t.ops[op]);
 	};
 	for (const g of guards) {
-		const tMed = opMed(g.suite, g.target, g.op);
-		const rMed = opMed(g.suite, g.reference, g.op);
-		if (tMed == null || rMed == null || rMed === 0) continue; // both sides must have run
+		const tScore = opScore(g.suite, g.target, g.op);
+		const rScore = opScore(g.suite, g.reference, g.op);
+		if (tScore == null || rScore == null || rScore === 0) continue; // both sides must have run
 		checked++;
-		const ratio = tMed / rMed;
+		const ratio = tScore / rScore;
 		const hasMax = typeof g.maxRatio === 'number';
 		const hasMin = typeof g.minRatio === 'number';
 		const highBreach = hasMax && ratio > g.maxRatio;

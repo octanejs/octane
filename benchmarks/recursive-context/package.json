@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "Recursive-component + Context-read bench. Same DOM shape rendered by octane and ripple; harness measures mount / update / unmount independently. Adjacent to benchmarks/js-framework.",
+  "description": "Recursive component and context fan-out benchmark across Octane and reference frameworks.",
   "scripts": {
     "bench": "node run.mjs",
     "bench:long": "node run.mjs 40"

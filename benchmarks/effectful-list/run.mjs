@@ -1,5 +1,4 @@
-// effectful-list bench harness — drives octane-tsrx / octane-jsx / react /
-// solid / ripple / vue-vapor via Playwright.
+// effectful-list bench harness — drives every framework fixture via Playwright.
 //
 // Where js-framework measures raw keyed-list DOM throughput on effect-free
 // rows, this suite makes every row LIFECYCLE-BEARING: a cross-module Row
@@ -57,6 +56,7 @@
 
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
+import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '30', 10);
 const WARMUP = Math.min(10, Math.max(2, ITER));
@@ -71,6 +71,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'solid', url: 'http://localhost:5204/' },
 			{ name: 'ripple', url: 'http://localhost:5205/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5221/' },
+			{ name: 'preact', url: 'http://localhost:5266/' },
+			{ name: 'svelte', url: 'http://localhost:5277/' },
 		];
 
 // perSamplePre: the op consumes its pre-state (empty / fresh 1k), so the pre
@@ -152,16 +154,7 @@ const OPS = [
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function summarize(samples) {
-	const sorted = [...samples].sort((a, b) => a - b);
-	const n = sorted.length;
-	const mean = sorted.reduce((a, b) => a + b, 0) / n;
-	const stddev = Math.sqrt(sorted.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
-	return {
-		median: sorted[n >> 1],
-		min: sorted[0],
-		p95: sorted[Math.min(n - 1, Math.floor(n * 0.95))],
-		stddev,
-	};
+	return summarizeSamples(samples);
 }
 
 async function freshPage(browser, url) {
@@ -300,10 +293,7 @@ function writeBenchJson(all, failed) {
 				ops: Object.fromEntries(
 					OPS.filter((op) => res.ops[op.name]).map((op) => {
 						const r = res.ops[op.name];
-						return [
-							op.name,
-							{ median: r.median, min: r.min, p95: r.p95, sd: r.stddev, samples: ITER },
-						];
+						return [op.name, timingStatForJson(r)];
 					}),
 				),
 				meta:
@@ -348,7 +338,7 @@ function writeBenchJson(all, failed) {
 		console.log();
 		for (const t of TARGETS.slice(1)) {
 			const r = all[t.name].ops;
-			console.log(`${t.name} / ${baselineName} ratio (median; <1 means ${t.name} faster):`);
+			console.log(`${t.name} / ${baselineName} ratio (score; <1 means ${t.name} faster):`);
 			for (const op of OPS) {
 				const a = r[op.name];
 				const b = baseline[op.name];
@@ -356,7 +346,7 @@ function writeBenchJson(all, failed) {
 					console.log(`  ${op.name.padEnd(20)} —      (gate fail)`);
 					continue;
 				}
-				const ratio = a.median / b.median;
+				const ratio = scoreOf(a) / scoreOf(b);
 				const tag = ratio < 0.95 ? '++ faster' : ratio < 1.05 ? '== ~equal' : '-- slower';
 				console.log(`  ${op.name.padEnd(20)} ${ratio.toFixed(2)}x  ${tag}`);
 			}

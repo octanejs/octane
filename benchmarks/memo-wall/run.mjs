@@ -1,4 +1,4 @@
-// memo-wall bench harness — drives octane-tsrx / octane-jsx / react via Playwright.
+// memo-wall bench harness — drives every framework fixture via Playwright.
 //
 // memo-wall isolates the cost of a MEMO WALL: 1000 `memo(Row)` children under
 // one parent, where a parent re-render must be absorbed by 1000 shallow-equal
@@ -49,6 +49,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
 const WARMUP = 5;
@@ -64,6 +65,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'solid', url: 'http://localhost:5182/' },
 			{ name: 'ripple', url: 'http://localhost:5225/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5223/' },
+			{ name: 'preact', url: 'http://localhost:5267/' },
+			{ name: 'svelte', url: 'http://localhost:5278/' },
 		];
 
 const Z = { rowA: 0, innerA: 0, leafA: 0, rowB: 0, innerB: 0, leafB: 0 };
@@ -112,16 +115,7 @@ const OPS = [
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function summarize(samples) {
-	const sorted = [...samples].sort((a, b) => a - b);
-	const n = sorted.length;
-	const mean = sorted.reduce((a, b) => a + b, 0) / n;
-	const sd = Math.sqrt(sorted.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
-	return {
-		median: sorted[n >> 1],
-		min: sorted[0],
-		p95: sorted[Math.min(n - 1, Math.floor(n * 0.95))],
-		sd,
-	};
+	return summarizeSamples(samples);
 }
 
 async function freshPage(browser, url) {
@@ -351,9 +345,9 @@ async function runTarget(t, failures) {
 		console.log();
 		for (const t of TARGETS.slice(1)) {
 			const r = all[t.name].results;
-			console.log(`${t.name} / ${baselineName} ratio (median; <1 means ${t.name} faster):`);
+			console.log(`${t.name} / ${baselineName} ratio (score; <1 means ${t.name} faster):`);
 			for (const op of OPS) {
-				const ratio = r[op.name].median / baseline[op.name].median;
+				const ratio = scoreOf(r[op.name]) / scoreOf(baseline[op.name]);
 				const tag = ratio < 0.95 ? '++ faster' : ratio < 1.05 ? '== ~equal' : '-- slower';
 				console.log(`  ${op.name.padEnd(24)} ${ratio.toFixed(2)}x  ${tag}`);
 			}
@@ -370,10 +364,7 @@ async function runTarget(t, failures) {
 				ops: Object.fromEntries(
 					OPS.map((op) => {
 						const r = all[t.name].results[op.name];
-						return [
-							op.name,
-							{ median: r.median, min: r.min, p95: r.p95, sd: r.sd, samples: r.samples },
-						];
+						return [op.name, timingStatForJson(r)];
 					}),
 				),
 				meta: all[t.name].meta,

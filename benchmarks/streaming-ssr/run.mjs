@@ -1,8 +1,10 @@
 // streaming-ssr bench harness — Node-only streaming SSR (NO browser, NO ports,
-// NO Playwright). Times the BUILT production SSR bundles of four targets —
+// NO Playwright). Times the BUILT production SSR bundles of five targets —
 // octane renderToPipeableStream ('octane/server'), React 19 Fizz
-// (react-dom/server), Solid 2.0 renderToStream ('@solidjs/web'), Ripple's
-// stream-mode render ('ripple/server') — rendering the SAME product page: a
+// (react-dom/server), Preact's renderToPipeableStream
+// ('preact-render-to-string/stream-node'), Solid 2.0 renderToStream
+// ('@solidjs/web'), and Ripple's stream-mode render ('ripple/server') —
+// rendering the SAME product page: a
 // synchronous shell (~50 elements) + 10 Suspense-boundary cards (~20 elements
 // each) whose data promises resolve on a deterministic setTimeout schedule.
 //
@@ -42,6 +44,7 @@ import { build } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(__dirname, 'dist');
@@ -56,6 +59,7 @@ const WARMUP = Math.min(5, ITER);
 const TARGETS = [
 	{ name: 'octane-tsrx', dir: 'octane' },
 	{ name: 'react', dir: 'react' },
+	{ name: 'preact', dir: 'preact' },
 	{ name: 'solid', dir: 'solid' },
 	{ name: 'ripple', dir: 'ripple' },
 ];
@@ -106,18 +110,10 @@ if (!noBuild) {
 // ── stats helpers ─────────────────────────────────────────────────────────────
 
 function summarize(samples) {
-	const s = [...samples].sort((a, b) => a - b);
-	const n = s.length;
-	const mean = s.reduce((a, b) => a + b, 0) / n;
-	const sd = Math.sqrt(s.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
-	const q = (p) => s[Math.min(n - 1, Math.floor(n * p))];
+	const stat = summarizeSamples(samples);
 	return {
-		median: s[n >> 1],
-		min: s[0],
-		p95: q(0.95),
-		sd,
-		samples: n,
-		opsPerSec: 1000 / mean,
+		...stat,
+		opsPerSec: 1000 / stat.score,
 	};
 }
 
@@ -252,16 +248,16 @@ console.log(
 for (const scenario of SCENARIOS) {
 	console.log(`\n[${scenario}]`);
 	console.log(
-		'target       | shell ms |  (min)   | total ms |  (min)   | chunks | bytes KB | renders/s',
+		'target       | shell score |  (min)   | total score |  (min)   | chunks | bytes KB | renders/s',
 	);
 	console.log(
-		'-------------+----------+----------+----------+----------+--------+----------+----------',
+		'-------------+-------------+----------+-------------+----------+--------+----------+----------',
 	);
 	for (const r of results) {
 		const s = r.scenarios[scenario];
 		if (!s) continue;
 		console.log(
-			`${r.name.padEnd(12)} |${f2(s.shell.median)} |${f2(s.shell.min)} |${f2(s.total.median)} |${f2(s.total.min)} | ${String(s.chunkCount).padStart(6)} | ${kb(s.bytes)} |${f2(s.total.opsPerSec)}`,
+			`${r.name.padEnd(12)} |${f2(s.shell.score)} |${f2(s.shell.min)} |${f2(s.total.score)} |${f2(s.total.min)} | ${String(s.chunkCount).padStart(6)} | ${kb(s.bytes)} |${f2(s.total.opsPerSec)}`,
 		);
 	}
 }
@@ -269,7 +265,7 @@ for (const scenario of SCENARIOS) {
 const byName = new Map(results.map((r) => [r.name, r]));
 const octane = byName.get('octane-tsrx');
 if (octane) {
-	console.log('\nratios vs octane-tsrx (median; >1 means slower than octane):');
+	console.log('\nratios vs octane-tsrx (score; >1 means slower than octane):');
 	for (const r of results) {
 		if (r.name === 'octane-tsrx') continue;
 		for (const scenario of SCENARIOS) {
@@ -277,7 +273,7 @@ if (octane) {
 			const b = octane.scenarios[scenario];
 			if (!a || !b) continue;
 			console.log(
-				`  ${r.name.padEnd(8)} ${scenario.padEnd(10)} shell ${(a.shell.median / b.shell.median).toFixed(2)}x  total ${(a.total.median / b.total.median).toFixed(2)}x`,
+				`  ${r.name.padEnd(8)} ${scenario.padEnd(10)} shell ${(scoreOf(a.shell) / scoreOf(b.shell)).toFixed(2)}x  total ${(scoreOf(a.total) / scoreOf(b.total)).toFixed(2)}x`,
 			);
 		}
 	}
@@ -297,12 +293,12 @@ if (process.env.BENCH_JSON) {
 			const af = r.scenarios['all-fast'];
 			const ops = {};
 			if (st) {
-				ops.shell_staggered = st.shell;
-				ops.total_staggered = st.total;
+				ops.shell_staggered = timingStatForJson(st.shell);
+				ops.total_staggered = timingStatForJson(st.total);
 			}
 			if (af) {
-				ops.shell_allfast = af.shell;
-				ops.total_allfast = af.total;
+				ops.shell_allfast = timingStatForJson(af.shell);
+				ops.total_allfast = timingStatForJson(af.total);
 			}
 			return {
 				name: r.name,

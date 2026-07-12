@@ -43,26 +43,49 @@ keyed `@for` directive (each item renders in its own scope, so per-item hooks
 get per-item state), or extract the loop body into a child component. `use()`
 and `useContext` do work inside loops — they aren't slot-keyed.
 
-## Events are just DOM events
+## State hooks have a current-state getter
 
-Octane doesn't have React's synthetic event system. `onClick`, `onInput`,
-`onSubmit` and friends are real, delegated browser events, so what you get is
-whatever the platform does — no wrapper layer second-guessing it.
+**This replaces a common React ref workaround.** `useState` and `useReducer`
+have an optional third tuple member: a stable thunk that reads the latest state
+cell.
 
-For most apps this is invisible: click, input, and submit behave exactly as
-you'd expect. The place it can surface is the handful of events React quietly
-reshapes. A few examples:
+```tsrx
+const [draft, setDraft, getDraft] = useState('');
 
-- Events that don't bubble in the DOM — `toggle`, `cancel`, media events,
-  `load`/`error` — fire on the element they happened to, and don't get replayed
-  up the tree. React re-dispatches them to ancestors; Octane doesn't.
-- `mouseEnter`/`pointerEnter` are the browser's own events, not something
-  synthesized from `mouseover`/`mouseout`.
-- There's no synthetic `onChange`. Use the native event — `onInput` — which is
-  what you actually wanted most of the time anyway.
+const saveLater = async () => {
+	await waitForConnection();
+	await save(getDraft());
+};
+```
 
-Everything else you rely on is native and works: `stopPropagation`, the capture
-phase, and `event.currentTarget` all behave the way the DOM defines them.
+In React, a callback like this usually needs a ref synchronized on every render
+to avoid capturing an old `draft`. In Octane, `getDraft()` reads the latest
+scheduled value directly without subscribing or causing a render. During
+pending work that value can be newer than the currently committed DOM.
+
+The compiler only emits the getter-enabled hook when tuple index 2 can be
+observed. Ordinary `[state, setState]` and `[state, dispatch]` destructures keep
+the existing two-item runtime path and allocate no getter; escaped or ambiguous
+tuples conservatively receive the full three-item shape.
+
+## Native event objects, no synthetic event layer
+
+Event propagation itself matches React and is **no longer a difference**.
+Ordinary bubbling and capture, `stopPropagation`, logical propagation through
+portals, and native non-bubbling events such as `toggle`, dialog
+`cancel`/`close`, media events, and `load`/`error` all reach the same logical
+ancestors React does.
+
+What remains different is the event API and synthesis layer:
+
+- `onClick`, `onInput`, `onSubmit`, and friends receive the browser's actual
+  `Event` object rather than a React `SyntheticEvent` wrapper.
+- `mouseEnter`/`pointerEnter` are the browser's own per-element events, not
+  events synthesized from `mouseover`/`mouseout`.
+- There's no synthetic `onChange`, `onBeforeInput`, or `onSelect` polyfill. Use
+  the corresponding native event — `onInput` for per-keystroke text changes.
+
+There is no event pooling, and `event.currentTarget` is the handler's element.
 
 ## Controlled components, native events
 
@@ -170,5 +193,6 @@ supported.
 
 ## Next
 
+- [Core APIs](/docs/core-apis) — roots, hooks, boundaries, actions, and SSR.
 - [TSRX vs TSX/JSX](/docs/tsrx-vs-tsx) — the two dialects and when to use each.
 - [Quick start](/docs/quick-start) — install, mount, and the essentials.

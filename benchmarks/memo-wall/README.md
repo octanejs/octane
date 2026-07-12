@@ -1,4 +1,4 @@
-# memo-wall bench — octane (TSRX vs JSX) vs react vs solid vs vue-vapor
+# memo-wall bench — memo and fine-grained walls across frameworks
 
 A benchmark adjacent to [`js-framework`](../js-framework/), [`dbmon`](../dbmon/)
 and [`recursive-context`](../recursive-context/). Where those measure list
@@ -14,18 +14,16 @@ NOT duplicate them. A bad number here points at `tryMemoBail` (both arms),
 `shallowEqualProps`'s key walk, `useContextInternal`'s memo-ancestor stamping,
 or the `refreshContextConsumers` / `refreshBlockForContext` descent.
 
-**Fine-grained columns (solid / vue-vapor).** Parent re-renders don't exist in
-fine-grained frameworks, so there is no memo wall to absorb one — their
+**Fine-grained columns (Solid / Ripple / Svelte / Vue Vapor).** Parent
+re-renders don't exist in fine-grained frameworks, so there is no memo wall to absorb one — their
 `parent_rerender_equal_*` numbers are near-zero BY MODEL (a tick bump updates
 one header text node), which is exactly what these columns are here to show.
 Their probes count the fine-grained equivalents: component CREATIONS for
 Row/Inner, leaf TEXT-EFFECT re-runs for Leaf (the analog of a Leaf re-render),
 with the keyed lists keyed by row-object identity so `one_change_*` recreates
 exactly one row. The same exact-count gates hold with the same expectations.
-Ripple uses the same
-mapping (bodies count creations; the leaf probe lives in the reactive text
-expression; `@for` keyed by row-object identity; the theme context carries a
-stable accessor over the wall's tracked theme).
+Ripple's version puts the leaf probe in a reactive text expression, keys its
+`@for` by row-object identity, and carries a stable accessor in theme context.
 
 ## Layout
 
@@ -35,7 +33,10 @@ benchmarks/memo-wall/
 ├── octane-jsx/    # Vite app, dev :5207 — same app authored in React-style .tsx
 ├── react/         # Vite app, dev :5208 (React 19, production mode)
 ├── solid/         # Vite app, dev :5182 (Solid 2.0 — no wall; fine-grained probes)
+├── ripple/        # Vite app, dev :5225 (fine-grained creation/text probes)
 ├── vue-vapor/     # Vite app, dev :5223 (Vue 3.6 Vapor — no wall; fine-grained probes)
+├── preact/       # Vite app, dev :5267 (memo + core context)
+├── svelte/       # Vite app, dev :5278 (fine-grained creation/text probes)
 ├── run.mjs        # Playwright harness — drives all targets, enforces the gates
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
@@ -63,8 +64,8 @@ how `<Row>` is put on screen:
   `forBlock` → `componentSlot` → the **componentSlot arm** of `tryMemoBail`.
   The list lives in `RowsA` (host-element root) rather than inline in the
   Provider children because the `.tsx` dialect only folds a keyed `.map` to
-  the compiled forBlock under host-only ancestors; all three fixtures keep
-  the identical structure so the columns stay comparable.
+  the compiled forBlock under host-only ancestors; the Octane, React, and
+  Preact fixtures keep the identical structure so those columns stay comparable.
 - **wall B — value-position**: a plain-`.ts` helper (`src/wall-b.ts`) builds
   `createElement(Row, props)` descriptors that reach the DOM through a
   `{rows}` children hole → `childSlot`'s keyed de-opt list → the **childSlot
@@ -110,19 +111,18 @@ harness forces `gc()` before every sample and loops sub-millisecond ops
 (10× re-render/one-change, 5× ctx) inside the timed window, dividing by the
 rep count. Default 20 iterations (+5 warmup); `node run.mjs 50` for longer.
 
+Native **Preact** (`:5267`) uses `memo` and core context. **Svelte 5** (`:5278`)
+reports compiler-granular behavior: component-creation probes run once, context
+consumers update selectively, and object keys recreate exactly one changed row.
+
 ## Running
 
-Start the three preview servers (production builds), then run the harness:
+The unified runner builds and starts every production preview server before it
+runs the harness:
 
 ```bash
-# build + preview each (production); run from the repo root
-pnpm --filter octane-tsrx-memowall-bench build && pnpm --filter octane-tsrx-memowall-bench preview &
-pnpm --filter octane-jsx-memowall-bench  build && pnpm --filter octane-jsx-memowall-bench  preview &
-pnpm --filter react-memowall-bench       build && pnpm --filter react-memowall-bench       preview &
-
-# then, from benchmarks/memo-wall:
-pnpm bench           # 20 timed iterations (+5 warmup) per op
-pnpm bench:long      # 50 iterations
+node benchmarks/bench.mjs --quick memo-wall
+node benchmarks/bench.mjs memo-wall
 ```
 
 Swap `build && … preview` for `dev` to measure the unminified dev build. Set

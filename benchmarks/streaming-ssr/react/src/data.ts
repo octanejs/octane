@@ -1,7 +1,7 @@
 // Shared product-page dataset + delay schedule for the streaming-ssr bench.
-// This file is byte-identical across the four targets (octane / react / solid /
-// ripple) so every framework streams the same DOM shape on the same clock —
-// only the framework glue in App.tsrx / entry-server.ts differs.
+// This file is byte-identical across the five targets (octane / react / preact /
+// solid / ripple) so every framework streams the same DOM shape on the same
+// clock — only the framework glue in App.tsrx / entry-server.ts differs.
 
 export interface CardItem {
 	label: string;

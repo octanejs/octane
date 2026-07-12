@@ -1,4 +1,4 @@
-// Bundle-size benchmark — PRODUCTION `vite build` of each js-framework app,
+// Bundle-size benchmark — PRODUCTION `vite build` of each comparative app,
 // reporting the built client JS bytes (raw / gzip / brotli) per framework. This
 // is the cross-framework shipped-bytes comparison the perf suites can't see
 // (docs/compiled-output-optimization-plan.md, Phase 0a).
@@ -38,25 +38,24 @@ const TODOMVC = path.resolve(__dirname, '../todomvc');
 const CHAT_STREAM = path.resolve(__dirname, '../chat-stream');
 const OUT_ROOT = path.join(__dirname, 'dist'); // gitignored (root .gitignore: dist)
 
-// Two app sets: the js-framework-benchmark rows apps (the original 0a set) and
-// the TodoMVC apps — the APP-shaped size comparison (forms, filtering, editing;
-// where per-component codegen dominates). TodoMVC ops are prefixed `todo_` so
-// both sets ride one suite with one baseline file.
+// Three app sets: js-framework rows, TodoMVC, and chat-stream. The latter two
+// are app-shaped size comparisons; their ops use `todo_` / `chat_` prefixes so
+// all sets ride one suite with one baseline file.
 const SETS = [
 	{
 		root: JS_FRAMEWORK,
 		prefix: '',
-		targets: ['octane-tsrx', 'octane-jsx', 'react', 'ripple', 'solid'],
+		targets: ['octane-tsrx', 'octane-jsx', 'react', 'preact', 'ripple', 'solid', 'svelte'],
 	},
 	{
 		root: TODOMVC,
 		prefix: 'todo_',
-		targets: ['octane-tsrx', 'react', 'solid', 'ripple', 'vue-vapor'],
+		targets: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'ripple', 'vue-vapor'],
 	},
 	{
 		root: CHAT_STREAM,
 		prefix: 'chat_',
-		targets: ['octane-tsrx', 'react', 'solid', 'ripple', 'vue-vapor'],
+		targets: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'ripple', 'vue-vapor'],
 	},
 ];
 

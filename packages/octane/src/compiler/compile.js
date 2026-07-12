@@ -575,7 +575,7 @@ function collectComponentLocals(componentNode) {
  * memoising on.
  *
  * Stability sources:
- *   - useState / useReducer setters (second destructured slot)
+ *   - useState / useReducer setters and state getters (second/third slots)
  *   - useRef returns (the ref object itself, not .current)
  *   - useCallback / useEffectEvent returns
  *   - Arrows previously declared in this body whose free vars are themselves
@@ -605,8 +605,20 @@ function computeStableLocals(statements, componentLocals) {
 					decl.id.elements[1].type === 'Identifier'
 				) {
 					stable.add(decl.id.elements[1].name);
-					continue;
 				}
+				// [_, _, getX] = useState(...) — the compiler-generated getter
+				// closes over the hook cell and is stable for that cell's lifetime.
+				if (
+					(callName === 'useState' || callName === 'useReducer') &&
+					decl.id.type === 'ArrayPattern' &&
+					decl.id.elements &&
+					decl.id.elements.length >= 3 &&
+					decl.id.elements[2] &&
+					decl.id.elements[2].type === 'Identifier'
+				) {
+					stable.add(decl.id.elements[2].name);
+				}
+				if (callName === 'useState' || callName === 'useReducer') continue;
 				// x = useRef(...) / useCallback(...) / useEffectEvent(...) — the
 				// return value is stable for the lifetime of the component.
 				if (
@@ -4152,7 +4164,86 @@ function rejectHookInJsLoop(loop, ctx, componentName) {
 	walk(loop);
 }
 
+const STATE_GETTER_HELPERS = {
+	useState: '__useStateWithGetter',
+	useReducer: '__useReducerWithGetter',
+};
+
+function arrayPatternObservesStateGetter(pattern) {
+	const elements = pattern.elements || [];
+	if (elements[2] != null) return true;
+	// A rest before/at index 2 observes the getter even without an explicit
+	// third binding: `[state, ...rest]` includes both update and getState.
+	for (let i = 0; i <= 2 && i < elements.length; i++) {
+		if (elements[i]?.type === 'RestElement') return true;
+	}
+	return false;
+}
+
+function isTransparentStateTupleWrapper(node, child) {
+	if (!node) return false;
+	if (
+		node.type === 'TSAsExpression' ||
+		node.type === 'TSTypeAssertion' ||
+		node.type === 'TSNonNullExpression' ||
+		node.type === 'ParenthesizedExpression' ||
+		node.type === 'ChainExpression'
+	) {
+		return node.expression === child;
+	}
+	return false;
+}
+
+// Source-level useState/useReducer tuples have a third getState member. Mark
+// calls that can observe it so rewriteHookCalls can select a specialized helper;
+// the ordinary two-item runtime path remains byte-for-byte for proven-dead
+// getters. Any escaping/ambiguous tuple is conservative and gets the full shape.
+function markStateGetterUsage(root) {
+	const ancestors = [];
+	function walk(node) {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (
+			node.type === 'CallExpression' &&
+			node.callee?.type === 'Identifier' &&
+			STATE_GETTER_HELPERS[node.callee.name]
+		) {
+			let child = node;
+			let i = ancestors.length - 1;
+			while (i >= 0 && isTransparentStateTupleWrapper(ancestors[i], child)) {
+				child = ancestors[i--];
+			}
+			const parent = i >= 0 ? ancestors[i] : null;
+			let observed = true;
+			if (parent?.type === 'VariableDeclarator' && parent.init === child) {
+				observed = parent.id.type !== 'ArrayPattern' || arrayPatternObservesStateGetter(parent.id);
+			} else if (parent?.type === 'AssignmentExpression' && parent.right === child) {
+				observed =
+					parent.left.type !== 'ArrayPattern' || arrayPatternObservesStateGetter(parent.left);
+			} else if (parent?.type === 'MemberExpression' && parent.object === child) {
+				const p = parent.property;
+				const index = parent.computed && p?.type === 'Literal' ? Number(p.value) : NaN;
+				observed = index !== 0 && index !== 1;
+			} else if (parent?.type === 'ExpressionStatement') {
+				observed = false;
+			}
+			node._octaneStateGetter = observed;
+		}
+		ancestors.push(node);
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key) || key === '_octaneStateGetter') continue;
+			walk(node[key]);
+		}
+		ancestors.pop();
+	}
+	walk(root);
+}
+
 function rewriteHookCalls(node, ctx, componentName) {
+	markStateGetterUsage(node);
 	return mapAst(node, (n) => {
 		// A plain JS loop must not contain slot-keyed hook calls — reject before
 		// slotting. (A template `@for` is also a ForOfStatement; its JSX body tells
@@ -4183,6 +4274,7 @@ function rewriteHookCalls(node, ctx, componentName) {
 			const isCustom = /^use[A-Z]/.test(name) && name !== 'useContext';
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isCustom || isServerUse) {
+				const getterHelper = n._octaneStateGetter ? STATE_GETTER_HELPERS[name] : null;
 				// A builtin hook call site is USER code (the user's own identifier), so
 				// its import stays bare — EXCEPT compiler-inserted calls (auto-callback's
 				// `useCallback`), whose callee is renamed to the `_$` alias below so a
@@ -4190,6 +4282,7 @@ function rewriteHookCalls(node, ctx, componentName) {
 				if (isBuiltin) {
 					if (n.callee._octaneGenerated) ctx.runtimeNeeded.add(name);
 					else ctx.userRuntimeNames.add(name);
+					if (getterHelper !== null) ctx.runtimeNeeded.add(getterHelper);
 				}
 				if (isServerUse) ctx.userRuntimeNames.add('use');
 				const debug = isServerUse
@@ -4226,9 +4319,12 @@ function rewriteHookCalls(node, ctx, componentName) {
 				}
 				return {
 					...n,
-					callee: n.callee._octaneGenerated
-						? { type: 'Identifier', name: rtAlias(name) }
-						: n.callee,
+					callee:
+						getterHelper !== null
+							? { type: 'Identifier', name: rtAlias(getterHelper) }
+							: n.callee._octaneGenerated
+								? { type: 'Identifier', name: rtAlias(name) }
+								: n.callee,
 					arguments: [...args, { type: 'Identifier', name: symVar }],
 				};
 			}

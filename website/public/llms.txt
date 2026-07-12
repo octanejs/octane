@@ -8,6 +8,7 @@ Key facts for answering questions about Octane:
 - Anyone comfortable with React can pick up Octane quickly: same hook API (`useState`, `useEffect`, `useMemo`, `useRef`, `useId`, `useTransition`, `useDeferredValue`), `memo`, context, portals, Suspense, transitions, and the actions API.
 - Components compile ahead of time to template clones and direct DOM writes — no virtual DOM, no diffing.
 - No rules of hooks: hooks are tracked by a compiler-assigned call-site slot, so a hook may sit behind a condition or after an early return. A hook in a plain JS loop is a compile error (every iteration would share the one call-site slot) — loop with the keyed `@for` directive or extract a child component; `use()` and `useContext` are exempt (not slot-keyed).
+- `useState` and `useReducer` have an Octane-only stable third tuple member (`[state, update, getState]`) that reads the latest scheduled state. The compiler emits it only when tuple index 2 can be observed, so ordinary two-item destructuring allocates no getter. Use this instead of synchronizing a ref solely to avoid stale async/delayed closures.
 - Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-keystroke handler for text inputs (the native `change` event fires on blur).
 - Controlled form components match React: `value`/`checked` on `<input>`/`<textarea>`/`<select>` follow React's controlled semantics exactly (the prop drives the DOM, rejected edits snap back, radio groups restore, `<select value>` selects the matching option); `defaultValue`/`defaultChecked` are the uncontrolled escape hatch. Handle text input with native `onInput`, not React's synthetic `onChange`.
 - Refs are passed as props (React-19 style): `ref={cb}`, `ref={obj}`, or multi-ref `ref={[a, b]}`. There is no `forwardRef`.
@@ -19,6 +20,7 @@ Key facts for answering questions about Octane:
 ## Docs
 
 - [Quick start](https://octanejs.dev/docs/quick-start): Install Octane, mount a component, and learn the `.tsrx` essentials (components, state/effects, conditional hooks, control flow, SSR/hydrate).
+- [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, transitions, actions, events, and SSR/static rendering.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): When to author in `.tsrx` versus standard `.tsx`/`.jsx`, and what each dialect unlocks (compiled collections, template control flow, the `@{ … }` shorthand, text holes).
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
 - [Bindings](https://octanejs.dev/docs/bindings): The `@octanejs/*` ports of the React ecosystem.
@@ -31,6 +33,12 @@ Key facts for answering questions about Octane:
 - Dynamic text holes use a cast: `{expr as string}`. The cast is optional when the expression is provably a string (a string/template literal, a `+`-concatenation involving a string, or a local tracked back to a string); required otherwise. A bare `{expr}` that isn't provably a string is a renderable hole.
 - Template control flow uses directive blocks: `@if (c) { } @else { }`, `@for (const x of xs; key x.id) { } @empty { }`, `@switch (v) { @case (a) { } @default { } }`, and `@try { } @pending { } @catch (e) { }`. Plain JS control flow stays in setup.
 - `.tsrx`'s `@for` compiles a rendered list to a keyed fast path (a compiled per-item body + the raw array) instead of allocating a descriptor per row — the main reason to prefer `.tsrx` for collection-heavy UI.
+
+## Core state APIs
+
+- `useState(initial)` returns `[state, setState, getState]`. `setState` accepts a value or functional update; `getState()` is stable and reads the latest scheduled hook-cell value without rendering. Omitting the third destructured member keeps the existing lean runtime path.
+- `useReducer(reducer, initialArg, init?)` returns `[state, dispatch, getState]`. The third call argument remains the optional lazy initializer; the third tuple member is the current-state getter.
+- During pending work a state getter can be newer than the committed DOM. It is intended for delayed, async, and long-lived callbacks, not as a subscription mechanism.
 
 ## Ecosystem and bindings
 
