@@ -106,8 +106,40 @@ function routeValueEqual(a: unknown, b: unknown, depth: number): boolean {
 	return true;
 }
 
+// Route DATA callbacks (loader/action/…): a fresh function identity is NOT a
+// material change. Inline `loader={async () => …}` recreates every parent
+// render; treating that as material would bump the collector → re-render
+// <Routes> → re-register with yet another fresh function — a retrigger loop.
+// Only PRESENCE changes (added/removed; middleware also length) are material.
+// Freshness is NOT lost: buildRoute bakes stable forwarders that read the LIVE
+// entry at call time, so the router always invokes the newest closure. The
+// component-typed keys (Component/ErrorBoundary/HydrateFallback) deliberately
+// stay on routeValueEqual — swapping a route's component IS material.
+const ROUTE_DATA_FN_KEYS = ['loader', 'action', 'shouldRevalidate', 'lazy'] as const;
+
+function dataFnEqual(a: unknown, b: unknown): boolean {
+	if (typeof a === 'function' && typeof b === 'function') return true;
+	return Object.is(a, b) || (a == null && b == null);
+}
+
 function routePropsEqual(a: Record<string, any>, b: Record<string, any>): boolean {
 	for (const key of ROUTE_PROP_KEYS) {
+		if ((ROUTE_DATA_FN_KEYS as readonly string[]).includes(key)) {
+			if (!dataFnEqual(a[key], b[key])) return false;
+			continue;
+		}
+		if (key === 'middleware') {
+			// An inline middleware array recreates per render too: material only
+			// when presence or LENGTH changes (entries are latest-wins forwarders).
+			const am = a.middleware;
+			const bm = b.middleware;
+			if (am == null || bm == null) {
+				if (am != bm) return false;
+			} else if (!Array.isArray(am) || !Array.isArray(bm) || am.length !== bm.length) {
+				return false;
+			}
+			continue;
+		}
 		if (!routeValueEqual(a[key], b[key], 0)) return false;
 	}
 	// BLOCK children are opaque compiled render fns whose identity is fresh
@@ -153,6 +185,15 @@ export function createCollector(onChange: () => void): RoutesCollector {
 	};
 }
 
+// A stable forwarder for a route data callback: reads the LIVE entry at call
+// time, so re-registers that only swapped a function identity (immaterial per
+// routePropsEqual — no rebuild) still route calls to the NEWEST closure. A
+// non-function value passes through as-is.
+function liveDataFn(entry: CollectorEntry, key: string): any {
+	if (typeof entry.props[key] !== 'function') return entry.props[key];
+	return (...args: any[]) => entry.props[key](...args);
+}
+
 function buildRoute(entry: CollectorEntry, treePath: number[]): RouteObject {
 	const p = entry.props;
 	invariant(!p.index || !p.children, 'An index route cannot have child routes.');
@@ -163,18 +204,24 @@ function buildRoute(entry: CollectorEntry, treePath: number[]): RouteObject {
 		Component: p.Component,
 		index: p.index,
 		path: p.path,
-		middleware: p.middleware,
-		loader: p.loader,
-		action: p.action,
+		// Latest-wins by INDEX: the array identity/entries may be recreated per
+		// render (immaterial while the length holds); each slot forwards to the
+		// live entry's current function.
+		middleware: p.middleware?.map((_: unknown, i: number) => (...args: any[]) => {
+			const m = entry.props.middleware?.[i];
+			return typeof m === 'function' ? m(...args) : undefined;
+		}),
+		loader: liveDataFn(entry, 'loader'),
+		action: liveDataFn(entry, 'action'),
 		hydrateFallbackElement: p.hydrateFallbackElement,
 		HydrateFallback: p.HydrateFallback,
 		errorElement: p.errorElement,
 		ErrorBoundary: p.ErrorBoundary,
 		hasErrorBoundary:
 			p.hasErrorBoundary === true || p.ErrorBoundary != null || p.errorElement != null,
-		shouldRevalidate: p.shouldRevalidate,
+		shouldRevalidate: liveDataFn(entry, 'shouldRevalidate'),
 		handle: p.handle,
-		lazy: p.lazy,
+		lazy: liveDataFn(entry, 'lazy'),
 	} as RouteObject;
 	if (entry.childCollector) {
 		// Block children — registered into the nested collector.
