@@ -1,454 +1,559 @@
 {
-  "suite": "ssr-throughput",
-  "iterations": 10,
-  "targets": [
-    {
-      "name": "news-50/octane-tsrx",
-      "ops": {
-        "render": {
-          "median": 0.007,
-          "min": 0.00625,
-          "p95": 0.007333,
-          "p99": 0.007875,
-          "sd": 0.002262484729426045,
-          "samples": 200000,
-          "opsPerSec": 140813.17187589966
-        }
-      },
-      "meta": {
-        "bodyBytes": 43196,
-        "hydrationMarkerPairs": 52,
-        "memRenders": 5000,
-        "rssGrowthBytes": -2981888,
-        "heapUsedGrowthBytes": -30489976
-      }
-    },
-    {
-      "name": "news-50/react",
-      "ops": {
-        "render": {
-          "median": 0.039458,
-          "min": 0.035625,
-          "p95": 0.041083,
-          "p99": 0.052792,
-          "sd": 0.007258317557212532,
-          "samples": 200000,
-          "opsPerSec": 24994.32729684549
-        }
-      },
-      "meta": {
-        "bodyBytes": 42364,
-        "hydrationMarkerPairs": 0,
-        "memRenders": 5000,
-        "rssGrowthBytes": -4620288,
-        "heapUsedGrowthBytes": -59168152
-      }
-    },
-    {
-      "name": "news-50/solid",
-      "ops": {
-        "render": {
-          "median": 0.033542,
-          "min": 0.029291,
-          "p95": 0.039042,
-          "p99": 0.043,
-          "sd": 0.3700058016258197,
-          "samples": 200000,
-          "opsPerSec": 27809.34813167224
-        }
-      },
-      "meta": {
-        "bodyBytes": 42820,
-        "hydrationMarkerPairs": 0,
-        "memRenders": 5000,
-        "rssGrowthBytes": 11337728,
-        "heapUsedGrowthBytes": 47982432
-      }
-    },
-    {
-      "name": "news-50/ripple",
-      "ops": {
-        "render": {
-          "median": 0.009209,
-          "min": 0.008208,
-          "p95": 0.009833,
-          "p99": 0.011833,
-          "sd": 0.0055469052283213085,
-          "samples": 200000,
-          "opsPerSec": 105020.20569846687
-        }
-      },
-      "meta": {
-        "bodyBytes": 42396,
-        "hydrationMarkerPairs": 2,
-        "memRenders": 5000,
-        "rssGrowthBytes": 81920,
-        "heapUsedGrowthBytes": 51516600
-      }
-    },
-    {
-      "name": "news-50/vue-vapor",
-      "ops": {
-        "render": {
-          "median": 0.0075,
-          "min": 0.006625,
-          "p95": 0.008375,
-          "p99": 0.0095,
-          "sd": 0.04559911539801032,
-          "samples": 200000,
-          "opsPerSec": 115319.9770516088
-        }
-      },
-      "meta": {
-        "bodyBytes": 42380,
-        "hydrationMarkerPairs": 1,
-        "memRenders": 5000,
-        "rssGrowthBytes": 11223040,
-        "heapUsedGrowthBytes": 51571088
-      }
-    },
-    {
-      "name": "news-500/octane-tsrx",
-      "ops": {
-        "render": {
-          "median": 0.088375,
-          "min": 0.077625,
-          "p95": 0.097292,
-          "p99": 0.117625,
-          "sd": 0.08828170421026298,
-          "samples": 104170,
-          "opsPerSec": 10421.275495012345
-        }
-      },
-      "meta": {
-        "bodyBytes": 426690,
-        "hydrationMarkerPairs": 502,
-        "memRenders": 5000,
-        "rssGrowthBytes": 4472832,
-        "heapUsedGrowthBytes": -25926432
-      }
-    },
-    {
-      "name": "news-500/react",
-      "ops": {
-        "render": {
-          "median": 0.412208,
-          "min": 0.375791,
-          "p95": 0.445291,
-          "p99": 1.577167,
-          "sd": 0.20556691284636144,
-          "samples": 22138,
-          "opsPerSec": 2214.024487249046
-        }
-      },
-      "meta": {
-        "bodyBytes": 418658,
-        "hydrationMarkerPairs": 0,
-        "memRenders": 5000,
-        "rssGrowthBytes": 37748736,
-        "heapUsedGrowthBytes": 69694952
-      }
-    },
-    {
-      "name": "news-500/solid",
-      "ops": {
-        "render": {
-          "median": 0.346417,
-          "min": 0.288708,
-          "p95": 0.383792,
-          "p99": 0.668958,
-          "sd": 0.07783455155466154,
-          "samples": 28129,
-          "opsPerSec": 2813.22588605589
-        }
-      },
-      "meta": {
-        "bodyBytes": 423614,
-        "hydrationMarkerPairs": 0,
-        "memRenders": 5000,
-        "rssGrowthBytes": -512311296,
-        "heapUsedGrowthBytes": -1619401288
-      }
-    },
-    {
-      "name": "news-500/ripple",
-      "ops": {
-        "render": {
-          "median": 0.124208,
-          "min": 0.107833,
-          "p95": 0.142875,
-          "p99": 0.731958,
-          "sd": 0.08325021824630675,
-          "samples": 74080,
-          "opsPerSec": 7410.130570374766
-        }
-      },
-      "meta": {
-        "bodyBytes": 418690,
-        "hydrationMarkerPairs": 2,
-        "memRenders": 5000,
-        "rssGrowthBytes": 34111488,
-        "heapUsedGrowthBytes": 22551400
-      }
-    },
-    {
-      "name": "news-500/vue-vapor",
-      "ops": {
-        "render": {
-          "median": 0.057208,
-          "min": 0.050833,
-          "p95": 0.064417,
-          "p99": 0.084833,
-          "sd": 0.12310928452516161,
-          "samples": 166254,
-          "opsPerSec": 16637.911148484734
-        }
-      },
-      "meta": {
-        "bodyBytes": 418674,
-        "hydrationMarkerPairs": 1,
-        "memRenders": 5000,
-        "rssGrowthBytes": -1196032,
-        "heapUsedGrowthBytes": -3591544
-      }
-    },
-    {
-      "name": "parallel-k4",
-      "ops": {
-        "render": {
-          "median": 5.224458,
-          "min": 3.354542,
-          "p95": 5.292625,
-          "p99": 5.355917,
-          "sd": 0.3596529192585535,
-          "samples": 1961,
-          "opsPerSec": 196.1322908477136
-        }
-      },
-      "meta": {
-        "bodyBytes": 26944,
-        "hydrationMarkerPairs": 244,
-        "memRenders": 5000,
-        "rssGrowthBytes": 393216,
-        "heapUsedGrowthBytes": 11112064
-      }
-    },
-    {
-      "name": "parallel-k8",
-      "ops": {
-        "render": {
-          "median": 5.214667,
-          "min": 3.247959,
-          "p95": 5.283458,
-          "p99": 5.446333,
-          "sd": 0.3751032774758853,
-          "samples": 1956,
-          "opsPerSec": 195.5316399291734
-        }
-      },
-      "meta": {
-        "bodyBytes": 26952,
-        "hydrationMarkerPairs": 244,
-        "memRenders": 5000,
-        "rssGrowthBytes": 655360,
-        "heapUsedGrowthBytes": 18026080
-      }
-    },
-    {
-      "name": "parallel-nested-d4",
-      "ops": {
-        "render": {
-          "median": 5.080709,
-          "min": 3.23225,
-          "p95": 5.144083,
-          "p99": 5.196417,
-          "sd": 0.3679835200486499,
-          "samples": 2023,
-          "opsPerSec": 202.31655825477225
-        }
-      },
-      "meta": {
-        "bodyBytes": 586,
-        "hydrationMarkerPairs": 13,
-        "memRenders": 5000,
-        "rssGrowthBytes": -1828012032,
-        "heapUsedGrowthBytes": -1774277936
-      }
-    },
-    {
-      "name": "parallel-nested-d8",
-      "ops": {
-        "render": {
-          "median": 5.103792,
-          "min": 3.163875,
-          "p95": 5.167125,
-          "p99": 5.260667,
-          "sd": 0.3440665359171904,
-          "samples": 2016,
-          "opsPerSec": 201.60510075017257
-        }
-      },
-      "meta": {
-        "bodyBytes": 1018,
-        "hydrationMarkerPairs": 25,
-        "memRenders": 5000,
-        "rssGrowthBytes": 0,
-        "heapUsedGrowthBytes": 802672
-      }
-    },
-    {
-      "name": "waterfall-d1",
-      "ops": {
-        "render": {
-          "median": 0.037667,
-          "min": 0.03475,
-          "p95": 0.039041,
-          "p99": 0.047917,
-          "sd": 0.010919979852764399,
-          "samples": 200000,
-          "opsPerSec": 26383.789476607668
-        }
-      },
-      "meta": {
-        "bodyBytes": 34597,
-        "hydrationMarkerPairs": 245,
-        "suspensePasses": 2,
-        "memRenders": 5000,
-        "rssGrowthBytes": -802816,
-        "heapUsedGrowthBytes": 40649392
-      }
-    },
-    {
-      "name": "waterfall-d2",
-      "ops": {
-        "render": {
-          "median": 0.04025,
-          "min": 0.036958,
-          "p95": 0.042584,
-          "p99": 0.052625,
-          "sd": 0.006160083382607032,
-          "samples": 200000,
-          "opsPerSec": 24447.49173519915
-        }
-      },
-      "meta": {
-        "bodyBytes": 34782,
-        "hydrationMarkerPairs": 250,
-        "suspensePasses": 3,
-        "memRenders": 5000,
-        "rssGrowthBytes": 0,
-        "heapUsedGrowthBytes": 38320808
-      }
-    },
-    {
-      "name": "waterfall-d4",
-      "ops": {
-        "render": {
-          "median": 0.044291,
-          "min": 0.04,
-          "p95": 0.04625,
-          "p99": 0.056041,
-          "sd": 0.0070666174222754514,
-          "samples": 200000,
-          "opsPerSec": 22422.98966669218
-        }
-      },
-      "meta": {
-        "bodyBytes": 35162,
-        "hydrationMarkerPairs": 260,
-        "suspensePasses": 5,
-        "memRenders": 5000,
-        "rssGrowthBytes": -1425408,
-        "heapUsedGrowthBytes": 23983496
-      }
-    },
-    {
-      "name": "waterfall-d4-x32",
-      "ops": {
-        "render": {
-          "median": 1.428542,
-          "min": 1.292958,
-          "p95": 1.596666,
-          "p99": 1.629208,
-          "sd": 0.0858950954196975,
-          "samples": 6923,
-          "opsPerSec": 692.2931892888312
-        }
-      },
-      "meta": {
-        "bodyBytes": 35162,
-        "hydrationMarkerPairs": 260,
-        "concurrency": 32,
-        "suspensePasses": 5,
-        "rendersPerSec": 22153.382057242598,
-        "memRenders": 5024,
-        "rssGrowthBytes": 0,
-        "heapUsedGrowthBytes": -9649320
-      }
-    },
-    {
-      "name": "deopt-page/octane-fast",
-      "ops": {
-        "render": {
-          "median": 0.296958,
-          "min": 0.272875,
-          "p95": 0.315792,
-          "p99": 0.611417,
-          "sd": 0.0598489754411096,
-          "samples": 32909,
-          "opsPerSec": 3291.275721504294
-        }
-      },
-      "meta": {
-        "bodyBytes": 152787,
-        "hydrationMarkerPairs": 2101,
-        "memRenders": 5000,
-        "rssGrowthBytes": 13860864,
-        "heapUsedGrowthBytes": -26992664
-      }
-    },
-    {
-      "name": "deopt-page/octane-deopt",
-      "ops": {
-        "render": {
-          "median": 0.494916,
-          "min": 0.453,
-          "p95": 0.527083,
-          "p99": 0.939709,
-          "sd": 0.10192623106491787,
-          "samples": 19424,
-          "opsPerSec": 1942.548420606332
-        }
-      },
-      "meta": {
-        "bodyBytes": 176867,
-        "hydrationMarkerPairs": 3606,
-        "memRenders": 5000,
-        "rssGrowthBytes": -311296,
-        "heapUsedGrowthBytes": -18265456
-      }
-    },
-    {
-      "name": "escape-heavy",
-      "ops": {
-        "render": {
-          "median": 3.218584,
-          "min": 2.855292,
-          "p95": 3.428666,
-          "p99": 3.527708,
-          "sd": 0.21073354166579206,
-          "samples": 3084,
-          "opsPerSec": 308.31638749388503
-        }
-      },
-      "meta": {
-        "bodyBytes": 1156362,
-        "hydrationMarkerPairs": 10001,
-        "memRenders": 5000,
-        "rssGrowthBytes": -68616192,
-        "heapUsedGrowthBytes": -63777928
-      }
-    }
-  ],
-  "harnessExit": 0
+	"suite": "ssr-throughput",
+	"iterations": 10,
+	"targets": [
+		{
+			"name": "news-50/octane-tsrx",
+			"ops": {
+				"render": {
+					"score": 0.04509325916249633,
+					"median": 0.044167,
+					"min": 0.041542,
+					"mean": 0.04507395848500711,
+					"p95": 0.047417,
+					"sd": 0.007328818685887053,
+					"rme": 0.07126057963703301,
+					"scoreRme": 0.11103572638883441,
+					"warmupRatio": 1.001627343285059,
+					"samples": 200000,
+					"p99": 0.06075,
+					"opsPerSec": 22176.263560733954
+				}
+			},
+			"meta": {
+				"bodyBytes": 43196,
+				"hydrationMarkerPairs": 52,
+				"memRenders": 5000,
+				"rssGrowthBytes": -2473984,
+				"heapUsedGrowthBytes": -786472
+			}
+		},
+		{
+			"name": "news-50/react",
+			"ops": {
+				"render": {
+					"score": 0.045044413275,
+					"median": 0.043833,
+					"min": 0.038791,
+					"mean": 0.04496268244000035,
+					"p95": 0.049333,
+					"sd": 0.010635255743682933,
+					"rme": 0.10366610904965629,
+					"scoreRme": 0.16592077863823512,
+					"warmupRatio": 1.0043698548984974,
+					"samples": 200000,
+					"p99": 0.069458,
+					"opsPerSec": 22200.311365915997
+				}
+			},
+			"meta": {
+				"bodyBytes": 42364,
+				"hydrationMarkerPairs": 0,
+				"memRenders": 5000,
+				"rssGrowthBytes": -2457600,
+				"heapUsedGrowthBytes": 9969776
+			}
+		},
+		{
+			"name": "news-50/solid",
+			"ops": {
+				"render": {
+					"score": 0.04313121758749963,
+					"median": 0.039416,
+					"min": 0.032333,
+					"mean": 0.04179822855000013,
+					"p95": 0.045583,
+					"sd": 0.3839135295025747,
+					"rme": 4.025470186872945,
+					"scoreRme": 9.677534200612357,
+					"warmupRatio": 0.9490401996409815,
+					"samples": 200000,
+					"p99": 0.058333,
+					"opsPerSec": 23185.063068792704
+				}
+			},
+			"meta": {
+				"bodyBytes": 42820,
+				"hydrationMarkerPairs": 0,
+				"memRenders": 5000,
+				"rssGrowthBytes": 5029888,
+				"heapUsedGrowthBytes": -19368392
+			}
+		},
+		{
+			"name": "news-50/ripple",
+			"ops": {
+				"render": {
+					"score": 0.011429886699999234,
+					"median": 0.010375,
+					"min": 0.008916,
+					"mean": 0.011250459069999006,
+					"p95": 0.012833,
+					"sd": 0.0123030885478801,
+					"rme": 0.47927522445066373,
+					"scoreRme": 0.761790029155654,
+					"warmupRatio": 0.9949416099637193,
+					"samples": 200000,
+					"p99": 0.018542,
+					"opsPerSec": 87489.93111192144
+				}
+			},
+			"meta": {
+				"bodyBytes": 42396,
+				"hydrationMarkerPairs": 2,
+				"memRenders": 5000,
+				"rssGrowthBytes": -6176768,
+				"heapUsedGrowthBytes": -18604592
+			}
+		},
+		{
+			"name": "news-50/vue-vapor",
+			"ops": {
+				"render": {
+					"score": 0.010727262800000859,
+					"median": 0.008375,
+					"min": 0.007417,
+					"mean": 0.010540540004997993,
+					"p95": 0.01125,
+					"sd": 0.07213992436617615,
+					"rme": 2.999534733590799,
+					"scoreRme": 4.763874840586897,
+					"warmupRatio": 0.9879099622225282,
+					"samples": 200000,
+					"p99": 0.020083,
+					"opsPerSec": 93220.42525143693
+				}
+			},
+			"meta": {
+				"bodyBytes": 42380,
+				"hydrationMarkerPairs": 1,
+				"memRenders": 5000,
+				"rssGrowthBytes": 7356416,
+				"heapUsedGrowthBytes": -18306504
+			}
+		},
+		{
+			"name": "news-500/octane-tsrx",
+			"ops": {
+				"render": {
+					"score": 0.6024791427872058,
+					"median": 0.606292,
+					"min": 0.526042,
+					"mean": 0.6527240947189736,
+					"p95": 0.76925,
+					"sd": 0.27757988113780535,
+					"rme": 0.6734404586032054,
+					"scoreRme": 0.7613078094599033,
+					"warmupRatio": 1.1920529627599648,
+					"samples": 15319,
+					"p99": 2.21725,
+					"opsPerSec": 1659.8084962307112
+				}
+			},
+			"meta": {
+				"bodyBytes": 426690,
+				"hydrationMarkerPairs": 502,
+				"memRenders": 5000,
+				"rssGrowthBytes": 54034432,
+				"heapUsedGrowthBytes": 39383376
+			}
+		},
+		{
+			"name": "news-500/react",
+			"ops": {
+				"render": {
+					"score": 0.46876133581384316,
+					"median": 0.431875,
+					"min": 0.408916,
+					"mean": 0.47246144951571034,
+					"p95": 0.465584,
+					"sd": 0.211188065824415,
+					"rme": 0.6022127271082515,
+					"scoreRme": 0.9041824018704138,
+					"warmupRatio": 1.0192716711594936,
+					"samples": 21165,
+					"p99": 1.621834,
+					"opsPerSec": 2133.2817440325857
+				}
+			},
+			"meta": {
+				"bodyBytes": 418658,
+				"hydrationMarkerPairs": 0,
+				"memRenders": 5000,
+				"rssGrowthBytes": 41041920,
+				"heapUsedGrowthBytes": 70687744
+			}
+		},
+		{
+			"name": "news-500/solid",
+			"ops": {
+				"render": {
+					"score": 0.35269405299055556,
+					"median": 0.342125,
+					"min": 0.306625,
+					"mean": 0.3497256010493193,
+					"p95": 0.38275,
+					"sd": 0.08772187955280468,
+					"rme": 0.2907565431730472,
+					"scoreRme": 0.48188702062148825,
+					"warmupRatio": 0.9650704413156778,
+					"samples": 28590,
+					"p99": 0.441417,
+					"opsPerSec": 2835.3185757480805
+				}
+			},
+			"meta": {
+				"bodyBytes": 423614,
+				"hydrationMarkerPairs": 0,
+				"memRenders": 5000,
+				"rssGrowthBytes": 14041088,
+				"heapUsedGrowthBytes": 12718472
+			}
+		},
+		{
+			"name": "news-500/ripple",
+			"ops": {
+				"render": {
+					"score": 0.16477478569007847,
+					"median": 0.139666,
+					"min": 0.116875,
+					"mean": 0.16939917136321536,
+					"p95": 0.162375,
+					"sd": 0.24781612366999925,
+					"rme": 1.1803020013051553,
+					"scoreRme": 1.8256368529332168,
+					"warmupRatio": 1.0584347392351716,
+					"samples": 59015,
+					"p99": 2.203708,
+					"opsPerSec": 6068.889701855717
+				}
+			},
+			"meta": {
+				"bodyBytes": 418690,
+				"hydrationMarkerPairs": 2,
+				"memRenders": 5000,
+				"rssGrowthBytes": 34848768,
+				"heapUsedGrowthBytes": 1423272
+			}
+		},
+		{
+			"name": "news-500/vue-vapor",
+			"ops": {
+				"render": {
+					"score": 0.06456083705559247,
+					"median": 0.060334,
+					"min": 0.054917,
+					"mean": 0.06588805315242496,
+					"p95": 0.068917,
+					"sd": 0.13547780237061768,
+					"rme": 1.0348029881937928,
+					"scoreRme": 0.8047519763072214,
+					"warmupRatio": 1.0501187557437235,
+					"samples": 151677,
+					"p99": 0.096958,
+					"opsPerSec": 15489.26633554818
+				}
+			},
+			"meta": {
+				"bodyBytes": 418674,
+				"hydrationMarkerPairs": 1,
+				"memRenders": 5000,
+				"rssGrowthBytes": -4521984,
+				"heapUsedGrowthBytes": -7699288
+			}
+		},
+		{
+			"name": "parallel-k4",
+			"ops": {
+				"render": {
+					"score": 4.71323780046948,
+					"median": 4.747041,
+					"min": 3.25825,
+					"mean": 4.694279587323936,
+					"p95": 4.933625,
+					"sd": 0.2720934135015241,
+					"rme": 0.24615878885526624,
+					"scoreRme": 0.4055034543754516,
+					"warmupRatio": 0.9961959224084381,
+					"samples": 2130,
+					"p99": 5.075333,
+					"opsPerSec": 212.16837391493192
+				}
+			},
+			"meta": {
+				"bodyBytes": 26944,
+				"hydrationMarkerPairs": 244,
+				"memRenders": 5000,
+				"rssGrowthBytes": 65536,
+				"heapUsedGrowthBytes": -9640656
+			}
+		},
+		{
+			"name": "parallel-k8",
+			"ops": {
+				"render": {
+					"score": 4.705184921176477,
+					"median": 4.755125,
+					"min": 3.204792,
+					"mean": 4.705545674352941,
+					"p95": 4.924625,
+					"sd": 0.26846086801851676,
+					"rme": 0.2425758718552262,
+					"scoreRme": 0.4212464428377499,
+					"warmupRatio": 0.9988738846049118,
+					"samples": 2125,
+					"p99": 5.196084,
+					"opsPerSec": 212.53149807127272
+				}
+			},
+			"meta": {
+				"bodyBytes": 26952,
+				"hydrationMarkerPairs": 244,
+				"memRenders": 5000,
+				"rssGrowthBytes": 557056,
+				"heapUsedGrowthBytes": -2528960
+			}
+		},
+		{
+			"name": "parallel-nested-d4",
+			"ops": {
+				"render": {
+					"score": 4.544263758542137,
+					"median": 4.613209,
+					"min": 3.332917,
+					"mean": 4.555313137129842,
+					"p95": 4.682958,
+					"sd": 0.2238385866968186,
+					"rme": 0.20556800819771992,
+					"scoreRme": 0.324176890655529,
+					"warmupRatio": 1.006081184610327,
+					"samples": 2195,
+					"p99": 4.73,
+					"opsPerSec": 220.05764918909856
+				}
+			},
+			"meta": {
+				"bodyBytes": 586,
+				"hydrationMarkerPairs": 13,
+				"memRenders": 5000,
+				"rssGrowthBytes": -2498641920,
+				"heapUsedGrowthBytes": -1893961736
+			}
+		},
+		{
+			"name": "parallel-nested-d8",
+			"ops": {
+				"render": {
+					"score": 4.618722687788024,
+					"median": 4.654916,
+					"min": 3.2405,
+					"mean": 4.610760112955285,
+					"p95": 4.820875,
+					"sd": 0.2542044912096491,
+					"rme": 0.23202617846485007,
+					"scoreRme": 0.3810576888000208,
+					"warmupRatio": 0.9965874190674755,
+					"samples": 2169,
+					"p99": 5.047958,
+					"opsPerSec": 216.51007596624407
+				}
+			},
+			"meta": {
+				"bodyBytes": 1018,
+				"hydrationMarkerPairs": 25,
+				"memRenders": 5000,
+				"rssGrowthBytes": 0,
+				"heapUsedGrowthBytes": 2983336
+			}
+		},
+		{
+			"name": "waterfall-d1",
+			"ops": {
+				"render": {
+					"score": 0.052432898924222725,
+					"median": 0.051292,
+					"min": 0.046667,
+					"mean": 0.052499147993443816,
+					"p95": 0.05675,
+					"sd": 0.017256182524665143,
+					"rme": 0.14767245049819724,
+					"scoreRme": 0.2470779858200163,
+					"warmupRatio": 1.0046627810550786,
+					"samples": 190326,
+					"p99": 0.072959,
+					"opsPerSec": 19071.995264752077
+				}
+			},
+			"meta": {
+				"bodyBytes": 34597,
+				"hydrationMarkerPairs": 245,
+				"suspensePasses": 2,
+				"memRenders": 5000,
+				"rssGrowthBytes": -2342912,
+				"heapUsedGrowthBytes": 31676008
+			}
+		},
+		{
+			"name": "waterfall-d2",
+			"ops": {
+				"render": {
+					"score": 0.05495701384678339,
+					"median": 0.053542,
+					"min": 0.048541,
+					"mean": 0.0545818058282126,
+					"p95": 0.059084,
+					"sd": 0.01169705961851252,
+					"rme": 0.09816809272036606,
+					"scoreRme": 0.167072038757351,
+					"warmupRatio": 0.988108517146874,
+					"samples": 183075,
+					"p99": 0.073959,
+					"opsPerSec": 18196.039595381502
+				}
+			},
+			"meta": {
+				"bodyBytes": 34782,
+				"hydrationMarkerPairs": 250,
+				"suspensePasses": 3,
+				"memRenders": 5000,
+				"rssGrowthBytes": -442368,
+				"heapUsedGrowthBytes": 22721944
+			}
+		},
+		{
+			"name": "waterfall-d4",
+			"ops": {
+				"render": {
+					"score": 0.0600570194195247,
+					"median": 0.058958,
+					"min": 0.053,
+					"mean": 0.060268404391721035,
+					"p95": 0.065125,
+					"sd": 0.013339410829690188,
+					"rme": 0.10653567137063254,
+					"scoreRme": 0.148998697155184,
+					"warmupRatio": 1.0016358443378754,
+					"samples": 165812,
+					"p99": 0.087,
+					"opsPerSec": 16650.84297664791
+				}
+			},
+			"meta": {
+				"bodyBytes": 35162,
+				"hydrationMarkerPairs": 260,
+				"suspensePasses": 5,
+				"memRenders": 5000,
+				"rssGrowthBytes": -2293760,
+				"heapUsedGrowthBytes": 29358920
+			}
+		},
+		{
+			"name": "waterfall-d4-x32",
+			"ops": {
+				"render": {
+					"score": 1.9330753088092958,
+					"median": 1.917334,
+					"min": 1.752333,
+					"mean": 1.9365896496901625,
+					"p95": 2.092834,
+					"sd": 0.11304469060423432,
+					"rme": 0.15921189727471638,
+					"scoreRme": 0.19328119650326897,
+					"warmupRatio": 0.9968734654616107,
+					"samples": 5164,
+					"p99": 2.396625,
+					"opsPerSec": 517.3104200559903
+				}
+			},
+			"meta": {
+				"bodyBytes": 35162,
+				"hydrationMarkerPairs": 260,
+				"concurrency": 32,
+				"suspensePasses": 5,
+				"rendersPerSec": 16553.93344179169,
+				"memRenders": 5024,
+				"rssGrowthBytes": 16384,
+				"heapUsedGrowthBytes": 12415808
+			}
+		},
+		{
+			"name": "deopt-page/octane-fast",
+			"ops": {
+				"render": {
+					"score": 0.3827603733435767,
+					"median": 0.361708,
+					"min": 0.324709,
+					"mean": 0.3840459539850183,
+					"p95": 0.413417,
+					"sd": 0.13137962364232078,
+					"rme": 0.41554886428762,
+					"scoreRme": 0.7400160954452882,
+					"warmupRatio": 1.0119859988949969,
+					"samples": 26035,
+					"p99": 1.114792,
+					"opsPerSec": 2612.60064949924
+				}
+			},
+			"meta": {
+				"bodyBytes": 152787,
+				"hydrationMarkerPairs": 2101,
+				"memRenders": 5000,
+				"rssGrowthBytes": 26509312,
+				"heapUsedGrowthBytes": 50929768
+			}
+		},
+		{
+			"name": "deopt-page/octane-deopt",
+			"ops": {
+				"render": {
+					"score": 0.6879515523215513,
+					"median": 0.668375,
+					"min": 0.60975,
+					"mean": 0.6929985071037501,
+					"p95": 0.878208,
+					"sd": 0.11541701064045597,
+					"rme": 0.271753707166469,
+					"scoreRme": 0.36116599886912576,
+					"warmupRatio": 1.0092814838056765,
+					"samples": 14429,
+					"p99": 1.231583,
+					"opsPerSec": 1453.5907312446852
+				}
+			},
+			"meta": {
+				"bodyBytes": 176867,
+				"hydrationMarkerPairs": 3606,
+				"memRenders": 5000,
+				"rssGrowthBytes": -41975808,
+				"heapUsedGrowthBytes": -37911832
+			}
+		},
+		{
+			"name": "escape-heavy",
+			"ops": {
+				"render": {
+					"score": 4.262193753528769,
+					"median": 4.280667,
+					"min": 3.908584,
+					"mean": 4.3439186068636,
+					"p95": 4.78625,
+					"sd": 0.3339878663386019,
+					"rme": 0.31408877944531033,
+					"scoreRme": 0.42558890930924337,
+					"warmupRatio": 1.0385709983896927,
+					"samples": 2302,
+					"p99": 5.344792,
+					"opsPerSec": 234.6209623089229
+				}
+			},
+			"meta": {
+				"bodyBytes": 1156362,
+				"hydrationMarkerPairs": 10001,
+				"memRenders": 5000,
+				"rssGrowthBytes": 11681792,
+				"heapUsedGrowthBytes": 38409008
+			}
+		}
+	],
+	"harnessExit": 0
 }

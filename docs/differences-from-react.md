@@ -34,11 +34,12 @@ receive the complete three-item shape.
 
 ## Native events, no synthetic event system
 
-Events are real, delegated DOM events (`onClick`, `onInput`, `onSubmit`) —
-behavior matches the platform, never React's emulation layer:
+Events are real, delegated DOM events (`onClick`, `onInput`, `onSubmit`). Octane
+does not expose a synthetic event object, but matches React's propagation where
+it matters for component composition:
 
-- Non-bubbling events (`toggle`, `close`, `cancel`, media, `load`/`error`) fire
-  the **target's** handler only; React re-dispatches them to ancestors.
+- Non-bubbling events (`toggle`, `close`, `cancel`, media, `load`/`error`) are
+  capture-delegated and re-dispatched through logical ancestors like React.
 - `mouseenter`/`pointerenter` families are the real per-element native events —
   no synthesis from `over`/`out`.
 - No synthetic `onChange`/`onBeforeInput`/`onSelect` polyfills — use the native

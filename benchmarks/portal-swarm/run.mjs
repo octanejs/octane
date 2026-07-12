@@ -53,6 +53,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
 const WARMUP = 5;
@@ -98,16 +99,7 @@ function gate(cond, reason) {
 }
 
 function summarize(samples) {
-	const sorted = [...samples].sort((a, b) => a - b);
-	const n = sorted.length;
-	const mean = sorted.reduce((a, b) => a + b, 0) / n;
-	const stddev = Math.sqrt(sorted.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
-	return {
-		median: sorted[n >> 1],
-		min: sorted[0],
-		p95: sorted[Math.min(n - 1, Math.floor(n * 0.95))],
-		stddev,
-	};
+	return summarizeSamples(samples);
 }
 
 async function freshPage(browser, url) {
@@ -456,7 +448,7 @@ function writeBenchJson(all, failed) {
 			ops: Object.fromEntries(
 				OPS.filter((op) => all[t.name].results[op]).map((op) => {
 					const r = all[t.name].results[op];
-					return [op, { median: r.median, min: r.min, p95: r.p95, sd: r.stddev, samples: ITER }];
+					return [op, timingStatForJson(r)];
 				}),
 			),
 			meta: all[t.name].meta,
@@ -501,14 +493,14 @@ if (TARGETS.length > 1) {
 	console.log();
 	for (const t of TARGETS.slice(1)) {
 		const r = all[t.name].results;
-		console.log(`${t.name} / ${baselineName} ratio (median; <1 means ${t.name} faster):`);
+		console.log(`${t.name} / ${baselineName} ratio (score; <1 means ${t.name} faster):`);
 		for (const op of OPS) {
-			const base = baseline[op].median;
+			const base = scoreOf(baseline[op]);
 			if (base === 0) {
 				console.log(`  ${op.padEnd(23)}   —    (baseline ~0, sub-resolution)`);
 				continue;
 			}
-			const ratio = r[op].median / base;
+			const ratio = scoreOf(r[op]) / base;
 			const tag = ratio < 0.95 ? '++ faster' : ratio < 1.05 ? '== ~equal' : '-- slower';
 			console.log(`  ${op.padEnd(23)} ${ratio.toFixed(2)}x  ${tag}`);
 		}
@@ -523,8 +515,8 @@ if (TARGETS.length > 1) {
 	console.log('distinct-target ratio (open_close_distinct / open_close_cycle, ~1.0 = free):');
 	for (const c of cols) {
 		const r = all[c].results;
-		const base = r.open_close_cycle.median;
-		const ratioStr = base === 0 ? '—' : (r.open_close_distinct.median / base).toFixed(2) + 'x';
+		const base = scoreOf(r.open_close_cycle);
+		const ratioStr = base === 0 ? '—' : (scoreOf(r.open_close_distinct) / base).toFixed(2) + 'x';
 		console.log(`  ${c.padEnd(23)} ${ratioStr}`);
 	}
 
@@ -537,8 +529,8 @@ if (TARGETS.length > 1) {
 	);
 	for (const c of cols) {
 		const r = all[c].results;
-		const base = r.rerender_open_B.median;
-		const ratioStr = base === 0 ? '—' : (r.rerender_open_B_stable.median / base).toFixed(2) + 'x';
+		const base = scoreOf(r.rerender_open_B);
+		const ratioStr = base === 0 ? '—' : (scoreOf(r.rerender_open_B_stable) / base).toFixed(2) + 'x';
 		console.log(`  ${c.padEnd(23)} ${ratioStr}`);
 	}
 }

@@ -53,6 +53,16 @@ export function CrossPortalBubble(props) @{
 	</div>
 }
 
+/** Non-bubbling media events use the same logical portal ascent as clicks. */
+export function NonBubblingPortal(props) @{
+	<div class="app-root" onPlay={() => props.log('outer')}>{createPortal(
+		() => @{
+			<video class="inside-video" onPlay={() => props.log('inner')}></video>
+		},
+		props.target,
+	)}</div>
+}
+
 /**
  * Stops propagation on the inner handler — verifies the outer handler does
  * NOT fire when the inner one cancels bubbling.
