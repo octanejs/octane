@@ -111,6 +111,27 @@ describe('automatic hook dependencies — full compiler', () => {
 		);
 	});
 
+	it('does not treat simple assignment targets as value reads', () => {
+		const code = c(`
+      import { useEffect, useRef } from 'octane';
+      export function App(props) @{
+        const ref = useRef(null);
+        useEffect(() => {
+          ref.current = props.value;
+          props.box.current = props.other;
+          props.box[props.key] = props.dynamic;
+          props.total += props.delta;
+        });
+        <div />
+      }
+    `);
+
+		expect(code).toMatch(
+			/useEffect\([\s\S]*?,\s*\[\s*props\.value,\s*props\.box,\s*props\.other,\s*props\.key,\s*props\.dynamic,\s*props\.total,\s*props\.delta\s*\],\s*_h\$\d+\s*\)/,
+		);
+		expect(code).not.toMatch(/\[\s*ref\.current/);
+	});
+
 	it('tracks mutable module bindings while omitting imports', () => {
 		const code = c(`
       import { useEffect } from 'octane';

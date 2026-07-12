@@ -507,6 +507,11 @@ function collectDependencies(expression, callbackScope, analysis) {
 				if (node.computed) walk(node.key);
 				walk(node.value);
 				return;
+			case 'AssignmentExpression':
+				if (node.operator === '=') walkAssignmentTarget(node.left);
+				else walk(node.left);
+				walk(node.right);
+				return;
 			case 'VariableDeclarator':
 				walkPatternExpression(node.id);
 				walk(node.init);
@@ -560,6 +565,42 @@ function collectDependencies(expression, callbackScope, analysis) {
 			}
 			walk(node[key]);
 		}
+	}
+
+	function walkAssignmentTarget(target) {
+		if (!target) return;
+		if (TS_VALUE_WRAPPERS.has(target.type)) {
+			walkAssignmentTarget(target.expression);
+			return;
+		}
+		switch (target.type) {
+			case 'Identifier':
+				return;
+			case 'MemberExpression':
+				// Writing `object[key]` reads the receiver and computed key, but not
+				// the previous property value. This keeps `ref.current = value` from
+				// depending on `ref.current` while still tracking a changing receiver.
+				walk(target.object);
+				if (target.computed) walk(target.property);
+				return;
+			case 'ObjectPattern':
+				for (const prop of target.properties || []) {
+					if (prop.computed) walk(prop.key);
+					walkAssignmentTarget(prop.type === 'RestElement' ? prop.argument : prop.value);
+				}
+				return;
+			case 'ArrayPattern':
+				for (const element of target.elements || []) walkAssignmentTarget(element);
+				return;
+			case 'AssignmentPattern':
+				walkAssignmentTarget(target.left);
+				walk(target.right);
+				return;
+			case 'RestElement':
+				walkAssignmentTarget(target.argument);
+				return;
+		}
+		walk(target);
 	}
 
 	function walkPatternExpression(pattern) {
