@@ -54,6 +54,13 @@ const FILES = [
 
 // path → [pattern, replacement, deviation note]
 const DEVIATIONS = {
+	'lib/server-runtime/crypto.ts': [
+		[
+			'function byteStringToUint8Array(byteString: string): Uint8Array {',
+			'function byteStringToUint8Array(byteString: string): Uint8Array<ArrayBuffer> {',
+			"type-only: bare Uint8Array return widens to Uint8Array<ArrayBufferLike> under TS 5.7+ typed-array generics, which crypto.subtle.verify's BufferSource rejects",
+		],
+	],
 	'lib/router/utils.ts': [
 		[
 			'import type * as React from "react";',
