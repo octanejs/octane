@@ -47,22 +47,25 @@ index 2 is unobserved, so ordinary two-item destructuring retains the existing
 runtime path and allocation profile. Escaped or ambiguous tuples conservatively
 receive the complete three-item shape.
 
-## Native events, no synthetic event system
+## Native event objects, no synthetic event layer
 
-Events are real, delegated DOM events (`onClick`, `onInput`, `onSubmit`). Octane
-does not expose a synthetic event object, but matches React's propagation where
-it matters for component composition:
+Event propagation itself matches React and is **not a divergence**. Ordinary
+bubbling and capture, `stopPropagation`, logical propagation through portals,
+and native non-bubbling families (`toggle`, dialog `close`/`cancel`, media,
+`load`/`error`) all reach the same logical ancestors React does.
 
-- Non-bubbling events (`toggle`, `close`, `cancel`, media, `load`/`error`) are
-  capture-delegated and re-dispatched through logical ancestors like React.
+What differs is the event API and synthesis layer:
+
+- Handlers receive the browser's real `Event` object, not a React
+  `SyntheticEvent` wrapper. There is no event pooling, and
+  `event.currentTarget` is the handler's element.
 - `mouseenter`/`pointerenter` families are the real per-element native events —
   no synthesis from `over`/`out`.
-- No synthetic `onChange`/`onBeforeInput`/`onSelect` polyfills — use the native
-  events (`onInput` etc.). No event pooling; `event.currentTarget` is the
-  handler's element, `stopPropagation` and capture phase work natively.
-- Delegated events bubble through **portals along the logical tree** (like
-  React). A noop `onclick` is stamped on delegation roots (iOS Safari), not on
-  every element.
+- There are no synthetic `onChange`/`onBeforeInput`/`onSelect` polyfills — use
+  the native events (`onInput` etc.).
+
+A noop `onclick` is stamped on delegation roots for iOS Safari, not on every
+element.
 
 ## Controlled components, native events
 

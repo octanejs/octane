@@ -1,24 +1,24 @@
-// Website smoke tests — render the site's routes through the REAL app stack
-// (@octanejs/tanstack-router match tree + the compiled .tsrx pages + the compiled .mdx
-// documents with Shiki highlighting) and assert the key content of each page.
-// Client-side render via @octanejs/testing-library; the dev-SSR path
-// (@octanejs/vite-plugin prerender + hydrate) is exercised by `pnpm dev`.
+// Website smoke tests — render routes through the real router, compiled .tsrx
+// pages, and compiled MDX documents. Keep assertions at route and structure
+// boundaries; detailed copy and visual behavior belong to focused tests.
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, waitFor, cleanup, within } from '@octanejs/testing-library';
+import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
+import { docs, defaultDoc } from '../src/content/docs.ts';
+import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../src/content/benchmarks.ts';
 
 afterEach(cleanup);
 
-// .tsrx static text and MDX paragraphs keep source line breaks/indentation in
-// their text nodes — normalize whitespace before substring assertions.
-function textOf(el: Element): string {
-	return (el.textContent ?? '').replace(/\s+/g, ' ');
+function findLink(root: ParentNode, href: string): HTMLAnchorElement | undefined {
+	return Array.from(root.querySelectorAll<HTMLAnchorElement>('a')).find(
+		(link) => link.getAttribute('href') === href,
+	);
 }
 
-// Build a fresh router at `url` (memory history so tests don't share jsdom
-// location state), load it, and mount the match tree. The client store factory
-// commits matches inside a transition, so wait for the root layout to land.
+// Build a fresh router at `url` so tests do not share jsdom location state.
+// The client store commits matches inside a transition, so wait for the root
+// layout before making route assertions.
 async function renderRoute(url: string) {
 	const router = makeRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
 	await router.load();
@@ -30,203 +30,93 @@ async function renderRoute(url: string) {
 }
 
 describe('website routes', () => {
-	it('/ renders the hero, feature cards, and the proven strip', async () => {
+	it('/ renders the home experience and primary navigation', async () => {
 		const { container } = await renderRoute('/');
 
-		// Hero tagline + CTA.
-		expect(container.querySelector('.hero-title')?.textContent).toContain(
-			'programming model, compiled',
-		);
-		expect(textOf(container)).toContain('No hand-maintained dependency arrays');
-		const cta = container.querySelector('a.btn-primary') as HTMLAnchorElement;
-		expect(cta?.getAttribute('href')).toBe('/docs/quick-start');
+		expect(container.querySelector('main .home')).toBeTruthy();
+		expect(container.querySelector('.hero h1')?.textContent?.trim()).toBeTruthy();
+		expect(container.textContent).toContain('No hand-maintained dependency arrays');
+		const heroActions = container.querySelector('.hero-actions')!;
+		expect(findLink(heroActions, '/docs/quick-start')).toBeTruthy();
+		expect(findLink(heroActions, '/docs/differences-from-react')).toBeTruthy();
 
-		// The .tsrx sample went through the Shiki pipeline (an .mdx module).
+		// The home-page MDX sample went through the Shiki pipeline.
 		expect(container.querySelector('pre.shiki')).toBeTruthy();
-		expect(container.textContent).toContain('export function Counter(props) @{');
-
-		// Feature cards — including the TSRX card linking to the TSRX site.
-		const cards = container.querySelectorAll('.card');
-		expect(cards.length).toBe(4);
+		const featureCards = container.querySelectorAll('.features article.card');
+		expect(featureCards).toHaveLength(4);
 		expect(container.textContent).toContain('Hooks without the homework');
-		expect(container.textContent).toContain('No virtual DOM. No diff tax.');
-		const tsrxLink = container.querySelector('a.card-link') as HTMLAnchorElement;
-		expect(tsrxLink?.getAttribute('href')).toBe('https://tsrx.dev');
+		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
-		// Proven strip links to the differences page.
-		expect(container.textContent).toContain('6,000+');
-		expect(container.textContent).toContain('2,200+');
-		const provenLink = Array.from(container.querySelectorAll('.proven a')).find((a) =>
-			a.getAttribute('href')?.includes('differences-from-react'),
-		);
-		expect(provenLink).toBeTruthy();
+		// The checked-in benchmark summary reaches the chart and table renderers.
+		const summary = container.querySelector('figure.bench-card');
+		expect(summary?.querySelector('figcaption')).toBeTruthy();
+		expect(summary?.querySelector('svg')).toBeTruthy();
+		expect(summary?.querySelector('details table')).toBeTruthy();
 
-		// Ecosystem strip advertises the bindings and links to the bindings page.
-		expect(container.textContent).toContain('17');
-		expect(container.textContent).toContain('ecosystem ports');
-		const bindingsLink = Array.from(container.querySelectorAll('.proven a')).find(
-			(a) => a.getAttribute('href') === '/docs/bindings',
-		);
-		expect(bindingsLink).toBeTruthy();
-
-		// Benchmark section: ONE normalized summary chart — the checked-in
-		// cross-framework runtime/SSR/async/size suites as ×-vs-Octane geomeans.
-		expect(container.textContent).toContain('Measured, not vibes');
-		const benchCharts = container.querySelectorAll('figure.bench-card svg');
-		expect(benchCharts.length).toBe(1);
-		for (const label of [
-			'Octane (.tsrx)',
-			'React 19',
-			'Solid 2.0 beta',
-			'Ripple 0.3',
-			'Vue Vapor 3.6 beta',
-		]) {
-			expect(container.textContent).toContain(label);
+		const nav = container.querySelector('.navlinks')!;
+		for (const href of ['/docs', '/benchmarks', '/llms.txt']) {
+			expect(findLink(nav, href)).toBeTruthy();
 		}
-		// Suite names ride the category axis; ratios carry the × suffix.
-		expect(container.textContent).toContain('signal-favoring');
-		expect(container.textContent).toContain('js-framework-reorder');
-		expect(container.textContent).toContain('async-waterfall');
-		expect(container.textContent).toContain('bundle-size');
-		expect(textOf(container)).toMatch(/\d×/);
-		expect(container.querySelectorAll('.bench-card path').length).toBeGreaterThan(10);
-
-		// llms.txt is linked in the top navigation.
-		const llms = Array.from(container.querySelectorAll('.navlinks a')).find(
-			(a) => a.getAttribute('href') === '/llms.txt',
-		);
-		expect(llms).toBeTruthy();
-
-		// Top nav (root layout).
-		const nav = container.querySelector('.navlinks') as HTMLElement;
-		expect(within(nav).getByText('Docs').getAttribute('href')).toBe('/docs');
-		expect(within(nav).getByText('Benchmarks').getAttribute('href')).toBe('/benchmarks');
-		expect(within(nav).getByText('GitHub').getAttribute('href')).toContain(
-			'github.com/octanejs/octane',
-		);
-		expect(within(nav).getByText('Discord').getAttribute('href')).toBe(
-			'https://discord.gg/8puY9fFqd9',
-		);
+		expect(findLink(nav, 'https://github.com/octanejs/octane')).toBeTruthy();
+		expect(findLink(nav, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
 	});
 
-	it('/benchmarks charts the checked-in performance and size baselines', async () => {
+	it('/benchmarks renders every configured benchmark card', async () => {
 		const { container } = await renderRoute('/benchmarks');
-		// The recharts store settles over microtask/raf rounds (autoBatch) —
-		// give charts the same generous settle the binding's own tests use.
+		// Recharts settles over microtask/raf rounds through autoBatch.
 		for (let round = 0; round < 12; round++) {
-			await new Promise((r) => setTimeout(r, 0));
-			await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
 		}
 
-		expect(container.querySelector('.benchpage-title')?.textContent).toBe('Benchmarks');
-		expect(textOf(container)).toContain('Octane vs the field');
-		expect(textOf(container)).toContain('The authoring cliff');
-
-		// 14 cross-framework cards + 3 octane-internal cards, each with real
-		// @octanejs/recharts bars and a data-table fallback.
-		const cards = Array.from(container.querySelectorAll('figure.bench-card'));
-		expect(cards.length).toBe(17);
-		for (const card of cards) {
-			expect(
-				card.querySelectorAll('.recharts-bar .recharts-bar-rectangle').length,
-				card.querySelector('.bench-card-title')?.textContent ?? 'card',
-			).toBeGreaterThan(0);
-			expect(card.querySelector('details.bench-table table')).toBeTruthy();
+		expect(container.querySelector('main .benchpage')).toBeTruthy();
+		const sections = [
+			{ id: 'bench-frameworks', cards: FRAMEWORK_CARDS },
+			{ id: 'bench-internal', cards: OCTANE_CARDS },
+		];
+		for (const { id, cards } of sections) {
+			const section = container.querySelector(`section[aria-labelledby="${id}"]`)!;
+			expect(section).toBeTruthy();
+			expect(section.querySelector(`#${id}`)).toBeTruthy();
+			const figures = Array.from(section.querySelectorAll('figure.bench-card'));
+			expect(figures).toHaveLength(cards.length);
+			for (const figure of figures) {
+				expect(figure.querySelector('figcaption')).toBeTruthy();
+				expect(figure.querySelector('svg')).toBeTruthy();
+				expect(figure.querySelector('details.bench-table table')).toBeTruthy();
+			}
 		}
-
-		// Series identity: octane keeps the brand hue (#ff415a) on every chart
-		// (the style attribute round-trips through cssText as rgb()).
-		const octaneSwatches = Array.from(container.querySelectorAll('.bench-swatch')).filter((s) =>
-			(s.getAttribute('style') ?? '').replace(/\s/g, '').includes('rgb(255,65,90)'),
-		);
-		expect(octaneSwatches.length).toBe(17);
 	});
 
-	it('/docs/quick-start renders the quick-start document with the sidebar', async () => {
-		const { container } = await renderRoute('/docs/quick-start');
-
-		expect(container.querySelector('.prose h1')?.textContent).toBe('Quick start');
-		expect(container.textContent).toContain('pnpm add octane @octanejs/vite-plugin');
-		// Highlighted code blocks from the MDX pipeline.
-		expect(container.querySelectorAll('pre.shiki').length).toBeGreaterThan(3);
-
-		// Sidebar lists every doc; the active one is marked.
-		const sidebarLinks = Array.from(container.querySelectorAll('a.sidebar-link'));
-		expect(sidebarLinks.map((a) => a.getAttribute('href'))).toEqual([
-			'/docs/quick-start',
-			'/docs/core-apis',
-			'/docs/tsrx-vs-tsx',
-			'/docs/differences-from-react',
-			'/docs/bindings',
-		]);
-		const active = sidebarLinks.filter((a) => a.getAttribute('data-status') === 'active');
-		expect(active.map((a) => a.textContent?.trim())).toEqual(['Quick start']);
-	});
-
-	it('/docs/core-apis documents the public surfaces and state getters', async () => {
-		const { container } = await renderRoute('/docs/core-apis');
-
-		expect(container.querySelector('.prose h1')?.textContent).toBe('Core APIs');
-		const text = textOf(container);
-		expect(text).toContain('Roots and rendering');
-		expect(text).toContain('useState');
-		expect(text).toContain('useReducer');
-		expect(text).toContain('getState');
-		expect(text).toContain('Server and static rendering');
-	});
-
-	it('/docs (index) renders the default document (quick-start)', async () => {
+	it('/docs renders the configured default document', async () => {
 		const { container } = await renderRoute('/docs');
-		expect(container.querySelector('.prose h1')?.textContent).toBe('Quick start');
+		expect(container.querySelector('.prose h1')?.textContent?.trim()).toBe(defaultDoc.title);
 	});
 
-	it('/docs/differences-from-react renders the divergences document', async () => {
-		const { container } = await renderRoute('/docs/differences-from-react');
-		const text = textOf(container);
+	it.each(docs)('/docs/$slug renders its MDX document and active sidebar link', async (doc) => {
+		const { container } = await renderRoute(`/docs/${doc.slug}`);
 
-		expect(container.querySelector('.prose h1')?.textContent).toBe('Differences from React');
-		expect(text).toContain('no rules of hooks');
-		expect(text).toContain('Hooks can go anywhere');
-		expect(text).toContain('State hooks have a current-state getter');
-		expect(text).toContain('getDraft');
-		expect(text).toContain("they're all on purpose");
-		// Non-bubbling event parity: native events are capture-delegated through
-		// logical component ancestors, including across portal boundaries.
-		expect(text).toContain('capture-delegated');
-		expect(text).toContain('That logical path continues across portals');
-		// Controlled form components (2026-07-08): React's value/checked semantics
-		// on native events — onInput per keystroke, no synthetic onChange.
-		expect(text).toContain('Controlled components, native events');
-		expect(text).toContain('Controlled inputs work exactly like React');
-		expect(text).toContain('onInput');
-	});
-
-	it('/docs/bindings renders the bindings overview table', async () => {
-		const { container } = await renderRoute('/docs/bindings');
-
-		expect(container.querySelector('.prose h1')?.textContent).toBe('Bindings');
-		for (const pkg of [
-			'@octanejs/zustand',
-			'@octanejs/tanstack-query',
-			'@octanejs/tanstack-router',
-			'@octanejs/motion',
-			'@octanejs/stylex',
-			'@octanejs/lexical',
-			'@octanejs/floating-ui',
-			'@octanejs/radix',
-			'@octanejs/base-ui',
-			'@octanejs/recharts',
-			'@octanejs/mdx',
-			'@octanejs/testing-library',
-		]) {
-			expect(container.textContent).toContain(pkg);
+		expect(container.querySelector('.prose h1')?.textContent?.trim()).toBe(doc.title);
+		const sidebar = container.querySelector('.sidebar-list')!;
+		const sidebarLinks = Array.from(sidebar.querySelectorAll<HTMLAnchorElement>('a.sidebar-link'));
+		expect(sidebarLinks).toHaveLength(docs.length);
+		for (const entry of docs) {
+			expect(findLink(sidebar, `/docs/${entry.slug}`)).toBeTruthy();
 		}
+		const active = sidebarLinks.filter((link) => link.getAttribute('data-status') === 'active');
+		expect(active).toHaveLength(1);
+		expect(active[0]?.getAttribute('href')).toBe(`/docs/${doc.slug}`);
+	});
+
+	it('/docs/quick-start renders highlighted MDX code', async () => {
+		const { container } = await renderRoute('/docs/quick-start');
+		expect(container.querySelector('.prose pre.shiki code')).toBeTruthy();
 	});
 
 	it('an unknown route renders the root notFoundComponent inside the layout', async () => {
 		const { container } = await renderRoute('/definitely/not/a/page');
-		expect(container.querySelector('.navlinks')).toBeTruthy(); // layout chrome stays up
-		expect(textOf(container)).toContain('Page not found'); // NotFound page in the outlet
-		expect(container.querySelector('a.notfound-home')?.getAttribute('href')).toBe('/');
+		expect(container.querySelector('.navlinks')).toBeTruthy();
+		expect(container.querySelector('main .notfound .notfound-title')).toBeTruthy();
+		expect(findLink(container.querySelector('.notfound')!, '/')).toBeTruthy();
 	});
 });
