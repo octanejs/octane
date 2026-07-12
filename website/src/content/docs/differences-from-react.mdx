@@ -68,26 +68,24 @@ observed. Ordinary `[state, setState]` and `[state, dispatch]` destructures keep
 the existing two-item runtime path and allocate no getter; escaped or ambiguous
 tuples conservatively receive the full three-item shape.
 
-## Native events, React-style propagation
+## Native event objects, no synthetic event layer
 
-Octane doesn't expose React's synthetic event object. `onClick`, `onInput`,
-`onSubmit` and friends receive the browser's actual `Event` object. Event
-handling is still delegated, so **native object does not mean native propagation
-only**: Octane routes that same event through the logical component tree where
-React does.
+Event propagation itself matches React and is **no longer a difference**.
+Ordinary bubbling and capture, `stopPropagation`, logical propagation through
+portals, and native non-bubbling events such as `toggle`, dialog
+`cancel`/`close`, media events, and `load`/`error` all reach the same logical
+ancestors React does.
 
-The resulting contract is:
+What remains different is the event API and synthesis layer:
 
-- Events that don't bubble in the DOM — `toggle`, dialog `cancel`/`close`,
-  media events, and `load`/`error` — are capture-delegated and delivered through
-  logical ancestors like React. That logical path continues across portals.
+- `onClick`, `onInput`, `onSubmit`, and friends receive the browser's actual
+  `Event` object rather than a React `SyntheticEvent` wrapper.
 - `mouseEnter`/`pointerEnter` are the browser's own per-element events, not
   events synthesized from `mouseover`/`mouseout`.
 - There's no synthetic `onChange`, `onBeforeInput`, or `onSelect` polyfill. Use
   the corresponding native event — `onInput` for per-keystroke text changes.
 
-There is no event pooling. `stopPropagation`, the capture phase, and
-`event.currentTarget` work with the real DOM event and the handler's element.
+There is no event pooling, and `event.currentTarget` is the handler's element.
 
 ## Controlled components, native events
 
