@@ -975,6 +975,8 @@ interface HookRec {
 	queue: unknown[];
 	/** Stable dispatch identity across the re-render passes (as on the client). */
 	dispatch: (action: unknown) => void;
+	/** Allocated only for compiler-proven third-tuple consumers. */
+	getter?: () => unknown;
 }
 interface HookPass {
 	/** Slot → occurrence-indexed records, persisting across this body's passes. */
@@ -1010,10 +1012,14 @@ function stateHook<S, A>(
 	reducer: (s: S, a: A) => S,
 	create: () => S,
 	slot: unknown,
-): [S, (action: A) => void] {
+	withGetter = false,
+): [S, (action: A) => void, (() => S)?] {
 	const hp = HOOK_PASS;
 	// Defensive: a hook invoked outside any component body — single-pass shape.
-	if (hp === null) return [create(), NOOP];
+	if (hp === null) {
+		const value = create();
+		return withGetter ? [value, NOOP, () => value] : [value, NOOP];
+	}
 	const key: symbol | string =
 		typeof slot === 'symbol' || typeof slot === 'string' ? slot : (PENDING_SLOT ?? NO_SLOT);
 	const n = hp.occ.get(key) ?? 0;
@@ -1042,7 +1048,9 @@ function stateHook<S, A>(
 		rec.queue = [];
 		rec.value = v;
 	}
-	return [rec.value as S, rec.dispatch as (action: A) => void];
+	if (!withGetter) return [rec.value as S, rec.dispatch as (action: A) => void];
+	const getter = (rec.getter ??= () => rec.value) as () => S;
+	return [rec.value as S, rec.dispatch as (action: A) => void, getter];
 }
 
 // Invoke a component body, re-invoking while render-phase dispatches fired
@@ -1907,12 +1915,25 @@ export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
 export function useState<T>(
 	initial: T | (() => T),
 	slot?: symbol | string,
-): [T, (next: any) => void] {
+): [T, (next: any) => void, () => T] {
 	return stateHook<T, any>(
 		basicStateReducer as (s: T, a: any) => T,
 		() => (typeof initial === 'function' ? (initial as () => T)() : initial),
 		slot,
-	);
+	) as [T, (next: any) => void, () => T];
+}
+
+/** Compiler-emitted useState variant for a tuple whose third member is observed. */
+export function __useStateWithGetter<T>(
+	initial: T | (() => T),
+	slot?: symbol | string,
+): [T, (next: any) => void, () => T] {
+	return stateHook<T, any>(
+		basicStateReducer as (s: T, a: any) => T,
+		() => (typeof initial === 'function' ? (initial as () => T)() : initial),
+		slot,
+		true,
+	) as [T, (next: any) => void, () => T];
 }
 
 export function useReducer<S, A, I = S>(
@@ -1922,14 +1943,31 @@ export function useReducer<S, A, I = S>(
 	// without one the slot itself sits third (`useReducer(r, arg, slot)`).
 	initOrSlot?: ((arg: I) => S) | symbol | string,
 	maybeSlot?: symbol | string,
-): [S, (action: A) => void] {
+): [S, (action: A) => void, () => S] {
 	const init = typeof initOrSlot === 'function' ? initOrSlot : undefined;
 	const slot = init !== undefined ? maybeSlot : initOrSlot;
 	return stateHook<S, A>(
 		reducer,
 		() => (init ? init(initialArg) : (initialArg as unknown as S)),
 		slot,
-	);
+	) as [S, (action: A) => void, () => S];
+}
+
+/** Compiler-emitted useReducer variant for a tuple whose third member is observed. */
+export function __useReducerWithGetter<S, A, I = S>(
+	reducer: (s: S, a: A) => S,
+	initialArg: I,
+	initOrSlot?: ((arg: I) => S) | symbol | string,
+	maybeSlot?: symbol | string,
+): [S, (action: A) => void, () => S] {
+	const init = typeof initOrSlot === 'function' ? initOrSlot : undefined;
+	const slot = init !== undefined ? maybeSlot : initOrSlot;
+	return stateHook<S, A>(
+		reducer,
+		() => (init ? init(initialArg) : (initialArg as unknown as S)),
+		slot,
+		true,
+	) as [S, (action: A) => void, () => S];
 }
 
 export function useEffect(): void {}
