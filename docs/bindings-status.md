@@ -39,7 +39,7 @@ upstream version.
 
 ## @octanejs/base-ui
 
-[`packages/base-ui`](../packages/base-ui) `0.1.1` — ports `@base-ui/react@1.6.0`. Status data: [`packages/base-ui/status.json`](../packages/base-ui/status.json).
+[`packages/base-ui`](../packages/base-ui) `0.1.2` — ports `@base-ui/react@1.6.0`. Status data: [`packages/base-ui/status.json`](../packages/base-ui/status.json).
 
 Alpha, in progress: the foundation + overlay infrastructure and the first component set (Dialog, AlertDialog, Popover open-path) landed, ported at full fidelity and differential-verified against the real `@base-ui/react`.
 
@@ -54,7 +54,7 @@ See also: [`docs/base-ui-migration-plan.md`](base-ui-migration-plan.md)
 
 ## @octanejs/floating-ui
 
-[`packages/floating-ui`](../packages/floating-ui) `0.1.2` — ports `@floating-ui/react@0.27.19`. Status data: [`packages/floating-ui/status.json`](../packages/floating-ui/status.json).
+[`packages/floating-ui`](../packages/floating-ui) `0.1.3` — ports `@floating-ui/react@0.27.19`. Status data: [`packages/floating-ui/status.json`](../packages/floating-ui/status.json).
 
 Positioning (`useFloating`, ref-aware `arrow`, the `@floating-ui/dom` middleware re-exports, the floating tree), the full interaction-hook set (`useInteractions`, `useHover` + `safePolygon`, `useClick`, `useFocus`, `useDismiss`, `useRole`, `useClientPoint`, `useListNavigation`, `useTypeahead`), the component layer (`FloatingPortal`, `FloatingOverlay`, `FloatingFocusManager`, `FloatingArrow`, `FloatingList`, `Composite`), and transitions + `FloatingDelayGroup`.
 
@@ -68,7 +68,7 @@ SSR / hydration: No dedicated SSR/hydration tests.
 
 ## @octanejs/hook-form
 
-[`packages/hook-form`](../packages/hook-form) `0.1.0` — ports `react-hook-form@7.81.0`. Status data: [`packages/hook-form/status.json`](../packages/hook-form/status.json).
+[`packages/hook-form`](../packages/hook-form) `0.1.1` — ports `react-hook-form@7.81.0`. Status data: [`packages/hook-form/status.json`](../packages/hook-form/status.json).
 
 Complete port of react-hook-form 7.81.0 (upstream commit b7df98c2) with the upstream test suite ported: `useForm`, `useController`, `useFieldArray`, `useFormState`, `useWatch`, `useFormContext`/`FormProvider`, schema resolvers, and all validation modes.
 
@@ -83,7 +83,7 @@ See also: [`docs/octanejs-hook-form-plan.md`](octanejs-hook-form-plan.md)
 
 ## @octanejs/jotai
 
-[`packages/jotai`](../packages/jotai) `0.1.0` — ports `jotai@2.20.1`. Status data: [`packages/jotai/status.json`](../packages/jotai/status.json).
+[`packages/jotai`](../packages/jotai) `0.1.1` — ports `jotai@2.20.1`. Status data: [`packages/jotai/status.json`](../packages/jotai/status.json).
 
 Complete 1:1 port: the framework-agnostic vanilla core (`jotai/vanilla`, `/vanilla/utils`, `/vanilla/internals`) is reused verbatim; the React layer (`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`) and `react/utils` (`useResetAtom`, `useReducerAtom`, `useAtomCallback`, `useHydrateAtoms`) are ported onto octane hooks, preserving upstream's useReducer force-update + effect-subscription implementation, async atoms via octane's `use()`.
 
@@ -95,7 +95,7 @@ SSR / hydration: No SSR-specific surface; `useHydrateAtoms` is ported and usable
 
 ## @octanejs/lexical
 
-[`packages/lexical`](../packages/lexical) `0.1.2` — ports `@lexical/react@0.46.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
+[`packages/lexical`](../packages/lexical) `0.1.3` — ports `@lexical/react@0.46.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
 
 35 of 39 `@lexical/react` modules ported: composer + contexts, the editable surface, plain/rich text, and the full plugin/menu set (history, lists + check-list, links, tables, markdown shortcuts, the typeahead/node-menu/context-menu family, draggable-block, character-limit, …) plus the `useLexical*` hooks.
 
@@ -110,7 +110,7 @@ SSR / hydration: No dedicated SSR/hydration tests.
 
 ## @octanejs/mdx
 
-[`packages/mdx`](../packages/mdx) `0.1.0` — ports `@mdx-js/mdx@3.1.1`. Status data: [`packages/mdx/status.json`](../packages/mdx/status.json).
+[`packages/mdx`](../packages/mdx) `0.1.1` — ports `@mdx-js/mdx@3.1.1`. Status data: [`packages/mdx/status.json`](../packages/mdx/status.json).
 
 The full compile-don't-interpret pipeline: `.mdx`/`.md` → `@mdx-js/mdx` (reused verbatim) → octane compiler, via the `octaneMdx()` Vite plugin plus the `./compile` and `./server` entries; `@mdx-js/react`'s provider layer (`MDXProvider`/`useMDXComponents`) is ported onto octane context. The octane website runs on it.
 
@@ -124,7 +124,7 @@ See also: [`docs/mdx-migration-plan.md`](mdx-migration-plan.md)
 
 ## @octanejs/motion
 
-[`packages/motion`](../packages/motion) `0.1.2` — ports `motion@12.40.0`. Status data: [`packages/motion/status.json`](../packages/motion/status.json).
+[`packages/motion`](../packages/motion) `0.1.3` — ports `motion@12.40.0`. Status data: [`packages/motion/status.json`](../packages/motion/status.json).
 
 Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, and the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.
 
@@ -139,7 +139,7 @@ SSR / hydration: No SSR-specific surface; no dedicated SSR tests.
 
 ## @octanejs/radix
 
-[`packages/radix`](../packages/radix) `0.1.2` — ports `radix-ui@1.6.1`. Status data: [`packages/radix/status.json`](../packages/radix/status.json).
+[`packages/radix`](../packages/radix) `0.1.3` — ports `radix-ui@1.6.1`. Status data: [`packages/radix/status.json`](../packages/radix/status.json).
 
 Complete against the unified `radix-ui@1.6.1` component surface — all primitives (incl. Dialog, the Menu/DropdownMenu/ContextMenu family, Popover, Tooltip, Select, NavigationMenu, Toast, Menubar, Slider, the form controls, and OneTimePasswordField/PasswordToggleField) plus the composition/state/overlay foundations — verified by a differential suite (same fixtures through octane and the real radix-ui, byte-identical DOM).
 
@@ -154,7 +154,7 @@ See also: [`docs/radix-migration-plan.md`](radix-migration-plan.md)
 
 ## @octanejs/recharts
 
-[`packages/recharts`](../packages/recharts) `0.1.0` — ports `recharts@3.9.2`. Status data: [`packages/recharts/status.json`](../packages/recharts/status.json).
+[`packages/recharts`](../packages/recharts) `0.1.1` — ports `recharts@3.9.2`. Status data: [`packages/recharts/status.json`](../packages/recharts/status.json).
 
 Partial (phases 0–1 of 5): the static `BarChart`/`LineChart` pipeline end-to-end (`isAnimationActive={false}`), byte-identical to upstream in the differential rig; the Redux/RTK state layer, `Surface`/`Layer`, and the pure shape set are in place.
 
@@ -170,7 +170,7 @@ See also: [`docs/recharts-port-plan.md`](recharts-port-plan.md)
 
 ## @octanejs/redux
 
-[`packages/redux`](../packages/redux) `0.1.0` — ports `react-redux@9.3.0`. Status data: [`packages/redux/status.json`](../packages/redux/status.json).
+[`packages/redux`](../packages/redux) `0.1.1` — ports `react-redux@9.3.0`. Status data: [`packages/redux/status.json`](../packages/redux/status.json).
 
 The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Export parity is pinned by test.
 
@@ -201,7 +201,7 @@ See also: [`docs/remix-router-port-plan.md`](remix-router-port-plan.md)
 
 ## @octanejs/stylex
 
-[`packages/stylex`](../packages/stylex) `0.1.2` — ports `@stylexjs/stylex@0.19.0`. Status data: [`packages/stylex/status.json`](../packages/stylex/status.json).
+[`packages/stylex`](../packages/stylex) `0.1.3` — ports `@stylexjs/stylex@0.19.0`. Status data: [`packages/stylex/status.json`](../packages/stylex/status.json).
 
 Full compile-time integration: re-exports the StyleX runtime API (`create`, `props`, `attrs`, `keyframes`, `defineVars`, `createTheme`) and registers as an import source; the `/vite` plugin runs the StyleX compiler over octane's compiled output and emits one static atomic stylesheet (`virtual:stylex.css`) with zero StyleX runtime in the bundle.
 
@@ -214,7 +214,7 @@ SSR / hydration: Works under SSR — the stylesheet is static and server markup 
 
 ## @octanejs/tanstack-query
 
-[`packages/tanstack-query`](../packages/tanstack-query) `0.1.2` — ports `@tanstack/react-query@5.101.0`. Status data: [`packages/tanstack-query/status.json`](../packages/tanstack-query/status.json).
+[`packages/tanstack-query`](../packages/tanstack-query) `0.1.3` — ports `@tanstack/react-query@5.101.0`. Status data: [`packages/tanstack-query/status.json`](../packages/tanstack-query/status.json).
 
 Complete: 58/58 runtime exports plus the full TypeScript surface; the export surface is byte-identical to upstream in both directions (locked by test), and `@tanstack/query-core` is re-exported verbatim.
 
@@ -228,7 +228,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router
 
-[`packages/tanstack-router`](../packages/tanstack-router) `0.1.2` — ports `@tanstack/react-router@1.170.16`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
+[`packages/tanstack-router`](../packages/tanstack-router) `0.1.3` — ports `@tanstack/react-router@1.170.16`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
 
 Code-based routing at full binding parity (2026-07-06 gap-closure sweep): the full Match pipeline, router lifecycle events, the complete read-hook family, full-parity `Link` (preloading, masking, `activeProps`), `useBlocker`/`Block`, `Await`/`defer`, scroll restoration, lazy routes, not-found handling, and search-param validation/middleware — differential-verified byte-equal vs the real `@tanstack/react-router`.
 
@@ -245,7 +245,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-table
 
-[`packages/tanstack-table`](../packages/tanstack-table) `0.1.0` — ports `@tanstack/react-table@8.21.3`. Status data: [`packages/tanstack-table/status.json`](../packages/tanstack-table/status.json).
+[`packages/tanstack-table`](../packages/tanstack-table) `0.1.1` — ports `@tanstack/react-table@8.21.3`. Status data: [`packages/tanstack-table/status.json`](../packages/tanstack-table/status.json).
 
 Complete 1:1 port: the framework-agnostic `@tanstack/table-core` (createTable + all feature row models) is reused verbatim; the ~100-line React adapter (`useReactTable`, `flexRender`) is transcribed onto octane hooks, preserving upstream's useState-based state wiring.
 
@@ -259,7 +259,7 @@ SSR / hydration: No SSR-specific surface; table-core is pure computation.
 
 ## @octanejs/tanstack-virtual
 
-[`packages/tanstack-virtual`](../packages/tanstack-virtual) `0.1.0` — ports `@tanstack/react-virtual@3.14.5`. Status data: [`packages/tanstack-virtual/status.json`](../packages/tanstack-virtual/status.json).
+[`packages/tanstack-virtual`](../packages/tanstack-virtual) `0.1.1` — ports `@tanstack/react-virtual@3.14.5`. Status data: [`packages/tanstack-virtual/status.json`](../packages/tanstack-virtual/status.json).
 
 Complete 1:1 port: the framework-agnostic `@tanstack/virtual-core` (Virtualizer + observers + windowing math) is reused verbatim; the React adapter (`useVirtualizer`, `useWindowVirtualizer`, incl. `useFlushSync` and the experimental `directDomUpdates` surface) is transcribed onto octane hooks, preserving upstream's force-update + flushSync-on-sync-scroll wiring and layout-effect lifecycle.
 
@@ -273,7 +273,7 @@ SSR / hydration: SSR-safe: `useIsomorphicLayoutEffect` degrades to `useEffect` w
 
 ## @octanejs/testing-library
 
-[`packages/testing-library`](../packages/testing-library) `0.1.0` — ports `@testing-library/react` (unpinned). Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
+[`packages/testing-library`](../packages/testing-library) `0.1.1` — ports `@testing-library/react` (unpinned). Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
 
 `render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config.
 
@@ -290,7 +290,7 @@ See also: [`docs/testing-library-migration-plan.md`](testing-library-migration-p
 
 ## @octanejs/zustand
 
-[`packages/zustand`](../packages/zustand) `0.1.2` — ports `zustand@5.0.14`. Status data: [`packages/zustand/status.json`](../packages/zustand/status.json).
+[`packages/zustand`](../packages/zustand) `0.1.3` — ports `zustand@5.0.14`. Status data: [`packages/zustand/status.json`](../packages/zustand/status.json).
 
 Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).
 
