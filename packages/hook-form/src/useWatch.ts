@@ -329,7 +329,7 @@ export function useWatch<TFieldValues extends FieldValues>(props?: UseWatchProps
 		});
 	}, [control, exact, name, refreshValue]);
 
-	useEffect(() => control._removeUnmounted());
+	useEffect(() => control._removeUnmounted(), null);
 
 	// If name or control changed for this render, synchronously reflect the
 	// latest value so callers (like useController) see the correct value

@@ -6,7 +6,8 @@ title: Quick start
 
 Octane is a fast, TypeScript-first UI framework — the successor to Inferno. You
 get the React API you already know, a compiler that keeps the runtime small and
-fast, and hooks that no longer come with the rules of hooks.
+fast, hooks that no longer come with the rules of hooks, and dependency arrays
+the compiler can derive from your closures.
 
 Components can be written in standard `.tsx`/`.jsx`, but opting for `.tsrx`
 provides better performance guarantees, especially around collections. TSRX is
@@ -93,13 +94,16 @@ export function Timer() @{
 	useEffect(() => {
 		const id = setInterval(() => setSeconds((s) => s + 1), 1000);
 		return () => clearInterval(id);
-	}, []);
+	});
 
 	<p>
 		{'Elapsed: ' + seconds}
 	</p>
 }
 ```
+
+Omitting a dependency list asks the compiler to infer it. Explicit arrays keep
+their React meaning; pass `null` for the intentional every-render form.
 
 ## Conditional hooks
 
@@ -118,7 +122,7 @@ export function Panel(props) @{
 
 	useEffect(() => {
 		console.log('n changed:', n);
-	}, [n]);
+	});
 
 	<button onClick={() => setN(n + 1)}>
 		{'count: ' + n}

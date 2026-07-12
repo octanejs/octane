@@ -14,7 +14,7 @@ export function EffectfulCounter(props) @{
 	const [count, setCount] = useState(0);
 	useEffect(() => {
 		props.callback();
-	});
+	}, null);
 	<button onClick={() => setCount(count + 1)}>
 		{'Count: ' + count}
 	</button>
