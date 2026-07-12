@@ -20,6 +20,10 @@ const clientDir = path.join(root, 'dist/client');
 const serverDir = path.join(root, 'dist/server');
 const outputDir = path.join(root, '.vercel/output');
 const funcDir = path.join(outputDir, 'functions/index.func');
+const buildNodeMajor = Number(process.versions.node.split('.')[0]);
+// Node 26 CI still targets Vercel's latest supported function runtime. Node 24
+// leaves this undefined so the adapter's default-runtime detection stays covered.
+const serverlessRuntime = buildNodeMajor > 24 ? 'nodejs24.x' : undefined;
 
 // A stand-in for the plugin's self-contained server bundle: same shape (fetch
 // `handler` export next to the SSR template), no dependencies.
@@ -38,7 +42,10 @@ beforeAll(async () => {
 	write(path.join(serverDir, 'entry.js'), FAKE_ENTRY);
 	write(path.join(serverDir, 'index.html'), '<!doctype html><html><!--ssr-body--></html>\n');
 
-	await adapt({ root, outDir: 'dist', clientDir, serverDir, log: () => {} });
+	await adapt(
+		{ root, outDir: 'dist', clientDir, serverDir, log: () => {} },
+		serverlessRuntime ? { serverless: { runtime: serverlessRuntime } } : undefined,
+	);
 });
 
 afterAll(() => {
@@ -84,7 +91,7 @@ describe('adapt()', () => {
 		const vcConfig = JSON.parse(fs.readFileSync(path.join(funcDir, '.vc-config.json'), 'utf-8'));
 		expect(vcConfig.handler).toBe('index.js');
 		expect(vcConfig.launcherType).toBe('Nodejs');
-		expect(vcConfig.runtime).toMatch(/^nodejs(20|22|24)\.x$/);
+		expect(vcConfig.runtime).toBe(serverlessRuntime ?? `nodejs${buildNodeMajor}.x`);
 
 		// The wrapper imports as ESM — the function dir must say so.
 		const pkg = JSON.parse(fs.readFileSync(path.join(funcDir, 'package.json'), 'utf-8'));

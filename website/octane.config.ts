@@ -27,7 +27,10 @@ const warmRouter: Middleware = async (context, next) => {
 const ENTRY = ['App', '/src/app/App.tsrx'] as const;
 
 export default defineConfig({
-	adapter: vercel(),
+	// CI also builds on Node 26, but Vercel Functions currently support Node 24
+	// as their newest runtime. Keep the build machine and deployment runtime
+	// independent until Vercel adds nodejs26.x.
+	adapter: vercel({ serverless: { runtime: 'nodejs24.x' } }),
 	router: {
 		routes: [
 			new RenderRoute({ path: '/', entry: ENTRY, before: [warmRouter] }),

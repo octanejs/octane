@@ -466,9 +466,10 @@ run the changeset check. Pull-request CI does not run that check, so an invalid
 major/minor changeset is discovered later than necessary. Add
 `pnpm changeset:check` to PR CI when a changeset file is present.
 
-CI tests Node 22 and 24, while the Vercel adapter accepts Node 20, 22, or 24 and
-the website says Node 20 or later. Either add Node 20 to the relevant server/
-adapter matrix or narrow the documented/supported versions.
+CI tests Node 24 and 26. Vercel Functions currently support Node 20, 22, or 24,
+so the website explicitly emits a Node 24 function even when its build runs on
+Node 26. The website's documented Node 20-or-later development requirement is
+broader than the CI matrix.
 
 Bindings depend on `octane` through workspace ranges and consume raw TS/TSRX in
 development. Before stable releases, test packed tarballs in a small external
@@ -502,4 +503,3 @@ compiler/runtime-version problems that workspace-source tests cannot.
 - land marker-elision M3 only with client/server/hydration symmetry;
 - continue size and same-session performance A/B gates;
 - preserve the `parallelUse` opt-out and conservative warm-plan analysis.
-
