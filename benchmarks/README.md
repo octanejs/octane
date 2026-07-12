@@ -101,6 +101,8 @@ after printing its normal tables:
   mean period + uncertainty over median-only reporting, while keeping sample
   order visible enough to catch residual JIT warmup. `median`, `min`, `p95`,
   `sd`, `rme` and `warmupRatio` are diagnostics; ops/sec suites add `opsPerSec`.
+  Independent cold samples whose order does not represent warmup use the full
+  sample mean via `summarizeSamples(samples, { scoreMode: 'mean' })`.
   Non-timing extras (payload bytes, render counters, gate status) go under a
   per-target `meta` object.
 - On a **correctness-gate failure** the harness still writes the JSON but adds a

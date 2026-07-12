@@ -41,8 +41,8 @@ const TARGETS = process.env.TARGETS
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const summarize = (samples) => {
-	return summarizeSamples(samples);
+const summarize = (samples, options) => {
+	return summarizeSamples(samples, options);
 };
 
 async function runTarget(t) {
@@ -64,7 +64,12 @@ async function runTarget(t) {
 	}
 
 	await browser.close();
-	return { init: summarize(initSamples), update: summarize(updateSamples) };
+	return {
+		// Each init sample is an independent cold page load, not an ordered JIT
+		// warmup sequence. Score the complete sample population.
+		init: summarize(initSamples, { scoreMode: 'mean' }),
+		update: summarize(updateSamples),
+	};
 }
 
 (async () => {

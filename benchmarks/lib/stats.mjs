@@ -80,6 +80,7 @@ function statsFor(values, start = 0) {
 
 function pickSteadyWindow(values, options) {
 	const all = statsFor(values);
+	if (options.scoreMode === 'mean') return { ...all, scoreKind: 'mean' };
 	const minSamples = options.minSamplesForScore ?? 5;
 	if (values.length < minSamples) return { ...all, scoreKind: 'median' };
 
