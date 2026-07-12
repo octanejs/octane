@@ -1,5 +1,77 @@
 # @octanejs/vite-plugin
 
+## 0.1.4
+
+### Patch Changes
+
+- 6d332ad: octane.config `adapter` is now the full deploy contract `{ name?, adapt?, serve?, runtime? }`: after the production server build, closeBundle runs `adapter.adapt({ root, outDir, clientDir, serverDir, log })` so an adapter package (e.g. `@octanejs/adapter-vercel`) can restructure the output for its platform (SvelteKit-style). All parts are optional and independent — `serve`/`runtime` keep their existing meanings. `@octanejs/adapter-vercel` is registered as a server-only package: client-side imports of it resolve to the browser stub (which now also covers the octane adapter surface, `vercel`/`adapt`) instead of dragging node builtins into the client graph.
+- 8fc8554: Production SSR builds — octane apps now deploy server-rendered instead of SPA-only:
+
+  - `vite build` produces BOTH bundles: hashed client assets in `{outDir}/client` (with the generated hydrate entry bundled into index.html via a static, Rollup-analyzable import map over the routes' entry/layout/preHydrate modules) and a self-contained SSR server at `{outDir}/server/entry.js` (app + octane bundled, only node builtins external; octane.config.ts is compiled in through a config-surface facade so neither the compiler nor vite ride along). The built index.html moves to `dist/server` — it is the SSR template, and leaving it in the static dir would shadow the handler at `/` on filesystem-first hosts.
+  - `createHandler` (`@octanejs/vite-plugin/production`) is implemented: it matches RenderRoutes/ServerRoutes, runs middleware chains, and streams via the same `renderToReadableStream` engine dev SSR uses — the rendered body region and the `#__octane_data` payload are byte-identical to dev, so `hydrateRoot()` adopts production responses unchanged (covered by an end-to-end fixture test). Per-route `<link rel="stylesheet">`/`modulepreload` tags come from the client manifest. `server.render: 'buffered'` in octane.config.ts switches to the await-everything `prerender` for hosts that break streamed responses.
+  - The server entry exports `handler` (Web fetch) and `nodeHandler` (Node `(req, res)`, for serverless wrappers such as a Vercel Node function), and auto-boots under `node dist/server/entry.js` — with the adapter's `serve()` when configured, else the new built-in Node server (`@octanejs/vite-plugin/node`) serving the client assets with immutable caching for `/assets/*`.
+  - `octane-preview` now runs that entry for real (pre-deploy verification) and accepts `--port`.
+
+- 3c56d95: Close the four metaframework gaps the octane website surfaced:
+
+  - `octane()` now accepts `exclude` and forwards it to the bundled compiler, so monorepo / aliased-to-source setups can skip the hook-slotting pass for hand-slot-forwarding binding sources (pnpm symlinks resolve `@octanejs/*` to `packages/*/src`, which the automatic node_modules skip can't see).
+  - The dev SSR middleware skips Vite-owned requests (`/@` namespaces, `/__` internals, node_modules, `?import`-style transform queries, and extension-bearing paths that name a real file under the Vite root/publicDir — dotted page URLs like `/docs/v2.0` still SSR) before route matching, so a catch-all `'/*splat'` RenderRoute can SSR a real not-found page without swallowing `/@vite/client` or `/src/*.ts`. `RenderRoute` also takes a `status` (e.g. 404 for the catch-all) applied to the rendered response.
+  - `appType: 'custom'` is now only a default: an explicit user `appType` wins, and `vite preview` is left on Vite's own SPA fallback so it can serve the client build (production SSR serving is still Phase 2).
+  - RenderRoute components (and layouts) receive the request `url` (pathname + search) alongside `params`, on the server and on the hydrating client, and the new `router.preHydrate` config names a module whose default export the client entry awaits before `hydrateRoot` — the hook an app-level client router uses to commit its match tree so hydration adopts the server DOM. The generated client entry also hides its dynamic imports from Vite's `?import` query injection so the page/hook share module singletons with statically-imported copies.
+
+  Dev SSR now streams: RenderRoutes render through `renderToReadableStream` (shell first, suspense boundaries flush out of order behind it) instead of the buffered `prerender`.
+
+- Updated dependencies [05fdef8]
+- Updated dependencies [e9ebfbf]
+- Updated dependencies [4ac4c98]
+- Updated dependencies [c2129eb]
+- Updated dependencies [4ac4c98]
+- Updated dependencies [8a44bb5]
+- Updated dependencies [6b0c244]
+- Updated dependencies [d3cf678]
+- Updated dependencies [05fdef8]
+- Updated dependencies [d19d4f3]
+- Updated dependencies [7e84258]
+- Updated dependencies [2f8c6ed]
+- Updated dependencies [8de4584]
+- Updated dependencies [9be6ba5]
+- Updated dependencies [db409de]
+- Updated dependencies [4f3c6c8]
+- Updated dependencies [62c3c4e]
+- Updated dependencies [3c56d95]
+- Updated dependencies [4c5b1d0]
+- Updated dependencies [b732399]
+- Updated dependencies [6d27cb0]
+- Updated dependencies [a3784b1]
+- Updated dependencies [fa77edf]
+- Updated dependencies [f5c9dba]
+- Updated dependencies [12d5410]
+- Updated dependencies [d71f1fc]
+- Updated dependencies [2f8c6ed]
+- Updated dependencies [63e51e8]
+- Updated dependencies [6d3b269]
+- Updated dependencies [b171c6d]
+- Updated dependencies [7f3d9c9]
+- Updated dependencies [820baaf]
+- Updated dependencies [c36cb32]
+- Updated dependencies [c33f409]
+- Updated dependencies [63e51e8]
+- Updated dependencies [8fc8554]
+- Updated dependencies [569daad]
+- Updated dependencies [6b7b727]
+- Updated dependencies [2ce7bc5]
+- Updated dependencies [c6a23f5]
+- Updated dependencies [c93aad5]
+- Updated dependencies [2942afb]
+- Updated dependencies [388b23c]
+- Updated dependencies [352cff1]
+- Updated dependencies [c7989eb]
+- Updated dependencies [dda2854]
+- Updated dependencies [dda2854]
+- Updated dependencies [3a9d855]
+- Updated dependencies [1f85217]
+  - octane@0.1.4
+
 ## 0.1.3
 
 ### Patch Changes
