@@ -1,0 +1,53 @@
+{
+  "name": "@octanejs/remix-router",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "react-router for the octane renderer — the framework-agnostic router core vendored byte-close from react-router v7, with the React layer (RouterProvider, hooks, Link, boundaries) transcribed onto octane.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/remix-router"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./dom": "./src/dom.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cookie": "^1.0.1",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-router": "catalog:default",
+    "react-router-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

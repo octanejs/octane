@@ -197,6 +197,7 @@ describe('manifest-declared manual hook slots', () => {
 			'mdx',
 			'motion',
 			'radix',
+			'remix-router',
 			'stylex',
 			'tanstack-query',
 			'tanstack-router',
