@@ -18,12 +18,6 @@ import * as port from '@octanejs/remix-router';
 import * as portDom from '@octanejs/remix-router/dom';
 
 const EXPECTED_MISSING = new Set([
-	// Phase D — mutations
-	'Form',
-	'useSubmit',
-	'useFormAction',
-	'useFetcher',
-	'useFetchers',
 	// Phase E — guards / scroll / view transitions
 	'useBlocker',
 	'unstable_usePrompt',

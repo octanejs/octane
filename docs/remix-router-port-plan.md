@@ -111,11 +111,16 @@ real react-router; searchParams defaultInit/set/clear round-trips; browser,
 hash, and provided-history routers + createBrowserRouter data mode green in
 jsdom smokes (real window.history / location.hash assertions).
 
-### Phase D — mutations
+### Phase D — mutations — SHIPPED (PR 1)
 `Form`, fetcher forms, `useSubmit`, `useFormAction`, `useFetcher`/`useFetchers`
-(FetchersContext + per-fetcher flushSync paths). *Exit criterion:* form-encoded
-+ JSON submissions and fetcher lifecycles differential-green; native-event
-divergences documented hook-form-style.
+(FetchersContext + per-fetcher flushSync paths). *Exit criterion (met):*
+form-encoded + JSON submissions and the fetcher lifecycle
+(load/Form/submit/shared keys/useFetchers) differential-green byte-identical
+vs real react-router; the one native-event divergence is documented
+hook-form-style (Form's onSubmit is a native delegated submit listener —
+`event.submitter` read directly where React goes through
+`event.nativeEvent.submitter`; jsdom fires SubmitEvent with `submitter` on
+submit-button clicks for both sides).
 
 ### Phase E — async guards + scroll + view transitions
 `useBlocker`, `unstable_usePrompt`, `ScrollRestoration` +

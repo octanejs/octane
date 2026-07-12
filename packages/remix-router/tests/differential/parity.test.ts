@@ -17,6 +17,7 @@ const AWAIT = resolve(__dirname, '../_fixtures/await-deferred-diff.tsrx');
 const PENDING = resolve(__dirname, '../_fixtures/pending-navigation-diff.tsrx');
 const DECLARATIVE = resolve(__dirname, '../_fixtures/declarative-diff.tsrx');
 const NAVLINK = resolve(__dirname, '../_fixtures/navlink-diff.tsrx');
+const FORMS = resolve(__dirname, '../_fixtures/forms-diff.tsrx');
 // React fixtures are precompiled into THIS package's cache (see differential
 // _setup.ts) so the React side resolves react-router from here.
 const CACHE = resolve(__dirname, '.react-cache');
@@ -153,6 +154,51 @@ describe('differential: @octanejs/remix-router vs real react-router', () => {
 		await d.step('clear search params', async (i, r) => {
 			await i.click('#clear-q');
 			await r.click('#clear-q');
+			await settle();
+		});
+		d.unmount();
+	});
+
+	it('FormsDiffApp: Form GET/POST + JSON submit + fetcher lifecycle, byte-identical', async () => {
+		// Phase D: native submit (octane) vs synthetic onSubmit (React) over the
+		// same jsdom SubmitEvent; submitter formmethod; fetchers.
+		const d = await mountDifferential(FORMS, 'FormsDiffApp', undefined, CACHE);
+		await d.step('mount', async () => {
+			await settle();
+		});
+		await d.step('GET form → search params', async (i, r) => {
+			await i.click('#get-submit');
+			await r.click('#get-submit');
+			await settle();
+		});
+		await d.step('POST form → actionData', async (i, r) => {
+			await i.click('#post-submit');
+			await r.click('#post-submit');
+			await settle();
+		});
+		await d.step('submitter formmethod=put override', async (i, r) => {
+			await i.click('#put-submit');
+			await r.click('#put-submit');
+			await settle();
+		});
+		await d.step('JSON useSubmit', async (i, r) => {
+			await i.click('#submit-json');
+			await r.click('#submit-json');
+			await settle();
+		});
+		await d.step('fetcher.load', async (i, r) => {
+			await i.click('#f-load');
+			await r.click('#f-load');
+			await settle();
+		});
+		await d.step('fetcher.Form post', async (i, r) => {
+			await i.click('#f-form-submit');
+			await r.click('#f-form-submit');
+			await settle();
+		});
+		await d.step('fetcher.submit imperative', async (i, r) => {
+			await i.click('#f-submit');
+			await r.click('#f-submit');
 			await settle();
 		});
 		d.unmount();

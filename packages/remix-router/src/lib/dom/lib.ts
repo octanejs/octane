@@ -4,24 +4,48 @@
 // useSearchParams, and useViewTransitionState (needed internally by NavLink;
 // its public export lands in Phase E with the rest of the view-transition
 // surface).
-import { useCallback, useContext, useMemo, useRef } from 'octane';
-import { DataRouterContext, ViewTransitionContext } from '../context';
+import {
+	createElement,
+	useCallback,
+	useContext,
+	useEffect,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+} from 'octane';
+import {
+	DataRouterContext,
+	DataRouterStateContext,
+	FetchersContext,
+	NavigationContext,
+	RouteContext,
+	ViewTransitionContext,
+} from '../context';
 import type { Location, To } from '../router/history';
-import { createBrowserHistory, createHashHistory, invariant, warning } from '../router/history';
+import {
+	createBrowserHistory,
+	createHashHistory,
+	createPath,
+	invariant,
+	warning,
+} from '../router/history';
 import type { HydrationState, Router as DataRouter } from '../router/router';
-import { createRouter } from '../router/router';
+import { IDLE_FETCHER, createRouter } from '../router/router';
 import type { RelativeRoutingType } from '../router/router';
 import type { RouteObject } from '../router/utils';
 import {
 	ErrorResponseImpl,
 	SUPPORTED_ERROR_TYPES,
+	joinPaths,
 	matchPath,
 	stripBasename,
 } from '../router/utils';
 import { hydrationRouteProperties, mapRouteProperties } from '../components/utils';
-import { useLocation, useNavigate, useResolvedPath } from '../hooks';
+import { useLocation, useNavigate, useResolvedPath, useRouteId } from '../hooks';
 import type { URLSearchParamsInit } from './dom';
-import { createSearchParams, getSearchParamsForLocation } from './dom';
+import { createSearchParams, getFormSubmissionInfo, getSearchParamsForLocation } from './dom';
+import { Form } from './Form.tsrx';
 import { splitSlot, subSlot } from '../../internal';
 
 export interface DOMRouterOpts {
@@ -237,6 +261,270 @@ export function useViewTransitionState(to: To, ...args: any[]): boolean {
 	// an indicated transition apply.
 	return (
 		matchPath(path.pathname, nextPath) != null || matchPath(path.pathname, currentPath) != null
+	);
+}
+
+// ── Phase D — mutations ─────────────────────────────────────────────────────
+// useSubmit / useFormAction / useFetcher / useFetchers — transcribed from
+// react-router@7.18.1 lib/dom/lib.tsx. The dom-side data-router guards mirror
+// upstream's local DataRouterHook enum + console errors.
+
+enum DataRouterHook {
+	UseSubmit = 'useSubmit',
+	UseFetcher = 'useFetcher',
+}
+
+enum DataRouterStateHook {
+	UseFetcher = 'useFetcher',
+	UseFetchers = 'useFetchers',
+}
+
+function getDataRouterConsoleError(hookName: DataRouterHook | DataRouterStateHook) {
+	return `${hookName} must be used within a data router.  See https://reactrouter.com/en/main/routers/picking-a-router.`;
+}
+
+function useDataRouterContext(hookName: DataRouterHook) {
+	let ctx = useContext(DataRouterContext);
+	invariant(ctx, getDataRouterConsoleError(hookName));
+	return ctx;
+}
+
+function useDataRouterState(hookName: DataRouterStateHook) {
+	let state = useContext(DataRouterStateContext);
+	invariant(state, getDataRouterConsoleError(hookName));
+	return state;
+}
+
+let fetcherId = 0;
+const getUniqueFetcherId = () => `__${String(++fetcherId)}__`;
+
+export type SubmitFunction = (target: any, options?: any) => Promise<void>;
+export type FetcherSubmitFunction = (target: any, options?: any) => Promise<void>;
+
+/**
+ * The imperative version of `<Form>` — submits a form (element, `FormData`,
+ * plain object, or JSON body) to a route action or loader.
+ */
+export function useSubmit(...args: any[]): SubmitFunction {
+	const [, slot] = splitSlot(args);
+	let { router } = useDataRouterContext(DataRouterHook.UseSubmit);
+	let { basename } = useContext(NavigationContext);
+	let currentRouteId = useRouteId();
+
+	let routerFetch = router.fetch;
+	let routerNavigate = router.navigate;
+
+	return useCallback(
+		(async (target: any, options: any = {}) => {
+			let { action, method, encType, formData, body } = getFormSubmissionInfo(target, basename);
+
+			if (options.navigate === false) {
+				let key = options.fetcherKey || getUniqueFetcherId();
+				await routerFetch(key, currentRouteId!, options.action || action, {
+					defaultShouldRevalidate: options.defaultShouldRevalidate,
+					preventScrollReset: options.preventScrollReset,
+					formData,
+					body,
+					formMethod: options.method || method,
+					formEncType: options.encType || encType,
+					flushSync: options.flushSync,
+				});
+			} else {
+				await routerNavigate(options.action || action, {
+					defaultShouldRevalidate: options.defaultShouldRevalidate,
+					preventScrollReset: options.preventScrollReset,
+					formData,
+					body,
+					formMethod: options.method || method,
+					formEncType: options.encType || encType,
+					replace: options.replace,
+					state: options.state,
+					fromRouteId: currentRouteId,
+					flushSync: options.flushSync,
+					viewTransition: options.viewTransition,
+				});
+			}
+		}) as SubmitFunction,
+		[routerFetch, routerNavigate, basename, currentRouteId],
+		subSlot(slot, 'us:cb') as any,
+	);
+}
+
+/**
+ * Resolves the URL to the closest route in the component hierarchy instead of
+ * the current URL of the app. Used internally by `<Form>` to resolve the
+ * `action` to the closest route.
+ */
+export function useFormAction(...args: any[]): string {
+	const [user, slot] = splitSlot(args);
+	const action = user[0] as string | undefined;
+	const { relative } = (user[1] ?? {}) as { relative?: RelativeRoutingType };
+
+	let { basename } = useContext(NavigationContext);
+	let routeContext = useContext(RouteContext);
+	invariant(routeContext, 'useFormAction must be used inside a RouteContext');
+
+	let [match] = routeContext.matches.slice(-1);
+	// Shallow clone path so we can modify it below, otherwise we modify the
+	// object referenced by useMemo inside useResolvedPath
+	let path = {
+		...(useResolvedPath(action ? action : '.', { relative }, subSlot(slot, 'ufa:path')) as any),
+	};
+
+	// If no action was specified, browsers will persist current search params
+	// when determining the path, so match that behavior
+	// https://github.com/remix-run/remix/issues/927
+	let location = useLocation();
+	if (action == null) {
+		// Safe to write to this directly here since if action was undefined, we
+		// would have called useResolvedPath(".") which will never include a search
+		path.search = location.search;
+
+		// When grabbing search params from the URL, remove any included ?index param
+		// since it might not apply to our contextual route.  We add it back based
+		// on match.route.index below
+		let params = new URLSearchParams(path.search);
+		let indexValues = params.getAll('index');
+		let hasNakedIndexParam = indexValues.some((v) => v === '');
+		if (hasNakedIndexParam) {
+			params.delete('index');
+			indexValues.filter((v) => v).forEach((v) => params.append('index', v));
+			let qs = params.toString();
+			path.search = qs ? `?${qs}` : '';
+		}
+	}
+
+	if ((!action || action === '.') && match.route.index) {
+		path.search = path.search ? path.search.replace(/^\?/, '?index&') : '?index';
+	}
+
+	// If we're operating within a basename, prepend it to the pathname prior
+	// to creating the form action.  If this is a root navigation, then just use
+	// the raw basename which allows the basename to have full control over the
+	// presence of a trailing slash on root actions
+	if (basename !== '/') {
+		path.pathname = path.pathname === '/' ? basename : joinPaths([basename, path.pathname]);
+	}
+
+	return createPath(path);
+}
+
+export type FetcherWithComponents<TData = any> = any;
+
+/**
+ * A hook for interacting with route loaders/actions WITHOUT navigating —
+ * returns a fetcher with `Form`/`submit`/`load`/`reset` plus the live fetcher
+ * state/data.
+ */
+export function useFetcher(...args: any[]): FetcherWithComponents {
+	const [user, slot] = splitSlot(args);
+	const { key } = (user[0] ?? {}) as { key?: string };
+
+	let { router } = useDataRouterContext(DataRouterHook.UseFetcher);
+	let state = useDataRouterState(DataRouterStateHook.UseFetcher);
+	let fetcherData = useContext(FetchersContext);
+	let route = useContext(RouteContext);
+	let routeId = route.matches[route.matches.length - 1]?.route.id;
+
+	invariant(fetcherData, `useFetcher must be used inside a FetchersContext`);
+	invariant(route, `useFetcher must be used inside a RouteContext`);
+	invariant(routeId != null, `useFetcher can only be used on routes that contain a unique "id"`);
+
+	// Fetcher key handling
+	let defaultKey = useId(subSlot(slot, 'uf:id') as any);
+	let [fetcherKey, setFetcherKey] = useState(key || defaultKey, subSlot(slot, 'uf:key') as any);
+	if (key && key !== fetcherKey) {
+		setFetcherKey(key);
+	}
+
+	let { deleteFetcher, getFetcher, resetFetcher, fetch: routerFetch } = router;
+
+	// Registration/cleanup
+	useEffect(
+		() => {
+			getFetcher(fetcherKey);
+			return () => deleteFetcher(fetcherKey);
+		},
+		[deleteFetcher, getFetcher, fetcherKey],
+		subSlot(slot, 'uf:reg') as any,
+	);
+
+	// Fetcher additions
+	let load = useCallback(
+		async (href: string, opts?: { flushSync?: boolean }) => {
+			invariant(routeId, 'No routeId available for fetcher.load()');
+			await routerFetch(fetcherKey, routeId, href, opts as any);
+		},
+		[fetcherKey, routeId, routerFetch],
+		subSlot(slot, 'uf:load') as any,
+	);
+
+	let submitImpl = useSubmit(subSlot(slot, 'uf:submitImpl'));
+	let submit = useCallback(
+		(async (target: any, opts: any) => {
+			await submitImpl(target, {
+				...opts,
+				navigate: false,
+				fetcherKey,
+			});
+		}) as FetcherSubmitFunction,
+		[fetcherKey, submitImpl],
+		subSlot(slot, 'uf:submit') as any,
+	);
+
+	let reset = useCallback(
+		(opts?: { reason?: unknown }) => resetFetcher(fetcherKey, opts),
+		[resetFetcher, fetcherKey],
+		subSlot(slot, 'uf:reset') as any,
+	);
+
+	// Bound `<fetcher.Form>` — a plain octane component closing over the key
+	// (upstream memoizes a forwardRef; octane refs are props and flow through
+	// the spread).
+	let FetcherForm = useMemo(
+		() => {
+			return function FetcherForm(props: any) {
+				return createElement(Form as any, { ...props, navigate: false, fetcherKey });
+			};
+		},
+		[fetcherKey],
+		subSlot(slot, 'uf:form') as any,
+	);
+
+	// Exposed FetcherWithComponents
+	let fetcher = state.fetchers.get(fetcherKey) || IDLE_FETCHER;
+	let data = fetcherData.get(fetcherKey);
+	let fetcherWithComponents = useMemo(
+		() => ({
+			Form: FetcherForm,
+			submit,
+			load,
+			reset,
+			...fetcher,
+			data,
+		}),
+		[FetcherForm, submit, load, reset, fetcher, data],
+		subSlot(slot, 'uf:combined') as any,
+	);
+
+	return fetcherWithComponents;
+}
+
+/**
+ * Returns an array of all in-flight fetchers (each with its unique `key`) —
+ * useful for optimistic UI over submissions made elsewhere in the app.
+ */
+export function useFetchers(...args: any[]): any[] {
+	const [, slot] = splitSlot(args);
+	let state = useDataRouterState(DataRouterStateHook.UseFetchers);
+	return useMemo(
+		() =>
+			Array.from(state.fetchers.entries()).map(([key, fetcher]) => ({
+				...fetcher,
+				key,
+			})),
+		[state.fetchers],
+		subSlot(slot, 'ufs:memo') as any,
 	);
 }
 

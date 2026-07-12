@@ -138,7 +138,7 @@ export {
 	useRoutes,
 } from './lib/hooks';
 
-// ── DOM layer (Phases A + C; Form/fetchers land in D, guards/VT in E) ──────
+// ── DOM layer (Phases A + C + D; guards/scroll/VT land in E) ───────────────
 export { Link } from './lib/dom/Link.tsrx';
 export { useLinkClickHandler } from './lib/dom/hooks';
 export { NavLink } from './lib/dom/NavLink.tsrx';
@@ -148,8 +148,23 @@ export {
 	HashRouter,
 	HistoryRouter as unstable_HistoryRouter,
 } from './lib/dom/routers.tsrx';
-export { createBrowserRouter, createHashRouter, useSearchParams } from './lib/dom/lib';
-export type { DOMRouterOpts, SetURLSearchParams } from './lib/dom/lib';
+export {
+	createBrowserRouter,
+	createHashRouter,
+	useSearchParams,
+	useSubmit,
+	useFormAction,
+	useFetcher,
+	useFetchers,
+} from './lib/dom/lib';
+export type {
+	DOMRouterOpts,
+	SetURLSearchParams,
+	SubmitFunction,
+	FetcherSubmitFunction,
+	FetcherWithComponents,
+} from './lib/dom/lib';
+export { Form } from './lib/dom/Form.tsrx';
 
 // ── UNSAFE_ surface (shipped subset) ────────────────────────────────────────
 export {
