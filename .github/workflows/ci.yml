@@ -7,12 +7,17 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  test_shard:
+    name: test shard (Node ${{ matrix.node-version }}, ${{ matrix.shard }})
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [22, 24]
+        node-version: [24, 26]
+        # Keep the full supported-Node coverage while splitting the large
+        # Vitest suite across runners. Four shards cuts the CI critical path
+        # substantially without letting repeated global setup dominate.
+        shard: ["1/4", "2/4", "3/4", "4/4"]
 
     steps:
       - name: Checkout code
@@ -37,7 +42,32 @@ jobs:
         run: pnpm --filter website exec playwright install --with-deps chromium
 
       - name: Run tests
-        run: pnpm test
+        # Node 26's process-wide localStorage shadows jsdom's per-window storage
+        # unless experimental web storage is disabled before workers start.
+        env:
+          NODE_OPTIONS: --no-experimental-webstorage
+        run: pnpm test --shard=${{ matrix.shard }}
+
+  # Keep the existing required check names while the work happens in parallel
+  # above. `always()` makes a failed shard produce a failed required check
+  # instead of leaving it skipped.
+  test:
+    name: test (${{ matrix.required-context }})
+    needs: test_shard
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # `test (22)` is a temporary status-only alias for the current branch
+        # protection rule. Remove it after the required contexts move to 24/26.
+        required-context: [22, 24, 26]
+
+    steps:
+      - name: Verify all test shards passed
+        env:
+          SHARD_RESULT: ${{ needs.test_shard.result }}
+        run: test "$SHARD_RESULT" = success
 
   lint:
     runs-on: ubuntu-latest
