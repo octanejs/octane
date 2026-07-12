@@ -20,15 +20,19 @@ node benchmarks/bench.mjs --list                # list suite names
 pnpm bench:all -- --quick                        # same via the root script
 ```
 
-The runner starts each suite's dev servers (`pnpm --filter <pkg> dev`), waits for
-their strict ports, runs the harness with `BENCH_JSON` pointed at a temp file,
-then kills the servers **by port** (`lsof -ti tcp:<port>`). Suites run
-**sequentially** so ports and CPU never contend. Collected results land in
-`benchmarks/results/<suite>.json` (gitignored), one file per suite.
+For server-backed browser suites, the runner first production-builds each fixture
+app (`pnpm --filter <pkg> build`), starts its preview server
+(`pnpm --filter <pkg> preview`), waits for the strict port, runs the harness with
+`BENCH_JSON` pointed at a temp file, then kills the server **by port**
+(`lsof -ti tcp:<port>`). Suites run **sequentially** so ports and CPU never
+contend. A fixture is built at most once per runner invocation, even if multiple
+suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
+(gitignored), one file per suite.
 
-Three suites need no servers: **news** vite-builds and times each target itself
-(the runner loops its per-target invocations and merges them), and
-**ssr-throughput** and **streaming-ssr** are Node-only.
+Some suites need no preview servers: **news** vite-builds and times each target
+itself (the runner loops its per-target invocations and merges them),
+**ssr-throughput** and **streaming-ssr** are Node-only, and **codegen-size** /
+**bundle-size** are deterministic build/byte checks.
 
 ## Regression modes
 
@@ -84,9 +88,8 @@ after printing its normal tables:
   under a per-target `meta` object.
 - On a **correctness-gate failure** the harness still writes the JSON but adds a
   top-level `"failed": "<reason>"` and exits non-zero. The runner surfaces this
-  (`harnessExit`) but does **not** treat it as fatal on its own — the ratio /
-  compare checks are the gate, so a suite pinned to a known octane bug doesn't
-  block CI's ratio enforcement.
+  (`harnessExit`) and treats it as fatal unless the suite has an active,
+  expiry-dated waiver in `HARNESS_FAILURE_ALLOWLIST`.
 - Every harness also accepts an **iterations argv** (`node run.mjs [iter]`, or
   after the target name for news) so the runner can drive reduced smoke passes.
   ssr-throughput is time-budgeted: its knob is a per-config seconds value and
@@ -149,7 +152,9 @@ Append an entry to the `SUITES` manifest in `benchmarks/bench.mjs`:
 }
 ```
 
-The harness must implement the BENCH_JSON contract above. For a suite that runs
-one harness per target (like news), give `runs` multiple entries — their
-`targets` arrays are concatenated into one result. Add ratio guards for the new
-suite to `baselines/ratios.json` and (optionally) `--record` local baselines.
+Each server-backed fixture package must provide `build` and `preview` scripts;
+the preview script must bind the manifest port with `--strictPort`. The harness
+must implement the BENCH_JSON contract above. For a suite that runs one harness
+per target (like news), give `runs` multiple entries — their `targets` arrays
+are concatenated into one result. Add ratio guards for the new suite to
+`baselines/ratios.json` and (optionally) `--record` local baselines.
