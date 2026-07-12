@@ -37,6 +37,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'react', url: 'http://localhost:5217/' },
 			{ name: 'solid', url: 'http://localhost:5218/' },
 			{ name: 'ripple', url: 'http://localhost:5219/' },
+			{ name: 'preact', url: 'http://localhost:5269/' },
+			{ name: 'svelte', url: 'http://localhost:5280/' },
 		];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

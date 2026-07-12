@@ -2,9 +2,8 @@
 // renders byte-identical list + tooltip content. 200 items, each with a
 // deterministic label; the tooltips portalled per item carry that label.
 //
-// Shared verbatim across octane-tsrx / react / solid (copied into each src/ —
-// benchmarks intentionally vendor their fixtures so each app is a
-// self-contained Vite build).
+// Shared verbatim across every portal-swarm target; fixtures are vendored so
+// each app remains a self-contained Vite build.
 
 export const ITEM_COUNT = 200;
 

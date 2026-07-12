@@ -1,0 +1,21 @@
+{
+  "name": "svelte-signal-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "signal-favoring benchmark fixture for Svelte 5 runes.",
+  "scripts": {
+    "dev": "vite --host --port 5276 --strictPort",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./jsconfig.json",
+    "preview": "vite preview --port 5276 --strictPort"
+  },
+  "dependencies": {
+    "svelte": "catalog:default"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "catalog:default",
+    "svelte-check": "catalog:default",
+    "vite": "catalog:default"
+  }
+}
