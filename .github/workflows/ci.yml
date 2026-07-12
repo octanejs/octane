@@ -42,6 +42,10 @@ jobs:
         run: pnpm --filter website exec playwright install --with-deps chromium
 
       - name: Run tests
+        # Node 26's process-wide localStorage shadows jsdom's per-window storage
+        # unless experimental web storage is disabled before workers start.
+        env:
+          NODE_OPTIONS: --no-experimental-webstorage
         run: pnpm test --shard=${{ matrix.shard }}
 
   # Keep the existing required check names while the work happens in parallel
