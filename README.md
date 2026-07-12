@@ -250,6 +250,29 @@ export function Timer() @{
 }
 ```
 
+`useState` and `useReducer` also expose an optional third tuple member: a stable
+getter for the hook's latest state. It is useful in async callbacks and other
+long-lived closures where capturing the render's state value would go stale:
+
+```jsx
+export function SaveButton() @{
+  const [draft, setDraft, getDraft] = useState('');
+
+  const saveLater = async () => {
+    await waitForConnection();
+    await save(getDraft()); // the latest draft, not the render that started this callback
+  };
+
+  <button onClick={saveLater}>{'Save ' + draft}</button>
+}
+```
+
+The compiler emits a getter-enabled hook only when the third tuple member can
+be observed. Ordinary `[state, setState]` and `[state, dispatch]` destructures
+keep the existing two-item runtime path and allocate no getter. The getter reads
+the latest scheduled hook value, which may be newer than the currently committed
+DOM during a pending render.
+
 ### Conditional hooks
 
 Unlike React, a hook can sit behind a guard or after an early `return`:

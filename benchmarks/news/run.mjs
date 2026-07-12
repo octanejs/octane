@@ -26,6 +26,7 @@ import { createServer as createHttp } from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TARGET_PORTS = {
@@ -74,12 +75,7 @@ if (!fs.existsSync(SSR_ENTRY) || !fs.existsSync(path.join(CLIENT_DIR, 'index.htm
 }
 
 const summarize = (samples) => {
-	const s = [...samples].sort((a, b) => a - b);
-	return {
-		median: s[s.length >> 1],
-		min: s[0],
-		p95: s[Math.min(s.length - 1, Math.floor(s.length * 0.95))],
-	};
+	return summarizeSamples(samples);
 };
 
 // ── 1. SSR render time (built bundle, Node, warm) ─────────────────────────────
@@ -181,10 +177,10 @@ const hyd = summarize(hydrateSamples);
 const f = (n) => n.toFixed(2).padStart(7);
 console.log(`\nThe Octane Times — SSR + hydration bench  (${target}, production)`);
 console.log(`document: ${check.cards} article cards, ${(htmlBytes / 1024).toFixed(1)} KB HTML\n`);
-console.log(`Metric          | median |    min |    p95`);
-console.log(`----------------+--------+--------+--------`);
-console.log(`SSR render (ms) |${f(ssr.median)} |${f(ssr.min)} |${f(ssr.p95)}`);
-console.log(`hydrate    (ms) |${f(hyd.median)} |${f(hyd.min)} |${f(hyd.p95)}`);
+console.log(`Metric          |  score | median |    min |    p95`);
+console.log(`----------------+--------+--------+--------+--------`);
+console.log(`SSR render (ms) |${f(ssr.score)} |${f(ssr.median)} |${f(ssr.min)} |${f(ssr.p95)}`);
+console.log(`hydrate    (ms) |${f(hyd.score)} |${f(hyd.median)} |${f(hyd.min)} |${f(hyd.p95)}`);
 console.log(
 	`\ncorrectness: cards=${check.cards}  no-rebuild=${check.noRebuild}  interactive=${check.toggled}`,
 );
@@ -203,8 +199,8 @@ if (process.env.BENCH_JSON) {
 			{
 				name: target,
 				ops: {
-					ssr_render: { median: ssr.median, min: ssr.min, p95: ssr.p95, samples: ITER },
-					hydrate: { median: hyd.median, min: hyd.min, p95: hyd.p95, samples: ITER },
+					ssr_render: timingStatForJson(ssr),
+					hydrate: timingStatForJson(hyd),
 				},
 				meta: { htmlBytes, cards: check.cards },
 			},

@@ -49,6 +49,7 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
 const WARMUP = 2; // untimed per-op samples before the ITER timed ones
@@ -131,17 +132,7 @@ const OPS = [
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function summarize(samples) {
-	const sorted = samples.slice().sort((a, b) => a - b);
-	const n = sorted.length;
-	const mean = sorted.reduce((a, b) => a + b, 0) / n;
-	const sd = Math.sqrt(sorted.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
-	return {
-		median: sorted[n >> 1],
-		min: sorted[0],
-		p95: sorted[Math.min(n - 1, Math.floor(n * 0.95))],
-		sd,
-		samples: n,
-	};
+	return summarizeSamples(samples);
 }
 
 // Reset to a fresh 1k table. Every target either commits synchronously on the
@@ -371,7 +362,7 @@ function writeBenchJson(payload) {
 		console.log();
 		for (const t of TARGETS.slice(1)) {
 			const r = all[t.name].results;
-			console.log(`${t.name} / ${baselineName} ratio (median; <1 means ${t.name} faster):`);
+			console.log(`${t.name} / ${baselineName} ratio (score; <1 means ${t.name} faster):`);
 			for (const op of OPS) {
 				const b = baseline[op.name];
 				const v = r[op.name];
@@ -379,11 +370,11 @@ function writeBenchJson(payload) {
 					console.log(`  ${op.name.padEnd(13)} GATE FAIL`);
 					continue;
 				}
-				if (b.median === 0) {
+				if (scoreOf(b) === 0) {
 					console.log(`  ${op.name.padEnd(13)}   —    (baseline ~0, sub-resolution)`);
 					continue;
 				}
-				const ratio = v.median / b.median;
+				const ratio = scoreOf(v) / scoreOf(b);
 				const tag = ratio < 0.95 ? '++ faster' : ratio < 1.05 ? '== ~equal' : '-- slower';
 				console.log(`  ${op.name.padEnd(13)} ${ratio.toFixed(2)}x  ${tag}`);
 			}
@@ -406,7 +397,11 @@ function writeBenchJson(payload) {
 		...(failures.length ? { failed: failures.join(' | ') } : {}),
 		targets: TARGETS.map((t) => ({
 			name: t.name,
-			ops: Object.fromEntries(Object.entries(all[t.name].results).filter(([, v]) => v != null)),
+			ops: Object.fromEntries(
+				Object.entries(all[t.name].results)
+					.filter(([, v]) => v != null)
+					.map(([op, r]) => [op, timingStatForJson(r)]),
+			),
 			meta: gateMeta(all[t.name].gateFails),
 		})),
 	});

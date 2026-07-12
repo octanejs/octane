@@ -130,6 +130,12 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   extract a child component — each item then renders in its own scope. `use()`
   and `useContext` are exempt (call-order / context-identity keyed, not
   slot-keyed).
+- **State hooks expose a compiler-driven current-state getter.** `useState` and
+  `useReducer` have a stable third tuple member (`[state, update, getState]`) that
+  reads the latest scheduled hook-cell value. The compiler emits its specialized
+  runtime helper only when tuple index 2 can be observed; ordinary two-item
+  destructures retain the existing allocation-free path. Escaped or ambiguous
+  tuples conservatively receive the complete three-item shape.
 - **Controlled `value`/`checked` with native events.** Controlled form components
   follow React's semantics exactly (2026-07-08) — the prop drives the DOM property
   and reasserts on every commit and after discrete events; `defaultValue`/
@@ -158,7 +164,10 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
 
 ## Validation
 
-Prefer the smallest validation that covers the change.
+Prefer the smallest behavioral validation that covers the change. After any file
+change, always run the repository-wide `pnpm format:check` before handoff. Running
+Prettier only on touched source files is not a substitute: generated baselines,
+docs, and RuleSync outputs must pass the same formatting gate as CI.
 
 ```bash
 pnpm test                 # full vitest run

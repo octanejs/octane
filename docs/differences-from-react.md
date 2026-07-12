@@ -18,21 +18,39 @@ renders in its own scope. `use()` and `useContext` are exempt (they are
 call-order / context-identity keyed, not slot-keyed), so they may sit in plain
 loops.
 
-## Native events, no synthetic event system
+## `useState` / `useReducer` current-state getters
 
-Events are real, delegated DOM events (`onClick`, `onInput`, `onSubmit`) —
-behavior matches the platform, never React's emulation layer:
+Both state hooks have an Octane-only third tuple member: a stable zero-argument
+function that reads the hook's latest state (`const [state, update, getState] =
+useState(initial)`). This replaces the common React pattern of synchronizing a
+ref solely so delayed or async callbacks can avoid a stale render closure.
 
-- Non-bubbling events (`toggle`, `close`, `cancel`, media, `load`/`error`) fire
-  the **target's** handler only; React re-dispatches them to ancestors.
+The getter reads the latest scheduled hook-cell value and does not subscribe or
+render. During pending work it can therefore be newer than the currently
+committed DOM. The compiler removes the getter entirely when it can prove tuple
+index 2 is unobserved, so ordinary two-item destructuring retains the existing
+runtime path and allocation profile. Escaped or ambiguous tuples conservatively
+receive the complete three-item shape.
+
+## Native event objects, no synthetic event layer
+
+Event propagation itself matches React and is **not a divergence**. Ordinary
+bubbling and capture, `stopPropagation`, logical propagation through portals,
+and native non-bubbling families (`toggle`, dialog `close`/`cancel`, media,
+`load`/`error`) all reach the same logical ancestors React does.
+
+What differs is the event API and synthesis layer:
+
+- Handlers receive the browser's real `Event` object, not a React
+  `SyntheticEvent` wrapper. There is no event pooling, and
+  `event.currentTarget` is the handler's element.
 - `mouseenter`/`pointerenter` families are the real per-element native events —
   no synthesis from `over`/`out`.
-- No synthetic `onChange`/`onBeforeInput`/`onSelect` polyfills — use the native
-  events (`onInput` etc.). No event pooling; `event.currentTarget` is the
-  handler's element, `stopPropagation` and capture phase work natively.
-- Delegated events bubble through **portals along the logical tree** (like
-  React). A noop `onclick` is stamped on delegation roots (iOS Safari), not on
-  every element.
+- There are no synthetic `onChange`/`onBeforeInput`/`onSelect` polyfills — use
+  the native events (`onInput` etc.).
+
+A noop `onclick` is stamped on delegation roots for iOS Safari, not on every
+element.
 
 ## Controlled components, native events
 

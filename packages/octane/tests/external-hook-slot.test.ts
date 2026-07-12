@@ -104,7 +104,7 @@ describe('vite plugin gate routing', () => {
 	const plugin = octane({ exclude: ['/packages/zustand/src/'] });
 	// the transform doesn't need a real plugin `this` for the client paths
 	const run = (code: string, id: string) => (plugin.transform as any).call({}, code, id);
-	const HOOK = `import { useState } from 'octane';\nexport const f = () => useState(0);`;
+	const HOOK = `import { useState } from 'octane';\nexport const f = () => { const [state, setState] = useState(0); return [state, setState]; };`;
 
 	it('.ts with an octane hook → surgical slot pass', () => {
 		expect(run(HOOK, '/app/h.ts')?.code).toMatch(/useState\(0, _h\$\d+\)/);
@@ -145,7 +145,7 @@ describe('manifest-declared manual hook slots', () => {
 	// actual manifests.
 	const plugin = octane();
 	const run = (code: string, id: string) => (plugin.transform as any).call({}, code, id);
-	const HOOK = `import { useState } from 'octane';\nexport const f = () => useState(0);`;
+	const HOOK = `import { useState } from 'octane';\nexport const f = () => { const [state, setState] = useState(0); return [state, setState]; };`;
 
 	it('skips files under a directory declared manual', () => {
 		const id = join(process.cwd(), 'packages/zustand/src/__probe__.ts');

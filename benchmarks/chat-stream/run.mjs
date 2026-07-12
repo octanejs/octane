@@ -27,6 +27,7 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
 
@@ -219,8 +220,7 @@ async function runTarget(t) {
 			samples.push(await timeOp(page, op));
 			await sleep(40);
 		}
-		samples.sort((a, b) => a - b);
-		results[op.name] = { median: samples[samples.length >> 1], min: samples[0], samples };
+		results[op.name] = summarizeSamples(samples);
 	}
 
 	// DOM-weight tripwire at steady state (conv0's 10 mixed messages).
@@ -273,7 +273,9 @@ async function runTarget(t) {
 				ops: Object.fromEntries(
 					Object.entries(all[t.name]).map(([name, r]) => [
 						name,
-						{ median: r.median, min: r.min, samples: r.samples.length },
+						r.score == null
+							? { median: r.median, min: r.min, samples: r.samples.length }
+							: timingStatForJson(r),
 					]),
 				),
 			})),

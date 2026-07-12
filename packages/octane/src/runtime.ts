@@ -3045,12 +3045,14 @@ function resolveSlot(slot: symbol | undefined): symbol | undefined {
 interface StateSlot<T> {
 	value: T;
 	setter: (next: T | ((prev: T) => T)) => void;
+	/** Allocated only for compiler-proven third-tuple consumers. */
+	getter?: () => T;
 }
 
-export function useState<T>(
-	initial: T | (() => T),
-	slot?: symbol,
-): [T, (next: T | ((prev: T) => T)) => void] {
+type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
+type StateTuple<T> = [T, StateSetter<T>, () => T];
+
+export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
 	// ABI: the compiler appends the slot as the LAST argument, so a zero-arg
 	// `useState()` (state starts undefined — React parity) arrives as
 	// `useState(slot)` with the symbol in the initial-value position. Same
@@ -3078,15 +3080,44 @@ export function useState<T>(
 		};
 		ensureHooks(scope).set(slot, s);
 	}
-	return [s.value, s.setter];
+	// Source-level useState returns a third `getState` tuple member. The compiler
+	// keeps this lean two-item path only when it can prove index 2 is unobserved;
+	// observable/escaping tuples are lowered to __useStateWithGetter below.
+	return [s.value, s.setter] as unknown as StateTuple<T>;
 }
+
+/** Compiler-emitted useState variant for a tuple whose third member is observed. */
+export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
+	// Mirror useState's zero-argument trailing-slot ABI before delegating so we
+	// can look the resulting cell up by the same effective slot afterwards.
+	if (slot === undefined && typeof initial === 'symbol') {
+		slot = initial as unknown as symbol;
+		initial = undefined as T;
+	}
+	const pair = useState(initial, slot);
+	const resolved = resolveSlot(slot);
+	if (resolved === undefined) missingSlot('useState');
+	const s = CURRENT_SCOPE!.hooks!.get(resolved) as StateSlot<T>;
+	const getter = s.getter ?? (s.getter = () => s.value);
+	return [pair[0], pair[1], getter];
+}
+
+interface ReducerSlot<S, A> {
+	value: S;
+	dispatch: (action: A) => void;
+	reducer: (state: S, action: A) => S;
+	/** Allocated only for compiler-proven third-tuple consumers. */
+	getter?: () => S;
+}
+
+type ReducerTuple<S, A> = [S, (action: A) => void, () => S];
 
 export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
 	slot?: symbol,
-): [S, (action: A) => void] {
+): ReducerTuple<S, A> {
 	// The compiler appends the hook slot symbol as the final argument. So the
 	// React 2-arg form `useReducer(reducer, initialState)` arrives as
 	// `(reducer, initialState, slot)` and the lazy 3-arg form
@@ -3103,9 +3134,7 @@ export function useReducer<S, A, I = S>(
 	if (slot === undefined) missingSlot('useReducer');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
-	let s = scope.hooks?.get(slot) as
-		| { value: S; dispatch: (a: A) => void; reducer: (s: S, a: A) => S }
-		| undefined;
+	let s = scope.hooks?.get(slot) as ReducerSlot<S, A> | undefined;
 	if (s === undefined) {
 		// React parity: the initial state is `initialArg` used AS-IS. Lazy
 		// initialization happens ONLY when the third `init` argument is supplied
@@ -3129,7 +3158,25 @@ export function useReducer<S, A, I = S>(
 		// Allow reducer reference to update across renders.
 		s.reducer = reducer;
 	}
-	return [s.value, s.dispatch];
+	// See useState: the compiler selects __useReducerWithGetter whenever the
+	// source can observe the third tuple member.
+	return [s.value, s.dispatch] as unknown as ReducerTuple<S, A>;
+}
+
+/** Compiler-emitted useReducer variant for a tuple whose third member is observed. */
+export function __useReducerWithGetter<S, A, I = S>(
+	reducer: (s: S, a: A) => S,
+	initialArg: I,
+	initOrSlot?: ((arg: I) => S) | symbol,
+	slot?: symbol,
+): ReducerTuple<S, A> {
+	const resolvedInput = typeof initOrSlot === 'symbol' ? initOrSlot : slot;
+	const pair = useReducer(reducer, initialArg, initOrSlot, slot);
+	const resolved = resolveSlot(resolvedInput);
+	if (resolved === undefined) missingSlot('useReducer');
+	const s = CURRENT_SCOPE!.hooks!.get(resolved) as ReducerSlot<S, A>;
+	const getter = s.getter ?? (s.getter = () => s.value);
+	return [pair[0], pair[1], getter];
 }
 
 function depsChanged(prev: any[] | undefined, next: any[] | undefined): boolean {
@@ -6164,14 +6211,11 @@ const _delegatedCapture = new Set<string>();
 // keep the cheaper bubbling-phase delegation.) The flag must match between
 // add/removeEventListener, so it is derived from the name both times.
 // The remaining NON-BUBBLING native families (media/resource lifecycle,
-// <details>/<dialog> state events, resize). The platform fires these on the
-// target only; ancestors never hear them natively. React's synthetic layer
-// re-dispatches them up the tree — octane deliberately does NOT (maintainer
-// ruling 2026-07-04: never replicate the synthetic event system) — but the
-// TARGET's own handler must still fire, which requires capture-phase delegation
-// (a bubble-phase root listener never hears a non-bubbling event at all).
-// Delivery is target-only, exactly like the platform.
-const NON_BUBBLING_TARGET_EVENTS = [
+// <details>/<dialog> state events, resize). A bubble-phase root listener cannot
+// hear them, so listen in capture and emulate React's target→root propagation in
+// dispatchDelegated. This lets an ancestor onPlay/onToggle/onLoad observe an
+// event from its descendant without installing a direct listener on every host.
+const EMULATED_BUBBLING_EVENTS = [
 	'abort',
 	'beforetoggle',
 	'cancel',
@@ -6219,7 +6263,7 @@ const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
 	// enter/leave target-only treatment below.
 	'scroll',
 	'scrollend',
-	...NON_BUBBLING_TARGET_EVENTS,
+	...EMULATED_BUBBLING_EVENTS,
 ]);
 const delegatedCapture = (name: string): boolean => CAPTURE_DELEGATED.has(name);
 
@@ -6238,9 +6282,6 @@ const TARGET_ONLY_DELEGATED = /* @__PURE__ */ new Set([
 	// bubbling), and ancestors receive their own scroll events natively.
 	'scroll',
 	'scrollend',
-	// Platform semantics for every other non-bubbling family (media, toggle,
-	// close, load/error, …): the target's handler fires, ancestors' do not.
-	...NON_BUBBLING_TARGET_EVENTS,
 ]);
 
 export function delegateEvents(eventNames: string[]): void {
@@ -6536,7 +6577,9 @@ function dispatchDelegated(event: Event): void {
 				fireEventSlot(slot, event);
 				if (event.cancelBubble) return;
 			}
-			// Enter/leave events fire on the target only (see TARGET_ONLY_DELEGATED).
+			// Enter/leave and scroll events fire on the target only (see
+			// TARGET_ONLY_DELEGATED). Other capture-delegated non-bubbling events
+			// emulate React propagation and continue through logical ancestors.
 			if (targetOnly) return;
 			// Portal-aware ascent: when crossing a portal root, jump to the rendering Block's DOM parent.
 			if (node.$$portalParent) {

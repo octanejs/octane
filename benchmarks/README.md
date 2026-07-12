@@ -58,9 +58,9 @@ itself (the runner loops its per-target invocations and merges them),
   [`baselines/README.md`](baselines/README.md).
 
 The **compare rule** is noise-aware: an op is a regression only if
-`median > 1.15× baseline` **and** `min > 1.10× baseline`; for sub-0.2ms ops it
-must also exceed the baseline median by an absolute >0.1ms. Both conditions guard
-against timer jitter on fast ops.
+`score > 1.15× baseline` **and** `min > 1.10× baseline`; for sub-1ms ops it must
+also exceed the baseline score by an absolute >0.1ms. Existing median-only
+baselines fall back to `median`, so old records remain readable.
 
 **Refreshing ratio guards:** `node benchmarks/bench.mjs --record --ratios <suites>`
 writes `baselines/ratios.suggested.json` (observed ratio × 1.5) **without**
@@ -77,15 +77,34 @@ after printing its normal tables:
   "iterations": 8,
   "targets": [
     { "name": "octane-tsrx",
-      "ops": { "run": { "median": 1.6, "min": 1.5, "p95": 1.8, "sd": 0.1, "samples": 8 } },
+      "ops": {
+        "run": {
+          "score": 1.58,
+          "median": 1.6,
+          "min": 1.5,
+          "mean": 1.62,
+          "p95": 1.8,
+          "sd": 0.1,
+          "rme": 4.2,
+          "warmupRatio": 1.08,
+          "samples": 8
+        }
+      },
       "meta": { "…": "correctness counters / bytes go here" } }
   ]
 }
 ```
 
-- Times are **milliseconds**; `p95`/`sd` are optional; ops/sec suites add
-  `opsPerSec`. Non-timing extras (payload bytes, render counters, gate status) go
-  under a per-target `meta` object.
+- Times are **milliseconds**. `score` is the headline value for comparisons:
+  the mean of the latest stable sample window (or `median` when a quick run has
+  too few samples to infer a window). This mirrors Benchmark.js's preference for
+  mean period + uncertainty over median-only reporting, while keeping sample
+  order visible enough to catch residual JIT warmup. `median`, `min`, `p95`,
+  `sd`, `rme` and `warmupRatio` are diagnostics; ops/sec suites add `opsPerSec`.
+  Independent cold samples whose order does not represent warmup use the full
+  sample mean via `summarizeSamples(samples, { scoreMode: 'mean' })`.
+  Non-timing extras (payload bytes, render counters, gate status) go under a
+  per-target `meta` object.
 - On a **correctness-gate failure** the harness still writes the JSON but adds a
   top-level `"failed": "<reason>"` and exits non-zero. The runner surfaces this
   (`harnessExit`) and treats it as fatal unless the suite has an active,
