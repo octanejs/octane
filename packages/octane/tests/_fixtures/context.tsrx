@@ -75,6 +75,29 @@ export function CombinedDynamic() @{
 	</div>
 }
 
+// A Provider whose children arrive as an IDENTITY-STABLE `{props.children}`
+// passthrough: the block is created by StableChildren's ONE-and-only render
+// (the value state lives in StableShell, below the block's creation point), so
+// every StableShell re-render passes the SAME block into the hole. The
+// compiled `{expr}` hole must still dispatch the unchanged renderable to
+// childSlot — an inline identity skip would never descend, stranding the
+// consumer on the old context value. This is the router-shaped regression: a
+// <MemoryRouter> holding location state and forwarding its (stable) children
+// through context providers on every navigation.
+function StableShell(props) @{
+	const [v, setV] = useState('init');
+	<div>
+		<button id="swap" onClick={() => setV(v === 'init' ? 'changed' : 'init')}>{'swap'}</button>
+		<ThemeCtx.Provider value={v}>{props.children}</ThemeCtx.Provider>
+	</div>
+}
+
+export function StableChildren() @{
+	<StableShell>
+		<ThemeReader />
+	</StableShell>
+}
+
 // A Provider wrapped in an @if: toggling `show` tears down the Provider's scope
 // and, on the next show, builds a FRESH one — with a different `value` each time.
 // The consumer inside must always read the current Provider's value, never one

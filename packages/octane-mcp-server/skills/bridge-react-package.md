@@ -12,11 +12,12 @@ of bridging by hand:
 | `zustand` | `@octanejs/zustand` |
 | `jotai` | `@octanejs/jotai` |
 | `@tanstack/react-query` | `@octanejs/tanstack-query` |
+| `@tanstack/react-router` | `@octanejs/tanstack-router` |
 | `@tanstack/react-table` | `@octanejs/tanstack-table` |
 | `@tanstack/react-virtual` | `@octanejs/tanstack-virtual` |
 | `framer-motion` / `motion` | `@octanejs/motion` |
 | `@stylexjs/stylex` | `@octanejs/stylex` |
-| `react-router` / `react-router-dom` | `@octanejs/tanstack-router` |
+| `react-router` / `react-router-dom` | `@octanejs/remix-router` |
 | `@lexical/react` | `@octanejs/lexical` |
 | `@floating-ui/react` | `@octanejs/floating-ui` |
 | `radix-ui` | `@octanejs/radix` |

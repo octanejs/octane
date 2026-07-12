@@ -11,11 +11,26 @@ import {
 	ListConsumers,
 	PortalledContext,
 	LiveCount,
+	StableChildren,
 } from './_fixtures/context.tsrx';
 
 describe('context — value updates', () => {
 	it('consumers re-render when Provider value changes', () => {
 		const r = mount(DynamicProvider);
+		expect(r.find('.theme').textContent).toBe('init');
+		r.click('#swap');
+		expect(r.find('.theme').textContent).toBe('changed');
+		r.click('#swap');
+		expect(r.find('.theme').textContent).toBe('init');
+		r.unmount();
+	});
+
+	it('consumers below an identity-stable {children} passthrough see the new value', () => {
+		// The Provider re-renders with a new value while its `{props.children}`
+		// hole receives the SAME children block each pass — the compiled hole
+		// must still hand the unchanged renderable to childSlot so the consumer
+		// below refreshes (an inline identity skip strands it on the old value).
+		const r = mount(StableChildren);
 		expect(r.find('.theme').textContent).toBe('init');
 		r.click('#swap');
 		expect(r.find('.theme').textContent).toBe('changed');
