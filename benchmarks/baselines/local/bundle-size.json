@@ -1,934 +1,934 @@
 {
-	"suite": "bundle-size",
-	"iterations": 1,
-	"targets": [
-		{
-			"name": "octane-tsrx",
-			"ops": {
-				"js_raw": {
-					"median": 88594,
-					"min": 88594,
-					"samples": 1
-				},
-				"js_gzip": {
-					"median": 28878,
-					"min": 28878,
-					"samples": 1
-				},
-				"js_brotli": {
-					"median": 25726,
-					"min": 25726,
-					"samples": 1
-				},
-				"app_raw": {
-					"median": 7935,
-					"min": 7935,
-					"samples": 1
-				},
-				"app_gzip": {
-					"median": 2706,
-					"min": 2706,
-					"samples": 1
-				},
-				"app_brotli": {
-					"median": 2318,
-					"min": 2318,
-					"samples": 1
-				},
-				"fw_raw": {
-					"median": 80659,
-					"min": 80659,
-					"samples": 1
-				},
-				"fw_gzip": {
-					"median": 26172,
-					"min": 26172,
-					"samples": 1
-				},
-				"fw_brotli": {
-					"median": 23408,
-					"min": 23408,
-					"samples": 1
-				},
-				"todo_js_raw": {
-					"median": 87532,
-					"min": 87532,
-					"samples": 1
-				},
-				"todo_js_gzip": {
-					"median": 28945,
-					"min": 28945,
-					"samples": 1
-				},
-				"todo_js_brotli": {
-					"median": 25819,
-					"min": 25819,
-					"samples": 1
-				},
-				"todo_app_raw": {
-					"median": 4660,
-					"min": 4660,
-					"samples": 1
-				},
-				"todo_app_gzip": {
-					"median": 2183,
-					"min": 2183,
-					"samples": 1
-				},
-				"todo_app_brotli": {
-					"median": 1867,
-					"min": 1867,
-					"samples": 1
-				},
-				"todo_fw_raw": {
-					"median": 82872,
-					"min": 82872,
-					"samples": 1
-				},
-				"todo_fw_gzip": {
-					"median": 26762,
-					"min": 26762,
-					"samples": 1
-				},
-				"todo_fw_brotli": {
-					"median": 23952,
-					"min": 23952,
-					"samples": 1
-				},
-				"chat_js_raw": {
-					"median": 88039,
-					"min": 88039,
-					"samples": 1
-				},
-				"chat_js_gzip": {
-					"median": 29209,
-					"min": 29209,
-					"samples": 1
-				},
-				"chat_js_brotli": {
-					"median": 26091,
-					"min": 26091,
-					"samples": 1
-				},
-				"chat_app_raw": {
-					"median": 5619,
-					"min": 5619,
-					"samples": 1
-				},
-				"chat_app_gzip": {
-					"median": 2602,
-					"min": 2602,
-					"samples": 1
-				},
-				"chat_app_brotli": {
-					"median": 2315,
-					"min": 2315,
-					"samples": 1
-				},
-				"chat_fw_raw": {
-					"median": 82420,
-					"min": 82420,
-					"samples": 1
-				},
-				"chat_fw_gzip": {
-					"median": 26607,
-					"min": 26607,
-					"samples": 1
-				},
-				"chat_fw_brotli": {
-					"median": 23776,
-					"min": 23776,
-					"samples": 1
-				}
-			},
-			"meta": {
-				"files": [
-					{
-						"file": "assets/framework-D98dy8iW.js",
-						"bucket": "fw",
-						"bytes": 80659,
-						"set": "js"
-					},
-					{
-						"file": "assets/index-DskVNH1u.js",
-						"bucket": "app",
-						"bytes": 7935,
-						"set": "js"
-					},
-					{
-						"file": "assets/framework-jtgfpTKP.js",
-						"bucket": "fw",
-						"bytes": 82872,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/index-HdZJRPJu.js",
-						"bucket": "app",
-						"bytes": 4660,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/framework-CLEWjL7m.js",
-						"bucket": "fw",
-						"bytes": 82420,
-						"set": "chat_"
-					},
-					{
-						"file": "assets/index-DlgZl8nB.js",
-						"bucket": "app",
-						"bytes": 5619,
-						"set": "chat_"
-					}
-				]
-			}
-		},
-		{
-			"name": "octane-jsx",
-			"ops": {
-				"js_raw": {
-					"median": 88512,
-					"min": 88512,
-					"samples": 1
-				},
-				"js_gzip": {
-					"median": 28880,
-					"min": 28880,
-					"samples": 1
-				},
-				"js_brotli": {
-					"median": 25716,
-					"min": 25716,
-					"samples": 1
-				},
-				"app_raw": {
-					"median": 8105,
-					"min": 8105,
-					"samples": 1
-				},
-				"app_gzip": {
-					"median": 2755,
-					"min": 2755,
-					"samples": 1
-				},
-				"app_brotli": {
-					"median": 2338,
-					"min": 2338,
-					"samples": 1
-				},
-				"fw_raw": {
-					"median": 80407,
-					"min": 80407,
-					"samples": 1
-				},
-				"fw_gzip": {
-					"median": 26125,
-					"min": 26125,
-					"samples": 1
-				},
-				"fw_brotli": {
-					"median": 23378,
-					"min": 23378,
-					"samples": 1
-				}
-			},
-			"meta": {
-				"files": [
-					{
-						"file": "assets/framework-Dng8nrVA.js",
-						"bucket": "fw",
-						"bytes": 80407,
-						"set": "js"
-					},
-					{
-						"file": "assets/index-CgO19-Sc.js",
-						"bucket": "app",
-						"bytes": 8105,
-						"set": "js"
-					}
-				]
-			}
-		},
-		{
-			"name": "react",
-			"ops": {
-				"js_raw": {
-					"median": 197487,
-					"min": 197487,
-					"samples": 1
-				},
-				"js_gzip": {
-					"median": 62236,
-					"min": 62236,
-					"samples": 1
-				},
-				"js_brotli": {
-					"median": 53647,
-					"min": 53647,
-					"samples": 1
-				},
-				"app_raw": {
-					"median": 5829,
-					"min": 5829,
-					"samples": 1
-				},
-				"app_gzip": {
-					"median": 2160,
-					"min": 2160,
-					"samples": 1
-				},
-				"app_brotli": {
-					"median": 1922,
-					"min": 1922,
-					"samples": 1
-				},
-				"fw_raw": {
-					"median": 191658,
-					"min": 191658,
-					"samples": 1
-				},
-				"fw_gzip": {
-					"median": 60076,
-					"min": 60076,
-					"samples": 1
-				},
-				"fw_brotli": {
-					"median": 51725,
-					"min": 51725,
-					"samples": 1
-				},
-				"todo_js_raw": {
-					"median": 194716,
-					"min": 194716,
-					"samples": 1
-				},
-				"todo_js_gzip": {
-					"median": 61257,
-					"min": 61257,
-					"samples": 1
-				},
-				"todo_js_brotli": {
-					"median": 52805,
-					"min": 52805,
-					"samples": 1
-				},
-				"todo_app_raw": {
-					"median": 3044,
-					"min": 3044,
-					"samples": 1
-				},
-				"todo_app_gzip": {
-					"median": 1181,
-					"min": 1181,
-					"samples": 1
-				},
-				"todo_app_brotli": {
-					"median": 1030,
-					"min": 1030,
-					"samples": 1
-				},
-				"todo_fw_raw": {
-					"median": 191672,
-					"min": 191672,
-					"samples": 1
-				},
-				"todo_fw_gzip": {
-					"median": 60076,
-					"min": 60076,
-					"samples": 1
-				},
-				"todo_fw_brotli": {
-					"median": 51775,
-					"min": 51775,
-					"samples": 1
-				},
-				"chat_js_raw": {
-					"median": 195978,
-					"min": 195978,
-					"samples": 1
-				},
-				"chat_js_gzip": {
-					"median": 62064,
-					"min": 62064,
-					"samples": 1
-				},
-				"chat_js_brotli": {
-					"median": 53489,
-					"min": 53489,
-					"samples": 1
-				},
-				"chat_app_raw": {
-					"median": 4320,
-					"min": 4320,
-					"samples": 1
-				},
-				"chat_app_gzip": {
-					"median": 1988,
-					"min": 1988,
-					"samples": 1
-				},
-				"chat_app_brotli": {
-					"median": 1764,
-					"min": 1764,
-					"samples": 1
-				},
-				"chat_fw_raw": {
-					"median": 191658,
-					"min": 191658,
-					"samples": 1
-				},
-				"chat_fw_gzip": {
-					"median": 60076,
-					"min": 60076,
-					"samples": 1
-				},
-				"chat_fw_brotli": {
-					"median": 51725,
-					"min": 51725,
-					"samples": 1
-				}
-			},
-			"meta": {
-				"files": [
-					{
-						"file": "assets/framework-BR0vhF23.js",
-						"bucket": "fw",
-						"bytes": 191658,
-						"set": "js"
-					},
-					{
-						"file": "assets/index-CvkyhRLc.js",
-						"bucket": "app",
-						"bytes": 5742,
-						"set": "js"
-					},
-					{
-						"file": "assets/rolldown-runtime-B8sk0Y4v.js",
-						"bucket": "app",
-						"bytes": 87,
-						"set": "js"
-					},
-					{
-						"file": "assets/framework-CXESz0sd.js",
-						"bucket": "fw",
-						"bytes": 191672,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/index-Dw2clB3d.js",
-						"bucket": "app",
-						"bytes": 2957,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/rolldown-runtime-B8sk0Y4v.js",
-						"bucket": "app",
-						"bytes": 87,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/framework-BR0vhF23.js",
-						"bucket": "fw",
-						"bytes": 191658,
-						"set": "chat_"
-					},
-					{
-						"file": "assets/index-Dzxue9kV.js",
-						"bucket": "app",
-						"bytes": 4233,
-						"set": "chat_"
-					},
-					{
-						"file": "assets/rolldown-runtime-B8sk0Y4v.js",
-						"bucket": "app",
-						"bytes": 87,
-						"set": "chat_"
-					}
-				]
-			}
-		},
-		{
-			"name": "ripple",
-			"ops": {
-				"js_raw": {
-					"median": 33627,
-					"min": 33627,
-					"samples": 1
-				},
-				"js_gzip": {
-					"median": 12814,
-					"min": 12814,
-					"samples": 1
-				},
-				"js_brotli": {
-					"median": 11449,
-					"min": 11449,
-					"samples": 1
-				},
-				"app_raw": {
-					"median": 7209,
-					"min": 7209,
-					"samples": 1
-				},
-				"app_gzip": {
-					"median": 2312,
-					"min": 2312,
-					"samples": 1
-				},
-				"app_brotli": {
-					"median": 1999,
-					"min": 1999,
-					"samples": 1
-				},
-				"fw_raw": {
-					"median": 26418,
-					"min": 26418,
-					"samples": 1
-				},
-				"fw_gzip": {
-					"median": 10502,
-					"min": 10502,
-					"samples": 1
-				},
-				"fw_brotli": {
-					"median": 9450,
-					"min": 9450,
-					"samples": 1
-				},
-				"todo_js_raw": {
-					"median": 32756,
-					"min": 32756,
-					"samples": 1
-				},
-				"todo_js_gzip": {
-					"median": 13159,
-					"min": 13159,
-					"samples": 1
-				},
-				"todo_js_brotli": {
-					"median": 11758,
-					"min": 11758,
-					"samples": 1
-				},
-				"todo_app_raw": {
-					"median": 3857,
-					"min": 3857,
-					"samples": 1
-				},
-				"todo_app_gzip": {
-					"median": 1696,
-					"min": 1696,
-					"samples": 1
-				},
-				"todo_app_brotli": {
-					"median": 1468,
-					"min": 1468,
-					"samples": 1
-				},
-				"todo_fw_raw": {
-					"median": 28899,
-					"min": 28899,
-					"samples": 1
-				},
-				"todo_fw_gzip": {
-					"median": 11463,
-					"min": 11463,
-					"samples": 1
-				},
-				"todo_fw_brotli": {
-					"median": 10290,
-					"min": 10290,
-					"samples": 1
-				},
-				"chat_js_raw": {
-					"median": 32160,
-					"min": 32160,
-					"samples": 1
-				},
-				"chat_js_gzip": {
-					"median": 13148,
-					"min": 13148,
-					"samples": 1
-				},
-				"chat_js_brotli": {
-					"median": 11831,
-					"min": 11831,
-					"samples": 1
-				},
-				"chat_app_raw": {
-					"median": 4896,
-					"min": 4896,
-					"samples": 1
-				},
-				"chat_app_gzip": {
-					"median": 2336,
-					"min": 2336,
-					"samples": 1
-				},
-				"chat_app_brotli": {
-					"median": 2100,
-					"min": 2100,
-					"samples": 1
-				},
-				"chat_fw_raw": {
-					"median": 27264,
-					"min": 27264,
-					"samples": 1
-				},
-				"chat_fw_gzip": {
-					"median": 10812,
-					"min": 10812,
-					"samples": 1
-				},
-				"chat_fw_brotli": {
-					"median": 9731,
-					"min": 9731,
-					"samples": 1
-				}
-			},
-			"meta": {
-				"files": [
-					{
-						"file": "assets/framework-DarL4GwF.js",
-						"bucket": "fw",
-						"bytes": 26418,
-						"set": "js"
-					},
-					{
-						"file": "assets/index-eiUDtehh.js",
-						"bucket": "app",
-						"bytes": 7209,
-						"set": "js"
-					},
-					{
-						"file": "assets/framework-DThiyZAD.js",
-						"bucket": "fw",
-						"bytes": 28899,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/index-DzQGa7ed.js",
-						"bucket": "app",
-						"bytes": 3857,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/framework-yufsFPmu.js",
-						"bucket": "fw",
-						"bytes": 27264,
-						"set": "chat_"
-					},
-					{
-						"file": "assets/index-CDx3eqtC.js",
-						"bucket": "app",
-						"bytes": 4896,
-						"set": "chat_"
-					}
-				]
-			}
-		},
-		{
-			"name": "solid",
-			"ops": {
-				"js_raw": {
-					"median": 38531,
-					"min": 38531,
-					"samples": 1
-				},
-				"js_gzip": {
-					"median": 14732,
-					"min": 14732,
-					"samples": 1
-				},
-				"js_brotli": {
-					"median": 13339,
-					"min": 13339,
-					"samples": 1
-				},
-				"app_raw": {
-					"median": 6375,
-					"min": 6375,
-					"samples": 1
-				},
-				"app_gzip": {
-					"median": 1991,
-					"min": 1991,
-					"samples": 1
-				},
-				"app_brotli": {
-					"median": 1757,
-					"min": 1757,
-					"samples": 1
-				},
-				"fw_raw": {
-					"median": 32156,
-					"min": 32156,
-					"samples": 1
-				},
-				"fw_gzip": {
-					"median": 12741,
-					"min": 12741,
-					"samples": 1
-				},
-				"fw_brotli": {
-					"median": 11582,
-					"min": 11582,
-					"samples": 1
-				},
-				"todo_js_raw": {
-					"median": 35501,
-					"min": 35501,
-					"samples": 1
-				},
-				"todo_js_gzip": {
-					"median": 14186,
-					"min": 14186,
-					"samples": 1
-				},
-				"todo_js_brotli": {
-					"median": 12827,
-					"min": 12827,
-					"samples": 1
-				},
-				"todo_app_raw": {
-					"median": 2969,
-					"min": 2969,
-					"samples": 1
-				},
-				"todo_app_gzip": {
-					"median": 1292,
-					"min": 1292,
-					"samples": 1
-				},
-				"todo_app_brotli": {
-					"median": 1121,
-					"min": 1121,
-					"samples": 1
-				},
-				"todo_fw_raw": {
-					"median": 32532,
-					"min": 32532,
-					"samples": 1
-				},
-				"todo_fw_gzip": {
-					"median": 12894,
-					"min": 12894,
-					"samples": 1
-				},
-				"todo_fw_brotli": {
-					"median": 11706,
-					"min": 11706,
-					"samples": 1
-				},
-				"chat_js_raw": {
-					"median": 37010,
-					"min": 37010,
-					"samples": 1
-				},
-				"chat_js_gzip": {
-					"median": 15026,
-					"min": 15026,
-					"samples": 1
-				},
-				"chat_js_brotli": {
-					"median": 13599,
-					"min": 13599,
-					"samples": 1
-				},
-				"chat_app_raw": {
-					"median": 4375,
-					"min": 4375,
-					"samples": 1
-				},
-				"chat_app_gzip": {
-					"median": 2103,
-					"min": 2103,
-					"samples": 1
-				},
-				"chat_app_brotli": {
-					"median": 1872,
-					"min": 1872,
-					"samples": 1
-				},
-				"chat_fw_raw": {
-					"median": 32635,
-					"min": 32635,
-					"samples": 1
-				},
-				"chat_fw_gzip": {
-					"median": 12923,
-					"min": 12923,
-					"samples": 1
-				},
-				"chat_fw_brotli": {
-					"median": 11727,
-					"min": 11727,
-					"samples": 1
-				}
-			},
-			"meta": {
-				"files": [
-					{
-						"file": "assets/framework-Bk-7v061.js",
-						"bucket": "fw",
-						"bytes": 32156,
-						"set": "js"
-					},
-					{
-						"file": "assets/index-CLV2OaAt.js",
-						"bucket": "app",
-						"bytes": 6375,
-						"set": "js"
-					},
-					{
-						"file": "assets/framework-DUU8JdeW.js",
-						"bucket": "fw",
-						"bytes": 32532,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/index-DmZ2rs_g.js",
-						"bucket": "app",
-						"bytes": 2969,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/framework-qlqzj9bq.js",
-						"bucket": "fw",
-						"bytes": 32635,
-						"set": "chat_"
-					},
-					{
-						"file": "assets/index-BYcUCPm-.js",
-						"bucket": "app",
-						"bytes": 4375,
-						"set": "chat_"
-					}
-				]
-			}
-		},
-		{
-			"name": "vue-vapor",
-			"ops": {
-				"todo_js_raw": {
-					"median": 63045,
-					"min": 63045,
-					"samples": 1
-				},
-				"todo_js_gzip": {
-					"median": 24107,
-					"min": 24107,
-					"samples": 1
-				},
-				"todo_js_brotli": {
-					"median": 21851,
-					"min": 21851,
-					"samples": 1
-				},
-				"todo_app_raw": {
-					"median": 3088,
-					"min": 3088,
-					"samples": 1
-				},
-				"todo_app_gzip": {
-					"median": 1351,
-					"min": 1351,
-					"samples": 1
-				},
-				"todo_app_brotli": {
-					"median": 1198,
-					"min": 1198,
-					"samples": 1
-				},
-				"todo_fw_raw": {
-					"median": 59957,
-					"min": 59957,
-					"samples": 1
-				},
-				"todo_fw_gzip": {
-					"median": 22756,
-					"min": 22756,
-					"samples": 1
-				},
-				"todo_fw_brotli": {
-					"median": 20653,
-					"min": 20653,
-					"samples": 1
-				},
-				"chat_js_raw": {
-					"median": 66534,
-					"min": 66534,
-					"samples": 1
-				},
-				"chat_js_gzip": {
-					"median": 25717,
-					"min": 25717,
-					"samples": 1
-				},
-				"chat_js_brotli": {
-					"median": 23280,
-					"min": 23280,
-					"samples": 1
-				},
-				"chat_app_raw": {
-					"median": 4573,
-					"min": 4573,
-					"samples": 1
-				},
-				"chat_app_gzip": {
-					"median": 2154,
-					"min": 2154,
-					"samples": 1
-				},
-				"chat_app_brotli": {
-					"median": 1946,
-					"min": 1946,
-					"samples": 1
-				},
-				"chat_fw_raw": {
-					"median": 61961,
-					"min": 61961,
-					"samples": 1
-				},
-				"chat_fw_gzip": {
-					"median": 23563,
-					"min": 23563,
-					"samples": 1
-				},
-				"chat_fw_brotli": {
-					"median": 21334,
-					"min": 21334,
-					"samples": 1
-				}
-			},
-			"meta": {
-				"files": [
-					{
-						"file": "assets/framework-B1-DOQNq.js",
-						"bucket": "fw",
-						"bytes": 59957,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/index-BLcb_3Z5.js",
-						"bucket": "app",
-						"bytes": 3088,
-						"set": "todo_"
-					},
-					{
-						"file": "assets/framework-aWhRM6yI.js",
-						"bucket": "fw",
-						"bytes": 61961,
-						"set": "chat_"
-					},
-					{
-						"file": "assets/index-j49ImTMm.js",
-						"bucket": "app",
-						"bytes": 4573,
-						"set": "chat_"
-					}
-				]
-			}
-		}
-	],
-	"harnessExit": 0
+  "suite": "bundle-size",
+  "iterations": 1,
+  "targets": [
+    {
+      "name": "octane-tsrx",
+      "ops": {
+        "js_raw": {
+          "median": 88594,
+          "min": 88594,
+          "samples": 1
+        },
+        "js_gzip": {
+          "median": 28878,
+          "min": 28878,
+          "samples": 1
+        },
+        "js_brotli": {
+          "median": 25726,
+          "min": 25726,
+          "samples": 1
+        },
+        "app_raw": {
+          "median": 7935,
+          "min": 7935,
+          "samples": 1
+        },
+        "app_gzip": {
+          "median": 2706,
+          "min": 2706,
+          "samples": 1
+        },
+        "app_brotli": {
+          "median": 2318,
+          "min": 2318,
+          "samples": 1
+        },
+        "fw_raw": {
+          "median": 80659,
+          "min": 80659,
+          "samples": 1
+        },
+        "fw_gzip": {
+          "median": 26172,
+          "min": 26172,
+          "samples": 1
+        },
+        "fw_brotli": {
+          "median": 23408,
+          "min": 23408,
+          "samples": 1
+        },
+        "todo_js_raw": {
+          "median": 87532,
+          "min": 87532,
+          "samples": 1
+        },
+        "todo_js_gzip": {
+          "median": 28945,
+          "min": 28945,
+          "samples": 1
+        },
+        "todo_js_brotli": {
+          "median": 25819,
+          "min": 25819,
+          "samples": 1
+        },
+        "todo_app_raw": {
+          "median": 4660,
+          "min": 4660,
+          "samples": 1
+        },
+        "todo_app_gzip": {
+          "median": 2183,
+          "min": 2183,
+          "samples": 1
+        },
+        "todo_app_brotli": {
+          "median": 1867,
+          "min": 1867,
+          "samples": 1
+        },
+        "todo_fw_raw": {
+          "median": 82872,
+          "min": 82872,
+          "samples": 1
+        },
+        "todo_fw_gzip": {
+          "median": 26762,
+          "min": 26762,
+          "samples": 1
+        },
+        "todo_fw_brotli": {
+          "median": 23952,
+          "min": 23952,
+          "samples": 1
+        },
+        "chat_js_raw": {
+          "median": 88039,
+          "min": 88039,
+          "samples": 1
+        },
+        "chat_js_gzip": {
+          "median": 29209,
+          "min": 29209,
+          "samples": 1
+        },
+        "chat_js_brotli": {
+          "median": 26091,
+          "min": 26091,
+          "samples": 1
+        },
+        "chat_app_raw": {
+          "median": 5619,
+          "min": 5619,
+          "samples": 1
+        },
+        "chat_app_gzip": {
+          "median": 2602,
+          "min": 2602,
+          "samples": 1
+        },
+        "chat_app_brotli": {
+          "median": 2315,
+          "min": 2315,
+          "samples": 1
+        },
+        "chat_fw_raw": {
+          "median": 82420,
+          "min": 82420,
+          "samples": 1
+        },
+        "chat_fw_gzip": {
+          "median": 26607,
+          "min": 26607,
+          "samples": 1
+        },
+        "chat_fw_brotli": {
+          "median": 23776,
+          "min": 23776,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-D98dy8iW.js",
+            "bucket": "fw",
+            "bytes": 80659,
+            "set": "js"
+          },
+          {
+            "file": "assets/index-DskVNH1u.js",
+            "bucket": "app",
+            "bytes": 7935,
+            "set": "js"
+          },
+          {
+            "file": "assets/framework-jtgfpTKP.js",
+            "bucket": "fw",
+            "bytes": 82872,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/index-HdZJRPJu.js",
+            "bucket": "app",
+            "bytes": 4660,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/framework-CLEWjL7m.js",
+            "bucket": "fw",
+            "bytes": 82420,
+            "set": "chat_"
+          },
+          {
+            "file": "assets/index-DlgZl8nB.js",
+            "bucket": "app",
+            "bytes": 5619,
+            "set": "chat_"
+          }
+        ]
+      }
+    },
+    {
+      "name": "octane-jsx",
+      "ops": {
+        "js_raw": {
+          "median": 88512,
+          "min": 88512,
+          "samples": 1
+        },
+        "js_gzip": {
+          "median": 28880,
+          "min": 28880,
+          "samples": 1
+        },
+        "js_brotli": {
+          "median": 25716,
+          "min": 25716,
+          "samples": 1
+        },
+        "app_raw": {
+          "median": 8105,
+          "min": 8105,
+          "samples": 1
+        },
+        "app_gzip": {
+          "median": 2755,
+          "min": 2755,
+          "samples": 1
+        },
+        "app_brotli": {
+          "median": 2338,
+          "min": 2338,
+          "samples": 1
+        },
+        "fw_raw": {
+          "median": 80407,
+          "min": 80407,
+          "samples": 1
+        },
+        "fw_gzip": {
+          "median": 26125,
+          "min": 26125,
+          "samples": 1
+        },
+        "fw_brotli": {
+          "median": 23378,
+          "min": 23378,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-Dng8nrVA.js",
+            "bucket": "fw",
+            "bytes": 80407,
+            "set": "js"
+          },
+          {
+            "file": "assets/index-CgO19-Sc.js",
+            "bucket": "app",
+            "bytes": 8105,
+            "set": "js"
+          }
+        ]
+      }
+    },
+    {
+      "name": "react",
+      "ops": {
+        "js_raw": {
+          "median": 197487,
+          "min": 197487,
+          "samples": 1
+        },
+        "js_gzip": {
+          "median": 62236,
+          "min": 62236,
+          "samples": 1
+        },
+        "js_brotli": {
+          "median": 53647,
+          "min": 53647,
+          "samples": 1
+        },
+        "app_raw": {
+          "median": 5829,
+          "min": 5829,
+          "samples": 1
+        },
+        "app_gzip": {
+          "median": 2160,
+          "min": 2160,
+          "samples": 1
+        },
+        "app_brotli": {
+          "median": 1922,
+          "min": 1922,
+          "samples": 1
+        },
+        "fw_raw": {
+          "median": 191658,
+          "min": 191658,
+          "samples": 1
+        },
+        "fw_gzip": {
+          "median": 60076,
+          "min": 60076,
+          "samples": 1
+        },
+        "fw_brotli": {
+          "median": 51725,
+          "min": 51725,
+          "samples": 1
+        },
+        "todo_js_raw": {
+          "median": 194716,
+          "min": 194716,
+          "samples": 1
+        },
+        "todo_js_gzip": {
+          "median": 61257,
+          "min": 61257,
+          "samples": 1
+        },
+        "todo_js_brotli": {
+          "median": 52805,
+          "min": 52805,
+          "samples": 1
+        },
+        "todo_app_raw": {
+          "median": 3044,
+          "min": 3044,
+          "samples": 1
+        },
+        "todo_app_gzip": {
+          "median": 1181,
+          "min": 1181,
+          "samples": 1
+        },
+        "todo_app_brotli": {
+          "median": 1030,
+          "min": 1030,
+          "samples": 1
+        },
+        "todo_fw_raw": {
+          "median": 191672,
+          "min": 191672,
+          "samples": 1
+        },
+        "todo_fw_gzip": {
+          "median": 60076,
+          "min": 60076,
+          "samples": 1
+        },
+        "todo_fw_brotli": {
+          "median": 51775,
+          "min": 51775,
+          "samples": 1
+        },
+        "chat_js_raw": {
+          "median": 195978,
+          "min": 195978,
+          "samples": 1
+        },
+        "chat_js_gzip": {
+          "median": 62064,
+          "min": 62064,
+          "samples": 1
+        },
+        "chat_js_brotli": {
+          "median": 53489,
+          "min": 53489,
+          "samples": 1
+        },
+        "chat_app_raw": {
+          "median": 4320,
+          "min": 4320,
+          "samples": 1
+        },
+        "chat_app_gzip": {
+          "median": 1988,
+          "min": 1988,
+          "samples": 1
+        },
+        "chat_app_brotli": {
+          "median": 1764,
+          "min": 1764,
+          "samples": 1
+        },
+        "chat_fw_raw": {
+          "median": 191658,
+          "min": 191658,
+          "samples": 1
+        },
+        "chat_fw_gzip": {
+          "median": 60076,
+          "min": 60076,
+          "samples": 1
+        },
+        "chat_fw_brotli": {
+          "median": 51725,
+          "min": 51725,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-BR0vhF23.js",
+            "bucket": "fw",
+            "bytes": 191658,
+            "set": "js"
+          },
+          {
+            "file": "assets/index-CvkyhRLc.js",
+            "bucket": "app",
+            "bytes": 5742,
+            "set": "js"
+          },
+          {
+            "file": "assets/rolldown-runtime-B8sk0Y4v.js",
+            "bucket": "app",
+            "bytes": 87,
+            "set": "js"
+          },
+          {
+            "file": "assets/framework-CXESz0sd.js",
+            "bucket": "fw",
+            "bytes": 191672,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/index-Dw2clB3d.js",
+            "bucket": "app",
+            "bytes": 2957,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/rolldown-runtime-B8sk0Y4v.js",
+            "bucket": "app",
+            "bytes": 87,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/framework-BR0vhF23.js",
+            "bucket": "fw",
+            "bytes": 191658,
+            "set": "chat_"
+          },
+          {
+            "file": "assets/index-Dzxue9kV.js",
+            "bucket": "app",
+            "bytes": 4233,
+            "set": "chat_"
+          },
+          {
+            "file": "assets/rolldown-runtime-B8sk0Y4v.js",
+            "bucket": "app",
+            "bytes": 87,
+            "set": "chat_"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ripple",
+      "ops": {
+        "js_raw": {
+          "median": 33627,
+          "min": 33627,
+          "samples": 1
+        },
+        "js_gzip": {
+          "median": 12814,
+          "min": 12814,
+          "samples": 1
+        },
+        "js_brotli": {
+          "median": 11449,
+          "min": 11449,
+          "samples": 1
+        },
+        "app_raw": {
+          "median": 7209,
+          "min": 7209,
+          "samples": 1
+        },
+        "app_gzip": {
+          "median": 2312,
+          "min": 2312,
+          "samples": 1
+        },
+        "app_brotli": {
+          "median": 1999,
+          "min": 1999,
+          "samples": 1
+        },
+        "fw_raw": {
+          "median": 26418,
+          "min": 26418,
+          "samples": 1
+        },
+        "fw_gzip": {
+          "median": 10502,
+          "min": 10502,
+          "samples": 1
+        },
+        "fw_brotli": {
+          "median": 9450,
+          "min": 9450,
+          "samples": 1
+        },
+        "todo_js_raw": {
+          "median": 32756,
+          "min": 32756,
+          "samples": 1
+        },
+        "todo_js_gzip": {
+          "median": 13159,
+          "min": 13159,
+          "samples": 1
+        },
+        "todo_js_brotli": {
+          "median": 11758,
+          "min": 11758,
+          "samples": 1
+        },
+        "todo_app_raw": {
+          "median": 3857,
+          "min": 3857,
+          "samples": 1
+        },
+        "todo_app_gzip": {
+          "median": 1696,
+          "min": 1696,
+          "samples": 1
+        },
+        "todo_app_brotli": {
+          "median": 1468,
+          "min": 1468,
+          "samples": 1
+        },
+        "todo_fw_raw": {
+          "median": 28899,
+          "min": 28899,
+          "samples": 1
+        },
+        "todo_fw_gzip": {
+          "median": 11463,
+          "min": 11463,
+          "samples": 1
+        },
+        "todo_fw_brotli": {
+          "median": 10290,
+          "min": 10290,
+          "samples": 1
+        },
+        "chat_js_raw": {
+          "median": 32160,
+          "min": 32160,
+          "samples": 1
+        },
+        "chat_js_gzip": {
+          "median": 13148,
+          "min": 13148,
+          "samples": 1
+        },
+        "chat_js_brotli": {
+          "median": 11831,
+          "min": 11831,
+          "samples": 1
+        },
+        "chat_app_raw": {
+          "median": 4896,
+          "min": 4896,
+          "samples": 1
+        },
+        "chat_app_gzip": {
+          "median": 2336,
+          "min": 2336,
+          "samples": 1
+        },
+        "chat_app_brotli": {
+          "median": 2100,
+          "min": 2100,
+          "samples": 1
+        },
+        "chat_fw_raw": {
+          "median": 27264,
+          "min": 27264,
+          "samples": 1
+        },
+        "chat_fw_gzip": {
+          "median": 10812,
+          "min": 10812,
+          "samples": 1
+        },
+        "chat_fw_brotli": {
+          "median": 9731,
+          "min": 9731,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-DarL4GwF.js",
+            "bucket": "fw",
+            "bytes": 26418,
+            "set": "js"
+          },
+          {
+            "file": "assets/index-eiUDtehh.js",
+            "bucket": "app",
+            "bytes": 7209,
+            "set": "js"
+          },
+          {
+            "file": "assets/framework-DThiyZAD.js",
+            "bucket": "fw",
+            "bytes": 28899,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/index-DzQGa7ed.js",
+            "bucket": "app",
+            "bytes": 3857,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/framework-yufsFPmu.js",
+            "bucket": "fw",
+            "bytes": 27264,
+            "set": "chat_"
+          },
+          {
+            "file": "assets/index-CDx3eqtC.js",
+            "bucket": "app",
+            "bytes": 4896,
+            "set": "chat_"
+          }
+        ]
+      }
+    },
+    {
+      "name": "solid",
+      "ops": {
+        "js_raw": {
+          "median": 38531,
+          "min": 38531,
+          "samples": 1
+        },
+        "js_gzip": {
+          "median": 14732,
+          "min": 14732,
+          "samples": 1
+        },
+        "js_brotli": {
+          "median": 13339,
+          "min": 13339,
+          "samples": 1
+        },
+        "app_raw": {
+          "median": 6375,
+          "min": 6375,
+          "samples": 1
+        },
+        "app_gzip": {
+          "median": 1991,
+          "min": 1991,
+          "samples": 1
+        },
+        "app_brotli": {
+          "median": 1757,
+          "min": 1757,
+          "samples": 1
+        },
+        "fw_raw": {
+          "median": 32156,
+          "min": 32156,
+          "samples": 1
+        },
+        "fw_gzip": {
+          "median": 12741,
+          "min": 12741,
+          "samples": 1
+        },
+        "fw_brotli": {
+          "median": 11582,
+          "min": 11582,
+          "samples": 1
+        },
+        "todo_js_raw": {
+          "median": 35501,
+          "min": 35501,
+          "samples": 1
+        },
+        "todo_js_gzip": {
+          "median": 14186,
+          "min": 14186,
+          "samples": 1
+        },
+        "todo_js_brotli": {
+          "median": 12827,
+          "min": 12827,
+          "samples": 1
+        },
+        "todo_app_raw": {
+          "median": 2969,
+          "min": 2969,
+          "samples": 1
+        },
+        "todo_app_gzip": {
+          "median": 1292,
+          "min": 1292,
+          "samples": 1
+        },
+        "todo_app_brotli": {
+          "median": 1121,
+          "min": 1121,
+          "samples": 1
+        },
+        "todo_fw_raw": {
+          "median": 32532,
+          "min": 32532,
+          "samples": 1
+        },
+        "todo_fw_gzip": {
+          "median": 12894,
+          "min": 12894,
+          "samples": 1
+        },
+        "todo_fw_brotli": {
+          "median": 11706,
+          "min": 11706,
+          "samples": 1
+        },
+        "chat_js_raw": {
+          "median": 37010,
+          "min": 37010,
+          "samples": 1
+        },
+        "chat_js_gzip": {
+          "median": 15026,
+          "min": 15026,
+          "samples": 1
+        },
+        "chat_js_brotli": {
+          "median": 13599,
+          "min": 13599,
+          "samples": 1
+        },
+        "chat_app_raw": {
+          "median": 4375,
+          "min": 4375,
+          "samples": 1
+        },
+        "chat_app_gzip": {
+          "median": 2103,
+          "min": 2103,
+          "samples": 1
+        },
+        "chat_app_brotli": {
+          "median": 1872,
+          "min": 1872,
+          "samples": 1
+        },
+        "chat_fw_raw": {
+          "median": 32635,
+          "min": 32635,
+          "samples": 1
+        },
+        "chat_fw_gzip": {
+          "median": 12923,
+          "min": 12923,
+          "samples": 1
+        },
+        "chat_fw_brotli": {
+          "median": 11727,
+          "min": 11727,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-Bk-7v061.js",
+            "bucket": "fw",
+            "bytes": 32156,
+            "set": "js"
+          },
+          {
+            "file": "assets/index-CLV2OaAt.js",
+            "bucket": "app",
+            "bytes": 6375,
+            "set": "js"
+          },
+          {
+            "file": "assets/framework-DUU8JdeW.js",
+            "bucket": "fw",
+            "bytes": 32532,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/index-DmZ2rs_g.js",
+            "bucket": "app",
+            "bytes": 2969,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/framework-qlqzj9bq.js",
+            "bucket": "fw",
+            "bytes": 32635,
+            "set": "chat_"
+          },
+          {
+            "file": "assets/index-BYcUCPm-.js",
+            "bucket": "app",
+            "bytes": 4375,
+            "set": "chat_"
+          }
+        ]
+      }
+    },
+    {
+      "name": "vue-vapor",
+      "ops": {
+        "todo_js_raw": {
+          "median": 63045,
+          "min": 63045,
+          "samples": 1
+        },
+        "todo_js_gzip": {
+          "median": 24107,
+          "min": 24107,
+          "samples": 1
+        },
+        "todo_js_brotli": {
+          "median": 21851,
+          "min": 21851,
+          "samples": 1
+        },
+        "todo_app_raw": {
+          "median": 3088,
+          "min": 3088,
+          "samples": 1
+        },
+        "todo_app_gzip": {
+          "median": 1351,
+          "min": 1351,
+          "samples": 1
+        },
+        "todo_app_brotli": {
+          "median": 1198,
+          "min": 1198,
+          "samples": 1
+        },
+        "todo_fw_raw": {
+          "median": 59957,
+          "min": 59957,
+          "samples": 1
+        },
+        "todo_fw_gzip": {
+          "median": 22756,
+          "min": 22756,
+          "samples": 1
+        },
+        "todo_fw_brotli": {
+          "median": 20653,
+          "min": 20653,
+          "samples": 1
+        },
+        "chat_js_raw": {
+          "median": 66534,
+          "min": 66534,
+          "samples": 1
+        },
+        "chat_js_gzip": {
+          "median": 25717,
+          "min": 25717,
+          "samples": 1
+        },
+        "chat_js_brotli": {
+          "median": 23280,
+          "min": 23280,
+          "samples": 1
+        },
+        "chat_app_raw": {
+          "median": 4573,
+          "min": 4573,
+          "samples": 1
+        },
+        "chat_app_gzip": {
+          "median": 2154,
+          "min": 2154,
+          "samples": 1
+        },
+        "chat_app_brotli": {
+          "median": 1946,
+          "min": 1946,
+          "samples": 1
+        },
+        "chat_fw_raw": {
+          "median": 61961,
+          "min": 61961,
+          "samples": 1
+        },
+        "chat_fw_gzip": {
+          "median": 23563,
+          "min": 23563,
+          "samples": 1
+        },
+        "chat_fw_brotli": {
+          "median": 21334,
+          "min": 21334,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "files": [
+          {
+            "file": "assets/framework-B1-DOQNq.js",
+            "bucket": "fw",
+            "bytes": 59957,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/index-BLcb_3Z5.js",
+            "bucket": "app",
+            "bytes": 3088,
+            "set": "todo_"
+          },
+          {
+            "file": "assets/framework-aWhRM6yI.js",
+            "bucket": "fw",
+            "bytes": 61961,
+            "set": "chat_"
+          },
+          {
+            "file": "assets/index-j49ImTMm.js",
+            "bucket": "app",
+            "bytes": 4573,
+            "set": "chat_"
+          }
+        ]
+      }
+    }
+  ],
+  "harnessExit": 0
 }
