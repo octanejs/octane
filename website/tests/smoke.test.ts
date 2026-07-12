@@ -181,18 +181,23 @@ describe('website routes', () => {
 
 	it('/docs/differences-from-react renders the divergences document', async () => {
 		const { container } = await renderRoute('/docs/differences-from-react');
+		const text = textOf(container);
 
 		expect(container.querySelector('.prose h1')?.textContent).toBe('Differences from React');
-		expect(textOf(container)).toContain('no rules of hooks');
-		expect(textOf(container)).toContain('Hooks can go anywhere');
-		expect(textOf(container)).toContain('State hooks have a current-state getter');
-		expect(textOf(container)).toContain('getDraft');
-		expect(textOf(container)).toContain("they're all on purpose");
+		expect(text).toContain('no rules of hooks');
+		expect(text).toContain('Hooks can go anywhere');
+		expect(text).toContain('State hooks have a current-state getter');
+		expect(text).toContain('getDraft');
+		expect(text).toContain("they're all on purpose");
+		// Non-bubbling event parity: native events are capture-delegated through
+		// logical component ancestors, including across portal boundaries.
+		expect(text).toContain('capture-delegated');
+		expect(text).toContain('That logical path continues across portals');
 		// Controlled form components (2026-07-08): React's value/checked semantics
 		// on native events — onInput per keystroke, no synthetic onChange.
-		expect(textOf(container)).toContain('Controlled components, native events');
-		expect(textOf(container)).toContain('Controlled inputs work exactly like React');
-		expect(textOf(container)).toContain('onInput');
+		expect(text).toContain('Controlled components, native events');
+		expect(text).toContain('Controlled inputs work exactly like React');
+		expect(text).toContain('onInput');
 	});
 
 	it('/docs/bindings renders the bindings overview table', async () => {

@@ -16,8 +16,8 @@ import {
 // ============================================================================
 // Octane delegates at the ROOT CONTAINER (React 17+ shape). Non-bubbling
 // media/resource events (error/load/…) are capture-phase-delegated with
-// target-only delivery (NON_BUBBLING_TARGET_EVENTS, runtime.ts ~4062), so the
-// target's own handler fires without any synthetic re-dispatch.
+// logical-tree propagation (EMULATED_BUBBLING_EVENTS), so target and ancestor
+// handlers fire without replacing the native Event object.
 
 describe('ReactDOMComponent — non-bubbling resource events', () => {
 	// Per ReactDOMComponent-test.js:1652 — should work error event on <source> element

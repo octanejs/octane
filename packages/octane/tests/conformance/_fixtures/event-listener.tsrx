@@ -72,8 +72,7 @@ export function MediaLoadTargets(props: { log: (s: string) => void }) @{
 }
 
 // :706/:733/:767 — non-bubbling events with a handler on BOTH the target and
-// an ancestor (React's synthetic layer fires both; the platform fires only the
-// target's).
+// an ancestor. Octane capture-delegates these so both fire like React.
 export function NonBubblingPairs(props: { log: (s: string) => void }) @{
 	<div
 		class="anc"

@@ -4,6 +4,7 @@ import { flushSync } from '../src/index.js';
 import {
 	BasicPortalClick,
 	CrossPortalBubble,
+	NonBubblingPortal,
 	StopPropagation,
 	TwoPortalsSameTarget,
 	TogglePortal,
@@ -61,6 +62,18 @@ describe('portal — event delegation', () => {
 		clickIn(portalTarget, '.inside-btn');
 		expect(r.find('.inner-count').textContent).toBe('2');
 		expect(r.find('.outer-count').textContent).toBe('2');
+
+		r.unmount();
+	});
+
+	it('propagates non-bubbling events through the logical portal tree', () => {
+		const log: string[] = [];
+		const r = mount(NonBubblingPortal, { target: portalTarget, log: (s: string) => log.push(s) });
+
+		portalTarget
+			.querySelector('.inside-video')!
+			.dispatchEvent(new Event('play', { bubbles: false }));
+		expect(log).toEqual(['inner', 'outer']);
 
 		r.unmount();
 	});
