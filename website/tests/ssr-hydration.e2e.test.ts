@@ -18,7 +18,7 @@ import { createServer } from 'node:net';
 import { join } from 'node:path';
 
 const WEBSITE = join(process.cwd(), 'website');
-const ROUTES = ['/', '/docs', '/benchmarks', '/playground'];
+const ROUTES = ['/', '/docs', '/benchmarks', '/playground', '/view-transitions'];
 
 // M0 of docs/comment-marker-elision-plan.md: per-route comment-node ceilings
 // (~15% above post-M4 2026-07-09 measurements: / 1,463 · /docs 361 ·
@@ -40,6 +40,9 @@ const COMMENT_CEILINGS: Record<string, number> = {
 	'/docs': 415,
 	'/benchmarks': 14400,
 	'/playground': 195,
+	// The view-transitions demo (added with the plan's Phase 5, measured 189) —
+	// a handful of boundaries + control-flow arms.
+	'/view-transitions': 200,
 };
 
 // A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a

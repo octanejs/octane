@@ -52,6 +52,7 @@ export function Layout() @{
 					<Link to="/docs" activeOptions={{ exact: false }} class="nav-link">Docs</Link>
 					<Link to="/benchmarks" class="nav-link">Benchmarks</Link>
 					<Link to="/playground" class="nav-link">Playground</Link>
+					<Link to="/view-transitions" class="nav-link">Transitions</Link>
 					<a class="nav-link" href="/llms.txt" target="_blank" rel="noreferrer">
 						llms.txt
 					</a>

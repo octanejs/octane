@@ -7,6 +7,7 @@ import { Layout } from '../components/Layout.tsrx';
 import { Home } from '../pages/Home.tsrx';
 import { Benchmarks } from '../pages/Benchmarks.tsrx';
 import { Playground } from '../pages/Playground.tsrx';
+import { ViewTransitionsDemo } from '../pages/ViewTransitions.tsrx';
 import { DocsLayout } from '../pages/DocsLayout.tsrx';
 import { DocPage } from '../pages/DocPage.tsrx';
 import { NotFound } from '../pages/NotFound.tsrx';
@@ -42,6 +43,12 @@ export function makeRouter(env: RouterEnv = {}): any {
 		component: Playground,
 	});
 
+	const viewTransitionsRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: 'view-transitions',
+		component: ViewTransitionsDemo,
+	});
+
 	const docsRoute = createRoute({
 		getParentRoute: () => rootRoute,
 		path: 'docs',
@@ -66,6 +73,7 @@ export function makeRouter(env: RouterEnv = {}): any {
 			indexRoute,
 			benchmarksRoute,
 			playgroundRoute,
+			viewTransitionsRoute,
 			docsRoute.addChildren([docsIndexRoute, docsSlugRoute]),
 		]),
 		history: env.history,

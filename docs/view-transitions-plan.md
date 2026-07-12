@@ -1,8 +1,19 @@
 # View Transitions — React-parity plan
 
-Status: Phases 0-4 LANDED 2026-07-11 — every in-scope ReactDOMViewTransition
-test (25) is ported and passing; Phase 5 (SSR annotations + docs + demo)
-remains. Phase 4: parent enter/exit relays SHIPPED (React's
+Status: COMPLETE — all phases (0-5) LANDED 2026-07-11/12. Every in-scope test
+from ReactDOMViewTransition-test.js (25) AND ReactDOMFizzViewTransition-test.js
+(4) is ported and passing. Phase 5: SSR `vt-*` annotations (server
+ViewTransition + ssrTry claim hooks in runtime.server.ts — arm-top detection
+is POSITIONAL via vt-enter-x/vt-exit-x candidate attributes claimed by each
+@try arm's first element and stripped at emission, exact where flag-based
+tracking couldn't be; auto names `_O<frame-path>_` are stable across
+streaming passes so fallback/content captures pair; streamed segment chunks
+inherit the wrapping boundary's name/share/update), the user doc
+(docs/view-transitions.md), and the website demo route (/view-transitions —
+enter/exit, shared-element morph, addTransitionType tabs; driven by the
+real-browser e2e; needed BOTH the app-router entry and the plugin-level
+octane.config.ts RenderRoute — the catch-all otherwise serves it with a 404
+status). Phase 4: parent enter/exit relays SHIPPED (React's
 `enableViewTransitionParentEnterExit` is ON in the experimental channel, so
 this is live behavior, not a pin): `parentEnter`/`parentExit` class props +
 `onParentEnter`/`onParentExit` callbacks; a nested boundary in a unit that
