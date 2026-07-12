@@ -68,18 +68,25 @@ describe('website routes', () => {
 		);
 		expect(bindingsLink).toBeTruthy();
 
-		// Benchmark section: ONE normalized summary chart — every cross-framework
-		// suite as ×-vs-Octane geomeans, all four frameworks in the legend
-		// (Solid/Ripple labeled with the catalog versions the fixtures run).
+		// Benchmark section: ONE normalized summary chart — the checked-in
+		// cross-framework runtime/SSR/async/size suites as ×-vs-Octane geomeans.
 		expect(container.textContent).toContain('Measured, not vibes');
 		const benchCharts = container.querySelectorAll('figure.bench-card svg');
 		expect(benchCharts.length).toBe(1);
-		for (const label of ['Octane (.tsrx)', 'React 19', 'Solid 2.0 beta', 'Ripple 0.3']) {
+		for (const label of [
+			'Octane (.tsrx)',
+			'React 19',
+			'Solid 2.0 beta',
+			'Ripple 0.3',
+			'Vue Vapor 3.6 beta',
+		]) {
 			expect(container.textContent).toContain(label);
 		}
 		// Suite names ride the category axis; ratios carry the × suffix.
 		expect(container.textContent).toContain('signal-favoring');
 		expect(container.textContent).toContain('js-framework-reorder');
+		expect(container.textContent).toContain('async-waterfall');
+		expect(container.textContent).toContain('bundle-size');
 		expect(textOf(container)).toMatch(/\d×/);
 		expect(container.querySelectorAll('.bench-card path').length).toBeGreaterThan(10);
 
@@ -101,7 +108,7 @@ describe('website routes', () => {
 		);
 	});
 
-	it('/benchmarks charts every suite from the checked-in baselines', async () => {
+	it('/benchmarks charts the checked-in performance and size baselines', async () => {
 		const { container } = await renderRoute('/benchmarks');
 		// The recharts store settles over microtask/raf rounds (autoBatch) —
 		// give charts the same generous settle the binding's own tests use.
@@ -114,10 +121,10 @@ describe('website routes', () => {
 		expect(textOf(container)).toContain('Octane vs the field');
 		expect(textOf(container)).toContain('The authoring cliff');
 
-		// 10 cross-framework cards + 3 octane-internal cards, each with real
+		// 14 cross-framework cards + 3 octane-internal cards, each with real
 		// @octanejs/recharts bars and a data-table fallback.
 		const cards = Array.from(container.querySelectorAll('figure.bench-card'));
-		expect(cards.length).toBe(13);
+		expect(cards.length).toBe(17);
 		for (const card of cards) {
 			expect(
 				card.querySelectorAll('.recharts-bar .recharts-bar-rectangle').length,
@@ -131,7 +138,7 @@ describe('website routes', () => {
 		const octaneSwatches = Array.from(container.querySelectorAll('.bench-swatch')).filter((s) =>
 			(s.getAttribute('style') ?? '').replace(/\s/g, '').includes('rgb(255,65,90)'),
 		);
-		expect(octaneSwatches.length).toBe(13);
+		expect(octaneSwatches.length).toBe(17);
 	});
 
 	it('/docs/quick-start renders the quick-start document with the sidebar', async () => {

@@ -40,15 +40,30 @@ function fmtX(value: unknown): string {
 	return n.toFixed(2) + '×';
 }
 
+function fmtBytes(value: unknown): string {
+	const n =
+		typeof value === 'number' ? value : Number(value);
+	if (!Number.isFinite(n)) return '—';
+	if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + ' MB';
+	if (n >= 1024) return Math.round(n / 1024) + ' kB';
+	return Math.round(n) + ' B';
+}
+
 export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?: number }) @{
 	const { card } = props;
 	const chartWidth = props.width ?? 560;
 	const format =
-		card.format === 'x' ? fmtX : fmt;
+		card.format === 'x'
+			? fmtX
+			: card.format === 'bytes'
+				? fmtBytes
+				: fmt;
 	const tableCaption =
 		card.format === 'x'
 			? 'Data table (× vs Octane, geometric mean across operations)'
-			: 'Data table (median ms, ' + card.iterations + ' iterations)';
+			: card.format === 'bytes'
+				? 'Data table (production build bytes)'
+				: 'Data table (median ms, ' + card.iterations + ' iterations)';
 	// Value labels at bar tips only where they stay readable (≤2 series);
 	// denser cards lean on the number axis + the table view instead.
 	const showValues = props.showValues ?? card.series.length <= 2;
