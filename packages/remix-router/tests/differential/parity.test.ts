@@ -15,6 +15,7 @@ const NESTED = resolve(__dirname, '../_fixtures/nested-layouts-diff.tsrx');
 const LOADER = resolve(__dirname, '../_fixtures/loader-redirect-error-diff.tsrx');
 const AWAIT = resolve(__dirname, '../_fixtures/await-deferred-diff.tsrx');
 const PENDING = resolve(__dirname, '../_fixtures/pending-navigation-diff.tsrx');
+const DECLARATIVE = resolve(__dirname, '../_fixtures/declarative-diff.tsrx');
 // React fixtures are precompiled into THIS package's cache (see differential
 // _setup.ts) so the React side resolves react-router from here.
 const CACHE = resolve(__dirname, '.react-cache');
@@ -83,6 +84,39 @@ describe('differential: @octanejs/remix-router vs real react-router', () => {
 		await d.step('resolve', async (i, r) => {
 			await i.click('#resolve');
 			await r.click('#resolve');
+			await settle(60);
+		});
+		d.unmount();
+	});
+
+	it('DeclarativeDiffApp: block-children <Routes> navigation, byte-identical', async () => {
+		// Phase B: the octane side goes through the registration collector; the
+		// React side is upstream's element-children walk of the SAME source.
+		const d = await mountDifferential(DECLARATIVE, 'DeclarativeDiffApp', undefined, CACHE);
+		await d.step('mount (index in layout)', async () => {
+			await settle();
+		});
+		await d.step('to /about', async (i, r) => {
+			await i.click('.nav-about');
+			await r.click('.nav-about');
+			await settle();
+		});
+		await d.step('to /users/42', async (i, r) => {
+			await i.click('.nav-user');
+			await r.click('.nav-user');
+			await settle();
+		});
+		await d.step('back home', async (i, r) => {
+			await i.click('.nav-home');
+			await r.click('.nav-home');
+			await settle();
+		});
+		d.unmount();
+	});
+
+	it('NavigateDiffApp: <Navigate> mount redirect, byte-identical', async () => {
+		const d = await mountDifferential(DECLARATIVE, 'NavigateDiffApp', undefined, CACHE);
+		await d.step('mount (redirected to /new)', async () => {
 			await settle(60);
 		});
 		d.unmount();

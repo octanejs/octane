@@ -6315,7 +6315,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
 				pushAfter(
 					cc.id,
-					`  { const _v = (${cc.valueExpr}); if (${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') _$setText(_t, _v); else ${chv} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); } }`,
+					`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); } }`,
 				);
 				continue;
 			}
@@ -6338,7 +6338,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			// unchanged-skippable primitive already backed by a text node, do a direct
 			// `setText` — exactly like a `.tsrx` `{… as string}` text binding. Objects /
 			// functions (component / element / array), the first render, and mode
-			// switches go through `textHole` → the full `childSlot`.
+			// switches go through `textHole` → the full `childSlot` — INCLUDING when
+			// the value is identity-UNCHANGED: only childSlot's bail path refreshes
+			// changed-context consumers below (a stable `{children}` passthrough under
+			// a re-rendering Provider), so an inline identity skip would strand them.
+			// Only unchanged primitives/null (no consumers possible) skip the call.
 			ctx.runtimeNeeded.add('setText');
 			ctx.runtimeNeeded.add('textHole');
 			// When the slot has its OWN `<!>` placeholder, tell textHole/childSlot to
@@ -6348,7 +6352,7 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
 			pushAfter(
 				cc.id,
-				`  { const _v = (${cc.valueExpr}); if (${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && typeof _v !== 'object' && typeof _v !== 'function') _$setText(_t, _v); else ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}); } }`,
+				`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}); } }`,
 			);
 			continue;
 		}

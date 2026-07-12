@@ -18,19 +18,6 @@ import * as port from '@octanejs/remix-router';
 import * as portDom from '@octanejs/remix-router/dom';
 
 const EXPECTED_MISSING = new Set([
-	// Phase B — declarative mode (Routes/Route JSX config, MemoryRouter, Navigate)
-	'MemoryRouter',
-	'Navigate',
-	'Route',
-	'Routes',
-	'createRoutesFromChildren',
-	'createRoutesFromElements',
-	'UNSAFE_WithComponentProps',
-	'UNSAFE_withComponentProps',
-	'UNSAFE_WithHydrateFallbackProps',
-	'UNSAFE_withHydrateFallbackProps',
-	'UNSAFE_WithErrorBoundaryProps',
-	'UNSAFE_withErrorBoundaryProps',
 	// Phase C — DOM entry + links
 	'createBrowserRouter',
 	'createHashRouter',

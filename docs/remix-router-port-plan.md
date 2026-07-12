@@ -82,12 +82,22 @@ Link + useLinkClickHandler (pulled forward from Phase C). *Exit criterion
 byte-identical differential vs real react-router; export parity pins the
 phase boundary.
 
-### Phase B — declarative mode
-`createRoutesFromChildren/Elements`, `Routes`/`Route` (hybrid per 2a),
+### Phase B — declarative mode — SHIPPED (PR 1)
+`createRoutesFromChildren/Elements`, `Routes`/`Route` (hybrid per 2a: descriptor
+children walked upstream-style, block children via the registration collector),
 `MemoryRouter`, `Navigate`, public `useRoutes` path, `UNSAFE_With*Props`.
-*Exit criterion:* upstream `<Routes>` fixtures (nested/index/splat/relative)
-pass in descriptor-children AND block-children forms (or block form explicitly
-deferred with the ordering caveat pinned by a test).
+*Exit criterion (met):* nested/index/param/splat routes + Link navigation +
+`<Navigate>` redirect green in BOTH children forms (conformance + differential
+byte-parity vs real react-router); the registration-ordering caveat
+(mount-order vs source-order, matchRoutes score ties only) is pinned by a
+conformance test and documented in status.json. Two convergence rules the
+collector depends on: Route props compare STRUCTURALLY (element descriptors
+are re-created every render), and opaque block children compare as always-equal
+(their content surfaces through the nested collector). Shipped alongside an
+octane compiler fix: identity-unchanged renderables in `{expr}` holes now still
+dispatch to childSlot, so context consumers below a stable `{children}`
+passthrough refresh when a provider re-renders (the navigation-re-render bug
+this phase surfaced).
 
 ### Phase C — DOM entry + links
 `createBrowserRouter`/`createHashRouter`, `BrowserRouter`/`HashRouter`/

@@ -97,7 +97,7 @@ export type {
 	SubmitTarget,
 } from './lib/dom/dom';
 
-// ── React layer (Phase A) ───────────────────────────────────────────────────
+// ── React layer (Phases A + B) ─────────────────────────────────────────────
 export type { NavigateOptions, Navigator, ClientOnErrorFunction } from './lib/context';
 export { AwaitContextProvider as UNSAFE_AwaitContextProvider } from './lib/context';
 export { Await } from './lib/Await.tsrx';
@@ -105,6 +105,15 @@ export { Router } from './lib/components/Router.tsrx';
 export { RouterProvider, Outlet } from './lib/components/RouterProvider.tsrx';
 export { createMemoryRouter, renderMatches } from './lib/components/utils';
 export type { MemoryRouterOpts } from './lib/components/utils';
+export { MemoryRouter } from './lib/components/MemoryRouter.tsrx';
+export { Navigate } from './lib/components/Navigate';
+export type { NavigateProps } from './lib/components/Navigate';
+export { Routes } from './lib/components/Routes.tsrx';
+export {
+	Route,
+	createRoutesFromChildren,
+	createRoutesFromElements,
+} from './lib/components/routes-collector';
 export type { NavigateFunction } from './lib/hooks';
 export {
 	useActionData,
@@ -155,5 +164,13 @@ export {
 	hydrationRouteProperties as UNSAFE_hydrationRouteProperties,
 	mapRouteProperties as UNSAFE_mapRouteProperties,
 } from './lib/components/utils';
+export {
+	WithComponentProps as UNSAFE_WithComponentProps,
+	withComponentProps as UNSAFE_withComponentProps,
+	WithHydrateFallbackProps as UNSAFE_WithHydrateFallbackProps,
+	withHydrateFallbackProps as UNSAFE_withHydrateFallbackProps,
+	WithErrorBoundaryProps as UNSAFE_WithErrorBoundaryProps,
+	withErrorBoundaryProps as UNSAFE_withErrorBoundaryProps,
+} from './lib/components/with-props';
 export type { Register } from './lib/types/register';
 export type { MiddlewareEnabled as UNSAFE_MiddlewareEnabled } from './lib/types/future';

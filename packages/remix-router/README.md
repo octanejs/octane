@@ -9,8 +9,9 @@ running against the vendored copy) and transcribes the React layer onto
 octane's hooks. The shipped surface matches react-router 1:1 — existing code
 works by changing the import.
 
-**This is a phased port.** Shipped today: the data-mode core. The full roadmap
-(declarative `<Routes>`, browser/hash routers + NavLink, Form/fetchers,
+**This is a phased port.** Shipped today: the data-mode core and declarative
+mode (`MemoryRouter`, `<Routes>`/`<Route>`, `<Navigate>`). The full roadmap
+(browser/hash routers + NavLink, Form/fetchers,
 blockers/scroll/view-transitions, static SSR) lives in
 [docs/remix-router-port-plan.md](../../docs/remix-router-port-plan.md), and
 `tests/conformance/parity.test.ts` pins exactly which upstream exports each
@@ -47,7 +48,7 @@ function User() @{
 
 | import | what you get | notes |
 | --- | --- | --- |
-| `@octanejs/remix-router` | the vendored core surface (matchPath, redirect, data, …) + `createMemoryRouter`, `RouterProvider`, `Outlet`, `Await`, `Link`, `useLinkClickHandler`, and the full read-hook family (`useLoaderData`, `useNavigate`, `useNavigation`, `useRouteError`, …) | Phase 0 + A + Link |
+| `@octanejs/remix-router` | the vendored core surface (matchPath, redirect, data, …) + `createMemoryRouter`, `RouterProvider`, `Outlet`, `Await`, `Link`, `useLinkClickHandler`, the full read-hook family (`useLoaderData`, `useNavigate`, `useNavigation`, `useRouteError`, …), and declarative mode (`MemoryRouter`, `Routes`/`Route`, `Navigate`, `createRoutesFromChildren`/`Elements`) | Phases 0 + A + B + Link |
 | `@octanejs/remix-router/dom` | `RouterProvider` with octane's `flushSync` wired in | mirror of `react-router/dom` |
 
 ## How it works
@@ -64,6 +65,13 @@ function User() @{
   upstream's TrackedPromise decoration kept verbatim, so `useAsyncValue`/
   `useAsyncError` are unchanged. Render-prop children work via octane's
   `isChildrenBlock` guard.
+- `<Routes>` accepts BOTH children forms: descriptor children
+  (`createRoutesFromElements`, `{expr}` arrays) are walked upstream-style,
+  while the natural `.tsrx` block-children authoring goes through a
+  registration collector — each `<Route>` registers its config in a pre-paint
+  layout effect, so the first paint already shows the matched route.
+  Registration order is mount order, which differs from upstream's source
+  order only for `matchRoutes` score ties (pinned + documented).
 - Refs are props (no `forwardRef`); hooks are keyed by octane's
   compiler-injected per-call-site slots, forwarded through every custom hook.
 
