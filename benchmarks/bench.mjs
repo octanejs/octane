@@ -1,12 +1,13 @@
 // Unified Octane benchmark runner — the CI/regression layer that makes every
 // per-suite number load-bearing.
 //
-// It knows how to, for each suite: start the fixture dev servers it needs (pnpm
-// --filter <pkg> dev), wait for their strict ports, run the suite's harness with
-// BENCH_JSON pointed at a temp file, collect the machine-readable results, then
-// kill the servers by port. Suites run SEQUENTIALLY so ports and CPU never
-// contend. The collected JSON per suite lands in the results dir (default
-// benchmarks/results, gitignored) and drives three checks:
+// It knows how to, for each suite: production-build the fixture apps, start
+// their preview servers (pnpm --filter <pkg> preview), wait for their strict
+// ports, run the suite's harness with BENCH_JSON pointed at a temp file, collect
+// the machine-readable results, then kill the servers by port. Suites run
+// SEQUENTIALLY so ports and CPU never contend. The collected JSON per suite
+// lands in the results dir (default benchmarks/results, gitignored) and drives
+// three checks:
 //
 //   --record    write the current numbers as the committed absolute baselines
 //               (baselines/local/<suite>.json).
@@ -43,10 +44,11 @@ const BENCH = __dirname;
 // ── manifest ────────────────────────────────────────────────────────────────
 // Each suite: name, cwd (where its harness resolves its deps — playwright/vite
 // live in the fixture package's node_modules, so the harness MUST run from the
-// suite dir), servers [{ filter, port }] to boot in dev mode, and runs[] — one
-// or more harness invocations whose BENCH_JSON payloads are MERGED (their
-// `targets` arrays concatenated) into a single suite result. `iter` supplies the
-// iteration knob (normal vs quick) each run's argv builder receives.
+// suite dir), servers [{ filter, port }] to build and boot in production preview
+// mode, and runs[] — one or more harness invocations whose BENCH_JSON payloads
+// are MERGED (their `targets` arrays concatenated) into a single suite result.
+// `iter` supplies the iteration knob (normal vs quick) each run's argv builder
+// receives.
 //
 // `env(iter, quick)` returns extra process env for a run — used by the deopt
 // suites to pair a tuned fixture against its naive/de-opt twin via TARGETS.
@@ -163,9 +165,9 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
-		// News is build-based (no dev servers): its harness vite-builds each target
-		// and times the built SSR + hydration. One invocation per target; the
-		// per-target single-target payloads are merged into one `news` result.
+		// News is build-based (no preview servers): its harness vite-builds each
+		// target and times the built SSR + hydration. One invocation per target;
+		// the per-target single-target payloads are merged into one `news` result.
 		name: 'news',
 		cwd: 'news',
 		servers: [],
@@ -421,14 +423,40 @@ function killPort(port) {
 	}
 }
 
-// Start `pnpm --filter <filter> dev` detached, logging to the results dir. We
-// track BOTH the child (to signal its process group) and the port (the reliable
-// kill handle — vite forks, so killing by listening port is what actually frees
-// it, per the spec).
+function tailFile(file, lines = 15) {
+	if (!fs.existsSync(file)) return '(no log)';
+	return fs.readFileSync(file, 'utf8').split('\n').slice(-lines).join('\n');
+}
+
+const builtServerFilters = new Set();
+
+function buildServer(filter, logDir) {
+	if (builtServerFilters.has(filter)) return;
+	const logPath = path.join(logDir, `build-${filter}.log`);
+	const logFd = fs.openSync(logPath, 'w');
+	const res = spawnSync('pnpm', ['--filter', filter, 'build'], {
+		cwd: REPO,
+		stdio: ['ignore', logFd, logFd],
+	});
+	fs.closeSync(logFd);
+	if ((res.status ?? 1) !== 0) {
+		throw new Error(
+			`build failed for ${filter}\n--- log tail (${path.relative(REPO, logPath)}) ---\n${tailFile(logPath)}`,
+		);
+	}
+	builtServerFilters.add(filter);
+}
+
+// Start `pnpm --filter <filter> preview` detached, logging to the results dir.
+// The corresponding `build` has already run, so browser suites compare
+// production bundles instead of Vite's dev transform/runtime. We track BOTH the
+// child (to signal its process group) and the port (the reliable kill handle —
+// vite forks, so killing by listening port is what actually frees it, per the
+// spec).
 function startServer(filter, port, logDir) {
 	const logPath = path.join(logDir, `server-${port}.log`);
 	const logFd = fs.openSync(logPath, 'w');
-	const child = spawn('pnpm', ['--filter', filter, 'dev'], {
+	const child = spawn('pnpm', ['--filter', filter, 'preview'], {
 		cwd: REPO,
 		detached: true,
 		stdio: ['ignore', logFd, logFd],
@@ -485,18 +513,17 @@ async function runSuite(suite) {
 	const started = [];
 	try {
 		for (const srv of suite.servers) {
-			console.error(`  starting ${srv.filter} on :${srv.port}…`);
+			console.error(`  building ${srv.filter}…`);
+			buildServer(srv.filter, RESULTS_DIR);
+			console.error(`  starting ${srv.filter} preview on :${srv.port}…`);
 			killPort(srv.port); // clear any stale listener from a crashed prior run
 			started.push(startServer(srv.filter, srv.port, RESULTS_DIR));
 		}
 		for (const srv of started) {
 			const ok = await waitForPort(srv.port);
 			if (!ok) {
-				const tail = fs.existsSync(srv.logPath)
-					? fs.readFileSync(srv.logPath, 'utf8').split('\n').slice(-15).join('\n')
-					: '(no log)';
 				throw new Error(
-					`server ${srv.filter} never came up on :${srv.port}\n--- log tail ---\n${tail}`,
+					`server ${srv.filter} never came up on :${srv.port}\n--- log tail (${path.relative(REPO, srv.logPath)}) ---\n${tailFile(srv.logPath)}`,
 				);
 			}
 			console.error(`  ✓ :${srv.port} ready`);
@@ -603,7 +630,8 @@ function loadRatios() {
 
 // For a set of collected suite results, check every guard whose (suite, target,
 // reference, op) all ran. ratio = target.median / reference.median; a breach is
-// ratio > maxRatio. Returns { checked, breaches[], suggestions[] }.
+// ratio > maxRatio or, for cliff/advantage guards, ratio < minRatio. Returns
+// { checked, breaches[], suggestions[] }.
 function checkRatios(resultsBySuite, guards) {
 	const breaches = [];
 	const suggestions = [];
@@ -621,12 +649,25 @@ function checkRatios(resultsBySuite, guards) {
 		if (tMed == null || rMed == null || rMed === 0) continue; // both sides must have run
 		checked++;
 		const ratio = tMed / rMed;
-		const breach = ratio > g.maxRatio;
-		if (breach) breaches.push({ ...g, ratio });
-		// Suggest a fresh guard at 1.5× the observed ratio (rounded up to 1 dp).
-		suggestions.push({ ...g, observedRatio: ratio, suggestedMaxRatio: Math.ceil(ratio * 15) / 10 });
+		const hasMax = typeof g.maxRatio === 'number';
+		const hasMin = typeof g.minRatio === 'number';
+		const highBreach = hasMax && ratio > g.maxRatio;
+		const lowBreach = hasMin && ratio < g.minRatio;
+		if (highBreach || lowBreach) breaches.push({ ...g, ratio, highBreach, lowBreach });
+		// Suggest fresh guard bounds with 1.5× headroom around the observed ratio.
+		const suggestion = { ...g, observedRatio: ratio };
+		if (hasMax) suggestion.suggestedMaxRatio = Math.ceil(ratio * 15) / 10;
+		if (hasMin) suggestion.suggestedMinRatio = Math.floor((ratio / 1.5) * 10) / 10;
+		suggestions.push(suggestion);
 	}
 	return { checked, breaches, suggestions };
+}
+
+function formatRatioBounds(guard) {
+	const bounds = [];
+	if (typeof guard.minRatio === 'number') bounds.push(`minRatio ${guard.minRatio}`);
+	if (typeof guard.maxRatio === 'number') bounds.push(`maxRatio ${guard.maxRatio}`);
+	return bounds.join(', ');
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
@@ -692,7 +733,7 @@ function checkRatios(resultsBySuite, guards) {
 		} else {
 			for (const b of breaches) {
 				console.log(
-					`  BREACH ${b.suite} ${b.op}: ${b.target}/${b.reference} = ${b.ratio.toFixed(2)}x > maxRatio ${b.maxRatio}`,
+					`  BREACH ${b.suite} ${b.op}: ${b.target}/${b.reference} = ${b.ratio.toFixed(2)}x outside ${formatRatioBounds(b)}`,
 				);
 			}
 		}

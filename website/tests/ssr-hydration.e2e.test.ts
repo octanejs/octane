@@ -32,13 +32,13 @@ const ROUTES = ['/', '/docs', '/benchmarks', '/playground', '/view-transitions']
 // sixth framework series (Vue Vapor) and memo-wall/portal-swarm/ssr-throughput
 // gained Solid/Vue bars — real content growth, not marker minting.
 //
-// `/benchmarks` re-based 2026-07-11 (measured 14,101): memo-wall/portal-swarm/
-// ssr-throughput gained Ripple bars + table columns — real content growth, not
-// marker minting.
+// `/` + `/benchmarks` re-based 2026-07-12 after the homepage/benchmarks charts
+// picked up TodoMVC, chat-stream, async-waterfall and bundle-size (measured
+// / 2,173 · /benchmarks 17,743): real content growth, not marker minting.
 const COMMENT_CEILINGS: Record<string, number> = {
-	'/': 1995,
+	'/': 2500,
 	'/docs': 415,
-	'/benchmarks': 14400,
+	'/benchmarks': 20500,
 	'/playground': 195,
 	// The view-transitions demo (added with the plan's Phase 5, measured 189) —
 	// a handful of boundaries + control-flow arms.
