@@ -78,12 +78,15 @@ describe('slotHooks surgical pass', () => {
 		expect(code).toContain('export const widen = <T>(x: T): T => x;');
 		// custom-hook calls are NOT wrapped here (the .tsrx/.tsx caller does that)
 		expect(code).not.toContain('withSlot(');
-		// purely additive: stripping the injected slots restores the original source
-		// (default = no hmr → Symbol("<hash>#<n>") decls; Symbol.for is dev-serve only)
+		// Apart from inferred dependency arrays, the transform remains surgical:
+		// stripping slots restores every original byte. (Default = no HMR →
+		// Symbol("<hash>#<n>") declarations; Symbol.for is dev-serve only.)
 		const stripped = code
 			.replace(/^const _h\$\d+ = Symbol\("[^"]*"\);\n/gm, '')
 			.replace(/, _h\$\d+(?=[),])/g, '');
-		expect(stripped).toBe(SRC);
+		expect(stripped).toBe(
+			SRC.replace("useCallback(() => 'nd:' + label)", "useCallback(() => 'nd:' + label, [label])"),
+		);
 	});
 
 	it('returns null (untouched) for modules with no octane base hook', () => {

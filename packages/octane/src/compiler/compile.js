@@ -36,6 +36,7 @@ import {
 } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
+import { applyHookDependencies } from './hook-deps.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -1442,6 +1443,11 @@ export function compile(source, filename, options) {
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	normalizeArrowComponents(ast);
+	// Omitted dependency lists are compiler-owned: infer reactive captures
+	// before any component splitting/hoisting so every lexical binding is still
+	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
+	// through untouched.
+	applyHookDependencies(ast, { filename });
 	const hmrEnabled = !!(options && options.hmr);
 	// Dev mode: emit dev-only hydration source-location metadata (a per-component
 	// `__s.locs` table of structured {line,column} keyed by slot index + the module file
@@ -1909,6 +1915,10 @@ function compileServer(source, filename, options) {
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	normalizeArrowComponents(ast);
+	// Mirror the client transform exactly. Effects are server no-ops, but
+	// useMemo/useCallback execute during SSR and must receive the same inferred
+	// dependency shape as hydration's client compile.
+	applyHookDependencies(ast, { filename });
 	const ctx = {
 		filename,
 		mode: 'server',

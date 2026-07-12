@@ -43,6 +43,24 @@ keyed `@for` directive (each item renders in its own scope, so per-item hooks
 get per-item state), or extract the loop body into a child component. `use()`
 and `useContext` do work inside loops — they aren't slot-keyed.
 
+## Dependency arrays are optional
+
+**Write the closure and let the compiler track it.** When you omit the
+dependency list from `useEffect`, `useLayoutEffect`, `useInsertionEffect`,
+`useMemo`, `useCallback`, or `useImperativeHandle`, Octane derives it from the
+values the callback captures. Proven-stable setters, dispatchers, refs, state
+getters, and effect events are left out automatically.
+
+```tsrx
+useEffect(() => {
+	syncRoom(room.id);
+}); // inferred: [syncRoom, room.id]
+```
+
+Explicit arrays remain authoritative: `[]` keeps the React mount/reconnect-only
+meaning and `[a, b]` tracks exactly those values. Pass `null` when you
+intentionally want the effect or computation to run after every render.
+
 ## State hooks have a current-state getter
 
 **This replaces a common React ref workaround.** `useState` and `useReducer`
