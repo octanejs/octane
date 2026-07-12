@@ -4,8 +4,9 @@ A second adjacent benchmark to [`recursive-context`](../recursive-context/). The
 recursive-context bench measures wide fan-out across a balanced binary tree. This
 one measures the **signal vs hook update cascade** along a deep linear chain.
 
-The bench is named honestly: it has a structural bias toward signal-based
-reactivity (Solid, ripple) over hook-based reactivity (React, octane). When
+The bench is named honestly: it has a structural bias toward fine-grained
+reactivity (Solid, Ripple, Svelte, Vue Vapor) over hook-based reactivity
+(React, Preact, Octane). When
 state changes at a mid-chain node, signal frameworks re-evaluate **only the text
 expression that read the signal** — they don't re-render any component bodies.
 Hook frameworks re-render the owning component, which cascades through every
@@ -25,6 +26,8 @@ benchmarks/signal-favoring/
 ├── ripple/            # Vite app, dev :5193
 ├── vue-vapor/         # Vite app, dev :5183 — Vue 3.6 Vapor: 100 SFCs, one per chain
 │                      #   link (Vue is one component per SFC); bumps return nextTick()
+├── preact/           # Vite app, dev :5265 — Preact hooks/VDOM cascade
+├── svelte/           # Vite app, dev :5276 — Svelte 5 runes, 100 generated SFCs
 ├── gen.mjs            # Source generator for the App fixtures (scaffold; see note below)
 ├── run.mjs            # Playwright harness — drives all adapters
 ├── package.json       # umbrella: `pnpm bench`
@@ -53,21 +56,27 @@ Each stateful component owns its own counter via the framework's native primitiv
 | **solid**      | `createSignal`           | re-evaluate the `{v()}` text expression in `CN`; descendants untouched |
 | **ripple**     | `track()`                | re-evaluate the `{v}` text expression in `CN`; descendants untouched   |
 | **vue-vapor**  | `shallowRef`             | re-run the `{{ v }}` text renderEffect in `CN`; descendants untouched  |
+| **preact**     | `useState`               | re-render of `CN`, cascade through `CN+1 .. C100`                       |
+| **svelte**     | `$state`                 | re-run the value text effect in `CN`; descendants untouched            |
 
 Generator-driven so the chain length, stateful spacing, and per-component shape
 stay consistent across frameworks. Edit `gen.mjs` and re-run `node gen.mjs` to
-regenerate the App fixtures (octane-tsrx, octane-jsx, ripple, react, solid).
+regenerate the component fixtures (octane-tsrx, octane-jsx, ripple, react,
+solid, preact, and the Svelte SFC chain).
 The vue-vapor chain is the same shape spread over 100 SFC files (Vue is one
 component per SFC), with the stateful links registering their bump closures in
 `src/bumps.js`; Vue has no public synchronous flush, so every `__bumpAtN`
 returns `nextTick()` and the harness awaits it inside the timed window (and
 between reps, so bumps can't coalesce into one commit).
 
-> **Note:** `gen.mjs` scaffolds each target's `App.*` and `main.*`, but the
-> `main.*` files are then hand-finished with the `__sweepBatched` /
-> `__sweepBatchedReverse` globals the harness drives (and each framework's flush
-> wrapper differs). So after `node gen.mjs` re-add those (and run `pnpm format`)
-> before benching — or just edit the `App.*` shape and leave the mains alone.
+> **Note:** `gen.mjs` deliberately regenerates component-chain sources only.
+> The `main.*` adapters stay hand-maintained because the `__sweepBatched` /
+> `__sweepBatchedReverse` globals and flush semantics differ by framework.
+
+Native **Preact** (`:5265`) deliberately uses hooks, making it a cascade/VDOM
+column rather than a signals variant. **Svelte 5** (`:5276`) uses 100 generated
+runes-mode SFCs, so a scalar write updates its owning text effect without
+recreating descendants.
 
 ## Measurements
 
@@ -114,18 +123,9 @@ pnpm install
 # 2. (Optional) regenerate fixtures if you edited gen.mjs:
 node benchmarks/signal-favoring/gen.mjs
 
-# 3. Start each adapter's dev server (separate terminals):
-pnpm --filter octane-tsrx-signal-bench dev   # :5190
-pnpm --filter octane-jsx-signal-bench dev    # :5194
-pnpm --filter solid-signal-bench dev         # :5191
-pnpm --filter react-signal-bench dev         # :5192
-pnpm --filter ripple-signal-bench dev        # :5193
-pnpm --filter vue-vapor-signal-bench dev     # :5183
-
-# 4. Run the harness:
-pnpm --filter @benchmarks/signal-favoring bench
-# or for a longer sample:
-pnpm --filter @benchmarks/signal-favoring bench:long
+# 3. Production-build, preview, and drive all eight targets:
+node benchmarks/bench.mjs --quick signal-favoring
+node benchmarks/bench.mjs signal-favoring
 ```
 
 ## Measurement contract

@@ -1,0 +1,22 @@
+{
+  "name": "svelte-portal-swarm-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "portal-swarm benchmark fixture for Svelte 5.",
+  "scripts": {
+    "dev": "vite --host --port 5279 --strictPort",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./jsconfig.json",
+    "preview": "vite preview --port 5279 --strictPort"
+  },
+  "dependencies": {
+    "svelte": "catalog:default"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "catalog:default",
+    "svelte-check": "catalog:default",
+    "vite": "catalog:default",
+    "terser": "catalog:default"
+  }
+}

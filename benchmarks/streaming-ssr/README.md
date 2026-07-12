@@ -8,20 +8,25 @@ built streaming render APIs directly:
 | ------------- | ---------------------------------------------------------- |
 | `octane-tsrx` | `renderToPipeableStream` from `octane/server`               |
 | `react`       | `renderToPipeableStream` from `react-dom/server` (Fizz)     |
+| `preact`      | `renderToPipeableStream` from `preact-render-to-string`     |
 | `solid`       | `renderToStream` from `@solidjs/web` (Solid 2.0)            |
 | `ripple`      | `render(App, { stream })` + `create_ssr_stream()` (Ripple)  |
 
-All four **do stream** (ripple 0.3.86 gained a stream-mode `render`; see the
+All five **do stream** (ripple 0.3.86 gained a stream-mode `render`; see the
 caveat below). Chunks are collected via each API's natural destination — a
 plain `{ write, end }` object (octane, solid), a minimal Node `Writable`
-(React insists on one), or a web-stream reader loop (ripple) — timestamped
+(React and Preact use one), or a web-stream reader loop (ripple) — timestamped
 with `performance.now()` as they land in the harness callback.
+
+Svelte 5 is explicitly **N/A** here: its public server API returns buffered
+`{ body, head }` output and exposes no component streaming renderer. Wrapping
+that result in a custom stream would benchmark the wrapper rather than Svelte.
 
 ## The workload
 
-One product page, byte-identical in DOM shape across targets (only the
-data-acquisition glue differs — `use()` / `use()` / `createMemo(promise)` /
-`trackAsync`):
+One product page, byte-identical in DOM shape across targets. Only the
+data-acquisition glue differs: Octane/React `use()`, a cached Preact resource
+read, Solid `createMemo(promise)`, or Ripple `trackAsync`.
 
 - a **synchronous shell** (~50 elements: masthead, 8-link nav, hero with
   stats, grid chrome, footer), plus
@@ -63,7 +68,7 @@ deterministic `setTimeout` schedule:
   suspended thenables (`Promise.all`), then re-runs a **full page pass**. With
   10 independent boundaries that means the staggered schedule produces exactly
   **2 chunks** (shell, then one segment batch after the *slowest* promise) —
-  octane does not flush card 0 at 5ms the way React/Solid/Ripple do. The
+  octane does not flush card 0 at 5ms the way React/Preact/Solid/Ripple do. The
   metrics here can't see per-boundary latency directly, but `chunkCount` = 2
   is its fingerprint, and any regression that adds rounds (or passes per
   round) shows up in `total_staggered` tail and `total_allfast`.
@@ -72,7 +77,7 @@ deterministic `setTimeout` schedule:
   re-pass + segment flush. If N boundaries with distinct resolve ticks ever
   stop coalescing into one round, this crashes first. Don't tune the runtime
   from this suite alone — profile `runStream`'s re-pass loop.
-- **react / solid / ripple** — reference engines measured on the same clock;
+- **React / Preact / Solid / Ripple** — reference engines measured on the same clock;
   their per-boundary flushing is the granularity octane's round model trades
   away.
 
@@ -80,12 +85,15 @@ deterministic `setTimeout` schedule:
 
 - Same DOM shape, same data schedule, promises created at render start for
   every target; the suspending read lives in a child component of the
-  boundary in all four fixtures.
+  boundary in all five fixtures.
 - **octane**: per-round full re-passes (documented divergence from React Fizz
   in `runtime.server.ts`) — batches all boundaries that resolve in the same
   round into one chunk, and re-renders the whole page each round.
 - **React**: splits the shell across ~2KB view-buffer writes (`chunkCount`
   counts them); streams one segment + swap script per boundary.
+- **Preact**: uses `preact-render-to-string/stream-node` with a real Node
+  `Writable`; its cached resource read throws each card promise into a native
+  compat Suspense boundary.
 - **Solid 2.0**: schedules its first flush ~1.5–2ms after render start; any
   boundary that resolves before that flush is **inlined into the shell**
   (no fallback). In all-fast this legitimately collapses the whole render to
@@ -94,7 +102,7 @@ deterministic `setTimeout` schedule:
 - **Ripple**: streams per-block chunks with the right timing, but its
   streamed segments are raw block HTML **without client swap/seed wiring**
   (an upstream `TODO` in `ripple/src/runtime/internal/server/index.js`), so
-  it ships fewer bytes and does less per-chunk work than the other three.
+  it ships fewer bytes and does less per-chunk work than the other four.
   Treat its numbers as a slightly-lighter-duty reference, not a strict
   apples-to-apples engine comparison.
 

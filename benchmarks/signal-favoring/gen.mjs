@@ -1,7 +1,9 @@
 // Generator for the signal-favoring bench fixtures.
 //
-// Emits four <framework>/src/App.* files: 100 uniquely-named components in a
-// linear chain C1 → C2 → ... → C100. Stateful counters live at C1, C11, C21,
+// Emits the generated component sources for every target whose 100-component
+// chain is maintained here. Adapter main files are intentionally hand-written:
+// their framework-specific flush and batching contracts are too nuanced to
+// regenerate from the component template. Stateful counters live at C1, C11, C21,
 // ..., C91. On `__bumpAt<N>`, signal frameworks (solid, ripple) re-evaluate
 // only the `{count}` text node inside CN; hook frameworks (react, octane)
 // re-render CN and cascade through CN+1..C100. The bench measures the median
@@ -153,6 +155,18 @@ function genReact() {
 }
 
 // ----------------------------------------------------------------------------
+// preact (jsx, hook/VDOM model)
+// ----------------------------------------------------------------------------
+function genPreact() {
+	return genReact()
+		.replace("import { useState } from 'react';", "import { useState } from 'preact/hooks';")
+		.replace(
+			'// React re-renders the owning component and cascades through its descendants.',
+			'// Preact re-renders the owning component and cascades through its descendants.',
+		);
+}
+
+// ----------------------------------------------------------------------------
 // solid (jsx, Solid 2.0)
 // ----------------------------------------------------------------------------
 function genSolid() {
@@ -184,108 +198,25 @@ function genSolid() {
 }
 
 // ----------------------------------------------------------------------------
-// main.{js,jsx} per framework — each imports the App + 10 bump fns and
-// installs window.__mount/__unmount/__reset/__ready + window.__bumpAt<N>.
+// svelte (one generated SFC per component, matching the framework's native
+// component compilation model)
 // ----------------------------------------------------------------------------
 
-const bumpImports = STATEFUL_INDICES.map((i) => `bumpAt${i}`).join(', ');
-const bumpExports = STATEFUL_INDICES.map(
-	(i) => `window.__bumpAt${i} = () => __WRAP__(bumpAt${i});`,
-).join('\n');
-
-function genRippleNewMain() {
-	let out = `import { createRoot, flushSync } from 'octane';\n`;
-	out += `import App, { ${bumpImports} } from './App.tsrx';\n\n`;
-	out += `const target = document.getElementById('main');\n`;
-	out += `let root = null;\n\n`;
-	out += `// index.html does NOT auto-mount — harness wraps each call in performance.now().\n`;
-	out += `window.__mount = () => {\n`;
-	out += `  root = createRoot(target);\n`;
-	out += `  root.render(App, {});\n`;
-	out += `};\n`;
-	out += `window.__unmount = () => { if (root) { root.unmount(); root = null; } };\n`;
-	out += `window.__reset = () => {\n`;
-	out += `  if (root) { root.unmount(); root = null; }\n`;
-	out += `  while (target.firstChild) target.removeChild(target.firstChild);\n`;
-	out += `};\n`;
-	out += bumpExports.replace(/__WRAP__/g, 'flushSync') + '\n';
-	out += `window.__ready = true;\n`;
+function genSvelteComponent(i) {
+	if (i === N) return `<span class="leaf">${i}</span>\n`;
+	let out = `<script>\n\timport C${i + 1} from './C${i + 1}.svelte';\n`;
+	if (isStateful(i)) {
+		out =
+			`<script module>\n\tlet update;\n\texport function bumpAt${i}() {\n\t\tupdate?.();\n\t}\n</script>\n\n` +
+			out;
+		out += `\n\tlet value = $state(0);\n\tupdate = () => {\n\t\tvalue += 1;\n\t};\n`;
+	}
+	out += `</script>\n\n<div class="c">${i}${isStateful(i) ? ':{value}' : ''} <C${i + 1} /></div>\n`;
 	return out;
 }
 
-function genOctaneJsxMain() {
-	let out = `import { createRoot, flushSync } from 'octane';\n`;
-	out += `import App, { ${bumpImports} } from './App.tsx';\n\n`;
-	out += `const target = document.getElementById('main');\n`;
-	out += `let root = null;\n\n`;
-	out += `// index.html does NOT auto-mount — harness wraps each call in performance.now().\n`;
-	out += `window.__mount = () => {\n`;
-	out += `  root = createRoot(target);\n`;
-	out += `  root.render(App, {});\n`;
-	out += `};\n`;
-	out += `window.__unmount = () => { if (root) { root.unmount(); root = null; } };\n`;
-	out += `window.__reset = () => {\n`;
-	out += `  if (root) { root.unmount(); root = null; }\n`;
-	out += `  while (target.firstChild) target.removeChild(target.firstChild);\n`;
-	out += `};\n`;
-	out += bumpExports.replace(/__WRAP__/g, 'flushSync') + '\n';
-	out += `window.__ready = true;\n`;
-	return out;
-}
-
-function genRippleMain() {
-	let out = `import { mount, flushSync } from 'ripple';\n`;
-	out += `import App, { ${bumpImports} } from './App.tsrx';\n\n`;
-	out += `const target = document.getElementById('main');\n`;
-	out += `let unmount = null;\n\n`;
-	out += `window.__mount = () => { unmount = mount(App, { target, props: {} }); };\n`;
-	out += `window.__unmount = () => { if (unmount) { unmount(); unmount = null; } };\n`;
-	out += `window.__reset = () => {\n`;
-	out += `  if (unmount) { unmount(); unmount = null; }\n`;
-	out += `  while (target.firstChild) target.removeChild(target.firstChild);\n`;
-	out += `};\n`;
-	out += bumpExports.replace(/__WRAP__/g, 'flushSync') + '\n';
-	out += `window.__ready = true;\n`;
-	return out;
-}
-
-function genReactMain() {
-	let out = `import { createRoot } from 'react-dom/client';\n`;
-	out += `import { flushSync } from 'react-dom';\n`;
-	out += `import { createElement } from 'react';\n`;
-	out += `import App, { ${bumpImports} } from './App.jsx';\n\n`;
-	out += `const target = document.getElementById('main');\n`;
-	out += `let root = null;\n\n`;
-	out += `window.__mount = () => {\n`;
-	out += `  root = createRoot(target);\n`;
-	out += `  flushSync(() => root.render(createElement(App)));\n`;
-	out += `};\n`;
-	out += `window.__unmount = () => { if (root) { root.unmount(); root = null; } };\n`;
-	out += `window.__reset = () => {\n`;
-	out += `  if (root) { root.unmount(); root = null; }\n`;
-	out += `  while (target.firstChild) target.removeChild(target.firstChild);\n`;
-	out += `};\n`;
-	// React's flushSync takes a thunk, same shape as ripple/octane.
-	out += bumpExports.replace(/__WRAP__/g, 'flushSync') + '\n';
-	out += `window.__ready = true;\n`;
-	return out;
-}
-
-function genSolidMain() {
-	let out = `import { render } from '@solidjs/web';\n`;
-	out += `import App, { ${bumpImports} } from './App.jsx';\n\n`;
-	out += `const target = document.getElementById('main');\n`;
-	out += `let dispose = null;\n\n`;
-	out += `window.__mount = () => { dispose = render(() => <App />, target); };\n`;
-	out += `window.__unmount = () => { if (dispose) { dispose(); dispose = null; } };\n`;
-	out += `window.__reset = () => {\n`;
-	out += `  if (dispose) { dispose(); dispose = null; }\n`;
-	out += `  while (target.firstChild) target.removeChild(target.firstChild);\n`;
-	out += `};\n`;
-	// Solid signal sets are synchronous; harness rAF gate handles paint settling.
-	out += bumpExports.replace(/__WRAP__\((.*?)\)/g, '$1()') + '\n';
-	out += `window.__ready = true;\n`;
-	return out;
+function genSvelteApp() {
+	return `<script>\n\timport C1 from './C1.svelte';\n</script>\n\n<C1 />\n`;
 }
 
 // ----------------------------------------------------------------------------
@@ -294,15 +225,16 @@ function genSolidMain() {
 
 const targets = [
 	{ rel: 'octane-tsrx/src/App.tsrx', content: genRippleNew() },
-	{ rel: 'octane-tsrx/src/main.js', content: genRippleNewMain() },
 	{ rel: 'octane-jsx/src/App.tsx', content: genOctaneJsx() },
-	{ rel: 'octane-jsx/src/main.js', content: genOctaneJsxMain() },
 	{ rel: 'ripple/src/App.tsrx', content: genRipple() },
-	{ rel: 'ripple/src/main.js', content: genRippleMain() },
 	{ rel: 'react/src/App.jsx', content: genReact() },
-	{ rel: 'react/src/main.jsx', content: genReactMain() },
 	{ rel: 'solid/src/App.jsx', content: genSolid() },
-	{ rel: 'solid/src/main.jsx', content: genSolidMain() },
+	{ rel: 'preact/src/App.jsx', content: genPreact() },
+	{ rel: 'svelte/src/App.svelte', content: genSvelteApp() },
+	...Array.from({ length: N }, (_, i) => ({
+		rel: `svelte/src/C${i + 1}.svelte`,
+		content: genSvelteComponent(i + 1),
+	})),
 ];
 
 for (const t of targets) {

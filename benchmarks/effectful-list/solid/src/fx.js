@@ -8,7 +8,7 @@
 // live) via setRowOwner() and applied by the shared rowRef through
 // runWithOwner. The cleanup still runs exactly once per row disposal, keyed to
 // the correct per-row owner, keeping the harness's expected counter values
-// identical across all five targets.
+// identical across all eight targets.
 
 import { onCleanup, runWithOwner } from 'solid-js';
 

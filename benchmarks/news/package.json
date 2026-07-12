@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "News-site SSR + hydration benchmark - measures pure server render time and full client hydration time for a large lorem-ipsum document. Targets: octane (.tsrx + .tsx), ripple, Solid 2.0, React 19.",
+  "description": "News-site SSR + hydration benchmark - measures pure server render time and full client hydration time for a large lorem-ipsum document across Octane and reference frameworks.",
   "scripts": {
     "gen": "node gen.mjs",
     "bench": "node run.mjs",
@@ -11,7 +11,9 @@
     "bench:octane-jsx": "node run.mjs octane-jsx",
     "bench:ripple": "node run.mjs ripple",
     "bench:solid": "node run.mjs solid",
-    "bench:react": "node run.mjs react"
+    "bench:react": "node run.mjs react",
+    "bench:preact": "node run.mjs preact",
+    "bench:svelte": "node run.mjs svelte"
   },
   "dependencies": {
     "playwright": "catalog:default",

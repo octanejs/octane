@@ -1,4 +1,4 @@
-# portal-swarm bench — octane vs react vs solid vs ripple vs vue-vapor
+# portal-swarm bench — portal lifecycle across frameworks
 
 A sibling of [`js-framework`](../js-framework/), [`dbmon`](../dbmon/),
 [`recursive-context`](../recursive-context/) and
@@ -33,7 +33,10 @@ benchmarks/portal-swarm/
 ├── octane-tsrx/   # Vite app, dev :5210 — octane authored in .tsrx (+ a plain-.ts portal helper)
 ├── react/         # Vite app, dev :5211 (React 19, production mode)
 ├── solid/         # Vite app, dev :5212 (Solid 2.0, hand-rolled portal — see caveats)
+├── ripple/        # Vite app, dev :5224 (built-in Portal)
 ├── vue-vapor/     # Vite app, dev :5181 (Vue 3.6 Vapor, VaporTeleport)
+├── preact/       # Vite app, dev :5268 (preact/compat createPortal)
+├── svelte/       # Vite app, dev :5279 (Svelte attachment portal pattern)
 ├── run.mjs        # Playwright harness — gates + timings
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
@@ -88,6 +91,11 @@ root-event delegation onto its target, and 200 portals sharing one target
 register the same module-level dispatcher, which `addEventListener` dedupes —
 a tooltip click bumps `__hits` exactly once.
 
+**Preact** (`:5268`) uses `preact/compat`'s `createPortal`. **Svelte 5**
+(`:5279`) has no built-in portal component, so its three sections honestly
+collapse onto a documented userland pattern: a modern attachment moves the
+compiled tooltip to the requested target and removes it during cleanup.
+
 ## Ops
 
 | op                        | what it stresses                                                                    |
@@ -104,9 +112,10 @@ a tooltip click bumps `__hits` exactly once.
 `dispatch_through_portal` handlers only bump a `window.__hits` counter — **no
 setState** — so the timed window is pure event dispatch (delegation lookup +
 portal bubble hop) with discrete-flush work excluded. All ops commit inside the
-timed adapter call — synchronously where the framework allows it (octane/react
-`flushSync`, solid `flush()`); vue-vapor returns a thenable the harness awaits —
-GC is forced before every sample, and sub-ms ops loop-and-divide.
+timed adapter call — synchronously where the framework allows it (Octane,
+React, Preact, Ripple, and Svelte via their public flush APIs; Solid via
+`flush()`); Vue Vapor returns a thenable the harness awaits. GC is forced before
+every sample, and sub-ms ops loop-and-divide.
 
 The harness also prints a `distinct/shared` cycle ratio (the per-target attach
 cost) and a `B_stable/B` rerender ratio (lower = the unchanged-portal bail
@@ -124,18 +133,12 @@ click-through hit counting. Cheap per-sample gates run inside every timed loop
 
 ## Running
 
-Start the three preview servers (production builds), then run the harness:
+The unified runner builds and starts every production preview server before it
+runs the harness:
 
 ```bash
-# build + preview each (production); run from the repo root
-pnpm --filter octane-tsrx-portal-swarm-bench build && pnpm --filter octane-tsrx-portal-swarm-bench preview &
-pnpm --filter react-portal-swarm-bench       build && pnpm --filter react-portal-swarm-bench       preview &
-pnpm --filter solid-portal-swarm-bench       build && pnpm --filter solid-portal-swarm-bench       preview &
-
-# then, from benchmarks/portal-swarm:
-pnpm bench           # 20 timed iterations (+5 warmup) per op
-pnpm bench:long      # 40 iterations
-node run.mjs 3       # reduced-iteration smoke pass
+node benchmarks/bench.mjs --quick portal-swarm
+node benchmarks/bench.mjs portal-swarm
 BENCH_JSON=out.json pnpm bench   # also write machine-readable results
 ```
 

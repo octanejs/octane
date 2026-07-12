@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "async-waterfall umbrella - drives the 10-level nested-async fixtures (octane use()/Suspense/transitions vs React 19 vs Solid 2.0 async memos vs ripple effects) via Playwright to measure the suspense waterfall.",
+  "description": "10-level nested-async benchmark across Octane, React, Preact, Solid, Svelte, and Ripple.",
   "scripts": {
     "bench": "node run.mjs"
   },
