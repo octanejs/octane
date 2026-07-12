@@ -1267,17 +1267,213 @@ export function Suspense(
 	);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// View-transition SSR annotations (docs/view-transitions-plan.md Phase 5) —
+// Fizz parity: the server stamps resolved `vt-*` attributes on each
+// boundary's first element so a client runtime can animate streamed reveals
+// before hydration, and so pre-rendered boundaries carry their classes:
+//   vt-update  — always (per-type maps resolve to their `default` server-side;
+//                there are no transition types during SSR).
+//   vt-name / vt-share — when the boundary is explicitly named OR contains a
+//                Suspense boundary (the name pairs old/new across the swap;
+//                auto names derive from the stable frame path, so every
+//                streaming pass mints the same name).
+//   vt-enter / vt-exit — when the boundary sits at the top of a Suspense
+//                CONTENT arm (it enters when streamed in) / FALLBACK arm (it
+//                exits on reveal); both can apply (a fallback that is itself
+//                Suspense content).
+// Arm-top detection is POSITIONAL, not flag-based (compiled static elements
+// emit as string concatenation — no runtime call to consult): every boundary
+// stamps CANDIDATE attributes (vt-enter-x / vt-exit-x) on its first element;
+// each @try arm then CLAIMS the matching candidate on the arm's first element
+// (renaming -x → real). Ordering makes this exact — an OUTER boundary's
+// surgery runs after the arm's claim, so its candidates are never claimed by
+// an arm it merely contains. Residual candidates are stripped at the final
+// emission points (buffered html / stream shell / stream segments).
+
+type VtSsrClassValue = string | Record<string, string>;
+interface VtSsrProps {
+	name?: string;
+	enter?: VtSsrClassValue;
+	exit?: VtSsrClassValue;
+	update?: VtSsrClassValue;
+	share?: VtSsrClassValue;
+	default?: VtSsrClassValue;
+	children?: unknown;
+}
+interface VtSsrCandidate {
+	name: string;
+	share: string;
+	update: string;
+	consumed: boolean;
+}
+
+let VT_SSR_TRY_SEQ = 0;
+const VT_SSR_STACK: VtSsrCandidate[] = [];
+
+/** Resolve a class-prop value server-side (no types → maps use `default`). */
+function vtSsrResolve(props: VtSsrProps, kind: 'enter' | 'exit' | 'update' | 'share'): string {
+	let v: VtSsrClassValue | undefined = props[kind];
+	if (v == null) v = props.default;
+	if (v == null) return 'auto';
+	if (typeof v === 'string') return v;
+	return v.default != null ? v.default : 'auto';
+}
+
+/**
+ * Inject `vt-*` attributes into the FIRST element open-tag of an HTML
+ * fragment, skipping block/comment markers and streaming `<template>`
+ * placeholders (the annotation belongs on the visible fallback root that
+ * follows). Attributes already present (an inner boundary annotated first —
+ * innermost owns vt-update) are left alone.
+ */
+function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
+	const n = html.length;
+	let i = 0;
+	while (i < n) {
+		const lt = html.indexOf('<', i);
+		if (lt === -1) return html;
+		if (html.startsWith('<!--', lt)) {
+			const close = html.indexOf('-->', lt + 4);
+			if (close === -1) return html;
+			i = close + 3;
+			continue;
+		}
+		const c = html.charCodeAt(lt + 1);
+		if (!((c >= 65 && c <= 90) || (c >= 97 && c <= 122))) {
+			// Not an element open (a closing tag or stray '<' text) — move on.
+			i = lt + 1;
+			continue;
+		}
+		let e = lt + 1;
+		while (e < n && /[a-zA-Z0-9-]/.test(html[e])) e++;
+		const tag = html.slice(lt + 1, e).toLowerCase();
+		// End of the open tag — quote-aware ('>' may appear inside attr values).
+		let j = e;
+		let q = '';
+		while (j < n) {
+			const ch = html[j];
+			if (q !== '') {
+				if (ch === q) q = '';
+			} else if (ch === '"' || ch === "'") q = ch;
+			else if (ch === '>') break;
+			j++;
+		}
+		if (j >= n) return html;
+		if (tag === 'template') {
+			const close = html.indexOf('</template>', j);
+			i = close === -1 ? j + 1 : close + 11;
+			continue;
+		}
+		const open = html.slice(lt, j);
+		let inject = '';
+		for (let k = 0; k < attrs.length; k++) {
+			if (open.indexOf(attrs[k][0] + '="') === -1) {
+				inject += ' ' + attrs[k][0] + '="' + escapeAttr(attrs[k][1]) + '"';
+			}
+		}
+		if (inject === '') return html;
+		const at = html[j - 1] === '/' ? j - 1 : j;
+		return html.slice(0, at) + inject + html.slice(at);
+	}
+	return html;
+}
+
+/**
+ * Claim an arm-top candidate: rename `vt-enter-x`/`vt-exit-x` → `vt-enter`/
+ * `vt-exit` on the FIRST element of an arm's HTML (same template/comment
+ * skipping as vtSsrAnnotate). A first element without the candidate (e.g. a
+ * static wrapper above the boundary, or an outer boundary's annotation target)
+ * claims nothing — that is exactly React's "top of the arm only" rule.
+ */
+function vtSsrClaimArm(html: string, kind: 'enter' | 'exit'): string {
+	const n = html.length;
+	let i = 0;
+	while (i < n) {
+		const lt = html.indexOf('<', i);
+		if (lt === -1) return html;
+		if (html.startsWith('<!--', lt)) {
+			const close = html.indexOf('-->', lt + 4);
+			if (close === -1) return html;
+			i = close + 3;
+			continue;
+		}
+		const c = html.charCodeAt(lt + 1);
+		if (!((c >= 65 && c <= 90) || (c >= 97 && c <= 122))) {
+			i = lt + 1;
+			continue;
+		}
+		let e = lt + 1;
+		while (e < n && /[a-zA-Z0-9-]/.test(html[e])) e++;
+		const tag = html.slice(lt + 1, e).toLowerCase();
+		let j = e;
+		let q = '';
+		while (j < n) {
+			const ch = html[j];
+			if (q !== '') {
+				if (ch === q) q = '';
+			} else if (ch === '"' || ch === "'") q = ch;
+			else if (ch === '>') break;
+			j++;
+		}
+		if (j >= n) return html;
+		if (tag === 'template') {
+			const close = html.indexOf('</template>', j);
+			i = close === -1 ? j + 1 : close + 11;
+			continue;
+		}
+		const marker = ' vt-' + kind + '-x="';
+		const at = html.slice(lt, j).indexOf(marker);
+		if (at === -1) return html;
+		return html.slice(0, lt + at) + ' vt-' + kind + '="' + html.slice(lt + at + marker.length);
+	}
+	return html;
+}
+
+/** Strip residual (unclaimed) arm candidates before emission. */
+function vtSsrStrip(html: string): string {
+	// Cheap fast path — apps without ViewTransition never pay the regex.
+	if (html.indexOf(' vt-e') === -1) return html;
+	return html.replace(/ vt-(?:enter|exit)-x="[^"]*"/g, '');
+}
+
 /**
  * `<ViewTransition>` — the server twin of the client boundary builtin
- * (docs/view-transitions-plan.md). View transitions are a CLIENT concern:
- * the server renders the children transparently, in the same nested-block
- * byte shape the client produces (componentSlot's comp pair around the body's
- * childSlot pair — renderComponentFramed adds the outer frame, the explicit
- * ssrBlock below is the inner childSlot range), so hydration adopts cleanly.
- * SSR activation annotations are Phase 5.
+ * (docs/view-transitions-plan.md). Renders the children transparently in the
+ * same nested-block byte shape the client produces (componentSlot's comp pair
+ * around the body's childSlot pair — renderComponentFramed adds the outer
+ * frame, the explicit ssrBlock below is the inner childSlot range), stamped
+ * with the Fizz-parity `vt-*` annotations described above.
  */
-export function ViewTransition(props: { children?: unknown }, scope: SSRScope): string {
-	return ssrBlock(ssrChildrenHtml(props.children, scope));
+export function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
+	const explicit = typeof props.name === 'string';
+	const frame = FRAME;
+	const cand: VtSsrCandidate = {
+		name: explicit
+			? (props.name as string)
+			: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
+		share: vtSsrResolve(props, 'share'),
+		update: vtSsrResolve(props, 'update'),
+		consumed: false,
+	};
+	VT_SSR_STACK.push(cand);
+	const seqBefore = VT_SSR_TRY_SEQ;
+	let inner: string;
+	try {
+		inner = ssrChildrenHtml(props.children, scope);
+	} finally {
+		VT_SSR_STACK.pop();
+	}
+	const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
+	const attrs: Array<[string, string]> = [];
+	if (named) attrs.push(['vt-name', cand.name]);
+	attrs.push(['vt-update', cand.update]);
+	// Arm candidates — claimed (renamed to vt-enter/vt-exit) by the @try arm
+	// this boundary tops, stripped at emission when unclaimed.
+	attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
+	attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
+	if (named) attrs.push(['vt-share', cand.share]);
+	return ssrBlock(vtSsrAnnotate(inner, attrs));
 }
 
 /**
@@ -2450,7 +2646,8 @@ async function runBuffered(
 function passToResult(pass: FullPassResult, nonceAttr: string): RenderResult {
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
-	return { html: spliceHead(body, pass.head), css: pass.css };
+	// Unclaimed view-transition arm candidates strip at emission (see vtSsrStrip).
+	return { html: vtSsrStrip(spliceHead(body, pass.head)), css: pass.css };
 }
 
 /**
@@ -2608,6 +2805,18 @@ export function ssrTry(
 	pendFn: ((arg: unknown, scope: SSRScope) => string) | null,
 	catchFn: ((err: unknown, scope: SSRScope) => string) | null,
 ): string {
+	VT_SSR_TRY_SEQ++;
+	// Consume the nearest un-consumed outer ViewTransition candidate: its
+	// name/share/update propagate onto this boundary's streamed content chunk
+	// so the old/new captures pair across the swap (Fizz vt-* parity).
+	let vtOuter: VtSsrCandidate | null = null;
+	if (VT_SSR_STACK.length > 0) {
+		const top = VT_SSR_STACK[VT_SSR_STACK.length - 1];
+		if (!top.consumed) {
+			top.consumed = true;
+			vtOuter = top;
+		}
+	}
 	const stream = STREAM;
 	let key = '';
 	let entry: StreamBoundary | undefined;
@@ -2630,7 +2839,10 @@ export function ssrTry(
 		serialStart = SERIAL !== null ? SERIAL.length : 0;
 	}
 	const pendingForm = (): string => {
-		const fallback = pendFn !== null ? ssrBlock(pendFn(undefined, scope)) : '';
+		// A ViewTransition at the top of the FALLBACK arm exits when the boundary
+		// reveals — claim its vt-exit candidate (see vtSsrClaimArm).
+		const fallback =
+			pendFn !== null ? vtSsrClaimArm(ssrBlock(pendFn(undefined, scope)), 'exit') : '';
 		if (entry !== undefined) {
 			return ssrBlock(
 				'<template ' + STREAM_BOUNDARY_ATTR + '="' + entry.id + '"></template>' + fallback,
@@ -2639,14 +2851,23 @@ export function ssrTry(
 		return ssrBlock(pendFn !== null ? fallback : '');
 	};
 	try {
-		const inner = ssrBlock(tryFn(undefined, scope));
+		// A ViewTransition at the top of the CONTENT arm enters when the content
+		// streams in — claim its vt-enter candidate.
+		const inner = vtSsrClaimArm(ssrBlock(tryFn(undefined, scope)), 'enter');
 		if (entry !== undefined) {
 			// Registered (was pending in an earlier pass): capture the content +
 			// this boundary's seed slice for its segment; the surrounding pass
 			// keeps seeing the pending form so the shell shape stays stable.
 			if (entry.state !== 'done') {
 				entry.state = 'done';
-				entry.html = inner;
+				entry.html =
+					vtOuter !== null
+						? vtSsrAnnotate(inner, [
+								['vt-name', vtOuter.name],
+								['vt-update', vtOuter.update],
+								['vt-share', vtOuter.share],
+							])
+						: inner;
 				if (SERIAL !== null) {
 					entry.seeds = SERIAL.slice(serialStart);
 					SERIAL.length = serialStart;
@@ -2809,7 +3030,7 @@ async function runStream(
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
 	if (anyPending) shell += '<script' + nonceAttr + '>' + STREAM_RUNTIME_JS + '</script>';
-	sink.write(shell);
+	sink.write(vtSsrStrip(shell));
 	sink.shellReady();
 
 	let suspended = pass.suspended;
@@ -2863,7 +3084,7 @@ async function runStream(
 			flushedSegments.add(b.id);
 			chunk += segmentChunk(b, nonceAttr);
 		}
-		if (chunk !== '') sink.write(chunk);
+		if (chunk !== '') sink.write(vtSsrStrip(chunk));
 	}
 	sink.allReady();
 }
