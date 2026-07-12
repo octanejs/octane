@@ -1,0 +1,22 @@
+{
+  "name": "svelte-jsbench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "js-framework-benchmark fixture for Svelte 5 (keyed runes implementation).",
+  "scripts": {
+    "dev": "vite --host --port 5271 --strictPort",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./jsconfig.json",
+    "preview": "vite preview --port 5271 --strictPort"
+  },
+  "dependencies": {
+    "svelte": "catalog:default"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "catalog:default",
+    "svelte-check": "catalog:default",
+    "vite": "catalog:default",
+    "terser": "catalog:default"
+  }
+}

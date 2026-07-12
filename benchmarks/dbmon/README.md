@@ -1,4 +1,4 @@
-# dbmon bench — octane (TSRX vs JSX) vs react
+# dbmon bench — keyed update stress across frameworks
 
 A fourth benchmark adjacent to [`js-framework`](../js-framework/),
 [`recursive-context`](../recursive-context/) and
@@ -21,6 +21,8 @@ benchmarks/dbmon/
 ├── ripple/        # Vite app, dev :5199 (Ripple — track + @for)
 ├── solid/         # Vite app, dev :5200 (Solid 2.0 — createStore + reconcile + <For>)
 ├── vue-vapor/     # Vite app, dev :5220 (Vue 3.6 Vapor — shallowRef + keyed v-for)
+├── preact/       # Vite app, dev :5263 (native Preact hooks)
+├── svelte/       # Vite app, dev :5274 (Svelte 5 runes + keyed #each)
 ├── run.mjs        # Playwright harness — drives all adapters
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
@@ -38,7 +40,7 @@ foil: a plain `createStore` of the rows with `reconcile` on each tick (the
 rows never re-render and only changed leaf signals update. Vue Vapor (3.6,
 `<script setup vapor>` — no VDOM) holds the rows in a `shallowRef` replaced
 wholesale each tick, so it shares the immutable-newArray + keyed-reconcile
-model while its per-cell vapor renderEffects do the cell diffing. All six
+model while its per-cell vapor renderEffects do the cell diffing. All eight
 render identical DOM from the same seeded data.
 
 > dbmon is a deliberate worst case for fine-grained reactivity: every tick is a
@@ -74,26 +76,21 @@ only framework JS work (GC forced before each sample). The harness also prints
 a `tick_partial / tick` diff-skip ratio — low means the per-binding diff is
 skipping unchanged cells.
 
+The comparative targets include native **Preact** on `:5263` and runes-mode
+**Svelte 5** on `:5274`. They vendor the identical seeded data and operations;
+Svelte replaces a `$state.raw` row array while Preact uses the hook/VDOM model.
+
 ## Running
 
-Start the preview servers (production builds), then run the harness:
+The unified runner production-builds and previews every target before running
+the harness:
 
 ```bash
-# build + preview each (production); run from the repo root
-pnpm --filter octane-tsrx-dbmon-bench build && pnpm --filter octane-tsrx-dbmon-bench preview &
-pnpm --filter octane-jsx-dbmon-bench  build && pnpm --filter octane-jsx-dbmon-bench  preview &
-pnpm --filter react-dbmon-bench       build && pnpm --filter react-dbmon-bench       preview &
-pnpm --filter ripple-dbmon-bench      build && pnpm --filter ripple-dbmon-bench      preview &
-pnpm --filter solid-dbmon-bench       build && pnpm --filter solid-dbmon-bench       preview &
-pnpm --filter vue-vapor-dbmon-bench   build && pnpm --filter vue-vapor-dbmon-bench   preview &
-
-# then, from benchmarks/dbmon:
-pnpm bench           # 30 timed iterations (+10 warmup) per op
-pnpm bench:long      # 50 iterations
+node benchmarks/bench.mjs --quick dbmon
+node benchmarks/bench.mjs dbmon
 ```
 
-Swap `build && … preview` for `dev` to measure the unminified dev build. Set
-`TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5196/"}]'` to run a
-single adapter.
+Set `TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5196/"}]'` when
+driving `run.mjs` directly against a single already-running adapter.
 
 [dbmon]: https://github.com/wycats/js-repaint-perfs

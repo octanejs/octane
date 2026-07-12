@@ -2,7 +2,7 @@
 
 The canonical app-shaped comparison: the SAME TodoMVC (uncontrolled inputs,
 keyed filtered list, inline editing, footer/filters) implemented faithfully and
-idiomatically in five frameworks, driven through identical Speedometer-style
+idiomatically in seven frameworks, driven through identical Speedometer-style
 scripted interactions, with the DOM verified after every timed sample.
 
 Unlike the js-framework rows suite (synthetic table churn), TodoMVC is made of
@@ -20,6 +20,8 @@ comparison: the `bundle-size` suite builds these apps too (ops prefixed
 | `solid`       | 5242 | Solid 2.0-beta; `flush()` per handler; class STRINGS (beta `classList` is inert) |
 | `ripple`      | 5243 | deriveds are FUNCTIONS called in template expressions (fine-grained: the body runs once — a setup-time `const` freezes) |
 | `vue-vapor`   | 5244 | Vapor SFC; `window.__benchFlush = () => nextTick()` (no public sync flush) |
+| `preact`      | 5261 | Preact core/hooks; `flushSync` commits each handler inside the timed window |
+| `svelte`      | 5272 | Svelte 5 runes; `flushSync` commits each handler inside the timed window |
 
 ## DOM contract (shared by every app)
 
@@ -51,11 +53,13 @@ React's column runs its dev-mode transform under the vite dev server (same as
 the js-framework react column) — compare react-to-react across commits, not
 react-to-compiled-frameworks absolute.
 
+The target matrix also includes native **Preact** on `:5261` and runes-mode
+**Svelte 5** on `:5272`. Both preserve the same native input/change semantics,
+uncontrolled edit fields, keyed todo identity, and DOM-only harness contract.
+
 ## Run
 
 ```bash
 node benchmarks/bench.mjs todomvc            # via the suite runner (starts servers)
-# or manually:
-pnpm --filter octane-tsrx-todomvc dev &      # …and the other four
-node benchmarks/todomvc/run.mjs [iterations]
+node benchmarks/bench.mjs --quick todomvc    # reduced smoke pass
 ```

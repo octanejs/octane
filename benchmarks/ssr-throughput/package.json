@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "Node-only SSR throughput bench - ops/sec + latency percentiles + memory growth for octane render() vs react-dom/server vs @solidjs/web vs ripple/server vs vue/server-renderer on the news page, plus octane-only waterfall / deopt-page / escape-heavy fixtures.",
+  "description": "Node-only buffered SSR throughput across Octane, React, Preact, Solid, Svelte, Ripple, and Vue, plus Octane-only stress fixtures.",
   "scripts": {
     "bench": "node run.mjs",
     "bench:smoke": "node run.mjs 2"
@@ -12,8 +12,11 @@
     "vite": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "preact": "catalog:default",
+    "preact-render-to-string": "catalog:default",
     "solid-js": "catalog:default",
     "@solidjs/web": "catalog:default",
-    "vue": "catalog:default"
+    "vue": "catalog:default",
+    "svelte": "catalog:default"
   }
 }

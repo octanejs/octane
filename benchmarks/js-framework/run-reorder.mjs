@@ -64,6 +64,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'ripple', url: 'http://localhost:5178/', ready: '#run' },
 			{ name: 'solid', url: 'http://localhost:5179/', ready: '#run' },
 			{ name: 'vue-vapor', url: 'http://localhost:5180/', ready: '#run' },
+			{ name: 'preact', url: 'http://localhost:5260/', ready: '#run' },
+			{ name: 'svelte', url: 'http://localhost:5271/', ready: '#run' },
 		];
 
 // ── Fixture-shared shuffle machinery, replayed for the identity gate ───────

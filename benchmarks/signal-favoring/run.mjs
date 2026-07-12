@@ -48,6 +48,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'react', url: 'http://localhost:5192/' },
 			{ name: 'ripple', url: 'http://localhost:5193/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5183/' },
+			{ name: 'preact', url: 'http://localhost:5265/' },
+			{ name: 'svelte', url: 'http://localhost:5276/' },
 		];
 
 const YIELD_MS = 5; // breathe between samples: let paint settle, don't block the page
@@ -72,6 +74,103 @@ async function freshPage(browser, url) {
 	return { ctx, page };
 }
 
+// Untimed fatal gate: prove all 100 chain nodes mount, each stateful site
+// updates the intended value, both batch orders reach the same values, and
+// teardown clears the root before accepting timings.
+async function semanticGate(browser, url) {
+	const { ctx, page } = await freshPage(browser, url);
+	try {
+		return await page.evaluate(async (indices) => {
+			const errors = [];
+			const expect = (condition, message) => {
+				if (!condition) errors.push(message);
+			};
+			const call = async (name) => {
+				const fn = window[name];
+				if (typeof fn !== 'function') throw new Error(`missing ${name}`);
+				const result = fn();
+				if (result && typeof result.then === 'function') await result;
+			};
+			const ownText = (element) => {
+				if (!element) return '';
+				const clone = element.cloneNode(true);
+				clone.querySelector(':scope > .c, :scope > .leaf')?.remove();
+				return clone.textContent.replace(/\s+/g, '');
+			};
+			const chain = () => Array.from(document.querySelectorAll('.c'));
+			const readValues = () => {
+				const nodes = chain();
+				return Object.fromEntries(
+					indices.map((index) => {
+						const match = ownText(nodes[index - 1]).match(new RegExp(`^${index}:(-?\\d+)$`));
+						return [index, match ? Number(match[1]) : null];
+					}),
+				);
+			};
+			const expectValues = (expected, label) => {
+				const actual = readValues();
+				for (const index of indices) {
+					expect(
+						actual[index] === expected[index],
+						`${label}: C${index}=${actual[index]}, expected ${expected[index]}`,
+					);
+				}
+			};
+
+			await call('__mount');
+			const nodes = chain();
+			expect(nodes.length === 99, `mount rendered ${nodes.length} chain divs, expected 99`);
+			expect(document.querySelectorAll('.leaf').length === 1, 'mount did not render one C100 leaf');
+			expect(document.querySelector('.leaf')?.textContent === '100', 'C100 leaf text is incorrect');
+			for (let i = 0; i < 98; i++) {
+				expect(
+					nodes[i]?.querySelector(':scope > .c') === nodes[i + 1],
+					`C${i + 1} is not the direct parent of C${i + 2}`,
+				);
+			}
+			expect(nodes[98]?.querySelector(':scope > .leaf') !== null, 'C99 does not own C100');
+			for (let index = 1; index <= 99; index++) {
+				const expected = indices.includes(index) ? `${index}:0` : String(index);
+				expect(ownText(nodes[index - 1]) === expected, `C${index} label is not "${expected}"`);
+			}
+			expectValues(Object.fromEntries(indices.map((index) => [index, 0])), 'mount');
+
+			await call('__bumpAt1');
+			await call('__bumpAt51');
+			await call('__bumpAt91');
+			let expected = Object.fromEntries(
+				indices.map((index) => [index, index === 1 || index === 51 || index === 91 ? 1 : 0]),
+			);
+			expectValues(expected, 'single bumps');
+
+			for (const index of indices) await call('__bumpAt' + index);
+			expected = Object.fromEntries(indices.map((index) => [index, expected[index] + 1]));
+			expectValues(expected, 'unbatched sweep');
+
+			await call('__sweepBatched');
+			expected = Object.fromEntries(indices.map((index) => [index, expected[index] + 1]));
+			expectValues(expected, 'ancestor-first batch');
+
+			await call('__sweepBatchedReverse');
+			expected = Object.fromEntries(indices.map((index) => [index, expected[index] + 1]));
+			expectValues(expected, 'descendant-first batch');
+
+			await call('__unmount');
+			expect(document.querySelectorAll('.c, .leaf').length === 0, 'unmount left chain nodes');
+			const root = document.getElementById('main');
+			expect(
+				root?.querySelector('*') === null && root.textContent?.trim() === '',
+				'unmount left rendered root content',
+			);
+			await call('__reset');
+			expect(document.getElementById('main')?.childNodes.length === 0, 'reset left root DOM');
+			return errors;
+		}, STATEFUL_INDICES);
+	} finally {
+		await ctx.close();
+	}
+}
+
 function summarize(samples) {
 	return summarizeSamples(samples);
 }
@@ -81,10 +180,11 @@ async function measureMount(browser, url) {
 	const samples = [];
 	for (let i = 0; i < WARMUP + ITER; i++) {
 		const { ctx, page } = await freshPage(browser, url);
-		const dt = await page.evaluate(() => {
+		const dt = await page.evaluate(async () => {
 			(window.gc || (() => {}))();
 			const t0 = performance.now();
-			window.__mount();
+			const result = window.__mount();
+			if (result && typeof result.then === 'function') await result;
 			return performance.now() - t0;
 		});
 		if (i >= WARMUP) samples.push(dt);
@@ -103,7 +203,10 @@ const BUMP_REPS = 50;
 // in-page loop with gc() before each sample.
 async function measureBump(browser, url, idx) {
 	const { ctx, page } = await freshPage(browser, url);
-	await page.evaluate(() => window.__mount());
+	await page.evaluate(async () => {
+		const result = window.__mount();
+		if (result && typeof result.then === 'function') await result;
+	});
 	await sleep(50);
 	const samples = await page.evaluate(
 		async ({ idx, REPS, WARMUP, ITER, YIELD_MS }) => {
@@ -144,7 +247,10 @@ async function measureBump(browser, url, idx) {
 // All modes end in the same DOM. Timed synchronously with gc() before each sample.
 async function measureSweep(browser, url, batchFn) {
 	const { ctx, page } = await freshPage(browser, url);
-	await page.evaluate(() => window.__mount());
+	await page.evaluate(async () => {
+		const result = window.__mount();
+		if (result && typeof result.then === 'function') await result;
+	});
 	await sleep(50);
 	const samples = await page.evaluate(
 		async ({ indices, batchFn, WARMUP, ITER, YIELD_MS, REPEAT }) => {
@@ -195,13 +301,16 @@ async function measureUnmount(browser, url) {
 			const gc = window.gc || (() => {});
 			const out = [];
 			for (let i = 0; i < WARMUP + ITER; i++) {
-				window.__mount();
+				const mounted = window.__mount();
+				if (mounted && typeof mounted.then === 'function') await mounted;
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 				gc();
 				const t0 = performance.now();
-				window.__unmount();
+				const unmounted = window.__unmount();
+				if (unmounted && typeof unmounted.then === 'function') await unmounted;
 				const dt = performance.now() - t0;
-				window.__reset();
+				const reset = window.__reset();
+				if (reset && typeof reset.then === 'function') await reset;
 				if (i >= WARMUP) out.push(dt);
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 			}
@@ -218,33 +327,43 @@ async function runTarget(t) {
 		headless: true,
 		args: ['--disable-extensions', '--no-sandbox', '--js-flags=--expose-gc'],
 	});
-	console.error(`  → mount`);
-	const mount = await measureMount(browser, t.url);
-	console.error(`  → bump_shallow (C1)`);
-	const bump_shallow = await measureBump(browser, t.url, 1);
-	console.error(`  → bump_middle (C51)`);
-	const bump_middle = await measureBump(browser, t.url, 51);
-	console.error(`  → bump_deep (C91)`);
-	const bump_deep = await measureBump(browser, t.url, 91);
-	console.error(`  → bump_sweep (10 bumps, flush each)`);
-	const bump_sweep = await measureSweep(browser, t.url, null);
-	console.error(`  → bump_sweep_batched (10 bumps, 1 flush, ancestor-first)`);
-	const bump_sweep_batched = await measureSweep(browser, t.url, '__sweepBatched');
-	console.error(`  → bump_sweep_reverse (10 bumps, 1 flush, descendant-first)`);
-	const bump_sweep_reverse = await measureSweep(browser, t.url, '__sweepBatchedReverse');
-	console.error(`  → unmount`);
-	const unmount = await measureUnmount(browser, t.url);
-	await browser.close();
-	return {
-		mount,
-		bump_shallow,
-		bump_middle,
-		bump_deep,
-		bump_sweep,
-		bump_sweep_batched,
-		bump_sweep_reverse,
-		unmount,
-	};
+	try {
+		console.error(`  → semantic gate`);
+		const gateErrors = await semanticGate(browser, t.url);
+		if (gateErrors.length > 0) return { gateErrors, results: null };
+
+		console.error(`  → mount`);
+		const mount = await measureMount(browser, t.url);
+		console.error(`  → bump_shallow (C1)`);
+		const bump_shallow = await measureBump(browser, t.url, 1);
+		console.error(`  → bump_middle (C51)`);
+		const bump_middle = await measureBump(browser, t.url, 51);
+		console.error(`  → bump_deep (C91)`);
+		const bump_deep = await measureBump(browser, t.url, 91);
+		console.error(`  → bump_sweep (10 bumps, flush each)`);
+		const bump_sweep = await measureSweep(browser, t.url, null);
+		console.error(`  → bump_sweep_batched (10 bumps, 1 flush, ancestor-first)`);
+		const bump_sweep_batched = await measureSweep(browser, t.url, '__sweepBatched');
+		console.error(`  → bump_sweep_reverse (10 bumps, 1 flush, descendant-first)`);
+		const bump_sweep_reverse = await measureSweep(browser, t.url, '__sweepBatchedReverse');
+		console.error(`  → unmount`);
+		const unmount = await measureUnmount(browser, t.url);
+		return {
+			gateErrors: [],
+			results: {
+				mount,
+				bump_shallow,
+				bump_middle,
+				bump_deep,
+				bump_sweep,
+				bump_sweep_batched,
+				bump_sweep_reverse,
+				unmount,
+			},
+		};
+	} finally {
+		await browser.close();
+	}
 }
 
 const OPS = [
@@ -260,12 +379,32 @@ const OPS = [
 
 (async () => {
 	const all = {};
+	const failures = [];
+	const failedTargets = new Set();
 	for (const t of TARGETS) {
 		console.error(`Running ${t.name} (${t.url}) × ${ITER} (+${WARMUP} warmup)…`);
-		all[t.name] = await runTarget(t);
+		try {
+			const { gateErrors, results } = await runTarget(t);
+			if (gateErrors.length > 0) {
+				failedTargets.add(t.name);
+				for (const error of gateErrors) {
+					const message = `${t.name}: semantic gate: ${error}`;
+					failures.push(message);
+					console.error(`  ✗ ${message}`);
+				}
+				continue;
+			}
+			all[t.name] = results;
+		} catch (error) {
+			failedTargets.add(t.name);
+			const message = `${t.name}: ${error instanceof Error ? error.message : String(error)}`;
+			failures.push(message);
+			console.error(`  ✗ ${message}`);
+		}
 	}
 
-	const cols = TARGETS.map((t) => t.name);
+	const successfulTargets = TARGETS.filter((t) => all[t.name]);
+	const cols = successfulTargets.map((t) => t.name);
 	const W = 32;
 	console.log();
 	console.log('Op             | ' + cols.map((c) => c.padEnd(W)).join('| '));
@@ -282,12 +421,14 @@ const OPS = [
 		console.log(row.join('| '));
 	}
 
-	if (TARGETS.length > 1) {
-		// Last target is the baseline; others printed as ratios.
-		const baselineName = TARGETS[TARGETS.length - 1].name;
+	if (successfulTargets.length > 1) {
+		const baselineName =
+			successfulTargets.find((target) => target.name === 'vue-vapor')?.name ??
+			successfulTargets.at(-1).name;
 		const baseline = all[baselineName];
 		console.log();
-		for (const t of TARGETS.slice(0, -1)) {
+		for (const t of successfulTargets) {
+			if (t.name === baselineName) continue;
 			const r = all[t.name];
 			console.log(`${t.name} / ${baselineName} ratio (score; <1 means ${t.name} faster):`);
 			for (const op of OPS) {
@@ -353,16 +494,26 @@ const OPS = [
 			iterations: ITER,
 			targets: TARGETS.map((t) => ({
 				name: t.name,
-				ops: Object.fromEntries(
-					OPS.map((op) => {
-						const r = all[t.name][op];
-						return [op, timingStatForJson(r)];
-					}),
-				),
+				ops: all[t.name]
+					? Object.fromEntries(
+							OPS.map((op) => {
+								const r = all[t.name][op];
+								return [op, timingStatForJson(r)];
+							}),
+						)
+					: {},
+				meta: { gates: failedTargets.has(t.name) ? 'fail' : 'pass' },
 			})),
 		};
+		if (failures.length > 0) payload.failed = failures.join('; ');
 		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');
 		console.error(`BENCH_JSON written to ${process.env.BENCH_JSON}`);
+	}
+
+	if (failures.length > 0) {
+		console.error(`\n✗ ${failures.length} failure(s):`);
+		for (const failure of failures) console.error(`  - ${failure}`);
+		process.exitCode = 1;
 	}
 })().catch((e) => {
 	console.error(e);

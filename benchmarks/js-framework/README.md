@@ -21,6 +21,8 @@ benchmarks/js-framework/
 ├── ripple/         # Vite app, dev server on :5178 — keyed ripple (ported to current syntax)
 ├── solid/          # Vite app, dev server on :5179 — Solid 2.0 (keyed <For>, production build)
 ├── vue-vapor/      # Vite app, dev server on :5180 — Vue 3.6 Vapor (<script setup vapor> SFC)
+├── preact/         # Vite app, dev server on :5260 — native Preact hooks
+├── svelte/         # Vite app, dev server on :5271 — Svelte 5 runes + keyed #each
 ├── run.mjs             # Playwright harness — the canonical krausest ops
 ├── run-reorder.mjs     # Playwright harness — the keyed-reorder matrix (see below)
 ├── package.json        # umbrella; depends on playwright
@@ -28,8 +30,8 @@ benchmarks/js-framework/
 └── README.md           # this file
 ```
 
-Both harnesses compare octane-tsrx / octane-jsx / react / ripple / solid /
-vue-vapor, with octane-tsrx as the ratio baseline.
+Both harnesses compare octane-tsrx / octane-jsx / react / preact / ripple /
+solid / svelte / vue-vapor, with octane-tsrx as the ratio baseline.
 
 The octane app is authored **twice** over the same octane core — once in `.tsrx`
 (directive syntax) and once in React-style `.tsx` (JSX). Both emit the same DOM
@@ -71,26 +73,22 @@ and expose the same button + table contract:
 [rp]: https://github.com/krausest/js-framework-benchmark/tree/master/frameworks/keyed/ripple
 [vv]: https://github.com/krausest/js-framework-benchmark/tree/master/frameworks/keyed/vue-vapor
 
+### Preact and Svelte 5 references
+
+- **`preact`** (`:5260`) is a native Preact hooks implementation using keyed
+  JSX rows and the public compat `flushSync`; it is not a React-alias build.
+- **`svelte`** (`:5271`) is a runes-mode Svelte 5 implementation using a raw
+  row array, keyed `#each`, modern event attributes, and public `flushSync`.
+
 ## Quick start
 
 ```bash
 # 1. From the repo root, install + sync workspaces:
 pnpm install
 
-# 2. Start the bench dev servers (separate terminals); for production numbers use
-#    `build` + `preview` instead of `dev`:
-pnpm --filter octane-tsrx-jsbench dev   # :5176
-pnpm --filter octane-jsx-jsbench dev    # :5177
-pnpm --filter react-jsbench dev         # :5175
-pnpm --filter ripple-jsbench dev        # :5178
-pnpm --filter solid-jsbench dev         # :5179
-pnpm --filter vue-vapor-jsbench dev     # :5180
-
-# 3. Run the harness (another terminal). By default it drives octane-tsrx,
-#    octane-jsx and react, with octane-tsrx as the ratio baseline:
-pnpm --filter octane-js-framework-benchmarks bench
-# or for a longer sample (16 iterations × all 8 ops):
-pnpm --filter octane-js-framework-benchmarks bench:long
+# 2. Production-build, preview, and drive all eight targets:
+node benchmarks/bench.mjs --quick js-framework js-framework-reorder
+node benchmarks/bench.mjs js-framework js-framework-reorder
 ```
 
 To drive just one dialect, pass a `TARGETS` env (see `run.mjs`). Both harnesses
@@ -115,7 +113,7 @@ the state setter (never in-place mutation):
 | op                          | shape                                                       |
 | --------------------------- | ----------------------------------------------------------- |
 | `reverse`                   | `rows.toReversed()` — every survivor moves                  |
-| `shuffle`                   | seeded Fisher–Yates; the seed advances deterministically per click (module-level mulberry32, fixed seed 42 — identical permutations across all four targets) |
+| `shuffle`                   | seeded Fisher–Yates; the seed advances deterministically per click (module-level mulberry32, fixed seed 42 — identical permutations across all eight targets) |
 | `rotatef`                   | rotate forward by 1 — last row to front                     |
 | `rotateb`                   | rotate backward by 1 — first row to end                     |
 | `prepend100` / `append100`  | 100 fresh-id rows at head / tail                            |
@@ -183,7 +181,7 @@ Two methodology points, both visible in the harness source:
   correctly, because there are no survivors *after* the inserted run. octane-tsrx,
   octane-jsx, and react pass all 14 ops.
 
-Run it against the same four dev servers as `run.mjs`:
+Run it against the same eight targets as `run.mjs`:
 
 ```bash
 node run-reorder.mjs           # 8 iterations

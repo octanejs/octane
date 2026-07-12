@@ -125,6 +125,8 @@ catalogs:
     '@tsrx/vite-plugin-solid': ^0.0.67
     '@types/babel__core': 7.20.5
     '@types/node': ^24.3.0
+    '@preact/preset-vite': ^2.10.5
+    '@sveltejs/vite-plugin-svelte': ^7.2.0
     '@vitejs/plugin-react': ^6.0.2
     devalue: ^5.8.1
     esbuild: ^0.28.1
@@ -137,6 +139,9 @@ catalogs:
     motion-dom: ^12.0.0
     playwright: ^1.61.0
     prettier: ^3.8.4
+    preact: ^10.29.7
+    preact-render-to-string: ^6.7.0
+    prettier-plugin-svelte: ^4.1.1
     '@base-ui/react': ^1.6.0
     radix-ui: ^1.4.3
     '@reduxjs/toolkit': ^2.9.0
@@ -158,6 +163,8 @@ catalogs:
     ripple: ^0.3.86
     rulesync: ^8.17.0
     solid-js: '2.0.0-beta.14'
+    svelte: ^5.56.4
+    svelte-check: ^4.7.2
     terser: ^5.31.0
     type-fest: ^5.6.0
     typescript: ^5.9.3

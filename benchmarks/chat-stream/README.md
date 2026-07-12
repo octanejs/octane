@@ -3,7 +3,7 @@
 The modern workload: a ChatGPT/Claude-style chat interface — conversation
 tabs, a keyed message list of role bubbles with mixed text/code segments, a
 CONTROLLED composer — streaming **predefined token sequences** into the UI.
-Five frameworks implement the same DOM contract and state model; the harness
+Seven frameworks implement the same DOM contract and state model; the harness
 drains the stream deterministically and verifies the DOM after every sample.
 
 ## Determinism
@@ -28,9 +28,9 @@ drains the stream deterministically and verifies the DOM after every sample.
 Streaming replaces the streaming message immutably with an advanced `done`
 counter per pump; segment text derives via the shared `segText(seg, done)`
 (settled segments cache their joined text). Frameworks differ only in their
-idiomatic reactivity around that model — ripple's deriveds are functions
-called in template expressions (fine-grained bodies run once), solid uses
-class strings (beta `classList` is inert), react wraps handlers in `flushSync`.
+idiomatic reactivity around that model. Ripple's deriveds are functions called
+in template expressions, Solid and Svelte update fine-grained bindings, and the
+React and Preact handlers use public `flushSync` to bound each timed commit.
 
 Known variance: solid's `switchConv` is bimodal PER BROWSER SESSION (~3.6ms
 or ~6ms median, stable within a session) — its recorded baseline is pinned at
@@ -46,6 +46,8 @@ catching a real regression above it.
 | `solid`       | 5252 |
 | `ripple`      | 5253 |
 | `vue-vapor`   | 5254 |
+| `preact`      | 5262 |
+| `svelte`      | 5273 |
 
 ## Ops
 
@@ -70,11 +72,13 @@ The `bundle-size` suite builds these apps too (`chat_*` ops) and the octane
 source is in the `codegen-size` corpus. React's column runs its dev-mode
 transform under the vite dev server (same caveat as every suite).
 
+Native **Preact** (`:5262`) and runes-mode **Svelte 5** (`:5273`) fixtures use
+the same deterministic corpus and window contract. Their state is immutable at
+the conversation/message boundary and timed commits finish before returning.
+
 ## Run
 
 ```bash
 node benchmarks/bench.mjs chat-stream       # via the suite runner (starts servers)
-# or manually:
-pnpm --filter octane-tsrx-chat-stream dev & # …and the other four
-node benchmarks/chat-stream/run.mjs [iterations]
+node benchmarks/bench.mjs --quick chat-stream
 ```

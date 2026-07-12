@@ -8,7 +8,7 @@ its child.
 | op | what happens |
 | --- | --- |
 | `init` | mount → deepest level rendered |
-| `update` | version bump (a transition for React/octane, a signal/tracked write for Solid/ripple) → deepest level shows the new value |
+| `update` | version bump (a transition for React/Preact/Octane, a fine-grained write for Solid/Svelte/Ripple) → deepest level shows the new value |
 
 ## What it demonstrates
 
@@ -39,6 +39,11 @@ solid 19.0/18.6ms; ripple 19.2/17.5ms. (Pre-pipeline, 2026-07-08: octane was
 Octane is ratio-guarded on BOTH sides now: ≤0.25× React (a regression back
 toward per-level rounds fails loudly) and ≤1.5× solid/ripple on init+update
 (the parallel-floor win the parallelUse pipeline earned must not regress).
+
+- **Preact** uses its documented cached-resource Suspense pattern. A level
+  suspends before creating its child, so the nested tree serializes honestly.
+- **Svelte 5** uses stable `#await` blocks around each value while rendering the
+  recursive child outside the block, starting all independent levels together.
 
 ## Running
 

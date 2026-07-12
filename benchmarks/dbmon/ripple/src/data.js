@@ -3,9 +3,8 @@
 // dbmonster table: N "databases", each with a query count + 5 most-recent
 // queries whose elapsed times (and threshold class) churn every tick.
 //
-// Shared verbatim across octane-tsrx / octane-jsx / react (copied into each
-// src/ — benchmarks intentionally vendor their fixtures so each app is a
-// self-contained Vite build).
+// Shared verbatim across every dbmon target; fixtures are vendored so each app
+// remains a self-contained Vite build.
 
 export const DB_COUNT = 1000;
 export const QUERIES_PER_DB = 5;

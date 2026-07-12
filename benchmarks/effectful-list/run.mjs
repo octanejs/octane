@@ -1,5 +1,4 @@
-// effectful-list bench harness — drives octane-tsrx / octane-jsx / react /
-// solid / ripple / vue-vapor via Playwright.
+// effectful-list bench harness — drives every framework fixture via Playwright.
 //
 // Where js-framework measures raw keyed-list DOM throughput on effect-free
 // rows, this suite makes every row LIFECYCLE-BEARING: a cross-module Row
@@ -72,6 +71,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'solid', url: 'http://localhost:5204/' },
 			{ name: 'ripple', url: 'http://localhost:5205/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5221/' },
+			{ name: 'preact', url: 'http://localhost:5266/' },
+			{ name: 'svelte', url: 'http://localhost:5277/' },
 		];
 
 // perSamplePre: the op consumes its pre-state (empty / fresh 1k), so the pre

@@ -1,4 +1,4 @@
-// portal-swarm bench harness — drives octane-tsrx / react / solid via Playwright.
+// portal-swarm bench harness — drives every framework fixture via Playwright.
 //
 // A 200-item list where EVERY item conditionally portals a 3-element tooltip.
 // Portal perf has zero coverage in the sibling benches; this suite isolates it.
@@ -68,6 +68,8 @@ const BASE_URLS = {
 	solid: 'http://localhost:5212/',
 	ripple: 'http://localhost:5224/',
 	'vue-vapor': 'http://localhost:5181/',
+	preact: 'http://localhost:5268/',
+	svelte: 'http://localhost:5279/',
 };
 
 const TARGETS = process.env.TARGETS
@@ -78,6 +80,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'solid', url: BASE_URLS.solid },
 			{ name: 'ripple', url: BASE_URLS.ripple },
 			{ name: 'vue-vapor', url: BASE_URLS['vue-vapor'] },
+			{ name: 'preact', url: BASE_URLS.preact },
+			{ name: 'svelte', url: BASE_URLS.svelte },
 		];
 
 const OPS = [

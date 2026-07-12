@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "memo-wall bench: two 1000-row memo(Row) walls (compiled list position vs value-position createElement) with per-op render-count gates; harness measures mount / parent_rerender_equal / one_change / ctx_through_wall across octane-tsrx, octane-jsx and react.",
+  "description": "Two 1000-row memo/fine-grained walls across Octane and reference frameworks, with exact render-count gates.",
   "scripts": {
     "bench": "node run.mjs",
     "bench:long": "node run.mjs 50"

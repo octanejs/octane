@@ -34,7 +34,9 @@ const TARGET_PORTS = {
 	'octane-jsx': 5195,
 	solid: 5192,
 	react: 5193,
+	preact: 5270,
 	ripple: 5194,
+	svelte: 5281,
 	'vue-vapor': 5222,
 };
 const args = process.argv.slice(2);
@@ -127,9 +129,9 @@ for (let i = 0; i < WARMUP + ITER; i++) {
 	const page = await ctx.newPage();
 	await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });
 	await page.waitForFunction(() => window.__ready === true, null, { timeout: 10000 });
-	// Measure the SYNCHRONOUS hydration work only. All three targets commit
-	// hydration synchronously inside __hydrate() (octane flushSync, Solid
-	// synchronous hydrate, React flushSync), so this is the actual hydration
+	// Measure the SYNCHRONOUS hydration work only. Every target's adapter commits
+	// hydration inside __hydrate() (using a public flush where its scheduler needs
+	// one), so this is the actual hydration
 	// cost. (An earlier version awaited rAF + setTimeout inside the timer, but
 	// that ~6–7 ms of frame-scheduling latency dominated and masked the signal.)
 	const dt = await page.evaluate(() => {

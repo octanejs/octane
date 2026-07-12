@@ -54,12 +54,14 @@ benchmarks/effectful-list/
 ├── ripple/        # Vite app, dev :5205 — ripple: track + keyed @for + effect()
 ├── vue-vapor/     # Vite app, dev :5221 — Vue 3.6 Vapor: keyed v-for + onMounted/
 │                  #   onUnmounted/watchPostEffect; ops return nextTick() (no sync flush)
+├── preact/       # Vite app, dev :5266 — native Preact hooks/effects/refs
+├── svelte/       # Vite app, dev :5277 — Svelte 5 effects + attachments
 ├── run.mjs        # Playwright harness — gates + timings
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
 ```
 
-All six apps share the same `data.js` (seeded mulberry32 item factory) and
+All eight apps share the same `data.js` (seeded mulberry32 item factory) and
 `ops.js` (module-scope current-array driver) verbatim, so every target renders
 byte-identical content for the same op sequence.
 
@@ -101,7 +103,8 @@ top-level `failed` reason (the contract). Counters are reset between ops.
 > NOT worked around — the failing gates are the intended regression signal and
 > will auto-pass once the runtime walks `_slots` in `fireCleanupsOnly` (and its
 > `b.cleanups.length || b.children.length` call-guard in `batchClearItems`
-> accounts for `_slots`). react / solid / ripple pass all six gates.
+> accounts for `_slots`). React, Preact, Solid, Ripple, and Svelte pass all six
+> gates.
 
 `clear` is specifically the path js-framework's `clear` skips: there, teardown
 of effect-free rows is pure DOM removal; here every removed row runs a passive
@@ -123,7 +126,7 @@ cleanup **and** a ref cleanup.
 - `update_nodeps` is **meaningfully octane-vs-react only**: fine-grained
   frameworks (solid, ripple, vue-vapor) don't re-render row bodies on an
   unrelated parent signal, so their column is ~the cost of one text-node
-  update. It's kept for all six targets because the gate (zero effect fires)
+  update. It's kept for all eight targets because the gate (zero effect fires)
   is still a correctness statement about each framework.
 - Sub-millisecond ops (`update_nodeps`, `update_deps`) run a ×10 inner loop
   inside the timed window and divide, to beat timer quantization.
@@ -158,22 +161,19 @@ cleanup **and** a ref cleanup.
     null-on-unmount call → `refCleanups` (verified by the `update_deps` and
     `remove_100_scattered` gates).
 
+The suite also includes **Preact** on `:5266` and **Svelte 5** on `:5277`.
+Preact waits for its native passive-effect phase through a post-commit sentinel;
+Svelte maps row refs to `{@attach}` cleanup and keys effects to the same
+primitive dependencies. The existing exact counter gate is authoritative.
+
 ## Running
 
-Start the six preview servers (production builds), then run the harness:
+The unified runner production-builds and previews all eight targets before
+running the harness:
 
 ```bash
-# build + preview each (production); run from the repo root
-pnpm --filter octane-tsrx-effectful-list-bench build && pnpm --filter octane-tsrx-effectful-list-bench preview &
-pnpm --filter octane-jsx-effectful-list-bench  build && pnpm --filter octane-jsx-effectful-list-bench  preview &
-pnpm --filter react-effectful-list-bench       build && pnpm --filter react-effectful-list-bench       preview &
-pnpm --filter solid-effectful-list-bench       build && pnpm --filter solid-effectful-list-bench       preview &
-pnpm --filter ripple-effectful-list-bench      build && pnpm --filter ripple-effectful-list-bench      preview &
-pnpm --filter vue-vapor-effectful-list-bench   build && pnpm --filter vue-vapor-effectful-list-bench   preview &
-
-# then, from benchmarks/effectful-list:
-pnpm bench           # 30 timed iterations (+10 warmup) per op
-pnpm bench:long      # 50 iterations
+node benchmarks/bench.mjs --quick effectful-list
+node benchmarks/bench.mjs effectful-list
 node run.mjs 3       # reduced-iteration smoke pass
 ```
 

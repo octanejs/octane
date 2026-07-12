@@ -1,4 +1,4 @@
-// dbmon bench harness — drives octane-tsrx / octane-jsx / react via Playwright.
+// dbmon bench harness — drives every framework fixture via Playwright.
 //
 // dbmon (dbmonster) stresses the UPDATE path: a table of DB_COUNT rows × 7 cells
 // whose text + threshold class churn every frame. Where js-framework measures
@@ -51,6 +51,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'solid', url: 'http://localhost:5200/' },
 			{ name: 'react', url: 'http://localhost:5198/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5220/' },
+			{ name: 'preact', url: 'http://localhost:5263/' },
+			{ name: 'svelte', url: 'http://localhost:5274/' },
 		];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -65,6 +67,107 @@ async function freshPage(browser, url) {
 	await page.goto(url, { waitUntil: 'load' });
 	await page.waitForFunction(() => window.__ready === true, null, { timeout: 10_000 });
 	return { ctx, page };
+}
+
+// Untimed fatal gate: prove the target implements the dbmon state/key contract
+// before accepting any measurements from it.
+async function semanticGate(browser, url) {
+	const { ctx, page } = await freshPage(browser, url);
+	try {
+		return await page.evaluate(async () => {
+			const errors = [];
+			const expect = (condition, message) => {
+				if (!condition) errors.push(message);
+			};
+			const call = async (name) => {
+				const fn = window[name];
+				if (typeof fn !== 'function') throw new Error(`missing ${name}`);
+				const result = fn();
+				if (result && typeof result.then === 'function') await result;
+			};
+			const rows = () => Array.from(document.querySelectorAll('.dbmon tbody > tr'));
+			const rowText = (row) => row?.textContent ?? '';
+
+			await call('__mount');
+			let current = rows();
+			expect(current.length === 1000, `mount rendered ${current.length} rows, expected 1000`);
+			expect(
+				current.every((row) => row.cells.length === 7),
+				'mount did not render exactly 7 cells per row',
+			);
+			expect(
+				current[0]?.querySelector('.dbname')?.textContent === 'cluster-0' &&
+					current[999]?.querySelector('.dbname')?.textContent === 'cluster-999',
+				'mount row identities are not cluster-0…cluster-999',
+			);
+
+			const firstRow = current[0];
+			const fullBefore = document.querySelector('.dbmon tbody')?.textContent ?? '';
+			await call('__tick');
+			current = rows();
+			expect(current.length === 1000, `full tick left ${current.length} rows`);
+			expect(current[0] === firstRow, 'full tick replaced a surviving keyed row');
+			expect(
+				(document.querySelector('.dbmon tbody')?.textContent ?? '') !== fullBefore,
+				'full tick did not update table values',
+			);
+
+			const changedBefore = rowText(current[0]);
+			const unchangedBefore = rowText(current[100]);
+			const unchangedRow = current[100];
+			await call('__tickPartial');
+			current = rows();
+			expect(rowText(current[0]) !== changedBefore, 'partial tick did not update a selected row');
+			expect(
+				rowText(current[100]) === unchangedBefore,
+				'partial tick changed a row outside the 10%',
+			);
+			expect(current[100] === unchangedRow, 'partial tick replaced an unchanged keyed row');
+
+			const preRemountRows = new Set(current);
+			await call('__remount');
+			current = rows();
+			expect(current.length === 1000, `remount rendered ${current.length} rows`);
+			expect(
+				current.every((row) => !preRemountRows.has(row)),
+				'remount retained DOM nodes after every key changed',
+			);
+			expect(
+				current[0]?.querySelector('.dbname')?.textContent === 'cluster-1000' &&
+					current[999]?.querySelector('.dbname')?.textContent === 'cluster-1999',
+				'remount did not advance the full key range',
+			);
+
+			const preSortRows = new Set(current);
+			const preSortOrder = current
+				.map((row) => row.querySelector('.dbname')?.textContent)
+				.join('|');
+			await call('__sort');
+			current = rows();
+			expect(current.length === 1000, `sort left ${current.length} rows`);
+			expect(
+				current.every((row) => preSortRows.has(row)),
+				'sort rebuilt rows instead of moving keyed survivors',
+			);
+			expect(
+				current.map((row) => row.querySelector('.dbname')?.textContent).join('|') !== preSortOrder,
+				'sort did not change row order',
+			);
+
+			await call('__unmount');
+			expect(document.querySelectorAll('.dbmon tbody > tr').length === 0, 'unmount left rows');
+			const root = document.getElementById('main');
+			expect(
+				root?.querySelector('*') === null && root.textContent?.trim() === '',
+				'unmount left rendered root content',
+			);
+			await call('__reset');
+			expect(document.getElementById('main')?.childNodes.length === 0, 'reset left root DOM');
+			return errors;
+		});
+	} finally {
+		await ctx.close();
+	}
 }
 
 // MOUNT — fresh page per sample (quiescent start); time __mount() with a
@@ -93,7 +196,10 @@ async function measureMount(browser, url) {
 // tight in-page loop with gc() before each sample.
 async function measureLoop(browser, url, op) {
 	const { ctx, page } = await freshPage(browser, url);
-	await page.evaluate(() => window.__mount());
+	await page.evaluate(async () => {
+		const result = window.__mount();
+		if (result && typeof result.then === 'function') await result;
+	});
 	await sleep(50);
 	const samples = await page.evaluate(
 		async ({ op, WARMUP, ITER, YIELD_MS }) => {
@@ -126,14 +232,16 @@ async function measureUnmount(browser, url) {
 			const gc = window.gc || (() => {});
 			const out = [];
 			for (let i = 0; i < WARMUP + ITER; i++) {
-				window.__mount();
+				const mounted = window.__mount();
+				if (mounted && typeof mounted.then === 'function') await mounted;
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 				gc();
 				const t0 = performance.now();
 				const r = window.__unmount();
 				if (r && typeof r.then === 'function') await r;
 				const dt = performance.now() - t0;
-				window.__reset();
+				const reset = window.__reset();
+				if (reset && typeof reset.then === 'function') await reset;
 				if (i >= WARMUP) out.push(dt);
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 			}
@@ -151,41 +259,71 @@ async function runTarget(t) {
 		args: ['--disable-extensions', '--no-sandbox', '--js-flags=--expose-gc'],
 	});
 
-	const { ctx, page } = await freshPage(browser, t.url);
-	const hasGc = await page.evaluate(() => typeof window.gc === 'function');
-	await ctx.close();
-	if (!hasGc) {
-		console.error(
-			'  ! window.gc unavailable (need --js-flags=--expose-gc) — results will be noisier',
-		);
-	}
+	try {
+		console.error(`  → semantic gate`);
+		const gateErrors = await semanticGate(browser, t.url);
+		if (gateErrors.length > 0) return { gateErrors, results: null };
 
-	console.error(`  → mount`);
-	const mount = await measureMount(browser, t.url);
-	console.error(`  → tick`);
-	const tick = await measureLoop(browser, t.url, '__tick');
-	console.error(`  → tick_partial`);
-	const tick_partial = await measureLoop(browser, t.url, '__tickPartial');
-	console.error(`  → remount`);
-	const remount = await measureLoop(browser, t.url, '__remount');
-	console.error(`  → sort`);
-	const sort = await measureLoop(browser, t.url, '__sort');
-	console.error(`  → unmount`);
-	const unmount = await measureUnmount(browser, t.url);
-	await browser.close();
-	return { mount, tick, tick_partial, remount, sort, unmount };
+		const { ctx, page } = await freshPage(browser, t.url);
+		const hasGc = await page.evaluate(() => typeof window.gc === 'function');
+		await ctx.close();
+		if (!hasGc) {
+			console.error(
+				'  ! window.gc unavailable (need --js-flags=--expose-gc) — results will be noisier',
+			);
+		}
+
+		console.error(`  → mount`);
+		const mount = await measureMount(browser, t.url);
+		console.error(`  → tick`);
+		const tick = await measureLoop(browser, t.url, '__tick');
+		console.error(`  → tick_partial`);
+		const tick_partial = await measureLoop(browser, t.url, '__tickPartial');
+		console.error(`  → remount`);
+		const remount = await measureLoop(browser, t.url, '__remount');
+		console.error(`  → sort`);
+		const sort = await measureLoop(browser, t.url, '__sort');
+		console.error(`  → unmount`);
+		const unmount = await measureUnmount(browser, t.url);
+		return {
+			gateErrors: [],
+			results: { mount, tick, tick_partial, remount, sort, unmount },
+		};
+	} finally {
+		await browser.close();
+	}
 }
 
 const OPS = ['mount', 'tick', 'tick_partial', 'remount', 'sort', 'unmount'];
 
 (async () => {
 	const all = {};
+	const failures = [];
+	const failedTargets = new Set();
 	for (const t of TARGETS) {
 		console.error(`Running ${t.name} (${t.url}) × ${ITER} (+${WARMUP} warmup)…`);
-		all[t.name] = await runTarget(t);
+		try {
+			const { gateErrors, results } = await runTarget(t);
+			if (gateErrors.length > 0) {
+				failedTargets.add(t.name);
+				for (const error of gateErrors) {
+					const message = `${t.name}: semantic gate: ${error}`;
+					failures.push(message);
+					console.error(`  ✗ ${message}`);
+				}
+				continue;
+			}
+			all[t.name] = results;
+		} catch (error) {
+			failedTargets.add(t.name);
+			const message = `${t.name}: ${error instanceof Error ? error.message : String(error)}`;
+			failures.push(message);
+			console.error(`  ✗ ${message}`);
+		}
 	}
 
-	const cols = TARGETS.map((t) => t.name);
+	const successfulTargets = TARGETS.filter((t) => all[t.name]);
+	const cols = successfulTargets.map((t) => t.name);
 	const W = 32;
 	console.log();
 	console.log('Op               | ' + cols.map((c) => c.padEnd(W)).join('| '));
@@ -201,11 +339,14 @@ const OPS = ['mount', 'tick', 'tick_partial', 'remount', 'sort', 'unmount'];
 		console.log(row.join('| '));
 	}
 
-	if (TARGETS.length > 1) {
-		const baselineName = TARGETS[TARGETS.length - 1].name;
+	if (successfulTargets.length > 1) {
+		const baselineName =
+			successfulTargets.find((target) => target.name === 'vue-vapor')?.name ??
+			successfulTargets.at(-1).name;
 		const baseline = all[baselineName];
 		console.log();
-		for (const t of TARGETS.slice(0, -1)) {
+		for (const t of successfulTargets) {
+			if (t.name === baselineName) continue;
 			const r = all[t.name];
 			console.log(`${t.name} / ${baselineName} ratio (score; <1 means ${t.name} faster):`);
 			for (const op of OPS) {
@@ -234,16 +375,26 @@ const OPS = ['mount', 'tick', 'tick_partial', 'remount', 'sort', 'unmount'];
 			iterations: ITER,
 			targets: TARGETS.map((t) => ({
 				name: t.name,
-				ops: Object.fromEntries(
-					OPS.map((op) => {
-						const r = all[t.name][op];
-						return [op, timingStatForJson(r)];
-					}),
-				),
+				ops: all[t.name]
+					? Object.fromEntries(
+							OPS.map((op) => {
+								const r = all[t.name][op];
+								return [op, timingStatForJson(r)];
+							}),
+						)
+					: {},
+				meta: { gates: failedTargets.has(t.name) ? 'fail' : 'pass' },
 			})),
 		};
+		if (failures.length > 0) payload.failed = failures.join('; ');
 		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');
 		console.error(`BENCH_JSON written to ${process.env.BENCH_JSON}`);
+	}
+
+	if (failures.length > 0) {
+		console.error(`\n✗ ${failures.length} failure(s):`);
+		for (const failure of failures) console.error(`  - ${failure}`);
+		process.exitCode = 1;
 	}
 })().catch((e) => {
 	console.error(e);

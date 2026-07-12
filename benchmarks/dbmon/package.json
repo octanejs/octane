@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "dbmon (dbmonster-style) update-stress bench. A table of DB_COUNT rows whose cell text + threshold class churn every tick; harness measures mount / tick / tick_partial / remount / sort / unmount across octane-tsrx, octane-jsx and react.",
+  "description": "dbmon update-stress benchmark across Octane, React, Preact, Solid, Svelte, Ripple, and Vue Vapor fixtures.",
   "scripts": {
     "bench": "node run.mjs",
     "bench:long": "node run.mjs 50"

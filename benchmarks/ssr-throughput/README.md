@@ -18,16 +18,17 @@ benchmarks/ssr-throughput/
 ├── fixtures/       # octane-only SSR fixtures (waterfall / deopt-page / escape-heavy)
 │   └── src/        # .tsrx + plain-.ts twins + deterministic seeded data modules
 ├── run.mjs         # builds bundles into dist/, times them, prints tables + BENCH_JSON
-├── package.json    # harness deps (vite + react/solid/vue — see note below)
+├── package.json    # harness deps (vite + externalized framework runtimes)
 └── README.md
 ```
 
-## Part 1 — news-page throughput (octane vs React 19 vs Solid 2.0 vs Ripple vs Vue 3.6)
+## Part 1 — news-page throughput (Octane and reference frameworks)
 
 Reuses the news app fixtures and build methodology verbatim: `news/gen.mjs` is
 invoked as a child process at 50 and then 500 cards, each target's SSR bundle
-(`octane-tsrx` `render()` from `octane/server`, react `react-dom/server`
-`renderToString`, solid `@solidjs/web` `renderToString`, ripple
+(`octane-tsrx` `render()` from `octane/server`, React and Preact
+`renderToString`, Solid `@solidjs/web` `renderToString`, Svelte's buffered
+`svelte/server` `render`, Ripple
 `ripple/server` `render` — bundled in by its app's `ssr.noExternal`, so the
 built entry is self-contained — and vue-vapor `vue/server-renderer`
 `renderToString` — on the server a vapor SFC compiles to
@@ -41,6 +42,9 @@ identical). Each config loops the built `renderApp()` for the time budget.
 A bad octane number here (relative to react/solid, or a regression vs an older
 run) points at the compiled `ssr*` helper emission or at `render()`'s per-pass
 setup cost — not at any specific feature, which is what Part 2 isolates.
+
+Part 2 remains Octane-only because its waterfall/deopt/escape cases test
+Octane-specific server paths.
 
 ## Part 2 — octane-only fixtures
 
@@ -97,11 +101,10 @@ gate failure (and a non-zero exit).
 - **`hydrationMarkerPairs` counts `<!--[` occurrences** — octane's marker
   protocol. It is reported for react/solid too (where it is ~0) purely so the
   octane payload overhead is visible next to their body bytes.
-- **This package depends on react/react-dom/solid-js/@solidjs/web** even though
-  it authors no react/solid code: the built news SSR bundles externalize their
-  framework imports, and Node resolves those from `dist/…` upward — i.e. from
-  *this* package's `node_modules`. Versions come from the same catalog as
-  news's own fixtures.
+- **This package declares the externalized reference runtimes** even though it
+  authors no code in those frameworks: Node resolves the built news bundles'
+  imports from `dist/…` upward — i.e. from this package's `node_modules`.
+  Versions come from the same catalog as the news fixtures.
 - Sub-millisecond configs (waterfall d1) rely on per-call `hrtime.bigint()`
   sampling; timer overhead (~0.1µs) is negligible at that scale, so no
   inner-loop division is needed.

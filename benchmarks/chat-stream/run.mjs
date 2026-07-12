@@ -39,6 +39,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'solid', url: 'http://localhost:5252/' },
 			{ name: 'ripple', url: 'http://localhost:5253/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5254/' },
+			{ name: 'preact', url: 'http://localhost:5262/' },
+			{ name: 'svelte', url: 'http://localhost:5273/' },
 		];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

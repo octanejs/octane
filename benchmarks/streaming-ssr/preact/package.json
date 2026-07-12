@@ -1,0 +1,15 @@
+{
+  "name": "preact-streaming-ssr-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Streaming SSR fixture for Preact using preact-render-to-string's Node stream API.",
+  "dependencies": {
+    "preact": "catalog:default",
+    "preact-render-to-string": "catalog:default"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "catalog:default",
+    "vite": "catalog:default"
+  }
+}
