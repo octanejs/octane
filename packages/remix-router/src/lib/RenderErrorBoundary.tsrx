@@ -94,12 +94,19 @@ function CaughtErrorView(props) @{
 
 	// Leave the catch state when the location changes or a revalidation
 	// completes — the octane analogue of upstream's render-phase reset.
+	// `location` stays pinned at the catch baseline (upstream's state.location
+	// only moves on reset), but `revalidation` must TRACK every render the way
+	// upstream's derived state does (`props.revalidation || state.revalidation`)
+	// — a render error is usually caught while revalidation is already "idle",
+	// and the recovery signal is the SUBSEQUENT loading → idle transition, not
+	// a transition relative to the frozen catch-time value.
 	const baseline = useRef({ location: props.location, revalidation: props.revalidation });
 	useLayoutEffect(() => {
 		const b = baseline.current;
-		if (
-			b.location !== props.location || b.revalidation !== 'idle' && props.revalidation === 'idle'
-		) {
+		const shouldReset =
+			b.location !== props.location || b.revalidation !== 'idle' && props.revalidation === 'idle';
+		b.revalidation = props.revalidation || b.revalidation;
+		if (shouldReset) {
 			props.reset();
 		}
 	}, [props.location, props.revalidation]);

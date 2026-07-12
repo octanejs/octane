@@ -143,6 +143,42 @@ describe('route error boundaries', () => {
 		r.unmount();
 	});
 
+	it('a caught render error clears after a same-location revalidation (loading → idle)', async () => {
+		// Per upstream getDerivedStateFromProps: derived state tracks
+		// `revalidation` on EVERY render, so a render error caught while
+		// revalidation is already "idle" is cleared by the NEXT revalidation
+		// completing (loading → idle) — not by a transition relative to the
+		// frozen catch-time value. (PR #46 review finding.)
+		let broken = true;
+		function FlakyRender() {
+			if (broken) throw new Error('render flake');
+			return createElement(Home);
+		}
+		const router = createMemoryRouter([
+			{
+				path: '/',
+				element: createElement(Layout),
+				children: [
+					{
+						index: true,
+						element: createElement(FlakyRender),
+						loader: () => ({}),
+						errorElement: createElement(ErrorProbe),
+					},
+				],
+			},
+		]);
+		const r = mount(App, { router });
+		await flush();
+		expect(r.find('main .err').textContent).toBe('error:render flake');
+
+		broken = false;
+		await router.revalidate();
+		await flush();
+		expect(r.find('main h1').textContent).toBe('Home');
+		r.unmount();
+	});
+
 	it('the boundary resets when navigating away and back after the loader recovers', async () => {
 		// Per data-memory-router-test.tsx:2396 ("handles back button routing away
 		// from a child error boundary").
