@@ -191,6 +191,8 @@ describe('website routes', () => {
 		expect(text).toContain("they're all on purpose");
 		// Non-bubbling event parity: native events are capture-delegated through
 		// logical component ancestors, including across portal boundaries.
+		expect(text).toContain('Native events, React-style propagation');
+		expect(text).toContain('native object does not mean native propagation only');
 		expect(text).toContain('capture-delegated');
 		expect(text).toContain('That logical path continues across portals');
 		// Controlled form components (2026-07-08): React's value/checked semantics

@@ -68,15 +68,15 @@ observed. Ordinary `[state, setState]` and `[state, dispatch]` destructures keep
 the existing two-item runtime path and allocate no getter; escaped or ambiguous
 tuples conservatively receive the full three-item shape.
 
-## Events are just DOM events
+## Native events, React-style propagation
 
-Octane doesn't have React's synthetic event system. `onClick`, `onInput`,
-`onSubmit` and friends are real, delegated browser events, so what you get is
-whatever the platform does — no wrapper layer second-guessing it.
+Octane doesn't expose React's synthetic event object. `onClick`, `onInput`,
+`onSubmit` and friends receive the browser's actual `Event` object. Event
+handling is still delegated, so **native object does not mean native propagation
+only**: Octane routes that same event through the logical component tree where
+React does.
 
-For most apps this is invisible: click, input, and submit behave exactly as
-you'd expect. Octane also matches the propagation behavior component authors
-rely on while preserving the native `Event` object:
+The resulting contract is:
 
 - Events that don't bubble in the DOM — `toggle`, dialog `cancel`/`close`,
   media events, and `load`/`error` — are capture-delegated and delivered through
