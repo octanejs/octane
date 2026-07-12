@@ -163,7 +163,10 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
 
 ## Validation
 
-Prefer the smallest validation that covers the change.
+Prefer the smallest behavioral validation that covers the change. After any file
+change, always run the repository-wide `pnpm format:check` before handoff. Running
+Prettier only on touched source files is not a substitute: generated baselines,
+docs, and RuleSync outputs must pass the same formatting gate as CI.
 
 ```bash
 pnpm test                 # full vitest run
