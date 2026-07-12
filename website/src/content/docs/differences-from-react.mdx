@@ -43,6 +43,31 @@ keyed `@for` directive (each item renders in its own scope, so per-item hooks
 get per-item state), or extract the loop body into a child component. `use()`
 and `useContext` do work inside loops — they aren't slot-keyed.
 
+## State hooks have a current-state getter
+
+**This replaces a common React ref workaround.** `useState` and `useReducer`
+have an optional third tuple member: a stable thunk that reads the latest state
+cell.
+
+```tsrx
+const [draft, setDraft, getDraft] = useState('');
+
+const saveLater = async () => {
+	await waitForConnection();
+	await save(getDraft());
+};
+```
+
+In React, a callback like this usually needs a ref synchronized on every render
+to avoid capturing an old `draft`. In Octane, `getDraft()` reads the latest
+scheduled value directly without subscribing or causing a render. During
+pending work that value can be newer than the currently committed DOM.
+
+The compiler only emits the getter-enabled hook when tuple index 2 can be
+observed. Ordinary `[state, setState]` and `[state, dispatch]` destructures keep
+the existing two-item runtime path and allocate no getter; escaped or ambiguous
+tuples conservatively receive the full three-item shape.
+
 ## Events are just DOM events
 
 Octane doesn't have React's synthetic event system. `onClick`, `onInput`,
@@ -170,5 +195,6 @@ supported.
 
 ## Next
 
+- [Core APIs](/docs/core-apis) — roots, hooks, boundaries, actions, and SSR.
 - [TSRX vs TSX/JSX](/docs/tsrx-vs-tsx) — the two dialects and when to use each.
 - [Quick start](/docs/quick-start) — install, mount, and the essentials.
