@@ -82,8 +82,8 @@ describe('built SSR handler', () => {
 		expect(text).toContain('Octane vs the field');
 		expect(text).toContain('The authoring cliff');
 		// The SSR/no-JS content is the data tables — every card ships one with
-		// the real checked-in medians (16 timing cards + one bytes card).
-		expect((html.match(/Data table \(median ms/g) ?? []).length).toBe(16);
+		// the real checked-in benchmark scores (16 timing cards + one bytes card).
+		expect((html.match(/Data table \(score ms/g) ?? []).length).toBe(16);
 		expect((html.match(/Data table \(production build bytes\)/g) ?? []).length).toBe(1);
 		expect(html).toContain('<th scope="row"');
 		// The charts themselves mount client-side (recharts' store populates via

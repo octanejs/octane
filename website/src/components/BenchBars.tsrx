@@ -1,5 +1,5 @@
 // A benchmark card: legend chips, an @octanejs/recharts horizontal-bar chart
-// (median ms per operation, lower is better), and a <details> table with the
+// (benchmark score ms per operation, lower is better), and a <details> table with the
 // exact numbers — the accessibility/relief channel for the color encoding.
 // Bars are static (isAnimationActive={false}); series colors come validated
 // from content/benchmarks.ts and text always wears the site's text tokens.
@@ -63,7 +63,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 			? 'Data table (× vs Octane, geometric mean across operations)'
 			: card.format === 'bytes'
 				? 'Data table (production build bytes)'
-				: 'Data table (median ms, ' + card.iterations + ' iterations)';
+				: 'Data table (score ms, ' + card.iterations + ' iterations)';
 	// Value labels at bar tips only where they stay readable (≤2 series);
 	// denser cards lean on the number axis + the table view instead.
 	const showValues = props.showValues ?? card.series.length <= 2;

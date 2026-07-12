@@ -54,6 +54,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NEWS = path.join(__dirname, '..', 'news');
@@ -138,19 +139,10 @@ if (!noBuild) {
 const hr = () => process.hrtime.bigint();
 
 function summarize(samples) {
-	const s = [...samples].sort((a, b) => a - b);
-	const n = s.length;
-	const mean = s.reduce((a, b) => a + b, 0) / n;
-	const sd = Math.sqrt(s.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
-	const q = (p) => s[Math.min(n - 1, Math.floor(n * p))];
+	const stat = summarizeSamples(samples);
 	return {
-		median: s[n >> 1],
-		min: s[0],
-		p95: q(0.95),
-		p99: q(0.99),
-		sd,
-		samples: n,
-		opsPerSec: 1000 / mean,
+		...stat,
+		opsPerSec: 1000 / stat.score,
 	};
 }
 
@@ -402,7 +394,7 @@ console.log(
 	`\nssr-throughput — Node SSR ops/sec + latency (${SECONDS}s/config, production builds)`,
 );
 console.log(
-	'\nconfig                     |   ops/sec |    p50 ms |    p95 ms |    p99 ms |    min ms | samples',
+	'\nconfig                     |   ops/sec |  score ms |    p95 ms |    p99 ms |    min ms | samples',
 );
 console.log(
 	'---------------------------+-----------+-----------+-----------+-----------+-----------+--------',
@@ -410,7 +402,7 @@ console.log(
 for (const r of results) {
 	const s = r.stats;
 	console.log(
-		`${r.name.padEnd(26)} |${f2(s.opsPerSec)} |${f3(s.median)} |${f3(s.p95)} |${f3(s.p99)} |${f3(s.min)} | ${String(s.samples).padStart(6)}`,
+		`${r.name.padEnd(26)} |${f2(s.opsPerSec)} |${f3(s.score)} |${f3(s.p95)} |${f3(s.p99)} |${f3(s.min)} | ${String(s.samples).padStart(6)}`,
 	);
 }
 
@@ -428,13 +420,13 @@ for (const r of results) {
 }
 
 const byName = new Map(results.map((r) => [r.name, r]));
-const ratio = (a, b) => byName.get(a).stats.median / byName.get(b).stats.median;
+const ratio = (a, b) => scoreOf(byName.get(a).stats) / scoreOf(byName.get(b).stats);
 const have = (...names) => names.every((n) => byName.has(n));
 
 for (const size of CARD_COUNTS) {
 	const base = `news-${size}/octane-tsrx`;
 	if (!byName.has(base)) continue;
-	console.log(`\nnews-${size} ratios vs ${base} (median; >1 means slower than octane):`);
+	console.log(`\nnews-${size} ratios vs ${base} (score; >1 means slower than octane):`);
 	for (const target of NEWS_TARGETS.slice(1)) {
 		const other = `news-${size}/${target}`;
 		if (!byName.has(other)) continue;
@@ -475,7 +467,7 @@ if (process.env.BENCH_JSON) {
 		iterations: SECONDS,
 		targets: results.map((r) => ({
 			name: r.name,
-			ops: { render: r.stats },
+			ops: { render: timingStatForJson(r.stats, { p99: true }) },
 			meta: r.meta,
 		})),
 	};

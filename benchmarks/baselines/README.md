@@ -7,10 +7,11 @@ kinds of data live here, and they are enforced very differently:
 
 A flat array of guards, each
 `{ suite, op, target, reference, maxRatio?, minRatio?, note }`. For a given
-suite result the runner computes `target.median / reference.median` (both
-measured on the **same machine in the same run**, so the number is
-hardware-independent) and **fails if it exceeds `maxRatio` or falls below
-`minRatio`**. Only guards whose both sides actually ran are checked.
+suite result the runner computes `target.score / reference.score` (falling back
+to `median` for older records). Both sides are measured on the **same machine in
+the same run**, so the number is hardware-independent, and the runner **fails if
+it exceeds `maxRatio` or falls below `minRatio`**. Only guards whose both sides
+actually ran are checked.
 
 This is the check `.github/workflows/bench.yml` enforces (`--ratios`). It is safe
 to enforce on any runner from day one because it is a ratio, not an absolute
@@ -39,9 +40,9 @@ thermal state. They are committed only so an individual developer can track thei
 own machine's regressions across branches; **they are not a CI gate** and the
 committed copy will reflect whoever last ran `--record`.
 
-`--compare` uses a noise-aware rule (a regression needs median > 1.15× *and*
-min > 1.10× baseline, plus an absolute >0.1ms excess for sub-0.2ms ops), but it
-is still only meaningful against a baseline you recorded on the *same* machine.
+`--compare` uses a noise-aware rule (a regression needs score > 1.15× *and*
+min > 1.10× baseline, plus an absolute >0.1ms excess for sub-1ms ops), but it is
+still only meaningful against a baseline you recorded on the *same* machine.
 
 > **Caveat:** if `local/*.json` looks "wrong", it is almost certainly because it
 > was recorded on a different machine than yours. Re-run `--record` locally

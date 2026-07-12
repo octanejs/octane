@@ -28,6 +28,7 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
 const ROW_COUNT = 1000;
@@ -150,10 +151,7 @@ async function runTarget(t) {
 			samples.push(dt);
 			await sleep(60);
 		}
-		samples.sort((a, b) => a - b);
-		const median = samples[samples.length >> 1];
-		const min = samples[0];
-		results[op.name] = { median, min, samples };
+		results[op.name] = summarizeSamples(samples);
 	}
 
 	// M0 of docs/comment-marker-elision-plan.md: comment-node DOM weight at
@@ -208,9 +206,9 @@ async function runTarget(t) {
 		console.log();
 		for (const t of TARGETS.slice(1)) {
 			const r = all[t.name];
-			console.log(`${t.name} / ${baselineName} ratio (median; <1 means ${t.name} faster):`);
+			console.log(`${t.name} / ${baselineName} ratio (score; <1 means ${t.name} faster):`);
 			for (const op of OPS) {
-				const ratio = r[op.name].median / baseline[op.name].median;
+				const ratio = scoreOf(r[op.name]) / scoreOf(baseline[op.name]);
 				const tag = ratio < 0.95 ? '++ faster' : ratio < 1.05 ? '== ~equal' : '-- slower';
 				console.log(`  ${op.name.padEnd(8)} ${ratio.toFixed(2)}x  ${tag}`);
 			}
@@ -229,7 +227,9 @@ async function runTarget(t) {
 				ops: Object.fromEntries(
 					Object.entries(all[t.name]).map(([name, r]) => [
 						name,
-						{ median: r.median, min: r.min, samples: r.samples.length },
+						r.score == null
+							? { median: r.median, min: r.min, samples: r.samples.length }
+							: timingStatForJson(r),
 					]),
 				),
 			})),

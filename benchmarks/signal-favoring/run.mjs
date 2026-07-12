@@ -33,6 +33,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
 const WARMUP = 5;
@@ -72,17 +73,7 @@ async function freshPage(browser, url) {
 }
 
 function summarize(samples) {
-	const sorted = [...samples].sort((a, b) => a - b);
-	const n = sorted.length;
-	const mean = sorted.reduce((a, b) => a + b, 0) / n;
-	const stddev = Math.sqrt(sorted.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
-	return {
-		median: sorted[n >> 1],
-		min: sorted[0],
-		mean,
-		p95: sorted[Math.min(n - 1, Math.floor(n * 0.95))],
-		stddev,
-	};
+	return summarizeSamples(samples);
 }
 
 // MOUNT — fresh page per sample; time the synchronous __mount() on a clean heap.
@@ -298,14 +289,14 @@ const OPS = [
 		console.log();
 		for (const t of TARGETS.slice(0, -1)) {
 			const r = all[t.name];
-			console.log(`${t.name} / ${baselineName} ratio (median; <1 means ${t.name} faster):`);
+			console.log(`${t.name} / ${baselineName} ratio (score; <1 means ${t.name} faster):`);
 			for (const op of OPS) {
-				const base = baseline[op].median;
+				const base = scoreOf(baseline[op]);
 				if (base === 0) {
 					console.log(`  ${op.padEnd(14)}   —    (baseline ~0, sub-resolution)`);
 					continue;
 				}
-				const ratio = r[op].median / base;
+				const ratio = scoreOf(r[op]) / base;
 				const tag = ratio < 0.95 ? '++ faster' : ratio < 1.05 ? '== ~equal' : '-- slower';
 				console.log(`  ${op.padEnd(14)} ${ratio.toFixed(2)}x  ${tag}`);
 			}
@@ -319,8 +310,8 @@ const OPS = [
 		console.log('cascade ratio (bump_shallow / bump_deep, signal frameworks should be near 1.0):');
 		for (const c of cols) {
 			const r = all[c];
-			const deep = r.bump_deep.median;
-			const ratioStr = deep === 0 ? '—' : (r.bump_shallow.median / deep).toFixed(2) + 'x';
+			const deep = scoreOf(r.bump_deep);
+			const ratioStr = deep === 0 ? '—' : (scoreOf(r.bump_shallow) / deep).toFixed(2) + 'x';
 			console.log(`  ${c.padEnd(14)} ${ratioStr}  (hooks expect ~10x, signals ~1x)`);
 		}
 
@@ -332,8 +323,8 @@ const OPS = [
 		);
 		for (const c of cols) {
 			const r = all[c];
-			const perOp = r.bump_sweep.median;
-			const ratioStr = perOp === 0 ? '—' : (r.bump_sweep_batched.median / perOp).toFixed(2) + 'x';
+			const perOp = scoreOf(r.bump_sweep);
+			const ratioStr = perOp === 0 ? '—' : (scoreOf(r.bump_sweep_batched) / perOp).toFixed(2) + 'x';
 			console.log(`  ${c.padEnd(14)} ${ratioStr}`);
 		}
 
@@ -365,7 +356,7 @@ const OPS = [
 				ops: Object.fromEntries(
 					OPS.map((op) => {
 						const r = all[t.name][op];
-						return [op, { median: r.median, min: r.min, p95: r.p95, sd: r.stddev, samples: ITER }];
+						return [op, timingStatForJson(r)];
 					}),
 				),
 			})),

@@ -2,14 +2,10 @@
  * Conformance port of react-dom/src/__tests__/ReactDOMEventListener-test.js
  * (React v19.2.7) — event delegation with REAL native DOM events.
  *
- * Scope notes (per docs/react-parity-migration-plan.md §2 + maintainer ruling):
- * octane will never replicate React's SYNTHETIC event layer. Behaviors that
- * exist only because the synthetic layer re-dispatches non-bubbling events to
- * ancestor JSX handlers (toggle/cancel/close/media/load) are INTENTIONAL
- * DIVERGENCES — those cases are ported as assertions of octane's platform
- * contract (ancestor handler does NOT fire). Delivery of a non-bubbling event
- * to the TARGET's OWN handler IS the platform contract, so where octane's
- * delegation currently misses it the case is pinned as `it.fails` + `// GAP`.
+ * Scope notes (per docs/react-parity-migration-plan.md §2): octane does not
+ * expose React's SyntheticEvent API or event polyfills. It does reproduce the
+ * user-visible propagation of native non-bubbling events (toggle/cancel/close,
+ * media, load/error) by capture-delegating them through the logical tree.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -239,12 +235,8 @@ describe('ReactDOMEventListener — non-bubbling event delivery', () => {
 	// copy: on the platform, a listener on the element fires for a dispatched
 	// event regardless of tag.
 	//
-	// GAP: octane delegates every JSX event through a BUBBLE-phase root listener
-	// (runtime.ts `delegateEvents`/`dispatchDelegated`); `loadstart` does not
-	// bubble and is not in CAPTURE_DELEGATED (runtime.ts:4035), so the event
-	// never reaches the delegation root and NEITHER handler fires (React fires
-	// the video's). Fix would capture-delegate the non-bubbling load/media family
-	// with the TARGET_ONLY treatment.
+	// Octane capture-delegates the non-bubbling load/media family, so the video's
+	// handler receives the native event.
 	it('delivers loadstart to a direct handler on the target element', () => {
 		const log = createLog();
 		const r = mount(MediaLoadTargets, { log: log.push });
@@ -256,9 +248,7 @@ describe('ReactDOMEventListener — non-bubbling event delivery', () => {
 		}
 	});
 
-	// Per ReactDOMEventListener-test.js:607 — should dispatch load for embed elements
-	// GAP: same root cause as :446 — `load` doesn't bubble and isn't
-	// capture-delegated, so the embed's own onLoad never fires (React fires it).
+	// Per ReactDOMEventListener-test.js:607 — should dispatch load for embed elements.
 	it('delivers load to a direct handler on an embed element', () => {
 		const log = createLog();
 		const r = mount(MediaLoadTargets, { log: log.push });
@@ -271,111 +261,64 @@ describe('ReactDOMEventListener — non-bubbling event delivery', () => {
 	});
 
 	// Per ReactDOMEventListener-test.js:706 — should bubble non-native bubbling
-	// toggle events. React's synthetic layer fires the ancestor handler too (2
-	// calls); the platform does not bubble toggle.
-	// GAP (target half): `toggle` never reaches octane's bubble-phase delegation
-	// root, so even the <details>' OWN handler doesn't fire. The platform
-	// contract is one call — the target's.
-	it('delivers toggle to the <details> element’s own handler', () => {
+	// toggle events. Capture delegation delivers to the target, then walks to the
+	// ancestor even though the native event does not bubble.
+	it('delivers toggle to the <details> and its ancestor', () => {
 		const log = createLog();
 		const r = mount(NonBubblingPairs, { log: log.push });
 		r.find('.det').dispatchEvent(new Event('toggle', { bubbles: false }));
 		try {
-			expect(log.drain()).toEqual(['det-toggle']);
+			expect(log.drain()).toEqual(['det-toggle', 'anc-toggle']);
 		} finally {
 			r.unmount();
 		}
-	});
-
-	// Per ReactDOMEventListener-test.js:706 — intentional divergence (synthetic
-	// emulation): React re-dispatches toggle so the ancestor's onToggle fires;
-	// octane matches the PLATFORM — toggle does not bubble, so an ancestor JSX
-	// handler never sees a descendant's toggle.
-	it('does NOT emulate toggle bubbling to an ancestor handler (intentional divergence)', () => {
-		const log = createLog();
-		const r = mount(NonBubblingPairs, { log: log.push });
-		r.find('.det').dispatchEvent(new Event('toggle', { bubbles: false }));
-		expect(log.drain()).not.toContain('anc-toggle');
-		r.unmount();
 	});
 
 	// Per ReactDOMEventListener-test.js:733 — should bubble non-native bubbling
-	// cancel/close events.
-	// GAP (target half): cancel/close never reach the bubble-phase delegation
-	// root, so the <dialog>'s own onCancel/onClose don't fire (platform: they do).
-	it('delivers cancel/close to the <dialog> element’s own handlers', () => {
+	// cancel/close events, target first and then ancestor.
+	it('delivers cancel/close to the <dialog> and its ancestor', () => {
 		const log = createLog();
 		const r = mount(NonBubblingPairs, { log: log.push });
 		r.find('.dlg').dispatchEvent(new Event('cancel', { bubbles: false }));
 		r.find('.dlg').dispatchEvent(new Event('close', { bubbles: false }));
 		try {
-			expect(log.drain()).toEqual(['dlg-cancel', 'dlg-close']);
+			expect(log.drain()).toEqual(['dlg-cancel', 'anc-cancel', 'dlg-close', 'anc-close']);
 		} finally {
 			r.unmount();
 		}
-	});
-
-	// Per ReactDOMEventListener-test.js:733 — intentional divergence (synthetic
-	// emulation): ancestor onCancel/onClose do NOT fire for a descendant dialog's
-	// events; octane matches the platform.
-	it('does NOT emulate cancel/close bubbling to an ancestor handler (intentional divergence)', () => {
-		const log = createLog();
-		const r = mount(NonBubblingPairs, { log: log.push });
-		r.find('.dlg').dispatchEvent(new Event('cancel', { bubbles: false }));
-		r.find('.dlg').dispatchEvent(new Event('close', { bubbles: false }));
-		const entries = log.drain();
-		expect(entries).not.toContain('anc-cancel');
-		expect(entries).not.toContain('anc-close');
-		r.unmount();
 	});
 
 	// Per ReactDOMEventListener-test.js:767 — should bubble non-native bubbling
-	// media events.
-	// GAP (target half): media events (play etc.) never reach the bubble-phase
-	// delegation root, so the <video>'s own onPlay doesn't fire (platform: it does).
-	it('delivers play to the <video> element’s own handler', () => {
+	// media events through the logical ancestor tree.
+	it('delivers play to the <video> and its ancestor', () => {
 		const log = createLog();
 		const r = mount(NonBubblingPairs, { log: log.push });
 		r.find('.vid').dispatchEvent(new Event('play', { bubbles: false }));
 		try {
-			expect(log.drain()).toEqual(['vid-play']);
+			expect(log.drain()).toEqual(['vid-play', 'anc-play']);
 		} finally {
 			r.unmount();
 		}
 	});
 
-	// Per ReactDOMEventListener-test.js:767 — intentional divergence (synthetic
-	// emulation): ancestor onPlay does not fire for a descendant video's play.
-	it('does NOT emulate media-event bubbling to an ancestor handler (intentional divergence)', () => {
-		const log = createLog();
-		const r = mount(NonBubblingPairs, { log: log.push });
-		r.find('.vid').dispatchEvent(new Event('play', { bubbles: false }));
-		expect(log.drain()).not.toContain('anc-play');
-		r.unmount();
-	});
-
-	// Per ReactDOMEventListener-test.js:638 — should delegate media events even
-	// without a direct listener. Intentional divergence (synthetic emulation):
-	// React's tree delegation fires the ancestor's onPlay even though the video
-	// itself has no handler; octane matches the platform — a non-bubbling play
-	// never reaches an ancestor's handler.
-	it('does NOT deliver a bare video’s play to an ancestor-only handler (intentional divergence)', () => {
+	// Per ReactDOMEventListener-test.js:638 — delegate media events even without
+	// a direct listener on the target.
+	it('delivers a bare video’s play to an ancestor-only handler', () => {
 		const log = createLog();
 		const r = mount(AncestorOnlyHandlers, { log: log.push });
 		r.find('.vid').dispatchEvent(new Event('play', { bubbles: false }));
-		expect(log.drain()).toEqual([]);
+		expect(log.drain()).toEqual(['anc-play']);
 		r.unmount();
 	});
 
-	// Per ReactDOMEventListener-test.js:669 — should delegate dialog events even
-	// without a direct listener. Intentional divergence (synthetic emulation) —
-	// same reasoning as :638.
-	it('does NOT deliver a bare dialog’s close/cancel to an ancestor-only handler (intentional divergence)', () => {
+	// Per ReactDOMEventListener-test.js:669 — delegate dialog events even without
+	// direct listeners on the target.
+	it('delivers a bare dialog’s close/cancel to ancestor-only handlers', () => {
 		const log = createLog();
 		const r = mount(AncestorOnlyHandlers, { log: log.push });
 		r.find('.dlg').dispatchEvent(new Event('close', { bubbles: false }));
 		r.find('.dlg').dispatchEvent(new Event('cancel', { bubbles: false }));
-		expect(log.drain()).toEqual([]);
+		expect(log.drain()).toEqual(['anc-close', 'anc-cancel']);
 		r.unmount();
 	});
 
@@ -420,16 +363,8 @@ describe('ReactDOMEventListener — scroll (not emulated upward)', () => {
 	];
 
 	// Per ReactDOMEventListener-test.js:875 — should not emulate bubbling of
-	// scroll events. octane agrees on the SET of handlers (captures on all three
-	// levels + bubble on the target only — no upward emulation) but not the ORDER.
-	//
-	// GAP: octane fires the target's bubble onScroll BEFORE the ancestors'
-	// capture handlers (['onScroll:bubble:child', 'onScroll:capture:grand', …]).
-	// Both delegated dispatchers are capture-phase listeners on the same root for
-	// scroll (runtime.ts CAPTURE_DELEGATED), and `registerDelegationTarget` /
-	// `delegateEvents` attach `dispatchDelegated` (which fires the target-only
-	// bubble slot) BEFORE `dispatchDelegatedCapture`, so same-node listener
-	// registration order inverts the platform's capture-before-bubble ordering.
+	// scroll events. Captures fire on all three levels before the target's handler;
+	// no ancestor bubble handler fires.
 	it('runs the capture phase before the target’s bubble handler for scroll/scrollend', () => {
 		const log = createLog();
 		const r = mount(ScrollTreeFull, { log: log.push });
@@ -442,10 +377,8 @@ describe('ReactDOMEventListener — scroll (not emulated upward)', () => {
 		}
 	});
 
-	// Per ReactDOMEventListener-test.js:875 — the SET half of the same case,
-	// order-insensitive so it holds regardless of the ordering gap above: bubble
-	// scroll fires on the scrolled element ONLY (no upward emulation), captures
-	// fire on every level.
+	// Set-level guard for the same case: bubble scroll fires on the scrolled
+	// element ONLY (no upward emulation), captures fire on every level.
 	it('does not emulate scroll/scrollend bubbling upward (set parity)', () => {
 		const log = createLog();
 		const r = mount(ScrollTreeFull, { log: log.push });

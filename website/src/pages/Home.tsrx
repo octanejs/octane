@@ -1,7 +1,7 @@
 // Home: hero + side-by-side .tsrx sample, feature cards, and the "proven" stat
 // strip. The code sample is an .mdx module so it rides the same Shiki pipeline
 // as the docs. The bench teaser charts are @octanejs/recharts over the
-// checked-in baseline medians (content/benchmarks.ts) — the full set lives at
+// checked-in benchmark scores (content/benchmarks.ts) — the full set lives at
 // /benchmarks.
 import { Link } from '@octanejs/tanstack-router';
 import CodeSample from '../content/home-sample.mdx';
@@ -131,7 +131,7 @@ export function Home() @{
 				<BenchBars card={HOME_SUMMARY} showValues={true} width={1100} />
 			</div>
 			<p class="bench-note">
-				{'Ratios are geometric means over each suite’s per-operation checked-in medians ('}
+				{'Ratios are geometric means over each suite’s per-operation checked-in benchmark scores ('}
 				<code>benchmarks/baselines/local</code>
 				{'), Octane .tsrx vs React 19.2, Solid 2.0 beta, Ripple 0.3 and Vue Vapor 3.6 beta. Reproduce with '}
 				<code>pnpm bench:all -- --quick --ratios</code>

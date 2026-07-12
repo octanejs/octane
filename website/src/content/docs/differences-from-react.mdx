@@ -75,19 +75,19 @@ Octane doesn't have React's synthetic event system. `onClick`, `onInput`,
 whatever the platform does — no wrapper layer second-guessing it.
 
 For most apps this is invisible: click, input, and submit behave exactly as
-you'd expect. The place it can surface is the handful of events React quietly
-reshapes. A few examples:
+you'd expect. Octane also matches the propagation behavior component authors
+rely on while preserving the native `Event` object:
 
-- Events that don't bubble in the DOM — `toggle`, `cancel`, media events,
-  `load`/`error` — fire on the element they happened to, and don't get replayed
-  up the tree. React re-dispatches them to ancestors; Octane doesn't.
-- `mouseEnter`/`pointerEnter` are the browser's own events, not something
-  synthesized from `mouseover`/`mouseout`.
-- There's no synthetic `onChange`. Use the native event — `onInput` — which is
-  what you actually wanted most of the time anyway.
+- Events that don't bubble in the DOM — `toggle`, dialog `cancel`/`close`,
+  media events, and `load`/`error` — are capture-delegated and delivered through
+  logical ancestors like React. That logical path continues across portals.
+- `mouseEnter`/`pointerEnter` are the browser's own per-element events, not
+  events synthesized from `mouseover`/`mouseout`.
+- There's no synthetic `onChange`, `onBeforeInput`, or `onSelect` polyfill. Use
+  the corresponding native event — `onInput` for per-keystroke text changes.
 
-Everything else you rely on is native and works: `stopPropagation`, the capture
-phase, and `event.currentTarget` all behave the way the DOM defines them.
+There is no event pooling. `stopPropagation`, the capture phase, and
+`event.currentTarget` work with the real DOM event and the handler's element.
 
 ## Controlled components, native events
 

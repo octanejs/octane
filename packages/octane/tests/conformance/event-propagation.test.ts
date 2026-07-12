@@ -24,11 +24,6 @@
 //     delegation can't hear non-bubbling events. Octane listens for the platform's
 //     REAL per-element enter/leave events, which the UA fires with the same
 //     common-ancestor semantics. The outcome (per-element order) is asserted below.
-//   • EMULATED BUBBLING of natively non-bubbling events (media/dialog/toggle…,
-//     lines 838-1368) — React re-dispatches these along the React tree so an
-//     ancestor's onPlay observes a descendant <video>. Octane keeps native
-//     semantics: they fire on the target only. The native-delivery half (target's
-//     own handler + capture phase) IS a parity target — see the GAP pins below.
 //   • cross-copy isolation (two ReactDOM instances not seeing each other's
 //     events, e.g. the onChange "outer React doesn't receive the event" case) —
 //     meaningless for a single-instance framework.
@@ -407,19 +402,11 @@ describe('onFocus/onBlur — emulated bubbling of the non-bubbling focus/blur na
 	});
 
 	// Per :1973 testNativeBubblingEventWithTargetListener applied to onFocus —
-	// React fires ALL captures (root→target) before ANY bubble handler.
-	// GAP: for capture-delegated event types (focus/blur/invalid/scroll…) octane
-	// attaches BOTH dispatchers as capture-phase listeners on the delegation root
-	// and `dispatchDelegated` (the emulated-bubble walk) is registered first
-	// (runtime.ts registerDelegationTarget iterates `_delegated` before
-	// `_delegatedCapture`; delegateEvents also lazy-attaches first), so the walk
-	// runs BEFORE the capture pass: octane logs the four bubbles then the four
-	// captures. React runs capture-then-bubble.
+	// all captures fire root→target before any bubble handler.
 	it('onFocus fires captures before bubbles when both are present (line 363 + :1973)', () => {
 		expect(exercise(FOCUS)).toEqual(FULL);
 	});
 
-	// GAP: same inversion as onFocus (see above).
 	it('onBlur fires captures before bubbles when both are present (line 127 + :1973)', () => {
 		expect(exercise(BLUR)).toEqual(FULL);
 	});
@@ -429,19 +416,8 @@ describe('onFocus/onBlur — emulated bubbling of the non-bubbling focus/blur na
 // 'non-bubbling events that bubble in React' (lines 838-1368).
 //
 // React attaches these directly to elements and re-dispatches along the React
-// tree. Octane keeps NATIVE semantics — ancestors never observe a descendant's
-// media/toggle/etc. event (intentional divergence, see the skip block up top).
-// What IS a parity target:
-//   • capture handlers fire root→target (the platform capture phase visits every
-//     ancestor even for non-bubbling events) — passing below;
-//   • the target's OWN handler fires (the platform delivers the event to the
-//     element) — GAP: runtime.ts delegates every event outside CAPTURE_DELEGATED
-//     with a bubble-phase root listener, which a non-bubbling native never
-//     reaches, so `onPlay` on the <video> itself is silently dropped. Fix likely
-//     lives in dispatchDelegated/CAPTURE_DELEGATED (capture-delegate these types
-//     with target-only dispatch, like scroll).
-// `onInvalid` is the exception octane already handles (focus/blur-style walking
-// delegation) and gets the full treatment further down.
+// tree. Octane capture-delegates the native event, then walks the logical tree so
+// target and ancestor handlers observe the same capture→bubble order.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const EMULATED_BUBBLING: EventConfig[] = [
@@ -613,17 +589,15 @@ const EMULATED_BUBBLING: EventConfig[] = [
 	},
 ];
 
-describe('non-bubbling events that bubble in React — native-delivery half', () => {
+describe('non-bubbling events that bubble in React', () => {
 	for (const cfg of EMULATED_BUBBLING) {
 		const label = `on${cfg.react}${cfg.targetExtra ? ' (popover)' : cfg.type === 'dialog' && cfg.react.includes('Toggle') ? ' (dialog)' : ''} (line ${cfg.line})`;
 
 		// Per ReactDOMEventPropagation-test.js:<line> via :2030
-		// testEmulatedBubblingEventWithTargetListener — the target's own handler
-		// must fire when the platform delivers the (non-bubbling) event.
-		// GAP: octane's bubble-phase root delegation never hears a non-bubbling
-		// native, so the element's own handler is dropped; React logs '---- inner'.
-		it(`${label} — the target's own handler fires on native delivery`, () => {
-			expect(exercise(cfg, { targetOnlyListener: true, phases: 'bubble' })).toEqual(['inner']);
+		// testEmulatedBubblingEventWithTargetListener — capture handlers run
+		// root→target, then bubble handlers run target→root.
+		it(`${label} — captures then bubbles through the logical tree`, () => {
+			expect(exercise(cfg)).toEqual(FULL);
 		});
 
 		// Per the same source case, capture half — the platform capture phase
@@ -633,18 +607,28 @@ describe('non-bubbling events that bubble in React — native-delivery half', ()
 			expect(exercise(cfg, { phases: 'capture' })).toEqual(CAPTURES);
 		});
 
-		// Native semantics: no bubble-phase handler above the target fires.
-		// React WOULD fire them (emulated bubbling) — intentional divergence
-		// (real native events; see skip block + docs/react-parity-migration-plan.md §2).
-		it(`${label} — does not propagate to ancestor bubble handlers (native semantics)`, () => {
-			expect(exercise(cfg, { withTargetListener: false, phases: 'bubble' })).toEqual([]);
+		// Per :2218 testEmulatedBubblingEventWithoutTargetListener — delegation
+		// still reaches ancestors when the target itself has no handler.
+		it(`${label} — reaches ancestor handlers without a target listener`, () => {
+			expect(exercise(cfg, { withTargetListener: false, phases: 'bubble' })).toEqual([
+				'inner parent',
+				'outer',
+				'outer parent',
+			]);
+		});
+
+		it(`${label} — stopPropagation halts the emulated bubble walk`, () => {
+			expect(exercise(cfg, { phases: 'bubble', stopAt: 'inner parent' })).toEqual([
+				'inner',
+				'inner parent',
+			]);
 		});
 	}
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// onInvalid — the one "emulated bubbling" event octane deliberately implements
-// (runtime.ts CAPTURE_DELEGATED: a form's onInvalid observes its controls).
+// onInvalid — a form's onInvalid observes its controls through the same
+// capture-delegated logical ancestor walk.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const INVALID: EventConfig = {
@@ -674,10 +658,6 @@ describe('onInvalid — emulated bubbling (line 999)', () => {
 		]);
 	});
 
-	// GAP: same capture/bubble inversion as onFocus — both dispatchers are
-	// capture-phase listeners on the root and the emulated-bubble walk is
-	// registered first, so octane logs bubbles before captures. React logs
-	// captures root→target first.
 	it('fires captures before bubbles when both are present (:2030 order)', () => {
 		expect(exercise(INVALID)).toEqual(FULL);
 	});
@@ -717,9 +697,6 @@ describe('non-bubbling events that do not bubble in React — onScroll/onScrollE
 		});
 
 		// Per :2090's combined log `[...captures, '---- inner']`.
-		// GAP: same capture-delegation ordering inversion as onFocus — octane
-		// fires the target's bubble handler before the capture pass
-		// (['inner', ...captures]); React fires captures first.
 		it(`on${cfg.react} captures fire before the target handler (line ${cfg.line} + :2090)`, () => {
 			expect(exercise(cfg)).toEqual([...CAPTURES, 'inner']);
 		});

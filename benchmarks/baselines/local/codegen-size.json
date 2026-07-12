@@ -6,13 +6,13 @@
       "name": "source",
       "ops": {
         "raw": {
-          "median": 62871,
-          "min": 62871,
+          "median": 62886,
+          "min": 62886,
           "samples": 1
         },
         "gzip": {
-          "median": 21941,
-          "min": 21941,
+          "median": 21943,
+          "min": 21943,
           "samples": 1
         }
       }
@@ -52,7 +52,7 @@
           },
           {
             "file": "benchmarks/chat-stream/octane-tsrx/src/Main.tsrx",
-            "source": 3958,
+            "source": 3973,
             "compiled": 6600,
             "minGz": 1571
           },

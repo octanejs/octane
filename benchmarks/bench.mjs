@@ -566,9 +566,12 @@ async function runSuite(suite) {
 
 // ── baseline compare (noise-aware) ────────────────────────────────────────────
 
-// Regression iff median > base.median*1.15 AND min > base.min*1.10. For ops with
-// base.median < 1ms, additionally require an absolute excess > 0.1ms so timer
+const scoreOf = (stat) => stat?.score ?? stat?.median;
+
+// Regression iff score > base.score*1.15 AND min > base.min*1.10. For ops with
+// base score < 1ms, additionally require an absolute excess > 0.1ms so timer
 // granularity (0.1ms in Chromium) on sub-ms ops can't trip a false regression.
+// Older baselines do not have `score`; they transparently fall back to median.
 function compareResult(result, baseline) {
 	const rows = [];
 	const baseTargets = new Map((baseline.targets || []).map((t) => [t.name, t]));
@@ -578,13 +581,17 @@ function compareResult(result, baseline) {
 		for (const [op, r] of Object.entries(t.ops)) {
 			const b = bt.ops[op];
 			if (!b) continue;
-			const medOver = r.median > b.median * 1.15;
+			const score = scoreOf(r);
+			const baseScore = scoreOf(b);
+			const scoreOver = score > baseScore * 1.15;
 			const minOver = r.min > b.min * 1.1;
-			const smallOk = b.median < 1 ? r.median - b.median > 0.1 : true;
-			const regressed = medOver && minOver && smallOk;
+			const smallOk = baseScore < 1 ? score - baseScore > 0.1 : true;
+			const regressed = scoreOver && minOver && smallOk;
 			rows.push({
 				target: t.name,
 				op,
+				score,
+				baseScore,
 				median: r.median,
 				baseMedian: b.median,
 				min: r.min,
@@ -604,12 +611,12 @@ function printCompareTable(suiteName, rows) {
 		return 0;
 	}
 	console.log(
-		'  target                    op                        median  (base)     min  (base)',
+		'  target                    op                         score  (base)     min  (base)',
 	);
 	for (const r of regs) {
 		console.log(
 			`  REGRESSION ${r.target.padEnd(16)} ${r.op.padEnd(24)} ` +
-				`${r.median.toFixed(3)} (${r.baseMedian.toFixed(3)})  ${r.min.toFixed(3)} (${r.baseMin.toFixed(3)})`,
+				`${r.score.toFixed(3)} (${r.baseScore.toFixed(3)})  ${r.min.toFixed(3)} (${r.baseMin.toFixed(3)})`,
 		);
 	}
 	return regs.length;
@@ -629,26 +636,27 @@ function loadRatios() {
 }
 
 // For a set of collected suite results, check every guard whose (suite, target,
-// reference, op) all ran. ratio = target.median / reference.median; a breach is
-// ratio > maxRatio or, for cliff/advantage guards, ratio < minRatio. Returns
-// { checked, breaches[], suggestions[] }.
+// reference, op) all ran. ratio = target score / reference score; a breach is
+// ratio > maxRatio or, for cliff/advantage guards, ratio < minRatio. Existing
+// median-only baselines fall back to median. Returns { checked, breaches[],
+// suggestions[] }.
 function checkRatios(resultsBySuite, guards) {
 	const breaches = [];
 	const suggestions = [];
 	let checked = 0;
-	const opMed = (suite, targetName, op) => {
+	const opScore = (suite, targetName, op) => {
 		const res = resultsBySuite.get(suite);
 		if (!res) return null;
 		const t = res.targets.find((x) => x.name === targetName);
 		if (!t || !t.ops[op]) return null;
-		return t.ops[op].median;
+		return scoreOf(t.ops[op]);
 	};
 	for (const g of guards) {
-		const tMed = opMed(g.suite, g.target, g.op);
-		const rMed = opMed(g.suite, g.reference, g.op);
-		if (tMed == null || rMed == null || rMed === 0) continue; // both sides must have run
+		const tScore = opScore(g.suite, g.target, g.op);
+		const rScore = opScore(g.suite, g.reference, g.op);
+		if (tScore == null || rScore == null || rScore === 0) continue; // both sides must have run
 		checked++;
-		const ratio = tMed / rMed;
+		const ratio = tScore / rScore;
 		const hasMax = typeof g.maxRatio === 'number';
 		const hasMin = typeof g.minRatio === 'number';
 		const highBreach = hasMax && ratio > g.maxRatio;

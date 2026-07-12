@@ -38,7 +38,7 @@ export default function Row(props) @{
 		}
 	});
 
-	<tr ref={rowRef}>
+	<tr ref={(el) => rowRef(el)}>
 		<td
 			class="col-id"
 			ref={(el) => {

@@ -199,7 +199,7 @@ propagation heuristics are unpinned:
 |---|---|---|
 | `ReactDOMComponent-test.js` (152) / `ReactDOMAttribute-test.js` / `DOMPropertyOperations-test.js` | Attribute **removal vs empty-string** (src/href/action `:594-690`); boolean reflection/strip; property-vs-attribute matrix + namespaced xlink; no-op mutation minimization. (Octane has SVG/MathML/style coverage already; this fills the HTML-attribute matrix.) | Medium |
 | `CSSPropertyOperations-test.js` | px auto-append, vendor-prefix casing, CSS-var passthrough, empty-style→omit. (Octane `style.test.ts` is strong; cross-check the edges.) | Low |
-| `ReactDOMEventListener-test.js` (24) | **Real-delegation checks** — SCOPE RULE (maintainer, 2026-07-04): octane never replicates the synthetic event system, so React's non-bubbling-event EMULATION (re-dispatching toggle/cancel/close/invalid/media/load so ancestors fire, `:706-794`) is an **intentional divergence** — port those as positive platform-contract tests, not gaps. In scope as real parity: scroll/selectionchange not-emulated (`:875,:1275` — platform-matching anyway), no duplicate dispatch (`:295`), dispatch-once across roots/portals. | High |
+| `ReactDOMEventListener-test.js` (24) | **Real-delegation checks** — Octane keeps native `Event` objects while matching React's user-visible propagation: capture-delegate and re-dispatch toggle/cancel/close/invalid/media/load to logical ancestors (`:706-794`), but keep scroll/selectionchange non-emulated (`:875,:1275`); no duplicate dispatch (`:295`), dispatch-once across roots/portals. | High |
 | `ReactDOMEventPropagation-test.js` (89) | Bubble inner→outer + capture ordering for genuinely-bubbling events — real parity, in scope. **Bubbling through portals** (✅ confirmed working incl. nested portals — see §8). mouseenter/leave + pointerenter/leave: React SYNTHESIZES pairs from over/out — octane uses REAL native enter/leave events (**intentional divergence**, same 2026-07-04 scope rule); the platform's own common-ancestor semantics apply. NB: capture-phase JSX handlers (`onClickCapture`) ARE implemented (see `tests/capture-events.test.ts`). | High |
 | `ReactBrowserEventEmitter-test.js`, `ReactTreeTraversal-test.js`, `InvalidEventListeners-test.js` | stopPropagation + mid-dispatch handler snapshot (`:332,:346`); enter/leave common-ancestor path; non-function/null listener safety. | Medium |
 
@@ -651,8 +651,8 @@ dom-attributes, css-properties, dom-component-{styles,attributes,children,
 custom-elements,events,ssr}.
 
 **Runtime fixes the port surfaced (all landed):** non-bubbling native families
-(media/toggle/close/load/error/resize) now capture-delegated TARGET-ONLY (they were
-silently dropped — even the target's own handler never fired); capture-before-bubble
+(media/toggle/close/load/error/resize) now capture-delegated (they were silently
+dropped — even the target's own handler never fired); capture-before-bubble
 ordering for capture-delegated types; guarded per-listener dispatch (throwing/
 non-function listeners report via reportError + continue the walk); enumerated
 attrs (spellcheck/contenteditable/draggable) stringify booleans; empty src/href
@@ -665,9 +665,9 @@ InvalidCharacterError crashes; dSIH shape + children-exclusivity throws;
 outside delegation roots); noop onclick stamped on delegation roots (iOS Safari).
 
 **Documented intentional divergences (2026-07-04 maintainer ruling — no synthetic
-event system, no known-attribute tables):** no ancestor re-dispatch of non-bubbling
-events; no enter/leave synthesis (real native events); no synthetic onChange/
-onBeforeInput/onSelect polyfills; unknown={true} → boolean presence; inert="" stays
+event API, no known-attribute tables):** no enter/leave synthesis (real native
+events); no synthetic onChange/onBeforeInput/onSelect polyfills; unknown={true} →
+boolean presence; inert="" stays
 (platform-true); verbatim boolean-attr strings; lenient toString() coercion; no
 possibleStandardNames DEV table (any-spelling normalization — native spellings
 remain the idiom); muted stays a plain attribute (no property routing). Each is a
@@ -715,9 +715,13 @@ new server helpers: `ssrValueAttr`, `ssrCheckedAttr`, `ssrTextareaValue`,
 `ssrSelectScope`, `ssrOption`. `<textarea>` with children AND a
 `value`/`defaultValue` prop is now a COMPILE ERROR (the prop owns the content);
 plain `<textarea>text</textarea>` keeps native default-text semantics. The
-synthetic-EVENT divergences from the 2026-07-04 ruling stand unchanged (no
-ancestor re-dispatch, no enter/leave synthesis, no synthetic
-onChange/onBeforeInput/onSelect).
+remaining synthetic-event API divergences from the 2026-07-04 ruling stand: no
+enter/leave synthesis and no synthetic onChange/onBeforeInput/onSelect.
+
+**Amendment (2026-07-12):** non-bubbling toggle/dialog/media/resource events now
+re-dispatch target→root through Octane's logical tree, including portals. The
+native `Event` object is preserved; scroll/scrollend and enter/leave remain
+target-only as in React.
 
 **Still pinned (3 it.fails):** React-19 custom-element semantics (lowercase on*
 listeners + property heuristic — needs a maintainer decision) and void-element

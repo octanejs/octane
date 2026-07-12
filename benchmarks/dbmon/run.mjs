@@ -36,6 +36,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '30', 10);
 const WARMUP = 10;
@@ -55,16 +56,7 @@ const TARGETS = process.env.TARGETS
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function summarize(samples) {
-	const sorted = [...samples].sort((a, b) => a - b);
-	const n = sorted.length;
-	const mean = sorted.reduce((a, b) => a + b, 0) / n;
-	const stddev = Math.sqrt(sorted.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
-	return {
-		median: sorted[n >> 1],
-		min: sorted[0],
-		p95: sorted[Math.min(n - 1, Math.floor(n * 0.95))],
-		stddev,
-	};
+	return summarizeSamples(samples);
 }
 
 async function freshPage(browser, url) {
@@ -215,9 +207,9 @@ const OPS = ['mount', 'tick', 'tick_partial', 'remount', 'sort', 'unmount'];
 		console.log();
 		for (const t of TARGETS.slice(0, -1)) {
 			const r = all[t.name];
-			console.log(`${t.name} / ${baselineName} ratio (median; <1 means ${t.name} faster):`);
+			console.log(`${t.name} / ${baselineName} ratio (score; <1 means ${t.name} faster):`);
 			for (const op of OPS) {
-				const ratio = r[op].median / baseline[op].median;
+				const ratio = scoreOf(r[op]) / scoreOf(baseline[op]);
 				const tag = ratio < 0.95 ? '++ faster' : ratio < 1.05 ? '== ~equal' : '-- slower';
 				console.log(`  ${op.padEnd(16)} ${ratio.toFixed(2)}x  ${tag}`);
 			}
@@ -229,7 +221,7 @@ const OPS = ['mount', 'tick', 'tick_partial', 'remount', 'sort', 'unmount'];
 		console.log('diff-skip ratio (tick_partial / tick, lower = better skipping):');
 		for (const c of cols) {
 			const r = all[c];
-			const ratio = r.tick_partial.median / r.tick.median;
+			const ratio = scoreOf(r.tick_partial) / scoreOf(r.tick);
 			console.log(`  ${c.padEnd(16)} ${ratio.toFixed(3)}x  (ideal: ~0.1)`);
 		}
 	}
@@ -245,7 +237,7 @@ const OPS = ['mount', 'tick', 'tick_partial', 'remount', 'sort', 'unmount'];
 				ops: Object.fromEntries(
 					OPS.map((op) => {
 						const r = all[t.name][op];
-						return [op, { median: r.median, min: r.min, p95: r.p95, sd: r.stddev, samples: ITER }];
+						return [op, timingStatForJson(r)];
 					}),
 				),
 			})),

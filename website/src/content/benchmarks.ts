@@ -1,4 +1,4 @@
-// Benchmark data for the site's charts — the CHECKED-IN medians from
+// Benchmark data for the site's charts — the CHECKED-IN benchmark scores from
 // `benchmarks/baselines/local/` (recorded by `node benchmarks/bench.mjs
 // --record`, reproduced with `pnpm bench:all`), imported at build time so the
 // site can never drift from the repo's numbers. This module massages the
@@ -29,9 +29,10 @@ import signalFavoring from '../../../benchmarks/baselines/local/signal-favoring.
 import ssrThroughput from '../../../benchmarks/baselines/local/ssr-throughput.json';
 import todoMvc from '../../../benchmarks/baselines/local/todomvc.json';
 
-// Only `median` is charted; the other stats vary by suite (some harnesses
-// don't record p95/sd), so they stay optional.
+// `score` is charted when present; older checked-in baselines fall back to
+// `median`. Other stats vary by suite, so they stay optional.
 interface OpStat {
+	score?: number;
 	median: number;
 	min?: number;
 	p95?: number;
@@ -67,7 +68,7 @@ export interface BenchCard {
 	series: SeriesDef[];
 	rows: BenchRow[];
 	iterations: number;
-	/** Value unit: absolute median milliseconds (default), bytes, or ×-vs-Octane ratio. */
+	/** Value unit: absolute score milliseconds (default), bytes, or ×-vs-Octane ratio. */
 	format?: 'ms' | 'bytes' | 'x';
 }
 
@@ -102,6 +103,10 @@ function seriesFor(baseline: SuiteBaseline, defs: SeriesDef[]): SeriesDef[] {
 	return defs.filter((d) => present.has(d.key));
 }
 
+function statValue(stat: OpStat): number {
+	return stat.score ?? stat.median;
+}
+
 function rowsFor(
 	baseline: SuiteBaseline,
 	series: SeriesDef[],
@@ -114,7 +119,7 @@ function rowsFor(
 		const row: BenchRow = { op: opLabels?.[op] ?? op };
 		for (const s of series) {
 			const stat = byName.get(s.key)?.ops[op];
-			if (stat) row[s.key] = stat.median;
+			if (stat) row[s.key] = statValue(stat);
 		}
 		return row;
 	});
@@ -278,14 +283,15 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		const row: BenchRow = { op: scenario };
 		for (const s of series) {
 			const target = b.targets.find((t) => t.name === `${scenario}/${s.key}`);
-			if (target) row[s.key] = target.ops.render.median;
+			if (target) row[s.key] = statValue(target.ops.render);
 		}
 		return row;
 	});
 	FRAMEWORK_CARDS.push({
 		id: 'ssr-throughput',
 		title: 'ssr-throughput',
-		description: 'Server renders of the news page at 50 and 500 items — median ms per render.',
+		description:
+			'Server renders of the news page at 50 and 500 items — benchmark score ms per render.',
 		series,
 		rows,
 		iterations: b.iterations,
@@ -352,12 +358,12 @@ export const OCTANE_CARDS: BenchCard[] = [];
 	const byName = new Map(b.targets.map((t) => [t.name, t]));
 	const rows: BenchRow[] = octaneOnly
 		.filter(([name]) => byName.has(name))
-		.map(([name, label]) => ({ op: label, octane: byName.get(name)!.ops.render.median }));
+		.map(([name, label]) => ({ op: label, octane: statValue(byName.get(name)!.ops.render) }));
 	OCTANE_CARDS.push({
 		id: 'ssr-scenarios',
 		title: 'SSR scenarios',
 		description:
-			'Octane-only SSR shapes — suspense waterfalls by depth, a 32-wide fan-out, an escape-heavy page, and the de-opt page pair. Median ms per render.',
+			'Octane-only SSR shapes — suspense waterfalls by depth, a 32-wide fan-out, an escape-heavy page, and the de-opt page pair. Benchmark score ms per render.',
 		series,
 		rows,
 		iterations: b.iterations,
@@ -367,9 +373,9 @@ export const OCTANE_CARDS: BenchCard[] = [];
 // ---------------------------------------------------------------------------
 // Home-page summary — EVERY cross-framework suite on one normalized scale:
 // per suite and framework, the geometric mean of per-operation
-// (framework median ÷ octane-tsrx median). Octane is the 1× reference bar.
+// (framework score ÷ octane-tsrx score). Octane is the 1× reference bar.
 // Ops without a measurement on either side — or with a sub-timer-resolution
-// 0 median — are skipped for that pair (geomean over the valid ops).
+// 0 score — are skipped for that pair (geomean over the valid ops).
 // ---------------------------------------------------------------------------
 const SUMMARY_SERIES = FRAMEWORKS.filter((f) =>
 	['octane-tsrx', 'react', 'solid', 'ripple', 'vue-vapor'].includes(f.key),
@@ -402,7 +408,7 @@ export const HOME_SUMMARY: BenchCard = (() => {
 		id: 'home-summary',
 		title: 'Every suite, normalized',
 		description:
-			'Geometric mean of per-operation medians, relative to Octane (.tsrx) = 1× — lower is better. Bars shorter than Octane’s mean the other framework wins that suite. Absolute numbers and per-operation charts are on the benchmarks page.',
+			'Geometric mean of per-operation benchmark scores, relative to Octane (.tsrx) = 1× — lower is better. Bars shorter than Octane’s mean the other framework wins that suite. Absolute numbers and per-operation charts are on the benchmarks page.',
 		series: SUMMARY_SERIES,
 		rows,
 		iterations: 0,

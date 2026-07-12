@@ -480,7 +480,7 @@ describe('ReactDOMComponent — attribute-name injection (client)', () => {
  *   :1598 correct markup with className (SSR)                      → ported (ssr)
  *   :1604 escape style names and values (SSR)                      → ported (ssr — outcome-level round-trip; entity choice differs)
  *   :1628 handle dangerouslySetInnerHTML (SSR)                     → ported (ssr)
- *   :1652 error event on <source> element                          → ported (events — NON_BUBBLING_TARGET_EVENTS delegation)
+ *   :1652 error event on <source> element                          → ported (events — EMULATED_BUBBLING_EVENTS delegation)
  *   :1676 warn for uppercased selfclosing tags                     → skipped (DEV warning; uppercase tags are component refs in TSRX)
  *   :1695 warn on upper case HTML tags                             → skipped (DEV warning; same)
  *   :1724 warn on props reserved for future use (`aria`)           → skipped (DEV warning text)

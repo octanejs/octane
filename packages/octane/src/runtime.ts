@@ -6211,14 +6211,11 @@ const _delegatedCapture = new Set<string>();
 // keep the cheaper bubbling-phase delegation.) The flag must match between
 // add/removeEventListener, so it is derived from the name both times.
 // The remaining NON-BUBBLING native families (media/resource lifecycle,
-// <details>/<dialog> state events, resize). The platform fires these on the
-// target only; ancestors never hear them natively. React's synthetic layer
-// re-dispatches them up the tree — octane deliberately does NOT (maintainer
-// ruling 2026-07-04: never replicate the synthetic event system) — but the
-// TARGET's own handler must still fire, which requires capture-phase delegation
-// (a bubble-phase root listener never hears a non-bubbling event at all).
-// Delivery is target-only, exactly like the platform.
-const NON_BUBBLING_TARGET_EVENTS = [
+// <details>/<dialog> state events, resize). A bubble-phase root listener cannot
+// hear them, so listen in capture and emulate React's target→root propagation in
+// dispatchDelegated. This lets an ancestor onPlay/onToggle/onLoad observe an
+// event from its descendant without installing a direct listener on every host.
+const EMULATED_BUBBLING_EVENTS = [
 	'abort',
 	'beforetoggle',
 	'cancel',
@@ -6266,7 +6263,7 @@ const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
 	// enter/leave target-only treatment below.
 	'scroll',
 	'scrollend',
-	...NON_BUBBLING_TARGET_EVENTS,
+	...EMULATED_BUBBLING_EVENTS,
 ]);
 const delegatedCapture = (name: string): boolean => CAPTURE_DELEGATED.has(name);
 
@@ -6285,9 +6282,6 @@ const TARGET_ONLY_DELEGATED = /* @__PURE__ */ new Set([
 	// bubbling), and ancestors receive their own scroll events natively.
 	'scroll',
 	'scrollend',
-	// Platform semantics for every other non-bubbling family (media, toggle,
-	// close, load/error, …): the target's handler fires, ancestors' do not.
-	...NON_BUBBLING_TARGET_EVENTS,
 ]);
 
 export function delegateEvents(eventNames: string[]): void {
@@ -6583,7 +6577,9 @@ function dispatchDelegated(event: Event): void {
 				fireEventSlot(slot, event);
 				if (event.cancelBubble) return;
 			}
-			// Enter/leave events fire on the target only (see TARGET_ONLY_DELEGATED).
+			// Enter/leave and scroll events fire on the target only (see
+			// TARGET_ONLY_DELEGATED). Other capture-delegated non-bubbling events
+			// emulate React propagation and continue through logical ancestors.
 			if (targetOnly) return;
 			// Portal-aware ascent: when crossing a portal root, jump to the rendering Block's DOM parent.
 			if (node.$$portalParent) {
