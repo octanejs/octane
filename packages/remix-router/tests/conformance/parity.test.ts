@@ -9,62 +9,18 @@
  *      fails the stale-entries assertion until it is deleted from its block.
  *   3. The port exports nothing upstream doesn't (no octane-specific extras).
  *
- * At the final phase EXPECTED_MISSING reaches empty — framework-mode client
- * APIs become throwing stubs and the server runtime is re-exported from the
- * vendored tree (see the plan doc for the stub policy).
+ * The final phase SHIPPED: EXPECTED_MISSING is empty — framework-mode client
+ * APIs are throwing stubs, the cookie/session server runtime is re-exported
+ * from the vendored tree (see the plan doc for the stub policy).
  */
 import { describe, it, expect } from 'vitest';
 import * as port from '@octanejs/remix-router';
 import * as portDom from '@octanejs/remix-router/dom';
 
-const EXPECTED_MISSING = new Set([
-	// Phase E — guards / scroll / view transitions
-	'useBlocker',
-	'unstable_usePrompt',
-	'ScrollRestoration',
-	'useBeforeUnload',
-	'useViewTransitionState',
-	'UNSAFE_useScrollRestoration',
-	'unstable_useRoute',
-	'unstable_useRouterState',
-	// Phase F — static SSR
-	'createStaticHandler',
-	'createStaticRouter',
-	'StaticRouter',
-	'StaticRouterProvider',
-	// Final phase — framework-mode client APIs (throwing stubs) + server
-	// runtime (re-exported from the vendored tree) + RSC (stubs)
-	'Meta',
-	'Links',
-	'Scripts',
-	'PrefetchPageLinks',
-	'ServerRouter',
-	'createRoutesStub',
-	'UNSAFE_FrameworkContext',
-	'UNSAFE_RemixErrorBoundary',
-	'UNSAFE_getPatchRoutesOnNavigationFunction',
-	'UNSAFE_useFogOFWarDiscovery',
-	'UNSAFE_getHydrationData',
-	'UNSAFE_createClientRoutes',
-	'UNSAFE_createClientRoutesWithHMRRevalidationOptOut',
-	'UNSAFE_shouldHydrateRouteLoader',
-	'UNSAFE_ServerMode',
-	'UNSAFE_SingleFetchRedirectSymbol',
-	'UNSAFE_decodeViaTurboStream',
-	'UNSAFE_getTurboStreamSingleFetchDataStrategy',
-	'createCookie',
-	'isCookie',
-	'createRequestHandler',
-	'createSession',
-	'createSessionStorage',
-	'isSession',
-	'createCookieSessionStorage',
-	'createMemorySessionStorage',
-	'unstable_setDevServerHooks',
-	'unstable_routeRSCServerRequest',
-	'unstable_RSCStaticRouter',
-	'UNSAFE_RSCDefaultRootErrorBoundary',
-]);
+// FULL PARITY: every upstream export ships (framework/RSC names as throwing
+// stubs per the plan doc's scope policy). Kept as a Set so a future re-vendor
+// (v8) can re-budget new exports the same way.
+const EXPECTED_MISSING = new Set<string>([]);
 
 describe('export surface (phased)', () => {
 	it('everything upstream exports is provided or budgeted per phase', async () => {

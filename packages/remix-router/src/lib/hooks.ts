@@ -5,17 +5,18 @@
 // slot off their trailing args and derive a distinct sub-slot per base-hook
 // call site), JSX → createElement descriptors (plain .ts), `__DEV__` →
 // ENABLE_DEV_WARNINGS, and the class RenderErrorBoundary / inline
-// DefaultErrorComponent live in sibling .tsrx files. RSC branches and the
-// Phase E hooks (useBlocker, unstable_useRoute, unstable_useRouterState) are
-// dropped at their upstream sites with OCTANE notes.
+// DefaultErrorComponent live in sibling .tsrx files. RSC branches are dropped
+// at their upstream sites with OCTANE notes.
 import {
 	createContext,
 	createElement,
 	useCallback,
 	useContext,
+	useEffect,
 	useLayoutEffect,
 	useMemo,
 	useRef,
+	useState,
 } from 'octane';
 import type { NavigateOptions, RouteContextObject, ClientOnErrorFunction } from './context';
 import {
@@ -30,10 +31,16 @@ import {
 } from './context';
 import type { Location, Path, To } from './router/history';
 import { Action as NavigationType, invariant, parsePath, warning } from './router/history';
-import type { RelativeRoutingType, Router as DataRouter, NavigationStates } from './router/router';
-// OCTANE: dropped — upstream also imports Blocker/BlockerFunction types and
-// { hasInvalidProtocol, IDLE_BLOCKER } here; they serve useBlocker (Phase E)
-// and the RSC redirect handler (no octane RSC runtime).
+import type {
+	Blocker,
+	BlockerFunction,
+	RelativeRoutingType,
+	Router as DataRouter,
+	NavigationStates,
+} from './router/router';
+import { IDLE_BLOCKER } from './router/router';
+// OCTANE: dropped — upstream also imports hasInvalidProtocol here; it serves
+// the RSC redirect handler (no octane RSC runtime).
 import type {
 	DataRouteMatch,
 	ParamParseKey,
@@ -54,6 +61,7 @@ import {
 	matchPath,
 	matchRoutes,
 	resolveTo,
+	stripBasename,
 } from './router/utils';
 // OCTANE: dropped — upstream imports { GetActionData, GetLoaderData,
 // SerializeFrom } from ./types/route-data (framework-mode serialization
@@ -1539,8 +1547,79 @@ export function useAsyncError(): unknown {
 	return value?._error;
 }
 
-// OCTANE: Phase E — useBlocker (and its module-level `blockerId` counter)
-// lands with navigation guards.
+let blockerId = 0;
+
+/**
+ * Allow the application to block navigations within the SPA and present the
+ * user a confirmation dialog to confirm the navigation.
+ */
+export function useBlocker(shouldBlock: boolean | BlockerFunction, ...args: any[]): Blocker {
+	const [, slot] = splitSlot(args);
+	let { router, basename } = useDataRouterContext(DataRouterHook.UseBlocker);
+	let state = useDataRouterState(DataRouterStateHook.UseBlocker);
+
+	let [blockerKey, setBlockerKey] = useState('', subSlot(slot, 'ub:key'));
+	let blockerFunction = useCallback(
+		((arg: Parameters<BlockerFunction>[0]) => {
+			if (typeof shouldBlock !== 'function') {
+				return !!shouldBlock;
+			}
+			if (basename === '/') {
+				return shouldBlock(arg);
+			}
+
+			// If they provided us a function and we've got an active basename, strip
+			// it from the locations we expose to the user to match the behavior of
+			// useLocation
+			let { currentLocation, nextLocation, historyAction } = arg;
+			return shouldBlock({
+				currentLocation: {
+					...currentLocation,
+					pathname: stripBasename(currentLocation.pathname, basename) || currentLocation.pathname,
+				},
+				nextLocation: {
+					...nextLocation,
+					pathname: stripBasename(nextLocation.pathname, basename) || nextLocation.pathname,
+				},
+				historyAction,
+			});
+		}) as BlockerFunction,
+		[basename, shouldBlock],
+		subSlot(slot, 'ub:fn'),
+	);
+
+	// This effect is in charge of blocker key assignment and deletion (which is
+	// tightly coupled to the key)
+	useEffect(
+		() => {
+			let key = String(++blockerId);
+			setBlockerKey(key);
+			return () => router.deleteBlocker(key);
+		},
+		[router],
+		subSlot(slot, 'ub:keyEff'),
+	);
+
+	// This effect handles assigning the blockerFunction.  This is to handle
+	// unstable blocker function identities, and happens only after the prior
+	// effect so we don't get an orphaned blockerFunction in the router with a
+	// key of "".  Until then we just have the IDLE_BLOCKER.
+	useEffect(
+		() => {
+			if (blockerKey !== '') {
+				router.getBlocker(blockerKey, blockerFunction);
+			}
+		},
+		[router, blockerKey, blockerFunction],
+		subSlot(slot, 'ub:fnEff'),
+	);
+
+	// Prefer the blocker from `state` not `router.state` since DataRouterContext
+	// is memoized so this ensures we update on blocker state updates
+	return blockerKey && state.blockers.has(blockerKey)
+		? state.blockers.get(blockerKey)!
+		: IDLE_BLOCKER;
+}
 
 // Stable version of useNavigate that is used when we are in the context of
 // a RouterProvider.
@@ -1586,11 +1665,133 @@ function warningOnce(key: string, cond: boolean, message: string) {
 	}
 }
 
-// OCTANE: Phase E — unstable_useRoute (`useRoute`, with its
-// UseRouteArgs/UseRouteResult/UseRoute typing over ./types/register's
-// RouteModules and ./types/route-data's GetLoaderData/GetActionData) lands
-// later.
+// OCTANE: upstream types useRoute over ./types/register's RouteModules and
+// ./types/route-data's GetLoaderData/GetActionData (framework-mode
+// serialization typing, not vendored) — declared loosely here.
+export function useRoute(...args: any[]): any {
+	const [user] = splitSlot(args);
+	const currentRouteId = useCurrentRouteId(DataRouterStateHook.UseRoute);
+	const id: string = user[0] ?? currentRouteId;
 
-// OCTANE: Phase E — unstable_useRouterState (`useRouterState`, with
-// `toRouterStateMatch` and the unstable_RouterState* type surface) lands
-// later.
+	const state = useDataRouterState(DataRouterStateHook.UseRoute);
+	const route = state.matches.find(({ route }) => route.id === id);
+
+	if (route === undefined) return undefined;
+	return {
+		handle: route.route.handle,
+		loaderData: state.loaderData[id],
+		actionData: state.actionData?.[id],
+	};
+}
+
+/**
+ * A single route match returned from `unstable_useRouterState`. Mirrors
+ * UIMatch minus the data-related fields (`data`, `loaderData`).
+ */
+export type unstable_RouterStateMatch<Handle = unknown> = Omit<
+	UIMatch<unknown, Handle>,
+	'data' | 'loaderData'
+>;
+
+export type unstable_RouterStateActiveVariant = {
+	location: Location;
+	searchParams: URLSearchParams;
+	params: Params;
+	matches: unstable_RouterStateMatch[];
+	type: NavigationType;
+};
+
+export type unstable_RouterStatePendingVariant = unstable_RouterStateActiveVariant & {
+	state: 'loading' | 'submitting';
+	formMethod: string | undefined;
+	formAction: string | undefined;
+	formEncType: string | undefined;
+	formData: FormData | undefined;
+	json: unknown;
+	text: string | undefined;
+};
+
+export type unstable_RouterState = {
+	active: unstable_RouterStateActiveVariant;
+	pending: unstable_RouterStatePendingVariant | null;
+};
+
+function toRouterStateMatch(match: DataRouteMatch): unstable_RouterStateMatch {
+	return {
+		id: match.route.id,
+		pathname: match.pathname,
+		params: match.params,
+		handle: match.route.handle,
+	};
+}
+
+/**
+ * A unified hook for reading router state: current (`active`) and in-flight
+ * (`pending`) locations, search params, params, matches, and navigation type.
+ */
+export function useRouterState(...args: any[]): unstable_RouterState {
+	const [, slot] = splitSlot(args);
+	let {
+		location,
+		historyAction: type,
+		matches,
+		navigation,
+	} = useDataRouterState(DataRouterStateHook.UseRouterState);
+
+	let active = useMemo(
+		() => ({
+			type,
+			location,
+			searchParams: new URLSearchParams(location.search),
+			params: matches[matches.length - 1]?.params ?? {},
+			matches: matches.map((m) => toRouterStateMatch(m)),
+		}),
+		[location, matches, type],
+		subSlot(slot, 'urs:active'),
+	) as unstable_RouterStateActiveVariant;
+
+	let pending = useMemo(
+		() => {
+			if (navigation.state === 'idle') return null;
+			let shared = {
+				type: navigation.historyAction,
+				location: navigation.location,
+				searchParams: new URLSearchParams(navigation.location.search),
+				params: navigation.matches[navigation.matches.length - 1]?.params ?? {},
+				matches: navigation.matches.map((m: DataRouteMatch) => toRouterStateMatch(m)),
+			};
+
+			// Do submissions fields independently to keep TS happy with the
+			// `NavigationStates` discriminated union
+			return navigation.state === 'loading'
+				? {
+						...shared,
+						state: 'loading',
+						formMethod: navigation.formMethod,
+						formAction: navigation.formAction,
+						formEncType: navigation.formEncType,
+						formData: navigation.formData,
+						json: navigation.json,
+						text: navigation.text,
+					}
+				: {
+						...shared,
+						state: 'submitting',
+						formMethod: navigation.formMethod,
+						formAction: navigation.formAction,
+						formEncType: navigation.formEncType,
+						formData: navigation.formData,
+						json: navigation.json,
+						text: navigation.text,
+					};
+		},
+		[navigation],
+		subSlot(slot, 'urs:pending'),
+	) as unstable_RouterStatePendingVariant | null;
+
+	return useMemo(
+		() => ({ active, pending }),
+		[active, pending],
+		subSlot(slot, 'urs:combined'),
+	) as unstable_RouterState;
+}

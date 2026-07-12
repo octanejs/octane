@@ -18,6 +18,7 @@ const PENDING = resolve(__dirname, '../_fixtures/pending-navigation-diff.tsrx');
 const DECLARATIVE = resolve(__dirname, '../_fixtures/declarative-diff.tsrx');
 const NAVLINK = resolve(__dirname, '../_fixtures/navlink-diff.tsrx');
 const FORMS = resolve(__dirname, '../_fixtures/forms-diff.tsrx');
+const GUARDS = resolve(__dirname, '../_fixtures/guards-diff.tsrx');
 // React fixtures are precompiled into THIS package's cache (see differential
 // _setup.ts) so the React side resolves react-router from here.
 const CACHE = resolve(__dirname, '.react-cache');
@@ -199,6 +200,43 @@ describe('differential: @octanejs/remix-router vs real react-router', () => {
 		await d.step('fetcher.submit imperative', async (i, r) => {
 			await i.click('#f-submit');
 			await r.click('#f-submit');
+			await settle();
+		});
+		d.unmount();
+	});
+
+	it('GuardsDiffApp: useBlocker lifecycle + unstable_useRouterState, byte-identical', async () => {
+		// Phase E: blocked → reset → blocked → proceed, with useRoute/useRouterState probes.
+		const d = await mountDifferential(GUARDS, 'GuardsDiffApp', undefined, CACHE);
+		await d.step('mount', async () => {
+			await settle();
+		});
+		await d.step('unblocked navigation', async (i, r) => {
+			await i.click('#to-away');
+			await r.click('#to-away');
+			await settle();
+		});
+		await d.step('arm blocker', async (i, r) => {
+			await i.click('#b-toggle');
+			await r.click('#b-toggle');
+			await settle();
+		});
+		await d.step('blocked navigation attempt', async (i, r) => {
+			await i.click('#to-home');
+			await r.click('#to-home');
+			await settle();
+		});
+		await d.step('reset (stay)', async (i, r) => {
+			await i.click('#b-reset');
+			await r.click('#b-reset');
+			await settle();
+		});
+		await d.step('block again then proceed', async (i, r) => {
+			await i.click('#to-home');
+			await r.click('#to-home');
+			await settle();
+			await i.click('#b-proceed');
+			await r.click('#b-proceed');
 			await settle();
 		});
 		d.unmount();

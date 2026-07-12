@@ -10,6 +10,7 @@ import {
 	useContext,
 	useEffect,
 	useId,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -42,7 +43,16 @@ import {
 	stripBasename,
 } from '../router/utils';
 import { hydrationRouteProperties, mapRouteProperties } from '../components/utils';
-import { useLocation, useNavigate, useResolvedPath, useRouteId } from '../hooks';
+import {
+	useBlocker,
+	useLocation,
+	useMatches,
+	useNavigate,
+	useNavigation,
+	useResolvedPath,
+	useRouteId,
+} from '../hooks';
+import type { BlockerFunction } from '../router/router';
 import type { URLSearchParamsInit } from './dom';
 import { createSearchParams, getFormSubmissionInfo, getSearchParamsForLocation } from './dom';
 import { Form } from './Form.tsrx';
@@ -270,6 +280,7 @@ export function useViewTransitionState(to: To, ...args: any[]): boolean {
 // upstream's local DataRouterHook enum + console errors.
 
 enum DataRouterHook {
+	UseScrollRestoration = 'useScrollRestoration',
 	UseSubmit = 'useSubmit',
 	UseFetcher = 'useFetcher',
 }
@@ -277,6 +288,7 @@ enum DataRouterHook {
 enum DataRouterStateHook {
 	UseFetcher = 'useFetcher',
 	UseFetchers = 'useFetchers',
+	UseScrollRestoration = 'useScrollRestoration',
 }
 
 function getDataRouterConsoleError(hookName: DataRouterHook | DataRouterStateHook) {
@@ -525,6 +537,284 @@ export function useFetchers(...args: any[]): any[] {
 			})),
 		[state.fetchers],
 		subSlot(slot, 'ufs:memo') as any,
+	);
+}
+
+// ── Phase E — guards / scroll ───────────────────────────────────────────────
+
+export type GetScrollRestorationKeyFunction = (location: Location, matches: any[]) => string | null;
+
+const SCROLL_RESTORATION_STORAGE_KEY = 'react-router-scroll-positions';
+let savedScrollPositions: Record<string, number> = {};
+
+function getScrollRestorationKey(
+	location: Location,
+	matches: any[],
+	basename: string,
+	getKey?: GetScrollRestorationKeyFunction,
+) {
+	let key: string | null = null;
+	if (getKey) {
+		if (basename !== '/') {
+			key = getKey(
+				{
+					...location,
+					pathname: stripBasename(location.pathname, basename) || location.pathname,
+				},
+				matches,
+			);
+		} else {
+			key = getKey(location, matches);
+		}
+	}
+	if (key == null) {
+		key = location.key;
+	}
+	return key;
+}
+
+/**
+ * When rendered inside a RouterProvider, will restore scroll positions on
+ * navigations.
+ */
+export function useScrollRestoration(...args: any[]): void {
+	const [user, slot] = splitSlot(args);
+	const { getKey, storageKey } = (user[0] ?? {}) as {
+		getKey?: GetScrollRestorationKeyFunction;
+		storageKey?: string;
+	};
+	let { router } = useDataRouterContext(DataRouterHook.UseScrollRestoration);
+	let { restoreScrollPosition, preventScrollReset } = useDataRouterState(
+		DataRouterStateHook.UseScrollRestoration,
+	);
+	let { basename } = useContext(NavigationContext);
+	let location = useLocation();
+	let matches = useMatches();
+	let navigation = useNavigation();
+
+	// Trigger manual scroll restoration while we're active
+	useEffect(
+		() => {
+			window.history.scrollRestoration = 'manual';
+			return () => {
+				window.history.scrollRestoration = 'auto';
+			};
+		},
+		[],
+		subSlot(slot, 'usr:manual') as any,
+	);
+
+	// Save positions on pagehide
+	usePageHide(
+		useCallback(
+			() => {
+				if (navigation.state === 'idle') {
+					let key = getScrollRestorationKey(location, matches, basename, getKey);
+					savedScrollPositions[key] = window.scrollY;
+				}
+				try {
+					sessionStorage.setItem(
+						storageKey || SCROLL_RESTORATION_STORAGE_KEY,
+						JSON.stringify(savedScrollPositions),
+					);
+				} catch (error) {
+					warning(
+						false,
+						`Failed to save scroll positions in sessionStorage, <ScrollRestoration /> will not work properly (${error}).`,
+					);
+				}
+				window.history.scrollRestoration = 'auto';
+			},
+			[navigation.state, getKey, basename, location, matches, storageKey],
+			subSlot(slot, 'usr:saveCb') as any,
+		),
+		undefined,
+		subSlot(slot, 'usr:pagehide'),
+	);
+
+	// Read in any saved scroll locations
+	if (typeof document !== 'undefined') {
+		useLayoutEffect(
+			() => {
+				try {
+					let sessionPositions = sessionStorage.getItem(
+						storageKey || SCROLL_RESTORATION_STORAGE_KEY,
+					);
+					if (sessionPositions) {
+						savedScrollPositions = JSON.parse(sessionPositions);
+					}
+				} catch (e) {
+					// no-op, use default empty object
+				}
+			},
+			[storageKey],
+			subSlot(slot, 'usr:read') as any,
+		);
+
+		// Enable scroll restoration in the router
+		useLayoutEffect(
+			() => {
+				let disableScrollRestoration = router?.enableScrollRestoration(
+					savedScrollPositions,
+					() => window.scrollY,
+					getKey
+						? (location, matches) => getScrollRestorationKey(location, matches, basename, getKey)
+						: undefined,
+				);
+				return () => disableScrollRestoration && disableScrollRestoration();
+			},
+			[router, basename, getKey],
+			subSlot(slot, 'usr:enable') as any,
+		);
+
+		// Restore scrolling when state.restoreScrollPosition changes
+		useLayoutEffect(
+			() => {
+				// Explicit false means don't do anything (used for submissions or revalidations)
+				if (restoreScrollPosition === false) {
+					return;
+				}
+
+				// been here before, scroll to it
+				if (typeof restoreScrollPosition === 'number') {
+					window.scrollTo(0, restoreScrollPosition);
+					return;
+				}
+
+				// try to scroll to the hash
+				try {
+					if (location.hash) {
+						let el = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+						if (el) {
+							el.scrollIntoView();
+							return;
+						}
+					}
+				} catch {
+					warning(
+						false,
+						`"${location.hash.slice(1)}" is not a decodable element ID. The view will not scroll to it.`,
+					);
+				}
+
+				// Don't reset if this navigation opted out
+				if (preventScrollReset === true) {
+					return;
+				}
+
+				// otherwise go to the top on new locations
+				window.scrollTo(0, 0);
+			},
+			[location, restoreScrollPosition, preventScrollReset],
+			subSlot(slot, 'usr:restore') as any,
+		);
+	}
+}
+
+/**
+ * Emulates the browser's scroll restoration on location changes. In data mode
+ * (this port's scope) upstream renders nothing — the SSR inline-script branch
+ * needs a FrameworkContext (framework mode, out of scope), so the component
+ * is the hook + `null`.
+ */
+export function ScrollRestoration(props: {
+	getKey?: GetScrollRestorationKeyFunction;
+	storageKey?: string;
+}): null {
+	// Plain-.ts component: hand-passed stable slot (state is keyed per
+	// component-instance scope).
+	useScrollRestoration(
+		{ getKey: props.getKey, storageKey: props.storageKey },
+		Symbol.for('rr:scroll-restoration') as any,
+	);
+	return null;
+}
+
+/**
+ * Set up a callback to be fired on Window's `beforeunload` event.
+ */
+export function useBeforeUnload(callback: (event: BeforeUnloadEvent) => any, ...args: any[]): void {
+	const [user, slot] = splitSlot(args);
+	const { capture } = (user[0] ?? {}) as { capture?: boolean };
+	useEffect(
+		() => {
+			let opts = capture != null ? { capture } : undefined;
+			window.addEventListener('beforeunload', callback, opts);
+			return () => {
+				window.removeEventListener('beforeunload', callback, opts);
+			};
+		},
+		[callback, capture],
+		subSlot(slot, 'ubu:eff') as any,
+	);
+}
+
+/*
+ * Setup a callback to be fired on the window's `pagehide` event. This is
+ * useful for saving some data to `window.localStorage` just before the page
+ * refreshes.  This event is better supported than beforeunload across browsers.
+ *
+ * Note: The `callback` argument should be a function created with
+ * `useCallback()`.
+ */
+function usePageHide(
+	callback: (event: PageTransitionEvent) => any,
+	options?: { capture?: boolean },
+	slot?: symbol,
+): void {
+	let { capture } = options || {};
+	useEffect(
+		() => {
+			let opts = capture != null ? { capture } : undefined;
+			window.addEventListener('pagehide', callback, opts);
+			return () => {
+				window.removeEventListener('pagehide', callback, opts);
+			};
+		},
+		[callback, capture],
+		subSlot(slot, 'uph:eff') as any,
+	);
+}
+
+/**
+ * Wrapper around useBlocker to show a `window.confirm` prompt to users
+ * instead of building a custom UI with useBlocker. Exported as
+ * `unstable_usePrompt`, as upstream (the flag will not be removed — the
+ * technique has rough edges across browsers).
+ */
+export function usePrompt(
+	{ when, message }: { when: boolean | BlockerFunction; message: string },
+	...args: any[]
+): void {
+	const [, slot] = splitSlot(args);
+	let blocker = useBlocker(when, subSlot(slot, 'up:blocker'));
+
+	useEffect(
+		() => {
+			if (blocker.state === 'blocked') {
+				let proceed = window.confirm(message);
+				if (proceed) {
+					// This timeout is needed to avoid a weird "race" on POP navigations
+					// between the `window.history` revert navigation and the result of
+					// `window.confirm`
+					setTimeout(blocker.proceed, 0);
+				} else {
+					blocker.reset();
+				}
+			}
+		},
+		[blocker, message],
+		subSlot(slot, 'up:confirm') as any,
+	);
+
+	useEffect(
+		() => {
+			if (blocker.state === 'blocked' && !when) {
+				blocker.reset();
+			}
+		},
+		[blocker, when],
+		subSlot(slot, 'up:reset') as any,
 	);
 }
 

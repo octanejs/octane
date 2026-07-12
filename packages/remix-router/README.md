@@ -9,15 +9,21 @@ running against the vendored copy) and transcribes the React layer onto
 octane's hooks. The shipped surface matches react-router 1:1 — existing code
 works by changing the import.
 
-**This is a phased port.** Shipped today: the data-mode core, declarative
-mode (`MemoryRouter`, `<Routes>`/`<Route>`, `<Navigate>`), the DOM entry
-points (`BrowserRouter`/`HashRouter`, `createBrowserRouter`/`createHashRouter`,
-`NavLink`, `useSearchParams`), and mutations (`Form`, `useSubmit`,
-`useFetcher`/`useFetchers`). The full roadmap
-(blockers/scroll/view-transitions, static SSR) lives in
-[docs/remix-router-port-plan.md](../../docs/remix-router-port-plan.md), and
-`tests/conformance/parity.test.ts` pins exactly which upstream exports each
-phase still owes.
+**The port is complete — full export parity.** Data mode, declarative mode
+(`MemoryRouter`, `<Routes>`/`<Route>`, `<Navigate>`), the DOM entry points
+(`BrowserRouter`/`HashRouter`, `createBrowserRouter`/`createHashRouter`,
+`NavLink`, `useSearchParams`), mutations (`Form`, `useSubmit`,
+`useFetcher`/`useFetchers`), guards + scroll (`useBlocker`,
+`unstable_usePrompt`, `ScrollRestoration`, `useBeforeUnload`,
+`useViewTransitionState`), static SSR (`StaticRouter`,
+`StaticRouterProvider`, `createStaticHandler`/`createStaticRouter` on
+`octane/server`), and the cookie/session server runtime (`createCookie`,
+`createSession`, `createCookieSessionStorage`, …). Framework mode
+(`Meta`/`Links`/`Scripts`, `createRequestHandler`) and RSC are permanently out
+of scope — those names exist as throwing stubs so
+`tests/conformance/parity.test.ts` pins the surface at exact parity
+([docs/remix-router-port-plan.md](../../docs/remix-router-port-plan.md) has
+the scope policy).
 
 ```tsx
 // before
@@ -50,7 +56,7 @@ function User() @{
 
 | import | what you get | notes |
 | --- | --- | --- |
-| `@octanejs/remix-router` | the vendored core surface (matchPath, redirect, data, …) + `createMemoryRouter`, `RouterProvider`, `Outlet`, `Await`, `Link`, `useLinkClickHandler`, the full read-hook family (`useLoaderData`, `useNavigate`, `useNavigation`, `useRouteError`, …), declarative mode (`MemoryRouter`, `Routes`/`Route`, `Navigate`, `createRoutesFromChildren`/`Elements`), and the DOM layer (`createBrowserRouter`/`createHashRouter`, `BrowserRouter`/`HashRouter`/`unstable_HistoryRouter`, `NavLink`, `useSearchParams`), and mutations (`Form`, `useSubmit`, `useFormAction`, `useFetcher`/`useFetchers`) | Phases 0 + A + B + C + D |
+| `@octanejs/remix-router` | the vendored core surface (matchPath, redirect, data, …) + `createMemoryRouter`, `RouterProvider`, `Outlet`, `Await`, `Link`, `useLinkClickHandler`, the full read-hook family (`useLoaderData`, `useNavigate`, `useNavigation`, `useRouteError`, …), declarative mode (`MemoryRouter`, `Routes`/`Route`, `Navigate`, `createRoutesFromChildren`/`Elements`), the DOM layer (`createBrowserRouter`/`createHashRouter`, `BrowserRouter`/`HashRouter`/`unstable_HistoryRouter`, `NavLink`, `useSearchParams`), mutations (`Form`, `useSubmit`, `useFormAction`, `useFetcher`/`useFetchers`), guards/scroll (`useBlocker`, `ScrollRestoration`, …), static SSR (`StaticRouter`/`StaticRouterProvider`/`createStaticHandler`/`createStaticRouter`), and cookies/sessions (`createCookie`, `createCookieSessionStorage`, …) | full parity |
 | `@octanejs/remix-router/dom` | `RouterProvider` with octane's `flushSync` wired in | mirror of `react-router/dom` |
 
 ## How it works

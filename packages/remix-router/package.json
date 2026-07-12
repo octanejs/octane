@@ -38,6 +38,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "cookie": "^1.0.1",
     "octane": "workspace:*"
   },
   "devDependencies": {

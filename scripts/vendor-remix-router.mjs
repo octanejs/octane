@@ -39,6 +39,17 @@ const FILES = [
 	'lib/types/register.ts',
 	'lib/types/params.ts',
 	'lib/types/route-module.ts',
+	// Server runtime — the framework-independent cookie/session surface
+	// (createCookie/createSession/…). server.ts (createRequestHandler) is NOT
+	// vendored: it is framework-mode (needs a @react-router/dev ServerBuild)
+	// and is exported as a throwing stub instead.
+	'lib/server-runtime/cookies.ts',
+	'lib/server-runtime/crypto.ts',
+	'lib/server-runtime/sessions.ts',
+	'lib/server-runtime/sessions/cookieStorage.ts',
+	'lib/server-runtime/sessions/memoryStorage.ts',
+	'lib/server-runtime/warnings.ts',
+	'lib/server-runtime/mode.ts',
 ];
 
 // path → [pattern, replacement, deviation note]

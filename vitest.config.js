@@ -182,6 +182,38 @@ export default defineConfig({
 				},
 			},
 			{
+				// Static SSR (Phase F): the whole graph compiles in SERVER mode
+				// (`octane({ ssr: true })`) and bare `octane` imports resolve to
+				// `octane/server` (the website's octane-ssr-server-alias pattern) so
+				// the binding's plain-.ts hooks run against the server runtime.
+				// Node environment; the React side renders via react-dom/server over
+				// the same react-cache compilation the client differential uses.
+				test: {
+					name: 'remix-router-ssr',
+					include: ['packages/remix-router/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globalSetup: ['packages/remix-router/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/remix-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/remix-router/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/remix-router\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/remix-router/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
 				// The vendored react-router core's own upstream unit tests — a
 				// VENDOR-INTEGRITY gate (loaders/redirects/interruptions driven with
 				// zero React/octane involved). Pure node environment; no octane plugin.

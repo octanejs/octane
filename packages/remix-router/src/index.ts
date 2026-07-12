@@ -119,6 +119,7 @@ export {
 	useActionData,
 	useAsyncError,
 	useAsyncValue,
+	useBlocker,
 	useHref,
 	useInRouterContext,
 	useLoaderData,
@@ -136,9 +137,17 @@ export {
 	useRouteError,
 	useRouteLoaderData,
 	useRoutes,
+	useRoute as unstable_useRoute,
+	useRouterState as unstable_useRouterState,
+} from './lib/hooks';
+export type {
+	unstable_RouterState,
+	unstable_RouterStateActiveVariant,
+	unstable_RouterStatePendingVariant,
+	unstable_RouterStateMatch,
 } from './lib/hooks';
 
-// ── DOM layer (Phases A + C + D; guards/scroll/VT land in E) ───────────────
+// ── DOM layer (Phases A + C + D + E + F) ────────────────────────────────────
 export { Link } from './lib/dom/Link.tsrx';
 export { useLinkClickHandler } from './lib/dom/hooks';
 export { NavLink } from './lib/dom/NavLink.tsrx';
@@ -156,6 +165,11 @@ export {
 	useFormAction,
 	useFetcher,
 	useFetchers,
+	useViewTransitionState,
+	useBeforeUnload,
+	usePrompt as unstable_usePrompt,
+	ScrollRestoration,
+	useScrollRestoration as UNSAFE_useScrollRestoration,
 } from './lib/dom/lib';
 export type {
 	DOMRouterOpts,
@@ -165,6 +179,12 @@ export type {
 	FetcherWithComponents,
 } from './lib/dom/lib';
 export { Form } from './lib/dom/Form.tsrx';
+export {
+	StaticRouter,
+	StaticRouterProvider,
+	createStaticHandler,
+	createStaticRouter,
+} from './lib/dom/server.tsrx';
 
 // ── UNSAFE_ surface (shipped subset) ────────────────────────────────────────
 export {
@@ -198,3 +218,50 @@ export {
 } from './lib/components/with-props';
 export type { Register } from './lib/types/register';
 export type { MiddlewareEnabled as UNSAFE_MiddlewareEnabled } from './lib/types/future';
+
+// ── Server runtime (vendored cookie/session surface) ────────────────────────
+export { createCookie, isCookie } from './lib/server-runtime/cookies';
+export type {
+	Cookie,
+	CookieOptions,
+	CookieParseOptions,
+	CookieSerializeOptions,
+	CookieSignatureOptions,
+} from './lib/server-runtime/cookies';
+export { createSession, isSession, createSessionStorage } from './lib/server-runtime/sessions';
+export type {
+	Session,
+	SessionData,
+	SessionStorage,
+	SessionIdStorageStrategy,
+	FlashSessionData,
+} from './lib/server-runtime/sessions';
+export { createCookieSessionStorage } from './lib/server-runtime/sessions/cookieStorage';
+export { createMemorySessionStorage } from './lib/server-runtime/sessions/memoryStorage';
+export { ServerMode as UNSAFE_ServerMode } from './lib/server-runtime/mode';
+
+// ── Framework-mode + RSC surface (throwing stubs — see framework-stubs.ts) ──
+export {
+	Meta,
+	Links,
+	Scripts,
+	PrefetchPageLinks,
+	ServerRouter,
+	createRoutesStub,
+	createRequestHandler,
+	unstable_setDevServerHooks,
+	FrameworkContext as UNSAFE_FrameworkContext,
+	RemixErrorBoundary as UNSAFE_RemixErrorBoundary,
+	getPatchRoutesOnNavigationFunction as UNSAFE_getPatchRoutesOnNavigationFunction,
+	useFogOFWarDiscovery as UNSAFE_useFogOFWarDiscovery,
+	getHydrationData as UNSAFE_getHydrationData,
+	createClientRoutes as UNSAFE_createClientRoutes,
+	createClientRoutesWithHMRRevalidationOptOut as UNSAFE_createClientRoutesWithHMRRevalidationOptOut,
+	shouldHydrateRouteLoader as UNSAFE_shouldHydrateRouteLoader,
+	SingleFetchRedirectSymbol as UNSAFE_SingleFetchRedirectSymbol,
+	decodeViaTurboStream as UNSAFE_decodeViaTurboStream,
+	getTurboStreamSingleFetchDataStrategy as UNSAFE_getTurboStreamSingleFetchDataStrategy,
+	routeRSCServerRequest as unstable_routeRSCServerRequest,
+	RSCStaticRouter as unstable_RSCStaticRouter,
+	RSCDefaultRootErrorBoundary as UNSAFE_RSCDefaultRootErrorBoundary,
+} from './lib/framework-stubs';

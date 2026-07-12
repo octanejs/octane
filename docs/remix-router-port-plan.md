@@ -122,20 +122,54 @@ hook-form-style (Form's onSubmit is a native delegated submit listener —
 `event.nativeEvent.submitter`; jsdom fires SubmitEvent with `submitter` on
 submit-button clicks for both sides).
 
-### Phase E — async guards + scroll + view transitions
+### Phase E — async guards + scroll + view transitions — SHIPPED (PR 1)
 `useBlocker`, `unstable_usePrompt`, `ScrollRestoration` +
-`UNSAFE_useScrollRestoration`, `useBeforeUnload`, `useViewTransitionState`,
-`unstable_useRoute`/`unstable_useRouterState`, activating RouterProvider's VT
-paths against octane's ViewTransition support. *Exit criterion:* blocker
-proceed/reset flows; scroll keys restored on memory router; VT context marks
-observable.
+`UNSAFE_useScrollRestoration`, `useBeforeUnload`, `useViewTransitionState`
+(public export; implemented since Phase C for NavLink),
+`unstable_useRoute`/`unstable_useRouterState`. *Exit criterion (met):* blocker
+proceed/reset flows green in conformance AND differential byte-parity; scroll
+positions restored on POP on the memory router (save keys are location.key —
+a PUSH to the same path mints a new key and goes to the top, as upstream);
+prompt confirm/cancel via stubbed window.confirm; passive unmount cleanup of
+window listeners asserted post-flush (octane defers passive cleanup, React
+parity). RouterProvider's VT COMMIT paths remain dormant in jsdom (no
+startViewTransition) — useViewTransitionState correctly reads the
+ViewTransitionContext and returns false; activating the visual paths is
+covered by octane's own view-transitions suite, not this port.
 
-### Phase F — static SSR + full parity
+### Phase F — static SSR — SHIPPED (PR 1)
 `StaticRouter`/`StaticRouterProvider`/`createStaticHandler`/
-`createStaticRouter` on `octane/server`; framework client stubs; server-runtime
-re-export; `EXPECTED_MISSING` reaches `[]`. *Exit criterion:* renderToString of
-a static data app matches upstream bytes; every upstream root export is
-ported / stubbed / omitted-with-reason.
+`createStaticRouter` transcribed from lib/dom/server.tsx (stateless navigator,
+error serialization, the dual-stringified `__staticRouterHydrationData`
+script; local `escapeHtml` — upstream's lives in the unvendored framework
+dir). Rendered through `octane/server` in the dedicated `remix-router-ssr`
+vitest project: the whole graph compiles in SERVER mode (`octane({ssr:
+true})`) and bare `octane` imports alias to `octane/server` (the website's
+octane-ssr-server-alias pattern) so the binding's plain-.ts hooks run against
+the server runtime. *Exit criterion (met):* renderToString of the static data
+app (index/loader-data/thrown-Response-errorElement routes) is byte-identical
+to react-dom/server over real react-router after stripping framework marker
+comments; the hydration script payload matches (the serialized
+ErrorResponseImpl's JSON key order is a transpilation artifact — compared
+parsed). Block-children `<Routes>` is CLIENT-only (the collector registers in
+layout effects, which never run server-side) — descriptor children and route
+objects SSR fine; documented in status.json.
+
+### Final phase — server runtime + framework/RSC stubs — SHIPPED (PR 1)
+The framework-independent cookie/session surface is VENDORED
+(`lib/server-runtime/{cookies,crypto,sessions,sessions/*,warnings,mode}.ts`,
+adding the `cookie` dependency exactly as upstream): createCookie/isCookie,
+createSession/isSession, createSessionStorage,
+createCookieSessionStorage/createMemorySessionStorage, UNSAFE_ServerMode.
+`createRequestHandler` is NOT vendored — it is framework-mode (consumes a
+`@react-router/dev` ServerBuild and drags in the single-fetch/turbo-stream/
+entry graph), so it ships as a throwing stub alongside the other
+framework-mode client APIs (Meta/Links/Scripts/PrefetchPageLinks/
+ServerRouter/createRoutesStub, the `UNSAFE_` framework internals) and the RSC
+names — each throws a scope-policy message when invoked (UNSAFE_FrameworkContext
+is a real null-holding context, the honest "not in framework mode" value).
+`EXPECTED_MISSING` reached `[]`: every upstream root export is ported,
+stubbed, or vendored.
 
 ## 4. First milestone — met in PR 1
 
