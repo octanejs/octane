@@ -65,10 +65,10 @@ async function runTarget(t) {
 
 	await browser.close();
 	return {
-		// Each init sample is an independent cold page load, not an ordered JIT
-		// warmup sequence. Score the complete sample population.
+		// Each init and paired first-update sample comes from an independent fresh
+		// page, not an ordered JIT warmup sequence. Score both full populations.
 		init: summarize(initSamples, { scoreMode: 'mean' }),
-		update: summarize(updateSamples),
+		update: summarize(updateSamples, { scoreMode: 'mean' }),
 	};
 }
 
