@@ -1,4 +1,4 @@
-# recursive-context bench — octane vs ripple vs react vs solid
+# recursive-context bench — context fan-out across frameworks
 
 A second benchmark adjacent to [`js-framework`](../js-framework/). Where
 js-framework-benchmark measures wide flat-list rendering (1000 rows in a table),
@@ -18,6 +18,8 @@ benchmarks/recursive-context/
 ├── ripple/            # Vite app, dev :5184
 ├── vue-vapor/         # Vite app, dev :5189 — Vue 3.6 Vapor: provide/inject shallowRefs;
 │                      #   update ops return nextTick() (no public sync flush)
+├── preact/           # Vite app, dev :5264 — native Preact context + hooks
+├── svelte/           # Vite app, dev :5275 — Svelte 5 createContext + runes
 ├── run.mjs            # Playwright harness — drives all adapters
 ├── package.json       # umbrella: `pnpm bench`
 └── README.md
@@ -29,14 +31,12 @@ Both compile to working blocks over the same runtime, so the two octane columns
 are a like-for-like read on the JSX backwards-compat path's cost for this
 recursive-tree + Context workload.
 
-Context maps to each framework's native mechanism: octane/React `createContext`
-+ `useContext`, Solid `createContext` + `useContext` (signal getters as the
-context value), Vue `provide`/`inject` (shallowRefs as the provided values —
-leaves read them in their text expression, so updates re-fire only leaf text
-renderEffects; non-Mid leaves get the non-reactive inject default `0` and never
-subscribe). Vue has no public synchronous flush, so the vue-vapor update ops
-return `nextTick()` and the harness awaits the thenable inside the timed
-window.
+Context maps to each framework's native mechanism: Octane, React, and Preact use
+`createContext` + `useContext`; Solid uses signal getters as context values;
+Svelte uses `createContext` with reactive objects; and Vue uses
+`provide`/`inject` with shallow refs. Vue has no public synchronous flush, so
+its update ops return `nextTick()` and the harness awaits that thenable inside
+the timed window.
 
 ## Shape
 
@@ -78,31 +78,26 @@ updates), **structural change** (toggle a subtree on/off vs mutate a value), and
   owner-tree dispose) can short-circuit this; the contrast against PARTIAL_UNMOUNT
   shows whether the win is structural or only applies to the whole-container case.
 
+Native **Preact** (`:5264`) uses core context and hooks. **Svelte 5** (`:5275`)
+uses `createContext` with reactive context-scoped values so the 32-leaf local
+provider remains isolated from the rest of the 2,047-component tree.
+
 ## Quick start
 
 ```bash
 # 1. From the repo root, install:
 pnpm install
 
-# 2. Start each adapter's dev server (separate terminals):
-pnpm --filter octane-tsrx-recursive-bench dev   # :5185
-pnpm --filter octane-jsx-recursive-bench dev    # :5188
-pnpm --filter solid-recursive-bench dev         # :5187
-pnpm --filter react-recursive-bench dev         # :5186
-pnpm --filter ripple-recursive-bench dev        # :5184
-pnpm --filter vue-vapor-recursive-bench dev     # :5189
-
-# 3. Run the harness:
-pnpm --filter @benchmarks/recursive-context bench
-# or for a longer sample:
-pnpm --filter @benchmarks/recursive-context bench:long
+# 2. Production-build, preview, and drive all eight targets:
+node benchmarks/bench.mjs --quick recursive-context
+node benchmarks/bench.mjs recursive-context
 ```
 
 Output is a side-by-side table of median / min / p95 millis per op, followed by a
 pairwise ratio block, e.g.:
 
 ```
-octane-tsrx / ripple ratio (median; <1 means octane-tsrx faster):
+octane-tsrx / vue-vapor ratio (score; <1 means octane-tsrx faster):
   mount             0.71x  ++ faster
   update_root       0.59x  ++ faster
   update_partial    0.84x  ++ faster

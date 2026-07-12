@@ -1,15 +1,16 @@
 # News SSR + hydration benchmark
 
 A large "news site" document (header + a feed of article cards, lorem ipsum) that
-measures, per target (**octane-tsrx**, **octane-jsx**, **ripple**, **Solid 2.0**,
-**React 19**, **Vue 3.6 Vapor**):
+measures, per target (**octane-tsrx**, **octane-jsx**, **React 19**, **Preact**,
+**Ripple**, **Solid 2.0**, **Svelte 5**, **Vue 3.6 Vapor**):
 
 - **SSR render time** — the built `renderApp()` → HTML string, in Node, warm.
 - **Hydration time** — the SYNCHRONOUS hydration work in a headless browser, on a
   fresh page whose `#app` already holds the server-rendered DOM (timed in
   isolation via a deferred `window.__hydrate()`), with the production client
-  bundle loaded. All targets commit hydration synchronously inside `__hydrate()` —
-  octane and React via `flushSync`, Solid and Vue Vapor are synchronous — so this is the
+  bundle loaded. All targets commit hydration synchronously inside `__hydrate()`;
+  Octane, React, Preact, and Svelte explicitly bound the work with their public
+  flush APIs, while the other adapters hydrate synchronously by model. This is
   hydration _work_, not frame-scheduling latency. (React's `hydrateRoot` is
   concurrent and would otherwise defer the work out of the measured window,
   reading as near-zero; `flushSync` forces it to commit so the comparison is
@@ -27,9 +28,9 @@ It also asserts **correctness**: that hydration _adopts_ the server DOM with no
 rebuild (`#app.innerHTML` unchanged) and that the page is interactive afterward
 (the header theme toggle flips).
 
-All apps render the same dataset, so the comparison is pure framework cost. The
-non-octane targets share the `.tsrx` source shape; octane is authored twice (the
-two dialects over one core):
+All apps render the same dataset and DOM contract, so the comparison is pure
+framework cost. Each target uses its native authoring format; Octane alone is
+authored twice to compare its two dialects over one core:
 
 - **octane-tsrx** — `octane/compiler` over `.tsrx` directive syntax (single
   runtime, `render()` + `hydrateRoot()`); the `@for` feed adopts each item range.
@@ -43,6 +44,9 @@ two dialects over one core):
   `renderToString` + `hydrate`, a hydratable two-build Vite drives per-request).
 - **React 19** — `@tsrx/react` (`react-dom/server` `renderToString` +
   `react-dom/client` `hydrateRoot`; one JSX transform serves both, no two-build).
+- **Preact** — native JSX, `preact-render-to-string`, and core `hydrate()`.
+- **Svelte 5** — runes-mode SFCs, buffered `svelte/server` `render()`, and the
+  public `hydrate()` API with recovery disabled for a strict adoption gate.
 - **Vue 3.6 Vapor** — `<script setup vapor>` SFCs (not `.tsrx`; Vue's own SFC
   compiler is the authoring model). Two builds like Solid: the SSR bundle
   compiles the vapor SFCs to the regular `ssrRender` string codegen (vapor has
@@ -52,9 +56,9 @@ two dialects over one core):
   The client aliases `vue` to a vapor-inclusive shim (`src/vue-shim.js`); the
   SSR build uses the real `vue` entry (see `vue-vapor/vite.config.js`).
 
-Reactive state is authored per target (the one real authoring difference):
-octane/React `useState`, Solid `createSignal`, original Ripple `track`, Vue
-`shallowRef`.
+Reactive state is authored per target: Octane, React, and Preact use `useState`;
+Solid uses `createSignal`; Ripple uses `track`; Svelte uses `$state`; and Vue
+uses `shallowRef`.
 
 This bench exercises octane's cursor-based hydration of **control flow +
 nested components** (the `@for` feed adopts each item's `<!--[-->…<!--]-->` range;
@@ -71,12 +75,14 @@ node benchmarks/news/run.mjs octane-jsx 20   # same app authored in React-style 
 node benchmarks/news/run.mjs ripple 20       # original Ripple, 20 iterations (+5 warmup)
 node benchmarks/news/run.mjs solid 20        # Solid 2.0
 node benchmarks/news/run.mjs react 20        # React 19
+node benchmarks/news/run.mjs preact 20       # Preact
+node benchmarks/news/run.mjs svelte 20       # Svelte 5
 node benchmarks/news/run.mjs vue-vapor 20    # Vue 3.6 Vapor
 node benchmarks/news/run.mjs react 20 --no-build   # reuse the existing dist/ (skip rebuild)
 ```
 
 `run.mjs [target] [iterations] [--no-build]` — `target` ∈
-`{octane-tsrx, octane-jsx, ripple, solid, react, vue-vapor}` (default `octane-tsrx`; a bare
+`{octane-tsrx, octane-jsx, react, preact, ripple, solid, svelte, vue-vapor}` (default `octane-tsrx`; a bare
 number is treated as iterations for back-compat). Each run rebuilds the target's
 production client + SSR bundles unless `--no-build` is passed. Build output goes to
 `<target>/dist/` (git-ignored). `octane-tsrx` and `octane-jsx` are the same app
@@ -89,10 +95,10 @@ backwards-compat path's SSR + hydration cost.
 | File                           | Role                                                                                                                                 |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `gen.mjs`                      | Generates `<target>/src/data.js` for every target (deterministic lorem-ipsum).                                                       |
-| `<target>/src/App.{tsrx,tsx}`  | Header component + feed of article cards + footer (`@for` in `.tsrx`; `.map(...key)` in the JSX `.tsx`).                              |
-| `<target>/src/Header.{tsrx,tsx}` | A stateful component (octane/React `useState`, Solid `createSignal`, Ripple `track`) with a theme toggle.                          |
-| `<target>/src/entry-server.ts` | `renderApp()` → `{ head, body, css }`.                                                                                               |
-| `<target>/src/entry-client.ts` | Deferred `window.__hydrate()`.                                                                                                       |
+| `<target>/src/App.*`           | Header component + keyed feed of article cards + footer, authored in the target's native format.                                    |
+| `<target>/src/Header.*`        | A stateful native component with a theme toggle.                                                                                       |
+| `<target>/src/entry-server.*`  | `renderApp()` → `{ head, body, css }`.                                                                                               |
+| `<target>/src/entry-client.*`  | Deferred `window.__hydrate()`.                                                                                                          |
 | `run.mjs`                      | `vite build` (client + SSR, prod) → static-serves the built artifacts + Playwright; measures SSR + hydration; prints median/min/p95. |
 
 ## Solid 2.0 toolchain note
