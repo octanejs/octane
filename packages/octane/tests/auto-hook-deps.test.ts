@@ -92,6 +92,37 @@ describe('automatic hook dependencies — full compiler', () => {
 		);
 	});
 
+	it('tracks mutable module bindings while omitting imports', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      import { importedValue } from './config';
+      let moduleValue = 0;
+      const moduleObject = { value: 1 };
+      export function App(props) @{
+        useEffect(() => {
+          props.log(importedValue, moduleValue, moduleObject.value);
+        });
+        <div />
+      }
+    `);
+
+		expect(code).toMatch(
+			/useEffect\([\s\S]*?,\s*\[props\.log, moduleValue, moduleObject\.value\],\s*_h\$\d+\s*\)/,
+		);
+	});
+
+	it('emits valid chain expressions for deep optional reads', () => {
+		const code = c(`
+      import { useMemo } from 'octane';
+      export function App(props) @{
+        const name = useMemo(() => props?.user?.name);
+        <div>{name as string}</div>
+      }
+    `);
+
+		expect(code).toMatch(/useMemo\(\(\) => props\?\.user\?\.name, \[props\?\.user\], _h\$\d+\)/);
+	});
+
 	it('infers [] for capture-free callbacks and honors every explicit second argument', () => {
 		const code = c(`
       import { useEffect, useMemo, useCallback } from 'octane';
@@ -164,5 +195,20 @@ export function useThing<T>(value: T) {
 			/effect\(\(\) => console\.log\(value, ref\.current\), \[value\], _h\$\d+\)/,
 		);
 		expect(code).toContain('useRef<T | null>(null, _h$');
+	});
+
+	it('preserves source ranges for module values and optional chains', () => {
+		const source = `
+import { useMemo as memo } from 'octane';
+import { importedValue } from './config';
+let moduleValue = 0;
+export function useThing<T extends { deep?: { name?: string } }>(value: T) {
+  return memo(() => [importedValue, moduleValue, value?.deep?.name]);
+}
+`;
+		const code = slotHooks(source, 'use-thing.ts')!.code;
+		expect(code).toMatch(
+			/memo\(\(\) => \[importedValue, moduleValue, value\?\.deep\?\.name\], \[moduleValue, value\?\.deep\], _h\$\d+\)/,
+		);
 	});
 });

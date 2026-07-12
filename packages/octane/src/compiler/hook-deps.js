@@ -45,12 +45,13 @@ function declareName(scope, name, details = null) {
 			id: nextBindingId++,
 			name,
 			scope,
-			module: scope.kind === 'module',
+			imported: false,
 			stable: false,
 			octaneImport: null,
 		};
 		scope.bindings.set(name, binding);
 	}
+	if (details?.imported) binding.imported = true;
 	if (details?.octaneImport) binding.octaneImport = details.octaneImport;
 	return binding;
 }
@@ -110,6 +111,7 @@ function predeclareDirect(statements, scope) {
 			for (const specifier of original.specifiers || []) {
 				const imported = specifier.imported?.name;
 				declareName(scope, specifier.local.name, {
+					imported: true,
 					octaneImport: original.source?.value === 'octane' ? imported : null,
 				});
 			}
@@ -377,8 +379,22 @@ function staticMemberInfo(node) {
 	// `props.order`. Besides avoiding over-specific getter reads, this preserves
 	// the receiver identity a method call executes against; tracking only
 	// `Array.prototype.push` would miss a new `props.order` array.
+	// A nested optional member is no longer wrapped by its original outer
+	// ChainExpression. Restore that wrapper for the generated dependency so the
+	// full-compiler AST remains valid ESTree (`props?.user`, not a bare optional
+	// MemberExpression). Source offsets stay on the wrapper for the surgical pass.
+	const dependencyNode =
+		original.type !== 'ChainExpression' && current.optional
+			? {
+					type: 'ChainExpression',
+					expression: original,
+					start: original.start,
+					end: original.end,
+					loc: original.loc,
+				}
+			: original;
 	return {
-		node: original,
+		node: dependencyNode,
 		root,
 		path: `${current.optional ? '?' : ''}.${current.property.name}`,
 	};
@@ -393,7 +409,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 		const binding = scope ? resolveBinding(scope, node.name) : null;
 		if (
 			binding === null ||
-			binding.module ||
+			binding.imported ||
 			binding.stable ||
 			(callbackScope !== null && scopeIsWithin(binding.scope, callbackScope))
 		) {
@@ -411,7 +427,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 		const binding = scope ? resolveBinding(scope, info.root.name) : null;
 		if (
 			binding === null ||
-			binding.module ||
+			binding.imported ||
 			binding.stable ||
 			(callbackScope !== null && scopeIsWithin(binding.scope, callbackScope))
 		) {
