@@ -3229,45 +3229,46 @@ function enqueueEffect(slot: symbol, fn: EffectFn, deps: any[] | undefined, phas
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.effects[phase] : effectQueues[phase]).push(entry);
 }
 
-// ABI: the compiler appends the hook slot as the LAST argument. When the user
-// omits deps (`useEffect(fn)` / `useMemo(fn)`), the call arrives as `hook(fn, slot)`
-// — the symbol lands in the deps position and the real slot param is undefined.
-// Detect the trailing symbol and reinterpret so optional-deps forms work. A
-// returned undefined deps means "run on every commit/render" (React parity for
-// omitted deps). Shared by the effect hooks AND useMemo; useCallback keeps its own
-// reinterpret fork (see its comment — it must forward the RAW slot to useMemo).
+// ABI: the compiler appends the hook slot as the LAST argument. Generated code
+// normally supplies an inferred or explicit deps array before it. Keep the
+// trailing-symbol reinterpret for direct/uncompiled calls and normalize the
+// public `null` escape hatch to undefined; internally undefined means "run or
+// recompute on every commit/render". Shared by the effect hooks AND useMemo;
+// useCallback keeps its own reinterpret fork (it must forward the RAW slot).
 function resolveHookArgs(
 	name: string,
-	deps: any[] | symbol | undefined,
+	deps: any[] | null | symbol | undefined,
 	slot: symbol | undefined,
 ): [any[] | undefined, symbol] {
 	if (slot === undefined && typeof deps === 'symbol') {
 		slot = deps;
 		deps = undefined;
 	}
+	if (deps === null) deps = undefined;
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot(name);
 	return [deps as any[] | undefined, slot];
 }
 
-export function useEffect(fn: EffectFn, deps?: any[], slot?: symbol): void {
+export function useEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void {
 	const [d, s] = resolveHookArgs('useEffect', deps, slot);
 	enqueueEffect(s, fn, d, PASSIVE);
 }
-export function useLayoutEffect(fn: EffectFn, deps?: any[], slot?: symbol): void {
+export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void {
 	const [d, s] = resolveHookArgs('useLayoutEffect', deps, slot);
 	enqueueEffect(s, fn, d, LAYOUT);
 }
-export function useInsertionEffect(fn: EffectFn, deps?: any[], slot?: symbol): void {
+export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void {
 	const [d, s] = resolveHookArgs('useInsertionEffect', deps, slot);
 	enqueueEffect(s, fn, d, INSERTION);
 }
 
-export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[], slot?: symbol): T {
+export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[] | null, slot?: symbol): T {
 	const [d, s] = resolveHookArgs('useMemo', deps, slot);
 	const scope = CURRENT_SCOPE!;
 	const prev = scope.hooks?.get(s) as { deps: any[] | undefined; value: T } | undefined;
-	// deps === undefined → recompute every render (React parity for omitted deps).
+	// deps === undefined → recompute every render (`null` at the public API;
+	// direct/uncompiled omitted calls also retain this runtime fallback).
 	if (prev && d !== undefined && !depsChanged(prev.deps, d)) return prev.value;
 	// Parallel-use warming: before recomputing, adopt a prefetched creation for
 	// this slot (started by warmMemo during a suspended ancestor's warm walk) —
@@ -3291,7 +3292,7 @@ export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[], slot?: 
 
 export function useCallback<F extends (...args: any[]) => any>(
 	fn: F,
-	deps?: any[],
+	deps?: any[] | null,
 	slot?: symbol,
 ): F {
 	// Trailing-symbol ABI (see resolveHookArgs): `useCallback(fn)` arrives as
@@ -3308,7 +3309,7 @@ export function useCallback<F extends (...args: any[]) => any>(
 	// Guard here (rather than letting useMemo throw) so the diagnostic names useCallback.
 	// resolveSlot is a read-only peek at the path stack, so this doesn't disturb useMemo's.
 	if (resolveSlot(slot) === undefined) missingSlot('useCallback');
-	return useMemo(() => fn, deps as any[] | undefined, slot);
+	return useMemo(() => fn, deps, slot);
 }
 
 export function useRef<T>(initial: T, slot?: symbol): { current: T } {
@@ -3346,7 +3347,7 @@ export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: symbo
 export function useImperativeHandle<T>(
 	ref: { current: T | null } | ((value: T | null) => void) | null | undefined,
 	factory: () => T,
-	deps?: any[],
+	deps?: any[] | null,
 	slot?: symbol,
 ): void {
 	const [resolvedDeps, resolvedSlot] = resolveHookArgs('useImperativeHandle', deps, slot);

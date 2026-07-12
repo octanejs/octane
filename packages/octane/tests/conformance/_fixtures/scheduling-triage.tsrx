@@ -40,7 +40,7 @@ export function ThrowSwitch(props) @{
 // ---------------------------------------------------------------------------
 // All-phase logger with an urgent setter — drives the flushSync/passive
 // timing ports (ReactFlushSync-test.js:162/:246/:269, ReactBatching:77).
-// The effects are dep-less so every render re-fires them.
+// `null` explicitly makes the effects re-fire after every render.
 // ---------------------------------------------------------------------------
 let _setPhaseTick: any = null;
 export function bumpPhaseLogger(n: number) {
@@ -52,10 +52,10 @@ export function PhaseLogger() @{
 	_log.push('render:' + n);
 	useLayoutEffect(() => {
 		_log.push('layout:' + n);
-	});
+	}, null);
 	useEffect(() => {
 		_log.push('effect:' + n);
-	});
+	}, null);
 	<span id="phase">
 		{'v' + n}
 	</span>

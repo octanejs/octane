@@ -18,6 +18,21 @@ renders in its own scope. `use()` and `useContext` are exempt (they are
 call-order / context-identity keyed, not slot-keyed), so they may sit in plain
 loops.
 
+## Compiler-inferred hook dependencies
+
+Dependency arrays are optional for `useEffect`, `useLayoutEffect`,
+`useInsertionEffect`, `useMemo`, `useCallback`, and `useImperativeHandle`.
+Omitting the list asks the compiler to derive it from the callback's lexical
+captures. The analysis tracks one-level member paths and omits values whose
+identity Octane can prove stable, including state setters, reducer dispatchers,
+refs, state getters, and `useEffectEvent` results.
+
+An explicit array is authoritative and retains React's exact behavior. Pass
+`null` to opt out of tracking and run an effect—or recompute a memo—after every
+render. Opaque callback creation such as `useEffect(makeEffect())` requires an
+explicit array or `null`, because evaluating it again to construct a dependency
+would change program behavior.
+
 ## `useState` / `useReducer` current-state getters
 
 Both state hooks have an Octane-only third tuple member: a stable zero-argument

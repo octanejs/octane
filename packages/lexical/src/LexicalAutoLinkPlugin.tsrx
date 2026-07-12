@@ -12,12 +12,12 @@ export function AutoLinkPlugin(props) {
 	const onChange = props.onChange;
 	const excludeParents = props.excludeParents;
 
-	// No deps — runs every render (matches @lexical/react).
+	// Explicit every-render check (matches @lexical/react).
 	useEffect(() => {
 		if (!editor.hasNodes([AutoLinkNode])) {
 			invariant(false, 'LexicalAutoLinkPlugin: AutoLinkNode not registered on editor');
 		}
-	});
+	}, null);
 
 	useEffect(
 		() => registerAutoLink(editor, {

@@ -61,10 +61,10 @@ pnpm rules:generate
 
 ## Repo Map
 
-This is a pnpm monorepo with eighteen publishable packages — the core `octane`
+This is a pnpm monorepo with twenty-one publishable packages — the core `octane`
 runtime+compiler, the `@octanejs/vite-plugin` metaframework (plus its
 `@octanejs/adapter-vercel` deploy adapter), the `@octanejs/mcp-server` MCP
-server, and fourteen `@octanejs/*` framework bindings:
+server, and seventeen `@octanejs/*` framework bindings:
 
 - `packages/octane/` (npm: `octane`) — the runtime **and** the compiler together.
   - `src/runtime.ts` — client runtime.
@@ -78,7 +78,7 @@ server, and fourteen `@octanejs/*` framework bindings:
   deploys it to Vercel (Build Output API).
 - `packages/octane-mcp-server/` (npm: `@octanejs/mcp-server`) — an MCP server
   exposing octane docs/compile tooling to AI agents.
-- `packages/{zustand,tanstack-query,motion,stylex,tanstack-router,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/`
+- `packages/{zustand,jotai,tanstack-query,motion,stylex,tanstack-router,tanstack-table,tanstack-virtual,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/`
   (npm: `@octanejs/*`) — framework bindings, each an octane port of a React
   library (state, data-fetching, animation, styling, routing, editor,
   positioning, UI primitives, forms, charts, testing, MDX). Parity varies by
@@ -132,6 +132,13 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   extract a child component — each item then renders in its own scope. `use()`
   and `useContext` are exempt (call-order / context-identity keyed, not
   slot-keyed).
+- **Dependency arrays are compiler-inferred when omitted.** This applies to
+  `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`,
+  and `useImperativeHandle`. The compiler derives dependencies from lexical
+  captures and omits proven-stable hook results (state setters/dispatchers,
+  refs, state getters, and `useEffectEvent`). Explicit arrays retain React's
+  exact behavior and are never rewritten; `null` explicitly means run or
+  recompute after every render.
 - **State hooks expose a compiler-driven current-state getter.** `useState` and
   `useReducer` have a stable third tuple member (`[state, update, getState]`) that
   reads the latest scheduled hook-cell value. The compiler emits its specialized

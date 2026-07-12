@@ -35,13 +35,16 @@ describe('website routes', () => {
 
 		expect(container.querySelector('main .home')).toBeTruthy();
 		expect(container.querySelector('.hero h1')?.textContent?.trim()).toBeTruthy();
+		expect(container.textContent).toContain('No hand-maintained dependency arrays');
 		const heroActions = container.querySelector('.hero-actions')!;
 		expect(findLink(heroActions, '/docs/quick-start')).toBeTruthy();
 		expect(findLink(heroActions, '/docs/differences-from-react')).toBeTruthy();
 
 		// The home-page MDX sample went through the Shiki pipeline.
 		expect(container.querySelector('pre.shiki')).toBeTruthy();
-		expect(container.querySelectorAll('.features article.card').length).toBeGreaterThan(0);
+		const featureCards = container.querySelectorAll('.features article.card');
+		expect(featureCards).toHaveLength(4);
+		expect(container.textContent).toContain('Hooks without the homework');
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
 		// The checked-in benchmark summary reaches the chart and table renderers.

@@ -64,7 +64,7 @@ describe('useState — render-phase bailout when all state is the same', () => {
 		expect(log.drain()).toEqual([]);
 
 		// A later REAL change must still render the full tree and re-fire the
-		// deps-less layout effect — the bailed sets must not poison the slot.
+		// every-render layout effect — the bailed sets must not poison the slot.
 		flushSync(() => getSetC1()(2));
 		expect(log.drain()).toEqual(['Parent: 2, 1', 'Child: 2, 1', 'Effect']);
 		expect(r.find('#child').textContent).toBe('2, 1');

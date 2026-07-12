@@ -171,7 +171,7 @@ export function useForm<
 		}
 
 		control._removeUnmounted();
-	});
+	}, null);
 
 	_formControl.current.formState = useMemo(
 		() => getProxyFormState(formState, control),

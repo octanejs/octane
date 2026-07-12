@@ -1975,7 +1975,7 @@ export const useLayoutEffect = useEffect;
 export const useInsertionEffect = useEffect;
 export function useImperativeHandle(): void {}
 
-export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[] | symbol): T {
+export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[] | null | symbol): T {
 	// deps may be a real array, omitted, or (per the trailing-slot ABI) a symbol.
 	const d = Array.isArray(deps) ? deps : [];
 	return compute.apply(null, d);

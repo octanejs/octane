@@ -72,7 +72,7 @@
 > (DismissableLayer/FocusScope/Presence `setNode`) → infinite loop. Ported the MODERN
 > react-slot instead (memoized `useComposedRefs`), and `Primitive` now renders `Slot` as
 > a component (own hook scope) rather than calling it inline. Also: octane's `useEffect`
-> with NO deps (run-every-render) is exercised by Collection's ItemSlot registration.
+> with explicit `null` deps (run-every-render) is exercised by Collection's ItemSlot registration.
 >
 > **AlertDialog + RovingFocusGroup + Toggle/ToggleGroup/Tabs (2026-07-02).** AlertDialog
 > is the faithful thin-over-Dialog port (always modal, `role=alertdialog`, outside

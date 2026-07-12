@@ -10,7 +10,7 @@ export function Counter(props) @{
 	if (!props.paused) {
 		useEffect(() => {
 			console.log('count is now', count);
-		}, [count]);
+		}); // the compiler infers [count]
 	}
 
 	<button onClick={() => setCount(count + 1)}>

@@ -31,9 +31,9 @@ export function useLabelled(start: number, label: string) {
 	return { text: label + ':' + c.n, inc: c.inc };
 }
 
-// Exercises useCallback inside a `.ts` custom hook (withSlot path context): a NO-DEPS form
-// must recompute every render (so it closes over the CURRENT value), and a WITH-DEPS form
-// must memoize. The trailing-slot ABI must not leak the slot Symbol into useMemo's deps.
+// Exercises useCallback inside a `.ts` custom hook (withSlot path context): an
+// omitted list is compiler-inferred as `[label]`, while the explicit form is
+// preserved. The trailing-slot ABI must not leak the slot Symbol into useMemo's deps.
 export function useLabelCallbacks(label: string) {
 	const noDeps = useCallback(() => 'nd:' + label);
 	const withDeps = useCallback(() => 'wd:' + label, [label]);

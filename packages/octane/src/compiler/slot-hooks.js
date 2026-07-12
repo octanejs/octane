@@ -15,6 +15,7 @@
 
 import { parseModule } from '@tsrx/core';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
+import { analyzeHookDependencies } from './hook-deps.js';
 
 // Build local-name → imported-name for hooks imported from 'octane' (handles
 // `import { useState as s }`). Namespace imports (`import * as o`) are ignored —
@@ -152,7 +153,20 @@ function walk(node, fnName, st) {
 				// compile.js hookSlotHash for the full rationale).
 				st.decls.push(`const ${sym} = Symbol(${JSON.stringify(`${st.hash}#${id}`)});`);
 			}
-			if (node.arguments.length === 0) {
+			const inferred = st.inferred.get(node);
+			if (inferred !== undefined) {
+				// The dependency callback is already the final user argument. Insert
+				// both the generated array and slot in one edit so equal-position edit
+				// ordering cannot reverse them. Dependency nodes retain original source
+				// offsets, preserving arbitrary TS syntax byte-for-byte.
+				const deps = inferred.dependencies
+					.map((dependency) => st.source.slice(dependency.node.start, dependency.node.end))
+					.join(', ');
+				st.edits.push({
+					pos: node.arguments[node.arguments.length - 1].end,
+					text: `, [${deps}], ${sym}`,
+				});
+			} else if (node.arguments.length === 0) {
 				// `useId()` → `useId(_h$N)` (insert before the closing paren).
 				st.edits.push({ pos: node.end - 1, text: sym });
 			} else {
@@ -209,6 +223,10 @@ export function slotHooks(source, id, options) {
 	const st = {
 		locals,
 		source,
+		inferred: analyzeHookDependencies(ast, {
+			filename: id,
+			onlyImported: true,
+		}),
 		getterCalls: collectStateGetterCalls(ast, locals),
 		getterHelpers: new Map(),
 		filename: id,

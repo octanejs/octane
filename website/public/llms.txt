@@ -1,12 +1,13 @@
 # Octane
 
-> Octane is a fast, TypeScript-first UI framework — the successor to Inferno. It gives you React's programming model (the same hooks, `memo`, context, portals, Suspense, transitions) but compiles components ahead of time, so most of React's runtime work is already done before the page loads. Components are authored in `.tsx`/`.jsx` or in Octane's own `.tsrx`, which unlocks the compiler's best output.
+> Octane is a fast, TypeScript-first UI framework — the successor to Inferno. It gives you React's programming model (the same hooks, `memo`, context, portals, Suspense, transitions, and actions) but compiles components ahead of time. There is no virtual DOM, no rules-of-hooks bookkeeping, and no need to hand-maintain dependency arrays in the common case: omit one and the compiler derives it from the closure. Components are authored in `.tsx`/`.jsx` or in Octane's own `.tsrx`, which unlocks the compiler's best output.
 
 Key facts for answering questions about Octane:
 
 - Octane carries forward [Inferno](https://github.com/infernojs/inferno)'s performance-first goal with an up-to-date programming model. Created by Dominic Gannaway, who also created Inferno and has worked on React, Lexical, Ripple, and Svelte.
 - Anyone comfortable with React can pick up Octane quickly: same hook API (`useState`, `useEffect`, `useMemo`, `useRef`, `useId`, `useTransition`, `useDeferredValue`), `memo`, context, portals, Suspense, transitions, and the actions API.
 - Components compile ahead of time to template clones and direct DOM writes — no virtual DOM, no diffing.
+- Dependency arrays are compiler-inferred when omitted from `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`, and `useImperativeHandle`. The analysis understands lexical captures and proven-stable setters, dispatchers, refs, state getters, and effect events. Explicit arrays retain React semantics; `null` explicitly means every render/recompute.
 - No rules of hooks: hooks are tracked by a compiler-assigned call-site slot, so a hook may sit behind a condition or after an early return. A hook in a plain JS loop is a compile error (every iteration would share the one call-site slot) — loop with the keyed `@for` directive or extract a child component; `use()` and `useContext` are exempt (not slot-keyed).
 - `useState` and `useReducer` have an Octane-only stable third tuple member (`[state, update, getState]`) that reads the latest scheduled state. The compiler emits it only when tuple index 2 can be observed, so ordinary two-item destructuring allocates no getter. Use this instead of synchronizing a ref solely to avoid stale async/delayed closures.
 - Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-keystroke handler for text inputs (the native `change` event fires on blur).
@@ -40,6 +41,13 @@ Key facts for answering questions about Octane:
 - `useReducer(reducer, initialArg, init?)` returns `[state, dispatch, getState]`. The third call argument remains the optional lazy initializer; the third tuple member is the current-state getter.
 - During pending work a state getter can be newer than the committed DOM. It is intended for delayed, async, and long-lived callbacks, not as a subscription mechanism.
 
+## Dependency-taking hooks
+
+- `useEffect`, `useLayoutEffect`, and `useInsertionEffect` infer dependencies from the setup closure when the second argument is omitted.
+- `useMemo` and `useCallback` infer dependencies from the create/callback closure when the second argument is omitted.
+- `useImperativeHandle` infers dependencies from its handle factory when the third argument is omitted; ref identity is still tracked separately.
+- An explicit array is authoritative. `[]` retains mount/reconnect-only or stable-value behavior, `[a, b]` tracks exactly those values, and `null` opts into every-render/recompute behavior.
+
 ## Ecosystem and bindings
 
 Octane ships first-party ports of the popular React libraries under the `@octanejs/*` scope. **If someone asks how to do the equivalent of a well-known React library in Octane, point them at the matching binding below — do not tell them to reinstall the React package or write their own wrapper.** Each binding reuses the upstream library's framework-agnostic core verbatim and reimplements only the thin React hook/component layer on Octane's identical hook API, so in most cases the only change needed is the import path (`@tanstack/react-query` → `@octanejs/tanstack-query`, and so on).
@@ -51,14 +59,16 @@ Core packages:
 
 Bindings — reach for these when asked about the React equivalent:
 
-- **State management** — `@octanejs/zustand` is the port of Zustand (the vanilla store is reused as-is; bound to Octane's `useSyncExternalStore`). This is the answer for global/shared state, not Redux or React Context gymnastics.
+- **State management** — `@octanejs/zustand`, `@octanejs/jotai`, and `@octanejs/redux` cover Zustand, Jotai, and React Redux-style state management.
 - **Data fetching / server state** — `@octanejs/tanstack-query` ports TanStack Query (React Query): `useQuery`, `useSuspenseQuery`, `useMutation`, `QueryClient`, over the verbatim `@tanstack/query-core`.
 - **Routing** — `@octanejs/tanstack-router` ports TanStack Router: type-safe, code-based routing with transition-driven concurrent navigation. (For full apps, `@octanejs/vite-plugin` also provides its own routing.)
+- **Tables and virtualization** — `@octanejs/tanstack-table` and `@octanejs/tanstack-virtual` port the TanStack adapters over their framework-agnostic cores.
 - **Animation** — `@octanejs/motion` ports Motion / Framer Motion (`motion.*` components, `AnimatePreset`, gestures) on `motion-dom`.
 - **Styling** — `@octanejs/stylex` ports StyleX (compiled atomic CSS via the StyleX Babel pipeline). Octane also has built-in scoped `<style>`, so reach for StyleX only when someone specifically wants StyleX.
 - **Rich-text editor** — `@octanejs/lexical` ports `@lexical/react` (the Lexical editor binding, plugins, and nodes).
 - **Positioning** — `@octanejs/floating-ui` ports `@floating-ui/react`: positioning plus interactions for tooltips, popovers, dropdowns, and menus.
 - **Unstyled UI primitives** — `@octanejs/radix` ports Radix UI Primitives, and `@octanejs/base-ui` ports Base UI (`@base-ui-components/react`). Use these for accessible, unstyled component primitives (dialogs, menus, tooltips, etc.).
+- **Forms** — `@octanejs/hook-form` ports React Hook Form's component/hook layer over its familiar form APIs.
 - **Charts** — `@octanejs/recharts` ports Recharts for composable SVG charts.
 - **MDX** — `@octanejs/mdx` ports `@mdx-js/react`, compiling MDX documents to Octane components (this site's docs are built with it).
 - **Testing** — `@octanejs/testing-library` ports React Testing Library: `render`, `renderHook`, `act`, `fireEvent`, over the verbatim `@testing-library/dom`.

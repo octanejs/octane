@@ -18,7 +18,7 @@ function BailChild(props) @{
 
 // Per ReactHooks-test.internal.js "bails out in the render phase if all of the
 // state is the same": setting both counters to their current values must not
-// re-render the child, re-fire the (deps-less) layout effect, or touch the DOM.
+// re-render the child, re-fire the every-render layout effect, or touch the DOM.
 export function BailParent(props) @{
 	const [c1, setC1] = useState(0);
 	const [c2, setC2] = useState(0);
@@ -27,7 +27,7 @@ export function BailParent(props) @{
 	props.log('Parent: ' + c1 + ', ' + c2);
 	useLayoutEffect(() => {
 		props.log('Effect');
-	});
+	}, null);
 	<div id="parent">
 		<BailChild text={c1 + ', ' + c2} log={props.log} />
 	</div>

@@ -10,32 +10,39 @@ import { HOME_SUMMARY } from '../content/benchmarks.ts';
 
 const FEATURES = [
 	{
-		title: 'Compiled templates',
-		body: 'Components compile ahead of time to template clones and direct DOM ' +
-			'writes — no virtual DOM, no diffing. The compiler even removes suspense ' +
-			'waterfalls, proving which use() fetches are independent and starting ' +
-			'them together.',
+		eyebrow: 'Compiler-owned reactivity',
+		title: 'Hooks without the homework',
+		body: 'Write the closure and move on. Octane infers dependencies for effects, ' +
+			'memos, callbacks, and imperative handles; hook call sites stay safe behind ' +
+			'conditions and early returns. The no-bookkeeping DX people reach for ' +
+			'signals to get, with the hooks model you already know.',
+		code: 'useEffect(() => sync(room.id))',
 	},
 	{
-		title: 'Native events',
-		body: 'Real, delegated DOM events instead of a synthetic layer. onClick is a ' +
-			'click. currentTarget, capture, and propagation behave exactly like the ' +
-			'platform.',
+		eyebrow: 'Async by construction',
+		title: 'Suspense without waterfalls',
+		body: 'Independent use() resources start together instead of serially ' +
+			'suspending through the tree. Descendant fetch plans warm early, and ' +
+			'streaming SSR flushes each ready boundary without waiting for the slowest one.',
+		code: 'const user = use(fetchUser(id))',
 	},
 	{
-		title: 'First-class TSRX',
-		body: 'Author components in TSRX — the successor to JSX. ' +
-			'Template control flow (@if, @for, @try), scoped styles, and hooks ' +
-			'co-located in one file, compiled to Octane’s fastest output. Plain ' +
-			'.tsx works too — mix them freely.',
+		eyebrow: 'Compiled rendering',
+		title: 'No virtual DOM. No diff tax.',
+		body: 'TSRX lowers templates to clones and direct DOM writes, while keyed @for ' +
+			'blocks compile to a dedicated minimal-move path. Standard .tsx works too, ' +
+			'so optimization is a per-component choice rather than a rewrite.',
+		code: '@for (const item of items; key item.id)',
 		href: 'https://tsrx.dev',
 		linkLabel: 'tsrx.dev',
 	},
 	{
-		title: 'Drop-in React model',
-		body: 'The same hooks, memo, context, portals, Suspense, transitions, and ' +
-			'actions API. Ports of zustand, TanStack Query & Router, Radix, Base UI, ' +
-			'Recharts, Lexical and more work by changing the import.',
+		eyebrow: 'React knowledge, upgraded',
+		title: 'Change the import. Keep the model.',
+		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms, ' +
+			'and Suspense behave the way you expect. Native events and refs-as-props ' +
+			'remove legacy layers, while 17 first-party bindings bring the ecosystem.',
+		code: 'import { useQuery } from \'@octanejs/tanstack-query\'',
 	},
 ];
 
@@ -43,6 +50,7 @@ export function Home() @{
 	<div class="home">
 		<section class="hero">
 			<div class="hero-copy">
+				<p class="hero-kicker">Compiler-first UI for TypeScript</p>
 				<h1 class="hero-title">
 					{'React’s programming model, '}
 					<span class="hero-accent">compiled</span>
@@ -55,9 +63,10 @@ export function Home() @{
 						target="_blank"
 						rel="noreferrer"
 					>{'Inferno'}</a>
-					{', carrying its performance-first goal forward: the hooks, Suspense and ' +
-						'actions API you already know, compiled ahead of time. No virtual DOM. ' +
-						'No rules of hooks.'}
+					{', carrying its performance-first goal forward: React’s hooks, Suspense ' +
+						'and actions, compiled ahead of time. No virtual DOM. No rules of hooks. ' +
+						'No hand-maintained dependency arrays — the compiler tracks closure ' +
+						'captures for you.'}
 				</p>
 				<div class="hero-actions">
 					<Link to="/docs/quick-start" class="btn-primary">Get started</Link>
@@ -78,26 +87,35 @@ export function Home() @{
 		<section class="features">
 			@for (const feature of FEATURES; key feature.title) {
 				<article class="card">
+					<p class="card-eyebrow">
+						{feature.eyebrow as string}
+					</p>
 					<h3 class="card-title">
 						{feature.title as string}
 					</h3>
 					<p class="card-body">
 						{feature.body as string}
 					</p>
-					@if (feature.href) {
-						<a class="card-link" href={feature.href} target="_blank" rel="noreferrer">
-							{(feature.linkLabel ?? feature.href) + ' →'}
-						</a>
-					}
+					<div class="card-bottom">
+						<code class="card-code">
+							{feature.code as string}
+						</code>
+						@if (feature.href) {
+							<a class="card-link" href={feature.href} target="_blank" rel="noreferrer">
+								{(feature.linkLabel ?? feature.href) + ' →'}
+							</a>
+						}
+					</div>
 				</article>
 			}
 		</section>
 
 		<section class="proven">
 			<div class="proven-stat">
-				<span class="proven-number">2,200+</span>
+				<span class="proven-number">6,000+</span>
 				<span class="proven-label">
-					{'conformance tests ported from facebook/react — '}
+					{'tests across the runtime, compiler, SSR and bindings — including 2,200+ ' +
+						'React conformance cases; '}
 					<Link to="/docs/differences-from-react">see what diverges, on purpose</Link>
 				</span>
 			</div>
@@ -108,7 +126,7 @@ export function Home() @{
 				</span>
 			</div>
 			<div class="proven-stat">
-				<span class="proven-number">12</span>
+				<span class="proven-number">17</span>
 				<span class="proven-label">
 					{'ecosystem ports — Zustand, TanStack Query & Router, Radix, Base UI, '}
 					<Link to="/docs/bindings">Recharts and more</Link>
@@ -169,6 +187,14 @@ export function Home() @{
 			}
 			.hero-accent {
 				color: #ff415a;
+			}
+			.hero-kicker {
+				color: #ff657a;
+				font-size: 0.75rem;
+				font-weight: 800;
+				letter-spacing: 0.14em;
+				text-transform: uppercase;
+				margin: 0 0 0.85rem;
 			}
 			.hero-sub {
 				color: #99a1b3;
@@ -275,14 +301,43 @@ export function Home() @{
 				}
 			}
 			.card {
-				background: #2b3138;
-				border: 1px solid rgba(255, 255, 255, 0.06);
+				position: relative;
+				display: flex;
+				flex-direction: column;
+				min-height: 20rem;
+				background: linear-gradient(145deg, rgba(255, 65, 90, 0.055), transparent 42%), #2b3138;
+				border: 1px solid rgba(255, 255, 255, 0.08);
 				border-radius: 1rem;
 				padding: 1.5rem;
+				overflow: hidden;
+				transition:
+					transform 0.18s ease,
+					border-color 0.18s ease,
+					box-shadow 0.18s ease;
+			}
+			.card::before {
+				content: '';
+				position: absolute;
+				inset: 0 0 auto;
+				height: 2px;
+				background: linear-gradient(90deg, #ff415a, #ff8a78 55%, transparent);
+			}
+			.card:hover {
+				transform: translateY(-3px);
+				border-color: rgba(255, 101, 122, 0.3);
+				box-shadow: 0 16px 30px rgba(0, 0, 0, 0.18);
+			}
+			.card-eyebrow {
+				margin: 0 0 0.85rem;
+				color: #ff657a;
+				font-size: 0.68rem;
+				font-weight: 800;
+				letter-spacing: 0.11em;
+				text-transform: uppercase;
 			}
 			.card-title {
-				margin: 0 0 0.5rem;
-				font-size: 1.05rem;
+				margin: 0 0 0.75rem;
+				font-size: 1.2rem;
 				letter-spacing: -0.01em;
 			}
 			.card-body {
@@ -290,9 +345,30 @@ export function Home() @{
 				color: #99a1b3;
 				font-size: 0.925rem;
 			}
+			.card-bottom {
+				display: flex;
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 0.65rem;
+				margin-top: auto;
+				padding-top: 1.25rem;
+				width: 100%;
+			}
+			.card-code {
+				display: block;
+				box-sizing: border-box;
+				width: 100%;
+				padding: 0.65rem 0.75rem;
+				background: rgba(15, 17, 21, 0.72);
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				border-radius: 0.55rem;
+				color: #f4eee8;
+				font-size: 0.72rem;
+				line-height: 1.45;
+				overflow-wrap: anywhere;
+			}
 			.card-link {
 				display: inline-block;
-				margin-top: 0.75rem;
 				color: #ff5d72;
 				font-weight: 600;
 				font-size: 0.9rem;

@@ -25,21 +25,20 @@ export function CleanupLifecycle(props) @{
 }
 
 // ---------------------------------------------------------------------------
-// #2 — omitted deps: useEffect(fn) / useMemo(fn) with NO deps array. The
-// compiler appends the slot last, so these arrive as (fn, slot); the runtime
-// must treat the missing deps as "run/recompute every commit", not throw.
+// #2 — explicit every-render deps: `null` opts out of compiler inference and
+// asks the runtime to run/recompute on every commit.
 // ---------------------------------------------------------------------------
 export function NoDeps(props) @{
 	const [n, setN] = useState(0);
-	// No deps array — runs on every commit.
+	// `null` — runs on every commit.
 	useEffect(() => {
 		props.log('effect:' + n);
-	});
-	// No deps array — recomputes every render.
+	}, null);
+	// `null` — recomputes every render.
 	const m = useMemo(() => {
 		props.log('memo');
 		return n * 10;
-	});
+	}, null);
 	<button id="bump" onClick={() => setN(n + 1)}>
 		{m as string}
 	</button>
