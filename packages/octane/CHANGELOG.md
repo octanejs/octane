@@ -1,5 +1,20 @@
 # octane
 
+## 0.1.5
+
+### Patch Changes
+
+- 940ae5a: Add compiler-driven third-tuple current-state getters to `useState` and
+  `useReducer`. Getter-free destructures retain the existing runtime path, while
+  observed or escaped tuples receive a stable thunk that reads the latest state.
+- 6fceaf3: Infer dependencies for effect-family hooks, `useMemo`, `useCallback`, and
+  `useImperativeHandle` when their dependency list is omitted. Explicit arrays
+  retain React semantics, while `null` opts into running or recomputing after
+  every render.
+- 62da8cc: Fix: a compiled `{expr}` child hole skipped its update entirely when the value was identity-unchanged, which stranded context consumers below an identity-stable `{children}` passthrough under a re-rendering Provider (e.g. a router forwarding stable children through location providers on every navigation). Unchanged renderables (objects/functions) now still dispatch to childSlot — whose bail path lazily refreshes changed-context consumers — while unchanged primitives keep the inline skip.
+- e737057: Propagate non-bubbling toggle, dialog, media, and resource events through logical
+  ancestors, matching React while preserving native Event objects.
+
 ## 0.1.4
 
 ### Patch Changes
