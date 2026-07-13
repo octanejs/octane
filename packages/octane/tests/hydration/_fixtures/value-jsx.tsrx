@@ -39,3 +39,27 @@ export function MapList(props) @{
 		</li>,
 	)}</ul>
 }
+
+// A return-based nested component with empty output. Its server component
+// range is adjacent (`<!--[--><!--]-->`) and hydration must not insert a
+// client-only empty anchor inside it.
+export const ReturnNullChild = () => null;
+
+export function ReturnNullParent() @{
+	<section id="empty-return">
+		<ReturnNullChild />
+		<span id="after-empty">after</span>
+	</section>
+}
+
+function ReturnMaybeChild(props) {
+	if (!props.show) return null;
+	return <em id="return-filled">filled</em>;
+}
+
+export function ReturnMaybeParent(props) @{
+	<section id="maybe-return">
+		<ReturnMaybeChild show={props.show} />
+		<span id="after-maybe">after</span>
+	</section>
+}

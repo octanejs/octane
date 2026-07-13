@@ -1,0 +1,66 @@
+{
+  "name": "@octanejs/dnd-kit",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "dnd-kit bindings for the octane renderer — a full port of the modern @dnd-kit/react adapter over the framework-agnostic @dnd-kit/dom core.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/dnd-kit"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./sortable": "./src/sortable/index.ts",
+    "./utilities": "./src/utilities/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project dnd-kit",
+    "test:coverage": "vitest run --root ../.. --project dnd-kit --coverage.enabled --coverage.provider=v8 --coverage.include=packages/dnd-kit/src/** --coverage.reporter=text --coverage.thresholds.lines=100 --coverage.thresholds.statements=98 --coverage.thresholds.functions=98 --coverage.thresholds.branches=86"
+  },
+  "dependencies": {
+    "@dnd-kit/abstract": "catalog:default",
+    "@dnd-kit/collision": "catalog:default",
+    "@dnd-kit/dom": "catalog:default",
+    "@dnd-kit/state": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@dnd-kit/helpers": "catalog:default",
+    "@dnd-kit/react": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "@vitest/coverage-v8": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

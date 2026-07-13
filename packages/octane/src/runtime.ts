@@ -2588,6 +2588,42 @@ export function renderBlock(block: Block): void {
 					hydrating && KEYED_ELEMENT_DESCRIPTORS.has(d),
 				);
 			} else {
+				// A nested return-based component whose server output is EMPTY owns an
+				// adjacent `<!--[--><!--]-->` range with no inner child range to adopt.
+				// Borrow that component range for the return slot instead of letting
+				// childSlot mint an empty `<!---->` anchor during hydration. The return
+				// slot is the block's entire output, so it can safely reconcile future
+				// text/component values between the borrowed markers while the block
+				// remains their owner. This keeps hydration byte-preserving for `return
+				// null` / `false` / `''` components (including memo wrappers).
+				if (
+					hydrating &&
+					block.slots[0] === undefined &&
+					block.startMarker !== null &&
+					block.endMarker !== null &&
+					block.startMarker !== block.endMarker &&
+					block.startMarker.nodeType === 8 &&
+					block.endMarker.nodeType === 8 &&
+					block.startMarker.nextSibling === block.endMarker
+				) {
+					const borrowed: ChildSlot = {
+						__kind: 'childSlot',
+						start: block.startMarker as Comment,
+						end: block.endMarker as Comment,
+						ownerHost: null,
+						borrowed: true,
+						compactable: false,
+						block: null,
+						text: null,
+						currentComp: null,
+						currentIsBodyFn: false,
+						forSlot: null,
+						hostNode: null,
+						portal: null,
+					};
+					block.slots[0] = borrowed;
+					registerSlot(block, borrowed);
+				}
 				childSlot(block, 0, block.parentNode, out, block.endMarker);
 			}
 		}

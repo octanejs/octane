@@ -4,7 +4,13 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
-import { HostProp, FragProp, MapList } from './_fixtures/value-jsx.tsrx';
+import {
+	HostProp,
+	FragProp,
+	MapList,
+	ReturnMaybeParent,
+	ReturnNullParent,
+} from './_fixtures/value-jsx.tsrx';
 
 // Value-position JSX under SSR: React-style render-prop children that return JSX
 // (`<Comp>{(data) => <span/>}</Comp>`) and `{xs.map(x => <li/>)}`. The compiler
@@ -92,6 +98,39 @@ describe('value-position JSX — hydration', () => {
 		expect(container.querySelector('#rp')).toBe(rp);
 		expect(container.querySelector('#rp b')!.textContent).toBe('DATA');
 		expect(container.querySelector('#rp i')!.textContent).toBe('!');
+		root.unmount();
+	});
+
+	it('keeps a nested return-null component range byte-identical', () => {
+		const { html } = ServerRT.renderToString(server.ReturnNullParent, {});
+		container.innerHTML = html;
+		const section = container.querySelector('#empty-return');
+		const sibling = container.querySelector('#after-empty');
+		const root = hydrateRoot(container, ReturnNullParent, {});
+		flushSync(() => {});
+		expect(container.innerHTML).toBe(html);
+		expect(container.querySelector('#empty-return')).toBe(section);
+		expect(container.querySelector('#after-empty')).toBe(sibling);
+		root.unmount();
+	});
+
+	it('fills and clears a borrowed empty return range after hydration', () => {
+		const { html } = ServerRT.renderToString(server.ReturnMaybeParent, { show: false });
+		container.innerHTML = html;
+		const sibling = container.querySelector('#after-maybe');
+		const root = hydrateRoot(container, ReturnMaybeParent, { show: false });
+		flushSync(() => {});
+		expect(container.innerHTML).toBe(html);
+
+		root.render(ReturnMaybeParent, { show: true });
+		flushSync(() => {});
+		expect(container.querySelector('#return-filled')?.textContent).toBe('filled');
+		expect(container.querySelector('#after-maybe')).toBe(sibling);
+
+		root.render(ReturnMaybeParent, { show: false });
+		flushSync(() => {});
+		expect(container.querySelector('#return-filled')).toBeNull();
+		expect(container.querySelector('#after-maybe')).toBe(sibling);
 		root.unmount();
 	});
 });
