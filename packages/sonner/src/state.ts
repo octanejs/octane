@@ -17,6 +17,9 @@ import type {
 
 let toastsCounter = 1;
 
+const getToastId = (id?: number | string): number | string =>
+	typeof id === 'number' || (typeof id === 'string' && id.length > 0) ? id : toastsCounter++;
+
 type Title = (() => ToastContent) | ToastContent;
 type PublishedToast = ToastT | ToastToDismiss;
 type PromiseToastResult<ToastData> =
@@ -65,10 +68,7 @@ class Observer {
 		},
 	): number | string => {
 		const { message, ...rest } = data;
-		const id =
-			typeof data.id === 'number' || (typeof data.id === 'string' && data.id.length > 0)
-				? data.id
-				: toastsCounter++;
+		const id = getToastId(data.id);
 		const alreadyExists = this.toasts.find((toast) => toast.id === id);
 		const dismissible = data.dismissible === undefined ? true : data.dismissible;
 
@@ -101,9 +101,11 @@ class Observer {
 	dismiss = (id?: number | string): number | string => {
 		if (id !== undefined) {
 			this.dismissedToasts.add(id);
-			requestAnimationFrame(() => {
+			const publishDismiss = (): void => {
 				this.subscribers.forEach((subscriber) => subscriber({ id, dismiss: true }));
-			});
+			};
+			if (typeof requestAnimationFrame === 'function') requestAnimationFrame(publishDismiss);
+			else publishDismiss();
 		} else {
 			this.toasts.forEach((toast) => {
 				this.dismissedToasts.add(toast.id);
@@ -245,7 +247,7 @@ class Observer {
 	};
 
 	custom = (jsx: (id: number | string) => ToastElement, data?: ExternalToast): number | string => {
-		const id = data?.id || toastsCounter++;
+		const id = getToastId(data?.id);
 		this.create({ jsx: jsx(id), ...data, id });
 		return id;
 	};
@@ -257,9 +259,7 @@ class Observer {
 export const ToastState = new Observer();
 
 const toastFunction = (message: Title, data?: ExternalToast): number | string => {
-	const id = data?.id || toastsCounter++;
-	ToastState.addToast({ title: message, ...data, id });
-	return id;
+	return ToastState.create({ ...data, message });
 };
 
 const isHttpResponse = (data: any): data is Response =>

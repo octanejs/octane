@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'octane/server';
+import { toast } from '@octanejs/sonner';
 import { ServerToaster } from './_fixtures/server.tsrx';
 
 describe('@octanejs/sonner — server rendering', () => {
@@ -9,5 +10,16 @@ describe('@octanejs/sonner — server rendering', () => {
 		expect(html).toContain('aria-label="Notifications alt+T"');
 		expect(html).toContain('aria-live="polite"');
 		expect(html).not.toContain('data-sonner-toaster');
+	});
+
+	it('dismisses a targeted toast without requestAnimationFrame', () => {
+		vi.stubGlobal('requestAnimationFrame', undefined);
+		try {
+			const id = toast('Server toast', { id: 'server-dismiss' });
+			expect(() => toast.dismiss(id)).not.toThrow();
+			expect(toast.getToasts().some((item) => item.id === id)).toBe(false);
+		} finally {
+			vi.unstubAllGlobals();
+		}
 	});
 });

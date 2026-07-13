@@ -192,6 +192,43 @@ describe('@octanejs/sonner — Toaster', () => {
 		root.unmount();
 	});
 
+	it('uses the front toast height from each position list', async () => {
+		vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+			const height = this.textContent?.includes('Top')
+				? 70
+				: this.textContent?.includes('Bottom')
+					? 30
+					: 0;
+			return {
+				x: 0,
+				y: 0,
+				width: 0,
+				height,
+				top: 0,
+				right: 0,
+				bottom: height,
+				left: 0,
+				toJSON: () => ({}),
+			};
+		});
+		const root = mount(ToasterApp);
+		await settle();
+		toast('Bottom', { id: 'bottom-height', duration: Infinity });
+		toast('Top', {
+			id: 'top-height',
+			position: 'top-left',
+			duration: Infinity,
+		});
+		await settle();
+
+		const lists = [...root.container.querySelectorAll('[data-sonner-toaster]')] as HTMLElement[];
+		const bottom = lists.find((list) => list.textContent?.includes('Bottom'))!;
+		const top = lists.find((list) => list.textContent?.includes('Top'))!;
+		expect(bottom.style.getPropertyValue('--front-toast-height')).toBe('30px');
+		expect(top.style.getPropertyValue('--front-toast-height')).toBe('70px');
+		root.unmount();
+	});
+
 	it('runs promise loading, extended success, finally and unwrap semantics', async () => {
 		const root = mount(ToasterApp);
 		await settle();

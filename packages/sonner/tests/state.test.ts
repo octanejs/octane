@@ -60,6 +60,22 @@ describe('@octanejs/sonner — imperative state', () => {
 		expect(published).toMatchObject({ id });
 	});
 
+	it('updates callable toasts in place when their ids match', () => {
+		const id = 'callable-update';
+		toast('Before', { id, duration: Infinity });
+		toast('After', { id, duration: Infinity });
+
+		const matching = toast.getHistory().filter((item) => item.id === id);
+		expect(matching).toHaveLength(1);
+		expect(matching[0]).toMatchObject({ id, title: 'After' });
+	});
+
+	it('preserves zero as an explicit callable and custom toast id', () => {
+		expect(toast('Zero', { id: 0, duration: Infinity })).toBe(0);
+		expect(toast.custom(() => ({}) as any, { id: 0, duration: Infinity })).toBe(0);
+		expect(toast.getHistory().filter((item) => item.id === 0)).toHaveLength(1);
+	});
+
 	it('removes every dismissed toast from the active toast collection', () => {
 		const first = toast.success('First', { id: 'dismiss-all-first', duration: Infinity });
 		const second = toast.error('Second', { id: 'dismiss-all-second', duration: Infinity });

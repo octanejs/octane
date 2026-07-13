@@ -619,6 +619,13 @@ export function Toaster(props: ToasterProps) {
 	const hotkeyLabel = hotkey.join('+').replace(/Key/g, '').replace(/Digit/g, '');
 	const lastFocusedElementRef = useRef<HTMLElement | null>(null);
 	const isFocusWithinRef = useRef(false);
+	const getFrontToastHeight = (currentPosition: Position, positionIndex: number): number => {
+		const frontToast = filteredToasts.find(
+			(toastItem) => !toastItem.position && positionIndex === 0 ||
+				toastItem.position === currentPosition,
+		);
+		return heights.find((height) => height.toastId === frontToast?.id)?.height ?? 0;
+	};
 
 	const removeToast = useCallback((toastToRemove: ToastT) => {
 		setToasts((current) => {
@@ -739,7 +746,7 @@ export function Toaster(props: ToasterProps) {
 					data-y-position={currentPosition.split('-')[0]}
 					data-x-position={currentPosition.split('-')[1]}
 					style={{
-						'--front-toast-height': `${heights[0]?.height || 0}px`,
+						'--front-toast-height': `${getFrontToastHeight(currentPosition, positionIndex)}px`,
 						'--width': `${TOAST_WIDTH}px`,
 						'--gap': `${gap}px`,
 						...style,
