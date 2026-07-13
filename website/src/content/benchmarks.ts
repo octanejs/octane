@@ -408,7 +408,7 @@ export const HOME_SUMMARY: BenchCard = (() => {
 		id: 'home-summary',
 		title: 'Every suite, normalized',
 		description:
-			'Geometric mean of per-operation benchmark scores, relative to Octane (.tsrx) = 1× — lower is better. Bars shorter than Octane’s mean the other framework wins that suite. Absolute numbers and per-operation charts are on the benchmarks page.',
+			'Geometric mean of per-operation benchmark scores, relative to Octane. Lower is better.',
 		series: SUMMARY_SERIES,
 		rows,
 		iterations: 0,
