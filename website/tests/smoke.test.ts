@@ -6,7 +6,7 @@ import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
 import { docs, defaultDoc } from '../src/content/docs.ts';
-import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../src/content/benchmarks.ts';
+import { FRAMEWORK_CARDS, HOME_SUMMARY, OCTANE_CARDS } from '../src/content/benchmarks.ts';
 
 afterEach(cleanup);
 
@@ -30,6 +30,28 @@ async function renderRoute(url: string) {
 }
 
 describe('website routes', () => {
+	it('publishes Preact and Svelte measurements for every supported comparison', () => {
+		for (const card of FRAMEWORK_CARDS) {
+			const keys = card.series.map((series) => series.key);
+			expect(keys, card.id).toContain('preact');
+			if (card.id === 'streaming-ssr') {
+				expect(keys, card.id).not.toContain('svelte');
+			} else {
+				expect(keys, card.id).toContain('svelte');
+			}
+
+			for (const row of card.rows) {
+				expect(typeof row.preact, `${card.id}/${row.op}/preact`).toBe('number');
+				if (card.id !== 'streaming-ssr') {
+					expect(typeof row.svelte, `${card.id}/${row.op}/svelte`).toBe('number');
+				}
+			}
+		}
+
+		const summaryKeys = HOME_SUMMARY.series.map((series) => series.key);
+		expect(summaryKeys).toEqual(expect.arrayContaining(['preact', 'svelte']));
+	});
+
 	it('/ renders the home experience and primary navigation', async () => {
 		const { container } = await renderRoute('/');
 
