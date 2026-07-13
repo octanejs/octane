@@ -73,6 +73,15 @@ describe('built SSR handler', () => {
 		expect(classCount(html, 'shiki')).toBeGreaterThan(0);
 	});
 
+	it('server-renders the Core APIs guide, TOC, and live-example shell', async () => {
+		const { response, html } = await get('/docs/core-apis');
+		expect(response.status).toBe(200);
+		expect(classCount(html, 'doc-hero')).toBeGreaterThan(0);
+		expect(classCount(html, 'on-this-page')).toBeGreaterThan(0);
+		expect(classCount(html, 'demo')).toBeGreaterThan(0);
+		expect(classCount(html, 'shiki')).toBeGreaterThan(0);
+	});
+
 	it('server-renders /benchmarks: table data SSRs, charts are client-mounted shells', async () => {
 		const { response, html } = await get('/benchmarks');
 		expect(response.status).toBe(200);

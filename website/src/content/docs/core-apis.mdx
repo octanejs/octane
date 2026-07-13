@@ -2,209 +2,826 @@
 title: Core APIs
 ---
 
-# Core APIs
+import { CoreApiDemo } from '../../components/CoreApiDemo.tsrx';
 
-Octane deliberately keeps the React programming model: components are functions,
-state lives in hooks, context and Suspense compose the tree, and roots mount or
-hydrate it. This page is the practical map of the APIs exported by `octane`,
-`octane/server`, and `octane/static`.
+<div className="doc-hero">
+	<p className="doc-eyebrow">Learn the essentials</p>
+	<h1>Core APIs</h1>
+	<p className="doc-lede">
+		{
+			'Octane lets you build interactive pages from small TypeScript functions called components. This guide introduces the APIs you will use most, starting from zero.'
+		}
+	</p>
+</div>
 
-If you already know React, most names mean the same thing. The Octane-specific
-behavior worth learning is called out where it matters.
+<aside className="doc-callout note">
+	<p className="doc-callout-title">No React experience needed</p>
+	<p>
+		{
+			'If you have used React, many names will look familiar. If you have not, you are in the right place: every idea is explained here in terms of the page you are building. React users can also read '
+		}
+		<a href="/docs/differences-from-react">Differences from React</a>
+		{'.'}
+	</p>
+</aside>
 
-## Roots and rendering
+<h2 id="mental-model">The mental model</h2>
 
-Create a client root and render either a component plus props or a JSX element:
+An Octane app is made from **components**. A component receives information, called
+**props**, and returns the elements that should appear on screen. When its **state**
+changes, Octane runs the component again and updates only the DOM that needs to change.
 
-```ts
-import { createRoot } from 'octane';
-import { App } from './App.tsrx';
+<div
+	className="mental-model"
+	aria-label="Props and state flow through a component to produce the user interface"
+>
+	<div>
+		<span>Inputs</span>
+		<strong>Props + state</strong>
+	</div>
+	<span className="mental-model-arrow" aria-hidden="true">
+		→
+	</span>
+	<div>
+		<span>Your function</span>
+		<strong>Component</strong>
+	</div>
+	<span className="mental-model-arrow" aria-hidden="true">
+		→
+	</span>
+	<div>
+		<span>Output</span>
+		<strong>Visible UI</strong>
+	</div>
+</div>
 
-const root = createRoot(document.getElementById('root')!);
-root.render(App, { title: 'Hello' });
+You do not call a component every time something changes. You describe the output,
+attach event handlers such as `onClick`, and let Octane keep the page in sync.
 
-// Later:
-root.render(App, { title: 'Updated' });
-root.unmount();
-```
+<nav className="topic-grid" aria-label="Core API topics">
+	<a href="#components-and-props">
+		<span className="topic-number">01</span>
+		<strong>Describe a page</strong>
+		<span>Components turn props into UI.</span>
+	</a>
+	<a href="#state-and-events">
+		<span className="topic-number">02</span>
+		<strong>Make it interactive</strong>
+		<span>Events update state and render again.</span>
+	</a>
+	<a href="#context">
+		<span className="topic-number">03</span>
+		<strong>Share information</strong>
+		<span>Context reaches distant children.</span>
+	</a>
+	<a href="#refs-and-effects">
+		<span className="topic-number">04</span>
+		<strong>Use the browser</strong>
+		<span>Refs and effects connect outside Octane.</span>
+	</a>
+	<a href="#async-ui">
+		<span className="topic-number">05</span>
+		<strong>Wait for data</strong>
+		<span>Boundaries make loading and errors visible.</span>
+	</a>
+	<a href="#roots-and-rendering">
+		<span className="topic-number">06</span>
+		<strong>Start the app</strong>
+		<span>A root connects Octane to your HTML.</span>
+	</a>
+</nav>
 
-Use `hydrateRoot(container, App, props)` for server-rendered HTML. The compiled
-client adopts the existing DOM, attaches events and bindings, and returns the
-same `Root` interface.
+<h2 id="components-and-props">Components and props</h2>
 
-- `createRoot` — create an empty client root.
-- `hydrateRoot` — adopt server-rendered markup as a live root.
-- `flushSync` — run an update and synchronously drain renders and layout work.
-- `act` — flush updates and effects in tests.
-
-## Components and composition
-
-A component is any function rendered at a component site. It may return JSX, a
-primitive, an array, or `null`; `.tsrx`'s `@{ ... }` form is shorthand for a
-function body whose final node is returned.
-
-The main composition APIs are:
-
-- `memo(Component, compare?)` — skip a component render when its props compare
-  equal.
-- `lazy(load)` — load a component through Suspense.
-- `Fragment` — group output without a host wrapper.
-- `createPortal(children, target)` — render into another DOM container while
-  preserving the logical event and context tree.
-- `createElement`, `cloneElement`, `isValidElement`, and `Children` — the
-  React-shaped descriptor utilities used by JSX interop and libraries.
-
-Refs are props, including multiple refs:
+A component is a TypeScript function used with a capitalized JSX tag such as
+`<WelcomeCard />`. **Props are its inputs.** They let a parent customize a child
+without the child changing those values.
 
 ```tsrx
-function Field(props) @{
-	<input ref={[props.ref, props.measureRef]} />
+interface WelcomeCardProps {
+	name: string;
+	unread: number;
+}
+
+function WelcomeCard(props: WelcomeCardProps) @{
+	<section class="welcome-card">
+		<h2>
+			{'Hello, ' + props.name}
+		</h2>
+		<p>
+			{'You have ' + props.unread + ' unread messages.'}
+		</p>
+	</section>
+}
+
+export function App() @{
+	<main>
+		<WelcomeCard name="Maya" unread={3} />
+	</main>
 }
 ```
 
-There is no `forwardRef`; accept `ref` like any other prop.
+The `@{ ... }` form means “return the final JSX node.” It is shorthand for a normal
+function body with `return`, so you can use whichever reads more clearly. A component
+can also return text, an array, or `null` when it should render nothing.
 
-## State
-
-### `useState`
-
-```tsrx
-const [count, setCount] = useState(0);
-setCount(1);
-setCount((previous) => previous + 1);
-```
-
-The initial value may be a lazy initializer. The setter accepts a value or a
-functional update and stays stable for the hook's lifetime.
-
-Octane also provides an optional third tuple member, a stable thunk that reads
-the latest state cell:
+Components compose by nesting. The special `children` prop contains whatever was put
+between a component's opening and closing tags:
 
 ```tsrx
-const [draft, setDraft, getDraft] = useState('');
+interface CardProps {
+	children: unknown;
+}
 
-const saveWhenReady = async () => {
-	await waitForConnection();
-	await save(getDraft());
-};
+function Card(props: CardProps) @{
+	<section class="card">{props.children}</section>
+}
+
+export function Profile() @{
+	<Card>
+		<h2>Ada Lovelace</h2>
+		<p>Mathematician and programmer</p>
+	</Card>
+}
 ```
 
-`getDraft()` avoids synchronizing a ref just to escape a stale render closure.
-It reads the latest scheduled value and does not subscribe or trigger a render,
-so during pending work it can be newer than the currently committed DOM.
+Use a fragment (`<>...</>`) when you need to return several siblings without adding
+another DOM element. APIs such as `memo`, `lazy`, and `createPortal` solve more specific
+composition problems and are collected in the [API index](#api-index).
 
-This is compiler-driven: when tuple index 2 cannot be observed, ordinary
-`[state, setState]` destructuring uses the existing two-item runtime path and
-allocates no getter. Escaped or ambiguous tuples conservatively receive the
-complete three-item shape.
+<h2 id="state-and-events">State and events</h2>
 
-### `useReducer`
+Props come from a parent. **State is a component's own memory.** Call `useState` with an
+initial value; it returns the value for this render and a function that schedules the
+next value.
 
 ```tsrx
-const [state, dispatch, getState] = useReducer(reducer, initialArg, init);
+import { useState } from 'octane';
+
+export function Counter() @{
+	const [count, setCount] = useState(0);
+
+	<section>
+		<p>
+			{'Items packed: ' + count}
+		</p>
+		<button onClick={() => setCount((current) => current + 1)}>
+			Add one
+		</button>
+	</section>
+}
 ```
 
-`useReducer` has the same reducer, initial argument, and optional lazy `init`
-call signature as React. Its optional third **tuple member** is the same stable
-latest-state getter as `useState`; the third **call argument** remains the lazy
-initializer.
+Here is that component running for real:
 
-## Effects, refs, and stable functions
+<CoreApiDemo />
 
-- `useEffect(setup, deps?)` — passive work after paint.
-- `useLayoutEffect(setup, deps?)` — synchronous layout work after DOM commit.
-- `useInsertionEffect(setup, deps?)` — insertion-phase work before layout
-  effects.
-- `useRef(initial)` — a stable `{ current }` object.
-- `useImperativeHandle(ref, create, deps?)` — expose an imperative ref value.
-- `useMemo(create, deps?)` and `useCallback(fn, deps?)` — memoized values and
-  functions.
-- `useEffectEvent(fn)` — a stable function that calls the latest implementation
-  without making the surrounding effect reactive to it.
-- `useId()` — an identifier stable across server rendering and hydration.
+The flow is always the same:
 
-For every dependency-taking hook above, omission asks the compiler to infer the
-list from lexical captures. It omits values whose identity is provably stable,
-including setters, dispatchers, refs, state getters, and effect events. Explicit
-arrays remain authoritative; pass `null` to run or recompute after every render.
+1. `useState(0)` gives the first render a count of `0`.
+2. Clicking the button runs its `onClick` function.
+3. `setCount` calculates the next value and asks Octane to render again.
+4. The component sees the new count, and Octane updates the text in the DOM.
 
-Octane keys hooks by compiler-assigned call site, so hooks may appear behind a
-condition or after an early return. Plain JavaScript loops are rejected because
-iterations would share one call-site slot; use a keyed template `@for` or a child
-component instead.
+The value you read during a render is a snapshot. When the next value depends on the
+previous one, the updater form—`setCount(current => current + 1)`—is the safest choice.
+For objects and arrays, create a new value instead of mutating the existing one.
 
-## Context, data, and boundaries
+Text fields use the browser's native `input` event:
 
-Create context with `createContext(defaultValue)`, provide it with
-`<Context.Provider value={value}>`, and read it with `use(Context)` or
-`useContext(Context)`.
+```tsrx
+import { useState } from 'octane';
 
-`use(value)` also unwraps thenables. A pending thenable suspends into the nearest
-`Suspense` or `@try`/`@pending` boundary; a rejection routes to `ErrorBoundary`
-or `@catch`. Independent `use()` calls are parallelized by the compiler by
-default, avoiding serial Suspense waterfalls.
+export function NameField() @{
+	const [name, setName] = useState('');
 
-Boundary components include:
+	<section>
+		<label>
+			Your name
+			<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
+		</label>
+		<p>
+			{name ? 'Hello, ' + name + '!' : 'Start typing above.'}
+		</p>
+	</section>
+}
+```
 
-- `Suspense` — show fallback content while descendants wait.
-- `ErrorBoundary` — component form of the `.tsrx` `@try`/`@catch` behavior.
-- `Activity` — hide and prerender a subtree while suppressing its effects.
-- `ViewTransition` — coordinate browser View Transitions; pair with
-  `addTransitionType` when selecting transition styles.
+<aside className="doc-callout important">
+	<p className="doc-callout-title">Use native event names</p>
+	<p>
+		{'Octane does not add a synthetic event layer. Use '}
+		<code>onInput</code>
+		{' for each keystroke in a text field. Native '}
+		<code>change</code>
+		{' fires when the browser commits the edit, often on blur. Events such as '}
+		<code>onClick</code>
+		{', '}
+		<code>onSubmit</code>
+		{', and '}
+		<code>onFocus</code>
+		{' otherwise work as normal browser events.'}
+	</p>
+</aside>
 
-## Transitions and deferred work
+For state with many related updates, `useReducer(reducer, initialState)` keeps the update
+rules in one function. It supports the same optional third-item latest-state getter as
+`useState`. Most components should begin with `useState` and move to a reducer only when
+that makes the code easier to understand.
 
-- `startTransition(fn)` — mark updates inside `fn` as transition work.
-- `useTransition()` — returns `[isPending, startTransition]` for a component.
-- `useDeferredValue(value)` — keep displaying an earlier value while the new
-  render suspends.
+<details className="deep-dive">
+	<summary>Octane deep dive: state getters and conditional hooks</summary>
+	<div>
+		<p>
+			{'Octane optionally provides a third state tuple item: '}
+			<code>const [value, setValue, getValue] = useState(initial)</code>
+			{'. '}
+			<code>getValue()</code>
+			{
+				' reads the latest scheduled value inside a long-lived callback; it does not subscribe or render. Most components only need the first two items.'
+			}
+		</p>
+		<p>
+			{
+				'Hooks are identified by their compiled call site, so they may appear after an early return or inside a condition. Do not put slot-keyed hooks in a plain JavaScript loop: every iteration would share one call site. The context and Promise readers use() and useContext() are the exceptions. Use a keyed '
+			}
+			<code>@for</code>
+			{' block or extract a child component instead.'}
+		</p>
+	</div>
+</details>
 
-Octane renders synchronously to completion, but transition priority still
-controls the important visible behavior: suspended transition work holds the
-previous UI until the replacement can commit.
+<h2 id="lists-and-conditions">Lists and conditions</h2>
 
-## Stores and actions
+Real pages rarely show the same elements every time. In `.tsrx`, rendered control flow
+uses directives. `@if` chooses a branch and a keyed `@for` keeps each list item's DOM and
+state attached to the right data.
 
-- `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot?)` — subscribe
-  to external stores with SSR support.
-- `useActionState(action, initialState, permalink?)` — action state, dispatch,
-  and pending status.
-- `useFormStatus()` — status for the nearest active form action.
-- `useOptimistic(state, reducer?)` — optimistic state during an action.
-- `requestFormReset(form)` — reset an uncontrolled form after an action.
+```tsrx
+interface Item {
+	id: number;
+	label: string;
+	packed: boolean;
+}
 
-For established ecosystem libraries, prefer the matching
-[`@octanejs/*` binding](/docs/bindings) rather than adapting the React package at
-runtime.
+export function PackingList(props: { items: Item[] }) @{
+	<ul>
+		@for (const item of props.items; key item.id) {
+			<li>
+				{item.label}
+				@if (item.packed) {
+					<span aria-label="packed">✓</span>
+				}
+			</li>
+		} @empty {
+			<li>Your list is empty.</li>
+		}
+	</ul>
+}
+```
 
-## Native events
+The key must be stable for that item—usually an ID from your data. Avoid using the array
+position when items can be inserted, removed, or reordered. `@switch` handles several
+exclusive branches, while `@try` handles loading and errors.
 
-Event props use native delegated DOM events: `onClick`, `onInput`, `onSubmit`,
-and their capture forms. There is no synthetic `onChange`; use `onInput` for
-per-keystroke text updates. Controlled `value` and `checked` behavior still
-matches React.
+<h2 id="context">Sharing data with context</h2>
 
-## Server and static rendering
+Passing props is usually the clearest way to move information. When many distant
+components need the same value—such as a theme, locale, or signed-in user—**context**
+lets a parent provide it to the whole subtree.
 
-Server entry points live under `octane/server`:
+```tsrx
+import { createContext, use, useState } from 'octane';
+
+const Theme = createContext('light');
+
+function ThemeLabel() @{
+	const theme = use(Theme);
+	<p>
+		{'The current theme is ' + theme + '.'}
+	</p>
+}
+
+export function Settings() @{
+	const [theme, setTheme] = useState('light');
+
+	<section>
+		<button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+			Switch theme
+		</button>
+		<Theme.Provider value={theme}>
+			<ThemeLabel />
+		</Theme.Provider>
+	</section>
+}
+```
+
+`createContext('light')` creates the context and its fallback value. A provider makes a
+value available below it. `use(Theme)` reads the closest provider; `useContext(Theme)` is
+an equivalent, context-specific spelling.
+
+Context is not automatically global state. Keep changing data close to the components
+that own it, then lift it to a shared parent or context when several branches truly need
+the same source of truth.
+
+<h2 id="refs-and-effects">Refs and effects</h2>
+
+Most components only need props and state. **Refs** and **effects** are escape hatches for
+things outside Octane's render flow: focusing an input, connecting to a service, starting
+a timer, or integrating a DOM library.
+
+### Refer to a DOM element with `useRef`
+
+A ref is a stable object whose `current` property can hold a DOM element. Changing it
+does not render the component again.
+
+```tsrx
+import { useRef } from 'octane';
+
+export function SearchBox() @{
+	const inputRef = useRef<HTMLInputElement | null>(null);
+
+	<div>
+		<input ref={inputRef} aria-label="Search" />
+		<button onClick={() => inputRef.current?.focus()}>
+			Focus search
+		</button>
+	</div>
+}
+```
+
+Refs are ordinary props in Octane, so your own component can accept `ref` directly.
+There is no `forwardRef` wrapper. A host element can also receive several refs at once,
+for example `ref={[inputRef, measurementRef]}`.
+
+### Synchronize an external system with `useEffect`
+
+An effect runs after Octane commits the DOM. If it starts something that outlives the
+render, return a cleanup function.
+
+```tsrx
+import { useEffect } from 'octane';
+
+export function Article(props: { title: string }) @{
+	useEffect(() => {
+		const previousTitle = document.title;
+		document.title = props.title;
+
+		return () => {
+			document.title = previousTitle;
+		};
+	});
+
+	<h1>{props.title}</h1>
+}
+```
+
+The compiler sees that the effect reads `props.title` and reruns it when that value
+changes. You can still pass an explicit dependency array when you need exact control;
+`[]` means mount and unmount only, while `null` deliberately means every render.
+
+<aside className="doc-callout tip">
+	<p className="doc-callout-title">You might not need an effect</p>
+	<p>
+		{
+			'If a value can be calculated from props or state, calculate it while rendering. If something happens because the user clicked, put it in that event handler. Effects are for synchronizing with systems outside the component, not for ordinary data flow.'
+		}
+	</p>
+</aside>
+
+`useLayoutEffect` runs earlier when you must measure or adjust layout before paint.
+`useInsertionEffect` is for styling libraries. `useEffectEvent` creates a stable callback
+that an effect can call without making the effect reactive to the callback's captures.
+
+<h2 id="async-ui">Loading data and code</h2>
+
+The `use` API reads a Promise during rendering. While it is pending, the closest
+`Suspense` boundary shows a fallback. If it rejects, the closest `ErrorBoundary` shows
+an error fallback.
+
+```tsrx
+import { ErrorBoundary, Suspense, use } from 'octane';
+
+interface ProfileData {
+	name: string;
+	bio: string;
+}
+
+function Profile(props: { data: Promise<ProfileData> }) @{
+	const profile = use(props.data);
+
+	<article>
+		<h2>{profile.name}</h2>
+		<p>{profile.bio}</p>
+	</article>
+}
+
+export function ProfilePage(props: { data: Promise<ProfileData> }) @{
+	<ErrorBoundary fallback={<p>We could not load this profile.</p>}>
+		<Suspense fallback={<p>Loading profile…</p>}>
+			<Profile data={props.data} />
+		</Suspense>
+	</ErrorBoundary>
+}
+```
+
+The parent owns the loading and error experience; `Profile` can describe the successful
+case directly. Keep the Promise stable by creating it in your data layer or router rather
+than creating a new one on every render.
+
+`.tsrx` also offers the same idea as template control flow:
+
+```tsrx
+export function ProfilePage(props: { data: Promise<ProfileData> }) @{
+	@try {
+		<Profile data={props.data} />
+	} @pending {
+		<p>Loading profile…</p>
+	} @catch (error) {
+		<p>
+			{'Could not load profile: ' + (error instanceof Error ? error.message : String(error))}
+		</p>
+	}
+}
+```
+
+`lazy(() => import('./Settings.tsrx'))` uses the same Suspense mechanism to load a
+component's code only when it is needed.
+
+<details className="deep-dive">
+	<summary>Octane deep dive: parallel data loading</summary>
+	<div>
+		<p>
+			{'When independent '}
+			<code>use()</code>
+			{
+				' calls can start together, the compiler does so automatically and suspends once for the group. Data that truly depends on an earlier result remains sequential. This avoids accidental loading waterfalls without changing the way you write the component.'
+			}
+		</p>
+	</div>
+</details>
+
+<h2 id="responsive-updates">Responsive updates and actions</h2>
+
+Some updates should feel immediate, such as typing. Others may reveal UI that needs to
+wait for data. A **transition** marks the second kind so Octane can keep the previous UI
+visible instead of replacing it with a loading fallback too soon.
+
+```tsrx
+import { useState, useTransition } from 'octane';
+
+export function Tabs() @{
+	const [tab, setTab] = useState('overview');
+	const [isPending, startTransition] = useTransition();
+
+	<section>
+		<button onClick={() => startTransition(() => setTab('overview'))}>
+			Overview
+		</button>
+		<button onClick={() => startTransition(() => setTab('reviews'))}>
+			Reviews
+		</button>
+		<p aria-live="polite">
+			{isPending ? 'Loading the next tab…' : 'Showing ' + tab}
+		</p>
+	</section>
+}
+```
+
+Use `startTransition` outside a component, or `useTransition` when this component also
+needs an `isPending` flag. `useDeferredValue(value)` is convenient when a slow child can
+temporarily keep receiving an older value while an input stays current.
+
+Octane renders each pass synchronously to completion. Transition priority still controls
+the important visible behavior: if the replacement suspends, the previous UI remains in
+place until the new one is ready.
+
+### Forms and actions
+
+`useActionState` connects an async action to a form and gives you its result and pending
+state:
+
+```tsrx
+import { useActionState } from 'octane';
+
+async function saveName(previousMessage: string, formData: FormData) {
+	const name = String(formData.get('name') ?? '');
+	await fetch('/api/profile', { method: 'POST', body: formData });
+	return 'Saved ' + name;
+}
+
+export function ProfileForm() @{
+	const [message, submit, isPending] = useActionState(saveName, '');
+
+	<form action={submit}>
+		<label>
+			Name
+			<input name="name" />
+		</label>
+		<button type="submit" disabled={isPending}>
+			{isPending ? 'Saving…' : 'Save'}
+		</button>
+		<p aria-live="polite">{message}</p>
+	</form>
+}
+```
+
+`useFormStatus` lets a child of the form read its status. `useOptimistic` temporarily
+shows the expected result while an action runs. `requestFormReset(form)` asks Octane to
+reset uncontrolled fields after the surrounding action or transition settles.
+
+<h2 id="roots-and-rendering">Roots and rendering</h2>
+
+A **root** connects an Octane component tree to an element in your HTML. Most apps create
+one root in their client entry file.
+
+```html
+<!-- index.html -->
+<div id="app"></div>
+```
 
 ```ts
-import {
-	renderToString,
-	renderToStaticMarkup,
-	renderToPipeableStream,
-	renderToReadableStream,
-} from 'octane/server';
+// main.ts
+import { createRoot } from 'octane';
+import { App } from './App.tsrx';
+
+const container = document.getElementById('app');
+
+if (!container) {
+	throw new Error('Missing #app element');
+}
+
+const root = createRoot(container);
+root.render(App);
 ```
 
-Buffered results are `{ html, css }`; `css` contains deduplicated scoped styles.
-`renderToString` performs a synchronous pass, while the stream APIs progressively
-flush Suspense boundaries. For an async build-time render that waits for all
-data, use `prerender` from `octane/static`.
+Call `root.unmount()` when another system removes the whole app. If the server already
+sent this component's HTML, use `hydrateRoot(container, App)` instead; hydration adopts
+that DOM and attaches Octane's events rather than building the page again.
 
-## Next
+Other rendering tools are intentionally less common:
 
-- [Quick start](/docs/quick-start) — build and mount your first component.
-- [Differences from React](/docs/differences-from-react) — the deliberate
-  behavioral differences, including state getters and native events.
-- [Bindings](/docs/bindings) — first-party ports of the React ecosystem.
+- `createPortal(children, target)` puts UI into another DOM container—useful for a modal—
+  while keeping its context and event relationships.
+- `flushSync(callback)` forces pending work to finish before the next line. Reserve it for
+  browser or third-party integrations that require the DOM immediately.
+- `act(callback)` flushes renders and effects in tests. Application code should not call it.
+
+<h2 id="server-rendering">Server and static rendering</h2>
+
+Server rendering sends useful HTML before client JavaScript starts. Streaming and
+single-pass APIs come from `octane/server`. `prerender` from `octane/static` waits for all
+Suspense data and is useful whenever you want fully resolved HTML, often at build time.
+
+| Goal                                    | API                              | What it returns                                         |
+| --------------------------------------- | -------------------------------- | ------------------------------------------------------- |
+| Hydratable HTML in one synchronous pass | `renderToString`                 | `{ html, css }`                                         |
+| HTML that will not hydrate              | `renderToStaticMarkup`           | `{ html, css }`                                         |
+| Progressive Node.js response            | `renderToPipeableStream`         | A pipeable stream controller                            |
+| Progressive Web response                | `renderToReadableStream`         | `Promise<ReadableStream & { allReady: Promise<void> }>` |
+| Fully resolved HTML after all data      | `prerender` from `octane/static` | `Promise<{ html, css }>`                                |
+
+```ts
+import { renderToString } from 'octane/server';
+import { App } from './App.tsrx';
+
+const { html, css } = renderToString(App);
+```
+
+Put `html` in the page body and the deduplicated scoped `css` in `<head>`. The streaming
+APIs can send the shell first and reveal Suspense content as it becomes ready.
+
+<h2 id="api-index">API index by job</h2>
+
+You do not need to memorize this list. Start with components, `useState`, and event
+handlers; return here when you have a specific problem to solve.
+
+<div className="api-index-grid">
+	<section className="api-index-card">
+		<h3>Remember and share data</h3>
+		<ul>
+			<li>
+				<code>useState</code>
+				<span>Remember a value owned by one component.</span>
+			</li>
+			<li>
+				<code>useReducer</code>
+				<span>Centralize several related state updates.</span>
+			</li>
+			<li>
+				<code>createContext</code>
+				<span>Create information a subtree can provide.</span>
+			</li>
+			<li>
+				<code>use</code> / <code>useContext</code>
+				<span>
+					Read context; <code>use</code> also reads Promises.
+				</span>
+			</li>
+			<li>
+				<code>useSyncExternalStore</code>
+				<span>Subscribe to a store managed outside Octane.</span>
+			</li>
+		</ul>
+	</section>
+	<section className="api-index-card">
+		<h3>Connect to the browser</h3>
+		<ul>
+			<li>
+				<code>useRef</code>
+				<span>Keep a DOM node or mutable value without rendering.</span>
+			</li>
+			<li>
+				<code>useEffect</code>
+				<span>Synchronize with an external system after paint.</span>
+			</li>
+			<li>
+				<code>useLayoutEffect</code>
+				<span>Measure or adjust layout before paint.</span>
+			</li>
+			<li>
+				<code>useInsertionEffect</code>
+				<span>Insert styles before layout effects; mainly for libraries.</span>
+			</li>
+			<li>
+				<code>useEffectEvent</code>
+				<span>Call the latest logic from an effect without reacting to it.</span>
+			</li>
+			<li>
+				<code>useId</code>
+				<span>Create an accessible ID stable across server and client.</span>
+			</li>
+			<li>
+				<code>useImperativeHandle</code>
+				<span>Customize the value exposed through a ref.</span>
+			</li>
+		</ul>
+	</section>
+	<section className="api-index-card">
+		<h3>Load and reveal UI</h3>
+		<ul>
+			<li>
+				<code>Suspense</code>
+				<span>Show a fallback while descendants wait.</span>
+			</li>
+			<li>
+				<code>ErrorBoundary</code>
+				<span>Replace a failed subtree with an error fallback.</span>
+			</li>
+			<li>
+				<code>lazy</code>
+				<span>Load a component's code on demand.</span>
+			</li>
+			<li>
+				<code>startTransition</code>
+				<span>Mark an update as non-urgent.</span>
+			</li>
+			<li>
+				<code>useTransition</code>
+				<span>Start a transition and read its pending state.</span>
+			</li>
+			<li>
+				<code>useDeferredValue</code>
+				<span>Let a slow child temporarily use an older value.</span>
+			</li>
+			<li>
+				<code>Activity</code>
+				<span>Hide or prerender a subtree while suppressing its effects.</span>
+			</li>
+		</ul>
+	</section>
+	<section className="api-index-card">
+		<h3>Handle actions and forms</h3>
+		<ul>
+			<li>
+				<code>useActionState</code>
+				<span>Track an action's result and pending state.</span>
+			</li>
+			<li>
+				<code>useFormStatus</code>
+				<span>Read the nearest parent form's active action.</span>
+			</li>
+			<li>
+				<code>useOptimistic</code>
+				<span>Show an expected result before an action finishes.</span>
+			</li>
+			<li>
+				<code>requestFormReset</code>
+				<span>Request an uncontrolled-form reset from an action or transition.</span>
+			</li>
+		</ul>
+	</section>
+	<section className="api-index-card">
+		<h3>Compose and optimize</h3>
+		<ul>
+			<li>
+				<code>Fragment</code>
+				<span>Group siblings without an extra DOM element.</span>
+			</li>
+			<li>
+				<code>memo</code>
+				<span>Skip a component render when its props are unchanged.</span>
+			</li>
+			<li>
+				<code>useMemo</code>
+				<span>Reuse an expensive calculated value.</span>
+			</li>
+			<li>
+				<code>useCallback</code>
+				<span>Reuse a function identity when a consumer needs it.</span>
+			</li>
+			<li>
+				<code>createPortal</code>
+				<span>Render into another DOM container.</span>
+			</li>
+			<li>
+				<code>ViewTransition</code> / <code>addTransitionType</code>
+				<span>Coordinate browser View Transitions.</span>
+			</li>
+			<li>
+				<code>ViewTransitionPseudoElement</code>
+				<span>Work with transition pseudo-elements in advanced integrations.</span>
+			</li>
+		</ul>
+	</section>
+	<section className="api-index-card">
+		<h3>Roots, resources, and library tools</h3>
+		<ul>
+			<li>
+				<code>createRoot</code> / <code>hydrateRoot</code>
+				<span>Start a client tree or adopt server HTML.</span>
+			</li>
+			<li>
+				<code>preload</code> / <code>preinit</code>
+				<span>Tell the browser about important resources early.</span>
+			</li>
+			<li>
+				<code>preconnect</code> / <code>prefetchDNS</code>
+				<span>Warm a connection to another origin.</span>
+			</li>
+			<li>
+				<code>createElement</code> / <code>cloneElement</code>
+				<span>Create or adapt element descriptors; mainly for libraries.</span>
+			</li>
+			<li>
+				<code>isValidElement</code> / <code>isChildrenBlock</code> / <code>Children</code>
+				<span>Inspect component children in library code.</span>
+			</li>
+			<li>
+				<code>flushSync</code> / <code>act</code>
+				<span>Integrate synchronous DOM work or test updates.</span>
+			</li>
+			<li>
+				<code>useDebugValue</code>
+				<span>Compatibility hook; it currently has no visible runtime effect.</span>
+			</li>
+			<li>
+				<code>setSsrSuspenseTimeout</code> / <code>getSsrSuspenseTimeout</code>
+				<span>Configure the server's global deadline for unresolved async data.</span>
+			</li>
+			<li>
+				<code>version</code>
+				<span>Read the installed Octane package version.</span>
+			</li>
+		</ul>
+	</section>
+</div>
+
+<aside className="doc-callout tip">
+	<p className="doc-callout-title">A good learning order</p>
+	<p>
+		{
+			'Build a component with props, add one piece of state, and update it from an event. Add context, effects, Suspense, or transitions only when the problem in front of you calls for them. Small components with clear data flow stay easy to change.'
+		}
+	</p>
+</aside>
+
+<h2 id="practice">Practice</h2>
+
+Try these small changes in the counter example:
+
+1. Add a **Reset** button that sets the count back to `0`.
+2. Accept a `step` prop and add that amount on each click.
+3. Show “Bag is empty” when the count is zero and “Ready to go” otherwise.
+
+<details className="challenge">
+	<summary>Show a hint</summary>
+	<div>
+		<p>
+			{'Event handlers can call '}
+			<code>setCount(0)</code>
+			{' directly. Read '}
+			<code>props.step</code>
+			{' inside the updater, and use an '}
+			<code>@if</code>
+			{' block for the two messages.'}
+		</p>
+	</div>
+</details>
+
+<h2 id="next-steps">Next steps</h2>
+
+- [Quick start](/docs/quick-start) — install Octane and run your first app.
+- [TSRX vs TSX/JSX](/docs/tsrx-vs-tsx) — choose an authoring format and learn the
+  `.tsrx` control-flow syntax.
+- [Bindings](/docs/bindings) — use first-party Octane ports of popular libraries.

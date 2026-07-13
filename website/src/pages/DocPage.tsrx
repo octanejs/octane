@@ -1,61 +1,277 @@
-// One documentation page: look the slug up in the registry and render its
-// compiled MDX document. The markdown-generated elements belong to the MDX
-// component, so the typography is applied through :global() descendant holes
-// under the scoped .prose wrapper.
-import { useParams } from '@octanejs/tanstack-router';
-import { findDoc } from '../content/docs.ts';
+// One documentation page: render compiled MDX in a readable article, add the
+// navigation supplied by the registry, and keep a local table of contents
+// beside longer guides.
+import { Link, useParams } from '@octanejs/tanstack-router';
+import { docs, findDoc } from '../content/docs.ts';
 
 export function DocPage() @{
 	const params = useParams({ strict: false }) as { slug?: string };
 	const doc = findDoc(params.slug);
 	const Doc = doc ? doc.component : null;
+	const sections = doc?.sections ?? [];
+	const currentIndex =
+		doc ? docs.indexOf(doc) : -1;
+	const previous =
+		currentIndex > 0 ? docs[currentIndex - 1] : null;
+	const next =
+		currentIndex >= 0 && currentIndex < docs.length - 1 ? docs[currentIndex + 1] : null;
+	const closeMobileToc = (event: Event) => {
+		const link = event.currentTarget as HTMLAnchorElement;
+		link.closest('details')?.removeAttribute('open');
+	};
 
-	<article class="prose">
-		@if (Doc) {
-			<Doc />
-		} @else {
-			<div class="doc-missing">
-				<h1>Document not found</h1>
-				<p>
-					{'No document named “' + params.slug + '”.' as string}
-				</p>
-			</div>
-		}
+	<>
+		<div class={['doc-frame', sections.length > 0 && 'has-toc']}>
+			<article class="prose">
+				@if (Doc) {
+					<>
+						<Doc />
+						@if (previous || next) {
+							<nav class="doc-pagination" aria-label="Previous and next documentation">
+								@if (previous) {
+									<Link
+										to="/docs/$slug"
+										params={{ slug: previous.slug }}
+										class="pagination-link previous"
+									>
+										<span>← Previous</span>
+										<strong>
+											{previous.title as string}
+										</strong>
+									</Link>
+								}
+								@if (next) {
+									<Link to="/docs/$slug" params={{ slug: next.slug }} class="pagination-link next">
+										<span>Next →</span>
+										<strong>
+											{next.title as string}
+										</strong>
+									</Link>
+								}
+							</nav>
+						}
+					</>
+				} @else {
+					<div class="doc-missing">
+						<h1>Document not found</h1>
+						<p>
+							{'No document named “' + params.slug + '”.' as string}
+						</p>
+					</div>
+				}
+			</article>
+			@if (sections.length > 0) {
+				<aside class="on-this-page">
+					<nav class="toc-desktop" aria-label="On this page">
+						<p class="toc-heading">On this page</p>
+						<ul class="toc-list">
+							@for (const section of sections; key section.id) {
+								<li>
+									<a href={'#' + section.id}>
+										{section.title as string}
+									</a>
+								</li>
+							}
+						</ul>
+					</nav>
+					<details class="toc-mobile">
+						<summary>On this page</summary>
+						<nav aria-label="On this page mobile">
+							<ul class="toc-list">
+								@for (const section of sections; key section.id) {
+									<li>
+										<a href={'#' + section.id} onClick={closeMobileToc}>
+											{section.title as string}
+										</a>
+									</li>
+								}
+							</ul>
+						</nav>
+					</details>
+				</aside>
+			}
+		</div>
 		<style>
+			.doc-frame {
+				width: 100%;
+				max-width: 68rem;
+				display: grid;
+				grid-template-columns: minmax(0, 48rem);
+				justify-content: start;
+			}
+			.doc-frame.has-toc {
+				grid-template-columns: minmax(0, 48rem) minmax(10rem, 11rem);
+				gap: clamp(2rem, 4vw, 3.5rem);
+			}
 			.prose {
-				max-width: 46rem;
+				min-width: 0;
+				max-width: 48rem;
+			}
+			.on-this-page {
+				position: sticky;
+				top: 88px;
+				align-self: start;
+				max-height: calc(100vh - 108px);
+				overflow-y: auto;
+				padding-left: 1rem;
+				border-left: 1px solid var(--border);
+				scrollbar-width: thin;
+			}
+			.toc-heading {
+				margin: 0 0 0.75rem;
+				color: var(--text);
+				font-size: 0.78rem;
+				font-weight: 750;
+			}
+			.toc-list {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+			}
+			.toc-list li {
+				margin: 0;
+			}
+			.toc-list a {
+				display: block;
+				padding: 0.28rem 0;
+				color: var(--text-secondary);
+				font-size: 0.8rem;
+				line-height: 1.35;
+				transition: color 0.15s;
+			}
+			.toc-list a:hover {
+				color: var(--accent-text);
+				text-decoration: none;
+			}
+			.toc-mobile {
+				display: none;
+			}
+			@media (max-width: 1180px) {
+				.doc-frame.has-toc {
+					grid-template-columns: minmax(0, 48rem);
+					gap: 1.5rem;
+				}
+				.on-this-page {
+					position: static;
+					grid-row: 1;
+					max-height: none;
+					padding: 1rem 1.1rem;
+					border: 1px solid var(--border);
+					border-radius: 0.875rem;
+					background: rgba(255, 255, 255, 0.025);
+				}
+				.toc-desktop {
+					display: none;
+				}
+				.toc-mobile {
+					display: block;
+				}
+				.toc-mobile summary {
+					position: relative;
+					padding-right: 1.5rem;
+					color: var(--text);
+					font-size: 0.82rem;
+					font-weight: 750;
+					cursor: pointer;
+					list-style: none;
+				}
+				.toc-mobile summary::-webkit-details-marker {
+					display: none;
+				}
+				.toc-mobile summary::after {
+					content: '+';
+					position: absolute;
+					right: 0;
+					top: 50%;
+					color: var(--accent-text);
+					font-size: 1rem;
+					transform: translateY(-50%);
+				}
+				.toc-mobile[open] summary::after {
+					content: '−';
+				}
+				.toc-mobile nav {
+					margin-top: 0.75rem;
+					padding-top: 0.65rem;
+					border-top: 1px solid var(--border);
+				}
+				.toc-list {
+					display: grid;
+					grid-template-columns: repeat(2, minmax(0, 1fr));
+					gap: 0 1rem;
+				}
+			}
+			@media (max-width: 560px) {
+				.toc-list {
+					grid-template-columns: 1fr;
+				}
+			}
+			.prose :global(.doc-hero) {
+				margin: 0 0 1.75rem;
+				padding-bottom: 1.75rem;
+				border-bottom: 1px solid var(--border);
+			}
+			.prose :global(.doc-eyebrow) {
+				margin: 0 0 0.45rem;
+				color: var(--accent-text);
+				font-size: 0.75rem;
+				font-weight: 800;
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+			}
+			.prose :global(.doc-lede) {
+				max-width: 43rem;
+				margin: 0;
+				color: #dfe3e9;
+				font-size: 1.15rem;
+				line-height: 1.7;
 			}
 			.prose :global(h1) {
-				font-size: 2.5rem;
-				letter-spacing: -0.03em;
-				line-height: 1.15;
+				font-size: clamp(2.65rem, 6vw, 3.5rem);
+				letter-spacing: -0.045em;
+				line-height: 1.05;
 				margin: 0 0 1rem;
 			}
 			.prose :global(h2) {
-				font-size: 1.5rem;
-				letter-spacing: -0.02em;
-				margin: 2.5rem 0 0.75rem;
-				padding-top: 1.5rem;
-				border-top: 1px solid rgba(255, 255, 255, 0.08);
+				font-size: clamp(1.55rem, 3vw, 1.85rem);
+				letter-spacing: -0.025em;
+				line-height: 1.25;
+				margin: 3.25rem 0 1rem;
+				padding-top: 2rem;
+				border-top: 1px solid var(--border);
+				scroll-margin-top: 5.5rem;
 			}
 			.prose :global(h3) {
-				font-size: 1.15rem;
-				margin: 2rem 0 0.5rem;
+				font-size: 1.2rem;
+				letter-spacing: -0.01em;
+				margin: 2.25rem 0 0.65rem;
+				scroll-margin-top: 5.5rem;
 			}
 			.prose :global(p) {
 				color: #d5d9e0;
-				margin: 0 0 1rem;
+				margin: 0 0 1.1rem;
+			}
+			.prose :global(ol),
+			.prose :global(ul) {
+				padding-left: 1.4rem;
 			}
 			.prose :global(li) {
 				color: #d5d9e0;
-				margin: 0.35rem 0;
+				margin: 0.45rem 0;
+				padding-left: 0.15rem;
 			}
 			.prose :global(a) {
-				color: #ff5d72;
+				color: var(--accent-text);
+				text-decoration: underline;
+				text-decoration-color: rgba(255, 93, 114, 0.4);
+				text-underline-offset: 0.18em;
+			}
+			.prose :global(a:hover) {
+				text-decoration-color: currentColor;
 			}
 			.prose :global(code) {
-				background: #16181d;
-				border: 1px solid rgba(255, 255, 255, 0.08);
+				background: var(--code-bg);
+				border: 1px solid var(--border);
 				border-radius: 0.375rem;
 				padding: 0.125rem 0.375rem;
 				font-size: 0.85em;
@@ -67,45 +283,312 @@ export function DocPage() @{
 				font-size: inherit;
 			}
 			.prose :global(pre) {
-				margin: 0 0 1.25rem;
+				margin: 0 0 1.4rem;
 			}
 			.prose :global(blockquote) {
-				border-left: 3px solid #ff415a;
+				border-left: 3px solid var(--accent);
 				margin: 0 0 1rem;
 				padding: 0.25rem 0 0.25rem 1rem;
-				color: #99a1b3;
+				color: var(--text-secondary);
+			}
+			.prose :global(.doc-callout) {
+				position: relative;
+				margin: 1.4rem 0;
+				padding: 1rem 1.15rem 1rem 3.25rem;
+				border: 1px solid var(--border);
+				border-radius: 0.9rem;
+				background: rgba(255, 255, 255, 0.035);
+			}
+			.prose :global(.doc-callout::before) {
+				position: absolute;
+				left: 1.15rem;
+				top: 1.05rem;
+				display: grid;
+				place-items: center;
+				width: 1.35rem;
+				height: 1.35rem;
+				border-radius: 999px;
+				font-size: 0.76rem;
+				font-weight: 900;
+			}
+			.prose :global(.doc-callout.note) {
+				border-color: rgba(114, 156, 255, 0.28);
+				background: rgba(75, 115, 205, 0.1);
+			}
+			.prose :global(.doc-callout.note::before) {
+				content: 'i';
+				background: rgba(114, 156, 255, 0.2);
+				color: #a9c2ff;
+			}
+			.prose :global(.doc-callout.important) {
+				border-color: rgba(255, 180, 65, 0.3);
+				background: rgba(191, 126, 30, 0.11);
+			}
+			.prose :global(.doc-callout.important::before) {
+				content: '!';
+				background: rgba(255, 180, 65, 0.2);
+				color: #ffc56d;
+			}
+			.prose :global(.doc-callout.tip) {
+				border-color: rgba(99, 211, 145, 0.28);
+				background: rgba(52, 151, 94, 0.1);
+			}
+			.prose :global(.doc-callout.tip::before) {
+				content: '✓';
+				background: rgba(99, 211, 145, 0.2);
+				color: #7ee2a7;
+			}
+			.prose :global(.doc-callout-title) {
+				margin: 0 0 0.2rem;
+				color: var(--text);
+				font-weight: 750;
+			}
+			.prose :global(.doc-callout p:last-child) {
+				margin-bottom: 0;
+			}
+			.prose :global(.mental-model) {
+				display: grid;
+				grid-template-columns: 1fr auto 1fr auto 1fr;
+				align-items: center;
+				gap: 0.65rem;
+				margin: 1.4rem 0 1.6rem;
+			}
+			.prose :global(.mental-model > div) {
+				min-width: 0;
+				padding: 1rem;
+				border: 1px solid var(--border);
+				border-radius: 0.85rem;
+				background: var(--panel);
+				text-align: center;
+			}
+			.prose :global(.mental-model span) {
+				display: block;
+				color: var(--text-secondary);
+				font-size: 0.7rem;
+				font-weight: 700;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+			}
+			.prose :global(.mental-model strong) {
+				display: block;
+				margin-top: 0.2rem;
+				color: var(--text);
+				font-size: 0.9rem;
+			}
+			.prose :global(.mental-model .mental-model-arrow) {
+				color: var(--accent-text);
+				font-size: 1.2rem;
+			}
+			.prose :global(.topic-grid) {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 0.75rem;
+				margin: 1.75rem 0 0;
+			}
+			.prose :global(.topic-grid a) {
+				display: grid;
+				grid-template-columns: auto minmax(0, 1fr);
+				gap: 0.1rem 0.75rem;
+				padding: 1rem;
+				border: 1px solid var(--border);
+				border-radius: 0.9rem;
+				background: rgba(255, 255, 255, 0.025);
+				color: var(--text);
+				text-decoration: none;
+				transition:
+					background 0.15s,
+					border-color 0.15s,
+					transform 0.15s;
+			}
+			.prose :global(.topic-grid a:hover) {
+				border-color: rgba(255, 93, 114, 0.4);
+				background: rgba(255, 65, 90, 0.07);
+				transform: translateY(-1px);
+			}
+			.prose :global(.topic-number) {
+				grid-row: 1 / 3;
+				color: var(--accent-text);
+				font-family: 'SF Mono', SFMono-Regular, ui-monospace, monospace;
+				font-size: 0.72rem;
+				font-weight: 700;
+			}
+			.prose :global(.topic-grid strong) {
+				font-size: 0.95rem;
+			}
+			.prose :global(.topic-grid strong + span) {
+				color: var(--text-secondary);
+				font-size: 0.82rem;
+				line-height: 1.4;
+			}
+			.prose :global(details.deep-dive),
+			.prose :global(details.challenge) {
+				margin: 1.4rem 0;
+				border: 1px solid var(--border);
+				border-radius: 0.9rem;
+				background: rgba(255, 255, 255, 0.025);
+				overflow: hidden;
+			}
+			.prose :global(details.deep-dive) {
+				border-color: rgba(176, 125, 255, 0.3);
+				background: rgba(116, 74, 180, 0.09);
+			}
+			.prose :global(details summary) {
+				padding: 0.9rem 1rem;
+				color: var(--text);
+				font-weight: 700;
+				cursor: pointer;
+			}
+			.prose :global(details summary:hover) {
+				background: rgba(255, 255, 255, 0.035);
+			}
+			.prose :global(details > div) {
+				padding: 0 1rem 0.1rem;
+				border-top: 1px solid var(--border);
+			}
+			.prose :global(details > div p:first-child) {
+				margin-top: 1rem;
+			}
+			.prose :global(.api-index-grid) {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 0.85rem;
+				margin: 1.5rem 0;
+			}
+			.prose :global(.api-index-card) {
+				padding: 1.1rem;
+				border: 1px solid var(--border);
+				border-radius: 0.9rem;
+				background: rgba(255, 255, 255, 0.025);
+			}
+			.prose :global(.api-index-card h3) {
+				margin: 0 0 0.85rem;
+				font-size: 1rem;
+			}
+			.prose :global(.api-index-card ul) {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+			}
+			.prose :global(.api-index-card li) {
+				display: block;
+				margin: 0;
+				padding: 0.55rem 0;
+				border-top: 1px solid rgba(255, 255, 255, 0.06);
+			}
+			.prose :global(.api-index-card li:first-child) {
+				padding-top: 0;
+				border-top: none;
+			}
+			.prose :global(.api-index-card li:last-child) {
+				padding-bottom: 0;
+			}
+			.prose :global(.api-index-card li > code) {
+				display: inline-block;
+				margin: 0 0 0.2rem;
+				color: #ff8b9b;
+			}
+			.prose :global(.api-index-card li > span) {
+				display: block;
+				color: var(--text-secondary);
+				font-size: 0.82rem;
+				line-height: 1.45;
 			}
 			.prose :global(table) {
-				border-collapse: collapse;
+				border-collapse: separate;
+				border-spacing: 0;
 				width: 100%;
 				display: block;
 				overflow-x: auto;
-				font-size: 0.925rem;
-				margin: 0 0 1.25rem;
+				font-size: 0.9rem;
+				margin: 0 0 1.4rem;
+				border: 1px solid var(--border);
+				border-radius: 0.8rem;
+			}
+			.prose :global(thead) {
+				background: rgba(255, 255, 255, 0.04);
 			}
 			.prose :global(th) {
 				text-align: left;
-				color: #f4eee8;
+				color: var(--text);
 				border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-				padding: 0.5rem 0.75rem;
+				padding: 0.65rem 0.8rem;
 			}
 			.prose :global(td) {
 				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-				padding: 0.5rem 0.75rem;
+				padding: 0.65rem 0.8rem;
 				color: #d5d9e0;
 				vertical-align: top;
 			}
+			.prose :global(tr:last-child td) {
+				border-bottom: none;
+			}
 			.prose :global(hr) {
 				border: none;
-				border-top: 1px solid rgba(255, 255, 255, 0.1);
+				border-top: 1px solid var(--border);
 				margin: 2rem 0;
 			}
 			.prose :global(strong) {
-				color: #f4eee8;
+				color: var(--text);
+			}
+			.doc-pagination {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 0.85rem;
+				margin: 3.5rem 0 0;
+				padding-top: 1.5rem;
+				border-top: 1px solid var(--border);
+			}
+			.doc-pagination :global(a.pagination-link) {
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+				min-width: 0;
+				padding: 0.9rem 1rem;
+				border: 1px solid var(--border);
+				border-radius: 0.85rem;
+				background: rgba(255, 255, 255, 0.025);
+				color: var(--text);
+				text-decoration: none;
+			}
+			.doc-pagination :global(a.pagination-link:hover) {
+				border-color: rgba(255, 93, 114, 0.4);
+				background: rgba(255, 65, 90, 0.07);
+			}
+			.doc-pagination :global(a.pagination-link.next) {
+				grid-column: 2;
+				text-align: right;
+			}
+			.doc-pagination :global(a.pagination-link span) {
+				color: var(--text-secondary);
+				font-size: 0.75rem;
+				font-weight: 650;
+			}
+			.doc-pagination :global(a.pagination-link strong) {
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
 			}
 			.doc-missing :global(h1) {
 				margin-top: 2rem;
 			}
+			@media (max-width: 640px) {
+				.prose :global(.mental-model) {
+					grid-template-columns: 1fr;
+				}
+				.prose :global(.mental-model .mental-model-arrow) {
+					transform: rotate(90deg);
+				}
+				.prose :global(.topic-grid),
+				.prose :global(.api-index-grid) {
+					grid-template-columns: 1fr;
+				}
+				.doc-pagination {
+					grid-template-columns: 1fr;
+				}
+				.doc-pagination :global(a.pagination-link.next) {
+					grid-column: 1;
+				}
+			}
 		</style>
-	</article>
+	</>
 }

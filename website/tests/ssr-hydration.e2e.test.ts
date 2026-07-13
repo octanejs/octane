@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { censusDomNodes, type DomNodeCensus } from '../../benchmarks/lib/dom-nodes.mjs';
 
 const WEBSITE = join(process.cwd(), 'website');
-const ROUTES = ['/', '/docs', '/benchmarks', '/playground', '/view-transitions'];
+const ROUTES = ['/', '/docs', '/docs/core-apis', '/benchmarks', '/playground', '/view-transitions'];
 
 // M0 of docs/comment-marker-elision-plan.md: per-route comment-node ceilings
 // (~15% above post-M4 2026-07-09 measurements: / 1,463 · /docs 361 ·
@@ -48,6 +48,9 @@ const ROUTES = ['/', '/docs', '/benchmarks', '/playground', '/view-transitions']
 const COMMENT_CEILINGS: Record<string, number> = {
 	'/': 3380,
 	'/docs': 415,
+	// Newcomer Core APIs guide (measured 569): richer MDX, local navigation,
+	// callouts, and the live state example are intentional content growth.
+	'/docs/core-apis': 655,
 	'/benchmarks': 26100,
 	'/playground': 195,
 	// The view-transitions demo (added with the plan's Phase 5, measured 189) —
@@ -257,6 +260,21 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			}
 		},
 	);
+
+	it('the Core APIs live example handles an event after hydration', async (ctx) => {
+		if (!browser) return ctx.skip();
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis');
+		try {
+			const count = page.locator('.demo-count');
+			await waitForLocatorText(count, '0');
+			await page.getByRole('button', { name: 'Add one' }).click();
+			await waitForLocatorText(count, '1');
+			const real = errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
 });
 
 describe.sequential('website production build → hydration (octane-preview)', () => {
