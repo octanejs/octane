@@ -28,6 +28,7 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import { censusDomNodes, deterministicCount } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
@@ -156,18 +157,18 @@ async function runTarget(t) {
 		results[op.name] = summarizeSamples(samples);
 	}
 
-	// M0 of docs/comment-marker-elision-plan.md: comment-node DOM weight at
-	// steady state (1,000 rows mounted). Deterministic per framework build
-	// (median === min), and cross-framework comparable — solid/ripple anchor
-	// dynamic positions on comments too. Ratchets down as elision phases land.
+	// Full steady-state DOM shape. Tracking element/text counts beside comments
+	// prevents a bookkeeping optimization from gaming the metric by replacing a
+	// comment with an invisible text node or dropping user-visible output.
 	await ensureState(page, 'rows');
-	const comments = await page.evaluate(() => {
-		const w = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
-		let n = 0;
-		while (w.nextNode()) n++;
-		return n;
-	});
-	results.comments_1k = { median: comments, min: comments, samples: [comments] };
+	const dom = await page.evaluate(censusDomNodes, '#main');
+	results.nodes_1k = deterministicCount(dom.total);
+	results.elements_1k = deterministicCount(dom.elements);
+	results.text_1k = deterministicCount(dom.text);
+	results.comments_1k = deterministicCount(dom.comments);
+	results.empty_text_1k = deterministicCount(dom.emptyText);
+	results.whitespace_text_1k = deterministicCount(dom.whitespaceText);
+	results.__dom = dom;
 
 	await browser.close();
 	return results;
@@ -193,9 +194,16 @@ async function runTarget(t) {
 		}
 		console.log(row.join('| '));
 	}
-	{
-		const row = ['#cmnts'.padEnd(8)];
-		for (const c of cols) row.push(String(all[c].comments_1k.median).padEnd(W));
+	for (const [label, op] of [
+		['#nodes', 'nodes_1k'],
+		['#elems', 'elements_1k'],
+		['#text', 'text_1k'],
+		['#cmnts', 'comments_1k'],
+		['#empty', 'empty_text_1k'],
+		['#ws', 'whitespace_text_1k'],
+	]) {
+		const row = [label.padEnd(8)];
+		for (const c of cols) row.push(String(all[c][op].median).padEnd(W));
 		console.log(row.join('| '));
 	}
 
@@ -227,13 +235,16 @@ async function runTarget(t) {
 			targets: TARGETS.map((t) => ({
 				name: t.name,
 				ops: Object.fromEntries(
-					Object.entries(all[t.name]).map(([name, r]) => [
-						name,
-						r.score == null
-							? { median: r.median, min: r.min, samples: r.samples.length }
-							: timingStatForJson(r),
-					]),
+					Object.entries(all[t.name])
+						.filter(([name]) => name !== '__dom')
+						.map(([name, r]) => [
+							name,
+							r.score == null
+								? { median: r.median, min: r.min, samples: r.samples.length }
+								: timingStatForJson(r),
+						]),
 				),
+				meta: { dom: all[t.name].__dom },
 			})),
 		};
 		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');

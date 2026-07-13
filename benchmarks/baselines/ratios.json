@@ -191,5 +191,153 @@
     "reference": "ripple",
     "maxRatio": 1.5,
     "note": "update vs ripple: measured 1.09x on record 2026-07-09."
+  },
+  {
+    "suite": "js-framework",
+    "op": "nodes_1k",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.01,
+    "note": "Deterministic DOM census at 1k rows. Marker reuse leaves Octane at 10074 vs React 10072 nodes (2026-07-13); catches structural-node regressions without timing noise."
+  },
+  {
+    "suite": "js-framework",
+    "op": "elements_1k",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control for the node census: equivalent fixtures must render exactly the same 8051 elements."
+  },
+  {
+    "suite": "js-framework",
+    "op": "text_1k",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control for the node census: equivalent fixtures must render exactly the same 2021 text nodes."
+  },
+  {
+    "suite": "js-framework-deopt",
+    "op": "nodes_1k",
+    "target": "octane-tsrx-naive",
+    "reference": "octane-tsrx",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "A stamped sole-component row must share its host boundary: TSRX naive and tuned now both render 10074 nodes instead of the naive fixture carrying 2000 extra comments."
+  },
+  {
+    "suite": "js-framework-deopt",
+    "op": "nodes_1k",
+    "target": "octane-jsx-naive",
+    "reference": "octane-tsrx",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Return-JSX single-root stamping plus keyed boundary sharing removes the JSX naive fixture's 4000 extra comments; its DOM shape must stay equal to tuned."
+  },
+  {
+    "suite": "todomvc",
+    "op": "nodes_100",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.2,
+    "note": "100-item TodoMVC DOM census: Octane 730 vs React 623 nodes after dormant-if/list-anchor elision (1.172x, 2026-07-13)."
+  },
+  {
+    "suite": "todomvc",
+    "op": "elements_100",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: equivalent TodoMVC states render exactly 517 elements."
+  },
+  {
+    "suite": "todomvc",
+    "op": "text_100",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: equivalent TodoMVC states render exactly 106 text nodes."
+  },
+  {
+    "suite": "chat-stream",
+    "op": "nodes_conv",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.32,
+    "note": "Mixed chat conversation census: Octane 104 vs React 80 nodes after host-vs-host keyed-item boundary sharing (1.30x, 2026-07-13)."
+  },
+  {
+    "suite": "chat-stream",
+    "op": "elements_conv",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: equivalent chat states render exactly 55 elements."
+  },
+  {
+    "suite": "chat-stream",
+    "op": "text_conv",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: equivalent chat states render exactly 25 text nodes."
+  },
+  {
+    "suite": "portal-swarm",
+    "op": "nodes_closed_main",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.33,
+    "note": "Closed portal swarm #main census: Octane 2622 vs React 2014 nodes after component-item and dormant-if elision (1.302x, 2026-07-13)."
+  },
+  {
+    "suite": "portal-swarm",
+    "op": "elements_closed_main",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: closed portal fixtures render exactly 1411 elements under #main."
+  },
+  {
+    "suite": "portal-swarm",
+    "op": "text_closed_main",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: closed portal fixtures render exactly 603 text nodes under #main."
+  },
+  {
+    "suite": "portal-swarm",
+    "op": "nodes_open_body",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.38,
+    "note": "Open portal swarm whole-body census retains load-bearing foreign target pairs: Octane 7025 vs React 5217 nodes (1.347x, 2026-07-13)."
+  },
+  {
+    "suite": "portal-swarm",
+    "op": "elements_open_body",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: open portal fixtures render exactly 3412 elements across main and foreign targets."
+  },
+  {
+    "suite": "portal-swarm",
+    "op": "text_open_body",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: open portal fixtures render exactly 1805 text nodes across main and foreign targets."
   }
 ]
