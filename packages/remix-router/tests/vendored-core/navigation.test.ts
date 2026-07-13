@@ -1,4 +1,4 @@
-// Ported from react-router@7.18.1 packages/react-router/__tests__/router/navigation-test.ts — verbatim except: renamed to navigation.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim, and the single createBrowserRouter/getWindow test skipped (createBrowserRouter lives in the React DOM layer, which is not vendored) with its imports removed.
+// Ported from react-router@8.2.0 packages/react-router/__tests__/router/navigation-test.ts — verbatim except: renamed to navigation.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim, and the single createBrowserRouter/getWindow test skipped (createBrowserRouter lives in the React DOM layer, which is not vendored) with its imports removed.
 import './_shim';
 import type { HydrationState } from '../../src/lib/router/router';
 import { cleanup, setup } from './utils/data-router-setup';
@@ -10,7 +10,7 @@ function initializeTest(init?: { url?: string; hydrationData?: HydrationState })
 			{
 				path: '',
 				id: 'root',
-				hasErrorBoundary: true,
+				ErrorBoundary: () => null,
 				loader: true,
 				children: [
 					{
@@ -149,7 +149,7 @@ describe('navigations', () => {
 							{
 								id: 'foo',
 								path: 'foo',
-								hasErrorBoundary: true,
+								ErrorBoundary: () => null,
 								loader: true,
 							},
 						],
@@ -180,7 +180,7 @@ describe('navigations', () => {
 					{
 						id: 'root',
 						path: '/',
-						hasErrorBoundary: true,
+						ErrorBoundary: () => null,
 						children: [
 							{
 								id: 'foo',
@@ -594,7 +594,7 @@ describe('navigations', () => {
 								{
 									path: '/child',
 									id: 'child',
-									hasErrorBoundary: true,
+									ErrorBoundary: () => null,
 									loader: true,
 								},
 							],
@@ -619,7 +619,7 @@ describe('navigations', () => {
 								{
 									path: '/child',
 									id: 'child',
-									hasErrorBoundary: true,
+									ErrorBoundary: () => null,
 									loader: true,
 								},
 							],
@@ -654,7 +654,7 @@ describe('navigations', () => {
 						{
 							path: '/',
 							id: 'parent',
-							hasErrorBoundary: true,
+							ErrorBoundary: () => null,
 							children: [
 								{
 									path: '/child',
@@ -688,7 +688,7 @@ describe('navigations', () => {
 										{
 											path: '/child',
 											id: 'child',
-											hasErrorBoundary: true,
+											ErrorBoundary: () => null,
 											loader: true,
 										},
 									],
@@ -722,7 +722,7 @@ describe('navigations', () => {
 								path: '/b',
 								id: 'b',
 								loader: true,
-								hasErrorBoundary: true,
+								ErrorBoundary: () => null,
 								children: [
 									{
 										path: '/b/c',

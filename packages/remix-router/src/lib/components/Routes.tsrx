@@ -1,4 +1,4 @@
-// Routes — transcribed from react-router@7.18.1 lib/components.tsx, hybrid
+// Routes — transcribed from react-router@8.2.0 lib/components.tsx, hybrid
 // per docs/remix-router-port-plan.md §2a:
 // - descriptor children (createRoutesFromElements results, `{expr}` arrays,
 //   prop-position elements) go through createRoutesFromChildren verbatim;

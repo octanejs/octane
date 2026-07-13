@@ -1,4 +1,4 @@
-// Vendored from react-router@7.18.1 packages/react-router/lib/router/links.ts — unmodified.
+// Vendored from react-router@8.2.0 packages/react-router/lib/router/links.ts — unmodified.
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
 type Primitive = null | undefined | string | number | boolean | symbol | bigint;
 

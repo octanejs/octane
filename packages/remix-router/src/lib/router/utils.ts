@@ -1,7 +1,7 @@
-// Vendored from react-router@7.18.1 packages/react-router/lib/router/utils.ts — unmodified except: type-only react import → local ../react-types shim.
+// Vendored from react-router@8.2.0 packages/react-router/lib/router/utils.ts — unmodified except: React types → local ../react-types shim; route descriptors → octane createElement; build-time __DEV__ constant → NODE_ENV check.
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
 import type * as React from '../react-types';
-import type { MiddlewareEnabled } from '../types/future';
+import { createElement } from 'octane';
 import type { Equal, Expect } from '../types/utils';
 import type { Location, Path, To } from './history';
 import { invariant, parsePath, warning } from './history';
@@ -10,6 +10,8 @@ import {
 	normalizeProtocolRelativeUrl,
 	PROTOCOL_RELATIVE_URL_REGEX,
 } from './url';
+
+export const ENABLE_DEV_WARNINGS = process.env.NODE_ENV !== 'production';
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -265,7 +267,7 @@ export class RouterContextProvider {
 	}
 }
 
-type DefaultContext = MiddlewareEnabled extends true ? Readonly<RouterContextProvider> : any;
+type DefaultContext = Readonly<RouterContextProvider>;
 
 /**
  * @private
@@ -277,11 +279,11 @@ interface DataFunctionArgs<Context> {
 	request: Request;
 	/**
 	 * A URL instance representing the application location being navigated to or
-	 * fetched. By default, this matches `request.url`.
+	 * fetched.
 	 *
-	 * In Framework mode with `future.v8_passThroughRequests` enabled, this is a
-	 * normalized URL with React-Router-specific implementation details removed
-	 * (`.data` suffixes, `index`/`_routes` search params).
+	 * In Framework mode, this is a normalized URL with React-Router-specific
+	 * implementation details removed (`.data` suffixes, `index`/`_routes` search
+	 * params). For the raw incoming URL, use `request.url`.
 	 */
 	url: URL;
 	/**
@@ -548,9 +550,7 @@ export type PatchRoutesOnNavigationFunction = (
  * Function provided to set route-specific properties from route objects
  */
 export interface MapRoutePropertiesFunction {
-	(route: DataRouteObject): {
-		hasErrorBoundary: boolean;
-	} & Record<string, any>;
+	(route: DataRouteObject): Partial<DataRouteObject>;
 }
 
 /**
@@ -654,8 +654,6 @@ export type BaseRouteObject = {
 	 * See [`action`](../../start/data/route-object#action).
 	 */
 	action?: ActionFunction | boolean;
-	// TODO(v8): deprecate/remove
-	hasErrorBoundary?: boolean;
 	/**
 	 * The route shouldRevalidate function.
 	 * See [`shouldRevalidate`](../../start/data/route-object#shouldRevalidate).
@@ -880,11 +878,65 @@ function isIndexRoute(route: RouteObject): route is IndexRouteObject {
 	return route.index === true;
 }
 
+export function defaultMapRouteProperties(route: DataRouteObject) {
+	let updates: Partial<DataRouteObject> = {};
+
+	if (route.Component) {
+		if (ENABLE_DEV_WARNINGS) {
+			if (route.element) {
+				warning(
+					false,
+					'You should not include both `Component` and `element` on your route - ' +
+						'`Component` will be used.',
+				);
+			}
+		}
+		Object.assign(updates, {
+			element: createElement(route.Component),
+			Component: undefined,
+		});
+	}
+
+	if (route.HydrateFallback) {
+		if (ENABLE_DEV_WARNINGS) {
+			if (route.hydrateFallbackElement) {
+				warning(
+					false,
+					'You should not include both `HydrateFallback` and `hydrateFallbackElement` on your route - ' +
+						'`HydrateFallback` will be used.',
+				);
+			}
+		}
+		Object.assign(updates, {
+			hydrateFallbackElement: createElement(route.HydrateFallback),
+			HydrateFallback: undefined,
+		});
+	}
+
+	if (route.ErrorBoundary) {
+		if (ENABLE_DEV_WARNINGS) {
+			if (route.errorElement) {
+				warning(
+					false,
+					'You should not include both `ErrorBoundary` and `errorElement` on your route - ' +
+						'`ErrorBoundary` will be used.',
+				);
+			}
+		}
+		Object.assign(updates, {
+			errorElement: createElement(route.ErrorBoundary),
+			ErrorBoundary: undefined,
+		});
+	}
+
+	return updates;
+}
+
 // Walk the route tree generating unique IDs where necessary, so we are working
 // solely with DataRouteObject's within the Router
 export function convertRoutesToDataRoutes(
 	routes: RouteObject[],
-	mapRouteProperties: MapRoutePropertiesFunction,
+	mapRouteProperties: MapRoutePropertiesFunction = defaultMapRouteProperties,
 	parentPath: string[] = [],
 	manifest: RouteManifest = {},
 	allowInPlaceMutations = false,
@@ -931,7 +983,7 @@ export function convertRoutesToDataRoutes(
 
 function mergeRouteUpdates<T extends DataRouteObject>(
 	route: T,
-	updates: ReturnType<MapRoutePropertiesFunction>,
+	updates: Partial<DataRouteObject>,
 ): T {
 	return Object.assign(route, {
 		...updates,
@@ -1023,14 +1075,6 @@ export interface UIMatch<Data = unknown, Handle = unknown> {
 	 * The return value from the matched route's loader or clientLoader. This might
 	 * be `undefined` if this route's `loader` (or a deeper route's `loader`) threw
 	 * an error and we're currently displaying an `ErrorBoundary`.
-	 *
-	 * @deprecated Use `UIMatch.loaderData` instead
-	 */
-	data: Data | undefined;
-	/**
-	 * The return value from the matched route's loader or clientLoader. This might
-	 * be `undefined` if this route's `loader` (or a deeper route's `loader`) threw
-	 * an error and we're currently displaying an `ErrorBoundary`.
 	 */
 	loaderData: Data | undefined;
 	/**
@@ -1046,7 +1090,6 @@ export function convertRouteMatchToUiMatch(match: DataRouteMatch, loaderData: Ro
 		id: route.id,
 		pathname,
 		params,
-		data: loaderData[route.id],
 		loaderData: loaderData[route.id],
 		handle: route.handle,
 	};
@@ -1243,6 +1286,8 @@ function rankRouteBranches(branches: RouteBranch[]): void {
 }
 
 const paramRe = /^:[\w-]+$/;
+const partialParamRe = /^:[\w-]+/;
+const partialDynamicSegmentValue = 3.5;
 const dynamicSegmentValue = 3;
 const indexRouteValue = 2;
 const emptySegmentValue = 1;
@@ -1265,12 +1310,13 @@ function computeScore(path: string, index: boolean | undefined): number {
 		.filter((s) => !isSplat(s))
 		.reduce(
 			(score, segment) =>
-				score +
-				(paramRe.test(segment)
-					? dynamicSegmentValue
-					: segment === ''
-						? emptySegmentValue
-						: staticSegmentValue),
+				// prettier-ignore
+				score + (
+          paramRe.test(segment) ? dynamicSegmentValue :
+          partialParamRe.test(segment) ? partialDynamicSegmentValue :
+          segment === "" ? emptySegmentValue :
+          staticSegmentValue
+        ),
 			initialScore,
 		);
 }
@@ -1577,7 +1623,7 @@ export function compilePath(
 					return '/([^\\/]+)';
 				},
 			) // Dynamic segment
-			.replace(/\/([\w-]+)\?(\/|$)/g, '(/$1)?$2'); // Optional static segment
+			.replace(/\/([\w-]+)\?(?=\/|$|\()/g, '(?:/$1)?'); // Optional static segment (non-capturing)
 
 	if (path.endsWith('*')) {
 		params.push({ paramName: '*' });
@@ -2108,9 +2154,39 @@ by the star-slash in the `getRoutePattern` regex and messes up the parsed commen
 for `isRouteErrorResponse` above.  This comment seems to reset the parser.
 */
 
-export function getRoutePattern(matches: RouteMatch[]) {
+// Accept the narrow shape we read so this can be used with server-runtime
+// matches, which do not include the full RouteMatch fields like pathnameBase.
+export function getRoutePattern(matches: { route: { path?: string } }[]) {
 	let parts = matches.map((m) => m.route.path).filter(Boolean) as string[];
 	return joinPaths(parts) || '/';
+}
+
+// Create the normalized URL instance to pass to loaders/actions/middleware.
+// We strip the `?index` param because that is a React Router implementation detail.
+export function createDataFunctionUrl(request: Request | URL | string, path: To): URL {
+	let url = new URL(typeof request === 'string' || request instanceof URL ? request : request.url);
+
+	let parsed = typeof path === 'string' ? parsePath(path) : path;
+	url.pathname = parsed.pathname || '/';
+
+	if (parsed.search) {
+		let searchParams = new URLSearchParams(parsed.search);
+
+		// Strip naked index param, preserve any other index params with values
+		let indexValues = searchParams.getAll('index');
+		searchParams.delete('index');
+		for (let value of indexValues.filter(Boolean)) {
+			searchParams.append('index', value);
+		}
+		let search = searchParams.toString();
+		url.search = search ? `?${search}` : '';
+	} else {
+		url.search = '';
+	}
+
+	url.hash = parsed.hash || '';
+
+	return url;
 }
 
 export const isBrowser =

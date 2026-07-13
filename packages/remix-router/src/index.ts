@@ -1,6 +1,6 @@
 // @octanejs/remix-router — react-router for the octane renderer.
 //
-// react-router v7 ships as a single package whose framework-agnostic core has
+// react-router v8 ships as a single package whose framework-agnostic core has
 // no runtime subpath, so the core (lib/router/* + framework-free lib helpers)
 // is VENDORED byte-close (see scripts/vendor-remix-router.mjs) and only the
 // React layer is transcribed onto octane's hooks. This entry mirrors upstream
@@ -24,8 +24,15 @@ export type {
 	InstrumentRouterFunction,
 	InstrumentRouteFunction,
 	InstrumentationHandlerResult,
+	InstrumentationClientRouterResult,
+	InstrumentationServerHandlerResult,
 } from './lib/router/instrumentation';
-export { IDLE_NAVIGATION, IDLE_FETCHER, IDLE_BLOCKER } from './lib/router/router';
+export {
+	createStaticHandler,
+	IDLE_NAVIGATION,
+	IDLE_FETCHER,
+	IDLE_BLOCKER,
+} from './lib/router/router';
 export {
 	data,
 	generatePath,
@@ -179,12 +186,7 @@ export type {
 	FetcherWithComponents,
 } from './lib/dom/lib';
 export { Form } from './lib/dom/Form.tsrx';
-export {
-	StaticRouter,
-	StaticRouterProvider,
-	createStaticHandler,
-	createStaticRouter,
-} from './lib/dom/server.tsrx';
+export { StaticRouter, StaticRouterProvider, createStaticRouter } from './lib/dom/server.tsrx';
 
 // ── UNSAFE_ surface (shipped subset) ────────────────────────────────────────
 export {
@@ -194,7 +196,10 @@ export {
 	invariant as UNSAFE_invariant,
 } from './lib/router/history';
 export { createRouter as UNSAFE_createRouter } from './lib/router/router';
-export { ErrorResponseImpl as UNSAFE_ErrorResponseImpl } from './lib/router/utils';
+export {
+	defaultMapRouteProperties as UNSAFE_defaultMapRouteProperties,
+	ErrorResponseImpl as UNSAFE_ErrorResponseImpl,
+} from './lib/router/utils';
 export {
 	DataRouterContext as UNSAFE_DataRouterContext,
 	DataRouterStateContext as UNSAFE_DataRouterStateContext,
@@ -204,10 +209,7 @@ export {
 	RouteContext as UNSAFE_RouteContext,
 	ViewTransitionContext as UNSAFE_ViewTransitionContext,
 } from './lib/context';
-export {
-	hydrationRouteProperties as UNSAFE_hydrationRouteProperties,
-	mapRouteProperties as UNSAFE_mapRouteProperties,
-} from './lib/components/utils';
+export { hydrationRouteProperties as UNSAFE_hydrationRouteProperties } from './lib/components/utils';
 export {
 	WithComponentProps as UNSAFE_WithComponentProps,
 	withComponentProps as UNSAFE_withComponentProps,
@@ -217,7 +219,7 @@ export {
 	withErrorBoundaryProps as UNSAFE_withErrorBoundaryProps,
 } from './lib/components/with-props';
 export type { Register } from './lib/types/register';
-export type { MiddlewareEnabled as UNSAFE_MiddlewareEnabled } from './lib/types/future';
+export type { Future } from './lib/types/future';
 
 // ── Server runtime (vendored cookie/session surface) ────────────────────────
 export { createCookie, isCookie } from './lib/server-runtime/cookies';

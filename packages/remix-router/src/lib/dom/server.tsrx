@@ -1,22 +1,15 @@
-// Static SSR — transcribed from react-router@7.18.1 lib/dom/server.tsx onto
+// Static SSR — transcribed from react-router@8.2.0 lib/dom/server.tsx onto
 // octane: StaticRouter (a Router that may not navigate), StaticRouterProvider
 // (renders a static data router + the __staticRouterHydrationData script),
-// createStaticHandler (the dom wrapper adding mapRouteProperties), and
-// createStaticRouter (a stateless DataRouter over a StaticHandlerContext).
+// and createStaticRouter (a stateless DataRouter over a StaticHandlerContext).
 // Render through `octane/server` (renderToString / renderToPipeableStream).
 import type { Location, Path, To } from '../router/history.ts';
 import { Action as NavigationType, createPath, invariant, parsePath } from '../router/history.ts';
-import {
-	IDLE_BLOCKER,
-	IDLE_FETCHER,
-	IDLE_NAVIGATION,
-	createStaticHandler as routerCreateStaticHandler,
-} from '../router/router.ts';
+import { IDLE_BLOCKER, IDLE_FETCHER, IDLE_NAVIGATION } from '../router/router.ts';
 import { convertRoutesToDataRoutes, isRouteErrorResponse } from '../router/utils.ts';
 import { ABSOLUTE_URL_REGEX } from '../router/url.ts';
 import { Router } from '../components/Router.tsrx';
 import { DataRoutes } from '../components/RouterProvider.tsrx';
-import { mapRouteProperties } from '../components/utils.ts';
 import {
 	DataRouterContext,
 	DataRouterStateContext,
@@ -136,7 +129,7 @@ function serializeErrors(errors) {
 	const serialized = {};
 	for (const [key, val] of entries) {
 		// Hey you!  If you change this, please change the corresponding logic in
-		// deserializeErrors in react-router-dom/index.tsx :)
+		// deserializeErrors in lib/dom/lib.tsx :)
 		if (isRouteErrorResponse(val)) {
 			serialized[key] = { ...val, __type: 'RouteErrorResponse' };
 		} else if (val instanceof Error) {
@@ -191,21 +184,11 @@ function getStatelessNavigator() {
 }
 
 /**
- * Create a static handler to perform server-side data loading.
- */
-export function createStaticHandler(routes, opts) {
-	return routerCreateStaticHandler(routes, {
-		...opts,
-		mapRouteProperties,
-	});
-}
-
-/**
  * Create a static DataRouter for server-side rendering.
  */
 export function createStaticRouter(routes, context, opts = {}) {
 	const manifest = {};
-	const dataRoutes = convertRoutesToDataRoutes(routes, mapRouteProperties, undefined, manifest);
+	const dataRoutes = convertRoutesToDataRoutes(routes, undefined, undefined, manifest);
 
 	// Because our context matches may be from a set of routes passed to
 	// createStaticHandler(), we update them here with our newly created/enhanced
@@ -226,12 +209,7 @@ export function createStaticRouter(routes, context, opts = {}) {
 			return context.basename;
 		},
 		get future() {
-			return {
-				v8_middleware: false,
-				v8_passThroughRequests: false,
-				v8_trailingSlashAwareDataRequests: false,
-				...opts?.future,
-			};
+			return { ...opts?.future };
 		},
 		get state() {
 			return {
