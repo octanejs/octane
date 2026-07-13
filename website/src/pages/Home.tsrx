@@ -22,7 +22,7 @@ const FEATURES = [
 			'each boundary as soon as it’s ready.',
 	},
 	{
-		title: 'No virtual DOM.',
+		title: 'No virtual DOM',
 		body: 'Templates compile to cloned nodes and direct DOM writes, and keyed ' +
 			'@for lists move the fewest nodes possible. Plain .tsx still works, so you ' +
 			'can adopt .tsrx one component at a time.',
@@ -30,7 +30,7 @@ const FEATURES = [
 		linkLabel: 'tsrx.dev',
 	},
 	{
-		title: 'Change the import. Keep the model.',
+		title: 'Change the import. Keep the model',
 		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms ' +
 			'and Suspense all behave the way you expect. Events are native, refs are ' +
 			'just props, and 17 first-party bindings cover the libraries you already use.',
