@@ -1,0 +1,62 @@
+{
+  "name": "@octanejs/evals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Public schemas, development tasks, and reporting tools for Octane and TSRX evaluations.",
+  "license": "MIT",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/octane-evals"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./jsonl": {
+      "types": "./dist/jsonl.d.ts",
+      "import": "./dist/jsonl.js"
+    },
+    "./dataset": {
+      "types": "./dist/dataset.d.ts",
+      "import": "./dist/dataset.js"
+    },
+    "./digest": {
+      "types": "./dist/digest.d.ts",
+      "import": "./dist/digest.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js"
+    },
+    "./reporting": {
+      "types": "./dist/reporting.d.ts",
+      "import": "./dist/reporting.js"
+    },
+    "./runner": {
+      "types": "./dist/runner.d.ts",
+      "import": "./dist/runner.js"
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "cd ../.. && vitest run --project octane-evals",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

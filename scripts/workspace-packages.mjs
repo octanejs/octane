@@ -11,6 +11,7 @@ const SPECIAL_ROLES = new Map([
 	['@octanejs/vite-plugin', 'metaframework'],
 	['@octanejs/adapter-vercel', 'deployment adapter'],
 	['@octanejs/mcp-server', 'agent tooling'],
+	['@octanejs/evals', 'evaluation tooling'],
 ]);
 
 function readJson(file) {
