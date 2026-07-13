@@ -1,0 +1,57 @@
+{
+  "name": "@octanejs/redux-toolkit",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Redux Toolkit for the octane renderer — reuses Redux Toolkit and RTK Query core unchanged and ports the React hook adapters onto octane.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/redux-toolkit"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react/index.ts",
+    "./query": "./src/query/index.ts",
+    "./query/react": "./src/query/react/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project redux-toolkit --project redux-toolkit-ssr"
+  },
+  "dependencies": {
+    "@octanejs/redux": "workspace:*",
+    "@reduxjs/toolkit": "catalog:default",
+    "redux": "catalog:default",
+    "reselect": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-redux": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

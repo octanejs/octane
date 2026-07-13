@@ -25,6 +25,7 @@ export const KNOWN_BINDINGS = {
 	sonner: '@octanejs/sonner',
 	recharts: '@octanejs/recharts',
 	'react-redux': '@octanejs/redux',
+	'@reduxjs/toolkit': '@octanejs/redux-toolkit',
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
 	'@mdx-js/react': '@octanejs/mdx',
