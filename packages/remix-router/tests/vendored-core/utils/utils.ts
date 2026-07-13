@@ -1,4 +1,4 @@
-// Ported from react-router@7.18.1 packages/react-router/__tests__/router/utils/utils.ts — verbatim except: DataRouteObject type imported from the vendored ../../../src/lib/router/utils (upstream re-exported it as AgnosticDataRouteObject from __tests__/utils).
+// Ported from react-router@8.2.0 packages/react-router/__tests__/router/utils/utils.ts — verbatim except: DataRouteObject type imported from the vendored ../../../src/lib/router/utils (upstream re-exported it as AgnosticDataRouteObject from __tests__/utils).
 import type { DataRouteObject } from '../../../src/lib/router/utils';
 
 export async function sleep(n: number) {

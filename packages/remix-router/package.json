@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "react-router for the octane renderer — the framework-agnostic router core vendored byte-close from react-router v7, with the React layer (RouterProvider, hooks, Link, boundaries) transcribed onto octane.",
+  "description": "react-router for the octane renderer — the framework-agnostic router core vendored byte-close from react-router v8, with the React layer (RouterProvider, hooks, Link, boundaries) transcribed onto octane.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -41,7 +41,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "cookie": "^1.0.1"
+    "cookie-es": "^3.1.1"
   },
   "peerDependencies": {
     "octane": "workspace:*"
@@ -53,7 +53,6 @@
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "react-router": "catalog:default",
-    "react-router-dom": "catalog:default",
     "vitest": "catalog:default"
   }
 }

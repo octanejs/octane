@@ -2,11 +2,11 @@
 
 [react-router](https://reactrouter.com) for the [octane](https://github.com/octanejs/octane) UI framework.
 
-react-router v7 ships as a single package, so this port **vendors the
+react-router v8 ships as a single package, so this port **vendors the
 framework-agnostic router core byte-close** (loaders, actions, redirects,
-matching, history — validated by 161 of upstream's own router unit tests
-running against the vendored copy) and transcribes the React layer onto
-octane's hooks. The shipped surface matches react-router 1:1 — existing code
+matching, history — validated by 161 ported upstream router tests plus four
+focused v8.2 regression pins) and transcribes the React layer onto octane's
+hooks. The shipped runtime surface matches react-router 1:1 — existing code
 works by changing the import.
 
 **The port is complete — full export parity.** Data mode, declarative mode
@@ -59,11 +59,25 @@ function User() @{
 | `@octanejs/remix-router` | the vendored core surface (matchPath, redirect, data, …) + `createMemoryRouter`, `RouterProvider`, `Outlet`, `Await`, `Link`, `useLinkClickHandler`, the full read-hook family (`useLoaderData`, `useNavigate`, `useNavigation`, `useRouteError`, …), declarative mode (`MemoryRouter`, `Routes`/`Route`, `Navigate`, `createRoutesFromChildren`/`Elements`), the DOM layer (`createBrowserRouter`/`createHashRouter`, `BrowserRouter`/`HashRouter`/`unstable_HistoryRouter`, `NavLink`, `useSearchParams`), mutations (`Form`, `useSubmit`, `useFormAction`, `useFetcher`/`useFetchers`), guards/scroll (`useBlocker`, `ScrollRestoration`, …), static SSR (`StaticRouter`/`StaticRouterProvider`/`createStaticHandler`/`createStaticRouter`), and cookies/sessions (`createCookie`, `createCookieSessionStorage`, …) | full parity |
 | `@octanejs/remix-router/dom` | `RouterProvider` with octane's `flushSync` wired in | mirror of `react-router/dom` |
 
+## React Router 8 migration
+
+- React Router 8 no longer publishes a `react-router-dom` package. Import
+  everything from `@octanejs/remix-router`, except the flushSync-enabled
+  `RouterProvider`, which comes from `@octanejs/remix-router/dom`.
+- Middleware is always enabled. Loader, action, and middleware `context` is a
+  `RouterContextProvider`; the `future.v8_middleware`,
+  `future.v8_passThroughRequests`, and
+  `future.v8_trailingSlashAwareDataRequests` flags are gone.
+- The internal `hasErrorBoundary` route property is gone. Use `ErrorBoundary`
+  or `errorElement`.
+- The package follows Octane's repository-wide Node.js 22 or newer runtime
+  contract.
+
 ## How it works
 
 - The router core under `src/lib/router/` is vendored verbatim from
-  react-router 7.18.1 (`scripts/vendor-remix-router.mjs`; two documented
-  type-only deviations; hand-edits prohibited).
+  react-router 8.2.0 (`scripts/vendor-remix-router.mjs`; two documented
+  Octane integration deviations; hand-edits prohibited).
 - `RouterProvider` preserves upstream's exact commit paths — `startTransition`
   wrapping, the `flushSync` option, and the ViewTransition dance (dormant until
   Phase E) — on octane's `useState`/`useLayoutEffect`/`useOptimistic`/

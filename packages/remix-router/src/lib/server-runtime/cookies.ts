@@ -1,12 +1,12 @@
-// Vendored from react-router@7.18.1 packages/react-router/lib/server-runtime/cookies.ts — unmodified.
+// Vendored from react-router@8.2.0 packages/react-router/lib/server-runtime/cookies.ts — unmodified.
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
-import type { ParseOptions, SerializeOptions } from 'cookie';
-import { parse, serialize } from 'cookie';
+import type { CookieParseOptions, CookieSerializeOptions } from 'cookie-es';
+import { parse, serialize } from 'cookie-es';
 
 import { sign, unsign } from './crypto';
 import { warnOnce } from './warnings';
 
-export type { ParseOptions as CookieParseOptions, SerializeOptions as CookieSerializeOptions };
+export type { CookieParseOptions, CookieSerializeOptions };
 
 export interface CookieSignatureOptions {
 	/**
@@ -20,7 +20,7 @@ export interface CookieSignatureOptions {
 	secrets?: string[];
 }
 
-export type CookieOptions = ParseOptions & SerializeOptions & CookieSignatureOptions;
+export type CookieOptions = CookieParseOptions & CookieSerializeOptions & CookieSignatureOptions;
 
 /**
  * A HTTP cookie.
@@ -55,13 +55,13 @@ export interface Cookie {
 	 * Parses a raw `Cookie` header and returns the value of this cookie or
 	 * `null` if it's not present.
 	 */
-	parse(cookieHeader: string | null, options?: ParseOptions): Promise<any>;
+	parse(cookieHeader: string | null, options?: CookieParseOptions): Promise<any>;
 
 	/**
 	 * Serializes the given value to a string and returns the `Set-Cookie`
 	 * header.
 	 */
-	serialize(value: any, options?: SerializeOptions): Promise<string>;
+	serialize(value: any, options?: CookieSerializeOptions): Promise<string>;
 }
 
 /**

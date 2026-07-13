@@ -1,4 +1,4 @@
-// RenderErrorBoundary — port of the class boundary in react-router@7.18.1
+// RenderErrorBoundary — port of the class boundary in react-router@8.2.0
 // lib/hooks.tsx onto octane's @try/@catch (octane has no class components).
 // RSC digest branches are dropped (RSCRouterContext is hardwired false here).
 //

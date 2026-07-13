@@ -1,4 +1,4 @@
-// DOM hooks — transcribed from react-router@7.18.1 lib/dom/lib.tsx onto
+// DOM hooks — transcribed from react-router@8.2.0 lib/dom/lib.tsx onto
 // octane. This PR ships useLinkClickHandler (Link's engine); the remaining DOM
 // hooks (useSearchParams, useSubmit, useFetcher, …) land in later phases per
 // docs/remix-router-port-plan.md.

@@ -1,5 +1,5 @@
 // Declarative `<Routes>`/`<Route>` support — transcribed from
-// react-router@7.18.1 lib/components.tsx with ONE octane-specific mechanism.
+// react-router@8.2.0 lib/components.tsx with ONE octane-specific mechanism.
 //
 // Upstream walks React children (`createRoutesFromChildren`) reading
 // `element.type === Route`. Octane value-position JSX (argument position, prop
@@ -60,7 +60,6 @@ const ROUTE_PROP_KEYS = [
 	'HydrateFallback',
 	'errorElement',
 	'ErrorBoundary',
-	'hasErrorBoundary',
 	'shouldRevalidate',
 	'handle',
 	'lazy',
@@ -170,8 +169,6 @@ function buildRoute(entry: CollectorEntry, treePath: number[]): RouteObject {
 		HydrateFallback: p.HydrateFallback,
 		errorElement: p.errorElement,
 		ErrorBoundary: p.ErrorBoundary,
-		hasErrorBoundary:
-			p.hasErrorBoundary === true || p.ErrorBoundary != null || p.errorElement != null,
 		shouldRevalidate: p.shouldRevalidate,
 		handle: p.handle,
 		lazy: p.lazy,
@@ -295,10 +292,6 @@ export function createRoutesFromChildren(
 			HydrateFallback: element.props.HydrateFallback,
 			errorElement: element.props.errorElement,
 			ErrorBoundary: element.props.ErrorBoundary,
-			hasErrorBoundary:
-				element.props.hasErrorBoundary === true ||
-				element.props.ErrorBoundary != null ||
-				element.props.errorElement != null,
 			shouldRevalidate: element.props.shouldRevalidate,
 			handle: element.props.handle,
 			lazy: element.props.lazy,

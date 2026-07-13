@@ -1,5 +1,5 @@
 // BrowserRouter / HashRouter / HistoryRouter — transcribed from
-// react-router@7.18.1 lib/dom/lib.tsx. Declarative routers over browser /
+// react-router@8.2.0 lib/dom/lib.tsx. Declarative routers over browser /
 // hash / caller-provided history (upstream repeats the subscribe body in each;
 // so does this transcription).
 import { startTransition, useCallback, useLayoutEffect, useRef, useState } from 'octane';

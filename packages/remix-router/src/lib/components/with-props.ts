@@ -1,4 +1,4 @@
-// UNSAFE_With*Props wrappers — transcribed from react-router@7.18.1
+// UNSAFE_With*Props wrappers — transcribed from react-router@8.2.0
 // lib/components.tsx. Used by framework-mode codegen upstream; exported here
 // for surface parity. Plain .ts: cloneElement/createElement over descriptors.
 import { cloneElement, createElement } from 'octane';

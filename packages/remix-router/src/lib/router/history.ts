@@ -1,4 +1,4 @@
-// Vendored from react-router@7.18.1 packages/react-router/lib/router/history.ts — unmodified.
+// Vendored from react-router@8.2.0 packages/react-router/lib/router/history.ts — unmodified.
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
 import { PROTOCOL_RELATIVE_URL_REGEX } from './url';
 
@@ -53,7 +53,7 @@ export interface Path {
 	hash: string;
 }
 
-// TODO: (v7) Change the Location generic default from `any` to `unknown` and
+// TODO: (v9) Change the Location generic default from `any` to `unknown` and
 // remove Remix `useLocation` wrapper.
 
 /**

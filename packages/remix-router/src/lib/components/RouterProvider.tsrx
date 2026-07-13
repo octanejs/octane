@@ -1,4 +1,4 @@
-// RouterProvider + DataRoutes + Outlet — transcribed from react-router@7.18.1
+// RouterProvider + DataRoutes + Outlet — transcribed from react-router@8.2.0
 // lib/components.tsx onto octane. Structure preserved verbatim: useState for
 // router state + layout-effect subscription (early enough for render-driven
 // redirects; subscribe() replays a pre-attach notification), useOptimistic for
