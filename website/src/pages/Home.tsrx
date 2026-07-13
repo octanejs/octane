@@ -10,13 +10,13 @@ import { HOME_SUMMARY } from '../content/benchmarks.ts';
 
 const FEATURES = [
 	{
-		title: 'Hooks without the homework',
+		title: 'No rules of hooks',
 		body: 'No dependency arrays and no rules of hooks. The compiler tracks what ' +
 			'your effects, memos and callbacks actually use, and hooks can sit behind ' +
-			'conditions or early returns. You keep the hooks you know.',
+			'conditions or early returns.',
 	},
 	{
-		title: 'Suspense without waterfalls',
+		title: 'Improved async',
 		body: 'Independent use() calls start together instead of suspending one at a ' +
 			'time down the tree. Nested fetches warm up early, and streaming SSR sends ' +
 			'each boundary as soon as it’s ready.',
@@ -26,11 +26,9 @@ const FEATURES = [
 		body: 'Templates compile to cloned nodes and direct DOM writes, and keyed ' +
 			'@for lists move the fewest nodes possible. Plain .tsx still works, so you ' +
 			'can adopt .tsrx one component at a time.',
-		href: 'https://tsrx.dev',
-		linkLabel: 'tsrx.dev',
 	},
 	{
-		title: 'Change the import. Keep the model',
+		title: 'Familiar model',
 		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms ' +
 			'and Suspense all behave the way you expect. Events are native, refs are ' +
 			'just props, and 17 first-party bindings cover the libraries you already use.',
