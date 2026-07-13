@@ -372,55 +372,264 @@ function collectOctaneBoundaryNames(astBody) {
 function moduleImportsViewTransition(astBody) {
 	const namespaces = new Set();
 	for (const node of astBody) {
-		if (node.type !== 'ImportDeclaration' || node.source.value !== 'octane') continue;
-		for (const sp of node.specifiers || []) {
-			if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
-				namespaces.add(sp.local.name);
-				continue;
+		if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
+			if (node.importKind === 'type') continue;
+			for (const sp of node.specifiers || []) {
+				if (sp.importKind === 'type') continue;
+				if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
+					namespaces.add(sp.local.name);
+					continue;
+				}
+				const imported = astName(sp.imported);
+				if (isViewTransitionName(imported)) return true;
 			}
-			const imported = sp.imported?.name;
-			if (imported === 'ViewTransition' || imported === 'unstable_ViewTransition') return true;
+			continue;
+		}
+
+		// A direct barrel re-export creates the same runtime dependency as a named
+		// import. Arm the module itself so an app importing the alias gets the
+		// sticky hint before its first transition can reveal a boundary.
+		if (
+			node.type === 'ExportNamedDeclaration' &&
+			node.source?.value === 'octane' &&
+			node.exportKind !== 'type'
+		) {
+			for (const sp of node.specifiers || []) {
+				if (sp.exportKind !== 'type' && isViewTransitionName(astName(sp.local))) return true;
+			}
 		}
 	}
 	if (namespaces.size === 0) return false;
 
+	// Namespace destructuring is another import alias form. Restrict this to
+	// module-level declarations whose initializer is the ACTUAL imported
+	// namespace; a similarly named object in a nested lexical scope is not
+	// evidence that Octane's ViewTransition is used. Static computed string keys
+	// are equivalent to identifier keys, while dynamic computed keys are not.
+	for (const statement of astBody) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (declaration?.type !== 'VariableDeclaration') continue;
+		for (const declarator of declaration.declarations || []) {
+			const init = unwrapTransparentExpression(declarator.init);
+			if (init?.type !== 'Identifier' || !namespaces.has(init.name)) continue;
+			if (objectPatternReadsViewTransition(declarator.id)) return true;
+		}
+	}
+
 	// A namespace import by itself is not evidence that the app uses view
 	// transitions (`import * as Octane` is also a common hook style). Look for a
-	// real member read/JSX tag so unrelated Suspense reveals are not wrapped in a
-	// document transition merely because the namespace exists.
+	// real, lexically-unshadowed member read/JSX tag so unrelated Suspense reveals
+	// are not wrapped merely because the namespace exists (or because a callback
+	// parameter happens to use the same name as the import).
 	let found = false;
-	const walk = (node) => {
+	const seen = new WeakSet();
+	const walk = (node, shadowed) => {
 		if (found || node == null || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
-			for (const child of node) walk(child);
+			for (const child of node) walk(child, shadowed);
 			return;
 		}
+		if (seen.has(node)) return;
+		seen.add(node);
+
+		// Type-only syntax cannot cause the runtime namespace to be read. Preserve
+		// the handful of transparent TS expression wrappers, then skip other TS
+		// nodes entirely.
+		if (
+			node.type === 'TSAsExpression' ||
+			node.type === 'TSTypeAssertion' ||
+			node.type === 'TSSatisfiesExpression' ||
+			node.type === 'TSNonNullExpression' ||
+			node.type === 'TSInstantiationExpression'
+		) {
+			walk(node.expression, shadowed);
+			return;
+		}
+		if (node.type?.startsWith('TS')) return;
+
 		if (node.type === 'MemberExpression' || node.type === 'JSXMemberExpression') {
 			const objectName = node.object?.name;
-			const propertyName = node.computed ? node.property?.value : node.property?.name;
+			const propertyName = memberPropertyName(node);
 			if (
 				namespaces.has(objectName) &&
-				(propertyName === 'ViewTransition' || propertyName === 'unstable_ViewTransition')
+				!shadowed.has(objectName) &&
+				isViewTransitionName(propertyName)
 			) {
 				found = true;
 				return;
 			}
+			walk(node.object, shadowed);
+			if (node.computed) walk(node.property, shadowed);
+			return;
+		}
+
+		if (
+			node.type === 'FunctionExpression' ||
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'ArrowFunctionExpression'
+		) {
+			const inner = new Set(shadowed);
+			for (const param of node.params || []) addNamespaceBindings(param, inner);
+			if (node.id) addNamespaceBindings(node.id, inner);
+			collectFunctionVarNamespaceBindings(node.body, inner);
+			walk(node.body, inner);
+			return;
+		}
+
+		if (node.type === 'BlockStatement') {
+			const inner = new Set(shadowed);
+			for (const statement of node.body || []) addDirectNamespaceBindings(statement, inner);
+			walk(node.body, inner);
+			return;
+		}
+
+		if (node.type === 'CatchClause') {
+			const inner = new Set(shadowed);
+			if (node.param) addNamespaceBindings(node.param, inner);
+			walk(node.body, inner);
+			return;
+		}
+
+		if (
+			node.type === 'ForStatement' ||
+			node.type === 'ForInStatement' ||
+			node.type === 'ForOfStatement'
+		) {
+			const inner = new Set(shadowed);
+			const left = node.type === 'ForStatement' ? node.init : node.left;
+			if (left?.type === 'VariableDeclaration') {
+				for (const declaration of left.declarations || []) {
+					addNamespaceBindings(declaration.id, inner);
+				}
+			}
+			walk(left, inner);
+			walk(node.test, inner);
+			walk(node.update, inner);
+			walk(node.right, inner);
+			walk(node.body, inner);
+			return;
+		}
+
+		if (node.type === 'VariableDeclarator') {
+			walk(node.init, shadowed);
+			return;
+		}
+
+		if (node.type === 'ImportDeclaration') return;
+		if (node.type === 'ExportNamedDeclaration') {
+			if (node.exportKind !== 'type') walk(node.declaration, shadowed);
+			return;
+		}
+		if (node.type === 'ExportDefaultDeclaration') {
+			walk(node.declaration, shadowed);
+			return;
 		}
 		for (const key in node) {
-			if (
-				key === 'loc' ||
-				key === 'start' ||
-				key === 'end' ||
-				key === 'range' ||
-				key === 'metadata'
-			) {
-				continue;
-			}
-			walk(node[key]);
+			if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+			if (key === 'range' || key === 'metadata' || key === 'parent') continue;
+			walk(node[key], shadowed);
 		}
 	};
-	walk(astBody);
+	walk(astBody, new Set());
 	return found;
+
+	function isViewTransitionName(name) {
+		return name === 'ViewTransition' || name === 'unstable_ViewTransition';
+	}
+
+	function astName(node) {
+		if (node?.type === 'Identifier' || node?.type === 'JSXIdentifier') return node.name;
+		return typeof node?.value === 'string' ? node.value : null;
+	}
+
+	function staticPropertyName(node, computed) {
+		if (!computed) return astName(node);
+		if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
+		if (node?.type === 'TemplateLiteral' && (node.expressions?.length ?? 0) === 0) {
+			return node.quasis?.[0]?.value?.cooked ?? null;
+		}
+		return null;
+	}
+
+	function memberPropertyName(node) {
+		return staticPropertyName(node.property, node.computed === true);
+	}
+
+	function unwrapTransparentExpression(node) {
+		while (
+			node &&
+			(node.type === 'TSAsExpression' ||
+				node.type === 'TSTypeAssertion' ||
+				node.type === 'TSSatisfiesExpression' ||
+				node.type === 'TSNonNullExpression' ||
+				node.type === 'ParenthesizedExpression')
+		) {
+			node = node.expression;
+		}
+		return node;
+	}
+
+	function objectPatternReadsViewTransition(pattern) {
+		if (pattern?.type !== 'ObjectPattern') return false;
+		for (const property of pattern.properties || []) {
+			if (
+				property.type === 'Property' &&
+				isViewTransitionName(staticPropertyName(property.key, property.computed === true))
+			) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function addNamespaceBindings(pattern, shadowed) {
+		const bindings = new Set();
+		collectBindings(pattern, bindings);
+		for (const name of bindings) {
+			if (namespaces.has(name)) shadowed.add(name);
+		}
+	}
+
+	function addDirectNamespaceBindings(statement, shadowed) {
+		if (statement.type === 'VariableDeclaration') {
+			for (const declaration of statement.declarations || []) {
+				addNamespaceBindings(declaration.id, shadowed);
+			}
+			return;
+		}
+		if (
+			(statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') &&
+			statement.id
+		) {
+			addNamespaceBindings(statement.id, shadowed);
+		}
+	}
+
+	function collectFunctionVarNamespaceBindings(node, shadowed) {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) collectFunctionVarNamespaceBindings(child, shadowed);
+			return;
+		}
+		if (
+			node.type === 'FunctionExpression' ||
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'ArrowFunctionExpression'
+		) {
+			return;
+		}
+		if (node.type === 'VariableDeclaration' && node.kind === 'var') {
+			for (const declaration of node.declarations || []) {
+				addNamespaceBindings(declaration.id, shadowed);
+			}
+		}
+		for (const key in node) {
+			if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+			if (key === 'range' || key === 'metadata' || key === 'parent') continue;
+			collectFunctionVarNamespaceBindings(node[key], shadowed);
+		}
+	}
 }
 
 export const HOOK_NAMES = new Set([

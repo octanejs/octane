@@ -24,21 +24,68 @@ import {
 } from './_fixtures/view-transition-features.tsrx';
 
 describe('ViewTransition compiler hints', () => {
+	const expectHint = (source: string, filename: string) => {
+		const code = compile(source, filename).code;
+		expect(code).toContain('__vtSeen as _$__vtSeen');
+		expect(code).toContain('_$__vtSeen();');
+	};
+
+	const expectNoHint = (source: string, filename: string) => {
+		expect(compile(source, filename).code).not.toContain('__vtSeen');
+	};
+
 	it('does not arm transitions for an unrelated Octane namespace import', () => {
-		const code = compile(
+		expectNoHint(
 			`import * as Octane from 'octane'; export function App() @{ <p>{Octane.useId()}</p> }`,
 			'namespace-hook.tsrx',
-		).code;
-		expect(code).not.toContain('__vtSeen');
+		);
 	});
 
 	it('arms transitions for a namespace ViewTransition tag', () => {
-		const code = compile(
+		expectHint(
 			`import * as Octane from 'octane'; export function App() @{ <Octane.ViewTransition><p /></Octane.ViewTransition> }`,
 			'namespace-view-transition.tsrx',
-		).code;
-		expect(code).toContain('__vtSeen as _$__vtSeen');
-		expect(code).toContain('_$__vtSeen();');
+		);
+	});
+
+	it.each([
+		['stable', 'ViewTransition'],
+		['unstable', 'unstable_ViewTransition'],
+		['computed stable', "['ViewTransition']"],
+		['computed unstable', "['unstable_ViewTransition']"],
+	])('arms transitions for a top-level %s namespace destructuring alias', (_, property) => {
+		expectHint(
+			`import * as Octane from 'octane'; const { ${property}: VT } = Octane; export function App() @{ <VT><p /></VT> }`,
+			'namespace-destructure.tsrx',
+		);
+	});
+
+	it('does not treat destructuring from another object as an Octane alias', () => {
+		expectNoHint(
+			`import * as Octane from 'octane'; const other = { ViewTransition: () => null }; const { ViewTransition: VT } = other; export function App() @{ <p /> }`,
+			'namespace-destructure-other.tsrx',
+		);
+	});
+
+	it('does not arm for a lexically shadowed namespace member', () => {
+		expectNoHint(
+			`import * as Octane from 'octane'; function read(Octane: { ViewTransition: unknown }) { return Octane.ViewTransition; } export function App() @{ <p /> }`,
+			'namespace-shadowed.tsrx',
+		);
+	});
+
+	it.each(['ViewTransition as VT', 'unstable_ViewTransition as VT'])(
+		'arms transitions for a direct Octane barrel export: %s',
+		(specifier) => {
+			expectHint(`export { ${specifier} } from 'octane';`, 'view-transition-barrel.tsrx');
+		},
+	);
+
+	it('ignores type-only ViewTransition namespace and barrel exports', () => {
+		expectNoHint(
+			`import type * as Octane from 'octane'; type VT = typeof Octane.ViewTransition; export type { ViewTransition } from 'octane';`,
+			'view-transition-type-only.tsrx',
+		);
 	});
 });
 

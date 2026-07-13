@@ -309,6 +309,12 @@ interface RootIdState {
 	next: number;
 }
 
+// Client-only roots need a namespace beyond their root-local useId counter: two
+// createRoot() calls can otherwise both emit `:in-0:` into the same document.
+// hydrateRoot deliberately does NOT consume this counter — its prefix/counter
+// must remain byte-identical to the server render it adopts.
+let nextClientRootId = 0;
+
 export interface Block extends Scope {
 	kind: BlockKind;
 	parentBlock: Block | null;
@@ -13867,7 +13873,10 @@ export interface Root {
 }
 
 export interface RootOptions {
-	/** Caller-controlled namespace for useId; use distinct prefixes for sibling roots. */
+	/**
+	 * Caller-controlled useId prefix. createRoot composes it with an automatic
+	 * client-root namespace; hydrateRoot uses it verbatim to match server output.
+	 */
 	identifierPrefix?: string;
 }
 
@@ -13966,7 +13975,7 @@ export function createRoot(container: Element, options?: RootOptions): Root {
 	registerDelegationTarget(container);
 	// Lazy root: the block is created on the first `.render()` call.
 	return makeRoot(container, null, null, {
-		prefix: options?.identifierPrefix ?? '',
+		prefix: (options?.identifierPrefix ?? '') + 'r' + (nextClientRootId++).toString(36) + '-',
 		next: 0,
 	});
 }

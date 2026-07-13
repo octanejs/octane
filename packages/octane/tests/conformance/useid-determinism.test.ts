@@ -4,8 +4,9 @@
 // (b) stable through wrapper-component indirection, (c) distinct for multiple
 // useId() calls in one component, and — the headline invariant of the file —
 // (d) byte-for-byte identical between the SERVER render and the CLIENT render so
-// hydration lines up. Octane reproduces all four with a root-local counter and a
-// caller-controlled identifierPrefix shared by server render + hydration.
+// hydration lines up. Octane reproduces all four with root-local counters, an
+// automatic namespace for client-only roots, and an identifierPrefix shared by
+// server render + hydration.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -99,17 +100,34 @@ describe('useId determinism', () => {
 		expect(c2).toBe(c1);
 	});
 
-	it('isolates counters per root and namespaces sibling roots with identifierPrefix', () => {
+	it('automatically namespaces sibling createRoot roots', () => {
 		const a = document.createElement('div');
 		const b = document.createElement('div');
 		const seenA: string[] = [];
 		const seenB: string[] = [];
-		const rootA = createRoot(a, { identifierPrefix: 'left-' });
-		const rootB = createRoot(b, { identifierPrefix: 'right-' });
+		const rootA = createRoot(a);
+		const rootB = createRoot(b);
 		rootA.render(Single, { onId: (id: string) => seenA.push(id) });
 		rootB.render(Single, { onId: (id: string) => seenB.push(id) });
-		expect(seenA[0]).toBe(':left-in-0:');
-		expect(seenB[0]).toBe(':right-in-0:');
+		expect(seenA[0]).toMatch(/^:r[0-9a-z]+-in-0:$/);
+		expect(seenB[0]).toMatch(/^:r[0-9a-z]+-in-0:$/);
+		expect(seenA[0]).not.toBe(seenB[0]);
+		rootA.unmount();
+		rootB.unmount();
+	});
+
+	it('composes identifierPrefix with the automatic client-root namespace', () => {
+		const a = document.createElement('div');
+		const b = document.createElement('div');
+		const seenA: string[] = [];
+		const seenB: string[] = [];
+		const rootA = createRoot(a, { identifierPrefix: 'app-' });
+		const rootB = createRoot(b, { identifierPrefix: 'app-' });
+		rootA.render(Single, { onId: (id: string) => seenA.push(id) });
+		rootB.render(Single, { onId: (id: string) => seenB.push(id) });
+		expect(seenA[0]).toMatch(/^:app-r[0-9a-z]+-in-0:$/);
+		expect(seenB[0]).toMatch(/^:app-r[0-9a-z]+-in-0:$/);
+		expect(seenA[0]).not.toBe(seenB[0]);
 		rootA.unmount();
 		rootB.unmount();
 	});
