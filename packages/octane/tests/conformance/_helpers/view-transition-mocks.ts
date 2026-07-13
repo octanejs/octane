@@ -19,7 +19,7 @@
 //   vt.restore();                              // in afterEach
 
 export interface ViewTransitionCall {
-	/** The options bag passed to document.startViewTransition. */
+	/** The normalized update callback passed to document.startViewTransition. */
 	options: { update: () => void };
 }
 
@@ -70,9 +70,10 @@ export function installViewTransitionMocks(): ViewTransitionMocks {
 	};
 
 	const calls: ViewTransitionCall[] = [];
-	(document as never as Record<string, unknown>)['startViewTransition'] = function (options: {
-		update: () => void;
-	}) {
+	(document as never as Record<string, unknown>)['startViewTransition'] = function (
+		input: (() => void) | { update: () => void },
+	) {
+		const options = typeof input === 'function' ? { update: input } : input;
 		calls.push({ options });
 		options.update();
 		return {

@@ -2,7 +2,13 @@
 title: Core APIs
 ---
 
-import { CoreApiDemo } from '../../components/CoreApiDemo.tsrx';
+import {
+	CoreApiDemo,
+	DataLoadingDemo,
+	FormActionDemo,
+	ListConditionsDemo,
+	RefEffectDemo,
+} from '../../components/CoreApiDemo.tsrx';
 
 <div className="doc-hero">
 	<p className="doc-eyebrow">Learn the essentials</p>
@@ -280,6 +286,11 @@ export function PackingList(props: { items: Item[] }) @{
 }
 ```
 
+Here is the same list with controls that exercise every branch, including the empty
+state:
+
+<ListConditionsDemo />
+
 The key must be stable for that item—usually an ID from your data. Avoid using the array
 position when items can be inserted, removed, or reordered. `@switch` handles several
 exclusive branches, while `@try` handles loading and errors.
@@ -356,29 +367,67 @@ for example `ref={[inputRef, measurementRef]}`.
 
 ### Synchronize an external system with `useEffect`
 
-An effect runs after Octane commits the DOM. If it starts something that outlives the
-render, return a cleanup function.
+Page metadata does not need an effect. Render `<title>` directly and Octane hoists it to
+the document head:
 
 ```tsrx
-import { useEffect } from 'octane';
-
 export function Article(props: { title: string }) @{
-	useEffect(() => {
-		const previousTitle = document.title;
-		document.title = props.title;
-
-		return () => {
-			document.title = previousTitle;
-		};
-	});
-
-	<h1>{props.title}</h1>
+	<>
+		<title>{props.title}</title>
+		<article>
+			<h1>{props.title}</h1>
+		</article>
+	</>
 }
 ```
 
-The compiler sees that the effect reads `props.title` and reruns it when that value
-changes. You can still pass an explicit dependency array when you need exact control;
-`[]` means mount and unmount only, while `null` deliberately means every render.
+Use an effect when a component must subscribe to a system outside Octane. This version
+adds a global keyboard shortcut to the search field. The effect connects after the DOM
+commits and disconnects when the component leaves the page:
+
+```tsrx
+import { useEffect, useRef } from 'octane';
+
+export function ShortcutSearch() @{
+	const inputRef = useRef<HTMLInputElement | null>(null);
+
+	useEffect(() => {
+		const focusSearch = (event: KeyboardEvent) => {
+			const target = event.target;
+			const isTyping =
+				target instanceof HTMLElement &&
+				target.matches('input, textarea, select, [contenteditable="true"]');
+
+			if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || isTyping) {
+				return;
+			}
+
+			event.preventDefault();
+			inputRef.current?.focus();
+		};
+
+		window.addEventListener('keydown', focusSearch);
+		return () => window.removeEventListener('keydown', focusSearch);
+	});
+
+	<div>
+		<input ref={inputRef} aria-label="Search" aria-keyshortcuts="/" />
+		<button onClick={() => inputRef.current?.focus()}>
+			Focus search
+		</button>
+	</div>
+}
+```
+
+Try both the ref-driven button and the effect-owned shortcut:
+
+<RefEffectDemo />
+
+The only component value this effect captures is a stable ref, so it connects once and
+disconnects on unmount. If an effect reads changing props or state, those values are
+inferred as dependencies. You can still pass an explicit dependency array when you need
+exact control; `[]` means mount and unmount only, while `null` deliberately means every
+render.
 
 <aside className="doc-callout tip">
 	<p className="doc-callout-title">You might not need an effect</p>
@@ -445,6 +494,11 @@ export function ProfilePage(props: { data: Promise<ProfileData> }) @{
 }
 ```
 
+This live version creates its Promise in an event handler, then shows the pending and
+success branches owned by the boundary:
+
+<DataLoadingDemo />
+
 `lazy(() => import('./Settings.tsrx'))` uses the same Suspense mechanism to load a
 component's code only when it is needed.
 
@@ -505,8 +559,11 @@ state:
 import { useActionState } from 'octane';
 
 async function saveName(previousMessage: string, formData: FormData) {
-	const name = String(formData.get('name') ?? '');
-	await fetch('/api/profile', { method: 'POST', body: formData });
+	const name = String(formData.get('name') ?? '').trim();
+	if (!name) return 'Enter a name before saving.';
+
+	// Replace this delay with your API or database call.
+	await new Promise((resolve) => setTimeout(resolve, 500));
 	return 'Saved ' + name;
 }
 
@@ -525,6 +582,11 @@ export function ProfileForm() @{
 	</form>
 }
 ```
+
+The example is fully interactive—the local delay stands in for a request so you can see
+pending, validation, and success states without a backend:
+
+<FormActionDemo />
 
 `useFormStatus` lets a child of the form read its status. `useOptimistic` temporarily
 shows the expected result while an action runs. `requestFormReset(form)` asks Octane to

@@ -1,4 +1,4 @@
-import { ViewTransition, use } from 'octane';
+import { ViewTransition, startTransition, use, useState } from 'octane';
 
 // Fixtures for ../view-transition.test.ts (Phase 2 feature coverage:
 // addTransitionType + per-type class maps, 'none' deactivation, share
@@ -80,5 +80,39 @@ export function FirstBoundaryRevealApp(props) @{
 		} @pending {
 			<div>{'Waiting...'}</div>
 		}
+	</>
+}
+
+// A native delegated click is the primary way consumers start transitions.
+// Keep the boundary separate from the button so only its changing content is
+// captured, matching the website demo's shape.
+export function ClickUpdateApp(props) @{
+	const [expanded, setExpanded] = useState(false);
+
+	<>
+		<button
+			onClick={() => startTransition(() => setExpanded((value) => !value))}
+		>{'Toggle'}</button>
+		<ViewTransition onUpdate={props.onUpdate}>
+			<div>
+				{expanded ? 'Much longer transition content' : 'Short'}
+			</div>
+		</ViewTransition>
+	</>
+}
+
+// The module-level ViewTransition import arms the controller, but this component
+// has no boundary. A transition click must still commit and then skip the native
+// animation once the asynchronous update discovers there was no activation.
+export function PlainClickApp() @{
+	const [count, setCount] = useState(0);
+
+	<>
+		<button
+			onClick={() => startTransition(() => setCount((value) => value + 1))}
+		>{'Increment'}</button>
+		<div>
+			{'Count: ' + count}
+		</div>
 	</>
 }

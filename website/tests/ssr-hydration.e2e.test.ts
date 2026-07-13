@@ -48,9 +48,10 @@ const ROUTES = ['/', '/docs', '/docs/core-apis', '/benchmarks', '/playground', '
 const COMMENT_CEILINGS: Record<string, number> = {
 	'/': 3380,
 	'/docs': 415,
-	// Newcomer Core APIs guide (measured 569): richer MDX, local navigation,
-	// callouts, and the live state example are intentional content growth.
-	'/docs/core-apis': 655,
+	// Core APIs guide re-based 2026-07-13 (measured 641) after lists/conditions,
+	// refs/effects, data-loading, and form live examples joined the state demo.
+	// The ceiling retains roughly 15% headroom for the intentional content growth.
+	'/docs/core-apis': 740,
 	'/benchmarks': 26100,
 	'/playground': 195,
 	// The view-transitions demo (added with the plan's Phase 5, measured 189) —
@@ -261,7 +262,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		},
 	);
 
-	it('the Core APIs live example handles an event after hydration', async (ctx) => {
+	it('the Core APIs live examples handle events after hydration', async (ctx) => {
 		if (!browser) return ctx.skip();
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis');
 		try {
@@ -269,6 +270,82 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			await waitForLocatorText(count, '0');
 			await page.getByRole('button', { name: 'Add one' }).click();
 			await waitForLocatorText(count, '1');
+
+			const packingStatus = page.locator('[data-demo="lists"] .packing-summary');
+			await page.getByRole('button', { name: 'Pack Passport' }).click();
+			await waitForLocatorText(packingStatus, '2 of 3 packed');
+
+			await page.keyboard.press('/');
+			expect(await page.evaluate(() => document.activeElement?.id)).toBe('core-api-search');
+
+			await page.getByRole('button', { name: 'Load profile' }).click();
+			await waitForLocatorText(
+				page.locator('[data-demo="data"] .data-loading'),
+				'Loading profile…',
+			);
+			await waitForLocatorText(
+				page.locator('[data-demo="data"] .profile-card strong'),
+				'Ada Lovelace',
+			);
+
+			await page.locator('#core-api-profile-name').fill('Grace Hopper');
+			await page.getByRole('button', { name: 'Save profile' }).click();
+			await waitForLocatorText(page.locator('[data-demo="form"] button[type="submit"]'), 'Saving…');
+			await waitForLocatorText(
+				page.locator('[data-demo="form"] .form-result'),
+				'Saved Grace Hopper.',
+			);
+
+			const real = errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
+	it('the View Transitions controls run native transitions after hydration', async (ctx) => {
+		if (!browser) return ctx.skip();
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/view-transitions');
+		try {
+			const supported = await page.evaluate(
+				() => typeof (document as any).startViewTransition === 'function',
+			);
+			expect(supported).toBe(true);
+
+			// Wrap the native API after hydration so this observes Octane's controller
+			// without replacing Chromium's snapshots or animations.
+			await page.evaluate(() => {
+				const original = (document as any).startViewTransition.bind(document);
+				(window as any).__octaneViewTransitionCalls = 0;
+				(window as any).__octaneViewTransitionFinished = Promise.resolve();
+				(document as any).startViewTransition = (update: unknown) => {
+					(window as any).__octaneViewTransitionCalls++;
+					const transition = original(update);
+					(window as any).__octaneViewTransitionFinished = transition.finished;
+					return transition;
+				};
+			});
+
+			const finishTransition = async (expectedCalls: number) => {
+				await page.waitForFunction(
+					(expected) => (window as any).__octaneViewTransitionCalls === expected,
+					expectedCalls,
+				);
+				await page.evaluate(() => (window as any).__octaneViewTransitionFinished);
+			};
+
+			await page.locator('#vt-toggle-card').click();
+			await waitForLocatorText(page.locator('#vt-toggle-card'), 'Add card');
+			await finishTransition(1);
+
+			await page.locator('#vt-toggle-hero').click();
+			await page.waitForSelector('.vtdemo-hero-big');
+			await finishTransition(2);
+
+			await page.getByRole('button', { name: 'Details' }).click();
+			await waitForLocatorText(page.locator('.vtdemo-panel'), 'Details');
+			await finishTransition(3);
+
 			const real = errors.filter((error) => !error.includes('Failed to load resource'));
 			expect(real).toEqual([]);
 		} finally {

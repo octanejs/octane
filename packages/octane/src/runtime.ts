@@ -663,7 +663,7 @@ interface VTHandle {
 	skipTransition: () => void;
 }
 type VTDocument = Document & {
-	startViewTransition?: (opts: { update: () => void }) => VTHandle;
+	startViewTransition?: (update: () => void) => VTHandle;
 };
 
 /** One tracked boundary for the current wrapped flush. */
@@ -1578,14 +1578,23 @@ function vtFlush(work: () => void = flushWork): void {
 			acts.push({ kind: 'parent-enter', rec });
 		}
 		VT_STATE = VT_ANIMATING;
-		if (acts.length === 0) skipRequested = true;
+		if (acts.length === 0) {
+			skipRequested = true;
+			// Native browsers run `update` asynchronously, after startViewTransition
+			// has returned its handle. The synchronous conformance mock reaches the
+			// post-call check below instead; together the two paths skip exactly once.
+			if (VT_HANDLE !== null) VT_HANDLE.skipTransition();
+		}
 		// Surface a drain error through the caller (mock/sync path) or the
 		// transition's rejection (real async path — see finished.catch below).
 		if (pendingError !== null) throw pendingError.err;
 	};
 	let vt: VTHandle;
 	try {
-		vt = (document as VTDocument).startViewTransition!({ update });
+		// Use the Level 1 callback overload. Octane's transition types resolve its
+		// own boundary classes and are not forwarded in the native options bag, so
+		// the newer overload buys us nothing and would exclude older Safari builds.
+		vt = (document as VTDocument).startViewTransition!(update);
 	} catch (err) {
 		// Synchronous-update path (the conformance mock): the drain threw inside
 		// startViewTransition. Clean up and surface to the flush caller.
@@ -6811,7 +6820,15 @@ function maybeFlushDiscrete(type: string): void {
 	if (_dispatchDepth !== 0 || !DISCRETE_EVENTS.has(type)) return;
 	// Commit handler-scheduled work first, so the controlled restore below
 	// compares the DOM against the values the handlers just rendered.
-	if (hasPendingWork()) flushSync(noop);
+	if (hasPendingWork()) {
+		// A transition-only queue in an app armed for ViewTransition must reach the
+		// regular flush controller. flushSync deliberately skips animations; using
+		// it here meant the canonical onClick={() => startTransition(...)} pattern
+		// could never call document.startViewTransition. flush() also knows how to
+		// leave a second transition queued while an earlier one is still in flight.
+		if (VT_SEEN && queueAllTransition()) flush();
+		else flushSync(noop);
+	}
 	// The restore runs even when NO work was scheduled — a rejected/unheard
 	// edit (no onInput, or an Object.is-equal setState) schedules nothing and
 	// is exactly the case that must snap back (React's restoreControlledState).
