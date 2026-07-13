@@ -77,9 +77,6 @@ export function Home() @{
 		<section class="features">
 			@for (const feature of FEATURES; key feature.title) {
 				<article class="card">
-					<p class="card-eyebrow">
-						{feature.eyebrow as string}
-					</p>
 					<h3 class="card-title">
 						{feature.title as string}
 					</h3>
