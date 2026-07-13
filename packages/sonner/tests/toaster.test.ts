@@ -153,6 +153,45 @@ describe('@octanejs/sonner — Toaster', () => {
 		root.unmount();
 	});
 
+	it('collapses a targeted Toaster when only one of its own toasts remains', async () => {
+		const root = mount(DualToasterApp);
+		await settle();
+		toast('Primary one', {
+			id: 'primary-one',
+			toasterId: 'primary',
+			duration: Infinity,
+		});
+		toast('Primary two', {
+			id: 'primary-two',
+			toasterId: 'primary',
+			duration: Infinity,
+		});
+		toast('Secondary', {
+			id: 'secondary-collapse',
+			toasterId: 'secondary',
+			duration: Infinity,
+		});
+		await settle();
+
+		document.dispatchEvent(
+			new KeyboardEvent('keydown', { code: 'KeyT', altKey: true, bubbles: true }),
+		);
+		await settle();
+		const primaryList = [...root.container.querySelectorAll('[data-sonner-toaster]')].find((list) =>
+			list.textContent?.includes('Primary one'),
+		)!;
+		expect(primaryList.querySelector('[data-sonner-toast]')?.getAttribute('data-expanded')).toBe(
+			'true',
+		);
+
+		toast.dismiss('primary-two');
+		await wait(260);
+		expect(primaryList.querySelector('[data-sonner-toast]')?.getAttribute('data-expanded')).toBe(
+			'false',
+		);
+		root.unmount();
+	});
+
 	it('runs promise loading, extended success, finally and unwrap semantics', async () => {
 		const root = mount(ToasterApp);
 		await settle();

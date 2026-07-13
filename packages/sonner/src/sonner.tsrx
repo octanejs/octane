@@ -685,8 +685,8 @@ export function Toaster(props: ToasterProps) {
 	}, [theme]);
 
 	useEffect(() => {
-		if (toasts.length <= 1) setExpanded(false);
-	}, [toasts]);
+		if (filteredToasts.length <= 1) setExpanded(false);
+	}, [filteredToasts]);
 
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent): void => {

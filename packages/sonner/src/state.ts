@@ -51,6 +51,7 @@ class Observer {
 	};
 
 	addToast = (data: ToastT): void => {
+		this.dismissedToasts.delete(data.id);
 		this.publish(data);
 		this.toasts = [...this.toasts, data];
 	};
@@ -98,13 +99,14 @@ class Observer {
 	};
 
 	dismiss = (id?: number | string): number | string => {
-		if (id) {
+		if (id !== undefined) {
 			this.dismissedToasts.add(id);
 			requestAnimationFrame(() => {
 				this.subscribers.forEach((subscriber) => subscriber({ id, dismiss: true }));
 			});
 		} else {
 			this.toasts.forEach((toast) => {
+				this.dismissedToasts.add(toast.id);
 				this.subscribers.forEach((subscriber) => subscriber({ id: toast.id, dismiss: true }));
 			});
 		}
@@ -244,7 +246,7 @@ class Observer {
 
 	custom = (jsx: (id: number | string) => ToastElement, data?: ExternalToast): number | string => {
 		const id = data?.id || toastsCounter++;
-		this.create({ jsx: jsx(id), id, ...data });
+		this.create({ jsx: jsx(id), ...data, id });
 		return id;
 	};
 

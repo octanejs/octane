@@ -1,5 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '@octanejs/sonner';
+
+afterEach(() => {
+	toast.dismiss();
+});
 
 describe('@octanejs/sonner — imperative state', () => {
 	it('exposes every upstream callable method and preserves id/history semantics', () => {
@@ -47,5 +51,26 @@ describe('@octanejs/sonner — imperative state', () => {
 			error: errorMessage,
 		});
 		await expect(rejected.unwrap()).rejects.toBe('rejected value');
+	});
+
+	it('publishes a custom toast under the id it returns when an optional id is undefined', () => {
+		const id = toast.custom(() => ({}) as any, { id: undefined, duration: Infinity });
+		const published = toast.getHistory().find((item) => item.id === id);
+
+		expect(published).toMatchObject({ id });
+	});
+
+	it('removes every dismissed toast from the active toast collection', () => {
+		const first = toast.success('First', { id: 'dismiss-all-first', duration: Infinity });
+		const second = toast.error('Second', { id: 'dismiss-all-second', duration: Infinity });
+		expect(toast.getToasts().map((item) => item.id)).toEqual(
+			expect.arrayContaining([first, second]),
+		);
+
+		toast.dismiss();
+
+		expect(toast.getToasts().map((item) => item.id)).not.toEqual(
+			expect.arrayContaining([first, second]),
+		);
 	});
 });
