@@ -54,6 +54,6 @@ Project settings in the Vercel dashboard:
 | Root Directory   | `website` (enable "Include files outside the Root Directory" — workspace deps) |
 | Framework Preset | Other (vercel.json supplies the build command) |
 | Install Command  | default (`pnpm install` at the repo root)    |
-| Node.js Version  | 20.x or later                                |
+| Node.js Version  | 22.x or 24.x                                |
 
 No environment variables are required.

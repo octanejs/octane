@@ -62,11 +62,21 @@ function validate_root_boundary(rootBoundary) {
 	}
 
 	const boundary = /** @type {{ pending?: unknown, catch?: unknown }} */ (rootBoundary);
-	if (boundary.pending !== undefined && typeof boundary.pending !== 'function') {
-		throw new Error('[@octanejs/vite-plugin] rootBoundary.pending must be a component function.');
-	}
-	if (boundary.catch !== undefined && typeof boundary.catch !== 'function') {
-		throw new Error('[@octanejs/vite-plugin] rootBoundary.catch must be a component function.');
+	for (const name of ['pending', 'catch']) {
+		const entry = boundary[/** @type {'pending' | 'catch'} */ (name)];
+		if (entry === undefined) continue;
+		const valid =
+			(typeof entry === 'string' && entry.startsWith('/')) ||
+			(Array.isArray(entry) &&
+				entry.length === 2 &&
+				typeof entry[0] === 'string' &&
+				typeof entry[1] === 'string' &&
+				entry[1].startsWith('/'));
+		if (!valid) {
+			throw new Error(
+				`[@octanejs/vite-plugin] rootBoundary.${name} must be a Vite-root component entry path or [exportName, path] tuple.`,
+			);
+		}
 	}
 }
 

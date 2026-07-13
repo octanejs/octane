@@ -58,12 +58,14 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 		expect(out.html).toBe('<div id="leaf">hello</div>' + seed('["hello"]'));
 	});
 
-	it('routes a rejected use(promise) to @catch (rejected boundaries are not seeded)', async () => {
+	it('routes a rejected use(promise) to @catch and seeds the catch hydration path', async () => {
 		const out = await prerender(m.Boundary, { promise: Promise.reject(new Error('nope')) });
 		expect(out.html).toBe(
-			`<div id="box">${OPEN}${OPEN}<span class="err">nope</span>${CLOSE}${CLOSE}</div>`,
+			`<div id="box">${OPEN}${OPEN}<span class="err">nope</span>${CLOSE}${CLOSE}</div>` +
+				seed(
+					'{"__octane_new_rejection__":{"version":1,"values":[null],"rejections":[[0,{"kind":"error","name":"Error","message":"nope","fields":{}}]]}}',
+				),
 		);
-		expect(out.html).not.toContain('data-octane-suspense');
 	});
 
 	it('resolves NESTED suspense across multiple passes (outer gates inner)', async () => {

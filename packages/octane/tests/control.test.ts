@@ -52,15 +52,19 @@ describe('useId', () => {
 	it('produces a stable id for the component', () => {
 		const r = mount(IdInComponent);
 		const id1 = r.find('label').getAttribute('for');
-		expect(id1).toMatch(/^:in-[a-z0-9]+:$/);
+		expect(id1).toMatch(/^:r[a-z0-9]+-in-[a-z0-9]+:$/);
 		expect(r.find('label').textContent).toBe(id1!);
 		r.unmount();
 	});
 
-	it('produces distinct ids across separate components', () => {
+	it('keeps default ids unique across independent roots', () => {
 		const r1 = mount(IdInComponent);
 		const r2 = mount(IdInComponent);
-		expect(r1.find('label').getAttribute('for')).not.toBe(r2.find('label').getAttribute('for'));
+		const id1 = r1.find('label').getAttribute('for');
+		const id2 = r2.find('label').getAttribute('for');
+		expect(id1).toMatch(/^:r[a-z0-9]+-in-0:$/);
+		expect(id2).toMatch(/^:r[a-z0-9]+-in-0:$/);
+		expect(id1).not.toBe(id2);
 		r1.unmount();
 		r2.unmount();
 	});

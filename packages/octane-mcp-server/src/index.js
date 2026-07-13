@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { bridgeReport, KNOWN_BINDINGS } from './bridge.js';
+import { bridgeReport, KNOWN_BINDINGS, KNOWN_BINDING_PACKAGE_DIRS } from './bridge.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const PACKAGE_ROOT = resolve(dirname(__filename), '..');
@@ -61,7 +61,8 @@ export function areaForPath(path) {
 	if (path.startsWith('packages/octane/tests/')) return 'core-tests';
 	if (path.startsWith('packages/vite-plugin-octane/')) return 'vite-plugin';
 	if (path.startsWith('packages/octane-mcp-server/')) return 'mcp-server';
-	if (/^packages\/(zustand|query|motion|stylex|router|lexical|floating-ui|radix)\//.test(path)) {
+	const packageMatch = path.match(/^packages\/([^/]+)\//);
+	if (packageMatch && KNOWN_BINDING_PACKAGE_DIRS.has(packageMatch[1])) {
 		return 'ecosystem-binding';
 	}
 	if (path.startsWith('benchmarks/')) return 'benchmark';
@@ -88,13 +89,12 @@ export function validationFor(paths, taskKind) {
 	}
 	if (areas.has('ecosystem-binding')) {
 		for (const path of paths) {
-			const match = path.match(
-				/^packages\/(zustand|query|motion|stylex|router|lexical|floating-ui|radix)\//,
-			);
-			if (match)
+			const match = path.match(/^packages\/([^/]+)\//);
+			if (match && KNOWN_BINDING_PACKAGE_DIRS.has(match[1])) {
 				commands.add(
 					`./node_modules/.bin/vitest run packages/${match[1]}/tests --project ${match[1]}`,
 				);
+			}
 		}
 	}
 	if (areas.has('mcp-server')) {

@@ -8,9 +8,9 @@ import type { OctaneAdapter, AdaptContext } from '@octanejs/vite-plugin';
 export interface ServerlessConfig {
 	/**
 	 * Node.js runtime version for the function.
-	 * @default auto-detected from the build machine's Node major (20/22/24)
+	 * @default auto-detected from the build machine's Node major (22/24)
 	 */
-	runtime?: string;
+	runtime?: 'nodejs22.x' | 'nodejs24.x';
 	/** Regions to deploy the function to (e.g. ['iad1']). */
 	regions?: string[];
 	/** Maximum execution duration in seconds. */

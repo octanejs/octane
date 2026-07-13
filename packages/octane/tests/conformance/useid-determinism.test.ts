@@ -4,16 +4,15 @@
 // (b) stable through wrapper-component indirection, (c) distinct for multiple
 // useId() calls in one component, and — the headline invariant of the file —
 // (d) byte-for-byte identical between the SERVER render and the CLIENT render so
-// hydration lines up. Octane reproduces all four: (a)/(b)/(c) on the client, and
-// (d) because `hydrateRoot()` resets the client `_idCounter` to 0 at the start of
-// hydration so it lines up with the server's per-render reset (the server resets
-// to 0 every render(); the client counter is otherwise monotonic).
+// hydration lines up. Octane reproduces all four with root-local counters, an
+// automatic namespace for client-only roots, and an identifierPrefix shared by
+// server render + hydration.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from '../../src/server/index.js';
-import { hydrateRoot } from '../../src/index.js';
+import { createRoot, hydrateRoot } from '../../src/index.js';
 import { mount } from '../_helpers';
 import { Single, Triple, Wrapper } from '../_fixtures/useid-determinism.tsrx';
 
@@ -101,6 +100,38 @@ describe('useId determinism', () => {
 		expect(c2).toBe(c1);
 	});
 
+	it('automatically namespaces sibling createRoot roots', () => {
+		const a = document.createElement('div');
+		const b = document.createElement('div');
+		const seenA: string[] = [];
+		const seenB: string[] = [];
+		const rootA = createRoot(a);
+		const rootB = createRoot(b);
+		rootA.render(Single, { onId: (id: string) => seenA.push(id) });
+		rootB.render(Single, { onId: (id: string) => seenB.push(id) });
+		expect(seenA[0]).toMatch(/^:r[0-9a-z]+-in-0:$/);
+		expect(seenB[0]).toMatch(/^:r[0-9a-z]+-in-0:$/);
+		expect(seenA[0]).not.toBe(seenB[0]);
+		rootA.unmount();
+		rootB.unmount();
+	});
+
+	it('composes identifierPrefix with the automatic client-root namespace', () => {
+		const a = document.createElement('div');
+		const b = document.createElement('div');
+		const seenA: string[] = [];
+		const seenB: string[] = [];
+		const rootA = createRoot(a, { identifierPrefix: 'app-' });
+		const rootB = createRoot(b, { identifierPrefix: 'app-' });
+		rootA.render(Single, { onId: (id: string) => seenA.push(id) });
+		rootB.render(Single, { onId: (id: string) => seenB.push(id) });
+		expect(seenA[0]).toMatch(/^:app-r[0-9a-z]+-in-0:$/);
+		expect(seenB[0]).toMatch(/^:app-r[0-9a-z]+-in-0:$/);
+		expect(seenA[0]).not.toBe(seenB[0]);
+		rootA.unmount();
+		rootB.unmount();
+	});
+
 	// Per ReactDOMUseId-test.js:127/140-146 — the WHOLE point of useId is that the
 	// id produced on the server matches the id produced on the client so the two
 	// trees hydrateRoot without mismatch. We server-render Single, place its HTML in a
@@ -109,16 +140,14 @@ describe('useId determinism', () => {
 	// callback — reading the adopted attribute alone would just echo the server's
 	// id and prove nothing). The two must be byte-for-byte equal.
 	//
-	// Fixed in runtime.ts hydrateRoot(): the client `_idCounter` is reset to 0 at the
-	// start of hydration so it lines up with the server's per-render reset.
 	it('server useId is preserved byte-for-byte after hydrateRoot()', async () => {
-		// Warm the client's monotonic id counter FIRST so the test is self-contained
-		// and actually exercises the fix: a hydrateRoot that did NOT reset the counter
-		// would mint a non-zero id here and mismatch the server's ':in-0:'.
+		// Warm a separate root first: root-local hydration state must be unaffected.
 		const warm = mount(Triple);
 		warm.unmount();
 
-		const out = await RT.renderToString(serverMod.Single);
+		const out = await RT.renderToString(serverMod.Single, undefined, {
+			identifierPrefix: 'profile-',
+		});
 		const serverId = out.html.match(/data-testid="([^"]+)"/)?.[1];
 
 		const container = document.createElement('div');
@@ -126,11 +155,17 @@ describe('useId determinism', () => {
 		document.body.appendChild(container);
 
 		let clientId: string | undefined;
-		const h = hydrateRoot(container, Single, { onId: (id: string) => (clientId = id) });
+		const h = hydrateRoot(
+			container,
+			Single,
+			{ onId: (id: string) => (clientId = id) },
+			{ identifierPrefix: 'profile-' },
+		);
 		h.unmount();
 		container.remove();
 
 		expect(serverId).toBeTruthy();
+		expect(serverId).toBe(':profile-in-0:');
 		expect(clientId).toBe(serverId);
 	});
 });

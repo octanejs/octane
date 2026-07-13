@@ -20,11 +20,12 @@
  *     `false` to opt out and restore React-timing waterfall semantics.
  *   - `exclude`: ad-hoc path fragments the `.ts`/`.js` hook-slotting pass must
  *     skip. Rarely needed — a library whose sources hand-forward hook slots
- *     declares `"octane": { "hookSlots": { "manual": ["src"] } }` in its own package.json
- *     and is skipped automatically (see hasManualHookSlots below).
+ *     declares `"octane": { "hookSlots": { "manual": ["src"] } }` in its own
+ *     package.json and is skipped automatically (see hasManualHookSlots below).
  */
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { compile } from './compile.js';
 import { slotHooks } from './slot-hooks.js';
 
@@ -46,7 +47,23 @@ import { slotHooks } from './slot-hooks.js';
 // it.
 const manifestRuleCache = new Map();
 
-function nearestManualHookSlotRule(fileDir) {
+const OCTANE_DEPENDENCY_FIELDS = [
+	'dependencies',
+	'devDependencies',
+	'optionalDependencies',
+	'peerDependencies',
+];
+
+function packageUsesOctane(pkg) {
+	return (
+		pkg.name === 'octane' ||
+		['dependencies', 'optionalDependencies', 'peerDependencies'].some(
+			(field) => typeof pkg[field]?.octane === 'string',
+		)
+	);
+}
+
+function nearestOctanePackageRule(fileDir) {
 	const missed = [];
 	let dir = fileDir;
 	let rule = null;
@@ -63,11 +80,19 @@ function nearestManualHookSlotRule(fileDir) {
 			// no manifest in this directory (or unreadable) — keep walking up
 		}
 		if (pkg !== null) {
-			// Nearest manifest wins — a package without the declaration is
-			// auto-slotted; don't let an outer (e.g. monorepo root) manifest speak
-			// for it.
+			// Nearest manifest wins. Besides the manual-slot directories, retain
+			// whether this is an installed Octane source package: published bindings
+			// deliberately ship raw TS/TSRX and therefore still need Vite's transform.
 			const manual = pkg.octane?.hookSlots?.manual;
-			rule = Array.isArray(manual) ? { root: dir, dirs: manual } : null;
+			rule = {
+				root: dir,
+				dirs: Array.isArray(manual) ? manual : [],
+				runtimeDependencies: [
+					...Object.keys(pkg.dependencies ?? {}),
+					...Object.keys(pkg.optionalDependencies ?? {}),
+				],
+				usesOctane: packageUsesOctane(pkg),
+			};
 			break;
 		}
 		const parent = dirname(dir);
@@ -79,44 +104,136 @@ function nearestManualHookSlotRule(fileDir) {
 }
 
 function hasManualHookSlots(file) {
-	const rule = nearestManualHookSlotRule(dirname(file));
+	const rule = nearestOctanePackageRule(dirname(file));
 	if (rule === null) return false;
-	return rule.dirs.some((d) => file.startsWith(rule.root + '/' + d.replace(/\/+$/, '') + '/'));
+	const relativeFile = relative(rule.root, file);
+	return rule.dirs.some((directory) => {
+		const relativeDirectory = directory
+			.replace(/[\\/]+$/, '')
+			.split(/[\\/]/)
+			.join(sep);
+		return (
+			relativeDirectory !== '' &&
+			(relativeFile === relativeDirectory || relativeFile.startsWith(relativeDirectory + sep))
+		);
+	});
+}
+
+function isNodeModulesFile(file) {
+	return /(?:^|[\\/])node_modules(?:[\\/]|$)/.test(file);
+}
+
+function isInstalledOctaneSource(file) {
+	if (!isNodeModulesFile(file)) return true;
+	return nearestOctanePackageRule(dirname(file))?.usesOctane === true;
+}
+
+/**
+ * Discover installed source packages which consume Octane, recursively
+ * following dependencies between those packages. Their raw TS/TSRX must
+ * bypass dependency prebundling and SSR externalization so this plugin can
+ * lower JSX and assign hook slots in the consuming application.
+ */
+export function discoverOctaneSourceDependencies(projectRoot) {
+	const root = resolve(projectRoot);
+	let projectManifest;
+	try {
+		projectManifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+	} catch {
+		return [];
+	}
+	const dependencyNames = new Set();
+	for (const field of OCTANE_DEPENDENCY_FIELDS) {
+		for (const name of Object.keys(projectManifest[field] ?? {})) dependencyNames.add(name);
+	}
+	const projectRequire = createRequire(join(root, 'package.json'));
+	const sourceDependencies = new Set();
+	const visitedPackageRoots = new Set();
+	const visit = (name, packageRequire) => {
+		try {
+			const entry = packageRequire.resolve(name);
+			const rule = nearestOctanePackageRule(dirname(entry));
+			if (!rule?.usesOctane) return;
+			sourceDependencies.add(name);
+			let packageRoot = rule.root;
+			try {
+				packageRoot = realpathSync(packageRoot);
+			} catch {
+				// Keep the resolved/symlink path as the cycle key.
+			}
+			if (visitedPackageRoots.has(packageRoot)) return;
+			visitedPackageRoots.add(packageRoot);
+			const childRequire = createRequire(join(rule.root, 'package.json'));
+			for (const dependency of rule.runtimeDependencies) visit(dependency, childRequire);
+		} catch {
+			// Optional dependency not installed or an unresolvable export — it cannot
+			// enter this Vite graph, so there is nothing to configure.
+		}
+	};
+	for (const name of dependencyNames) visit(name, projectRequire);
+	return [...sourceDependencies].sort();
 }
 
 export function octane(options = {}) {
 	let hmrEnabled = options.hmr;
+	let viteRoot = '';
 	// An explicit override of the per-module SSR auto-detection (true → always
 	// server, false → always client). `undefined` keeps auto-detection.
 	const forceSsr = options.ssr;
 	// Ad-hoc path fragments to skip in the plain `.ts`/`.js` hook-slotting pass.
 	// Hand-slot-forwarding bindings should NOT need this: they self-declare via
 	// `"octane": { "hookSlots": { "manual": ["src"] } }` in their package.json (see
-	// hasManualHookSlots above), and published bindings live in node_modules and
-	// are skipped automatically. This option remains as an escape hatch for
-	// sources that can't carry a manifest declaration.
+	// hasManualHookSlots above). Installed raw-source packages that consume
+	// Octane are transformed automatically; this option remains as an escape
+	// hatch for sources that cannot carry a manifest declaration.
 	const excludePaths = options.exclude ?? [];
 	return {
 		name: 'octane',
 		enforce: 'pre',
+		config(config) {
+			const projectRoot = resolve(config.root ?? process.cwd());
+			const sourceDependencies = discoverOctaneSourceDependencies(projectRoot);
+			return {
+				// Raw Octane dependencies must reach this plugin, never esbuild's dep
+				// prebundle or Node's SSR external loader. Dedupe the runtime as an
+				// additional guard for linked/local package layouts.
+				optimizeDeps: { exclude: sourceDependencies },
+				resolve: { dedupe: ['octane'] },
+				ssr: { noExternal: sourceDependencies },
+			};
+		},
 		configResolved(config) {
+			viteRoot = config.root;
 			if (hmrEnabled === undefined) hmrEnabled = config.command === 'serve';
+		},
+		async resolveId(source, importer, options) {
+			if (!options?.ssr || source !== 'octane') return null;
+			const resolved = await this.resolve('octane/server', importer, { skipSelf: true });
+			return resolved?.id ?? null;
 		},
 		transform(code, id, transformOptions) {
 			const file = id.split('?')[0]; // strip Vite's ?v=/?used query suffix
 
 			// `.tsrx` and `.tsx` (TS + JSX) go through the FULL compiler — it lowers JSX
-			// and slots hooks. `.tsx` in node_modules is skipped (a published dep ships
-			// compiled `.js`; a stray React `.tsx` there must not be octane-compiled);
-			// `.tsrx` keeps its existing always-compile behavior. Mirror Ripple's mode
-			// decision: an explicit `options.ssr` override wins; otherwise Vite's
-			// transform-level SSR flag OR the environment consumer marks a server build.
-			if (file.endsWith('.tsrx') || (file.endsWith('.tsx') && !file.includes('/node_modules/'))) {
+			// and slots hooks. A generic dependency's `.tsx` is left alone, while an
+			// installed package whose manifest consumes Octane is compiled as published
+			// raw source. `.tsrx` is Octane-specific and always compiles. Mirror
+			// Ripple's mode decision: an explicit `options.ssr` override wins;
+			// otherwise Vite's transform-level SSR flag OR the environment consumer
+			// marks a server build.
+			if (file.endsWith('.tsrx') || (file.endsWith('.tsx') && isInstalledOctaneSource(file))) {
 				const ssr =
 					forceSsr !== undefined
 						? forceSsr
 						: transformOptions?.ssr === true || this.environment?.config?.consumer === 'server';
-				const out = compile(code, id, {
+				const relativeFile = viteRoot ? relative(viteRoot, file) : '';
+				const isWithinRoot =
+					viteRoot !== '' &&
+					relativeFile !== '..' &&
+					!relativeFile.startsWith('..' + sep) &&
+					!isAbsolute(relativeFile);
+				const filename = isWithinRoot ? '/' + relativeFile.split(sep).join('/') : file;
+				const out = compile(code, filename, {
 					hmr: !ssr && !!hmrEnabled,
 					mode: ssr ? 'server' : 'client',
 					// Dev-only hydration source-LOC metadata — same serve+client gate as HMR.
@@ -129,15 +246,15 @@ export function octane(options = {}) {
 
 			// Plain `.ts`/`.js` can't be re-emitted (esrap can't print arbitrary TS), so a
 			// custom hook living there gets the SURGICAL, hook-only pass: only octane base
-			// hook calls are edited; every other byte passes through. Skip node_modules
-			// (published bindings ship pre-slotted), the `// octane-no-slot` opt-out, any
-			// configured exclude path, and packages whose manifest declares manual hook
-			// slots. Cheap import pre-check before parsing (and before touching the fs).
+			// hook calls are edited; every other byte passes through. Installed packages
+			// are eligible only when their nearest manifest consumes Octane (official
+			// bindings ship raw source); explicit manual-slot directories, opt-outs, and
+			// configured excludes still pass through untouched.
 			if ((file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')) {
-				if (file.includes('/node_modules/')) return null;
 				if (/\/\/\s*octane-no-slot\b/.test(code)) return null;
 				if (excludePaths.some((p) => file.includes(p))) return null;
 				if (!/from\s*['"]octane['"]/.test(code)) return null;
+				if (!isInstalledOctaneSource(file)) return null;
 				if (hasManualHookSlots(file)) return null;
 				// Same HMR gate as the full compiler: dev serve gets Symbol.for
 				// (registry identity survives re-import), builds/SSR get Symbol().

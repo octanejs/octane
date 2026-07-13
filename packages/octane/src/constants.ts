@@ -49,14 +49,24 @@ export const HYDRATION_TEXT_SEP = ' ';
 export const SUSPENSE_SCRIPT_ATTR = 'data-octane-suspense';
 
 /**
- * Sentinel marker for a `use(thenable)` value that resolved to `undefined`.
- * JSON can't represent `undefined` (an array element round-trips to `null`, an
- * object property is dropped), so the server's seed serializer encodes any
- * `undefined` as `{ [UNDEFINED_SENTINEL_KEY]: true }` and the client's parser
- * reviver decodes it back to `undefined`. Shared so both sides agree, and keyed
- * obscurely enough that real resolved data won't collide.
+ * Legacy undefined-sentinel key retained for consumers of `octane/constants`.
+ * New seed payloads use the collision-free escaped-string protocol below.
  */
 export const UNDEFINED_SENTINEL_KEY = '__octane_new_undefined__';
+
+/**
+ * Prefix for collision-free scalar escapes inside SSR Suspense seed JSON.
+ * `undefined` is encoded as `${prefix}u`; user strings beginning with the
+ * prefix are encoded as `${prefix}s${value}` before JSON serialization.
+ */
+export const SUSPENSE_SEED_WIRE_PREFIX = '\0octane:ssr-seed:';
+
+/**
+ * Top-level envelope key used only when a server hydration-seed stream contains
+ * rejected `use(thenable)` entries. Keeping rejection metadata outside the
+ * fulfilled value array prevents user data from colliding with the protocol.
+ */
+export const REJECTION_SENTINEL_KEY = '__octane_new_rejection__';
 
 // ── Streaming SSR protocol (renderToPipeableStream / renderToReadableStream) ──
 // A boundary that is still PENDING when the shell flushes emits its fallback

@@ -48,11 +48,13 @@ function declareName(scope, name, details = null) {
 			imported: false,
 			stable: false,
 			octaneImport: null,
+			octaneNamespace: false,
 		};
 		scope.bindings.set(name, binding);
 	}
 	if (details?.imported) binding.imported = true;
 	if (details?.octaneImport) binding.octaneImport = details.octaneImport;
+	if (details?.octaneNamespace) binding.octaneNamespace = true;
 	return binding;
 }
 
@@ -113,6 +115,8 @@ function predeclareDirect(statements, scope) {
 				declareName(scope, specifier.local.name, {
 					imported: true,
 					octaneImport: original.source?.value === 'octane' ? imported : null,
+					octaneNamespace:
+						original.source?.value === 'octane' && specifier.type === 'ImportNamespaceSpecifier',
 				});
 			}
 			continue;
@@ -170,11 +174,23 @@ function unwrapValue(node) {
 
 function canonicalHookName(call, scope, onlyImported) {
 	const callee = unwrapValue(call?.callee);
-	if (!callee || callee.type !== 'Identifier') return null;
-	const binding = resolveBinding(scope, callee.name);
-	if (binding?.octaneImport) return binding.octaneImport;
-	if (onlyImported) return null;
-	return callee.name;
+	if (!callee) return null;
+	if (callee.type === 'Identifier') {
+		const binding = resolveBinding(scope, callee.name);
+		if (binding?.octaneImport) return binding.octaneImport;
+		if (onlyImported) return null;
+		return callee.name;
+	}
+	if (
+		callee.type === 'MemberExpression' &&
+		!callee.computed &&
+		callee.object?.type === 'Identifier' &&
+		callee.property?.type === 'Identifier'
+	) {
+		const binding = resolveBinding(scope, callee.object.name);
+		if (binding?.octaneNamespace) return callee.property.name;
+	}
+	return null;
 }
 
 function buildScopes(ast, onlyImported) {
@@ -285,6 +301,12 @@ function buildScopes(ast, onlyImported) {
 		}
 
 		if (node.type === 'CallExpression') {
+			// Preserve lexical import identity for the later slotting pass. A module-
+			// level name map is insufficient: a component can shadow either a named
+			// alias or an Octane namespace inside any nested scope. The annotation is
+			// copied with the call AST when the full compiler lowers setup statements.
+			const importedName = canonicalHookName(node, scope, true);
+			if (importedName !== null) node._octaneImportedHook = importedName;
 			const name = canonicalHookName(node, scope, onlyImported);
 			const config = DEPENDENCY_HOOKS.get(name);
 			if (config && node.arguments.length === config.deps) {

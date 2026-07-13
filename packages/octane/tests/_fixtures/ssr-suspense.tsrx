@@ -1,4 +1,4 @@
-import { use, useState } from 'octane';
+import { use, useId, useState } from 'octane';
 
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
 // use(promise) and renders the resolved value (not the @pending fallback); the
@@ -61,6 +61,182 @@ export function Boundary(props) @{
 			<span class="loading">{'loading'}</span>
 		} @catch (err) {
 			<span class="err">
+				{err.message as string}
+			</span>
+		}
+	</div>
+}
+
+// Rejection hydration fidelity probe. The catch arm observes both the original
+// reason type and custom fields, so streamed hydration cannot silently replace
+// a primitive/plain-object reason with a generic Error.
+export function ReasonBoundary(props) @{
+	<div id="reason-box">
+		@try {
+			const value = use(props.promise);
+			<span class="reason-ok">
+				{String(value) as string}
+			</span>
+		} @pending {
+			<span class="reason-loading">{'loading'}</span>
+		} @catch (err) {
+			const kind = typeof err;
+			const isObject = err !== null && (kind === 'object' || kind === 'function');
+			const message =
+				isObject && typeof err.message === 'string' ? err.message : String(err);
+			const code =
+				isObject && typeof err.code === 'string' ? err.code : '';
+			props.onCatch?.(err);
+			<span class="reason-error" data-kind={kind} data-code={code}>
+				{message + ':' + code as string}
+			</span>
+		}
+	</div>
+}
+
+// A catch arm that never inspects the reason lets opaque/revoked objects prove
+// that rejection transport itself is exception-safe.
+export function OpaqueReasonBoundary(props) @{
+	<div id="opaque-reason-box">
+		@try {
+			use(props.promise);
+			<span class="opaque-reason-ok">{'ok'}</span>
+		} @pending {
+			<span class="opaque-reason-loading">{'loading'}</span>
+		} @catch (err) {
+			props.onCatch?.(err);
+			<span class="opaque-reason-error">{'caught'}</span>
+		}
+	</div>
+}
+
+// A fulfilled value deliberately shaped like the former in-band rejection
+// sentinel. Hydration must treat it as ordinary user data.
+export function SeedCollision(props) @{
+	const value = use(props.promise);
+	props.onValue?.(value);
+	<div
+		id="seed-collision"
+		data-message={value.__octane_new_rejection__.message}
+		data-undefined={String(value.__octane_new_undefined__)}
+	>
+		{value.label as string}
+	</div>
+}
+
+// The inner boundary has no catch arm. A hydrated rejection must retain its
+// private adoption signal while bubbling, then unwrap only for the outer catch.
+export function NestedRejectionBoundary(props) @{
+	<div id="nested-rejection">
+		@try {
+			@try {
+				const value = use(props.promise);
+				<span class="nested-ok">
+					{String(value) as string}
+				</span>
+			} @pending {
+				<span class="nested-inner-loading">{'inner'}</span>
+			}
+		} @pending {
+			<span class="nested-outer-loading">{'outer'}</span>
+		} @catch (err) {
+			<span class="nested-error">
+				{String(err) as string}
+			</span>
+		}
+	</div>
+}
+
+// The inner catch deliberately rethrows the raw reason. Hydration must retain
+// its private adoption token while unwinding so the outer catch can claim the
+// already-rendered server range without exposing the token to user code.
+export function RethrowingNestedRejectionBoundary(props) @{
+	<div id="nested-rethrow-rejection">
+		@try {
+			@try {
+				const value = use(props.promise);
+				<span class="nested-rethrow-ok">
+					{String(value) as string}
+				</span>
+			} @pending {
+				<i>{'inner pending'}</i>
+			} @catch (err) {
+				props.onInnerCatch?.(err);
+				throw err;
+				<span class="nested-rethrow-never">{'never'}</span>
+			}
+		} @pending {
+			<i>{'outer pending'}</i>
+		} @catch (err) {
+			props.onOuterCatch?.(err);
+			<span class="nested-rethrow-error" data-code={err.code}>
+				{err.message as string}
+			</span>
+		}
+	</div>
+}
+
+// The outer streamed segment can complete while the inner boundary remains a
+// template. The inner boundary must install an empty seed scope rather than
+// consuming the outer segment's later seed.
+function LaterStreamSeed(props) @{
+	const later = use(props.promise);
+	<span class="later-seed">
+		{later as string}
+	</span>
+}
+
+function NestedStreamSeedContent(props) @{
+	<section class="outer-seed-content">
+		<span class="outer-seed">
+			{props.outer as string}
+		</span>
+		@try {
+			const inner = use(props.inner);
+			<span class="inner-seed">
+				{inner as string}
+			</span>
+		} @pending {
+			<span class="inner-seed-pending">{'inner pending'}</span>
+		}
+		<LaterStreamSeed promise={props.later} />
+	</section>
+}
+
+export function NestedStreamSeedScopes(props) @{
+	<div id="nested-stream-seeds">
+		@try {
+			const outer = use(props.outer);
+			<NestedStreamSeedContent outer={outer} inner={props.inner} later={props.later} />
+		} @pending {
+			<span class="outer-seed-pending">{'outer pending'}</span>
+		}
+	</div>
+}
+
+// Streaming useId namespace probe. The root and whichever boundary arm is
+// visible both allocate their first local id; the boundary's opaque stream id
+// must keep those otherwise-identical counters disjoint across server output
+// and hydration.
+export function IdBoundary(props) @{
+	const rootId = useId();
+	props.onId?.('root', rootId);
+	<div id="id-box" data-root-id={rootId}>
+		@try {
+			const value = use(props.promise);
+			const contentId = useId();
+			props.onId?.('content', contentId);
+			<span class="id-ok" data-boundary-id={contentId}>
+				{value as string}
+			</span>
+		} @pending {
+			const pendingId = useId();
+			props.onId?.('pending', pendingId);
+			<span class="id-loading" data-boundary-id={pendingId}>{'loading'}</span>
+		} @catch (err) {
+			const catchId = useId();
+			props.onId?.('catch', catchId);
+			<span class="id-error" data-boundary-id={catchId}>
 				{err.message as string}
 			</span>
 		}

@@ -13,6 +13,7 @@ import { createRouter } from './server/router.js';
 import { createContext, runMiddlewareChain } from './server/middleware.js';
 import { handleRenderRoute } from './server/render-route.js';
 import { handleServerRoute } from './server/server-route.js';
+import { HYDRATION_NONCE_PLACEHOLDER, injectHydrationEntry } from './server/html-template.js';
 import { generateServerEntry } from './server/virtual-entry.js';
 import { nodeRequestToWebRequest, sendWebResponse } from './server/node-http.js';
 import { ENTRY_FILENAME } from './constants.js';
@@ -37,6 +38,7 @@ import { get_route_entry_path } from './routes.js';
 
 // Re-export route classes + config helpers (public API surface).
 export { RenderRoute, ServerRoute } from './routes.js';
+export { OCTANE_NONCE_STATE_KEY } from './constants.js';
 export {
 	getOctaneConfigPath,
 	loadOctaneConfig,
@@ -46,7 +48,9 @@ export {
 
 const VIRTUAL_HYDRATE_ID = 'virtual:octane-hydrate';
 const RESOLVED_VIRTUAL_HYDRATE_ID = '\0virtual:octane-hydrate';
-const OCTANE_EXTENSIONS = ['.tsrx'];
+// Mirrors octane/compiler/vite's full-compiler surface. Keeping this list in
+// sync is especially important for production `module server` discovery.
+const OCTANE_EXTENSIONS = ['.tsrx', '.tsx'];
 
 /**
  * @param {string} file_name
@@ -184,6 +188,8 @@ export function octane(inlineOptions = {}) {
 	let buildOctaneConfig = null;
 	/** @type {string[]} Module paths the generated client entry maps statically (build only) */
 	let staticEntries = [];
+	/** @type {Set<string>} Vite-root paths of modules containing `module server` */
+	const serverModuleModules = new Set();
 
 	/** @type {Plugin} */
 	const metaPlugin = {
@@ -208,21 +214,15 @@ export function octane(inlineOptions = {}) {
 					: {}),
 				optimizeDeps: {
 					exclude: [
-						// `@octanejs/tanstack-query` ships a `.tsrx` provider component, so it must NOT
-						// be esbuild-prebundled — the octane transform owns `.tsrx` compilation.
-						...new Set([
-							...exclude,
-							'octane',
-							'octane/compiler',
-							'@octanejs/tanstack-query',
-							...SERVER_ONLY_ADAPTER_IDS,
-						]),
+						// The compiler plugin has already added every manifest-discovered
+						// raw Octane dependency to `exclude`; preserve that list here.
+						...new Set([...exclude, 'octane', 'octane/compiler', ...SERVER_ONLY_ADAPTER_IDS]),
 					],
 				},
-				// Workspace packages with TS source must be transformed by Vite's SSR
-				// pipeline (not require()'d raw) so ssrLoadModule gets transpiled code.
+				// Raw binding packages are supplied recursively by the compiler plugin;
+				// these core entrypoints remain explicit metaframework dependencies.
 				ssr: {
-					noExternal: ['octane', 'octane/compiler', '@octanejs/tanstack-query'],
+					noExternal: ['octane', 'octane/compiler'],
 				},
 			};
 
@@ -267,11 +267,16 @@ export function octane(inlineOptions = {}) {
 		 */
 		buildStart() {
 			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
+			serverModuleModules.clear();
 			const cfg = /** @type {ResolvedOctaneConfig} */ (buildOctaneConfig);
 			const entries = cfg.router.routes
 				.filter((r) => r.type === 'render')
 				.flatMap((r) => [get_route_entry_path(/** @type {RenderRoute} */ (r).entry), r.layout]);
 			if (cfg.router.preHydrate) entries.push(cfg.router.preHydrate);
+			entries.push(
+				get_route_entry_path(cfg.rootBoundary.pending),
+				get_route_entry_path(cfg.rootBoundary.catch),
+			);
 			staticEntries = [...new Set(entries.filter((e) => typeof e === 'string'))];
 		},
 
@@ -310,6 +315,22 @@ export function octane(inlineOptions = {}) {
 				);
 				return fs.readFileSync(file, 'utf-8');
 			}
+			return null;
+		},
+
+		/**
+		 * Observe the compiler's client output after the pre-transform. A generated
+		 * __serverRpc call is an exact, syntax-level signal that this source owns a
+		 * `module server`; production uses the collected paths as static SSR imports.
+		 */
+		transform(code, id, options) {
+			if (!isBuild || options?.ssr || !is_octane_module_path(id.split('?')[0])) return null;
+			if (!code.includes('_$__serverRpc(')) return null;
+			const file = id.split('?')[0];
+			const relative = path.relative(root, file);
+			const isWithinRoot =
+				relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
+			serverModuleModules.add(isWithinRoot ? '/' + relative.split(path.sep).join('/') : file);
 			return null;
 		},
 
@@ -521,8 +542,7 @@ export function octane(inlineOptions = {}) {
 			order: 'pre',
 			handler(html) {
 				if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return html;
-				const hydrationScript = `<script type="module" src="${VIRTUAL_HYDRATE_ID}"></script>`;
-				return html.replace('</body>', `${hydrationScript}\n</body>`);
+				return injectHydrationEntry(html, VIRTUAL_HYDRATE_ID, HYDRATION_NONCE_PLACEHOLDER);
 			},
 		},
 
@@ -605,6 +625,8 @@ export function octane(inlineOptions = {}) {
 				generateServerEntry({
 					routes: cfg.router.routes,
 					octaneConfigPath: getOctaneConfigPath(root),
+					rootBoundary: cfg.rootBoundary,
+					rpcModulePaths: [...serverModuleModules],
 					clientAssetMap,
 				}),
 			);
@@ -700,8 +722,8 @@ export function octane(inlineOptions = {}) {
 	// compiler's `.ts`/`.js` hook-slotting pass must skip. Hand-slot-forwarding
 	// bindings should not need it: they declare
 	// `"octane": { "hookSlots": { "manual": ["src"] } }` in their own package.json and the
-	// compiler plugin skips them via a nearest-manifest lookup (published
-	// bindings live in node_modules and are skipped outright).
+	// compiler plugin skips those directories via a nearest-manifest lookup.
+	// Other installed raw-source Octane packages are transformed automatically.
 	const compilerOptions = {};
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;

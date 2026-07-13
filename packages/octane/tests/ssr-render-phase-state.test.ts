@@ -13,7 +13,7 @@ import { prerender } from 'octane/static';
 // that renders the settled state in a single pass.
 
 const SRC = `
-import { useState, useId, use } from 'octane';
+import { useState, useId, use, preload } from 'octane';
 
 export function Updater() @{
 	const [count, setCount] = useState(0);
@@ -72,6 +72,42 @@ export function TwoCells() @{
 	<span>{a + '/' + b}</span>
 }
 
+function DiscardedStyle() @{
+	<div class="discarded-style">
+		{'discarded'}
+		<style>
+			.discarded-style {
+				--discarded-render-pass: 1;
+			}
+		</style>
+	</div>
+}
+function SettledStyle() @{
+	<div class="settled-style">
+		{'settled'}
+		<style>
+			.settled-style {
+				--settled-render-pass: 1;
+			}
+		</style>
+	</div>
+}
+export function ArtifactUpdater() @{
+	const [phase, setPhase] = useState(0);
+	if (phase === 0) {
+		preload('/discarded-render-pass.css', { as: 'style' });
+		setPhase(1);
+	}
+	preload('/shared-render-pass.css', { as: 'style' });
+	<section>
+		@if (phase === 0) {
+			<DiscardedStyle />
+		} @else {
+			<SettledStyle />
+		}
+	</section>
+}
+
 export function Runaway() @{
 	const [count, setCount] = useState(0);
 	setCount(count + 1);
@@ -118,6 +154,16 @@ describe('SSR render-phase state updates — rewind bookkeeping', () => {
 
 	it('converges chained updates across two independent cells', () => {
 		expect(RT.renderToString(mod.TwoCells).html).toContain('2/3');
+	});
+
+	it('rewinds scoped CSS and resource-hint dedupe state from a discarded pass', () => {
+		const { html, css } = RT.renderToString(mod.ArtifactUpdater);
+
+		expect(html).toContain('settled');
+		expect(html).not.toContain('discarded-render-pass.css');
+		expect(html.match(/href="\/shared-render-pass\.css"/g)).toHaveLength(1);
+		expect(css).toContain('--settled-render-pass');
+		expect(css).not.toContain('--discarded-render-pass');
 	});
 
 	it('throws after 25 passes when a render-phase update never settles', () => {

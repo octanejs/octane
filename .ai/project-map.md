@@ -21,7 +21,7 @@ Always prefer current source over summaries:
 
 - `packages/octane/` (`octane`) — core runtime, compiler, SSR, tests.
 - `packages/vite-plugin-octane/` (`@octanejs/vite-plugin`) — optional metaframework/plugin surface.
-- `packages/{zustand,tanstack-query,motion,stylex,tanstack-router,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/` — Octane ports/bindings for React ecosystem libraries (parity varies; see each README).
+- The framework-binding rows in `docs/packages.md` — the generated inventory of Octane ports for React ecosystem libraries (parity varies; see `docs/bindings-status.md` and each package README).
 - `packages/adapter-vercel/` (`@octanejs/adapter-vercel`) — Vercel deploy adapter for the vite-plugin build output.
 - `packages/octane-mcp-server/` (`@octanejs/mcp-server`) — MCP server: user-facing bridge/migration/SSR skills plus repo automation tools.
 - `benchmarks/` — unified perf harnesses under `benchmarks/bench.mjs` (js-framework, dbmon, news, signal-favoring, recursive-context, async-waterfall, SSR/streaming, size suites, …).

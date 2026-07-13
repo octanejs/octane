@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getBindingPackages } from './workspace-packages.mjs';
 
 // Generates docs/bindings-status.md — the central status table for the
 // @octanejs/* framework bindings. The per-package data lives in a small
@@ -23,39 +24,23 @@ import { fileURLToPath } from 'node:url';
 //   divergences        string[] of intentional API/behavior differences ([]
 //                      allowed)
 //   ssr                one-liner: SSR/hydration support status
-//   verified           YYYY-MM-DD of the last parity verification (an audit,
-//                      differential run, or full-suite pass against the pinned
-//                      upstream version — bump it when re-verifying or when
-//                      the scope changes)
+//   verified           YYYY-MM-DD when the package's stated scope/evidence was
+//                      last checked (an audit, differential run, or relevant
+//                      suite pass). This is not a blanket full-parity claim.
 //   notes              optional string[] rendered as bullets in the package's
 //                      detail section
 //   docs               optional string[] of repo-relative paths to deeper
 //                      status/plan docs
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PACKAGES = path.join(REPO, 'packages');
 const OUT = path.join(REPO, 'docs/bindings-status.md');
 const CHECK = process.argv.includes('--check');
-
-// @octanejs/* packages that are NOT React-library bindings and therefore do
-// not carry a status.json. Any other @octanejs/* package (including future
-// bindings) MUST have one — that's what keeps this table complete.
-const NON_BINDINGS = new Set([
-	'@octanejs/vite-plugin',
-	'@octanejs/adapter-vercel',
-	'@octanejs/mcp-server',
-]);
 
 const errors = [];
 const rows = [];
 
-for (const dir of readdirSync(PACKAGES).sort()) {
-	const pkgPath = path.join(PACKAGES, dir, 'package.json');
-	if (!existsSync(pkgPath)) continue;
-	const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-	if (!pkg.name?.startsWith('@octanejs/') || NON_BINDINGS.has(pkg.name)) continue;
-
-	const statusPath = path.join(PACKAGES, dir, 'status.json');
+for (const workspacePackage of getBindingPackages()) {
+	const { dir, manifest: pkg, statusPath } = workspacePackage;
 	if (!existsSync(statusPath)) {
 		errors.push(`packages/${dir} (${pkg.name}) is a binding but has no status.json`);
 		continue;
@@ -106,14 +91,14 @@ machine-readable status block maintained next to the code it describes — merge
 with the version in its \`package.json\`. CI runs \`pnpm bindings:status:check\`,
 so a scope change that isn't reflected here fails the build.
 
-The bindings deliberately sit at different maturity levels: some are
-behaviorally complete ports verified differentially against the real React
-library, others are thin bindings over a framework-agnostic core, and some are
-explicitly partial or alpha. "Verified" is the date of the last parity
-verification (audit, differential run, or full-suite pass) against the pinned
-upstream version.
+The bindings deliberately sit at different maturity levels: some have broad
+differential evidence against the real React library, others are thin bindings
+over a framework-agnostic core, and some are explicitly partial or alpha. "Last
+checked" records when the stated scope and its supporting evidence were most
+recently reviewed. It does **not** certify full semantic parity outside the
+supported surface and known test coverage described for that package.
 
-| Package | Ports | Supported surface | Known divergences | SSR / hydration | Verified |
+| Package | Ports | Supported surface | Known divergences | SSR / hydration | Last checked |
 | --- | --- | --- | --- | --- | --- |
 `;
 
@@ -135,6 +120,7 @@ for (const { dir, pkg, status } of rows) {
 		md += `\n`;
 	}
 	md += `SSR / hydration: ${status.ssr}\n`;
+	md += `\nScope/evidence last checked: ${status.verified}.\n`;
 	if (status.notes?.length) {
 		md += `\n`;
 		for (const n of status.notes) md += `- ${n}\n`;
