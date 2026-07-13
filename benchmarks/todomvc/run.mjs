@@ -27,6 +27,7 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import { censusDomNodes, deterministicCount } from '../lib/dom-nodes.mjs';
 import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
@@ -280,16 +281,17 @@ async function runTarget(t) {
 		results[op.name] = summarizeSamples(samples);
 	}
 
-	// DOM-weight tripwire at steady state (100 todos mounted) — comparable
-	// across frameworks, deterministic per build (median === min).
+	// Full steady-state DOM shape (100 todos mounted). Element/text counts are
+	// semantic controls beside the bookkeeping-node total.
 	await ensureState(page, 'items');
-	const comments = await page.evaluate(() => {
-		const w = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
-		let n = 0;
-		while (w.nextNode()) n++;
-		return n;
-	});
-	results.comments_100 = { median: comments, min: comments, samples: [comments] };
+	const dom = await page.evaluate(censusDomNodes, '#main');
+	results.nodes_100 = deterministicCount(dom.total);
+	results.elements_100 = deterministicCount(dom.elements);
+	results.text_100 = deterministicCount(dom.text);
+	results.comments_100 = deterministicCount(dom.comments);
+	results.empty_text_100 = deterministicCount(dom.emptyText);
+	results.whitespace_text_100 = deterministicCount(dom.whitespaceText);
+	results.__dom = dom;
 
 	await browser.close();
 	return results;
@@ -315,9 +317,16 @@ async function runTarget(t) {
 		}
 		console.log(row.join('| '));
 	}
-	{
-		const row = ['#cmnts'.padEnd(13)];
-		for (const c of cols) row.push(String(all[c].comments_100.median).padEnd(W));
+	for (const [label, op] of [
+		['#nodes', 'nodes_100'],
+		['#elems', 'elements_100'],
+		['#text', 'text_100'],
+		['#cmnts', 'comments_100'],
+		['#empty', 'empty_text_100'],
+		['#ws', 'whitespace_text_100'],
+	]) {
+		const row = [label.padEnd(13)];
+		for (const c of cols) row.push(String(all[c][op].median).padEnd(W));
 		console.log(row.join('| '));
 	}
 
@@ -330,13 +339,16 @@ async function runTarget(t) {
 			targets: TARGETS.map((t) => ({
 				name: t.name,
 				ops: Object.fromEntries(
-					Object.entries(all[t.name]).map(([name, r]) => [
-						name,
-						r.score == null
-							? { median: r.median, min: r.min, samples: r.samples.length }
-							: timingStatForJson(r),
-					]),
+					Object.entries(all[t.name])
+						.filter(([name]) => name !== '__dom')
+						.map(([name, r]) => [
+							name,
+							r.score == null
+								? { median: r.median, min: r.min, samples: r.samples.length }
+								: timingStatForJson(r),
+						]),
 				),
+				meta: { dom: all[t.name].__dom },
 			})),
 		};
 		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');

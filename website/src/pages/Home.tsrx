@@ -10,39 +10,28 @@ import { HOME_SUMMARY } from '../content/benchmarks.ts';
 
 const FEATURES = [
 	{
-		eyebrow: 'Compiler-owned reactivity',
-		title: 'Hooks without the homework',
-		body: 'Write the closure and move on. Octane infers dependencies for effects, ' +
-			'memos, callbacks, and imperative handles; hook call sites stay safe behind ' +
-			'conditions and early returns. The no-bookkeeping DX people reach for ' +
-			'signals to get, with the hooks model you already know.',
-		code: 'useEffect(() => sync(room.id))',
+		title: 'No rules of hooks',
+		body: 'No dependency arrays and no rules of hooks. The compiler tracks what ' +
+			'your effects, memos and callbacks actually use, and hooks can sit behind ' +
+			'conditions or early returns.',
 	},
 	{
-		eyebrow: 'Async by construction',
-		title: 'Suspense without waterfalls',
-		body: 'Independent use() resources start together instead of serially ' +
-			'suspending through the tree. Descendant fetch plans warm early, and ' +
-			'streaming SSR flushes each ready boundary without waiting for the slowest one.',
-		code: 'const user = use(fetchUser(id))',
+		title: 'Improved async',
+		body: 'Independent use() calls start together instead of suspending one at a ' +
+			'time down the tree. Nested fetches warm up early, and streaming SSR sends ' +
+			'each boundary as soon as it’s ready.',
 	},
 	{
-		eyebrow: 'Compiled rendering',
-		title: 'No virtual DOM. No diff tax.',
-		body: 'TSRX lowers templates to clones and direct DOM writes, while keyed @for ' +
-			'blocks compile to a dedicated minimal-move path. Standard .tsx works too, ' +
-			'so optimization is a per-component choice rather than a rewrite.',
-		code: '@for (const item of items; key item.id)',
-		href: 'https://tsrx.dev',
-		linkLabel: 'tsrx.dev',
+		title: 'No virtual DOM',
+		body: 'Templates compile to cloned nodes and direct DOM writes, and keyed ' +
+			'@for lists move the fewest nodes possible. Plain .tsx still works, so you ' +
+			'can adopt .tsrx one component at a time.',
 	},
 	{
-		eyebrow: 'React knowledge, upgraded',
-		title: 'Change the import. Keep the model.',
-		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms, ' +
-			'and Suspense behave the way you expect. Native events and refs-as-props ' +
-			'remove legacy layers, while 17 first-party bindings bring the ecosystem.',
-		code: 'import { useQuery } from \'@octanejs/tanstack-query\'',
+		title: 'Familiar model',
+		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms ' +
+			'and Suspense all behave the way you expect. Events are native, refs are ' +
+			'just props, and 17 first-party bindings cover the libraries you already use.',
 	},
 ];
 
@@ -50,7 +39,6 @@ export function Home() @{
 	<div class="home">
 		<section class="hero">
 			<div class="hero-copy">
-				<p class="hero-kicker">Compiler-first UI for TypeScript</p>
 				<h1 class="hero-title">
 					{'React’s programming model, '}
 					<span class="hero-accent">compiled</span>
@@ -87,25 +75,17 @@ export function Home() @{
 		<section class="features">
 			@for (const feature of FEATURES; key feature.title) {
 				<article class="card">
-					<p class="card-eyebrow">
-						{feature.eyebrow as string}
-					</p>
 					<h3 class="card-title">
 						{feature.title as string}
 					</h3>
 					<p class="card-body">
 						{feature.body as string}
 					</p>
-					<div class="card-bottom">
-						<code class="card-code">
-							{feature.code as string}
-						</code>
-						@if (feature.href) {
-							<a class="card-link" href={feature.href} target="_blank" rel="noreferrer">
-								{(feature.linkLabel ?? feature.href) + ' →'}
-							</a>
-						}
-					</div>
+					@if (feature.href) {
+						<a class="card-link" href={feature.href} target="_blank" rel="noreferrer">
+							{(feature.linkLabel ?? feature.href) + ' →'}
+						</a>
+					}
 				</article>
 			}
 		</section>
@@ -139,12 +119,6 @@ export function Home() @{
 				<h2 id="bench-heading" class="bench-title">Measured, not vibes</h2>
 				<Link to="/benchmarks" class="bench-all">All suites →</Link>
 			</div>
-			<p class="bench-sub">
-				Cross-framework browser, SSR, async and shipped-bytes suites on one scale: each framework’s
-				cost relative to Octane (1×), lower is better. Same apps, same hardware, from production
-				builds or production preview servers — charted with @octanejs/recharts, the site’s own
-				charting binding. Where a bar is shorter than Octane’s, that framework wins the suite.
-			</p>
 			<div class="bench-grid">
 				<BenchBars card={HOME_SUMMARY} showValues={true} width={1100} />
 			</div>
@@ -310,30 +284,6 @@ export function Home() @{
 				border-radius: 1rem;
 				padding: 1.5rem;
 				overflow: hidden;
-				transition:
-					transform 0.18s ease,
-					border-color 0.18s ease,
-					box-shadow 0.18s ease;
-			}
-			.card::before {
-				content: '';
-				position: absolute;
-				inset: 0 0 auto;
-				height: 2px;
-				background: linear-gradient(90deg, #ff415a, #ff8a78 55%, transparent);
-			}
-			.card:hover {
-				transform: translateY(-3px);
-				border-color: rgba(255, 101, 122, 0.3);
-				box-shadow: 0 16px 30px rgba(0, 0, 0, 0.18);
-			}
-			.card-eyebrow {
-				margin: 0 0 0.85rem;
-				color: #ff657a;
-				font-size: 0.68rem;
-				font-weight: 800;
-				letter-spacing: 0.11em;
-				text-transform: uppercase;
 			}
 			.card-title {
 				margin: 0 0 0.75rem;
@@ -345,30 +295,11 @@ export function Home() @{
 				color: #99a1b3;
 				font-size: 0.925rem;
 			}
-			.card-bottom {
-				display: flex;
-				flex-direction: column;
-				align-items: flex-start;
-				gap: 0.65rem;
-				margin-top: auto;
-				padding-top: 1.25rem;
-				width: 100%;
-			}
-			.card-code {
-				display: block;
-				box-sizing: border-box;
-				width: 100%;
-				padding: 0.65rem 0.75rem;
-				background: rgba(15, 17, 21, 0.72);
-				border: 1px solid rgba(255, 255, 255, 0.08);
-				border-radius: 0.55rem;
-				color: #f4eee8;
-				font-size: 0.72rem;
-				line-height: 1.45;
-				overflow-wrap: anywhere;
-			}
 			.card-link {
 				display: inline-block;
+				align-self: flex-start;
+				margin-top: auto;
+				padding-top: 1.25rem;
 				color: #ff5d72;
 				font-weight: 600;
 				font-size: 0.9rem;

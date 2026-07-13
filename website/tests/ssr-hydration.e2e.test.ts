@@ -35,10 +35,19 @@ const ROUTES = ['/', '/docs', '/benchmarks', '/playground', '/view-transitions']
 // `/` + `/benchmarks` re-based 2026-07-12 after the homepage/benchmarks charts
 // picked up TodoMVC, chat-stream, async-waterfall and bundle-size (measured
 // / 2,173 · /benchmarks 17,743): real content growth, not marker minting.
+//
+// `/` + `/benchmarks` re-based 2026-07-13 after every comparative chart gained
+// Preact/Svelte series and streaming-ssr joined the page (measured / 2,210 ·
+// /benchmarks 22,621). The ceilings retain roughly 15% headroom.
+//
+// `/` re-based again 2026-07-13 after the home summary chart turned on
+// showValues (a value label on every bar — ~7 series × 14 suites of small
+// recharts label trees; measured / 2,929): real content growth, not marker
+// minting.
 const COMMENT_CEILINGS: Record<string, number> = {
-	'/': 2500,
+	'/': 3380,
 	'/docs': 415,
-	'/benchmarks': 20500,
+	'/benchmarks': 26100,
 	'/playground': 195,
 	// The view-transitions demo (added with the plan's Phase 5, measured 189) —
 	// a handful of boundaries + control-flow arms.

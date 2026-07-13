@@ -1,6 +1,6 @@
 # Comment-Marker Elision Plan — fewer `<!--[-->`s when they carry no information
 
-Status: M0-M4 LANDED (2026-07-09; see each phase's note). Follow-up to the
+Status: M0-M5 LANDED (2026-07-13; see each phase's note). Follow-up to the
 website Elements-panel report
 (a 40-deep run of `<!--[-->` before `.shell`, ~2,100 comment nodes on the home
 page). Companion to docs/compiled-output-optimization-plan.md — this is the
@@ -317,20 +317,102 @@ M2; SSR emission and hydration adoption untouched):**
   **12,061**. Cumulative from the 2,122 / 17,381 start: **−31%** on both.
   Ceilings ratcheted to 1,680 / 415 / 13,800 / 195.
 
+### M5 — Benchmark-fixture client ranges and a general DOM census
+
+**M5 LANDED 2026-07-13.** This phase started from production builds of the
+representative benchmark fixtures and counted every descendant of the fixture
+root by `nodeType`. That separates user-visible elements/text from Octane's
+comment bookkeeping and avoids treating another framework's whitespace text as
+equivalent to a range marker.
+
+| Fixture state | Octane before | Octane after | React / Preact | Visible elements/text |
+| --- | ---: | ---: | ---: | --- |
+| js-framework, 1,000 rows | 10,075 (3 comments) | **10,074 (2)** | 10,072 (0) | 8,051 / 2,021, exact |
+| TodoMVC, 100 todos | 933 (310 comments) | **730 (107)** | 623 (0) | 517 / 106, exact |
+| chat-stream, 10 messages / 21 segments | 158 (78 comments) | **104 (24)** | 80 (0) | 55 / 25, exact |
+| portal-swarm, 600 closed cards | 3,826 (1,812 comments) | **2,622 (608)** | 2,014 (0) | 1,411 / 603, exact |
+| portal-swarm, all portals open (whole body) | 8,229 (3,012 comments) | **7,025 (1,808)** | 5,217 (0) | 3,412 / 1,805, exact |
+
+The same js-framework fixture authored through the generic return-JSX paths
+lost its cliff: the naive TSRX variant went from 2,003 comments to **2**, and
+the naive JSX variant from 4,003 to **2**, matching the tuned fixture's DOM
+shape. Solid and Svelte are still reported separately by the harness because
+their compiled output deliberately uses extra text/comment nodes in several
+fixtures; element and meaningful-text equality is the semantic comparison.
+
+The attribution and changes are deliberately narrow:
+
+- `compile.js` (`makeForCall` + `planJsx`) now proves sole keyed-item roots for
+  direct hosts, a component definition with exactly one unconditional host
+  return, and an `@if/@else` whose every reachable arm is exactly one host.
+  Imported components use the existing immutable `$$singleRoot` definition
+  stamp. A missing branch, fragment, spread, children override, key, early
+  return, or unknown/dynamic callee declines the optimization.
+- `runtime.ts` (`forBlock`) reuses a compiler-owned trailing `<!>` as the
+  list's closing marker, and an active `@empty` body borrows the list's outer
+  range rather than nesting another pair. Hydration adopts the established
+  server range unchanged.
+- `runtime.ts` (`renderBranchSlot`) leaves an inactive client-only branch on
+  its existing insertion anchor and re-enters the self-marked one-host regime
+  when it becomes active. When a sole-root branch is also a keyed-item
+  boundary, replacements update every exact borrower; an empty result or a
+  transition commit promotes that shared boundary to one durable pair.
+- `runtime.server.ts` / the compiler's SSR emitters were intentionally not
+  changed. Hydratable HTML keeps the current balanced range protocol, and the
+  client continues to adopt legacy/current server output. Eliminating server
+  item ranges needs a versioned, symmetric SSR + hydration change and is not
+  bundled into this low-risk client optimization.
+- Portals keep their target-side pair (1,200 comments for 600 open portals),
+  which is used for target ownership, event propagation, update insertion, and
+  teardown. Suspense/`@try` streaming boundaries, transition WIP pairs,
+  `<Activity>` ranges, multi-root keyed items, order-bearing value-hole
+  anchors, and adjacent-text SSR separators also remain load-bearing.
+
+`benchmarks/lib/dom-nodes.mjs` is the regression surface: js-framework,
+TodoMVC, chat-stream, and portal-swarm now emit deterministic `nodes_*`,
+`elements_*`, `text_*`, `comments_*`, `empty_text_*`, and
+`whitespace_text_*` operations plus comment-payload/parent histograms in
+`meta.dom`. Ratio guards cap total nodes while requiring Octane's visible
+element/text counts to equal React's. Portal-swarm records both the fixture
+root and whole-body census so target-side portal ranges cannot disappear from
+the accounting.
+
+The implementation plan was ordered by invariant risk: instrument first;
+reuse already-owned anchors/ranges; extend the existing single-root proof;
+then test keyed identity, state/effects/events/refs through the full suite,
+branch replacement, transitions, SSR adoption, and mismatch recovery. The
+SSR/hydration wire format and foreign-target/streaming boundaries stay a
+separate follow-up. Normal production comparisons kept the affected work
+competitive: js-framework `run` 1.8 ms vs React 6.5 / Solid 1.7; TodoMVC
+`add100` 2.7 ms vs React 13.8 / Solid 2.1; chat `streamFine` 1.4 ms vs React
+7.2 / Solid 3.2; portal mount/open 2.4/1.3 ms vs React 3.8/1.5. Fewer nodes
+also shorten range walks and reduce DOM memory.
+
+The exact size cost, measured against an isolated current-main worktree with
+the same toolchain, is small but non-zero. The fixed codegen corpus grows
+121,122 → 121,280 raw bytes, 63,229 → 63,337 minified, and 23,205 → 23,247
+gzip (**+42 B / +0.18% gzip**). The js-framework production bundle grows
+28,884 → 28,889 B gzip (+5 B); control-flow-heavy TodoMVC grows 28,972 →
+29,115 (+143 B / +0.49%), and chat-stream 29,223 → 29,358 (+135 B / +0.46%).
+That is the boundary-propagation/runtime proof cost paid by apps that use the
+optimized paths; the matching js-framework, TodoMVC, and chat states lose 1,
+203, and 54 live nodes respectively, while closed portal-swarm loses 1,204.
+
 **Still open (small or order-constrained — diminishing returns):**
 
 1. Multi-hole hosts: the remaining ~684 empty anchors on `/` are
    order-bearing (`<g>{a}{b}</g>` — siblings need stable positions); eliding
    them needs per-hole neighbor bookkeeping. Biggest remaining bucket.
 2. Component-bearing `it` pairs (145 on `/`) — required borrow ranges today.
-3. Sole-root @if/@switch construct inherit + children-render-fn /
-   value-position sole roots (M3 leftovers; 4 `if` pairs on home).
-4. SSR-side symmetry for the M2/M4 owns-parent regimes (hydrated pages keep
-   server pairs the client mount wouldn't mint).
+3. Sole-root `@switch` construct inherit + children-render-fn /
+   value-position sole roots (M3 leftovers).
+4. SSR-side symmetry for the M2/M4/M5 client regimes (hydrated pages keep
+   server item/component pairs the client mount would not mint). This must be
+   designed as one SSR-emission + hydration-adoption protocol change.
 
 ### Ordering & expected effect
 
-M0 → M1 → M2 → M3. Home-page projection: M2 removes ~1,600 (chart + rows),
+M0 → M1 → M2 → M3 → M4 → M5. Home-page projection: M2 removes ~1,600 (chart + rows),
 M3 removes ~39 of the 40-deep prefix and every wrapper pair page-wide
 (≈300 of the 392 SSR-pair comments), M1 covers client-rendered leaves.
 Target: **2,122 → under ~400**, root prefix 40 → ≤ 3.
@@ -350,14 +432,14 @@ Target: **2,122 → under ~400**, root prefix 40 → ≤ 3.
 
 ## 6. Open questions
 
-1. M3 for `@if` branch pairs too (slot pair inherits, branch pair remains as
-   the swap range) — or both when the branch is also sole-child? Proposal:
-   slot pair only in v1; branch pairs carry swap semantics.
+1. M5 now elides client-only inactive `@if` pairs and lets a guaranteed
+   host-vs-host branch share a keyed-item boundary. General sole-root
+   `@if`/`@switch` inheritance still needs a symmetric SSR/hydration design.
 2. Should `mountItem` under hydration ALSO skip adopting per-item pairs when
    the server (post-M3 compiler) stopped emitting them for singleRoot @for
    bodies? Natural extension of M3's flag to `ssrEmitFor` — folds the last
    big pair population on SSR'd list pages. Proposal: yes, same mechanism,
    after M3 core proves out.
-3. Empty-pair elision (6 on the home page) — an empty block still needs an
-   insertion anchor unless its position is recoverable from siblings; not
-   worth special-casing in v1.
+3. Empty branches still need one insertion anchor unless their position is
+   recoverable from siblings. M5 removes the redundant pair but deliberately
+   retains that single anchor.
