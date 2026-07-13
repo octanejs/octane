@@ -1,0 +1,10 @@
+{
+  "upstream": { "package": "@reduxjs/toolkit", "version": "2.12.0" },
+  "surface": "Complete four-entry-point port: the framework-agnostic Toolkit and RTK Query core are re-exported verbatim; `/query/react` provides generated query, lazy-query, mutation, infinite-query, prefetch hooks and `ApiProvider`; `/react` provides the dynamic-middleware dispatch-hook integration.",
+  "divergences": [
+    "The compatibility `/react` subpaths and `reactHooksModule` names are retained, but use octane and `@octanejs/redux` internally.",
+    "`useDebugValue` is octane's no-op compatibility hook; observable query behavior is unchanged."
+  ],
+  "ssr": "Preloaded RTK Query state renders through the traditional @octanejs/redux Provider; effects and browser listeners remain client-only. Dedicated SSR and hydration tests are included.",
+  "verified": "2026-07-13"
+}

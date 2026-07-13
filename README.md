@@ -430,7 +430,8 @@ generated from the workspace manifests in
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
   [`base-ui`](./packages/base-ui), [`sonner`](./packages/sonner),
   [`recharts`](./packages/recharts),
-  [`redux`](./packages/redux), [`testing-library`](./packages/testing-library),
+  [`redux`](./packages/redux), [`redux-toolkit`](./packages/redux-toolkit),
+  [`testing-library`](./packages/testing-library),
   [`i18next`](./packages/i18next), and [`mdx`](./packages/mdx).
   Parity varies by package — some are behaviorally complete, others are
   explicitly partial or alpha. [`docs/bindings-status.md`](./docs/bindings-status.md)
