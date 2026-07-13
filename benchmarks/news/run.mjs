@@ -26,6 +26,7 @@ import { createServer as createHttp } from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { censusDomNodes } from '../lib/dom-nodes.mjs';
 import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -147,20 +148,24 @@ for (let i = 0; i < WARMUP + ITER; i++) {
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });
+const domBeforeHydration = await page.evaluate(censusDomNodes, '#app');
 const check = await page.evaluate(async () => {
 	const root = document.getElementById('app');
-	// hydrate() consumes + REMOVES the server's suspense seed
-	// (<script data-octane-suspense>) from the container, so comparing raw
-	// innerHTML before/after would report a false rebuild for any app that
-	// emitted that script. Exclude it from both sides; the no-rebuild check is
-	// about the rendered tree, not the seed.
-	const stripSeed = (html) =>
-		html.replace(/<script[^>]*\bdata-octane-suspense\b[^>]*>[\s\S]*?<\/script>/g, '');
-	const before = stripSeed(root.innerHTML);
+	// Hydration consumes its suspense seed and Octane may coalesce redundant
+	// protocol comments after every host/text node has been adopted. Compare the
+	// semantic tree without either bookkeeping form, and separately pin a host
+	// node's identity so a byte-identical rebuild cannot pass this gate.
+	const stripBookkeeping = (html) =>
+		html
+			.replace(/<script[^>]*\bdata-octane-suspense\b[^>]*>[\s\S]*?<\/script>/g, '')
+			.replace(/<!--(?:\[|\]|\[(?:[2-9]\d*|1\d+)|\](?:[2-9]\d*|1\d+))-->/g, '');
+	const before = stripBookkeeping(root.innerHTML);
+	const firstCard = root.querySelector('article.card');
 	window.__hydrate();
 	await new Promise((r) => requestAnimationFrame(r));
 	const cards = root.querySelectorAll('article.card').length;
-	const noRebuild = stripSeed(root.innerHTML) === before; // hydration adopted, didn't rebuild
+	const noRebuild =
+		stripBookkeeping(root.innerHTML) === before && root.querySelector('article.card') === firstCard;
 	const cls0 = root.querySelector('header.masthead').className;
 	root.querySelector('#theme').click();
 	// Let the framework's reactive update flush before reading the result:
@@ -170,6 +175,7 @@ const check = await page.evaluate(async () => {
 	const cls1 = root.querySelector('header.masthead').className;
 	return { cards, noRebuild, toggled: cls0 !== cls1 };
 });
+const domAfterHydration = await page.evaluate(censusDomNodes, '#app');
 await ctx.close();
 await browser.close();
 await new Promise((r) => httpServer.close(r));
@@ -204,7 +210,12 @@ if (process.env.BENCH_JSON) {
 					ssr_render: timingStatForJson(ssr),
 					hydrate: timingStatForJson(hyd),
 				},
-				meta: { htmlBytes, cards: check.cards },
+				meta: {
+					htmlBytes,
+					cards: check.cards,
+					domBeforeHydration,
+					domAfterHydration,
+				},
 			},
 		],
 	};

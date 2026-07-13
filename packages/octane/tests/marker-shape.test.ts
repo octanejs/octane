@@ -31,8 +31,8 @@ import {
 //   client — fresh createRoot mount (client minting regimes incl. the
 //            existing elisions: forBlock singleRoot items, branch self-mark)
 //   ssr    — the server HTML string (pairs are emitted UNCONDITIONALLY today)
-//   hydrate— server HTML adopted by hydrateRoot (adoption keeps every server
-//            pair, so hydrated counts ≥ client counts)
+//   hydrate— server HTML adopted by hydrateRoot, then exactly-coextensive
+//            logical ranges share one counted physical pair (`[N` / `]N`)
 // The counts are the CURRENT contract, with the arithmetic in comments. The
 // elision phases (M1-M3) are EXPECTED to lower them — edit deliberately, and
 // keep client/ssr/hydrate mutually consistent when you do.
@@ -174,10 +174,10 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 	it('(a9) ALIASED boundary builtin declines at RUNTIME on both sides', () => {
 		// `const S = Suspense` dodges the compile-time name exclusion — the site
 		// is stamped, and componentSlot + ssrComponent both decline by identity,
-		// keeping the frame pair (and Suspense's own boundary bookkeeping) on
-		// both sides. A one-sided decline would desync hydration here; hydrate
-		// matching ssr proves the pairs adopted cleanly.
-		expect(counts('AliasSusp', AliasSusp, {})).toEqual({ client: 6, ssr: 8, hydrate: 8 });
+		// keeping the frame pair (and Suspense's own boundary bookkeeping) on both
+		// sides. Hydration compacts one coextensive descendant range but preserves
+		// the independent Suspense boundary: 8 server comments → 6 live comments.
+		expect(counts('AliasSusp', AliasSusp, {})).toEqual({ client: 6, ssr: 8, hydrate: 6 });
 	});
 
 	it('(a5) chain hydration ADOPTS the server DOM (same node, no mismatch)', () => {
@@ -271,19 +271,20 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 		const props = { items: ['a', 'b', 'c'] };
 		// SingleItem: client outer pair only. The server protocol remains
 		// conservative and keeps both an item pair and component frame per row;
-		// hydration adopts those established ranges.
+		// hydration adopts them, then stores both logical depths on one counted
+		// physical item pair: outer pair (2) + three item pairs (3×2) = 8.
 		expect(counts('ListComponent', ListComponent, props)).toEqual({
 			client: 2,
 			ssr: 14,
-			hydrate: 14,
+			hydrate: 8,
 		});
 		// MultiItem is not stamped singleRoot, so every client item retains its
 		// pair; the sole nested component borrows it. SSR keeps both established
-		// ranges and hydration adopts them.
+		// logical ranges and hydration coalesces each exact per-item pair.
 		expect(counts('ListComponentMulti', ListComponentMulti, props)).toEqual({
 			client: 8,
 			ssr: 14,
-			hydrate: 14,
+			hydrate: 8,
 		});
 	});
 
@@ -341,7 +342,7 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 		);
 		const root = hydrateRoot(container, ListComponent, props);
 		expect(container.querySelector('[data-value="a"]')).toBe(rows.get('a'));
-		expect(domComments(container)).toBe(14);
+		expect(domComments(container)).toBe(8);
 		flushSync(() => root.render(ListComponent, { items: ['c', 'a', 'b'] }));
 		expect([...container.querySelectorAll<HTMLElement>('.component-item')]).toEqual([
 			rows.get('c'),
@@ -360,13 +361,13 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 		expect(counts('ListConditional', ListConditional, { items })).toEqual({
 			client: 2,
 			ssr: 20,
-			hydrate: 20,
+			hydrate: 8,
 		});
 		expect(
 			counts('ListConditionalEmpty', ListConditionalEmpty, {
 				items: items.map((item) => ({ id: item.id, show: false })),
 			}),
-		).toEqual({ client: 8, ssr: 14, hydrate: 14 });
+		).toEqual({ client: 8, ssr: 14, hydrate: 8 });
 	});
 
 	it('(c4b) conditional item boundaries follow branch swaps and keyed moves', () => {
@@ -453,9 +454,9 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 		expect(newA?.localName).toBe('pre');
 		expect(newB?.localName).toBe('p');
 		expect(newA).not.toBe(serverA);
-		// The first post-hydration arm swap retires each adopted inner branch
-		// pair; the branch then borrows its durable outer slot range.
-		expect(domComments(container)).toBe(10);
+		// Each branch and keyed item already shares one counted physical range;
+		// the arm swap updates that logical group without adding nested pairs.
+		expect(domComments(container)).toBe(6);
 
 		flushSync(() =>
 			root.render(ListConditional, {
@@ -472,8 +473,9 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 	it('(d) @if single-element branch: client self-marks everything', () => {
 		// Client: the single-element branch self-marks AND the if slot rides the
 		// template's <!> anchor — only that anchor remains = 1. SSR: if-slot
-		// pair + taken-branch pair = 4. Hydration adopts both server pairs = 4.
-		expect(counts('Branch', Branch, { on: true })).toEqual({ client: 1, ssr: 4, hydrate: 4 });
+		// pair + taken-branch pair = 4. Hydration adopts both logical ranges on
+		// one counted physical pair = 2.
+		expect(counts('Branch', Branch, { on: true })).toEqual({ client: 1, ssr: 4, hydrate: 2 });
 	});
 
 	it('(d2) inactive @if uses one anchor and stays markerless through toggles', () => {

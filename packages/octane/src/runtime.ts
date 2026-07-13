@@ -229,9 +229,8 @@ function describeHydrationNode(node: Node | null): string {
 	if (node.nodeType === 1) return `<${(node as Element).localName}>`;
 	if (node.nodeType === 3) return `text ${JSON.stringify((node as Text).nodeValue)}`;
 	if (node.nodeType === 8) {
-		const d = (node as Comment).data;
-		if (d === HYDRATION_START) return 'a control-flow block';
-		if (d === HYDRATION_END) return 'the end of the parent block (fewer nodes than expected)';
+		if (isBlockOpen(node)) return 'a control-flow block';
+		if (isBlockClose(node)) return 'the end of the parent block (fewer nodes than expected)';
 		return 'a comment';
 	}
 	return 'a node';
@@ -2585,6 +2584,8 @@ export function renderBlock(block: Block): void {
 					block.endMarker,
 					d.key ?? undefined,
 					true,
+					undefined,
+					hydrating && KEYED_ELEMENT_DESCRIPTORS.has(d),
 				);
 			} else {
 				childSlot(block, 0, block.parentNode, out, block.endMarker);
@@ -2619,13 +2620,17 @@ function disposeReturnSlot(block: Block, state: any): void {
 		}
 		// Fires the content's cleanups and sweeps the nodes between the markers.
 		clearChildContent(state);
-		(state.start as ChildNode | null)?.remove();
-		(state.end as ChildNode | null)?.remove();
+		if (!state.borrowed) {
+			(state.start as ChildNode | null)?.remove();
+			(state.end as ChildNode | null)?.remove();
+		}
 	} else {
 		// componentSlotSlot — unmountBlock removes its DOM (incl. any owned markers).
 		if (state.block) unmountBlock(state.block, true);
-		(state.start as ChildNode | null)?.remove?.();
-		(state.end as ChildNode | null)?.remove?.();
+		if (!state.inherited) {
+			(state.start as ChildNode | null)?.remove?.();
+			(state.end as ChildNode | null)?.remove?.();
+		}
 	}
 	const reg = block._slots;
 	if (reg !== null) {
@@ -2689,6 +2694,7 @@ export function componentSlotLite<P>(
 	let scope = parentScope.slots[slotKey] as Scope | undefined;
 	// The server `<!--]-->` this call adopted as its range end (hydration first
 	// render only) — consumed by the post-body cursor advance below.
+	let adoptedOpen: Comment | null = null;
 	let adoptedClose: Node | null = null;
 	if (scope === undefined) {
 		scope = new ScopeImpl(parentScope, parentScope.block);
@@ -2704,6 +2710,7 @@ export function componentSlotLite<P>(
 			// cursor at the content so the body's clone() adopts the server DOM, and
 			// use `<!--]-->` as the insert anchor so the body's
 			// `insertBefore(content, endMarker)` is a no-op (content already there).
+			adoptedOpen = anchor as Comment;
 			endMarker = matchingClose(anchor as Node);
 			adoptedClose = endMarker;
 			hydrateNode = (anchor as Node).nextSibling;
@@ -2720,12 +2727,19 @@ export function componentSlotLite<P>(
 			let open: Node | null = hydrateNode;
 			if (open === null || open.parentNode !== host) open = host.firstChild;
 			if (open !== null && isBlockOpen(open)) {
+				adoptedOpen = open;
 				endMarker = matchingClose(open);
 				adoptedClose = endMarker;
 				hydrateNode = open.nextSibling;
 			}
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
+		if (adoptedOpen !== null && adoptedClose !== null) {
+			hydratedLiteRanges?.set(scope, {
+				start: adoptedOpen,
+				end: adoptedClose as Comment,
+			});
+		}
 		parentScope.slots[slotKey] = scope;
 		// Register on parent.children so unmountScope(parent) walks into us.
 		parentScope.children.push({ key: slotKey, scope });
@@ -4495,6 +4509,22 @@ let hydrateNode: Node | null = null;
 // constant-fold away with the rest of the hydration path in client-only builds.
 let hydrationSeeds: unknown[] | null = null;
 let hydrationSeedCursor = 0;
+// Set while adopting a root when a matched range is physically wrapped by an
+// exactly-adjacent marker pair. The post-hydration ownership walk can only
+// remove comments in that shape, so roots without one skip the pass entirely.
+let hydrationHasAdjacentRangePair = false;
+
+/**
+ * Lite component calls deliberately allocate no CompSlot/Block range owner,
+ * but hydration still adopts their server frame pair. Keep that pair in an
+ * ephemeral map for the one post-hydration compaction pass; the live lite
+ * scope only needs its end marker re-pointed if the pair is borrowed.
+ */
+interface HydratedLiteRange {
+	start: Comment;
+	end: Comment;
+}
+let hydratedLiteRanges: WeakMap<Scope, HydratedLiteRange> | null = null;
 
 /**
  * Parse a seed-JSON payload (the shell's `data-octane-suspense` script or a
@@ -4585,7 +4615,7 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 					describeHydrationNode(hydrateNode),
 				);
 			const stale = hydrateNode;
-			if (stale.nodeType === 8 && (stale as Comment).data === HYDRATION_END) {
+			if (isBlockClose(stale)) {
 				// The server rendered NOTHING at this slot (the cursor sits on the ENCLOSING
 				// block's close marker — e.g. a client-only `@if` branch the server left empty).
 				// Build fresh but consume nothing: don't remove the close marker (it delimits the
@@ -4795,9 +4825,43 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 // hydration path DCE-folds away for client-only builds.
 // ---------------------------------------------------------------------------
 
-/** True if `node` is a server block-open marker `<!--[-->`. */
+/**
+ * Decode a hydration range marker. Legacy `[` / `]` comments have
+ * multiplicity one; hydration-time range compaction writes `[N` / `]N` for
+ * N >= 2 exactly-coextensive logical ranges sharing one physical pair. The
+ * count is metadata — DOM navigation still treats the comment as ONE physical
+ * nesting level. Non-canonical payloads are ordinary user comments.
+ */
+function hydrationMarkerMultiplicity(data: string, open: boolean): number {
+	const marker = open ? HYDRATION_START : HYDRATION_END;
+	if (data === marker) return 1;
+	if (data.length < 2 || data.charCodeAt(0) !== marker.charCodeAt(0)) return 0;
+	// Canonical positive decimal: no signs, whitespace, zero, or leading zeroes.
+	const first = data.charCodeAt(1);
+	if (first < 49 || first > 57) return 0;
+	let value = first - 48;
+	for (let i = 2; i < data.length; i++) {
+		const digit = data.charCodeAt(i) - 48;
+		if (digit < 0 || digit > 9) return 0;
+		value = value * 10 + digit;
+		if (!Number.isSafeInteger(value)) return 0;
+	}
+	// Multiplicity one has exactly one canonical spelling: the legacy marker.
+	return value >= 2 ? value : 0;
+}
+
+/** True if `node` is a legacy or counted block-open marker. */
 function isBlockOpen(node: Node | null): node is Comment {
-	return node !== null && node.nodeType === 8 && (node as Comment).data === HYDRATION_START;
+	if (node === null || node.nodeType !== 8) return false;
+	const data = (node as Comment).data;
+	return data === HYDRATION_START || hydrationMarkerMultiplicity(data, true) > 1;
+}
+
+/** True if `node` is a legacy or counted block-close marker. */
+function isBlockClose(node: Node | null): node is Comment {
+	if (node === null || node.nodeType !== 8) return false;
+	const data = (node as Comment).data;
+	return data === HYDRATION_END || hydrationMarkerMultiplicity(data, false) > 1;
 }
 
 /**
@@ -4842,10 +4906,31 @@ function matchingClose(open: Node): Comment {
 	for (;;) {
 		if (node.nodeType === 8) {
 			const data = (node as Comment).data;
-			if (data === HYDRATION_END) {
-				if (depth === 0) return node as Comment;
+			let close = data === HYDRATION_END;
+			let nestedOpen = data === HYDRATION_START;
+			if (!close && !nestedOpen && data.length > 1) {
+				const first = data.charCodeAt(0);
+				if (first === HYDRATION_END.charCodeAt(0)) {
+					close = hydrationMarkerMultiplicity(data, false) > 1;
+				} else if (first === HYDRATION_START.charCodeAt(0)) {
+					nestedOpen = hydrationMarkerMultiplicity(data, true) > 1;
+				}
+			}
+			if (close) {
+				if (depth === 0) {
+					const found = node as Comment;
+					if (
+						hydrating &&
+						!hydrationHasAdjacentRangePair &&
+						isBlockOpen(open.previousSibling) &&
+						isBlockClose(found.nextSibling)
+					) {
+						hydrationHasAdjacentRangePair = true;
+					}
+					return found;
+				}
 				depth -= 1;
-			} else if (data === HYDRATION_START) {
+			} else if (nestedOpen) {
 				depth += 1;
 			}
 		}
@@ -7906,6 +7991,12 @@ export function createPortal(
 // `root.render(<App foo={next}/>)` updates props while keeping `type` identity.
 // ---------------------------------------------------------------------------
 const ELEMENT_TAG = Symbol.for('octane.element');
+// ElementDescriptor.key intentionally matches React's public shape (`null` for
+// both no key and a nullish key), so preserve compiler-visible key PRESENCE out
+// of band. This lets hydration keep an explicit `key={undefined}` as an
+// independent reconciliation boundary without adding an observable descriptor
+// field or penalizing unkeyed descriptors with extra object shape.
+const KEYED_ELEMENT_DESCRIPTORS = new WeakSet<object>();
 export interface ElementDescriptor<P = any> {
 	$$kind: typeof ELEMENT_TAG;
 	// A compiled ComponentBody (the fast/common case, e.g. `root.render(<App/>)`)
@@ -7973,7 +8064,15 @@ export function createElement<P>(
 		}
 		if (addChildren) p.children = kids;
 	}
-	return { $$kind: ELEMENT_TAG, type, props: p as P, key, children: kids ?? null };
+	const descriptor: ElementDescriptor<P> = {
+		$$kind: ELEMENT_TAG,
+		type,
+		props: p as P,
+		key,
+		children: kids ?? null,
+	};
+	if (stripKey) KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	return descriptor;
 }
 function isElementDescriptor(v: any): v is ElementDescriptor {
 	return v != null && v.$$kind === ELEMENT_TAG;
@@ -8038,7 +8137,20 @@ export function cloneElement<P>(
 	// and never fold them into props (the de-opt reconciler owns them) — mirror createElement.
 	if (typeof element.type === 'function') props.children = kids;
 	else if ('children' in props) delete props.children;
-	return { $$kind: ELEMENT_TAG, type: element.type, props, key, children: kids ?? null };
+	const descriptor: ElementDescriptor<P> = {
+		$$kind: ELEMENT_TAG,
+		type: element.type,
+		props,
+		key,
+		children: kids ?? null,
+	};
+	if (
+		KEYED_ELEMENT_DESCRIPTORS.has(element) ||
+		(config != null && Object.prototype.hasOwnProperty.call(config, 'key'))
+	) {
+		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	}
+	return descriptor;
 }
 
 // Visit each leaf of `children` (flattening arrays), passing empties through as `null`.
@@ -8135,6 +8247,8 @@ interface CompSlot {
 	// `key=undefined` doesn't spuriously remount. Compared with Object.is so
 	// NaN keys are stable and 0 / -0 are distinguished.
 	prevKey: any;
+	/** The call site supplied `key=`, even when its current value is undefined. */
+	keyed: boolean;
 }
 
 const NO_KEY: unique symbol = Symbol('NO_KEY');
@@ -8169,6 +8283,9 @@ export function componentSlot(
 	// in the compiler stamps both sides from the same AST). Declined at
 	// runtime when the parent block has no coherent borrowable regime.
 	inherit?: boolean,
+	// Compiler call-site bit: unlike the key value, this distinguishes an
+	// explicit `key={undefined}` from an unkeyed call.
+	hasKey?: boolean,
 ): void {
 	const parentBlock = parentScope.block;
 	// A STRING comp: a dynamic JSX tag — `<props.parts.title>`, `<Tag/>` with
@@ -8284,10 +8401,12 @@ export function componentSlot(
 			block: null,
 			currentComp: null,
 			prevKey: NO_KEY,
+			keyed: hasKey === true || key !== undefined,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
+	if (hasKey === true || key !== undefined) state.keyed = true;
 	// Key-driven remount: when the compiler emitted a key arg AND its value
 	// changed since last render, force `comp !== state.currentComp` semantics
 	// even if the component identity is unchanged. Null out currentComp so the
@@ -8503,6 +8622,14 @@ interface ChildSlot {
 	 * marked regime; hydration never enters it (adoption wins at mount).
 	 */
 	ownerHost: Element | null;
+	/**
+	 * Hydration compaction: this slot's pair is borrowed from its sole-range
+	 * parent. Teardown may clear between the comments but must never remove the
+	 * comments themselves.
+	 */
+	borrowed: boolean;
+	/** Compiler proof that this renderable hole is the body's entire output. */
+	compactable: boolean;
 	block: Block | null;
 	text: Text | null;
 	currentComp: ComponentBody | null;
@@ -9357,6 +9484,8 @@ function deoptItemBody(item: any, scope: Scope): void {
 				start: block.startMarker as Comment,
 				end: block.endMarker as Comment,
 				ownerHost: null,
+				borrowed: true,
+				compactable: false,
 				block: null,
 				text: null,
 				currentComp: null,
@@ -9389,6 +9518,8 @@ function deoptItemBody(item: any, scope: Scope): void {
 				start: block.startMarker as Comment,
 				end: block.endMarker as Comment,
 				ownerHost: null,
+				borrowed: true,
+				compactable: false,
 				block: null,
 				text: null,
 				currentComp: null,
@@ -9793,6 +9924,9 @@ export function childSlot(
 	// element clears). De-opt hosts (hostElementBody/hostComponent) pass their
 	// element here; ignored under hydration (server-pair adoption wins).
 	ownsHost?: Element,
+	// Compiler proof that this renderable hole is the body's entire output.
+	// Used only by the post-hydration exact-range compactor.
+	compactable?: boolean,
 ): void {
 	const parentBlock = parentScope.block;
 	// A LONE PURE-HOST descriptor (host/text-only subtree — no components, no
@@ -9853,6 +9987,8 @@ export function childSlot(
 			start,
 			end,
 			ownerHost: (!hydrating ? (ownsHost ?? null) : null) as Element | null,
+			borrowed: false,
+			compactable: compactable === true,
 			block: null,
 			text: null,
 			currentComp: null,
@@ -9864,6 +10000,7 @@ export function childSlot(
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
+	if (compactable === true) state.compactable = true;
 
 	// Consume the pure-host → blocks upgrade handoff: this is the upgraded
 	// block's owns-parent children slot (its FIRST render), and the element's
@@ -10175,15 +10312,22 @@ export function childSlot(
 				if (r.error) throw r.error;
 				throw new SuspenseException(r.suspended);
 			}
-			// Completed → commit: tear down old (sweeps state.start..state.end; the WIP sits
-			// OUTSIDE that range so it's untouched), then move the WIP into the slot range.
-			// Synchronous, so there is no painted blank between the two.
-			clearChildContent(state);
-			commitOffscreen(r.wip, state.end!);
-			state.block = r.wip.block;
-			state.currentComp = comp;
-			state.currentIsBodyFn = isBodyFn;
-			return;
+			if (state.borrowed) {
+				// The retained pair belongs to a coextensive parent range. Probe for
+				// suspension, discard, then use the in-place mount below; committing
+				// a nested WIP pair would split the compacted ownership graph.
+				disposeWip(r.wip);
+			} else {
+				// Completed → commit: tear down old (sweeps state.start..state.end; the WIP sits
+				// OUTSIDE that range so it's untouched), then move the WIP into the slot range.
+				// Synchronous, so there is no painted blank between the two.
+				clearChildContent(state);
+				commitOffscreen(r.wip, state.end!);
+				state.block = r.wip.block;
+				state.currentComp = comp;
+				state.currentIsBodyFn = isBodyFn;
+				return;
+			}
 		}
 		// PURE-HOST → BLOCKS UPGRADE (adopt, don't rebuild): the slot's last render
 		// was a raw pure-host tree (state.hostNode), and this render the SAME-TAG
@@ -10214,6 +10358,7 @@ export function childSlot(
 			state.currentComp = comp;
 			state.currentIsBodyFn = false;
 			const b = createBlock('dynamic', parentBlock, domParent, state.start, state.end, comp, props);
+			if (state.borrowed) b.exclusiveMarkers = true;
 			b.$$implicitBail = true;
 			b.memoInChain = true;
 			b.deoptNode = el;
@@ -10244,6 +10389,7 @@ export function childSlot(
 			domParent.insertBefore(state.start, state.end);
 		}
 		const b = createBlock('dynamic', parentBlock, domParent, state.start, state.end, comp, props);
+		if (state.borrowed) b.exclusiveMarkers = true;
 		// Arm React's implicit same-element bailout: value-position mounts are the
 		// sites that can receive a CACHED descriptor back (provider children, `.ts`
 		// binding trees, `return children` passthroughs), so their context reads
@@ -10315,10 +10461,11 @@ export function textSlot(
 	value: unknown,
 	anchor?: Node | null,
 	ownEnd?: boolean,
+	compactable?: boolean,
 ): void {
 	const vt = typeof value;
 	if (vt === 'object' || vt === 'function') {
-		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd);
+		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, undefined, compactable);
 		return;
 	}
 	const state = parentScope.slots[slotKey] as ChildSlot | undefined;
@@ -10333,7 +10480,7 @@ export function textSlot(
 		// non-text content (block / array / host node / portal) — let the full
 		// classifier handle it (it also tears the outgoing mode down, e.g. a
 		// portal's foreign-target content).
-		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd);
+		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, undefined, compactable);
 		return;
 	}
 	// Hot path: primitive into a text/empty slot (markerless single Text node).
@@ -10366,8 +10513,9 @@ export function textHole(
 	value: unknown,
 	anchor?: Node | null,
 	ownEnd?: boolean,
+	compactable?: boolean,
 ): Text | null {
-	childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd);
+	childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, undefined, compactable);
 	const state = parentScope.slots[slotKey] as ChildSlot;
 	return state.block === null && state.forSlot === null && state.hostNode === null
 		? state.text
@@ -12270,6 +12418,8 @@ interface BranchSlot {
 	anchor: Node | null;
 	start: Comment | null;
 	end: Node | null;
+	/** Hydration compaction borrowed this slot's pair from its sole-range parent. */
+	borrowed: boolean;
 	branch: number;
 	block: Block | null;
 }
@@ -12384,29 +12534,44 @@ function renderBranchSlot(
 					if (r.error) throw r.error;
 					throw new SuspenseException(r.suspended);
 				}
-				r.wip.start.data = marker;
-				r.wip.end.data = '/' + marker;
-				// Tear down the old branch. A borrowed-marker branch (exclusiveMarkers=true)
-				// keeps oldStart/oldEnd; a self-marked branch removes its element. The wip
-				// pair was inserted after `probeAfter` (state.end/anchor) and stays put.
-				const oldStart = state.start;
-				const oldEnd = state.end;
-				unmountBlock(state.block);
-				// Orphaned old slot markers (borrowed regime) — nothing references them once
-				// the old block is dead; remove so only the adopted wip pair bounds the slot.
-				if (oldStart !== null) {
-					oldStart.remove();
-					(oldEnd as ChildNode | null)?.remove();
+				// A hydration-compacted branch borrows a pair that still belongs to
+				// its parent (and possibly several outer wrapper states). Probe for
+				// suspension off-screen, then discard and use the in-place path below;
+				// adopting the WIP pair would strand every outer owner on removed
+				// comments. This mirrors componentSlot's inherited transition path.
+				if (state.borrowed) {
+					disposeWip(r.wip);
+				} else {
+					r.wip.start.data = marker;
+					r.wip.end.data = '/' + marker;
+					// Tear down the old branch. A borrowed-marker branch (exclusiveMarkers=true)
+					// keeps oldStart/oldEnd; a self-marked branch removes its element. The wip
+					// pair was inserted after `probeAfter` (state.end/anchor) and stays put.
+					const oldStart = state.start;
+					const oldEnd = state.end;
+					unmountBlock(state.block);
+					// Orphaned old slot markers (borrowed regime) — nothing references them once
+					// the old block is dead; remove so only the adopted wip pair bounds the slot.
+					if (oldStart !== null) {
+						oldStart.remove();
+						(oldEnd as ChildNode | null)?.remove();
+					}
+					state.start = r.wip.start;
+					state.end = r.wip.end;
+					state.block = r.wip.block;
+					state.branch = next;
+					replaceSharedBlockBoundary(
+						parentBlock,
+						oldBlockStart,
+						oldBlockEnd,
+						r.wip.start,
+						r.wip.end,
+					);
+					// Adopted pair is now the slot's durable boundary (see NEXT-swap note above).
+					r.wip.block.exclusiveMarkers = true;
+					spliceWipCapture(r.wip);
+					return;
 				}
-				state.start = r.wip.start;
-				state.end = r.wip.end;
-				state.block = r.wip.block;
-				state.branch = next;
-				replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, r.wip.start, r.wip.end);
-				// Adopted pair is now the slot's durable boundary (see NEXT-swap note above).
-				r.wip.block.exclusiveMarkers = true;
-				spliceWipCapture(r.wip);
-				return;
 			}
 		}
 		// Position for the new branch: just after the current branch's trailing node,
@@ -12583,7 +12748,15 @@ export function ifBlock(
 			start = open;
 			end = matchingClose(open);
 		}
-		state = { __kind: 'ifBlockSlot', anchor: anchor ?? null, start, end, branch: -1, block: null };
+		state = {
+			__kind: 'ifBlockSlot',
+			anchor: anchor ?? null,
+			start,
+			end,
+			borrowed: false,
+			branch: -1,
+			block: null,
+		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
@@ -12971,6 +13144,7 @@ export function switchBlock(
 			anchor: anchor ?? null,
 			start,
 			end,
+			borrowed: false,
 			branch: -1,
 			block: null,
 		};
@@ -14101,6 +14275,348 @@ function lis(arr: Int32Array): number[] {
 }
 
 // ---------------------------------------------------------------------------
+// Post-hydration exact-range compaction
+// ---------------------------------------------------------------------------
+
+type CoalescedRangeOwner = CompSlot | ChildSlot | BranchSlot;
+
+interface HydrationRangeGroup {
+	start: Comment;
+	end: Comment;
+	/** Number of logical hydration ranges represented by this physical pair. */
+	depth: number;
+	blocks: Block[];
+	liteScopes: Scope[];
+	owners: CoalescedRangeOwner[];
+}
+
+/** True when a compiled ref manifest contains a `<Fragment ref>` binding. */
+function scopeHasFragmentRef(scope: Scope): boolean {
+	const fields = scope.refFields;
+	if (fields === null) return false;
+	for (let i = 0; i < fields.length; i += 3) {
+		if (fields[i] === 'f') return true;
+	}
+	return false;
+}
+
+/**
+ * Collapse only ranges whose runtime ownership graph and DOM positions both
+ * prove they are exactly coextensive. SSR deliberately stays on the legacy
+ * explicit-pair protocol: hydration first adopts every range unambiguously,
+ * then this one-shot pass redirects inner owners to the retained outer pair and
+ * removes the redundant comments. Suspense/try, Activity, portals, and list
+ * outer ranges are traversal barriers; keyed item ranges remain independently
+ * movable, though wrapper-only descendants may compact inside each item pair.
+ */
+function coalesceHydratedRanges(
+	rootBlock: Block,
+	liteRanges: WeakMap<Scope, HydratedLiteRange>,
+): void {
+	const blockGroups = new WeakMap<Block, HydrationRangeGroup>();
+	const scopeGroups = new WeakMap<Scope, HydrationRangeGroup>();
+	const ownerGroups = new WeakMap<object, HydrationRangeGroup>();
+	const seenBlocks = new WeakSet<Block>();
+	const seenScopes = new WeakSet<Scope>();
+
+	function makeGroup(
+		startNode: Node | null,
+		endNode: Node | null,
+		block?: Block,
+		liteScope?: Scope,
+		owner?: CoalescedRangeOwner,
+	): HydrationRangeGroup | null {
+		if (!isBlockOpen(startNode) || !isBlockClose(endNode) || startNode === endNode) return null;
+		if (startNode.parentNode === null || startNode.parentNode !== endNode.parentNode) return null;
+		const openDepth = hydrationMarkerMultiplicity(startNode.data, true);
+		const closeDepth = hydrationMarkerMultiplicity(endNode.data, false);
+		if (openDepth === 0 || openDepth !== closeDepth) return null;
+		const group: HydrationRangeGroup = {
+			start: startNode,
+			end: endNode,
+			depth: openDepth,
+			blocks: block === undefined ? [] : [block],
+			liteScopes: liteScope === undefined ? [] : [liteScope],
+			owners: owner === undefined ? [] : [owner],
+		};
+		if (block !== undefined) blockGroups.set(block, group);
+		if (liteScope !== undefined) scopeGroups.set(liteScope, group);
+		if (owner !== undefined) ownerGroups.set(owner, group);
+		return group;
+	}
+
+	function appendUnique<T>(target: T[], source: T[]): void {
+		for (let i = 0; i < source.length; i++) {
+			if (target.indexOf(source[i]) === -1) target.push(source[i]);
+		}
+	}
+
+	function remapGroup(from: HydrationRangeGroup, to: HydrationRangeGroup): void {
+		for (let i = 0; i < from.blocks.length; i++) blockGroups.set(from.blocks[i], to);
+		for (let i = 0; i < from.liteScopes.length; i++) scopeGroups.set(from.liteScopes[i], to);
+		for (let i = 0; i < from.owners.length; i++) ownerGroups.set(from.owners[i], to);
+	}
+
+	function writeMultiplicity(group: HydrationRangeGroup): void {
+		group.start.data = group.depth === 1 ? HYDRATION_START : HYDRATION_START + String(group.depth);
+		group.end.data = group.depth === 1 ? HYDRATION_END : HYDRATION_END + String(group.depth);
+	}
+
+	/** Merge bookkeeping for two runtime owners that already share one pair. */
+	function unifySharedPair(
+		outer: HydrationRangeGroup,
+		inner: HydrationRangeGroup,
+	): HydrationRangeGroup {
+		if (outer === inner) return outer;
+		outer.depth = Math.max(outer.depth, inner.depth);
+		appendUnique(outer.blocks, inner.blocks);
+		appendUnique(outer.liteScopes, inner.liteScopes);
+		appendUnique(outer.owners, inner.owners);
+		remapGroup(inner, outer);
+		writeMultiplicity(outer);
+		return outer;
+	}
+
+	function rangesAreExactlyNested(outer: HydrationRangeGroup, inner: HydrationRangeGroup): boolean {
+		return (
+			outer.start.parentNode !== null &&
+			outer.start.parentNode === inner.start.parentNode &&
+			outer.end.parentNode === outer.start.parentNode &&
+			inner.end.parentNode === outer.start.parentNode &&
+			outer.start.nextSibling === inner.start &&
+			inner.end.nextSibling === outer.end
+		);
+	}
+
+	/** Redirect every inner runtime owner before removing its redundant pair. */
+	function borrowInnerRange(outer: HydrationRangeGroup, inner: HydrationRangeGroup): void {
+		for (let i = 0; i < inner.blocks.length; i++) {
+			const block = inner.blocks[i];
+			block.startMarker = outer.start;
+			block.endMarker = outer.end;
+			block.exclusiveMarkers = true;
+		}
+		for (let i = 0; i < inner.liteScopes.length; i++) {
+			inner.liteScopes[i].block.endMarker = outer.end;
+		}
+		for (let i = 0; i < inner.owners.length; i++) {
+			const owner = inner.owners[i];
+			owner.start = outer.start;
+			owner.end = outer.end;
+			if (owner.__kind === 'componentSlotSlot') {
+				owner.inherited = true;
+			} else if (owner.__kind === 'childSlot') {
+				owner.borrowed = true;
+				if (owner.forSlot !== null) {
+					owner.forSlot.start = outer.start;
+					owner.forSlot.end = outer.end;
+				}
+			} else {
+				owner.borrowed = true;
+			}
+		}
+	}
+
+	function mergeExactRanges(
+		outer: HydrationRangeGroup,
+		inner: HydrationRangeGroup,
+	): HydrationRangeGroup {
+		if (outer === inner) return outer;
+		if (outer.start === inner.start && outer.end === inner.end) {
+			return unifySharedPair(outer, inner);
+		}
+		if (!rangesAreExactlyNested(outer, inner)) return outer;
+		const mergedDepth = outer.depth + inner.depth;
+		// Both inputs were decoded as safe integers, but their sum may not be. Keep
+		// both physical pairs rather than minting metadata the protocol cannot parse.
+		if (!Number.isSafeInteger(mergedDepth)) return outer;
+		borrowInnerRange(outer, inner);
+		inner.start.remove();
+		inner.end.remove();
+		outer.depth = mergedDepth;
+		appendUnique(outer.blocks, inner.blocks);
+		appendUnique(outer.liteScopes, inner.liteScopes);
+		appendUnique(outer.owners, inner.owners);
+		remapGroup(inner, outer);
+		writeMultiplicity(outer);
+		return outer;
+	}
+
+	function attachOwner(group: HydrationRangeGroup | null, owner: CoalescedRangeOwner): void {
+		if (group === null) return;
+		if (group.owners.indexOf(owner) === -1) group.owners.push(owner);
+		ownerGroups.set(owner, group);
+	}
+
+	function isBoundaryComponent(owner: CompSlot): boolean {
+		return (
+			owner.currentComp === Suspense ||
+			owner.currentComp === ErrorBoundary ||
+			owner.currentComp === ViewTransition
+		);
+	}
+
+	function mayBorrowCandidate(value: any): boolean {
+		if (value === null || typeof value !== 'object') return false;
+		const kind = value.__kind;
+		if (kind === 'componentSlotSlot') {
+			const owner = value as CompSlot;
+			return (
+				owner.block !== null &&
+				!owner.keyed &&
+				!isBoundaryComponent(owner) &&
+				!scopeHasFragmentRef(owner.block)
+			);
+		}
+		if (kind === 'childSlot') {
+			const owner = value as ChildSlot;
+			return (
+				owner.block !== null &&
+				owner.forSlot === null &&
+				owner.portal === null &&
+				owner.currentComp !== Suspense &&
+				owner.currentComp !== ErrorBoundary &&
+				owner.currentComp !== ViewTransition &&
+				!scopeHasFragmentRef(owner.block)
+			);
+		}
+		if (kind === 'ifBlockSlot' || kind === 'switchBlockSlot') {
+			const owner = value as BranchSlot;
+			return owner.block === null || !scopeHasFragmentRef(owner.block);
+		}
+		return liteRanges.has(value as Scope) && !scopeHasFragmentRef(value as Scope);
+	}
+
+	function mappedGroup(value: any): HydrationRangeGroup | undefined {
+		if (value === null || typeof value !== 'object') return undefined;
+		return ownerGroups.get(value) ?? scopeGroups.get(value as Scope);
+	}
+
+	/**
+	 * A packed one-entry scope is the runtime proof for a sole output range.
+	 * Template pass-through holes also carry a compiler proof because slot 0 is
+	 * their binding bag; no DOM-only inference is made for arbitrary empty holes.
+	 */
+	function soleRangeCandidate(scope: Scope): HydrationRangeGroup | null {
+		let only: any = undefined;
+		let count = 0;
+		const slots = scope.slots;
+		for (let i = 0; i < slots.length; i++) {
+			if (slots[i] === undefined) continue;
+			only = slots[i];
+			count++;
+			if (count > 1) break;
+		}
+		if (count === 1 && mayBorrowCandidate(only)) {
+			const group = mappedGroup(only);
+			if (group !== undefined) return group;
+		}
+
+		const registered = scope._slots;
+		if (
+			registered !== null &&
+			registered.length === 1 &&
+			scope.children.length === 0 &&
+			registered[0].__kind === 'childSlot' &&
+			(registered[0] as ChildSlot).compactable &&
+			mayBorrowCandidate(registered[0])
+		) {
+			return ownerGroups.get(registered[0]) ?? null;
+		}
+		return null;
+	}
+
+	function compactScopeRange(scope: Scope, own: HydrationRangeGroup | null): void {
+		visitScopeContents(scope);
+		if (own === null || scopeHasFragmentRef(scope)) return;
+		const candidate = soleRangeCandidate(scope);
+		if (candidate !== null) mergeExactRanges(own, candidate);
+	}
+
+	function visitBlock(block: Block, owner?: CoalescedRangeOwner): HydrationRangeGroup | null {
+		if (seenBlocks.has(block)) {
+			const existing = blockGroups.get(block) ?? null;
+			if (owner !== undefined) attachOwner(existing, owner);
+			return existing;
+		}
+		seenBlocks.add(block);
+		const own = makeGroup(block.startMarker, block.endMarker, block, undefined, owner);
+		compactScopeRange(block, own);
+		return blockGroups.get(block) ?? own;
+	}
+
+	function visitNestedScope(scope: Scope): HydrationRangeGroup | null {
+		if (seenScopes.has(scope)) return scopeGroups.get(scope) ?? null;
+		seenScopes.add(scope);
+		const range = liteRanges.get(scope);
+		const own =
+			range === undefined ? null : makeGroup(range.start, range.end, undefined, scope, undefined);
+		compactScopeRange(scope, own);
+		return scopeGroups.get(scope) ?? own;
+	}
+
+	function visitForSlot(state: ForSlot): void {
+		for (let block = state.head; block !== null; block = block.nextSibling) visitBlock(block);
+		if (state.emptyBlock !== null) visitBlock(state.emptyBlock);
+	}
+
+	function visitBranchSlot(state: BranchSlot): void {
+		const inner = state.block === null ? null : visitBlock(state.block);
+		const outer = makeGroup(state.start, state.end, undefined, undefined, state);
+		if (outer !== null && inner !== null && !scopeHasFragmentRef(state.block!)) {
+			mergeExactRanges(outer, inner);
+		}
+	}
+
+	function visitSlot(state: any): void {
+		const kind = state.__kind;
+		if (kind === 'componentSlotSlot') {
+			if (state.block !== null) visitBlock(state.block, state as CompSlot);
+			return;
+		}
+		if (kind === 'childSlot') {
+			const child = state as ChildSlot;
+			if (child.block !== null) visitBlock(child.block, child);
+			if (child.forSlot !== null) visitForSlot(child.forSlot);
+			if (child.portal?.block != null) visitBlock(child.portal.block);
+			return;
+		}
+		if (kind === 'ifBlockSlot' || kind === 'switchBlockSlot') {
+			visitBranchSlot(state as BranchSlot);
+			return;
+		}
+		if (kind === 'forBlockSlot') {
+			visitForSlot(state as ForSlot);
+			return;
+		}
+		if (kind === 'trySlotSlot') {
+			const visible = state.block as Block | null;
+			const persistent = state.tryBlock as Block | null;
+			if (visible !== null) visitBlock(visible);
+			if (persistent !== null && persistent !== visible) visitBlock(persistent);
+			return;
+		}
+		if (kind === 'activityBlockSlot' || kind === 'portalSlotSlot') {
+			if (state.block !== null) visitBlock(state.block);
+			return;
+		}
+		// Internal host-children scopes may carry a markerless Block. Traverse it
+		// for descendants, but never expose the wrapper itself as a candidate.
+		if (state.block != null) visitBlock(state.block);
+	}
+
+	function visitScopeContents(scope: Scope): void {
+		const children = scope.children;
+		for (let i = 0; i < children.length; i++) visitNestedScope(children[i].scope);
+		const registered = scope._slots;
+		if (registered === null) return;
+		for (let i = 0; i < registered.length; i++) visitSlot(registered[i]);
+	}
+
+	visitBlock(rootBlock);
+}
+
+// ---------------------------------------------------------------------------
 // Public root API — React-DOM parity
 // ---------------------------------------------------------------------------
 
@@ -14276,7 +14792,12 @@ export function hydrateRoot(
 		next: 0,
 	};
 	rootBlock.idState = idState;
+	hydrationHasAdjacentRangePair = false;
 	hydrating = true;
+	const liteRanges = new WeakMap<Scope, HydratedLiteRange>();
+	hydratedLiteRanges = liteRanges;
+	let hydrationCompleted = false;
+	let shouldCoalesceRanges = false;
 	// The root-local counter starts at zero, matching the server render carrying
 	// the same identifierPrefix. Other roots cannot perturb hydration ordering.
 	// Adopt server-serialized use(thenable) values, if any: pull them out of the
@@ -14306,12 +14827,17 @@ export function hydrateRoot(
 	hydrateNode = firstNode;
 	try {
 		renderBlock(rootBlock);
+		hydrationCompleted = true;
+		shouldCoalesceRanges = hydrationHasAdjacentRangePair;
 	} finally {
 		hydrating = false;
+		hydrationHasAdjacentRangePair = false;
 		hydrateNode = null;
 		hydrationSeeds = null;
 		hydrationSeedCursor = 0;
+		hydratedLiteRanges = null;
 	}
+	if (hydrationCompleted && shouldCoalesceRanges) coalesceHydratedRanges(rootBlock, liteRanges);
 	// Commit effects on the next microtask flush (same as createRoot's first render).
 	if (!syncFlush && !scheduled) {
 		scheduled = true;

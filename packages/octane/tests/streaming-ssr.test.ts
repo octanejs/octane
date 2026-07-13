@@ -136,6 +136,42 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(shell).not.toContain('streamed!');
 	});
 
+	it('balances canonical counted markers in the inline segment swap runtime', async () => {
+		const d = deferred<string>();
+		const c = collector();
+		const { pipe } = ServerRT.renderToPipeableStream(server.Boundary, { promise: d.promise });
+		pipe(c.dest);
+		const shell = c.chunks[0];
+		d.resolve('done');
+		await c.ended;
+
+		// Install the real emitted runtime, then exercise it against a compacted
+		// enclosing boundary. The counted close is the scanner's stopping node; a
+		// legacy-only parser runs past it and deletes the trailing sibling/segment.
+		container.innerHTML = shell;
+		const runtimeScript = Array.from(container.querySelectorAll('script')).find((script) =>
+			(script.textContent || '').includes('$OCTRC=function'),
+		);
+		expect(runtimeScript).toBeDefined();
+		// eslint-disable-next-line no-eval
+		(0, eval)(runtimeScript!.textContent || '');
+		container.innerHTML =
+			'<!--[2--><template data-oct-b="counted"></template>' +
+			'<i class="counted-fallback">loading</i><!--]2-->' +
+			'<p class="after-counted">after</p>' +
+			'<div hidden data-oct-s="counted"><b class="counted-ready">ready</b></div>';
+
+		(window as any).$OCTRC('counted');
+		expect(container.querySelector('.counted-fallback')).toBeNull();
+		expect(container.querySelector('.counted-ready')?.textContent).toBe('ready');
+		expect(container.querySelector('.after-counted')?.textContent).toBe('after');
+		expect(container.querySelector('[data-oct-s]')).toBeNull();
+		const comments = Array.from(container.childNodes)
+			.filter((node): node is Comment => node.nodeType === Node.COMMENT_NODE)
+			.map((node) => node.data);
+		expect(comments).toEqual(['[2', 'oct-seed:counted', ']2']);
+	});
+
 	it('streams independent sibling boundaries as separate segments', async () => {
 		const a = deferred<string>();
 		const b = deferred<string>();

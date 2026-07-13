@@ -5,6 +5,7 @@ import { compile } from 'octane/compiler';
 import * as ClientRT from '../../src/index.js';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { hydrationMarkerSummary } from './_marker-summary.js';
 
 // P3 — STRUCTURAL hydration mismatch: the server DOM's SHAPE differs from what the client
 // renders (a swapped @if/@switch branch, a changed tag, a different @for list length). The
@@ -200,24 +201,40 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		expect(warns()).toEqual([]); // prod: recovery without the dev warning
 	});
 
-	it('PROD build: matching branch adopts unchanged (structural check has no false positives)', async () => {
+	it('PROD build: matching branch adopts hosts without a false-positive mismatch', async () => {
 		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
 		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
 		container.innerHTML = html;
-		const before = container.innerHTML;
+		const toggle = container.querySelector('#toggle')!;
+		const button = container.querySelector('#hit')!;
+		const before = hydrationMarkerSummary(toggle);
 		hydrateRoot(container, clientProd.Toggle, { on: true });
 		flushSync(() => {});
-		expect(container.innerHTML).toBe(before);
+		expect(container.querySelector('#toggle')).toBe(toggle);
+		expect(container.querySelector('#hit')).toBe(button);
+		expect(button.textContent).toBe('on:0');
+		const after = hydrationMarkerSummary(toggle);
+		expect(after.logicalPairs).toBe(before.logicalPairs);
+		expect(after.physicalPairs).toBeLessThan(before.physicalPairs);
+		expect(after.countedPairs).toBe(1);
 		expect(warns()).toEqual([]);
 	});
 
-	it('no warning + adopted unchanged when the branch matches', async () => {
+	it('no warning + adopted hosts when the branch matches', async () => {
 		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
 		container.innerHTML = html;
-		const before = container.innerHTML;
+		const toggle = container.querySelector('#toggle')!;
+		const button = container.querySelector('#hit')!;
+		const before = hydrationMarkerSummary(toggle);
 		hydrateRoot(container, clientDev.Toggle, { on: true });
 		flushSync(() => {});
-		expect(container.innerHTML).toBe(before);
+		expect(container.querySelector('#toggle')).toBe(toggle);
+		expect(container.querySelector('#hit')).toBe(button);
+		expect(button.textContent).toBe('on:0');
+		const after = hydrationMarkerSummary(toggle);
+		expect(after.logicalPairs).toBe(before.logicalPairs);
+		expect(after.physicalPairs).toBeLessThan(before.physicalPairs);
+		expect(after.countedPairs).toBe(1);
 		expect(warns()).toEqual([]);
 	});
 
