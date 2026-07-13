@@ -57,6 +57,7 @@ overrides:
 
 catalogs:
   default:
+    '@lucide/icons': 1.24.0
     '@babel/core': 7.29.7
     '@changesets/changelog-github': ^0.7.0
     '@changesets/changelog-git': ^0.2.1
@@ -138,6 +139,7 @@ catalogs:
     jsdom: ^29.0.2
     jotai: ^2.20.1
     lexical: 0.46.0
+    lucide-react: 1.24.0
     motion: ^12.0.0
     motion-dom: ^12.0.0
     playwright: ^1.61.0

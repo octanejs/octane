@@ -396,7 +396,7 @@ export function ShortcutSearch() @{
 			const target = event.target;
 			const isTyping =
 				target instanceof HTMLElement &&
-				target.matches('input, textarea, select, [contenteditable="true"]');
+					target.matches('input, textarea, select, [contenteditable="true"]');
 
 			if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || isTyping) {
 				return;

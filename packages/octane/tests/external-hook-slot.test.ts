@@ -276,6 +276,7 @@ describe('manifest-declared manual hook slots', () => {
 			'i18next',
 			'jotai',
 			'lexical',
+			'lucide',
 			'mdx',
 			'motion',
 			'radix',

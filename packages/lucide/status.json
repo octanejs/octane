@@ -1,0 +1,15 @@
+{
+  "upstream": { "package": "lucide-react", "version": "1.24.0" },
+  "surface": "Complete against the published `lucide-react@1.24.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports.",
+  "divergences": [
+    "Icon refs are normal Octane `ref` props rather than React `forwardRef` components.",
+    "Event callbacks receive native DOM events rather than React synthetic events."
+  ],
+  "ssr": "Supported and tested: icons and provider defaults render through `octane/server`, and client hydration adopts the server-rendered SVG element.",
+  "verified": "2026-07-13",
+  "notes": [
+    "Generated wrappers consume official framework-neutral `@lucide/icons@1.24.0` data, so SVG geometry is not copied or maintained by the port.",
+    "Generation checks pin the React export, alias, and dynamic-name surfaces and reject stale generated files."
+  ],
+  "docs": ["docs/lucide-port-plan.md"]
+}

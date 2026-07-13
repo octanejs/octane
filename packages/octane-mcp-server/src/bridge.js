@@ -17,6 +17,7 @@ export const KNOWN_BINDINGS = {
 	'react-router': '@octanejs/remix-router',
 	'react-router-dom': '@octanejs/remix-router',
 	'@lexical/react': '@octanejs/lexical',
+	'lucide-react': '@octanejs/lucide',
 	'@floating-ui/react': '@octanejs/floating-ui',
 	'radix-ui': '@octanejs/radix',
 	'react-hook-form': '@octanejs/hook-form',

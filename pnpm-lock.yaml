@@ -123,6 +123,9 @@ catalogs:
     '@lexical/yjs':
       specifier: 0.46.0
       version: 0.46.0
+    '@lucide/icons':
+      specifier: 1.24.0
+      version: 1.24.0
     '@mdx-js/mdx':
       specifier: ^3.1.1
       version: 3.1.1
@@ -276,6 +279,9 @@ catalogs:
     lexical:
       specifier: 0.46.0
       version: 0.46.0
+    lucide-react:
+      specifier: 1.24.0
+      version: 1.24.0
     motion:
       specifier: ^12.0.0
       version: 12.40.0
@@ -2383,6 +2389,37 @@ importers:
         specifier: catalog:default
         version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
 
+  packages/lucide:
+    dependencies:
+      '@lucide/icons':
+        specifier: catalog:default
+        version: 1.24.0
+    devDependencies:
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.37(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      lucide-react:
+        specifier: catalog:default
+        version: 1.24.0(react@19.2.7)
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      prettier:
+        specifier: catalog:default
+        version: 3.8.4
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
   packages/mdx:
     dependencies:
       '@jridgewell/remapping':
@@ -3700,6 +3737,9 @@ packages:
 
   '@lezer/lr@1.4.10':
     resolution: {integrity: sha512-rnCpTIBafOx4mRp43xOxDJbFipJm/c0cia/V5TiGlhmMa+wsSdoGmUN3w5Bqrks/09Q/D4tNAmWaT8p6NRi77A==}
+
+  '@lucide/icons@1.24.0':
+    resolution: {integrity: sha512-Wmmhr4kYD2u+dzMKQKavMN7CLHpXDqCkVKBDxmW29JFnApmTXjjoeNurXHlDvqvYqTYKLVJyV+3jW5Hi/UcmGw==}
 
   '@manypkg/find-root@1.1.0':
     resolution: {integrity: sha512-mki5uBvhHzO8kYYix/WRy2WX8S3B5wdVSc9D6KcU5lQNglP2yt58/VfLuAK49glRXChosY8ap2oJ1qgma3GUVA==}
@@ -6292,6 +6332,11 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
+  lucide-react@1.24.0:
+    resolution: {integrity: sha512-YT6mBD8lGKkg4nM39enlm94/sfJIiW0YKUT60fBy4YK8tai31ylg1VhGNWxkpSKHo9UagfnZqwIff3HTDQwXeA==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
     hasBin: true
@@ -8564,6 +8609,8 @@ snapshots:
   '@lezer/lr@1.4.10':
     dependencies:
       '@lezer/common': 1.5.2
+
+  '@lucide/icons@1.24.0': {}
 
   '@manypkg/find-root@1.1.0':
     dependencies:
@@ -11218,6 +11265,10 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-react@1.24.0(react@19.2.7):
+    dependencies:
+      react: 19.2.7
 
   lz-string@1.5.0: {}
 
