@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/hook-form",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "description": "React Hook Form for the octane renderer — the full react-hook-form 7.81.0 source ported onto octane's hooks: performant, flexible forms with native-event validation (onInput), field arrays, and schema resolvers.",
