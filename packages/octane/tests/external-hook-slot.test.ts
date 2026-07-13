@@ -271,6 +271,7 @@ describe('manifest-declared manual hook slots', () => {
 			.sort();
 		expect(declared).toEqual([
 			'base-ui',
+			'dnd-kit',
 			'floating-ui',
 			'jotai',
 			'lexical',
