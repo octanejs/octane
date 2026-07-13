@@ -137,12 +137,12 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   refs, state getters, and `useEffectEvent`). Explicit arrays retain React's
   exact behavior and are never rewritten; `null` explicitly means run or
   recompute after every render.
-- **State hooks expose a current-state getter.** Public `useState` and
-  `useReducer` calls always return a stable third tuple member
-  (`[state, update, getState]`) that reads the latest scheduled hook-cell value.
-  At compiled call sites, the compiler selects a private two-item helper only
-  when it can prove tuple index 2 is unobserved; escaped or ambiguous tuples
-  retain the complete public shape.
+- **State hooks expose a compiler-driven current-state getter.** `useState` and
+  `useReducer` have a stable third tuple member (`[state, update, getState]`) that
+  reads the latest scheduled hook-cell value. The compiler emits its specialized
+  runtime helper only when tuple index 2 can be observed; ordinary two-item
+  destructures retain the existing allocation-free path. Escaped or ambiguous
+  tuples conservatively receive the complete three-item shape.
 - **Controlled `value`/`checked` with native events.** Controlled form components
   follow React's semantics exactly (2026-07-08) — the prop drives the DOM property
   and reasserts on every commit and after discrete events; `defaultValue`/

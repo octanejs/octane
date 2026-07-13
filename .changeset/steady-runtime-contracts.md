@@ -20,10 +20,12 @@
 "@octanejs/zustand": patch
 ---
 
-Guarantee the public three-item state-hook tuple on client and server, including
-bounded server render-phase updates, and isolate `useId` by root with working
-identifier prefixes. Harden first-reveal ViewTransitions and compiler hook
-discovery for aliases, namespaces, dependency inference, and plain-loop errors.
+Preserve compiler-driven state-hook getters on client and server while keeping
+getter-free calls on the existing two-item path, including bounded server
+render-phase updates and immediate getter reads. Isolate `useId` by root with
+working identifier prefixes. Harden first-reveal ViewTransitions and compiler
+hook discovery for aliases, namespaces, dependency inference, and plain-loop
+errors.
 
 Consume Octane as an exact singleton peer from every framework binding and
 publish a Node 22 minimum engine requirement across core and the bindings.

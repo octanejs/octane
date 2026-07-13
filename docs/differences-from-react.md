@@ -42,11 +42,10 @@ ref solely so delayed or async callbacks can avoid a stale render closure.
 
 The getter reads the latest scheduled hook-cell value and does not subscribe or
 render. During pending work it can therefore be newer than the currently
-committed DOM. The public runtime hooks always return the complete three-item
-tuple. At compiled call sites, the compiler selects a private two-item fast path
-only when it can prove tuple index 2 is unobserved, preserving the existing
-allocation profile for ordinary two-item destructuring. Escaped or ambiguous
-tuples conservatively retain the public shape.
+committed DOM. The compiler emits a getter-enabled hook only when tuple index 2
+can be observed, preserving the existing runtime path and allocation profile for
+ordinary two-item destructuring. Escaped or ambiguous tuples conservatively
+receive the complete three-item shape.
 
 ## Native event objects, no synthetic event layer
 

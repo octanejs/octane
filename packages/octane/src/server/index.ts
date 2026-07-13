@@ -41,8 +41,6 @@ export {
 	// Hooks (server semantics)
 	useState,
 	useReducer,
-	__useStatePair,
-	__useReducerPair,
 	__useStateWithGetter,
 	__useReducerWithGetter,
 	useEffect,

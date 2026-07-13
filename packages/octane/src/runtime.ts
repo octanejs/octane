@@ -3061,15 +3061,16 @@ function resolveSlot(slot: symbol | undefined): symbol | undefined {
 interface StateSlot<T> {
 	value: T;
 	setter: (next: T | ((prev: T) => T)) => void;
-	/** Lazily allocated for the public three-item tuple. */
+	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => T;
 }
 
 type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
 type StateTuple<T> = [T, StateSetter<T>, () => T];
 
-/** Compiler-emitted allocation-free path when tuple index 2 is provably dead. */
-export function __useStatePair<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
+export function useState<T = undefined>(): StateTuple<T | undefined>;
+export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
+export function useState<T>(initial?: T | (() => T), slot?: symbol): StateTuple<T> {
 	// ABI: the compiler appends the slot as the LAST argument, so a zero-arg
 	// `useState()` (state starts undefined — React parity) arrives as
 	// `useState(slot)` with the symbol in the initial-value position. Same
@@ -3085,7 +3086,7 @@ export function __useStatePair<T>(initial: T | (() => T), slot?: symbol): StateT
 	const block = CURRENT_BLOCK!;
 	let s = scope.hooks?.get(slot) as StateSlot<T> | undefined;
 	if (s === undefined) {
-		const initVal = typeof initial === 'function' ? (initial as () => T)() : initial;
+		const initVal = typeof initial === 'function' ? (initial as () => T)() : (initial as T);
 		s = {
 			value: initVal,
 			setter: (next) => {
@@ -3097,27 +3098,10 @@ export function __useStatePair<T>(initial: T | (() => T), slot?: symbol): StateT
 		};
 		ensureHooks(scope).set(slot, s);
 	}
-	// This helper is compiler-only: its declared tuple type matches useState so a
-	// dead third member can be erased without perturbing source-level inference.
+	// Source-level useState has a third getState member, but this physical base
+	// path stays allocation-free. The compiler selects __useStateWithGetter only
+	// when index 2 can be observed (including escaped or ambiguous tuples).
 	return [s.value, s.setter] as unknown as StateTuple<T>;
-}
-
-/** Public useState always has the documented stable three-item shape. */
-export function useState<T = undefined>(): StateTuple<T | undefined>;
-export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
-export function useState<T>(initial?: T | (() => T), slot?: symbol): StateTuple<T> {
-	// Mirror __useStatePair's zero-argument trailing-slot ABI before delegating so we
-	// can look the resulting cell up by the same effective slot afterwards.
-	if (slot === undefined && typeof initial === 'symbol') {
-		slot = initial as unknown as symbol;
-		initial = undefined as T;
-	}
-	const pair = __useStatePair(initial as T | (() => T), slot);
-	const resolved = resolveSlot(slot);
-	if (resolved === undefined) missingSlot('useState');
-	const s = CURRENT_SCOPE!.hooks!.get(resolved) as StateSlot<T>;
-	const getter = s.getter ?? (s.getter = () => s.value);
-	return [pair[0], pair[1], getter];
 }
 
 type AssertUseStateType<T extends true> = T;
@@ -3125,23 +3109,33 @@ type _UseStateAcceptsNoArguments = AssertUseStateType<
 	typeof useState extends <T = undefined>() => StateTuple<T | undefined> ? true : false
 >;
 
-/** Backward-compatible compiler ABI; new compilers call public useState directly. */
+/** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
-	return useState(initial, slot);
+	// Mirror useState's zero-argument trailing-slot ABI before delegating so we
+	// can look the resulting cell up by the same effective slot afterwards.
+	if (slot === undefined && typeof initial === 'symbol') {
+		slot = initial as unknown as symbol;
+		initial = undefined as T;
+	}
+	const pair = useState(initial, slot);
+	const resolved = resolveSlot(slot);
+	if (resolved === undefined) missingSlot('useState');
+	const s = CURRENT_SCOPE!.hooks!.get(resolved) as StateSlot<T>;
+	const getter = s.getter ?? (s.getter = () => s.value);
+	return [pair[0], pair[1], getter];
 }
 
 interface ReducerSlot<S, A> {
 	value: S;
 	dispatch: (action: A) => void;
 	reducer: (state: S, action: A) => S;
-	/** Lazily allocated for the public three-item tuple. */
+	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => S;
 }
 
 type ReducerTuple<S, A> = [S, (action: A) => void, () => S];
 
-/** Compiler-emitted allocation-free path when tuple index 2 is provably dead. */
-export function __useReducerPair<S, A, I = S>(
+export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
@@ -3187,34 +3181,25 @@ export function __useReducerPair<S, A, I = S>(
 		// Allow reducer reference to update across renders.
 		s.reducer = reducer;
 	}
-	// Compiler-only pair path; see __useStatePair.
+	// See useState: the compiler selects __useReducerWithGetter whenever the
+	// source can observe the third tuple member.
 	return [s.value, s.dispatch] as unknown as ReducerTuple<S, A>;
 }
 
-/** Public useReducer always has the documented stable three-item shape. */
-export function useReducer<S, A, I = S>(
-	reducer: (s: S, a: A) => S,
-	initialArg: I,
-	initOrSlot?: ((arg: I) => S) | symbol,
-	slot?: symbol,
-): ReducerTuple<S, A> {
-	const resolvedInput = typeof initOrSlot === 'symbol' ? initOrSlot : slot;
-	const pair = __useReducerPair(reducer, initialArg, initOrSlot, slot);
-	const resolved = resolveSlot(resolvedInput);
-	if (resolved === undefined) missingSlot('useReducer');
-	const s = CURRENT_SCOPE!.hooks!.get(resolved) as ReducerSlot<S, A>;
-	const getter = s.getter ?? (s.getter = () => s.value);
-	return [pair[0], pair[1], getter];
-}
-
-/** Backward-compatible compiler ABI; new compilers call public useReducer directly. */
+/** Compiler-emitted useReducer variant for a tuple whose third member is observable. */
 export function __useReducerWithGetter<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
 	slot?: symbol,
 ): ReducerTuple<S, A> {
-	return useReducer(reducer, initialArg, initOrSlot, slot);
+	const resolvedInput = typeof initOrSlot === 'symbol' ? initOrSlot : slot;
+	const pair = useReducer(reducer, initialArg, initOrSlot, slot);
+	const resolved = resolveSlot(resolvedInput);
+	if (resolved === undefined) missingSlot('useReducer');
+	const s = CURRENT_SCOPE!.hooks!.get(resolved) as ReducerSlot<S, A>;
+	const getter = s.getter ?? (s.getter = () => s.value);
+	return [pair[0], pair[1], getter];
 }
 
 function depsChanged(prev: any[] | undefined, next: any[] | undefined): boolean {

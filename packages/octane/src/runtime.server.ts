@@ -1110,15 +1110,17 @@ function ssrOptionSelected(value: unknown, content: string): string {
 
 interface HookRec {
 	value: unknown;
-	/** Value after every action scheduled during the current render pass. */
-	pendingValue: unknown;
 	/** Actions queued by render-phase dispatches, folded by the NEXT pass's hook call. */
 	queue: unknown[];
-	/** Reducer from the currently executing pass, used by the synchronous getter view. */
-	reducer: (state: unknown, action: unknown) => unknown;
 	/** Stable dispatch identity across the re-render passes (as on the client). */
 	dispatch: (action: unknown) => void;
-	/** Lazily allocated for the public three-item tuple. */
+}
+interface GetterHookRec extends HookRec {
+	/** Value after every action scheduled during the current render pass. */
+	pendingValue: unknown;
+	/** Reducer from the currently executing pass, used by the synchronous getter view. */
+	reducer: (state: unknown, action: unknown) => unknown;
+	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => unknown;
 }
 interface HookPass {
@@ -1147,11 +1149,11 @@ function basicStateReducer(s: unknown, a: unknown): unknown {
 	return typeof a === 'function' ? (a as (v: unknown) => unknown)(s) : a;
 }
 
-// The shared useState/useReducer server cell. First pass creates the record
-// (running the lazy initializer once). A render-phase dispatch folds its action
-// into `pendingValue` immediately so the public getter sees it synchronously;
-// the next pass adopts that already-computed value without invoking a functional
-// updater/reducer for a second time.
+// The shared useState/useReducer server cell. Getter-free hooks keep Fizz's lean
+// queue: the next pass folds actions with that pass's reducer. Getter-enabled
+// hooks additionally fold each action into `pendingValue` immediately so index 2
+// sees scheduled state synchronously; the next pass adopts it without invoking a
+// functional updater or reducer twice.
 function stateHook<S, A>(
 	reducer: (s: S, a: A) => S,
 	create: () => S,
@@ -1173,32 +1175,54 @@ function stateHook<S, A>(
 	let rec = list[n];
 	if (rec === undefined) {
 		const value = create();
-		const r: HookRec = {
-			value,
-			pendingValue: value,
-			queue: [],
-			reducer: reducer as (state: unknown, action: unknown) => unknown,
-			dispatch: (action: unknown): void => {
-				// Only while OUR body is the one rendering (Fizz's componentIdentity
-				// gate) — a dispatch invoked after the pass, or from a descendant's
-				// render, is inert on the server.
-				if (hp !== HOOK_PASS) return;
-				r.queue.push(action);
-				// The public third tuple member observes the latest SCHEDULED value,
-				// matching the client hook cell even before the bounded re-render pass
-				// folds the queue into `value`.
-				r.pendingValue = r.reducer(r.pendingValue, action);
-				hp.update = true;
-			},
-		};
-		list[n] = rec = r;
+		if (withGetter) {
+			const r: GetterHookRec = {
+				value,
+				pendingValue: value,
+				queue: [],
+				reducer: reducer as (state: unknown, action: unknown) => unknown,
+				dispatch: (action: unknown): void => {
+					// Only while OUR body is the one rendering (Fizz's componentIdentity
+					// gate) — a dispatch invoked after the pass, or from a descendant's
+					// render, is inert on the server.
+					if (hp !== HOOK_PASS) return;
+					r.queue.push(action);
+					// The compiler-selected third tuple member observes the latest
+					// scheduled value before the bounded re-render pass commits it.
+					r.pendingValue = r.reducer(r.pendingValue, action);
+					hp.update = true;
+				},
+			};
+			list[n] = rec = r;
+		} else {
+			const r: HookRec = {
+				value,
+				queue: [],
+				dispatch: (action: unknown): void => {
+					if (hp !== HOOK_PASS) return;
+					r.queue.push(action);
+					hp.update = true;
+				},
+			};
+			list[n] = rec = r;
+		}
 	} else if (rec.queue.length > 0) {
-		rec.queue = [];
-		rec.value = rec.pendingValue;
+		if (withGetter) {
+			const getterRec = rec as GetterHookRec;
+			rec.queue = [];
+			rec.value = getterRec.pendingValue;
+		} else {
+			let value = rec.value as S;
+			const queue = rec.queue;
+			for (let i = 0; i < queue.length; i++) value = reducer(value, queue[i] as A);
+			rec.queue = [];
+			rec.value = value;
+		}
 	}
-	rec.reducer = reducer as (state: unknown, action: unknown) => unknown;
 	if (!withGetter) return [rec.value as S, rec.dispatch as (action: A) => void];
-	const getter = (rec.getter ??= () => rec.pendingValue) as () => S;
+	const getterRec = rec as GetterHookRec;
+	getterRec.reducer = reducer as (state: unknown, action: unknown) => unknown;
+	const getter = (getterRec.getter ??= () => getterRec.pendingValue) as () => S;
 	return [rec.value as S, rec.dispatch as (action: A) => void, getter];
 }
 
@@ -2348,25 +2372,6 @@ export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
 // stateHook machinery above renderComponentFramed).
 // ---------------------------------------------------------------------------
 
-/** Compiler-emitted allocation-free path when tuple index 2 is provably dead. */
-export function __useStatePair<T>(
-	initial: T | (() => T),
-	slot?: symbol | string,
-): [T, (next: any) => void, () => T] {
-	// A compiled zero-argument call is emitted as `useState(slot)`. Mirror the
-	// client trailing-slot ABI so the injected symbol is not mistaken for state.
-	if (slot === undefined && typeof initial === 'symbol') {
-		slot = initial;
-		initial = undefined as T;
-	}
-	return stateHook<T, any>(
-		basicStateReducer as (s: T, a: any) => T,
-		() => (typeof initial === 'function' ? (initial as () => T)() : initial),
-		slot,
-	) as [T, (next: any) => void, () => T];
-}
-
-/** Public useState always has the documented stable three-item shape. */
 export function useState<T = undefined>(): [
 	T | undefined,
 	(next: T | undefined | ((value: T | undefined) => T | undefined)) => void,
@@ -2390,7 +2395,6 @@ export function useState<T>(
 		basicStateReducer as (s: T, a: any) => T,
 		() => (typeof initial === 'function' ? (initial as () => T)() : (initial as T)),
 		slot,
-		true,
 	) as [T, (next: any) => void, () => T];
 }
 
@@ -2405,20 +2409,28 @@ type _ServerUseStateAcceptsNoArguments = AssertServerUseStateType<
 		: false
 >;
 
-/** Backward-compatible compiler ABI; new compilers call public useState directly. */
+/** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(
 	initial: T | (() => T),
 	slot?: symbol | string,
 ): [T, (next: any) => void, () => T] {
-	return useState(initial, slot);
+	// A compiled zero-argument call is emitted as `__useStateWithGetter(slot)`.
+	// Mirror the public hook's trailing-slot ABI before creating the getter cell.
+	if (slot === undefined && typeof initial === 'symbol') {
+		slot = initial;
+		initial = undefined as T;
+	}
+	return stateHook<T, any>(
+		basicStateReducer as (s: T, a: any) => T,
+		() => (typeof initial === 'function' ? (initial as () => T)() : initial),
+		slot,
+		true,
+	) as [T, (next: any) => void, () => T];
 }
 
-/** Compiler-emitted allocation-free path when tuple index 2 is provably dead. */
-export function __useReducerPair<S, A, I = S>(
+export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
-	// With a lazy init the slot trails it (`useReducer(r, arg, init, slot)`);
-	// without one the slot itself sits third (`useReducer(r, arg, slot)`).
 	initOrSlot?: ((arg: I) => S) | symbol | string,
 	maybeSlot?: symbol | string,
 ): [S, (action: A) => void, () => S] {
@@ -2431,8 +2443,8 @@ export function __useReducerPair<S, A, I = S>(
 	) as [S, (action: A) => void, () => S];
 }
 
-/** Public useReducer always has the documented stable three-item shape. */
-export function useReducer<S, A, I = S>(
+/** Compiler-emitted useReducer variant for a tuple whose third member is observable. */
+export function __useReducerWithGetter<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol | string,
@@ -2446,16 +2458,6 @@ export function useReducer<S, A, I = S>(
 		slot,
 		true,
 	) as [S, (action: A) => void, () => S];
-}
-
-/** Backward-compatible compiler ABI; new compilers call public useReducer directly. */
-export function __useReducerWithGetter<S, A, I = S>(
-	reducer: (s: S, a: A) => S,
-	initialArg: I,
-	initOrSlot?: ((arg: I) => S) | symbol | string,
-	maybeSlot?: symbol | string,
-): [S, (action: A) => void, () => S] {
-	return useReducer(reducer, initialArg, initOrSlot, maybeSlot);
 }
 
 export function useEffect(): void {}

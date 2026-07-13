@@ -78,10 +78,10 @@ describe('slotHooks surgical pass', () => {
 		const out = slotHooks(SRC, 'external-hook.ts');
 		expect(out).not.toBeNull();
 		const code = out!.code;
-		// The observed two-item tuple takes the allocation-free pair helper, and
-		// both calls still receive their compiler slot.
-		expect(code).toMatch(/_\$__useStatePair<number>\(start, _h\$\d+\)/);
-		expect(code).toMatch(/_\$__useStatePair<boolean>\(false, _h\$\d+\)/);
+		// Two-item destructures retain the allocation-free public base-hook path,
+		// and both calls still receive their compiler slot.
+		expect(code).toMatch(/useState<number>\(start, _h\$\d+\)/);
+		expect(code).toMatch(/useState<boolean>\(false, _h\$\d+\)/);
 		// the un-printable TS is preserved byte-for-byte
 		expect(code).toContain('[key: string]: number;');
 		expect(code).toContain('export type Pair<A, B> = { a: A; b: B };');
@@ -92,10 +92,8 @@ describe('slotHooks surgical pass', () => {
 		// stripping slots restores every original byte. (Default = no HMR →
 		// Symbol("<hash>#<n>") declarations; Symbol.for is dev-serve only.)
 		const stripped = code
-			.replace(/^import \{ __useStatePair as _\$__useStatePair \} from 'octane';\n/gm, '')
 			.replace(/^const _h\$\d+ = Symbol\("[^"]*"\);\n/gm, '')
-			.replace(/, _h\$\d+(?=[),])/g, '')
-			.replace(/_\$__useStatePair/g, 'useState');
+			.replace(/, _h\$\d+(?=[),])/g, '');
 		expect(stripped).toBe(
 			SRC.replace("useCallback(() => 'nd:' + label)", "useCallback(() => 'nd:' + label, [label])"),
 		);
@@ -122,11 +120,11 @@ describe('vite plugin gate routing', () => {
 	const HOOK = `import { useState } from 'octane';\nexport const f = () => { const [state, setState] = useState(0); return [state, setState]; };`;
 
 	it('.ts with an octane hook → surgical slot pass', () => {
-		expect(run(HOOK, '/app/h.ts')?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
+		expect(run(HOOK, '/app/h.ts')?.code).toMatch(/useState\(0, _h\$\d+\)/);
 	});
 
 	it('.js with an octane hook → surgical slot pass', () => {
-		expect(run(HOOK, '/app/h.js')?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
+		expect(run(HOOK, '/app/h.js')?.code).toMatch(/useState\(0, _h\$\d+\)/);
 	});
 
 	it('.tsx → full compiler (JSX lowered, hook slotted)', () => {
@@ -151,7 +149,7 @@ describe('vite plugin gate routing', () => {
 		const hookFormTsx = join(installedRoot, 'hook-form/src/__probe__.tsx');
 		const zustand = join(installedRoot, 'zustand/src/__probe__.ts');
 
-		expect(run(HOOK, hookForm)?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
+		expect(run(HOOK, hookForm)?.code).toMatch(/useState\(0, _h\$\d+\)/);
 		expect(
 			run(
 				`import { useState } from 'octane'; export function C() { const [n] = useState(0); return <b>{n as string}</b>; }`,
@@ -241,17 +239,17 @@ describe('manifest-declared manual hook slots', () => {
 		// Inline hook callbacks in a binding's tests rely on call-site slots —
 		// the declaration must not swallow the whole package directory.
 		const id = join(process.cwd(), 'packages/testing-library/tests/__probe__.ts');
-		expect(run(HOOK, id)?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
+		expect(run(HOOK, id)?.code).toMatch(/useState\(0, _h\$\d+\)/);
 	});
 
 	it('still slots packages without the declaration (redux is auto-slotted)', () => {
 		const id = join(process.cwd(), 'packages/redux/src/__probe__.ts');
-		expect(run(HOOK, id)?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
+		expect(run(HOOK, id)?.code).toMatch(/useState\(0, _h\$\d+\)/);
 	});
 
 	it('still slots app files outside any declaring package', () => {
 		const id = join(process.cwd(), 'packages/octane/tests/_fixtures/__probe__.ts');
-		expect(run(HOOK, id)?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
+		expect(run(HOOK, id)?.code).toMatch(/useState\(0, _h\$\d+\)/);
 	});
 
 	it('the declaration registry matches the hand-slot-forwarding bindings exactly', () => {

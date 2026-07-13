@@ -279,7 +279,7 @@ useEffect(() => sync(room.id), [room.id]); // explicit dependencies
 useEffect(() => measure(), null); // explicitly after every commit
 ```
 
-`useState` and `useReducer` also expose a third tuple member: a stable getter for
+`useState` and `useReducer` also expose an optional third tuple member: a stable getter for
 the hook's latest state. It is useful in async callbacks and other long-lived
 closures where capturing the render's state value would go stale:
 
@@ -296,11 +296,12 @@ export function SaveButton() @{
 }
 ```
 
-The public runtime hooks always return the complete three-item tuple. At compiled
-call sites, the compiler selects a private two-item fast path only when it can
-prove tuple index 2 is unobserved; escaped or ambiguous tuples retain the public
-shape. The getter reads the latest scheduled hook value, which may be newer than
-the currently committed DOM during a pending render.
+The compiler emits a getter-enabled hook only when the third tuple member can
+be observed. Ordinary `[state, setState]` and `[state, dispatch]` destructures
+keep the existing two-item runtime path and allocate no getter. Escaped or
+ambiguous tuples conservatively receive the complete three-item shape. The
+getter reads the latest scheduled hook value, which may be newer than the
+currently committed DOM during a pending render.
 
 ### Conditional hooks
 

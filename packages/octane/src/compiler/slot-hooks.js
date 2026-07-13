@@ -42,9 +42,9 @@ function octaneHookLocals(ast) {
 	return importsHook ? locals : null;
 }
 
-const STATE_PAIR_HELPERS = {
-	useState: '__useStatePair',
-	useReducer: '__useReducerPair',
+const STATE_GETTER_HELPERS = {
+	useState: '__useStateWithGetter',
+	useReducer: '__useReducerWithGetter',
 };
 
 function arrayPatternObservesStateGetter(pattern) {
@@ -67,10 +67,10 @@ function isTransparentStateTupleWrapper(node, child) {
 	);
 }
 
-// Mark base-hook calls whose source tuple provably cannot observe index 2. Only
-// those calls may use the private two-item helper; escaped or ambiguous tuples
-// retain the public, physically complete three-item shape.
-function collectStatePairCalls(ast) {
+// Mark base-hook calls whose source tuple can observe index 2. The public base
+// hooks stay on the physical two-item path; escaped or ambiguous tuples
+// conservatively receive the getter-enabled shape.
+function collectStateGetterCalls(ast) {
 	const calls = new WeakSet();
 	const ancestors = [];
 	function walk(node) {
@@ -81,7 +81,7 @@ function collectStatePairCalls(ast) {
 		}
 		if (node.type === 'CallExpression') {
 			const imported = node._octaneImportedHook;
-			if (STATE_PAIR_HELPERS[imported]) {
+			if (STATE_GETTER_HELPERS[imported]) {
 				let child = node;
 				let i = ancestors.length - 1;
 				while (i >= 0 && isTransparentStateTupleWrapper(ancestors[i], child)) {
@@ -102,7 +102,7 @@ function collectStatePairCalls(ast) {
 				} else if (parent?.type === 'ExpressionStatement') {
 					observed = false;
 				}
-				if (!observed) calls.add(node);
+				if (observed) calls.add(node);
 			}
 		}
 		ancestors.push(node);
@@ -181,14 +181,14 @@ function walk(node, fnName, st) {
 				// trailing commas / whitespace before `)` stay valid.
 				st.edits.push({ pos: node.arguments[node.arguments.length - 1].end, text: ', ' + sym });
 			}
-			if (st.pairCalls.has(node) && STATE_PAIR_HELPERS[imported]) {
-				let helper = st.pairHelpers.get(imported);
+			if (st.getterCalls.has(node) && STATE_GETTER_HELPERS[imported]) {
+				let helper = st.getterHelpers.get(imported);
 				if (helper === undefined) {
-					const base = `_$${STATE_PAIR_HELPERS[imported]}`;
+					const base = `_$${STATE_GETTER_HELPERS[imported]}`;
 					helper = base;
 					let suffix = 0;
 					while (st.source.includes(helper)) helper = `${base}$${++suffix}`;
-					st.pairHelpers.set(imported, helper);
+					st.getterHelpers.set(imported, helper);
 				}
 				st.edits.push({ pos: node.callee.start, end: node.callee.end, text: helper });
 			}
@@ -234,8 +234,8 @@ export function slotHooks(source, id, options) {
 			filename: id,
 			onlyImported: true,
 		}),
-		pairCalls: collectStatePairCalls(ast),
-		pairHelpers: new Map(),
+		getterCalls: collectStateGetterCalls(ast),
+		getterHelpers: new Map(),
 		filename: id,
 		hmr: !!(options && options.hmr),
 		hash: hookSlotHash(id),
@@ -260,10 +260,10 @@ export function slotHooks(source, id, options) {
 	// run after the module is fully evaluated, including cross-module imports), so
 	// trailing placement has no TDZ hazard for any valid hook usage.
 	const helperImport =
-		st.pairHelpers.size === 0
+		st.getterHelpers.size === 0
 			? ''
-			: `import { ${[...st.pairHelpers]
-					.map(([hook, local]) => `${STATE_PAIR_HELPERS[hook]} as ${local}`)
+			: `import { ${[...st.getterHelpers]
+					.map(([hook, local]) => `${STATE_GETTER_HELPERS[hook]} as ${local}`)
 					.join(', ')} } from 'octane';\n`;
 	const block = helperImport + st.decls.join('\n') + '\n';
 	code = code.endsWith('\n') ? code + block : code + '\n' + block;

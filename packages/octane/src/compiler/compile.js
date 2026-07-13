@@ -5016,9 +5016,9 @@ function rejectHookInJsLoop(loop, ctx, componentName) {
 	walk(loop);
 }
 
-const STATE_PAIR_HELPERS = {
-	useState: '__useStatePair',
-	useReducer: '__useReducerPair',
+const STATE_GETTER_HELPERS = {
+	useState: '__useStateWithGetter',
+	useReducer: '__useReducerWithGetter',
 };
 
 function arrayPatternObservesStateGetter(pattern) {
@@ -5046,19 +5046,19 @@ function isTransparentStateTupleWrapper(node, child) {
 	return false;
 }
 
-// Source-level useState/useReducer tuples always have a third getState member.
-// Mark whether calls can observe it so rewriteHookCalls can select the private
-// pair helper only for a proven-dead index 2. Escaping/ambiguous tuples retain
-// the public, physically complete three-item shape.
+// Source-level useState/useReducer tuples have a third getState member. Mark
+// calls that can observe it so rewriteHookCalls can select the getter-enabled
+// helper; the public base hooks remain the allocation-free two-item path.
+// Escaping or ambiguous tuples conservatively receive the full shape.
 function stateTupleHookName(call, ctx) {
 	const callee = call?.callee;
 	const imported = call?._octaneImportedHook;
-	if (imported !== undefined) return STATE_PAIR_HELPERS[imported] ? imported : null;
+	if (imported !== undefined) return STATE_GETTER_HELPERS[imported] ? imported : null;
 	if (callee?.type === 'Identifier') {
 		// Preserve the historical auto-import shorthand for an unbound bare base
 		// hook, but never mistake a lexically shadowed import alias for that hook.
 		if (ctx.octaneImportLocals?.has(callee.name)) return null;
-		return STATE_PAIR_HELPERS[callee.name] ? callee.name : null;
+		return STATE_GETTER_HELPERS[callee.name] ? callee.name : null;
 	}
 	return null;
 }
@@ -5139,7 +5139,7 @@ function rewriteHookCalls(node, ctx, componentName) {
 				importedName === undefined && /^use[A-Z]/.test(localName) && localName !== 'useContext';
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isCustom || isServerUse) {
-				const pairHelper = n._octaneStateGetter === false ? STATE_PAIR_HELPERS[name] : null;
+				const getterHelper = n._octaneStateGetter ? STATE_GETTER_HELPERS[name] : null;
 				// A builtin hook call site is USER code (the user's own identifier), so
 				// its import stays bare — EXCEPT compiler-inserted calls (auto-callback's
 				// `useCallback`), whose callee is renamed to the `_$` alias below so a
@@ -5147,7 +5147,7 @@ function rewriteHookCalls(node, ctx, componentName) {
 				if (isBuiltin) {
 					if (n.callee._octaneGenerated) ctx.runtimeNeeded.add(name);
 					else ctx.userRuntimeNames.add(localName === name ? name : `${name} as ${localName}`);
-					if (pairHelper !== null) ctx.runtimeNeeded.add(pairHelper);
+					if (getterHelper !== null) ctx.runtimeNeeded.add(getterHelper);
 				}
 				if (isServerUse)
 					ctx.userRuntimeNames.add(localName === name ? 'use' : `use as ${localName}`);
@@ -5186,8 +5186,8 @@ function rewriteHookCalls(node, ctx, componentName) {
 				return {
 					...n,
 					callee:
-						pairHelper !== null
-							? { type: 'Identifier', name: rtAlias(pairHelper) }
+						getterHelper !== null
+							? { type: 'Identifier', name: rtAlias(getterHelper) }
 							: n.callee._octaneGenerated
 								? { type: 'Identifier', name: rtAlias(name) }
 								: n.callee,
@@ -5212,14 +5212,14 @@ function rewriteHookCalls(node, ctx, componentName) {
 			const isBuiltin = HOOK_NAMES.has(name);
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isServerUse) {
-				const pairHelper = n._octaneStateGetter === false ? STATE_PAIR_HELPERS[name] : null;
-				if (pairHelper !== null) ctx.runtimeNeeded.add(pairHelper);
+				const getterHelper = n._octaneStateGetter ? STATE_GETTER_HELPERS[name] : null;
+				if (getterHelper !== null) ctx.runtimeNeeded.add(getterHelper);
 				const symVar = allocHookSymbol(ctx, `${componentName}.${name}#${ctx.nextHookSymId}`);
 				const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName));
 				return {
 					...n,
 					callee:
-						pairHelper !== null ? { type: 'Identifier', name: rtAlias(pairHelper) } : n.callee,
+						getterHelper !== null ? { type: 'Identifier', name: rtAlias(getterHelper) } : n.callee,
 					arguments: [...args, { type: 'Identifier', name: symVar }],
 				};
 			}

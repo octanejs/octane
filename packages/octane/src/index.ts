@@ -82,8 +82,6 @@ export {
 
 	// ── 2. Semi-public: compiler-emitted / binding-infrastructure helpers ─────
 	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)
-	__useStatePair,
-	__useReducerPair,
 	__useStateWithGetter,
 	__useReducerWithGetter,
 	// Module-load "this module uses <ViewTransition>" hint (view-transitions plan).

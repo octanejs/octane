@@ -157,9 +157,9 @@ trimming path.
 
 Hook compilation has also become more explicit:
 
-- public `useState` and `useReducer` always expose the stable third getter;
-- compiled sites use private two-item helpers only when tuple index 2 is proven
-  dead;
+- public `useState` and `useReducer` retain their physical two-item fast path;
+- the compiler selects getter-enabled helpers only when tuple index 2 is
+  observed or the tuple escapes ambiguously;
 - named aliases, namespace imports, and default imports are discovered;
 - slot-keyed hooks in plain JavaScript loops are compile errors;
 - manual slot-forwarding packages declare their source directories in their
