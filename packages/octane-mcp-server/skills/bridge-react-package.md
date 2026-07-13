@@ -19,6 +19,7 @@ of bridging by hand:
 | `@stylexjs/stylex` | `@octanejs/stylex` |
 | `react-router` / `react-router-dom` | `@octanejs/remix-router` |
 | `@lexical/react` | `@octanejs/lexical` |
+| `lucide-react` | `@octanejs/lucide` |
 | `@floating-ui/react` | `@octanejs/floating-ui` |
 | `radix-ui` | `@octanejs/radix` |
 | `react-i18next` | `@octanejs/i18next` |
