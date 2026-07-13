@@ -12,33 +12,33 @@ const FEATURES = [
 	{
 		eyebrow: 'Compiler-owned reactivity',
 		title: 'Hooks without the homework',
-		body: 'Write the closure and move on. Octane infers dependencies for effects, ' +
-			'memos, callbacks, and imperative handles; hook call sites stay safe behind ' +
-			'conditions and early returns. The no-bookkeeping DX people reach for ' +
-			'signals to get, with the hooks model you already know.',
+		body: 'No dependency arrays and no rules of hooks. The compiler tracks what ' +
+			'your effects, memos and callbacks actually use, and hooks can sit behind ' +
+			'conditions or early returns. You keep the hooks you know — the ' +
+			'bookkeeping is gone.',
 	},
 	{
-		eyebrow: 'Async by construction',
+		eyebrow: 'Async by default',
 		title: 'Suspense without waterfalls',
-		body: 'Independent use() resources start together instead of serially ' +
-			'suspending through the tree. Descendant fetch plans warm early, and ' +
-			'streaming SSR flushes each ready boundary without waiting for the slowest one.',
+		body: 'Independent use() calls start together instead of suspending one at a ' +
+			'time down the tree. Nested fetches warm up early, and streaming SSR sends ' +
+			'each boundary as soon as it’s ready — not when the slowest one is.',
 	},
 	{
 		eyebrow: 'Compiled rendering',
-		title: 'No virtual DOM. No diff tax.',
-		body: 'TSRX lowers templates to clones and direct DOM writes, while keyed @for ' +
-			'blocks compile to a dedicated minimal-move path. Standard .tsx works too, ' +
-			'so optimization is a per-component choice rather than a rewrite.',
+		title: 'No virtual DOM.',
+		body: 'Templates compile to cloned nodes and direct DOM writes, and keyed ' +
+			'@for lists move the fewest nodes possible. Plain .tsx still works, so you ' +
+			'can adopt .tsrx one component at a time.',
 		href: 'https://tsrx.dev',
 		linkLabel: 'tsrx.dev',
 	},
 	{
 		eyebrow: 'React knowledge, upgraded',
 		title: 'Change the import. Keep the model.',
-		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms, ' +
-			'and Suspense behave the way you expect. Native events and refs-as-props ' +
-			'remove legacy layers, while 17 first-party bindings bring the ecosystem.',
+		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms ' +
+			'and Suspense all behave the way you expect. Events are native, refs are ' +
+			'just props, and 17 first-party bindings cover the libraries you already use.',
 	},
 ];
 
