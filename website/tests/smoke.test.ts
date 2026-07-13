@@ -6,7 +6,7 @@ import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
 import { docs, defaultDoc } from '../src/content/docs.ts';
-import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../src/content/benchmarks.ts';
+import { FRAMEWORK_CARDS, HOME_SUMMARY, OCTANE_CARDS } from '../src/content/benchmarks.ts';
 
 afterEach(cleanup);
 
@@ -30,6 +30,28 @@ async function renderRoute(url: string) {
 }
 
 describe('website routes', () => {
+	it('publishes Preact and Svelte measurements for every supported comparison', () => {
+		for (const card of FRAMEWORK_CARDS) {
+			const keys = card.series.map((series) => series.key);
+			expect(keys, card.id).toContain('preact');
+			if (card.id === 'streaming-ssr') {
+				expect(keys, card.id).not.toContain('svelte');
+			} else {
+				expect(keys, card.id).toContain('svelte');
+			}
+
+			for (const row of card.rows) {
+				expect(typeof row.preact, `${card.id}/${row.op}/preact`).toBe('number');
+				if (card.id !== 'streaming-ssr') {
+					expect(typeof row.svelte, `${card.id}/${row.op}/svelte`).toBe('number');
+				}
+			}
+		}
+
+		const summaryKeys = HOME_SUMMARY.series.map((series) => series.key);
+		expect(summaryKeys).toEqual(expect.arrayContaining(['preact', 'svelte']));
+	});
+
 	it('/ renders the home experience and primary navigation', async () => {
 		const { container } = await renderRoute('/');
 
@@ -42,9 +64,15 @@ describe('website routes', () => {
 
 		// The home-page MDX sample went through the Shiki pipeline.
 		expect(container.querySelector('pre.shiki')).toBeTruthy();
+		// Feature cards are data-driven and their copy churns; assert structure,
+		// not wording (see the header note).
 		const featureCards = container.querySelectorAll('.features article.card');
 		expect(featureCards).toHaveLength(4);
-		expect(container.textContent).toContain('Hooks without the homework');
+		expect(container.querySelector('.card-eyebrow')).toBeNull();
+		for (const card of Array.from(featureCards)) {
+			expect(card.querySelector('.card-title')?.textContent?.trim()).toBeTruthy();
+			expect(card.querySelector('.card-body')?.textContent?.trim()).toBeTruthy();
+		}
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
 		// The checked-in benchmark summary reaches the chart and table renderers.

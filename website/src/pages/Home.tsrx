@@ -10,32 +10,25 @@ import { HOME_SUMMARY } from '../content/benchmarks.ts';
 
 const FEATURES = [
 	{
-		eyebrow: 'Compiler-owned reactivity',
-		title: 'Hooks without the homework',
+		title: 'No rules of hooks',
 		body: 'No dependency arrays and no rules of hooks. The compiler tracks what ' +
 			'your effects, memos and callbacks actually use, and hooks can sit behind ' +
-			'conditions or early returns. You keep the hooks you know — the ' +
-			'bookkeeping is gone.',
+			'conditions or early returns.',
 	},
 	{
-		eyebrow: 'Async by default',
-		title: 'Suspense without waterfalls',
+		title: 'Improved async',
 		body: 'Independent use() calls start together instead of suspending one at a ' +
 			'time down the tree. Nested fetches warm up early, and streaming SSR sends ' +
-			'each boundary as soon as it’s ready — not when the slowest one is.',
+			'each boundary as soon as it’s ready.',
 	},
 	{
-		eyebrow: 'Compiled rendering',
-		title: 'No virtual DOM.',
+		title: 'No virtual DOM',
 		body: 'Templates compile to cloned nodes and direct DOM writes, and keyed ' +
 			'@for lists move the fewest nodes possible. Plain .tsx still works, so you ' +
 			'can adopt .tsrx one component at a time.',
-		href: 'https://tsrx.dev',
-		linkLabel: 'tsrx.dev',
 	},
 	{
-		eyebrow: 'React knowledge, upgraded',
-		title: 'Change the import. Keep the model.',
+		title: 'Familiar model',
 		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms ' +
 			'and Suspense all behave the way you expect. Events are native, refs are ' +
 			'just props, and 17 first-party bindings cover the libraries you already use.',
@@ -82,9 +75,6 @@ export function Home() @{
 		<section class="features">
 			@for (const feature of FEATURES; key feature.title) {
 				<article class="card">
-					<p class="card-eyebrow">
-						{feature.eyebrow as string}
-					</p>
 					<h3 class="card-title">
 						{feature.title as string}
 					</h3>
@@ -294,30 +284,6 @@ export function Home() @{
 				border-radius: 1rem;
 				padding: 1.5rem;
 				overflow: hidden;
-				transition:
-					transform 0.18s ease,
-					border-color 0.18s ease,
-					box-shadow 0.18s ease;
-			}
-			.card::before {
-				content: '';
-				position: absolute;
-				inset: 0 0 auto;
-				height: 2px;
-				background: linear-gradient(90deg, #ff415a, #ff8a78 55%, transparent);
-			}
-			.card:hover {
-				transform: translateY(-3px);
-				border-color: rgba(255, 101, 122, 0.3);
-				box-shadow: 0 16px 30px rgba(0, 0, 0, 0.18);
-			}
-			.card-eyebrow {
-				margin: 0 0 0.85rem;
-				color: #ff657a;
-				font-size: 0.68rem;
-				font-weight: 800;
-				letter-spacing: 0.11em;
-				text-transform: uppercase;
 			}
 			.card-title {
 				margin: 0 0 0.75rem;

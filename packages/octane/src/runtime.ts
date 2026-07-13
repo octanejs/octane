@@ -12290,6 +12290,39 @@ interface BranchSlot {
 }
 
 /**
+ * A sole-root control-flow block may share its element boundary with one or
+ * more enclosing sole-root blocks (for example a branch directly inside a
+ * keyed item). When the inner branch replaces that element, keep every exact
+ * borrower pointed at the new element/range so keyed moves and later teardown
+ * never retain a detached boundary.
+ */
+function replaceSharedBlockBoundary(
+	parent: Block | null,
+	oldStart: Node | null,
+	oldEnd: Node | null,
+	newStart: Node | null,
+	newEnd: Node | null,
+): void {
+	if (oldStart === null || oldEnd === null) return;
+	let block = parent;
+	while (block !== null && block.startMarker === oldStart && block.endMarker === oldEnd) {
+		block.startMarker = newStart;
+		block.endMarker = newEnd;
+		block = block.parentBlock;
+	}
+}
+
+function sharesBlockBoundary(parent: Block | null, start: Node | null, end: Node | null): boolean {
+	return (
+		parent !== null &&
+		start !== null &&
+		end !== null &&
+		parent.startMarker === start &&
+		parent.endMarker === end
+	);
+}
+
+/**
  * The shared branch-swap core. When `next` differs from the mounted branch:
  * under a transition, render `body` off-screen and COMMIT it in place (adopting
  * the WIP markers — see below); otherwise tear the old branch down and mount
@@ -12317,6 +12350,15 @@ function renderBranchSlot(
 ): void {
 	const parentBlock = parentScope.block;
 	if (next !== state.branch) {
+		// A markerless branch may share its host boundary with a nested sole-root
+		// branch. The nested branch updates Block markers when it replaces that
+		// host, but this slot's cached `end` is intentionally not part of the Block
+		// chain. Follow the live block boundary for positioning/probing so an outer
+		// swap never inserts relative to a detached former root.
+		const liveEnd =
+			state.start === null && state.block !== null && state.block.endMarker !== null
+				? state.block.endMarker
+				: state.end;
 		// Off-screen swap (React WIP model): on a TRANSITION swap to a new branch that may
 		// suspend, render it off-screen FIRST without tearing down the old branch. If it
 		// suspends, dispose + route to the enclosing tryBlock so its transition hold keeps
@@ -12333,17 +12375,20 @@ function renderBranchSlot(
 			!hydrating &&
 			parentBlock.currentRenderMode === 'transition'
 		) {
-			// Commit path requires the marker regime (state.end !== null): renderOffscreen
+			// Commit path requires a live branch boundary: renderOffscreen
 			// inserts the wip pair AFTER its reference node, which matches "right after the
 			// old end marker" — but in the anchor regime the legacy path mounts BEFORE the
 			// anchor, so committing there would land the branch on the wrong side of the
 			// anchor's trailing static siblings. Anchor-regime swaps keep the legacy
 			// in-place path below.
-			if (state.end !== null) {
+			if (liveEnd !== null) {
+				const oldBlock = state.block;
+				const oldBlockStart = oldBlock.startMarker;
+				const oldBlockEnd = oldBlock.endMarker;
 				const r = renderOffscreen(
 					parentBlock,
 					domParent,
-					state.end,
+					liveEnd,
 					body,
 					undefined,
 					'control-flow',
@@ -12372,6 +12417,7 @@ function renderBranchSlot(
 				state.end = r.wip.end;
 				state.block = r.wip.block;
 				state.branch = next;
+				replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, r.wip.start, r.wip.end);
 				// Adopted pair is now the slot's durable boundary (see NEXT-swap note above).
 				r.wip.block.exclusiveMarkers = true;
 				spliceWipCapture(r.wip);
@@ -12381,8 +12427,11 @@ function renderBranchSlot(
 		// Position for the new branch: just after the current branch's trailing node,
 		// or the slot anchor on first mount. Captured BEFORE teardown (a self-marked
 		// branch's trailing node is removed by it).
-		const after: Node | null = state.end !== null ? state.end.nextSibling : state.anchor;
-		const firstMount = state.branch === -1;
+		const after: Node | null = liveEnd !== null ? liveEnd.nextSibling : state.anchor;
+		const oldBlock = state.block;
+		const oldBlockStart = oldBlock?.startMarker ?? null;
+		const oldBlockEnd = oldBlock?.endMarker ?? null;
+		const oldBoundaryShared = sharesBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd);
 		if (state.block) {
 			unmountBlock(state.block);
 			state.block = null;
@@ -12438,8 +12487,10 @@ function renderBranchSlot(
 					);
 				removeRange(state.start.nextSibling, state.end);
 			}
-		} else if (firstMount && body) {
-			// First client mount — pick the boundary by what the branch renders.
+		} else if (body) {
+			// Markerless client mount — pick the boundary by what the branch renders.
+			// This applies both on first mount and after an anchor-only empty arm:
+			// a single host can self-mark without first manufacturing a pair.
 			const before = after ? after.previousSibling : domParent.lastChild;
 			const b = createBlock(
 				'control-flow',
@@ -12462,6 +12513,7 @@ function renderBranchSlot(
 				b.startMarker = first;
 				b.endMarker = first;
 				state.end = first;
+				replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, first, first);
 			} else {
 				// Multi-node (or rendered nothing) — mint markers around the content.
 				const s = document.createComment(marker);
@@ -12473,22 +12525,26 @@ function renderBranchSlot(
 				b.exclusiveMarkers = true;
 				state.start = s;
 				state.end = e;
+				replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
 			}
+		} else if (!oldBoundaryShared) {
+			// A truly empty client arm needs only its existing insertion anchor.
+			// Keep the markerless regime so a later empty → single-host transition
+			// can self-mark directly. Hydration never enters here: it adopted the
+			// server's outer slot pair above.
+			state.anchor = after;
+			state.end = null;
 		} else {
-			// Swap away from a self-marked branch, or an empty branch: mint stable
-			// markers at the position so the slot has a boundary from here on.
+			// An enclosing sole-root block borrowed the old element. Empty output
+			// cannot self-delimit, so promote both the slot and every exact borrower
+			// to one shared pair rather than leaving an ancestor on a detached node.
 			const s = document.createComment(marker);
 			const e = document.createComment('/' + marker);
 			domParent.insertBefore(s, after);
 			domParent.insertBefore(e, after);
 			state.start = s;
 			state.end = e;
-			if (body) {
-				const b = createBlock('control-flow', parentBlock, domParent, s, e, body, undefined, env);
-				b.exclusiveMarkers = true;
-				state.block = b;
-				renderBlock(b);
-			}
+			replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
 		}
 	} else if (state.block) {
 		// Same branch — re-render in place with this render's env snapshot.
@@ -12999,6 +13055,10 @@ export function forBlock<T>(
 	deps?: any[],
 	emptyBody?: ComponentBody | null,
 	anchor?: Node | null,
+	// The compiler created `anchor` as this call site's dedicated `<!>`
+	// placeholder. Reuse it as the durable closing boundary instead of keeping
+	// both that placeholder and a newly-created `/for` comment.
+	ownEnd?: boolean,
 ): void {
 	// flags bitfield: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item
 	// Comment markers), bit 2 = depEligible (compare `deps` to cachedDeps and
@@ -13029,13 +13089,19 @@ export function forBlock<T>(
 			hydrateNode = start.nextSibling;
 		} else {
 			start = document.createComment('for');
-			end = document.createComment('/for');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (when a static sibling follows this @for in mixed
 			// children, the compiler emits a `<!>` anchor at the @for's source-order
 			// index and threads it here so the markers land BEFORE the sibling).
-			domParent.insertBefore(start, anchor ?? null);
-			domParent.insertBefore(end, anchor ?? null);
+			if (ownEnd === true && anchor?.nodeType === 8) {
+				end = anchor as Comment;
+				end.data = '/for';
+				domParent.insertBefore(start, end);
+			} else {
+				end = document.createComment('/for');
+				domParent.insertBefore(start, anchor ?? null);
+				domParent.insertBefore(end, anchor ?? null);
+			}
 		}
 		state = {
 			__kind: 'forBlockSlot',
@@ -13074,8 +13140,6 @@ export function forBlock<T>(
 			state.emptyBlock.extra = state.env;
 			renderBlock(state.emptyBlock);
 		} else {
-			const bStart = document.createComment('empty');
-			const bEnd = document.createComment('/empty');
 			// When the SERVER rendered a populated list but the client is empty now, the
 			// content inside the @for range is item blocks (`<!--[-->`), not the @empty body
 			// — a STRUCTURAL mismatch. Discard the server items and build @empty fresh with
@@ -13089,31 +13153,27 @@ export function forBlock<T>(
 				if (mmLoc)
 					warnHydrationStructuralMismatch(mmLoc, 'an empty list (@empty)', 'a populated list');
 				removeRange(state.start.nextSibling, state.end);
-				domParent.insertBefore(bStart, state.end);
-				domParent.insertBefore(bEnd, state.end);
 				suspendForEmpty = true;
 			} else if (hydrating) {
-				// The server rendered the @empty content directly inside the adopted
-				// `<!--[-->…<!--]-->` range — bracket it (don't insert at the end +
-				// re-mount, which would move the adopted content) and point the cursor
-				// at it so the empty body's clone() adopts the server DOM.
-				domParent.insertBefore(bStart, state.start.nextSibling);
-				domParent.insertBefore(bEnd, state.end);
-				hydrateNode = bStart.nextSibling;
-			} else {
-				domParent.insertBefore(bStart, state.end);
-				domParent.insertBefore(bEnd, state.end);
+				// The server already rendered the @empty content directly inside the
+				// adopted outer range. The empty body borrows that range and adopts from
+				// its first child; no redundant inner pair is necessary.
+				hydrateNode = state.start.nextSibling;
 			}
 			const b = createBlock(
 				'control-flow',
 				parentBlock,
 				domParent,
-				bStart,
-				bEnd,
+				state.start,
+				state.end,
 				emptyBody,
 				undefined,
 				state.env,
 			);
+			// The outer ForSlot owns these comments. Empty-body teardown clears only
+			// their contents so the slot remains a stable insertion boundary for the
+			// next empty → items transition.
+			b.exclusiveMarkers = true;
 			state.emptyBlock = b;
 			const savedHydrating = hydrating;
 			if (suspendForEmpty) hydrating = false;

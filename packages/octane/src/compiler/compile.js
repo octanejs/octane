@@ -1544,6 +1544,78 @@ function isReturnJsxFunction(node) {
 	);
 }
 
+/** True when `node` is one plain lowercase host element (never a component/fragment). */
+function isPlainHostRoot(node) {
+	return (
+		node != null &&
+		(node.type === 'JSXElement' || node.type === 'Element') &&
+		!isComponentTag(node) &&
+		typeof (node.id?.name ?? node.openingElement?.name?.name) === 'string'
+	);
+}
+
+function statementsOf(node) {
+	if (node == null) return [];
+	return node.type === 'BlockStatement' ? node.body || [] : [node];
+}
+
+function isIfDirective(node) {
+	return node?.type === 'IfStatement' || node?.type === 'JSXIfExpression';
+}
+
+/**
+ * A directive @if/@else whose every reachable arm emits exactly one plain
+ * host. The chosen tag may change, but the item always owns one element; the
+ * runtime propagates a branch replacement to enclosing shared boundaries.
+ */
+function isSingleHostIfRoot(node) {
+	if (!isIfDirective(node) || node.alternate == null) return false;
+	const armIsSingleHost = (arm) => {
+		if (isIfDirective(arm)) return isSingleHostIfRoot(arm);
+		const render = statementsOf(arm).filter((s) => isJsxNode(s) || isIfDirective(s));
+		return render.length === 1 && isPlainHostRoot(render[0]);
+	};
+	return armIsSingleHost(node.consequent) && armIsSingleHost(node.alternate);
+}
+
+/**
+ * Prove that a component always returns one host element.
+ *
+ * TSRX's `@{}` form carries that output as `body.render`. Ordinary TSX keeps a
+ * real `return`; accept only a final host-element return and reject any other
+ * component-level return (including one nested in control flow). Nested
+ * callbacks are separate functions and do not affect the component's shape.
+ */
+function singleHostComponentRoot(node) {
+	if (node?.body?.type === 'JSXCodeBlock') return isPlainHostRoot(node.body.render);
+	if (node?.body?.type !== 'BlockStatement') return false;
+	const stmts = node.body.body || [];
+	const final = stmts[stmts.length - 1];
+	if (!final || final.type !== 'ReturnStatement' || !isPlainHostRoot(final.argument)) return false;
+
+	let returns = 0;
+	const seen = new WeakSet();
+	const walk = (n) => {
+		if (!n || typeof n !== 'object') return;
+		if (seen.has(n)) return;
+		seen.add(n);
+		if (
+			n !== node &&
+			(n.type === 'FunctionDeclaration' ||
+				n.type === 'FunctionExpression' ||
+				n.type === 'ArrowFunctionExpression')
+		)
+			return;
+		if (n.type === 'ReturnStatement') returns++;
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	};
+	walk(node.body);
+	return returns === 1;
+}
+
 // Arrow-function component shape: `const X = (props) => @{…}` (and the `export`
 // variant). @tsrx/core parses the `@{…}` arrow body as a JSXCodeBlock, but the
 // rest of the compiler keys on FunctionDeclaration. Convert a single-declarator
@@ -2215,13 +2287,23 @@ export function compile(source, filename, options) {
 	//   unknown-call walker doesn't flag it.
 	for (const node of ast.body) {
 		let compNode = null;
-		if (isComponentFunction(node)) compNode = node;
-		else if (node.type === 'ExportDefaultDeclaration' && isComponentFunction(node.declaration))
+		if (isComponentFunction(node) || isReturnJsxFunction(node)) compNode = node;
+		else if (
+			node.type === 'ExportDefaultDeclaration' &&
+			(isComponentFunction(node.declaration) || isReturnJsxFunction(node.declaration))
+		)
 			compNode = node.declaration;
-		else if (node.type === 'ExportNamedDeclaration' && isComponentFunction(node.declaration))
+		else if (
+			node.type === 'ExportNamedDeclaration' &&
+			(isComponentFunction(node.declaration) || isReturnJsxFunction(node.declaration))
+		)
 			compNode = node.declaration;
 		if (compNode && compNode.id) {
-			ctx.componentInfo.set(compNode.id.name, { eligible: false, node: compNode });
+			ctx.componentInfo.set(compNode.id.name, {
+				eligible: false,
+				node: compNode,
+				returnJsx: isReturnJsxFunction(compNode),
+			});
 		}
 	}
 	for (const [, info] of ctx.componentInfo) {
@@ -2234,7 +2316,10 @@ export function compile(source, filename, options) {
 		const root = { type: 'BlockStatement', body: stmts };
 		const free = collectFreeIdentifiers(root, locals);
 		// Hookless check.
-		let eligible = true;
+		// Return-JSX functions reconcile their returned descriptor through
+		// renderBlock. componentSlotLite intentionally ignores return values, so
+		// these functions may participate in output-shape proofs but never lite.
+		let eligible = !info.returnJsx;
 		for (const n of free) {
 			if (
 				HOOK_NAMES.has(n) ||
@@ -2316,12 +2401,7 @@ export function compile(source, filename, options) {
 		// `componentSlot` needs no `comp`/`/comp` markers (singleRoot path), exactly
 		// like a single-root `@for` item. (Output-shape based — independent of which
 		// hooks it calls.)
-		const render = compNode.body.render;
-		info.singleRoot =
-			render != null &&
-			(render.type === 'JSXElement' || render.type === 'Element') &&
-			!isComponentTag(render) &&
-			typeof (render.id?.name ?? render.openingElement?.name?.name) === 'string';
+		info.singleRoot = singleHostComponentRoot(compNode);
 	}
 
 	let body = emitServerModulePrelude(serverModuleInfo, ctx);
@@ -7157,7 +7237,8 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			(fc.singleRoot ? 2 : 0) |
 			(fc.depEligible ? 4 : 0) |
 			(fc.indexIndependent ? 8 : 0);
-		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, flags?, deps?, emptyBody?, anchor?).
+		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, flags?, deps?,
+		// emptyBody?, anchor?, ownEnd?).
 		// Optional args backfill positionally: `flags`/`deps` placeholders
 		// (`0`/`undefined`) when only `emptyHelper` ('null' literal when no
 		// `@empty` branch) or the anchor is present, and a `null` empty-body
@@ -7170,7 +7251,11 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// helpers captured anything, not only for the dep-pure promotion. A deps
 		// arg forces the flags placeholder too (positional alignment).
 		const hasDeps = fc.depNames.length > 0;
-		const flagsPart = flags || hasDeps || hasEmpty || hasAnchor ? ', ' + (flags || 0) : '';
+		const flagsExpr = fc.singleRootExpr
+			? `(${flags} | (${fc.singleRootExpr}.$$singleRoot === true ? 2 : 0))`
+			: String(flags || 0);
+		const flagsPart =
+			flags || fc.singleRootExpr || hasDeps || hasEmpty || hasAnchor ? ', ' + flagsExpr : '';
 		const depsPart = hasDeps
 			? `, [${fc.depNames.join(', ')}]`
 			: hasEmpty || hasAnchor
@@ -7178,9 +7263,13 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				: '';
 		const emptyPart = hasEmpty ? `, ${fc.emptyHelper}` : hasAnchor ? ', null' : '';
 		const anchorPart = hasAnchor ? `, ${anchorExpr}` : '';
+		// A dedicated template `<!>` is already a durable comment at exactly the
+		// list's trailing boundary. Let forBlock reuse it as its end marker instead
+		// of retaining it beside a newly-created `/for` comment.
+		const ownEndPart = fc.anchorVar ? ', true' : '';
 		pushAfter(
 			fc.id,
-			`  _$forBlock(__s, ${slotIndex}, ${hostExpr}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}${flagsPart}${depsPart}${emptyPart}${anchorPart});`,
+			`  _$forBlock(__s, ${slotIndex}, ${hostExpr}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}${flagsPart}${depsPart}${emptyPart}${anchorPart}${ownEndPart});`,
 		);
 	}
 	for (const ic of ifCalls) {
@@ -9516,7 +9605,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// itself as the block boundary. For a 1000-row keyed list this removes 2000
 	// Comment nodes from the parent — meaningful paint-time savings when the
 	// parent is laid out per child (e.g. <tbody> in js-framework-benchmark).
+	// In addition to a direct host root, accept only narrowly-proven sole
+	// component and host-vs-host conditional roots; all other shapes keep item
+	// ranges.
 	let singleRoot = false;
+	let singleRootExpr = null;
 	{
 		const jsxChildren = subStmts.filter((s) => isJsxNode(s));
 		if (jsxChildren.length === 1) {
@@ -9524,8 +9617,40 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			// Old IR uses `Element`; new TSRX AST uses `JSXElement`. Both qualify
 			// for the singleRoot fast path so long as the tag is lowercase (so the
 			// row itself is the block-boundary host, no Comment markers needed).
-			if ((c.type === 'Element' || c.type === 'JSXElement') && !isComponentTag(c))
+			if (isSingleHostIfRoot(c)) {
 				singleRoot = true;
+			} else if (isPlainHostRoot(c)) {
+				singleRoot = true;
+			} else if ((c.type === 'Element' || c.type === 'JSXElement') && isComponentTag(c)) {
+				// A sole component item can share the component's proven host root as
+				// its keyed boundary. Keep the same conservative call-site exclusions
+				// as componentSlot's singleRoot path. Imported bindings are immutable,
+				// so resolve their definition-site stamp once per parent render.
+				const tagName = c.openingElement?.name || c.id || c.name;
+				const bare =
+					tagName &&
+					(tagName.type === 'Identifier' || tagName.type === 'JSXIdentifier') &&
+					typeof tagName.name === 'string';
+				const attrs = c.attributes || c.openingElement?.attributes || [];
+				const hasSpread = attrs.some(
+					(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
+				);
+				const hasKeyOrChildren = attrs.some((a) => {
+					const n = a.name?.name || a.name;
+					return n === 'key' || n === 'children';
+				});
+				const hasChildren = (c.children || []).length > 0;
+				if (bare && !hasSpread && !hasKeyOrChildren && !hasChildren) {
+					const compName = tagName.name;
+					const local = ctx.componentInfo?.get(compName);
+					if (local?.singleRoot === true) singleRoot = true;
+					else if (ctx.importedNames?.has(compName)) singleRootExpr = compName;
+				}
+			}
+		}
+		if (jsxChildren.length === 0) {
+			const controls = subStmts.filter((s) => isIfDirective(s));
+			if (controls.length === 1 && isSingleHostIfRoot(controls[0])) singleRoot = true;
 		}
 	}
 
@@ -9537,6 +9662,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		bodyHelper: itemHelperName,
 		pure,
 		singleRoot,
+		singleRootExpr,
 		// The env union doubles as the deps array: emitted whenever the helpers
 		// capture anything (Phase 2 — the runtime stamps it as block.extra), and
 		// ALSO compared for the dep-pure survivor short-circuit when depEligible.
