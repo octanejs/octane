@@ -39,13 +39,8 @@ const ROUTES = ['/', '/docs', '/benchmarks', '/playground', '/view-transitions']
 // `/` + `/benchmarks` re-based 2026-07-13 after every comparative chart gained
 // Preact/Svelte series and streaming-ssr joined the page (measured / 2,210 ·
 // /benchmarks 22,621). The ceilings retain roughly 15% headroom.
-//
-// `/` re-based again 2026-07-13 after the home summary chart turned on
-// showValues (a value label on every bar — ~7 series × 14 suites of small
-// recharts label trees; measured / 2,929): real content growth, not marker
-// minting.
 const COMMENT_CEILINGS: Record<string, number> = {
-	'/': 3380,
+	'/': 2550,
 	'/docs': 415,
 	'/benchmarks': 26100,
 	'/playground': 195,
