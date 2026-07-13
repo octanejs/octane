@@ -20,8 +20,18 @@ function assertStateGetterTypes(): void {
 }
 void assertStateGetterTypes;
 
+function evalServer(source: string, filename: string): Record<string, any> {
+	let code = compile(source, filename, { mode: 'server' }).code;
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
+		(_match, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
+	);
+	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
+	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
+}
+
 describe('compiler-driven state getters', () => {
-	it('keeps the existing hook path when tuple index 2 is provably unobserved', () => {
+	it('selects pair helpers when tuple index 2 is provably unobserved', () => {
 		const source = `
       import { useState, useReducer } from 'octane';
       export function App() @{
@@ -32,14 +42,14 @@ describe('compiler-driven state getters', () => {
     `;
 		for (const mode of ['client', 'server'] as const) {
 			const code = compile(source, 'lean-state.tsrx', { mode }).code;
-			expect(code).not.toContain('__useStateWithGetter');
-			expect(code).not.toContain('__useReducerWithGetter');
-			expect(code).toMatch(/useState\(0, _h\$\d+\)/);
-			expect(code).toMatch(/useReducer\([^;]+, _h\$\d+\)/);
+			expect(code).toContain('__useStatePair as _$__useStatePair');
+			expect(code).toContain('__useReducerPair as _$__useReducerPair');
+			expect(code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
+			expect(code).toMatch(/_\$__useReducerPair\([^;]+, _h\$\d+\)/);
 		}
 	});
 
-	it('selects getter helpers for third bindings and escaped tuples', () => {
+	it('keeps public hooks for third bindings and escaped tuples', () => {
 		const source = `
       import { useState, useReducer } from 'octane';
       export function Direct() @{
@@ -51,10 +61,10 @@ describe('compiler-driven state getters', () => {
     `;
 		for (const mode of ['client', 'server'] as const) {
 			const code = compile(source, 'getter-state.tsrx', { mode }).code;
-			expect(code).toContain('__useStateWithGetter as _$__useStateWithGetter');
-			expect(code).toContain('__useReducerWithGetter as _$__useReducerWithGetter');
-			expect(code).toMatch(/_\$__useStateWithGetter\(0, _h\$\d+\)/);
-			expect(code).toMatch(/_\$__useReducerWithGetter\([^;]+, _h\$\d+\)/);
+			expect(code).not.toContain('__useStatePair');
+			expect(code).not.toContain('__useReducerPair');
+			expect(code).toMatch(/useState\(0, _h\$\d+\)/);
+			expect(code).toMatch(/useReducer\([^;]+, _h\$\d+\)/);
 		}
 	});
 
@@ -77,9 +87,9 @@ describe('compiler-driven state getters', () => {
       `,
 			'tuple-state.tsrx',
 		).code;
-		expect(code).toMatch(/const first = useState\(0, _h\$\d+\)\[0\]/);
-		expect(code).toMatch(/const getState = _\$__useStateWithGetter\(0, _h\$\d+\)\[2\]/);
-		expect(code).toMatch(/\[state, \.\.\.rest\] = _\$__useStateWithGetter\(0, _h\$\d+\)/);
+		expect(code).toMatch(/const first = _\$__useStatePair\(0, _h\$\d+\)\[0\]/);
+		expect(code).toMatch(/const getState = useState\(0, _h\$\d+\)\[2\]/);
+		expect(code).toMatch(/\[state, \.\.\.rest\] = useState\(0, _h\$\d+\)/);
 	});
 
 	it('handles aliases and preserves the surgical TypeScript pass', () => {
@@ -89,15 +99,81 @@ export function useValue() {
   return { value, setValue, getValue };
 }`;
 		const code = slotHooks(source, 'state-getter.ts')!.code;
-		expect(code).toMatch(/_\$__useStateWithGetter<number>\(0, _h\$\d+\)/);
-		expect(code).toContain(
-			"import { __useStateWithGetter as _$__useStateWithGetter } from 'octane';",
-		);
-		expect(code).not.toContain('state<number>');
+		expect(code).toMatch(/state<number>\(0, _h\$\d+\)/);
+		expect(code).not.toContain('__useStatePair');
+	});
+
+	it('does not slot a lexically shadowed named import in plain TypeScript', () => {
+		const source = `import { useState as state } from 'octane';
+export function value() {
+  function state(initial: number) { return [initial, 'local'] as const; }
+  return state(1);
+}`;
+		expect(slotHooks(source, 'shadowed-state.ts')).toBeNull();
+	});
+
+	it('slots aliased and namespace-imported hooks in full client/server compilation', () => {
+		const source = `
+      import { useState as state } from 'octane';
+      import * as Octane from 'octane';
+      export function App() @{
+        const [left, setLeft] = state(0);
+        const [right, setRight, getRight] = Octane.useState(1);
+        const id = Octane.useId();
+        <button id={id} onClick={() => { setLeft(left + 1); setRight(right + 1); }}>
+          {left + getRight() + ''}
+        </button>
+      }
+    `;
+		for (const mode of ['client', 'server'] as const) {
+			const code = compile(source, 'aliased-hooks.tsrx', { mode }).code;
+			expect(code).toContain('useState as state');
+			expect(code).toContain(
+				`import * as Octane from 'octane${mode === 'server' ? '/server' : ''}'`,
+			);
+			expect(code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
+			expect(code).toMatch(/Octane\.useState\(1, _h\$\d+\)/);
+			expect(code).toMatch(/Octane\.useId\(_h\$\d+\)/);
+		}
+	});
+
+	it('resolves imported aliases and namespaces through lexical shadowing', () => {
+		const source = `
+      import { useState as state } from 'octane';
+      import * as Octane from 'octane';
+      export function App() @{
+        function state(value) { return [value, 'local']; }
+        const Octane = { useState(value) { return [value, 'local']; } };
+        const [left, leftTag] = state(7);
+        const [right, rightTag] = Octane.useState(8);
+        <p>{left + right + leftTag + rightTag + ''}</p>
+      }
+    `;
+		for (const mode of ['client', 'server'] as const) {
+			const code = compile(source, 'shadowed-hooks.tsrx', { mode }).code;
+			expect(code).not.toContain('__useStatePair');
+			expect(code).toContain('state(7)');
+			// The method still follows the custom-hook naming convention, but it must
+			// not be rewritten as the imported Octane base hook.
+			expect(code).toContain('Octane.useState(8, _h$');
+		}
 	});
 });
 
 describe('state getter runtime semantics', () => {
+	it('returns a physical three-item tuple through the public runtime API', () => {
+		const seen: unknown[] = [];
+		const Probe = (_props: unknown, scope: any) => {
+			const tuple = useState(1, Symbol.for('physical.state'));
+			seen.push(tuple, tuple[2]);
+			return null;
+		};
+		const r = mount(Probe as any, {});
+		expect(seen[0]).toHaveLength(3);
+		expect(typeof seen[1]).toBe('function');
+		r.unmount();
+	});
+
 	it('reads sequential useState updates immediately and stays stable', () => {
 		const values: number[] = [];
 		const getters: Array<() => number> = [];
@@ -152,5 +228,47 @@ describe('state getter runtime semantics', () => {
 		code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 		const mod = new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
 		expect(ServerRuntime.renderToString(mod.App).html).toContain('Count: 2');
+	});
+
+	it('treats a compiled zero-argument useState slot as the slot on the server', () => {
+		const mod = evalServer(
+			`
+      import { useState } from 'octane';
+      export function App() @{
+        const [pairValue] = useState();
+        const tuple = useState();
+        <span>{String(pairValue) + '|' + String(tuple[0]) + '|' + tuple.length}</span>
+      }
+    `,
+			'server-zero-state.tsrx',
+		);
+		expect(ServerRuntime.renderToString(mod.App).html).toContain('undefined|undefined|3');
+	});
+
+	it('server getters observe each render-phase update immediately', () => {
+		const mod = evalServer(
+			`
+      import { useReducer, useState } from 'octane';
+      export function App() @{
+        const [count, setCount, getCount] = useState(0);
+        const [total, dispatch, getTotal] = useReducer((value, amount) => value + amount, 0);
+        if (count === 0) {
+          setCount(1);
+          if (getCount() !== 1) throw new Error('stale state getter');
+          setCount((value) => value + 1);
+          if (getCount() !== 2) throw new Error('stale functional state getter');
+        }
+        if (total === 0) {
+          dispatch(2);
+          if (getTotal() !== 2) throw new Error('stale reducer getter');
+          dispatch(3);
+          if (getTotal() !== 5) throw new Error('stale sequential reducer getter');
+        }
+        <span>{count + '|' + total}</span>
+      }
+    `,
+			'server-immediate-getter.tsrx',
+		);
+		expect(ServerRuntime.renderToString(mod.App).html).toContain('2|5');
 	});
 });

@@ -20,16 +20,15 @@ import { vercel } from '@octanejs/adapter-vercel';
 // graph).
 const warmRouter: Middleware = async (context, next) => {
 	const { warmServerRouter } = await import('./src/app/router-server.ts');
-	await warmServerRouter(context.url.pathname);
+	await warmServerRouter(context.state, context.url.pathname + context.url.search);
 	return next();
 };
 
 const ENTRY = ['App', '/src/app/App.tsrx'] as const;
 
 export default defineConfig({
-	// CI also builds on Node 26, but Vercel Functions currently support Node 24
-	// as their newest runtime. Keep the build machine and deployment runtime
-	// independent until Vercel adds nodejs26.x.
+	// Pin production to the newest supported runtime. Local and CI builds also
+	// support Node 22; Node 20 is no longer part of Octane's baseline.
 	adapter: vercel({ serverless: { runtime: 'nodejs24.x' } }),
 	router: {
 		routes: [

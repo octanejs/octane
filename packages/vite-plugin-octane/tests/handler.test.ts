@@ -5,10 +5,11 @@
 import { describe, it, expect } from 'vitest';
 import { createHandler } from '../src/server/production.js';
 import { RenderRoute, ServerRoute } from '../src/routes.js';
+import { OCTANE_NONCE_STATE_KEY } from '../src/constants.js';
 
 const TEMPLATE = `<!doctype html>
 <html><head><!--ssr-head--></head><body><div id="root"><!--ssr-body--></div>
-<script type="module" src="/assets/hydrate-abc.js"></script></body></html>`;
+<script type="module" data-octane-hydrate src="/assets/hydrate-abc.js"></script></body></html>`;
 
 function Page() {
 	return '<main>page</main>';
@@ -76,6 +77,7 @@ describe('createHandler', () => {
 				params: {},
 				url: '/?q=1',
 				preHydrate: null,
+				rootBoundary: { pending: null, catch: null },
 			}),
 		);
 	});
@@ -90,16 +92,30 @@ describe('createHandler', () => {
 
 	it("render: 'buffered' awaits prerender and sends one document (css leads the body)", async () => {
 		let streamed = false;
+		let prerenderSignal: AbortSignal | undefined;
 		const deps = {
 			...baseDeps,
 			renderToReadableStream: async () => {
 				streamed = true;
 				return streamOf('');
 			},
+			prerender: async (
+				_component: Function,
+				_props: unknown,
+				options: { signal?: AbortSignal } | undefined,
+			) => {
+				prerenderSignal = options?.signal;
+				return {
+					html: '<main>page</main>',
+					css: '<style data-octane="x">.x{}</style>',
+				};
+			},
 		};
 		const handler = createHandler(makeManifest({ render: 'buffered' }) as any, deps as any);
-		const html = await (await handler(new Request('http://localhost/'))).text();
+		const request = new Request('http://localhost/');
+		const html = await (await handler(request)).text();
 		expect(streamed).toBe(false);
+		expect(prerenderSignal).toBe(request.signal);
 		expect(html).toContain(
 			'<div id="root"><style data-octane="x">.x{}</style><main>page</main></div>',
 		);
@@ -130,5 +146,111 @@ describe('createHandler', () => {
 
 		const missing = await handler(new Request('http://localhost/nope'));
 		expect(missing.status).toBe(404);
+	});
+
+	it('threads a middleware CSP nonce through renderer and inline hydration scripts', async () => {
+		let rendererNonce: string | undefined;
+		let rendererSignal: AbortSignal | undefined;
+		const nonce = 'request-123"&';
+		const handler = createHandler(
+			makeManifest({
+				middlewares: [
+					(context: { state: Map<string, unknown> }, next: () => Promise<Response>) => {
+						context.state.set(OCTANE_NONCE_STATE_KEY, nonce);
+						return next();
+					},
+				],
+			}) as any,
+			{
+				...baseDeps,
+				renderToReadableStream: async (
+					_component: Function,
+					_props: unknown,
+					options: { nonce?: string; signal?: AbortSignal } | undefined,
+				) => {
+					rendererNonce = options?.nonce;
+					rendererSignal = options?.signal;
+					return streamOf('<main>page</main>');
+				},
+			} as any,
+		);
+		const request = new Request('http://localhost/');
+		const html = await (await handler(request)).text();
+		expect(rendererNonce).toBe(nonce);
+		expect(rendererSignal).toBe(request.signal);
+		expect(html.match(/nonce="request-123&quot;&amp;"/g)).toHaveLength(2);
+	});
+
+	it('passes request Context.state to server route props without serializing it', async () => {
+		let seenState: Map<string, unknown> | undefined;
+		const StatePage = (props: { state?: Map<string, unknown> }) => {
+			seenState = props.state;
+			return '<main>state</main>';
+		};
+		const manifest = makeManifest({
+			components: { '/src/Page.tsrx': { Page: StatePage } },
+			middlewares: [
+				(context: { state: Map<string, unknown> }, next: () => Promise<Response>) => {
+					context.state.set('loaded.router', 'server-value');
+					return next();
+				},
+			],
+		});
+		const handler = createHandler(
+			manifest as any,
+			{
+				...baseDeps,
+				renderToReadableStream: async (component: Function) => {
+					component(undefined, undefined, undefined);
+					return streamOf('<main>state</main>');
+				},
+			} as any,
+		);
+		const html = await (await handler(new Request('http://localhost/'))).text();
+		expect(seenState?.get('loaded.router')).toBe('server-value');
+		expect(html).not.toContain('loaded.router');
+		expect(html).not.toContain('server-value');
+	});
+
+	it('rejects invalid nonce state instead of stringifying unsafe values', async () => {
+		const handler = createHandler(
+			makeManifest({
+				middlewares: [
+					(context: { state: Map<string, unknown> }, next: () => Promise<Response>) => {
+						context.state.set(OCTANE_NONCE_STATE_KEY, 123);
+						return next();
+					},
+				],
+			}) as any,
+			baseDeps as any,
+		);
+		const response = await handler(new Request('http://localhost/'));
+		expect(response.status).toBe(500);
+	});
+
+	it.each([
+		['missing head marker', TEMPLATE.replace('<!--ssr-head-->', '')],
+		[
+			'duplicate head marker',
+			TEMPLATE.replace('<!--ssr-head-->', '<!--ssr-head--><!--ssr-head-->'),
+		],
+		['missing body marker', TEMPLATE.replace('<!--ssr-body-->', '')],
+		[
+			'duplicate body marker',
+			TEMPLATE.replace('<!--ssr-body-->', '<!--ssr-body--><!--ssr-body-->'),
+		],
+		['missing closing body', TEMPLATE.replace('</body>', '')],
+		['missing hydrate entry marker', TEMPLATE.replace(' data-octane-hydrate', '')],
+		[
+			'duplicate hydrate entry marker',
+			TEMPLATE.replace(
+				'</body>',
+				'<script type="module" data-octane-hydrate src="/assets/other.js"></script></body>',
+			),
+		],
+	])('rejects a malformed SSR template: %s', (_name, htmlTemplate) => {
+		expect(() =>
+			createHandler(makeManifest() as any, { ...baseDeps, htmlTemplate } as any),
+		).toThrow(/exactly one|hydration module/);
 	});
 });

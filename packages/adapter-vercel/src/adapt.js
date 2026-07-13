@@ -28,6 +28,8 @@ import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 
 const VERCEL_OUTPUT_DIR = '.vercel/output';
+const VALID_NODE_MAJORS = [22, 24];
+const VALID_NODE_RUNTIMES = new Set(VALID_NODE_MAJORS.map((major) => `nodejs${major}.x`));
 
 /**
  * The adapter's own version (for .vc-config.json `framework`). MUST stay lazy:
@@ -51,14 +53,30 @@ function get_adapter_version() {
  */
 function get_default_runtime() {
 	const major = Number(process.version.slice(1).split('.')[0]);
-	const valid = [20, 22, 24];
-	if (!valid.includes(major)) {
+	if (!VALID_NODE_MAJORS.includes(major)) {
 		throw new Error(
 			`[@octanejs/adapter-vercel] Unsupported Node.js version: ${process.version}. ` +
-				`Build with Node ${valid.join('/')} or set serverless.runtime explicitly.`,
+				`Build with Node ${VALID_NODE_MAJORS.join('/')} or set serverless.runtime to ` +
+				'nodejs22.x/nodejs24.x explicitly.',
 		);
 	}
 	return `nodejs${major}.x`;
+}
+
+/**
+ * Reject deployment runtimes outside Octane's supported Node.js baseline.
+ * An explicit runtime still lets a newer build machine target Node 22 or 24.
+ * @param {string} runtime
+ * @returns {string}
+ */
+function validate_runtime(runtime) {
+	if (!VALID_NODE_RUNTIMES.has(runtime)) {
+		throw new Error(
+			`[@octanejs/adapter-vercel] Unsupported serverless runtime: ${runtime}. ` +
+				'Use nodejs22.x or nodejs24.x.',
+		);
+	}
+	return runtime;
 }
 
 /**
@@ -162,6 +180,7 @@ export async function adapt(ctx, options = {}) {
 	if (!existsSync(server_entry)) {
 		throw new Error(`[@octanejs/adapter-vercel] Server entry not found at ${server_entry}.`);
 	}
+	const runtime = validate_runtime(options.serverless?.runtime ?? get_default_runtime());
 
 	const output_dir = join(root, VERCEL_OUTPUT_DIR);
 	rmSync(output_dir, { recursive: true, force: true });
@@ -181,27 +200,30 @@ export async function adapt(ctx, options = {}) {
 	write(join(func_dir, 'index.js'), generate_handler_source());
 	write(join(func_dir, 'package.json'), JSON.stringify({ type: 'module' }));
 
-	const runtime = options.serverless?.runtime ?? get_default_runtime();
 	/** @type {Record<string, unknown>} */
 	const vc_config = {
 		runtime,
 		handler: 'index.js',
 		launcherType: 'Nodejs',
-		experimentalResponseStreaming: true,
+		supportsResponseStreaming: true,
 		framework: { slug: 'octane', version: get_adapter_version() },
 	};
 	if (options.serverless?.regions) vc_config.regions = options.serverless.regions;
 	if (options.serverless?.memory) vc_config.memory = options.serverless.memory;
 	if (options.serverless?.maxDuration) vc_config.maxDuration = options.serverless.maxDuration;
 
-	// ISR: cache the function's response at the edge, revalidate after
-	// `expiration` seconds (false = never expire).
+	// ISR belongs in an ADJACENT prerender-config file, not in the function's
+	// .vc-config.json. Build Output API associates functions/index.func with
+	// functions/index.prerender-config.json by basename.
 	if (options.isr) {
 		/** @type {Record<string, unknown>} */
 		const prerender = { expiration: options.isr.expiration };
 		if (options.isr.bypassToken) prerender.bypassToken = options.isr.bypassToken;
 		if (options.isr.allowQuery !== undefined) prerender.allowQuery = options.isr.allowQuery;
-		vc_config.prerender = prerender;
+		write(
+			join(output_dir, 'functions', 'index.prerender-config.json'),
+			JSON.stringify(prerender, null, '\t'),
+		);
 	}
 
 	write(join(func_dir, '.vc-config.json'), JSON.stringify(vc_config, null, '\t'));

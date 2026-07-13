@@ -1,55 +1,61 @@
-// Per-URL SERVER routers. octane's prerender() calls the App component
-// synchronously, but @octanejs/tanstack-router resolves its match tree through the async
-// `router.load()` — so the loaded router has to exist BEFORE the component
-// render reaches <RouterProvider/>. Two cooperating paths:
+// Request-scoped SERVER routers. octane's prerender() calls the App component
+// synchronously, but @octanejs/tanstack-router resolves its match tree through
+// async `router.load()`, so middleware prepares one router in Context.state
+// before rendering. App reads that same entry synchronously; an unwarmed render
+// may start it itself and suspend on its promise.
 //
-//  1. The octane.config.ts `before` middleware calls `warmServerRouter(url)`
-//     per request, so by render time the entry is `done` and App reads the
-//     loaded router synchronously (the normal dev-SSR path).
-//  2. If a render arrives unwarmed (e.g. a direct `prerender(App, …)` outside
-//     the plugin), App falls back to `use(entry.promise)` inside a @try
-//     boundary — prerender awaits it and re-renders.
-//
-// Routers are cached per normalized pathname: this site's routes are static
-// (no loaders, no per-request data), so reusing a loaded router across
-// requests for the same URL is sound.
+// Loaded routers must never live in a module-global pathname cache: route
+// loaders/context can contain request or user data. Context.state belongs to
+// one middleware request, so identical URLs still receive distinct routers.
 import { createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from './router.ts';
 
 export interface ServerRouterEntry {
+	url: string;
 	router: any;
 	promise: Promise<void>;
 	done: boolean;
 }
 
-const cache = new Map<string, ServerRouterEntry>();
-const MAX_CACHED = 200; // dev-server safety valve; entries are tiny
+export const SERVER_ROUTER_STATE_KEY = 'octane.website.server-router';
 
-export function normalizePathname(pathname: string): string {
+export function normalizeRequestUrl(requestUrl: string): string {
+	const url = new URL(requestUrl, 'http://octane.invalid');
+	let pathname = url.pathname;
 	if (!pathname.startsWith('/')) pathname = '/' + pathname;
-	// Strip a trailing slash (except the root) so '/docs/' and '/docs' share an entry.
 	if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);
-	return pathname;
+	return pathname + url.search;
 }
 
-export function getServerRouterEntry(pathname: string): ServerRouterEntry {
-	const key = normalizePathname(pathname);
-	let entry = cache.get(key);
-	if (!entry) {
-		if (cache.size >= MAX_CACHED) cache.clear();
-		const history = createMemoryHistory({ initialEntries: [key] });
-		const router = makeRouter({ history, isServer: true });
-		const created: ServerRouterEntry = { router, done: false, promise: Promise.resolve() };
-		created.promise = router.load().then(() => {
-			created.done = true;
-		});
-		cache.set(key, created);
-		entry = created;
-	}
+function createServerRouterEntry(requestUrl: string): ServerRouterEntry {
+	const url = normalizeRequestUrl(requestUrl);
+	const history = createMemoryHistory({ initialEntries: [url] });
+	const router = makeRouter({ history, isServer: true });
+	const entry: ServerRouterEntry = { url, router, done: false, promise: Promise.resolve() };
+	entry.promise = router.load().then(() => {
+		entry.done = true;
+	});
 	return entry;
 }
 
-/** Load (or reuse) the server router for `pathname`; resolves when matches are ready. */
-export async function warmServerRouter(pathname: string): Promise<void> {
-	await getServerRouterEntry(pathname).promise;
+export function getServerRouterEntry(
+	state: Map<string, unknown>,
+	requestUrl: string,
+): ServerRouterEntry {
+	const url = normalizeRequestUrl(requestUrl);
+	const existing = state.get(SERVER_ROUTER_STATE_KEY);
+	if (existing && (existing as ServerRouterEntry).url === url) {
+		return existing as ServerRouterEntry;
+	}
+	const entry = createServerRouterEntry(url);
+	state.set(SERVER_ROUTER_STATE_KEY, entry);
+	return entry;
+}
+
+/** Prepare this request's router before the synchronous SSR shell pass. */
+export async function warmServerRouter(
+	state: Map<string, unknown>,
+	requestUrl: string,
+): Promise<void> {
+	await getServerRouterEntry(state, requestUrl).promise;
 }

@@ -7,7 +7,7 @@
 // any hydration-mismatch warning or page error; then builds and repeats against
 // the production `octane-preview` server (prod output has no mismatch warnings
 // — dev-gated — so there the gate is "no errors + routes render + client-side
-// nav works").
+// nav works + the playground compiles, runs, and handles an iframe event").
 //
 // Runs inside the website vitest project (playwright as a library). Skips
 // loudly when Chromium isn't installed — CI installs it (see ci.yml).
@@ -175,6 +175,19 @@ async function loadRoute(base: string, path: string) {
 	return { page, errors, main, comments };
 }
 
+async function waitForLocatorText(
+	locator: import('playwright').Locator,
+	expected: string,
+	timeoutMs = 10_000,
+): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		if ((await locator.textContent())?.trim() === expected) return;
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+	throw new Error(`locator did not reach text ${JSON.stringify(expected)} within ${timeoutMs}ms`);
+}
+
 describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	let server: ChildProcess;
 	let DEV_PORT: number;
@@ -271,4 +284,20 @@ describe.sequential('website production build → hydration (octane-preview)', (
 			await page.close();
 		}
 	});
+
+	it('playground compiles, runs, and handles an event inside its sandbox', async (ctx) => {
+		if (!browser) return ctx.skip();
+		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			const preview = page.frameLocator('iframe[title="Playground preview"]');
+			const heading = preview.locator('h2');
+			await waitForLocatorText(heading, 'Count: 0', 20_000);
+			await preview.getByRole('button', { name: 'Increment' }).click();
+			await waitForLocatorText(heading, 'Count: 1');
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
 });

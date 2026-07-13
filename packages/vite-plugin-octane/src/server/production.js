@@ -25,7 +25,19 @@
 import { createRouter } from './router.js';
 import { createContext, runMiddlewareChain } from './middleware.js';
 import { handleServerRoute } from './server-route.js';
-import { createLayoutWrapper, createPropsWrapper } from './component-wrappers.js';
+import { composeHtmlStream } from './html-stream.js';
+import {
+	applyHydrationNonce,
+	getContextNonce,
+	nonceAttribute,
+	splitSsrTemplate,
+	validateSsrTemplate,
+} from './html-template.js';
+import {
+	createLayoutWrapper,
+	createPropsWrapper,
+	createRootBoundaryWrapper,
+} from './component-wrappers.js';
 import {
 	get_component_export,
 	get_route_entry_export_name,
@@ -67,10 +79,13 @@ export function createHandler(manifest, deps) {
 	const globalMiddlewares = manifest.middlewares ?? [];
 	const trustProxy = manifest.trustProxy ?? false;
 	const runtime = manifest.runtime;
+	validateSsrTemplate(htmlTemplate);
+	// Also pin the built-template contract up front. The marker is emitted by
+	// transformIndexHtml and survives Vite's src hashing.
+	applyHydrationNonce(htmlTemplate, null);
 
-	// RPC lookup for `module server` functions (hash → server function). Empty
-	// today — the octane compiler does not emit `module server` modules yet —
-	// but the wiring matches the dev middleware so it lights up when it does.
+	// RPC lookup for statically imported `module server` functions
+	// (compiler hash → server function).
 	const rpcLookup =
 		manifest.rpcModules && runtime ? build_rpc_lookup(manifest.rpcModules, runtime.hash) : null;
 
@@ -154,7 +169,8 @@ export function createHandler(manifest, deps) {
 		// Identical props to dev: `{ params, url }`, url origin-free so the client
 		// re-renders the exact string.
 		const requestUrl = context.url.pathname + context.url.search;
-		const pageProps = { params: context.params, url: requestUrl };
+		const pageProps = { params: context.params, url: requestUrl, state: context.state };
+		const nonce = getContextNonce(context);
 
 		let RootComponent;
 		if (route.layout) {
@@ -170,6 +186,14 @@ export function createHandler(manifest, deps) {
 		} else {
 			RootComponent = createPropsWrapper(/** @type {any} */ (PageComponent), pageProps);
 		}
+		RootComponent = createRootBoundaryWrapper(
+			RootComponent,
+			{
+				pending: manifest.rootBoundary?.pending ?? null,
+				catch: manifest.rootBoundary?.catch ?? null,
+			},
+			deps,
+		);
 
 		// The hydration payload — SAME keys, SAME order as dev render-route.js, so
 		// the data script is byte-identical between dev and production.
@@ -181,8 +205,9 @@ export function createHandler(manifest, deps) {
 			params: context.params,
 			url: requestUrl,
 			preHydrate: manifest.preHydrate ?? null,
+			rootBoundary: manifest.rootBoundaryEntries ?? { pending: null, catch: null },
 		});
-		const dataScript = `<script id="__octane_data" type="application/json">${escapeScript(routeData)}</script>`;
+		const dataScript = `<script id="__octane_data" type="application/json"${nonceAttribute(nonce)}>${escapeScript(routeData)}</script>`;
 
 		// Per-route asset hints from the client manifest: stylesheet links so
 		// page CSS applies before hydration, modulepreload so the page chunk
@@ -201,17 +226,12 @@ export function createHandler(manifest, deps) {
 		}
 
 		const headContent = [...preloadTags, dataScript].join('\n');
-		const html = htmlTemplate.replace('<!--ssr-head-->', headContent);
+		const html = applyHydrationNonce(htmlTemplate, nonce).replace('<!--ssr-head-->', headContent);
 
 		const status = route.status ?? 200;
 		const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
-		const splitAt = html.indexOf('<!--ssr-body-->');
-		if (splitAt === -1) {
-			return new Response(html, { status, headers });
-		}
-		const prefix = html.slice(0, splitAt);
-		const suffix = html.slice(splitAt + '<!--ssr-body-->'.length);
+		const [prefix, suffix] = splitSsrTemplate(html);
 
 		if (manifest.render === 'buffered') {
 			// Await-everything fallback (`prerender` from octane/static): no
@@ -219,6 +239,8 @@ export function createHandler(manifest, deps) {
 			// markup inside #root — the same position they hold in the streamed
 			// shell — so hydrateRoot's leading-style skip applies unchanged.
 			const { html: body, css } = await prerender(RootComponent, undefined, {
+				nonce: nonce ?? undefined,
+				signal: context.request.signal,
 				onError(/** @type {unknown} */ error) {
 					console.error('[octane] SSR render error:', error);
 				},
@@ -230,34 +252,14 @@ export function createHandler(manifest, deps) {
 		// stream out-of-order behind it — identical to dev.
 		/** @type {ReadableStream<Uint8Array>} */
 		const renderStream = await renderToReadableStream(RootComponent, undefined, {
+			nonce: nonce ?? undefined,
+			signal: context.request.signal,
 			onError(/** @type {unknown} */ error) {
 				console.error('[octane] SSR render error:', error);
 			},
 		});
 
-		const encoder = new TextEncoder();
-		const body = new ReadableStream({
-			async start(controller) {
-				controller.enqueue(encoder.encode(prefix));
-				const reader = renderStream.getReader();
-				try {
-					while (true) {
-						const { done, value } = await reader.read();
-						if (done) break;
-						controller.enqueue(value);
-					}
-					controller.enqueue(encoder.encode(suffix));
-					controller.close();
-				} catch (error) {
-					controller.error(error);
-				} finally {
-					reader.releaseLock();
-				}
-			},
-			cancel(reason) {
-				return renderStream.cancel(reason);
-			},
-		});
+		const body = composeHtmlStream(prefix, renderStream, suffix);
 
 		return new Response(body, { status, headers });
 	}

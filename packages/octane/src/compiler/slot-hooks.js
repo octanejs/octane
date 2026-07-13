@@ -17,16 +17,20 @@ import { parseModule } from '@tsrx/core';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
 import { analyzeHookDependencies } from './hook-deps.js';
 
-// Build local-name → imported-name for hooks imported from 'octane' (handles
-// `import { useState as s }`). Namespace imports (`import * as o`) are ignored —
-// `o.useState(...)` has a MemberExpression callee, which the call walk never
-// matches, so it's skipped for free (matching the `.tsrx` path).
+// Build a cheap import-presence gate. Precise call identity is annotated by the
+// lexical scope analysis in analyzeHookDependencies below; this gate only avoids
+// doing the surgical edit walk for modules that cannot contain an Octane hook.
 function octaneHookLocals(ast) {
 	const locals = new Map();
 	let importsHook = false;
 	for (const node of ast.body || []) {
 		if (node.type !== 'ImportDeclaration' || node.source?.value !== 'octane') continue;
 		for (const sp of node.specifiers || []) {
+			if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
+				locals.set(sp.local.name, '*');
+				importsHook = true;
+				continue;
+			}
 			if (sp.type !== 'ImportSpecifier') continue;
 			const imported = sp.imported?.name;
 			const local = sp.local?.name;
@@ -38,9 +42,9 @@ function octaneHookLocals(ast) {
 	return importsHook ? locals : null;
 }
 
-const STATE_GETTER_HELPERS = {
-	useState: '__useStateWithGetter',
-	useReducer: '__useReducerWithGetter',
+const STATE_PAIR_HELPERS = {
+	useState: '__useStatePair',
+	useReducer: '__useReducerPair',
 };
 
 function arrayPatternObservesStateGetter(pattern) {
@@ -63,10 +67,10 @@ function isTransparentStateTupleWrapper(node, child) {
 	);
 }
 
-// Mark base-hook calls whose source tuple can observe index 2. Direct fixed
-// destructures that omit it keep the existing two-item runtime path; escaped or
-// otherwise ambiguous tuples conservatively receive the full getter-enabled shape.
-function collectStateGetterCalls(ast, locals) {
+// Mark base-hook calls whose source tuple provably cannot observe index 2. Only
+// those calls may use the private two-item helper; escaped or ambiguous tuples
+// retain the public, physically complete three-item shape.
+function collectStatePairCalls(ast) {
 	const calls = new WeakSet();
 	const ancestors = [];
 	function walk(node) {
@@ -75,9 +79,9 @@ function collectStateGetterCalls(ast, locals) {
 			for (const child of node) walk(child);
 			return;
 		}
-		if (node.type === 'CallExpression' && node.callee?.type === 'Identifier') {
-			const imported = locals.get(node.callee.name);
-			if (STATE_GETTER_HELPERS[imported]) {
+		if (node.type === 'CallExpression') {
+			const imported = node._octaneImportedHook;
+			if (STATE_PAIR_HELPERS[imported]) {
 				let child = node;
 				let i = ancestors.length - 1;
 				while (i >= 0 && isTransparentStateTupleWrapper(ancestors[i], child)) {
@@ -98,7 +102,7 @@ function collectStateGetterCalls(ast, locals) {
 				} else if (parent?.type === 'ExpressionStatement') {
 					observed = false;
 				}
-				if (observed) calls.add(node);
+				if (!observed) calls.add(node);
 			}
 		}
 		ancestors.push(node);
@@ -136,10 +140,13 @@ function walk(node, fnName, st) {
 	}
 	const childFn = node.type === 'FunctionDeclaration' && node.id ? node.id.name : fnName;
 
-	if (node.type === 'CallExpression' && node.callee?.type === 'Identifier') {
-		const local = node.callee.name;
-		const imported = st.locals.get(local);
+	if (node.type === 'CallExpression') {
+		const imported = node._octaneImportedHook;
 		if (imported && HOOK_NAMES.has(imported)) {
+			const local =
+				node.callee?.type === 'Identifier'
+					? node.callee.name
+					: `${node.callee?.object?.name || 'octane'}.${imported}`;
 			const id = st.nextId++;
 			const sym = `_h$${id}`;
 			if (st.hmr) {
@@ -174,14 +181,14 @@ function walk(node, fnName, st) {
 				// trailing commas / whitespace before `)` stay valid.
 				st.edits.push({ pos: node.arguments[node.arguments.length - 1].end, text: ', ' + sym });
 			}
-			if (st.getterCalls.has(node) && STATE_GETTER_HELPERS[imported]) {
-				let helper = st.getterHelpers.get(imported);
+			if (st.pairCalls.has(node) && STATE_PAIR_HELPERS[imported]) {
+				let helper = st.pairHelpers.get(imported);
 				if (helper === undefined) {
-					const base = `_$${STATE_GETTER_HELPERS[imported]}`;
+					const base = `_$${STATE_PAIR_HELPERS[imported]}`;
 					helper = base;
 					let suffix = 0;
 					while (st.source.includes(helper)) helper = `${base}$${++suffix}`;
-					st.getterHelpers.set(imported, helper);
+					st.pairHelpers.set(imported, helper);
 				}
 				st.edits.push({ pos: node.callee.start, end: node.callee.end, text: helper });
 			}
@@ -227,8 +234,8 @@ export function slotHooks(source, id, options) {
 			filename: id,
 			onlyImported: true,
 		}),
-		getterCalls: collectStateGetterCalls(ast, locals),
-		getterHelpers: new Map(),
+		pairCalls: collectStatePairCalls(ast),
+		pairHelpers: new Map(),
 		filename: id,
 		hmr: !!(options && options.hmr),
 		hash: hookSlotHash(id),
@@ -253,10 +260,10 @@ export function slotHooks(source, id, options) {
 	// run after the module is fully evaluated, including cross-module imports), so
 	// trailing placement has no TDZ hazard for any valid hook usage.
 	const helperImport =
-		st.getterHelpers.size === 0
+		st.pairHelpers.size === 0
 			? ''
-			: `import { ${[...st.getterHelpers]
-					.map(([hook, local]) => `${STATE_GETTER_HELPERS[hook]} as ${local}`)
+			: `import { ${[...st.pairHelpers]
+					.map(([hook, local]) => `${STATE_PAIR_HELPERS[hook]} as ${local}`)
 					.join(', ')} } from 'octane';\n`;
 	const block = helperImport + st.decls.join('\n') + '\n';
 	code = code.endsWith('\n') ? code + block : code + '\n' + block;

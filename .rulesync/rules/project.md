@@ -61,10 +61,11 @@ pnpm rules:generate
 
 ## Repo Map
 
-This is a pnpm monorepo with twenty-one publishable packages — the core `octane`
-runtime+compiler, the `@octanejs/vite-plugin` metaframework (plus its
-`@octanejs/adapter-vercel` deploy adapter), the `@octanejs/mcp-server` MCP
-server, and seventeen `@octanejs/*` framework bindings:
+This is a pnpm monorepo containing the core `octane` runtime+compiler, the
+`@octanejs/vite-plugin` metaframework (plus its `@octanejs/adapter-vercel`
+deploy adapter), the `@octanejs/mcp-server` MCP server, and the `@octanejs/*`
+framework bindings. The current publishable-package list and counts are
+generated from workspace manifests in `docs/packages.md`:
 
 - `packages/octane/` (npm: `octane`) — the runtime **and** the compiler together.
   - `src/runtime.ts` — client runtime.
@@ -78,14 +79,14 @@ server, and seventeen `@octanejs/*` framework bindings:
   deploys it to Vercel (Build Output API).
 - `packages/octane-mcp-server/` (npm: `@octanejs/mcp-server`) — an MCP server
   exposing octane docs/compile tooling to AI agents.
-- `packages/{zustand,jotai,tanstack-query,motion,stylex,tanstack-router,tanstack-table,tanstack-virtual,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/`
+- `packages/{zustand,jotai,tanstack-query,motion,stylex,tanstack-router,remix-router,tanstack-table,tanstack-virtual,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/`
   (npm: `@octanejs/*`) — framework bindings, each an octane port of a React
   library (state, data-fetching, animation, styling, routing, editor,
   positioning, UI primitives, forms, charts, testing, MDX). Parity varies by
   package — some are behaviorally complete ports, others are explicitly
   partial or alpha. `docs/bindings-status.md` is the generated per-package
   status table (upstream version, supported surface, known divergences,
-  SSR/hydration, last parity verification); it is sourced from each package's
+  SSR/hydration, last evidence check); it is sourced from each package's
   `status.json` and CI checks it stays current (`pnpm bindings:status` to
   regenerate after a scope change).
 
@@ -139,12 +140,12 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   refs, state getters, and `useEffectEvent`). Explicit arrays retain React's
   exact behavior and are never rewritten; `null` explicitly means run or
   recompute after every render.
-- **State hooks expose a compiler-driven current-state getter.** `useState` and
-  `useReducer` have a stable third tuple member (`[state, update, getState]`) that
-  reads the latest scheduled hook-cell value. The compiler emits its specialized
-  runtime helper only when tuple index 2 can be observed; ordinary two-item
-  destructures retain the existing allocation-free path. Escaped or ambiguous
-  tuples conservatively receive the complete three-item shape.
+- **State hooks expose a current-state getter.** Public `useState` and
+  `useReducer` calls always return a stable third tuple member
+  (`[state, update, getState]`) that reads the latest scheduled hook-cell value.
+  At compiled call sites, the compiler selects a private two-item helper only
+  when it can prove tuple index 2 is unobserved; escaped or ambiguous tuples
+  retain the complete public shape.
 - **Controlled `value`/`checked` with native events.** Controlled form components
   follow React's semantics exactly (2026-07-08) — the prop drives the DOM property
   and reasserts on every commit and after discrete events; `defaultValue`/

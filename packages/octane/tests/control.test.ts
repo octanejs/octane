@@ -57,10 +57,13 @@ describe('useId', () => {
 		r.unmount();
 	});
 
-	it('produces distinct ids across separate components', () => {
+	it('restarts the default counter for an independent root', () => {
 		const r1 = mount(IdInComponent);
 		const r2 = mount(IdInComponent);
-		expect(r1.find('label').getAttribute('for')).not.toBe(r2.find('label').getAttribute('for'));
+		// Root-local numbering must not depend on which other roots rendered first.
+		// Sibling roots that share a document use RootOptions.identifierPrefix to
+		// namespace these deterministic local ids (covered by useid-determinism).
+		expect(r1.find('label').getAttribute('for')).toBe(r2.find('label').getAttribute('for'));
 		r1.unmount();
 		r2.unmount();
 	});

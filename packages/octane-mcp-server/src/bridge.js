@@ -27,6 +27,13 @@ export const KNOWN_BINDINGS = {
 	'@mdx-js/react': '@octanejs/mdx',
 };
 
+// Workspace directory names for the maintained bindings. Keep this derived
+// from KNOWN_BINDINGS so repository path routing cannot drift from the public
+// binding list (aliases such as `motion` intentionally collapse to one dir).
+export const KNOWN_BINDING_PACKAGE_DIRS = new Set(
+	Object.values(KNOWN_BINDINGS).map((name) => name.slice('@octanejs/'.length)),
+);
+
 export const KNOWN_VANILLA_CORES = {
 	'@tanstack/react-query': '@tanstack/query-core',
 	'@tanstack/react-table': '@tanstack/table-core',
@@ -46,9 +53,12 @@ export const KNOWN_VANILLA_CORES = {
 export const REACT_API_MAP = {
 	useState: {
 		status: 'same',
-		note: 'Identical, including lazy initializer and functional updates.',
+		note: 'Same lazy initializer and functional-update semantics; Octane additionally exposes a stable current-state getter at tuple index 2.',
 	},
-	useReducer: { status: 'same', note: 'Identical, including lazy init third argument.' },
+	useReducer: {
+		status: 'same',
+		note: 'Same reducer and lazy-init semantics; Octane additionally exposes a stable current-state getter at tuple index 2.',
+	},
 	useEffect: { status: 'same', note: 'Identical deps/cleanup semantics.' },
 	useLayoutEffect: { status: 'same', note: 'Identical: synchronous after DOM mutation.' },
 	useInsertionEffect: { status: 'same', note: 'Supported.' },

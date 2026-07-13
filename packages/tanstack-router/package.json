@@ -3,6 +3,9 @@
   "version": "0.1.4",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "octane": {
     "hookSlots": {
       "manual": [
@@ -40,13 +43,16 @@
   "dependencies": {
     "@tanstack/history": "catalog:default",
     "@tanstack/router-core": "catalog:default",
-    "@tanstack/store": "catalog:default",
+    "@tanstack/store": "catalog:default"
+  },
+  "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
     "@tanstack/react-router": "catalog:default",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
+    "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "vitest": "catalog:default"

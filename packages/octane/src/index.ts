@@ -19,6 +19,7 @@ export {
 	flushSync,
 	act,
 	type Root,
+	type RootOptions,
 	// Hooks (octane extension: each accepts a trailing slot symbol — required
 	// when calling from plain .ts, injected by the compiler in .tsrx/.tsx)
 	useState,
@@ -81,6 +82,8 @@ export {
 
 	// ── 2. Semi-public: compiler-emitted / binding-infrastructure helpers ─────
 	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)
+	__useStatePair,
+	__useReducerPair,
 	__useStateWithGetter,
 	__useReducerWithGetter,
 	// Module-load "this module uses <ViewTransition>" hint (view-transitions plan).
@@ -185,3 +188,6 @@ export {
 	setTransitionFallbackTimeout,
 	getTransitionFallbackTimeout,
 } from './runtime.js';
+
+// Semi-public compiler target for `module server` browser stubs.
+export { __serverRpc } from './server-rpc-client.js';

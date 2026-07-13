@@ -19,32 +19,15 @@
 // before.
 import { useState, useRef, useEffect } from 'octane';
 import type { PlaygroundLang } from '../lib/playground.ts';
+import {
+	decodePlaygroundHash,
+	encodePlaygroundHash,
+	MAX_PLAYGROUND_SOURCE_LENGTH,
+	PLAYGROUND_SOURCE_LIMIT_ERROR,
+} from '../lib/playground-hash.ts';
 
 const HASH_DEBOUNCE_MS = 400;
 const COMPILE_DEBOUNCE_MS = 250;
-const MAX_SOURCE_LENGTH = 20000;
-
-function encodeHash(source: string, lang: string): string {
-	try {
-		const payload = JSON.stringify({ s: source, l: lang });
-		return btoa(String.fromCharCode(...new TextEncoder().encode(payload)));
-	} catch {
-		return '';
-	}
-}
-
-function decodeHash(hash: string): { source: string; lang: PlaygroundLang } | null {
-	try {
-		const json = new TextDecoder().decode(Uint8Array.from(atob(hash), (c) => c.charCodeAt(0)));
-		const parsed = JSON.parse(json);
-		if (typeof parsed?.s === 'string' && (parsed?.l === 'tsrx' || parsed?.l === 'tsx')) {
-			return { source: parsed.s, lang: parsed.l };
-		}
-	} catch {
-		// malformed hash — ignore
-	}
-	return null;
-}
 
 export function Playground() @{
 	const [lang, setLang] = useState<PlaygroundLang>('tsrx');
@@ -82,6 +65,12 @@ export function Playground() @{
 		| null = null;
 		let compileDebounceId = 0;
 		let hashDebounceId = 0;
+		// Validate the URL payload before loading CodeMirror, Shiki, or the
+		// compiler. Oversized input is ignored in favor of the bounded defaults.
+		const hashResult = decodePlaygroundHash(window.location.hash.slice(1));
+		const initial = hashResult.ok ? hashResult.value : null;
+		const initialDiagnostic = hashResult.ok ? '' : hashResult.error;
+		if (initialDiagnostic) setError(initialDiagnostic);
 
 		(async () => {
 			let stateMod: any, commandsMod: any, viewMod: any, shikiMod: any, pg: any;
@@ -108,7 +97,6 @@ export function Playground() @{
 			const { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } = viewMod;
 			const { shikiHighlight } = shikiMod;
 
-			const initial = decodeHash(window.location.hash.slice(1));
 			let currentLang: PlaygroundLang = initial?.lang ?? 'tsrx';
 			const buffers: Record<PlaygroundLang, string> = {
 				tsrx: pg.DEFAULT_SOURCES.tsrx,
@@ -171,8 +159,8 @@ export function Playground() @{
 
 			const compileAndRun = (source: string) => {
 				if (disposed) return;
-				if (source.length > MAX_SOURCE_LENGTH) {
-					setError(`Source is limited to ${MAX_SOURCE_LENGTH} characters in the playground.`);
+				if (source.length > MAX_PLAYGROUND_SOURCE_LENGTH) {
+					setError(PLAYGROUND_SOURCE_LIMIT_ERROR);
 					return;
 				}
 				const result = pg.compilePlayground(source, currentLang);
@@ -195,7 +183,7 @@ export function Playground() @{
 			const updateHash = (source: string) => {
 				window.clearTimeout(hashDebounceId);
 				hashDebounceId = window.setTimeout(() => {
-					const encoded = encodeHash(source, currentLang);
+					const encoded = encodePlaygroundHash(source, currentLang);
 					if (encoded) window.history.replaceState(null, '', '#' + encoded);
 				}, HASH_DEBOUNCE_MS);
 			};
@@ -204,6 +192,12 @@ export function Playground() @{
 				state: EditorState.create({
 					doc: buffers[currentLang],
 					extensions: [
+						EditorState.changeFilter.of((transaction: any) => {
+							if (!transaction.docChanged) return true;
+							if (transaction.newDoc.length <= MAX_PLAYGROUND_SOURCE_LENGTH) return true;
+							setError(PLAYGROUND_SOURCE_LIMIT_ERROR);
+							return false;
+						}),
 						lineNumbers(),
 						history(),
 						drawSelection(),
@@ -265,6 +259,7 @@ export function Playground() @{
 			};
 
 			compileAndRun(buffers[currentLang]);
+			if (initialDiagnostic) setError(initialDiagnostic);
 			setReady(true);
 		})();
 

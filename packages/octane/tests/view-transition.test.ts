@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { act } from './_helpers';
 import { createRoot, startTransition, addTransitionType, type Root } from '../src/index.js';
+import { compile } from '../src/compiler/compile.js';
 import {
 	installViewTransitionMocks,
 	type ViewTransitionMocks,
@@ -19,7 +20,27 @@ import {
 	NamedShareApp,
 	CleanupApp,
 	RevealApp,
+	FirstBoundaryRevealApp,
 } from './_fixtures/view-transition-features.tsrx';
+
+describe('ViewTransition compiler hints', () => {
+	it('does not arm transitions for an unrelated Octane namespace import', () => {
+		const code = compile(
+			`import * as Octane from 'octane'; export function App() @{ <p>{Octane.useId()}</p> }`,
+			'namespace-hook.tsrx',
+		).code;
+		expect(code).not.toContain('__vtSeen');
+	});
+
+	it('arms transitions for a namespace ViewTransition tag', () => {
+		const code = compile(
+			`import * as Octane from 'octane'; export function App() @{ <Octane.ViewTransition><p /></Octane.ViewTransition> }`,
+			'namespace-view-transition.tsrx',
+		).code;
+		expect(code).toContain('__vtSeen as _$__vtSeen');
+		expect(code).toContain('_$__vtSeen();');
+	});
+});
 
 describe('ViewTransition features', () => {
 	let vt: ViewTransitionMocks;
@@ -197,6 +218,33 @@ describe('ViewTransition features', () => {
 		expect(container.textContent).toBe('Loaded');
 		expect(vt.calls.length).toBeGreaterThan(0);
 		expect(updates).toBe(1);
+	});
+
+	it('wraps a Suspense reveal that mounts the first ViewTransition boundary', async () => {
+		let enters = 0;
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((r) => {
+			resolve = r;
+		});
+		await act(() => {
+			root.render(FirstBoundaryRevealApp, {
+				promise,
+				onEnter: () => {
+					enters++;
+				},
+			});
+		});
+		expect(container.textContent).toBe('Waiting...');
+		expect(vt.calls).toHaveLength(0);
+
+		await act(async () => {
+			resolve('Ready');
+			await promise;
+		});
+
+		expect(container.textContent).toBe('Ready');
+		expect(vt.calls.length).toBeGreaterThan(0);
+		expect(enters).toBe(1);
 	});
 
 	it('runs the previous callback cleanup before the next activation fires', async () => {

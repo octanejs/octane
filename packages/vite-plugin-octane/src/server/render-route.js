@@ -1,7 +1,18 @@
 // @ts-check
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createLayoutWrapper, createPropsWrapper } from './component-wrappers.js';
+import { composeHtmlStream } from './html-stream.js';
+import {
+	getContextNonce,
+	injectHydrationEntry,
+	nonceAttribute,
+	splitSsrTemplate,
+} from './html-template.js';
+import {
+	createLayoutWrapper,
+	createPropsWrapper,
+	createRootBoundaryWrapper,
+} from './component-wrappers.js';
 import {
 	get_component_export,
 	get_route_entry_export_name,
@@ -55,7 +66,8 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		// Load the octane streaming renderer. The wrappers call components
 		// directly (no ssrComponent injection — the root must NOT be
 		// marker-wrapped).
-		const { renderToReadableStream } = await vite.ssrLoadModule('octane/server');
+		const serverRuntime = await vite.ssrLoadModule('octane/server');
+		const { renderToReadableStream } = serverRuntime;
 
 		// Load the page component (compiled in server mode by octane()).
 		const entryPath = get_route_entry_path(route.entry);
@@ -76,7 +88,8 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		// entry exports.
 		let RootComponent;
 		const requestUrl = context.url.pathname + context.url.search;
-		const pageProps = { params: context.params, url: requestUrl };
+		const pageProps = { params: context.params, url: requestUrl, state: context.state };
+		const nonce = getContextNonce(context);
 
 		if (route.layout) {
 			const layoutModule = await vite.ssrLoadModule(route.layout);
@@ -95,6 +108,16 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 			RootComponent = createPropsWrapper(/** @type {any} */ (PageComponent), pageProps);
 		}
 
+		const pendingEntry = octaneConfig?.rootBoundary.pending;
+		const catchEntry = octaneConfig?.rootBoundary.catch;
+		const PendingComponent = await loadBoundaryComponent(vite, pendingEntry, 'pending');
+		const CatchComponent = await loadBoundaryComponent(vite, catchEntry, 'catch');
+		RootComponent = createRootBoundaryWrapper(
+			RootComponent,
+			{ pending: PendingComponent, catch: CatchComponent },
+			/** @type {any} */ (serverRuntime),
+		);
+
 		// Build head content with hydration data. The client entry is CONFIG-FREE
 		// (importing octane.config.ts into the browser would drag the plugin + the
 		// server adapter — and their `node:fs` imports — into the client graph and
@@ -111,8 +134,12 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 			params: context.params,
 			url: requestUrl,
 			preHydrate: octaneConfig?.router.preHydrate ?? null,
+			rootBoundary: {
+				pending: serializeComponentEntry(pendingEntry),
+				catch: serializeComponentEntry(catchEntry),
+			},
 		});
-		const headContent = `<script id="__octane_data" type="application/json">${escapeScript(routeData)}</script>`;
+		const headContent = `<script id="__octane_data" type="application/json"${nonceAttribute(nonce)}>${escapeScript(routeData)}</script>`;
 
 		// Load and process index.html template.
 		const templatePath = join(vite.config.root, 'index.html');
@@ -121,17 +148,18 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		// Apply Vite's HTML transforms (HMR client, module resolution, etc.).
 		template = await vite.transformIndexHtml(context.url.pathname, template);
 
-		let html = template.replace('<!--ssr-head-->', headContent);
-
-		// Inject the hydration entry before </body>.
-		const hydrationScript = `<script type="module" src="/@id/virtual:octane-hydrate"></script>`;
-		html = html.replace('</body>', `${hydrationScript}\n</body>`);
+		// Validate the raw SSR template and inject the request-nonced hydrate entry
+		// before consuming the one required head marker with request data.
+		let html = injectHydrationEntry(template, '/@id/virtual:octane-hydrate', nonce);
+		html = html.replace('<!--ssr-head-->', headContent);
 
 		// Start the render. This await resolves at SHELL-ready (so a synchronous
 		// render error still falls into the catch below and produces the dev 500
 		// page); segments keep flushing through the returned stream afterwards.
 		/** @type {ReadableStream<Uint8Array>} */
 		const renderStream = await renderToReadableStream(RootComponent, undefined, {
+			nonce: nonce ?? undefined,
+			signal: context.request.signal,
 			onError(/** @type {unknown} */ error) {
 				if (error instanceof Error) vite.ssrFixStacktrace(error);
 				console.error('[octane] SSR render error:', error);
@@ -141,42 +169,12 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		const status = route.status ?? 200;
 		const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
-		// No body placeholder → nothing to stream into; cancel the render and
-		// serve the transformed template (matches the old buffered behavior).
-		const splitAt = html.indexOf('<!--ssr-body-->');
-		if (splitAt === -1) {
-			await renderStream.cancel();
-			return new Response(html, { status, headers });
-		}
-		const prefix = html.slice(0, splitAt);
-		const suffix = html.slice(splitAt + '<!--ssr-body-->'.length);
+		const [prefix, suffix] = splitSsrTemplate(html);
 
 		// Template prefix → render stream (shell, then out-of-order segments) →
 		// template suffix. The hydration <script> is in the SUFFIX, so by the time
 		// the browser requests the entry every segment is already in the DOM.
-		const encoder = new TextEncoder();
-		const body = new ReadableStream({
-			async start(controller) {
-				controller.enqueue(encoder.encode(prefix));
-				const reader = renderStream.getReader();
-				try {
-					while (true) {
-						const { done, value } = await reader.read();
-						if (done) break;
-						controller.enqueue(value);
-					}
-					controller.enqueue(encoder.encode(suffix));
-					controller.close();
-				} catch (error) {
-					controller.error(error);
-				} finally {
-					reader.releaseLock();
-				}
-			},
-			cancel(reason) {
-				return renderStream.cancel(reason);
-			},
-		});
+		const body = composeHtmlStream(prefix, renderStream, suffix);
 
 		return new Response(body, { status, headers });
 	} catch (error) {
@@ -190,6 +188,33 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 			},
 		});
 	}
+}
+
+/**
+ * @param {ViteDevServer} vite
+ * @param {import('@octanejs/vite-plugin').RenderRouteEntry | undefined} entry
+ * @param {'pending' | 'catch'} kind
+ * @returns {Promise<((props?: any, scope?: any, extra?: any) => string | void) | null>}
+ */
+async function loadBoundaryComponent(vite, entry, kind) {
+	if (!entry) return null;
+	const modulePath = get_route_entry_path(entry);
+	const module = await vite.ssrLoadModule(/** @type {string} */ (modulePath));
+	const component = get_component_export(module, get_route_entry_export_name(entry));
+	if (!component) {
+		throw new Error(`No ${kind} rootBoundary component found in ${modulePath}`);
+	}
+	return /** @type {(props?: any, scope?: any, extra?: any) => string | void} */ (component);
+}
+
+/**
+ * @param {import('@octanejs/vite-plugin').RenderRouteEntry | undefined} entry
+ * @returns {{ path: string, exportName: string | null } | null}
+ */
+function serializeComponentEntry(entry) {
+	const path = get_route_entry_path(entry);
+	if (!path) return null;
+	return { path, exportName: get_route_entry_export_name(entry) ?? null };
 }
 
 /**

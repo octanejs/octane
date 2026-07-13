@@ -1,9 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import {
+	mkdtempSync,
+	mkdirSync,
+	readFileSync,
+	readdirSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mount } from './_helpers';
 import { slotHooks } from '../src/compiler/slot-hooks.js';
-import { octane } from '../src/compiler/vite.js';
+import { discoverOctaneSourceDependencies, octane } from '../src/compiler/vite.js';
 import { TsrxSingle, TsrxReuse, TsrxNested } from './_fixtures/external-hook-callers.tsrx';
 import { TsxApp, TsxReuse } from './_fixtures/external-hook-tsx.tsx';
 
@@ -69,9 +78,10 @@ describe('slotHooks surgical pass', () => {
 		const out = slotHooks(SRC, 'external-hook.ts');
 		expect(out).not.toBeNull();
 		const code = out!.code;
-		// base hook calls got a trailing slot
-		expect(code).toMatch(/useState<number>\(start, _h\$\d+\)/);
-		expect(code).toMatch(/useState<boolean>\(false, _h\$\d+\)/);
+		// The observed two-item tuple takes the allocation-free pair helper, and
+		// both calls still receive their compiler slot.
+		expect(code).toMatch(/_\$__useStatePair<number>\(start, _h\$\d+\)/);
+		expect(code).toMatch(/_\$__useStatePair<boolean>\(false, _h\$\d+\)/);
 		// the un-printable TS is preserved byte-for-byte
 		expect(code).toContain('[key: string]: number;');
 		expect(code).toContain('export type Pair<A, B> = { a: A; b: B };');
@@ -82,8 +92,10 @@ describe('slotHooks surgical pass', () => {
 		// stripping slots restores every original byte. (Default = no HMR →
 		// Symbol("<hash>#<n>") declarations; Symbol.for is dev-serve only.)
 		const stripped = code
+			.replace(/^import \{ __useStatePair as _\$__useStatePair \} from 'octane';\n/gm, '')
 			.replace(/^const _h\$\d+ = Symbol\("[^"]*"\);\n/gm, '')
-			.replace(/, _h\$\d+(?=[),])/g, '');
+			.replace(/, _h\$\d+(?=[),])/g, '')
+			.replace(/_\$__useStatePair/g, 'useState');
 		expect(stripped).toBe(
 			SRC.replace("useCallback(() => 'nd:' + label)", "useCallback(() => 'nd:' + label, [label])"),
 		);
@@ -110,11 +122,11 @@ describe('vite plugin gate routing', () => {
 	const HOOK = `import { useState } from 'octane';\nexport const f = () => { const [state, setState] = useState(0); return [state, setState]; };`;
 
 	it('.ts with an octane hook → surgical slot pass', () => {
-		expect(run(HOOK, '/app/h.ts')?.code).toMatch(/useState\(0, _h\$\d+\)/);
+		expect(run(HOOK, '/app/h.ts')?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
 	});
 
 	it('.js with an octane hook → surgical slot pass', () => {
-		expect(run(HOOK, '/app/h.js')?.code).toMatch(/useState\(0, _h\$\d+\)/);
+		expect(run(HOOK, '/app/h.js')?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
 	});
 
 	it('.tsx → full compiler (JSX lowered, hook slotted)', () => {
@@ -126,11 +138,81 @@ describe('vite plugin gate routing', () => {
 		expect(tsx?.code).toMatch(/_frag\$|template\(/); // JSX lowered (slot-pass never emits these)
 	});
 
-	it('skips node_modules (.ts AND .tsx), the exclude option, and .d.ts', () => {
+	it('skips unrelated node_modules, the exclude option, and .d.ts', () => {
 		expect(run(HOOK, '/x/node_modules/pkg/h.ts')).toBeNull();
 		expect(run(`export function C() { return <b/>; }`, '/x/node_modules/pkg/c.tsx')).toBeNull();
 		expect(run(HOOK, '/packages/zustand/src/index.ts')).toBeNull();
 		expect(run(`import { useState } from 'octane';`, '/app/types.d.ts')).toBeNull();
+	});
+
+	it('transforms installed raw Octane packages but preserves manual-slot sources', () => {
+		const installedRoot = join(process.cwd(), 'node_modules/.pnpm/node_modules/@octanejs');
+		const hookForm = join(installedRoot, 'hook-form/src/__probe__.ts');
+		const hookFormTsx = join(installedRoot, 'hook-form/src/__probe__.tsx');
+		const zustand = join(installedRoot, 'zustand/src/__probe__.ts');
+
+		expect(run(HOOK, hookForm)?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
+		expect(
+			run(
+				`import { useState } from 'octane'; export function C() { const [n] = useState(0); return <b>{n as string}</b>; }`,
+				hookFormTsx,
+			)?.code,
+		).toMatch(/template\(/);
+		// Zustand declares octane.hookSlots.manual=["src"], so installed and
+		// workspace-linked copies both retain their explicit sub-slot ABI.
+		expect(run(HOOK, zustand)).toBeNull();
+	});
+
+	it('configures installed Octane source packages for Vite transformation', () => {
+		const websiteRoot = join(process.cwd(), 'website');
+		const discovered = discoverOctaneSourceDependencies(websiteRoot);
+		expect(discovered).toContain('octane');
+		expect(discovered).toContain('@octanejs/recharts');
+		expect(discovered).toContain('@octanejs/tanstack-router');
+		expect(discovered).not.toContain('@octanejs/adapter-vercel');
+
+		const config = (octane().config as any)({ root: websiteRoot });
+		expect(config.optimizeDeps.exclude).toEqual(discovered);
+		expect(config.ssr.noExternal).toEqual(discovered);
+		expect(config.resolve.dedupe).toContain('octane');
+	});
+
+	it('recursively discovers raw Octane bindings behind another binding', () => {
+		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-source-discovery-'));
+		try {
+			writeFileSync(
+				join(fixtureRoot, 'package.json'),
+				JSON.stringify({
+					name: 'consumer',
+					private: true,
+					dependencies: { '@octanejs/base-ui': '0.1.3' },
+				}),
+			);
+			const scope = join(fixtureRoot, 'node_modules/@octanejs');
+			mkdirSync(scope, { recursive: true });
+			symlinkSync(join(process.cwd(), 'packages/base-ui'), join(scope, 'base-ui'), 'dir');
+
+			const discovered = discoverOctaneSourceDependencies(fixtureRoot);
+			expect(discovered).toContain('@octanejs/base-ui');
+			expect(discovered).toContain('@octanejs/floating-ui');
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('aliases bare Octane imports to the server runtime for SSR', async () => {
+		const plugin = octane();
+		const resolved = await (plugin.resolveId as any).call(
+			{
+				resolve(source: string) {
+					return { id: '/consumer/node_modules/' + source + '/index.js' };
+				},
+			},
+			'octane',
+			'/consumer/node_modules/@octanejs/hook-form/src/useForm.ts',
+			{ ssr: true },
+		);
+		expect(resolved).toBe('/consumer/node_modules/octane/server/index.js');
 	});
 
 	it('honors the // octane-no-slot opt-out and skips non-octane files', () => {
@@ -159,25 +241,25 @@ describe('manifest-declared manual hook slots', () => {
 		// Inline hook callbacks in a binding's tests rely on call-site slots —
 		// the declaration must not swallow the whole package directory.
 		const id = join(process.cwd(), 'packages/testing-library/tests/__probe__.ts');
-		expect(run(HOOK, id)?.code).toMatch(/useState\(0, _h\$\d+\)/);
+		expect(run(HOOK, id)?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
 	});
 
 	it('still slots packages without the declaration (redux is auto-slotted)', () => {
 		const id = join(process.cwd(), 'packages/redux/src/__probe__.ts');
-		expect(run(HOOK, id)?.code).toMatch(/useState\(0, _h\$\d+\)/);
+		expect(run(HOOK, id)?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
 	});
 
 	it('still slots app files outside any declaring package', () => {
 		const id = join(process.cwd(), 'packages/octane/tests/_fixtures/__probe__.ts');
-		expect(run(HOOK, id)?.code).toMatch(/useState\(0, _h\$\d+\)/);
+		expect(run(HOOK, id)?.code).toMatch(/_\$__useStatePair\(0, _h\$\d+\)/);
 	});
 
 	it('the declaration registry matches the hand-slot-forwarding bindings exactly', () => {
 		// The definitive list. Adding a binding here without the manifest flag (or
 		// removing the flag from a listed one) means its sources double-slot the
 		// moment ANOTHER project imports them — the exact drift the declaration
-		// exists to prevent. Auto-slotted by design (no flag): redux, recharts,
-		// hook-form.
+		// exists to prevent. Redux, Recharts, and Hook Form are auto-slotted by
+		// design and therefore carry no flag.
 		const packagesDir = join(process.cwd(), 'packages');
 		const declared = readdirSync(packagesDir)
 			.filter((dir) => {

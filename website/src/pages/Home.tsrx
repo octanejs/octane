@@ -46,7 +46,6 @@ export function Home() @{
 	<div class="home">
 		<section class="hero">
 			<div class="hero-copy">
-				<p class="hero-kicker">Compiler-first UI for TypeScript</p>
 				<h1 class="hero-title">
 					{'React’s programming model, '}
 					<span class="hero-accent">compiled</span>
@@ -130,10 +129,6 @@ export function Home() @{
 				<h2 id="bench-heading" class="bench-title">Measured, not vibes</h2>
 				<Link to="/benchmarks" class="bench-all">All suites →</Link>
 			</div>
-			<p class="bench-sub">
-				Cross-framework browser, SSR, async and shipped-bytes suites on one scale: each framework’s
-				cost relative to Octane (1×), lower is better.
-			</p>
 			<div class="bench-grid">
 				<BenchBars card={HOME_SUMMARY} showValues={true} width={1100} />
 			</div>

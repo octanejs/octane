@@ -3,6 +3,9 @@
   "version": "0.1.4",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "octane": {
     "hookSlots": {
       "manual": [
@@ -40,11 +43,14 @@
   "dependencies": {
     "@babel/core": "catalog:default",
     "@stylexjs/babel-plugin": "catalog:default",
-    "@stylexjs/stylex": "catalog:default",
+    "@stylexjs/stylex": "catalog:default"
+  },
+  "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
     "@types/babel__core": "catalog:default",
+    "octane": "workspace:*",
     "vite": "catalog:default",
     "vitest": "catalog:default"
   }

@@ -304,10 +304,17 @@ function removeHydrationRange(start: Node, end: Node): void {
 
 type BlockKind = 'root' | 'control-flow' | 'dynamic' | 'portal';
 
+interface RootIdState {
+	prefix: string;
+	next: number;
+}
+
 export interface Block extends Scope {
 	kind: BlockKind;
 	parentBlock: Block | null;
 	parentNode: Node;
+	/** Root-owned useId namespace/counter, shared by every descendant block. */
+	idState: RootIdState;
 	startMarker: Node | null;
 	endMarker: Node | null;
 	/**
@@ -979,8 +986,8 @@ function vtWouldWrap(): boolean {
 /**
  * Same question for a Suspense reveal commit (commitResume /
  * flushStagedReveals — they run OUTSIDE the flush, in thenable microtasks).
- * Gated on a mounted boundary existing: a reveal whose content mounts the
- * app's first-ever boundary is a documented miss (unknowable pre-snapshot).
+ * VT_SEEN is set at module load by the compiler, so the pre-snapshot can run
+ * even when the reveal itself mounts the app's first boundary.
  */
 function vtWouldWrapResume(): boolean {
 	return (
@@ -989,7 +996,6 @@ function vtWouldWrapResume(): boolean {
 		!hydrating &&
 		!inFlush &&
 		!VT_DRAIN &&
-		VT_REGISTRY.size > 0 &&
 		typeof document !== 'undefined' &&
 		(document as VTDocument).startViewTransition !== undefined
 	);
@@ -2277,6 +2283,7 @@ class BlockImpl {
 	memoInChain: boolean;
 	parentNode: Node;
 	parentBlock: Block | null;
+	idState: RootIdState;
 	startMarker: Node | null;
 	endMarker: Node | null;
 	exclusiveMarkers: boolean;
@@ -2360,6 +2367,7 @@ class BlockImpl {
 			(body as any)?.__memo === true || (parentBlock !== null && parentBlock.memoInChain === true);
 		this.parentNode = parentNode;
 		this.parentBlock = parentBlock;
+		this.idState = parentBlock?.idState ?? { prefix: '', next: 0 };
 		this.startMarker = startMarker;
 		this.endMarker = endMarker;
 		this.exclusiveMarkers = false;
@@ -3045,14 +3053,15 @@ function resolveSlot(slot: symbol | undefined): symbol | undefined {
 interface StateSlot<T> {
 	value: T;
 	setter: (next: T | ((prev: T) => T)) => void;
-	/** Allocated only for compiler-proven third-tuple consumers. */
+	/** Lazily allocated for the public three-item tuple. */
 	getter?: () => T;
 }
 
 type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
 type StateTuple<T> = [T, StateSetter<T>, () => T];
 
-export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
+/** Compiler-emitted allocation-free path when tuple index 2 is provably dead. */
+export function __useStatePair<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
 	// ABI: the compiler appends the slot as the LAST argument, so a zero-arg
 	// `useState()` (state starts undefined — React parity) arrives as
 	// `useState(slot)` with the symbol in the initial-value position. Same
@@ -3080,21 +3089,22 @@ export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T
 		};
 		ensureHooks(scope).set(slot, s);
 	}
-	// Source-level useState returns a third `getState` tuple member. The compiler
-	// keeps this lean two-item path only when it can prove index 2 is unobserved;
-	// observable/escaping tuples are lowered to __useStateWithGetter below.
+	// This helper is compiler-only: its declared tuple type matches useState so a
+	// dead third member can be erased without perturbing source-level inference.
 	return [s.value, s.setter] as unknown as StateTuple<T>;
 }
 
-/** Compiler-emitted useState variant for a tuple whose third member is observed. */
-export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
-	// Mirror useState's zero-argument trailing-slot ABI before delegating so we
+/** Public useState always has the documented stable three-item shape. */
+export function useState<T = undefined>(): StateTuple<T | undefined>;
+export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
+export function useState<T>(initial?: T | (() => T), slot?: symbol): StateTuple<T> {
+	// Mirror __useStatePair's zero-argument trailing-slot ABI before delegating so we
 	// can look the resulting cell up by the same effective slot afterwards.
 	if (slot === undefined && typeof initial === 'symbol') {
 		slot = initial as unknown as symbol;
 		initial = undefined as T;
 	}
-	const pair = useState(initial, slot);
+	const pair = __useStatePair(initial as T | (() => T), slot);
 	const resolved = resolveSlot(slot);
 	if (resolved === undefined) missingSlot('useState');
 	const s = CURRENT_SCOPE!.hooks!.get(resolved) as StateSlot<T>;
@@ -3102,17 +3112,28 @@ export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): 
 	return [pair[0], pair[1], getter];
 }
 
+type AssertUseStateType<T extends true> = T;
+type _UseStateAcceptsNoArguments = AssertUseStateType<
+	typeof useState extends <T = undefined>() => StateTuple<T | undefined> ? true : false
+>;
+
+/** Backward-compatible compiler ABI; new compilers call public useState directly. */
+export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
+	return useState(initial, slot);
+}
+
 interface ReducerSlot<S, A> {
 	value: S;
 	dispatch: (action: A) => void;
 	reducer: (state: S, action: A) => S;
-	/** Allocated only for compiler-proven third-tuple consumers. */
+	/** Lazily allocated for the public three-item tuple. */
 	getter?: () => S;
 }
 
 type ReducerTuple<S, A> = [S, (action: A) => void, () => S];
 
-export function useReducer<S, A, I = S>(
+/** Compiler-emitted allocation-free path when tuple index 2 is provably dead. */
+export function __useReducerPair<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
@@ -3158,25 +3179,34 @@ export function useReducer<S, A, I = S>(
 		// Allow reducer reference to update across renders.
 		s.reducer = reducer;
 	}
-	// See useState: the compiler selects __useReducerWithGetter whenever the
-	// source can observe the third tuple member.
+	// Compiler-only pair path; see __useStatePair.
 	return [s.value, s.dispatch] as unknown as ReducerTuple<S, A>;
 }
 
-/** Compiler-emitted useReducer variant for a tuple whose third member is observed. */
-export function __useReducerWithGetter<S, A, I = S>(
+/** Public useReducer always has the documented stable three-item shape. */
+export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
 	slot?: symbol,
 ): ReducerTuple<S, A> {
 	const resolvedInput = typeof initOrSlot === 'symbol' ? initOrSlot : slot;
-	const pair = useReducer(reducer, initialArg, initOrSlot, slot);
+	const pair = __useReducerPair(reducer, initialArg, initOrSlot, slot);
 	const resolved = resolveSlot(resolvedInput);
 	if (resolved === undefined) missingSlot('useReducer');
 	const s = CURRENT_SCOPE!.hooks!.get(resolved) as ReducerSlot<S, A>;
 	const getter = s.getter ?? (s.getter = () => s.value);
 	return [pair[0], pair[1], getter];
+}
+
+/** Backward-compatible compiler ABI; new compilers call public useReducer directly. */
+export function __useReducerWithGetter<S, A, I = S>(
+	reducer: (s: S, a: A) => S,
+	initialArg: I,
+	initOrSlot?: ((arg: I) => S) | symbol,
+	slot?: symbol,
+): ReducerTuple<S, A> {
+	return useReducer(reducer, initialArg, initOrSlot, slot);
 }
 
 function depsChanged(prev: any[] | undefined, next: any[] | undefined): boolean {
@@ -4295,15 +4325,14 @@ export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ def
 	return lazyWrapper as unknown as C;
 }
 
-// Monotonic counter — produces stable cross-render IDs.
-let _idCounter = 0;
 export function useId(slot?: symbol): string {
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useId');
 	const scope = CURRENT_SCOPE!;
 	let s = scope.hooks?.get(slot) as { id: string } | undefined;
 	if (s === undefined) {
-		s = { id: ':in-' + (_idCounter++).toString(36) + ':' };
+		const ids = scope.block.idState;
+		s = { id: ':' + ids.prefix + 'in-' + (ids.next++).toString(36) + ':' };
 		ensureHooks(scope).set(slot, s);
 	}
 	return s.id;
@@ -10810,8 +10839,10 @@ function mountTry(state: TrySlot): void {
 	let bStart: Node;
 	let bEnd: Node;
 	// Streamed-boundary seed scope: the swap runtime ($OCTRC) left a
-	// `<!--oct-seed:id-->` comment between the slot's open marker and the inner
-	// branch range, with the boundary's seed JSON stashed on window.$OCTS[id].
+	// `<!--oct-seed:opaque-id-->` comment between the slot's open marker and the
+	// inner branch range, with the boundary's seed JSON stashed on
+	// window.$OCTS[opaqueId]. The full id includes its stream namespace, so two
+	// roots composed into one document cannot consume each other's values.
 	// Scope the seed stream to THIS boundary while its subtree hydrates (a
 	// depth-first synchronous render), restoring the outer scope after — nested
 	// streamed boundaries push again naturally.
@@ -13835,6 +13866,11 @@ export interface Root {
 	unmount(): void;
 }
 
+export interface RootOptions {
+	/** Caller-controlled namespace for useId; use distinct prefixes for sibling roots. */
+	identifierPrefix?: string;
+}
+
 // Shared Root factory behind both `createRoot` and `hydrateRoot`. The
 // `rootBlock`/`currentBody` parameters are the live state captured by the
 // returned closures: `createRoot` starts them `null` (the block is created
@@ -13842,7 +13878,7 @@ export interface Root {
 // already-hydrated block + its body so the FIRST post-hydration `.render()`
 // with the SAME component hits the same-body fast path (props update) and never
 // wipes the adopted server DOM. This factory NEVER touches the hydration-only
-// state (`hydrating`/`hydrateNode`/`hydrationSeeds`/`_idCounter`) — that runs
+// state (`hydrating`/`hydrateNode`/`hydrationSeeds`) — that runs
 // once, inside `hydrateRoot`. Keeping `hydrating` out of here preserves the DCE
 // contract (it is assigned only in the hydrate entry, so client-only builds fold
 // every `if (hydrating)` branch out).
@@ -13850,6 +13886,7 @@ function makeRoot(
 	container: Element,
 	rootBlock: Block | null,
 	currentBody: ComponentBody | null,
+	idState: RootIdState,
 ): Root {
 	return {
 		render(bodyOrElement: ComponentBody | ElementDescriptor, props?: any) {
@@ -13879,6 +13916,7 @@ function makeRoot(
 			}
 			while (container.firstChild) container.removeChild(container.firstChild);
 			rootBlock = createBlock('root', null, container, null, null, body, props);
+			rootBlock.idState = idState;
 			currentBody = body;
 			// React parity: render() inside a transition never commits synchronously
 			// — schedule at transition priority so the commit is view-transition-
@@ -13921,13 +13959,16 @@ function makeRoot(
 	};
 }
 
-export function createRoot(container: Element): Root {
+export function createRoot(container: Element, options?: RootOptions): Root {
 	// Register the container as an event-delegation target up front. Listeners
 	// for all currently-known delegated events attach now; any new event types
 	// registered later (via `delegateEvents`) will back-attach automatically.
 	registerDelegationTarget(container);
 	// Lazy root: the block is created on the first `.render()` call.
-	return makeRoot(container, null, null);
+	return makeRoot(container, null, null, {
+		prefix: options?.identifierPrefix ?? '',
+		next: 0,
+	});
 }
 
 /**
@@ -13945,33 +13986,43 @@ export function createRoot(container: Element): Root {
  * component updates props in place on the adopted DOM, a different component
  * tears down and remounts.
  */
-export function hydrateRoot(container: Element, element: ElementDescriptor): Root;
-export function hydrateRoot(container: Element, body: ComponentBody, props?: any): Root;
+export function hydrateRoot(
+	container: Element,
+	element: ElementDescriptor,
+	options?: RootOptions,
+): Root;
+export function hydrateRoot(
+	container: Element,
+	body: ComponentBody,
+	props?: any,
+	options?: RootOptions,
+): Root;
 export function hydrateRoot(
 	container: Element,
 	bodyOrElement: ComponentBody | ElementDescriptor,
-	props?: any,
+	propsOrOptions?: any,
+	rootOptions?: RootOptions,
 ): Root {
 	let body: ComponentBody;
+	let props: any;
 	if (isElementDescriptor(bodyOrElement)) {
 		body = bodyOrElement.type as ComponentBody;
 		props = bodyOrElement.props;
+		rootOptions = propsOrOptions as RootOptions | undefined;
 	} else {
 		body = bodyOrElement;
+		props = propsOrOptions;
 	}
 	registerDelegationTarget(container);
 	const rootBlock = createBlock('root', null, container, null, null, body, props);
+	const idState: RootIdState = {
+		prefix: rootOptions?.identifierPrefix ?? '',
+		next: 0,
+	};
+	rootBlock.idState = idState;
 	hydrating = true;
-	// Align useId with the server. The server resets ID_COUNTER to 0 at the start
-	// of every render() (runtime.server.ts), so its ids are :in-0:, :in-1:, … in
-	// depth-first render order. Hydration renders the SAME tree in the SAME order,
-	// so resetting the client counter to 0 here makes the client mint byte-identical
-	// ids — otherwise the monotonic global (advanced by any earlier client render)
-	// would drift and every useId would hydration-mismatch. Subsequent client-only
-	// renders continue monotonically from after the hydrated tree's ids, so no
-	// collision. (Single-root hydration; multi-root pages share the flat-counter
-	// limitation that already exists server-side.)
-	_idCounter = 0;
+	// The root-local counter starts at zero, matching the server render carrying
+	// the same identifierPrefix. Other roots cannot perturb hydration ordering.
 	// Adopt server-serialized use(thenable) values, if any: pull them out of the
 	// inline data <script> (and remove it, so it isn't taken for a hydratable
 	// node) and stage them for useThenable to consume in render order.
@@ -14014,7 +14065,7 @@ export function hydrateRoot(
 	// the root behaves exactly like a `createRoot` root — a `.render()` with the
 	// same component updates props on the adopted DOM (same-body fast path), a
 	// different component tears down and remounts.
-	return makeRoot(container, rootBlock, body);
+	return makeRoot(container, rootBlock, body, idState);
 }
 
 // ---------------------------------------------------------------------------
