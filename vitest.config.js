@@ -836,6 +836,14 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'octane-evals',
+					include: ['packages/octane-evals/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'vite-plugin',
 					include: ['packages/vite-plugin-octane/tests/**/*.test.ts'],
 					environment: 'node',
