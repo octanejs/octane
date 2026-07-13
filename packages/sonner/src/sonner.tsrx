@@ -660,7 +660,7 @@ export function Toaster(props: ToasterProps) {
 				});
 			});
 		}),
-		[toasts],
+		[],
 	);
 
 	useEffect(() => {
@@ -669,22 +669,18 @@ export function Toaster(props: ToasterProps) {
 			return;
 		}
 
-		setActualTheme(window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-		if (typeof window === 'undefined') return;
+		if (typeof window === 'undefined' || !window.matchMedia) return;
 		const darkMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+		const updateTheme = ({ matches }: MediaQueryListEvent): void => {
+			setActualTheme(matches ? 'dark' : 'light');
+		};
+		setActualTheme(darkMediaQuery.matches ? 'dark' : 'light');
 		try {
-			darkMediaQuery.addEventListener(
-				'change',
-				({ matches }) => setActualTheme(matches ? 'dark' : 'light'),
-			);
-		} catch (error) {
-			darkMediaQuery.addListener(({ matches }) => {
-				try {
-					setActualTheme(matches ? 'dark' : 'light');
-				} catch (caught) {
-					console.error(caught);
-				}
-			});
+			darkMediaQuery.addEventListener('change', updateTheme);
+			return () => darkMediaQuery.removeEventListener('change', updateTheme);
+		} catch {
+			darkMediaQuery.addListener(updateTheme);
+			return () => darkMediaQuery.removeListener(updateTheme);
 		}
 	}, [theme]);
 

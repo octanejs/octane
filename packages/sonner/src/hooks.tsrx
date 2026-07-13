@@ -11,7 +11,7 @@ export function useIsDocumentHidden(): boolean {
 	useEffect(() => {
 		const callback = (): void => setIsDocumentHidden(document.hidden);
 		document.addEventListener('visibilitychange', callback);
-		return () => window.removeEventListener('visibilitychange', callback);
+		return () => document.removeEventListener('visibilitychange', callback);
 	}, []);
 
 	return isDocumentHidden;

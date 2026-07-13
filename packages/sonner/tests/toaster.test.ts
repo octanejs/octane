@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'octane';
 import { toast } from '@octanejs/sonner';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
+import { ToastState } from '../src/state';
 import { DualToasterApp, showCustom, SonnerStateProbe, ToasterApp } from './_fixtures/app.tsrx';
 
 async function settle(): Promise<void> {
@@ -20,6 +21,8 @@ async function wait(ms: number): Promise<void> {
 afterEach(async () => {
 	toast.dismiss();
 	await wait(220);
+	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
 
 describe('@octanejs/sonner — Toaster', () => {
@@ -263,5 +266,65 @@ describe('@octanejs/sonner — Toaster', () => {
 		await wait(220);
 		expect(root.container.querySelector('[data-sonner-toast]')).toBeNull();
 		root.unmount();
+	});
+
+	it('subscribes to toast state once for the lifetime of the Toaster', async () => {
+		const subscribe = vi.spyOn(ToastState, 'subscribe');
+		const root = mount(ToasterApp);
+		await settle();
+		expect(subscribe).toHaveBeenCalledTimes(1);
+
+		toast('First', { id: 'subscription', duration: Infinity });
+		await settle();
+		toast.success('Updated', { id: 'subscription', duration: Infinity });
+		await settle();
+		expect(subscribe).toHaveBeenCalledTimes(1);
+
+		root.unmount();
+		subscribe.mockRestore();
+	});
+
+	it('removes the document visibility listener when a toast unmounts', async () => {
+		const add = vi.spyOn(document, 'addEventListener');
+		const remove = vi.spyOn(document, 'removeEventListener');
+		const root = mount(ToasterApp);
+		await settle();
+		toast('Visibility', { id: 'visibility', duration: Infinity });
+		await settle();
+
+		const visibilityRegistration = add.mock.calls.find(
+			([eventName]) => eventName === 'visibilitychange',
+		);
+		expect(visibilityRegistration).toBeDefined();
+		root.unmount();
+		await settle();
+		expect(remove).toHaveBeenCalledWith('visibilitychange', visibilityRegistration?.[1]);
+
+		add.mockRestore();
+		remove.mockRestore();
+	});
+
+	it('removes the system theme media-query listener on unmount', async () => {
+		const addEventListener = vi.fn();
+		const removeEventListener = vi.fn();
+		const mediaQuery = {
+			matches: false,
+			addEventListener,
+			removeEventListener,
+			addListener: vi.fn(),
+			removeListener: vi.fn(),
+		};
+		vi.stubGlobal(
+			'matchMedia',
+			vi.fn(() => mediaQuery),
+		);
+
+		const root = mount(ToasterApp, { theme: 'system' });
+		await settle();
+		expect(addEventListener).toHaveBeenCalledTimes(1);
+		const listener = addEventListener.mock.calls[0][1];
+		root.unmount();
+		await settle();
+		expect(removeEventListener).toHaveBeenCalledWith('change', listener);
 	});
 });
