@@ -451,8 +451,13 @@ export async function mountDifferential(
 		// only sees synchronous (useState) updates. Strictly more draining — inert
 		// for fixtures that were already settled.
 		octaneDrainEffects();
-		// Drain React commits + effects, give microtasks a chance.
-		await reactAct(async () => {});
+		// Drain React commits + effects, including external stores that chain work
+		// from a renderer-completion promise. Keeping one macrotask inside act()
+		// gives those promise continuations a chance to enqueue their final commit
+		// without escaping React's test boundary.
+		await reactAct(async () => {
+			await new Promise<void>((resolve) => setTimeout(resolve, 0));
+		});
 		const i = normaliseHtml(octaneContainer.innerHTML);
 		const r = normaliseHtml(reactContainer.innerHTML);
 		if (i !== r) {

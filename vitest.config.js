@@ -487,6 +487,74 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'dnd-kit',
+					include: [
+						'packages/dnd-kit/tests/conformance/**/*.test.ts',
+						'packages/dnd-kit/tests/differential/**/*.test.ts',
+						'packages/dnd-kit/tests/hydration/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/dnd-kit/tests/differential/_setup.ts'],
+					setupFiles: ['packages/dnd-kit/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/dnd-kit$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/hooks$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/hooks/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/sortable$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/sortable/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/utilities$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/utilities/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'dnd-kit-ssr',
+					include: ['packages/dnd-kit/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/hooks$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/hooks/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/sortable$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/sortable/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/utilities$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/utilities/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'lexical',
 					include: ['packages/lexical/tests/**/*.test.ts', 'packages/lexical/tests/**/*.test.tsx'],
 					environment: 'jsdom',

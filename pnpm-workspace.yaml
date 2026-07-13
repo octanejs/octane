@@ -116,6 +116,7 @@ catalogs:
     '@tanstack/virtual-core': 3.17.3
     '@testing-library/dom': ^10.4.1
     '@testing-library/jest-dom': ^6.9.1
+    '@vitest/coverage-v8': 4.1.9
     '@tsrx/core': ^0.1.37
     '@tsrx/prettier-plugin': ^0.3.95
     '@tsrx/ripple': ^0.1.38
@@ -143,6 +144,12 @@ catalogs:
     preact-render-to-string: ^6.7.0
     prettier-plugin-svelte: ^4.1.1
     '@base-ui/react': ^1.6.0
+    '@dnd-kit/abstract': 0.5.0
+    '@dnd-kit/collision': 0.5.0
+    '@dnd-kit/dom': 0.5.0
+    '@dnd-kit/helpers': 0.5.0
+    '@dnd-kit/react': 0.5.0
+    '@dnd-kit/state': 0.5.0
     radix-ui: ^1.4.3
     '@reduxjs/toolkit': ^2.9.0
     clsx: ^2.1.1
