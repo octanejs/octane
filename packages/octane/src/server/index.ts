@@ -117,6 +117,8 @@ export {
 	ssrOption,
 	ssrComponent,
 	ssrBlock,
+	ssrControl,
+	ssrArm,
 	ssrTry,
 	ssrPortal,
 	injectStyle,

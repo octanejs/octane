@@ -3,6 +3,9 @@
   "version": "0.1.2",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "description": "React Hook Form for the octane renderer — the full react-hook-form 7.81.0 source ported onto octane's hooks: performant, flexible forms with native-event validation (onInput), field arrays, and schema resolvers.",
   "author": {
     "name": "Dominic Gannaway",
@@ -29,7 +32,7 @@
   "scripts": {
     "test": "vitest run"
   },
-  "dependencies": {
+  "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
@@ -37,6 +40,7 @@
     "@testing-library/jest-dom": "catalog:default",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
+    "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "react-hook-form": "catalog:default",

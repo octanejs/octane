@@ -43,8 +43,8 @@ harness is outside the compiler:
 
 - the harness component's own hooks use **explicit `Symbol.for` slots**, and the
   package **declares `"octane": { "hookSlots": { "manual": ["src"] } }` in its package.json**
-  so the auto-slotting pass skips its sources everywhere (published
-  node_modules are skipped automatically);
+  so the auto-slotting pass skips those sources in workspace links and installed
+  raw packages alike; other installed Octane sources remain transformable;
 - the user's hook callback is invoked through **`withSlot`**, so a slotless
   binding hook (`renderHook(() => useStore(api))`) resolves an identity via the
   path stack; callbacks the compiler did slot fold their explicit slots into the

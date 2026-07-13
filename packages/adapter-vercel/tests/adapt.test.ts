@@ -21,8 +21,8 @@ const serverDir = path.join(root, 'dist/server');
 const outputDir = path.join(root, '.vercel/output');
 const funcDir = path.join(outputDir, 'functions/index.func');
 const buildNodeMajor = Number(process.versions.node.split('.')[0]);
-// Node 26 CI still targets Vercel's latest supported function runtime. Node 24
-// leaves this undefined so the adapter's default-runtime detection stays covered.
+// Supported build machines exercise default-runtime detection. A newer local
+// Node can still run the suite by explicitly targeting the latest supported runtime.
 const serverlessRuntime = buildNodeMajor > 24 ? 'nodejs24.x' : undefined;
 
 // A stand-in for the plugin's self-contained server bundle: same shape (fetch
@@ -91,6 +91,9 @@ describe('adapt()', () => {
 		const vcConfig = JSON.parse(fs.readFileSync(path.join(funcDir, '.vc-config.json'), 'utf-8'));
 		expect(vcConfig.handler).toBe('index.js');
 		expect(vcConfig.launcherType).toBe('Nodejs');
+		expect(vcConfig.supportsResponseStreaming).toBe(true);
+		expect(vcConfig).not.toHaveProperty('experimentalResponseStreaming');
+		expect(vcConfig).not.toHaveProperty('prerender');
 		expect(vcConfig.runtime).toBe(serverlessRuntime ?? `nodejs${buildNodeMajor}.x`);
 
 		// The wrapper imports as ESM — the function dir must say so.
@@ -103,5 +106,44 @@ describe('adapt()', () => {
 		const response = await mod.default.fetch(new Request('http://x/hello'));
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe('ok:/hello');
+	});
+
+	it('emits ISR as the adjacent function prerender config', async () => {
+		await adapt(
+			{ root, outDir: 'dist', clientDir, serverDir, log: () => {} },
+			{
+				serverless: serverlessRuntime ? { runtime: serverlessRuntime } : undefined,
+				isr: { expiration: 60, bypassToken: 'secret', allowQuery: ['page'] },
+			},
+		);
+
+		const prerenderPath = path.join(outputDir, 'functions/index.prerender-config.json');
+		expect(JSON.parse(fs.readFileSync(prerenderPath, 'utf-8'))).toEqual({
+			expiration: 60,
+			bypassToken: 'secret',
+			allowQuery: ['page'],
+		});
+		const vcConfig = JSON.parse(fs.readFileSync(path.join(funcDir, '.vc-config.json'), 'utf-8'));
+		expect(vcConfig).not.toHaveProperty('prerender');
+	});
+
+	it.each(['nodejs22.x', 'nodejs24.x'] as const)('accepts the %s runtime', async (runtime) => {
+		await adapt(
+			{ root, outDir: 'dist', clientDir, serverDir, log: () => {} },
+			{ serverless: { runtime } },
+		);
+
+		const vcConfig = JSON.parse(fs.readFileSync(path.join(funcDir, '.vc-config.json'), 'utf-8'));
+		expect(vcConfig.runtime).toBe(runtime);
+	});
+
+	it('rejects the retired Node 20 runtime before replacing the output', async () => {
+		await expect(
+			adapt(
+				{ root, outDir: 'dist', clientDir, serverDir, log: () => {} },
+				// @ts-expect-error Node 20 is intentionally absent from the public type.
+				{ serverless: { runtime: 'nodejs20.x' } },
+			),
+		).rejects.toThrow('Unsupported serverless runtime: nodejs20.x');
 	});
 });

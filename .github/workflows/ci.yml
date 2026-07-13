@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [24, 26]
+        node-version: [22, 24]
         # Keep the full supported-Node coverage while splitting the large
         # Vitest suite across runners. Four shards cuts the CI critical path
         # substantially without letting repeated global setup dominate.
@@ -42,10 +42,6 @@ jobs:
         run: pnpm --filter website exec playwright install --with-deps chromium
 
       - name: Run tests
-        # Node 26's process-wide localStorage shadows jsdom's per-window storage
-        # unless experimental web storage is disabled before workers start.
-        env:
-          NODE_OPTIONS: --no-experimental-webstorage
         run: pnpm test --shard=${{ matrix.shard }}
 
   # Keep the existing required check names while the work happens in parallel
@@ -59,9 +55,8 @@ jobs:
 
     strategy:
       matrix:
-        # `test (22)` is a temporary status-only alias for the current branch
-        # protection rule. Remove it after the required contexts move to 24/26.
-        required-context: [22, 24, 26]
+        # Keep one stable aggregate context for each supported Node release.
+        required-context: [22, 24]
 
     steps:
       - name: Verify all test shards passed
@@ -114,6 +109,15 @@ jobs:
       - name: Check parity-gap index is current
         run: pnpm parity:gaps:check
 
+      # Package discovery is shared by every package-wide repository check.
+      # This generated inventory catches unreviewed package additions and stale
+      # hard-coded package counts before they spread to docs and tooling.
+      - name: Check package inventory is current
+        run: pnpm packages:inventory:check
+
+      - name: Check binding parity-gap index is current
+        run: pnpm binding-parity:gaps:check
+
       # docs/bindings-status.md is generated from the per-package status.json
       # blocks in the @octanejs/* binding packages. Changing a binding's scope
       # means updating its status.json and regenerating in the same change.
@@ -149,3 +153,71 @@ jobs:
 
       - name: Type check
         run: pnpm typecheck
+
+  package:
+    name: validate publishable packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Pack the live, discovered package set instead of a hand-maintained
+      # allowlist. The validator checks the post-pnpm manifest and tar contents,
+      # including exports/bin/types and workspace/catalog protocol replacement,
+      # then installs packed core + binding tarballs into an isolated consumer
+      # to prove singleton resolution and client/server raw-source compilation.
+      - name: Pack and validate every publishable package
+        run: pnpm packages:pack:check
+
+  # Publishing lives in the same workflow and depends on every validation job.
+  # All jobs checkout github.sha, so npm can only receive the exact commit that
+  # passed tests, lint/generated checks, typechecking, and tarball validation.
+  publish:
+    name: publish validated SHA
+    needs: [test, lint, typecheck, package]
+    if: github.event_name == 'push' && github.repository == 'octanejs/octane' && contains(github.event.head_commit.message, 'Version Packages')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: npm-publish
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout validated SHA
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish to npm
+        uses: changesets/action@v1
+        with:
+          publish: pnpm changeset:publish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PNPM_CONFIG_PROVENANCE: true
+          NPM_CONFIG_PROVENANCE: true

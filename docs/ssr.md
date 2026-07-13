@@ -79,7 +79,10 @@ boundary then streams **out of order** as a hidden segment plus an inline
 `$OCTRC` swap script when its data settles. Scoped styles flush with the shell
 (before the body markup) and per-wave with their segment; hoisted head elements
 render with the shell only. `hydrateRoot` on the client adopts the swapped-in
-DOM byte-for-byte, including per-boundary `use()` seeds.
+DOM byte-for-byte, including per-boundary `use()` value or rejection seeds (a
+rejected boundary hydrates directly into its server-rendered `@catch` arm). Node
+destinations honor `write(false)`/`drain`; destination errors or an early close
+cancel the render.
 
 `StreamOptions` extends `RenderOptions` with `onShellReady()`,
 `onShellError(err)`, and `onAllReady()`.
@@ -87,19 +90,24 @@ DOM byte-for-byte, including per-boundary `use()` seeds.
 ### `renderToReadableStream(component, props?, options?)` — `octane/server`
 
 The same streaming engine over web streams: resolves with a
-`ReadableStream<Uint8Array>` once the shell is ready (rejects on a shell
-error); the stream's `allReady` promise settles when every boundary has
-flushed. Same `StreamOptions`.
+`ReadableStream<Uint8Array>` once the shell is ready (rejects on a shell error).
+Output is pull-driven and bounded by consumer backpressure; cancelling the
+reader cancels the render. The stream's `allReady` promise settles when every
+boundary chunk has been accepted by the consumer, so consume the stream
+concurrently rather than awaiting `allReady` before reading. Same
+`StreamOptions`.
 
 ### `RenderOptions`
 
 - `nonce?: string` — CSP nonce stamped on every inline tag the renderer emits
-  (the style tags and the suspense seed script). Applies to all three renderers.
+  (style, suspense seed, swap-runtime, and recovery scripts). Applies to every
+  buffered and streaming renderer.
 - `onError?: (error) => void` — called with any error thrown during the render,
   before it propagates.
-- `identifierPrefix?: string` — reserved for `useId` prefixing (React parity).
-- `signal?: AbortSignal` — abort a suspended render when the request dies; the
-  promise rejects with `signal.reason`. Async renders only (`prerender`).
+- `identifierPrefix?: string` — namespaces root-local `useId` values. Pass the
+  same value to `hydrateRoot` and use distinct prefixes for sibling roots.
+- `signal?: AbortSignal` — abort a suspended async/streaming render when the
+  request dies; pending promises reject with `signal.reason` and streams cancel.
 - `timeoutMs?: number` — per-render override of the suspense settle deadline;
   `0` disables it. Async renders only.
 
@@ -129,12 +137,20 @@ and the resolved server function share one SSR runtime.
   between canonical full passes (a deep waterfall costs ~2 full passes + cheap
   subtree re-runs, not D+1 full passes). The emitted HTML always comes from a
   full pass, so hydration byte-format is identical either way. Resolved values
-  are serialized into the seed script so hydration does not re-fetch or
-  re-suspend.
-- `useId` counters reset identically on server and client, so ids are
-  hydration-stable.
-- Server hooks are render-only: state returns its initial value, effects never
-  run, `useSyncExternalStore` reads `getServerSnapshot`.
+  and versioned rejection metadata are serialized into the seed script so
+  hydration does not re-fetch, re-suspend, or replace a server `@catch` arm.
+  Rejection records preserve primitive and JSON-safe plain-object reasons plus
+  Error names, messages, and enumerable custom fields. Cyclic fields are
+  bounded and marked, while hostile or opaque values degrade to fixed safe
+  markers instead of breaking the response. Rejection metadata lives outside
+  fulfilled values, and the undefined wire encoding escapes its string prefix,
+  so sentinel-shaped user data remains ordinary data.
+- `useId` counters are root-local. Server output is hydration-stable when the
+  client passes the same `identifierPrefix`; distinct sibling roots should use
+  distinct prefixes.
+- Server hooks are render-only: state and reducers process bounded render-phase
+  updates and expose the same current-state getter as the client, effects never
+  run, and `useSyncExternalStore` reads `getServerSnapshot`.
 - Renders are concurrency-safe: each pass saves and restores the ambient module
   state around its synchronous run, so overlapping requests cannot observe each
   other.
@@ -155,6 +171,10 @@ your own `entry-server.ts` around `prerender()` or the streaming renderers and
 serialize any app data (for example a dehydrated query-client cache) into your
 own inline script.
 
+On the server, page and layout props also receive `state`, the same
+request-scoped `Context.state` Map middleware populated. It is deliberately not
+serialized; browser hydration receives only `{ params, url }`.
+
 In production, `vite build` emits both bundles: hashed client assets in
 `dist/client` and a self-contained SSR server at `dist/server/entry.js`
 (exports `handler`/`nodeHandler`, auto-boots under `node`; preview with
@@ -163,7 +183,65 @@ emits the same hydratable shape as dev — `server.render: 'buffered'` switches
 it to the await-everything `prerender`. A deploy adapter (e.g.
 `@octanejs/adapter-vercel`) can restructure the output for a host:
 `adapter: vercel()` in octane.config.ts emits Vercel's Build Output API under
-`.vercel/output` after the build.
+`.vercel/output` after the build. Request abort signals reach both render modes;
+the built-in Node bridge also waits for `drain` and cancels the render when the
+response socket closes.
+
+### Root boundaries, server functions, and CSP
+
+`rootBoundary` uses importable component entries so the same pending/error UI
+can be loaded by dev SSR, the production server bundle, and the browser hydrate
+entry. A string selects a module's default (or first PascalCase) export; use an
+`[exportName, path]` tuple for an explicit named export:
+
+```ts
+export default defineConfig({
+  rootBoundary: {
+    pending: '/src/RootPending.tsrx',
+    catch: ['RootCatch', '/src/RootCatch.tsrx'],
+  },
+  // ...router
+});
+```
+
+The catch component receives `{ error, reset }`; the pending component receives
+no props. Paths must be Vite-root paths. `index.html` must contain exactly one
+`<!--ssr-head-->` marker, one `<!--ssr-body-->` marker, and one closing `</body>`
+tag; builds now fail with an actionable error when that hydration contract is
+malformed.
+
+Server functions are declared and imported in the same full-compiled `.tsrx` or
+`.tsx` file. The client compiler replaces the local import with an RPC stub; dev
+registers it in Vite's SSR module graph, while production adds a static server
+import:
+
+```tsrx
+module server {
+  import { database } from './database.js';
+
+  export async function saveName(name: string) {
+    return database.users.save({ name });
+  }
+}
+
+import { saveName } from 'server';
+```
+
+Only named imports/exports are supported. Arguments and results use devalue, so
+Dates, Maps, Sets, `undefined`, and cyclic values survive the round trip.
+
+For a strict CSP, middleware can set the documented `Context.state` key. The
+raw nonce is passed to the core renderer and safely attribute-escaped on the
+hydration-data and hydrate-module scripts in both dev and production:
+
+```ts
+import { OCTANE_NONCE_STATE_KEY } from '@octanejs/vite-plugin';
+
+const cspNonce = async (context, next) => {
+  context.state.set(OCTANE_NONCE_STATE_KEY, crypto.randomUUID());
+  return next();
+};
+```
 
 ## Not built yet
 

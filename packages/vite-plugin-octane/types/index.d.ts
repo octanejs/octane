@@ -11,10 +11,10 @@ export interface OctanePluginOptions {
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip — hand-slot-forwarding library sources that would otherwise be
-	 * double-slotted. Published bindings live in node_modules and are skipped
-	 * automatically; set this for monorepo / aliased-to-source setups where
-	 * pnpm symlinks resolve `@octanejs/*` imports to `packages/*\/src` paths
-	 * (e.g. `['/packages/tanstack-router/src/']`).
+	 * double-slotted. Prefer declaring package-relative manual directories in
+	 * the library manifest as `octane.hookSlots.manual`; that contract works for
+	 * both installed raw source and monorepo links. This option remains an
+	 * escape hatch for sources whose manifest cannot carry that declaration.
 	 */
 	exclude?: string[];
 }
@@ -38,6 +38,8 @@ export function octane(options?: OctanePluginOptions): Plugin[];
  */
 export function isViteOwnedUrl(url: URL, fileRoots?: string[]): boolean;
 export function defineConfig(options: OctaneConfigOptions): OctaneConfigOptions;
+/** Context.state key for a per-request CSP nonce set by middleware. */
+export const OCTANE_NONCE_STATE_KEY: 'octane.nonce';
 export function resolveOctaneConfig(
 	raw: OctaneConfigOptions,
 	options?: { requireAdapter?: boolean },
@@ -119,7 +121,11 @@ export interface Context {
 	params: Record<string, string>;
 	/** Parsed URL object */
 	url: URL;
-	/** Shared state for passing data between middlewares */
+	/**
+	 * Shared state for passing data between middlewares. Set
+	 * `OCTANE_NONCE_STATE_KEY` (`'octane.nonce'`) to a non-empty string to nonce
+	 * renderer inline scripts, hydration data, and the hydrate module script.
+	 */
 	state: Map<string, unknown>;
 }
 
@@ -132,8 +138,8 @@ export type RouteHandler = (context: Context) => Response | Promise<Response>;
 // ============================================================================
 
 export type Component<T = Record<string, any>> = (
-	scope: any,
 	props: T,
+	scope: any,
 	extra?: any,
 ) => string | void;
 
@@ -147,6 +153,11 @@ export type RenderRouteEntry = string | readonly [exportName: string, path: stri
 export interface RenderRouteProps {
 	params: Record<string, string>;
 	url: string;
+	/**
+	 * Request-scoped middleware state on the server. This Map is intentionally
+	 * absent during browser hydration and is never serialized.
+	 */
+	state?: Map<string, unknown>;
 }
 
 /**
@@ -161,8 +172,10 @@ export type PreHydrateHook = (info: {
 }) => void | Promise<void>;
 
 export interface RootBoundaryOptions {
-	pending?: Component<Record<string, never>>;
-	catch?: Component<{ error: unknown; reset: () => void }>;
+	/** Component entry rendered while the root route tree is suspended. */
+	pending?: RenderRouteEntry;
+	/** Component entry rendered when an uncaught root render/effect error reaches the boundary. */
+	catch?: RenderRouteEntry;
 }
 
 export interface OctaneConfigOptions {
@@ -182,7 +195,11 @@ export interface OctaneConfigOptions {
 		 */
 		preHydrate?: string;
 	};
-	/** Global root pending/catch UI used by client and SSR render roots */
+	/**
+	 * Global root pending/catch component entries used by client and SSR roots.
+	 * Paths use Vite-root syntax (for example `/src/Pending.tsrx`); a tuple
+	 * selects a named export.
+	 */
 	rootBoundary?: RootBoundaryOptions;
 	/** Global middlewares applied to all routes */
 	middlewares?: Middleware[];

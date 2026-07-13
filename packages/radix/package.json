@@ -3,6 +3,9 @@
   "version": "0.1.4",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "octane": {
     "hookSlots": {
       "manual": [
@@ -38,12 +41,15 @@
   },
   "dependencies": {
     "@octanejs/floating-ui": "workspace:*",
-    "aria-hidden": "catalog:default",
+    "aria-hidden": "catalog:default"
+  },
+  "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
+    "octane": "workspace:*",
     "radix-ui": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",

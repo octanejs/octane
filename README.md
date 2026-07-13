@@ -90,6 +90,8 @@ see [Differences from React](https://octanejs.dev/docs/differences-from-react).
 
 ### Install
 
+Octane's published packages require Node.js 22 or newer.
+
 ```bash
 pnpm add octane @octanejs/vite-plugin
 ```
@@ -151,10 +153,10 @@ export async function renderApp() {
 | `renderToReadableStream(el, props?, opts?)` | `octane/server` | streams | shell ships the fallback; boundary streams in when it settles |
 | `prerender(el, props?, opts?)` | `octane/static` | yes | awaits data, renders the success arm |
 
-The buffered/static renderers accept a `RenderOptions` (CSP `nonce`, an
-`AbortSignal`, a per-render `timeoutMs`). See [docs/ssr.md](./docs/ssr.md) for the
-full server guide (Suspense on the server, head hoisting, `module server` RPC) and
-the SSR roadmap.
+The buffered/static renderers accept a `RenderOptions` (CSP `nonce`, a root-local
+`identifierPrefix`, an `AbortSignal`, and a per-render `timeoutMs`). See
+[docs/ssr.md](./docs/ssr.md) for the full server guide (Suspense on the server,
+head hoisting, `module server` RPC) and the SSR roadmap.
 
 ### Streaming SSR
 
@@ -188,11 +190,14 @@ export function renderApp(res) {
 ```
 
 `renderToReadableStream` returns a `Promise<ReadableStream<Uint8Array>>` that
-resolves once the shell is ready (rejects on a shell error); the stream carries an
-`allReady` promise that settles when every boundary has flushed. Both accept a
-`StreamOptions` (`RenderOptions` plus `onShellReady()`, `onShellError(err)`, and
-`onAllReady()`). `@octanejs/vite-plugin` renders through `renderToReadableStream`
-by default.
+resolves once the shell is ready (rejects on a shell error). It is pull-driven,
+honors consumer cancellation, and carries an `allReady` promise that settles
+when every boundary chunk has been accepted under backpressure; consume the
+stream concurrently rather than awaiting `allReady` before reading. The Node
+stream honors `write(false)`/`drain` and cancels on destination error or close.
+Both accept a `StreamOptions` (`RenderOptions` plus `onShellReady()`,
+`onShellError(err)`, and `onAllReady()`). `@octanejs/vite-plugin` renders through
+`renderToReadableStream` by default.
 
 ```ts
 // entry-client.ts
@@ -274,9 +279,9 @@ useEffect(() => sync(room.id), [room.id]); // explicit dependencies
 useEffect(() => measure(), null); // explicitly after every commit
 ```
 
-`useState` and `useReducer` also expose an optional third tuple member: a stable
-getter for the hook's latest state. It is useful in async callbacks and other
-long-lived closures where capturing the render's state value would go stale:
+`useState` and `useReducer` also expose an optional third tuple member: a stable getter for
+the hook's latest state. It is useful in async callbacks and other long-lived
+closures where capturing the render's state value would go stale:
 
 ```jsx
 export function SaveButton() @{
@@ -293,9 +298,10 @@ export function SaveButton() @{
 
 The compiler emits a getter-enabled hook only when the third tuple member can
 be observed. Ordinary `[state, setState]` and `[state, dispatch]` destructures
-keep the existing two-item runtime path and allocate no getter. The getter reads
-the latest scheduled hook value, which may be newer than the currently committed
-DOM during a pending render.
+keep the existing two-item runtime path and allocate no getter. Escaped or
+ambiguous tuples conservatively receive the complete three-item shape. The
+getter reads the latest scheduled hook value, which may be newer than the
+currently committed DOM during a pending render.
 
 ### Conditional hooks
 
@@ -394,9 +400,10 @@ Octane itself. Good places to start:
 
 ## Packages
 
-This is a pnpm monorepo with twenty-one publishable packages — the core
-runtime+compiler, the metaframework plugin (and its Vercel adapter), an MCP
-server, and seventeen framework bindings:
+This is a pnpm monorepo containing the core runtime+compiler, the metaframework
+plugin (and its Vercel adapter), an MCP server, and the framework bindings. The
+current publishable-package list and counts are generated from the workspace
+manifests in [`docs/packages.md`](./docs/packages.md):
 
 - [`octane`](./packages/octane) is the runtime and the compiler together. It covers
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
@@ -412,6 +419,7 @@ server, and seventeen framework bindings:
   [`zustand`](./packages/zustand), [`jotai`](./packages/jotai),
   [`query`](./packages/tanstack-query), [`motion`](./packages/motion),
   [`stylex`](./packages/stylex), [`router`](./packages/tanstack-router),
+  [`remix-router`](./packages/remix-router),
   [`table`](./packages/tanstack-table), [`virtual`](./packages/tanstack-virtual),
   [`lexical`](./packages/lexical), [`floating-ui`](./packages/floating-ui),
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
@@ -421,7 +429,7 @@ server, and seventeen framework bindings:
   Parity varies by package — some are behaviorally complete, others are
   explicitly partial or alpha. [`docs/bindings-status.md`](./docs/bindings-status.md)
   is the generated per-package status table (upstream version, supported
-  surface, known divergences, SSR/hydration, last parity verification), sourced
+  surface, known divergences, SSR/hydration, last evidence check), sourced
   from each package's `status.json` and checked in CI.
 
 ## Development

@@ -3,6 +3,9 @@
   "version": "0.1.1",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "octane": {
     "hookSlots": {
       "manual": [
@@ -38,12 +41,15 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "cookie": "^1.0.1",
+    "cookie": "^1.0.1"
+  },
+  "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
+    "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "react-router": "catalog:default",

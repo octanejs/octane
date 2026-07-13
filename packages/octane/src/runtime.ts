@@ -15,6 +15,7 @@
 
 import {
 	SUSPENSE_SCRIPT_ATTR,
+	STREAM_BOUNDARY_ATTR,
 	STREAM_SEED_COMMENT,
 	HYDRATION_START,
 	HYDRATION_END,
@@ -23,7 +24,8 @@ import {
 	BOOLEAN_ATTR_PROPS,
 	VALID_ATTR_NAME,
 	isEnumeratedBooleanAttr,
-	UNDEFINED_SENTINEL_KEY,
+	SUSPENSE_SEED_WIRE_PREFIX,
+	REJECTION_SENTINEL_KEY,
 	cssStyleValue,
 	ATTRIBUTE_ALIASES,
 	SVG_ONLY_TAGS,
@@ -304,10 +306,23 @@ function removeHydrationRange(start: Node, end: Node): void {
 
 type BlockKind = 'root' | 'control-flow' | 'dynamic' | 'portal';
 
+interface RootIdState {
+	prefix: string;
+	next: number;
+}
+
+// Client-only roots need a namespace beyond their root-local useId counter: two
+// createRoot() calls can otherwise both emit `:in-0:` into the same document.
+// hydrateRoot deliberately does NOT consume this counter — its prefix/counter
+// must remain byte-identical to the server render it adopts.
+let nextClientRootId = 0;
+
 export interface Block extends Scope {
 	kind: BlockKind;
 	parentBlock: Block | null;
 	parentNode: Node;
+	/** Root-owned useId namespace/counter, shared by every descendant block. */
+	idState: RootIdState;
 	startMarker: Node | null;
 	endMarker: Node | null;
 	/**
@@ -979,8 +994,8 @@ function vtWouldWrap(): boolean {
 /**
  * Same question for a Suspense reveal commit (commitResume /
  * flushStagedReveals — they run OUTSIDE the flush, in thenable microtasks).
- * Gated on a mounted boundary existing: a reveal whose content mounts the
- * app's first-ever boundary is a documented miss (unknowable pre-snapshot).
+ * VT_SEEN is set at module load by the compiler, so the pre-snapshot can run
+ * even when the reveal itself mounts the app's first boundary.
  */
 function vtWouldWrapResume(): boolean {
 	return (
@@ -989,7 +1004,6 @@ function vtWouldWrapResume(): boolean {
 		!hydrating &&
 		!inFlush &&
 		!VT_DRAIN &&
-		VT_REGISTRY.size > 0 &&
 		typeof document !== 'undefined' &&
 		(document as VTDocument).startViewTransition !== undefined
 	);
@@ -2277,6 +2291,7 @@ class BlockImpl {
 	memoInChain: boolean;
 	parentNode: Node;
 	parentBlock: Block | null;
+	idState: RootIdState;
 	startMarker: Node | null;
 	endMarker: Node | null;
 	exclusiveMarkers: boolean;
@@ -2360,6 +2375,7 @@ class BlockImpl {
 			(body as any)?.__memo === true || (parentBlock !== null && parentBlock.memoInChain === true);
 		this.parentNode = parentNode;
 		this.parentBlock = parentBlock;
+		this.idState = parentBlock?.idState ?? { prefix: '', next: 0 };
 		this.startMarker = startMarker;
 		this.endMarker = endMarker;
 		this.exclusiveMarkers = false;
@@ -3045,14 +3061,16 @@ function resolveSlot(slot: symbol | undefined): symbol | undefined {
 interface StateSlot<T> {
 	value: T;
 	setter: (next: T | ((prev: T) => T)) => void;
-	/** Allocated only for compiler-proven third-tuple consumers. */
+	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => T;
 }
 
 type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
 type StateTuple<T> = [T, StateSetter<T>, () => T];
 
-export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
+export function useState<T = undefined>(): StateTuple<T | undefined>;
+export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
+export function useState<T>(initial?: T | (() => T), slot?: symbol): StateTuple<T> {
 	// ABI: the compiler appends the slot as the LAST argument, so a zero-arg
 	// `useState()` (state starts undefined — React parity) arrives as
 	// `useState(slot)` with the symbol in the initial-value position. Same
@@ -3068,7 +3086,7 @@ export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T
 	const block = CURRENT_BLOCK!;
 	let s = scope.hooks?.get(slot) as StateSlot<T> | undefined;
 	if (s === undefined) {
-		const initVal = typeof initial === 'function' ? (initial as () => T)() : initial;
+		const initVal = typeof initial === 'function' ? (initial as () => T)() : (initial as T);
 		s = {
 			value: initVal,
 			setter: (next) => {
@@ -3080,13 +3098,18 @@ export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T
 		};
 		ensureHooks(scope).set(slot, s);
 	}
-	// Source-level useState returns a third `getState` tuple member. The compiler
-	// keeps this lean two-item path only when it can prove index 2 is unobserved;
-	// observable/escaping tuples are lowered to __useStateWithGetter below.
+	// Source-level useState has a third getState member, but this physical base
+	// path stays allocation-free. The compiler selects __useStateWithGetter only
+	// when index 2 can be observed (including escaped or ambiguous tuples).
 	return [s.value, s.setter] as unknown as StateTuple<T>;
 }
 
-/** Compiler-emitted useState variant for a tuple whose third member is observed. */
+type AssertUseStateType<T extends true> = T;
+type _UseStateAcceptsNoArguments = AssertUseStateType<
+	typeof useState extends <T = undefined>() => StateTuple<T | undefined> ? true : false
+>;
+
+/** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T> {
 	// Mirror useState's zero-argument trailing-slot ABI before delegating so we
 	// can look the resulting cell up by the same effective slot afterwards.
@@ -3106,7 +3129,7 @@ interface ReducerSlot<S, A> {
 	value: S;
 	dispatch: (action: A) => void;
 	reducer: (state: S, action: A) => S;
-	/** Allocated only for compiler-proven third-tuple consumers. */
+	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => S;
 }
 
@@ -3163,7 +3186,7 @@ export function useReducer<S, A, I = S>(
 	return [s.value, s.dispatch] as unknown as ReducerTuple<S, A>;
 }
 
-/** Compiler-emitted useReducer variant for a tuple whose third member is observed. */
+/** Compiler-emitted useReducer variant for a tuple whose third member is observable. */
 export function __useReducerWithGetter<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
@@ -3917,6 +3940,93 @@ function isSuspenseException(x: any): x is SuspenseException {
 	return x !== null && typeof x === 'object' && (x as any).__isSuspense === true;
 }
 
+const HYDRATION_REJECTION_SEED = Symbol('octane.hydration.rejection-seed');
+const HYDRATION_REJECTION_EXCEPTION = Symbol('octane.hydration.rejection-exception');
+
+interface HydrationRejectionSeed {
+	[HYDRATION_REJECTION_SEED]: unknown;
+}
+
+class HydrationRejectionException {
+	readonly [HYDRATION_REJECTION_EXCEPTION] = true;
+	constructor(readonly reason: unknown) {}
+}
+
+function decodeHydrationRejectionPayload(payload: any): unknown {
+	if (payload === null || typeof payload !== 'object') {
+		return new Error('Server-rendered use() rejected');
+	}
+	switch (payload.kind) {
+		case 'value':
+			return payload.value;
+		case 'number':
+			switch (payload.value) {
+				case 'NaN':
+					return NaN;
+				case 'Infinity':
+					return Infinity;
+				case '-Infinity':
+					return -Infinity;
+				case '-0':
+					return -0;
+				default:
+					return new Error('Server-rendered use() rejected');
+			}
+		case 'bigint':
+			try {
+				return BigInt(payload.value);
+			} catch {
+				return String(payload.value);
+			}
+		case 'symbol':
+			return Symbol(typeof payload.value === 'string' ? payload.value : '');
+		case 'error': {
+			const error = new Error(
+				typeof payload.message === 'string' ? payload.message : 'Server-rendered use() rejected',
+			);
+			if (typeof payload.name === 'string') error.name = payload.name;
+			const fields = payload.fields;
+			if (fields !== null && typeof fields === 'object') {
+				for (const key of Object.keys(fields)) {
+					Object.defineProperty(error, key, {
+						value: fields[key],
+						writable: true,
+						enumerable: true,
+						configurable: true,
+					});
+				}
+			}
+			return error;
+		}
+		case 'fallback':
+			return typeof payload.message === 'string'
+				? payload.message
+				: 'Server-rendered use() rejected';
+		default:
+			return new Error('Server-rendered use() rejected');
+	}
+}
+
+function hydrationRejectionFromSeed(seed: unknown): HydrationRejectionException | null {
+	if (
+		seed === null ||
+		typeof seed !== 'object' ||
+		!Object.prototype.hasOwnProperty.call(seed, HYDRATION_REJECTION_SEED)
+	)
+		return null;
+	return new HydrationRejectionException(
+		(seed as HydrationRejectionSeed)[HYDRATION_REJECTION_SEED],
+	);
+}
+
+function isHydrationRejection(error: unknown): error is HydrationRejectionException {
+	return (
+		error !== null &&
+		typeof error === 'object' &&
+		(error as HydrationRejectionException)[HYDRATION_REJECTION_EXCEPTION] === true
+	);
+}
+
 function useThenable<T>(thenable: TrackedThenable<T>): T {
 	const block = CURRENT_BLOCK!;
 	const state: TrackedThenable<any>[] = ((block as any).__thenables ??= []);
@@ -3929,7 +4039,15 @@ function useThenable<T>(thenable: TrackedThenable<T>): T {
 	// fulfilled, so this render and every later one return synchronously — no
 	// re-suspend, no client re-fetch. Folds out for client-only builds.
 	if (hydrating && hydrationSeeds !== null && hydrationSeedCursor < hydrationSeeds.length) {
-		const value = hydrationSeeds[hydrationSeedCursor++] as T;
+		const seed = hydrationSeeds[hydrationSeedCursor++];
+		const rejection = hydrationRejectionFromSeed(seed);
+		if (rejection !== null) {
+			thenable.status = 'rejected';
+			thenable.reason = rejection.reason;
+			state[idx] = thenable;
+			throw rejection;
+		}
+		const value = seed as T;
 		thenable.status = 'fulfilled';
 		thenable.value = value;
 		state[idx] = thenable;
@@ -4295,15 +4413,14 @@ export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ def
 	return lazyWrapper as unknown as C;
 }
 
-// Monotonic counter — produces stable cross-render IDs.
-let _idCounter = 0;
 export function useId(slot?: symbol): string {
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useId');
 	const scope = CURRENT_SCOPE!;
 	let s = scope.hooks?.get(slot) as { id: string } | undefined;
 	if (s === undefined) {
-		s = { id: ':in-' + (_idCounter++).toString(36) + ':' };
+		const ids = scope.block.idState;
+		s = { id: ':' + ids.prefix + 'in-' + (ids.next++).toString(36) + ':' };
 		ensureHooks(scope).set(slot, s);
 	}
 	return s.id;
@@ -4381,18 +4498,69 @@ let hydrationSeedCursor = 0;
 
 /**
  * Parse a seed-JSON payload (the shell's `data-octane-suspense` script or a
- * streamed boundary's `window.$OCTS[id]` stash). The reviver decodes the
- * server's `undefined` sentinel back to `undefined` (JSON has no `undefined`),
- * so a `use(thenable)` that resolved to `undefined` seeds as `undefined`, not
- * `null`. Returns null on malformed input (the caller re-suspends client-side).
+ * streamed boundary's `window.$OCTS[id]` stash). Successful values retain the
+ * compact array form; a versioned top-level envelope carries rejection reasons
+ * without colliding with fulfilled user data. A post-parse wire decoder restores
+ * `undefined` without deleting object properties and unescapes prefix-leading
+ * user strings. Returns null on malformed input (the caller re-suspends
+ * client-side).
  */
+function decodeSeedWire(value: unknown): unknown {
+	const undefinedWire = SUSPENSE_SEED_WIRE_PREFIX + 'u';
+	const escapedStringWire = SUSPENSE_SEED_WIRE_PREFIX + 's';
+	if (typeof value === 'string') {
+		if (value === undefinedWire) return undefined;
+		if (value.startsWith(escapedStringWire)) return value.slice(escapedStringWire.length);
+		return value;
+	}
+	if (Array.isArray(value)) {
+		for (let i = 0; i < value.length; i++) value[i] = decodeSeedWire(value[i]);
+		return value;
+	}
+	if (value !== null && typeof value === 'object') {
+		for (const key of Object.keys(value)) {
+			(value as Record<string, unknown>)[key] = decodeSeedWire(
+				(value as Record<string, unknown>)[key],
+			);
+		}
+	}
+	return value;
+}
+
 function parseSeedJson(raw: string): unknown[] | null {
 	try {
-		return JSON.parse(raw, (_key, value) =>
-			value !== null && typeof value === 'object' && value[UNDEFINED_SENTINEL_KEY] === true
-				? undefined
-				: value,
-		);
+		const parsed = decodeSeedWire(JSON.parse(raw));
+		if (Array.isArray(parsed)) return parsed;
+		if (parsed === null || typeof parsed !== 'object') return null;
+		const envelope = (parsed as Record<string, any>)[REJECTION_SENTINEL_KEY];
+		if (
+			envelope === null ||
+			typeof envelope !== 'object' ||
+			envelope.version !== 1 ||
+			!Array.isArray(envelope.values) ||
+			!Array.isArray(envelope.rejections)
+		)
+			return null;
+		const values = envelope.values.slice() as unknown[];
+		const seen = new Set<number>();
+		for (const entry of envelope.rejections) {
+			if (
+				!Array.isArray(entry) ||
+				entry.length !== 2 ||
+				!Number.isInteger(entry[0]) ||
+				entry[0] < 0 ||
+				entry[0] >= values.length ||
+				seen.has(entry[0]) ||
+				entry[1] === null ||
+				typeof entry[1] !== 'object'
+			)
+				return null;
+			seen.add(entry[0]);
+			values[entry[0]] = {
+				[HYDRATION_REJECTION_SEED]: decodeHydrationRejectionPayload(entry[1]),
+			} satisfies HydrationRejectionSeed;
+		}
+		return values;
 	} catch {
 		return null;
 	}
@@ -10677,6 +10845,11 @@ interface TrySlot {
 	detachedRefs: { ref: any; el: any }[] | null;
 	domParent: Node;
 	parentBlock: Block;
+	/**
+	 * useId state shared by every arm. Streamed boundaries replace the inherited
+	 * root state with an opaque boundary namespace during hydration.
+	 */
+	idState: RootIdState;
 }
 
 export function tryBlock(
@@ -10735,6 +10908,7 @@ export function tryBlock(
 			detachedRefs: null,
 			domParent,
 			parentBlock,
+			idState: parentBlock.idState,
 		};
 		parentScope.slots[slotKey] = newState;
 		registerSlot(parentScope, newState);
@@ -10810,24 +10984,46 @@ function mountTry(state: TrySlot): void {
 	let bStart: Node;
 	let bEnd: Node;
 	// Streamed-boundary seed scope: the swap runtime ($OCTRC) left a
-	// `<!--oct-seed:id-->` comment between the slot's open marker and the inner
-	// branch range, with the boundary's seed JSON stashed on window.$OCTS[id].
+	// `<!--oct-seed:opaque-id-->` comment between the slot's open marker and the
+	// inner branch range, with the boundary's seed JSON stashed on
+	// window.$OCTS[opaqueId]. The full id includes its stream namespace, so two
+	// roots composed into one document cannot consume each other's values.
 	// Scope the seed stream to THIS boundary while its subtree hydrates (a
 	// depth-first synchronous render), restoring the outer scope after — nested
 	// streamed boundaries push again naturally.
 	let scopedSeeds: unknown[] | null = null;
+	let hasScopedBoundary = false;
 	let adoptCursor = state.start.nextSibling;
+	let streamedBoundaryId: string | null = null;
 	if (
 		hydrating &&
 		adoptCursor !== null &&
 		adoptCursor.nodeType === 8 &&
 		(adoptCursor as Comment).data.startsWith(STREAM_SEED_COMMENT)
 	) {
-		const id = (adoptCursor as Comment).data.slice(STREAM_SEED_COMMENT.length);
+		hasScopedBoundary = true;
+		streamedBoundaryId = (adoptCursor as Comment).data.slice(STREAM_SEED_COMMENT.length);
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
-		const raw = stash !== undefined ? stash[id] : undefined;
+		const raw = stash !== undefined ? stash[streamedBoundaryId] : undefined;
 		if (typeof raw === 'string') scopedSeeds = parseSeedJson(raw);
 		adoptCursor = adoptCursor.nextSibling;
+	} else if (
+		// A shell hydrated before its streamed segment swaps still has the
+		// template sentinel instead of the seed comment. Its opaque id owns the
+		// same boundary namespace even though there are no scoped seeds yet.
+		hydrating &&
+		adoptCursor !== null &&
+		adoptCursor.nodeType === 1 &&
+		(adoptCursor as Element).tagName === 'TEMPLATE'
+	) {
+		hasScopedBoundary = true;
+		streamedBoundaryId = (adoptCursor as Element).getAttribute(STREAM_BOUNDARY_ATTR);
+	}
+	if (streamedBoundaryId !== null) {
+		state.idState = {
+			prefix: state.parentBlock.idState.prefix + 'b' + streamedBoundaryId + '-',
+			next: 0,
+		};
 	}
 	if (hydrating && isBlockOpen(adoptCursor)) {
 		// ADOPT the server's inner arm range (no inserted markers — byte-for-byte;
@@ -10853,6 +11049,7 @@ function mountTry(state: TrySlot): void {
 		undefined,
 		state.env,
 	);
+	b.idState = state.idState;
 	(b as any).__trySlot = state;
 	// Register handlers so descendant effect/render errors can find us.
 	(b as any).$$tryHandler = (err: any) => switchToCatch(state, err);
@@ -10864,7 +11061,7 @@ function mountTry(state: TrySlot): void {
 	// Install this boundary's streamed seed scope (if any) for the subtree render.
 	const prevSeeds = hydrationSeeds;
 	const prevSeedCursor = hydrationSeedCursor;
-	if (scopedSeeds !== null) {
+	if (hasScopedBoundary) {
 		hydrationSeeds = scopedSeeds;
 		hydrationSeedCursor = 0;
 	}
@@ -10875,15 +11072,24 @@ function mountTry(state: TrySlot): void {
 		if (isSuspenseException(err)) {
 			handleSuspense(state, err.thenable, b);
 		} else {
+			const adoptServerCatch = hydrating && isHydrationRejection(err);
 			if (state.tryBlock) {
-				unmountBlock(state.tryBlock);
+				// A rejection seed means the DOM already contains the server's catch
+				// arm inside this adopted range. Tear down the aborted try render's
+				// bookkeeping while preserving that range for catch-arm adoption.
+				unmountBlock(state.tryBlock, !adoptServerCatch);
 				state.tryBlock = null;
 				state.block = null;
 			}
-			switchToCatch(state, err);
+			switchToCatch(
+				state,
+				err,
+				adoptServerCatch ? bStart : undefined,
+				adoptServerCatch ? bEnd : undefined,
+			);
 		}
 	} finally {
-		if (scopedSeeds !== null) {
+		if (hasScopedBoundary) {
 			hydrationSeeds = prevSeeds;
 			hydrationSeedCursor = prevSeedCursor;
 		}
@@ -11126,6 +11332,7 @@ function hideTryContentAndMountPending(state: TrySlot): boolean {
 			undefined,
 			state.env,
 		);
+		b.idState = state.idState;
 		(b as any).__trySlot = state;
 		state.block = b;
 		try {
@@ -11904,7 +12111,7 @@ function requestReset(state: TrySlot): void {
 	scheduleRender(state.parentBlock);
 }
 
-function switchToCatch(state: TrySlot, err: any): void {
+function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd?: Node): void {
 	// Cancel any pending transition-fallback timeout — catch is a terminal
 	// state, so a timeout-driven swap to @pending would conflict with the
 	// catch branch about to mount.
@@ -11959,12 +12166,21 @@ function switchToCatch(state: TrySlot, err: any): void {
 		else console.error('tryBlock with no catch arm received error:', err);
 		return;
 	}
+	// Preserve the internal wrapper while bubbling through catch-less boundaries,
+	// then expose the original decoded reason only to the boundary that actually
+	// owns a catch arm (including primitive and null rejection reasons).
+	const caughtError = isHydrationRejection(err) ? err.reason : err;
 	state.branch = 0;
-	state.err = err;
-	const bStart = document.createComment('catch-b');
-	const bEnd = document.createComment('/catch-b');
-	state.domParent.insertBefore(bStart, state.end);
-	state.domParent.insertBefore(bEnd, state.end);
+	state.err = caughtError;
+	const adopting = adoptedStart !== undefined && adoptedEnd !== undefined;
+	const bStart = adoptedStart ?? document.createComment('catch-b');
+	const bEnd = adoptedEnd ?? document.createComment('/catch-b');
+	if (!adopting) {
+		state.domParent.insertBefore(bStart, state.end);
+		state.domParent.insertBefore(bEnd, state.end);
+	} else if (hydrating) {
+		hydrateNode = bStart.nextSibling;
+	}
 	const reset = () => requestReset(state);
 	const b = createBlock(
 		'control-flow',
@@ -11973,20 +12189,28 @@ function switchToCatch(state: TrySlot, err: any): void {
 		bStart,
 		bEnd,
 		state.catchBody,
-		{ err, reset },
+		{ err: caughtError, reset },
 		state.env,
 	);
+	b.idState = state.idState;
 	state.block = b;
 	try {
 		renderBlock(b);
 	} catch (e2) {
 		// Catch body itself threw — bubble to next enclosing tryBlock.
+		const rethrowsHydrationReason = isHydrationRejection(err) && Object.is(e2, caughtError);
+		const preserveAdoptedRange = adopting && rethrowsHydrationReason;
 		if (state.block) {
-			unmountBlock(state.block);
+			unmountBlock(state.block, !preserveAdoptedRange);
 			state.block = null;
 		}
+		const propagated = rethrowsHydrationReason ? err : e2;
+		// An exact rethrow of the raw catch reason must retain the private hydration
+		// token while the render stack unwinds. The outer mountTry can then adopt its
+		// own server catch range instead of rebuilding it.
+		if (rethrowsHydrationReason && CURRENT_BLOCK !== null) throw propagated;
 		const parent = findTryHandler(state.parentBlock);
-		if (parent) parent(e2);
+		if (parent) parent(propagated);
 		else console.error('catch body threw, no outer tryBlock:', e2);
 	}
 }
@@ -13895,6 +14119,14 @@ export interface Root {
 	unmount(): void;
 }
 
+export interface RootOptions {
+	/**
+	 * Caller-controlled useId prefix. createRoot composes it with an automatic
+	 * client-root namespace; hydrateRoot uses it verbatim to match server output.
+	 */
+	identifierPrefix?: string;
+}
+
 // Shared Root factory behind both `createRoot` and `hydrateRoot`. The
 // `rootBlock`/`currentBody` parameters are the live state captured by the
 // returned closures: `createRoot` starts them `null` (the block is created
@@ -13902,7 +14134,7 @@ export interface Root {
 // already-hydrated block + its body so the FIRST post-hydration `.render()`
 // with the SAME component hits the same-body fast path (props update) and never
 // wipes the adopted server DOM. This factory NEVER touches the hydration-only
-// state (`hydrating`/`hydrateNode`/`hydrationSeeds`/`_idCounter`) — that runs
+// state (`hydrating`/`hydrateNode`/`hydrationSeeds`) — that runs
 // once, inside `hydrateRoot`. Keeping `hydrating` out of here preserves the DCE
 // contract (it is assigned only in the hydrate entry, so client-only builds fold
 // every `if (hydrating)` branch out).
@@ -13910,6 +14142,7 @@ function makeRoot(
 	container: Element,
 	rootBlock: Block | null,
 	currentBody: ComponentBody | null,
+	idState: RootIdState,
 ): Root {
 	return {
 		render(bodyOrElement: ComponentBody | ElementDescriptor, props?: any) {
@@ -13939,6 +14172,7 @@ function makeRoot(
 			}
 			while (container.firstChild) container.removeChild(container.firstChild);
 			rootBlock = createBlock('root', null, container, null, null, body, props);
+			rootBlock.idState = idState;
 			currentBody = body;
 			// React parity: render() inside a transition never commits synchronously
 			// — schedule at transition priority so the commit is view-transition-
@@ -13981,13 +14215,16 @@ function makeRoot(
 	};
 }
 
-export function createRoot(container: Element): Root {
+export function createRoot(container: Element, options?: RootOptions): Root {
 	// Register the container as an event-delegation target up front. Listeners
 	// for all currently-known delegated events attach now; any new event types
 	// registered later (via `delegateEvents`) will back-attach automatically.
 	registerDelegationTarget(container);
 	// Lazy root: the block is created on the first `.render()` call.
-	return makeRoot(container, null, null);
+	return makeRoot(container, null, null, {
+		prefix: (options?.identifierPrefix ?? '') + 'r' + (nextClientRootId++).toString(36) + '-',
+		next: 0,
+	});
 }
 
 /**
@@ -14005,33 +14242,43 @@ export function createRoot(container: Element): Root {
  * component updates props in place on the adopted DOM, a different component
  * tears down and remounts.
  */
-export function hydrateRoot(container: Element, element: ElementDescriptor): Root;
-export function hydrateRoot(container: Element, body: ComponentBody, props?: any): Root;
+export function hydrateRoot(
+	container: Element,
+	element: ElementDescriptor,
+	options?: RootOptions,
+): Root;
+export function hydrateRoot(
+	container: Element,
+	body: ComponentBody,
+	props?: any,
+	options?: RootOptions,
+): Root;
 export function hydrateRoot(
 	container: Element,
 	bodyOrElement: ComponentBody | ElementDescriptor,
-	props?: any,
+	propsOrOptions?: any,
+	rootOptions?: RootOptions,
 ): Root {
 	let body: ComponentBody;
+	let props: any;
 	if (isElementDescriptor(bodyOrElement)) {
 		body = bodyOrElement.type as ComponentBody;
 		props = bodyOrElement.props;
+		rootOptions = propsOrOptions as RootOptions | undefined;
 	} else {
 		body = bodyOrElement;
+		props = propsOrOptions;
 	}
 	registerDelegationTarget(container);
 	const rootBlock = createBlock('root', null, container, null, null, body, props);
+	const idState: RootIdState = {
+		prefix: rootOptions?.identifierPrefix ?? '',
+		next: 0,
+	};
+	rootBlock.idState = idState;
 	hydrating = true;
-	// Align useId with the server. The server resets ID_COUNTER to 0 at the start
-	// of every render() (runtime.server.ts), so its ids are :in-0:, :in-1:, … in
-	// depth-first render order. Hydration renders the SAME tree in the SAME order,
-	// so resetting the client counter to 0 here makes the client mint byte-identical
-	// ids — otherwise the monotonic global (advanced by any earlier client render)
-	// would drift and every useId would hydration-mismatch. Subsequent client-only
-	// renders continue monotonically from after the hydrated tree's ids, so no
-	// collision. (Single-root hydration; multi-root pages share the flat-counter
-	// limitation that already exists server-side.)
-	_idCounter = 0;
+	// The root-local counter starts at zero, matching the server render carrying
+	// the same identifierPrefix. Other roots cannot perturb hydration ordering.
 	// Adopt server-serialized use(thenable) values, if any: pull them out of the
 	// inline data <script> (and remove it, so it isn't taken for a hydratable
 	// node) and stage them for useThenable to consume in render order.
@@ -14074,7 +14321,7 @@ export function hydrateRoot(
 	// the root behaves exactly like a `createRoot` root — a `.render()` with the
 	// same component updates props on the adopted DOM (same-body fast path), a
 	// different component tears down and remounts.
-	return makeRoot(container, rootBlock, body);
+	return makeRoot(container, rootBlock, body, idState);
 }
 
 // ---------------------------------------------------------------------------

@@ -36,6 +36,21 @@ export function nodeRequestToWebRequest(nodeRequest) {
 	const method = (nodeRequest.method || 'GET').toUpperCase();
 	/** @type {RequestInit & { duplex?: 'half' }} */
 	const init = { method, headers };
+	const abortController = new AbortController();
+	const abortRequest = () => {
+		if (!abortController.signal.aborted) {
+			abortController.abort(new Error('The client disconnected before the request completed.'));
+		}
+	};
+	if (nodeRequest.aborted || (nodeRequest.destroyed && !nodeRequest.complete)) {
+		abortRequest();
+	} else {
+		nodeRequest.once('aborted', abortRequest);
+		nodeRequest.once('close', () => {
+			if (!nodeRequest.complete) abortRequest();
+		});
+	}
+	init.signal = abortController.signal;
 	if (method !== 'GET' && method !== 'HEAD') {
 		// node:stream/web's ReadableStream and the DOM lib's are structurally the
 		// same at runtime; the lib types disagree on BYOB details.
@@ -62,17 +77,76 @@ export async function sendWebResponse(nodeResponse, webResponse) {
 	});
 	if (webResponse.body) {
 		const reader = webResponse.body.getReader();
+		let disconnected = nodeResponse.destroyed;
+		let disconnectReason = new Error('The client disconnected while streaming the response.');
+		/** @type {Promise<void> | null} */
+		let cancelPromise = null;
+		const cancelReader = (/** @type {unknown} */ reason) => {
+			disconnectReason = reason instanceof Error ? reason : disconnectReason;
+			return (cancelPromise ??= reader.cancel(reason).catch(() => {}));
+		};
+		const onClose = () => {
+			if (nodeResponse.writableEnded) return;
+			disconnected = true;
+			void cancelReader(disconnectReason);
+		};
+		const onError = (/** @type {Error} */ error) => {
+			disconnected = true;
+			void cancelReader(error);
+		};
+		nodeResponse.once('close', onClose);
+		nodeResponse.once('error', onError);
 		try {
-			while (true) {
+			if (disconnected) await cancelReader(disconnectReason);
+			while (!disconnected) {
 				const { done, value } = await reader.read();
 				if (done) break;
-				nodeResponse.write(value);
+				const accepted = nodeResponse.write(value);
+				if (!accepted && !disconnected) await waitForDrain(nodeResponse);
 			}
+		} catch (error) {
+			if (!disconnected) throw error;
 		} finally {
+			nodeResponse.off('close', onClose);
+			nodeResponse.off('error', onError);
+			if (disconnected) await cancelReader(disconnectReason);
 			reader.releaseLock();
 		}
 	}
-	nodeResponse.end();
+	if (!nodeResponse.destroyed) nodeResponse.end();
+}
+
+/**
+ * Pause source reads until Node's writable buffer drains. A disconnect/error
+ * rejects the wait; sendWebResponse's socket listeners cancel the web reader.
+ * @param {import('node:http').ServerResponse} response
+ */
+function waitForDrain(response) {
+	if (response.destroyed) {
+		return Promise.reject(new Error('The client disconnected while waiting for drain.'));
+	}
+	return new Promise((resolve, reject) => {
+		const cleanup = () => {
+			response.off('drain', onDrain);
+			response.off('close', onClose);
+			response.off('error', onError);
+		};
+		const onDrain = () => {
+			cleanup();
+			resolve(undefined);
+		};
+		const onClose = () => {
+			cleanup();
+			reject(new Error('The client disconnected while waiting for drain.'));
+		};
+		const onError = (/** @type {Error} */ error) => {
+			cleanup();
+			reject(error);
+		};
+		response.once('drain', onDrain);
+		response.once('close', onClose);
+		response.once('error', onError);
+	});
 }
 
 // Static-file MIME map (the common web set; anything else falls back to

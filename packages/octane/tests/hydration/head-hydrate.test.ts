@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync, delegateEvents } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
@@ -16,12 +16,16 @@ import { Page } from './_fixtures/head.tsrx';
 delegateEvents(['click']);
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/head.tsrx');
+// octane/compiler/vite normalizes modules inside Vite's root to root-relative
+// ids so client/server builds (and installed symlink layouts) hash the same
+// logical module path. Mirror that id for this manually evaluated server copy.
+const VITE_FILENAME = '/' + relative(process.cwd(), FIXTURE).split(sep).join('/');
 function serverModule(): Record<string, any> {
-	// Compile with the SAME (absolute) module id the client gets from the Vite plugin, so the
+	// Compile with the SAME root-relative module id the client gets from the Vite plugin, so the
 	// CSS scope hash (which includes the filename) matches both sides — exactly as in a real
 	// app where client + server compile the same path. (A short name here desynced the hash,
 	// which the structural-mismatch static-attribute check would then flag + rebuild.)
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), FIXTURE, { mode: 'server' });
+	let { code } = compile(readFileSync(FIXTURE, 'utf8'), VITE_FILENAME, { mode: 'server' });
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,

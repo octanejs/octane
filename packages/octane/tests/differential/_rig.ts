@@ -125,18 +125,19 @@ function normaliseHtml(html: string): string {
 /**
  * Canonicalise `useId`-generated tokens so id VALUES don't fail the byte-compare while id
  * REFERENCES still must line up. React's useId emits `:r0:` / `«r0»`-style tokens and
- * octane's emits `:in-0:` — both are documented-opaque, so comparing them literally would
- * fail every fixture that renders an id (e.g. Radix's `aria-controls`/`aria-labelledby`
- * wiring). Each distinct token maps to a sequential placeholder in order of first
- * appearance; a mismatch in WHERE ids appear, how many there are, or which attribute
- * references which id still diverges the normalised strings.
+ * octane's client roots emit `:r0-in-0:` (and hydration emits `:in-0:`) — both are
+ * documented-opaque, so comparing them literally would fail every fixture that renders an
+ * id (e.g. Radix's `aria-controls`/`aria-labelledby` wiring). Each distinct token maps to a
+ * sequential placeholder in order of first appearance; a mismatch in WHERE ids appear, how
+ * many there are, or which attribute references which id still diverges the normalised
+ * strings.
  */
 function canonicaliseGeneratedIds(html: string): string {
 	const map = new Map<string, string>();
 	return html.replace(
 		// `recharts\\d+` covers recharts' module-counter uniqueId() (clipPath ids) —
 		// counter VALUES depend on render-pass counts, which legitimately differ.
-		/«[^»]{1,24}»|:r[0-9a-z]*:|:R[0-9a-zA-Z]*:|:in-[0-9a-z]+:|_r_[0-9a-z]+_|\brecharts\d+\b/g,
+		/«[^»]{1,24}»|:r[0-9a-z]*:|:R[0-9a-zA-Z]*:|:[^\s"'<>:]*r[0-9a-z]+-in-[0-9a-z]+:|:in-[0-9a-z]+:|_r_[0-9a-z]+_|\brecharts\d+\b/g,
 		(token) => {
 			let placeholder = map.get(token);
 			if (placeholder === undefined) {

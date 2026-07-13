@@ -9,14 +9,14 @@ machine-readable status block maintained next to the code it describes — merge
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
 so a scope change that isn't reflected here fails the build.
 
-The bindings deliberately sit at different maturity levels: some are
-behaviorally complete ports verified differentially against the real React
-library, others are thin bindings over a framework-agnostic core, and some are
-explicitly partial or alpha. "Verified" is the date of the last parity
-verification (audit, differential run, or full-suite pass) against the pinned
-upstream version.
+The bindings deliberately sit at different maturity levels: some have broad
+differential evidence against the real React library, others are thin bindings
+over a framework-agnostic core, and some are explicitly partial or alpha. "Last
+checked" records when the stated scope and its supporting evidence were most
+recently reviewed. It does **not** certify full semantic parity outside the
+supported surface and known test coverage described for that package.
 
-| Package | Ports | Supported surface | Known divergences | SSR / hydration | Verified |
+| Package | Ports | Supported surface | Known divergences | SSR / hydration | Last checked |
 | --- | --- | --- | --- | --- | --- |
 | [`@octanejs/base-ui`](#octanejsbase-ui) | `@base-ui/react@1.6.0` | Alpha, in progress: the foundation + overlay infrastructure and the first component set (Dialog, AlertDialog, Popover open-path) landed, ported at full fidelity and differential-verified against the real `@base-ui/react`. | Handlers receive native DOM events (no synthetic layer); `forwardRef` becomes ref-as-prop; `className` composes via octane's `normalizeClass` (the render-prop string merge matches Base UI exactly) | No dedicated SSR/hydration tests yet. | 2026-07-08 |
 | [`@octanejs/floating-ui`](#octanejsfloating-ui) | `@floating-ui/react@0.27.19` | Positioning (`useFloating`, ref-aware `arrow`, the `@floating-ui/dom` middleware re-exports, the floating tree), the full interaction-hook set (`useInteractions`, `useHover` + `safePolygon`, `useClick`, `useFocus`, `useDismiss`, `useRole`, `useClientPoint`, `useListNavigation`, `useTypeahead`), the component layer (`FloatingPortal`, `FloatingOverlay`, `FloatingFocusManager`, `FloatingArrow`, `FloatingList`, `Composite`), and transitions + `FloatingDelayGroup`. | `forwardRef` becomes octane's ref-as-prop | No dedicated SSR/hydration tests. | 2026-07-05 |
@@ -50,6 +50,8 @@ Known divergences:
 
 SSR / hydration: No dedicated SSR/hydration tests yet.
 
+Scope/evidence last checked: 2026-07-08.
+
 See also: [`docs/base-ui-migration-plan.md`](base-ui-migration-plan.md)
 
 ## @octanejs/floating-ui
@@ -63,6 +65,8 @@ Known divergences:
 - `forwardRef` becomes octane's ref-as-prop.
 
 SSR / hydration: No dedicated SSR/hydration tests.
+
+Scope/evidence last checked: 2026-07-05.
 
 - Not yet ported: the `inner`/`useInnerOffset` middleware pair.
 
@@ -79,6 +83,8 @@ Known divergences:
 
 SSR / hydration: Supported and tested — the upstream `*.server.test.tsx` suite runs via `octane/server` with byte-identical markup.
 
+Scope/evidence last checked: 2026-07-09.
+
 See also: [`docs/octanejs-hook-form-plan.md`](octanejs-hook-form-plan.md)
 
 ## @octanejs/jotai
@@ -93,6 +99,8 @@ Known divergences:
 
 SSR / hydration: No SSR-specific surface; `useHydrateAtoms` is ported and usable for hydration seeding; no dedicated SSR tests.
 
+Scope/evidence last checked: 2026-07-11.
+
 ## @octanejs/lexical
 
 [`packages/lexical`](../packages/lexical) `0.1.4` — ports `@lexical/react@0.46.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
@@ -105,6 +113,8 @@ Known divergences:
 - The class-based `LexicalErrorBoundary` becomes an octane error boundary; `forwardRef` becomes ref-as-prop.
 
 SSR / hydration: No dedicated SSR/hydration tests.
+
+Scope/evidence last checked: 2026-07-09.
 
 - Not ported (4 modules, with reasons): `LexicalCollaborationPlugin` (real-time Yjs collaboration needs a two-peer harness), `LexicalExtensionComposer`/`LexicalExtensionEditorComposer` (the newer extension API wraps a React-only subsystem), and `LexicalTreeView` (wraps the `@lexical/devtools-core` React component).
 
@@ -119,6 +129,8 @@ Known divergences:
 - `useMDXComponents` drops upstream's `useMemo` referential-stability wrapper so the call is valid in both server and client runtimes (same observable mapping).
 
 SSR / hydration: Full SSR + hydration coverage — server-compiled documents render via `renderToString` and hydrate byte-for-byte (`ssr.test.ts`, `hydration.test.ts`).
+
+Scope/evidence last checked: 2026-07-07.
 
 See also: [`docs/mdx-migration-plan.md`](mdx-migration-plan.md)
 
@@ -135,6 +147,8 @@ Known divergences:
 
 SSR / hydration: No SSR-specific surface; no dedicated SSR tests.
 
+Scope/evidence last checked: 2026-07-06.
+
 - Not yet ported: nested/shared layout projection (incl. child scale correction and shared layout during drag), drag momentum + elastic physics, reduced-motion enforcement, the `useTransform` output-map form, and `when: 'beforeChildren' | 'afterChildren'` sequencing.
 
 ## @octanejs/radix
@@ -150,6 +164,8 @@ Known divergences:
 
 SSR / hydration: SSR/hydration coverage for the overlay/portal components is still open (tracked in the migration plan).
 
+Scope/evidence last checked: 2026-07-08.
+
 See also: [`docs/radix-migration-plan.md`](radix-migration-plan.md)
 
 ## @octanejs/recharts
@@ -163,6 +179,8 @@ Known divergences:
 - Chart events coordinate through octane's native delegated events rather than React's synthetic layer.
 
 SSR / hydration: Untested; text measurement (`getStringSize`) returns 0×0 under SSR.
+
+Scope/evidence last checked: 2026-07-07.
 
 - Planned next (phases 2–5): `Tooltip`/`Legend`/`ResponsiveContainer`, the remaining cartesian charts, polar charts, and animation + chart sync. Target surface: 97 runtime + 78 type exports.
 
@@ -181,6 +199,8 @@ Known divergences:
 
 SSR / hydration: No SSR-specific surface; no dedicated SSR tests.
 
+Scope/evidence last checked: 2026-07-08.
+
 ## @octanejs/remix-router
 
 [`packages/remix-router`](../packages/remix-router) `0.1.1` — ports `react-router@7.18.1`. Status data: [`packages/remix-router/status.json`](../packages/remix-router/status.json).
@@ -196,6 +216,8 @@ Known divergences:
 - Block-children `<Routes>` collects `<Route>`s by registration (mount order) instead of upstream's element-children walk (source order) — a conditionally-mounted `<Route>` between static siblings registers after them, which only affects matchRoutes score TIES; conformance-pinned.
 
 SSR / hydration: Shipped: StaticRouter/StaticRouterProvider/createStaticHandler/createStaticRouter render through octane/server (remix-router-ssr vitest project compiles the whole graph in server mode; markup matches react-dom/server byte-for-byte after framework-marker stripping). Block-children <Routes> is CLIENT-only (the registration collector runs in layout effects) — use descriptor children or route objects for SSR.
+
+Scope/evidence last checked: 2026-07-12.
 
 - Full export parity: tests/conformance/parity.test.ts pins EXPECTED_MISSING at []. Framework mode (needs @react-router/dev) and RSC are permanently out of scope — those names are throwing stubs with scope-policy messages. The cookie/session server runtime is vendored (adds the `cookie` dependency, as upstream).
 
@@ -214,6 +236,8 @@ Known divergences:
 
 SSR / hydration: Works under SSR — the stylesheet is static and server markup carries the final class names; no dedicated SSR test files.
 
+Scope/evidence last checked: 2026-07-09.
+
 ## @octanejs/tanstack-query
 
 [`packages/tanstack-query`](../packages/tanstack-query) `0.1.4` — ports `@tanstack/react-query@5.101.0`. Status data: [`packages/tanstack-query/status.json`](../packages/tanstack-query/status.json).
@@ -225,6 +249,8 @@ Known divergences:
 - Suspense integrates via octane's `use(thenable)` rather than throwing a promise (observable behavior matches).
 
 SSR / hydration: `HydrationBoundary` fully ported (incl. streaming `promise`/`dehydratedAt` re-hydration); the SSR/streaming server entries and server-render tests are still open.
+
+Scope/evidence last checked: 2026-07-06.
 
 See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
@@ -240,6 +266,8 @@ Known divergences:
 - No `flushSync` in the `Link` click handler; navigation state updates run synchronously.
 
 SSR / hydration: SSR entries (`RouterServer`/`RouterClient`, `HeadContent`/`Scripts`) not yet ported; no SSR tests.
+
+Scope/evidence last checked: 2026-07-06.
 
 - Still open: file-based routing + the codegen plugin, devtools, and the typed public surface (factories/hooks are still `any`).
 
@@ -257,6 +285,8 @@ Known divergences:
 
 SSR / hydration: No SSR-specific surface; table-core is pure computation.
 
+Scope/evidence last checked: 2026-07-11.
+
 - Column sizing/resizing and pinning/ordering drag interactions are untested-by-interaction (the differential rig has no mousemove driver); their state APIs are table-core computation reused verbatim.
 
 ## @octanejs/tanstack-virtual
@@ -270,6 +300,8 @@ Known divergences:
 - octane's `flushSync` called while a flush is already on the stack degrades to a plain call drained by the ambient flush (re-entrancy guard) — sync scroll notifies dispatched from inside a discrete-event flush land at that flush's boundary instead of nested; consumer-invisible, pinned by a conformance test.
 
 SSR / hydration: SSR-safe: `useIsomorphicLayoutEffect` degrades to `useEffect` without `document`; the first paint windows from `initialRect`/`initialOffset` exactly as upstream. No dedicated SSR tests.
+
+Scope/evidence last checked: 2026-07-12.
 
 - Smooth scrolling (`behavior: 'smooth'`) and the default ResizeObserver measurement path are untestable in jsdom (no layout); their code is verbatim upstream/virtual-core. Tests drive rects via the public `initialRect`/`observeElementRect`/`measureElement` options, mirroring upstream's own harness.
 
@@ -286,6 +318,8 @@ Known divergences:
 
 SSR / hydration: `hydrate: true` adopts octane SSR output via `hydrateRoot`.
 
+Scope/evidence last checked: 2026-07-09.
+
 - The reused framework-agnostic core is `@testing-library/dom@^10.4.1`; the ported react-testing-library layer tracks upstream behavior rather than a pinned release.
 
 See also: [`docs/testing-library-migration-plan.md`](testing-library-migration-plan.md)
@@ -301,3 +335,5 @@ Known divergences:
 - Unstable selectors (a new reference every render) settle after a bounded number of re-renders instead of hitting React's `useSyncExternalStore` warning loop — still prefer `useShallow`.
 
 SSR / hydration: No SSR-specific surface; no dedicated SSR tests.
+
+Scope/evidence last checked: 2026-07-06.

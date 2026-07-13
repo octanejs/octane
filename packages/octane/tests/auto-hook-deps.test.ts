@@ -230,6 +230,24 @@ describe('automatic hook dependencies — full compiler', () => {
 		);
 		expect(code).toMatch(/useMemo\(\(\) => props\.value \* 2, \[props\.value\], _h\$\d+\)/);
 	});
+
+	it('infers dependencies for namespace imports without crossing lexical shadows', () => {
+		const code = c(`
+      import * as Octane from 'octane';
+      export function App(props) @{
+        Octane.useEffect(() => console.log(props.value));
+        {
+          const Octane = { useEffect(callback) { callback(); } };
+          Octane.useEffect(() => console.log(props.shadowed));
+        }
+        <div />
+      }
+    `);
+		expect(code).toMatch(
+			/Octane\.useEffect\(\(\) => console\.log\(props\.value\), \[props\.value\], _h\$\d+\)/,
+		);
+		expect(code).not.toContain('[props.shadowed]');
+	});
 });
 
 describe('automatic hook dependencies — plain TS surgical transform', () => {
@@ -272,5 +290,29 @@ export function useThing(props: { api?: { run?: () => void } }) {
 `;
 		const code = slotHooks(source, 'use-thing.ts')!.code;
 		expect(code).toMatch(/effect\(props\?\.api\?\.run, \[props\?\.api\?\.run\], _h\$\d+\)/);
+	});
+
+	it('infers and slots namespace-imported hooks', () => {
+		const source = `
+import * as Octane from 'octane';
+export function useThing(value: string) {
+  Octane.useEffect(() => console.log(value));
+  return Octane.useMemo(() => value + '!');
+}
+`;
+		const code = slotHooks(source, 'namespace-hooks.ts')!.code;
+		expect(code).toMatch(/Octane\.useEffect\([^;]+, \[value\], _h\$\d+\)/);
+		expect(code).toMatch(/Octane\.useMemo\([^;]+, \[value\], _h\$\d+\)/);
+	});
+
+	it('does not infer or slot a lexically shadowed Octane namespace', () => {
+		const source = `
+import * as Octane from 'octane';
+export function run(value: string) {
+  const Octane = { useEffect(callback: () => void) { callback(); } };
+  Octane.useEffect(() => console.log(value));
+}
+`;
+		expect(slotHooks(source, 'shadowed-namespace.ts')).toBeNull();
 	});
 });

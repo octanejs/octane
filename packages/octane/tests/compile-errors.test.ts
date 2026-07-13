@@ -167,6 +167,17 @@ describe('compile errors — slot-keyed hooks in plain JS loops', () => {
 		expect(() => compile(inSrc, 'hook-forin.tsrx')).toThrow(/`useId`.*`for…in` loop/);
 	});
 
+	it('rejects an aliased Octane base hook inside a plain JS loop', () => {
+		const source = `
+      import { useState as state } from 'octane';
+      export function App(props) @{
+        for (const item of props.items) state(item);
+        <div />
+      }
+    `;
+		expect(() => compile(source, 'aliased-hook-loop.tsrx')).toThrow(/`useState`.*`for…of` loop/);
+	});
+
 	it('rejects a custom hook (identifier and method form) inside a `for…of` loop', () => {
 		// A custom hook repeats ONE withSlot call-site symbol per iteration → its
 		// inner base hooks share one path → shared state, same failure as builtins.

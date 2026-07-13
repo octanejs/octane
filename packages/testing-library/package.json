@@ -3,6 +3,9 @@
   "version": "0.1.2",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "octane": {
     "hookSlots": {
       "manual": [
@@ -38,11 +41,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@testing-library/dom": "catalog:default",
+    "@testing-library/dom": "catalog:default"
+  },
+  "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
     "@testing-library/user-event": "^14.6.1",
+    "octane": "workspace:*",
     "vitest": "catalog:default"
   }
 }

@@ -18,7 +18,7 @@
  * `childSlot` applies the identical rule (bare function = ComponentBody, `{}`
  * props, one marker range), so server markers and client adoption line up.
  *
- * @typedef {(props?: any, scope?: any, extra?: any) => string} ServerComponent
+ * @typedef {(props?: any, scope?: any, extra?: any) => string | void} ServerComponent
  */
 
 /**
@@ -53,4 +53,47 @@ export function createLayoutWrapper(Layout, Page, pageProps) {
 			Page(pageProps, cscope, undefined);
 		return Layout({ ...pageProps, children }, scope, undefined);
 	};
+}
+
+/**
+ * Add the configured app-wide Suspense/ErrorBoundary around a route root.
+ * The same composition helper is used by dev SSR, production SSR, and the
+ * generated browser hydrate entry, so all three produce/adopt the same nested
+ * marker shape.
+ *
+ * @param {ServerComponent} Content
+ * @param {{ pending?: ServerComponent | null, catch?: ServerComponent | null }} boundary
+ * @param {{ Suspense: ServerComponent, ErrorBoundary: ServerComponent, createElement: Function }} runtime
+ * @returns {ServerComponent}
+ */
+export function createRootBoundaryWrapper(Content, boundary, runtime) {
+	let body = Content;
+
+	if (boundary.pending) {
+		const child = body;
+		const Pending = boundary.pending;
+		body = function RootSuspense(props, scope) {
+			const children = (/** @type {any} */ _props, /** @type {any} */ childScope) =>
+				child(props, childScope, undefined);
+			return runtime.Suspense(
+				{ fallback: runtime.createElement(Pending, {}), children },
+				scope,
+				undefined,
+			);
+		};
+	}
+
+	if (boundary.catch) {
+		const child = body;
+		const Catch = boundary.catch;
+		body = function RootErrorBoundary(props, scope) {
+			const children = (/** @type {any} */ _props, /** @type {any} */ childScope) =>
+				child(props, childScope, undefined);
+			const fallback = (/** @type {unknown} */ error, /** @type {() => void} */ reset) =>
+				runtime.createElement(Catch, { error, reset });
+			return runtime.ErrorBoundary({ fallback, children }, scope, undefined);
+		};
+	}
+
+	return body;
 }

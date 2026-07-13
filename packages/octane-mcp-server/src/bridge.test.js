@@ -3,7 +3,13 @@ import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { bridgeReport, detectVanillaCore, scanSource, KNOWN_BINDINGS } from './bridge.js';
+import {
+	bridgeReport,
+	detectVanillaCore,
+	scanSource,
+	KNOWN_BINDINGS,
+	KNOWN_BINDING_PACKAGE_DIRS,
+} from './bridge.js';
 
 describe('scanSource', () => {
 	it('collects React API usage counts and import specifiers', () => {
@@ -152,6 +158,7 @@ describe('KNOWN_BINDINGS', () => {
 		]);
 		const packagesRoot = fileURLToPath(new URL('../..', import.meta.url));
 		const bindings = [];
+		const bindingDirectories = [];
 		for (const entry of await readdir(packagesRoot, { withFileTypes: true })) {
 			if (!entry.isDirectory()) continue;
 			let manifest;
@@ -164,8 +171,10 @@ describe('KNOWN_BINDINGS', () => {
 			}
 			if (manifest.private || NON_BINDINGS.has(manifest.name)) continue;
 			bindings.push(manifest.name);
+			bindingDirectories.push(entry.name);
 		}
 		expect(bindings.length).toBeGreaterThan(0);
 		expect(new Set(Object.values(KNOWN_BINDINGS))).toEqual(new Set(bindings));
+		expect(KNOWN_BINDING_PACKAGE_DIRS).toEqual(new Set(bindingDirectories));
 	});
 });

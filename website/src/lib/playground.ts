@@ -48,6 +48,9 @@ export interface Preview {
 	destroy(): void;
 }
 
+export const PREVIEW_READY_TIMEOUT_MS = 10_000;
+export const PREVIEW_RUN_TIMEOUT_MS = 10_000;
+
 /**
  * A live preview bound to `container` — creates the sandboxed iframe and
  * drives the postMessage protocol (see playground-sandbox.ts for the boundary
@@ -71,66 +74,90 @@ export function createPreview(
 	iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;';
 	iframe.srcdoc = sandboxSrcdoc();
 	container.appendChild(iframe);
+	const frameWindow = iframe.contentWindow;
 
 	let destroyed = false;
 	let generation = 0;
-	const pending = new Map<number, (r: { error: string | null }) => void>();
+	const pending = new Map<
+		number,
+		{
+			resolve: (result: { error: string | null }) => void;
+			timeout: number;
+		}
+	>();
 	const send = (msg: Record<string, unknown>) => {
-		iframe.contentWindow?.postMessage({ [PROTOCOL_KEY]: true, ...msg }, '*');
+		frameWindow?.postMessage({ [PROTOCOL_KEY]: true, ...msg }, '*');
+	};
+	const settlePending = (gen: number, result: { error: string | null }) => {
+		const entry = pending.get(gen);
+		if (!entry) return;
+		pending.delete(gen);
+		win.clearTimeout(entry.timeout);
+		entry.resolve(result);
 	};
 
 	// Resolves once the sandbox has imported the runtime bundle; resolves with
-	// an error string when it can't (fetch failed, srcdoc scripts unsupported —
-	// e.g. jsdom — so run() reports instead of hanging).
+	// an actionable error string when the iframe is unavailable, fails to boot,
+	// or boots but never acknowledges the runtime bundle.
 	let cleanupListener: (() => void) | undefined;
-	const ready = new Promise<string | null>((resolve) => {
-		const fail = (message: string) => resolve(message);
-		const bootTimeout = win.setTimeout(
-			() => fail('Preview sandbox failed to boot (iframe scripts unavailable?).'),
-			10_000,
-		);
-		const onMessage = (event: MessageEvent) => {
-			if (destroyed || event.source !== iframe.contentWindow) return;
-			const msg = event.data;
-			if (!msg || msg[PROTOCOL_KEY] !== true) return;
-			switch (msg.type) {
-				case 'boot':
-					// Sandbox is listening — hand it the runtime bundle as text (it
-					// cannot fetch same-origin resources itself; see sandbox notes).
-					fetch(RUNTIME_MODULE_PATH)
-						.then((res) => {
-							if (!res.ok) throw new Error(`${RUNTIME_MODULE_PATH} → HTTP ${res.status}`);
-							return res.text();
-						})
-						.then((runtime) => send({ type: 'init', runtime }))
-						.catch((error) =>
-							fail(
-								'Failed to load the preview runtime: ' +
-									(error instanceof Error ? error.message : String(error)),
-							),
-						);
-					break;
-				case 'ready':
-					win.clearTimeout(bootTimeout);
-					resolve(typeof msg.error === 'string' ? msg.error : null);
-					break;
-				case 'result': {
-					const resolvePending = pending.get(msg.gen);
-					pending.delete(msg.gen);
-					resolvePending?.({ error: typeof msg.error === 'string' ? msg.error : null });
-					break;
-				}
-				case 'runtime-error':
-					if (typeof msg.error === 'string') onRuntimeError(msg.error);
-					break;
-			}
-		};
-		win.addEventListener('message', onMessage);
-		cleanupListener = () => {
-			win.clearTimeout(bootTimeout);
-			win.removeEventListener('message', onMessage);
-		};
-	});
+	let settleReady: (error: string | null) => void = () => {};
+	const ready = frameWindow
+		? new Promise<string | null>((resolve) => {
+				let settled = false;
+				let bootReceived = false;
+				const readyTimeout = win.setTimeout(() => {
+					settleReady(
+						bootReceived
+							? 'Preview sandbox booted but did not become ready before the timeout.'
+							: 'Preview sandbox did not boot before the timeout (iframe scripts may be unavailable).',
+					);
+				}, PREVIEW_READY_TIMEOUT_MS);
+				settleReady = (error) => {
+					if (settled) return;
+					settled = true;
+					win.clearTimeout(readyTimeout);
+					resolve(error);
+				};
+				const onMessage = (event: MessageEvent) => {
+					if (destroyed || event.source !== frameWindow) return;
+					const msg = event.data;
+					if (!msg || msg[PROTOCOL_KEY] !== true) return;
+					switch (msg.type) {
+						case 'boot':
+							bootReceived = true;
+							// Sandbox is listening — hand it the runtime bundle as text (it
+							// cannot fetch same-origin resources itself; see sandbox notes).
+							fetch(RUNTIME_MODULE_PATH)
+								.then((res) => {
+									if (!res.ok) throw new Error(`${RUNTIME_MODULE_PATH} → HTTP ${res.status}`);
+									return res.text();
+								})
+								.then((runtime) => send({ type: 'init', runtime }))
+								.catch((error) =>
+									settleReady(
+										'Failed to load the preview runtime: ' +
+											(error instanceof Error ? error.message : String(error)),
+									),
+								);
+							break;
+						case 'ready':
+							settleReady(typeof msg.error === 'string' ? msg.error : null);
+							break;
+						case 'result': {
+							settlePending(msg.gen, { error: typeof msg.error === 'string' ? msg.error : null });
+							break;
+						}
+						case 'runtime-error':
+							if (typeof msg.error === 'string') onRuntimeError(msg.error);
+							break;
+					}
+				};
+				win.addEventListener('message', onMessage);
+				cleanupListener = () => {
+					win.removeEventListener('message', onMessage);
+				};
+			})
+		: Promise.resolve('Preview iframe is unavailable in this browser environment.');
 
 	return {
 		async run(code) {
@@ -141,20 +168,24 @@ export function createPreview(
 
 			// A newer run supersedes any still-pending one — resolve it quietly so
 			// the caller's error handling never fires for stale results.
-			for (const [staleGen, resolveStale] of pending) {
-				pending.delete(staleGen);
-				resolveStale({ error: null });
+			for (const staleGen of pending.keys()) {
+				settlePending(staleGen, { error: null });
 			}
 			return new Promise((resolve) => {
-				pending.set(gen, resolve);
+				const timeout = win.setTimeout(() => {
+					settlePending(gen, {
+						error: 'Preview sandbox did not return a render result before the timeout.',
+					});
+				}, PREVIEW_RUN_TIMEOUT_MS);
+				pending.set(gen, { resolve, timeout });
 				send({ type: 'run', code, gen });
 			});
 		},
 		destroy() {
 			destroyed = true;
+			settleReady(null);
 			cleanupListener?.();
-			for (const [, resolveStale] of pending) resolveStale({ error: null });
-			pending.clear();
+			for (const gen of pending.keys()) settlePending(gen, { error: null });
 			iframe.remove();
 		},
 	};

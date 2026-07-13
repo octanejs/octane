@@ -3,6 +3,9 @@
   "version": "0.1.2",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "octane": {
     "hookSlots": {
       "manual": [
@@ -49,16 +52,19 @@
   "dependencies": {
     "@jridgewell/remapping": "catalog:default",
     "@mdx-js/mdx": "catalog:default",
-    "octane": "workspace:*",
     "remark-frontmatter": "catalog:default",
     "remark-gfm": "catalog:default",
     "remark-mdx-frontmatter": "catalog:default",
     "source-map": "catalog:default"
   },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
   "devDependencies": {
     "@jridgewell/trace-mapping": "catalog:default",
     "@octanejs/testing-library": "workspace:*",
     "@shikijs/rehype": "catalog:default",
+    "octane": "workspace:*",
     "vite": "catalog:default",
     "vitest": "catalog:default"
   }

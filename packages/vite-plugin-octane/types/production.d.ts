@@ -2,9 +2,9 @@ import type { RuntimePrimitives } from '@ripple-ts/adapter';
 import type {
 	Route,
 	Middleware,
-	ResolvedOctaneConfig,
 	OctaneConfigOptions,
-	RootBoundaryOptions,
+	ResolvedOctaneConfig,
+	Component,
 } from '@octanejs/vite-plugin';
 import type { RenderResult, StreamOptions, RenderOptions } from 'octane/server';
 
@@ -31,7 +31,16 @@ export interface ServerManifest {
 	trustProxy?: boolean;
 	/** 'streaming' (default) renders via renderToReadableStream; 'buffered' awaits everything via prerender */
 	render?: 'streaming' | 'buffered';
-	rootBoundary?: RootBoundaryOptions;
+	/** Resolved server-compiled global boundary components. */
+	rootBoundary?: {
+		pending?: Component | null;
+		catch?: Component<{ error: unknown; reset: () => void }> | null;
+	};
+	/** Import descriptors serialized to the client hydration payload. */
+	rootBoundaryEntries?: {
+		pending: { path: string; exportName: string | null } | null;
+		catch: { path: string; exportName: string | null } | null;
+	};
 	/** config `router.preHydrate`, serialized into #__octane_data for the client entry */
 	preHydrate?: string | null;
 	/** Map of entry path → `module server` namespace for RPC support */
@@ -59,6 +68,10 @@ export interface HandlerOptions {
 	htmlTemplate: string;
 	/** RPC executor from 'octane/server' */
 	executeServerFunction: (fn: Function, body: string) => Promise<string>;
+	/** Boundary primitives from 'octane/server'. */
+	Suspense: Component;
+	ErrorBoundary: Component;
+	createElement: Function;
 }
 
 /**

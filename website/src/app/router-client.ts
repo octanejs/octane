@@ -9,14 +9,26 @@ import { makeRouter } from './router.ts';
 
 export const clientRouter: any = typeof document === 'undefined' ? null : makeRouter();
 
+export async function waitForRouterMatches(
+	router: any,
+	maxTimerTurns = 50,
+	waitForTurn: () => Promise<unknown> = () => new Promise((resolve) => setTimeout(resolve, 0)),
+): Promise<void> {
+	for (let turn = 0; turn < maxTimerTurns; turn++) {
+		const matches = router.stores.matches.get?.() ?? router.stores.matches.value ?? [];
+		if (matches.length > 0) return;
+		await waitForTurn();
+	}
+	const href = router.latestLocation?.href ?? router.state?.location?.href ?? '<unknown URL>';
+	throw new Error(
+		`[octane website] Router load completed for ${href}, but no matches were committed after ${maxTimerTurns} timer turns. Hydration was stopped before it could erase the server tree.`,
+	);
+}
+
 export async function ensureClientRouterReady(): Promise<void> {
 	if (!clientRouter) return;
 	await clientRouter.load();
-	for (let i = 0; i < 50; i++) {
-		const matches = clientRouter.stores.matches.get?.() ?? clientRouter.stores.matches.value ?? [];
-		if (matches.length > 0) return;
-		await new Promise((resolve) => setTimeout(resolve, 0));
-	}
+	await waitForRouterMatches(clientRouter);
 }
 
 export default ensureClientRouterReady;

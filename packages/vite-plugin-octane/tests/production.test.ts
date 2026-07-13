@@ -11,6 +11,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, createServer, type ViteDevServer } from 'vite';
 
@@ -37,7 +39,9 @@ function bodyRegionOf(html: string): string {
 }
 
 function dataScriptOf(html: string): string {
-	const match = html.match(/<script id="__octane_data" type="application\/json">(.*?)<\/script>/s);
+	const match = html.match(
+		/<script id="__octane_data" type="application\/json"[^>]*>(.*?)<\/script>/s,
+	);
 	expect(match).not.toBeNull();
 	return match![1];
 }
@@ -132,24 +136,112 @@ describe('production SSR build', () => {
 		expect(response.status).toBe(404);
 	});
 
+	it('loads and renders the configured root catch boundary in production', async () => {
+		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
+		const response = await handler(new Request('http://localhost/pages/error'));
+		expect(response.status).toBe(200);
+		expect(await response.text()).toContain('Fixture failed: Error: fixture root boundary');
+	});
+
+	it('applies the middleware CSP nonce in dev and production', async () => {
+		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
+		const prodHtml = await (await handler(new Request('http://localhost/'))).text();
+		const devHtml = await (await fetch(devOrigin + '/')).text();
+		for (const html of [prodHtml, devHtml]) {
+			expect(html).toMatch(/<script[^>]*id="__octane_data"[^>]*nonce="fixture-nonce"/);
+			expect(html).toMatch(
+				/<script(?=[^>]*data-octane-hydrate)(?=[^>]*nonce="fixture-nonce")[^>]*>/,
+			);
+		}
+	});
+
+	it('loads and streams the configured root pending boundary in production', async () => {
+		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
+		const response = await handler(new Request('http://localhost/pages/pending'));
+		expect(response.status).toBe(200);
+		const html = await response.text();
+		expect(html).toContain('Loading fixture…');
+		expect(html).toContain('Fixture page pending');
+	});
+
+	it('bundles module-server exports and executes them through production RPC', async () => {
+		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
+		const hash = createHash('sha256').update('/src/Page.tsrx#fixtureRpc').digest('hex').slice(0, 8);
+		const response = await handler(
+			new Request(`http://localhost/_$_ripple_rpc_$_/${hash}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				// devalue.stringify(['hello'])
+				body: '[[1],"hello"]',
+			}),
+		);
+		expect(response.status).toBe(200);
+		const encoded = JSON.parse(await response.text());
+		expect(encoded[encoded[0].value]).toBe('rpc:hello');
+	});
+
+	it('discovers module-server exports in full-compiled .tsx modules', async () => {
+		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
+		const hash = createHash('sha256')
+			.update('/src/Rpc.tsx#fixtureTsxRpc')
+			.digest('hex')
+			.slice(0, 8);
+		const response = await handler(
+			new Request(`http://localhost/_$_ripple_rpc_$_/${hash}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: '[[1],"tsx"]',
+			}),
+		);
+		expect(response.status).toBe(200);
+		const encoded = JSON.parse(await response.text());
+		expect(encoded[encoded[0].value]).toBe('tsx-rpc:tsx');
+	});
+
+	it('registers and executes module-server exports through the dev SSR graph', async () => {
+		// Load the route once so its server-compiled module registers into the dev map.
+		await fetch(devOrigin + '/');
+		const hash = createHash('sha256').update('/src/Page.tsrx#fixtureRpc').digest('hex').slice(0, 8);
+		const response = await fetch(`${devOrigin}/_$_ripple_rpc_$_/${hash}`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: '[[1],"dev"]',
+		});
+		expect(response.status).toBe(200);
+		const encoded = JSON.parse(await response.text());
+		expect(encoded[encoded[0].value]).toBe('rpc:dev');
+	});
+
 	it('nodeHandler bridges the same handler for Node-style serverless wrappers', async () => {
 		const { nodeHandler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
 		const chunks: Buffer[] = [];
 		const headers: Record<string, unknown> = {};
-		const res = {
+		const res = Object.assign(new EventEmitter(), {
 			statusCode: 0,
 			headersSent: false,
+			destroyed: false,
+			writableEnded: false,
 			setHeader(key: string, value: unknown) {
 				headers[key.toLowerCase()] = value;
 			},
 			write(chunk: Uint8Array) {
 				chunks.push(Buffer.from(chunk));
+				return true;
 			},
 			end(chunk?: Uint8Array) {
 				if (chunk) chunks.push(Buffer.from(chunk));
+				this.writableEnded = true;
 			},
-		};
-		await nodeHandler({ method: 'GET', url: '/pages/node', headers: { host: 'localhost' } }, res);
+		});
+		const req = Object.assign(new EventEmitter(), {
+			method: 'GET',
+			url: '/pages/node',
+			headers: { host: 'localhost' },
+			aborted: false,
+			destroyed: false,
+			complete: true,
+		});
+		await nodeHandler(req, res);
 		expect(res.statusCode).toBe(200);
 		expect(headers['content-type']).toBe('text/html; charset=utf-8');
 		expect(Buffer.concat(chunks).toString('utf-8')).toContain('Fixture page node');

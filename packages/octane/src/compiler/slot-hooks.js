@@ -17,16 +17,20 @@ import { parseModule } from '@tsrx/core';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
 import { analyzeHookDependencies } from './hook-deps.js';
 
-// Build local-name → imported-name for hooks imported from 'octane' (handles
-// `import { useState as s }`). Namespace imports (`import * as o`) are ignored —
-// `o.useState(...)` has a MemberExpression callee, which the call walk never
-// matches, so it's skipped for free (matching the `.tsrx` path).
+// Build a cheap import-presence gate. Precise call identity is annotated by the
+// lexical scope analysis in analyzeHookDependencies below; this gate only avoids
+// doing the surgical edit walk for modules that cannot contain an Octane hook.
 function octaneHookLocals(ast) {
 	const locals = new Map();
 	let importsHook = false;
 	for (const node of ast.body || []) {
 		if (node.type !== 'ImportDeclaration' || node.source?.value !== 'octane') continue;
 		for (const sp of node.specifiers || []) {
+			if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
+				locals.set(sp.local.name, '*');
+				importsHook = true;
+				continue;
+			}
 			if (sp.type !== 'ImportSpecifier') continue;
 			const imported = sp.imported?.name;
 			const local = sp.local?.name;
@@ -63,10 +67,10 @@ function isTransparentStateTupleWrapper(node, child) {
 	);
 }
 
-// Mark base-hook calls whose source tuple can observe index 2. Direct fixed
-// destructures that omit it keep the existing two-item runtime path; escaped or
-// otherwise ambiguous tuples conservatively receive the full getter-enabled shape.
-function collectStateGetterCalls(ast, locals) {
+// Mark base-hook calls whose source tuple can observe index 2. The public base
+// hooks stay on the physical two-item path; escaped or ambiguous tuples
+// conservatively receive the getter-enabled shape.
+function collectStateGetterCalls(ast) {
 	const calls = new WeakSet();
 	const ancestors = [];
 	function walk(node) {
@@ -75,8 +79,8 @@ function collectStateGetterCalls(ast, locals) {
 			for (const child of node) walk(child);
 			return;
 		}
-		if (node.type === 'CallExpression' && node.callee?.type === 'Identifier') {
-			const imported = locals.get(node.callee.name);
+		if (node.type === 'CallExpression') {
+			const imported = node._octaneImportedHook;
 			if (STATE_GETTER_HELPERS[imported]) {
 				let child = node;
 				let i = ancestors.length - 1;
@@ -136,10 +140,13 @@ function walk(node, fnName, st) {
 	}
 	const childFn = node.type === 'FunctionDeclaration' && node.id ? node.id.name : fnName;
 
-	if (node.type === 'CallExpression' && node.callee?.type === 'Identifier') {
-		const local = node.callee.name;
-		const imported = st.locals.get(local);
+	if (node.type === 'CallExpression') {
+		const imported = node._octaneImportedHook;
 		if (imported && HOOK_NAMES.has(imported)) {
+			const local =
+				node.callee?.type === 'Identifier'
+					? node.callee.name
+					: `${node.callee?.object?.name || 'octane'}.${imported}`;
 			const id = st.nextId++;
 			const sym = `_h$${id}`;
 			if (st.hmr) {
@@ -227,7 +234,7 @@ export function slotHooks(source, id, options) {
 			filename: id,
 			onlyImported: true,
 		}),
-		getterCalls: collectStateGetterCalls(ast, locals),
+		getterCalls: collectStateGetterCalls(ast),
 		getterHelpers: new Map(),
 		filename: id,
 		hmr: !!(options && options.hmr),

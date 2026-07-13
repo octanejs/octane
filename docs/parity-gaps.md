@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE — do not edit. Regenerate with `pnpm parity:gaps`. -->
 
-The **executable** parity backlog: every `it.fails(...)` pin under
+The **executable** parity backlog: every `it.fails(...)` or `test.fails(...)` pin under
 `packages/octane/tests`. Each pin is a real, currently-failing divergence from
 React — when the runtime is fixed the pin flips red in the suite and must be
 converted to a plain `it`, and this index must be regenerated

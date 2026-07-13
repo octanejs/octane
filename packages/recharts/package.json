@@ -3,6 +3,9 @@
   "version": "0.1.2",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "description": "Recharts for the octane renderer — reuses recharts' framework-agnostic core (Redux Toolkit state, reselect, d3 via victory-vendor) and swaps the React layer for octane's hooks.",
   "author": {
     "name": "Dominic Gannaway",
@@ -37,14 +40,17 @@
     "es-toolkit": "catalog:default",
     "eventemitter3": "catalog:default",
     "immer": "catalog:default",
-    "octane": "workspace:*",
     "reselect": "catalog:default",
     "tiny-invariant": "catalog:default",
     "victory-vendor": "catalog:default"
   },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
+    "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "recharts": "catalog:default",

@@ -19,15 +19,17 @@
  * It is unused in dev (dev SSR loads modules through `vite.ssrLoadModule`).
  */
 
-/** @import { Route } from '@octanejs/vite-plugin' */
+/** @import { Route, RootBoundaryOptions } from '@octanejs/vite-plugin' */
 /** @import { ClientAssetEntry } from '../../types/production.d.ts' */
 
-import { get_route_entry_path } from '../routes.js';
+import { get_route_entry_export_name, get_route_entry_path } from '../routes.js';
 
 /**
  * @typedef {Object} ServerEntryOptions
  * @property {Route[]} routes - Route definitions from octane.config.ts
  * @property {string} octaneConfigPath - Absolute path to octane.config.ts
+ * @property {RootBoundaryOptions} [rootBoundary] - Importable app-wide boundary entries
+ * @property {string[]} [rpcModulePaths] - Vite-root module paths containing `module server`
  * @property {Record<string, ClientAssetEntry>} [clientAssetMap] - Route entry path → built client asset paths
  */
 
@@ -36,13 +38,23 @@ import { get_route_entry_path } from '../routes.js';
  * @returns {string} The generated JavaScript module source
  */
 export function generateServerEntry(options) {
-	const { routes, octaneConfigPath, clientAssetMap = {} } = options;
+	const {
+		routes,
+		octaneConfigPath,
+		rootBoundary = {},
+		rpcModulePaths = [],
+		clientAssetMap = {},
+	} = options;
 
 	// Unique page-entry and layout module paths (multiple routes may share both).
 	/** @type {Map<string, string>} module path → import variable name */
 	const page_imports = new Map();
 	/** @type {Map<string, string>} */
 	const layout_imports = new Map();
+	/** @type {Map<string, string>} */
+	const rpc_imports = new Map();
+	/** @type {Map<string, string>} */
+	const boundary_imports = new Map();
 
 	for (const route of routes) {
 		if (route.type !== 'render') continue;
@@ -55,12 +67,35 @@ export function generateServerEntry(options) {
 		}
 	}
 
+	for (const entry of [rootBoundary.pending, rootBoundary.catch]) {
+		const modulePath = get_route_entry_path(entry);
+		if (modulePath && !boundary_imports.has(modulePath)) {
+			boundary_imports.set(modulePath, `_boundary_${boundary_imports.size}`);
+		}
+	}
+
+	for (const modulePath of rpcModulePaths) {
+		if (!page_imports.has(modulePath)) {
+			rpc_imports.set(modulePath, `_rpc_${rpc_imports.size}`);
+		}
+	}
+
 	const import_lines = [];
 	for (const [modulePath, varName] of page_imports) {
 		import_lines.push(`import * as ${varName} from ${JSON.stringify(modulePath)};`);
 	}
 	for (const [modulePath, varName] of layout_imports) {
 		import_lines.push(`import * as ${varName} from ${JSON.stringify(modulePath)};`);
+	}
+	for (const [modulePath, varName] of boundary_imports) {
+		if (!page_imports.has(modulePath) && !layout_imports.has(modulePath)) {
+			import_lines.push(`import * as ${varName} from ${JSON.stringify(modulePath)};`);
+		}
+	}
+	for (const [modulePath, varName] of rpc_imports) {
+		if (!boundary_imports.has(modulePath) && !layout_imports.has(modulePath)) {
+			import_lines.push(`import * as ${varName} from ${JSON.stringify(modulePath)};`);
+		}
 	}
 
 	// The manifest maps MODULE PATHS to module namespaces; createHandler picks
@@ -70,6 +105,25 @@ export function generateServerEntry(options) {
 		.join('\n');
 	const layout_entries = [...layout_imports]
 		.map(([modulePath, varName]) => `\t${JSON.stringify(modulePath)}: ${varName},`)
+		.join('\n');
+
+	const import_var_for = (/** @type {string} */ modulePath) =>
+		page_imports.get(modulePath) ??
+		layout_imports.get(modulePath) ??
+		boundary_imports.get(modulePath) ??
+		rpc_imports.get(modulePath);
+	const boundary_value = (/** @type {unknown} */ entry) => {
+		const modulePath = get_route_entry_path(/** @type {any} */ (entry));
+		if (!modulePath) return 'null';
+		const varName = import_var_for(modulePath);
+		const exportName = get_route_entry_export_name(/** @type {any} */ (entry));
+		return `getComponentExport(${varName}, ${JSON.stringify(exportName ?? null)})`;
+	};
+	const rpc_entries = rpcModulePaths
+		.map((modulePath) => {
+			const varName = import_var_for(modulePath);
+			return `\t${JSON.stringify(modulePath)}: ${varName}._$_server_$_,`;
+		})
 		.join('\n');
 
 	return `\
@@ -82,7 +136,13 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
-import { renderToReadableStream, executeServerFunction } from 'octane/server';
+import {
+	renderToReadableStream,
+	executeServerFunction,
+	Suspense,
+	ErrorBoundary,
+	createElement,
+} from 'octane/server';
 import { prerender } from 'octane/static';
 import { createHandler, resolveOctaneConfig } from '@octanejs/vite-plugin/production';
 import { createNodeServer, nodeRequestToWebRequest, sendWebResponse } from '@octanejs/vite-plugin/node';
@@ -118,6 +178,31 @@ const layouts = {
 ${layout_entries}
 };
 
+function getComponentExport(module, exportName) {
+	if (exportName) return typeof module[exportName] === 'function' ? module[exportName] : null;
+	if (typeof module.default === 'function') return module.default;
+	return Object.entries(module).find(([key, value]) =>
+		typeof value === 'function' && /^[A-Z]/.test(key))?.[1] ?? null;
+}
+
+const rootBoundary = {
+	pending: ${boundary_value(rootBoundary.pending)},
+	catch: ${boundary_value(rootBoundary.catch)},
+};
+
+const rootBoundaryEntries = ${JSON.stringify(
+		{
+			pending: serialize_entry(rootBoundary.pending),
+			catch: serialize_entry(rootBoundary.catch),
+		},
+		null,
+		'\t',
+	)};
+
+const rpcModules = {
+${rpc_entries}
+};
+
 const clientAssets = ${JSON.stringify(clientAssetMap, null, '\t')};
 
 export const handler = createHandler(
@@ -128,9 +213,10 @@ export const handler = createHandler(
 		middlewares: octaneConfig.middlewares,
 		trustProxy: octaneConfig.server.trustProxy,
 		render: octaneConfig.server.render,
-		rootBoundary: octaneConfig.rootBoundary,
+		rootBoundary,
+		rootBoundaryEntries,
 		preHydrate: octaneConfig.router.preHydrate ?? null,
-		rpcModules: {},
+		rpcModules,
 		runtime,
 		clientAssets,
 	},
@@ -139,6 +225,9 @@ export const handler = createHandler(
 		prerender,
 		htmlTemplate,
 		executeServerFunction,
+		Suspense,
+		ErrorBoundary,
+		createElement,
 	},
 );
 
@@ -181,4 +270,17 @@ if (isMainModule) {
 	console.log('[@octanejs/vite-plugin] Production server listening on port ' + port);
 }
 `;
+}
+
+/**
+ * @param {unknown} entry
+ * @returns {{ path: string, exportName: string | null } | null}
+ */
+function serialize_entry(entry) {
+	const path = get_route_entry_path(/** @type {any} */ (entry));
+	if (!path) return null;
+	return {
+		path,
+		exportName: get_route_entry_export_name(/** @type {any} */ (entry)) ?? null,
+	};
 }

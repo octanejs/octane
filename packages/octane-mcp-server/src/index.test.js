@@ -11,6 +11,7 @@ import {
 	scaffoldReactPort,
 	validationFor,
 } from './index.js';
+import { KNOWN_BINDING_PACKAGE_DIRS } from './bridge.js';
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -24,6 +25,20 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(areaForPath('packages/octane-mcp-server/src/index.js')).toBe('mcp-server');
 		expect(areaForPath('benchmarks/news/run.mjs')).toBe('benchmark');
 		expect(areaForPath('.rulesync/rules/project.md')).toBe('rulesync-source');
+	});
+
+	it('classifies every maintained binding and recommends its test project', () => {
+		const paths = [...KNOWN_BINDING_PACKAGE_DIRS].map(
+			(directory) => `packages/${directory}/src/index.ts`,
+		);
+		const commands = validationFor(paths, 'binding');
+
+		for (const directory of KNOWN_BINDING_PACKAGE_DIRS) {
+			expect(areaForPath(`packages/${directory}/src/index.ts`)).toBe('ecosystem-binding');
+			expect(commands).toContain(
+				`./node_modules/.bin/vitest run packages/${directory}/tests --project ${directory}`,
+			);
+		}
 	});
 
 	it('recommends validation commands from changed paths', () => {

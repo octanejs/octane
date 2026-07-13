@@ -13,6 +13,7 @@
 
 export { RenderRoute, ServerRoute } from './routes.js';
 export { resolveOctaneConfig } from './resolve-config.js';
+export { OCTANE_NONCE_STATE_KEY } from './constants.js';
 
 // Mirrors src/index.js — enforce types / DX only.
 export function defineConfig(/** @type {any} */ options) {

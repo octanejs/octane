@@ -62,10 +62,10 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		const { html } = await prerender(server.AsyncUndef, {
 			promise: Promise.resolve(undefined),
 		});
-		// Server saw `undefined` and the seed encodes it via the sentinel — NOT
+		// Server saw `undefined` and the seed encodes it via a scalar wire escape — NOT
 		// `[null]` (which a naive JSON.stringify of `[undefined]` would produce).
 		expect(html).toContain('<div id="undef">is-undefined</div>');
-		expect(html).toContain('__octane_new_undefined__');
+		expect(html).toContain('\\u0000octane:ssr-seed:u');
 		expect(html).not.toContain('>[null]<');
 
 		container.innerHTML = html;

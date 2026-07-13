@@ -1,14 +1,28 @@
 // Playground tests — the in-browser compile pipeline (the same
 // `octane/compiler` call the page makes), the sandbox boundary's static shape,
 // and the /playground route's static shell. The full editor/preview stack
-// (CodeMirror + Shiki + sandboxed-iframe execution) is browser-only and is
-// exercised by the dev-SSR path, not jsdom.
-import { describe, it, expect, afterEach } from 'vitest';
+// (CodeMirror + Shiki + sandboxed-iframe execution) is browser-only; the real
+// browser hydration suite runs the default program and clicks its Increment
+// button inside the opaque-origin frame.
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
-import { compilePlayground, createPreview, DEFAULT_SOURCES } from '../src/lib/playground.ts';
-import { sandboxSrcdoc } from '../src/lib/playground-sandbox.ts';
+import {
+	compilePlayground,
+	createPreview,
+	DEFAULT_SOURCES,
+	PREVIEW_READY_TIMEOUT_MS,
+	PREVIEW_RUN_TIMEOUT_MS,
+} from '../src/lib/playground.ts';
+import { PROTOCOL_KEY, sandboxSrcdoc } from '../src/lib/playground-sandbox.ts';
+import {
+	decodePlaygroundHash,
+	encodePlaygroundHash,
+	MAX_PLAYGROUND_HASH_LENGTH,
+	MAX_PLAYGROUND_SOURCE_LENGTH,
+	PLAYGROUND_SOURCE_LIMIT_ERROR,
+} from '../src/lib/playground-hash.ts';
 
 afterEach(cleanup);
 
@@ -52,6 +66,45 @@ describe('playground compile pipeline', () => {
 	});
 });
 
+describe('playground shared-hash bounds', () => {
+	it('round-trips a bounded source payload', () => {
+		const source = 'export default function App() { return "✓"; }';
+		const encoded = encodePlaygroundHash(source, 'tsx');
+		expect(encoded.length).toBeGreaterThan(0);
+		expect(decodePlaygroundHash(encoded)).toEqual({
+			ok: true,
+			value: { source, lang: 'tsx' },
+		});
+	});
+
+	it('rejects an oversized encoded payload before base64 decoding', () => {
+		const atobSpy = vi.spyOn(globalThis, 'atob');
+		try {
+			expect(decodePlaygroundHash('A'.repeat(MAX_PLAYGROUND_HASH_LENGTH + 1))).toEqual({
+				ok: false,
+				error: PLAYGROUND_SOURCE_LIMIT_ERROR,
+			});
+			expect(atobSpy).not.toHaveBeenCalled();
+		} finally {
+			atobSpy.mockRestore();
+		}
+	});
+
+	it('rejects decoded source before it can reach CodeMirror or Shiki', () => {
+		const payload = JSON.stringify({
+			s: 'x'.repeat(MAX_PLAYGROUND_SOURCE_LENGTH + 1),
+			l: 'tsrx',
+		});
+		const encoded = btoa(payload);
+		expect(encoded.length).toBeLessThan(MAX_PLAYGROUND_HASH_LENGTH);
+		expect(decodePlaygroundHash(encoded)).toEqual({
+			ok: false,
+			error: PLAYGROUND_SOURCE_LIMIT_ERROR,
+		});
+		expect(encodePlaygroundHash('x'.repeat(MAX_PLAYGROUND_SOURCE_LENGTH + 1), 'tsrx')).toBe('');
+	});
+});
+
 describe('playground sandbox boundary', () => {
 	it('srcdoc pins the security posture: opaque-origin CSP, no network, no form submission', () => {
 		const srcdoc = sandboxSrcdoc();
@@ -84,6 +137,50 @@ describe('playground sandbox boundary', () => {
 			host.remove();
 		}
 		expect(host.querySelector('iframe')).toBeNull();
+	});
+
+	it('reports when the iframe never boots instead of leaving run pending', async () => {
+		vi.useFakeTimers();
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const preview = createPreview(host, () => {});
+		try {
+			const result = preview.run('export default function App() {}');
+			await vi.advanceTimersByTimeAsync(PREVIEW_READY_TIMEOUT_MS);
+			await expect(result).resolves.toEqual({
+				error:
+					'Preview sandbox did not boot before the timeout (iframe scripts may be unavailable).',
+			});
+		} finally {
+			preview.destroy();
+			host.remove();
+			vi.useRealTimers();
+		}
+	});
+
+	it('reports when a ready iframe never returns a render result', async () => {
+		vi.useFakeTimers();
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const preview = createPreview(host, () => {});
+		try {
+			const iframe = host.querySelector('iframe')!;
+			window.dispatchEvent(
+				new MessageEvent('message', {
+					source: iframe.contentWindow,
+					data: { [PROTOCOL_KEY]: true, type: 'ready' },
+				}),
+			);
+			const result = preview.run('export default function App() {}');
+			await vi.advanceTimersByTimeAsync(PREVIEW_RUN_TIMEOUT_MS);
+			await expect(result).resolves.toEqual({
+				error: 'Preview sandbox did not return a render result before the timeout.',
+			});
+		} finally {
+			preview.destroy();
+			host.remove();
+			vi.useRealTimers();
+		}
 	});
 });
 

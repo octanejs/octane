@@ -7,6 +7,7 @@ import { dirname } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { octane, isViteOwnedUrl, resolveOctaneConfig, RenderRoute } from '../src/index.js';
 import { RESOLVED_ADAPTER_BROWSER_STUB_ID } from '../src/project-codegen.js';
+import type { Component } from '@octanejs/vite-plugin';
 
 function url(u: string): URL {
 	return new URL(u, 'http://localhost');
@@ -63,6 +64,11 @@ describe('isViteOwnedUrl', () => {
 });
 
 describe('octane() plugin factory', () => {
+	it('types components with the live props-first ABI', () => {
+		const Component: Component<{ value: string }> = (props) => props.value;
+		expect(Component({ value: 'props-first' }, undefined)).toBe('props-first');
+	});
+
 	it('forwards `exclude` to the bundled compiler (hook-slotting skip)', () => {
 		const [compiler] = octane({ exclude: ['/packages/tanstack-router/src/'] });
 		const code =
@@ -124,6 +130,25 @@ describe('resolveOctaneConfig', () => {
 				router: { routes: [new RenderRoute({ path: '/', entry, status: 4.04 })] },
 			}),
 		).toThrow(/status/);
+	});
+
+	it('accepts importable root boundary entries and rejects runtime functions', () => {
+		const resolved = resolveOctaneConfig({
+			rootBoundary: {
+				pending: '/src/Pending.tsrx',
+				catch: ['RootCatch', '/src/Catch.tsrx'],
+			},
+		});
+		expect(resolved.rootBoundary).toEqual({
+			pending: '/src/Pending.tsrx',
+			catch: ['RootCatch', '/src/Catch.tsrx'],
+		});
+		expect(() =>
+			resolveOctaneConfig({
+				// @ts-expect-error Config must be serializable across client/server builds.
+				rootBoundary: { pending: () => undefined },
+			}),
+		).toThrow(/rootBoundary\.pending/);
 	});
 });
 

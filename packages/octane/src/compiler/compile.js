@@ -33,6 +33,7 @@ import {
 	renderStylesheets,
 	annotateWithHash,
 	createStyleClassMapFromStylesheet,
+	strongHash,
 } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
@@ -239,10 +240,19 @@ export function rtAlias(name) {
 // Merge one import list: user specifiers verbatim (preserving `x as y`
 // aliases) + every generated-code helper aliased to `_$name`.
 function buildRuntimeImport(ctx, moduleName) {
+	let out = '';
+	for (const local of ctx.userRuntimeNamespaces || []) {
+		out += `import * as ${local} from '${moduleName}';\n`;
+	}
+	for (const local of ctx.userRuntimeDefaults || []) {
+		out += `import ${local} from '${moduleName}';\n`;
+	}
 	const specifiers = new Set(ctx.userRuntimeNames);
 	for (const n of ctx.runtimeNeeded) specifiers.add(`${n} as ${rtAlias(n)}`);
-	if (specifiers.size === 0) return '';
-	return `import { ${[...specifiers].sort().join(', ')} } from '${moduleName}';\n\n`;
+	if (specifiers.size > 0) {
+		out += `import { ${[...specifiers].sort().join(', ')} } from '${moduleName}';\n`;
+	}
+	return out === '' ? '' : out + '\n';
 }
 
 // Record a user `import { … } from 'octane'` declaration's specifiers so the
@@ -250,6 +260,14 @@ function buildRuntimeImport(ctx, moduleName) {
 // references (including `imported as local` renames).
 function addUserImportSpecifiers(ctx, node) {
 	for (const sp of node.specifiers || []) {
+		if (sp.type === 'ImportNamespaceSpecifier') {
+			if (sp.local?.name) ctx.userRuntimeNamespaces.add(sp.local.name);
+			continue;
+		}
+		if (sp.type === 'ImportDefaultSpecifier') {
+			if (sp.local?.name) ctx.userRuntimeDefaults.add(sp.local.name);
+			continue;
+		}
 		if (
 			sp.type === 'ImportSpecifier' &&
 			sp.imported?.name &&
@@ -262,6 +280,23 @@ function addUserImportSpecifiers(ctx, node) {
 		const name = sp.imported?.name || sp.local?.name;
 		if (name) ctx.userRuntimeNames.add(name);
 	}
+}
+
+/** Imported-name lookup used by hook slotting (including aliases/namespaces). */
+function collectOctaneImportBindings(astBody) {
+	const locals = new Map();
+	const namespaces = new Set();
+	for (const node of astBody) {
+		if (node.type !== 'ImportDeclaration' || node.source.value !== 'octane') continue;
+		for (const sp of node.specifiers || []) {
+			if (sp.type === 'ImportSpecifier' && sp.local?.name && sp.imported?.name) {
+				locals.set(sp.local.name, sp.imported.name);
+			} else if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
+				namespaces.add(sp.local.name);
+			}
+		}
+	}
+	return { locals, namespaces };
 }
 
 // M3 marker elision (docs/comment-marker-elision-plan.md): a component body
@@ -335,14 +370,299 @@ function collectOctaneBoundaryNames(astBody) {
 // learn "this app uses ViewTransition" mid-drain — after the chance to
 // snapshot the old state has passed (docs/view-transitions-plan.md).
 function moduleImportsViewTransition(astBody) {
+	const namespaces = new Set();
 	for (const node of astBody) {
-		if (node.type !== 'ImportDeclaration' || node.source.value !== 'octane') continue;
-		for (const sp of node.specifiers || []) {
-			const imported = sp.imported?.name;
-			if (imported === 'ViewTransition' || imported === 'unstable_ViewTransition') return true;
+		if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
+			if (node.importKind === 'type') continue;
+			for (const sp of node.specifiers || []) {
+				if (sp.importKind === 'type') continue;
+				if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
+					namespaces.add(sp.local.name);
+					continue;
+				}
+				const imported = astName(sp.imported);
+				if (isViewTransitionName(imported)) return true;
+			}
+			continue;
+		}
+
+		// A direct barrel re-export creates the same runtime dependency as a named
+		// import. Arm the module itself so an app importing the alias gets the
+		// sticky hint before its first transition can reveal a boundary.
+		if (
+			node.type === 'ExportNamedDeclaration' &&
+			node.source?.value === 'octane' &&
+			node.exportKind !== 'type'
+		) {
+			for (const sp of node.specifiers || []) {
+				if (sp.exportKind !== 'type' && isViewTransitionName(astName(sp.local))) return true;
+			}
+		}
+		// A star barrel can expose ViewTransition without naming it in this AST,
+		// while the consuming module only sees the barrel's path. Conservatively arm
+		// runtime export-stars (including `export * as Octane`) at the source module.
+		if (
+			node.type === 'ExportAllDeclaration' &&
+			node.source?.value === 'octane' &&
+			node.exportKind !== 'type'
+		) {
+			return true;
 		}
 	}
-	return false;
+	if (namespaces.size === 0) return false;
+
+	// Follow simple module-level namespace aliases to a fixed point (`const X =
+	// Octane; const Y = X`). Consumers often shorten a namespace before using a
+	// member tag, and the alias remains statically tied to the actual import. The
+	// lexical walker below still rejects a same-named nested binding.
+	let addedNamespace = true;
+	while (addedNamespace) {
+		addedNamespace = false;
+		for (const statement of astBody) {
+			const declaration =
+				statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+			if (declaration?.type !== 'VariableDeclaration') continue;
+			for (const declarator of declaration.declarations || []) {
+				if (declarator.id?.type !== 'Identifier') continue;
+				const init = unwrapTransparentExpression(declarator.init);
+				if (init?.type !== 'Identifier' || !namespaces.has(init.name)) continue;
+				if (!namespaces.has(declarator.id.name)) {
+					namespaces.add(declarator.id.name);
+					addedNamespace = true;
+				}
+			}
+		}
+	}
+
+	// Namespace destructuring is another import alias form. Restrict this to
+	// module-level declarations whose initializer is the ACTUAL imported
+	// namespace; a similarly named object in a nested lexical scope is not
+	// evidence that Octane's ViewTransition is used. Static computed string keys
+	// are equivalent to identifier keys, while dynamic computed keys are not.
+	for (const statement of astBody) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (declaration?.type !== 'VariableDeclaration') continue;
+		for (const declarator of declaration.declarations || []) {
+			const init = unwrapTransparentExpression(declarator.init);
+			if (init?.type !== 'Identifier' || !namespaces.has(init.name)) continue;
+			if (objectPatternReadsViewTransition(declarator.id)) return true;
+		}
+	}
+
+	// A namespace import by itself is not evidence that the app uses view
+	// transitions (`import * as Octane` is also a common hook style). Look for a
+	// real, lexically-unshadowed member read/JSX tag so unrelated Suspense reveals
+	// are not wrapped merely because the namespace exists (or because a callback
+	// parameter happens to use the same name as the import).
+	let found = false;
+	const seen = new WeakSet();
+	const walk = (node, shadowed) => {
+		if (found || node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child, shadowed);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+
+		// Type-only syntax cannot cause the runtime namespace to be read. Preserve
+		// the handful of transparent TS expression wrappers, then skip other TS
+		// nodes entirely.
+		if (
+			node.type === 'TSAsExpression' ||
+			node.type === 'TSTypeAssertion' ||
+			node.type === 'TSSatisfiesExpression' ||
+			node.type === 'TSNonNullExpression' ||
+			node.type === 'TSInstantiationExpression'
+		) {
+			walk(node.expression, shadowed);
+			return;
+		}
+		if (node.type?.startsWith('TS')) return;
+
+		if (node.type === 'MemberExpression' || node.type === 'JSXMemberExpression') {
+			const objectName = node.object?.name;
+			const propertyName = memberPropertyName(node);
+			if (
+				namespaces.has(objectName) &&
+				!shadowed.has(objectName) &&
+				isViewTransitionName(propertyName)
+			) {
+				found = true;
+				return;
+			}
+			walk(node.object, shadowed);
+			if (node.computed) walk(node.property, shadowed);
+			return;
+		}
+
+		if (
+			node.type === 'FunctionExpression' ||
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'ArrowFunctionExpression'
+		) {
+			const inner = new Set(shadowed);
+			for (const param of node.params || []) addNamespaceBindings(param, inner);
+			if (node.id) addNamespaceBindings(node.id, inner);
+			collectFunctionVarNamespaceBindings(node.body, inner);
+			walk(node.body, inner);
+			return;
+		}
+
+		if (node.type === 'BlockStatement') {
+			const inner = new Set(shadowed);
+			for (const statement of node.body || []) addDirectNamespaceBindings(statement, inner);
+			walk(node.body, inner);
+			return;
+		}
+
+		if (node.type === 'CatchClause') {
+			const inner = new Set(shadowed);
+			if (node.param) addNamespaceBindings(node.param, inner);
+			walk(node.body, inner);
+			return;
+		}
+
+		if (
+			node.type === 'ForStatement' ||
+			node.type === 'ForInStatement' ||
+			node.type === 'ForOfStatement'
+		) {
+			const inner = new Set(shadowed);
+			const left = node.type === 'ForStatement' ? node.init : node.left;
+			if (left?.type === 'VariableDeclaration') {
+				for (const declaration of left.declarations || []) {
+					addNamespaceBindings(declaration.id, inner);
+				}
+			}
+			walk(left, inner);
+			walk(node.test, inner);
+			walk(node.update, inner);
+			walk(node.right, inner);
+			walk(node.body, inner);
+			return;
+		}
+
+		if (node.type === 'VariableDeclarator') {
+			walk(node.init, shadowed);
+			return;
+		}
+
+		if (node.type === 'ImportDeclaration') return;
+		if (node.type === 'ExportNamedDeclaration') {
+			if (node.exportKind !== 'type') walk(node.declaration, shadowed);
+			return;
+		}
+		if (node.type === 'ExportDefaultDeclaration') {
+			walk(node.declaration, shadowed);
+			return;
+		}
+		for (const key in node) {
+			if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+			if (key === 'range' || key === 'metadata' || key === 'parent') continue;
+			walk(node[key], shadowed);
+		}
+	};
+	walk(astBody, new Set());
+	return found;
+
+	function isViewTransitionName(name) {
+		return name === 'ViewTransition' || name === 'unstable_ViewTransition';
+	}
+
+	function astName(node) {
+		if (node?.type === 'Identifier' || node?.type === 'JSXIdentifier') return node.name;
+		return typeof node?.value === 'string' ? node.value : null;
+	}
+
+	function staticPropertyName(node, computed) {
+		if (!computed) return astName(node);
+		if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
+		if (node?.type === 'TemplateLiteral' && (node.expressions?.length ?? 0) === 0) {
+			return node.quasis?.[0]?.value?.cooked ?? null;
+		}
+		return null;
+	}
+
+	function memberPropertyName(node) {
+		return staticPropertyName(node.property, node.computed === true);
+	}
+
+	function unwrapTransparentExpression(node) {
+		while (
+			node &&
+			(node.type === 'TSAsExpression' ||
+				node.type === 'TSTypeAssertion' ||
+				node.type === 'TSSatisfiesExpression' ||
+				node.type === 'TSNonNullExpression' ||
+				node.type === 'ParenthesizedExpression')
+		) {
+			node = node.expression;
+		}
+		return node;
+	}
+
+	function objectPatternReadsViewTransition(pattern) {
+		if (pattern?.type !== 'ObjectPattern') return false;
+		for (const property of pattern.properties || []) {
+			if (
+				property.type === 'Property' &&
+				isViewTransitionName(staticPropertyName(property.key, property.computed === true))
+			) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function addNamespaceBindings(pattern, shadowed) {
+		const bindings = new Set();
+		collectBindings(pattern, bindings);
+		for (const name of bindings) {
+			if (namespaces.has(name)) shadowed.add(name);
+		}
+	}
+
+	function addDirectNamespaceBindings(statement, shadowed) {
+		if (statement.type === 'VariableDeclaration') {
+			for (const declaration of statement.declarations || []) {
+				addNamespaceBindings(declaration.id, shadowed);
+			}
+			return;
+		}
+		if (
+			(statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') &&
+			statement.id
+		) {
+			addNamespaceBindings(statement.id, shadowed);
+		}
+	}
+
+	function collectFunctionVarNamespaceBindings(node, shadowed) {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) collectFunctionVarNamespaceBindings(child, shadowed);
+			return;
+		}
+		if (
+			node.type === 'FunctionExpression' ||
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'ArrowFunctionExpression'
+		) {
+			return;
+		}
+		if (node.type === 'VariableDeclaration' && node.kind === 'var') {
+			for (const declaration of node.declarations || []) {
+				addNamespaceBindings(declaration.id, shadowed);
+			}
+		}
+		for (const key in node) {
+			if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+			if (key === 'range' || key === 'metadata' || key === 'parent') continue;
+			collectFunctionVarNamespaceBindings(node[key], shadowed);
+		}
+	}
 }
 
 export const HOOK_NAMES = new Set([
@@ -1380,6 +1700,360 @@ function isTypeOnlyStatement(node) {
 	return false;
 }
 
+// ---------------------------------------------------------------------------
+// `module server` analysis + emit
+// ---------------------------------------------------------------------------
+
+function isServerModuleDeclaration(node) {
+	return (
+		node?.type === 'TSModuleDeclaration' &&
+		node.declare !== true &&
+		node.metadata?.module_keyword === 'module'
+	);
+}
+
+function identifierName(node) {
+	if (node?.type === 'Identifier') return node.name;
+	if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
+	return null;
+}
+
+function unwrapServerFunctionInitializer(node) {
+	let current = node;
+	while (
+		current &&
+		(current.type === 'TSAsExpression' ||
+			current.type === 'TSSatisfiesExpression' ||
+			current.type === 'TSNonNullExpression' ||
+			current.type === 'TypeCastExpression' ||
+			current.type === 'ParenthesizedExpression')
+	) {
+		current = current.expression;
+	}
+	return current;
+}
+
+function collectServerFunctionBindings(statements) {
+	const functions = new Set();
+	const aliases = new Map();
+
+	for (const statement of statements) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (!declaration || isTypeOnlyStatement(declaration)) continue;
+		if (declaration.type === 'FunctionDeclaration' && declaration.id) {
+			functions.add(declaration.id.name);
+			continue;
+		}
+		if (declaration.type !== 'VariableDeclaration') continue;
+		for (const item of declaration.declarations || []) {
+			if (item.id?.type !== 'Identifier' || !item.init) continue;
+			const init = unwrapServerFunctionInitializer(item.init);
+			if (init?.type === 'FunctionExpression' || init?.type === 'ArrowFunctionExpression') {
+				functions.add(item.id.name);
+			} else if (init?.type === 'Identifier') {
+				aliases.set(item.id.name, init.name);
+			}
+		}
+	}
+
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const [local, target] of aliases) {
+			if (!functions.has(local) && functions.has(target)) {
+				functions.add(local);
+				changed = true;
+			}
+		}
+	}
+	return functions;
+}
+
+function collectStatementBindings(statement, out) {
+	if (statement?.type === 'ExportNamedDeclaration') {
+		for (const specifier of statement.specifiers || []) {
+			if (specifier.local) collectBindings(specifier.local, out);
+			if (specifier.exported) collectBindings(specifier.exported, out);
+		}
+	}
+	const declaration =
+		statement?.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+	if (!declaration) return;
+	if (declaration.type === 'ImportDeclaration') {
+		for (const specifier of declaration.specifiers || []) {
+			if (specifier.local) collectBindings(specifier.local, out);
+			// collectFreeIdentifiers treats an ImportSpecifier's imported name as
+			// an identifier reference; mark that syntax position as local too.
+			if (specifier.imported) collectBindings(specifier.imported, out);
+		}
+	} else if (declaration.type === 'VariableDeclaration') {
+		for (const item of declaration.declarations || []) collectBindings(item.id, out);
+	} else if (
+		(declaration.type === 'FunctionDeclaration' || declaration.type === 'ClassDeclaration') &&
+		declaration.id
+	) {
+		collectBindings(declaration.id, out);
+	}
+}
+
+function validateServerModuleIsolation(ast, declaration, filename) {
+	const outerBindings = new Set();
+	for (const statement of ast.body) {
+		if (
+			statement !== declaration &&
+			!(statement.type === 'ImportDeclaration' && statement.source?.value === 'server')
+		) {
+			collectStatementBindings(statement, outerBindings);
+		}
+	}
+	if (outerBindings.size === 0) return;
+
+	const serverBindings = new Set();
+	for (const statement of declaration.body?.body || []) {
+		collectStatementBindings(statement, serverBindings);
+	}
+	const free = collectFreeIdentifiers(declaration.body, serverBindings);
+	const captures = [...free].filter((name) => outerBindings.has(name)).sort();
+	if (captures.length > 0) {
+		throw new Error(
+			`\`module server\` cannot reference client-module bindings (${captures.join(', ')}) in ${filename}; declare or import them inside the server block.`,
+		);
+	}
+}
+
+function assertServerModulesAreTopLevel(ast, filename) {
+	const topLevel = new Set(ast.body);
+	const seen = new WeakSet();
+	function walk(node) {
+		if (node === null || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (isServerModuleDeclaration(node) && !topLevel.has(node)) {
+			throw new Error(`\`module server\` can only be declared at module level (${filename}).`);
+		}
+		for (const [key, value] of Object.entries(node)) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			if (Array.isArray(value)) {
+				for (const child of value) walk(child);
+			} else {
+				walk(value);
+			}
+		}
+	}
+	walk(ast);
+}
+
+/**
+ * Validate the file-local server submodule contract once, before either
+ * client or server codegen mutates the AST.
+ */
+function analyzeServerModule(ast, filename) {
+	assertServerModulesAreTopLevel(ast, filename);
+	let declaration = null;
+	const imports = [];
+	/** @type {Map<string, string>} exported name -> local name */
+	const exports = new Map();
+
+	for (const node of ast.body) {
+		if (isServerModuleDeclaration(node)) {
+			const name = identifierName(node.id);
+			if (name !== 'server') {
+				throw new Error(
+					`Octane only supports \`module server\` submodules, found \`module ${name ?? '<unknown>'}\` in ${filename}.`,
+				);
+			}
+			if (declaration !== null) {
+				throw new Error(
+					`Only one \`module server\` declaration is allowed per file (${filename}).`,
+				);
+			}
+			declaration = node;
+		}
+		if (node.type === 'ImportDeclaration' && node.source?.value === 'server') {
+			if (node.importKind === 'type') continue;
+			const valueSpecifiers = (node.specifiers || []).filter(
+				(specifier) => specifier.importKind !== 'type',
+			);
+			for (const specifier of valueSpecifiers) {
+				if (specifier.type !== 'ImportSpecifier') {
+					throw new Error('Only named imports are supported from `module server`.');
+				}
+			}
+			if (valueSpecifiers.length > 0) imports.push(node);
+		}
+	}
+
+	if (declaration === null) {
+		if (imports.length > 0) {
+			throw new Error(
+				`Cannot import from \`server\` because ${filename} has no \`module server\` declaration.`,
+			);
+		}
+		return null;
+	}
+
+	const statements = declaration.body?.body || [];
+	validateServerModuleIsolation(ast, declaration, filename);
+	const functionBindings = collectServerFunctionBindings(statements);
+	for (const statement of statements) {
+		if (statement.type === 'ExportDefaultDeclaration') {
+			throw new Error('`module server` does not support default exports; use named functions.');
+		}
+		if (statement.type === 'ExportAllDeclaration') {
+			throw new Error('`module server` does not support export-all declarations.');
+		}
+		if (statement.type !== 'ExportNamedDeclaration' || statement.exportKind === 'type') continue;
+		if (statement.source) {
+			throw new Error('`module server` does not support re-exports from another module.');
+		}
+
+		const decl = statement.declaration;
+		if (decl) {
+			if (decl.type === 'FunctionDeclaration' && decl.id) {
+				exports.set(decl.id.name, decl.id.name);
+			} else if (decl.type === 'VariableDeclaration') {
+				for (const item of decl.declarations || []) {
+					if (item.id?.type !== 'Identifier') {
+						throw new Error('`module server` exported variables must use identifier bindings.');
+					}
+					if (!functionBindings.has(item.id.name)) {
+						throw new Error(
+							'`module server` exported variables must be initialized with a function.',
+						);
+					}
+					exports.set(item.id.name, item.id.name);
+				}
+			} else if (!isTypeOnlyStatement(decl)) {
+				throw new Error('`module server` exports must be functions or function-valued variables.');
+			}
+		}
+
+		for (const specifier of statement.specifiers || []) {
+			if (specifier.exportKind === 'type') continue;
+			const local = identifierName(specifier.local);
+			const exported = identifierName(specifier.exported);
+			if (local && exported) {
+				if (!functionBindings.has(local)) {
+					throw new Error('`module server` export specifiers must reference local functions.');
+				}
+				exports.set(exported, local);
+			}
+		}
+	}
+
+	for (const node of imports) {
+		for (const specifier of node.specifiers) {
+			if (specifier.importKind === 'type') continue;
+			const imported = identifierName(specifier.imported);
+			if (imported !== null && !exports.has(imported)) {
+				throw new Error(`Module \`server\` does not export \`${imported}\` in ${filename}.`);
+			}
+		}
+	}
+
+	return { declaration, imports, exports, filename };
+}
+
+function indentCode(code, spaces = 1) {
+	const prefix = '\t'.repeat(spaces);
+	return prefix + code.replace(/\n/g, '\n' + prefix);
+}
+
+/**
+ * Emit the server namespace itself for SSR, or RPC stubs for the browser.
+ * Synthetic `from 'server'` imports are file-local and are always emitted
+ * before ordinary module statements, independent of source order.
+ */
+function emitServerModulePrelude(info, ctx) {
+	if (info === null) return '';
+	let code = '';
+
+	if (ctx.mode === 'server') {
+		const body = [];
+		const importLocals = [];
+		let importIndex = 0;
+
+		for (const statement of info.declaration.body?.body || []) {
+			if (isTypeOnlyStatement(statement)) continue;
+			if (statement.type === 'ImportDeclaration') {
+				if (statement.importKind === 'type') continue;
+				const valueSpecifiers = (statement.specifiers || []).filter(
+					(specifier) => specifier.importKind !== 'type',
+				);
+				if ((statement.specifiers || []).length === 0) {
+					code += `import ${JSON.stringify(statement.source.value)};\n`;
+					continue;
+				}
+				if (valueSpecifiers.length === 0) continue;
+				const moduleName = `__oct_server_import$${importIndex++}`;
+				code += `import * as ${moduleName} from ${JSON.stringify(statement.source.value)};\n`;
+				for (const specifier of valueSpecifiers) {
+					const local = specifier.local?.name;
+					if (!local) continue;
+					if (specifier.type === 'ImportNamespaceSpecifier') {
+						importLocals.push(`const ${local} = ${moduleName};`);
+					} else if (specifier.type === 'ImportDefaultSpecifier') {
+						importLocals.push(`const ${local} = ${moduleName}.default;`);
+					} else {
+						const imported = identifierName(specifier.imported);
+						importLocals.push(`const ${local} = ${moduleName}[${JSON.stringify(imported)}];`);
+					}
+				}
+				continue;
+			}
+
+			if (statement.type === 'ExportDefaultDeclaration') continue;
+			if (statement.type === 'ExportNamedDeclaration') {
+				if (statement.declaration && !isTypeOnlyStatement(statement.declaration)) {
+					body.push(printNode(statement.declaration));
+				}
+				continue;
+			}
+			body.push(printNode(statement));
+		}
+
+		code += 'export const _$_server_$_ = (() => {\n';
+		code += '\tconst server = {};\n';
+		for (const line of importLocals) code += indentCode(line) + '\n';
+		for (const statement of body) code += indentCode(statement) + '\n';
+		for (const [exported, local] of info.exports) {
+			code += `\tserver[${JSON.stringify(exported)}] = ${local};\n`;
+		}
+		code += '\treturn server;\n})();\n';
+
+		// Dev SSR initializes this map before loading the route module. Register
+		// hash -> [module path, export] so the request handler can lazy-load the
+		// same Vite module and resolve the real function.
+		if (info.exports.size > 0) {
+			code += 'const _$_rpc_modules_$_ = globalThis.rpc_modules;\n';
+			code += 'if (_$_rpc_modules_$_) {\n';
+			for (const exported of info.exports.keys()) {
+				const hash = strongHash(info.filename + '#' + exported);
+				code += `\t_$_rpc_modules_$_.set(${JSON.stringify(hash)}, [${JSON.stringify(info.filename)}, ${JSON.stringify(exported)}]);\n`;
+			}
+			code += '}\n';
+		}
+	}
+
+	for (const node of info.imports) {
+		for (const specifier of node.specifiers) {
+			if (specifier.importKind === 'type') continue;
+			const imported = identifierName(specifier.imported);
+			const local = specifier.local?.name;
+			if (!imported || !local) continue;
+			if (ctx.mode === 'server') {
+				code += `const ${local} = _$_server_$_[${JSON.stringify(imported)}];\n`;
+			} else {
+				ctx.runtimeNeeded.add('__serverRpc');
+				const hash = strongHash(info.filename + '#' + imported);
+				code += `const ${local} = (...args) => _$__serverRpc(${JSON.stringify(hash)}, args);\n`;
+			}
+		}
+	}
+
+	return code === '' ? '' : code + '\n';
+}
+
 const VLQ_B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 /** Base64-VLQ encode a list of signed integers (source-map v3 segment fields). */
@@ -1512,6 +2186,7 @@ export function compile(source, filename, options) {
 	// before emit — they carry no runtime value and would leak invalid TS into
 	// the .js (or crash the printer). Runtime-only; Volar keeps them.
 	ast.body = ast.body.filter((n) => !isTypeOnlyStatement(n));
+	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	normalizeArrowComponents(ast);
@@ -1542,6 +2217,8 @@ export function compile(source, filename, options) {
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
+		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`
+		userRuntimeDefaults: new Set(), // preserved verbatim; package resolution owns validity
 		hoistedTemplates: [], // { name, html }
 		hoistedHelpers: [], // raw JS strings (sub-components, hook Symbols, key fns)
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
@@ -1567,6 +2244,11 @@ export function compile(source, filename, options) {
 		// the top-level (autoCallback) pass and drained per component below.
 		_setupMaps: null,
 	};
+	{
+		const imports = collectOctaneImportBindings(ast.body);
+		ctx.octaneImportLocals = imports.locals;
+		ctx.octaneImportNamespaces = imports.namespaces;
+	}
 	// Imported local bindings (any source). Used by the M1 cross-module
 	// singleRoot sentinel: only an IMPORTED identifier is a stable component
 	// identity for the lifetime of a slot — a local `const Comp = cond ? A : B`
@@ -1722,13 +2404,13 @@ export function compile(source, filename, options) {
 		info.singleRoot = singleHostComponentRoot(compNode);
 	}
 
-	let body = '';
+	let body = emitServerModulePrelude(serverModuleInfo, ctx);
 	// Source-map bookkeeping. `bodySegments` collects mapping segments in
 	// body-relative coordinates (0-based line within `body`); they're shifted by
 	// the prelude line count and encoded at return. Segments come from esrap's
 	// real per-token maps (component setup statements, top-level passthrough
 	// statements) plus a coarse anchor at each component declaration line.
-	let bodyLine = 0;
+	let bodyLine = countNewlines(body);
 	const bodySegments = [];
 	const pushEsrapSegments = (baseLine, colShift, mappings) => {
 		for (let i = 0; i < mappings.length; i++) {
@@ -1763,6 +2445,12 @@ export function compile(source, filename, options) {
 	};
 	const compileOpts = { hmrWrap: hmrEnabled };
 	for (const node of ast.body) {
+		if (
+			node === serverModuleInfo?.declaration ||
+			(node.type === 'ImportDeclaration' && node.source?.value === 'server')
+		) {
+			continue;
+		}
 		if (isComponentFunction(node)) {
 			// `function Foo() @{ ... }` (new TSRX shape) — non-exported helper. HMR
 			// doesn't wrap these (they're not user-visible across module boundaries).
@@ -1992,6 +2680,7 @@ function compileServer(source, filename, options) {
 	// Drop type-only statements before emit (see isTypeOnlyStatement) — same as
 	// the client path; the server HTML-string output is plain JS too.
 	ast.body = ast.body.filter((n) => !isTypeOnlyStatement(n));
+	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	normalizeArrowComponents(ast);
@@ -2014,6 +2703,8 @@ function compileServer(source, filename, options) {
 		_pendingWarm: null, // `X.__warm = …` source, set by ssrCompileBody, drained by compileServerComponent
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
+		userRuntimeNamespaces: new Set(), // rewritten to the server runtime module
+		userRuntimeDefaults: new Set(),
 		hoistedHelpers: [],
 		cssInjections: [],
 		currentComponentLocals: null,
@@ -2026,12 +2717,23 @@ function compileServer(source, filename, options) {
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		_setupMaps: null,
 	};
+	{
+		const imports = collectOctaneImportBindings(ast.body);
+		ctx.octaneImportLocals = imports.locals;
+		ctx.octaneImportNamespaces = imports.namespaces;
+	}
 	// M3 inherit-range exclusion set — must match the client compile's
 	// (see inheritSoleCompRoot; both modes read the same import declarations).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
 
-	let body = '';
+	let body = emitServerModulePrelude(serverModuleInfo, ctx);
 	for (const node of ast.body) {
+		if (
+			node === serverModuleInfo?.declaration ||
+			(node.type === 'ImportDeclaration' && node.source?.value === 'server')
+		) {
+			continue;
+		}
 		if (isComponentFunction(node)) {
 			body += compileServerComponent(node, ctx) + '\n\n';
 		} else if (node.type === 'ExportDefaultDeclaration' && isComponentFunction(node.declaration)) {
@@ -2763,6 +3465,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 	const compExpr = tagExpr(node);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const propParts = [];
+	let keyExpr = null;
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 			propParts.push(`...(${printExprWithTsrx(attr.argument, ctx, name, inlinedSubs)})`);
@@ -2770,8 +3473,14 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const attrName = attr.name.name || attr.name;
-		if (attrName === 'key') continue;
 		const val = attr.value;
+		if (attrName === 'key') {
+			if (val != null) {
+				const inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
+				keyExpr = printExprWithTsrx(inner, ctx, name, inlinedSubs);
+			}
+			continue;
+		}
 		if (val == null) {
 			propParts.push(`${JSON.stringify(attrName)}: true`);
 			continue;
@@ -2836,7 +3545,9 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 		}
 	}
 	ctx.runtimeNeeded.add('ssrComponent');
-	return `_$ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} }${inherit ? ', true' : ''})`;
+	const trailing =
+		keyExpr !== null ? `, ${inherit ? 'true' : 'false'}, (${keyExpr})` : inherit ? ', true' : '';
+	return `_$ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} }${trailing})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -2877,13 +3588,15 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		elseCall = `${elseSub.fnName}(undefined, __s)`;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
+	ctx.runtimeNeeded.add('ssrControl');
+	ctx.runtimeNeeded.add('ssrArm');
 	// Nested ranges: the OUTER ssrBlock is the if-slot; the INNER one wraps the
 	// taken branch's content. The client adopts BOTH on hydration (slot = outer,
 	// branch = inner) so no comment markers are inserted — byte-for-byte, exactly
 	// like @for. The not-taken arm emits no inner range (just `''`).
-	const thenInner = `_$ssrBlock(${thenSub.fnName}(undefined, __s))`;
-	const elseInner = node.alternate ? `_$ssrBlock(${elseCall})` : "''";
-	return `_$ssrBlock((${testExpr}) ? ${thenInner} : ${elseInner})`;
+	const thenInner = `_$ssrArm("then", () => _$ssrBlock(${thenSub.fnName}(undefined, __s)))`;
+	const elseInner = node.alternate ? `_$ssrArm("else", () => _$ssrBlock(${elseCall}))` : "''";
+	return `_$ssrBlock(_$ssrControl("${ssrControlKey('if', node)}", () => ((${testExpr}) ? ${thenInner} : ${elseInner})))`;
 }
 
 function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
@@ -2899,15 +3612,45 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		const emptyStmts = node.empty.type === 'BlockStatement' ? node.empty.body : [node.empty];
 		const emptySub = ssrCompileSub(emptyStmts, ctx, '__sempty', [], cssHash, parentNs);
 		inlinedSubs.push(emptySub.fn + ';');
-		emptyCall = `${emptySub.fnName}(undefined, __s)`;
+		emptyCall = `_$ssrArm("empty", () => ${emptySub.fnName}(undefined, __s))`;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
+	ctx.runtimeNeeded.add('ssrControl');
+	ctx.runtimeNeeded.add('ssrArm');
+	let itemKey = '__it != null && __it.id != null ? __it.id : __it';
+	let explicitKey = null;
+	const firstEl = (node.body.body || []).find(
+		(child) => child.type === 'Element' || child.type === 'JSXElement',
+	);
+	if (firstEl) {
+		const keyAttr = (firstEl.attributes || firstEl.openingElement?.attributes || []).find(
+			(attr) => (attr.name?.name || attr.name) === 'key',
+		);
+		if (keyAttr?.value != null) {
+			explicitKey =
+				keyAttr.value.type === 'JSXExpressionContainer' ? keyAttr.value.expression : keyAttr.value;
+		}
+	}
+	if (explicitKey === null) explicitKey = node.key || null;
+	if (explicitKey !== null) {
+		const keyParams = [itemId];
+		if (node.index) keyParams.push(node.index);
+		const keyFn = printExpr({
+			type: 'ArrowFunctionExpression',
+			params: keyParams,
+			body: explicitKey,
+			expression: true,
+		});
+		itemKey = `(${keyFn})(__it${node.index ? ', __i' : ''})`;
+	} else if (node.index) {
+		itemKey = '__i';
+	}
 	const mapper = node.index
-		? `(__it, __i) => _$ssrBlock(${itemSub.fnName}(__it, __i, __s))`
-		: `(__it) => _$ssrBlock(${itemSub.fnName}(__it, __s))`;
+		? `(__it, __i) => _$ssrArm((${itemKey}), () => _$ssrBlock(${itemSub.fnName}(__it, __i, __s)))`
+		: `(__it, __i) => _$ssrArm((${itemKey}), () => _$ssrBlock(${itemSub.fnName}(__it, __s)))`;
 	// Eager: render every item now and join. No keyed reconciliation server-side;
 	// each item gets its own block marker for a future hydrate to match.
-	return `_$ssrBlock((() => { const __items = Array.from((${itemsExpr}) ?? []); return __items.length === 0 ? ${emptyCall} : __items.map(${mapper}).join(''); })())`;
+	return `_$ssrBlock(_$ssrControl("${ssrControlKey('for', node)}", () => { const __items = Array.from((${itemsExpr}) ?? []); return __items.length === 0 ? ${emptyCall} : __items.map(${mapper}).join(''); }))`;
 }
 
 function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
@@ -2915,18 +3658,26 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	const discExpr = printExpr(rewriteHookCalls(node.discriminant, ctx, name));
 	const arms = [];
 	let defaultCall = "''";
+	let caseIndex = 0;
 	for (const c of node.cases || []) {
 		const sub = ssrCompileSub(c.consequent || [], ctx, '__scase', [], cssHash, parentNs);
 		inlinedSubs.push(sub.fn + ';');
 		// Inner ssrBlock wraps the matched case's content (see ssrEmitIf) so the
 		// client adopts it as the branch range during hydration (no inserted markers).
-		if (c.test == null) defaultCall = `_$ssrBlock(${sub.fnName}(undefined, __s))`;
-		else arms.push(`__d === (${printExpr(c.test)}) ? _$ssrBlock(${sub.fnName}(undefined, __s))`);
+		if (c.test == null)
+			defaultCall = `_$ssrArm("default", () => _$ssrBlock(${sub.fnName}(undefined, __s)))`;
+		else
+			arms.push(
+				`__d === (${printExpr(c.test)}) ? _$ssrArm("case:${caseIndex}", () => _$ssrBlock(${sub.fnName}(undefined, __s)))`,
+			);
+		caseIndex++;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
+	ctx.runtimeNeeded.add('ssrControl');
+	ctx.runtimeNeeded.add('ssrArm');
 	// First case matching by strict-equality wins (no JS fall-through); else default.
 	const selector = arms.length ? `${arms.join(' : ')} : ${defaultCall}` : defaultCall;
-	return `_$ssrBlock((() => { const __d = (${discExpr}); return ${selector}; })())`;
+	return `_$ssrBlock(_$ssrControl("${ssrControlKey('switch', node)}", () => { const __d = (${discExpr}); return ${selector}; }))`;
 }
 
 function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
@@ -2971,11 +3722,16 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 // keyed ONLY on the node's source position (same AST → same offset across the
 // client and server compiles of one source), hashed compactly.
 function ssrTryKey(node) {
-	const pos = node && node.start != null ? node.start : 0;
-	const src = `try:${pos}`;
+	return ssrControlKey('try', node);
+}
+
+function ssrControlKey(kind, node) {
+	const loc = node && node.loc && node.loc.start;
+	const pos = node && node.start != null ? node.start : `${loc?.line ?? 0}:${loc?.column ?? 0}`;
+	const src = `${kind}:${pos}`;
 	let h = 5381;
 	for (let i = 0; i < src.length; i++) h = (Math.imul(h, 33) + src.charCodeAt(i)) | 0;
-	return 't' + (h >>> 0).toString(36);
+	return kind[0] + (h >>> 0).toString(36);
 }
 
 // `{createPortal(...)}` (and other JSX-bearing expression holes) at child
@@ -4124,13 +4880,19 @@ const JS_LOOP_WORD = {
 // bare `use` (keyed by per-render call order — `block.__thenableIdx` on the
 // client, the frame occurrence counter in runtime.server.ts) are NOT
 // slot-keyed, so they genuinely work in loops and are exempt.
-function slotKeyedHookName(n) {
+function slotKeyedHookName(n, ctx) {
 	if (n.type !== 'CallExpression') return null;
 	if (n.callee.type === 'Identifier') {
-		const name = n.callee.name;
-		if (HOOK_NAMES.has(name)) return name;
-		if (/^use[A-Z]/.test(name) && name !== 'useContext') return name;
+		const local = n.callee.name;
+		const imported = n._octaneImportedHook;
+		const shadowsImport = ctx.octaneImportLocals?.has(local) && imported === undefined;
+		if (imported !== undefined && HOOK_NAMES.has(imported)) return imported;
+		if (!shadowsImport && HOOK_NAMES.has(local)) return local;
+		if (/^use[A-Z]/.test(local) && local !== 'useContext') return local;
 		return null;
+	}
+	if (n._octaneImportedHook !== undefined && HOOK_NAMES.has(n._octaneImportedHook)) {
+		return n._octaneImportedHook;
 	}
 	if (
 		!n.optional &&
@@ -4230,7 +4992,7 @@ function rejectHookInJsLoop(loop, ctx, componentName) {
 			}
 		}
 		if (isFunctionNode(n) && !syncInvoked.has(n)) return;
-		const hook = slotKeyedHookName(n);
+		const hook = slotKeyedHookName(n, ctx);
 		if (hook !== null) {
 			const l = (n.loc && n.loc.start) || (loop.loc && loop.loc.start);
 			const at = l
@@ -4285,10 +5047,23 @@ function isTransparentStateTupleWrapper(node, child) {
 }
 
 // Source-level useState/useReducer tuples have a third getState member. Mark
-// calls that can observe it so rewriteHookCalls can select a specialized helper;
-// the ordinary two-item runtime path remains byte-for-byte for proven-dead
-// getters. Any escaping/ambiguous tuple is conservative and gets the full shape.
-function markStateGetterUsage(root) {
+// calls that can observe it so rewriteHookCalls can select the getter-enabled
+// helper; the public base hooks remain the allocation-free two-item path.
+// Escaping or ambiguous tuples conservatively receive the full shape.
+function stateTupleHookName(call, ctx) {
+	const callee = call?.callee;
+	const imported = call?._octaneImportedHook;
+	if (imported !== undefined) return STATE_GETTER_HELPERS[imported] ? imported : null;
+	if (callee?.type === 'Identifier') {
+		// Preserve the historical auto-import shorthand for an unbound bare base
+		// hook, but never mistake a lexically shadowed import alias for that hook.
+		if (ctx.octaneImportLocals?.has(callee.name)) return null;
+		return STATE_GETTER_HELPERS[callee.name] ? callee.name : null;
+	}
+	return null;
+}
+
+function markStateGetterUsage(root, ctx) {
 	const ancestors = [];
 	function walk(node) {
 		if (node == null || typeof node !== 'object') return;
@@ -4296,11 +5071,7 @@ function markStateGetterUsage(root) {
 			for (const child of node) walk(child);
 			return;
 		}
-		if (
-			node.type === 'CallExpression' &&
-			node.callee?.type === 'Identifier' &&
-			STATE_GETTER_HELPERS[node.callee.name]
-		) {
+		if (node.type === 'CallExpression' && stateTupleHookName(node, ctx) !== null) {
 			let child = node;
 			let i = ancestors.length - 1;
 			while (i >= 0 && isTransparentStateTupleWrapper(ancestors[i], child)) {
@@ -4333,7 +5104,7 @@ function markStateGetterUsage(root) {
 }
 
 function rewriteHookCalls(node, ctx, componentName) {
-	markStateGetterUsage(node);
+	markStateGetterUsage(node, ctx);
 	return mapAst(node, (n) => {
 		// A plain JS loop must not contain slot-keyed hook calls — reject before
 		// slotting. (A template `@for` is also a ForOfStatement; its JSX body tells
@@ -4345,7 +5116,10 @@ function rewriteHookCalls(node, ctx, componentName) {
 			rejectHookInJsLoop(n, ctx, componentName);
 		}
 		if (n.type === 'CallExpression' && n.callee.type === 'Identifier') {
-			const name = n.callee.name;
+			const localName = n.callee.name;
+			const importedName = n._octaneImportedHook;
+			const shadowsImport = ctx.octaneImportLocals?.has(localName) && importedName === undefined;
+			const name = importedName ?? localName;
 			// Three kinds of call get a trailing per-call-site slot symbol:
 			//  - a built-in base hook (HOOK_NAMES) — also needs its runtime import;
 			//  - a custom / library hook by React's `use[A-Z]` convention — e.g. a
@@ -4360,8 +5134,9 @@ function rewriteHookCalls(node, ctx, componentName) {
 			// NB: a `use*` NAME is reserved for hooks (React's convention) — a non-hook
 			// function named like one gets a harmless extra trailing argument (though
 			// inside a plain JS loop the convention is enforced: rejectHookInJsLoop).
-			const isBuiltin = HOOK_NAMES.has(name);
-			const isCustom = /^use[A-Z]/.test(name) && name !== 'useContext';
+			const isBuiltin = !shadowsImport && HOOK_NAMES.has(name);
+			const isCustom =
+				importedName === undefined && /^use[A-Z]/.test(localName) && localName !== 'useContext';
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isCustom || isServerUse) {
 				const getterHelper = n._octaneStateGetter ? STATE_GETTER_HELPERS[name] : null;
@@ -4371,10 +5146,11 @@ function rewriteHookCalls(node, ctx, componentName) {
 				// user binding of the same name can't shadow it.
 				if (isBuiltin) {
 					if (n.callee._octaneGenerated) ctx.runtimeNeeded.add(name);
-					else ctx.userRuntimeNames.add(name);
+					else ctx.userRuntimeNames.add(localName === name ? name : `${name} as ${localName}`);
 					if (getterHelper !== null) ctx.runtimeNeeded.add(getterHelper);
 				}
-				if (isServerUse) ctx.userRuntimeNames.add('use');
+				if (isServerUse)
+					ctx.userRuntimeNames.add(localName === name ? 'use' : `use as ${localName}`);
 				const debug = isServerUse
 					? `${componentName}.use#${ctx.nextHookSymId}`
 					: `${componentName}.${name}#${ctx.nextHookSymId}`;
@@ -4415,6 +5191,35 @@ function rewriteHookCalls(node, ctx, componentName) {
 							: n.callee._octaneGenerated
 								? { type: 'Identifier', name: rtAlias(name) }
 								: n.callee,
+					arguments: [...args, { type: 'Identifier', name: symVar }],
+				};
+			}
+		}
+		// Namespace-imported Octane hooks keep their member call intact while
+		// receiving the same trailing slot as named imports. This is deliberately
+		// separate from object-carried custom hooks below: `Octane.useState` is a
+		// base hook and must not be wrapped through withSlot.
+		if (
+			n.type === 'CallExpression' &&
+			!n.optional &&
+			n.callee.type === 'MemberExpression' &&
+			!n.callee.computed &&
+			n.callee.object.type === 'Identifier' &&
+			n.callee.property.type === 'Identifier' &&
+			n._octaneImportedHook !== undefined
+		) {
+			const name = n._octaneImportedHook;
+			const isBuiltin = HOOK_NAMES.has(name);
+			const isServerUse = name === 'use' && ctx.mode === 'server';
+			if (isBuiltin || isServerUse) {
+				const getterHelper = n._octaneStateGetter ? STATE_GETTER_HELPERS[name] : null;
+				if (getterHelper !== null) ctx.runtimeNeeded.add(getterHelper);
+				const symVar = allocHookSymbol(ctx, `${componentName}.${name}#${ctx.nextHookSymId}`);
+				const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName));
+				return {
+					...n,
+					callee:
+						getterHelper !== null ? { type: 'Identifier', name: rtAlias(getterHelper) } : n.callee,
 					arguments: [...args, { type: 'Identifier', name: symVar }],
 				};
 			}

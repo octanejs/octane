@@ -59,7 +59,9 @@ describe('built SSR handler', () => {
 		// and the template carries the built hydrate script.
 		expect(html).toContain('"entry":"/src/app/App.tsrx"');
 		expect(html).toContain('"preHydrate":"/src/app/router-client.ts"');
-		expect(html).toMatch(/<script type="module"[^>]*src="\/assets\/[^"]+\.js"/);
+		expect(html).toMatch(
+			/<script(?=[^>]*\bdata-octane-hydrate\b)(?=[^>]*\btype="module")(?=[^>]*\bsrc="\/assets\/[^"]+\.js")[^>]*>/,
+		);
 	});
 
 	it('server-renders an MDX doc through the bundle (Shiki output included)', async () => {

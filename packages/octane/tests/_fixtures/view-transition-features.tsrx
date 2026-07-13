@@ -64,3 +64,21 @@ export function RevealApp(props) @{
 		</>
 	</ViewTransition>
 }
+
+// The fallback contains no ViewTransition. Resolving the boundary mounts the
+// app's first one; the compiler's module-load __vtSeen hint must still arrange
+// the pre-snapshot before this reveal commit.
+export function FirstBoundaryRevealApp(props) @{
+	<>
+		@try {
+			const value = use(props.promise);
+			<ViewTransition onEnter={props.onEnter}>
+				<div>
+					{value as string}
+				</div>
+			</ViewTransition>
+		} @pending {
+			<div>{'Waiting...'}</div>
+		}
+	</>
+}
