@@ -6,6 +6,7 @@ import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { App } from '../_fixtures/ssr-provider.tsx';
 import { ProviderApp } from '../_fixtures/jsx-context-children.tsx';
+import { hydrationMarkerSummary } from './_marker-summary.js';
 
 // Round-trip SSR→hydrate for `.tsx` `<Ctx.Provider>` with descriptor children.
 // Regression for two server bugs:
@@ -41,11 +42,16 @@ describe('hydration — .tsx <Context.Provider> descriptor children', () => {
 		expect(html).toContain('class="leaf"');
 		expect(html).toContain('provided'); // children NOT dropped (bug 1)
 		container.innerHTML = html;
-		const before = container.innerHTML;
+		const leaf = container.querySelector('.leaf')!;
+		const before = hydrationMarkerSummary(container);
 		const root = hydrateRoot(container, App as any, {});
 		flushSync(() => {});
-		expect(container.innerHTML).toBe(before); // adopted, not rebuilt
-		expect(container.querySelector('.leaf')!.textContent).toBe('provided');
+		expect(container.querySelector('.leaf')).toBe(leaf); // adopted, not rebuilt
+		expect(leaf.textContent).toBe('provided');
+		const after = hydrationMarkerSummary(container);
+		expect(after.logicalPairs).toBe(before.logicalPairs);
+		expect(after.physicalPairs).toBeLessThan(before.physicalPairs);
+		expect(after.countedPairs).toBeGreaterThanOrEqual(1);
 		root.unmount();
 	});
 
@@ -54,19 +60,26 @@ describe('hydration — .tsx <Context.Provider> descriptor children', () => {
 	// `hostElementBody` → `childSlot` → the de-opt keyed list, which ADOPTS markers on
 	// hydration. The client now adopts the server host node (instead of building fresh),
 	// and the server emits the matching childSlot/forSlot/component block nesting
-	// (`ssrDeoptBlockChildren`) — so this round-trips byte-for-byte.
+	// (`ssrDeoptBlockChildren`) — so this round-trips without rebuilding hosts;
+	// hydration may compact exactly-coextensive protocol ranges afterward.
 	it('hydrates a de-opt host with a component-list child without mismatch', async () => {
 		const dserver = serverModule('packages/octane/tests/_fixtures/jsx-context-children.tsx');
 		const { html } = await ServerRT.renderToString(dserver.ProviderApp, {});
 		container.innerHTML = html;
-		const before = container.innerHTML;
+		const wrap = container.querySelector('.wrap')!;
+		const leaves = [...container.querySelectorAll('.leaf')];
+		const before = hydrationMarkerSummary(container);
 		const root = hydrateRoot(container, ProviderApp as any, {});
 		flushSync(() => {});
-		expect(container.innerHTML).toBe(before); // adopted, not rebuilt
-		expect(container.querySelectorAll('.leaf').length).toBe(2);
-		for (const el of container.querySelectorAll('.leaf')) {
+		expect(container.querySelector('.wrap')).toBe(wrap);
+		expect([...container.querySelectorAll('.leaf')]).toEqual(leaves);
+		for (const el of leaves) {
 			expect(el.textContent).toBe('provided');
 		}
+		const after = hydrationMarkerSummary(container);
+		expect(after.logicalPairs).toBe(before.logicalPairs);
+		expect(after.physicalPairs).toBeLessThan(before.physicalPairs);
+		expect(after.countedPairs).toBeGreaterThanOrEqual(1);
 		root.unmount();
 	});
 });

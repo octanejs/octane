@@ -1,6 +1,6 @@
 # Comment-Marker Elision Plan — fewer `<!--[-->`s when they carry no information
 
-Status: M0-M5 LANDED (2026-07-13; see each phase's note). Follow-up to the
+Status: M0-M6 LANDED (2026-07-13; see each phase's note). Follow-up to the
 website Elements-panel report
 (a 40-deep run of `<!--[-->` before `.shell`, ~2,100 comment nodes on the home
 page). Companion to docs/compiled-output-optimization-plan.md — this is the
@@ -398,6 +398,90 @@ That is the boundary-propagation/runtime proof cost paid by apps that use the
 optimized paths; the matching js-framework, TodoMVC, and chat states lose 1,
 203, and 54 live nodes respectively, while closed portal-swarm loses 1,204.
 
+### M6 — Post-hydration counted range coalescing
+
+**M6 IMPLEMENTED 2026-07-13.** Hydratable SSR deliberately keeps emitting the
+established, explicit `<!--[-->…<!--]-->` wire format. Once hydration has
+successfully adopted that tree, the client now compacts only nested ranges
+that are proven to have exactly the same extent. A stack of `N` coextensive
+pairs becomes one counted pair, `<!--[N-->…<!--]N-->`; `N` records logical
+ownership multiplicity for diagnostics while the DOM contains only two
+physical boundary nodes.
+
+The proof is deliberately runtime- and ownership-aware rather than a textual
+comment rewrite:
+
+- compaction walks the hydrated Block/Scope ownership graph bottom-up and
+  requires one live range-bearing child plus exact DOM adjacency
+  (`outer.start.nextSibling === inner.start` and
+  `inner.end.nextSibling === outer.end`);
+- every owner is retargeted to the retained pair, with the inner owners marked
+  as borrowers so teardown, replacement, transitions, and reconciliation do
+  not remove a shared endpoint;
+- compiler-proven sole renderable-child wrappers carry an explicit flag so
+  binding-bag bookkeeping cannot obscure the otherwise exact runtime proof;
+- keyed component boundaries, keyed-list outer ranges, Suspense/`@try`,
+  `<Activity>`, portals, fragment refs, and non-coextensive control flow remain
+  physical barriers. Independent keyed items and active try bodies may still
+  compact internally without merging across their ownership boundary;
+- counted payloads use a canonical positive-safe-integer grammar, and range
+  matching still treats a counted marker as one physical nesting level. The
+  multiplicity is metadata, not an instruction to skip or synthesize DOM.
+
+That final point is why the safe representation is a counted **pair**, not one
+comment total: mutable ownership still needs both a start and an end insertion
+boundary. On the website's shared router prefix, 19 logical opening ranges are
+now represented by five physical opening comments; the other four endpoints
+start ranges with genuinely different spans and cannot be merged without
+changing teardown or insertion semantics.
+
+Production website measurements against a clean worktree at the same
+`origin/main` commit (after hydration and a 400 ms settle) were:
+
+| Route | All body comments | Octane range comments | Shared `<main>` prefix |
+| --- | ---: | ---: | ---: |
+| `/` | 2,439 → **2,315** (−124) | 542 → **418** | 19 → **5 physical / 19 logical** |
+| `/docs` | 383 → **227** (−156) | 382 → **226** | 19 → **5 / 19** |
+| `/benchmarks` | 18,213 → **18,079** (−134) | 2,824 → **2,690** | 19 → **5 / 19** |
+| `/playground` | 165 → **69** (−96) | 164 → **68** | 19 → **5 / 19** |
+| `/view-transitions` | 189 → **81** (−108) | 188 → **80** | 19 → **5 / 19** |
+
+Raw SSR comment counts are unchanged (`/` 545, `/docs` 383,
+`/benchmarks` 2,861, `/playground` 167, `/view-transitions` 189). This keeps
+streaming, old server output, and hydration recovery unambiguous; the saving is
+applied only after successful client adoption. The general DOM census now
+reports physical and logical hydration markers, counted-marker count, maximum
+multiplicity, and physical/logical leading opens so future regressions remain
+visible independently of user-visible elements and text.
+
+Hydration records whether range matching encountered any physically adjacent
+pair before considering compaction. Roots without one skip the ownership walk;
+eligible roots pay one hydration-only, linear walk plus the comment removals.
+Normal client mounts, SSR output, and steady-state update traversal do not run
+the compactor. Focused coverage pins adoption identity, events/state, branch
+replacement, keyed reorder identity, direct- and return-position Suspense
+barriers, mismatch recovery, streaming scanning, and both development and
+production compilation.
+
+The production `news` hydration benchmark is a useful overhead control because
+its 52 independent pairs have no coextensive adjacency to remove, so the new
+candidate guard skips the ownership walk: its census stays at 763 nodes / 104
+physical and logical hydration comments before and after. Across 20 fresh-page
+samples, Octane TSRX hydration measured 1.30 ms on this branch versus 1.3125 ms
+on the clean-main run (1.30 ms median and 1.40 ms p95 in both). Treat that
+0.0125 ms difference as noise, not a claimed speedup; the result shows no
+measurable no-op regression. In the branch's same uncontended run, React
+measured 2.40 ms, Preact 1.70 ms, Solid 1.70 ms, and Svelte 1.3875 ms. Adoption
+identity, 50-card content, and interaction gates all passed.
+
+The deterministic size tradeoff is modest: the fixed compiled corpus grows by
+51 raw / 37 minified / **1 gzip byte**. The production TSRX js-framework
+bundle grows 29,682 → 30,017 gzip bytes (**+335 B / +1.13%**), almost entirely
+in the framework chunk (the app chunk shrinks by 2 B); the JSX fixture grows
+29,689 → 30,041 (**+352 B / +1.19%**). TodoMVC and chat grow 358 B / 379 B
+gzip. This is the counted-marker parser, ownership proof, and no-op guard cost;
+normal app codegen is effectively unchanged.
+
 **Still open (small or order-constrained — diminishing returns):**
 
 1. Multi-hole hosts: the remaining ~684 empty anchors on `/` are
@@ -406,16 +490,21 @@ optimized paths; the matching js-framework, TodoMVC, and chat states lose 1,
 2. Component-bearing `it` pairs (145 on `/`) — required borrow ranges today.
 3. Sole-root `@switch` construct inherit + children-render-fn /
    value-position sole roots (M3 leftovers).
-4. SSR-side symmetry for the M2/M4/M5 client regimes (hydrated pages keep
-   server item/component pairs the client mount would not mint). This must be
-   designed as one SSR-emission + hydration-adoption protocol change.
+4. SSR payload size: M6 removes redundant nodes only after successful
+   hydration. Omitting them from the wire would require a versioned,
+   server/client-symmetric encoding and streaming compatibility; it is not
+   needed to obtain the live-DOM reduction.
 
-### Ordering & expected effect
+### Ordering & measured effect
 
-M0 → M1 → M2 → M3 → M4 → M5. Home-page projection: M2 removes ~1,600 (chart + rows),
-M3 removes ~39 of the 40-deep prefix and every wrapper pair page-wide
-(≈300 of the 392 SSR-pair comments), M1 covers client-rendered leaves.
-Target: **2,122 → under ~400**, root prefix 40 → ≤ 3.
+M0 → M1 → M2 → M3 → M4 → M5 → M6. M1-M5 remove ranges at the
+compiler/runtime source for client-created content; M6 complements them by
+compacting redundant ranges that must remain explicit in the SSR wire format.
+The original home-page report's 40-opening wrapper prefix fell to 19 before
+M6 and now occupies five opening comments while preserving all 19 logical
+owners. The remaining page-wide comments are predominantly chart-internal,
+order-bearing anchors or independent ownership ranges rather than a redundant
+coextensive wrapper stack.
 
 ## 5. Test & perf strategy
 
