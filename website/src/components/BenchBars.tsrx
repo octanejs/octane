@@ -68,7 +68,11 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 	// denser cards lean on the number axis + the table view instead.
 	const showValues = props.showValues ?? card.series.length <= 2;
 
-	const groupHeight = card.series.length * (BAR_SIZE + 2) + GROUP_PAD;
+	// Keep dense seven/eight-series comparisons legible without making each
+	// operation group disproportionately tall.
+	const barSize =
+		card.series.length > 6 ? 9 : BAR_SIZE;
+	const groupHeight = card.series.length * (barSize + 2) + GROUP_PAD;
 	const chartHeight = card.rows.length * groupHeight + 24;
 	const longestOp = Math.max(...card.rows.map((row) => String(row.op).length));
 	const categoryWidth = Math.min(170, Math.max(90, longestOp * 6.6 + 12));
@@ -103,7 +107,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 					height={chartHeight}
 					data={card.rows}
 					layout="vertical"
-					barSize={BAR_SIZE}
+					barSize={barSize}
 					barGap={2}
 					margin={{ top: 4, right: showValues ? 48 : 16, bottom: 4, left: 0 }}
 				>
@@ -226,12 +230,12 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 			}
 			.bench-plot svg {
 				display: block;
-				max-width: 100%;
-				height: auto;
+				max-width: none;
 			}
 			.bench-table {
 				border-top: 1px solid rgba(255, 255, 255, 0.08);
 				padding-top: 0.5rem;
+				overflow-x: auto;
 			}
 			.bench-table summary {
 				color: #99a1b3;
@@ -243,6 +247,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 			}
 			.bench-table table {
 				width: 100%;
+				min-width: max-content;
 				border-collapse: collapse;
 				margin: 0.6rem 0 0.4rem;
 				font-size: 0.8rem;
@@ -254,6 +259,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 				padding: 0.25rem 0.5rem;
 				color: #f6f7f9;
 				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+				white-space: nowrap;
 			}
 			.bench-table thead th {
 				color: #99a1b3;
