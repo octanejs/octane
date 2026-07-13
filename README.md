@@ -401,9 +401,10 @@ Octane itself. Good places to start:
 ## Packages
 
 This is a pnpm monorepo containing the core runtime+compiler, the metaframework
-plugin (and its Vercel adapter), an MCP server, and the framework bindings. The
-current publishable-package list and counts are generated from the workspace
-manifests in [`docs/packages.md`](./docs/packages.md):
+plugin (and its Vercel adapter), an MCP server, private evaluation tooling, and
+the framework bindings. The current workspace package inventory and counts are
+generated from the workspace manifests in
+[`docs/packages.md`](./docs/packages.md):
 
 - [`octane`](./packages/octane) is the runtime and the compiler together. It covers
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
@@ -415,6 +416,10 @@ manifests in [`docs/packages.md`](./docs/packages.md):
   output to Vercel.
 - [`@octanejs/mcp-server`](./packages/octane-mcp-server) exposes octane docs and
   compile tooling to AI agents over MCP.
+- [`@octanejs/evals`](./packages/octane-evals) is the private workspace package
+  for public Octane, TSRX, and integration evaluation schemas, development
+  tasks, runners, and reporting tools. Active held-out material stays outside
+  the repository.
 - The `@octanejs/*` framework bindings — each an octane port of a React library:
   [`zustand`](./packages/zustand), [`jotai`](./packages/jotai),
   [`query`](./packages/tanstack-query), [`motion`](./packages/motion),
@@ -423,7 +428,8 @@ manifests in [`docs/packages.md`](./docs/packages.md):
   [`table`](./packages/tanstack-table), [`virtual`](./packages/tanstack-virtual),
   [`lexical`](./packages/lexical), [`floating-ui`](./packages/floating-ui),
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
-  [`base-ui`](./packages/base-ui), [`recharts`](./packages/recharts),
+  [`base-ui`](./packages/base-ui), [`sonner`](./packages/sonner),
+  [`recharts`](./packages/recharts),
   [`redux`](./packages/redux), [`testing-library`](./packages/testing-library),
   [`i18next`](./packages/i18next), and [`mdx`](./packages/mdx).
   Parity varies by package — some are behaviorally complete, others are

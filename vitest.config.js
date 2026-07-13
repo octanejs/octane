@@ -761,6 +761,54 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'sonner',
+					include: [
+						'packages/sonner/tests/**/*.test.ts',
+						'!packages/sonner/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					// Differential precompile for Sonner fixtures: rewrites
+					// `@octanejs/sonner` → the real published `sonner@2.0.7`.
+					globalSetup: ['packages/sonner/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/sonner$/,
+							replacement: resolve(import.meta.dirname, 'packages/sonner/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/sonner\/dist\/styles\.css$/,
+							replacement: resolve(import.meta.dirname, 'packages/sonner/src/styles.css'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'sonner-ssr',
+					include: ['packages/sonner/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/sonner$/,
+							replacement: resolve(import.meta.dirname, 'packages/sonner/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'testing-library',
 					include: ['packages/testing-library/tests/**/*.test.ts'],
 					environment: 'jsdom',
@@ -830,6 +878,14 @@ export default defineConfig({
 				test: {
 					name: 'octane-mcp-server',
 					include: ['packages/octane-mcp-server/src/**/*.test.js'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
+					name: 'octane-evals',
+					include: ['packages/octane-evals/tests/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 				},
