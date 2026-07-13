@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**23 publishable package(s), including 19 framework binding(s).**
+**24 publishable package(s), including 20 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -17,6 +17,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/dnd-kit` | [`packages/dnd-kit`](../packages/dnd-kit) | framework binding | `0.1.0` | 4 |
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.4` | 1 |
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.2` | 1 |
+| `@octanejs/i18next` | [`packages/i18next`](../packages/i18next) | framework binding | `0.1.0` | 3 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.2` | 7 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.1.4` | 42 |
 | `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.2.2` | 1 |

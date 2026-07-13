@@ -79,10 +79,11 @@ generated from workspace manifests in `docs/packages.md`:
   deploys it to Vercel (Build Output API).
 - `packages/octane-mcp-server/` (npm: `@octanejs/mcp-server`) — an MCP server
   exposing octane docs/compile tooling to AI agents.
-- `packages/{zustand,jotai,tanstack-query,motion,dnd-kit,stylex,tanstack-router,remix-router,tanstack-table,tanstack-virtual,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/`
+- `packages/{zustand,jotai,i18next,tanstack-query,motion,dnd-kit,stylex,tanstack-router,remix-router,tanstack-table,tanstack-virtual,lexical,floating-ui,radix,hook-form,base-ui,recharts,redux,testing-library,mdx}/`
   (npm: `@octanejs/*`) — framework bindings, each an octane port of a React
   library (state, data-fetching, animation, styling, routing, editor,
-  positioning, UI primitives, forms, charts, testing, MDX). Parity varies by
+  positioning, UI primitives, forms, charts, internationalization, testing,
+  MDX). Parity varies by
   package — some are behaviorally complete ports, others are explicitly
   partial or alpha. `docs/bindings-status.md` is the generated per-package
   status table (upstream version, supported surface, known divergences,

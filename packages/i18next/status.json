@@ -1,0 +1,12 @@
+{
+  "upstream": { "package": "react-i18next", "version": "17.0.9" },
+  "surface": "Complete runtime port of react-i18next 17.0.9: useTranslation, I18nextProvider/context, Trans/TransWithoutContext, IcuTrans/IcuTransWithoutContext, Translation, the withTranslation/withSSR HOCs, useSSR, namespace reporting, initialization/default helpers, and the root ICU helper exports over the unchanged i18next core.",
+  "divergences": [
+    "Trans children that must be inspected are passed in prop position (`children={<>…</>}`) or through `defaults` + `components`; natural .tsrx block children are opaque compiled render bodies and fall back with a development warning.",
+    "Suspense uses octane's `use(thenable)` instead of throwing a Promise.",
+    "withTranslation's `withRef` option uses octane's ref-as-prop model; class components are unsupported.",
+    "The React/Babel-specific `icu.macro` subpath is not shipped; the runtime IcuTrans APIs are fully supported."
+  ],
+  "ssr": "Preloaded renderToString output and namespace collection are covered; useSSR, withSSR, getInitialProps, and composeInitialProps are ported. A dedicated hydration differential is still open.",
+  "verified": "2026-07-13"
+}

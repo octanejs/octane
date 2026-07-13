@@ -25,6 +25,7 @@ export const KNOWN_BINDINGS = {
 	recharts: '@octanejs/recharts',
 	'react-redux': '@octanejs/redux',
 	'@testing-library/react': '@octanejs/testing-library',
+	'react-i18next': '@octanejs/i18next',
 	'@mdx-js/react': '@octanejs/mdx',
 };
 
@@ -45,6 +46,7 @@ export const KNOWN_VANILLA_CORES = {
 	'@xstate/react': 'xstate',
 	'react-redux': 'redux',
 	'@reduxjs/toolkit': 'redux',
+	'react-i18next': 'i18next',
 	'react-hook-form': null,
 	zustand: 'zustand/vanilla',
 	valtio: 'valtio/vanilla',
