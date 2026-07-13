@@ -1,4 +1,4 @@
-// Vendored from react-router@7.18.1 packages/react-router/lib/actions.ts — unmodified.
+// Vendored from react-router@8.2.0 packages/react-router/lib/actions.ts — unmodified.
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
 export function throwIfPotentialCSRFAttack(
 	request: Request,

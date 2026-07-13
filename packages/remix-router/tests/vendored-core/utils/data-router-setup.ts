@@ -1,4 +1,4 @@
-// Ported from react-router@7.18.1 packages/react-router/__tests__/router/utils/data-router-setup.ts — verbatim except: imports re-pointed at the vendored sources (../../../lib/* → ../../../src/lib/*), Agnostic* route types renamed to their vendored (non-Agnostic) names, and the jest-friendly test window is built from a minimal stub when no global `window` exists (this port runs under node, upstream ran under jsdom). jest/expect globals come from the ../_shim loaded first by every test file.
+// Ported from react-router@8.2.0 packages/react-router/__tests__/router/utils/data-router-setup.ts — verbatim except: imports re-pointed at the vendored sources (../../../lib/* → ../../../src/lib/*), Agnostic* route types renamed to their vendored (non-Agnostic) names, and the jest-friendly test window is built from a minimal stub when no global `window` exists (this port runs under node, upstream ran under jsdom). jest/expect globals come from the ../_shim loaded first by every test file.
 import type { InitialEntry } from '../../../src/lib/router/history';
 import type {
 	Fetcher,
@@ -11,7 +11,12 @@ import type { DataRouteObject, RouteMatch } from '../../../src/lib/router/utils'
 import { createRouter, IDLE_FETCHER } from '../../../src/lib/router/router';
 import { createMemoryHistory, invariant, parsePath } from '../../../src/lib/router/history';
 import type { IndexRouteObject, NonIndexRouteObject } from '../../../src/lib/router/utils';
-import { matchRoutes, redirect, stripBasename } from '../../../src/lib/router/utils';
+import {
+	defaultMapRouteProperties,
+	matchRoutes,
+	redirect,
+	stripBasename,
+} from '../../../src/lib/router/utils';
 
 import { isRedirect, tick } from './utils';
 
@@ -20,20 +25,18 @@ import { isRedirect, tick } from './utils';
 // by our test harness
 export type TestIndexRouteObject = Pick<
 	IndexRouteObject,
-	'id' | 'index' | 'path' | 'shouldRevalidate' | 'handle' | 'lazy' | 'middleware'
+	'id' | 'index' | 'path' | 'shouldRevalidate' | 'handle' | 'lazy' | 'middleware' | 'ErrorBoundary'
 > & {
 	loader?: boolean;
 	action?: boolean;
-	hasErrorBoundary?: boolean;
 };
 
 export type TestNonIndexRouteObject = Pick<
 	NonIndexRouteObject,
-	'id' | 'index' | 'path' | 'shouldRevalidate' | 'handle' | 'lazy' | 'middleware'
+	'id' | 'index' | 'path' | 'shouldRevalidate' | 'handle' | 'lazy' | 'middleware' | 'ErrorBoundary'
 > & {
 	loader?: boolean;
 	action?: boolean;
-	hasErrorBoundary?: boolean;
 	children?: TestRouteObject[];
 };
 
@@ -91,7 +94,7 @@ export const TASK_ROUTES: TestRouteObject[] = [
 		id: 'root',
 		path: '/',
 		loader: true,
-		hasErrorBoundary: true,
+		ErrorBoundary: () => null,
 		children: [
 			{
 				id: 'index',
@@ -103,14 +106,14 @@ export const TASK_ROUTES: TestRouteObject[] = [
 				path: 'tasks',
 				loader: true,
 				action: true,
-				hasErrorBoundary: true,
+				ErrorBoundary: () => null,
 			},
 			{
 				id: 'tasksId',
 				path: 'tasks/:id',
 				loader: true,
 				action: true,
-				hasErrorBoundary: true,
+				ErrorBoundary: () => null,
 			},
 			{
 				id: 'noLoader',
@@ -265,9 +268,12 @@ export function setup({ routes, initialEntries, initialIndex, ...routerInit }: S
 					);
 				};
 			}
-			if (!r.index && r.children) {
+			if (!r.index && 'children' in r && r.children) {
 				enhancedRoute.children = enhanceRoutes(r.children);
 			}
+			// Match what the router does internally so tests comparing the
+			// enhanced routes against router.routes line up.
+			Object.assign(enhancedRoute, defaultMapRouteProperties(enhancedRoute));
 			return enhancedRoute;
 		});
 	}

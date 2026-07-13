@@ -1,4 +1,4 @@
-// Router — transcribed from react-router@7.18.1 lib/components.tsx. The
+// Router — transcribed from react-router@8.2.0 lib/components.tsx. The
 // low-level context provider every router variant renders through.
 import { useMemo } from 'octane';
 import { LocationContext, NavigationContext } from '../context.ts';

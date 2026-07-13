@@ -1,25 +1,25 @@
 // Vendors react-router's framework-agnostic core into packages/remix-router/src.
 //
-// react-router v7 ships as a single package whose `./internal` subpath is
+// react-router v8 ships as a single package whose `./internal` subpath is
 // types-only, so the router core (lib/router/* + the framework-free lib
 // helpers) cannot be consumed as a dependency — it is copied here byte-close
 // from the pinned tag. Upstream's `lib/**` layout is mirrored under `src/lib/**`
 // so every relative import survives unchanged and upgrade diffs are mechanical:
 // bump TAG, re-run `node scripts/vendor-remix-router.mjs`, review the diff.
 //
-// Exactly TWO deviations are applied (each noted in the file header):
-//   1. lib/router/utils.ts: the type-only `react` import is pointed at the
-//      local `../react-types` shim (consumers of this package don't have
-//      @types/react; the shim aliases the handful of referenced types).
-//   2. lib/router/instrumentation.ts: two type-only `../server-runtime/*`
-//      imports are pointed at the local `./server-runtime-types` stub (the
-//      server runtime is out of scope; only two type names are referenced).
+// Exactly TWO categories of deviations are applied (each noted in the file
+// header):
+//   1. lib/router/utils.ts: React types are pointed at the local shim and the
+//      three route-component descriptor creations use octane's createElement.
+//   2. lib/router/instrumentation.ts: its type-only RequestHandler import is
+//      pointed at the local server-runtime-types stub. The framework request
+//      handler itself remains out of scope.
 //
 // NEVER hand-edit vendored files beyond these deviations.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-const TAG = 'react-router@7.18.1';
+const TAG = 'react-router@8.2.0';
 const BASE = `https://raw.githubusercontent.com/remix-run/react-router/${encodeURIComponent(TAG)}/packages/react-router/`;
 const DEST = join(import.meta.dirname, '../packages/remix-router/src');
 
@@ -54,25 +54,26 @@ const FILES = [
 
 // path → [pattern, replacement, deviation note]
 const DEVIATIONS = {
-	'lib/server-runtime/crypto.ts': [
-		[
-			'function byteStringToUint8Array(byteString: string): Uint8Array {',
-			'function byteStringToUint8Array(byteString: string): Uint8Array<ArrayBuffer> {',
-			"type-only: bare Uint8Array return widens to Uint8Array<ArrayBufferLike> under TS 5.7+ typed-array generics, which crypto.subtle.verify's BufferSource rejects",
-		],
-	],
 	'lib/router/utils.ts': [
 		[
-			'import type * as React from "react";',
-			'import type * as React from "../react-types";',
-			'type-only react import → local ../react-types shim',
+			'import * as React from "react";',
+			'import type * as React from "../react-types";\nimport { createElement } from "octane";',
+			'React types → local ../react-types shim; route descriptors → octane createElement',
+		],
+		['React.createElement(route.Component)', 'createElement(route.Component)'],
+		['React.createElement(route.HydrateFallback)', 'createElement(route.HydrateFallback)'],
+		['React.createElement(route.ErrorBoundary)', 'createElement(route.ErrorBoundary)'],
+		[
+			'// Provided by the build system\ndeclare const __DEV__: boolean;\nexport const ENABLE_DEV_WARNINGS = __DEV__;',
+			'export const ENABLE_DEV_WARNINGS = process.env.NODE_ENV !== "production";',
+			'build-time __DEV__ constant → NODE_ENV check',
 		],
 	],
 	'lib/router/instrumentation.ts': [
 		[
-			'import type { AppLoadContext } from "../server-runtime/data";\nimport type { RequestHandler } from "../server-runtime/server";',
-			'import type { AppLoadContext, RequestHandler } from "./server-runtime-types";',
-			'type-only ../server-runtime/* imports → local ./server-runtime-types stub',
+			'import type { RequestHandler } from "../server-runtime/server";',
+			'import type { RequestHandler } from "./server-runtime-types";',
+			'type-only ../server-runtime/server import → local ./server-runtime-types stub',
 		],
 	],
 };
@@ -85,7 +86,7 @@ for (const file of FILES) {
 	for (const [pattern, replacement, note] of DEVIATIONS[file] ?? []) {
 		if (!code.includes(pattern)) throw new Error(`deviation pattern missing in ${file}: ${note}`);
 		code = code.replace(pattern, replacement);
-		notes.push(note);
+		if (note) notes.push(note);
 	}
 	const header =
 		`// Vendored from ${TAG} packages/react-router/${file} — unmodified` +

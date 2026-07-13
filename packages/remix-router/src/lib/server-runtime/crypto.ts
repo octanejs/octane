@@ -1,4 +1,4 @@
-// Vendored from react-router@7.18.1 packages/react-router/lib/server-runtime/crypto.ts — unmodified except: type-only: bare Uint8Array return widens to Uint8Array<ArrayBufferLike> under TS 5.7+ typed-array generics, which crypto.subtle.verify's BufferSource rejects.
+// Vendored from react-router@8.2.0 packages/react-router/lib/server-runtime/crypto.ts — unmodified.
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
 const encoder = /* @__PURE__ */ new TextEncoder();
 
@@ -45,7 +45,7 @@ const createKey = async (secret: string, usages: CryptoKey['usages']): Promise<C
 	);
 
 function byteStringToUint8Array(byteString: string): Uint8Array<ArrayBuffer> {
-	let array = new Uint8Array(byteString.length);
+	let array: Uint8Array<ArrayBuffer> = new Uint8Array(byteString.length);
 
 	for (let i = 0; i < byteString.length; i++) {
 		array[i] = byteString.charCodeAt(i);

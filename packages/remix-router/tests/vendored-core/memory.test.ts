@@ -1,4 +1,4 @@
-// Ported from react-router@7.18.1 packages/react-router/__tests__/router/memory-test.ts — verbatim except: renamed to memory.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim.
+// Ported from react-router@8.2.0 packages/react-router/__tests__/router/memory-test.ts — verbatim except: renamed to memory.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim.
 import './_shim';
 /* eslint-disable jest/expect-expect */
 
