@@ -53,6 +53,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { censusDomNodes, deterministicCount } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
@@ -93,6 +94,20 @@ const OPS = [
 	'open_close_cycle',
 	'open_close_distinct',
 	'dispatch_through_portal',
+];
+const DOM_OPS = [
+	'nodes_closed_main',
+	'elements_closed_main',
+	'text_closed_main',
+	'comments_closed_main',
+	'nodes_open_main',
+	'comments_open_main',
+	'nodes_open_body',
+	'elements_open_body',
+	'text_open_body',
+	'comments_open_body',
+	'empty_text_open_body',
+	'whitespace_text_open_body',
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -387,6 +402,30 @@ async function measureDispatch(browser, url) {
 	return summarize(samples);
 }
 
+// Portals split their DOM between #main and foreign targets under body. Record
+// both scopes while closed and open so site placeholders and target-owned
+// ranges stay attributable.
+async function measureDomShape(browser, url) {
+	const { ctx, page } = await freshPage(browser, url);
+	await page.evaluate(async () => {
+		const r = window.__mount();
+		if (r && typeof r.then === 'function') await r;
+	});
+	const closedMain = await page.evaluate(censusDomNodes, '#main');
+	await page.evaluate(async () => {
+		const r = window.__openAll();
+		if (r && typeof r.then === 'function') await r;
+	});
+	const openMain = await page.evaluate(censusDomNodes, '#main');
+	const openBody = await page.evaluate(censusDomNodes, 'body');
+	await page.evaluate(async () => {
+		const r = window.__closeAll();
+		if (r && typeof r.then === 'function') await r;
+	});
+	await ctx.close();
+	return { closedMain, openMain, openBody };
+}
+
 async function runTarget(t) {
 	const browser = await chromium.launch({
 		headless: true,
@@ -420,6 +459,8 @@ async function runTarget(t) {
 	const open_close_distinct = await measureCycle(browser, t.url, true);
 	console.error(`  → dispatch_through_portal`);
 	const dispatch_through_portal = await measureDispatch(browser, t.url);
+	console.error(`  → DOM census (closed/open, main/body)`);
+	const dom = await measureDomShape(browser, t.url);
 	await browser.close();
 	return {
 		results: {
@@ -431,6 +472,18 @@ async function runTarget(t) {
 			open_close_cycle,
 			open_close_distinct,
 			dispatch_through_portal,
+			nodes_closed_main: deterministicCount(dom.closedMain.total),
+			elements_closed_main: deterministicCount(dom.closedMain.elements),
+			text_closed_main: deterministicCount(dom.closedMain.text),
+			comments_closed_main: deterministicCount(dom.closedMain.comments),
+			nodes_open_main: deterministicCount(dom.openMain.total),
+			comments_open_main: deterministicCount(dom.openMain.comments),
+			nodes_open_body: deterministicCount(dom.openBody.total),
+			elements_open_body: deterministicCount(dom.openBody.elements),
+			text_open_body: deterministicCount(dom.openBody.text),
+			comments_open_body: deterministicCount(dom.openBody.comments),
+			empty_text_open_body: deterministicCount(dom.openBody.emptyText),
+			whitespace_text_open_body: deterministicCount(dom.openBody.whitespaceText),
 		},
 		meta: {
 			gates: 'pass',
@@ -438,6 +491,7 @@ async function runTarget(t) {
 			sections: SECTIONS,
 			portalsAtOpenAll: SECTIONS * N,
 			hitsPerDispatchSample: N,
+			dom,
 		},
 	};
 }
@@ -450,10 +504,17 @@ function writeBenchJson(all, failed) {
 		targets: TARGETS.filter((t) => all[t.name]).map((t) => ({
 			name: t.name,
 			ops: Object.fromEntries(
-				OPS.filter((op) => all[t.name].results[op]).map((op) => {
-					const r = all[t.name].results[op];
-					return [op, timingStatForJson(r)];
-				}),
+				[...OPS, ...DOM_OPS]
+					.filter((op) => all[t.name].results[op])
+					.map((op) => {
+						const r = all[t.name].results[op];
+						return [
+							op,
+							r.score == null
+								? { median: r.median, min: r.min, samples: r.samples.length }
+								: timingStatForJson(r),
+						];
+					}),
 			),
 			meta: all[t.name].meta,
 		})),
@@ -487,6 +548,11 @@ for (const op of OPS) {
 		const r = all[c].results[op];
 		row.push(`${fmt(r.median)} (min ${fmt(r.min)}, sd ${fmt(r.stddev)})`.padEnd(W));
 	}
+	console.log(row.join('| '));
+}
+for (const op of DOM_OPS) {
+	const row = [op.padEnd(23)];
+	for (const c of cols) row.push(String(all[c].results[op].median).padEnd(W));
 	console.log(row.join('| '));
 }
 

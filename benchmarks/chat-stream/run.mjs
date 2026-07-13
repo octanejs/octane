@@ -27,6 +27,7 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import { censusDomNodes, deterministicCount } from '../lib/dom-nodes.mjs';
 import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
@@ -225,15 +226,16 @@ async function runTarget(t) {
 		results[op.name] = summarizeSamples(samples);
 	}
 
-	// DOM-weight tripwire at steady state (conv0's 10 mixed messages).
+	// Full steady-state DOM shape (conv0's 10 mixed messages).
 	await ensureState(page, 'reset');
-	const comments = await page.evaluate(() => {
-		const w = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
-		let n = 0;
-		while (w.nextNode()) n++;
-		return n;
-	});
-	results.comments_conv = { median: comments, min: comments, samples: [comments] };
+	const dom = await page.evaluate(censusDomNodes, '#main');
+	results.nodes_conv = deterministicCount(dom.total);
+	results.elements_conv = deterministicCount(dom.elements);
+	results.text_conv = deterministicCount(dom.text);
+	results.comments_conv = deterministicCount(dom.comments);
+	results.empty_text_conv = deterministicCount(dom.emptyText);
+	results.whitespace_text_conv = deterministicCount(dom.whitespaceText);
+	results.__dom = dom;
 
 	await browser.close();
 	return results;
@@ -259,9 +261,16 @@ async function runTarget(t) {
 		}
 		console.log(row.join('| '));
 	}
-	{
-		const row = ['#cmnts'.padEnd(13)];
-		for (const c of cols) row.push(String(all[c].comments_conv.median).padEnd(W));
+	for (const [label, op] of [
+		['#nodes', 'nodes_conv'],
+		['#elems', 'elements_conv'],
+		['#text', 'text_conv'],
+		['#cmnts', 'comments_conv'],
+		['#empty', 'empty_text_conv'],
+		['#ws', 'whitespace_text_conv'],
+	]) {
+		const row = [label.padEnd(13)];
+		for (const c of cols) row.push(String(all[c][op].median).padEnd(W));
 		console.log(row.join('| '));
 	}
 
@@ -273,13 +282,16 @@ async function runTarget(t) {
 			targets: TARGETS.map((t) => ({
 				name: t.name,
 				ops: Object.fromEntries(
-					Object.entries(all[t.name]).map(([name, r]) => [
-						name,
-						r.score == null
-							? { median: r.median, min: r.min, samples: r.samples.length }
-							: timingStatForJson(r),
-					]),
+					Object.entries(all[t.name])
+						.filter(([name]) => name !== '__dom')
+						.map(([name, r]) => [
+							name,
+							r.score == null
+								? { median: r.median, min: r.min, samples: r.samples.length }
+								: timingStatForJson(r),
+						]),
 				),
+				meta: { dom: all[t.name].__dom },
 			})),
 		};
 		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');
