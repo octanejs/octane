@@ -1,0 +1,12 @@
+{
+  "upstream": { "package": "sonner", "version": "2.0.7" },
+  "surface": "Complete against the published `sonner@2.0.7` public surface: `Toaster`, the callable `toast` API and all methods, `useSonner`, promise lifecycle, multiple toaster targeting, stacked layout, themes, styling, focus management, timers, and swipe dismissal.",
+  "divergences": [
+    "Action callbacks receive native DOM `MouseEvent`s rather than React synthetic events.",
+    "`Toaster` accepts its ref as a normal prop instead of using `forwardRef`.",
+    "The document-visibility hook is guarded during SSR; upstream 2.0.7 reads `document.hidden` during render."
+  ],
+  "ssr": "Supported and tested: `Toaster` server-renders without browser globals, hydrates by adopting the server host, and can show the first client-created toast without replacing it.",
+  "verified": "2026-07-13",
+  "docs": ["docs/sonner-port-plan.md"]
+}

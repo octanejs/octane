@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**24 publishable package(s), including 20 framework binding(s).**
+**25 publishable package(s), including 21 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -27,6 +27,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/recharts` | [`packages/recharts`](../packages/recharts) | framework binding | `0.1.2` | 1 |
 | `@octanejs/redux` | [`packages/redux`](../packages/redux) | framework binding | `0.1.2` | 1 |
 | `@octanejs/remix-router` | [`packages/remix-router`](../packages/remix-router) | framework binding | `0.1.1` | 2 |
+| `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.0` | 2 |
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.4` | 2 |
 | `@octanejs/tanstack-query` | [`packages/tanstack-query`](../packages/tanstack-query) | framework binding | `0.1.4` | 1 |
 | `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.4` | 2 |

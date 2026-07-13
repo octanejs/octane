@@ -428,7 +428,8 @@ generated from the workspace manifests in
   [`table`](./packages/tanstack-table), [`virtual`](./packages/tanstack-virtual),
   [`lexical`](./packages/lexical), [`floating-ui`](./packages/floating-ui),
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
-  [`base-ui`](./packages/base-ui), [`recharts`](./packages/recharts),
+  [`base-ui`](./packages/base-ui), [`sonner`](./packages/sonner),
+  [`recharts`](./packages/recharts),
   [`redux`](./packages/redux), [`testing-library`](./packages/testing-library),
   [`i18next`](./packages/i18next), and [`mdx`](./packages/mdx).
   Parity varies by package — some are behaviorally complete, others are
