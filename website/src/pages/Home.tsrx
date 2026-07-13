@@ -289,30 +289,6 @@ export function Home() @{
 				border-radius: 1rem;
 				padding: 1.5rem;
 				overflow: hidden;
-				transition:
-					transform 0.18s ease,
-					border-color 0.18s ease,
-					box-shadow 0.18s ease;
-			}
-			.card::before {
-				content: '';
-				position: absolute;
-				inset: 0 0 auto;
-				height: 2px;
-				background: linear-gradient(90deg, #ff415a, #ff8a78 55%, transparent);
-			}
-			.card:hover {
-				transform: translateY(-3px);
-				border-color: rgba(255, 101, 122, 0.3);
-				box-shadow: 0 16px 30px rgba(0, 0, 0, 0.18);
-			}
-			.card-eyebrow {
-				margin: 0 0 0.85rem;
-				color: #ff657a;
-				font-size: 0.68rem;
-				font-weight: 800;
-				letter-spacing: 0.11em;
-				text-transform: uppercase;
 			}
 			.card-title {
 				margin: 0 0 0.75rem;
