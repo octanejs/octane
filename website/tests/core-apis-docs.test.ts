@@ -44,6 +44,10 @@ describe('Core APIs documentation', () => {
 		}
 
 		expect(container.querySelectorAll('.topic-grid a')).toHaveLength(6);
+		expect(container.querySelectorAll('[data-demo]')).toHaveLength(5);
+		for (const id of ['state', 'lists', 'refs-effects', 'data', 'form']) {
+			expect(container.querySelector(`[data-demo="${id}"]`)).toBeTruthy();
+		}
 		expect(container.querySelectorAll('.doc-callout')).toHaveLength(4);
 		expect(container.querySelectorAll('details.deep-dive')).toHaveLength(2);
 		expect(container.querySelector('details.challenge')).toBeTruthy();
@@ -54,6 +58,13 @@ describe('Core APIs documentation', () => {
 		expect(highlightedSource.some((source) => source.includes('export function Counter()'))).toBe(
 			true,
 		);
+		expect(
+			highlightedSource.some((source) => source.includes('<title>{props.title}</title>')),
+		).toBe(true);
+		expect(highlightedSource.some((source) => source.includes('document.title'))).toBe(false);
+		expect(
+			highlightedSource.some((source) => source.includes('export function ShortcutSearch()')),
+		).toBe(true);
 		expect(highlightedSource.some((source) => source.includes('createRoot(container)'))).toBe(true);
 		expect(highlightedSource.some((source) => source.includes('renderToString(App'))).toBe(true);
 
@@ -72,7 +83,7 @@ describe('Core APIs documentation', () => {
 
 	it('runs the embedded state example', async () => {
 		const { container } = await renderCoreApis();
-		const demo = container.querySelector('.demo')!;
+		const demo = container.querySelector('[data-demo="state"]')!;
 		const count = demo.querySelector('.demo-count')!;
 		const buttons = Array.from(demo.querySelectorAll<HTMLButtonElement>('button'));
 		const remove = buttons.find((button) => button.textContent?.includes('Remove one'))!;
@@ -88,6 +99,96 @@ describe('Core APIs documentation', () => {
 		fireEvent.click(remove);
 		await waitFor(() => expect(count.textContent).toBe('0'));
 		expect(remove.disabled).toBe(true);
+	});
+
+	it('runs the lists and conditions example through packed and empty branches', async () => {
+		const { container } = await renderCoreApis();
+		const demo = container.querySelector('[data-demo="lists"]')!;
+		const status = demo.querySelector('.packing-summary')!;
+		const packPassport = demo.querySelector<HTMLButtonElement>('[aria-label="Pack Passport"]')!;
+		const clear = Array.from(demo.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
+			button.textContent?.includes('Clear list'),
+		)!;
+		const restore = Array.from(demo.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
+			button.textContent?.includes('Restore list'),
+		)!;
+
+		expect(status.textContent).toContain('1 of 3 packed');
+		expect(packPassport.getAttribute('aria-pressed')).toBe('false');
+
+		fireEvent.click(packPassport);
+		await waitFor(() => expect(status.textContent).toContain('2 of 3 packed'));
+		expect(packPassport.getAttribute('aria-pressed')).toBe('true');
+
+		const packNotebook = demo.querySelector<HTMLButtonElement>('[aria-label="Pack Notebook"]')!;
+		fireEvent.click(packNotebook);
+		await waitFor(() => expect(status.textContent).toContain('Everything is packed.'));
+		expect(packNotebook.getAttribute('aria-pressed')).toBe('true');
+
+		fireEvent.click(clear);
+		await waitFor(() => expect(status.textContent).toContain('Your list is empty.'));
+		expect(demo.querySelector('.packing-empty')?.textContent).toContain('No items yet');
+		expect(clear.disabled).toBe(true);
+
+		fireEvent.click(restore);
+		await waitFor(() => expect(demo.querySelectorAll('.packing-item')).toHaveLength(3));
+		expect(status.textContent).toContain('1 of 3 packed');
+	});
+
+	it('runs the ref button and effect-owned keyboard shortcut', async () => {
+		const { container } = await renderCoreApis();
+		const demo = container.querySelector('[data-demo="refs-effects"]')!;
+		const search = demo.querySelector<HTMLInputElement>('#core-api-search')!;
+		const focusButton = Array.from(demo.querySelectorAll<HTMLButtonElement>('button')).find(
+			(button) => button.textContent?.includes('Focus search'),
+		)!;
+
+		fireEvent.click(focusButton);
+		expect(document.activeElement).toBe(search);
+		search.blur();
+
+		fireEvent.keyDown(window, { key: '/' });
+		await waitFor(() => expect(document.activeElement).toBe(search));
+		expect(demo.querySelector('.shortcut-note')?.textContent).toContain('shortcut focused');
+
+		const formInput = container.querySelector<HTMLInputElement>('#core-api-profile-name')!;
+		formInput.focus();
+		fireEvent.keyDown(formInput, { key: '/' });
+		expect(document.activeElement).toBe(formInput);
+	});
+
+	it('runs the data example through pending and success states', async () => {
+		const { container } = await renderCoreApis();
+		const demo = container.querySelector('[data-demo="data"]')!;
+		const load = Array.from(demo.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
+			button.textContent?.includes('Load profile'),
+		)!;
+
+		fireEvent.click(load);
+		await waitFor(() => expect(demo.querySelector('.data-loading')).toBeTruthy());
+		await waitFor(
+			() => expect(demo.querySelector('.profile-card')?.textContent).toContain('Ada Lovelace'),
+			{ timeout: 2000 },
+		);
+	});
+
+	it('runs the form action through validation, pending, and success states', async () => {
+		const { container } = await renderCoreApis();
+		const demo = container.querySelector('[data-demo="form"]')!;
+		const form = demo.querySelector('form')!;
+		const input = demo.querySelector<HTMLInputElement>('input[name="name"]')!;
+		const submit = demo.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+		const result = demo.querySelector('.form-result')!;
+
+		fireEvent.submit(form);
+		await waitFor(() => expect(result.textContent).toContain('Enter a name'));
+
+		fireEvent.input(input, { target: { value: 'Grace Hopper' } });
+		fireEvent.submit(form);
+		await waitFor(() => expect(submit.textContent).toContain('Saving'));
+		expect(submit.disabled).toBe(true);
+		await waitFor(() => expect(result.textContent).toContain('Saved Grace Hopper.'));
+		expect(submit.disabled).toBe(false);
 	});
 
 	it('collapses the mobile docs menu after choosing another page', async () => {
