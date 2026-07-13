@@ -66,7 +66,7 @@ describe('website routes', () => {
 		expect(container.querySelector('pre.shiki')).toBeTruthy();
 		const featureCards = container.querySelectorAll('.features article.card');
 		expect(featureCards).toHaveLength(4);
-		expect(container.querySelector('.card-eyebrow')).toBeNull();
+		expect(container.querySelectorAll('.features .card-eyebrow')).toHaveLength(4);
 		expect(container.textContent).toContain('Hooks without the homework');
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
