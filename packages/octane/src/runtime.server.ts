@@ -3715,6 +3715,10 @@ export function ssrTry(
 // boundary errored (hydration client-renders it via mismatch recovery).
 const STREAM_RUNTIME_JS =
 	'(function(){var d=document;var S=window.$OCTS=window.$OCTS||{};' +
+	// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
+	// for safe integer N >= 2. Keep this in sync with hydrationMarkerMultiplicity.
+	'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
+	'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s;};' +
 	'window.$OCTRC=function(id){' +
 	"var t=d.querySelector('template[" +
 	STREAM_BOUNDARY_ATTR +
@@ -3729,7 +3733,7 @@ const STREAM_RUNTIME_JS =
 	'if(sd){S[id]=sd.textContent;sd.parentNode.removeChild(sd);}' +
 	'var n=t.nextSibling,depth=1;' +
 	'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
-	'if(v==="[")depth++;else if(v==="]"){depth--;if(depth===0)break;}' +
+	'if(M(v,"["))depth++;else if(M(v,"]")){depth--;if(depth===0)break;}' +
 	'n.parentNode.removeChild(n);n=x;}' +
 	'var p=t.parentNode;' +
 	'while(s.firstChild)p.insertBefore(s.firstChild,n);' +

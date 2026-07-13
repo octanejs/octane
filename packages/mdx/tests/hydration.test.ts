@@ -1,7 +1,7 @@
 /**
  * Hydration — a server-rendered MDX document adopts into the client-compiled
- * module via `hydrateRoot`: byte-identical DOM, adopted (not rebuilt) nodes,
- * no mismatch warnings, and embedded interactive components stay live.
+ * module via `hydrateRoot`: logically equivalent DOM, adopted (not rebuilt)
+ * nodes, no mismatch warnings, and embedded interactive components stay live.
  *
  * The server side compiles the SAME `.mdx` source with `mode: 'server'` and
  * evaluates it with the server runtime injected (the ssr.test.ts eval trick,
@@ -26,6 +26,13 @@ import BasicDoc from './_fixtures/basic.mdx';
 import ComponentsDoc from './_fixtures/components.mdx';
 
 const FIXTURES = join(process.cwd(), 'packages/mdx/tests/_fixtures');
+
+const expandCountedHydrationMarkers = (html: string) =>
+	html.replace(/<!--([\[\]])([1-9]\d*)-->/g, (whole, marker: string, raw: string) => {
+		const multiplicity = Number(raw);
+		if (!Number.isSafeInteger(multiplicity) || multiplicity < 2) return whole;
+		return `<!--${marker}-->`.repeat(multiplicity);
+	});
 
 // Server-compile an `.mdx` fixture through the pipeline. The provider import
 // is the REAL `@octanejs/mdx/server` (the server-mode default).
@@ -117,8 +124,8 @@ describe('hydration', () => {
 	});
 
 	// The server provider (@octanejs/mdx/server) and the client provider mount
-	// the same component-frame shape, so a document server-rendered under the
-	// server MDXProvider hydrates byte-for-byte into the client MDXProvider.
+	// the same logical component-frame shape. Hydration may store an exactly
+	// coextensive prefix as a counted pair after adopting every document node.
 	it('adopts a document rendered under the server MDXProvider into the client MDXProvider', () => {
 		const mod = serverMdxModule('basic.mdx');
 		const components = { h1: 'h2', em: 'i' };
@@ -135,7 +142,7 @@ describe('hydration', () => {
 			children: createElement(BasicDoc),
 		});
 		flushSync(() => {});
-		expect(container.innerHTML).toBe(html);
+		expect(expandCountedHydrationMarkers(container.innerHTML)).toBe(html);
 		expect(container.querySelector('h2')).toBe(h2);
 		root.unmount();
 	});

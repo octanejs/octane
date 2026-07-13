@@ -6697,6 +6697,16 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 	// by construction; the stamped cc emits componentSlot(..., inherit=true).
 	const inheritRoot = ctx._inheritBody === true && inheritSoleCompRoot(jsxNodes, ctx);
 	ctx._inheritBody = false;
+	// Hydration range compaction: a bare renderable hole that is the ENTIRE body
+	// (the common `SafeFragment` / `{children}` pass-through shape) is provably
+	// coextensive with its component block. Unlike M3 component inheritance we
+	// keep the explicit SSR pair for backward-compatible hydration, then stamp
+	// the client ChildSlot so the post-hydration pass may borrow the outer pair.
+	const coalesceChildRoot =
+		jsxNodes.length === 1 &&
+		((jsxNodes[0].type === 'Text' &&
+			!isKnownStringExpression(jsxNodes[0].expression, ctx.knownStringLocals)) ||
+			jsxNodes[0].type === 'TSRXExpression');
 	// Top-level control-flow directives (@if/@for/@switch/@try/<Activity>). In a
 	// body that ALSO has static template roots, each construct emits a `<!>`
 	// anchor at its child index (mirroring the in-element mixed-children path)
@@ -6767,6 +6777,9 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		// pushed first, before makeCompCall returns to the root push).
 		if (inheritRoot && compCalls.length > 0) {
 			compCalls[compCalls.length - 1].inheritRange = true;
+		}
+		if (coalesceChildRoot && compCalls.length > 0) {
+			compCalls[compCalls.length - 1].coalesceRange = true;
 		}
 		// Advance the child index only when the node actually contributed template
 		// HTML (an element / text / `<!>` anchor). Component calls and un-anchored
@@ -7327,9 +7340,14 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 				// primitive into a text slot; delegates to `childSlot` otherwise).
 				ctx.runtimeNeeded.add('textSlot');
 				const anchorArg = anchorExpr === 'null' ? '' : `, ${anchorExpr}`;
+				const coalesceArg = cc.coalesceRange
+					? anchorArg
+						? ', undefined, true'
+						: ', undefined, undefined, true'
+					: '';
 				pushAfter(
 					cc.id,
-					`  _$textSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg});`,
+					`  _$textSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg}${coalesceArg});`,
 				);
 				continue;
 			}
@@ -7348,11 +7366,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			// When the slot has its OWN `<!>` placeholder, tell textHole/childSlot to
 			// reuse it as the end marker (no second comment minted) — `ownEnd`.
 			const ownEndArg = cc.anchorVar ? ', true' : '';
+			const coalesceArg = cc.coalesceRange ? (cc.anchorVar ? ', true' : ', undefined, true') : '';
 			const chp = `_b.${bag.letter(`_chp$${cc.id}`)}`;
 			const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
 			pushAfter(
 				cc.id,
-				`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}); } }`,
+				`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}${coalesceArg}); } }`,
 			);
 			continue;
 		}
@@ -7416,9 +7435,12 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 			if (anchorArg === '') anchorArg = ', undefined';
 			singleRootArg = cc.singleRoot ? ', undefined, true' : ', undefined, 2';
 		}
+		// Persist key ownership separately from the current key VALUE so
+		// `key={undefined}` remains an independent reconciliation boundary.
+		const keyedArg = cc.keyExpr != null ? ', undefined, undefined, true' : '';
 		pushAfter(
 			cc.id,
-			`  _$componentSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg});`,
+			`  _$componentSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg}${keyedArg});`,
 		);
 	}
 	for (const pc of ctx._portalCalls) {

@@ -16,6 +16,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
+import { censusDomNodes, type DomNodeCensus } from '../../benchmarks/lib/dom-nodes.mjs';
 
 const WEBSITE = join(process.cwd(), 'website');
 const ROUTES = ['/', '/docs', '/benchmarks', '/playground', '/view-transitions'];
@@ -163,8 +164,8 @@ async function stop(child: ChildProcess | undefined): Promise<void> {
 	if (child.exitCode === null) signalGroup('SIGKILL');
 }
 
-// Load `path`, collecting console errors + page errors; returns the filtered
-// error list and the rendered <main> text.
+// Load `path`, collecting console errors + page errors; returns the rendered
+// <main> text plus deterministic whole-body / main DOM censuses.
 async function loadRoute(base: string, path: string) {
 	const page = await browser!.newPage();
 	const errors: string[] = [];
@@ -175,13 +176,25 @@ async function loadRoute(base: string, path: string) {
 	await page.goto(base + path, { waitUntil: 'networkidle' });
 	await page.waitForTimeout(400); // hydration commit + recovery warnings
 	const main = (await page.evaluate(() => document.querySelector('main')?.textContent)) ?? '';
-	const comments = await page.evaluate(() => {
-		const w = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
-		let n = 0;
-		while (w.nextNode()) n++;
-		return n;
-	});
-	return { page, errors, main, comments };
+	const bodyDom = await page.evaluate(censusDomNodes, 'body');
+	const mainDom = await page.evaluate(censusDomNodes, 'main');
+	// Keep the legacy scalar for the existing COMMENT_CEILINGS assertion.
+	return { page, errors, main, comments: bodyDom.comments, bodyDom, mainDom };
+}
+
+function assertCountedHydrationMarkers(bodyDom: DomNodeCensus, mainDom: DomNodeCensus): void {
+	// Counted comments reduce physical DOM nodes while preserving the logical
+	// open/close multiplicity the hydration cursor consumes.
+	expect(bodyDom.hydrationMarkersLogical).toBeGreaterThan(bodyDom.hydrationMarkersPhysical);
+	expect(bodyDom.hydrationMarkersCounted).toBeGreaterThan(0);
+	expect(bodyDom.hydrationMarkerMaxMultiplicity).toBeGreaterThan(1);
+
+	// Every website route shares the router/provider prefix that motivated this
+	// protocol. Nineteen logical opens compact to five physical comments: the
+	// remaining splits are the independent Suspense frame/try range plus the
+	// shorter route-content span, not redundant wrapper bookkeeping.
+	expect(mainDom.leadingHydrationStartsPhysical).toBe(5);
+	expect(mainDom.leadingHydrationStartsLogical).toBe(19);
 }
 
 async function waitForLocatorText(
@@ -226,7 +239,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		{ timeout: 30_000 },
 		async (route, ctx) => {
 			if (!browser) return ctx.skip();
-			const { page, errors, main, comments } = await loadRoute(
+			const { page, errors, main, comments, bodyDom, mainDom } = await loadRoute(
 				`http://localhost:${DEV_PORT}`,
 				route,
 			);
@@ -238,6 +251,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				expect(main.length).toBeGreaterThan(0);
 				// DOM-weight ratchet (see COMMENT_CEILINGS).
 				expect(comments).toBeLessThanOrEqual(COMMENT_CEILINGS[route]);
+				assertCountedHydrationMarkers(bodyDom, mainDom);
 			} finally {
 				await page.close();
 			}
@@ -268,10 +282,14 @@ describe.sequential('website production build → hydration (octane-preview)', (
 
 	it.for(ROUTES)('%s renders and runs with no errors', { timeout: 30_000 }, async (route, ctx) => {
 		if (!browser) return ctx.skip();
-		const { page, errors, main } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, route);
+		const { page, errors, main, bodyDom, mainDom } = await loadRoute(
+			`http://localhost:${PREVIEW_PORT}`,
+			route,
+		);
 		try {
 			expect(errors).toEqual([]);
 			expect(main.length).toBeGreaterThan(0);
+			assertCountedHydrationMarkers(bodyDom, mainDom);
 		} finally {
 			await page.close();
 		}
