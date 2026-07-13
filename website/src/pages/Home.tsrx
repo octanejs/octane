@@ -10,7 +10,6 @@ import { HOME_SUMMARY } from '../content/benchmarks.ts';
 
 const FEATURES = [
 	{
-		eyebrow: 'Compiler-owned reactivity',
 		title: 'Hooks without the homework',
 		body: 'Write the closure and move on. Octane infers dependencies for effects, ' +
 			'memos, callbacks, and imperative handles; hook call sites stay safe behind ' +
@@ -18,14 +17,12 @@ const FEATURES = [
 			'signals to get, with the hooks model you already know.',
 	},
 	{
-		eyebrow: 'Async by construction',
 		title: 'Suspense without waterfalls',
 		body: 'Independent use() resources start together instead of serially ' +
 			'suspending through the tree. Descendant fetch plans warm early, and ' +
 			'streaming SSR flushes each ready boundary without waiting for the slowest one.',
 	},
 	{
-		eyebrow: 'Compiled rendering',
 		title: 'No virtual DOM. No diff tax.',
 		body: 'TSRX lowers templates to clones and direct DOM writes, while keyed @for ' +
 			'blocks compile to a dedicated minimal-move path. Standard .tsx works too, ' +
@@ -34,7 +31,6 @@ const FEATURES = [
 		linkLabel: 'tsrx.dev',
 	},
 	{
-		eyebrow: 'React knowledge, upgraded',
 		title: 'Change the import. Keep the model.',
 		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms, ' +
 			'and Suspense behave the way you expect. Native events and refs-as-props ' +
@@ -83,9 +79,6 @@ export function Home() @{
 		<section class="features">
 			@for (const feature of FEATURES; key feature.title) {
 				<article class="card">
-					<p class="card-eyebrow">
-						{feature.eyebrow as string}
-					</p>
 					<h3 class="card-title">
 						{feature.title as string}
 					</h3>
@@ -135,12 +128,12 @@ export function Home() @{
 				cost relative to Octane (1×), lower is better.
 			</p>
 			<div class="bench-grid">
-				<BenchBars card={HOME_SUMMARY} showValues={true} width={1100} />
+				<BenchBars card={HOME_SUMMARY} width={1100} />
 			</div>
 			<p class="bench-note">
 				{'Ratios are geometric means over each suite’s per-operation checked-in benchmark scores ('}
 				<code>benchmarks/baselines/local</code>
-				{'), Octane .tsrx vs React 19.2, Solid 2.0 beta, Ripple 0.3 and Vue Vapor 3.6 beta. Reproduce with '}
+				{'), Octane .tsrx vs React 19.2, Preact 10, Solid 2.0 beta, Svelte 5, Ripple 0.3 and Vue Vapor 3.6 beta. Reproduce with '}
 				<code>pnpm bench:all -- --quick --ratios</code>
 				{', or see '}
 				<Link to="/benchmarks">absolute per-operation numbers for the charted suites</Link>
@@ -299,30 +292,6 @@ export function Home() @{
 				border-radius: 1rem;
 				padding: 1.5rem;
 				overflow: hidden;
-				transition:
-					transform 0.18s ease,
-					border-color 0.18s ease,
-					box-shadow 0.18s ease;
-			}
-			.card::before {
-				content: '';
-				position: absolute;
-				inset: 0 0 auto;
-				height: 2px;
-				background: linear-gradient(90deg, #ff415a, #ff8a78 55%, transparent);
-			}
-			.card:hover {
-				transform: translateY(-3px);
-				border-color: rgba(255, 101, 122, 0.3);
-				box-shadow: 0 16px 30px rgba(0, 0, 0, 0.18);
-			}
-			.card-eyebrow {
-				margin: 0 0 0.85rem;
-				color: #ff657a;
-				font-size: 0.68rem;
-				font-weight: 800;
-				letter-spacing: 0.11em;
-				text-transform: uppercase;
 			}
 			.card-title {
 				margin: 0 0 0.75rem;
