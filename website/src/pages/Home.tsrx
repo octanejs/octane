@@ -16,7 +16,6 @@ const FEATURES = [
 			'memos, callbacks, and imperative handles; hook call sites stay safe behind ' +
 			'conditions and early returns. The no-bookkeeping DX people reach for ' +
 			'signals to get, with the hooks model you already know.',
-		code: 'useEffect(() => sync(room.id))',
 	},
 	{
 		eyebrow: 'Async by construction',
@@ -24,7 +23,6 @@ const FEATURES = [
 		body: 'Independent use() resources start together instead of serially ' +
 			'suspending through the tree. Descendant fetch plans warm early, and ' +
 			'streaming SSR flushes each ready boundary without waiting for the slowest one.',
-		code: 'const user = use(fetchUser(id))',
 	},
 	{
 		eyebrow: 'Compiled rendering',
@@ -32,7 +30,6 @@ const FEATURES = [
 		body: 'TSRX lowers templates to clones and direct DOM writes, while keyed @for ' +
 			'blocks compile to a dedicated minimal-move path. Standard .tsx works too, ' +
 			'so optimization is a per-component choice rather than a rewrite.',
-		code: '@for (const item of items; key item.id)',
 		href: 'https://tsrx.dev',
 		linkLabel: 'tsrx.dev',
 	},
@@ -42,7 +39,6 @@ const FEATURES = [
 		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms, ' +
 			'and Suspense behave the way you expect. Native events and refs-as-props ' +
 			'remove legacy layers, while 17 first-party bindings bring the ecosystem.',
-		code: 'import { useQuery } from \'@octanejs/tanstack-query\'',
 	},
 ];
 
@@ -96,16 +92,11 @@ export function Home() @{
 					<p class="card-body">
 						{feature.body as string}
 					</p>
-					<div class="card-bottom">
-						<code class="card-code">
-							{feature.code as string}
-						</code>
-						@if (feature.href) {
-							<a class="card-link" href={feature.href} target="_blank" rel="noreferrer">
-								{(feature.linkLabel ?? feature.href) + ' →'}
-							</a>
-						}
-					</div>
+					@if (feature.href) {
+						<a class="card-link" href={feature.href} target="_blank" rel="noreferrer">
+							{(feature.linkLabel ?? feature.href) + ' →'}
+						</a>
+					}
 				</article>
 			}
 		</section>
@@ -141,9 +132,7 @@ export function Home() @{
 			</div>
 			<p class="bench-sub">
 				Cross-framework browser, SSR, async and shipped-bytes suites on one scale: each framework’s
-				cost relative to Octane (1×), lower is better. Same apps, same hardware, from production
-				builds or production preview servers — charted with @octanejs/recharts, the site’s own
-				charting binding. Where a bar is shorter than Octane’s, that framework wins the suite.
+				cost relative to Octane (1×), lower is better.
 			</p>
 			<div class="bench-grid">
 				<BenchBars card={HOME_SUMMARY} showValues={true} width={1100} />
@@ -345,30 +334,11 @@ export function Home() @{
 				color: #99a1b3;
 				font-size: 0.925rem;
 			}
-			.card-bottom {
-				display: flex;
-				flex-direction: column;
-				align-items: flex-start;
-				gap: 0.65rem;
-				margin-top: auto;
-				padding-top: 1.25rem;
-				width: 100%;
-			}
-			.card-code {
-				display: block;
-				box-sizing: border-box;
-				width: 100%;
-				padding: 0.65rem 0.75rem;
-				background: rgba(15, 17, 21, 0.72);
-				border: 1px solid rgba(255, 255, 255, 0.08);
-				border-radius: 0.55rem;
-				color: #f4eee8;
-				font-size: 0.72rem;
-				line-height: 1.45;
-				overflow-wrap: anywhere;
-			}
 			.card-link {
 				display: inline-block;
+				align-self: flex-start;
+				margin-top: auto;
+				padding-top: 1.25rem;
 				color: #ff5d72;
 				font-weight: 600;
 				font-size: 0.9rem;
