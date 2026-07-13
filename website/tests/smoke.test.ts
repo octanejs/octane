@@ -66,8 +66,7 @@ describe('website routes', () => {
 		expect(container.querySelector('pre.shiki')).toBeTruthy();
 		const featureCards = container.querySelectorAll('.features article.card');
 		expect(featureCards).toHaveLength(4);
-		expect(container.querySelectorAll('.features .card-eyebrow')).toHaveLength(4);
-		expect(container.textContent).toContain('Hooks without the homework');
+		expect(container.textContent).toContain('No rules of hooks');
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
 		// The checked-in benchmark summary reaches the chart and table renderers.
