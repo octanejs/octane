@@ -64,10 +64,15 @@ describe('website routes', () => {
 
 		// The home-page MDX sample went through the Shiki pipeline.
 		expect(container.querySelector('pre.shiki')).toBeTruthy();
+		// Feature cards are data-driven and their copy churns; assert structure,
+		// not wording (see the header note).
 		const featureCards = container.querySelectorAll('.features article.card');
 		expect(featureCards).toHaveLength(4);
-		expect(container.querySelectorAll('.features .card-eyebrow')).toHaveLength(4);
-		expect(container.textContent).toContain('Hooks without the homework');
+		expect(container.querySelector('.card-eyebrow')).toBeNull();
+		for (const card of Array.from(featureCards)) {
+			expect(card.querySelector('.card-title')?.textContent?.trim()).toBeTruthy();
+			expect(card.querySelector('.card-body')?.textContent?.trim()).toBeTruthy();
+		}
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
 		// The checked-in benchmark summary reaches the chart and table renderers.
