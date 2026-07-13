@@ -1,4 +1,4 @@
-// Vendored from react-router@7.18.1 packages/react-router/lib/server-runtime/sessions/cookieStorage.ts — unmodified.
+// Vendored from react-router@8.2.0 packages/react-router/lib/server-runtime/sessions/cookieStorage.ts — unmodified.
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
 import { createCookie, isCookie } from '../cookies';
 import type { SessionStorage, SessionIdStorageStrategy, SessionData } from '../sessions';

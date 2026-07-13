@@ -1,4 +1,4 @@
-// Navigate — transcribed from react-router@7.18.1 lib/components.tsx.
+// Navigate — transcribed from react-router@8.2.0 lib/components.tsx.
 // Renders nothing; navigates from an effect on mount/update. Plain .ts (no
 // JSX needed); the hooks it composes handle a slotless caller via bare-tag
 // sub-slots.

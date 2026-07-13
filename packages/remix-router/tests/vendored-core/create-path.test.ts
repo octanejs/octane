@@ -1,4 +1,4 @@
-// Ported from react-router@7.18.1 packages/react-router/__tests__/router/create-path-test.ts — verbatim except: renamed to create-path.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim.
+// Ported from react-router@8.2.0 packages/react-router/__tests__/router/create-path-test.ts — verbatim except: renamed to create-path.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim.
 import './_shim';
 import { createPath } from '../../src/lib/router/history';
 

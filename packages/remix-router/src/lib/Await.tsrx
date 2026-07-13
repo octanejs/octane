@@ -1,4 +1,4 @@
-// Await — port of react-router@7.18.1 lib/components.tsx's Await +
+// Await — port of react-router@8.2.0 lib/components.tsx's Await +
 // AwaitErrorBoundary + ResolveAwait onto octane. The class boundary becomes an
 // octane @try/@catch; the "throw to the suspense boundary" becomes use(promise)
 // (octane's suspend primitive); the TrackedPromise decoration (_tracked/_data/

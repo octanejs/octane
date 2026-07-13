@@ -1,4 +1,4 @@
-// Transcribed from react-router@7.18.1 lib/context.ts onto octane. The ten
+// Transcribed from react-router@8.2.0 lib/context.ts onto octane. The ten
 // contexts and their shapes are verbatim; octane substitutions: createContext/
 // createElement from 'octane', `__DEV__` → NODE_ENV, no displayName (octane
 // contexts carry none). RSCRouterContext is kept (hardwired default false — no
@@ -48,7 +48,7 @@ export const ViewTransitionContext = createContext<ViewTransitionContextObject>(
 	isTransitioning: false,
 });
 
-// TODO: (v7) Change the useFetcher data from `any` to `unknown`
+// TODO: (v9) Change the useFetcher data from `any` to `unknown`
 export type FetchersContextObject = Map<string, any>;
 
 export const FetchersContext = createContext<FetchersContextObject>(new Map());
@@ -125,5 +125,3 @@ export const RouteContext = createContext<RouteContextObject>({
 });
 
 export const RouteErrorContext = createContext<any>(null);
-
-export const ENABLE_DEV_WARNINGS = process.env.NODE_ENV !== 'production';

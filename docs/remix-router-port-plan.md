@@ -1,22 +1,22 @@
 # Octane Port Plan: react-router → `@octanejs/remix-router`
 
-Target: **react-router 7.18.1** (the v7 line; `react-router-dom@7.18.1` is a
-pure re-export shim and doubles as a second parity oracle). v8.2.0 exists — the
-upgrade path is "bump the tag in `scripts/vendor-remix-router.mjs`, re-vendor,
-re-pin export parity" (v8 mostly deletes deprecated APIs); vendor headers make
-the diff mechanical.
+Target: **react-router 8.2.0**. React Router 8 removes the `react-router-dom`
+shim, makes middleware unconditional, removes `hasErrorBoundary` and the v8
+future flags, and moves the default route-property mapper into the router core.
+The vendored headers and `scripts/vendor-remix-router.mjs` keep future upgrades
+mechanical.
 
 ## 1. Recommendation
 
 One package (`packages/remix-router`) shipping raw TS, mirroring upstream's
-`lib/**` layout under `src/lib/**`. react-router v7's `./internal` subpath is
+`lib/**` layout under `src/lib/**`. react-router v8's `./internal` subpath is
 types-only, so the framework-agnostic core CANNOT be consumed as a dependency —
 it is **vendored byte-close** (the hook-form model, ~12k lines) and validated
 by upstream's own router unit tests running against the vendored copy
-(`tests/vendored-core/` — 161 tests, node environment, zero React). The React
-layer (~2k lines so far) is transcribed onto octane per the repo's port
-doctrine: upstream structure, comments, and warning strings preserved; React
-APIs substituted.
+(`tests/vendored-core/` — 161 ported tests plus four focused v8.2 regression
+pins, node environment, zero React). The React layer (~2k lines so far) is
+transcribed onto octane per the repo's port doctrine: upstream structure,
+comments, and warning strings preserved; React APIs substituted.
 
 Out of scope permanently: framework mode (`lib/dom/ssr/*` — needs
 `@react-router/dev`), RSC (`lib/rsc/*`). Final-phase policy: framework client
@@ -69,7 +69,7 @@ destroying render-prop identity (Await's render-prop children found this).
 Vendor script + 15 files (two documented type-only deviations: the
 `react-types` shim and the `server-runtime-types` stub); upstream router unit
 tests (memory/navigation/redirects/path-resolution/route-fallback/
-interruptions, 161 tests) running against the vendored copy in a node-env
+interruptions, 165 tests) running against the vendored copy in a node-env
 vitest project. *Exit criterion (met):* vendored core typechecks standalone and
 passes upstream's own suite untouched.
 
@@ -158,7 +158,7 @@ objects SSR fine; documented in status.json.
 ### Final phase — server runtime + framework/RSC stubs — SHIPPED (PR 1)
 The framework-independent cookie/session surface is VENDORED
 (`lib/server-runtime/{cookies,crypto,sessions,sessions/*,warnings,mode}.ts`,
-adding the `cookie` dependency exactly as upstream): createCookie/isCookie,
+adding the `cookie-es` dependency exactly as upstream): createCookie/isCookie,
 createSession/isSession, createSessionStorage,
 createCookieSessionStorage/createMemorySessionStorage, UNSAFE_ServerMode.
 `createRequestHandler` is NOT vendored — it is framework-mode (consumes a
@@ -188,10 +188,10 @@ green and byte-identical against real react-router in the differential rig.
   convergence drain — targeted tests before advertising `flushSync` options.
 - **useOptimistic parity** — RouterProvider's `useTransitions === true` path is
   untested until Phase B/C fixtures drive it explicitly.
-- **KNOWN_BINDINGS repoint**: `react-router`/`react-router-dom` now map to
-  `@octanejs/remix-router` (previously suggested `@octanejs/tanstack-router` as
-  the alternative) — the tanstack-router binding remains for TanStack Router
-  apps.
+- **KNOWN_BINDINGS repoint**: `react-router` maps to
+  `@octanejs/remix-router`. React Router 8 removed `react-router-dom`; use the
+  binding's `/dom` entry only for its flushSync-enabled `RouterProvider`. The
+  tanstack-router binding remains for TanStack Router apps.
 
 **Key source references:** `packages/remix-router/scripts` (vendor),
 `packages/tanstack-router/src/CatchBoundary.tsrx` (boundary model),

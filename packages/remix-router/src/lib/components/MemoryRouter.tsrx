@@ -1,4 +1,4 @@
-// MemoryRouter — transcribed from react-router@7.18.1 lib/components.tsx.
+// MemoryRouter — transcribed from react-router@8.2.0 lib/components.tsx.
 // A declarative Router over an in-memory history stack.
 import { startTransition, useCallback, useLayoutEffect, useRef, useState } from 'octane';
 import { createMemoryHistory } from '../router/history.ts';

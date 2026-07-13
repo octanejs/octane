@@ -1,4 +1,4 @@
-// DOM-mode entry points + hooks — transcribed from react-router@7.18.1
+// DOM-mode entry points + hooks — transcribed from react-router@8.2.0
 // lib/dom/lib.tsx onto octane: createBrowserRouter / createHashRouter (with
 // upstream's __staticRouterHydrationData parsing + error deserialization),
 // useSearchParams, and useViewTransitionState (needed internally by NavLink;
@@ -38,11 +38,12 @@ import type { RouteObject } from '../router/utils';
 import {
 	ErrorResponseImpl,
 	SUPPORTED_ERROR_TYPES,
+	defaultMapRouteProperties,
 	joinPaths,
 	matchPath,
 	stripBasename,
 } from '../router/utils';
-import { hydrationRouteProperties, mapRouteProperties } from '../components/utils';
+import { hydrationRouteProperties } from '../components/utils';
 import {
 	useBlocker,
 	useLocation,
@@ -81,7 +82,7 @@ export function createBrowserRouter(routes: RouteObject[], opts?: DOMRouterOpts)
 		history: createBrowserHistory({ window: opts?.window }),
 		hydrationData: opts?.hydrationData || parseHydrationData(),
 		routes,
-		mapRouteProperties,
+		mapRouteProperties: defaultMapRouteProperties,
 		hydrationRouteProperties,
 		dataStrategy: opts?.dataStrategy,
 		patchRoutesOnNavigation: opts?.patchRoutesOnNavigation,
@@ -102,7 +103,7 @@ export function createHashRouter(routes: RouteObject[], opts?: DOMRouterOpts): D
 		history: createHashHistory({ window: opts?.window }),
 		hydrationData: opts?.hydrationData || parseHydrationData(),
 		routes,
-		mapRouteProperties,
+		mapRouteProperties: defaultMapRouteProperties,
 		hydrationRouteProperties,
 		dataStrategy: opts?.dataStrategy,
 		patchRoutesOnNavigation: opts?.patchRoutesOnNavigation,
@@ -134,7 +135,7 @@ function deserializeErrors(errors: DataRouter['state']['errors']): DataRouter['s
 	let serialized: DataRouter['state']['errors'] = {};
 	for (let [key, val] of entries) {
 		// Hey you!  If you change this, please change the corresponding logic in
-		// serializeErrors in react-router-dom/server.tsx :)
+		// serializeErrors in lib/dom/server.tsx :)
 		if (val && val.__type === 'RouteErrorResponse') {
 			serialized[key] = new ErrorResponseImpl(
 				val.status,
@@ -246,7 +247,7 @@ export function useViewTransitionState(to: To, ...args: any[]): boolean {
 
 	invariant(
 		vtContext != null,
-		"`useViewTransitionState` must be used within `react-router-dom`'s `RouterProvider`.  " +
+		"`useViewTransitionState` must be used within `react-router/dom`'s `RouterProvider`.  " +
 			'Did you accidentally import `RouterProvider` from `react-router`?',
 	);
 
@@ -276,7 +277,7 @@ export function useViewTransitionState(to: To, ...args: any[]): boolean {
 
 // ── Phase D — mutations ─────────────────────────────────────────────────────
 // useSubmit / useFormAction / useFetcher / useFetchers — transcribed from
-// react-router@7.18.1 lib/dom/lib.tsx. The dom-side data-router guards mirror
+// react-router@8.2.0 lib/dom/lib.tsx. The dom-side data-router guards mirror
 // upstream's local DataRouterHook enum + console errors.
 
 enum DataRouterHook {

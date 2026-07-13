@@ -1,4 +1,4 @@
-// Ported from react-router@7.18.1 packages/react-router/__tests__/router/route-fallback-test.ts — verbatim except: renamed to route-fallback.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim.
+// Ported from react-router@8.2.0 packages/react-router/__tests__/router/route-fallback-test.ts — verbatim except: renamed to route-fallback.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim.
 import './_shim';
 import type { LoaderFunction } from '../../src/lib/router/utils';
 import type { Router } from '../../src/lib/router/router';
@@ -324,7 +324,7 @@ describe('route HydrateFallback', () => {
 				id: 'parent',
 				path: '/',
 				loader: () => `PARENT ${++parentCount}`,
-				hasErrorBoundary: true,
+				ErrorBoundary: () => null,
 				children: [
 					{
 						path: 'child',
@@ -386,7 +386,7 @@ describe('route HydrateFallback', () => {
 				id: 'parent',
 				path: '/',
 				loader: () => `PARENT ${++parentCount}`,
-				hasErrorBoundary: true,
+				ErrorBoundary: () => null,
 				children: [
 					{
 						path: 'child',

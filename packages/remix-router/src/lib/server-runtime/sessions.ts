@@ -1,6 +1,6 @@
-// Vendored from react-router@7.18.1 packages/react-router/lib/server-runtime/sessions.ts — unmodified.
+// Vendored from react-router@8.2.0 packages/react-router/lib/server-runtime/sessions.ts — unmodified.
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
-import type { ParseOptions, SerializeOptions } from 'cookie';
+import type { CookieParseOptions, CookieSerializeOptions } from 'cookie-es';
 
 import type { Cookie, CookieOptions } from './cookies';
 import { createCookie, isCookie } from './cookies';
@@ -167,14 +167,17 @@ export interface SessionStorage<Data = SessionData, FlashData = Data> {
 	 */
 	getSession: (
 		cookieHeader?: string | null,
-		options?: ParseOptions,
+		options?: CookieParseOptions,
 	) => Promise<Session<Data, FlashData>>;
 
 	/**
 	 * Stores all data in the Session and returns the Set-Cookie header to be
 	 * used in the HTTP response.
 	 */
-	commitSession: (session: Session<Data, FlashData>, options?: SerializeOptions) => Promise<string>;
+	commitSession: (
+		session: Session<Data, FlashData>,
+		options?: CookieSerializeOptions,
+	) => Promise<string>;
 
 	/**
 	 * Deletes all data associated with the Session and returns the Set-Cookie
@@ -182,7 +185,7 @@ export interface SessionStorage<Data = SessionData, FlashData = Data> {
 	 */
 	destroySession: (
 		session: Session<Data, FlashData>,
-		options?: SerializeOptions,
+		options?: CookieSerializeOptions,
 	) => Promise<string>;
 }
 

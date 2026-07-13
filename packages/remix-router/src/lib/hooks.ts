@@ -1,4 +1,4 @@
-// Transcribed from react-router@7.18.1 lib/hooks.tsx onto octane. Upstream
+// Transcribed from react-router@8.2.0 lib/hooks.tsx onto octane. Upstream
 // logic, comments, and warning strings are verbatim; octane substitutions:
 // hooks from 'octane' with the binding slot idiom (splitSlot/subSlot — this
 // file is NOT compiled, so exported hooks peel the caller's compiler-injected
@@ -23,7 +23,6 @@ import {
 	AwaitContext,
 	DataRouterContext,
 	DataRouterStateContext,
-	ENABLE_DEV_WARNINGS,
 	LocationContext,
 	NavigationContext,
 	RouteContext,
@@ -55,6 +54,7 @@ import type {
 import {
 	convertRouteMatchToUiMatch,
 	decodePath,
+	ENABLE_DEV_WARNINGS,
 	getResolveToMatches,
 	getRoutePattern,
 	joinPaths,
@@ -222,18 +222,6 @@ export interface NavigateFunction {
 
 const navigateEffectWarning =
 	`You should call navigate() in a useEffect(), not when ` + `your component is first rendered.`;
-
-// Mute warnings for calls to useNavigate in SSR environments
-function useIsomorphicLayoutEffect(cb: Parameters<typeof useLayoutEffect>[0], slot?: symbol) {
-	let isStatic = useContext(NavigationContext).static;
-	if (!isStatic) {
-		// We should be able to get rid of this once react 18.3 is released
-		// See: https://github.com/facebook/react/pull/26395
-		// OCTANE: conditional hook calls are fine — hooks are slot-keyed, not
-		// call-order keyed.
-		useLayoutEffect(cb, undefined, subSlot(slot, 'ile'));
-	}
-}
 
 /**
  * Returns a function that lets you navigate programmatically in the browser in
@@ -406,10 +394,11 @@ function useNavigateUnstable(slot?: symbol): NavigateFunction {
 	let routePathnamesJson = JSON.stringify(getResolveToMatches(matches));
 
 	let activeRef = useRef(false, subSlot(slot, 'unav:ref'));
-	useIsomorphicLayoutEffect(
+	useLayoutEffect(
 		() => {
 			activeRef.current = true;
 		},
+		undefined,
 		subSlot(slot, 'unav:ile'),
 	);
 
@@ -1628,10 +1617,11 @@ function useNavigateStable(slot?: symbol): NavigateFunction {
 	let id = useCurrentRouteId(DataRouterStateHook.UseNavigateStable);
 
 	let activeRef = useRef(false, subSlot(slot, 'snav:ref'));
-	useIsomorphicLayoutEffect(
+	useLayoutEffect(
 		() => {
 			activeRef.current = true;
 		},
+		undefined,
 		subSlot(slot, 'snav:ile'),
 	);
 

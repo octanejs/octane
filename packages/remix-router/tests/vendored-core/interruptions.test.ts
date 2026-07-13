@@ -1,4 +1,4 @@
-// Ported from react-router@7.18.1 packages/react-router/__tests__/router/interruptions-test.ts — verbatim except: renamed to interruptions.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim.
+// Ported from react-router@8.2.0 packages/react-router/__tests__/router/interruptions-test.ts — verbatim except: renamed to interruptions.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim.
 import './_shim';
 /* eslint-disable jest/valid-title */
 import type { HydrationState } from '../../src/lib/router/router';
@@ -12,7 +12,7 @@ function initializeTest(init?: { url?: string; hydrationData?: HydrationState })
 			{
 				path: '',
 				id: 'root',
-				hasErrorBoundary: true,
+				ErrorBoundary: () => null,
 				loader: true,
 				children: [
 					{

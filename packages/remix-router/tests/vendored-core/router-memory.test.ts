@@ -1,4 +1,4 @@
-// Ported from react-router@7.18.1 packages/react-router/__tests__/router/router-memory-test.ts — verbatim except: renamed to router-memory.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim.
+// Ported from react-router@8.2.0 packages/react-router/__tests__/router/router-memory-test.ts — verbatim except: renamed to router-memory.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim.
 import './_shim';
 /**
  * @jest-environment node
@@ -27,6 +27,7 @@ describe('a memory router', () => {
 			location: {
 				hash: '',
 				key: expect.any(String),
+				mask: undefined,
 				pathname: '/',
 				search: '',
 				state: null,
@@ -37,8 +38,8 @@ describe('a memory router', () => {
 					pathname: '/',
 					pathnameBase: '/',
 					route: {
+						children: undefined,
 						id: '0',
-						hasErrorBoundary: false,
 						path: '/',
 					},
 				},
@@ -46,8 +47,16 @@ describe('a memory router', () => {
 			initialized: true,
 			renderFallback: false,
 			navigation: {
+				formAction: undefined,
+				formData: undefined,
+				formEncType: undefined,
+				formMethod: undefined,
+				historyAction: undefined,
+				json: undefined,
 				location: undefined,
+				matches: undefined,
 				state: 'idle',
+				text: undefined,
 			},
 			preventScrollReset: false,
 			restoreScrollPosition: null,

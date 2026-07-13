@@ -1,12 +1,9 @@
-// Local type stub for the vendored instrumentation.ts's two type-only
-// `../server-runtime/*` imports. The server runtime (createRequestHandler,
-// cookies, sessions — react-router's framework-mode server) is out of scope
-// for this binding; only these two names are referenced, in type positions.
-// Shapes mirror react-router@7.18.1 lib/server-runtime/{data,server}.ts
-// (RequestHandler simplified: the MiddlewareEnabled conditional collapses to
-// its AppLoadContext arm — middleware typing is a framework-mode concern).
-export interface AppLoadContext {
-	[key: string]: unknown;
-}
+// Local type stub for vendored instrumentation.ts's type-only import from the
+// unvendored framework request handler. In v8 middleware is always enabled, so
+// request context is unconditionally a RouterContextProvider.
+import type { RouterContextProvider } from './utils';
 
-export type RequestHandler = (request: Request, loadContext?: AppLoadContext) => Promise<Response>;
+export type RequestHandler = (
+	request: Request,
+	loadContext?: RouterContextProvider,
+) => Promise<Response>;

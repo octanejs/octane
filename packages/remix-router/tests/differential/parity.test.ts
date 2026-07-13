@@ -1,6 +1,6 @@
 /**
  * Differential parity: the SAME `.tsrx` fixture runs through
- * @octanejs/remix-router (octane) AND real react-router 7.18.1 (React) — the
+ * @octanejs/remix-router (octane) AND real react-router 8.2.0 (React) — the
  * setup rewrites the imports for the React side, and both sides run the SAME
  * (vendored-equal) router core. octane's mountDifferential mounts both,
  * drives identical clicks, and asserts byte-identical innerHTML after each

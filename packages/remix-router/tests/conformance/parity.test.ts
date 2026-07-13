@@ -44,15 +44,9 @@ describe('export surface (phased)', () => {
 		expect(extras).toEqual([]);
 	});
 
-	it('react-router-dom shim surface is covered by the same budget', async () => {
-		const shim = await import('react-router-dom');
-		const portKeys = new Set(Object.keys(port));
-		const missing = Object.keys(shim)
-			.sort()
-			.filter((name) => name !== 'RouterProvider' && name !== 'HydratedRouter')
-			.filter((name) => !portKeys.has(name) && !EXPECTED_MISSING.has(name));
-		expect(missing).toEqual([]);
-		// The shim's RouterProvider is the /dom flushSync variant.
+	it('the /dom entry provides the flushSync RouterProvider variant', () => {
+		// react-router-dom was removed in v8; DOM RouterProvider now lives only
+		// at react-router/dom.
 		expect(typeof portDom.RouterProvider).toBe('function');
 	});
 

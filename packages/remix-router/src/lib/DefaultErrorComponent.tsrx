@@ -1,9 +1,9 @@
-// DefaultErrorComponent — port of react-router@7.18.1 lib/hooks.tsx's default
+// DefaultErrorComponent — port of react-router@8.2.0 lib/hooks.tsx's default
 // error UI. Markup-identical (differential fixtures still avoid it — the dev
 // stack trace can never byte-match across runtimes).
 import { useContext } from 'octane';
-import { RouteErrorContext, ENABLE_DEV_WARNINGS } from './context.ts';
-import { isRouteErrorResponse } from './router/utils.ts';
+import { RouteErrorContext } from './context.ts';
+import { ENABLE_DEV_WARNINGS, isRouteErrorResponse } from './router/utils.ts';
 
 export function DefaultErrorComponent() @{
 	const error = useContext(RouteErrorContext);
