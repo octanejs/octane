@@ -131,6 +131,42 @@ describe('SSR Phase 1 — semantics', () => {
 	});
 });
 
+describe('SSR — nested render entry isolation', () => {
+	it('keeps a nested render hydratable inside static markup and preserves outer hint dedupe', () => {
+		const mod = evalServer(
+			`
+        import { preload } from 'octane';
+        function Child() @{ <span>{'nested'}</span> }
+        export function Inner() @{
+          preload('/nested-render.css', { as: 'style' });
+          <div class="inner"><Child /></div>
+        }
+        export function Outer(props) @{
+          preload('/outer-render.css', { as: 'style' });
+          props.renderInner();
+          preload('/outer-render.css', { as: 'style' });
+          <main class="outer">{'outer'}</main>
+        }
+      `,
+			'nested-render-isolation.tsrx',
+		);
+		let nested: { html: string; css: string } | undefined;
+		const outer = RT.renderToStaticMarkup(mod.Outer, {
+			renderInner: () => {
+				nested = RT.renderToString(mod.Inner);
+			},
+		});
+
+		expect(nested).toBeDefined();
+		expect(nested!.html).toContain('<!--[-->');
+		expect(nested!.html).toContain('href="/nested-render.css"');
+		expect(outer.html).not.toContain('<!--[-->');
+		expect(outer.html).not.toContain('<!--]-->');
+		expect(outer.html).not.toContain('/nested-render.css');
+		expect(outer.html.match(/href="\/outer-render\.css"/g)).toHaveLength(1);
+	});
+});
+
 describe('SSR — ssrSpread attribute-name validation', () => {
 	it('skips injection-unsafe attr names but keeps valid ones', () => {
 		const out = RT.ssrSpread({

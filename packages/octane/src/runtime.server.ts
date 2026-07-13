@@ -30,7 +30,8 @@ import {
 	BLOCK_CLOSE,
 	EMPTY_COMMENT,
 	SUSPENSE_SCRIPT_ATTR,
-	UNDEFINED_SENTINEL_KEY,
+	SUSPENSE_SEED_WIRE_PREFIX,
+	REJECTION_SENTINEL_KEY,
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SEGMENT_ATTR,
 	STREAM_SEED_ATTR,
@@ -67,15 +68,20 @@ let CSS: Map<string, string> | null = null;
 // Emit hydration block markers (`<!--[-->…<!--]-->`) and head-adoption markers?
 // True for hydratable output (renderToString / prerender / streaming); flipped
 // false for the whole of a `renderToStaticMarkup` render, which produces clean,
-// non-hydratable HTML (emails / static pages). Set only around a synchronous
-// pass, so no concurrency save/restore is needed.
+// non-hydratable HTML (emails / static pages). It is part of the ambient pass
+// snapshot so a nested hydratable render cannot inherit a static outer pass.
 let MARKERS = true;
 // Accumulates hoisted `<head>` content (`<title>`/`<meta>`/`<link>`) during the
 // active render pass (a mutable container, mirroring CSS's mutable Map, so a
 // per-pass local capture keeps accumulating via `HEAD.html +=` even though
 // strings are immutable). Folded into the result `html` by `spliceHead` (into
 // `<head>` when present, else prepended).
-let HEAD: { html: string } | null = null;
+interface HeadBuffer {
+	html: string;
+	/** Resource-hint dedupe keys emitted into `html` during this pass. */
+	hints: Set<string>;
+}
+let HEAD: HeadBuffer | null = null;
 
 // Suspense (SSR Phase 4). A render pass that reaches an unresolved `use(thenable)`
 // records the thenable in SUSPENDED and throws SSR_SUSPENSE; the nearest @try
@@ -115,6 +121,10 @@ interface Frame {
 	seg: number;
 	// Monotonic counter handing the NEXT child component its `seg`.
 	nextChild: number;
+	// Arm/list-local child counters. The same component position can be visited
+	// in multiple mutually-exclusive scopes during SSR retries; each scope must
+	// retain its own ordinal just as the client retains a separate Block tree.
+	scopedChildren: Map<string, number> | null;
 	// Per-site use() occurrence counter (a use() in an inline @for hits the same
 	// site N times → distinct keys). Lazily allocated (never for a use()-free
 	// component, i.e. the common case).
@@ -124,6 +134,10 @@ interface Frame {
 	// Whether this component already registered a discovery job this pass (dedupe
 	// two sibling suspending use()s in one component to a single job).
 	deferred: boolean;
+	// Async control-arm scope active where this component instance was entered.
+	// Discovery re-runs restore it before replaying the component so identical
+	// child positions in @try content/pending/catch arms never share cache keys.
+	asyncScope: string;
 }
 interface Job {
 	comp: ServerComponent;
@@ -145,6 +159,10 @@ let DEFERRED: Job[] | null = null;
 let CURRENT_COMP: ServerComponent | null = null;
 let CURRENT_PROPS: any = null;
 let CURRENT_PARENT_SCOPE: SSRScope | null = null;
+// Stable identity of the active async control-flow arm. Component frame paths
+// alone cannot distinguish a child rendered at the same position in an @try's
+// content and pending arms, even though those are separate client block scopes.
+let ASYNC_SCOPE = '';
 
 // Walk a frame to its dotted path ('' for the root). Memoized per frame.
 function framePath(f: Frame): string {
@@ -152,6 +170,26 @@ function framePath(f: Frame): string {
 	const p = f.parent === null ? '' : framePath(f.parent) + '/' + f.seg;
 	f.path = p;
 	return p;
+}
+
+function asyncFramePath(frame: Frame | null): string {
+	return (frame === null ? '' : framePath(frame)) + ASYNC_SCOPE;
+}
+
+function nextFrameOccurrence(frame: Frame, base: string): number {
+	if (frame.occ === null) frame.occ = new Map();
+	const scopedBase = ASYNC_SCOPE === frame.asyncScope ? base : ASYNC_SCOPE + '\0' + base;
+	const next = frame.occ.get(scopedBase) ?? 0;
+	frame.occ.set(scopedBase, next + 1);
+	return next;
+}
+
+function nextChildSegment(frame: Frame): number {
+	if (ASYNC_SCOPE === frame.asyncScope) return frame.nextChild++;
+	if (frame.scopedChildren === null) frame.scopedChildren = new Map();
+	const next = frame.scopedChildren.get(ASYNC_SCOPE) ?? 0;
+	frame.scopedChildren.set(ASYNC_SCOPE, next + 1);
+	return next;
 }
 
 function ssrScope(parent: SSRScope | null): SSRScope {
@@ -425,12 +463,17 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 	// (fragment-of-arrays) flattens into more sibling item blocks — matching the
 	// client's recursive de-opt build.
 	if (Array.isArray(v)) {
-		let out = '';
-		for (let i = 0; i < v.length; i++) out += ssrChildItem(v[i], scope);
-		return ssrBlock(out);
+		return withAsyncListScope('child', () => {
+			let out = '';
+			for (let i = 0; i < v.length; i++) out += ssrChildItem(v[i], scope, i, '');
+			return ssrBlock(out);
+		});
 	}
 	// A component-body / children render function, or `<Comp/>` used as a value.
-	if (typeof v === 'function') return ssrComponent(scope, v as ServerComponent, {});
+	if (typeof v === 'function')
+		// Bare body/children functions can be recreated every parent pass. The
+		// client treats this as one child-slot body, not component-type identity.
+		return ssrComponent(scope, v as ServerComponent, {}, undefined, undefined, true);
 	if (typeof v === 'object') {
 		if ((v as any).$$kind === ELEMENT_TAG) {
 			const d = v as ElementDescriptor;
@@ -439,9 +482,13 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 			// the client adopts (de-opt host children are rebuilt, not adopted in place,
 			// so only the outer marker pair must line up). COMPONENT descriptor →
 			// ssrComponent, passing `children` through (don't drop them).
-			if (typeof d.type === 'string')
-				return ssrBlock(ssrHostElement(d.type, d.props, d.children, scope));
-			return ssrComponentDescriptor(d, scope);
+			const render = (): string => {
+				if (typeof d.type === 'string')
+					return ssrBlock(ssrHostElement(d.type, d.props, d.children, scope));
+				return ssrComponentDescriptor(d, scope);
+			};
+			const renderType = () => withAsyncIdentity('child-type', d.type, render);
+			return d.key != null ? withAsyncIdentity('child-key', d.key, renderType, true) : renderType();
 		}
 		// A portal as a value: its body renders into a foreign target client-side —
 		// server-side the site leaves the anchor placeholder (see ssrPortal).
@@ -474,13 +521,20 @@ export function ssrChildText(v: unknown, scope: SSRScope): string {
 // sibling item blocks (React fragment-of-arrays) — NOT the extra wrapping block
 // ssrChild gives a whole array hole — while every non-array item reuses ssrChild's
 // per-value serialization (host element, component, primitive, or empty).
-function ssrChildItem(v: unknown, scope: SSRScope): string {
+function ssrChildItem(v: unknown, scope: SSRScope, index: number, prefix: string): string {
 	if (Array.isArray(v)) {
 		let out = '';
-		for (let i = 0; i < v.length; i++) out += ssrChildItem(v[i], scope);
+		const nestedPrefix = prefix + index + ':';
+		for (let i = 0; i < v.length; i++) out += ssrChildItem(v[i], scope, i, nestedPrefix);
 		return out;
 	}
-	return ssrChild(v, scope);
+	const explicit =
+		v !== null && typeof v === 'object' && (v as any).$$kind === ELEMENT_TAG
+			? (v as ElementDescriptor).key
+			: null;
+	const rawKey = explicit != null ? explicit : index;
+	const key = prefix === '' ? rawKey : prefix + String(rawKey);
+	return withAsyncIdentity('item', key, () => ssrChild(v, scope));
 }
 
 // Serialize a HOST element descriptor (`createElement('span', props, ...children)`)
@@ -595,9 +649,20 @@ function ssrHostElement(
 // wrapper the client mints fresh markers (hydration mismatch).
 function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
 	if (Array.isArray(children)) {
-		let out = '';
-		for (let i = 0; i < children.length; i++) out += ssrBlock(ssrChild(children[i], scope));
-		return ssrBlock(out);
+		return withAsyncListScope('host-child', () => {
+			let out = '';
+			for (let i = 0; i < children.length; i++) {
+				const item = children[i];
+				const explicit =
+					item !== null && typeof item === 'object' && (item as any).$$kind === ELEMENT_TAG
+						? (item as ElementDescriptor).key
+						: null;
+				out += withAsyncIdentity('item', explicit != null ? explicit : i, () =>
+					ssrBlock(ssrChild(item, scope)),
+				);
+			}
+			return ssrBlock(out);
+		});
 	}
 	return ssrChild(children, scope);
 }
@@ -650,6 +715,79 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
  */
 export function ssrBlock(content: string): string {
 	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : content;
+}
+
+// URI encoders reject lone UTF-16 surrogates, while UTF-8 encoders generally
+// replace them with U+FFFD (which would conflate distinct JavaScript strings).
+// Encode each code unit at a fixed width instead: this is total for every JS
+// string and injective over its exact UTF-16 representation.
+function encodeAsyncIdentityString(value: string): string {
+	let encoded = '';
+	for (let i = 0; i < value.length; i++) {
+		encoded += value.charCodeAt(i).toString(16).padStart(4, '0');
+	}
+	return encoded;
+}
+
+function asyncIdentityKey(value: unknown, objectIs: boolean): string {
+	switch (typeof value) {
+		case 'string':
+			return 's' + encodeAsyncIdentityString(value);
+		case 'number':
+			return 'n' + (objectIs && Object.is(value, -0) ? '-0' : String(value));
+		case 'bigint':
+			return 'i' + String(value);
+		case 'boolean':
+			return value ? 'b1' : 'b0';
+		case 'undefined':
+			return 'u';
+		case 'symbol':
+		case 'function':
+		case 'object': {
+			if (value === null) return 'l';
+			const ids = RESOLVED?.asyncIdentities;
+			if (ids === undefined) return 'o' + encodeAsyncIdentityString(String(value));
+			let id = ids.get(value);
+			if (id === undefined) {
+				id = RESOLVED!.nextAsyncIdentity++;
+				ids.set(value, id);
+			}
+			return 'o' + id.toString(36);
+		}
+	}
+}
+
+function withAsyncIdentity<T>(
+	siteKey: string,
+	identity: unknown,
+	fn: () => T,
+	objectIs: boolean = false,
+): T {
+	const prev = ASYNC_SCOPE;
+	ASYNC_SCOPE = prev + '|@' + siteKey + ':' + asyncIdentityKey(identity, objectIs);
+	try {
+		return fn();
+	} finally {
+		ASYNC_SCOPE = prev;
+	}
+}
+
+function withAsyncListScope<T>(kind: string, fn: () => T): T {
+	const frame = FRAME;
+	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@list:' + kind);
+	return withAsyncIdentity('list:' + kind, occurrence, fn);
+}
+
+/** Compiler-emitted identity membrane for one @if/@switch/@for instance. */
+export function ssrControl<T>(siteKey: string, fn: () => T): T {
+	const frame = FRAME;
+	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@control:' + siteKey);
+	return withAsyncIdentity('control:' + siteKey, occurrence, fn);
+}
+
+/** Compiler-emitted identity membrane for one arm/item inside ssrControl. */
+export function ssrArm<T>(armKey: unknown, fn: () => T): T {
+	return withAsyncIdentity('arm', armKey, fn);
 }
 
 /**
@@ -1010,9 +1148,10 @@ function basicStateReducer(s: unknown, a: unknown): unknown {
 }
 
 // The shared useState/useReducer server cell. First pass creates the record
-// (running the lazy initializer once); a re-render pass folds any queued
-// render-phase actions with THIS pass's reducer (Fizz applies the latest
-// reducer closure, not the one that queued).
+// (running the lazy initializer once). A render-phase dispatch folds its action
+// into `pendingValue` immediately so the public getter sees it synchronously;
+// the next pass adopts that already-computed value without invoking a functional
+// updater/reducer for a second time.
 function stateHook<S, A>(
 	reducer: (s: S, a: A) => S,
 	create: () => S,
@@ -1054,12 +1193,8 @@ function stateHook<S, A>(
 		};
 		list[n] = rec = r;
 	} else if (rec.queue.length > 0) {
-		let v = rec.value as S;
-		const q = rec.queue;
-		for (let i = 0; i < q.length; i++) v = reducer(v, q[i] as A);
 		rec.queue = [];
-		rec.value = v;
-		rec.pendingValue = v;
+		rec.value = rec.pendingValue;
 	}
 	rec.reducer = reducer as (state: unknown, action: unknown) => unknown;
 	if (!withGetter) return [rec.value as S, rec.dispatch as (action: A) => void];
@@ -1069,12 +1204,12 @@ function stateHook<S, A>(
 
 // Invoke a component body, re-invoking while render-phase dispatches fired
 // (bounded). Each retry REWINDS everything the discarded pass emitted into the
-// ambient pass state — useId numbering, suspense seed order (SERIAL), suspense
-// registrations + discovery jobs, hoisted head markup, and the frame's child-seg
-// / occurrence counters — so the pass that converges is byte-identical to a
-// single pass rendered directly with the settled state. A suspension or real
-// error propagates as before (the discarded updates die with the pass; the
-// suspense retry re-runs the initializers, exactly like Fizz).
+// ambient pass state — useId numbering, suspense seed order/registrations,
+// discovery jobs, head/resource hints, scoped CSS, streaming-boundary state,
+// ViewTransition candidates, and frame counters — so the pass that converges is
+// byte-identical to a single pass rendered directly with the settled state. A
+// suspension or real error propagates as before (the discarded updates die with
+// the pass; the suspense retry re-runs the initializers, exactly like Fizz).
 function invokeComponentBody(
 	comp: ServerComponent,
 	props: any,
@@ -1083,12 +1218,13 @@ function invokeComponentBody(
 ): unknown {
 	const prevHP = HOOK_PASS;
 	const hp: HookPass = { hooks: new Map(), occ: new Map(), update: false };
-	// Entry watermarks for the rewind, taken BEFORE the first pass. Every rewound
-	// structure is append-only within a pass (ID_COUNTER / nextChild increment,
-	// the buffers push), so truncating back to these restores the entry state.
+	// Entry watermarks/snapshots for the rewind, taken BEFORE the first pass.
 	const id0 = ID_COUNTER;
+	const css = CSS;
+	const css0 = css === null ? null : new Map(css);
 	const head = HEAD;
 	const headLen = head !== null ? head.html.length : 0;
+	const headHints0 = head === null ? null : new Set(head.hints);
 	const serial = SERIAL;
 	const serialLen = serial !== null ? serial.length : 0;
 	const susp = SUSPENDED;
@@ -1096,12 +1232,39 @@ function invokeComponentBody(
 	const jobs = DEFERRED;
 	const jobsLen = jobs !== null ? jobs.length : 0;
 	const ctx0 = scope.$$ctxValues;
+	const vtTrySeq0 = VT_SSR_TRY_SEQ;
+	const vtStack0 = VT_SSR_STACK.map((candidate) => ({
+		candidate,
+		consumed: candidate.consumed,
+	}));
+	const stream = STREAM;
+	const streamNextId0 = stream?.nextId ?? 0;
+	const streamActiveTryKeys0 = stream?.activeTryKeys.slice() ?? [];
+	const streamActiveOwnerKeys0 = stream?.activeOwnerKeys.slice() ?? [];
+	const asyncScope0 = ASYNC_SCOPE;
+	const streamBoundaries0 =
+		stream === null
+			? null
+			: Array.from(stream.boundaries, ([key, entry]) => ({
+					key,
+					entry,
+					id: entry.id,
+					order: entry.order,
+					state: entry.state,
+					html: entry.html,
+					seeds: entry.seeds.slice(),
+					pendingIdOffset: entry.pendingIdOffset,
+					ancestors: entry.ancestors.slice(),
+					owners: entry.owners.slice(),
+				}));
 	let deferred0 = false;
 	let nextChild0 = 0;
+	let scopedChildren0: Map<string, number> | null = null;
 	let occ0: Map<string, number> | null = null;
 	if (frame !== null) {
 		deferred0 = frame.deferred;
 		nextChild0 = frame.nextChild;
+		scopedChildren0 = frame.scopedChildren === null ? null : new Map(frame.scopedChildren);
 		occ0 = frame.occ === null ? null : new Map(frame.occ);
 	}
 	HOOK_PASS = hp;
@@ -1117,14 +1280,50 @@ function invokeComponentBody(
 			hp.update = false;
 			hp.occ = new Map();
 			ID_COUNTER = id0;
-			if (head !== null) head.html = head.html.slice(0, headLen);
+			ASYNC_SCOPE = asyncScope0;
+			if (css !== null && css0 !== null) {
+				css.clear();
+				for (const [hash, sheet] of css0) css.set(hash, sheet);
+			}
+			if (head !== null && headHints0 !== null) {
+				head.html = head.html.slice(0, headLen);
+				head.hints.clear();
+				for (const key of headHints0) head.hints.add(key);
+			}
 			if (serial !== null) serial.length = serialLen;
 			if (susp !== null) susp.length = suspLen;
 			if (jobs !== null) jobs.length = jobsLen;
+			VT_SSR_TRY_SEQ = vtTrySeq0;
+			VT_SSR_STACK.length = 0;
+			for (const snapshot of vtStack0) {
+				snapshot.candidate.consumed = snapshot.consumed;
+				VT_SSR_STACK.push(snapshot.candidate);
+			}
+			if (stream !== null && streamBoundaries0 !== null) {
+				stream.nextId = streamNextId0;
+				stream.activeTryKeys.length = 0;
+				stream.activeTryKeys.push(...streamActiveTryKeys0);
+				stream.activeOwnerKeys.length = 0;
+				stream.activeOwnerKeys.push(...streamActiveOwnerKeys0);
+				stream.boundaries.clear();
+				for (const snapshot of streamBoundaries0) {
+					const entry = snapshot.entry;
+					entry.id = snapshot.id;
+					entry.order = snapshot.order;
+					entry.state = snapshot.state;
+					entry.html = snapshot.html;
+					entry.seeds = snapshot.seeds.slice();
+					entry.pendingIdOffset = snapshot.pendingIdOffset;
+					entry.ancestors = snapshot.ancestors.slice();
+					entry.owners = snapshot.owners.slice();
+					stream.boundaries.set(snapshot.key, entry);
+				}
+			}
 			scope.$$ctxValues = ctx0;
 			if (frame !== null) {
 				frame.deferred = deferred0;
 				frame.nextChild = nextChild0;
+				frame.scopedChildren = scopedChildren0 === null ? null : new Map(scopedChildren0);
 				frame.occ = occ0 === null ? null : new Map(occ0);
 			}
 			out = comp(props ?? {}, scope, undefined);
@@ -1156,6 +1355,7 @@ function renderComponentFramed(
 	const prevComp = CURRENT_COMP;
 	const prevProps = CURRENT_PROPS;
 	const prevParent = CURRENT_PARENT_SCOPE;
+	const prevAsyncScope = ASYNC_SCOPE;
 	const parentScope = parent ?? prevScope;
 	const scope = ssrScope(parentScope);
 	CURRENT_SCOPE = scope;
@@ -1163,6 +1363,7 @@ function renderComponentFramed(
 	CURRENT_COMP = comp;
 	CURRENT_PROPS = props;
 	CURRENT_PARENT_SCOPE = parentScope;
+	ASYNC_SCOPE = frame.asyncScope;
 	try {
 		// The compiled body normally returns its HTML string, but a component that
 		// early-returns non-template JSX (the de-opt path — e.g. a `.tsx` `if (…)
@@ -1185,6 +1386,7 @@ function renderComponentFramed(
 		CURRENT_COMP = prevComp;
 		CURRENT_PROPS = prevProps;
 		CURRENT_PARENT_SCOPE = prevParent;
+		ASYNC_SCOPE = prevAsyncScope;
 	}
 }
 
@@ -1200,7 +1402,15 @@ export function ssrComponent(
 	comp: ServerComponent | string,
 	props: any,
 	inherit?: boolean,
+	key?: unknown,
+	identityScoped?: boolean,
 ): string {
+	if (identityScoped !== true) {
+		return withAsyncIdentity('component-type', comp, () => {
+			const render = () => ssrComponent(parent, comp, props, inherit, undefined, true);
+			return key != null ? withAsyncIdentity('component-key', key, render, true) : render();
+		});
+	}
 	// Boundary builtins decline inherit by IDENTITY — mirrors componentSlot's
 	// client-side decline exactly (member/aliased/dynamic tags resolving to
 	// Suspense/ErrorBoundary/ViewTransition keep their pair; both sides agree
@@ -1246,8 +1456,26 @@ export function ssrComponent(
 	// ad-hoc root frame so keys still work.
 	const frame: Frame =
 		pf === null
-			? { parent: null, seg: 0, nextChild: 0, occ: null, path: null, deferred: false }
-			: { parent: pf, seg: pf.nextChild++, nextChild: 0, occ: null, path: null, deferred: false };
+			? {
+					parent: null,
+					seg: 0,
+					nextChild: 0,
+					scopedChildren: null,
+					occ: null,
+					path: null,
+					deferred: false,
+					asyncScope: ASYNC_SCOPE,
+				}
+			: {
+					parent: pf,
+					seg: nextChildSegment(pf),
+					nextChild: 0,
+					scopedChildren: null,
+					occ: null,
+					path: null,
+					deferred: false,
+					asyncScope: ASYNC_SCOPE,
+				};
 	return renderComponentFramed(comp, props, parent, frame, inherit);
 }
 
@@ -1520,14 +1748,16 @@ export function ErrorBoundary(
 	return ssrBlock(
 		(() => {
 			try {
-				return ssrBlock(ssrChildrenHtml(props.children, scope));
+				return withAsyncIdentity('error-boundary', 'content', () =>
+					ssrBlock(ssrChildrenHtml(props.children, scope)),
+				);
 			} catch (e) {
 				if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
 				const fb =
 					typeof props.fallback === 'function'
 						? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
 						: props.fallback;
-				return ssrBlock(ssrChild(fb, scope));
+				return withAsyncIdentity('error-boundary', 'catch', () => ssrBlock(ssrChild(fb, scope)));
 			}
 		})(),
 	);
@@ -1587,6 +1817,195 @@ export function ssrIsSuspense(err: unknown): boolean {
 	return err === SSR_SUSPENSE;
 }
 
+type HydrationRejectionPayload =
+	| { kind: 'value'; value?: unknown }
+	| { kind: 'number'; value: 'NaN' | 'Infinity' | '-Infinity' | '-0' }
+	| { kind: 'bigint'; value: string }
+	| { kind: 'symbol'; value: string }
+	| { kind: 'error'; name: string; message: string; fields: Record<string, unknown> }
+	| { kind: 'fallback'; message: string };
+
+const HYDRATION_REJECTION_SEED = Symbol('octane.ssr.hydration-rejection-seed');
+interface HydrationRejectionSeed {
+	[HYDRATION_REJECTION_SEED]: HydrationRejectionPayload;
+}
+
+interface ReasonSnapshotState {
+	active: WeakSet<object>;
+	nodes: number;
+}
+
+// Build a bounded, detached JSON-safe snapshot without invoking toJSON. Plain
+// object/array fields survive, cycles become an explicit marker, and hostile
+// accessors/proxies or unsupported nested values degrade locally rather than
+// making the entire SSR response fail during the final JSON.stringify.
+function reasonSnapshot(
+	value: unknown,
+	state: ReasonSnapshotState = { active: new WeakSet(), nodes: 0 },
+	depth: number = 0,
+): unknown {
+	if (
+		value === null ||
+		typeof value === 'string' ||
+		typeof value === 'boolean' ||
+		typeof value === 'undefined'
+	)
+		return value;
+	if (typeof value === 'number') {
+		return Number.isFinite(value) && !Object.is(value, -0) ? value : String(value);
+	}
+	if (typeof value === 'bigint') return String(value);
+	if (typeof value === 'symbol') return '[symbol]';
+	if (typeof value === 'function') return '[function]';
+	if (depth >= 20 || state.nodes++ >= 512) return '[truncated]';
+	if (state.active.has(value)) return '[Circular]';
+	state.active.add(value);
+	try {
+		let isArray: boolean;
+		try {
+			isArray = Array.isArray(value);
+		} catch {
+			return '[unavailable]';
+		}
+		if (isArray) {
+			const arrayValue = value as unknown[];
+			let length = 0;
+			try {
+				length = Math.min(arrayValue.length, 512);
+			} catch {
+				return '[unavailable]';
+			}
+			const out = new Array(length);
+			for (let i = 0; i < length; i++) {
+				try {
+					if (Object.prototype.hasOwnProperty.call(arrayValue, i)) {
+						out[i] = reasonSnapshot(arrayValue[i], state, depth + 1);
+					}
+				} catch {
+					out[i] = '[unavailable]';
+				}
+			}
+			return out;
+		}
+		const out: Record<string, unknown> = Object.create(null);
+		let keys: string[];
+		try {
+			keys = Object.keys(value);
+		} catch {
+			return '[unavailable]';
+		}
+		const length = Math.min(keys.length, 512);
+		for (let i = 0; i < length; i++) {
+			const key = keys[i];
+			try {
+				out[key] = reasonSnapshot((value as any)[key], state, depth + 1);
+			} catch {
+				out[key] = '[unavailable]';
+			}
+		}
+		if (keys.length > length) out.__octane_truncated__ = true;
+		return out;
+	} finally {
+		state.active.delete(value);
+	}
+}
+
+function isErrorReason(reason: unknown): boolean {
+	try {
+		if (reason instanceof Error) return true;
+		if (reason === null || typeof reason !== 'object') return false;
+		const tag = Object.prototype.toString.call(reason);
+		return tag === '[object Error]' || tag === '[object DOMException]';
+	} catch {
+		return false;
+	}
+}
+
+function hydrationRejectionPayload(reason: unknown): HydrationRejectionPayload {
+	try {
+		return hydrationRejectionPayloadUnsafe(reason);
+	} catch {
+		// Rejection transport must never replace the application's original reason
+		// with an encoder failure. Opaque proxies and exotic host objects degrade
+		// to a fixed message while still seeding the client's catch arm.
+		return { kind: 'fallback', message: 'Server-rendered use() rejected' };
+	}
+}
+
+function hydrationRejectionPayloadUnsafe(reason: unknown): HydrationRejectionPayload {
+	if (typeof reason === 'number' && (!Number.isFinite(reason) || Object.is(reason, -0))) {
+		return {
+			kind: 'number',
+			value: Number.isNaN(reason)
+				? 'NaN'
+				: Object.is(reason, -0)
+					? '-0'
+					: reason === Infinity
+						? 'Infinity'
+						: '-Infinity',
+		};
+	}
+	if (typeof reason === 'bigint') return { kind: 'bigint', value: String(reason) };
+	if (typeof reason === 'symbol') return { kind: 'symbol', value: reason.description ?? '' };
+	if (isErrorReason(reason)) {
+		let name = 'Error';
+		let message = 'Server-rendered use() rejected';
+		try {
+			const candidate = (reason as any).name;
+			if (typeof candidate === 'string') name = candidate;
+		} catch {
+			/* hostile getter — retain the safe fallback */
+		}
+		try {
+			const candidate = (reason as any).message;
+			if (typeof candidate === 'string') message = candidate;
+		} catch {
+			/* hostile getter — retain the safe fallback */
+		}
+		const fields: Record<string, unknown> = Object.create(null);
+		let keys: string[] = [];
+		try {
+			keys = Object.keys(reason as object);
+		} catch {
+			/* hostile proxy — emit the core Error fields only */
+		}
+		const length = Math.min(keys.length, 512);
+		const snapshotState: ReasonSnapshotState = { active: new WeakSet(), nodes: 0 };
+		snapshotState.active.add(reason as object);
+		for (let i = 0; i < length; i++) {
+			const key = keys[i];
+			if (key === 'name' || key === 'message' || key === 'stack') continue;
+			try {
+				fields[key] = reasonSnapshot((reason as any)[key], snapshotState);
+			} catch {
+				fields[key] = '[unavailable]';
+			}
+		}
+		if (keys.length > length) fields.__octane_truncated__ = true;
+		return { kind: 'error', name, message, fields };
+	}
+	if (typeof reason === 'function') {
+		return { kind: 'fallback', message: 'Server-rendered use() rejected (function)' };
+	}
+	return { kind: 'value', value: reasonSnapshot(reason) };
+}
+
+function hydrationRejectionSeed(reason: unknown): HydrationRejectionSeed {
+	return { [HYDRATION_REJECTION_SEED]: hydrationRejectionPayload(reason) };
+}
+
+function isHydrationRejectionSeed(value: unknown): value is HydrationRejectionSeed {
+	return (
+		value !== null &&
+		typeof value === 'object' &&
+		Object.prototype.hasOwnProperty.call(value, HYDRATION_REJECTION_SEED)
+	);
+}
+
+function recordHydrationRejection(reason: unknown): void {
+	if (SERIAL !== null) SERIAL.push(hydrationRejectionSeed(reason));
+}
+
 export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: string | symbol): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) return readContext(usable as Context<T>);
 	// A thenable. Key it by the current FRAME path + the compiler-injected
@@ -1602,12 +2021,10 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: string | s
 				: String(siteKey);
 	const frame = FRAME;
 	let n = 0;
-	let prefix = '';
+	let prefix = ASYNC_SCOPE;
 	if (frame !== null) {
-		if (frame.occ === null) frame.occ = new Map();
-		n = frame.occ.get(base) ?? 0;
-		frame.occ.set(base, n + 1);
-		prefix = framePath(frame);
+		n = nextFrameOccurrence(frame, base);
+		prefix = asyncFramePath(frame);
 	}
 	const key = prefix + '|' + base + '#' + n;
 
@@ -1622,7 +2039,10 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: string | s
 	if (RESOLVED !== null) {
 		const entryT = RESOLVED.pu.resolvedT.get(usable as PromiseLike<unknown>);
 		if (entryT !== undefined) {
-			if ('reason' in entryT) throw entryT.reason;
+			if ('reason' in entryT) {
+				recordHydrationRejection(entryT.reason);
+				throw entryT.reason;
+			}
 			if (SERIAL !== null) SERIAL.push(entryT.value);
 			return entryT.value as T;
 		}
@@ -1631,8 +2051,12 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: string | s
 	if (resolved !== null && resolved.has(key)) {
 		const entry = resolved.get(key)!;
 		// Rejected on a prior pass → throw so the enclosing @try renders @catch.
-		// (Not seeded for hydration; the client re-derives a rejected boundary.)
-		if ('reason' in entry) throw entry.reason;
+		// Serialize a typed rejection seed first so hydration takes the same catch
+		// arm even when the client receives a fresh, still-pending thenable.
+		if ('reason' in entry) {
+			recordHydrationRejection(entry.reason);
+			throw entry.reason;
+		}
 		// Resolved → return it, and record it (in render order) for client seeding.
 		if (SERIAL !== null) SERIAL.push(entry.value);
 		return entry.value as T;
@@ -1696,12 +2120,10 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: string | symbo
 				: String(siteKey);
 	const frame = FRAME;
 	let n = 0;
-	let prefix = '';
+	let prefix = ASYNC_SCOPE;
 	if (frame !== null) {
-		if (frame.occ === null) frame.occ = new Map();
-		n = frame.occ.get(base) ?? 0;
-		frame.occ.set(base, n + 1);
-		prefix = framePath(frame);
+		n = nextFrameOccurrence(frame, base);
+		prefix = asyncFramePath(frame);
 	}
 	const key = prefix + '|' + base + '#' + n;
 	const hit = res.pu.created.get(key);
@@ -2308,6 +2730,41 @@ export function getSsrSuspenseTimeout(): number {
 	return SUSPENSE_TIMEOUT_MS;
 }
 
+function serializeSuspenseSeedJson(values: unknown[]): string {
+	let wireValues: unknown[] | null = null;
+	let rejections: Array<[number, HydrationRejectionPayload]> | null = null;
+	for (let i = 0; i < values.length; i++) {
+		const value = values[i];
+		if (!isHydrationRejectionSeed(value)) continue;
+		wireValues ??= values.slice();
+		rejections ??= [];
+		wireValues[i] = null;
+		rejections.push([i, value[HYDRATION_REJECTION_SEED]]);
+	}
+	// Successful seeds retain the established compact array format. Rejections
+	// use renderer-owned TOP-LEVEL metadata, so a fulfilled user value shaped
+	// like the old in-band sentinel can never be mistaken for control data.
+	const payload =
+		rejections === null
+			? values
+			: {
+					[REJECTION_SENTINEL_KEY]: {
+						version: 1,
+						values: wireValues!,
+						rejections,
+					},
+				};
+	const undefinedWire = SUSPENSE_SEED_WIRE_PREFIX + 'u';
+	const escapedStringWire = SUSPENSE_SEED_WIRE_PREFIX + 's';
+	return JSON.stringify(payload, (_key, value) => {
+		if (value === undefined) return undefinedWire;
+		if (typeof value === 'string' && value.startsWith(SUSPENSE_SEED_WIRE_PREFIX)) {
+			return escapedStringWire + value;
+		}
+		return value;
+	}).replace(/</g, '\\u003c');
+}
+
 /**
  * Serialize the resolved `use(thenable)` values (in render order) into an inline
  * data `<script>` the client reads during hydration. `<` is escaped to
@@ -2315,13 +2772,11 @@ export function getSsrSuspenseTimeout(): number {
  * an HTML comment. Only emitted when at least one value was resolved.
  */
 function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
-	// Encode `undefined` (which JSON drops/nulls) as a sentinel so a
+	// Encode `undefined` (which JSON drops/nulls) through the seed wire escape so a
 	// `use(thenable)` that resolved to `undefined` round-trips to `undefined` on
-	// the client — not `null`. The replacer fires for array elements AND nested
-	// object properties, so deeply-nested `undefined` survives too.
-	const json = JSON.stringify(values, (_key, value) =>
-		value === undefined ? { [UNDEFINED_SENTINEL_KEY]: true } : value,
-	).replace(/</g, '\\u003c');
+	// the client — not `null`. Prefix-leading user strings are escaped first, so
+	// neither sentinel-shaped objects nor user strings can collide with it.
+	const json = serializeSuspenseSeedJson(values);
 	return (
 		'<script type="application/json" ' + SUSPENSE_SCRIPT_ATTR + nonceAttr + '>' + json + '</script>'
 	);
@@ -2355,6 +2810,9 @@ type SuspenseOutcome = { value: unknown } | { reason: unknown };
 //              can't know the unwraps' string keys, but puMemo makes instance
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
+	/** Render-local stable ids for non-primitive control/list keys. */
+	asyncIdentities: Map<unknown, number>;
+	nextAsyncIdentity: number;
 	pu: {
 		created: Map<string, { deps: unknown[]; value: unknown }>;
 		resolvedT: Map<PromiseLike<unknown>, SuspenseOutcome>;
@@ -2366,6 +2824,8 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 };
 function newResolvedMap(): ResolvedMap {
 	const m = new Map() as ResolvedMap;
+	m.asyncIdentities = new Map();
+	m.nextAsyncIdentity = 0;
 	m.pu = { created: new Map(), resolvedT: new Map(), warm: new Map() };
 	return m;
 }
@@ -2391,7 +2851,8 @@ interface Ambient {
 	id: number;
 	idPrefix: string;
 	css: Map<string, string> | null;
-	head: { html: string } | null;
+	markers: boolean;
+	head: HeadBuffer | null;
 	susp: SuspendedList | null;
 	res: ResolvedMap | null;
 	serial: unknown[] | null;
@@ -2400,6 +2861,9 @@ interface Ambient {
 	comp: ServerComponent | null;
 	props: any;
 	parentScope: SSRScope | null;
+	asyncScope: string;
+	vtTrySeq: number;
+	vtStack: Array<{ candidate: VtSsrCandidate; consumed: boolean }>;
 }
 function saveAmbient(): Ambient {
 	return {
@@ -2407,6 +2871,7 @@ function saveAmbient(): Ambient {
 		id: ID_COUNTER,
 		idPrefix: ID_PREFIX,
 		css: CSS,
+		markers: MARKERS,
 		head: HEAD,
 		susp: SUSPENDED,
 		res: RESOLVED,
@@ -2416,6 +2881,9 @@ function saveAmbient(): Ambient {
 		comp: CURRENT_COMP,
 		props: CURRENT_PROPS,
 		parentScope: CURRENT_PARENT_SCOPE,
+		asyncScope: ASYNC_SCOPE,
+		vtTrySeq: VT_SSR_TRY_SEQ,
+		vtStack: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed })),
 	};
 }
 function restoreAmbient(a: Ambient): void {
@@ -2423,6 +2891,7 @@ function restoreAmbient(a: Ambient): void {
 	ID_COUNTER = a.id;
 	ID_PREFIX = a.idPrefix;
 	CSS = a.css;
+	MARKERS = a.markers;
 	HEAD = a.head;
 	SUSPENDED = a.susp;
 	RESOLVED = a.res;
@@ -2432,6 +2901,13 @@ function restoreAmbient(a: Ambient): void {
 	CURRENT_COMP = a.comp;
 	CURRENT_PROPS = a.props;
 	CURRENT_PARENT_SCOPE = a.parentScope;
+	ASYNC_SCOPE = a.asyncScope;
+	VT_SSR_TRY_SEQ = a.vtTrySeq;
+	VT_SSR_STACK.length = 0;
+	for (const snapshot of a.vtStack) {
+		snapshot.candidate.consumed = snapshot.consumed;
+		VT_SSR_STACK.push(snapshot.candidate);
+	}
 }
 
 // Run ONE full canonical pass over the whole tree, synchronously within this
@@ -2449,12 +2925,17 @@ function runFullFramedPass(
 	resolved: ResolvedMap,
 	nonceAttr: string = '',
 	identifierPrefix: string = '',
+	markers: boolean = true,
 ): FullPassResult {
 	const saved = saveAmbient();
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
+	ASYNC_SCOPE = '';
+	MARKERS = markers;
+	VT_SSR_TRY_SEQ = 0;
+	VT_SSR_STACK.length = 0;
 	const cssMap = (CSS = new Map<string, string>());
-	const headBuf = (HEAD = { html: '' });
+	const headBuf = (HEAD = { html: '', hints: new Set() });
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	const serial = (SERIAL = [] as unknown[]);
 	const deferred = (DEFERRED = [] as Job[]);
@@ -2463,7 +2944,16 @@ function runFullFramedPass(
 	CURRENT_SCOPE = root;
 	// A root frame so use() keys resolve; the root component is the fallback
 	// discovery job for a bare use() with no enclosing sub-component boundary.
-	FRAME = { parent: null, seg: 0, nextChild: 0, occ: null, path: '', deferred: false };
+	FRAME = {
+		parent: null,
+		seg: 0,
+		nextChild: 0,
+		scopedChildren: null,
+		occ: null,
+		path: '',
+		deferred: false,
+		asyncScope: '',
+	};
 	CURRENT_COMP = component;
 	CURRENT_PROPS = props;
 	CURRENT_PARENT_SCOPE = null;
@@ -2504,8 +2994,12 @@ function runDiscoveryRound(
 	const saved = saveAmbient();
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
+	ASYNC_SCOPE = '';
+	MARKERS = true;
+	VT_SSR_TRY_SEQ = 0;
+	VT_SSR_STACK.length = 0;
 	CSS = new Map();
-	HEAD = { html: '' };
+	HEAD = { html: '', hints: new Set() };
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	SERIAL = [] as unknown[];
 	const deferred = (DEFERRED = [] as Job[]);
@@ -2524,9 +3018,11 @@ function runDiscoveryRound(
 				parent: job.frame.parent,
 				seg: job.frame.seg,
 				nextChild: 0,
+				scopedChildren: null,
 				occ: null,
 				path: null,
 				deferred: false,
+				asyncScope: job.frame.asyncScope,
 			};
 			try {
 				renderComponentFramed(job.comp, job.props, job.parentScope, frame);
@@ -2819,21 +3315,24 @@ export function renderToStaticMarkup(
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = newResolvedMap();
-	const prevMarkers = MARKERS;
-	MARKERS = false;
 	let pass: FullPassResult;
 	try {
 		pass = withStream(null, () =>
-			runFullFramedPass(component, props, resolved, nonceAttr, options?.identifierPrefix ?? ''),
+			runFullFramedPass(
+				component,
+				props,
+				resolved,
+				nonceAttr,
+				options?.identifierPrefix ?? '',
+				false,
+			),
 		);
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;
-	} finally {
-		MARKERS = prevMarkers;
 	}
 	// No seeds (non-hydratable). Head is folded in without adoption markers.
-	return { html: spliceHead(pass.body, pass.head), css: pass.css };
+	return { html: vtSsrStrip(spliceHead(pass.body, pass.head)), css: pass.css };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2861,9 +3360,9 @@ export function renderToStaticMarkup(
 // A registered boundary ALWAYS returns its pending form (template + fallback)
 // to the surrounding pass — its real content ships ONLY via its own segment, so
 // a nested pending boundary inside a completed one swaps later by discovery
-// order (tracked separately from its opaque id). A promise REJECTION needs no
-// special path: the next pass's `use()` throws the reason, the boundary's
-// `@catch` renders, and the catch arm streams as a normal segment.
+// order (tracked separately from its opaque id). On promise rejection the next
+// pass's `use()` throws the reason, the boundary's `@catch` renders as a normal
+// segment, and a typed rejection seed makes hydration take/adopt that same arm.
 //
 // Hydration: `$OCTRC` stashes the boundary's seed JSON on `window.$OCTS[id]`
 // and leaves a `<!--oct-seed:id-->` comment where the template was; the client
@@ -2886,19 +3385,29 @@ export function renderToStaticMarkup(
 interface StreamBoundary {
 	/** Per-stream opaque DOM protocol key (never reused by another render). */
 	id: string;
-	/** Discovery order, kept separate from the opaque wire id. */
+	/** Discovery order, used as the stable tiebreaker among reachable siblings. */
 	order: number;
 	state: 'pending' | 'done';
 	/** Inner branch-range html (`<!--[-->…<!--]-->`) from the resolving pass. */
 	html: string;
 	/** This boundary's `use()` seed slice from the resolving pass. */
 	seeds: unknown[];
+	/** Number of boundary-local useIds consumed before the shell suspended. */
+	pendingIdOffset: number;
+	/** Enclosing `ssrTry` keys, outermost first (including non-suspending tries). */
+	ancestors: string[];
+	/** Enclosing content/fallback owners used to prune vanished template paths. */
+	owners: string[];
 }
 
 interface StreamState {
 	boundaries: Map<string, StreamBoundary>;
 	nextId: number;
 	token: string;
+	/** Content-arm nesting while the synchronous pass walks `ssrTry` calls. */
+	activeTryKeys: string[];
+	/** All arm owners (content/catch/fallback) while walking nested `ssrTry` calls. */
+	activeOwnerKeys: string[];
 }
 
 // Every boundary id includes a render-unique token. The counter proves
@@ -2924,6 +3433,38 @@ function createStreamToken(): string {
 // buffered pass) through withStream, so nested render entry points restore the
 // enclosing registry without registering their boundaries into it.
 let STREAM: StreamState | null = null;
+
+// Once a boundary finalizes, only descendant entries whose template sentinel is
+// present in that FINAL segment remain reachable. A child registered while
+// rendering a fallback, or in content later replaced by an outer catch arm,
+// otherwise keeps the stream pending forever after its DOM template vanished.
+// Judge direct registered ownership only; a deeper descendant belongs to its
+// nearest registered owner, whose own segment performs the next pruning step.
+function pruneUnrepresentedStreamDescendants(
+	stream: StreamState,
+	ownerKey: string,
+	ownerHtml: string,
+): void {
+	let removed = true;
+	while (removed) {
+		removed = false;
+		for (const [childKey, child] of stream.boundaries) {
+			if (childKey === ownerKey) continue;
+			let nearestOwner: string | null = null;
+			for (let i = child.owners.length - 1; i >= 0; i--) {
+				const candidate = child.owners[i];
+				if (candidate === ownerKey || stream.boundaries.has(candidate)) {
+					nearestOwner = candidate;
+					break;
+				}
+			}
+			if (nearestOwner !== ownerKey) continue;
+			if (ownerHtml.includes(STREAM_BOUNDARY_ATTR + '="' + child.id + '"')) continue;
+			stream.boundaries.delete(childKey);
+			removed = true;
+		}
+	}
+}
 
 /**
  * Compiled `@try` / JSX `<Suspense>` boundary. `siteKey` is the compiler's
@@ -2959,31 +3500,108 @@ export function ssrTry(
 		}
 	}
 	const stream = STREAM;
-	let key = '';
+	// Boundary identity is needed in buffered renders too: descendants rendered
+	// at the same component position in content/pending/catch are separate client
+	// block scopes and must not share server use()/puMemo caches across passes.
+	const frame = FRAME;
+	const base = '@try:' + siteKey;
+	let occurrence = 0;
+	if (frame !== null) {
+		occurrence = nextFrameOccurrence(frame, base);
+	}
+	const key = asyncFramePath(frame) + '|' + base + '#' + occurrence;
+	const outerAsyncScope = ASYNC_SCOPE;
+	const armScope = outerAsyncScope + '|@arm:' + siteKey + '#' + occurrence.toString(36) + ':';
 	let entry: StreamBoundary | undefined;
 	let serialStart = 0;
+	let ancestorKeys: string[] = [];
+	let ownerKeys: string[] = [];
 	if (stream !== null) {
-		// Stable per-instance id: frame path + site + per-frame occurrence —
-		// the same scheme use() keys its thenables with.
-		const frame = FRAME;
-		const base = '@try:' + siteKey;
-		let n = 0;
-		let prefix = '';
-		if (frame !== null) {
-			if (frame.occ === null) frame.occ = new Map();
-			n = frame.occ.get(base) ?? 0;
-			frame.occ.set(base, n + 1);
-			prefix = framePath(frame);
-		}
-		key = prefix + '|' + base + '#' + n;
+		ancestorKeys = stream.activeTryKeys.slice();
+		ownerKeys = stream.activeOwnerKeys.slice();
 		entry = stream.boundaries.get(key);
+		if (entry !== undefined && entry.state === 'pending') {
+			entry.ancestors = ancestorKeys;
+			entry.owners = ownerKeys;
+		}
 		serialStart = SERIAL !== null ? SERIAL.length : 0;
 	}
+	const withArmScope = <T>(arm: 'content' | 'pending' | 'catch', fn: () => T): T => {
+		const prev = ASYNC_SCOPE;
+		ASYNC_SCOPE = armScope + arm;
+		try {
+			return fn();
+		} finally {
+			ASYNC_SCOPE = prev;
+		}
+	};
+	const withContentArm = <T>(fn: () => T): T =>
+		withArmScope('content', () => {
+			if (stream === null) return fn();
+			stream.activeTryKeys.push(key);
+			stream.activeOwnerKeys.push(key);
+			try {
+				return fn();
+			} finally {
+				stream.activeOwnerKeys.pop();
+				stream.activeTryKeys.pop();
+			}
+		});
+	const withPendingArm = <T>(fn: () => T): T => {
+		return withArmScope('pending', () => {
+			if (stream === null) return fn();
+			stream.activeOwnerKeys.push(key);
+			try {
+				return fn();
+			} finally {
+				stream.activeOwnerKeys.pop();
+			}
+		});
+	};
+	const withCatchArm = <T>(fn: () => T): T =>
+		withArmScope('catch', () => {
+			if (stream === null) return fn();
+			stream.activeTryKeys.push(key);
+			stream.activeOwnerKeys.push(key);
+			try {
+				return fn();
+			} finally {
+				stream.activeOwnerKeys.pop();
+				stream.activeTryKeys.pop();
+			}
+		});
+	// A boundary that actually suspends owns a useId namespace derived from its
+	// opaque stream id. That keeps sibling/content IDs independent of resolution
+	// order and prevents a pending branch from shifting already-flushed shell IDs.
+	// Non-suspending boundaries retain the ordinary root-local sequential format.
+	const outerIdPrefix = ID_PREFIX;
+	const outerIdCounter = ID_COUNTER;
+	let boundaryIds = false;
+	const enterBoundaryIds = (next: number): void => {
+		if (entry === undefined) return;
+		ID_PREFIX = outerIdPrefix + 'b' + entry.id + '-';
+		ID_COUNTER = next;
+		boundaryIds = true;
+	};
+	const restoreOuterIds = (): void => {
+		ID_PREFIX = outerIdPrefix;
+		ID_COUNTER = outerIdCounter;
+		boundaryIds = false;
+	};
+	if (entry !== undefined) enterBoundaryIds(0);
 	const pendingForm = (): string => {
 		// A ViewTransition at the top of the FALLBACK arm exits when the boundary
 		// reveals — claim its vt-exit candidate (see vtSsrClaimArm).
+		const renderFallback = (): string =>
+			withPendingArm(() =>
+				pendFn !== null ? vtSsrClaimArm(ssrBlock(pendFn(undefined, scope)), 'exit') : '',
+			);
+		// Once this boundary has final content, any fallback-only descendants are
+		// doomed. Render the placeholder shape without registering new stream work.
 		const fallback =
-			pendFn !== null ? vtSsrClaimArm(ssrBlock(pendFn(undefined, scope)), 'exit') : '';
+			entry !== undefined && entry.state === 'done'
+				? withStream(null, renderFallback)
+				: renderFallback();
 		if (entry !== undefined) {
 			return ssrBlock(
 				'<template ' + STREAM_BOUNDARY_ATTR + '="' + entry.id + '"></template>' + fallback,
@@ -2992,68 +3610,96 @@ export function ssrTry(
 		return ssrBlock(pendFn !== null ? fallback : '');
 	};
 	try {
-		// A ViewTransition at the top of the CONTENT arm enters when the content
-		// streams in — claim its vt-enter candidate.
-		const inner = vtSsrClaimArm(ssrBlock(tryFn(undefined, scope)), 'enter');
-		if (entry !== undefined) {
-			// Registered (was pending in an earlier pass): capture the content +
-			// this boundary's seed slice for its segment; the surrounding pass
-			// keeps seeing the pending form so the shell shape stays stable.
-			if (entry.state !== 'done') {
-				entry.state = 'done';
-				entry.html =
-					vtOuter !== null
-						? vtSsrAnnotate(inner, [
-								['vt-name', vtOuter.name],
-								['vt-update', vtOuter.update],
-								['vt-share', vtOuter.share],
-							])
-						: inner;
-				if (SERIAL !== null) {
-					entry.seeds = SERIAL.slice(serialStart);
-					SERIAL.length = serialStart;
-				}
-			} else if (SERIAL !== null) {
-				// Later passes re-render from cache — drop the duplicate seeds.
-				SERIAL.length = serialStart;
-			}
-			return pendingForm();
-		}
-		return ssrBlock(inner);
-	} catch (e) {
-		if (ssrIsSuspense(e)) {
-			if (stream !== null) {
-				// Drop seeds pushed by the partially-rendered body — they belong to
-				// the boundary's own slice once it completes.
-				if (SERIAL !== null) SERIAL.length = serialStart;
-				if (entry === undefined) {
-					const order = stream.nextId++;
-					entry = {
-						id: stream.token + '-' + order.toString(36),
-						order,
-						state: 'pending',
-						html: '',
-						seeds: [],
-					};
-					stream.boundaries.set(key, entry);
-				}
-			}
-			return pendingForm();
-		}
-		if (entry !== undefined && SERIAL !== null) SERIAL.length = serialStart;
-		if (catchFn !== null) {
-			const inner = ssrBlock(catchFn(e, scope));
+		try {
+			// A ViewTransition at the top of the CONTENT arm enters when the content
+			// streams in — claim its vt-enter candidate.
+			const inner = vtSsrClaimArm(ssrBlock(withContentArm(() => tryFn(undefined, scope))), 'enter');
 			if (entry !== undefined) {
+				// Registered (was pending in an earlier pass): capture the content +
+				// this boundary's seed slice for its segment; the surrounding pass
+				// keeps seeing the pending form so the shell shape stays stable.
 				if (entry.state !== 'done') {
 					entry.state = 'done';
-					entry.html = inner;
-					entry.seeds = [];
+					entry.html =
+						vtOuter !== null
+							? vtSsrAnnotate(inner, [
+									['vt-name', vtOuter.name],
+									['vt-update', vtOuter.update],
+									['vt-share', vtOuter.share],
+								])
+							: inner;
+					if (SERIAL !== null) {
+						entry.seeds = SERIAL.slice(serialStart);
+						SERIAL.length = serialStart;
+					}
+					pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
+				} else if (SERIAL !== null) {
+					// Later passes re-render from cache — drop the duplicate seeds.
+					SERIAL.length = serialStart;
 				}
+				ID_COUNTER = entry.pendingIdOffset;
 				return pendingForm();
 			}
 			return ssrBlock(inner);
+		} catch (e) {
+			if (ssrIsSuspense(e)) {
+				if (stream !== null) {
+					// Drop seeds pushed by the partially-rendered body — they belong to
+					// the boundary's own slice once it completes.
+					if (SERIAL !== null) SERIAL.length = serialStart;
+					if (entry === undefined) {
+						const pendingIdOffset = Math.max(0, ID_COUNTER - outerIdCounter);
+						restoreOuterIds();
+						const order = stream.nextId++;
+						entry = {
+							id: stream.token + '-' + order.toString(36),
+							order,
+							state: 'pending',
+							html: '',
+							seeds: [],
+							pendingIdOffset,
+							ancestors: ancestorKeys,
+							owners: ownerKeys,
+						};
+						stream.boundaries.set(key, entry);
+						enterBoundaryIds(pendingIdOffset);
+					} else {
+						ID_COUNTER = entry.pendingIdOffset;
+					}
+				}
+				return pendingForm();
+			}
+			if (catchFn !== null) {
+				// Preserve values consumed before the rejection plus its typed rejection
+				// record. The client replays that exact seed order, throws at the same
+				// use(), then hydrates the already-streamed catch arm (whose own use() calls
+				// consume any seeds appended while rendering it below).
+				const caughtSeeds = entry !== undefined && SERIAL !== null ? SERIAL.slice(serialStart) : [];
+				if (entry !== undefined && SERIAL !== null) SERIAL.length = serialStart;
+				const inner = ssrBlock(withCatchArm(() => catchFn(e, scope)));
+				if (entry !== undefined) {
+					if (entry.state !== 'done') {
+						if (SERIAL !== null) {
+							caughtSeeds.push(...SERIAL.slice(serialStart));
+							SERIAL.length = serialStart;
+						}
+						entry.state = 'done';
+						entry.html = inner;
+						entry.seeds = caughtSeeds;
+						pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
+					} else if (SERIAL !== null) {
+						SERIAL.length = serialStart;
+					}
+					ID_COUNTER = entry.pendingIdOffset;
+					return pendingForm();
+				}
+				return ssrBlock(inner);
+			}
+			throw e;
 		}
-		throw e;
+	} finally {
+		ASYNC_SCOPE = outerAsyncScope;
+		if (boundaryIds) restoreOuterIds();
 	}
 }
 
@@ -3128,9 +3774,7 @@ function withStream<T>(stream: StreamState | null, fn: () => T): T {
 function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 	let seedScript = '';
 	if (b.seeds.length > 0) {
-		const json = JSON.stringify(b.seeds, (_key, value) =>
-			value === undefined ? { [UNDEFINED_SENTINEL_KEY]: true } : value,
-		).replace(/</g, '\\u003c');
+		const json = serializeSuspenseSeedJson(b.seeds);
 		seedScript =
 			'<script type="application/json" ' + STREAM_SEED_ATTR + nonceAttr + '>' + json + '</script>';
 	}
@@ -3166,9 +3810,12 @@ async function runStream(
 		boundaries: new Map(),
 		nextId: 0,
 		token: createStreamToken(),
+		activeTryKeys: [],
+		activeOwnerKeys: [],
 	};
 	const emittedCss = new Set<string>();
 	const flushedSegments = new Set<string>();
+	const observedDone = new Set<string>();
 
 	let pass: FullPassResult;
 	try {
@@ -3214,6 +3861,12 @@ async function runStream(
 	try {
 		while ([...stream.boundaries.values()].some((b) => b.state === 'pending')) {
 			signal?.throwIfAborted();
+			if (suspended.length === 0) {
+				throw new Error(
+					'octane SSR: a pending streamed boundary no longer has resumable work; ' +
+						'its error escaped to an ancestor that was already flushed.',
+				);
+			}
 			if (++attempt > MAX_SUSPENSE_PASSES) {
 				throw new Error(
 					'octane SSR: ' +
@@ -3232,11 +3885,39 @@ async function runStream(
 				emittedCss.add(hash);
 				chunk += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
 			}
-			// Parent-first: discovery order is separate from the opaque wire id.
-			const done = [...stream.boundaries.values()]
-				.filter((b) => b.state === 'done' && !flushedSegments.has(b.id))
-				.sort((a, b) => a.order - b.order);
-			if (done.length > 0) attempt = 0; // boundary progress — this wave was legitimate
+			let madeProgress = false;
+			for (const boundary of stream.boundaries.values()) {
+				if (boundary.state === 'done' && !observedDone.has(boundary.id)) {
+					observedDone.add(boundary.id);
+					madeProgress = true;
+				}
+			}
+			if (madeProgress) attempt = 0; // a boundary completed — this wave was legitimate
+
+			// A nested boundary's template may live inside an enclosing boundary's
+			// not-yet-flushed segment. Build a topological emission order: roots and
+			// shell-reachable siblings first, then children whose nearest registered
+			// ancestor is already flushed or earlier in this same chunk. Browser script
+			// execution then introduces each child template before its `$OCTRC` call.
+			const done: StreamBoundary[] = [];
+			const reachable = new Set(flushedSegments);
+			for (;;) {
+				const next = [...stream.boundaries.values()]
+					.filter((boundary) => {
+						if (boundary.state !== 'done' || reachable.has(boundary.id)) return false;
+						for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+							const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+							if (ancestor !== undefined) return reachable.has(ancestor.id);
+						}
+						return true;
+					})
+					.sort((a, b) => a.order - b.order);
+				if (next.length === 0) break;
+				for (const boundary of next) {
+					done.push(boundary);
+					reachable.add(boundary.id);
+				}
+			}
 			for (const b of done) chunk += segmentChunk(b, nonceAttr);
 			if (chunk !== '') {
 				const segmentWrite = sink.write(vtSsrStrip(chunk));
@@ -3677,20 +4358,10 @@ export function renderToReadableStream(
 // call for the same resource is a no-op.
 // ---------------------------------------------------------------------------
 
-// Per-render emitted-hint keys. Reset via the HEAD identity: each pass installs
-// a fresh HEAD buffer, so tracking last-seen HEAD keeps this render-local
-// without touching saveAmbient.
-let _hintHead: { html: string } | null = null;
-let _hintKeys: Set<string> | null = null;
-
 function emitHeadHint(key: string, html: string): void {
 	if (HEAD === null) return;
-	if (_hintHead !== HEAD) {
-		_hintHead = HEAD;
-		_hintKeys = new Set();
-	}
-	if (_hintKeys!.has(key)) return;
-	_hintKeys!.add(key);
+	if (HEAD.hints.has(key)) return;
+	HEAD.hints.add(key);
 	HEAD.html += html;
 }
 

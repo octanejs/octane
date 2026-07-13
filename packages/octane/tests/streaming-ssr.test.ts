@@ -7,7 +7,14 @@ import { hydrateRoot, flushSync } from '../src/index.js';
 import * as ServerRT from 'octane/server';
 import { prerender } from 'octane/static';
 // CLIENT-compiled fixture (registers click delegation at import).
-import { Boundary, Siblings, StyledBoundary } from './_fixtures/ssr-suspense.tsrx';
+import {
+	Boundary,
+	IdBoundary,
+	NestedStreamSeedScopes,
+	ReasonBoundary,
+	Siblings,
+	StyledBoundary,
+} from './_fixtures/ssr-suspense.tsrx';
 
 // Streaming SSR — renderToPipeableStream / renderToReadableStream: shell with
 // fallbacks + <template data-oct-b> sentinels, out-of-order hidden segments
@@ -306,6 +313,57 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		// segment swaps into it afterwards (parent-first discovery order).
 		expect(tail.indexOf(swapCall(outerId))).toBeLessThan(tail.indexOf(swapCall(innerId)));
 		expect(tail).toContain('one:two');
+	});
+
+	it('defers an inner segment until its outer segment introduces the template', async () => {
+		const NestedInnerFirst = (props: any, scope: any) =>
+			ServerRT.ssrTry(
+				scope,
+				'outer-inner-first',
+				() => {
+					const inner = ServerRT.ssrTry(
+						scope,
+						'inner-first',
+						() =>
+							ServerRT.ssrBlock(
+								'<span class="inner-value">' + ServerRT.use(props.inner, 'inner-value') + '</span>',
+							),
+						() => ServerRT.ssrBlock('<span class="inner-pending">inner…</span>'),
+						null,
+					);
+					const outer = ServerRT.use(props.outer, 'outer-value');
+					return inner + ServerRT.ssrBlock('<span class="outer-value">' + outer + '</span>');
+				},
+				() => ServerRT.ssrBlock('<span class="outer-pending">outer…</span>'),
+				null,
+			);
+		const outer = deferred<string>();
+		const inner = deferred<string>();
+		const c = collector();
+		const { pipe } = ServerRT.renderToPipeableStream(NestedInnerFirst as any, {
+			outer: outer.promise,
+			inner: inner.promise,
+		});
+		pipe(c.dest);
+		const [outerId] = protocolIds(c.chunks[0]);
+
+		inner.resolve('inside');
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		// The inner content is ready, but its template exists only inside the outer
+		// segment. Emitting it now would make `$OCTRC` a permanent no-op.
+		expect(c.chunks).toHaveLength(1);
+
+		outer.resolve('outside');
+		await c.ended;
+		const tail = c.chunks.slice(1).join('');
+		const [innerId] = protocolIds(tail);
+		expect(innerId).toBeTruthy();
+		expect(tail.indexOf(swapCall(outerId))).toBeLessThan(tail.indexOf(swapCall(innerId)));
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		expect(container.querySelector('.inner-value')?.textContent).toBe('inside');
+		expect(container.querySelector('.outer-value')?.textContent).toBe('outside');
 	});
 
 	it('streams the @catch arm when the promise rejects', async () => {
@@ -627,6 +685,166 @@ describe('renderToReadableStream', () => {
 });
 
 describe('streamed page → swap runtime → hydration (end to end)', () => {
+	it('hydrates completed boundary useId values in its opaque stream namespace', async () => {
+		const d = deferred<string>();
+		const c = collector();
+		const { pipe } = ServerRT.renderToPipeableStream(
+			server.IdBoundary,
+			{ promise: d.promise },
+			{ identifierPrefix: 'page-' },
+		);
+		pipe(c.dest);
+		const [id] = protocolIds(c.chunks[0]);
+		d.resolve('ready');
+		await c.ended;
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const rootId = ':page-in-0:';
+		const boundaryId = ':page-b' + id + '-in-0:';
+		expect(container.querySelector('#id-box')!.getAttribute('data-root-id')).toBe(rootId);
+		expect(container.querySelector('.id-ok')!.getAttribute('data-boundary-id')).toBe(boundaryId);
+
+		const seen: Array<[string, string]> = [];
+		const content = container.querySelector('.id-ok');
+		const clientPending = new Promise<string>(() => {});
+		const root = hydrateRoot(
+			container,
+			IdBoundary as any,
+			{ promise: clientPending, onId: (arm: string, value: string) => seen.push([arm, value]) },
+			{ identifierPrefix: 'page-' },
+		);
+		flushSync(() => {});
+		expect(container.querySelector('.id-ok')).toBe(content);
+		expect(seen).toContainEqual(['root', rootId]);
+		expect(seen).toContainEqual(['content', boundaryId]);
+		root.unmount();
+	});
+
+	it('hydrates a pending shell with the template boundary useId namespace', async () => {
+		const d = deferred<string>();
+		const c = collector();
+		const render = ServerRT.renderToPipeableStream(
+			server.IdBoundary,
+			{ promise: d.promise },
+			{ identifierPrefix: 'page-' },
+		);
+		render.pipe(c.dest);
+		const [id] = protocolIds(c.chunks[0]);
+		container.innerHTML = c.chunks[0];
+		activate(container);
+
+		const rootId = ':page-in-0:';
+		const boundaryId = ':page-b' + id + '-in-0:';
+		expect(container.querySelector('#id-box')!.getAttribute('data-root-id')).toBe(rootId);
+		expect(container.querySelector('.id-loading')!.getAttribute('data-boundary-id')).toBe(
+			boundaryId,
+		);
+
+		const seen: Array<[string, string]> = [];
+		const clientPending = new Promise<string>(() => {});
+		// A still-pending shell intentionally takes mountTry's documented degraded
+		// client-render path; keep its expected structural warning out of test output.
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = hydrateRoot(
+			container,
+			IdBoundary as any,
+			{ promise: clientPending, onId: (arm: string, value: string) => seen.push([arm, value]) },
+			{ identifierPrefix: 'page-' },
+		);
+		flushSync(() => {});
+		errSpy.mockRestore();
+		expect(seen).toContainEqual(['root', rootId]);
+		expect(seen).toContainEqual(['pending', boundaryId]);
+		root.unmount();
+		render.abort(new Error('test complete'));
+		await c.ended;
+	});
+
+	it('hydrates a streamed catch arm from a rejection seed without replacing its DOM', async () => {
+		const d = deferred<string>();
+		const c = collector();
+		const { pipe } = ServerRT.renderToPipeableStream(
+			server.IdBoundary,
+			{ promise: d.promise },
+			{ identifierPrefix: 'page-' },
+		);
+		pipe(c.dest);
+		const [id] = protocolIds(c.chunks[0]);
+		d.reject({ name: 'PlainFailure', message: 'server-no' });
+		await c.ended;
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const rootId = ':page-in-0:';
+		const boundaryId = ':page-b' + id + '-in-0:';
+		const errorSpan = container.querySelector('.id-error');
+		expect(errorSpan!.textContent).toBe('server-no');
+		expect(errorSpan!.getAttribute('data-boundary-id')).toBe(boundaryId);
+
+		const seen: Array<[string, string]> = [];
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const clientPending = new Promise<string>(() => {});
+		const root = hydrateRoot(
+			container,
+			IdBoundary as any,
+			{ promise: clientPending, onId: (arm: string, value: string) => seen.push([arm, value]) },
+			{ identifierPrefix: 'page-' },
+		);
+		flushSync(() => {});
+		expect(container.querySelector('.id-error')).toBe(errorSpan);
+		expect(container.querySelector('.id-loading')).toBeNull();
+		expect(seen).toContainEqual(['root', rootId]);
+		expect(seen).toContainEqual(['catch', boundaryId]);
+		expect(errSpy).not.toHaveBeenCalled();
+		errSpy.mockRestore();
+		root.unmount();
+	});
+
+	it('preserves primitive and plain-object reasons in streamed catch hydration', async () => {
+		const cases = [
+			{ reason: 'stream-string', text: 'stream-string:', kind: 'string', code: '' },
+			{
+				reason: { message: 'stream-object', code: 'E_STREAM' },
+				text: 'stream-object:E_STREAM',
+				kind: 'object',
+				code: 'E_STREAM',
+			},
+		] as const;
+
+		for (const testCase of cases) {
+			const d = deferred<string>();
+			const c = collector();
+			const { pipe } = ServerRT.renderToPipeableStream(server.ReasonBoundary, {
+				promise: d.promise,
+			});
+			pipe(c.dest);
+			d.reject(testCase.reason);
+			await c.ended;
+
+			container.innerHTML = c.chunks.join('');
+			activate(container);
+			const serverCatch = container.querySelector('.reason-error');
+			let caught: any;
+			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const root = hydrateRoot(container, ReasonBoundary as any, {
+				promise: new Promise<string>(() => {}),
+				onCatch: (reason: unknown) => (caught = reason),
+			});
+			flushSync(() => {});
+
+			expect(container.querySelector('.reason-error')).toBe(serverCatch);
+			expect(serverCatch!.textContent).toBe(testCase.text);
+			expect(serverCatch!.getAttribute('data-kind')).toBe(testCase.kind);
+			expect(serverCatch!.getAttribute('data-code')).toBe(testCase.code);
+			if (typeof testCase.reason === 'string') expect(caught).toBe(testCase.reason);
+			else expect(caught).toEqual(testCase.reason);
+			expect(errorSpy).not.toHaveBeenCalled();
+			errorSpy.mockRestore();
+			root.unmount();
+		}
+	});
+
 	it('swaps the segment into place, scopes its seeds, and hydrates byte-for-byte', async () => {
 		const d = deferred<string>();
 		const c = collector();
@@ -719,5 +937,54 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		expect(errSpy).not.toHaveBeenCalled();
 		errSpy.mockRestore();
 		root.unmount();
+	});
+
+	it('gives a pending nested stream boundary an empty seed scope', async () => {
+		const outer = deferred<string>();
+		const inner = deferred<string>();
+		const later = deferred<string>();
+		const c = collector();
+		const render = ServerRT.renderToPipeableStream(server.NestedStreamSeedScopes, {
+			outer: outer.promise,
+			inner: inner.promise,
+			later: later.promise,
+		});
+		render.pipe(c.dest);
+		outer.resolve('outer-ready');
+		later.resolve('later-ready');
+		await vi.waitFor(() => expect(c.chunks.length).toBeGreaterThan(1));
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const outerNode = container.querySelector('.outer-seed');
+		const pendingNode = container.querySelector('.inner-seed-pending');
+		const laterNode = container.querySelector('.later-seed');
+		expect(outerNode!.textContent).toBe('outer-ready');
+		expect(pendingNode!.textContent).toBe('inner pending');
+		expect(laterNode!.textContent).toBe('later-ready');
+
+		const clientOuter: any = new Promise<string>(() => {});
+		const clientInner: any = new Promise<string>(() => {});
+		const clientLater: any = new Promise<string>(() => {});
+		// A still-pending nested template takes the existing degraded structural
+		// recovery path; this regression observes seed ownership on the thenables.
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = hydrateRoot(container, NestedStreamSeedScopes as any, {
+			outer: clientOuter,
+			inner: clientInner,
+			later: clientLater,
+		});
+		flushSync(() => {});
+
+		expect(clientOuter.status).toBe('fulfilled');
+		expect(clientOuter.value).toBe('outer-ready');
+		// The inner template owns an EMPTY scope. Without the guard it consumes
+		// the outer segment's `later-ready` seed and becomes spuriously fulfilled.
+		expect(clientInner.status).toBe('pending');
+		expect(clientInner.value).toBeUndefined();
+		errorSpy.mockRestore();
+		root.unmount();
+		render.abort(new Error('test complete'));
+		await c.ended;
 	});
 });

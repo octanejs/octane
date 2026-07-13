@@ -271,4 +271,48 @@ describe('state getter runtime semantics', () => {
 		);
 		expect(ServerRuntime.renderToString(mod.App).html).toContain('2|5');
 	});
+
+	it('server functional updaters and reducers run once while getters update immediately', () => {
+		const mod = evalServer(
+			`
+      import { useReducer, useState } from 'octane';
+      export function App(props) @{
+        const [count, setCount, getCount] = useState(0);
+        const [total, dispatch, getTotal] = useReducer(props.reducer, 0);
+        if (count === 0) {
+          setCount(props.updater);
+          props.observe('state', getCount());
+        }
+        if (total === 0) {
+          dispatch(2);
+          props.observe('reducer', getTotal());
+        }
+        <span>{count + '|' + total}</span>
+      }
+    `,
+			'server-single-apply-getter.tsrx',
+		);
+		let updaterCalls = 0;
+		let reducerCalls = 0;
+		const observed: Array<[string, number]> = [];
+		const { html } = ServerRuntime.renderToString(mod.App, {
+			updater: (value: number) => {
+				updaterCalls++;
+				return value + 1;
+			},
+			reducer: (value: number, amount: number) => {
+				reducerCalls++;
+				return value + amount;
+			},
+			observe: (kind: string, value: number) => observed.push([kind, value]),
+		});
+
+		expect(observed).toEqual([
+			['state', 1],
+			['reducer', 2],
+		]);
+		expect(updaterCalls).toBe(1);
+		expect(reducerCalls).toBe(1);
+		expect(html).toContain('1|2');
+	});
 });

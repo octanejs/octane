@@ -79,8 +79,10 @@ boundary then streams **out of order** as a hidden segment plus an inline
 `$OCTRC` swap script when its data settles. Scoped styles flush with the shell
 (before the body markup) and per-wave with their segment; hoisted head elements
 render with the shell only. `hydrateRoot` on the client adopts the swapped-in
-DOM byte-for-byte, including per-boundary `use()` seeds. Node destinations honor
-`write(false)`/`drain`; destination errors or an early close cancel the render.
+DOM byte-for-byte, including per-boundary `use()` value or rejection seeds (a
+rejected boundary hydrates directly into its server-rendered `@catch` arm). Node
+destinations honor `write(false)`/`drain`; destination errors or an early close
+cancel the render.
 
 `StreamOptions` extends `RenderOptions` with `onShellReady()`,
 `onShellError(err)`, and `onAllReady()`.
@@ -135,8 +137,14 @@ and the resolved server function share one SSR runtime.
   between canonical full passes (a deep waterfall costs ~2 full passes + cheap
   subtree re-runs, not D+1 full passes). The emitted HTML always comes from a
   full pass, so hydration byte-format is identical either way. Resolved values
-  are serialized into the seed script so hydration does not re-fetch or
-  re-suspend.
+  and versioned rejection metadata are serialized into the seed script so
+  hydration does not re-fetch, re-suspend, or replace a server `@catch` arm.
+  Rejection records preserve primitive and JSON-safe plain-object reasons plus
+  Error names, messages, and enumerable custom fields. Cyclic fields are
+  bounded and marked, while hostile or opaque values degrade to fixed safe
+  markers instead of breaking the response. Rejection metadata lives outside
+  fulfilled values, and the undefined wire encoding escapes its string prefix,
+  so sentinel-shaped user data remains ordinary data.
 - `useId` counters are root-local. Server output is hydration-stable when the
   client passes the same `identifierPrefix`; distinct sibling roots should use
   distinct prefixes.

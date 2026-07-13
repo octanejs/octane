@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { act } from './_helpers';
 import { createRoot, startTransition, addTransitionType, type Root } from '../src/index.js';
 import { compile } from '../src/compiler/compile.js';
+import * as ServerRuntime from '../src/server/index.js';
 import {
 	installViewTransitionMocks,
 	type ViewTransitionMocks,
@@ -22,6 +23,17 @@ import {
 	RevealApp,
 	FirstBoundaryRevealApp,
 } from './_fixtures/view-transition-features.tsrx';
+
+function evalServer(source: string, filename: string): Record<string, any> {
+	let code = compile(source, filename, { mode: 'server' }).code;
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
+		(_match, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
+	);
+	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
+	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
+	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
+}
 
 describe('ViewTransition compiler hints', () => {
 	const expectHint = (source: string, filename: string) => {
@@ -74,10 +86,31 @@ describe('ViewTransition compiler hints', () => {
 		);
 	});
 
+	it('arms transitions through transitive module-level namespace aliases', () => {
+		expectHint(
+			`import * as Octane from 'octane'; const Short = Octane; const UI = Short; export function App() @{ <UI.ViewTransition><p /></UI.ViewTransition> }`,
+			'namespace-transitive-alias.tsrx',
+		);
+	});
+
+	it('does not arm for an unused namespace alias or its shadowed member', () => {
+		expectNoHint(
+			`import * as Octane from 'octane'; const UI = Octane; function read(UI: { ViewTransition: unknown }) { return UI.ViewTransition; } export function App() @{ <p /> }`,
+			'namespace-alias-shadowed.tsrx',
+		);
+	});
+
 	it.each(['ViewTransition as VT', 'unstable_ViewTransition as VT'])(
 		'arms transitions for a direct Octane barrel export: %s',
 		(specifier) => {
 			expectHint(`export { ${specifier} } from 'octane';`, 'view-transition-barrel.tsrx');
+		},
+	);
+
+	it.each([`export * from 'octane';`, `export * as Octane from 'octane';`])(
+		'arms transitions for an Octane star barrel: %s',
+		(source) => {
+			expectHint(source, 'view-transition-star-barrel.tsrx');
 		},
 	);
 
@@ -86,6 +119,119 @@ describe('ViewTransition compiler hints', () => {
 			`import type * as Octane from 'octane'; type VT = typeof Octane.ViewTransition; export type { ViewTransition } from 'octane';`,
 			'view-transition-type-only.tsrx',
 		);
+	});
+});
+
+describe('ViewTransition server output', () => {
+	const ambient = evalServer(
+		`
+			import { ViewTransition, use, useState } from 'octane';
+			function Invoke(props) { props.run(); return null; }
+			export function Nested() @{
+				@try { <span>{'nested'}</span> } @pending { <i>{'nested pending'}</i> }
+			}
+			export function NestedInsideViewTransition(props) @{
+				<ViewTransition>
+					<><Invoke run={props.run} /><div id="outer-after-nested">{'outer'}</div></>
+				</ViewTransition>
+			}
+			function SettlingChild() @{
+				const [settled, setSettled] = useState(false);
+				if (!settled) setSettled(true);
+				@if (!settled) {
+					@try { <span>{'discarded try'}</span> } @pending { <i>{'discarded pending'}</i> }
+				} @else {
+					<div id="settled-without-try">{'settled'}</div>
+				}
+			}
+			export function RenderPhaseViewTransition() @{
+				<ViewTransition><SettlingChild /></ViewTransition>
+			}
+			function AsyncContent(props) @{
+				const value = use(props.promise);
+				<div id="streamed-vt-content">{value as string}</div>
+			}
+			export function NestedBeforeStream(props) @{
+				<ViewTransition name="outer-name" update="fade" share="pair">
+					<>
+						<Invoke run={props.run} />
+						@try {
+							<AsyncContent promise={props.promise} />
+						} @pending {
+							<div id="streamed-vt-pending">{'pending'}</div>
+						}
+					</>
+				</ViewTransition>
+			}
+		`,
+		'view-transition-ambient-state.tsrx',
+	);
+
+	it('strips unclaimed enter/exit candidates from static markup', () => {
+		const mod = evalServer(
+			`
+        import { ViewTransition } from 'octane';
+        export function App() @{
+          <ViewTransition enter="fade-in" exit="fade-out">
+            <div id="static-vt">{'static'}</div>
+          </ViewTransition>
+        }
+      `,
+			'static-view-transition.tsrx',
+		);
+		const { html } = ServerRuntime.renderToStaticMarkup(mod.App);
+
+		expect(html).toContain('id="static-vt"');
+		expect(html).not.toContain('vt-enter-x');
+		expect(html).not.toContain('vt-exit-x');
+		expect(html).not.toContain('vt-enter=');
+		expect(html).not.toContain('vt-exit=');
+	});
+
+	it('isolates nested buffered renders from an enclosing ViewTransition candidate', () => {
+		const { html } = ServerRuntime.renderToString(ambient.NestedInsideViewTransition, {
+			run: () => ServerRuntime.renderToString(ambient.Nested),
+		});
+		const root = document.createElement('div');
+		root.innerHTML = html;
+		const outer = root.querySelector('#outer-after-nested')!;
+		expect(outer.getAttribute('vt-update')).toBe('auto');
+		expect(outer.hasAttribute('vt-name')).toBe(false);
+		expect(outer.hasAttribute('vt-share')).toBe(false);
+	});
+
+	it('rewinds discarded render-phase ViewTransition try state', () => {
+		const { html } = ServerRuntime.renderToString(ambient.RenderPhaseViewTransition);
+		const root = document.createElement('div');
+		root.innerHTML = html;
+		const settled = root.querySelector('#settled-without-try')!;
+		expect(settled.getAttribute('vt-update')).toBe('auto');
+		expect(settled.hasAttribute('vt-name')).toBe(false);
+		expect(settled.hasAttribute('vt-share')).toBe(false);
+	});
+
+	it('preserves ViewTransition annotations after a nested buffered render before streaming', async () => {
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const chunks: string[] = [];
+		let finish!: () => void;
+		const ended = new Promise<void>((done) => {
+			finish = done;
+		});
+		ServerRuntime.renderToPipeableStream(ambient.NestedBeforeStream, {
+			promise,
+			run: () => ServerRuntime.renderToString(ambient.Nested),
+		}).pipe({ write: (chunk: string) => chunks.push(chunk), end: finish });
+
+		resolve('ready');
+		await ended;
+		const tail = chunks.slice(1).join('');
+		expect(tail).toContain('id="streamed-vt-content"');
+		expect(tail).toContain('vt-name="outer-name"');
+		expect(tail).toContain('vt-update="fade"');
+		expect(tail).toContain('vt-share="pair"');
 	});
 });
 

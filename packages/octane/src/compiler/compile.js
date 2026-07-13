@@ -398,8 +398,41 @@ function moduleImportsViewTransition(astBody) {
 				if (sp.exportKind !== 'type' && isViewTransitionName(astName(sp.local))) return true;
 			}
 		}
+		// A star barrel can expose ViewTransition without naming it in this AST,
+		// while the consuming module only sees the barrel's path. Conservatively arm
+		// runtime export-stars (including `export * as Octane`) at the source module.
+		if (
+			node.type === 'ExportAllDeclaration' &&
+			node.source?.value === 'octane' &&
+			node.exportKind !== 'type'
+		) {
+			return true;
+		}
 	}
 	if (namespaces.size === 0) return false;
+
+	// Follow simple module-level namespace aliases to a fixed point (`const X =
+	// Octane; const Y = X`). Consumers often shorten a namespace before using a
+	// member tag, and the alias remains statically tied to the actual import. The
+	// lexical walker below still rejects a same-named nested binding.
+	let addedNamespace = true;
+	while (addedNamespace) {
+		addedNamespace = false;
+		for (const statement of astBody) {
+			const declaration =
+				statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+			if (declaration?.type !== 'VariableDeclaration') continue;
+			for (const declarator of declaration.declarations || []) {
+				if (declarator.id?.type !== 'Identifier') continue;
+				const init = unwrapTransparentExpression(declarator.init);
+				if (init?.type !== 'Identifier' || !namespaces.has(init.name)) continue;
+				if (!namespaces.has(declarator.id.name)) {
+					namespaces.add(declarator.id.name);
+					addedNamespace = true;
+				}
+			}
+		}
+	}
 
 	// Namespace destructuring is another import alias form. Restrict this to
 	// module-level declarations whose initializer is the ACTUAL imported
@@ -3352,6 +3385,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 	const compExpr = tagExpr(node);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const propParts = [];
+	let keyExpr = null;
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 			propParts.push(`...(${printExprWithTsrx(attr.argument, ctx, name, inlinedSubs)})`);
@@ -3359,8 +3393,14 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const attrName = attr.name.name || attr.name;
-		if (attrName === 'key') continue;
 		const val = attr.value;
+		if (attrName === 'key') {
+			if (val != null) {
+				const inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
+				keyExpr = printExprWithTsrx(inner, ctx, name, inlinedSubs);
+			}
+			continue;
+		}
 		if (val == null) {
 			propParts.push(`${JSON.stringify(attrName)}: true`);
 			continue;
@@ -3425,7 +3465,9 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 		}
 	}
 	ctx.runtimeNeeded.add('ssrComponent');
-	return `_$ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} }${inherit ? ', true' : ''})`;
+	const trailing =
+		keyExpr !== null ? `, ${inherit ? 'true' : 'false'}, (${keyExpr})` : inherit ? ', true' : '';
+	return `_$ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} }${trailing})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -3466,13 +3508,15 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		elseCall = `${elseSub.fnName}(undefined, __s)`;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
+	ctx.runtimeNeeded.add('ssrControl');
+	ctx.runtimeNeeded.add('ssrArm');
 	// Nested ranges: the OUTER ssrBlock is the if-slot; the INNER one wraps the
 	// taken branch's content. The client adopts BOTH on hydration (slot = outer,
 	// branch = inner) so no comment markers are inserted — byte-for-byte, exactly
 	// like @for. The not-taken arm emits no inner range (just `''`).
-	const thenInner = `_$ssrBlock(${thenSub.fnName}(undefined, __s))`;
-	const elseInner = node.alternate ? `_$ssrBlock(${elseCall})` : "''";
-	return `_$ssrBlock((${testExpr}) ? ${thenInner} : ${elseInner})`;
+	const thenInner = `_$ssrArm("then", () => _$ssrBlock(${thenSub.fnName}(undefined, __s)))`;
+	const elseInner = node.alternate ? `_$ssrArm("else", () => _$ssrBlock(${elseCall}))` : "''";
+	return `_$ssrBlock(_$ssrControl("${ssrControlKey('if', node)}", () => ((${testExpr}) ? ${thenInner} : ${elseInner})))`;
 }
 
 function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
@@ -3488,15 +3532,45 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		const emptyStmts = node.empty.type === 'BlockStatement' ? node.empty.body : [node.empty];
 		const emptySub = ssrCompileSub(emptyStmts, ctx, '__sempty', [], cssHash, parentNs);
 		inlinedSubs.push(emptySub.fn + ';');
-		emptyCall = `${emptySub.fnName}(undefined, __s)`;
+		emptyCall = `_$ssrArm("empty", () => ${emptySub.fnName}(undefined, __s))`;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
+	ctx.runtimeNeeded.add('ssrControl');
+	ctx.runtimeNeeded.add('ssrArm');
+	let itemKey = '__it != null && __it.id != null ? __it.id : __it';
+	let explicitKey = null;
+	const firstEl = (node.body.body || []).find(
+		(child) => child.type === 'Element' || child.type === 'JSXElement',
+	);
+	if (firstEl) {
+		const keyAttr = (firstEl.attributes || firstEl.openingElement?.attributes || []).find(
+			(attr) => (attr.name?.name || attr.name) === 'key',
+		);
+		if (keyAttr?.value != null) {
+			explicitKey =
+				keyAttr.value.type === 'JSXExpressionContainer' ? keyAttr.value.expression : keyAttr.value;
+		}
+	}
+	if (explicitKey === null) explicitKey = node.key || null;
+	if (explicitKey !== null) {
+		const keyParams = [itemId];
+		if (node.index) keyParams.push(node.index);
+		const keyFn = printExpr({
+			type: 'ArrowFunctionExpression',
+			params: keyParams,
+			body: explicitKey,
+			expression: true,
+		});
+		itemKey = `(${keyFn})(__it${node.index ? ', __i' : ''})`;
+	} else if (node.index) {
+		itemKey = '__i';
+	}
 	const mapper = node.index
-		? `(__it, __i) => _$ssrBlock(${itemSub.fnName}(__it, __i, __s))`
-		: `(__it) => _$ssrBlock(${itemSub.fnName}(__it, __s))`;
+		? `(__it, __i) => _$ssrArm((${itemKey}), () => _$ssrBlock(${itemSub.fnName}(__it, __i, __s)))`
+		: `(__it, __i) => _$ssrArm((${itemKey}), () => _$ssrBlock(${itemSub.fnName}(__it, __s)))`;
 	// Eager: render every item now and join. No keyed reconciliation server-side;
 	// each item gets its own block marker for a future hydrate to match.
-	return `_$ssrBlock((() => { const __items = Array.from((${itemsExpr}) ?? []); return __items.length === 0 ? ${emptyCall} : __items.map(${mapper}).join(''); })())`;
+	return `_$ssrBlock(_$ssrControl("${ssrControlKey('for', node)}", () => { const __items = Array.from((${itemsExpr}) ?? []); return __items.length === 0 ? ${emptyCall} : __items.map(${mapper}).join(''); }))`;
 }
 
 function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
@@ -3504,18 +3578,26 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	const discExpr = printExpr(rewriteHookCalls(node.discriminant, ctx, name));
 	const arms = [];
 	let defaultCall = "''";
+	let caseIndex = 0;
 	for (const c of node.cases || []) {
 		const sub = ssrCompileSub(c.consequent || [], ctx, '__scase', [], cssHash, parentNs);
 		inlinedSubs.push(sub.fn + ';');
 		// Inner ssrBlock wraps the matched case's content (see ssrEmitIf) so the
 		// client adopts it as the branch range during hydration (no inserted markers).
-		if (c.test == null) defaultCall = `_$ssrBlock(${sub.fnName}(undefined, __s))`;
-		else arms.push(`__d === (${printExpr(c.test)}) ? _$ssrBlock(${sub.fnName}(undefined, __s))`);
+		if (c.test == null)
+			defaultCall = `_$ssrArm("default", () => _$ssrBlock(${sub.fnName}(undefined, __s)))`;
+		else
+			arms.push(
+				`__d === (${printExpr(c.test)}) ? _$ssrArm("case:${caseIndex}", () => _$ssrBlock(${sub.fnName}(undefined, __s)))`,
+			);
+		caseIndex++;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
+	ctx.runtimeNeeded.add('ssrControl');
+	ctx.runtimeNeeded.add('ssrArm');
 	// First case matching by strict-equality wins (no JS fall-through); else default.
 	const selector = arms.length ? `${arms.join(' : ')} : ${defaultCall}` : defaultCall;
-	return `_$ssrBlock((() => { const __d = (${discExpr}); return ${selector}; })())`;
+	return `_$ssrBlock(_$ssrControl("${ssrControlKey('switch', node)}", () => { const __d = (${discExpr}); return ${selector}; }))`;
 }
 
 function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
@@ -3560,11 +3642,16 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 // keyed ONLY on the node's source position (same AST → same offset across the
 // client and server compiles of one source), hashed compactly.
 function ssrTryKey(node) {
-	const pos = node && node.start != null ? node.start : 0;
-	const src = `try:${pos}`;
+	return ssrControlKey('try', node);
+}
+
+function ssrControlKey(kind, node) {
+	const loc = node && node.loc && node.loc.start;
+	const pos = node && node.start != null ? node.start : `${loc?.line ?? 0}:${loc?.column ?? 0}`;
+	const src = `${kind}:${pos}`;
 	let h = 5381;
 	for (let i = 0; i < src.length; i++) h = (Math.imul(h, 33) + src.charCodeAt(i)) | 0;
-	return 't' + (h >>> 0).toString(36);
+	return kind[0] + (h >>> 0).toString(36);
 }
 
 // `{createPortal(...)}` (and other JSX-bearing expression holes) at child
