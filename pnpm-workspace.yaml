@@ -133,6 +133,8 @@ catalogs:
     esbuild: ^0.28.1
     esrap: *esrap_common
     happy-dom: ^20.10.6
+    html-parse-stringify: ^3.0.1
+    i18next: 26.3.6
     jsdom: ^29.0.2
     jotai: ^2.20.1
     lexical: 0.46.0
@@ -168,6 +170,7 @@ catalogs:
     react: ^19.2.0
     'react-router': 8.2.0
     react-dom: ^19.2.0
+    react-i18next: 17.0.9
     ripple: ^0.3.86
     rulesync: ^8.17.0
     solid-js: '2.0.0-beta.14'

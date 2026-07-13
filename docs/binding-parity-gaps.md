@@ -11,7 +11,7 @@ it does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**8 active pin(s) across 19 binding package(s).**
+**8 active pin(s) across 20 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -19,6 +19,7 @@ surface and evidence.
 | `@octanejs/dnd-kit` | 0 |
 | `@octanejs/floating-ui` | 0 |
 | `@octanejs/hook-form` | 8 |
+| `@octanejs/i18next` | 0 |
 | `@octanejs/jotai` | 0 |
 | `@octanejs/lexical` | 0 |
 | `@octanejs/mdx` | 0 |

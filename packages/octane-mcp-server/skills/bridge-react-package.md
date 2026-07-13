@@ -21,6 +21,7 @@ of bridging by hand:
 | `@lexical/react` | `@octanejs/lexical` |
 | `@floating-ui/react` | `@octanejs/floating-ui` |
 | `radix-ui` | `@octanejs/radix` |
+| `react-i18next` | `@octanejs/i18next` |
 
 For anything else, run the `octane_bridge_react_package` tool to get a scan of the
 package's React API usage and a tailored plan, then follow the workflow below.

@@ -122,6 +122,59 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'i18next',
+					include: ['packages/i18next/tests/**/*.test.ts'],
+					exclude: [...configDefaults.exclude, 'packages/i18next/tests/ssr/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/i18next/tests/differential/_setup.ts'],
+					setupFiles: ['packages/i18next/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/i18next$/,
+							replacement: resolve(import.meta.dirname, 'packages/i18next/src/index.js'),
+						},
+						{
+							find: /^@octanejs\/i18next\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/i18next/src') + '/$1.js',
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'i18next-ssr',
+					include: ['packages/i18next/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/i18next$/,
+							replacement: resolve(import.meta.dirname, 'packages/i18next/src/index.js'),
+						},
+						{
+							find: /^@octanejs\/i18next\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/i18next/src') + '/$1.js',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
 					environment: 'jsdom',
