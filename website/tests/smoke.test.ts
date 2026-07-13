@@ -5,7 +5,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
-import { docs, defaultDoc } from '../src/content/docs.ts';
+import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { FRAMEWORK_CARDS, HOME_SUMMARY, OCTANE_CARDS } from '../src/content/benchmarks.ts';
 
 afterEach(cleanup);
@@ -125,9 +125,10 @@ describe('website routes', () => {
 		const { container } = await renderRoute(`/docs/${doc.slug}`);
 
 		expect(container.querySelector('.prose h1')?.textContent?.trim()).toBe(doc.title);
-		const sidebar = container.querySelector('.sidebar-list')!;
+		const sidebar = container.querySelector('.sidebar-nav')!;
 		const sidebarLinks = Array.from(sidebar.querySelectorAll<HTMLAnchorElement>('a.sidebar-link'));
 		expect(sidebarLinks).toHaveLength(docs.length);
+		expect(sidebar.querySelectorAll('.sidebar-group')).toHaveLength(docGroups.length);
 		for (const entry of docs) {
 			expect(findLink(sidebar, `/docs/${entry.slug}`)).toBeTruthy();
 		}
