@@ -13,14 +13,13 @@ const FEATURES = [
 		title: 'Hooks without the homework',
 		body: 'No dependency arrays and no rules of hooks. The compiler tracks what ' +
 			'your effects, memos and callbacks actually use, and hooks can sit behind ' +
-			'conditions or early returns. You keep the hooks you know — the ' +
-			'bookkeeping is gone.',
+			'conditions or early returns. You keep the hooks you know.',
 	},
 	{
 		title: 'Suspense without waterfalls',
 		body: 'Independent use() calls start together instead of suspending one at a ' +
 			'time down the tree. Nested fetches warm up early, and streaming SSR sends ' +
-			'each boundary as soon as it’s ready — not when the slowest one is.',
+			'each boundary as soon as it’s ready.',
 	},
 	{
 		title: 'No virtual DOM.',
