@@ -106,9 +106,9 @@ export function Home() @{
 				</span>
 			</div>
 			<div class="proven-stat">
-				<span class="proven-number">17</span>
+				<span class="proven-number">18</span>
 				<span class="proven-label">
-					{'ecosystem ports — Zustand, TanStack Query & Router, Radix, Base UI, '}
+					{'ecosystem ports — Zustand, TanStack Query & Router, Radix, Lucide, '}
 					<Link to="/docs/bindings">Recharts and more</Link>
 				</span>
 			</div>

@@ -124,6 +124,9 @@ jobs:
       - name: Check bindings-status table is current
         run: pnpm bindings:status:check
 
+      - name: Check Lucide generated sources are current
+        run: pnpm lucide:generate:check
+
       # The publish build otherwise only runs at prepack, so a broken dist
       # (an entry point missing from the build, an unresolvable relative
       # import in dist/ or the verbatim-copied compiler/) would ship silently.
