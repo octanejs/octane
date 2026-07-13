@@ -10,10 +10,11 @@ export function Layout() @{
 	const [menuOpen, setMenuOpen] = useState(false);
 	// The playground fills the viewport below the nav — no footer under it.
 	const pathname = useLocation({ select: (l: any) => l.pathname });
+	const isDocsPath = pathname === '/docs' || pathname.startsWith('/docs/');
 	const showFooter = pathname !== '/playground';
 	<div class="shell">
 		<header class="topnav">
-			<div class="topnav-inner">
+			<div class={['topnav-inner', isDocsPath && 'docs-width']}>
 				<Link to="/" class="wordmark" aria-label="Octane home">
 					<img src={logoUrl} alt="Octane" class="wordmark-img" />
 				</Link>
@@ -105,6 +106,9 @@ export function Layout() @{
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
+			}
+			.topnav-inner.docs-width {
+				max-width: 1420px;
 			}
 			.topnav-inner :global(a.wordmark) {
 				display: inline-flex;

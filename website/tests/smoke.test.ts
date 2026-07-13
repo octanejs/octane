@@ -56,6 +56,7 @@ describe('website routes', () => {
 		const { container } = await renderRoute('/');
 
 		expect(container.querySelector('main .home')).toBeTruthy();
+		expect(container.querySelector('.topnav-inner.docs-width')).toBeNull();
 		expect(container.querySelector('.hero h1')?.textContent?.trim()).toBeTruthy();
 		expect(container.textContent).toContain('No hand-maintained dependency arrays');
 		const heroActions = container.querySelector('.hero-actions')!;
@@ -119,6 +120,7 @@ describe('website routes', () => {
 	it('/docs renders the configured default document', async () => {
 		const { container } = await renderRoute('/docs');
 		expect(container.querySelector('.prose h1')?.textContent?.trim()).toBe(defaultDoc.title);
+		expect(container.querySelector('.topnav-inner.docs-width')).toBeTruthy();
 	});
 
 	it.each(docs)('/docs/$slug renders its MDX document and active sidebar link', async (doc) => {

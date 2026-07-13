@@ -22,6 +22,8 @@ import {
 	CleanupApp,
 	RevealApp,
 	FirstBoundaryRevealApp,
+	ClickUpdateApp,
+	PlainClickApp,
 } from './_fixtures/view-transition-features.tsrx';
 
 function evalServer(source: string, filename: string): Record<string, any> {
@@ -438,6 +440,61 @@ describe('ViewTransition features', () => {
 		expect(container.textContent).toBe('Ready');
 		expect(vt.calls.length).toBeGreaterThan(0);
 		expect(enters).toBe(1);
+	});
+
+	it('routes delegated click transitions through startViewTransition, including while in flight', async () => {
+		let updates = 0;
+		await act(() => {
+			root.render(ClickUpdateApp, {
+				onUpdate: () => {
+					updates++;
+				},
+			});
+		});
+		expect(vt.calls).toHaveLength(0);
+		expect(container.querySelector('div')?.textContent).toBe('Short');
+
+		// The mock's update callback is synchronous but its finished promise settles
+		// in a microtask. A second immediate click therefore exercises the controller's
+		// in-flight path instead of merely repeating the idle case.
+		await act(async () => {
+			const button = container.querySelector('button')!;
+			button.click();
+			button.click();
+			await Promise.resolve();
+		});
+
+		expect(vt.calls).toHaveLength(2);
+		expect(updates).toBe(2);
+		expect(container.querySelector('div')?.textContent).toBe('Short');
+	});
+
+	it('skips an asynchronous native transition when a click touches no boundary', async () => {
+		let calls = 0;
+		let skips = 0;
+		(document as never as Record<string, unknown>)['startViewTransition'] = (
+			update: () => void,
+		) => {
+			calls++;
+			const updated = Promise.resolve().then(update);
+			return {
+				ready: updated,
+				finished: updated,
+				skipTransition: () => {
+					skips++;
+				},
+			};
+		};
+
+		await act(() => root.render(PlainClickApp));
+		await act(async () => {
+			container.querySelector('button')!.click();
+			await Promise.resolve();
+		});
+
+		expect(calls).toBe(1);
+		expect(skips).toBe(1);
+		expect(container.querySelector('div')?.textContent).toBe('Count: 1');
 	});
 
 	it('runs the previous callback cleanup before the next activation fires', async () => {
