@@ -278,7 +278,7 @@ export function Home() @{
 				position: relative;
 				display: flex;
 				flex-direction: column;
-				min-height: 20rem;
+				min-height: 17rem;
 				background: linear-gradient(145deg, rgba(255, 65, 90, 0.055), transparent 42%), #2b3138;
 				border: 1px solid rgba(255, 255, 255, 0.08);
 				border-radius: 1rem;
