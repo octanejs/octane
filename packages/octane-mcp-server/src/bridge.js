@@ -22,6 +22,7 @@ export const KNOWN_BINDINGS = {
 	'react-hook-form': '@octanejs/hook-form',
 	'@base-ui-components/react': '@octanejs/base-ui',
 	'@dnd-kit/react': '@octanejs/dnd-kit',
+	sonner: '@octanejs/sonner',
 	recharts: '@octanejs/recharts',
 	'react-redux': '@octanejs/redux',
 	'@testing-library/react': '@octanejs/testing-library',

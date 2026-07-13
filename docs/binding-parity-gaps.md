@@ -11,7 +11,7 @@ it does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**8 active pin(s) across 20 binding package(s).**
+**8 active pin(s) across 21 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -28,6 +28,7 @@ surface and evidence.
 | `@octanejs/recharts` | 0 |
 | `@octanejs/redux` | 0 |
 | `@octanejs/remix-router` | 0 |
+| `@octanejs/sonner` | 0 |
 | `@octanejs/stylex` | 0 |
 | `@octanejs/tanstack-query` | 0 |
 | `@octanejs/tanstack-router` | 0 |
