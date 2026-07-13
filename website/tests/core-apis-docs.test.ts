@@ -160,16 +160,20 @@ describe('Core APIs documentation', () => {
 	it('runs the data example through pending and success states', async () => {
 		const { container } = await renderCoreApis();
 		const demo = container.querySelector('[data-demo="data"]')!;
+		const stage = demo.querySelector('.data-stage')!;
 		const load = Array.from(demo.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
 			button.textContent?.includes('Load profile'),
 		)!;
 
+		expect(stage.hasAttribute('aria-live')).toBe(false);
 		fireEvent.click(load);
 		await waitFor(() => expect(demo.querySelector('.data-loading')).toBeTruthy());
+		expect(demo.querySelector('.data-loading')?.getAttribute('role')).toBe('status');
 		await waitFor(
 			() => expect(demo.querySelector('.profile-card')?.textContent).toContain('Ada Lovelace'),
 			{ timeout: 2000 },
 		);
+		expect(demo.querySelector('.profile-card')?.getAttribute('role')).toBe('status');
 	});
 
 	it('runs the form action through validation, pending, and success states', async () => {

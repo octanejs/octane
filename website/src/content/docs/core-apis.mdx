@@ -396,9 +396,12 @@ export function ShortcutSearch() @{
 			const target = event.target;
 			const isTyping =
 				target instanceof HTMLElement &&
-				target.matches('input, textarea, select, [contenteditable="true"]');
+					(target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 
-			if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || isTyping) {
+			if (
+				event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || event.isComposing ||
+					isTyping
+			) {
 				return;
 			}
 

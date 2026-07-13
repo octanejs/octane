@@ -555,7 +555,7 @@ function loadDemoProfile(): Promise<DemoProfile> {
 function ProfileResult(props: { request: Promise<DemoProfile> }) @{
 	const profile = use(props.request);
 
-	<article class="profile-card">
+	<article class="profile-card" role="status">
 		<span class="profile-avatar" aria-hidden="true">
 			{profile.initials as string}
 		</span>
@@ -591,11 +591,11 @@ export function DataLoadingDemo() @{
 		description="The button creates one stable request; the boundary owns the pending UI."
 		hint="Start a request"
 	>
-		<div class="data-stage" aria-live="polite">
+		<div class="data-stage">
 			@if (request) {
 				<ProfileRequest request={request} />
 			} @else {
-				<p class="data-empty">Choose a request to see the boundary change.</p>
+				<p class="data-empty">Load the profile to see the boundary change.</p>
 			}
 		</div>
 		<div class="demo-actions">
