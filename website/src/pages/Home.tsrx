@@ -13,7 +13,7 @@ const FEATURES = [
 		title: 'Hooks without the homework',
 		body: 'No dependency arrays and no rules of hooks. The compiler tracks what ' +
 			'your effects, memos and callbacks actually use, and hooks can sit behind ' +
-			'conditions or early returns. You keep the hooks you know.",
+			'conditions or early returns. You keep the hooks you know.',
 	},
 	{
 		title: 'Suspense without waterfalls',
