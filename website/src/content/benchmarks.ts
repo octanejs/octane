@@ -27,6 +27,7 @@ import portalSwarm from '../../../benchmarks/baselines/local/portal-swarm.json';
 import recursiveContext from '../../../benchmarks/baselines/local/recursive-context.json';
 import signalFavoring from '../../../benchmarks/baselines/local/signal-favoring.json';
 import ssrThroughput from '../../../benchmarks/baselines/local/ssr-throughput.json';
+import streamingSsr from '../../../benchmarks/baselines/local/streaming-ssr.json';
 import todoMvc from '../../../benchmarks/baselines/local/todomvc.json';
 
 // `score` is charted when present; older checked-in baselines fall back to
@@ -74,17 +75,21 @@ export interface BenchCard {
 
 // ---------------------------------------------------------------------------
 // Series identity — fixed hue per framework, everywhere.
-// Validated set: #ff415a #c98500 #1e93b0 #1baf7a #9085e9 #e06ec4 (dark, on
-// #2b3138). Vue can't wear its brand green — it collapses into Solid's under
-// tritan simulation (ΔE 3) — so it wears orchid: inside the palette's L 56-64
-// band, 4.5:1 on the panel, min pairwise ΔE 13 across protan/deutan/tritan.
+// Validated set: #ff415a #c98500 #1e93b0 #7478fb #1baf7a #f57547 #9085e9
+// #e06ec4 (dark, on #2b3138). Every color clears 3:1 contrast on the panel;
+// the palette keeps at least ΔE 10 across protan/deutan/tritan simulations.
+// Preact and Svelte wear accessible indigo/coral variants of their brand hues.
+// Vue can't wear its brand green — it collapses into Solid's under tritan
+// simulation — so it wears orchid.
 // ---------------------------------------------------------------------------
 // Versions are the pnpm-catalog pins the fixtures actually run.
 const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'octane-tsrx', label: 'Octane (.tsrx)', color: '#ff415a' },
 	{ key: 'octane-jsx', label: 'Octane (.tsx)', color: '#c98500' },
 	{ key: 'react', label: 'React 19', color: '#1e93b0' },
+	{ key: 'preact', label: 'Preact 10', color: '#7478fb' },
 	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
+	{ key: 'svelte', label: 'Svelte 5', color: '#f57547' },
 	{ key: 'ripple', label: 'Ripple 0.3', color: '#9085e9' },
 	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 beta', color: '#e06ec4' },
 ];
@@ -201,7 +206,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		jsFrameworkReorder,
 		'js-framework-reorder',
 		'js-framework-reorder',
-		'The keyed-reorder matrix — reverse, shuffle, rotations, prepends and displacements — stressing the keyed reconciler.',
+		'The keyed-reorder matrix — reverse, shuffle, rotations, prepends and displacements — stressing the keyed reconciler. Ripple’s prepend and insert-mid cells are omitted because their current identity gates fail; invalid timings are never charted.',
 	),
 	frameworkCard(
 		dbmon,
@@ -219,7 +224,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		memoWall,
 		'memo-wall',
 		'memo-wall',
-		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. Solid, Ripple and Vue Vapor have no parent re-render to absorb, so their near-zero wall ops are the fine-grained model’s honest number.',
+		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. Solid, Svelte, Ripple and Vue Vapor have no parent re-render to absorb, so their near-zero wall ops are the fine-grained model’s honest number.',
 	),
 	frameworkCard(
 		recursiveContext,
@@ -243,7 +248,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		asyncWaterfall,
 		'async-waterfall',
 		'async-waterfall',
-		'Ten nested async levels with 16ms simulated latency — Octane’s compiled parallel-use path versus React’s nested-use waterfall and signal-first models.',
+		'Ten nested async levels with 16ms simulated latency — Octane’s compiled parallel-use path versus React and Preact nested-use waterfalls and signal-first models.',
 	),
 	frameworkCard(
 		news,
@@ -254,6 +259,19 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 			ssr_render: 'SSR render',
 			hydrate: 'hydrate',
 		},
+	),
+	frameworkCard(
+		streamingSsr,
+		'streaming-ssr',
+		'streaming-ssr',
+		'Streaming SSR shell and completion times for staggered Suspense and all-fast renders. Preact participates with its public stream renderer; Svelte 5 is omitted because its public server renderer is buffered.',
+		{
+			shell_staggered: 'staggered shell',
+			total_staggered: 'staggered complete',
+			shell_allfast: 'all-fast shell',
+			total_allfast: 'all-fast complete',
+		},
+		['shell_staggered', 'total_staggered', 'shell_allfast', 'total_allfast'],
 	),
 	frameworkCard(
 		bundleSize,
@@ -378,7 +396,7 @@ export const OCTANE_CARDS: BenchCard[] = [];
 // 0 score — are skipped for that pair (geomean over the valid ops).
 // ---------------------------------------------------------------------------
 const SUMMARY_SERIES = FRAMEWORKS.filter((f) =>
-	['octane-tsrx', 'react', 'solid', 'ripple', 'vue-vapor'].includes(f.key),
+	['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'ripple', 'vue-vapor'].includes(f.key),
 );
 
 function geomeanVsOctane(card: BenchCard, key: string): number | undefined {
