@@ -53,7 +53,7 @@ export function Home() @{
 					>{'Inferno'}</a>
 					{', carrying its performance-first goal forward: React’s hooks, Suspense ' +
 						'and actions, compiled ahead of time. No virtual DOM. No rules of hooks. ' +
-						'No hand-maintained dependency arrays — the compiler tracks closure ' +
+						'No hand-maintained dependency arrays. Octane\'s compiler does all the heavy lifting.' +
 						'captures for you.'}
 				</p>
 				<div class="hero-actions">
@@ -102,7 +102,7 @@ export function Home() @{
 			<div class="proven-stat">
 				<span class="proven-number">0</span>
 				<span class="proven-label">
-					rules of hooks — conditions and early returns are fine
+					rules of hooks
 				</span>
 			</div>
 			<div class="proven-stat">
