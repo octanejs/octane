@@ -10,7 +10,6 @@ import { HOME_SUMMARY } from '../content/benchmarks.ts';
 
 const FEATURES = [
 	{
-		eyebrow: 'Compiler-owned reactivity',
 		title: 'Hooks without the homework',
 		body: 'No dependency arrays and no rules of hooks. The compiler tracks what ' +
 			'your effects, memos and callbacks actually use, and hooks can sit behind ' +
@@ -18,14 +17,12 @@ const FEATURES = [
 			'bookkeeping is gone.',
 	},
 	{
-		eyebrow: 'Async by default',
 		title: 'Suspense without waterfalls',
 		body: 'Independent use() calls start together instead of suspending one at a ' +
 			'time down the tree. Nested fetches warm up early, and streaming SSR sends ' +
 			'each boundary as soon as it’s ready — not when the slowest one is.',
 	},
 	{
-		eyebrow: 'Compiled rendering',
 		title: 'No virtual DOM.',
 		body: 'Templates compile to cloned nodes and direct DOM writes, and keyed ' +
 			'@for lists move the fewest nodes possible. Plain .tsx still works, so you ' +
@@ -34,7 +31,6 @@ const FEATURES = [
 		linkLabel: 'tsrx.dev',
 	},
 	{
-		eyebrow: 'React knowledge, upgraded',
 		title: 'Change the import. Keep the model.',
 		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms ' +
 			'and Suspense all behave the way you expect. Events are native, refs are ' +
