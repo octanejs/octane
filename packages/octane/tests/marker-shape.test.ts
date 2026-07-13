@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { createRoot, hydrateRoot, flushSync } from '../src/index.js';
+import { createRoot, hydrateRoot, flushSync, act } from '../src/index.js';
 import * as ServerRT from 'octane/server';
 import {
 	Chain,
@@ -14,7 +14,14 @@ import {
 	AliasSusp,
 	ListSingle,
 	ListMulti,
+	ListComponent,
+	ListComponentMulti,
+	ListConditional,
+	ListConditionalEmpty,
+	TransitionConditionalList,
 	Branch,
+	BranchEmpty,
+	NestedBranch,
 	Deopt,
 } from './_fixtures/marker-shape.tsrx';
 
@@ -233,33 +240,233 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 
 	it('(b) keyed @for, single-root items: client elides item pairs, SSR keeps them', () => {
 		const props = { items: ['a', 'b', 'c'] };
-		// Client: the template's <!> position anchor (1) + the <!--for--> slot
-		// pair (2) = 3; items self-mark (forBlock singleRoot) = 0. SSR: outer
+		// Client: the template's <!> position anchor is reused as the for slot's
+		// end, so the outer range costs 2; items self-mark = 0. SSR: outer
 		// for-slot pair (2) + one pair PER ITEM (3×2=6) = 8 — the server always
 		// pairs items (open question 2 of the plan). Hydration adopts all
 		// server pairs (no template anchor — the server emits none) = 8.
-		expect(counts('ListSingle', ListSingle, props)).toEqual({ client: 3, ssr: 8, hydrate: 8 });
+		expect(counts('ListSingle', ListSingle, props)).toEqual({ client: 2, ssr: 8, hydrate: 8 });
 	});
 
 	it('(b2) keyed @for, @empty branch active', () => {
-		// Client: template anchor (1) + for-slot pair (2) + <!--empty--> branch
-		// pair (2) = 5. SSR emits ONLY the outer for-slot pair with the @empty
-		// content inline = 2. Hydration adopts the outer pair and mints the
-		// client's empty-branch pair around the adopted content = 4 — a known
-		// client/server asymmetry (the branch pair is client bookkeeping).
+		// The client reuses its template anchor as the outer range end and the
+		// @empty block borrows that range. SSR already emits the empty content
+		// directly inside the same outer pair; hydration now adopts it unchanged.
 		expect(counts('ListSingle', ListSingle, { items: [] })).toEqual({
-			client: 5,
+			client: 2,
 			ssr: 2,
-			hydrate: 4,
+			hydrate: 2,
 		});
 	});
 
 	it('(c) keyed @for, multi-root items: item pairs on BOTH sides', () => {
 		const props = { items: ['a', 'b'] };
-		// Client: template anchor (1) + for-slot pair (2) + per-item <!--it-->
-		// pairs (2×2=4) = 7 (multi-root items can't self-mark). SSR: for-slot
+		// Client: reused-anchor for-slot pair (2) + per-item <!--it-->
+		// pairs (2×2=4) = 6 (multi-root items can't self-mark). SSR: for-slot
 		// pair (2) + per-item pairs (4) = 6 (no template anchor). Hydrate: 6.
-		expect(counts('ListMulti', ListMulti, props)).toEqual({ client: 7, ssr: 6, hydrate: 6 });
+		expect(counts('ListMulti', ListMulti, props)).toEqual({ client: 6, ssr: 6, hydrate: 6 });
+	});
+
+	it('(c2) keyed sole-component items share only proven single-host roots', () => {
+		const props = { items: ['a', 'b', 'c'] };
+		// SingleItem: client outer pair only. The server protocol remains
+		// conservative and keeps both an item pair and component frame per row;
+		// hydration adopts those established ranges.
+		expect(counts('ListComponent', ListComponent, props)).toEqual({
+			client: 2,
+			ssr: 14,
+			hydrate: 14,
+		});
+		// MultiItem is not stamped singleRoot, so every client item retains its
+		// pair; the sole nested component borrows it. SSR keeps both established
+		// ranges and hydration adopts them.
+		expect(counts('ListComponentMulti', ListComponentMulti, props)).toEqual({
+			client: 8,
+			ssr: 14,
+			hydrate: 14,
+		});
+	});
+
+	it('(c2b) markerless component items preserve identity, state, effects, refs, and events', async () => {
+		const effects: string[] = [];
+		const refs: string[] = [];
+		const onEffect = (entry: string) => effects.push(entry);
+		const onRef = (value: string, node: HTMLLIElement | null) =>
+			refs.push(`${node === null ? 'detach' : 'attach'}:${value}`);
+		const root = createRoot(container);
+		root.render(ListComponent, { items: ['a', 'b', 'c'], onEffect, onRef });
+		await act(() => {});
+		const rows = new Map(
+			[...container.querySelectorAll<HTMLElement>('.component-item')].map((row) => [
+				row.dataset.value,
+				row,
+			]),
+		);
+		expect(domComments(container)).toBe(2);
+		expect(effects).toEqual(['mount:a', 'mount:b', 'mount:c']);
+		expect(refs).toEqual(['attach:a', 'attach:b', 'attach:c']);
+		(rows.get('b')!.querySelector('.increment') as HTMLButtonElement).click();
+		expect(rows.get('b')!.textContent).toBe('b:1');
+
+		flushSync(() => root.render(ListComponent, { items: ['c', 'b', 'a'], onEffect, onRef }));
+		const reordered = [...container.querySelectorAll<HTMLElement>('.component-item')];
+		expect(reordered).toEqual([rows.get('c'), rows.get('b'), rows.get('a')]);
+		expect(rows.get('b')!.textContent).toBe('b:1');
+		expect(domComments(container)).toBe(2);
+
+		flushSync(() => root.render(ListComponent, { items: ['c', 'a'], onEffect, onRef }));
+		await act(() => {});
+		expect(container.querySelector('[data-value="b"]')).toBeNull();
+		expect([...container.querySelectorAll('.component-item')]).toEqual([
+			rows.get('c'),
+			rows.get('a'),
+		]);
+		expect(effects).toContain('cleanup:b');
+		expect(refs).toContain('detach:b');
+		root.unmount();
+		await act(() => {});
+		expect(effects).toEqual(expect.arrayContaining(['cleanup:a', 'cleanup:b', 'cleanup:c']));
+		expect(refs).toEqual(expect.arrayContaining(['detach:a', 'detach:b', 'detach:c']));
+	});
+
+	it('(c2c) component-item server ranges still hydrate and reorder in place', () => {
+		const props = { items: ['a', 'b', 'c'] };
+		const { html } = ServerRT.renderToString(server.ListComponent, props);
+		container.innerHTML = html;
+		const rows = new Map(
+			[...container.querySelectorAll<HTMLElement>('.component-item')].map((row) => [
+				row.dataset.value,
+				row,
+			]),
+		);
+		const root = hydrateRoot(container, ListComponent, props);
+		expect(container.querySelector('[data-value="a"]')).toBe(rows.get('a'));
+		expect(domComments(container)).toBe(14);
+		flushSync(() => root.render(ListComponent, { items: ['c', 'a', 'b'] }));
+		expect([...container.querySelectorAll<HTMLElement>('.component-item')]).toEqual([
+			rows.get('c'),
+			rows.get('a'),
+			rows.get('b'),
+		]);
+		root.unmount();
+	});
+
+	it('(c4) keyed host-vs-host @if items share the active element boundary', () => {
+		const items = [
+			{ id: 'a', code: false },
+			{ id: 'b', code: true },
+			{ id: 'c', code: false },
+		];
+		expect(counts('ListConditional', ListConditional, { items })).toEqual({
+			client: 2,
+			ssr: 20,
+			hydrate: 20,
+		});
+		expect(
+			counts('ListConditionalEmpty', ListConditionalEmpty, {
+				items: items.map((item) => ({ id: item.id, show: false })),
+			}),
+		).toEqual({ client: 8, ssr: 14, hydrate: 14 });
+	});
+
+	it('(c4b) conditional item boundaries follow branch swaps and keyed moves', () => {
+		const root = createRoot(container);
+		root.render(ListConditional, {
+			items: [
+				{ id: 'a', code: false },
+				{ id: 'b', code: true },
+			],
+		});
+		const oldA = container.querySelector('[data-id="a"]');
+		const oldB = container.querySelector('[data-id="b"]');
+		expect(oldA?.localName).toBe('p');
+		expect(oldB?.localName).toBe('pre');
+		expect(domComments(container)).toBe(2);
+
+		flushSync(() =>
+			root.render(ListConditional, {
+				items: [
+					{ id: 'a', code: true },
+					{ id: 'b', code: false },
+				],
+			}),
+		);
+		const newA = container.querySelector('[data-id="a"]');
+		const newB = container.querySelector('[data-id="b"]');
+		expect(newA?.localName).toBe('pre');
+		expect(newB?.localName).toBe('p');
+		expect(newA).not.toBe(oldA);
+		expect(newB).not.toBe(oldB);
+		expect(domComments(container)).toBe(2);
+
+		flushSync(() =>
+			root.render(ListConditional, {
+				items: [
+					{ id: 'b', code: false },
+					{ id: 'a', code: true },
+				],
+			}),
+		);
+		expect([...container.querySelectorAll('.conditional-item')]).toEqual([newB, newA]);
+		expect(domComments(container)).toBe(2);
+		root.unmount();
+	});
+
+	it('(c4c) transition branch commits promote the shared item to one durable pair', async () => {
+		const root = createRoot(container);
+		root.render(TransitionConditionalList, {});
+		expect(container.querySelector('.transition-item')?.localName).toBe('p');
+		expect(domComments(container)).toBe(2);
+
+		await act(() => (container.querySelector('.transition-flip') as HTMLButtonElement).click());
+		expect(container.querySelector('.transition-item')?.localName).toBe('pre');
+		// Off-screen transition commits intentionally retain their WIP pair. The
+		// item and branch share it, so this is one pair rather than nested pairs.
+		expect(domComments(container)).toBe(4);
+		root.unmount();
+		expect(container.innerHTML).toBe('');
+	});
+
+	it('(c4d) hydrated conditional items retain server ranges across swaps', () => {
+		const initial = {
+			items: [
+				{ id: 'a', code: false },
+				{ id: 'b', code: true },
+			],
+		};
+		const { html } = ServerRT.renderToString(server.ListConditional, initial);
+		container.innerHTML = html;
+		const serverA = container.querySelector('[data-id="a"]');
+		const root = hydrateRoot(container, ListConditional, initial);
+		expect(container.querySelector('[data-id="a"]')).toBe(serverA);
+
+		flushSync(() =>
+			root.render(ListConditional, {
+				items: [
+					{ id: 'a', code: true },
+					{ id: 'b', code: false },
+				],
+			}),
+		);
+		const newA = container.querySelector('[data-id="a"]');
+		const newB = container.querySelector('[data-id="b"]');
+		expect(newA?.localName).toBe('pre');
+		expect(newB?.localName).toBe('p');
+		expect(newA).not.toBe(serverA);
+		// The first post-hydration arm swap retires each adopted inner branch
+		// pair; the branch then borrows its durable outer slot range.
+		expect(domComments(container)).toBe(10);
+
+		flushSync(() =>
+			root.render(ListConditional, {
+				items: [
+					{ id: 'b', code: false },
+					{ id: 'a', code: true },
+				],
+			}),
+		);
+		expect([...container.querySelectorAll('.conditional-item')]).toEqual([newB, newA]);
+		root.unmount();
 	});
 
 	it('(d) @if single-element branch: client self-marks everything', () => {
@@ -267,6 +474,80 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 		// template's <!> anchor — only that anchor remains = 1. SSR: if-slot
 		// pair + taken-branch pair = 4. Hydration adopts both server pairs = 4.
 		expect(counts('Branch', Branch, { on: true })).toEqual({ client: 1, ssr: 4, hydrate: 4 });
+	});
+
+	it('(d2) inactive @if uses one anchor and stays markerless through toggles', () => {
+		expect(counts('BranchEmpty', BranchEmpty, { on: false })).toEqual({
+			client: 1,
+			ssr: 2,
+			hydrate: 2,
+		});
+
+		const hit = vi.fn();
+		const root = createRoot(container);
+		root.render(BranchEmpty, { on: false, hit });
+		const before = container.querySelector('.before');
+		const after = container.querySelector('.after');
+		expect(domComments(container)).toBe(1);
+		flushSync(() => root.render(BranchEmpty, { on: true, hit }));
+		const active = container.querySelector('.active') as HTMLButtonElement;
+		expect(active).not.toBeNull();
+		expect(domComments(container)).toBe(1);
+		active.click();
+		expect(hit).toHaveBeenCalledTimes(1);
+		expect(container.querySelector('.before')).toBe(before);
+		expect(container.querySelector('.after')).toBe(after);
+		flushSync(() => root.render(BranchEmpty, { on: false, hit }));
+		expect(container.querySelector('.active')).toBeNull();
+		expect(domComments(container)).toBe(1);
+		expect(container.querySelector('.before')).toBe(before);
+		expect(container.querySelector('.after')).toBe(after);
+		root.unmount();
+	});
+
+	it('(d3) nested self-marked branches refresh every shared ancestor boundary', () => {
+		const root = createRoot(container);
+		root.render(NestedBranch, { outer: true, inner: true });
+		expect(container.querySelector('.inner-a')?.textContent).toBe('A');
+		flushSync(() => root.render(NestedBranch, { outer: true, inner: false }));
+		expect(container.querySelector('.inner-a')).toBeNull();
+		expect(container.querySelector('.inner-b')?.textContent).toBe('B');
+		flushSync(() => root.render(NestedBranch, { outer: false, inner: false }));
+		expect(container.querySelector('.inner-b')).toBeNull();
+		expect(container.querySelector('.tail')?.textContent).toBe('tail');
+		flushSync(() => root.render(NestedBranch, { outer: true, inner: true }));
+		expect(container.querySelector('.inner-a')?.textContent).toBe('A');
+		expect([...container.querySelector('.nb')!.children].map((node) => node.className)).toEqual([
+			'inner-a',
+			'tail',
+		]);
+		root.unmount();
+		expect(container.innerHTML).toBe('');
+	});
+
+	it('(c3) ordinary return-JSX functions receive only narrow single-root stamps', () => {
+		const positive = compile(
+			`export default function Row(props) { const x = props.x; return <li>{x}</li>; }`,
+			'row.tsx',
+		).code;
+		expect(positive).toContain('Row.$$singleRoot = true;');
+
+		const earlyReturn = compile(
+			`export default function Row(props) { if (!props.x) return null; return <li>{props.x}</li>; }`,
+			'row-early.tsx',
+		).code;
+		expect(earlyReturn).not.toContain('Row.$$singleRoot = true;');
+		const fragment = compile(
+			`export default function Row() { return <><li>a</li><li>b</li></>; }`,
+			'row-fragment.tsx',
+		).code;
+		expect(fragment).not.toContain('Row.$$singleRoot = true;');
+
+		const consumer = compile(
+			`import Row from './row'; export function List(props) @{ <ul>@for (const x of props.items; key x.id) { <Row x={x}/> }</ul> }`,
+			'list.tsrx',
+		).code;
+		expect(consumer).toContain('Row.$$singleRoot === true ? 2 : 0');
 	});
 
 	it('(e) de-opt descriptor tree: hostElementBody + nested childSlot pairs', () => {

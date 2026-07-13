@@ -124,6 +124,16 @@ after printing its normal tables:
   ssr-throughput is time-budgeted: its knob is a per-config seconds value and
   `--quick` passes the harness's own `--quick`.
 
+The DOM-heavy browser suites use `lib/dom-nodes.mjs` to publish a deterministic
+census alongside timings. `nodes_*`, `elements_*`, `text_*`, `comments_*`,
+`empty_text_*`, and `whitespace_text_*` are zero-variance operations suitable
+for ratio guards; detailed comment-payload and parent-element histograms live
+under `meta.dom`. Count the fixture root (`#main`, with `#app` fallback) unless
+the behavior intentionally escapes it: portal-swarm records both `#main` and
+the whole body so target-side portal ranges stay visible. Keep visible
+elements/text as independent guards—a lower total obtained by dropping
+user-visible content is a correctness failure, not an optimization.
+
 The runner keys everything (result files, baselines, ratio guards) by the
 **manifest suite name**, not the JSON's internal `suite` field — so the deopt
 variants (`dbmon-deopt`, `js-framework-deopt`), which reuse a base harness via a

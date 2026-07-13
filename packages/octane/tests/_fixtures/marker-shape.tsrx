@@ -1,4 +1,12 @@
-import { useState, createElement, createContext, useContext, Suspense } from 'octane';
+import {
+	useState,
+	useEffect,
+	createElement,
+	createContext,
+	useContext,
+	Suspense,
+	startTransition,
+} from 'octane';
 import { ExtLeaf } from './marker-shape-ext.tsrx';
 
 // Marker-shape corpus (M0 of docs/comment-marker-elision-plan.md): one
@@ -135,6 +143,102 @@ export function ListMulti(props: { items: string[] }) @{
 	</ul>
 }
 
+// (c2) A keyed list whose item body is a sole component call. SingleItem's
+// definition proves one host root, so the item block and component slot share
+// that <li> boundary. MultiItem is the conservative negative control.
+function SingleItem(props: {
+	value: string;
+	onEffect?: (entry: string) => void;
+	onRef?: (value: string, node: HTMLLIElement | null) => void;
+}) @{
+	const [n, setN] = useState(0);
+	useEffect(() => {
+		props.onEffect?.('mount:' + props.value);
+		return () => props.onEffect?.('cleanup:' + props.value);
+	}, []);
+	<li
+		class="component-item"
+		data-value={props.value}
+		ref={(node) => props.onRef?.(props.value, node)}
+	>
+		<button class="increment" onClick={() => setN(n + 1)}>
+			{props.value + ':' + n}
+		</button>
+	</li>
+}
+function MultiItem(props: { value: string }) @{
+	<>
+		<li class="component-a">{props.value}</li>
+		<li class="component-b">
+			{props.value + '!'}
+		</li>
+	</>
+}
+export function ListComponent(props: {
+	items: string[];
+	onEffect?: (entry: string) => void;
+	onRef?: (value: string, node: HTMLLIElement | null) => void;
+}) @{
+	<ul class="lc">
+		@for (const it of props.items; key it) {
+			<SingleItem value={it} onEffect={props.onEffect} onRef={props.onRef} />
+		}
+	</ul>
+}
+export function ListComponentMulti(props: { items: string[] }) @{
+	<ul class="lcm">
+		@for (const it of props.items; key it) {
+			<MultiItem value={it} />
+		}
+	</ul>
+}
+
+export function ListConditional(props: { items: Array<{ id: string; code: boolean }> }) @{
+	<div class="conditional-list">
+		@for (const it of props.items; key it.id) {
+			@if (it.code) {
+				<pre class="conditional-item" data-id={it.id}>
+					{'code:' + it.id}
+				</pre>
+			} @else {
+				<p class="conditional-item" data-id={it.id}>
+					{'text:' + it.id}
+				</p>
+			}
+		}
+	</div>
+}
+
+// Missing @else means the item can be empty, so it cannot use an element as a
+// permanent keyed boundary.
+export function ListConditionalEmpty(props: { items: Array<{ id: string; show: boolean }> }) @{
+	<div class="conditional-empty-list">
+		@for (const it of props.items; key it.id) {
+			@if (it.show) {
+				<span class="maybe-item" data-id={it.id}>{it.id}</span>
+			}
+		}
+	</div>
+}
+
+export function TransitionConditionalList() @{
+	const [code, setCode] = useState(false);
+	<div class="transition-conditional">
+		<button class="transition-flip" onClick={() => startTransition(() => setCode(!code))}>
+			flip
+		</button>
+		<div class="transition-items">
+			@for (const id of ['x']; key id) {
+				@if (code) {
+					<pre class="transition-item">code</pre>
+				} @else {
+					<p class="transition-item">text</p>
+				}
+			}
+		</div>
+	</div>
+}
+
 // (d) @if/@else with a single-element branch (self-marks on the client).
 export function Branch(props: { on: boolean }) @{
 	<div class="br">
@@ -144,6 +248,34 @@ export function Branch(props: { on: boolean }) @{
 			<p class="no">no</p>
 		}
 	</div>
+}
+
+// (d2) No @else: an inactive client branch keeps only the compiler's existing
+// insertion anchor, then self-marks its host while active and returns to that
+// one-anchor representation when inactive again.
+export function BranchEmpty(props: { on: boolean; hit?: () => void }) @{
+	<div class="be">
+		<i class="before">before</i>
+		@if (props.on) {
+			<button class="active" onClick={props.hit}>active</button>
+		}
+		<i class="after">after</i>
+	</div>
+}
+
+// Nested sole-root branches share the same element boundary. Replacing the
+// inner arm must update the outer block's borrowed boundary too.
+export function NestedBranch(props: { outer: boolean; inner: boolean }) @{
+	<section class="nb">
+		@if (props.outer) {
+			@if (props.inner) {
+				<strong class="inner-a">A</strong>
+			} @else {
+				<em class="inner-b">B</em>
+			}
+		}
+		<span class="tail">tail</span>
+	</section>
 }
 
 // (e) De-opt descriptor tree — a value-position createElement host whose
