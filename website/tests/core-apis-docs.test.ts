@@ -165,15 +165,18 @@ describe('Core APIs documentation', () => {
 			button.textContent?.includes('Load profile'),
 		)!;
 
-		expect(stage.hasAttribute('aria-live')).toBe(false);
+		expect(stage.getAttribute('role')).toBe('status');
+		expect(stage.getAttribute('aria-atomic')).toBe('true');
 		fireEvent.click(load);
 		await waitFor(() => expect(demo.querySelector('.data-loading')).toBeTruthy());
-		expect(demo.querySelector('.data-loading')?.getAttribute('role')).toBe('status');
+		expect(demo.querySelector('.data-loading')?.hasAttribute('role')).toBe(false);
 		await waitFor(
 			() => expect(demo.querySelector('.profile-card')?.textContent).toContain('Ada Lovelace'),
 			{ timeout: 2000 },
 		);
-		expect(demo.querySelector('.profile-card')?.getAttribute('role')).toBe('status');
+		const profile = demo.querySelector('.profile-card')!;
+		expect(profile.tagName).toBe('ARTICLE');
+		expect(profile.hasAttribute('role')).toBe(false);
 	});
 
 	it('runs the form action through validation, pending, and success states', async () => {

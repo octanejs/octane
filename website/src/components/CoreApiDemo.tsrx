@@ -555,7 +555,7 @@ function loadDemoProfile(): Promise<DemoProfile> {
 function ProfileResult(props: { request: Promise<DemoProfile> }) @{
 	const profile = use(props.request);
 
-	<article class="profile-card" role="status">
+	<article class="profile-card">
 		<span class="profile-avatar" aria-hidden="true">
 			{profile.initials as string}
 		</span>
@@ -574,9 +574,9 @@ function ProfileRequest(props: { request: Promise<DemoProfile> }) @{
 	@try {
 		<ProfileResult request={props.request} />
 	} @pending {
-		<p class="data-loading" role="status">Loading profile…</p>
+		<p class="data-loading">Loading profile…</p>
 	} @catch (error) {
-		<p class="data-error" role="alert">
+		<p class="data-error">
 			{error instanceof Error ? error.message : 'The request failed.'}
 		</p>
 	}
@@ -591,7 +591,7 @@ export function DataLoadingDemo() @{
 		description="The button creates one stable request; the boundary owns the pending UI."
 		hint="Start a request"
 	>
-		<div class="data-stage">
+		<div class="data-stage" role="status" aria-atomic="true">
 			@if (request) {
 				<ProfileRequest request={request} />
 			} @else {
