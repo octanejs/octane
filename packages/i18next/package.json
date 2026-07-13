@@ -1,0 +1,73 @@
+{
+  "name": "@octanejs/i18next",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "react-i18next for the octane renderer — reuses i18next unchanged and ports the React context, hooks, Trans, ICU, and SSR binding layer onto octane.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/i18next"
+  },
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./TransWithoutContext": {
+      "types": "./src/TransWithoutContext.d.ts",
+      "default": "./src/TransWithoutContext.js"
+    },
+    "./initReactI18next": {
+      "types": "./src/initReactI18next.d.ts",
+      "default": "./src/initReactI18next.js"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "html-parse-stringify": "catalog:default"
+  },
+  "peerDependencies": {
+    "i18next": ">=26.2.0",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "i18next": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-i18next": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

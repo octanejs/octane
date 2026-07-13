@@ -425,7 +425,7 @@ manifests in [`docs/packages.md`](./docs/packages.md):
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
   [`base-ui`](./packages/base-ui), [`recharts`](./packages/recharts),
   [`redux`](./packages/redux), [`testing-library`](./packages/testing-library),
-  and [`mdx`](./packages/mdx).
+  [`i18next`](./packages/i18next), and [`mdx`](./packages/mdx).
   Parity varies by package — some are behaviorally complete, others are
   explicitly partial or alpha. [`docs/bindings-status.md`](./docs/bindings-status.md)
   is the generated per-package status table (upstream version, supported
