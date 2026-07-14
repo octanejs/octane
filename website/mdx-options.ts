@@ -27,8 +27,8 @@ export const websiteMdxOptions = {
 		[
 			rehypeShiki,
 			{
-				// Dark-first site — match the code panel.
-				theme: 'github-dark',
+				// Dark-first site — use GitHub's accessible high-contrast token set.
+				theme: 'github-dark-high-contrast',
 				// Explicit `langs` replaces shiki's all-bundled default set: list the
 				// fence languages the site actually uses, plus the TSRX grammar twice —
 				// once under its own name ("TSRX") and once lowercased so ```tsrx

@@ -78,6 +78,7 @@ export {
 	// Suspense / error boundaries as JSX components (alongside the @try directive)
 	Suspense,
 	ErrorBoundary,
+	Activity,
 	// Transparent server twin of the client ViewTransition boundary (client-only
 	// behavior; SSR annotations are view-transitions plan Phase 5).
 	ViewTransition,
@@ -117,6 +118,7 @@ export {
 	ssrOption,
 	ssrComponent,
 	ssrBlock,
+	ssrActivity,
 	ssrForBlock,
 	ssrControl,
 	ssrArm,

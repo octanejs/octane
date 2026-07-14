@@ -15,9 +15,8 @@
  * server renderer does — effects no-op, memo runs once, ids are deterministic).
  * Every dynamic site is
  * wrapped in the hydration markers (`constants.ts`) the client `hydrateRoot`
- * cursor adopts. Events and refs are dropped (no DOM on the server); `<Activity>`
- * and fragment refs (`<Fragment ref={…}>`) are rejected by the compiler in
- * server mode.
+ * cursor adopts. Events and refs are dropped (no DOM on the server); fragment
+ * refs (`<Fragment ref={…}>`) are rejected by the compiler in server mode.
  */
 
 // ---------------------------------------------------------------------------
@@ -207,6 +206,13 @@ const ELEMENT_TAG = Symbol.for('octane.element');
 // a portal flowing through props/children to `ssrChild` leaves its site anchor
 // instead of tripping the plain-object child throw.
 const PORTAL_TAG = Symbol.for('octane.portal');
+
+/**
+ * React-19 `<Activity>` sentinel. Server-compiled template sites lower directly
+ * to `ssrActivity`; this export keeps `import { Activity } from 'octane'`
+ * resolvable after the server compiler retargets it to `octane/server`.
+ */
+export const Activity: unique symbol = Symbol.for('octane.Activity');
 
 interface ElementDescriptor {
 	$$kind: typeof ELEMENT_TAG;
@@ -717,6 +723,18 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
  */
 export function ssrBlock(content: string): string {
 	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : content;
+}
+
+/**
+ * Server half of `<Activity mode="visible"|"hidden">`.
+ *
+ * Visible content renders inside one hydratable range. Hidden content is not
+ * evaluated and serializes as an empty range (or an empty string for static
+ * markup), matching React's server behavior while leaving the client a stable
+ * range to adopt and populate offscreen during hydration.
+ */
+export function ssrActivity(mode: string, render: () => string): string {
+	return ssrBlock(mode === 'hidden' ? '' : render());
 }
 
 /**
