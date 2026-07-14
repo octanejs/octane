@@ -6,264 +6,608 @@
       "name": "octane-tsrx",
       "ops": {
         "ssr_render": {
-          "score": 0.04945837499999328,
-          "median": 0.05083299999995461,
-          "min": 0.046125000000017735,
-          "mean": 0.05559159999999963,
-          "p95": 0.07958300000001373,
-          "sd": 0.009559897959159477,
-          "rme": 8.04819172085103,
-          "scoreRme": 3.0079358075521316,
-          "warmupRatio": 1.3134959448225656,
+          "score": 0.060536624999969035,
+          "median": 0.060875000000010004,
+          "min": 0.0548750000000382,
+          "mean": 0.07100844999999936,
+          "p95": 0.109375,
+          "sd": 0.017768005022268413,
+          "rme": 11.710700282115008,
+          "scoreRme": 9.6337187486694,
+          "warmupRatio": 1.3998075545185247,
           "samples": 20
         },
         "hydrate": {
-          "score": 1.387500001117587,
-          "median": 1.3999999910593033,
-          "min": 1.2999999970197678,
-          "mean": 1.3899999998509884,
-          "p95": 1.5,
-          "sd": 0.07181848375050538,
-          "rme": 2.418107824021442,
-          "scoreRme": 5.02911343872724,
-          "warmupRatio": 1.0180180155871006,
+          "score": 1.4624999985098839,
+          "median": 1.5,
+          "min": 1.399999976158142,
+          "mean": 1.4600000008940697,
+          "p95": 1.5999999940395355,
+          "sd": 0.05982430216895571,
+          "rme": 1.9176927036453728,
+          "scoreRme": 2.9589791879317033,
+          "warmupRatio": 1.0085470105934826,
           "samples": 20
         }
       },
       "meta": {
         "htmlBytes": 43196,
-        "cards": 50
+        "cards": 50,
+        "domBeforeHydration": {
+          "root": "#app",
+          "total": 763,
+          "elements": 356,
+          "text": 303,
+          "comments": 104,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 104,
+          "hydrationMarkersLogical": 104,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 1,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {
+            "[": 52,
+            "]": 52
+          },
+          "commentParents": {
+            "main.feed": 102,
+            "div.site": 2
+          }
+        },
+        "domAfterHydration": {
+          "root": "#app",
+          "total": 763,
+          "elements": 356,
+          "text": 303,
+          "comments": 104,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 104,
+          "hydrationMarkersLogical": 104,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 1,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {
+            "[": 52,
+            "]": 52
+          },
+          "commentParents": {
+            "main.feed": 102,
+            "div.site": 2
+          }
+        }
       }
     },
     {
       "name": "octane-jsx",
       "ops": {
         "ssr_render": {
-          "score": 0.05237524999999721,
-          "median": 0.058708000000024185,
-          "min": 0.04733300000003737,
-          "mean": 0.06481269999999881,
-          "p95": 0.10387500000001637,
-          "sd": 0.018257594495095404,
-          "rme": 13.183710981984925,
-          "scoreRme": 14.021858482518844,
-          "warmupRatio": 1.340291931780778,
+          "score": 0.05229687500000324,
+          "median": 0.05791700000003175,
+          "min": 0.049167000000011285,
+          "mean": 0.06018130000000212,
+          "p95": 0.0887079999999969,
+          "sd": 0.011612852857254984,
+          "rme": 9.030911552988966,
+          "scoreRme": 6.502834281410462,
+          "warmupRatio": 1.355745443680933,
           "samples": 20
         },
         "hydrate": {
-          "score": 1.674999998882413,
-          "median": 1.7000000029802322,
-          "min": 1.5,
-          "mean": 1.6950000002980232,
-          "p95": 1.9000000059604645,
-          "sd": 0.08870412244144305,
-          "rme": 2.449223014081288,
-          "scoreRme": 5.815460713669534,
-          "warmupRatio": 1.0298507478454113,
+          "score": 1.6625000014901161,
+          "median": 1.699999988079071,
+          "min": 1.5999999940395355,
+          "mean": 1.6949999988079072,
+          "p95": 2,
+          "sd": 0.10500626720999029,
+          "rme": 2.899344014922766,
+          "scoreRme": 3.7420654201032812,
+          "warmupRatio": 1.0225563896127605,
           "samples": 20
         }
       },
       "meta": {
         "htmlBytes": 43196,
-        "cards": 50
+        "cards": 50,
+        "domBeforeHydration": {
+          "root": "#app",
+          "total": 763,
+          "elements": 356,
+          "text": 303,
+          "comments": 104,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 104,
+          "hydrationMarkersLogical": 104,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 1,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {
+            "[": 52,
+            "]": 52
+          },
+          "commentParents": {
+            "main.feed": 102,
+            "div.site": 2
+          }
+        },
+        "domAfterHydration": {
+          "root": "#app",
+          "total": 763,
+          "elements": 356,
+          "text": 303,
+          "comments": 104,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 104,
+          "hydrationMarkersLogical": 104,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 1,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {
+            "[": 52,
+            "]": 52
+          },
+          "commentParents": {
+            "main.feed": 102,
+            "div.site": 2
+          }
+        }
       }
     },
     {
       "name": "react",
       "ops": {
         "ssr_render": {
-          "score": 0.08806787500000013,
-          "median": 0.11074999999999591,
-          "min": 0.07579200000003539,
-          "mean": 0.10638350000000116,
-          "p95": 0.15100000000001046,
-          "sd": 0.023554092686054382,
-          "rme": 10.362065561047494,
-          "scoreRme": 15.327930757274217,
-          "warmupRatio": 1.308060686146895,
+          "score": 0.07924999999999471,
+          "median": 0.083500000000015,
+          "min": 0.06479100000001381,
+          "mean": 0.08989779999999711,
+          "p95": 0.1415829999999687,
+          "sd": 0.019985957326924455,
+          "rme": 10.40471341461321,
+          "scoreRme": 3.9877947451829034,
+          "warmupRatio": 1.295936908517414,
           "samples": 20
         },
         "hydrate": {
-          "score": 2.587499998509884,
-          "median": 2.5999999940395355,
-          "min": 2.5,
-          "mean": 2.5749999985098837,
-          "p95": 2.7000000029802322,
-          "sd": 0.05501195999432682,
-          "rme": 0.9998483076972354,
-          "scoreRme": 1.1425120584958035,
-          "warmupRatio": 0.990338164101671,
+          "score": 2.5124999955296516,
+          "median": 2.5,
+          "min": 2.399999976158142,
+          "mean": 2.514999996125698,
+          "p95": 2.5999999940395355,
+          "sd": 0.08750939689816113,
+          "rme": 1.6284368914194447,
+          "scoreRme": 3.2981272550137106,
+          "warmupRatio": 0.9950248759095791,
           "samples": 20
         }
       },
       "meta": {
         "htmlBytes": 42364,
-        "cards": 50
+        "cards": 50,
+        "domBeforeHydration": {
+          "root": "#app",
+          "total": 659,
+          "elements": 356,
+          "text": 303,
+          "comments": 0,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 0,
+          "hydrationMarkersLogical": 0,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 0,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {},
+          "commentParents": {}
+        },
+        "domAfterHydration": {
+          "root": "#app",
+          "total": 659,
+          "elements": 356,
+          "text": 303,
+          "comments": 0,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 0,
+          "hydrationMarkersLogical": 0,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 0,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {},
+          "commentParents": {}
+        }
       }
     },
     {
       "name": "preact",
       "ops": {
         "ssr_render": {
-          "score": 0.069432374999991,
-          "median": 0.07670899999999392,
-          "min": 0.06633299999998599,
-          "mean": 0.07942514999999731,
-          "p95": 0.13520899999997482,
-          "sd": 0.016009409983785004,
-          "rme": 9.433470884742873,
-          "scoreRme": 4.632204239461549,
-          "warmupRatio": 1.2954781541033422,
+          "score": 0.07166662499999887,
+          "median": 0.0709590000000162,
+          "min": 0.061249999999972715,
+          "mean": 0.07425195000000429,
+          "p95": 0.1275410000000079,
+          "sd": 0.01424601739166883,
+          "rme": 8.97924532344192,
+          "scoreRme": 10.4331497638174,
+          "warmupRatio": 1.0709291110054746,
           "samples": 20
         },
         "hydrate": {
-          "score": 1.6875,
-          "median": 1.7000000029802322,
+          "score": 1.75,
+          "median": 1.7000000178813934,
           "min": 1.5999999940395355,
-          "mean": 1.705000002682209,
-          "p95": 1.8999999910593033,
-          "sd": 0.08870411908169792,
-          "rme": 2.4348579740925547,
-          "scoreRme": 5.579271784263562,
-          "warmupRatio": 1.029629632278725,
+          "mean": 1.7400000020861626,
+          "p95": 1.9000000059604645,
+          "sd": 0.10462967491487901,
+          "rme": 2.814231745160789,
+          "scoreRme": 3.6118445682766906,
+          "warmupRatio": 1.0000000021287374,
           "samples": 20
         }
       },
       "meta": {
         "htmlBytes": 42364,
-        "cards": 50
+        "cards": 50,
+        "domBeforeHydration": {
+          "root": "#app",
+          "total": 659,
+          "elements": 356,
+          "text": 303,
+          "comments": 0,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 0,
+          "hydrationMarkersLogical": 0,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 0,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {},
+          "commentParents": {}
+        },
+        "domAfterHydration": {
+          "root": "#app",
+          "total": 659,
+          "elements": 356,
+          "text": 303,
+          "comments": 0,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 0,
+          "hydrationMarkersLogical": 0,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 0,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {},
+          "commentParents": {}
+        }
       }
     },
     {
       "name": "ripple",
       "ops": {
         "ssr_render": {
-          "score": 0.024130000000006646,
-          "median": 0.025624999999990905,
-          "min": 0.021583000000021002,
-          "mean": 0.03184784999999977,
-          "p95": 0.09375,
-          "sd": 0.016463974621724883,
-          "rme": 24.194062565096157,
-          "scoreRme": 13.918224928609884,
-          "warmupRatio": 1.7863292581846044,
+          "score": 0.018833250000014345,
+          "median": 0.0206670000000031,
+          "min": 0.016999999999995907,
+          "mean": 0.021425000000004957,
+          "p95": 0.03141700000003311,
+          "sd": 0.0043806212368855575,
+          "rme": 9.569056176222137,
+          "scoreRme": 12.313821339593952,
+          "warmupRatio": 1.3172115805809268,
           "samples": 20
         },
         "hydrate": {
-          "score": 1.1499999966472387,
+          "score": 1.1124999895691872,
           "median": 1.0999999940395355,
-          "min": 1,
-          "mean": 1.1249999970197677,
-          "p95": 1.2000000029802322,
-          "sd": 0.05501195928150775,
-          "rme": 2.2885416571469337,
-          "scoreRme": 3.886460990837774,
-          "warmupRatio": 0.9673913045766955,
+          "min": 0.8999999761581421,
+          "mean": 1.1399999946355819,
+          "p95": 1.300000011920929,
+          "sd": 0.10462967581436154,
+          "rme": 4.295406410166375,
+          "scoreRme": 8.462940781498068,
+          "warmupRatio": 1.033707873521166,
           "samples": 20
         }
       },
       "meta": {
         "htmlBytes": 42396,
-        "cards": 50
+        "cards": 50,
+        "domBeforeHydration": {
+          "root": "#app",
+          "total": 663,
+          "elements": 356,
+          "text": 303,
+          "comments": 4,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 4,
+          "hydrationMarkersLogical": 4,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 1,
+          "leadingHydrationStartsPhysical": 1,
+          "leadingHydrationStartsLogical": 1,
+          "commentsByData": {
+            "[": 2,
+            "]": 2
+          },
+          "commentParents": {
+            "div#app": 2,
+            "main.feed": 2
+          }
+        },
+        "domAfterHydration": {
+          "root": "#app",
+          "total": 663,
+          "elements": 356,
+          "text": 303,
+          "comments": 4,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 4,
+          "hydrationMarkersLogical": 4,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 1,
+          "leadingHydrationStartsPhysical": 1,
+          "leadingHydrationStartsLogical": 1,
+          "commentsByData": {
+            "[": 2,
+            "]": 2
+          },
+          "commentParents": {
+            "div#app": 2,
+            "main.feed": 2
+          }
+        }
       }
     },
     {
       "name": "solid",
       "ops": {
         "ssr_render": {
-          "score": 0.06386449999997978,
-          "median": 0.06945799999999736,
-          "min": 0.05933399999997846,
-          "mean": 0.07449999999999476,
-          "p95": 0.12154199999997672,
-          "sd": 0.016723377951398704,
-          "rme": 10.505626650656172,
-          "scoreRme": 4.9420931347692685,
-          "warmupRatio": 1.384603339884144,
+          "score": 0.04309387499999673,
+          "median": 0.05675000000002228,
+          "min": 0.04037500000004002,
+          "mean": 0.060597999999993137,
+          "p95": 0.09954199999998536,
+          "sd": 0.019492848467278934,
+          "rme": 15.054670216994811,
+          "scoreRme": 4.854452896763373,
+          "warmupRatio": 1.8564152098178648,
           "samples": 20
         },
         "hydrate": {
-          "score": 1.7624999955296516,
-          "median": 1.7999999970197678,
-          "min": 1.6000000089406967,
-          "mean": 1.7699999988079071,
-          "p95": 1.9000000059604645,
-          "sd": 0.08645047106297965,
-          "rme": 2.2858531600473513,
-          "scoreRme": 2.455323159669216,
-          "warmupRatio": 1.0070922013472805,
+          "score": 1.7875000089406967,
+          "median": 1.7999999821186066,
+          "min": 1.5999999940395355,
+          "mean": 1.8150000020861625,
+          "p95": 2,
+          "sd": 0.12258187150497087,
+          "rme": 3.1608497206395594,
+          "scoreRme": 3.903717303677808,
+          "warmupRatio": 1.0349650285379117,
           "samples": 20
         }
       },
       "meta": {
         "htmlBytes": 42820,
-        "cards": 50
+        "cards": 50,
+        "domBeforeHydration": {
+          "root": "#app",
+          "total": 661,
+          "elements": 356,
+          "text": 303,
+          "comments": 2,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 0,
+          "hydrationMarkersLogical": 0,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 0,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {
+            "/": 1,
+            "$": 1
+          },
+          "commentParents": {
+            "div.site": 2
+          }
+        },
+        "domAfterHydration": {
+          "root": "#app",
+          "total": 661,
+          "elements": 356,
+          "text": 303,
+          "comments": 2,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 0,
+          "hydrationMarkersLogical": 0,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 0,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {
+            "/": 1,
+            "$": 1
+          },
+          "commentParents": {
+            "div.site": 2
+          }
+        }
       }
     },
     {
       "name": "svelte",
       "ops": {
         "ssr_render": {
-          "score": 0.015911374999987515,
-          "median": 0.018458000000009633,
-          "min": 0.014916000000027907,
-          "mean": 0.020204049999989593,
-          "p95": 0.040208000000006905,
-          "sd": 0.006383013588512809,
-          "rme": 14.78568892523025,
-          "scoreRme": 6.522432164328805,
-          "warmupRatio": 1.64615723028467,
+          "score": 0.01596874999999187,
+          "median": 0.02075000000002092,
+          "min": 0.014874999999960892,
+          "mean": 0.020833350000000906,
+          "p95": 0.04537500000003547,
+          "sd": 0.007291405967059417,
+          "rme": 16.379717218505622,
+          "scoreRme": 6.632568673816627,
+          "warmupRatio": 1.6820039138956562,
           "samples": 20
         },
         "hydrate": {
-          "score": 1.4874999970197678,
+          "score": 1.4625000059604645,
           "median": 1.5,
-          "min": 1.2999999970197678,
-          "mean": 1.4649999983608724,
-          "p95": 1.7000000029802322,
-          "sd": 0.09333020265871275,
-          "rme": 2.9815274709455113,
-          "scoreRme": 7.006397924296283,
-          "warmupRatio": 0.9747899174185158,
+          "min": 1.300000011920929,
+          "mean": 1.4850000023841858,
+          "p95": 1.699999988079071,
+          "sd": 0.11367080574822999,
+          "rme": 3.5824217636118947,
+          "scoreRme": 6.064102493489902,
+          "warmupRatio": 1.01709401345826,
           "samples": 20
         }
       },
       "meta": {
         "htmlBytes": 42656,
-        "cards": 50
+        "cards": 50,
+        "domBeforeHydration": {
+          "root": "#app",
+          "total": 917,
+          "elements": 356,
+          "text": 556,
+          "comments": 5,
+          "emptyText": 0,
+          "whitespaceText": 253,
+          "hydrationMarkersPhysical": 4,
+          "hydrationMarkersLogical": 4,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 1,
+          "leadingHydrationStartsPhysical": 1,
+          "leadingHydrationStartsLogical": 1,
+          "commentsByData": {
+            "[": 2,
+            "]": 2,
+            "": 1
+          },
+          "commentParents": {
+            "div#app": 2,
+            "main.feed": 2,
+            "div.site": 1
+          }
+        },
+        "domAfterHydration": {
+          "root": "#app",
+          "total": 917,
+          "elements": 356,
+          "text": 556,
+          "comments": 5,
+          "emptyText": 0,
+          "whitespaceText": 253,
+          "hydrationMarkersPhysical": 4,
+          "hydrationMarkersLogical": 4,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 1,
+          "leadingHydrationStartsPhysical": 1,
+          "leadingHydrationStartsLogical": 1,
+          "commentsByData": {
+            "[": 2,
+            "]": 2,
+            "": 1
+          },
+          "commentParents": {
+            "div#app": 2,
+            "main.feed": 2,
+            "div.site": 1
+          }
+        }
       }
     },
     {
       "name": "vue-vapor",
       "ops": {
         "ssr_render": {
-          "score": 0.01982299999999526,
-          "median": 0.024416999999971267,
-          "min": 0.014625000000023647,
-          "mean": 0.029143749999997227,
-          "p95": 0.05699999999995953,
-          "sd": 0.011880982056142624,
-          "rme": 19.079242925521125,
-          "scoreRme": 15.58957420692037,
-          "warmupRatio": 2.053851586541146,
+          "score": 0.02020837499998862,
+          "median": 0.02354200000002038,
+          "min": 0.016333999999972093,
+          "mean": 0.02957909999999515,
+          "p95": 0.05670799999995779,
+          "sd": 0.012348632534135151,
+          "rme": 19.53836156479189,
+          "scoreRme": 10.925967447674012,
+          "warmupRatio": 2.112354407517532,
           "samples": 20
         },
         "hydrate": {
-          "score": 1.6499999966472387,
-          "median": 1.5999999940395355,
+          "score": 1.7125000022351742,
+          "median": 1.7000000178813934,
           "min": 1.5,
-          "mean": 1.624999998509884,
-          "p95": 1.7999999970197678,
-          "sd": 0.08506963046138162,
-          "rme": 2.4500526199844614,
-          "scoreRme": 5.4174908210797295,
-          "warmupRatio": 0.9848484868496739,
+          "mean": 1.6700000017881393,
+          "p95": 1.800000011920929,
+          "sd": 0.10310954883183088,
+          "rme": 2.8895927929785983,
+          "scoreRme": 4.838858508951276,
+          "warmupRatio": 0.9708029193110671,
           "samples": 20
         }
       },
       "meta": {
         "htmlBytes": 42380,
-        "cards": 50
+        "cards": 50,
+        "domBeforeHydration": {
+          "root": "#app",
+          "total": 661,
+          "elements": 356,
+          "text": 303,
+          "comments": 2,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 2,
+          "hydrationMarkersLogical": 2,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 1,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {
+            "[": 1,
+            "]": 1
+          },
+          "commentParents": {
+            "main.feed": 2
+          }
+        },
+        "domAfterHydration": {
+          "root": "#app",
+          "total": 661,
+          "elements": 356,
+          "text": 303,
+          "comments": 2,
+          "emptyText": 0,
+          "whitespaceText": 0,
+          "hydrationMarkersPhysical": 2,
+          "hydrationMarkersLogical": 2,
+          "hydrationMarkersCounted": 0,
+          "hydrationMarkerMaxMultiplicity": 1,
+          "leadingHydrationStartsPhysical": 0,
+          "leadingHydrationStartsLogical": 0,
+          "commentsByData": {
+            "[": 1,
+            "]": 1
+          },
+          "commentParents": {
+            "main.feed": 2
+          }
+        }
       }
     }
   ],

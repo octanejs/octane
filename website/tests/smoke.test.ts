@@ -5,6 +5,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
+import { compactChartRows } from '../src/components/BenchBars.tsrx';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { FRAMEWORK_CARDS, HOME_SUMMARY, OCTANE_CARDS } from '../src/content/benchmarks.ts';
 
@@ -50,6 +51,36 @@ describe('website routes', () => {
 
 		const summaryKeys = HOME_SUMMARY.series.map((series) => series.key);
 		expect(summaryKeys).toEqual(expect.arrayContaining(['preact', 'svelte']));
+
+		// Unsupported summary combinations remain absent from the table data, but
+		// the chart packs the remaining framework bars into contiguous slots.
+		const streamingRow = HOME_SUMMARY.rows.find((row) => row.op === 'streaming-ssr')!;
+		const compactStreamingRow = compactChartRows(HOME_SUMMARY).find(
+			(row: Record<string, string | number>) => row.op === 'streaming-ssr',
+		)!;
+		const originalValues = HOME_SUMMARY.series.flatMap((series) =>
+			typeof streamingRow[series.key] === 'number' ? [streamingRow[series.key]] : [],
+		);
+		const occupiedSlots = HOME_SUMMARY.series.flatMap((series, index) =>
+			typeof compactStreamingRow[series.key] === 'number' ? [index] : [],
+		);
+		expect(occupiedSlots).toEqual(
+			Array.from({ length: originalValues.length }, (_, index) => occupiedSlots[0] + index),
+		);
+		expect(
+			HOME_SUMMARY.series.flatMap((series) =>
+				typeof compactStreamingRow[series.key] === 'number'
+					? [compactStreamingRow[series.key]]
+					: [],
+			),
+		).toEqual(originalValues);
+		expect(
+			Object.values(compactStreamingRow).filter((value) => /^#[0-9a-f]{6}$/.test(String(value))),
+		).toEqual(
+			HOME_SUMMARY.series.flatMap((series) =>
+				typeof streamingRow[series.key] === 'number' ? [series.color] : [],
+			),
+		);
 	});
 
 	it('/ renders the home experience and primary navigation', async () => {
