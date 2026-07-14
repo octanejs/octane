@@ -26,6 +26,7 @@ const ROUTES = [
 	'/docs/core-apis',
 	'/docs/tsrx-vs-tsx',
 	'/docs/differences-from-react',
+	'/docs/profiling',
 	'/docs/bindings',
 	'/benchmarks',
 	'/playground',
@@ -64,6 +65,8 @@ const COMMENT_CEILINGS: Record<string, number> = {
 	'/docs/core-apis': 895,
 	'/docs/tsrx-vs-tsx': 1000,
 	'/docs/differences-from-react': 1000,
+	// Profiling guide baseline 2026-07-14: 301 comments in the hydrated dev page.
+	'/docs/profiling': 350,
 	'/docs/bindings': 1000,
 	'/benchmarks': 26100,
 	'/playground': 195,

@@ -44,6 +44,8 @@ new OctaneRspackPlugin({ environment: 'server' });
 
 Set `transpile: false` when an existing rule already strips TypeScript. Set
 `hmr: false` to disable Octane HMR codegen even when Rspack HMR is active.
+Set `profile: true` to produce a client profiling build; server compilations
+always keep profiling disabled.
 Options contain only serializable strings, booleans, and string arrays, so the
 same configuration is safe to reuse across compiler environments and caches.
 
@@ -73,8 +75,43 @@ export default {
 ```
 
 With the loader-only form, configure `.tsrx` resolution, TypeScript stripping,
-and the exact server runtime alias yourself. The class plugin is recommended
-unless another integration owns those concerns.
+and exact `octane$` / `octane/profiling$` aliases to the app's Octane package
+yourself. The profiling alias keeps compiler metadata and runtime recording on
+one module even when transformed raw dependencies carry a nested Octane copy.
+You must also define Octane's
+reserved profiling constant to the same boolean passed to the loader. Defining
+`false` is important too: it lets production optimization erase the inactive
+profiling runtime. The class plugin installs and owns this definition for you,
+so do not configure it separately when using `OctaneRspackPlugin`.
+
+```js
+import { rspack } from '@rspack/core';
+
+const profiling = process.env.OCTANE_PROFILE === '1';
+
+export default {
+	module: {
+		rules: [
+			{
+				test: /\.(?:tsrx|tsx|ts|js)$/,
+				enforce: 'pre',
+				type: 'javascript/auto',
+				use: {
+					loader: '@octanejs/rspack-plugin/loader',
+					options: { environment: 'client', profile: profiling },
+				},
+			},
+		],
+	},
+	plugins: [
+		new rspack.DefinePlugin({
+			__OCTANE_PROFILE_ENABLED__: JSON.stringify(profiling),
+		}),
+	],
+};
+```
+
+The class plugin is recommended unless another integration owns those concerns.
 
 ## App-level metadata
 

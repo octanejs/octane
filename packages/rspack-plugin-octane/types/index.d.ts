@@ -11,6 +11,8 @@ export interface OctaneRspackLoaderOptions {
 	hmr?: boolean;
 	/** Emit client development metadata. Defaults to Rspack's non-production mode. */
 	dev?: boolean;
+	/** Emit client profiling metadata and enable the profiling runtime. Default `false`. */
+	profile?: boolean;
 	/** Enable Octane's parallel `use()` compilation pipeline. Default `true`. */
 	parallelUse?: boolean;
 	/** Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. */

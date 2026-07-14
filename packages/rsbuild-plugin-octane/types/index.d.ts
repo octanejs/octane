@@ -11,6 +11,8 @@ export {
 export interface OctaneRsbuildPluginOptions {
 	/** Override component HMR in the browser environment. */
 	hmr?: boolean;
+	/** Enable component profiling in the browser environment. */
+	profile?: boolean;
 	/** Disable the compiler's parallel `use()` transform. */
 	parallelUse?: boolean;
 	/** Ad-hoc path fragments skipped by the plain TypeScript/JavaScript hook-slot pass. */

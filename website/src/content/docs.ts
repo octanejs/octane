@@ -7,6 +7,7 @@ import CoreApis from './docs/core-apis.mdx';
 import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
 import Bindings from './docs/bindings.mdx';
+import Profiling from './docs/profiling.mdx';
 
 export interface DocEntry {
 	slug: string;
@@ -101,6 +102,22 @@ export const docs: DocEntry[] = [
 			{ id: 'not-supported', title: 'APIs left out' },
 		],
 		component: DifferencesFromReact as DocEntry['component'],
+	},
+	{
+		slug: 'profiling',
+		title: 'Profiling',
+		description:
+			'Profile component renders, render causes, and schedule-to-render delay in Chrome.',
+		group: 'Explore',
+		sections: [
+			{ id: 'enable-profiling', title: 'Enable profiling' },
+			{ id: 'record-in-chrome', title: 'Record in Chrome' },
+			{ id: 'console-api', title: 'Console API' },
+			{ id: 'reading-the-data', title: 'Reading the data' },
+			{ id: 'render-causes', title: 'Render causes' },
+			{ id: 'cost-and-privacy', title: 'Cost and privacy' },
+		],
+		component: Profiling as DocEntry['component'],
 	},
 	{
 		slug: 'bindings',

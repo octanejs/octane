@@ -8,6 +8,7 @@ declare module 'octane/compiler' {
 			mode?: 'client' | 'server';
 			hmr?: boolean;
 			dev?: boolean;
+			profile?: boolean;
 		},
 	): { code: string; map: unknown };
 }

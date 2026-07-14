@@ -1,0 +1,201 @@
+---
+title: Profiling
+---
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">Understand every update</p>
+	<h1>Profiling</h1>
+	<p className="doc-lede">
+		{
+			'Build Octane with profiling metadata to see component timing, render counts, render causes, and scheduling delay in Chrome without changing production behavior in normal builds.'
+		}
+	</p>
+</div>
+
+Profiling is a client build specialization. The compiler keeps component and
+hook source identity, while the runtime records bounded structured events and
+adds Octane tracks to Chrome's Performance panel. It works with Vite, Rspack,
+and Rsbuild.
+
+[Chrome 134 or newer](https://developer.chrome.com/docs/devtools/performance/extension)
+supports the custom duration tracks used here. Older browsers can still use the
+structured profiler API and exported trace.
+
+<h2 id="enable-profiling">Enable profiling</h2>
+
+Set `profile: true` on the Octane build integration. Keep the flag off for the
+build you deploy to users; profiling deliberately trades some speed and bundle
+size for diagnostics.
+
+For Vite, a named mode makes it easy to produce a production-optimized profile
+build:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { octane } from '@octanejs/vite-plugin';
+
+export default defineConfig(({ mode }) => {
+	const profiling = mode === 'profile';
+
+	return {
+		plugins: [octane({ profile: profiling })],
+		build: { sourcemap: profiling },
+	};
+});
+```
+
+```bash
+vite build --mode profile
+octane-preview
+```
+
+If the app also uses `@octanejs/mdx`, pass the same value to `octaneMdx()` so
+document components receive profiling metadata:
+
+```ts
+import { octaneMdx } from '@octanejs/mdx/vite';
+
+plugins: [octaneMdx({ profile: profiling }), octane({ profile: profiling })];
+```
+
+Use the same flag with low-level Rspack:
+
+```js
+// rspack.config.mjs
+import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
+
+export default {
+	mode: 'production',
+	plugins: [new OctaneRspackPlugin({ profile: true })],
+	devtool: 'source-map',
+};
+```
+
+Or with the full Rsbuild integration:
+
+```ts
+// rsbuild.config.ts
+import { defineConfig } from '@rsbuild/core';
+import { pluginOctane } from '@octanejs/rsbuild-plugin';
+
+export default defineConfig({
+	plugins: [pluginOctane({ profile: true })],
+	output: { sourceMap: { js: 'source-map' } },
+});
+```
+
+The flag is independent of development metadata and HMR. A production-mode
+build with `hmr: false` can still be profiled, and Rspack's webpack-dialect HMR
+continues to work when it is enabled. Full Vite and Rsbuild apps instrument only
+the browser graph; the SSR bundle stays unprofiled.
+
+<h2 id="record-in-chrome">Record in Chrome</h2>
+
+1. Open Chrome DevTools and select **Performance**.
+2. In the panel settings, enable **Show custom tracks**.
+3. Start recording, interact with the application, and stop recording.
+4. Expand the **Octane** tracks.
+
+Custom-track spans show the component, mount/update phase, inclusive duration,
+and colors that distinguish errors and suspension. The structured event buffer
+and exported trace add source identity, instance and attempt numbers, render
+causes, self duration, and schedule-to-render delay. Suspended and errored
+attempts close normally and are labelled separately from completed work.
+
+Octane uses Chrome custom timestamps for the compact timeline rather than
+logging every render. Per-render logging changes the timings it is trying to
+measure and quickly overwhelms the console.
+
+<h2 id="console-api">Console API</h2>
+
+Profile builds expose a bounded event buffer as
+`globalThis.__OCTANE_PROFILER__` for DevTools. Recording starts automatically,
+so you can inspect it without adding an import to application code:
+
+```js
+const profiler = globalThis.__OCTANE_PROFILER__;
+
+console.table(profiler.summary());
+profiler.why('TodoRow');
+
+const events = profiler.getEvents();
+const trace = profiler.exportTrace();
+
+profiler.stop();
+profiler.clear();
+profiler.start({ bufferSize: 10_000, timeline: true });
+```
+
+Application-side profiling tools can instead import `{ profiler }` from
+`octane/profiling`. An explicit import keeps the recorder module in that build,
+even when `profile` is false, so keep it in a profiling-only entry if normal
+builds must have zero profiler code.
+
+`summary()` aggregates attempts, completed renders, bails, total and average
+self time, maximum inclusive time, queue delay, and dominant causes by
+component. `why()` returns recent events for a component name or stable
+component ID. `exportTrace()` produces Chrome Trace Event data that can be
+loaded into Perfetto for offline analysis.
+
+The default buffer retains the newest 10,000 events. Pass `bufferSize` to
+`start()` to resize it; the oldest events are discarded first. Pass
+`timeline: false` when you need the structured data without Chrome custom-track
+timestamps.
+
+`stop()` pauses event and clock collection without removing the
+instrumentation. Call `start()` to begin recording again, or call `clear()`
+followed by `start()` to begin a fresh session.
+
+<h2 id="reading-the-data">Reading the data</h2>
+
+Octane renders eagerly: a component invocation can execute setup code, apply
+direct DOM changes, and render descendants before it returns. The profiler
+therefore reports **render and DOM work**, not a React-style pure render phase
+and not browser paint time.
+
+- **Inclusive time** includes nested component work.
+- **Self time** subtracts directly nested component spans.
+- **Attempts** count actual component-function invocations.
+- **Completed**, **suspended**, and **errored** classify their outcomes.
+- **Bails** count memo or implicit bails where the component body did not run.
+- **Queue delay** measures schedule-to-render time only for queued updates. The
+  event's `scheduled` field distinguishes a genuine zero-delay schedule from a
+  synchronous cascade, where both otherwise report zero milliseconds.
+
+Effects and browser style, layout, and paint remain separate work. Use the
+surrounding Chrome events to understand how component updates lead into them.
+
+<h2 id="render-causes">Render causes</h2>
+
+One render can have several causes because Octane batches work and drains
+ancestors before descendants. The profiler preserves the bounded cause set
+instead of keeping only the last update.
+
+Common causes include mounting, root renders, state and reducer hooks, parent
+cascades, memo/implicit bails, and conservatively-labelled unknown updates. Hook
+causes include their compiler-known name and source location when available. A
+cause identifies the cell or path that scheduled work; asynchronous callbacks
+cannot always retain a precise initiating call site and are labelled
+conservatively.
+
+Render-phase updates belong to the following attempt. If an ancestor renders a
+queued child first, the child's direct state cause is kept alongside the parent
+cascade cause.
+
+<h2 id="cost-and-privacy">Cost and privacy</h2>
+
+With profiling omitted or false, the compiler emits no component or hook
+metadata and the bundler specializes the runtime with profiling disabled. When
+application code does not explicitly import `octane/profiling`, normal
+production bundles can remove the recorder, track labels, clock reads, and
+profiling allocations.
+
+Profile builds keep a bounded buffer. By default events contain project-relative
+or package-relative source paths, component and hook names, timing, and outcome
+metadata. They do not retain prop values, state values, reducer actions, DOM
+nodes, browser events, promises, thrown values, or absolute machine paths.
+
+Profile timings include instrumentation overhead and should not be presented as
+normal production timings. Compare changes using the same profile build,
+browser, interaction, and recording mode.

@@ -24,6 +24,10 @@ function hook() {
 }
 
 function createCompiler(target: unknown = 'node') {
+	class DefinePlugin {
+		constructor(_definitions: Record<string, string>) {}
+		apply() {}
+	}
 	return {
 		options: {
 			context: '/project',
@@ -36,6 +40,7 @@ function createCompiler(target: unknown = 'node') {
 			watchRun: hook(),
 			thisCompilation: hook(),
 		},
+		webpack: { DefinePlugin },
 	};
 }
 
@@ -64,7 +69,9 @@ describe('OctaneRspackPlugin', () => {
 		const plugin = new OctaneRspackPlugin();
 		plugin.apply(compiler as any);
 
-		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({ root: '/project' });
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
+			expect.objectContaining({ root: '/project' }),
+		);
 		expect(mocks.resolveRuntimeRequest).toHaveBeenCalledWith('octane', 'server');
 		expect(compiler.options.resolve.extensions).toEqual(['.tsrx', '.tsx', '.ts', '.js']);
 		const aliases = compiler.options.resolve.alias as Record<string, string>;
@@ -76,7 +83,7 @@ describe('OctaneRspackPlugin', () => {
 		expect(compiler.options.module.rules[0]).toMatchObject({
 			type: 'javascript/auto',
 			enforce: 'pre',
-			use: [{ options: { root: '/project', environment: 'server' } }],
+			use: [{ options: expect.objectContaining({ root: '/project', environment: 'server' }) }],
 		});
 		expect(compiler.options.module.rules[1]).toEqual({
 			test: expect.any(RegExp),
@@ -119,7 +126,7 @@ describe('OctaneRspackPlugin', () => {
 		const aliases = compiler.options.resolve.alias as Record<string, string>;
 		expect(aliases['octane$']).toMatch(/(?:^octane$|packages\/octane\/src\/index\.ts$)/);
 		expect(compiler.options.module.rules).toHaveLength(1);
-		expect(compiler.options.module.rules[0].use[0].options).toEqual({
+		expect(compiler.options.module.rules[0].use[0].options).toMatchObject({
 			root: '/project',
 			environment: 'client',
 			hmr: false,
@@ -132,6 +139,12 @@ describe('OctaneRspackPlugin', () => {
 	it('resolves a relative root from the Rspack context', () => {
 		const compiler = createCompiler('web');
 		new OctaneRspackPlugin({ root: 'apps/site' }).apply(compiler as any);
-		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({ root: '/project/apps/site' });
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
+			expect.objectContaining({ root: '/project/apps/site' }),
+		);
+	});
+
+	it('rejects a non-boolean profile option at the public constructor', () => {
+		expect(() => new OctaneRspackPlugin({ profile: 'yes' } as any)).toThrow(/profile/);
 	});
 });
