@@ -5,9 +5,11 @@ title: Core APIs
 import {
 	CoreApiDemo,
 	DataLoadingDemo,
+	DeferredSearchDemo,
 	FormActionDemo,
 	ListConditionsDemo,
 	RefEffectDemo,
+	TransitionDemo,
 } from '../../components/CoreApiDemo.tsrx';
 import { PortalEventDemo } from '../../components/PortalEventDemo.tsrx';
 import { ViewTransitionsDemo } from '../../components/ViewTransitionsDemo.tsrx';
@@ -579,169 +581,90 @@ visible instead of replacing it with a loading fallback too soon.
 	Keep the current screen with <code>useTransition</code>
 </h3>
 
-Use `useTransition` when an update can wait and the current screen is still useful. It
-returns an `isPending` flag and a function that marks state updates as transition work.
+`useTransition` marks a screen change that can wait. Use it when the next view may need
+time, but the current view is still useful—opening a dashboard tab, moving between
+pages, or applying a large filter.
 
 ```tsrx
-import { use, useState, useTransition } from 'octane';
+const [isPending, startTransition] = useTransition();
 
-interface TabResource {
-	label: string;
-	content: Promise<string>;
-}
-
-function TabPanel(props: { tab: TabResource }) @{
-	const content = use(props.tab.content);
-
-	<article>
-		<h4>{props.tab.label}</h4>
-		<p>{content}</p>
-	</article>
-}
-
-export function ProjectTabs(props: { overview: TabResource; activity: TabResource }) @{
-	const [tab, setTab] = useState(props.overview);
-	const [isPending, startTransition] = useTransition();
-
-	<section aria-busy={isPending}>
-		<div role="tablist" aria-label="Project sections">
-			<button
-				type="button"
-				role="tab"
-				aria-selected={tab === props.overview}
-				onClick={() => startTransition(() => setTab(props.overview))}
-			>
-				Overview
-			</button>
-			<button
-				type="button"
-				role="tab"
-				aria-selected={tab === props.activity}
-				onClick={() => startTransition(() => setTab(props.activity))}
-			>
-				Activity
-			</button>
-		</div>
-
-		<span aria-live="polite">
-			{isPending ? 'Loading the next tab…' : 'Tab ready'}
-		</span>
-
-		@try {
-			<TabPanel tab={tab} />
-		} @pending {
-			<p>Loading the first tab…</p>
-		}
-	</section>
-}
+<button disabled={isPending} onClick={() => startTransition(() => setTab('activity'))}>
+	{isPending ? 'Opening…' : 'Open activity'}
+</button>
 ```
 
-The function passed to `startTransition` runs immediately; the updates it schedules are
-non-urgent. If the next panel suspends, Octane leaves the committed panel visible while
-`isPending` reports the work. The pending branch still handles the first load.
+The live example keeps the current report on screen while another one loads. The
+`isPending` flag gives you a place to explain what is happening instead of flashing a
+full-page loading state.
 
-Keep state that controls a text input urgent. A transition does not make a request or
-calculation faster, and Octane still renders each pass synchronously to completion. Use
-the standalone `startTransition` API outside a component when no pending flag is needed.
+<TransitionDemo />
+
+A transition does not make the work faster, and state that controls typing should stay
+urgent. Read the [React `useTransition` reference](https://react.dev/reference/react/useTransition)
+for the full API; Octane uses the same component-level pattern.
 
 <h3 id="use-deferred-value">
 	Let a slow view lag with <code>useDeferredValue</code>
 </h3>
 
-When one value must update immediately but a slower child can temporarily show its
-previous result, pass a deferred copy to that child. This product search keeps typing
-urgent while its result list catches up:
+`useDeferredValue` gives one part of the page permission to be a step behind. A search
+box can receive every keystroke immediately while a slower result list continues to show
+the last useful result.
 
 ```tsrx
-import { memo, useDeferredValue, useState } from 'octane';
+const [query, setQuery] = useState('');
+const deferredQuery = useDeferredValue(query);
+const isStale = query !== deferredQuery;
 
-interface ResultsProps {
-	products: string[];
-	query: string;
-}
-
-function ResultsImpl(props: ResultsProps) @{
-	const query = props.query.toLowerCase();
-	const matches = props.products.filter((product) => product.toLowerCase().includes(query));
-
-	<ul>
-		@for (const product of matches; key product) {
-			<li>{product}</li>
-		} @empty {
-			<li>No matching products.</li>
-		}
-	</ul>
-}
-
-const Results = memo(ResultsImpl);
-
-export function ProductSearch(props: { products: string[] }) @{
-	const [query, setQuery] = useState('');
-	const deferredQuery = useDeferredValue(query);
-	const isStale = query !== deferredQuery;
-
-	<section>
-		<label>
-			Search products
-			<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
-		</label>
-
-		<div aria-busy={isStale} style={{ opacity: isStale ? 0.6 : 1 }}>
-			<Results products={props.products} query={deferredQuery} />
-		</div>
-	</section>
-}
+<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
+<div aria-busy={isStale}>
+	<ProductResults query={deferredQuery} />
+</div>
 ```
 
-The input always receives `query`; only the results receive `deferredQuery`. While the
-two values differ, the visible results are stale. `memo` matters here: the unchanged
-deferred prop lets the urgent input render skip the slow child, then Octane renders the
-new results at transition priority.
+Type “camera” or “desk” below. The input owns the current value; the catalogue receives
+the deferred copy and keeps its old cards visible while the new search finishes.
 
-`useDeferredValue(value, initialValue)` can provide a preview on the first render. It is
-not a debounce or rate limiter, so use another strategy when the goal is fewer requests.
+<DeferredSearchDemo />
+
+This is not a debounce: there is no fixed delay, and it does not reduce network requests.
+It only changes which render may wait. See the
+[React `useDeferredValue` reference](https://react.dev/reference/react/useDeferredValue)
+for initial values, Suspense, and performance details.
 
 <h3 id="view-transitions">
 	Animate visual changes with <code>ViewTransition</code>
 </h3>
 
-Transition work can also use the browser's native View Transitions API. Wrap the part
-whose visual identity matters in `ViewTransition`, then schedule the state change with
-`startTransition`:
+`ViewTransition` handles a different part of the experience: how the old and new screens
+visually connect. Wrap the element whose appearance or position changes, then make that
+change inside a transition.
 
 ```tsrx
-import { startTransition, useState, ViewTransition } from 'octane';
+const [visible, setVisible] = useState(true);
 
-export function SavedNotice() @{
-	const [visible, setVisible] = useState(true);
+<button onClick={() => startTransition(() => setVisible((value) => !value))}>
+	Toggle notice
+</button>
 
-	<section>
-		<button type="button" onClick={() => startTransition(() => setVisible((current) => !current))}>
-			{visible ? 'Hide notice' : 'Show notice'}
-		</button>
-
-		@if (visible) {
-			<ViewTransition enter="notice-in" exit="notice-out">
-				<p>Project saved.</p>
-			</ViewTransition>
-		}
-	</section>
-}
+@if (visible) {
+	<ViewTransition enter="notice-in" exit="notice-out">
+		<p>Project saved.</p>
+	</ViewTransition>
+};
 ```
 
-The `enter` and `exit` names become classes on the browser's transition pseudo-elements,
-which your CSS can target with `::view-transition-new(.notice-in)` and
-`::view-transition-old(.notice-out)`. A shared `name` animates the same visual element
-between layouts. `addTransitionType` lets one update select direction-aware class maps.
-
-Try all three patterns below. In a browser without `document.startViewTransition`, the
-same controls still work and commit immediately.
+The lab below turns the three everyday patterns into controls you can try: an item
+entering or leaving, one item moving between layouts, and tabs sliding in different
+directions. Browsers without the native API still make the same state changes; they just
+skip the animation.
 
 <ViewTransitionsDemo />
 
-See the [full View Transitions guide](https://github.com/octanejs/octane/blob/main/docs/view-transitions.md)
-for lifecycle callbacks, typed class maps, shared elements, and imperative pseudo-element
-access.
+Read the [React `ViewTransition` reference](https://react.dev/reference/react/ViewTransition)
+for the component model, or the
+[full Octane View Transitions guide](https://github.com/octanejs/octane/blob/main/docs/view-transitions.md)
+for class maps, shared elements, and Octane's complete API.
 
 ### Forms and actions
 

@@ -89,7 +89,7 @@ export function PortalEventDemo() @{
 				text-transform: uppercase;
 			}
 			.portal-demo-source > button,
-			.portal-demo-toast button {
+			:global(.portal-demo-toast button) {
 				border: 1px solid transparent;
 				border-radius: 999px;
 				background: var(--accent);
@@ -115,7 +115,8 @@ export function PortalEventDemo() @{
 			.portal-demo-layer {
 				min-height: 5.5rem;
 			}
-			.portal-demo-toast {
+			/* Portal content lives outside this component's scoped DOM subtree. */
+			:global(.portal-demo-toast) {
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
@@ -126,19 +127,19 @@ export function PortalEventDemo() @{
 				background: rgba(33, 105, 65, 0.2);
 				box-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.22);
 			}
-			.portal-demo-toast div {
+			:global(.portal-demo-toast div) {
 				display: grid;
 				gap: 0.15rem;
 			}
-			.portal-demo-toast strong {
+			:global(.portal-demo-toast strong) {
 				color: var(--text);
 				font-size: 0.88rem;
 			}
-			.portal-demo-toast span {
+			:global(.portal-demo-toast span) {
 				color: var(--text-secondary);
 				font-size: 0.75rem;
 			}
-			.portal-demo-toast button {
+			:global(.portal-demo-toast button) {
 				background: transparent;
 				border-color: rgba(255, 255, 255, 0.15);
 				padding: 0.35rem 0.65rem;

@@ -293,6 +293,28 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				'Ada Lovelace',
 			);
 
+			const transitionDemo = page.locator('[data-demo="transition"]');
+			await transitionDemo.getByRole('tab', { name: 'Activity' }).click();
+			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Loading Activity');
+			expect(await transitionDemo.locator('[data-report]').getAttribute('data-report')).toBe(
+				'overview',
+			);
+			await transitionDemo.locator('[data-report="activity"]').waitFor();
+			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Activity is ready');
+
+			const deferredDemo = page.locator('[data-demo="deferred-value"]');
+			await deferredDemo.getByRole('searchbox', { name: 'Search products' }).fill('camera');
+			await deferredDemo.locator('.search-updating').waitFor();
+			expect(await deferredDemo.locator('.product-result').count()).toBe(6);
+			await page.waitForFunction(
+				() =>
+					document.querySelectorAll('[data-demo="deferred-value"] .product-result').length === 2,
+			);
+			expect(await deferredDemo.locator('.product-result').allTextContents()).toEqual([
+				'Pocket cameraPhotography',
+				'Camera shoulder bagPhotography',
+			]);
+
 			await page.locator('#core-api-profile-name').fill('Grace Hopper');
 			await page.getByRole('button', { name: 'Save name' }).click();
 			await waitForLocatorText(page.locator('[data-demo="form"] button[type="submit"]'), 'Saving…');

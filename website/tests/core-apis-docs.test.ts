@@ -44,12 +44,14 @@ describe('Core APIs documentation', () => {
 		}
 
 		expect(container.querySelectorAll('.topic-grid a')).toHaveLength(6);
-		expect(container.querySelectorAll('[data-demo]')).toHaveLength(7);
+		expect(container.querySelectorAll('[data-demo]')).toHaveLength(9);
 		for (const id of [
 			'state',
 			'lists',
 			'refs-effects',
 			'data',
+			'transition',
+			'deferred-value',
 			'view-transitions',
 			'form',
 			'portal',
@@ -89,9 +91,9 @@ describe('Core APIs documentation', () => {
 		expect(highlightedSource.some((source) => source.includes('renderToString(App'))).toBe(true);
 		for (const sourceMarker of [
 			'export function NetworkStatus()',
-			'export function ProjectTabs(',
-			'export function ProductSearch(',
-			'export function SavedNotice()',
+			'const [isPending, startTransition] = useTransition();',
+			'const deferredQuery = useDeferredValue(query);',
+			'<ViewTransition enter="notice-in" exit="notice-out">',
 			'createPortal(',
 		]) {
 			expect(highlightedSource.some((source) => source.includes(sourceMarker))).toBe(true);
@@ -122,6 +124,57 @@ describe('Core APIs documentation', () => {
 		expect(container.querySelector('.pagination-link.next')?.getAttribute('href')).toBe(
 			'/docs/tsrx-vs-tsx',
 		);
+	});
+
+	it('keeps the current dashboard report visible during a transition', async () => {
+		const { container } = await renderCoreApis();
+		const demo = container.querySelector<HTMLElement>('[data-demo="transition"]')!;
+		const dashboard = within(demo);
+		const activity = dashboard.getByRole('tab', { name: 'Activity' });
+		const region = demo.querySelector<HTMLElement>('section[aria-busy]')!;
+
+		expect(demo.querySelector('[data-report]')?.getAttribute('data-report')).toBe('overview');
+		fireEvent.click(activity);
+
+		await waitFor(() =>
+			expect(demo.querySelector('.transition-status')?.textContent).toContain('Loading Activity'),
+		);
+		expect(region.getAttribute('aria-busy')).toBe('true');
+		expect(demo.querySelector('[data-report]')?.getAttribute('data-report')).toBe('overview');
+		expect(demo.querySelector('.data-loading')).toBeNull();
+
+		await waitFor(
+			() =>
+				expect(demo.querySelector('[data-report]')?.getAttribute('data-report')).toBe('activity'),
+			{ timeout: 2000 },
+		);
+		expect(region.getAttribute('aria-busy')).toBe('false');
+		expect(demo.querySelector('.transition-status')?.textContent).toContain('Activity is ready');
+	});
+
+	it('keeps search input immediate while deferred results catch up', async () => {
+		const { container } = await renderCoreApis();
+		const demo = container.querySelector<HTMLElement>('[data-demo="deferred-value"]')!;
+		const input = within(demo).getByRole('searchbox', {
+			name: 'Search products',
+		}) as HTMLInputElement;
+
+		expect(demo.querySelectorAll('.product-result')).toHaveLength(6);
+		fireEvent.input(input, { target: { value: 'camera' } });
+		expect(input.value).toBe('camera');
+
+		await waitFor(() => expect(demo.querySelector('.search-updating')).toBeTruthy());
+		expect(demo.querySelector('.product-results')?.getAttribute('data-stale')).toBe('true');
+		expect(demo.querySelectorAll('.product-result')).toHaveLength(6);
+
+		await waitFor(() => expect(demo.querySelectorAll('.product-result')).toHaveLength(2), {
+			timeout: 2000,
+		});
+		expect(demo.querySelector('.search-summary')?.textContent).toContain('“camera”');
+		expect(demo.querySelector('.search-updating')).toBeNull();
+		expect(
+			Array.from(demo.querySelectorAll('.product-result')).map((item) => item.textContent),
+		).toEqual(['Pocket cameraPhotography', 'Camera shoulder bagPhotography']);
 	});
 
 	it('runs the embedded state example', async () => {
@@ -254,7 +307,7 @@ describe('Core APIs documentation', () => {
 
 	it('runs the embedded View Transitions controls as a progressive fallback', async () => {
 		const { container } = await renderCoreApis();
-		const demo = container.querySelector('[data-demo="view-transitions"]')!;
+		const demo = container.querySelector<HTMLElement>('[data-demo="view-transitions"]')!;
 		const cardToggle = demo.querySelector<HTMLButtonElement>('#vt-toggle-card')!;
 		const heroToggle = demo.querySelector<HTMLButtonElement>('#vt-toggle-hero')!;
 		const details = within(demo).getByRole('tab', { name: 'Details' });

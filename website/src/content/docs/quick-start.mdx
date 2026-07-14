@@ -2,191 +2,143 @@
 title: Quick start
 ---
 
-# Quick start
+<div className="doc-hero">
+	<p className="doc-eyebrow">From install to a working button</p>
+	<h1>Quick start</h1>
+	<p className="doc-lede">
+		{
+			'Install Octane, connect it to a page, and build your first stateful component. If you already have a Vite project, the whole path takes three small files.'
+		}
+	</p>
+</div>
 
-Octane is a fast, TypeScript-first UI framework — the successor to Inferno. You
-get the React API you already know, a compiler that keeps the runtime small and
-fast, hooks that no longer come with the rules of hooks, and dependency arrays
-the compiler can derive from your closures.
+<aside className="doc-callout note">
+	<p className="doc-callout-title">Before you begin</p>
+	<p>
+		This guide starts with an existing Vite project and requires Node.js 22 or newer. Octane is
+		currently alpha software, so pin versions when you use it in a real project.
+	</p>
+</aside>
 
-Components can be written in standard `.tsx`/`.jsx`, but opting for `.tsrx`
-provides better performance guarantees, especially around collections. TSRX is
-the spiritual successor to JSX, and allows for far better composability and
-future optimizations.
+<h2 id="install">Install and configure</h2>
 
-## Install
+Install the runtime and the full Vite integration:
 
 ```bash
 pnpm add octane @octanejs/vite-plugin
 ```
 
-Add the compiler plugin to your Vite config:
+Then add the plugin to Vite:
 
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite';
-import { octane } from 'octane/compiler/vite';
+import { octane } from '@octanejs/vite-plugin';
 
 export default defineConfig({
 	plugins: [octane()],
 });
 ```
 
-`@octanejs/vite-plugin` is the optional metaframework (dev SSR, routing,
-hydrate). For a plain SPA you only need the `octane()` compiler plugin shown
-above.
+The Vite plugin includes the compiler and adds routing, server rendering, hydration, and
+production builds when you need them. For a client-only app, you can import `octane` from
+`octane/compiler/vite` instead and install only `octane`.
 
-## Mount
+<h2 id="first-component">Build your first component</h2>
+
+A component is a TypeScript function that returns UI. This one receives a title, remembers
+a count, and updates it when the button is clicked:
+
+```tsrx
+// src/App.tsrx
+import { useState } from 'octane';
+
+interface AppProps {
+	title: string;
+}
+
+export function App(props: AppProps) @{
+	const [count, setCount] = useState(0);
+
+	<main>
+		<h1>
+			{props.title as string}
+		</h1>
+		<p>
+			{'Button pressed ' + count + ' times'}
+		</p>
+		<button onClick={() => setCount((current) => current + 1)}>
+			Press me
+		</button>
+	</main>
+}
+```
+
+There are only four ideas here: `App` is the component, `props` are its inputs,
+`useState` is its memory, and `onClick` handles the browser event. Calling `setCount`
+renders the component again with the new value.
+
+The `@{ ... }` body is TSRX shorthand for returning its final JSX node. If you prefer
+standard `.tsx` or `.jsx`, use a normal function body with `return`; the APIs and runtime
+stay the same.
+
+<h2 id="mount">Connect it to the page</h2>
+
+Give Octane an empty element in your HTML:
+
+```html
+<!-- index.html -->
+<div id="app"></div>
+<script type="module" src="/src/main.ts"></script>
+```
+
+Create a root for that element and render the component into it:
 
 ```ts
-// main.ts
+// src/main.ts
 import { createRoot } from 'octane';
 import { App } from './App.tsrx';
 
-const root = createRoot(document.getElementById('root')!);
-root.render(App, { title: 'Hello world!' });
+const container = document.getElementById('app')!;
+const root = createRoot(container);
+
+root.render(App, { title: 'My first Octane app' });
 ```
 
-## Components
+That is a complete client-rendered Octane app. Start your Vite development server, open
+the page, and the button will update without replacing the rest of the document.
 
-A component is any function you use at a `<Foo/>` site — there's no separate
-"component" declaration. `@{ … }` is shorthand for returning JSX, so hooks and
-locals can sit next to the output:
+<h2 id="tsrx-at-a-glance">TSRX at a glance</h2>
 
-```tsrx
-import { useState } from 'octane';
-
-export function Counter() @{
-	const [count, setCount] = useState(0);
-
-	<button onClick={() => setCount(count + 1)}>
-		{'Count: ' + count}
-	</button>
-}
-```
-
-The same component written with an explicit `return` is identical — and a
-function is free to return a non-JSX value, which is coerced like any
-renderable:
+TSRX keeps rendered branches and lists next to the elements they control. For example,
+`@for` renders a keyed list and `@empty` handles the no-results case:
 
 ```tsrx
-export function Counter() {
-	const [count, setCount] = useState(0);
-	return <button onClick={() => setCount(count + 1)}>
-		{'Count: ' + count}
-	</button>;
-}
-
-function Label(props) {
-	if (props.hidden) return null; // renders nothing
-	return props.text; // a string renders as text
-}
-```
-
-## State and effects
-
-```tsrx
-import { useState, useEffect } from 'octane';
-
-export function Timer() @{
-	const [seconds, setSeconds] = useState(0);
-
-	useEffect(() => {
-		const id = setInterval(() => setSeconds((s) => s + 1), 1000);
-		return () => clearInterval(id);
-	});
-
-	<p>
-		{'Elapsed: ' + seconds}
-	</p>
-}
-```
-
-Omitting a dependency list asks the compiler to infer it. Explicit arrays keep
-their React meaning; pass `null` for the intentional every-render form.
-
-## Conditional hooks
-
-Unlike React, a hook can sit behind a guard or after an early `return`. Each
-hook call site has a stable compiler-assigned slot, so render order can't
-desync the hooks:
-
-```tsrx
-import { useState, useEffect } from 'octane';
-
-export function Panel(props) @{
-	const [n, setN] = useState(0);
-
-	// An early return before a hook is fine in octane.
-	if (props.hidden) return;
-
-	useEffect(() => {
-		console.log('n changed:', n);
-	});
-
-	<button onClick={() => setN(n + 1)}>
-		{'count: ' + n}
-	</button>
-}
-```
-
-## Control flow
-
-Rendered control flow uses directive-prefixed blocks: `@if`, `@for`, `@switch`,
-and `@try`. Plain JavaScript control flow stays in setup code.
-
-```tsrx
-export function Feed(props) @{
+export function TodoList(props) @{
 	<ul>
-		@for (const item of props.items; key item.id) {
+		@for (const todo of props.todos; key todo.id) {
 			<li>
-				{item.title as string}
+				{todo.label as string}
 			</li>
 		} @empty {
-			<li>Nothing to show</li>
+			<li>No tasks yet</li>
 		}
 	</ul>
 }
 ```
 
-```tsrx
-export function Greeting(props) @{
-	@if (props.name) {
-		<p>
-			{'Hello, ' + props.name}
-		</p>
-	} @else {
-		<p>Hello, stranger</p>
-	}
-}
-```
+The same family includes `@if` for two-way branches, `@switch` for several choices, and
+`@try` for loading and error states. Plain JavaScript still belongs in the setup part of
+the function. The [TSRX vs TSX/JSX guide](/docs/tsrx-vs-tsx) shows when each syntax is the
+better fit.
 
-## Server render and hydrate
+<aside className="doc-callout tip">
+	<p className="doc-callout-title">Your next stop</p>
+	<p>
+		{
+			'Continue with Core APIs for events, effects, async UI, server rendering, and interactive examples. If you are moving React code, read Differences from React before porting forms or event handlers.'
+		}
+	</p>
+</aside>
 
-Octane's SSR entry points mirror React's: `octane/server` is the request-time
-renderer, `octane/static` the static-generation renderer. Buffered renders
-return `{ html, css }`; streaming (`renderToPipeableStream` /
-`renderToReadableStream`) flushes out-of-order Suspense like Fizz.
-
-```ts
-// entry-server.ts
-import { prerender } from 'octane/static'; // async; awaits all Suspense data
-import { App } from './App.tsrx';
-
-const { html, css } = await prerender(App);
-```
-
-```ts
-// entry-client.ts
-import { hydrateRoot } from 'octane';
-import { App } from './App.tsrx';
-
-hydrateRoot(document.getElementById('app')!, App);
-```
-
-## Next
-
-- [Core APIs](/docs/core-apis) — roots, hooks, boundaries, actions, and SSR.
-- [Differences from React](/docs/differences-from-react) — the deliberate
-  divergences (everything else matching React is the point).
-- [Bindings](/docs/bindings) — the `@octanejs/*` ports of the React ecosystem.
+[Continue to Core APIs →](/docs/core-apis)

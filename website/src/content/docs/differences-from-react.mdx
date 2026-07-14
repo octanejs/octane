@@ -2,215 +2,295 @@
 title: Differences from React
 ---
 
-# Differences from React
+<div className="doc-hero">
+	<p className="doc-eyebrow">What carries over—and what changes</p>
+	<h1>Differences from React</h1>
+	<p className="doc-lede">
+		{
+			'Bring your React mental model. Octane keeps the component and hook APIs, then changes a small set of rules where the compiler or the browser can do a better job.'
+		}
+	</p>
+</div>
 
-Octane runs on React's programming model — the same hooks, `memo`, context,
-portals, Suspense, transitions, actions, and SSR. We check this the boring way:
-over 2,200 conformance tests lifted straight from `facebook/react`. So the
-starting assumption is that your React knowledge just works.
+<aside className="doc-callout note">
+	<p className="doc-callout-title">Assume React behavior</p>
+	<p>
+		{
+			'The test suite checks Octane against React behavior directly. The differences on this page are deliberate; if something else behaves differently, treat it as a bug.'
+		}
+	</p>
+</aside>
 
-The handful of places Octane diverges are listed below, and they're all on
-purpose. If Octane behaves differently from React and it isn't on this page,
-that's a bug — please file it.
+<nav className="topic-grid" aria-label="Differences from React topics">
+	<a href="#hooks">
+		<span className="topic-number">01</span>
+		<strong>Place hooks freely</strong>
+		<span>The compiler tracks call sites, not call order.</span>
+	</a>
+	<a href="#events-and-dom">
+		<span className="topic-number">02</span>
+		<strong>Use the browser</strong>
+		<span>Events are native and classes compose.</span>
+	</a>
+	<a href="#async-work">
+		<span className="topic-number">03</span>
+		<strong>Understand async work</strong>
+		<span>Transitions work without time slicing.</span>
+	</a>
+	<a href="#errors-and-server">
+		<span className="topic-number">04</span>
+		<strong>Handle boundaries</strong>
+		<span>Errors use templates; SSR returns CSS.</span>
+	</a>
+	<a href="#reconciliation">
+		<span className="topic-number">05</span>
+		<strong>Keep DOM identity</strong>
+		<span>Lists use a different move algorithm.</span>
+	</a>
+	<a href="#not-supported">
+		<span className="topic-number">06</span>
+		<strong>Know what is absent</strong>
+		<span>Octane is functions, hooks, and the DOM.</span>
+	</a>
+</nav>
 
-A quick note before the list: most of these won't come up in day-to-day code.
-Some are freedoms you'll be glad to have, a couple are things to know if you hit
-them, and a few are internal details we've written down for completeness that
-you'll never actually feel. We've said which is which.
+<h2 id="hooks">Hooks fit the code, not a call order</h2>
 
-## Hooks can go anywhere
+React's state and effect model still applies. What changes is where you may call a
+hook and how much bookkeeping you need to write.
 
-**This one you'll notice, and you'll like it.** There are no rules of hooks in
-Octane. A hook can sit inside an `if` or after an early return — the compiler
-tracks each hook by its position in the source, not by the order it runs, so
-the usual React footguns just aren't there.
+<h3>Conditional hooks are valid</h3>
+
+Octane assigns each hook call site a stable slot at compile time. A hook can sit
+behind a condition or after an early return without shifting the state of another
+hook.
 
 ```tsrx
-function Profile(props) {
-	if (props.loading) return <Spinner />;
-	// Totally fine — React would throw here.
-	const [name, setName] = useState(props.name);
-	@{
-		<input value={name} onInput={(e) => setName(e.target.value)} />
-	};
+export function Profile(props) {
+	if (!props.user) return <EmptyState />;
+
+	const [editing, setEditing] = useState(false);
+	return <button onClick={() => setEditing(!editing)}>Edit profile</button>;
 }
 ```
 
-The exception is a plain JS loop. One call site means one hook slot, so every
-iteration of a loop would share the same state — instead of letting that fail
-silently, the compiler rejects it at build time. Loop in the template with the
-keyed `@for` directive (each item renders in its own scope, so per-item hooks
-get per-item state), or extract the loop body into a child component. `use()`
-and `useContext` do work inside loops — they aren't slot-keyed.
+The exception is a slot-based hook inside a plain JavaScript `for` or `while` loop.
+Every iteration would share one slot, so the compiler reports an error. Use keyed
+`@for` or move the hook into a child component. `use()` and `useContext` are exempt
+because they are not slot-keyed.
 
-## Dependency arrays are optional
+<h3>Dependency lists are optional</h3>
 
-**Write the closure and let the compiler track it.** When you omit the
-dependency list from `useEffect`, `useLayoutEffect`, `useInsertionEffect`,
-`useMemo`, `useCallback`, or `useImperativeHandle`, Octane derives it from the
-values the callback captures. Proven-stable setters, dispatchers, refs, state
-getters, and effect events are left out automatically.
+Leave the dependency list off an effect or memo and the compiler reads the values
+captured by its callback:
 
 ```tsrx
 useEffect(() => {
 	syncRoom(room.id);
-}); // inferred: [syncRoom, room.id]
+}); // inferred from syncRoom and room.id
 ```
 
-Explicit arrays remain authoritative: `[]` keeps the React mount/reconnect-only
-meaning and `[a, b]` tracks exactly those values. Pass `null` when you
-intentionally want the effect or computation to run after every render.
+This works for `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`,
+`useCallback`, and `useImperativeHandle`. An explicit array keeps its exact React
+meaning. Pass `null` for an intentional every-render effect or every-render
+recomputation.
 
-## State hooks have a current-state getter
+If the callback is created by opaque code, such as `useEffect(makeEffect())`, provide
+an array or `null`. The compiler cannot inspect it without calling it again.
 
-**This replaces a common React ref workaround.** `useState` and `useReducer`
-have an optional third tuple member: a stable thunk that reads the latest state
-cell.
+<h3>State hooks can read the latest value</h3>
+
+`useState` and `useReducer` have an optional third tuple member: a stable function
+that reads the latest scheduled state. It replaces the ref often used to avoid a
+stale value after `await`.
 
 ```tsrx
 const [draft, setDraft, getDraft] = useState('');
 
-const saveLater = async () => {
+async function saveLater() {
 	await waitForConnection();
 	await save(getDraft());
-};
+}
 ```
 
-In React, a callback like this usually needs a ref synchronized on every render
-to avoid capturing an old `draft`. In Octane, `getDraft()` reads the latest
-scheduled value directly without subscribing or causing a render. During
-pending work that value can be newer than the currently committed DOM.
+`getDraft()` does not subscribe or render. During pending work it can be newer than
+the DOM currently on screen. Ordinary two-item destructuring keeps the normal
+two-item runtime path.
 
-The compiler only emits the getter-enabled hook when tuple index 2 can be
-observed. Ordinary `[state, setState]` and `[state, dispatch]` destructures keep
-the existing two-item runtime path and allocate no getter; escaped or ambiguous
-tuples conservatively receive the full three-item shape.
+One small bailout detail is observable in render logging: after a real state change,
+a same-value `setState` can skip Octane's component body entirely. React may enter
+that body once more before it bails out. Children, effects, and the committed DOM are
+unchanged.
 
-## Native event objects, no synthetic event layer
+<h2 id="events-and-dom">Events come from the browser</h2>
 
-Event propagation itself matches React and is **no longer a difference**.
-Ordinary bubbling and capture, `stopPropagation`, logical propagation through
-portals, and native non-bubbling events such as `toggle`, dialog
-`cancel`/`close`, media events, and `load`/`error` all reach the same logical
-ancestors React does.
+Octane delegates DOM events, but it does not wrap them in React's synthetic event
+layer. Handlers receive the browser's real `Event` object. There is no event pooling,
+and `event.currentTarget` is the element whose handler is running.
 
-What remains different is the event API and synthesis layer:
+Bubbling, capture, `stopPropagation()`, portal bubbling, and native non-bubbling
+events still reach the same logical ancestors as they do in React. The differences
+are at the edges:
 
-- `onClick`, `onInput`, `onSubmit`, and friends receive the browser's actual
-  `Event` object rather than a React `SyntheticEvent` wrapper.
-- `mouseEnter`/`pointerEnter` are the browser's own per-element events, not
-  events synthesized from `mouseover`/`mouseout`.
-- There's no synthetic `onChange`, `onBeforeInput`, or `onSelect` polyfill. Use
-  the corresponding native event — `onInput` for per-keystroke text changes.
+- Use `onInput` for each text edit. Native `change` fires when the browser commits
+  the value, usually on blur.
+- There are no synthetic `onChange`, `onBeforeInput`, or `onSelect` polyfills.
+- Mouse and pointer enter/leave handlers use the browser's native per-element events;
+  Octane does not synthesize them from over/out events.
 
-There is no event pooling, and `event.currentTarget` is the handler's element.
+For most controlled text fields, migration is one renamed prop:
 
-## Controlled components, native events
-
-Controlled inputs work exactly like React's. Put `value` or `checked` on an
-`<input>`, `<textarea>`, or `<select>` and the prop drives the DOM: Octane
-re-asserts it on every render and after events, so a rejected edit snaps
-straight back, radio groups stay in sync, and `<select value>` selects the
-matching option. IME composition is respected, and `defaultValue` /
-`defaultChecked` give you uncontrolled inputs, same as React.
-
-The one thing to rename: there's no synthetic `onChange`. The per-keystroke
-event is the native one, `onInput` — the native `change` event fires on blur.
-Migration is a one-word diff:
-
-```tsrx
+```tsx
 // React
-<input value={text} onChange={(e) => setText(e.target.value)} />
+<input value={text} onChange={(event) => setText(event.currentTarget.value)} />
+
 // Octane
-<input value={text} onInput={(e) => setText(e.target.value)} />
+<input value={text} onInput={(event) => setText(event.currentTarget.value)} />
 ```
 
-If you render a controlled text input without an `onInput` handler, Octane
-warns in development — with a specific pointer when you passed `onChange`,
-since that fires on blur here, not per keystroke.
+<h3>Controlled fields still stay controlled</h3>
 
-Form **actions** are the modern React 19 story and match it:
-`<form action={fn}>`, `useActionState`, `useFormStatus`, `useOptimistic`, and
-form reset all work as you'd expect.
+`value` and `checked` work like React: the prop drives the DOM and is re-applied after
+renders and discrete events. Radio groups, single and multiple selects, textareas,
+and IME composition are covered. Use `defaultValue` or `defaultChecked` when the
+browser should own the value.
 
-## `className` is smarter about arrays and objects
+Hydration preserves an edit made before Octane attaches, then the next real commit
+re-applies a controlled value. A controlled text field without `onInput` gets a
+development warning.
 
-Octane composes `class`/`className` clsx-style. Strings, numbers, arrays,
-objects, and nested combinations all fold into a class string, and falsy values
-drop out:
+React 19 form actions and their hooks work too. One queueing edge differs: when an
+action rejects, Octane continues later queued dispatches instead of cancelling them.
+
+<h3>Attribute names stay close to HTML</h3>
+
+Attribute values follow React's rules, including boolean attributes, overloaded
+booleans, and common camelCase aliases. Native spellings such as `accept-charset`
+also work directly. Octane has a small set of useful casing warnings rather than
+React's exhaustive known-attribute table.
+
+Unusual object values are converted with `toString()` and warned about in
+development instead of throwing. On custom elements, a function-valued lowercase
+`on*` prop attaches a listener; other props stay on the attribute path rather than
+using React's property-or-attribute heuristic.
+
+<h3>Classes compose without a helper</h3>
+
+`class` and `className` accept strings, numbers, arrays, objects, and nesting.
+Falsy entries drop out:
 
 ```tsrx
-<div className={['card', isActive && 'active', { selected }]} />
+<article class={['card', isActive && 'active', { selected }]} />
 ```
 
-A plain string is still the fast path and behaves identically to React. The one
-visible difference: React turns `className={['a', 'b']}` into `"a,b"`, while
-Octane gives you `"a b"` — which is almost certainly what you meant.
+React turns `className={['a', 'b']}` into `"a,b"`. Octane produces `"a b"` on the
+client and server.
 
-## Errors use `@try`/`@catch`
+<h2 id="async-work">Transitions work without time slicing</h2>
 
-Octane has no class components, so error boundaries aren't a class lifecycle.
-You wrap the risky part in a `@try`/`@catch` block (or the `<ErrorBoundary>`
-component) instead:
+Octane batches updates in a microtask, then runs each render to completion. It has
+urgent and transition work, but no lanes, yield points, expiration, CPU time slicing,
+or selective hydration.
+
+That does not remove the useful part of transitions. A transition can keep the
+current screen visible when its replacement suspends, and related boundaries can
+reveal together. Priority controls those Suspense semantics; it does not interrupt a
+render halfway through.
+
+Two practical consequences:
+
+- `flushSync` drains the whole update queue, including transition work.
+- Passive effects always run after paint; `flushSync` does not pull them into the
+  current call.
+
+<h3>Independent `use()` calls start together</h3>
+
+By default, the compiler removes avoidable Suspense waterfalls. It memoizes promise
+creation by call site, starts provably independent `use()` inputs together, and
+warms independent descendant fetches while a parent is suspended.
+
+```tsrx
+const user = use(fetchUser(id));
+const teams = use(fetchTeams(id)); // starts with fetchUser, not after it
+```
+
+A real data dependency remains sequential, and unwrap order, error routing, and
+hydration order stay React-compatible. Set `parallelUse: false` in the compiler or
+Vite plugin when you specifically need React's serial waterfall timing.
+
+<h3>External stores must notify</h3>
+
+`useSyncExternalStore` works normally for stores that call their subscriber when
+state changes. Unlike React, Octane does not perform an extra commit-time
+`getSnapshot` read when the snapshot is unchanged and only the callback identity
+changed. Its synchronous renderer does not have the concurrent gap that check
+protects. A store that mutates silently between render and commit will therefore not
+be discovered on that render.
+
+<h2 id="errors-and-server">Errors and server rendering use Octane-shaped boundaries</h2>
+
+<h3>Error boundaries are functions and templates</h3>
+
+There are no class lifecycles for errors. Use `@try` / `@catch`, or the
+`<ErrorBoundary>` component:
 
 ```tsrx
 @try {
-	<RiskyThing />
-} @catch (err, reset) {
-	<div>
-		Something broke.
-		<button onClick={reset}>Try again</button>
-	</div>
+	<RiskyPanel />
+} @catch (error, reset) {
+	<button onClick={reset}>Try again</button>
 };
 ```
 
-It catches what React's boundaries catch — render errors, and errors thrown
-during teardown. The only real difference is that an error nothing catches goes
-to `console.error` rather than React's `onUncaughtError` callback.
+Errors from rendering, teardown, and ref cleanup route to the nearest boundary.
+An error with no boundary is reported through `console.error` rather than React's
+`onUncaughtError` callback.
 
-## SSR gives you the CSS too
+<h3>Buffered SSR returns styles beside the HTML</h3>
 
-Server rendering works the same way, including streaming out-of-order Suspense
-content. The one addition worth knowing: `renderToString` and friends return
-`{ html, css }`, where `css` carries Octane's scoped styles. React has no
-equivalent because it has no built-in scoped styling.
+`renderToString`, `renderToStaticMarkup`, and `prerender` return
+`{ html, css }`. The extra `css` field carries Octane's scoped styles.
 
-If server and client HTML disagree during hydration, Octane fixes it up in
-place — it patches to the client's value and warns in the console — instead of
-throwing away the tree.
+The streaming APIs flush Suspense content out of order, but they are not Fizz
+internals copied line for line. Octane re-runs the render in rounds instead of
+incrementally rendering one boundary at a time, does not selectively hydrate, and
+recreates head elements from a late streamed boundary on the client.
 
-## Things that differ under the hood (you won't feel these)
+When hydration finds a value mismatch, Octane patches to the client value. A
+structural mismatch is rebuilt in place with a warning instead of being thrown to a
+boundary for a re-render. Function component output also carries Octane hydration
+markers, so a server HTML snapshot is not necessarily identical to the same bare
+host element.
 
-For completeness, a couple of internal behaviors differ from React. You can
-skip this section unless you're the kind of person who reads runtime source for
-fun — none of it changes what your components do.
+<h2 id="reconciliation">Keyed lists move differently, not more often</h2>
 
-- **Scheduling is synchronous.** Octane batches renders in a microtask and runs
-  them to completion. There are no lanes, time-slicing, or selective hydration.
-  `flushSync` drains everything; passive effects always run after paint. The
-  user-visible behavior of transitions — keeping the old UI on screen while new
-  content suspends — is fully there.
-- **The keyed list reconciler uses a different algorithm** to work out the
-  minimal set of DOM moves. The final DOM, the identity of the nodes that
-  survive, and their order are all identical to React's — only the internal set
-  of nodes it physically moves can differ, which nothing observable depends on.
+Octane uses a longest-increasing-subsequence algorithm to minimize DOM moves. React
+uses a different placement heuristic. The final order, the identity of surviving
+nodes, focus, and component state are the same; only instrumentation that records
+the exact nodes physically moved can see a difference.
 
-## Not implemented, on purpose
+<h2 id="not-supported">APIs Octane leaves out</h2>
 
-A few React features don't exist in Octane by design:
+Octane is built around function components, hooks, and the DOM. These React features
+are intentionally absent:
 
-- **Class components** — Octane is functions only.
-- **Server Components / RSC.**
-- **`StrictMode` double-invoke, `Profiler`, `SuspenseList`.**
-- **`forwardRef` and `createRef`** — refs are just props
-  (`ref={cb}`, `ref={obj}`, or `ref={[a, b]}`), so you never need to forward
-  them.
+- Class components, legacy roots, and class error-boundary lifecycles.
+- Server Components, RSC/Flight, and `cache()`.
+- `StrictMode` double-invocation, `Profiler`, and `SuspenseList`.
+- `forwardRef` and `createRef`. Refs are ordinary props, including callback refs,
+  object refs, and arrays of refs.
+- The unstable CPU/commit-phase Suspense options and full React resource-hoisting
+  machinery.
+- Most `React.Children` utilities. Keyed `@for` is the normal collection API.
 
-Resource hints (`preload`, `preinit`, `preconnect`, `prefetchDNS`) are
+`useDebugValue` exists for library compatibility but has no visible runtime effect.
+Resource hint functions—`preload`, `preinit`, `preconnect`, and `prefetchDNS`—are
 supported.
 
 ## Next
 
-- [Core APIs](/docs/core-apis) — roots, hooks, boundaries, actions, and SSR.
-- [TSRX vs TSX/JSX](/docs/tsrx-vs-tsx) — the two dialects and when to use each.
-- [Quick start](/docs/quick-start) — install, mount, and the essentials.
+- [Core APIs](/docs/core-apis) — see the shared component and hook model in
+  practice.
+- [TSRX vs TSX/JSX](/docs/tsrx-vs-tsx) — choose the clearest syntax for each
+  component.
+- [Bindings](/docs/bindings) — find Octane ports of familiar React libraries.

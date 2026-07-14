@@ -487,6 +487,14 @@ export function DocPage() @{
 				margin: 0 0 0.2rem;
 				color: #ff8b9b;
 			}
+			.prose :global(.api-index-card li > a) {
+				display: inline-block;
+				margin: 0 0 0.2rem;
+				text-decoration: none;
+			}
+			.prose :global(.api-index-card li > a code) {
+				color: #ff8b9b;
+			}
 			.prose :global(.api-index-card li > span) {
 				display: block;
 				color: var(--text-secondary);
