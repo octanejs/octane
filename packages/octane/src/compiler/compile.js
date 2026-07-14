@@ -2195,7 +2195,8 @@ export function compile(source, filename, options) {
 		// Server (SSR) codegen: static markup + dynamic holes + control flow +
 		// nested components + scoped CSS, emitted as HTML-string-building bodies
 		// (with hydration markers) importing the server runtime from 'octane/server'.
-		// Only `<Activity>` and fragment refs are rejected.
+		// Fragment refs remain client-only because there is no server-side DOM range
+		// object for their imperative API.
 		return compileServer(source, filename, options);
 	}
 	const ast = parseModule(source, filename);
@@ -2727,8 +2728,8 @@ export function compile(source, filename, options) {
 // the hydration markers (`constants.ts`) the client `hydrateRoot` adopts. The
 // client path (template/clone + bindings) is left completely untouched.
 //
-// Still rejected with a clear diagnostic (see ssrUnsupported): `<Activity>` and
-// fragment refs (`<Fragment ref={…}>`).
+// Still rejected with a clear diagnostic (see ssrUnsupported): fragment refs
+// (`<Fragment ref={…}>`).
 // ===========================================================================
 
 function ssrUnsupported(what) {
@@ -3153,7 +3154,7 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = 
 		case 'SwitchStatement':
 			return ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash);
 		case 'ActivityStatement':
-			return ssrUnsupported('`<Activity>`');
+			return ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash);
 		case 'FragmentStart':
 		case 'FragmentEnd':
 			return ssrUnsupported('fragment refs (`<Fragment ref={…}>`)');
@@ -3661,6 +3662,19 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	const thenInner = `_$ssrArm("then", () => _$ssrBlock(${thenSub.fnName}(undefined, __s)))`;
 	const elseInner = node.alternate ? `_$ssrArm("else", () => _$ssrBlock(${elseCall}))` : "''";
 	return `_$ssrBlock(_$ssrControl("${ssrControlKey('if', node)}", () => ((${testExpr}) ? ${thenInner} : ${elseInner})))`;
+}
+
+function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+	// React's server contract renders visible content and omits hidden content
+	// entirely. Keep the body behind a thunk so a hidden Activity does not execute
+	// child components/hooks or start descendant data work on the server.
+	const modeExpr = node.mode ? printExpr(rewriteHookCalls(node.mode, ctx, name)) : "'visible'";
+	const bodySub = ssrCompileSub(node.children || [], ctx, '__sactivity', [], cssHash, parentNs);
+	inlinedSubs.push(bodySub.fn + ';');
+	ctx.runtimeNeeded.add('ssrActivity');
+	ctx.runtimeNeeded.add('ssrControl');
+	ctx.runtimeNeeded.add('ssrArm');
+	return `_$ssrControl("${ssrControlKey('activity', node)}", () => _$ssrActivity(${modeExpr}, () => _$ssrArm("visible", () => ${bodySub.fnName}(undefined, __s))))`;
 }
 
 function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {

@@ -388,48 +388,7 @@ export const OCTANE_CARDS: BenchCard[] = [];
 	});
 }
 
-// ---------------------------------------------------------------------------
-// Home-page summary — EVERY cross-framework suite on one normalized scale:
-// per suite and framework, the geometric mean of per-operation
-// (framework score ÷ octane-tsrx score). Octane is the 1× reference bar.
-// Ops without a measurement on either side — or with a sub-timer-resolution
-// 0 score — are skipped for that pair (geomean over the valid ops).
-// ---------------------------------------------------------------------------
-const SUMMARY_SERIES = FRAMEWORKS.filter((f) =>
-	['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'ripple', 'vue-vapor'].includes(f.key),
-);
-
-function geomeanVsOctane(card: BenchCard, key: string): number | undefined {
-	const ratios: number[] = [];
-	for (const row of card.rows) {
-		const octane = row['octane-tsrx'];
-		const value = row[key];
-		if (typeof octane === 'number' && octane > 0 && typeof value === 'number' && value > 0) {
-			ratios.push(value / octane);
-		}
-	}
-	if (ratios.length === 0) return undefined;
-	return Math.exp(ratios.reduce((sum, r) => sum + Math.log(r), 0) / ratios.length);
-}
-
-export const HOME_SUMMARY: BenchCard = (() => {
-	const rows: BenchRow[] = FRAMEWORK_CARDS.map((card) => {
-		const row: BenchRow = { op: card.id, 'octane-tsrx': 1 };
-		for (const s of SUMMARY_SERIES) {
-			if (s.key === 'octane-tsrx') continue;
-			const gm = geomeanVsOctane(card, s.key);
-			if (gm !== undefined) row[s.key] = gm;
-		}
-		return row;
-	});
-	return {
-		id: 'home-summary',
-		title: 'Every suite, normalized',
-		description:
-			'Geometric mean of per-operation benchmark scores, relative to Octane. Lower is better.',
-		series: SUMMARY_SERIES,
-		rows,
-		iterations: 0,
-		format: 'x',
-	};
-})();
+// The home page consumes a compact checked-in snapshot rather than pulling
+// every raw baseline into its client chunk. Its smoke test recomputes the
+// snapshot from FRAMEWORK_CARDS and catches drift.
+export { HOME_SUMMARY } from './home-benchmark.ts';

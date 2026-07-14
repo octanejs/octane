@@ -203,7 +203,11 @@ async function loadRoute(base: string, path: string) {
 	return { page, errors, main, comments: bodyDom.comments, bodyDom, mainDom };
 }
 
-function assertCountedHydrationMarkers(bodyDom: DomNodeCensus, mainDom: DomNodeCensus): void {
+function assertCountedHydrationMarkers(
+	bodyDom: DomNodeCensus,
+	mainDom: DomNodeCensus,
+	expectedLeadingLogical: number,
+): void {
 	// Counted comments reduce physical DOM nodes while preserving the logical
 	// open/close multiplicity the hydration cursor consumes.
 	expect(bodyDom.hydrationMarkersLogical).toBeGreaterThan(bodyDom.hydrationMarkersPhysical);
@@ -211,11 +215,12 @@ function assertCountedHydrationMarkers(bodyDom: DomNodeCensus, mainDom: DomNodeC
 	expect(bodyDom.hydrationMarkerMaxMultiplicity).toBeGreaterThan(1);
 
 	// Every website route shares the router/provider prefix that motivated this
-	// protocol. Nineteen logical opens compact to five physical comments: the
-	// remaining splits are the independent Suspense frame/try range plus the
-	// shorter route-content span, not redundant wrapper bookkeeping.
+	// protocol. The eager home route has nineteen logical opens; route-level lazy
+	// components add one Suspense range, for twenty. Both compact to five physical
+	// comments: the remaining splits are independent Suspense frame/try ranges and
+	// the shorter route-content span, not redundant wrapper bookkeeping.
 	expect(mainDom.leadingHydrationStartsPhysical).toBe(5);
-	expect(mainDom.leadingHydrationStartsLogical).toBe(19);
+	expect(mainDom.leadingHydrationStartsLogical).toBe(expectedLeadingLogical);
 }
 
 async function waitForLocatorText(
@@ -265,7 +270,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				expect(main.length).toBeGreaterThan(0);
 				// DOM-weight ratchet (see COMMENT_CEILINGS).
 				expect(comments).toBeLessThanOrEqual(COMMENT_CEILINGS[route]);
-				assertCountedHydrationMarkers(bodyDom, mainDom);
+				assertCountedHydrationMarkers(bodyDom, mainDom, route === '/' ? 19 : 20);
 			} finally {
 				await page.close();
 			}
@@ -462,7 +467,7 @@ describe.sequential('website production build → hydration (octane-preview)', (
 		try {
 			expect(errors).toEqual([]);
 			expect(main.length).toBeGreaterThan(0);
-			assertCountedHydrationMarkers(bodyDom, mainDom);
+			assertCountedHydrationMarkers(bodyDom, mainDom, route === '/' ? 19 : 20);
 		} finally {
 			await page.close();
 		}
