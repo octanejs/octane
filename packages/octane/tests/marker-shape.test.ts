@@ -238,14 +238,13 @@ describe('marker-shape pins (M0) — exact comment counts per minting regime', (
 		);
 	});
 
-	it('(b) keyed @for, single-root items: client elides item pairs, SSR keeps them', () => {
+	it('(b) keyed @for, direct-host items: item pairs are elided on client and server', () => {
 		const props = { items: ['a', 'b', 'c'] };
 		// Client: the template's <!> position anchor is reused as the for slot's
-		// end, so the outer range costs 2; items self-mark = 0. SSR: outer
-		// for-slot pair (2) + one pair PER ITEM (3×2=6) = 8 — the server always
-		// pairs items (open question 2 of the plan). Hydration adopts all
-		// server pairs (no template anchor — the server emits none) = 8.
-		expect(counts('ListSingle', ListSingle, props)).toEqual({ client: 2, ssr: 8, hydrate: 8 });
+		// end, so the outer range costs 2; items self-mark = 0. The server uses
+		// the same direct hosts as item boundaries and emits only its outer pair.
+		// Hydration adopts those hosts without minting or retaining item pairs.
+		expect(counts('ListSingle', ListSingle, props)).toEqual({ client: 2, ssr: 2, hydrate: 2 });
 	});
 
 	it('(b2) keyed @for, @empty branch active', () => {
