@@ -59,6 +59,9 @@ export function areaForPath(path) {
 		return 'core-runtime';
 	}
 	if (path.startsWith('packages/octane/tests/')) return 'core-tests';
+	if (path.startsWith('packages/app-core/')) return 'metaframework-core';
+	if (path.startsWith('packages/rspack-plugin-octane/')) return 'rspack-plugin';
+	if (path.startsWith('packages/rsbuild-plugin-octane/')) return 'rsbuild-plugin';
 	if (path.startsWith('packages/vite-plugin-octane/')) return 'vite-plugin';
 	if (path.startsWith('packages/octane-mcp-server/')) return 'mcp-server';
 	const packageMatch = path.match(/^packages\/([^/]+)\//);
@@ -102,7 +105,14 @@ export function validationFor(paths, taskKind) {
 			'./node_modules/.bin/vitest run packages/octane-mcp-server --project octane-mcp-server',
 		);
 	}
-	if (areas.has('vite-plugin')) commands.add('pnpm typecheck');
+	if (
+		areas.has('metaframework-core') ||
+		areas.has('rspack-plugin') ||
+		areas.has('rsbuild-plugin') ||
+		areas.has('vite-plugin')
+	) {
+		commands.add('pnpm typecheck');
+	}
 	if (areas.has('benchmark') || taskKind === 'performance') commands.add('pnpm bench');
 	if (taskKind === 'api' || taskKind === 'core' || taskKind === 'package')
 		commands.add('pnpm typecheck');

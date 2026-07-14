@@ -8,10 +8,20 @@ export const INVENTORY_PATH = path.join(REPO_ROOT, 'docs/packages.md');
 
 const SPECIAL_ROLES = new Map([
 	['octane', 'core runtime + compiler'],
+	['@octanejs/app-core', 'metaframework core'],
+	['@octanejs/rspack-plugin', 'compiler integration'],
+	['@octanejs/rsbuild-plugin', 'metaframework'],
 	['@octanejs/vite-plugin', 'metaframework'],
 	['@octanejs/adapter-vercel', 'deployment adapter'],
 	['@octanejs/mcp-server', 'agent tooling'],
 	['@octanejs/evals', 'evaluation tooling'],
+]);
+
+const OCTANE_SINGLETON_CONSUMERS = new Set([
+	'@octanejs/app-core',
+	'@octanejs/rspack-plugin',
+	'@octanejs/rsbuild-plugin',
+	'@octanejs/vite-plugin',
 ]);
 
 function readJson(file) {
@@ -101,7 +111,7 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 		// and the metaframework must therefore consume the application's singleton
 		// runtime as an exact 0.x peer, while retaining a workspace dev dependency
 		// for this monorepo's source tests.
-		if (pkg.role === 'framework binding' || pkg.name === '@octanejs/vite-plugin') {
+		if (pkg.role === 'framework binding' || OCTANE_SINGLETON_CONSUMERS.has(pkg.name)) {
 			if (pkg.manifest.dependencies?.octane !== undefined) {
 				errors.push(`${label} must not install octane as a regular dependency`);
 			}
@@ -117,11 +127,26 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 			) {
 				errors.push(`${label} must declare its supported Vite range as a peer dependency`);
 			}
+			if (
+				pkg.name === '@octanejs/rspack-plugin' &&
+				typeof pkg.manifest.peerDependencies?.['@rspack/core'] !== 'string'
+			) {
+				errors.push(`${label} must declare its supported Rspack range as a peer dependency`);
+			}
+			if (
+				pkg.name === '@octanejs/rsbuild-plugin' &&
+				typeof pkg.manifest.peerDependencies?.['@rsbuild/core'] !== 'string'
+			) {
+				errors.push(`${label} must declare its supported Rsbuild range as a peer dependency`);
+			}
 		}
 
 		if (pkg.name === '@octanejs/adapter-vercel') {
-			if (pkg.manifest.peerDependencies?.['@octanejs/vite-plugin'] !== 'workspace:*') {
-				errors.push(`${label} must peer on the exact workspace vite plugin`);
+			if (pkg.manifest.peerDependencies?.['@octanejs/app-core'] !== 'workspace:*') {
+				errors.push(`${label} must peer on the exact workspace app core`);
+			}
+			if (pkg.manifest.devDependencies?.['@octanejs/app-core'] !== 'workspace:*') {
+				errors.push(`${label} must keep the workspace app core as a dev dependency`);
 			}
 		}
 	}

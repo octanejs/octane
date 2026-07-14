@@ -12,6 +12,12 @@ import {
 
 const packages = getPublishablePackages();
 const packageVersions = new Map(packages.map((pkg) => [pkg.name, pkg.version]));
+const octaneSingletonConsumers = new Set([
+	'@octanejs/app-core',
+	'@octanejs/rspack-plugin',
+	'@octanejs/rsbuild-plugin',
+	'@octanejs/vite-plugin',
+]);
 const inventoryErrors = validateWorkspacePackages(packages);
 if (inventoryErrors.length) {
 	console.error(`cannot pack an invalid package inventory:\n  - ${inventoryErrors.join('\n  - ')}`);
@@ -76,7 +82,7 @@ function validatePackedPackage(pkg, manifest, files) {
 		);
 	}
 
-	if (pkg.role === 'framework binding' || pkg.name === '@octanejs/vite-plugin') {
+	if (pkg.role === 'framework binding' || octaneSingletonConsumers.has(pkg.name)) {
 		if (manifest.dependencies?.octane !== undefined) {
 			errors.push('packed manifest installs a duplicate octane runtime dependency');
 		}
@@ -88,10 +94,10 @@ function validatePackedPackage(pkg, manifest, files) {
 		}
 	}
 	if (pkg.name === '@octanejs/adapter-vercel') {
-		const expectedPlugin = packageVersions.get('@octanejs/vite-plugin');
-		if (manifest.peerDependencies?.['@octanejs/vite-plugin'] !== expectedPlugin) {
+		const expectedAppCore = packageVersions.get('@octanejs/app-core');
+		if (manifest.peerDependencies?.['@octanejs/app-core'] !== expectedAppCore) {
 			errors.push(
-				`packed vite-plugin peer is ${JSON.stringify(manifest.peerDependencies?.['@octanejs/vite-plugin'])}, expected exact ${JSON.stringify(expectedPlugin)}`,
+				`packed app-core peer is ${JSON.stringify(manifest.peerDependencies?.['@octanejs/app-core'])}, expected exact ${JSON.stringify(expectedAppCore)}`,
 			);
 		}
 	}

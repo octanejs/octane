@@ -1,0 +1,66 @@
+{
+  "name": "@octanejs/rsbuild-plugin",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Rsbuild metaframework plugin for Octane (Rspack compiler, routing, SSR, hydration, and production builds)",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/rsbuild-plugin-octane"
+  },
+  "files": [
+    "src",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "module": "src/index.js",
+  "main": "src/index.js",
+  "bin": {
+    "octane-rsbuild-preview": "src/bin/preview.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./production": {
+      "types": "./types/production.d.ts",
+      "import": "./src/production.js",
+      "default": "./src/production.js"
+    },
+    "./node": {
+      "types": "./types/node.d.ts",
+      "import": "./src/node.js",
+      "default": "./src/node.js"
+    }
+  },
+  "dependencies": {
+    "@octanejs/app-core": "workspace:*",
+    "@octanejs/rspack-plugin": "workspace:*"
+  },
+  "peerDependencies": {
+    "@rsbuild/core": "^2.0.0",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@rsbuild/core": "catalog:default",
+    "@rspack/core": "catalog:default",
+    "@types/node": "catalog:default",
+    "octane": "workspace:*",
+    "type-fest": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

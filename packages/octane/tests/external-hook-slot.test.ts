@@ -115,22 +115,23 @@ describe('slotHooks surgical pass', () => {
 
 describe('vite plugin gate routing', () => {
 	const plugin = octane({ exclude: ['/packages/zustand/src/'] });
+	const appRoot = join(process.cwd(), 'app');
 	// the transform doesn't need a real plugin `this` for the client paths
 	const run = (code: string, id: string) => (plugin.transform as any).call({}, code, id);
 	const HOOK = `import { useState } from 'octane';\nexport const f = () => { const [state, setState] = useState(0); return [state, setState]; };`;
 
 	it('.ts with an octane hook → surgical slot pass', () => {
-		expect(run(HOOK, '/app/h.ts')?.code).toMatch(/useState\(0, _h\$\d+\)/);
+		expect(run(HOOK, join(appRoot, 'h.ts'))?.code).toMatch(/useState\(0, _h\$\d+\)/);
 	});
 
 	it('.js with an octane hook → surgical slot pass', () => {
-		expect(run(HOOK, '/app/h.js')?.code).toMatch(/useState\(0, _h\$\d+\)/);
+		expect(run(HOOK, join(appRoot, 'h.js'))?.code).toMatch(/useState\(0, _h\$\d+\)/);
 	});
 
 	it('.tsx → full compiler (JSX lowered, hook slotted)', () => {
 		const tsx = run(
 			`import { useState } from 'octane';\nexport function C() { const [n] = useState(0); return <b>{n as string}</b>; }`,
-			'/app/c.tsx',
+			join(appRoot, 'c.tsx'),
 		);
 		expect(tsx?.code).toMatch(/_h\$\d+/); // hook slotted
 		expect(tsx?.code).toMatch(/_frag\$|template\(/); // JSX lowered (slot-pass never emits these)

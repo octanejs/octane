@@ -206,8 +206,12 @@ answers those questions for all 23 first-party bindings and is checked in CI.
 	<p className="doc-callout-title">App tooling is a separate layer</p>
 	<p>
 		<code>@octanejs/vite-plugin</code>
+		{' and '}
+		<code>@octanejs/rsbuild-plugin</code>
 		{
-			' provides routes, server rendering, hydration wiring, and a production build. The Quick start configures it; bindings are the library adapters you add afterwards.'
+			' provide full-app routing, server rendering, hydration, and production builds. @octanejs/rspack-plugin is the lower-level compiler integration. The '
 		}
+		<a href="/docs/build-tools">Build tools guide</a>
+		{' compares all three; bindings are the library adapters you add afterwards.'}
 	</p>
 </aside>

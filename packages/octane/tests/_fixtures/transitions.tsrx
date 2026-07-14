@@ -1,4 +1,11 @@
-import { use, useState, useTransition, startTransition, useDeferredValue } from 'octane';
+import {
+	use,
+	useReducer,
+	useState,
+	useTransition,
+	startTransition,
+	useDeferredValue,
+} from 'octane';
 
 // ---------------------------------------------------------------------------
 // useTransition basics — [isPending, start]. The setter returned from start
@@ -38,6 +45,55 @@ export function TransitionKeepsDom(props) @{
 			</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// React 19 async Actions keep ordinary transition state on the last committed
+// value until the Action's promise settles. The pending cue is urgent, while
+// both the parent selection and its suspending child remain on the old screen.
+// useReducer joins the same Action batch as useState.
+export function AsyncActionKeepsCommittedState(props) @{
+	const [selection, setSelection] = useState(props.initialSelection);
+	const [count, setCount] = useState(0);
+	const [reducerSelection, dispatchSelection] = useReducer(
+		(_current, next) => next,
+		props.initialSelection.id,
+	);
+	const [isPending, start] = useTransition();
+	<div>
+		<span id="pending">
+			{isPending ? 'pending' : 'idle'}
+		</span>
+		<span id="parent-selection">
+			{selection.id as string}
+		</span>
+		<span id="reducer-selection">
+			{reducerSelection as string}
+		</span>
+		<span id="action-count">
+			{count as string}
+		</span>
+		<button
+			id="swap-action"
+			onClick={() => start(async () => {
+				setCount((value) => value + 10);
+				await props.stageGate;
+				startTransition(() => {
+					setSelection(() => props.nextSelection);
+					dispatchSelection(props.nextSelection.id);
+				});
+				await props.nextSelection.promise;
+			})}
+		>{'swap'}</button>
+		<button id="urgent-count" onClick={() => setCount((value) => value + 1)}>{'urgent'}</button>
+		@try {
+			const value = use(selection.promise);
+			<span id="action-value">
+				{value as string}
+			</span>
+		} @pending {
+			<span id="action-fallback">{'fallback'}</span>
 		}
 	</div>
 }

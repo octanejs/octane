@@ -2156,13 +2156,15 @@ function devLoc(ctx, node) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean, mode?: 'client' | 'server', dev?: boolean }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean }} [options] —
  *   `dev: true` emits dev-only hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`); strictly gated so production output is byte-identical.
- *   `hmr: true` wraps each exported component in `hmr(Component)` and emits an
- *   `import.meta.hot.accept(...)` block that delegates updates to the runtime
- *   HMR wrapper. Dev tooling (e.g. the Vite plugin) should pass `hmr: true` in
- *   serve mode and leave it off for production builds.
+ *   `hmr: true` (backwards-compatible shorthand for `hmr: 'vite'`) wraps each
+ *   exported component in `hmr(Component)` and emits Vite
+ *   `import.meta.hot.accept(...)` wiring. `hmr: 'webpack'` emits Rspack/webpack
+ *   `import.meta.webpackHot` wiring with dispose-data wrapper handoff. Dev
+ *   tooling should select its dialect in serve mode and leave HMR off for
+ *   production builds.
  *   `mode` selects the codegen target: `'client'` (default) emits the
  *   template-clone DOM runtime; `'server'` emits HTML-string SSR output (static
  *   chunks interleaved with `ssr*` helpers) carrying the hydration markers the
@@ -2195,7 +2197,14 @@ export function compile(source, filename, options) {
 	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
 	// through untouched.
 	applyHookDependencies(ast, { filename });
-	const hmrEnabled = !!(options && options.hmr);
+	const hmrOption = options && options.hmr;
+	const hmrDialect = hmrOption === true ? 'vite' : hmrOption || false;
+	if (hmrDialect !== false && hmrDialect !== 'vite' && hmrDialect !== 'webpack') {
+		throw new Error(
+			`Unknown HMR dialect ${JSON.stringify(hmrDialect)} — expected false, 'vite', or 'webpack'.`,
+		);
+	}
+	const hmrEnabled = hmrDialect !== false;
 	// Dev mode: emit dev-only hydration source-location metadata (a per-component
 	// `__s.locs` table of structured {line,column} keyed by slot index + the module file
 	// name), used by hydration-mismatch warnings and reusable by a future Chrome-DevTools
@@ -2443,7 +2452,7 @@ export function compile(source, filename, options) {
 			ctx._setupMaps = null;
 		}
 	};
-	const compileOpts = { hmrWrap: hmrEnabled };
+	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrDialect === 'webpack' };
 	for (const node of ast.body) {
 		if (
 			node === serverModuleInfo?.declaration ||
@@ -2495,19 +2504,31 @@ export function compile(source, filename, options) {
 		} else if (node.type === 'ExportNamedDeclaration' && isReturnJsxFunction(node.declaration)) {
 			const base = bodyLine;
 			ctx._setupMaps = null;
-			const chunk = compileReturnJsxFunction(node.declaration, ctx, { export: true }) + '\n\n';
+			const chunk =
+				compileReturnJsxFunction(node.declaration, ctx, {
+					export: true,
+					hmrWrap: hmrEnabled,
+					hmrMutable: hmrDialect === 'webpack',
+				}) + '\n\n';
 			pushDeclAnchor(node, base);
 			drainSetupMaps(base);
 			body += chunk;
 			bodyLine += countNewlines(chunk);
+			if (hmrEnabled) hmrComponents.push({ name: node.declaration.id.name, exportKind: 'named' });
 		} else if (node.type === 'ExportDefaultDeclaration' && isReturnJsxFunction(node.declaration)) {
 			const base = bodyLine;
 			ctx._setupMaps = null;
-			const chunk = compileReturnJsxFunction(node.declaration, ctx, { default: true }) + '\n\n';
+			const chunk =
+				compileReturnJsxFunction(node.declaration, ctx, {
+					default: true,
+					hmrWrap: hmrEnabled,
+					hmrMutable: hmrDialect === 'webpack',
+				}) + '\n\n';
 			pushDeclAnchor(node, base);
 			drainSetupMaps(base);
 			body += chunk;
 			bodyLine += countNewlines(chunk);
+			if (hmrEnabled) hmrComponents.push({ name: node.declaration.id.name, exportKind: 'default' });
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
 			// Preserve ALL user-imported names from octane (Portal, createContext,
 			// use, custom helpers, etc.) — merged into the single prelude import.
@@ -2592,19 +2613,47 @@ export function compile(source, filename, options) {
 		// Symbol key used to reach the wrapper's meta on `.update(...)`).
 		ctx.runtimeNeeded.add('hmr');
 		ctx.runtimeNeeded.add('HMR');
-		const updates = hmrComponents
-			.map((c) => {
-				const accessor = c.exportKind === 'default' ? 'module.default' : `module.${c.name}`;
-				return `    ${c.name}[_$HMR].update(${accessor});`;
-			})
-			.join('\n');
-		hmrBlock =
-			'if (import.meta.hot) {\n' +
-			'  import.meta.hot.accept((module) => {\n' +
-			updates +
-			'\n' +
-			'  });\n' +
-			'}\n';
+		if (hmrDialect === 'webpack') {
+			// Rspack/webpack re-evaluates the accepted module and exposes the previous
+			// module's dispose data to that NEW evaluation. Hand the fresh body to the
+			// previous canonical wrapper, then make the new ESM binding point back to
+			// it. Persist that canonical identity again for the next update. This keeps
+			// working across any number of edits; accept callbacks in webpack are error
+			// handlers, not Vite-style callbacks carrying the new module namespace.
+			const handoffs = hmrComponents
+				.map(
+					(c) =>
+						`  if (import.meta.webpackHot.data?.__octaneComponents?.${c.name}) {\n` +
+						`    import.meta.webpackHot.data.__octaneComponents.${c.name}[_$HMR].update(${c.name});\n` +
+						`    ${c.name} = import.meta.webpackHot.data.__octaneComponents.${c.name};\n` +
+						'  }',
+				)
+				.join('\n');
+			const bindings = hmrComponents.map((c) => c.name).join(', ');
+			hmrBlock =
+				'if (import.meta.webpackHot) {\n' +
+				handoffs +
+				'\n' +
+				'  import.meta.webpackHot.dispose((data) => {\n' +
+				`    data.__octaneComponents = { ${bindings} };\n` +
+				'  });\n' +
+				'  import.meta.webpackHot.accept();\n' +
+				'}\n';
+		} else {
+			const updates = hmrComponents
+				.map((c) => {
+					const accessor = c.exportKind === 'default' ? 'module.default' : `module.${c.name}`;
+					return `    ${c.name}[_$HMR].update(${accessor});`;
+				})
+				.join('\n');
+			hmrBlock =
+				'if (import.meta.hot) {\n' +
+				'  import.meta.hot.accept((module) => {\n' +
+				updates +
+				'\n' +
+				'  });\n' +
+				'}\n';
+		}
 	}
 
 	// Cross-module singleRoot stamps (docs/comment-marker-elision-plan.md M1):
@@ -3996,16 +4045,22 @@ function compileComponent(node, ctx, options) {
 	ctx._pendingWarm = null;
 
 	// HMR-wrap exported components inline so the binding stays a `const` (no
-	// reassignment dance needed). The wrapper preserves the user-facing
+	// reassignment dance needed in Vite). Webpack/Rspack HMR instead uses a `let`
+	// binding so a re-evaluated module can hand its export back to the previous
+	// canonical wrapper stored in hot dispose data. The wrapper preserves the user-facing
 	// function-name identity by NAMING the inner FunctionExpression — `hmr`
 	// returns a wrapper that delegates to whatever fn is currently committed,
 	// and `module.Foo[HMR].update(...)` swaps it on each accept.
 	const valueExpr = hmrWrap && isExported ? `_$hmr(${warmedFn})` : warmedFn;
+	const declaration = options && options.hmrMutable ? 'let' : 'const';
 	if (isDefault) {
+		if (options && options.hmrMutable) {
+			return `let ${name} = ${valueExpr};\nexport { ${name} as default };`;
+		}
 		return `const ${name} = ${valueExpr};\nexport default ${name};`;
 	}
 	if (isExported) {
-		return `export const ${name} = ${valueExpr};`;
+		return `export ${declaration} ${name} = ${valueExpr};`;
 	}
 	return `const ${name} = ${valueExpr};`;
 }
@@ -5333,12 +5388,21 @@ function compileReturnJsxFunction(node, ctx, options) {
 	// `export ` prefix shifts only line 0's columns; `export default` appends a
 	// trailing (unmapped) line and shifts nothing.
 	ctx._setupMaps =
-		options && options.export
+		options && options.export && !options.hmrWrap
 			? [
 					{ fnRelLine: 0, colShift: 'export '.length, mappings: mappings.slice(0, 1) },
 					{ fnRelLine: 1, colShift: 0, mappings: mappings.slice(1) },
 				]
 			: [{ fnRelLine: 0, colShift: 0, mappings }];
+	if (options && options.hmrWrap) {
+		code += `\n${name} = _$hmr(${name});`;
+		if (options.default) {
+			return options.hmrMutable
+				? `${code}\nexport { ${name} as default };`
+				: `${code}\nexport default ${name};`;
+		}
+		if (options.export) return `${code}\nexport { ${name} };`;
+	}
 	if (options && options.default) return `${code}\nexport default ${name};`;
 	if (options && options.export) return `export ${code}`;
 	return code;

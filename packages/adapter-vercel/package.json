@@ -33,10 +33,10 @@
     }
   },
   "peerDependencies": {
-    "@octanejs/vite-plugin": "workspace:*"
+    "@octanejs/app-core": "workspace:*"
   },
   "devDependencies": {
-    "@octanejs/vite-plugin": "workspace:*",
+    "@octanejs/app-core": "workspace:*",
     "@types/node": "catalog:default"
   }
 }

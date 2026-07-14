@@ -14,6 +14,20 @@
 export { RenderRoute, ServerRoute } from './routes.js';
 export { resolveOctaneConfig } from './resolve-config.js';
 export { OCTANE_NONCE_STATE_KEY } from './constants.js';
+export {
+	DEFAULT_OUTDIR,
+	ENTRY_FILENAME,
+	compose,
+	createContext,
+	createRouter,
+	get_component_export,
+	get_route_entry_export_name,
+	get_route_entry_id,
+	get_route_entry_path,
+	handleServerRoute,
+	is_rpc_request,
+	runMiddlewareChain,
+} from '@octanejs/app-core';
 
 // Mirrors src/index.js — enforce types / DX only.
 export function defineConfig(/** @type {any} */ options) {

@@ -29,6 +29,7 @@
     "./static": "./src/static/index.ts",
     "./constants": "./src/constants.ts",
     "./compiler": "./src/compiler/index.js",
+    "./compiler/bundler": "./src/compiler/bundler.js",
     "./compiler/vite": "./src/compiler/vite.js",
     "./compiler/volar": "./src/compiler/volar.js"
   },
@@ -55,6 +56,7 @@
         "default": "./dist/constants.js"
       },
       "./compiler": "./dist/compiler/index.js",
+      "./compiler/bundler": "./dist/compiler/bundler.js",
       "./compiler/vite": "./dist/compiler/vite.js",
       "./compiler/volar": "./dist/compiler/volar.js"
     }

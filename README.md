@@ -93,10 +93,10 @@ see [Differences from React](https://octanejs.dev/docs/differences-from-react).
 Octane's published packages require Node.js 22 or newer.
 
 ```bash
-pnpm add octane @octanejs/vite-plugin
+pnpm add octane
 ```
 
-Add the plugin to your Vite config:
+For a Vite SPA, add the compiler plugin:
 
 ```ts
 // vite.config.ts
@@ -108,8 +108,45 @@ export default defineConfig({
 });
 ```
 
-`@octanejs/vite-plugin` is the optional metaframework (dev SSR, routing, hydrate). For
-a plain SPA you only need the `octane()` compiler plugin shown above.
+Octane also supports Rspack and Rsbuild 2.x. Use the low-level Rspack plugin
+when you own the application shell and entries yourself:
+
+```bash
+pnpm add -D @rspack/core @octanejs/rspack-plugin
+```
+
+```js
+// rspack.config.mjs
+import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
+
+export default {
+  entry: './src/main.tsrx',
+  plugins: [new OctaneRspackPlugin()],
+};
+```
+
+Use the Rsbuild plugin for the full Octane app layer: routing, streaming dev
+SSR, hydration entries, client/server production environments, preview, and
+deployment adapters.
+
+```bash
+pnpm add @octanejs/rsbuild-plugin
+pnpm add -D @rsbuild/core
+```
+
+```ts
+// rsbuild.config.ts
+import { defineConfig } from '@rsbuild/core';
+import { pluginOctane } from '@octanejs/rsbuild-plugin';
+
+export default defineConfig({
+  plugins: [pluginOctane()],
+});
+```
+
+`@octanejs/vite-plugin` provides the same app-level features for Vite. See the
+[build tools guide](https://octanejs.dev/docs/build-tools) for SPA, SSR,
+client/server target, HMR, and config examples.
 
 ### Mount
 
@@ -196,8 +233,8 @@ when every boundary chunk has been accepted under backpressure; consume the
 stream concurrently rather than awaiting `allReady` before reading. The Node
 stream honors `write(false)`/`drain` and cancels on destination error or close.
 Both accept a `StreamOptions` (`RenderOptions` plus `onShellReady()`,
-`onShellError(err)`, and `onAllReady()`). `@octanejs/vite-plugin` renders through
-`renderToReadableStream` by default.
+`onShellError(err)`, and `onAllReady()`). The Vite and Rsbuild metaframework
+plugins render through `renderToReadableStream` by default.
 
 ```ts
 // entry-client.ts
@@ -390,6 +427,8 @@ Octane itself. Good places to start:
 
 - **[Quick start](https://octanejs.dev/docs/quick-start)** — install, mount, and
   the `.tsrx` essentials.
+- **[Build tools](https://octanejs.dev/docs/build-tools)** — configure Vite,
+  Rspack, or Rsbuild for SPA compilation and full-stack SSR.
 - **[TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx)** — when to reach for
   each dialect and exactly what TSRX unlocks: compiled `@for` collections,
   template control flow, and text holes.
@@ -408,10 +447,16 @@ generated from the workspace manifests in
 
 - [`octane`](./packages/octane) is the runtime and the compiler together. It covers
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
-  and the compiler itself, which is exposed at `octane/compiler` (and
-  `octane/compiler/vite` for the build transform).
-- [`@octanejs/vite-plugin`](./packages/vite-plugin-octane) is the optional metaframework
-  plugin, with dev SSR, routing, and hydration wiring for full apps;
+  and the compiler itself, exposed at `octane/compiler` with bundler adapters at
+  `octane/compiler/vite` and `octane/compiler/bundler`.
+- [`@octanejs/app-core`](./packages/app-core) contains the bundler-neutral app
+  config, routing, SSR, hydration code generation, and production handler used
+  by the metaframework integrations.
+- [`@octanejs/rspack-plugin`](./packages/rspack-plugin-octane) is the low-level
+  Rspack compiler integration; [`@octanejs/rsbuild-plugin`](./packages/rsbuild-plugin-octane)
+  is the full Rsbuild metaframework integration.
+- [`@octanejs/vite-plugin`](./packages/vite-plugin-octane) is the equivalent Vite
+  metaframework plugin, with dev SSR, routing, and hydration wiring for full apps;
   [`@octanejs/adapter-vercel`](./packages/adapter-vercel) deploys its build
   output to Vercel.
 - [`@octanejs/mcp-server`](./packages/octane-mcp-server) exposes octane docs and

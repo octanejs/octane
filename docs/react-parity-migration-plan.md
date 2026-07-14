@@ -532,8 +532,10 @@ and resumes. Urgent + hydration keep the legacy path. This closed the `@octanejs
 concurrent-navigation gap (its `it.fails` flipped to passing). Validated by differential
 (React-oracle) tests for childSlot + ifBlock + nested-Suspense, and direct tests for
 switchBlock + componentSlot(router) + portal-in-WIP. Documented scope: per-swap, not a
-global double-buffered tree (SUSPENSE_DIVERGENCE.md #4). **Still open in Tier 5:**
-effects-semantics, reveal-throttle, async-actions, Activity ports + the fidelity audit.
+global double-buffered tree (SUSPENSE_DIVERGENCE.md #4). Cross-boundary reveal coordination
+is complete, but an ordinary synchronous same-identity parent render can still patch
+siblings before a descendant suspends; the later async Action batch closes that shape only
+while an Action is in flight.
 
 **Tier 5 port — findings so far (in progress):**
 - **Rig limitation discovered:** `@tsrx/react` compiles octane's `@pending` arm to a
@@ -582,14 +584,14 @@ effects-semantics, reveal-throttle, async-actions, Activity ports + the fidelity
   real order (workaround removed). Pinned by `conformance/effect-order.test.ts`.
 - **Global commit coordination — DONE for #1 + #4 (`conformance/entangled-commit.test.ts`,
   flipped `transitions.test.ts` entangled test):** a single `startTransition` that fans
-  out to multiple suspending boundaries now holds EVERY prior screen until all are
-  data-ready, then reveals them together (React's atomic-commit contract). Implemented as
+  out to multiple suspending boundaries now holds every affected boundary's prior content
+  until all are data-ready, then reveals them together. Implemented as
   a data-ready barrier in runtime.ts: `HELD_TRANSITIONS` tracks boundaries holding prior
   content; each stages its reveal as its data resolves; when `STAGED_REVEALS.size ===
   HELD_TRANSITIONS.size` the batch flushes in one commit. `commitResume` was extracted
   from `attachResume`'s retry; abandon paths (urgent supersede / error / unmount) drop a
-  boundary from the group so the rest aren't stranded. Divergences #1 and #4 closed; full
-  suite green, zero regressions.
+  boundary from the group so the rest aren't stranded. The cross-boundary reveal gap is
+  closed; same-identity parent/sibling rollback remains outside this coordinator (#4).
 - **#5 reveal throttling — investigated and DISMISSED (octane matches default React).**
   The provisional divergence used the wrong oracle (the `-test.internal.js` suite). The
   public default-flags test `ReactUse-test.js:1096` reveals `A(Loading B...)` immediately
@@ -601,11 +603,12 @@ effects-semantics, reveal-throttle, async-actions, Activity ports + the fidelity
   (passthrough change mid-action), custom reducers, and repeated updates in one action all
   match React (`conformance/async-actions.test.ts`). `<Activity>` reveal-outer-without-inner
   and child-first-mount / parent-first-hide cleanup order match React (`activity.test.ts`).
-  Two narrow divergences surfaced and were documented (not pinned): async-action
-  transition entanglement (#6 — a non-optimistic intermediate transition update commits
-  eagerly instead of being held until the action settles) and `useInsertionEffect` toggling
-  under `<Activity>` (#7). Both are rare edges where a fix risks the working optimistic flow
-  / touches the effect-slot shape; deferred.
+  The two narrow divergences found here are now closed: `TransitionActionBatch` stages
+  ordinary state/reducer updates until every entangled async Action settles while urgent
+  discrete updates remain immediate (`transitions.test.ts`, #6), and insertion effects stay
+  connected across Activity visibility changes (`activity.test.ts`, #7). The Action
+  regression also covers post-`await` nested transitions, Suspense hold, and functional
+  rebasing over an urgent update; `useOptimistic` remains visible while pending.
 - **Fidelity re-audit — DONE.** Every existing suspense/transition/activity/actions test
   (~80 across 16 files) was cross-referenced against the React v19.2.7 clone (4 parallel
   read-only audits). Result: NO "cheating" — no test encodes octane-current behavior as

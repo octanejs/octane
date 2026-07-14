@@ -121,12 +121,19 @@ React.
 	<p className="doc-callout-title">The file extension does not change the framework</p>
 	<p>
 		{
-			'Both dialects use the same hooks, context, portals, Suspense, transitions, native events, SSR, and hydration. The octane() Vite plugin builds both, while octane/compiler/volar adds editor support for .tsrx.'
+			'Both dialects use the same hooks, context, portals, Suspense, transitions, native events, SSR, and hydration. The Vite, Rspack, and Rsbuild integrations compile both, while octane/compiler/volar adds editor support for .tsrx.'
 		}
 	</p>
 </aside>
 
 One rule also applies to both: do not call a slot-based hook directly in a plain
 JavaScript loop. Use keyed `@for`, or move the hook into a row component rendered by a
-keyed `.map()`. Continue with [Core APIs](/docs/core-apis) for the APIs shared by both
-styles.
+keyed `.map()`.
+
+<h2 id="next">Next</h2>
+
+- [Quick start](/docs/quick-start) — install, mount, and the `.tsrx` essentials.
+- [Build tools](/docs/build-tools) — Vite, Rspack, and Rsbuild integration.
+- [Core APIs](/docs/core-apis) — roots, hooks, boundaries, actions, and SSR.
+- [Differences from React](/docs/differences-from-react) — the deliberate
+  divergences (everything else matching React is the point).

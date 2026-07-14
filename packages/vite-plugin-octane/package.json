@@ -46,6 +46,7 @@
     }
   },
   "dependencies": {
+    "@octanejs/app-core": "workspace:*",
     "@ripple-ts/adapter": "catalog:default"
   },
   "peerDependencies": {
