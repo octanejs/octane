@@ -1,0 +1,79 @@
+import * as React from 'octane';
+import {
+	assertWrappedQueryRef,
+	getWrappedPromise,
+	unwrapQueryRef,
+	updateWrappedQueryRef,
+	wrapQueryRef,
+} from '@octanejs/apollo-client/react/internal';
+import { wrapHook } from './internal/index.js';
+import { useApolloClient } from './useApolloClient.js';
+/**
+ * A React hook that returns a `refetch` and `fetchMore` function for a given
+ * `queryRef`.
+ *
+ * This is useful to get access to handlers for a `queryRef` that was created by
+ * `createQueryPreloader` or when the handlers for a `queryRef` produced in
+ * a different component are inaccessible.
+ *
+ * @example
+ *
+ * ```tsx
+ * const MyComponent({ queryRef }) {
+ *   const { refetch, fetchMore } = useQueryRefHandlers(queryRef);
+ *
+ *   // ...
+ * }
+ * ```
+ *
+ * @param queryRef - A `QueryRef` returned from `useBackgroundQuery`, `useLoadableQuery`, or `createQueryPreloader`.
+ */
+export function useQueryRefHandlers(queryRef) {
+	'use no memo';
+	const unwrapped = unwrapQueryRef(queryRef);
+	const clientOrObsQuery = useApolloClient(
+		unwrapped
+			? // passing an `ObservableQuery` is not supported by the types, but it will
+				// return any truthy value that is passed in as an override so we cast the result
+				unwrapped['observable']
+			: undefined,
+	);
+	return wrapHook('useQueryRefHandlers', useQueryRefHandlers_, clientOrObsQuery)(queryRef);
+}
+function useQueryRefHandlers_(queryRef) {
+	assertWrappedQueryRef(queryRef);
+	const [previousQueryRef, setPreviousQueryRef] = React.useState(queryRef);
+	const [wrappedQueryRef, setWrappedQueryRef] = React.useState(queryRef);
+	const internalQueryRef = unwrapQueryRef(queryRef);
+	// To ensure we can support React transitions, this hook needs to manage the
+	// queryRef state and apply React's state value immediately to the existing
+	// queryRef since this hook doesn't return the queryRef directly
+	if (previousQueryRef !== queryRef) {
+		setPreviousQueryRef(queryRef);
+		setWrappedQueryRef(queryRef);
+	} else {
+		updateWrappedQueryRef(queryRef, getWrappedPromise(wrappedQueryRef));
+	}
+	const refetch = React.useCallback(
+		(variables) => {
+			const promise = internalQueryRef.refetch(variables);
+			setWrappedQueryRef(wrapQueryRef(internalQueryRef));
+			return promise;
+		},
+		[internalQueryRef],
+	);
+	const fetchMore = React.useCallback(
+		(options) => {
+			const promise = internalQueryRef.fetchMore(options);
+			setWrappedQueryRef(wrapQueryRef(internalQueryRef));
+			return promise;
+		},
+		[internalQueryRef],
+	);
+	return {
+		refetch,
+		fetchMore,
+		// TODO: The internalQueryRef doesn't have TVariables' type information so we have to cast it here
+		subscribeToMore: internalQueryRef.observable.subscribeToMore,
+	};
+}

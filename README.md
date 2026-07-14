@@ -467,7 +467,8 @@ generated from the workspace manifests in
   the repository.
 - The `@octanejs/*` framework bindings — each an octane port of a React library:
   [`zustand`](./packages/zustand), [`jotai`](./packages/jotai),
-  [`query`](./packages/tanstack-query), [`motion`](./packages/motion),
+  [`query`](./packages/tanstack-query), [`apollo-client`](./packages/apollo-client),
+  [`motion`](./packages/motion),
   [`stylex`](./packages/stylex), [`router`](./packages/tanstack-router),
   [`remix-router`](./packages/remix-router),
   [`table`](./packages/tanstack-table), [`virtual`](./packages/tanstack-virtual),
