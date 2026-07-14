@@ -11,7 +11,9 @@ const repositoryRoot = join(packageRoot, '..', '..');
 const corpusRoot = join(packageRoot, 'datasets', 'train', 'user-apps-v1');
 const generatorTimeoutMs = 10_000;
 const gradingCommandTimeoutMs = 20_000;
-const starterVerificationTimeoutMs = 25_000;
+// The verifier gives its nested Vitest run 60 seconds, so this wrapper must leave
+// enough time for that timeout to surface its own actionable error under CI load.
+const starterVerificationTimeoutMs = 70_000;
 
 interface UserAppCatalog {
 	environment: {
@@ -206,5 +208,5 @@ describe('public user-app training corpus', () => {
 			timeout: starterVerificationTimeoutMs,
 			killSignal: 'SIGKILL',
 		});
-	}, 30_000);
+	}, 75_000);
 });
