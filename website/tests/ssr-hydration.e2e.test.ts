@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { censusDomNodes, type DomNodeCensus } from '../../benchmarks/lib/dom-nodes.mjs';
 
 const WEBSITE = join(process.cwd(), 'website');
-const ROUTES = ['/', '/docs', '/docs/core-apis', '/benchmarks', '/playground', '/view-transitions'];
+const ROUTES = ['/', '/docs', '/docs/core-apis', '/benchmarks', '/playground'];
 
 // M0 of docs/comment-marker-elision-plan.md: per-route comment-node ceilings
 // (~15% above post-M4 2026-07-09 measurements: / 1,463 · /docs 361 ·
@@ -48,15 +48,12 @@ const ROUTES = ['/', '/docs', '/docs/core-apis', '/benchmarks', '/playground', '
 const COMMENT_CEILINGS: Record<string, number> = {
 	'/': 3380,
 	'/docs': 415,
-	// Core APIs guide re-based 2026-07-13 (measured 641) after lists/conditions,
-	// refs/effects, data-loading, and form live examples joined the state demo.
-	// The ceiling retains roughly 15% headroom for the intentional content growth.
-	'/docs/core-apis': 740,
+	// Core APIs guide re-based 2026-07-14 (measured 777) after the View Transitions
+	// and portal demos plus four dedicated API examples joined the guide. The
+	// ceiling retains roughly 15% headroom for the intentional content growth.
+	'/docs/core-apis': 895,
 	'/benchmarks': 26100,
 	'/playground': 195,
-	// The view-transitions demo (added with the plan's Phase 5, measured 189) —
-	// a handful of boundaries + control-flow arms.
-	'/view-transitions': 200,
 };
 
 // A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a
@@ -304,6 +301,31 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				'Saved Grace Hopper.',
 			);
 
+			const portalDemo = page.locator('[data-demo="portal"]');
+			await portalDemo.getByRole('button', { name: 'Show saved toast' }).click();
+			const portalToast = portalDemo.locator('.portal-demo-toast');
+			await portalToast.waitFor();
+			expect(
+				await portalDemo.evaluate((root) => {
+					const toast = root.querySelector('.portal-demo-toast');
+					return {
+						inTarget: root.querySelector('.portal-demo-layer')?.contains(toast) ?? false,
+						inLogicalParent: root.querySelector('.portal-demo-parent')?.contains(toast) ?? false,
+					};
+				}),
+			).toEqual({ inTarget: true, inLogicalParent: false });
+			await portalToast.getByRole('button', { name: 'Dismiss' }).click();
+			await waitForLocatorText(
+				portalDemo.locator('.portal-demo-result'),
+				'Clicks observed by the logical parent: 1',
+			);
+
+			expect(await page.locator('.api-index-card li > p').count()).toBe(0);
+			const badgeColors = await page
+				.locator('.api-index-card li > code')
+				.evaluateAll((badges) => badges.map((badge) => getComputedStyle(badge).color));
+			expect(new Set(badgeColors).size).toBe(1);
+
 			const real = errors.filter((error) => !error.includes('Failed to load resource'));
 			expect(real).toEqual([]);
 		} finally {
@@ -311,10 +333,11 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
-	it('the View Transitions controls run native transitions after hydration', async (ctx) => {
+	it('the embedded View Transitions controls run native transitions after hydration', async (ctx) => {
 		if (!browser) return ctx.skip();
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/view-transitions');
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis');
 		try {
+			const demo = page.locator('[data-demo="view-transitions"]');
 			const supported = await page.evaluate(
 				() => typeof (document as any).startViewTransition === 'function',
 			);
@@ -342,16 +365,16 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				await page.evaluate(() => (window as any).__octaneViewTransitionFinished);
 			};
 
-			await page.locator('#vt-toggle-card').click();
-			await waitForLocatorText(page.locator('#vt-toggle-card'), 'Add card');
+			await demo.locator('#vt-toggle-card').click();
+			await waitForLocatorText(demo.locator('#vt-toggle-card'), 'Add card');
 			await finishTransition(1);
 
-			await page.locator('#vt-toggle-hero').click();
-			await page.waitForSelector('.vtdemo-hero-big');
+			await demo.locator('#vt-toggle-hero').click();
+			await demo.locator('.vtdemo-hero-big').waitFor();
 			await finishTransition(2);
 
-			await page.getByRole('button', { name: 'Details' }).click();
-			await waitForLocatorText(page.locator('.vtdemo-panel'), 'Details');
+			await demo.getByRole('tab', { name: 'Details' }).click();
+			await waitForLocatorText(demo.locator('.vtdemo-panel'), 'Details');
 			await finishTransition(3);
 
 			const real = errors.filter((error) => !error.includes('Failed to load resource'));

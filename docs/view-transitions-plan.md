@@ -13,7 +13,9 @@ inherit the wrapping boundary's name/share/update), the user doc
 enter/exit, shared-element morph, addTransitionType tabs; driven by the
 real-browser e2e; needed BOTH the app-router entry and the plugin-level
 octane.config.ts RenderRoute — the catch-all otherwise serves it with a 404
-status). Phase 4: parent enter/exit relays SHIPPED (React's
+status). Follow-up polish on 2026-07-14 moved that live demo into the Core APIs
+guide at `/docs/core-apis` and removed the standalone route and nav item. Phase
+4: parent enter/exit relays SHIPPED (React's
 `enableViewTransitionParentEnterExit` is ON in the experimental channel, so
 this is live behavior, not a pin): `parentEnter`/`parentExit` class props +
 `onParentEnter`/`onParentExit` callbacks; a nested boundary in a unit that
