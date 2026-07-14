@@ -448,54 +448,65 @@ export function DocPage() @{
 			.prose :global(details > div p:first-child) {
 				margin-top: 1rem;
 			}
-			.prose :global(.api-index-grid) {
+			.prose :global(.api-index-grid),
+			.prose :global(.doc-card-grid) {
 				display: grid;
 				grid-template-columns: repeat(2, minmax(0, 1fr));
 				gap: 0.85rem;
 				margin: 1.5rem 0;
 			}
-			.prose :global(.api-index-card) {
+			.prose :global(.api-index-card),
+			.prose :global(.doc-card) {
 				padding: 1.1rem;
 				border: 1px solid var(--border);
 				border-radius: 0.9rem;
 				background: rgba(255, 255, 255, 0.025);
 			}
-			.prose :global(.api-index-card h3) {
+			.prose :global(.api-index-card h3),
+			.prose :global(.doc-card h3) {
 				margin: 0 0 0.85rem;
 				font-size: 1rem;
 			}
-			.prose :global(.api-index-card ul) {
+			.prose :global(.api-index-card ul),
+			.prose :global(.doc-card ul) {
 				list-style: none;
 				margin: 0;
 				padding: 0;
 			}
-			.prose :global(.api-index-card li) {
+			.prose :global(.api-index-card li),
+			.prose :global(.doc-card li) {
 				display: block;
 				margin: 0;
 				padding: 0.55rem 0;
 				border-top: 1px solid rgba(255, 255, 255, 0.06);
 			}
-			.prose :global(.api-index-card li:first-child) {
+			.prose :global(.api-index-card li:first-child),
+			.prose :global(.doc-card li:first-child) {
 				padding-top: 0;
 				border-top: none;
 			}
-			.prose :global(.api-index-card li:last-child) {
+			.prose :global(.api-index-card li:last-child),
+			.prose :global(.doc-card li:last-child) {
 				padding-bottom: 0;
 			}
-			.prose :global(.api-index-card li > code) {
+			.prose :global(.api-index-card li > code),
+			.prose :global(.doc-card li > code) {
 				display: inline-block;
 				margin: 0 0 0.2rem;
 				color: #ff8b9b;
 			}
-			.prose :global(.api-index-card li > a) {
+			.prose :global(.api-index-card li > a),
+			.prose :global(.doc-card li > a) {
 				display: inline-block;
 				margin: 0 0 0.2rem;
 				text-decoration: none;
 			}
-			.prose :global(.api-index-card li > a code) {
+			.prose :global(.api-index-card li > a code),
+			.prose :global(.doc-card li > a code) {
 				color: #ff8b9b;
 			}
-			.prose :global(.api-index-card li > span) {
+			.prose :global(.api-index-card li > span),
+			.prose :global(.doc-card li > span) {
 				display: block;
 				color: var(--text-secondary);
 				font-size: 0.82rem;
@@ -587,7 +598,8 @@ export function DocPage() @{
 					transform: rotate(90deg);
 				}
 				.prose :global(.topic-grid),
-				.prose :global(.api-index-grid) {
+				.prose :global(.api-index-grid),
+				.prose :global(.doc-card-grid) {
 					grid-template-columns: 1fr;
 				}
 				.doc-pagination {
