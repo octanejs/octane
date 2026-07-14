@@ -408,8 +408,8 @@ describe('ReactDOMEventListener — scroll (not emulated upward)', () => {
 	// Per ReactDOMEventListener-test.js:1013 — should subscribe to scroll during
 	// updates. Handlers attached by an UPDATE fire; re-rendering with fresh inline
 	// functions doesn't double-fire; removing them detaches. Asserted as a set
-	// (order-insensitive) — the capture/bubble interleaving is pinned by the :875
-	// `it.fails` above.
+	// (order-insensitive) — the capture/bubble interleaving is asserted exactly
+	// by the :875 test above.
 	it('subscribes to scroll during updates, dedupes on re-render, and detaches', () => {
 		const log = createLog();
 		const mk = () => ({

@@ -560,7 +560,7 @@ is that Phase 4's coverage makes this unnecessary.
 | Transitions | The pending set replaces the single `pendingThenable` inside the existing `handleSuspense`/`STAGED_REVEALS` flow; entangled-boundary commit barriers unchanged. Add a transition test with a batched pair inside one boundary plus a sibling boundary. |
 | Rejection while batch partially pending | Wake on first rejection; replay unwraps in textual order; earlier-pending members re-enroll. |
 | Differential suite (`tests/differential/`) | Compares final `innerHTML` only — unaffected by fetch-start timing. Do NOT add a differential fixture that asserts fetch counts against React; that comparison now intentionally diverges. |
-| Conformance suite | Any port pinning React's waterfall timing gets the `it.fails` + `// GAP`-style annotation inverted — Octane is deliberately better here; annotate as intentional divergence, not GAP. |
+| Conformance suite | Any port covering React's waterfall timing is a plain passing test of Octane's deliberate parallel behavior, annotated as an intentional divergence rather than a gap. |
 | `WaterfallBody` pin (`tests/suspense.test.ts`) | Flips by design: with the transform on, `bStarts === 1` at mount. Rewrite as the positive assertion of parallel starts; keep an opted-out variant pinning the sequential behavior so the flag's off-state stays tested. |
 
 ## Test plan

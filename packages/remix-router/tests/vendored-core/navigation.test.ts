@@ -1,6 +1,8 @@
-// Ported from react-router@8.2.0 packages/react-router/__tests__/router/navigation-test.ts — verbatim except: renamed to navigation.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim, and the single createBrowserRouter/getWindow test skipped (createBrowserRouter lives in the React DOM layer, which is not vendored) with its imports removed.
+// Ported from react-router@8.2.0 packages/react-router/__tests__/router/navigation-test.ts — verbatim except: renamed to navigation.test.ts, imports re-pointed at the vendored sources (../../lib/* → ../../src/lib/*), jest→vitest globals via ./_shim, and the createBrowserRouter/getWindow test expressed through the equivalent vendored core router surface.
 import './_shim';
+import { createMemoryHistory } from '../../src/lib/router/history';
 import type { HydrationState } from '../../src/lib/router/router';
+import { createRouter } from '../../src/lib/router/router';
 import { cleanup, setup } from './utils/data-router-setup';
 import { createFormData } from './utils/utils';
 
@@ -428,12 +430,10 @@ describe('navigations', () => {
 			});
 		});
 
-		// SKIPPED (vendor gate): uses createBrowserRouter + a jsdom window from the
-		// React DOM layer (lib/dom/lib), which is not part of the vendored core.
-		it.skip('does not use fog of war partial matches for hash change only navigations', async () => {
-			// @ts-expect-error createBrowserRouter is not vendored; body never runs
-			let router = createBrowserRouter(
-				[
+		it('does not use fog of war partial matches for hash change only navigations', async () => {
+			const router = createRouter({
+				history: createMemoryHistory({ initialEntries: ['/'] }),
+				routes: [
 					{
 						path: '/',
 						children: [
@@ -443,12 +443,9 @@ describe('navigations', () => {
 						],
 					},
 				],
-				{
-					window: getWindow('/'),
-					// This is what enables the partialMatches logic
-					patchRoutesOnNavigation: () => {},
-				},
-			);
+				// This is what enables the partialMatches logic.
+				patchRoutesOnNavigation: () => {},
+			}).initialize();
 			expect(router.state.location).toMatchObject({
 				pathname: '/',
 				hash: '',
@@ -472,6 +469,7 @@ describe('navigations', () => {
 				{ route: { path: '/' } },
 				{ route: { path: '*' } },
 			]);
+			router.dispose();
 		});
 
 		it('redirects from loaders (throw)', async () => {

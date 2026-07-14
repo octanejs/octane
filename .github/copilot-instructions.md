@@ -195,11 +195,11 @@ The test suite (`packages/octane/tests/`) is organized as:
 
 - top-level `*.test.ts` — feature/unit tests for runtime + compiler behavior.
 - `conformance/` — ports of `facebook/react` behaviors; each `it` cites the source
-  like `// Per ReactHooksWithNoopRenderer-test.js:1885`. Genuine Octane divergences
-  are pinned with `it.fails(...)` + a `// GAP` note so the suite stays green and the
-  test auto-flips when the runtime is fixed. `docs/parity-gaps.md` is the generated
-  index of the executable pins (`pnpm parity:gaps`; checked in CI) — it, not the
-  many historical `// GAP` comments, is the live parity backlog.
+  like `// Per ReactHooksWithNoopRenderer-test.js:1885`. Committed tests must run:
+  do not use `skip`, `todo`, or expected-failure modifiers. Fix genuine gaps before
+  landing their tests; assert intentional Octane divergences as ordinary passing
+  tests with a durable `// OCTANE DIVERGENCE:` explanation. `docs/parity-gaps.md`
+  audits expected-failure pins and should remain at zero.
 - `differential/` — the gold-standard parity proof: `_rig.ts` runs the SAME `.tsrx`
   fixture through both Octane and `@tsrx/react`, drives identical events, and
   asserts byte-equal `innerHTML` after each step. Note it compares only final HTML,
@@ -219,11 +219,13 @@ Two regression layers beyond the octane project:
   `process.env.OCTANE_TEST_COMPILE_MODE === 'prod'`.
 - **`website/tests/ssr-hydration.e2e.test.ts`** — boots the REAL vite dev server
   and the production `octane-preview` server and drives every route in headless
-  Chromium, failing on hydration-mismatch warnings or page errors. Skips itself
-  (loudly) when Chromium isn't installed; CI installs it (ci.yml).
+  Chromium, failing on hydration-mismatch warnings or page errors. Chromium is
+  required; missing local browser binaries fail with the installation command,
+  and CI installs them in `ci.yml`.
 
-`scripts/scaffold-react-port.mjs` turns a React test file into a triaged port
-skeleton (in-scope `it.todo`s + out-of-scope reasons).
+`scripts/scaffold-react-port.mjs` turns a React test file into a local triage
+skeleton (in-scope `it.todo`s + out-of-scope reasons). Resolve or remove every
+todo before committing the port.
 
 ## Changesets
 
@@ -239,9 +241,10 @@ pnpm changeset
 
 - Read the owning source + its tests for exact behavior; `runtime.ts` comments are
   the spec. Don't rely on a repo-wide summary for subtle reconciler/scheduler rules.
-- When porting React behavior, follow the conformance convention (cite the source
-  line; pin real divergences as `it.fails` with a `// GAP` note) rather than
-  asserting Octane's current behavior as if it were the target.
+- When porting React behavior, cite the source line and keep the committed suite
+  fully executable. Fix genuine gaps before landing their tests. For intentional
+  divergences, use a plain passing test that asserts the documented Octane contract
+  and label the rationale `// OCTANE DIVERGENCE:`.
 - Keep `.tsrx` fixtures minimal and focused on the asserted behavior.
 - Match nearby naming, file layout, and test style; keep documentation updates short
   and durable.

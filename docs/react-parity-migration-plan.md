@@ -1,8 +1,9 @@
 # React → Octane Test-Parity Migration Plan
 
-> **STATUS: COMPLETE (2026-07-05).** Every phase and tier below is ported or
-> accounted; remaining runtime work lives in pinned `it.fails` tests + spawned
-> follow-up tasks. The distilled, user-facing summary of every intentional
+> **STATUS: COMPLETE (2026-07-05; executable-pin audit refreshed 2026-07-14).**
+> Every phase and tier below is ported or accounted, and the committed suite now
+> has zero skipped or expected-failure tests. Historical checkpoint counts below
+> record the migration as it happened. The distilled, user-facing summary of every intentional
 > divergence is **[differences-from-react.md](./differences-from-react.md)** —
 > keep that page current when a divergence is added or closed; this document is
 > the historical execution record and porting methodology.
@@ -727,9 +728,9 @@ re-dispatch target→root through Octane's logical tree, including portals. The
 native `Event` object is preserved; scroll/scrollend and enter/leave remain
 target-only as in React.
 
-**Still pinned (3 it.fails):** React-19 custom-element semantics (lowercase on*
-listeners + property heuristic — needs a maintainer decision) and void-element
-children/dSIH validation ×2 (compile-time diagnostic; follow-up task spawned).
+**Formerly pinned (resolved):** React-19 custom-element semantics (lowercase on*
+listeners + property heuristic) and void-element children/dSIH validation ×2.
+Their coverage now runs normally; there are no active expected-failure pins.
 
 ### Tier 7 — errors under reconciliation: PORTED (2026-07-05)
 Two parallel agents covered ReactErrorBoundaries-test.internal.js (50 — OUTCOME
@@ -790,8 +791,8 @@ accounting blocks in each file):
   with precise reasons (no yield points in a sync scheduler).
 
 With Tier 0/3/7 (earlier waves) and Phases A/B/D, **every tier in §3 is now
-ported or accounted.** Remaining runtime work lives in pinned it.fails +
-spawned tasks, not in this plan.
+ported or accounted.** Follow-up work is tracked outside disabled tests; the
+committed suite has no skipped or expected-failure cases.
 
 ### Suite status
 **204 test files, 1074 passed, 0 expected-fail, 0 regressions** (after the off-screen

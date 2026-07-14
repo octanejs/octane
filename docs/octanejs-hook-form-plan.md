@@ -66,7 +66,9 @@ forwardRef→ref-as-prop, `react-dom/server` → `octane/server`'s
 - `typetests/` — upstream `__typetest__` (Path/FieldPath type machinery, zod
   resolver inference) vendored; wired into `pnpm typecheck`.
 
-Genuine gaps are pinned `it.fails` + `// GAP` notes (auto-flip when fixed).
+Committed tests execute normally. Intentional divergences use ordinary passing
+assertions with `// OCTANE DIVERGENCE:` notes; genuine gaps are fixed before
+their conformance tests land.
 
 ## Octane bugs found & fixed by this port (root-cause fixes, no workarounds)
 
@@ -102,15 +104,16 @@ Genuine gaps are pinned `it.fails` + `// GAP` notes (auto-flip when fixed).
    everything after `/>` as JSX text unless the closer was adjacent — the
    standard prettier `=> (\n  <div />\n)` shape failed to parse.
 
-## Remaining pinned divergences (pre-existing documented octane designs)
+## Intentional divergences (pre-existing documented Octane designs)
 
-Eight ported tests stay `it.fails`-pinned on divergences that are DOCUMENTED
-octane-wide design decisions, not port workarounds: microtask-flush commit
-granularity vs React's macrotask coalescing (an extra committed render around
-async handleSubmit/notification continuations — 6 pins), the eager `Object.is`
-setState bailout (one fewer probe render than React — 1 pin), and native-event
+Eight ported cases directly assert divergences that are DOCUMENTED Octane-wide
+design decisions, not port workarounds: microtask-flush commit granularity vs
+React's macrotask coalescing (an extra committed render around async
+handleSubmit/notification continuations — 6 cases), the eager `Object.is`
+setState bailout (one fewer probe render than React — 1 case), and native-event
 delivery of a no-op input event React's synthetic value tracker swallows
-(1 pin). Each pin's GAP note cites the corresponding conformance doc.
+(1 case). They are ordinary passing tests with explicit divergence notes; the
+binding suite contains no skipped or expected-failure cases.
 
 ## Release
 

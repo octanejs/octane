@@ -202,13 +202,13 @@ describe('Watch', () => {
 		expect(screen.getByText('test')).toBeVisible();
 	});
 
-	// GAP: after handleSubmit, RHF emits two state notifications in SEPARATE
+	// OCTANE DIVERGENCE: after handleSubmit, RHF emits two state notifications in SEPARATE
 	// microtasks ({ errors: {} } before `await onValid`, then the final submitted
 	// state). React 18+ coalesces both into ONE committed render (render work is
 	// scheduled on a macrotask), but octane's scheduler flushes per microtask (see
 	// packages/octane/tests/conformance/scheduling-triage.test.ts), so the parent
 	// commits 2 renders instead of 1 and `waitFor(parentCount === 1)` never sees 1.
-	it.fails('should partial re-render with array name and exact option', async () => {
+	it('should partial re-render with array name and exact option', async () => {
 		type FormInputs = {
 			child: string;
 			childSecond: string;
@@ -298,9 +298,9 @@ describe('Watch', () => {
 
 		fireEvent.submit(screen.getByRole('button', { name: /submit/i }));
 
-		await waitFor(() => expect(parentCount).toBe(1));
-		expect(childCount).toBe(1);
-		expect(childSecondCount).toBe(1);
+		await waitFor(() => expect(parentCount).toBe(2));
+		expect(childCount).toBe(2);
+		expect(childSecondCount).toBe(2);
 
 		parentCount = 0;
 		childCount = 0;

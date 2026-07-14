@@ -120,8 +120,9 @@ the browser's same-document View Transitions
 
 ## 2. Conformance anchors (the user-facing spec is React's tests)
 
-Port via `scripts/scaffold-react-port.mjs`, cite source lines, pin real
-divergences `it.fails` + `// GAP` per the conformance convention:
+Port via `scripts/scaffold-react-port.mjs` and cite source lines. Fix real gaps
+before landing their tests; encode intentional divergences as ordinary passing
+assertions with `// OCTANE DIVERGENCE:` rationale:
 
 | React test file | size | scope |
 | --- | --- | --- |

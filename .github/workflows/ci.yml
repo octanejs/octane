@@ -103,9 +103,14 @@ jobs:
       - name: Disallow major and minor bumps in changesets
         run: pnpm changeset:check
 
-      # docs/parity-gaps.md is generated from the executable it.fails pins in
-      # the conformance suite. Fixing a gap flips its pin to a plain `it`, so
-      # this check forces the index to be regenerated in the same change.
+      # A committed test must execute and pass. Intentional framework
+      # divergences are ordinary assertions; missing environment prerequisites
+      # fail with setup instructions instead of silently turning CI green.
+      - name: Disallow skipped and expected-failure tests
+        run: pnpm test:markers:check
+
+      # docs/parity-gaps.md audits executable expected-failure pins and should
+      # remain at zero under the committed-test policy above.
       - name: Check parity-gap index is current
         run: pnpm parity:gaps:check
 

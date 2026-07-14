@@ -317,13 +317,13 @@ describe('conformance: missing-onInput dev warning', () => {
 	// text control with no onInput and not readOnly/disabled warns once —
 	// with an onChange-specific message when an onChange handler exists
 	// (native change fires on blur, not per keystroke).
-	it.skipIf(PROD_COMPILE)('warns once for a controlled text input without onInput', () => {
+	it('warns once in development for a controlled text input without onInput', () => {
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const r = mount(ControlledInput, { value: 'x' });
 		const warnings = errSpy.mock.calls.filter((c) =>
 			String(c[0]).includes('without an `onInput` handler'),
 		);
-		expect(warnings.length).toBe(1);
+		expect(warnings.length).toBe(PROD_COMPILE ? 0 : 1);
 		errSpy.mockClear();
 		r.update(ControlledInput, { value: 'y' });
 		expect(errSpy).not.toHaveBeenCalled(); // once per element

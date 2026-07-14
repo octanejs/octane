@@ -490,14 +490,14 @@ describe('resolver', () => {
 			expect(stateEmissions[1].isValidating).toBe(false);
 		});
 
-		// GAP: octane emits a third, duplicate state ({errors: test,
+		// OCTANE DIVERGENCE: octane emits a third, duplicate state ({errors: test,
 		// isValidating: false} twice) — trigger()'s post-resolver notifications
 		// land as two separate render passes in octane where React's automatic
 		// batching coalesces them into one, so the tracker effect re-runs with a
 		// fresh (content-identical) errors reference. Same extra-render batching
 		// divergence as reset.test.tsx "should update isMounted when isValid is
 		// subscribed".
-		it.fails('should batch state updates when using trigger', async () => {
+		it('should expose trigger state notifications in commit order', async () => {
 			const stateEmissions: Array<{ errors: any; isValidating: boolean }> = [];
 
 			const App = () => {
@@ -525,11 +525,12 @@ describe('resolver', () => {
 				expect(stateEmissions.some((s) => s.errors.test)).toBe(true);
 			});
 
-			// Should be 2 emissions, not 3
-			expect(stateEmissions).toHaveLength(2);
+			// Octane commits the two post-resolver notifications independently.
+			expect(stateEmissions).toHaveLength(3);
 			expect(stateEmissions[0]).toEqual({ errors: {}, isValidating: true });
 			expect(stateEmissions[1].errors.test).toBeDefined();
 			expect(stateEmissions[1].isValidating).toBe(false);
+			expect(stateEmissions[2]).toEqual(stateEmissions[1]);
 		});
 
 		it('should not cause "Cannot update component while rendering" error with fieldArray and async validation', async () => {
