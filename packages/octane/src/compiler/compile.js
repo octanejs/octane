@@ -4331,8 +4331,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 //     recurses down the tree — the whole descendant fetch tree starts in the
 //     first attempt.
 //
-// With the flag off, output is byte-identical (pinned by
-// tests/compile-parallel-use.test.ts).
+// With the flag off, the parallel-use rewrite is skipped; the server and
+// Suspense suites cover the resulting behavior through compiled fixtures.
 
 // Names bound by a binding pattern (params, declarator ids). Mirrors the
 // pattern handling of collectFreeIdentifiers' collectBindings.

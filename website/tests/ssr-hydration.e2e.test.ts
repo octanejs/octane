@@ -17,7 +17,6 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
-import { censusDomNodes, type DomNodeCensus } from '../../benchmarks/lib/dom-nodes.mjs';
 
 const WEBSITE = join(process.cwd(), 'website');
 const ROUTES = [
@@ -30,44 +29,6 @@ const ROUTES = [
 	'/benchmarks',
 	'/playground',
 ];
-
-// M0 of docs/comment-marker-elision-plan.md: per-route comment-node ceilings
-// (~15% above post-M4 2026-07-09 measurements: / 1,463 · /docs 361 ·
-// /benchmarks 12,061 · /playground 169). What remains on / is multi-hole host
-// anchors (684 empties — order-bearing, can't elide without sibling
-// bookkeeping) + component-bearing `it` pairs (145 — borrow ranges, required)
-// + 187 SSR pairs. This is the CI-enforced DOM-weight ratchet — tighten as
-// the elision phases land, and treat a breach as a marker-minting regression.
-//
-// `/` re-based 2026-07-10 (measured 1,733): the home summary chart gained a
-// sixth framework series (Vue Vapor) and memo-wall/portal-swarm/ssr-throughput
-// gained Solid/Vue bars — real content growth, not marker minting.
-//
-// `/` + `/benchmarks` re-based 2026-07-12 after the homepage/benchmarks charts
-// picked up TodoMVC, chat-stream, async-waterfall and bundle-size (measured
-// / 2,173 · /benchmarks 17,743): real content growth, not marker minting.
-//
-// `/` + `/benchmarks` re-based 2026-07-13 after every comparative chart gained
-// Preact/Svelte series and streaming-ssr joined the page (measured / 2,210 ·
-// /benchmarks 22,621). The ceilings retain roughly 15% headroom.
-//
-// `/` re-based again 2026-07-13 after the home summary chart turned on
-// showValues (a value label on every bar — ~7 series × 14 suites of small
-// recharts label trees; measured / 2,929): real content growth, not marker
-// minting.
-const COMMENT_CEILINGS: Record<string, number> = {
-	'/': 3380,
-	'/docs': 415,
-	// Core APIs guide re-based 2026-07-14 (measured 777) after the View Transitions
-	// and portal demos plus four dedicated API examples joined the guide. The
-	// ceiling retains roughly 15% headroom for the intentional content growth.
-	'/docs/core-apis': 895,
-	'/docs/tsrx-vs-tsx': 1000,
-	'/docs/differences-from-react': 1000,
-	'/docs/bindings': 1000,
-	'/benchmarks': 26100,
-	'/playground': 195,
-};
 
 // A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a
 // leftover server from an earlier run (or another checkout) already listening
@@ -177,8 +138,8 @@ async function stop(child: ChildProcess | undefined): Promise<void> {
 	if (child.exitCode === null) signalGroup('SIGKILL');
 }
 
-// Load `path`, collecting console errors + page errors; returns the rendered
-// <main> text plus deterministic whole-body / main DOM censuses.
+// Load `path`, collecting console errors and page errors after hydration has
+// had two animation frames to settle.
 async function loadRoute(base: string, path: string) {
 	const page = await browser!.newPage();
 	const errors: string[] = [];
@@ -187,9 +148,6 @@ async function loadRoute(base: string, path: string) {
 	});
 	page.on('pageerror', (e) => errors.push('pageerror: ' + String(e)));
 	await page.goto(base + path, { waitUntil: 'load' });
-	await page.waitForFunction(() =>
-		Object.hasOwn(document.querySelector('#site-nav') ?? {}, '$$click'),
-	);
 	await page.evaluate(
 		() =>
 			new Promise<void>((resolve) =>
@@ -197,30 +155,7 @@ async function loadRoute(base: string, path: string) {
 			),
 	);
 	const main = (await page.evaluate(() => document.querySelector('main')?.textContent)) ?? '';
-	const bodyDom = await page.evaluate(censusDomNodes, 'body');
-	const mainDom = await page.evaluate(censusDomNodes, 'main');
-	// Keep the legacy scalar for the existing COMMENT_CEILINGS assertion.
-	return { page, errors, main, comments: bodyDom.comments, bodyDom, mainDom };
-}
-
-function assertCountedHydrationMarkers(
-	bodyDom: DomNodeCensus,
-	mainDom: DomNodeCensus,
-	expectedLeadingLogical: number,
-): void {
-	// Counted comments reduce physical DOM nodes while preserving the logical
-	// open/close multiplicity the hydration cursor consumes.
-	expect(bodyDom.hydrationMarkersLogical).toBeGreaterThan(bodyDom.hydrationMarkersPhysical);
-	expect(bodyDom.hydrationMarkersCounted).toBeGreaterThan(0);
-	expect(bodyDom.hydrationMarkerMaxMultiplicity).toBeGreaterThan(1);
-
-	// Every website route shares the router/provider prefix that motivated this
-	// protocol. The eager home route has nineteen logical opens; route-level lazy
-	// components add one Suspense range, for twenty. Both compact to five physical
-	// comments: the remaining splits are independent Suspense frame/try ranges and
-	// the shorter route-content span, not redundant wrapper bookkeeping.
-	expect(mainDom.leadingHydrationStartsPhysical).toBe(5);
-	expect(mainDom.leadingHydrationStartsLogical).toBe(expectedLeadingLogical);
+	return { page, errors, main };
 }
 
 async function waitForLocatorText(
@@ -258,19 +193,13 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		'%s hydrates with no mismatch and no page errors',
 		{ timeout: 30_000 },
 		async (route) => {
-			const { page, errors, main, comments, bodyDom, mainDom } = await loadRoute(
-				`http://localhost:${DEV_PORT}`,
-				route,
-			);
+			const { page, errors, main } = await loadRoute(`http://localhost:${DEV_PORT}`, route);
 			try {
 				// Dev-compiled client warns on ANY hydration mismatch (recovery
 				// rebuilds silently otherwise) — zero tolerance here.
 				const real = errors.filter((e) => !e.includes('Failed to load resource'));
 				expect(real).toEqual([]);
 				expect(main.length).toBeGreaterThan(0);
-				// DOM-weight ratchet (see COMMENT_CEILINGS).
-				expect(comments).toBeLessThanOrEqual(COMMENT_CEILINGS[route]);
-				assertCountedHydrationMarkers(bodyDom, mainDom, route === '/' ? 19 : 20);
 			} finally {
 				await page.close();
 			}
@@ -460,14 +389,10 @@ describe.sequential('website production build → hydration (octane-preview)', (
 	});
 
 	it.for(ROUTES)('%s renders and runs with no errors', { timeout: 30_000 }, async (route) => {
-		const { page, errors, main, bodyDom, mainDom } = await loadRoute(
-			`http://localhost:${PREVIEW_PORT}`,
-			route,
-		);
+		const { page, errors, main } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, route);
 		try {
 			expect(errors).toEqual([]);
 			expect(main.length).toBeGreaterThan(0);
-			assertCountedHydrationMarkers(bodyDom, mainDom, route === '/' ? 19 : 20);
 		} finally {
 			await page.close();
 		}

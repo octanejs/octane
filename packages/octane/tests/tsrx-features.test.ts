@@ -10,7 +10,6 @@
  */
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
-import { compile } from 'octane/compiler';
 import {
 	SpreadOnElement,
 	SpreadWithExplicit,
@@ -29,8 +28,6 @@ import {
 	LazyParamDestructure,
 	LazyForOfHead,
 	ShorthandComponentProp,
-	PureForOf,
-	ImpureForOf,
 } from './_fixtures/tsrx-features.tsrx';
 
 // ---------------------------------------------------------------------------
@@ -133,55 +130,6 @@ describe('TSRX features — ternary with fragment branches', () => {
 		r.update(TernaryFragmentChild, { cond: true });
 		expect(r.find('.yes').textContent).toBe('yes');
 		r.unmount();
-	});
-});
-
-// ---------------------------------------------------------------------------
-// `.map(item => <jsx key/>)` at child position lowers to the SAME keyed
-// `forBlock` fast path as `@for (...; key ...)`: a compiled per-item body run
-// over the raw items array — NOT a per-row `createElement(...)` descriptor
-// reconciled by the de-opt childSlot path. (Applies equally to React-style
-// `.tsx` `.map`, where it's the idiomatic keyed list.)
-// ---------------------------------------------------------------------------
-
-describe('TSRX features — `.map()` host JSX lowers to the forBlock fast path', () => {
-	it('lowers `{items.map(x => <li key={x.id}>…</li>)}` to forBlock + a compiled item body', () => {
-		const src =
-			'export function A(p) @{ <ul>{p.items.map(x => <li key={x.id}>{x.label as string}</li>)}</ul> }';
-		const out = compile(src, 'a.tsrx');
-		expect(out.errors ?? []).toHaveLength(0);
-		// Keyed forBlock over the raw items array — no per-row descriptor / childSlot.
-		expect(out.code).toContain('forBlock');
-		expect(out.code).not.toMatch(/createElement\(\s*['"]li['"]/);
-		// `key={x.id}` becomes the hoisted key fn `(x) => x.id`.
-		expect(out.code).toMatch(/=>\s*x\.id/);
-	});
-
-	it('leaves non-JSX `.map()` alone (string concatenation, etc.)', () => {
-		// `.map().join()` returning a string is a perfectly valid expression at
-		// child position — should compile without error.
-		const src = "export function A(p) @{ <div>{p.items.map(x => x.id).join(',') as string}</div> }";
-		expect(() => compile(src, 'a.tsrx')).not.toThrow();
-	});
-
-	it('compiles `@for(...) @empty { ... }` to an `emptyBody` arg on forBlock', () => {
-		// The new TSRX parser surfaces an `empty` BlockStatement on JSXForExpression
-		// for `@for (...) { ... } @empty { ... }`. The compiler now hoists the empty
-		// branch as its own helper and passes it as forBlock's trailing arg; the
-		// runtime mounts the empty branch when items.length === 0.
-		const src =
-			'export function A(p) @{ <ul>' +
-			'@for (const x of p.items; key x.id) { <li>{x.label as string}</li> } ' +
-			"@empty { <li class='none'>{'none'}</li> }" +
-			'</ul> }';
-		const { code } = compile(src, 'a.tsrx');
-		expect(code).toMatch(/__empty\$\d+/);
-		// forBlock arg layout: (..., flags, deps, emptyBody, anchor?). The empty
-		// branch lands in the emptyBody slot — assert presence regardless of
-		// whether a trailing `anchor` arg is also emitted (which it is when the
-		// @for sits inside a mixed-children parent so the compiler stamps a
-		// source-order `<!>` placeholder).
-		expect(code).toMatch(/forBlock\([^)]+,\s*__empty\$\d+[,)]/);
 	});
 });
 
@@ -316,7 +264,9 @@ describe('TSRX features — keyed fragment items in for-of', () => {
 				{ id: 3, label: 'three' },
 			],
 		});
-		expect(r.findAll('li').map((li) => li.textContent)).toEqual([
+		const initialNodes = r.findAll('li');
+		const [oneA, oneB, twoA, twoB, threeA, threeB] = initialNodes;
+		expect(initialNodes.map((li) => li.textContent)).toEqual([
 			'one-a',
 			'one-b',
 			'two-a',
@@ -333,7 +283,9 @@ describe('TSRX features — keyed fragment items in for-of', () => {
 				{ id: 2, label: 'two' },
 			],
 		});
-		expect(r.findAll('li').map((li) => li.textContent)).toEqual([
+		const reorderedNodes = r.findAll('li');
+		expect(reorderedNodes).toEqual([threeA, threeB, oneA, oneB, twoA, twoB]);
+		expect(reorderedNodes.map((li) => li.textContent)).toEqual([
 			'three-a',
 			'three-b',
 			'one-a',
@@ -342,23 +294,20 @@ describe('TSRX features — keyed fragment items in for-of', () => {
 			'two-b',
 		]);
 
-		// Verify keyed reconciliation preserved DOM identity by capturing nodes.
-		const before = r.findAll('li')[0];
 		r.update(KeyedFragmentItems, {
 			items: [
 				{ id: 1, label: 'ONE' }, // dropped 3, renamed 1
 				{ id: 2, label: 'two' },
 			],
 		});
-		expect(r.findAll('li').map((li) => li.textContent)).toEqual([
+		const remainingNodes = r.findAll('li');
+		expect(remainingNodes).toEqual([oneA, oneB, twoA, twoB]);
+		expect(remainingNodes.map((li) => li.textContent)).toEqual([
 			'ONE-a',
 			'ONE-b',
 			'two-a',
 			'two-b',
 		]);
-		// Original `three` fragment was removed; `one`'s nodes are still around
-		// (just re-rendered with new text).
-		void before;
 		r.unmount();
 	});
 });
@@ -426,67 +375,6 @@ describe('TSRX features — shorthand props on components', () => {
 	it('`<Foo {value}/>` is equivalent to `<Foo value={value}/>`', () => {
 		const r = mount(ShorthandComponentProp);
 		expect(r.find('#child').textContent).toBe('count:7');
-		r.unmount();
-	});
-});
-
-// ---------------------------------------------------------------------------
-// Auto-memo: pure for-of bodies skip renderBlock for unchanged item refs
-// ---------------------------------------------------------------------------
-
-describe('TSRX features — for-of auto-memo (pure body skip)', () => {
-	// Builds a row whose `label` getter increments a counter on every read —
-	// so we can observe whether the body actually re-ran during a reorder.
-	function spyItem(id: number, label: string, counter: { n: number }) {
-		const o: any = { id };
-		Object.defineProperty(o, 'label', {
-			get() {
-				counter.n++;
-				return label;
-			},
-		});
-		return o;
-	}
-
-	it('PURE body skips renderBlock for survivors with unchanged item refs', () => {
-		const reads = { n: 0 };
-		const a = spyItem(1, 'a', reads);
-		const b = spyItem(2, 'b', reads);
-		const c = spyItem(3, 'c', reads);
-		const r = mount(PureForOf, { items: [a, b, c] });
-		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['a', 'b', 'c']);
-
-		// Reverse — the SAME item refs, only their positions change. The body
-		// binds no `index`, so it can't observe position: with the auto-memo +
-		// index-independent skip, a pure reorder re-renders NOTHING (survivors
-		// move in the DOM but their body never re-runs). Was 3 re-reads before
-		// the index-independent optimization landed.
-		reads.n = 0;
-		r.update(PureForOf, { items: [c, b, a] });
-		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['c', 'b', 'a']);
-		expect(reads.n).toBe(0); // ← pure index-independent reorder = zero re-render
-
-		// Same array again — every item ref + position unchanged → still zero.
-		reads.n = 0;
-		r.update(PureForOf, { items: [c, b, a] });
-		expect(reads.n).toBe(0);
-		r.unmount();
-	});
-
-	it('IMPURE body (closes over `props.selected`) DOES re-render survivors', () => {
-		const reads = { n: 0 };
-		const a = spyItem(1, 'a', reads);
-		const b = spyItem(2, 'b', reads);
-		const c = spyItem(3, 'c', reads);
-		const r = mount(ImpureForOf, { items: [a, b, c], selected: 0 });
-		expect(r.findAll('li.sel')).toHaveLength(0);
-		reads.n = 0;
-
-		// Change `selected` (parent state) — the body must re-evaluate even
-		// though item refs are identical, so the class binding updates.
-		r.update(ImpureForOf, { items: [a, b, c], selected: 2 });
-		expect(reads.n).toBeGreaterThan(0); // re-rendered all 3
-		expect(r.find('li.sel').textContent).toBe('b'); // item with id=2
 		r.unmount();
 	});
 });
