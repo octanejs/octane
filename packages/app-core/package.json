@@ -1,0 +1,88 @@
+{
+  "name": "@octanejs/app-core",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Bundler-neutral app runtime, configuration, routing, and code generation for Octane integrations",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/app-core"
+  },
+  "files": [
+    "src",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "module": "src/index.js",
+  "main": "src/index.js",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./config": {
+      "types": "./types/config.d.ts",
+      "import": "./src/config.js",
+      "default": "./src/config.js"
+    },
+    "./config-loader": {
+      "types": "./types/config-loader.d.ts",
+      "import": "./src/config-loader.js",
+      "default": "./src/config-loader.js"
+    },
+    "./routes": {
+      "types": "./types/routes.d.ts",
+      "import": "./src/routes.js",
+      "default": "./src/routes.js"
+    },
+    "./middleware": {
+      "types": "./types/middleware.d.ts",
+      "import": "./src/middleware.js",
+      "default": "./src/middleware.js"
+    },
+    "./html": {
+      "types": "./types/html.d.ts",
+      "import": "./src/html.js",
+      "default": "./src/html.js"
+    },
+    "./codegen": {
+      "types": "./types/codegen.d.ts",
+      "import": "./src/codegen.js",
+      "default": "./src/codegen.js"
+    },
+    "./production": {
+      "types": "./types/production.d.ts",
+      "import": "./src/server/production.js",
+      "default": "./src/server/production.js"
+    },
+    "./node": {
+      "types": "./types/node.d.ts",
+      "import": "./src/server/node-http.js",
+      "default": "./src/server/node-http.js"
+    }
+  },
+  "dependencies": {
+    "@ripple-ts/adapter": "catalog:default",
+    "esbuild": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:default",
+    "octane": "workspace:*"
+  }
+}

@@ -3,7 +3,7 @@
  * Vercel Build Output API v3 emitter.
  *
  * Restructures an octane production build (`dist/client` + `dist/server`,
- * produced by @octanejs/vite-plugin) into `.vercel/output/`:
+ * produced by an Octane app integration) into `.vercel/output/`:
  *
  *   static/               ← dist/client verbatim (hashed assets; the build
  *                           already moved index.html — the SSR template —
@@ -21,7 +21,7 @@
  */
 
 /** @import { VercelAdapterOptions, VercelConfig, VercelRoute } from '@octanejs/adapter-vercel' */
-/** @import { AdaptContext } from '@octanejs/vite-plugin' */
+/** @import { AdaptContext } from '@octanejs/app-core' */
 
 import { existsSync, mkdirSync, cpSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -131,12 +131,15 @@ function generate_vercel_config(options) {
 		});
 	}
 
-	// Hashed build assets are immutable by construction.
-	routes.push({
-		src: '/assets/.+',
-		headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
-		continue: true,
-	});
+	// Hashed build assets are immutable by construction. Vite emits them under
+	// /assets, while Rsbuild uses /static by default.
+	for (const assetDirectory of ['assets', 'static']) {
+		routes.push({
+			src: `/${assetDirectory}/.+`,
+			headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+			continue: true,
+		});
+	}
 
 	for (const header of headers) {
 		routes.push({
@@ -162,7 +165,7 @@ function generate_vercel_config(options) {
 /**
  * Emit `.vercel/output` from a completed octane build.
  *
- * Callable two ways: by @octanejs/vite-plugin's closeBundle (which passes its
+ * Callable two ways: by an app integration's post-build hook (which passes its
  * {@link AdaptContext}) or directly with explicit dirs.
  *
  * @param {AdaptContext} ctx

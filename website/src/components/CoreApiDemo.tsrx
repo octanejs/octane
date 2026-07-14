@@ -793,20 +793,18 @@ export function TransitionDemo() @{
 		id: 'overview',
 		value: DASHBOARD_REPORTS.overview,
 	});
-	const [currentTab, setCurrentTab] = useState<DashboardTab>('overview');
 	const [isPending, startTransition] = useTransition();
 	const pendingTab = useRef<DashboardTab | null>(null);
 	const isLoading = isPending && pendingTab.current !== null;
 
 	const openReport = (next: DashboardTab) => {
-		if (currentTab === next || pendingTab.current !== null) return;
+		if (selection.id === next || pendingTab.current !== null) return;
 
 		const request = loadDashboardReport(next);
 		pendingTab.current = next;
 		startTransition(async () => {
 			setSelection({ id: next, value: request });
 			await request;
-			setCurrentTab(next);
 			pendingTab.current = null;
 		});
 	};
@@ -825,11 +823,11 @@ export function TransitionDemo() @{
 						type="button"
 						class={[
 							'demo-tab',
-							currentTab === tab && 'demo-tab-selected',
+							selection.id === tab && 'demo-tab-selected',
 							isLoading && pendingTab.current === tab && 'demo-tab-pending',
 						]}
 						role="tab"
-						aria-selected={currentTab === tab}
+						aria-selected={selection.id === tab}
 						disabled={isLoading}
 						onClick={() => openReport(tab)}
 					>
@@ -841,12 +839,12 @@ export function TransitionDemo() @{
 				@if (isLoading && pendingTab.current !== null) {
 					<span>
 						{'Loading ' + DASHBOARD_REPORTS[pendingTab.current].label + ' — ' +
-							DASHBOARD_REPORTS[currentTab].label +
+							DASHBOARD_REPORTS[selection.id].label +
 							' stays on screen.'}
 					</span>
 				} @else {
 					<span>
-						{DASHBOARD_REPORTS[currentTab].label + ' is ready.'}
+						{DASHBOARD_REPORTS[selection.id].label + ' is ready.'}
 					</span>
 				}
 			</p>

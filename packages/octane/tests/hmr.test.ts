@@ -154,6 +154,97 @@ describe('hmr — runtime wrapper', () => {
 		expect(code).toMatch(/Foo\[_\$HMR\]\.update\(module\.Foo\)/);
 	});
 
+	it('webpack HMR preserves named and default wrapper identity across repeated updates', async () => {
+		const { compile } = await import('octane/compiler');
+		const runtime = new Proxy(
+			{ hmr, HMR },
+			{
+				get(target, property) {
+					return (target as any)[property] ?? (() => undefined);
+				},
+			},
+		);
+		const compileVersion = (version: number) =>
+			compile(
+				`export function Named() @{ <span>{'named ${version}'}</span> }\n` +
+					`export default function Default() @{ <b>{'default ${version}'}</b> }\n`,
+				'file.tsrx',
+				{ hmr: 'webpack' },
+			).code;
+		const evaluate = (code: string, data: Record<string, any> | undefined) => {
+			const transformed =
+				code
+					.replace(/^import \{ ([^}]+) \} from 'octane';/m, (_match, imports: string) => {
+						const properties = imports
+							.split(', ')
+							.map((specifier) => specifier.replace(' as ', ': '))
+							.join(', ');
+						return `const { ${properties} } = runtime;`;
+					})
+					.replace(/\bexport let /g, 'let ')
+					.replace(/export \{ Default as default \};/g, '')
+					.replaceAll('import.meta.webpackHot', 'hot') + '\nreturn { Named, default: Default };';
+			let dispose: ((value: Record<string, any>) => void) | undefined;
+			let accepted = false;
+			const hot = {
+				data,
+				dispose(callback: (value: Record<string, any>) => void) {
+					dispose = callback;
+				},
+				accept() {
+					accepted = true;
+				},
+			};
+			const exports = Function('runtime', 'hot', transformed)(runtime, hot) as {
+				Named: any;
+				default: any;
+			};
+			const nextData: Record<string, any> = {};
+			dispose?.(nextData);
+			expect(accepted).toBe(true);
+			return { exports, data: nextData };
+		};
+
+		const first = evaluate(compileVersion(1), undefined);
+		const firstNamedBody = first.exports.Named[HMR].fn;
+		const firstDefaultBody = first.exports.default[HMR].fn;
+		const second = evaluate(compileVersion(2), first.data);
+		expect(second.exports.Named).toBe(first.exports.Named);
+		expect(second.exports.default).toBe(first.exports.default);
+		expect(second.exports.Named[HMR].fn).not.toBe(firstNamedBody);
+		expect(second.exports.default[HMR].fn).not.toBe(firstDefaultBody);
+
+		const secondNamedBody = second.exports.Named[HMR].fn;
+		const secondDefaultBody = second.exports.default[HMR].fn;
+		const third = evaluate(compileVersion(3), second.data);
+		expect(third.exports.Named).toBe(first.exports.Named);
+		expect(third.exports.default).toBe(first.exports.default);
+		expect(third.exports.Named[HMR].fn).not.toBe(secondNamedBody);
+		expect(third.exports.default[HMR].fn).not.toBe(secondDefaultBody);
+
+		const output = compileVersion(3);
+		expect(output).toContain('import.meta.webpackHot.data?.__octaneComponents?.Named');
+		expect(output).toContain('import.meta.webpackHot.dispose');
+		expect(output).toContain('import.meta.webpackHot.accept();');
+		expect(output).not.toContain('import.meta.hot');
+	});
+
+	it('wraps plain return-JSX exports for both HMR dialects', async () => {
+		const { compile } = await import('octane/compiler');
+		const source =
+			`export function Named() { return <span>{'named'}</span>; }\n` +
+			`export default function Default() { return <b>{'default'}</b>; }\n`;
+		const vite = compile(source, 'file.tsx', { hmr: 'vite' }).code;
+		expect(vite).toContain('Named = _$hmr(Named);');
+		expect(vite).toContain('Default = _$hmr(Default);');
+		expect(vite).toContain('import.meta.hot.accept');
+
+		const webpack = compile(source, 'file.tsx', { hmr: 'webpack' }).code;
+		expect(webpack).toContain('export { Named };');
+		expect(webpack).toContain('export { Default as default };');
+		expect(webpack).toContain('import.meta.webpackHot.dispose');
+	});
+
 	it('hmr option off → no wrapping, no accept block', async () => {
 		const { compile } = await import('octane/compiler');
 		const src = "export function Foo() @{ <span>{'hi'}</span> }\n";

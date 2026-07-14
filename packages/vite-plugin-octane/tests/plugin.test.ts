@@ -71,6 +71,9 @@ describe('octane() plugin factory', () => {
 
 	it('forwards `exclude` to the bundled compiler (hook-slotting skip)', () => {
 		const [compiler] = octane({ exclude: ['/packages/tanstack-router/src/'] });
+		// Vite calls config() before transforms; pin the synthetic project root so
+		// linked paths outside it are correctly treated as external packages.
+		(compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
 		const code =
 			"import { useState } from 'octane';\nexport function useThing() { return useState(0); }\n";
 		const transform = compiler.transform as (code: string, id: string) => unknown;

@@ -43,6 +43,15 @@ The Vite plugin includes the compiler and adds routing, server rendering, hydrat
 production builds when you need them. For a client-only app, you can import `octane` from
 `octane/compiler/vite` instead and install only `octane`.
 
+For Rspack, install `@octanejs/rspack-plugin` and add
+`new OctaneRspackPlugin()` to `plugins`. For full apps on Rsbuild, install
+`@octanejs/rsbuild-plugin` and add `pluginOctane()` instead. The full-app Vite
+equivalent is `@octanejs/vite-plugin`.
+
+The [build tools guide](/docs/build-tools) has complete Vite, Rspack, and
+Rsbuild examples, including server compilation, routing, SSR, hydration, HMR,
+production output, and preview.
+
 <h2 id="first-component">Build your first component</h2>
 
 A component is a TypeScript function that returns UI. This one receives a title, remembers
@@ -140,4 +149,10 @@ better fit.
 	</p>
 </aside>
 
-[Continue to Core APIs →](/docs/core-apis)
+<h2 id="next">Next</h2>
+
+- [Build tools](/docs/build-tools) — choose Vite, Rspack, or Rsbuild.
+- [Core APIs](/docs/core-apis) — roots, hooks, boundaries, actions, and SSR.
+- [Differences from React](/docs/differences-from-react) — the deliberate
+  divergences (everything else matching React is the point).
+- [Bindings](/docs/bindings) — the `@octanejs/*` ports of the React ecosystem.

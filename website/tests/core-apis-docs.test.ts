@@ -119,7 +119,7 @@ describe('Core APIs documentation', () => {
 		expect(active).toBeTruthy();
 		expect(active?.getAttribute('aria-current')).toBe('page');
 		expect(container.querySelector('.pagination-link.previous')?.getAttribute('href')).toBe(
-			'/docs/quick-start',
+			'/docs/build-tools',
 		);
 		expect(container.querySelector('.pagination-link.next')?.getAttribute('href')).toBe(
 			'/docs/tsrx-vs-tsx',
@@ -140,7 +140,9 @@ describe('Core APIs documentation', () => {
 		fireEvent.click(activity);
 
 		await waitFor(() =>
-			expect(demo.querySelector('.transition-status')?.textContent).toContain('Loading Activity'),
+			expect(demo.querySelector('.transition-status')?.textContent).toBe(
+				'Loading Activity — Overview stays on screen.',
+			),
 		);
 		expect(region.getAttribute('aria-busy')).toBe('true');
 		expect(demo.querySelector('[data-report]')?.getAttribute('data-report')).toBe('overview');
@@ -157,7 +159,7 @@ describe('Core APIs documentation', () => {
 		expect(region.getAttribute('aria-busy')).toBe('false');
 		expect(activity.getAttribute('aria-selected')).toBe('true');
 		expect(activity.getAttribute('class')).toContain('demo-tab-selected');
-		expect(demo.querySelector('.transition-status')?.textContent).toContain('Activity is ready');
+		expect(demo.querySelector('.transition-status')?.textContent).toBe('Activity is ready.');
 	});
 
 	it('keeps search input immediate while deferred results catch up', async () => {
