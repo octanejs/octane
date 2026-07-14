@@ -305,6 +305,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			await portalDemo.getByRole('button', { name: 'Show saved toast' }).click();
 			const portalToast = portalDemo.locator('.portal-demo-toast');
 			await portalToast.waitFor();
+			expect(await portalToast.evaluate((toast) => getComputedStyle(toast).display)).toBe('flex');
 			expect(
 				await portalDemo.evaluate((root) => {
 					const toast = root.querySelector('.portal-demo-toast');

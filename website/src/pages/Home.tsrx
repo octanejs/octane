@@ -348,7 +348,7 @@ export function Home() @{
 				justify-content: space-between;
 				gap: 1rem;
 				flex-wrap: wrap;
-				padding-bottom: 1rem;
+				padding-bottom: 1.5rem;
 			}
 			.bench-title {
 				margin: 0;
