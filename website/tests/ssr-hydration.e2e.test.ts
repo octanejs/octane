@@ -177,8 +177,16 @@ async function loadRoute(base: string, path: string) {
 		if (m.type() === 'error') errors.push(m.text());
 	});
 	page.on('pageerror', (e) => errors.push('pageerror: ' + String(e)));
-	await page.goto(base + path, { waitUntil: 'networkidle' });
-	await page.waitForTimeout(400); // hydration commit + recovery warnings
+	await page.goto(base + path, { waitUntil: 'load' });
+	await page.waitForFunction(() =>
+		Object.hasOwn(document.querySelector('#site-nav') ?? {}, '$$click'),
+	);
+	await page.evaluate(
+		() =>
+			new Promise<void>((resolve) =>
+				requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+			),
+	);
 	const main = (await page.evaluate(() => document.querySelector('main')?.textContent)) ?? '';
 	const bodyDom = await page.evaluate(censusDomNodes, 'body');
 	const mainDom = await page.evaluate(censusDomNodes, 'main');
@@ -221,17 +229,11 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	beforeAll(async () => {
 		if (!browser) return;
 		DEV_PORT = await getFreePort();
-		// Fresh optimize-deps cache → deterministic cold start (the warmup pass
-		// below absorbs the one-time "Outdated Optimize Dep" reload).
+		// Fresh optimize-deps cache → prove the declared dependency graph handles
+		// a deterministic cold start without an "Outdated Optimize Dep" reload.
 		rmSync(join(WEBSITE, 'node_modules/.vite'), { recursive: true, force: true });
 		server = spawnServer(['exec', 'vite', '--port', String(DEV_PORT), '--strictPort']);
 		await waitForServer(server, `http://localhost:${DEV_PORT}/`, 60_000);
-		// Warmup pass: let vite discover + optimize every route's deps so the
-		// assertion pass sees steady-state dev behavior.
-		for (const route of ROUTES) {
-			const { page } = await loadRoute(`http://localhost:${DEV_PORT}`, route);
-			await page.close();
-		}
 	}, 120_000);
 
 	afterAll(async () => {
@@ -271,10 +273,16 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			await page.getByRole('button', { name: 'Add one' }).click();
 			await waitForLocatorText(count, '1');
 
-			const packingStatus = page.locator('[data-demo="lists"] .packing-summary');
-			await page.getByRole('button', { name: 'Pack Passport' }).click();
+			const packingDemo = page.locator('[data-demo="lists"]');
+			const packingStatus = packingDemo.locator('.packing-summary');
+			const passport = packingDemo.getByRole('checkbox', { name: 'Passport' });
+			expect(await passport.isChecked()).toBe(false);
+			expect(await packingDemo.getByRole('button', { name: /^(Pack|Unpack) / }).count()).toBe(0);
+			await passport.check();
 			await waitForLocatorText(packingStatus, '2 of 3 packed');
+			expect(await passport.isChecked()).toBe(true);
 
+			await passport.blur();
 			await page.keyboard.press('/');
 			expect(await page.evaluate(() => document.activeElement?.id)).toBe('core-api-search');
 
@@ -289,7 +297,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			);
 
 			await page.locator('#core-api-profile-name').fill('Grace Hopper');
-			await page.getByRole('button', { name: 'Save profile' }).click();
+			await page.getByRole('button', { name: 'Save name' }).click();
 			await waitForLocatorText(page.locator('[data-demo="form"] button[type="submit"]'), 'Saving…');
 			await waitForLocatorText(
 				page.locator('[data-demo="form"] .form-result'),

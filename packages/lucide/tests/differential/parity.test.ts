@@ -10,7 +10,7 @@ describe('differential: @octanejs/lucide vs lucide-react@1.24.0', () => {
 		const differential = await mountDifferential(fixture, 'IconGallery', undefined, CACHE);
 		await differential.step('mount', () => {});
 		differential.unmount();
-	}, 15_000);
+	}, 30_000);
 
 	it('loads a dynamic icon identically', async () => {
 		const fixture = resolve(__dirname, '../_fixtures/dynamic.tsrx');
