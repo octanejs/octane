@@ -169,7 +169,9 @@ function has_route_config(config) {
 }
 
 /**
- * The octane metaframework Vite plugin.
+ * The recommended Octane Vite integration. With no octane.config.ts it behaves
+ * as a compiler plugin inside a normal Vite SPA; configured routes activate the
+ * metaframework layer.
  *
  * Returns an ARRAY: `[octaneCompiler({ hmr }), metaPlugin]`. The first element is
  * octane/compiler's transform plugin — it owns ALL `.tsrx` compilation, picking
@@ -220,14 +222,18 @@ export function octane(inlineOptions = {}) {
 		async config(userConfig, env) {
 			isBuild = env?.command === 'build';
 			isSSRBuild = !!userConfig.build?.ssr;
+			const projectRoot = userConfig.root ? path.resolve(userConfig.root) : process.cwd();
+			const hasOctaneConfig = octaneConfigExists(projectRoot);
 
 			const exclude = userConfig.optimizeDeps?.exclude || [];
 			const base = {
-				// SSR owns routing, so default appType to 'custom' (no SPA HTML
-				// fallback masking SSR routes). Respect an explicit user appType, and
-				// leave `vite preview` alone — the production SSR build is previewed
+				// A zero-config project is a normal Vite SPA: leave appType unset so
+				// Vite retains its HTML transform and history fallback. An Octane app
+				// config opts into framework routing, where SSR owns navigation and the
+				// SPA fallback must not mask unmatched routes. Respect an explicit user
+				// appType, and leave `vite preview` alone — production SSR is previewed
 				// with `octane-preview` (it serves dist/server), not `vite preview`.
-				...(userConfig.appType === undefined && !env?.isPreview
+				...(hasOctaneConfig && userConfig.appType === undefined && !env?.isPreview
 					? { appType: /** @type {const} */ ('custom') }
 					: {}),
 				optimizeDeps: {
@@ -248,8 +254,7 @@ export function octane(inlineOptions = {}) {
 			// build.ssr, so it skips this): route the client bundle to
 			// `{outDir}/client` and emit a manifest for the server's asset map.
 			if (isBuild && !isSSRBuild) {
-				const projectRoot = userConfig.root ? path.resolve(userConfig.root) : process.cwd();
-				if (octaneConfigExists(projectRoot)) {
+				if (hasOctaneConfig) {
 					buildOctaneConfig = await loadOctaneConfig(projectRoot);
 					if (has_route_config(buildOctaneConfig)) {
 						if (!fs.existsSync(path.join(projectRoot, 'index.html'))) {

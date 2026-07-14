@@ -22,7 +22,7 @@ Add the plugin **after** `octane()` and import the generated sheet once:
 
 ```ts
 // vite.config.ts
-import { octane } from 'octane/compiler/vite';
+import { octane } from '@octanejs/vite-plugin';
 import { stylex } from '@octanejs/stylex/vite';
 
 export default {

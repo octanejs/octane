@@ -21,7 +21,7 @@ title: Quick start
 
 <h2 id="install">Install and configure</h2>
 
-Install the runtime and the full Vite integration:
+Install the runtime and the recommended Vite integration:
 
 ```bash
 pnpm add octane @octanejs/vite-plugin
@@ -39,14 +39,12 @@ export default defineConfig({
 });
 ```
 
-The Vite plugin includes the compiler and adds routing, server rendering, hydration, and
-production builds when you need them. For a client-only app, you can import `octane` from
-`octane/compiler/vite` instead and install only `octane`.
+The Vite plugin includes the compiler. Use this same integration for client-only SPAs and
+for apps that add routing, server rendering, hydration, and production server builds.
 
 For Rspack, install `@octanejs/rspack-plugin` and add
 `new OctaneRspackPlugin()` to `plugins`. For full apps on Rsbuild, install
-`@octanejs/rsbuild-plugin` and add `pluginOctane()` instead. The full-app Vite
-equivalent is `@octanejs/vite-plugin`.
+`@octanejs/rsbuild-plugin` and add `pluginOctane()` instead.
 
 The [build tools guide](/docs/build-tools) has complete Vite, Rspack, and
 Rsbuild examples, including server compilation, routing, SSR, hydration, HMR,

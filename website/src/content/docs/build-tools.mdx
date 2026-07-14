@@ -7,20 +7,19 @@ title: Build tools
 	<h1>Build tools</h1>
 	<p className="doc-lede">
 		{
-			'Use the same Octane compiler with Vite or Rspack, then add the Vite or Rsbuild app integration when you need routing, streaming SSR, hydration, production builds, and preview.'
+			'Use the same Vite integration from a client-only SPA through a routed SSR app, or choose the matching Rspack or Rsbuild integration when those bundlers own your pipeline.'
 		}
 	</p>
 </div>
 
-Octane has one compiler with thin bundler adapters. Choosing a bundler changes the
-build pipeline, not component semantics.
+Octane has one compiler with thin bundler integrations. Choosing a bundler changes
+the build pipeline, not component semantics.
 
 <h2 id="choose-an-integration">Choose an integration</h2>
 
-| Goal                                 | Package                    |
+| Goal                                 | Integration                |
 | ------------------------------------ | -------------------------- |
-| Vite SPA compiler                    | `octane/compiler/vite`     |
-| Full Vite app                        | `@octanejs/vite-plugin`    |
+| Vite app (SPA or routed SSR)         | `@octanejs/vite-plugin`    |
 | Rspack SPA or custom server pipeline | `@octanejs/rspack-plugin`  |
 | Full Rsbuild app                     | `@octanejs/rsbuild-plugin` |
 
@@ -30,35 +29,27 @@ not change component semantics.
 
 <h2 id="vite">Vite</h2>
 
-For an SPA, the compiler ships in `octane`:
+Use `@octanejs/vite-plugin` for every Vite app:
 
 ```bash
-pnpm add octane
+pnpm add octane @octanejs/vite-plugin
 pnpm add -D vite
 ```
 
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite';
-import { octane } from 'octane/compiler/vite';
+import { octane } from '@octanejs/vite-plugin';
 
 export default defineConfig({
 	plugins: [octane()],
 });
 ```
 
-Install `@octanejs/vite-plugin` and import `octane` from that package when you
-want Octane's full app layer:
-
-```ts
-import { defineConfig } from 'vite';
-import { octane } from '@octanejs/vite-plugin';
-
-export default defineConfig({ plugins: [octane()] });
-```
-
-Existing Vite projects keep their current behavior, including Vite's
-`import.meta.hot` HMR dialect.
+Without `octane.config.ts`, the plugin compiles Octane source and leaves Vite's
+normal client-only SPA behavior intact, including its `import.meta.hot` HMR
+dialect. Add an Octane config with routes to activate the full app layer:
+routing, streaming SSR, hydration, production client/server builds, and preview.
 
 <h2 id="rspack">Rspack</h2>
 

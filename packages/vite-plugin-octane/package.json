@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Vite metaframework plugin for the octane renderer (dev SSR + routing + hydrate)",
+  "description": "Vite integration for Octane (SPA compilation plus optional routing, SSR, and hydration)",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
