@@ -1,0 +1,281 @@
+{
+  "benchmarkVersion": "user-apps-v1",
+  "coverage": {
+    "codingPatterns": {
+      "component-composition": [
+        "octane.composed-team-board",
+        "octane.native-inbox",
+        "octane.reducer-wizard",
+        "octane.ref-composition"
+      ],
+      "hooks": [
+        "tsrx.counter",
+        "tsrx.conditional-note",
+        "octane.reducer-wizard",
+        "octane.inferred-hook-deps",
+        "octane.state-getter"
+      ],
+      "native-events": [
+        "tsrx.packing-list",
+        "octane.native-inbox",
+        "octane.native-controlled-search",
+        "octane.reducer-wizard"
+      ],
+      "state-updates": [
+        "tsrx.counter",
+        "octane.composed-team-board",
+        "octane.reducer-wizard",
+        "octane.state-getter"
+      ],
+      "keyed-reconciliation": ["tsrx.packing-list", "octane.composed-team-board"],
+      "tsrx-control-flow": [
+        "tsrx.counter",
+        "tsrx.packing-list",
+        "octane.reducer-wizard",
+        "octane.async-product"
+      ]
+    },
+    "reactDivergences": {
+      "conditional-hooks": ["tsrx.conditional-note"],
+      "inferred-hook-dependencies": ["octane.inferred-hook-deps"],
+      "current-state-getter": ["octane.state-getter"],
+      "native-controlled-events": ["octane.native-controlled-search"],
+      "class-composition": ["octane.theme-context"],
+      "refs-as-props": ["octane.ref-composition"],
+      "parallel-use": ["octane.parallel-use-dashboard"]
+    },
+    "integrations": {
+      "zustand": ["integration.zustand-cart"],
+      "hook-form": ["integration.hook-form-profile"],
+      "i18next": ["integration.i18next-switcher"],
+      "tanstack-query": ["integration.query-user-card"]
+    }
+  },
+  "tasks": [
+    {
+      "taskId": "tsrx.counter",
+      "title": "Build an accessible counter",
+      "suite": "tsrx",
+      "capability": "authoring",
+      "difficulty": "introductory",
+      "sourcePath": "README.md",
+      "tags": [
+        "components",
+        "hooks",
+        "state",
+        "state-updates",
+        "native-events",
+        "tsrx-control-flow"
+      ]
+    },
+    {
+      "taskId": "tsrx.packing-list",
+      "title": "Build a keyed packing-list editor",
+      "suite": "tsrx",
+      "capability": "authoring",
+      "difficulty": "standard",
+      "sourcePath": "README.md",
+      "tags": [
+        "for",
+        "empty",
+        "state-updates",
+        "keyed-reconciliation",
+        "native-events",
+        "tsrx-control-flow"
+      ]
+    },
+    {
+      "taskId": "tsrx.conditional-note",
+      "title": "Build an editor with a conditional hook",
+      "suite": "tsrx",
+      "capability": "divergence-recognition",
+      "difficulty": "standard",
+      "sourcePath": "docs/differences-from-react.md",
+      "tags": ["hooks", "conditional-hooks", "early-return", "state", "state-updates"]
+    },
+    {
+      "taskId": "octane.theme-context",
+      "title": "Build live and nested theme context",
+      "suite": "octane",
+      "capability": "authoring",
+      "difficulty": "standard",
+      "sourcePath": "README.md",
+      "tags": [
+        "component-composition",
+        "hooks",
+        "context",
+        "state",
+        "state-updates",
+        "class-composition"
+      ]
+    },
+    {
+      "taskId": "octane.composed-team-board",
+      "title": "Compose a keyed team board",
+      "suite": "octane",
+      "capability": "authoring",
+      "difficulty": "standard",
+      "sourcePath": "README.md",
+      "tags": [
+        "component-composition",
+        "hooks",
+        "lifted-state",
+        "local-state",
+        "state-updates",
+        "functional-updates",
+        "keyed-reconciliation",
+        "native-events",
+        "tsrx-control-flow"
+      ]
+    },
+    {
+      "taskId": "octane.native-inbox",
+      "title": "Build a native-event inbox",
+      "suite": "octane",
+      "capability": "authoring",
+      "difficulty": "standard",
+      "sourcePath": "README.md",
+      "tags": [
+        "component-composition",
+        "hooks",
+        "state-updates",
+        "native-events",
+        "event-propagation",
+        "keyboard-events",
+        "for",
+        "tsrx-control-flow"
+      ]
+    },
+    {
+      "taskId": "octane.reducer-wizard",
+      "title": "Build a reducer-driven account wizard",
+      "suite": "octane",
+      "capability": "authoring",
+      "difficulty": "standard",
+      "sourcePath": "README.md",
+      "tags": [
+        "component-composition",
+        "hooks",
+        "usereducer",
+        "state-updates",
+        "native-events",
+        "switch",
+        "tsrx-control-flow"
+      ]
+    },
+    {
+      "taskId": "octane.native-controlled-search",
+      "title": "Build a controlled search with native events",
+      "suite": "octane",
+      "capability": "divergence-recognition",
+      "difficulty": "standard",
+      "sourcePath": "docs/differences-from-react.md",
+      "tags": [
+        "component-composition",
+        "hooks",
+        "state-updates",
+        "native-events",
+        "native-controlled-events",
+        "controlled-input"
+      ]
+    },
+    {
+      "taskId": "octane.inferred-hook-deps",
+      "title": "Derive an invoice with inferred hook dependencies",
+      "suite": "octane",
+      "capability": "divergence-recognition",
+      "difficulty": "standard",
+      "sourcePath": "docs/differences-from-react.md",
+      "tags": ["hooks", "inferred-hook-dependencies", "usememo", "useeffect"]
+    },
+    {
+      "taskId": "octane.state-getter",
+      "title": "Report current state from long-lived callbacks",
+      "suite": "octane",
+      "capability": "divergence-recognition",
+      "difficulty": "standard",
+      "sourcePath": "docs/differences-from-react.md",
+      "tags": ["hooks", "state-updates", "current-state-getter", "functional-updates"]
+    },
+    {
+      "taskId": "octane.ref-composition",
+      "title": "Compose refs through a reusable field",
+      "suite": "octane",
+      "capability": "divergence-recognition",
+      "difficulty": "standard",
+      "sourcePath": "docs/differences-from-react.md",
+      "tags": ["component-composition", "hooks", "refs-as-props", "multi-ref", "useref"]
+    },
+    {
+      "taskId": "octane.parallel-use-dashboard",
+      "title": "Load a dashboard without a Suspense waterfall",
+      "suite": "octane",
+      "capability": "divergence-recognition",
+      "difficulty": "advanced",
+      "sourcePath": "docs/differences-from-react.md",
+      "tags": ["hooks", "parallel-use", "use", "suspense", "async"]
+    },
+    {
+      "taskId": "octane.async-product",
+      "title": "Build asynchronous product details",
+      "suite": "octane",
+      "capability": "api-integration",
+      "difficulty": "standard",
+      "sourcePath": "README.md",
+      "tags": ["hooks", "use", "suspense", "async", "error-boundary", "tsrx-control-flow"]
+    },
+    {
+      "taskId": "octane.ssr-signup-card",
+      "title": "Build an SSR-safe signup card",
+      "suite": "octane",
+      "capability": "ssr-hydration",
+      "difficulty": "advanced",
+      "sourcePath": "docs/ssr.md",
+      "tags": ["hooks", "state-updates", "ssr", "hydration", "useid", "native-events"]
+    },
+    {
+      "taskId": "integration.zustand-cart",
+      "title": "Build a Zustand shopping cart",
+      "suite": "integration",
+      "capability": "api-integration",
+      "difficulty": "standard",
+      "packageName": "@octanejs/zustand",
+      "portShape": "stateful-binding",
+      "sourcePath": "packages/zustand/README.md",
+      "tags": ["zustand", "store", "selectors"]
+    },
+    {
+      "taskId": "integration.hook-form-profile",
+      "title": "Build a validated profile form",
+      "suite": "integration",
+      "capability": "api-integration",
+      "difficulty": "standard",
+      "packageName": "@octanejs/hook-form",
+      "portShape": "stateful-binding",
+      "sourcePath": "packages/hook-form/README.md",
+      "tags": ["hook-form", "validation", "native-events"]
+    },
+    {
+      "taskId": "integration.i18next-switcher",
+      "title": "Build a localized language switcher",
+      "suite": "integration",
+      "capability": "api-integration",
+      "difficulty": "standard",
+      "packageName": "@octanejs/i18next",
+      "portShape": "stateful-binding",
+      "sourcePath": "packages/i18next/README.md",
+      "tags": ["i18next", "localization", "provider"]
+    },
+    {
+      "taskId": "integration.query-user-card",
+      "title": "Build a TanStack Query user card",
+      "suite": "integration",
+      "capability": "api-integration",
+      "difficulty": "standard",
+      "packageName": "@octanejs/tanstack-query",
+      "portShape": "stateful-binding",
+      "sourcePath": "packages/tanstack-query/README.md",
+      "tags": ["tanstack-query", "async", "server-state"]
+    }
+  ]
+}

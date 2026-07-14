@@ -14,8 +14,8 @@ digests before accepting comparable submissions.
 4. Publish aggregate and per-task results, harness metadata, and declared
    exclusions without revealing active private artifacts.
 5. Retire the wave when exposure or age weakens its signal.
-6. After an embargo, publish cleared prompts, tests, gold and alternative
-   solutions, and audit notes as a versioned training release.
+6. After an embargo, publish cleared prompts, tests, reference and alternative
+   implementations, and audit notes as a versioned training release.
 7. Replace retired tasks with new families. Never promote public material back
    into a held-out set.
 
@@ -27,14 +27,22 @@ Historical manifests and reports remain available so results can be reproduced.
 Use one context mode throughout a comparable run and record it in both the task
 set and run manifest:
 
-- `repo-docs`: frozen checkout plus the documentation at the pinned
-  commit. This is the default for a fast-moving alpha project.
-- `repo-docs-mcp`: the same context plus a pinned Octane MCP server and
+- `framework-docs`: the frozen starter application plus framework documentation
+  at the pinned commit. The candidate may read the framework sources for
+  context, but only edits the declared application paths.
+- `framework-docs-mcp`: the same context plus a pinned Octane MCP server and
   declared tool set.
 - `closed-book`: prompt-only recall, reported separately from open-book runs.
 
-Also separate direct completion, instruction-to-patch, and agentic repository
-repair. The collection validator rejects mixed benchmark versions, splits,
+These standalone-framework names belong to the current schema `1.1`. Parsers
+also retain schema `1.0` for historical rows, where the corresponding modes are
+named `repo-docs` and `repo-docs-mcp`. Do not mix names across schema versions.
+Schema 1.1 also separates the framework base lockfile (`lockfileHash`) from an
+optional effective benchmark overlay (`overlayLockfileHash`); both are immutable
+SHA-256 digests.
+
+Also separate direct completion, instruction-to-patch, and agentic application
+authoring. The collection validator rejects mixed benchmark versions, splits,
 contexts, or execution modes. A score belongs to the full evaluated system:
 model revision, system and user prompts, harness commit and image, context,
 tools, sampling settings, attempt policy, token budget, wall-clock limit, and
@@ -54,9 +62,9 @@ Use strict task resolution as the headline measure:
   narrow; use a family-cluster analysis for inferential comparisons.
 
 Compile rate, target-test rate, regression rate, tokens, time, and cost are useful
-diagnostics, not substitutes for resolution. Schema `1.0` is explicitly pass@1
-and rejects any other attempt count. Add pass@k only in a future schema that
-defines independent sampling and the estimator used.
+diagnostics, not substitutes for resolution. Schemas `1.0` and `1.1` are
+explicitly pass@1 and reject any other attempt count. Add pass@k only in a
+future schema that defines independent sampling and the estimator used.
 
 Preserve each result with its matching prediction, run manifest, and immutable
 task manifest. Results carry the run, task-set, attempt, prediction, grader, and
@@ -86,8 +94,8 @@ Run every attempt in a fresh ephemeral sandbox with:
 - No network, cloud metadata endpoint, credentials, or host sockets.
 - A non-root user, read-only base filesystem, and a writable task workspace.
 - CPU, memory, process, disk, output, and wall-clock limits.
-- A repository snapshot without answer-bearing branches, refs, reflogs, build
-  caches, or Git objects.
+- A starter workspace and documentation snapshot without reference solutions,
+  answer-bearing branches, refs, reflogs, build caches, or Git objects.
 - Hidden tests injected only into a separate grader phase and removed afterward.
 - An allowlisted command surface and captured, size-limited logs.
 

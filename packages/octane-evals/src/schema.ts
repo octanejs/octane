@@ -1,4 +1,5 @@
-export const EVAL_SCHEMA_VERSION = '1.0' as const;
+export const EVAL_SCHEMA_VERSION = '1.1' as const;
+export const EVAL_SCHEMA_VERSIONS = ['1.0', EVAL_SCHEMA_VERSION] as const;
 
 export const EVAL_SUITES = ['tsrx', 'octane', 'integration'] as const;
 export const DATASET_SPLITS = ['train', 'dev', 'test'] as const;
@@ -19,7 +20,19 @@ export const PORT_SHAPES = [
 	'router-hybrid',
 ] as const;
 export const DIFFICULTIES = ['introductory', 'standard', 'advanced'] as const;
-export const CONTEXT_MODES = ['repo-docs', 'repo-docs-mcp', 'closed-book'] as const;
+export const LEGACY_CONTEXT_MODES = ['repo-docs', 'repo-docs-mcp', 'closed-book'] as const;
+export const CURRENT_CONTEXT_MODES = [
+	'framework-docs',
+	'framework-docs-mcp',
+	'closed-book',
+] as const;
+export const CONTEXT_MODES = [
+	'repo-docs',
+	'repo-docs-mcp',
+	'framework-docs',
+	'framework-docs-mcp',
+	'closed-book',
+] as const;
 export const EXECUTION_MODES = ['completion', 'instruction', 'agentic'] as const;
 export const OUTPUT_TYPES = ['patch', 'completion', 'classification'] as const;
 export const RESULT_OUTCOMES = ['resolved', 'unresolved', 'error'] as const;
@@ -54,6 +67,7 @@ export const FAILURE_STAGES = [
 ] as const;
 
 export type EvalSuite = (typeof EVAL_SUITES)[number];
+export type EvalSchemaVersion = (typeof EVAL_SCHEMA_VERSIONS)[number];
 export type DatasetSplit = (typeof DATASET_SPLITS)[number];
 export type Capability = (typeof CAPABILITIES)[number];
 export type PortShape = (typeof PORT_SHAPES)[number];
@@ -99,7 +113,23 @@ export interface TaskEnvironment {
 	node: string;
 	pnpm: string;
 	packageVersions: Record<string, string>;
+	/** Lockfile from the pinned framework base commit. */
 	lockfileHash: string;
+	/** Effective evaluation overlay lockfile. Available from schema 1.1. */
+	overlayLockfileHash?: string;
+}
+
+/** A schema 1.1 self-contained starter project supplied to an application-authoring task. */
+export interface TaskWorkspace {
+	kind: 'template';
+	templatePath: string;
+	templateDigest: string;
+}
+
+/** Schema 1.1 public answer bytes released only with a training task. */
+export interface TrainingArtifacts {
+	referencePath: string;
+	referenceDigest: string;
 }
 
 export interface McpContext {
@@ -146,11 +176,12 @@ export interface PublicCommand {
 }
 
 /**
- * Public task metadata. Gold patches, reference solutions, and hidden test
- * contents are intentionally absent and rejected by the runtime validator.
+ * Public task metadata. Training tasks may expose reference metadata; hidden
+ * grader contents and non-training gold artifacts remain absent.
  */
 export interface TaskManifest {
-	schemaVersion: typeof EVAL_SCHEMA_VERSION;
+	/** Parsers accept legacy 1.0 rows; EVAL_SCHEMA_VERSION identifies the current writer version. */
+	schemaVersion: EvalSchemaVersion;
 	benchmarkVersion: string;
 	taskId: string;
 	familyId: string;
@@ -165,6 +196,8 @@ export interface TaskManifest {
 	difficulty?: Difficulty;
 	provenance: TaskProvenance;
 	environment: TaskEnvironment;
+	workspace?: TaskWorkspace;
+	trainingArtifacts?: TrainingArtifacts;
 	context: TaskContext;
 	policy: TaskPolicy;
 	grader: PublicGraderMetadata;
@@ -220,7 +253,7 @@ export interface RunAttemptPolicy {
 }
 
 export interface EvaluationRunManifest {
-	schemaVersion: typeof EVAL_SCHEMA_VERSION;
+	schemaVersion: EvalSchemaVersion;
 	runId: string;
 	createdAt: string;
 	benchmarkVersion: string;
@@ -238,7 +271,7 @@ export interface EvaluationRunManifest {
 }
 
 export interface Prediction {
-	schemaVersion: typeof EVAL_SCHEMA_VERSION;
+	schemaVersion: EvalSchemaVersion;
 	runId: string;
 	runManifestDigest: string;
 	taskId: string;
@@ -271,7 +304,7 @@ export interface CommandResult {
 }
 
 export interface EvaluationResult {
-	schemaVersion: typeof EVAL_SCHEMA_VERSION;
+	schemaVersion: EvalSchemaVersion;
 	runId: string;
 	runManifestDigest: string;
 	benchmarkVersion: string;
@@ -472,6 +505,13 @@ class Validator {
 		}
 		return valid ? (value as Record<string, string>) : undefined;
 	}
+}
+
+function validateSchemaVersion(
+	record: UnknownRecord,
+	validator: Validator,
+): EvalSchemaVersion | undefined {
+	return validator.enum(record, 'schemaVersion', '$', EVAL_SCHEMA_VERSIONS);
 }
 
 function normalizedKey(key: string): string {
@@ -750,7 +790,11 @@ function validateProvenance(
 	}
 }
 
-function validateEnvironment(value: unknown, validator: Validator): void {
+function validateEnvironment(
+	value: unknown,
+	validator: Validator,
+	schemaVersion: EvalSchemaVersion | undefined,
+): void {
 	const record = validator.record(value, '$.environment');
 	if (record === undefined) return;
 	validator.keys(record, '$.environment', [
@@ -762,6 +806,7 @@ function validateEnvironment(value: unknown, validator: Validator): void {
 		'pnpm',
 		'packageVersions',
 		'lockfileHash',
+		'overlayLockfileHash',
 	]);
 	validator.string(record, 'repository', '$.environment');
 	validateGitCommit(
@@ -800,17 +845,73 @@ function validateEnvironment(value: unknown, validator: Validator): void {
 		'$.environment.lockfileHash',
 		validator,
 	);
+	const overlayLockfileHash = validator.string(
+		record,
+		'overlayLockfileHash',
+		'$.environment',
+		true,
+	);
+	validateDigest(overlayLockfileHash, '$.environment.overlayLockfileHash', validator);
+	if (overlayLockfileHash !== undefined && schemaVersion === '1.0') {
+		validator.issue('$.environment.overlayLockfileHash', 'requires schema 1.1');
+	}
+}
+
+function validateWorkspace(value: unknown, validator: Validator): void {
+	if (value === undefined) return;
+	const path = '$.workspace';
+	const record = validator.record(value, path);
+	if (record === undefined) return;
+	validator.keys(record, path, ['kind', 'templatePath', 'templateDigest']);
+	validator.enum(record, 'kind', path, ['template'] as const);
+	const templatePath = validator.string(record, 'templatePath', path);
+	validateRelativePaths(
+		templatePath === undefined ? undefined : [templatePath],
+		`${path}.templatePath`,
+		validator,
+	);
+	validateDigest(
+		validator.string(record, 'templateDigest', path),
+		`${path}.templateDigest`,
+		validator,
+	);
+}
+
+function validateTrainingArtifacts(value: unknown, validator: Validator): void {
+	if (value === undefined) return;
+	const path = '$.trainingArtifacts';
+	const record = validator.record(value, path);
+	if (record === undefined) return;
+	validator.keys(record, path, ['referencePath', 'referenceDigest']);
+	const referencePath = validator.string(record, 'referencePath', path);
+	validateRelativePaths(
+		referencePath === undefined ? undefined : [referencePath],
+		`${path}.referencePath`,
+		validator,
+	);
+	validateDigest(
+		validator.string(record, 'referenceDigest', path),
+		`${path}.referenceDigest`,
+		validator,
+	);
 }
 
 function validateContext(
 	value: unknown,
 	validator: Validator,
+	schemaVersion: EvalSchemaVersion | undefined,
 	path = '$.context',
 ): { mode?: ContextMode; mcpTools?: string[] } | undefined {
 	const record = validator.record(value, path);
 	if (record === undefined) return undefined;
 	validator.keys(record, path, ['mode', 'docsCommit', 'mcp']);
 	const mode = validator.enum(record, 'mode', path, CONTEXT_MODES);
+	if (schemaVersion === '1.0' && (mode === 'framework-docs' || mode === 'framework-docs-mcp')) {
+		validator.issue(`${path}.mode`, 'framework documentation modes require schema 1.1');
+	}
+	if (schemaVersion === '1.1' && (mode === 'repo-docs' || mode === 'repo-docs-mcp')) {
+		validator.issue(`${path}.mode`, 'repository documentation modes are legacy schema 1.0 modes');
+	}
 	const docsCommit = validator.string(record, 'docsCommit', path, true);
 	validateGitCommit(docsCommit, `${path}.docsCommit`, validator);
 
@@ -831,8 +932,9 @@ function validateContext(
 		}
 	}
 
-	if (mode === 'repo-docs-mcp' && mcpValue === undefined) {
-		validator.issue(`${path}.mcp`, 'is required for repo-docs-mcp mode');
+	const isMcpMode = mode === 'repo-docs-mcp' || mode === 'framework-docs-mcp';
+	if (isMcpMode && mcpValue === undefined) {
+		validator.issue(`${path}.mcp`, 'is required for an MCP-assisted mode');
 	}
 	if (mode !== undefined && mode !== 'closed-book' && docsCommit === undefined) {
 		validator.issue(`${path}.docsCommit`, 'is required for an open-book mode');
@@ -840,8 +942,8 @@ function validateContext(
 	if (mode === 'closed-book' && docsCommit !== undefined) {
 		validator.issue(`${path}.docsCommit`, 'must be omitted for closed-book mode');
 	}
-	if (mode !== undefined && mode !== 'repo-docs-mcp' && mcpValue !== undefined) {
-		validator.issue(`${path}.mcp`, 'is only allowed for repo-docs-mcp mode');
+	if (mode !== undefined && !isMcpMode && mcpValue !== undefined) {
+		validator.issue(`${path}.mcp`, 'is only allowed for an MCP-assisted mode');
 	}
 	return { mode, mcpTools };
 }
@@ -952,12 +1054,14 @@ function parseTaskManifestInternal(value: unknown, publicOnly: boolean): TaskMan
 			'difficulty',
 			'provenance',
 			'environment',
+			'workspace',
+			'trainingArtifacts',
 			'context',
 			'policy',
 			'grader',
 			'tags',
 		]);
-		validator.enum(record, 'schemaVersion', '$', [EVAL_SCHEMA_VERSION] as const);
+		const schemaVersion = validateSchemaVersion(record, validator);
 		validator.string(record, 'benchmarkVersion', '$');
 		const taskId = validator.string(record, 'taskId', '$');
 		const familyId = validator.string(record, 'familyId', '$');
@@ -991,8 +1095,19 @@ function parseTaskManifestInternal(value: unknown, publicOnly: boolean): TaskMan
 
 		const allowedPaths = validatePrompt(record.prompt, validator);
 		validateProvenance(record.provenance, validator, split);
-		validateEnvironment(record.environment, validator);
-		validateContext(record.context, validator);
+		validateEnvironment(record.environment, validator, schemaVersion);
+		validateWorkspace(record.workspace, validator);
+		validateTrainingArtifacts(record.trainingArtifacts, validator);
+		if (schemaVersion === '1.0' && record.workspace !== undefined) {
+			validator.issue('$.workspace', 'requires schema 1.1');
+		}
+		if (schemaVersion === '1.0' && record.trainingArtifacts !== undefined) {
+			validator.issue('$.trainingArtifacts', 'requires schema 1.1');
+		}
+		if (record.trainingArtifacts !== undefined && split !== 'train') {
+			validator.issue('$.trainingArtifacts', 'is only allowed on the train split');
+		}
+		validateContext(record.context, validator, schemaVersion);
 		const writablePaths = validatePolicy(record.policy, validator);
 		validateAllowedPaths(allowedPaths, writablePaths, validator);
 		validateGrader(record.grader, validator, split);
@@ -1176,11 +1291,14 @@ function validateAttemptPolicy(value: unknown, validator: Validator): void {
 	validator.keys(record, path, ['attemptsPerTask', 'aggregation']);
 	const attemptsPerTask = validator.positiveInteger(record, 'attemptsPerTask', path);
 	if (attemptsPerTask !== undefined && attemptsPerTask !== 1) {
-		validator.issue(`${path}.attemptsPerTask`, 'schema 1.0 supports exactly one attempt per task');
+		validator.issue(
+			`${path}.attemptsPerTask`,
+			'schemas 1.0 and 1.1 support exactly one attempt per task',
+		);
 	}
 	const aggregation = validator.string(record, 'aggregation', path);
 	if (aggregation !== undefined && aggregation !== 'pass@1') {
-		validator.issue(`${path}.aggregation`, 'schema 1.0 supports only pass@1');
+		validator.issue(`${path}.aggregation`, 'schemas 1.0 and 1.1 support only pass@1');
 	}
 }
 
@@ -1205,7 +1323,7 @@ export function parseEvaluationRunManifest(value: unknown): EvaluationRunManifes
 			'limits',
 			'attempts',
 		]);
-		validator.enum(record, 'schemaVersion', '$', [EVAL_SCHEMA_VERSION] as const);
+		const schemaVersion = validateSchemaVersion(record, validator);
 		const runId = validator.string(record, 'runId', '$');
 		validateIdentifier(runId, '$.runId', validator);
 		validateTimestamp(validator.string(record, 'createdAt', '$'), '$.createdAt', validator);
@@ -1221,7 +1339,7 @@ export function parseEvaluationRunManifest(value: unknown): EvaluationRunManifes
 			validator,
 		);
 		validator.enum(record, 'executionMode', '$', EXECUTION_MODES);
-		const context = validateContext(record.context, validator);
+		const context = validateContext(record.context, validator, schemaVersion);
 		validateModel(record.model, validator);
 		validateHarness(record.harness, validator);
 		validatePromptArtifacts(record.promptArtifacts, validator);
@@ -1259,7 +1377,7 @@ export function parsePrediction(value: unknown): Prediction {
 			'attempt',
 			'createdAt',
 		]);
-		validator.enum(record, 'schemaVersion', '$', [EVAL_SCHEMA_VERSION] as const);
+		validateSchemaVersion(record, validator);
 		const runId = validator.string(record, 'runId', '$');
 		validateIdentifier(runId, '$.runId', validator);
 		validateDigest(
@@ -1273,7 +1391,7 @@ export function parsePrediction(value: unknown): Prediction {
 		validator.string(record, 'output', '$');
 		const attempt = validator.positiveInteger(record, 'attempt', '$');
 		if (attempt !== undefined && attempt !== 1) {
-			validator.issue('$.attempt', 'schema 1.0 supports exactly one attempt per task');
+			validator.issue('$.attempt', 'schemas 1.0 and 1.1 support exactly one attempt per task');
 		}
 		validateTimestamp(validator.string(record, 'createdAt', '$', true), '$.createdAt', validator);
 	}
@@ -1386,7 +1504,7 @@ export function parseEvaluationResult(value: unknown): EvaluationResult {
 			'metrics',
 			'commands',
 		]);
-		validator.enum(record, 'schemaVersion', '$', [EVAL_SCHEMA_VERSION] as const);
+		validateSchemaVersion(record, validator);
 		const runId = validator.string(record, 'runId', '$');
 		validateIdentifier(runId, '$.runId', validator);
 		validateDigest(
@@ -1404,7 +1522,7 @@ export function parseEvaluationResult(value: unknown): EvaluationResult {
 		validateIdentifier(taskId, '$.taskId', validator);
 		const attempt = validator.positiveInteger(record, 'attempt', '$');
 		if (attempt !== undefined && attempt !== 1) {
-			validator.issue('$.attempt', 'schema 1.0 supports exactly one attempt per task');
+			validator.issue('$.attempt', 'schemas 1.0 and 1.1 support exactly one attempt per task');
 		}
 		const outcome = validator.enum(record, 'outcome', '$', RESULT_OUTCOMES);
 		const failureStage = validator.enum(record, 'failureStage', '$', FAILURE_STAGES, true);
