@@ -24,7 +24,7 @@ describe('createEvaluationReport', () => {
 		const tasks = [
 			createTask('tsrx-resolved', { suite: 'tsrx', capability: 'authoring' }),
 			createTask('tsrx-unresolved', { suite: 'tsrx', capability: 'migration' }),
-			createTask('octane-repair', { suite: 'octane', capability: 'repair' }),
+			createTask('octane-context', { suite: 'octane', capability: 'authoring' }),
 			createTask('port-a', {
 				suite: 'integration',
 				capability: 'api-integration',
@@ -39,7 +39,7 @@ describe('createEvaluationReport', () => {
 			}),
 			createTask('port-error', {
 				suite: 'integration',
-				capability: 'repair',
+				capability: 'divergence-recognition',
 				portShape: 'dom-component',
 				packageName: '@octanejs/b',
 			}),
@@ -63,7 +63,7 @@ describe('createEvaluationReport', () => {
 			benchmarkVersion: run.benchmarkVersion,
 			taskManifestDigest: run.taskManifestDigest,
 			executionMode: 'agentic',
-			contextMode: 'repo-docs',
+			contextMode: 'framework-docs',
 		});
 		expect(report.overall).toMatchObject({
 			taskCount: 6,
@@ -105,7 +105,7 @@ describe('createEvaluationReport', () => {
 			result: { outcome: 'error', commands: [{ id: 'public-test', outcome: 'passed' }] },
 		});
 		expect(report.diagnostics).toEqual({
-			missingTaskIds: ['octane-repair'],
+			missingTaskIds: ['octane-context'],
 			duplicateResultIds: [],
 		});
 	});

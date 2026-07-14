@@ -468,9 +468,10 @@ generated from the workspace manifests in
 - [`@octanejs/mcp-server`](./packages/octane-mcp-server) exposes octane docs and
   compile tooling to AI agents over MCP.
 - [`@octanejs/evals`](./packages/octane-evals) is the private workspace package
-  for public Octane, TSRX, and integration evaluation schemas, development
-  tasks, runners, and reporting tools. Active held-out material stays outside
-  the repository.
+  for standalone Octane application prompts, starter workspaces, behavioral
+  graders, public reference implementations, and reproducible evaluation
+  tooling. It measures framework use rather than monorepo repair. Active
+  held-out material stays outside the repository.
 - The `@octanejs/*` framework bindings — each an octane port of a React library:
   [`zustand`](./packages/zustand), [`jotai`](./packages/jotai),
   [`query`](./packages/tanstack-query), [`apollo-client`](./packages/apollo-client),

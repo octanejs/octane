@@ -9,6 +9,18 @@ import {
 } from '../src/schema.js';
 import { createPrediction, createResult, createRun, createTask } from './_fixtures.js';
 
+function createLegacyTask(taskId: string) {
+	const task = createTask(taskId);
+	const environment = { ...task.environment };
+	delete environment.overlayLockfileHash;
+	return {
+		...task,
+		schemaVersion: '1.0' as const,
+		environment,
+		context: { mode: 'repo-docs' as const, docsCommit: task.environment.baseCommit },
+	};
+}
+
 describe('task manifest schemas', () => {
 	it('accepts complete, pinned public task metadata', () => {
 		const manifest = createTask('tsrx.counter.001');
@@ -64,6 +76,152 @@ describe('task manifest schemas', () => {
 		expect(() => parseTaskManifest(traversal)).toThrow(/not contained.*writable path/);
 	});
 
+	it('binds standalone application tasks to an immutable starter template', () => {
+		const manifest = createTask('tsrx.template.001');
+		const withWorkspace = {
+			...manifest,
+			workspace: {
+				kind: 'template',
+				templatePath: 'datasets/train/user-apps-v1/tasks/tsrx.template.001/starter',
+				templateDigest: `sha256:${'a'.repeat(64)}`,
+			},
+		};
+		expect(parseTaskManifest(withWorkspace)).toBe(withWorkspace);
+
+		const mutable = {
+			...withWorkspace,
+			workspace: { ...withWorkspace.workspace, templateDigest: 'latest' },
+		};
+		expect(() => parseTaskManifest(mutable)).toThrow(/templateDigest.*sha256/);
+
+		expect(() =>
+			parseTaskManifest({
+				...withWorkspace,
+				schemaVersion: '1.0',
+				environment: createLegacyTask('tsrx.template-legacy.001').environment,
+				context: { mode: 'repo-docs', docsCommit: manifest.environment.baseCommit },
+			}),
+		).toThrow(/workspace.*requires schema 1\.1/);
+	});
+
+	it('publishes immutable reference artifacts only for training tasks', () => {
+		const manifest = createTask('tsrx.training-artifacts.001', { split: 'train' });
+		const withTrainingArtifacts = {
+			...manifest,
+			trainingArtifacts: {
+				referencePath: 'datasets/train/user-apps-v1/tasks/tsrx.training-artifacts.001/reference',
+				referenceDigest: `sha256:${'f'.repeat(64)}`,
+			},
+		};
+
+		expect(parsePublicTaskManifest(withTrainingArtifacts)).toBe(withTrainingArtifacts);
+		expect(() =>
+			parseTaskManifest({
+				...withTrainingArtifacts,
+				schemaVersion: '1.0',
+				environment: createLegacyTask('tsrx.training-artifacts-legacy.001').environment,
+				context: { mode: 'repo-docs', docsCommit: manifest.environment.baseCommit },
+			}),
+		).toThrow(/trainingArtifacts.*requires schema 1\.1/);
+
+		const developmentTask = {
+			...withTrainingArtifacts,
+			split: 'dev',
+		};
+		expect(() => parseTaskManifest(developmentTask)).toThrow(
+			/trainingArtifacts.*only allowed on the train split/,
+		);
+	});
+
+	it('rejects unsafe or mutable training artifact metadata', () => {
+		const manifest = createTask('tsrx.training-artifacts-invalid.001', { split: 'train' });
+		const trainingArtifacts = {
+			referencePath:
+				'datasets/train/user-apps-v1/tasks/tsrx.training-artifacts-invalid.001/reference',
+			referenceDigest: `sha256:${'f'.repeat(64)}`,
+		};
+
+		expect(() =>
+			parseTaskManifest({
+				...manifest,
+				trainingArtifacts: { ...trainingArtifacts, referencePath: '../reference' },
+			}),
+		).toThrow(/referencePath.*safe repository-relative path/);
+		expect(() =>
+			parseTaskManifest({
+				...manifest,
+				trainingArtifacts: { ...trainingArtifacts, referenceDigest: 'latest' },
+			}),
+		).toThrow(/referenceDigest.*sha256/);
+	});
+
+	it('versions framework context names while retaining schema 1.0 repository modes', () => {
+		const docsContext = {
+			mode: 'repo-docs',
+			docsCommit: createLegacyTask('tsrx.docs.001').environment.baseCommit,
+		};
+		const mcpContext = {
+			mode: 'repo-docs-mcp',
+			docsCommit: createLegacyTask('tsrx.docs-mcp.001').environment.baseCommit,
+			mcp: {
+				package: '@octanejs/mcp-server',
+				version: '0.1.0',
+				tools: ['compile'],
+			},
+		};
+
+		for (const [taskId, context] of [
+			['tsrx.legacy-docs.001', docsContext],
+			['tsrx.legacy-docs-mcp.001', mcpContext],
+		] as const) {
+			const manifest = { ...createLegacyTask(taskId), context };
+			expect(parseTaskManifest(manifest)).toBe(manifest);
+		}
+
+		const current = createTask('tsrx.current-docs.001');
+		const legacy = createLegacyTask('tsrx.legacy-framework-docs.001');
+		expect(parseTaskManifest(current)).toBe(current);
+		expect(() =>
+			parseTaskManifest({
+				...legacy,
+				context: { mode: 'framework-docs', docsCommit: current.environment.baseCommit },
+			}),
+		).toThrow(/framework documentation modes require schema 1\.1/);
+		expect(() =>
+			parseTaskManifest({
+				...current,
+				context: { mode: 'repo-docs', docsCommit: current.environment.baseCommit },
+			}),
+		).toThrow(/repository documentation modes are legacy schema 1\.0 modes/);
+		expect(() => parseTaskManifest({ ...current, schemaVersion: '1.2' })).toThrow(
+			/schemaVersion.*expected one of: 1\.0, 1\.1/,
+		);
+	});
+
+	it('separately pins the schema 1.1 overlay lockfile', () => {
+		const current = createTask('tsrx.overlay-lockfile.001');
+		expect(parseTaskManifest(current)).toBe(current);
+
+		expect(() =>
+			parseTaskManifest({
+				...current,
+				environment: { ...current.environment, overlayLockfileHash: 'latest' },
+			}),
+		).toThrow(/overlayLockfileHash.*sha256/);
+
+		const legacy = createLegacyTask('tsrx.legacy-overlay-lockfile.001');
+		expect(parseTaskManifest(legacy)).toBe(legacy);
+		expect(() =>
+			parseTaskManifest({
+				...legacy,
+				environment: {
+					...legacy.environment,
+					overlayLockfileHash: `sha256:${'f'.repeat(64)}`,
+				},
+			}),
+		).toThrow(/overlayLockfileHash.*requires schema 1\.1/);
+	});
+
 	it('validates exact SemVer and complete SPDX expression syntax', () => {
 		for (const version of ['01.2.3', '1.2.3-alpha..1', '1.2.3-01']) {
 			const manifest = createTask(`tsrx.semver.${version.replaceAll(/[^a-z0-9]/g, '-')}`);
@@ -92,13 +250,47 @@ describe('run, prediction, and result schemas', () => {
 		expect(parseEvaluationResult(result)).toBe(result);
 	});
 
+	it('parses legacy 1.0 protocol rows and rejects unknown versions consistently', () => {
+		const task = createTask('octane.legacy-protocol.001', { suite: 'octane' });
+		const run = createRun([task]);
+		const prediction = createPrediction(run, task);
+		const result = createResult(run, task, prediction);
+		const legacyRun = {
+			...run,
+			schemaVersion: '1.0',
+			context: { mode: 'repo-docs', docsCommit: task.environment.baseCommit },
+		};
+		const legacyPrediction = { ...prediction, schemaVersion: '1.0' };
+		const legacyResult = { ...result, schemaVersion: '1.0' };
+
+		expect(parseEvaluationRunManifest(legacyRun)).toBe(legacyRun);
+		expect(parsePrediction(legacyPrediction)).toBe(legacyPrediction);
+		expect(parseEvaluationResult(legacyResult)).toBe(legacyResult);
+		expect(() =>
+			parseEvaluationRunManifest({
+				...legacyRun,
+				context: { mode: 'framework-docs', docsCommit: task.environment.baseCommit },
+			}),
+		).toThrow(/framework documentation modes require schema 1\.1/);
+
+		for (const [parse, value] of [
+			[parseEvaluationRunManifest, run],
+			[parsePrediction, prediction],
+			[parseEvaluationResult, result],
+		] as const) {
+			expect(() => parse({ ...value, schemaVersion: '1.2' })).toThrow(
+				/schemaVersion.*expected one of: 1\.0, 1\.1/,
+			);
+		}
+	});
+
 	it('rejects timestamps that have valid syntax but impossible calendar values', () => {
 		const task = createTask('octane.timestamp.001', { suite: 'octane' });
 		const run = createRun([task], { createdAt: '2026-02-30T00:00:00Z' });
 		expect(() => parseEvaluationRunManifest(run)).toThrow(/valid ISO 8601 UTC timestamp/);
 	});
 
-	it('makes attempt identity explicit and limits schema 1.0 to pass@1', () => {
+	it('makes attempt identity explicit and limits schema 1.x to pass@1', () => {
 		const task = createTask('tsrx.attempt.001');
 		const run = createRun([task]);
 		const unsupported = {
@@ -115,7 +307,7 @@ describe('run, prediction, and result schemas', () => {
 		const task = createTask('tsrx.mcp.001');
 		const run = createRun([task], {
 			context: {
-				mode: 'repo-docs-mcp',
+				mode: 'framework-docs-mcp',
 				docsCommit: task.context.docsCommit,
 				mcp: { package: '@octanejs/mcp-server', version: '0.1.0', tools: ['compile'] },
 			},

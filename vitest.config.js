@@ -1,9 +1,117 @@
-import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { isAbsolute, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
 import { octaneMdx } from './packages/mdx/src/vite.js';
 import { stylex } from './packages/stylex/src/vite.js';
 import { websiteMdxOptions } from './website/mdx-options.ts';
+
+const USER_APP_EVAL_PREFIX = '@octane-eval-submission/';
+const USER_APP_EVAL_ALLOWED_IMPORTS = new Map([
+	['@octanejs/hook-form', resolve(import.meta.dirname, 'packages/hook-form/src/index.ts')],
+	['@octanejs/i18next', resolve(import.meta.dirname, 'packages/i18next/src/index.js')],
+	[
+		'@octanejs/tanstack-query',
+		resolve(import.meta.dirname, 'packages/tanstack-query/src/index.ts'),
+	],
+	['@octanejs/zustand', resolve(import.meta.dirname, 'packages/zustand/src/index.ts')],
+	['@tanstack/query-core', null],
+	['i18next', null],
+	['octane', resolve(import.meta.dirname, 'packages/octane/src/index.ts')],
+]);
+const USER_APP_EVAL_TASKS = resolve(
+	import.meta.dirname,
+	'packages/octane-evals/datasets/train/user-apps-v1/tasks',
+);
+
+function userAppEvalModuleIds(id) {
+	let cleanId = id.split(/[?#]/, 1)[0];
+	if (cleanId.startsWith('\0')) cleanId = cleanId.slice(1);
+	if (cleanId.startsWith('/@fs/')) cleanId = cleanId.slice('/@fs'.length);
+	if (cleanId.startsWith('file://')) {
+		try {
+			cleanId = fileURLToPath(cleanId);
+		} catch {
+			// Keep the original ID so an invalid URL cannot evade origin matching.
+		}
+	}
+
+	const ids = new Set([cleanId]);
+	if (isAbsolute(cleanId)) {
+		const absoluteId = resolve(cleanId);
+		ids.add(absoluteId);
+		try {
+			ids.add(realpathSync(absoluteId));
+		} catch {
+			// Resolution reports the useful error if the entry itself does not exist.
+		}
+	}
+	return ids;
+}
+
+function userAppEvalSubmission() {
+	const candidateEntryOrigins = new Map();
+	const trackCandidateEntry = (id, origin) => {
+		for (const candidateId of userAppEvalModuleIds(id)) {
+			candidateEntryOrigins.set(candidateId, origin);
+		}
+	};
+	const findCandidateEntryOrigin = (id) => {
+		if (id === undefined) return undefined;
+		for (const candidateId of userAppEvalModuleIds(id)) {
+			const origin = candidateEntryOrigins.get(candidateId);
+			if (origin !== undefined) return origin;
+		}
+		return undefined;
+	};
+
+	return {
+		name: 'octane-user-app-eval-submission',
+		enforce: 'pre',
+		async resolveId(source, importer, resolveOptions) {
+			const candidateOrigin = findCandidateEntryOrigin(importer);
+			if (candidateOrigin !== undefined) {
+				if (!USER_APP_EVAL_ALLOWED_IMPORTS.has(source)) {
+					throw new Error(
+						`User-app eval submission ${candidateOrigin} may not import ${JSON.stringify(source)}. ` +
+							`Allowed imports: ${[...USER_APP_EVAL_ALLOWED_IMPORTS.keys()].join(', ')}`,
+					);
+				}
+				const frameworkEntry = USER_APP_EVAL_ALLOWED_IMPORTS.get(source);
+				if (frameworkEntry !== null) return frameworkEntry;
+				return this.resolve(source, importer, { ...resolveOptions, skipSelf: true });
+			}
+
+			if (!source.startsWith(USER_APP_EVAL_PREFIX)) {
+				const frameworkEntry = USER_APP_EVAL_ALLOWED_IMPORTS.get(source);
+				return typeof frameworkEntry === 'string' ? frameworkEntry : null;
+			}
+			const [taskId, ...relativeParts] = source.slice(USER_APP_EVAL_PREFIX.length).split('/');
+			if (
+				!/^[a-z0-9][a-z0-9._-]*$/.test(taskId) ||
+				relativeParts.length === 0 ||
+				relativeParts.some((part) => part === '' || part === '.' || part === '..') ||
+				(process.env.OCTANE_EVAL_TASK_ID !== undefined &&
+					process.env.OCTANE_EVAL_TASK_ID !== taskId)
+			) {
+				throw new Error(`Invalid user-app eval submission import: ${source}`);
+			}
+			const submissionRoot = process.env.OCTANE_EVAL_SUBMISSION_ROOT;
+			const taskRoot = submissionRoot
+				? resolve(submissionRoot, taskId)
+				: resolve(USER_APP_EVAL_TASKS, taskId, 'reference');
+			const resolved = resolve(taskRoot, ...relativeParts);
+			const relativePath = relative(taskRoot, resolved);
+			if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+				throw new Error(`User-app eval submission import escapes its task root: ${source}`);
+			}
+			trackCandidateEntry(source, source);
+			trackCandidateEntry(resolved, source);
+			return resolved;
+		},
+	};
+}
 
 export default defineConfig({
 	test: {
@@ -1061,6 +1169,34 @@ export default defineConfig({
 					include: ['packages/octane-evals/tests/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
+				},
+			},
+			{
+				test: {
+					name: 'octane-evals-user-apps',
+					include: [
+						'packages/octane-evals/datasets/train/user-apps-v1/tasks/**/grader.test.ts',
+						'packages/octane-evals/datasets/train/user-apps-v1/source-contracts.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [userAppEvalSubmission(), octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane\/compiler$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/compiler/index.js'),
+						},
+						{
+							find: /^octane\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+					],
 				},
 			},
 			{

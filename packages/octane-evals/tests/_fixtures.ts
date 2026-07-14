@@ -41,20 +41,20 @@ export function createTask(
 ): TaskManifest {
 	const suite = options.suite ?? 'tsrx';
 	return {
-		schemaVersion: '1.0',
+		schemaVersion: '1.1',
 		benchmarkVersion: options.benchmarkVersion ?? 'dev-1',
 		taskId,
 		familyId: options.familyId ?? `family.${taskId}`,
 		title: `Task ${taskId}`,
 		prompt: {
-			statement: 'Return a unified diff that repairs the task.',
+			statement: 'Implement the requested behavior in the starter application.',
 			outputType: 'patch',
 			allowedPaths: ['src/App.tsrx'],
 		},
 		suite,
 		split: options.split ?? 'dev',
 		executionMode: options.executionMode ?? 'agentic',
-		capability: options.capability ?? 'repair',
+		capability: options.capability ?? 'authoring',
 		...(suite === 'integration'
 			? {
 					portShape: options.portShape ?? 'core-adapter',
@@ -84,8 +84,9 @@ export function createTask(
 			pnpm: '11.1.1',
 			packageVersions: { octane: '0.1.5' },
 			lockfileHash: `sha256:${'d'.repeat(64)}`,
+			overlayLockfileHash: `sha256:${'e'.repeat(64)}`,
 		},
-		context: { mode: 'repo-docs', docsCommit: commit },
+		context: { mode: 'framework-docs', docsCommit: commit },
 		policy: {
 			network: 'none',
 			...limits,
@@ -108,14 +109,14 @@ export function createRun(
 ): EvaluationRunManifest {
 	const first = tasks[0];
 	return {
-		schemaVersion: '1.0',
+		schemaVersion: '1.1',
 		runId: 'test-run',
 		createdAt: '2026-07-13T20:00:00Z',
 		benchmarkVersion: first?.benchmarkVersion ?? 'dev-1',
 		taskManifestDigest: digestTaskManifests(tasks),
 		scoringPolicyDigest,
 		executionMode: first?.executionMode ?? 'agentic',
-		context: first?.context ?? { mode: 'repo-docs', docsCommit: commit },
+		context: first?.context ?? { mode: 'framework-docs', docsCommit: commit },
 		model: {
 			provider: 'test-provider',
 			name: 'test-model',
@@ -141,7 +142,7 @@ export function createRun(
 
 export function createPrediction(run: EvaluationRunManifest, task: TaskManifest): Prediction {
 	return {
-		schemaVersion: '1.0',
+		schemaVersion: '1.1',
 		runId: run.runId,
 		runManifestDigest: digestRunManifest(run),
 		taskId: task.taskId,
@@ -159,7 +160,7 @@ export function createResult(
 	outcome: ResultOutcome = 'resolved',
 ): EvaluationResult {
 	return {
-		schemaVersion: '1.0',
+		schemaVersion: '1.1',
 		runId: run.runId,
 		runManifestDigest: digestRunManifest(run),
 		benchmarkVersion: run.benchmarkVersion,

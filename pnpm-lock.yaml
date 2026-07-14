@@ -2586,6 +2586,9 @@ importers:
 
   packages/octane-evals:
     devDependencies:
+      '@tsrx/core':
+        specifier: catalog:default
+        version: 0.1.37(patch_hash=0b7535578a1327e33019974cc015cbaafbd88bc4a1f60997c23bfb979cd7a081)
       '@types/node':
         specifier: catalog:default
         version: 24.13.2
