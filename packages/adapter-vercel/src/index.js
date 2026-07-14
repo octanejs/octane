@@ -10,8 +10,8 @@
  *     router: { … },
  *   });
  *
- * `vercel(options)` returns the plugin's adapter contract: after `vite build`
- * produces both bundles, @octanejs/vite-plugin calls `adapt(ctx)` and this
+ * `vercel(options)` returns the shared adapter contract: after a production
+ * build produces both bundles, the active integration calls `adapt(ctx)` and this
  * adapter restructures them into Vercel's Build Output API v3 under
  * `.vercel/output/` — no vercel.json rewrites, no hand-written api/ function.
  * The same contract shape (`{ name, adapt }`) is what a Cloudflare/Netlify
@@ -24,7 +24,7 @@
  */
 
 /** @import { VercelAdapterOptions } from '@octanejs/adapter-vercel' */
-/** @import { OctaneAdapter } from '@octanejs/vite-plugin' */
+/** @import { OctaneAdapter } from '@octanejs/app-core' */
 
 import { adapt } from './adapt.js';
 

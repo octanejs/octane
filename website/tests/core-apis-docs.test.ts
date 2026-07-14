@@ -119,7 +119,7 @@ describe('Core APIs documentation', () => {
 		expect(active).toBeTruthy();
 		expect(active?.getAttribute('aria-current')).toBe('page');
 		expect(container.querySelector('.pagination-link.previous')?.getAttribute('href')).toBe(
-			'/docs/quick-start',
+			'/docs/build-tools',
 		);
 		expect(container.querySelector('.pagination-link.next')?.getAttribute('href')).toBe(
 			'/docs/tsrx-vs-tsx',

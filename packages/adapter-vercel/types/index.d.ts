@@ -1,4 +1,4 @@
-import type { OctaneAdapter, AdaptContext } from '@octanejs/vite-plugin';
+import type { OctaneAdapter, AdaptContext } from '@octanejs/app-core';
 
 // ============================================================================
 // Adapter options
@@ -69,8 +69,8 @@ export interface VercelConfig {
 // ============================================================================
 
 /**
- * The octane.config.ts adapter: @octanejs/vite-plugin runs its `adapt()` after
- * `vite build` produces dist/client + dist/server, emitting `.vercel/output/`
+ * The octane.config.ts adapter: the active app integration runs its `adapt()`
+ * after producing dist/client + dist/server, emitting `.vercel/output/`
  * (Build Output API v3).
  */
 export function vercel(options?: VercelAdapterOptions): OctaneAdapter;

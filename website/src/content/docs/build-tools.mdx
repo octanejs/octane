@@ -1,0 +1,198 @@
+---
+title: Build tools
+---
+
+# Build tools
+
+Octane has one compiler with thin bundler adapters. Vite and Rspack own source
+transforms; the Vite and Rsbuild metaframework plugins add routing, streaming
+SSR, hydration wiring, production client/server builds, preview, and deployment
+adapters.
+
+## Choose an integration
+
+| Goal                                 | Package                    |
+| ------------------------------------ | -------------------------- |
+| Vite SPA compiler                    | `octane/compiler/vite`     |
+| Full Vite app                        | `@octanejs/vite-plugin`    |
+| Rspack SPA or custom server pipeline | `@octanejs/rspack-plugin`  |
+| Full Rsbuild app                     | `@octanejs/rsbuild-plugin` |
+
+All integrations use the same compiler, runtime selection, source maps, raw
+Octane dependency discovery, and cache dependencies. Choosing a bundler does
+not change component semantics.
+
+## Vite
+
+For an SPA, the compiler ships in `octane`:
+
+```bash
+pnpm add octane
+pnpm add -D vite
+```
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { octane } from 'octane/compiler/vite';
+
+export default defineConfig({
+	plugins: [octane()],
+});
+```
+
+Install `@octanejs/vite-plugin` and import `octane` from that package when you
+want Octane's full app layer:
+
+```ts
+import { defineConfig } from 'vite';
+import { octane } from '@octanejs/vite-plugin';
+
+export default defineConfig({ plugins: [octane()] });
+```
+
+Existing Vite projects keep their current behavior, including Vite's
+`import.meta.hot` HMR dialect.
+
+## Rspack
+
+The Rspack package is deliberately low-level. It compiles `.tsrx`, eligible
+Octane `.tsx`, and raw Octane `.ts`/`.js` dependency sources, but leaves HTML,
+routing, and server orchestration to your application.
+
+```bash
+pnpm add octane
+pnpm add -D @rspack/core @octanejs/rspack-plugin
+```
+
+```js
+// rspack.config.mjs
+import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
+
+export default {
+	entry: './src/main.tsrx',
+	plugins: [new OctaneRspackPlugin()],
+};
+```
+
+The plugin infers client or server compilation from standard Rspack targets.
+Set it explicitly for an unusual target or a multi-compiler setup:
+
+```js
+new OctaneRspackPlugin({ environment: 'server' });
+```
+
+Server compilation resolves exact bare `octane` imports to `octane/server`.
+Client compilation uses the DOM runtime and emits `import.meta.webpackHot` HMR
+handoff code when Rspack's hot loader context is active. Set `hmr: false` to
+disable component handoff, or `transpile: false` if another rule already strips
+TypeScript. The loader-only export at `@octanejs/rspack-plugin/loader` is
+available for custom rule composition.
+
+## Rsbuild
+
+Rsbuild is the closest equivalent to the full Vite metaframework integration.
+Its Environment API builds a browser hydration environment and a Node SSR
+environment with the correct Octane runtime in each.
+
+```bash
+pnpm add octane @octanejs/rsbuild-plugin
+pnpm add -D @rsbuild/core
+```
+
+```ts
+// rsbuild.config.ts
+import { defineConfig } from '@rsbuild/core';
+import { pluginOctane } from '@octanejs/rsbuild-plugin';
+
+export default defineConfig({
+	plugins: [pluginOctane()],
+});
+```
+
+Without `octane.config.ts`, `pluginOctane()` behaves as a compiler integration
+and preserves your own entries. With routes in `octane.config.ts`, it owns the
+web and Node entries required for SSR and hydration.
+
+The shared `build.target` setting controls both SWC application transforms and
+Rspack's generated runtime. Rsbuild accepts one ES level, `modules`, `false`, or
+esbuild-style browser targets such as `['chrome100', 'firefox100']`; do not mix
+ES levels and browser targets in the same array.
+
+## Full app configuration
+
+The config surface is shared by the Vite and Rsbuild integrations. Keep route
+module IDs project-root-relative and declarative so either bundler can turn
+them into stable client/server imports:
+
+```ts
+// octane.config.ts
+import { defineConfig, RenderRoute, ServerRoute } from '@octanejs/rsbuild-plugin';
+
+export default defineConfig({
+	router: {
+		routes: [
+			new RenderRoute({ path: '/', entry: '/src/Home.tsrx' }),
+			new RenderRoute({
+				path: '/posts/:id',
+				entry: ['Post', '/src/Post.tsrx'],
+				layout: '/src/Layout.tsrx',
+			}),
+			new ServerRoute({
+				path: '/api/health',
+				handler: () => Response.json({ ok: true }),
+			}),
+		],
+	},
+});
+```
+
+SSR templates require both markers:
+
+```html
+<head>
+	<!--ssr-head-->
+</head>
+<body>
+	<div id="root"><!--ssr-body--></div>
+</body>
+```
+
+The generated client entry hydrates the matched route, layout, pre-hydration
+hook, and root boundaries. The generated server entry statically imports route
+and `module server` owners, supports streaming or buffered SSR, and exposes Web
+and Node request handlers.
+
+## Production and preview
+
+Use the normal Rsbuild commands:
+
+```bash
+pnpm rsbuild dev
+pnpm rsbuild build
+pnpm octane-rsbuild-preview
+```
+
+The app build writes static browser assets to `dist/client` and the self-contained
+SSR entry and template metadata to `dist/server`. `octane-rsbuild-preview`
+starts that server entry. Change `build.outDir` in `octane.config.ts` to move
+both outputs together; configured deployment adapters run after both
+environments finish.
+
+Rsbuild app mode currently expects root-path hosting: keep `server.base` at `/`
+and `output.assetPrefix` at `auto` or `/`. Deployments beneath a subpath should
+rewrite that prefix to the app root at the hosting proxy. Route/config edits
+within an already enabled app reload the browser. Changing `build.target`,
+`build.outDir`, `build.minify`, or adding the first route reshapes environments
+and needs a dev-server restart.
+
+## Renderer targets
+
+Compiler and app-core options use declarative module IDs rather than bundler
+callbacks or instantiated renderer objects. That keeps DOM, Three, and future
+Lynx renderer selection an Octane compiler/config concern.
+
+`@octanejs/rsbuild-plugin` already follows the Rsbuild plugin model consumed by
+Rspeedy, but this release targets Octane's DOM renderer. A Lynx renderer target
+and Rspeedy preset are future work; do not point the current web hydration entry
+at a Lynx application.

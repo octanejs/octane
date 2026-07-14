@@ -1020,6 +1020,30 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'app-core',
+					include: ['packages/app-core/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
+					name: 'rspack-plugin',
+					include: ['packages/rspack-plugin-octane/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
+					name: 'rsbuild-plugin',
+					include: ['packages/rsbuild-plugin-octane/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'vite-plugin',
 					include: ['packages/vite-plugin-octane/tests/**/*.test.ts'],
 					environment: 'node',

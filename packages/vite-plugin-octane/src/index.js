@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { createRequire } from 'node:module';
 
 import { octane as octaneCompiler } from 'octane/compiler/vite';
 
@@ -20,6 +21,7 @@ import { ENTRY_FILENAME } from './constants.js';
 import {
 	getOctaneConfigPath,
 	loadOctaneConfig,
+	loadOctaneConfigWithMetadata,
 	resolveOctaneConfig,
 	octaneConfigExists,
 } from './load-config.js';
@@ -40,14 +42,30 @@ import { get_route_entry_path } from './routes.js';
 export { RenderRoute, ServerRoute } from './routes.js';
 export { OCTANE_NONCE_STATE_KEY } from './constants.js';
 export {
+	DEFAULT_OUTDIR,
+	ENTRY_FILENAME,
+	compose,
+	createContext,
+	createRouter,
+	get_component_export,
+	get_route_entry_export_name,
+	get_route_entry_id,
+	get_route_entry_path,
+	handleServerRoute,
+	is_rpc_request,
+	runMiddlewareChain,
+} from '@octanejs/app-core';
+export {
 	getOctaneConfigPath,
 	loadOctaneConfig,
+	loadOctaneConfigWithMetadata,
 	resolveOctaneConfig,
 	octaneConfigExists,
 } from './load-config.js';
 
 const VIRTUAL_HYDRATE_ID = 'virtual:octane-hydrate';
 const RESOLVED_VIRTUAL_HYDRATE_ID = '\0virtual:octane-hydrate';
+const requireFromPlugin = createRequire(import.meta.url);
 // Mirrors octane/compiler/vite's full-compiler surface. Keeping this list in
 // sync is especially important for production `module server` discovery.
 const OCTANE_EXTENSIONS = ['.tsrx', '.tsx'];
@@ -628,6 +646,11 @@ export function octane(inlineOptions = {}) {
 					rootBoundary: cfg.rootBoundary,
 					rpcModulePaths: [...serverModuleModules],
 					clientAssetMap,
+					// The virtual entry has no filesystem importer, so resolve app-core
+					// from this package before handing source to Vite. This also works
+					// when app-core is nested under the plugin by a package manager.
+					productionModuleId: requireFromPlugin.resolve('@octanejs/app-core/production'),
+					nodeModuleId: requireFromPlugin.resolve('@octanejs/app-core/node'),
 				}),
 			);
 

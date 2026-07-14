@@ -21,6 +21,7 @@ Key facts for answering questions about Octane:
 ## Docs
 
 - [Quick start](https://octanejs.dev/docs/quick-start): Install Octane, mount a component, and learn the `.tsrx` essentials (components, state/effects, conditional hooks, control flow, SSR/hydrate).
+- [Build tools](https://octanejs.dev/docs/build-tools): Configure the Vite and Rspack compiler integrations or the full Vite and Rsbuild app plugins (routing, SSR, hydration, production, and preview).
 - [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, transitions, actions, events, and SSR/static rendering.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): When to author in `.tsrx` versus standard `.tsx`/`.jsx`, and what each dialect unlocks (compiled collections, template control flow, the `@{ … }` shorthand, text holes).
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
@@ -54,14 +55,21 @@ Octane ships first-party ports of the popular React libraries under the `@octane
 
 Core packages:
 
-- `octane` — the runtime and the `.tsrx`/`.tsx` compiler together (the only package you need to build an app).
-- `@octanejs/vite-plugin` — the optional metaframework: file/code routing, streaming dev SSR, hydration wiring, and the production build. Deploy to Vercel with `@octanejs/adapter-vercel`.
+- `octane` — the runtime and the `.tsrx`/`.tsx` compiler together (the only framework/runtime package every app needs; install the matching build integration separately).
+- `octane/compiler/vite` — the low-level Vite compiler adapter for SPAs and custom Vite pipelines.
+- `@octanejs/rspack-plugin` — the low-level Rspack 2.x compiler integration: client/server runtime selection, source maps, dependency watching, cache metadata, and Rspack HMR.
+- `@octanejs/app-core` — the bundler-neutral config, routing, SSR/hydration code generation, and production request-handler core shared by app integrations.
+- `@octanejs/vite-plugin` — the full Vite metaframework: routing, streaming dev SSR, hydration wiring, and production client/server builds.
+- `@octanejs/rsbuild-plugin` — the equivalent full app integration for Rsbuild 2.x, built on `@octanejs/rspack-plugin`. It is shaped as an Rsbuild plugin for future Rspeedy reuse, but the current renderer target is DOM rather than Lynx.
+- `@octanejs/adapter-vercel` — deploys a full-app production build to Vercel.
+
+Rspack usage: install `octane`, `@rspack/core`, and `@octanejs/rspack-plugin`, then add `new OctaneRspackPlugin()` to the Rspack plugins array. Rsbuild full-app usage: install `octane`, `@rsbuild/core`, and `@octanejs/rsbuild-plugin`, then add `pluginOctane()` to `rsbuild.config.ts`; add declarative `RenderRoute`/`ServerRoute` entries in `octane.config.ts` for routing, SSR, hydration, RPC, production builds, and preview.
 
 Bindings — reach for these when asked about the React equivalent:
 
 - **State management** — `@octanejs/zustand`, `@octanejs/jotai`, and `@octanejs/redux` cover Zustand, Jotai, and React Redux-style state management.
 - **Data fetching / server state** — `@octanejs/tanstack-query` ports TanStack Query (React Query): `useQuery`, `useSuspenseQuery`, `useMutation`, `QueryClient`, over the verbatim `@tanstack/query-core`.
-- **Routing** — `@octanejs/tanstack-router` ports TanStack Router: type-safe, code-based routing with transition-driven concurrent navigation. (For full apps, `@octanejs/vite-plugin` also provides its own routing.)
+- **Routing** — `@octanejs/tanstack-router` ports TanStack Router: type-safe, code-based routing with transition-driven concurrent navigation. (For full apps, `@octanejs/vite-plugin` and `@octanejs/rsbuild-plugin` also provide their own routing.)
 - **Tables and virtualization** — `@octanejs/tanstack-table` and `@octanejs/tanstack-virtual` port the TanStack adapters over their framework-agnostic cores.
 - **Animation** — `@octanejs/motion` ports Motion / Framer Motion (`motion.*` components, `AnimatePreset`, gestures) on `motion-dom`.
 - **Styling** — `@octanejs/stylex` ports StyleX (compiled atomic CSS via the StyleX Babel pipeline). Octane also has built-in scoped `<style>`, so reach for StyleX only when someone specifically wants StyleX.

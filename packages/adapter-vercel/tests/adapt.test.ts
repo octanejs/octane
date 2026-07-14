@@ -69,13 +69,16 @@ describe('adapt()', () => {
 		expect(filesystemIndex).toBeGreaterThanOrEqual(0);
 		expect(catchAllIndex).toBe(filesystemIndex + 1);
 
-		// Hashed assets are immutable, applied BEFORE the filesystem handler.
-		const assetsRoute = config.routes.find((r: Record<string, unknown>) => r.src === '/assets/.+');
-		expect(assetsRoute).toMatchObject({
-			headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
-			continue: true,
-		});
-		expect(config.routes.indexOf(assetsRoute)).toBeLessThan(filesystemIndex);
+		// Both Vite (/assets) and Rsbuild (/static) hashed assets are immutable,
+		// applied BEFORE the filesystem handler.
+		for (const src of ['/assets/.+', '/static/.+']) {
+			const assetsRoute = config.routes.find((r: Record<string, unknown>) => r.src === src);
+			expect(assetsRoute).toMatchObject({
+				headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+				continue: true,
+			});
+			expect(config.routes.indexOf(assetsRoute)).toBeLessThan(filesystemIndex);
+		}
 	});
 
 	it('copies the client bundle to static/ (no index.html to shadow SSR)', () => {

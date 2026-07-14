@@ -2,6 +2,7 @@
 // Static imports keep every document in both module graphs (server-compiled
 // for SSR, client-compiled for hydration/navigation) — fine at this scale.
 import QuickStart from './docs/quick-start.mdx';
+import BuildTools from './docs/build-tools.mdx';
 import CoreApis from './docs/core-apis.mdx';
 import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
@@ -28,6 +29,22 @@ export const docs: DocEntry[] = [
 		description: 'Install octane, mount a component, and learn the .tsrx essentials.',
 		group: 'Start here',
 		component: QuickStart as DocEntry['component'],
+	},
+	{
+		slug: 'build-tools',
+		title: 'Build tools',
+		description: 'Configure Vite, Rspack, or Rsbuild for Octane apps.',
+		group: 'Start here',
+		sections: [
+			{ id: 'choose-an-integration', title: 'Choose an integration' },
+			{ id: 'vite', title: 'Vite' },
+			{ id: 'rspack', title: 'Rspack' },
+			{ id: 'rsbuild', title: 'Rsbuild' },
+			{ id: 'full-app-configuration', title: 'Full app configuration' },
+			{ id: 'production-and-preview', title: 'Production and preview' },
+			{ id: 'renderer-targets', title: 'Renderer targets' },
+		],
+		component: BuildTools as DocEntry['component'],
 	},
 	{
 		slug: 'core-apis',

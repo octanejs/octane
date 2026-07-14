@@ -152,6 +152,9 @@ describe('KNOWN_BINDINGS', () => {
 		// excluded by name.
 		const NON_BINDINGS = new Set([
 			'octane',
+			'@octanejs/app-core',
+			'@octanejs/rspack-plugin',
+			'@octanejs/rsbuild-plugin',
 			'@octanejs/vite-plugin',
 			'@octanejs/adapter-vercel',
 			'@octanejs/mcp-server',
