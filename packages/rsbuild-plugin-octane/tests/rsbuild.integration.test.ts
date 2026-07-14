@@ -77,14 +77,24 @@ function writeRoutedApp(root: string, render: 'buffered' | 'streaming' = 'buffer
 	write(
 		root,
 		'src/Page.tsrx',
-		`import './page.css';
+		`import { vendorLabel } from './vendor.js';
+import './page.css';
 
 export function Page() @{
-	<main class="route" data-rsbuild-ssr="ready">Rsbuild route</main>
+	<main class="route vendor" data-rsbuild-ssr="ready">Rsbuild route{vendorLabel as string}</main>
 }
 `,
 	);
 	write(root, 'src/page.css', '.route { color: rebeccapurple; }\n');
+	write(
+		root,
+		'src/vendor.js',
+		`import './vendor.css';
+
+export const vendorLabel = ' with split assets';
+`,
+	);
+	write(root, 'src/vendor.css', '.vendor { font-weight: 600; }\n');
 	write(
 		root,
 		'src/actions.tsrx',
@@ -210,7 +220,29 @@ export function App() @{
 	it('builds routed client/server environments and serves the production SSR handler', async () => {
 		writeRoutedApp(root);
 
-		await build(root, { plugins: [pluginOctane({ hmr: false })] });
+		await build(root, {
+			plugins: [pluginOctane({ hmr: false })],
+			tools: {
+				rspack(config: any, context: { environment: { name: string } }) {
+					if (context.environment.name !== 'web') return;
+					config.optimization ??= {};
+					config.optimization.splitChunks = {
+						chunks: 'async',
+						minSize: 0,
+						cacheGroups: {
+							default: false,
+							defaultVendors: false,
+							octaneTestVendor: {
+								test: /[\\/]vendor\.(?:css|js)$/,
+								name: '0-vendor',
+								chunks: 'async',
+								enforce: true,
+							},
+						},
+					};
+				},
+			},
+		});
 
 		const clientRoot = join(root, 'build/client');
 		const serverRoot = join(root, 'build/server');
@@ -229,10 +261,16 @@ export function App() @{
 		);
 		expect(assetMap['/src/Page.tsrx']).toEqual({
 			js: expect.stringMatching(/\.js$/),
-			css: [expect.stringMatching(/\.css$/)],
+			css: [expect.stringMatching(/\.css$/), expect.stringMatching(/\.css$/)],
 		});
+		expect(assetMap['/src/Page.tsrx'].js).not.toContain('0-vendor');
+		expect(assetMap['/src/Page.tsrx'].css.some((file: string) => file.includes('0-vendor'))).toBe(
+			true,
+		);
 		expect(existsSync(join(clientRoot, assetMap['/src/Page.tsrx'].js))).toBe(true);
-		expect(existsSync(join(clientRoot, assetMap['/src/Page.tsrx'].css[0]))).toBe(true);
+		for (const cssFile of assetMap['/src/Page.tsrx'].css) {
+			expect(existsSync(join(clientRoot, cssFile))).toBe(true);
+		}
 
 		const entry = pathToFileURL(join(serverRoot, 'entry.js'));
 		entry.searchParams.set('test', String(Date.now()));
@@ -246,7 +284,8 @@ export function App() @{
 		expect(response.status).toBe(200);
 		expect(body).toContain('data-rsbuild-ssr="ready"');
 		expect(body).toContain('Rsbuild route');
-		expect(body).toContain(assetMap['/src/Page.tsrx'].css[0]);
+		for (const cssFile of assetMap['/src/Page.tsrx'].css) expect(body).toContain(cssFile);
+		expect(body).toContain(`<link rel="modulepreload" href="/${assetMap['/src/Page.tsrx'].js}">`);
 		expect(body).toContain('id="__octane_data"');
 		expect(body).not.toContain('<!--ssr-body-->');
 

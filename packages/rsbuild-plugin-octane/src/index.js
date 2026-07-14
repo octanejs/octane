@@ -522,6 +522,7 @@ export function pluginOctane(inlineOptions = {}) {
 						config.plugins.push(
 							new OctaneClientAssetsPlugin({
 								root,
+								clientEntry: clientEntryFile,
 								entries: () =>
 									collectClientEntries(
 										/** @type {import('@octanejs/app-core').ResolvedOctaneConfig} */ (
