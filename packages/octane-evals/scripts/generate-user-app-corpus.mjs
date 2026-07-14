@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,14 +7,7 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = resolve(packageRoot, '..', '..');
 const corpusRoot = join(packageRoot, 'datasets', 'train', 'user-apps-v1');
 const catalog = JSON.parse(readFileSync(join(corpusRoot, 'catalog.json'), 'utf8'));
-const baseCommit = '4d7f96230df3c5af5df4f733135a08beeec00737';
-const lockfileHash = sha256(
-	execFileSync('git', ['show', `${baseCommit}:pnpm-lock.yaml`], {
-		cwd: repositoryRoot,
-		timeout: 10_000,
-		killSignal: 'SIGKILL',
-	}),
-);
+const { baseCommit, lockfileHash } = catalog.environment;
 const overlayLockfileHash = sha256(readFileSync(join(repositoryRoot, 'pnpm-lock.yaml')));
 const image = 'node@sha256:752ea8a2f758c34002a0461bd9f1cee4f9a3c36d48494586f60ffce1fc708e0e';
 const trainingSystemPrompt =

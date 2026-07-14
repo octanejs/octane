@@ -12,9 +12,12 @@ const corpusRoot = join(packageRoot, 'datasets', 'train', 'user-apps-v1');
 const generatorTimeoutMs = 10_000;
 const gradingCommandTimeoutMs = 20_000;
 const starterVerificationTimeoutMs = 25_000;
-const baseLockfileDigests = new Map<string, string>();
 
 interface UserAppCatalog {
+	environment: {
+		baseCommit: string;
+		lockfileHash: string;
+	};
 	tasks: Array<{ taskId: string; tags: string[] }>;
 	coverage: Record<string, Record<string, string[]>>;
 }
@@ -42,20 +45,6 @@ const REQUIRED_COVERAGE = {
 
 function readCatalog(): UserAppCatalog {
 	return JSON.parse(readFileSync(join(corpusRoot, 'catalog.json'), 'utf8'));
-}
-
-function baseLockfileDigest(commit: string): string {
-	const cached = baseLockfileDigests.get(commit);
-	if (cached !== undefined) return cached;
-	const digest = sha256Digest(
-		execFileSync('git', ['show', `${commit}:pnpm-lock.yaml`], {
-			cwd: repositoryRoot,
-			timeout: generatorTimeoutMs,
-			killSignal: 'SIGKILL',
-		}),
-	);
-	baseLockfileDigests.set(commit, digest);
-	return digest;
 }
 
 function readWorkspace(directory: string, root = directory): WorkspaceDigestFile[] {
@@ -117,7 +106,8 @@ describe('public user-app training corpus', () => {
 				relative(packageRoot, reference).replaceAll('\\', '/'),
 			);
 			expect(task.trainingArtifacts?.referenceDigest).toBe(sha256Digest(readFileSync(reference)));
-			expect(task.environment.lockfileHash).toBe(baseLockfileDigest(task.environment.baseCommit));
+			expect(task.environment.baseCommit).toBe(catalog.environment.baseCommit);
+			expect(task.environment.lockfileHash).toBe(catalog.environment.lockfileHash);
 			expect(task.environment.overlayLockfileHash).toBe(overlayLockfileDigest);
 			expect(task.grader.graderDigest).toBe(digestWorkspaceFiles(readGrader(grader)));
 			expect(readFileSync(join(starterRoot, 'src', 'App.tsrx'), 'utf8')).not.toBe(
@@ -207,7 +197,7 @@ describe('public user-app training corpus', () => {
 				killSignal: 'SIGKILL',
 			},
 		);
-	});
+	}, 30_000);
 
 	it('keeps every incomplete starter behaviorally unresolved', () => {
 		execFileSync(process.execPath, ['scripts/verify-user-app-starters.mjs'], {

@@ -1,5 +1,9 @@
 {
   "benchmarkVersion": "user-apps-v1",
+  "environment": {
+    "baseCommit": "4d7f96230df3c5af5df4f733135a08beeec00737",
+    "lockfileHash": "sha256:d3c1c7ee50a935f86a0131d9ff3c22232d5ea84bd0eb56ac0f3511280d77e51a"
+  },
   "coverage": {
     "codingPatterns": {
       "component-composition": [
