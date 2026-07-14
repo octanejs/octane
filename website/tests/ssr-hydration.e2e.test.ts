@@ -325,10 +325,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				await deploymentsTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
 			);
 			await transitionDemo.locator('[data-report="activity"]').waitFor();
-			await waitForLocatorText(
-				transitionDemo.locator('.transition-status'),
-				'Activity is ready.',
-			);
+			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Activity is ready.');
 			expect(await activityTab.getAttribute('aria-selected')).toBe('true');
 			expect(await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
 				await overviewTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
