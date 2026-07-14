@@ -137,7 +137,9 @@ describe('Core APIs documentation', () => {
 		fireEvent.click(activity);
 
 		await waitFor(() =>
-			expect(demo.querySelector('.transition-status')?.textContent).toContain('Loading Activity'),
+			expect(demo.querySelector('.transition-status')?.textContent).toBe(
+				'Loading Activity — Overview stays on screen.',
+			),
 		);
 		expect(region.getAttribute('aria-busy')).toBe('true');
 		expect(demo.querySelector('[data-report]')?.getAttribute('data-report')).toBe('overview');
@@ -149,7 +151,7 @@ describe('Core APIs documentation', () => {
 			{ timeout: 2000 },
 		);
 		expect(region.getAttribute('aria-busy')).toBe('false');
-		expect(demo.querySelector('.transition-status')?.textContent).toContain('Activity is ready');
+		expect(demo.querySelector('.transition-status')?.textContent).toBe('Activity is ready.');
 	});
 
 	it('keeps search input immediate while deferred results catch up', async () => {

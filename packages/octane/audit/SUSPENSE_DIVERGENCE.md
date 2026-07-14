@@ -68,7 +68,7 @@ future optimization can't accidentally change it without a deliberate decision.
 
 ---
 
-## 4. Per-swap off-screen rendering — observable cross-boundary gap ✅ CLOSED
+## 4. Per-swap off-screen rendering — cross-boundary reveal gap ✅ CLOSED
 
 **Where it shows up:**
 [differential/transition-swap-suspend.test.ts](__tests__/differential/transition-swap-suspend.test.ts),
@@ -92,9 +92,12 @@ coordinator (Divergence #1) holds every region's prior content and reveals them
 together once all are data-ready (`entangled-commit.test.ts` exercises two off-screen
 if-block swaps in one transition revealing together, effects firing in one batch).
 
-**Remaining note:** the coordinator is data-ready-based, not a fully interruptible
-time-sliced global WIP. Time-based cross-boundary fallback throttling is the separate
-Divergence #5.
+**Remaining limitation:** this is still not a global WIP. During an ordinary synchronous
+transition, a same-identity parent can patch bindings outside a suspending `@try` before a
+descendant throws. octane then holds the old boundary content beside already-updated
+parent/sibling UI; React retains the whole prior screen. The async Action batching in #6
+prevents that tear while an Action is in flight, but does not close the synchronous case.
+Time-based cross-boundary fallback throttling is the separate Divergence #5.
 
 ---
 
@@ -125,10 +128,12 @@ future release, revisit — it could layer on the existing commit coordinator as
 
 ---
 
-## 6. Async-action transition entanglement (intermediate commits)
+## 6. Async-action transition entanglement (intermediate commits) — ✅ CLOSED (2026-07-14)
 
 **Where it shows up:** `ReactAsyncActions-test.js:352` ("urgent updates are not blocked
-during an async action"). A `startTransition(() => setX(1))` nested INSIDE an in-flight
+during an async action") and [transitions.test.ts](../tests/transitions.test.ts) —
+`'keeps parent state and suspended child on the committed screen until the Action settles'`.
+A `startTransition(() => setX(1))` nested INSIDE an in-flight
 `startTransition(async () => …)` keeps `X` on its OLD value until the async action's
 promise settles, then commits with the rest of the action.
 
@@ -136,23 +141,12 @@ promise settles, then commits with the rest of the action.
 update made while it is in flight is entangled and deferred, committing together when the
 action settles. Urgent updates made meanwhile are NOT blocked (they commit immediately).
 
-**octane behavior:** octane matches the urgent half (an urgent update during a pending
-async action commits immediately) and keeps `isPending` true for the action's whole life
-(`ASYNC_TRANSITION_COUNT`). What it does NOT do is HOLD intermediate transition-priority
-updates: a regular `setX` inside the action commits eagerly (verified: `A` goes to `A1`
-immediately, where React shows `A0` until settle). The dominant async-action pattern —
-`useOptimistic` — is unaffected and matches React (optimistic value shows during the
-action, rebases on passthrough changes, converges on settle; see
-`conformance/async-actions.test.ts`); only a *non-optimistic* intermediate transition
-update differs.
-
-**Surface impact:** Low. The optimistic path (the designed way to show in-flight state)
-matches React; this only affects a plain `setState` made mid-action expecting to be held.
-
-**Closure plan:** Holding regular transition commits while `ASYNC_TRANSITION_COUNT > 0`
-(flushing them on settle) while still letting `useOptimistic` renders show requires
-distinguishing optimistic from regular transition renders in the scheduler — fragile next
-to the working optimistic flow. Deferred; revisit alongside the broader scheduler work.
+**octane now matches:** a `TransitionActionBatch` stages ordinary `useState` and
+`useReducer` updates until every entangled async Action settles. Explicit transitions
+started after `await` join the same batch; discrete urgent updates bypass it and staged
+functional updates rebase over them at commit. `useOptimistic` deliberately remains the
+visible in-flight surface. The regression covers parent state, reducer state, a suspending
+child with no fallback flash, post-`await` entanglement, and urgent-update rebasing.
 
 ---
 
@@ -202,9 +196,13 @@ React on, including:
 - Sibling boundaries on a shared promise commit in the same frame.
 - Unmounting a suspended boundary mid-pending cancels the retry cleanly (no late
   commits).
-- Entangled-transition atomic commit: one `startTransition` that fans out to multiple
-  suspending boundaries holds every prior screen until all are data-ready, then reveals
-  them together — never a half-updated screen (global commit coordinator; Divergence #1/#4).
+- Entangled-boundary reveal: one `startTransition` that fans out to multiple suspending
+  boundaries holds each boundary's prior content until all are data-ready, then reveals
+  them together (global commit coordinator; Divergence #1/#4). This does not imply global
+  parent/sibling rollback; see #4's remaining synchronous limitation.
+- Async Action entanglement: ordinary state/reducer updates stay staged until the Action
+  settles, post-`await` explicit transitions join the batch, and urgent discrete updates
+  still commit immediately (`transitions.test.ts`; Divergence #6).
 - `useOptimistic` rebasing: the optimistic value folds the pending queue onto the CURRENT
   passthrough each render, so a passthrough change mid-action rebases the pending update;
   custom reducers and repeated updates in one action work too (`ReactAsyncActions-test.js`
@@ -212,8 +210,9 @@ React on, including:
 - `<Activity>`: revealing an outer boundary does NOT mount a still-hidden inner one
   (`Activity-test.js:1362`); layout/passive effects mount child-first and tear down
   parent-first on hide (`Activity-test.js`); state + DOM preserved across hide/show — all
-  in `activity.test.ts`. (Insertion-effect handling is the lone exception, Divergence #7.)
-- Transition prior-DOM preservation during suspense (IN-PLACE re-suspend).
+  in `activity.test.ts`, including insertion effects remaining connected while hidden
+  (closed Divergence #7).
+- Transition prior-DOM preservation inside the suspending boundary (IN-PLACE re-suspend).
 - Transition REPLACE-suspend hold: swapping in a different component/branch that
   suspends on mount keeps the prior content on screen (per-swap off-screen WIP — see
   Divergence #4 for the single- vs multi-boundary scope).

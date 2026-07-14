@@ -295,12 +295,15 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 
 			const transitionDemo = page.locator('[data-demo="transition"]');
 			await transitionDemo.getByRole('tab', { name: 'Activity' }).click();
-			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Loading Activity');
+			await waitForLocatorText(
+				transitionDemo.locator('.transition-status'),
+				'Loading Activity — Overview stays on screen.',
+			);
 			expect(await transitionDemo.locator('[data-report]').getAttribute('data-report')).toBe(
 				'overview',
 			);
 			await transitionDemo.locator('[data-report="activity"]').waitFor();
-			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Activity is ready');
+			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Activity is ready.');
 
 			const deferredDemo = page.locator('[data-demo="deferred-value"]');
 			await deferredDemo.getByRole('searchbox', { name: 'Search products' }).fill('camera');

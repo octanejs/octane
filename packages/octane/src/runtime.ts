@@ -518,6 +518,132 @@ let TRANSITION_DEPTH = 0;
  * would need AsyncContext, which isn't available in the browser target.
  */
 let ASYNC_TRANSITION_COUNT = 0;
+
+interface TransitionActionSlot<T> {
+	value: T;
+	pendingActionBatch?: TransitionActionBatch;
+	pendingActionValue?: T;
+}
+
+interface TransitionActionUpdate<T = unknown> {
+	slot: TransitionActionSlot<T>;
+	block: Block;
+	operations: Array<(value: T) => T>;
+	baseValue: T;
+	value: T;
+	forceRender: boolean;
+}
+
+interface TransitionActionBatch {
+	updates: Map<object, TransitionActionUpdate<any>>;
+	pendingActions: number;
+	closed: boolean;
+	flushed: boolean;
+}
+
+/**
+ * Ordinary state updates dispatched during the synchronous slice of an async
+ * transition Action must not become committed UI before the Action settles.
+ * React renders those updates in a transition lane while an urgent render
+ * exposes `isPending` against the last committed state. Octane has one live
+ * tree, so stage the cells here and promote them together when the returned
+ * promise settles. Synchronous transitions flush their batch before returning
+ * and therefore keep their existing scheduling behavior.
+ *
+ * `useOptimistic` deliberately does not use this batch: optimistic values are
+ * the explicit in-flight surface and must remain visible while the Action is
+ * pending.
+ */
+let ACTIVE_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
+/** The entangled batch shared by explicit transitions while an Action is awaiting. */
+let IN_FLIGHT_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
+/** Direct updates from discrete handlers stay urgent even while an Action is awaiting. */
+let ACTIVE_DISCRETE_EVENT_DEPTH = 0;
+
+function createTransitionActionBatch(): TransitionActionBatch {
+	return { updates: new Map(), pendingActions: 0, closed: false, flushed: false };
+}
+
+function transitionActionBatchForUpdate(): TransitionActionBatch | null {
+	if (ACTIVE_TRANSITION_ACTION_BATCH !== null) return ACTIVE_TRANSITION_ACTION_BATCH;
+	// AsyncContext is not available in the browser target, so post-await Action
+	// continuations share the one entangled in-flight batch. Explicit urgent
+	// surfaces opt out: their updates must commit immediately.
+	if (syncFlush || ACTIVE_DISCRETE_EVENT_DEPTH > 0) return null;
+	return IN_FLIGHT_TRANSITION_ACTION_BATCH;
+}
+
+function rebaseTransitionActionUpdate<T>(update: TransitionActionUpdate<T>): T {
+	if (Object.is(update.baseValue, update.slot.value)) return update.value;
+	let value = update.slot.value;
+	for (const operation of update.operations) value = operation(value);
+	update.baseValue = update.slot.value;
+	update.value = value;
+	if (update.slot.pendingActionBatch !== undefined) update.slot.pendingActionValue = value;
+	return value;
+}
+
+function stagedTransitionValue<T>(slot: TransitionActionSlot<T>): T {
+	const batch = transitionActionBatchForUpdate();
+	if (batch === null) return slot.value;
+	const update = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
+	return update === undefined ? slot.value : rebaseTransitionActionUpdate(update);
+}
+
+function stageTransitionValue<T>(
+	slot: TransitionActionSlot<T>,
+	block: Block,
+	operation: (value: T) => T,
+	value: T,
+	forceRender = false,
+): boolean {
+	const batch = transitionActionBatchForUpdate();
+	if (batch === null) return false;
+	const current = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
+	if (current === undefined) {
+		batch.updates.set(slot, {
+			slot,
+			block,
+			operations: [operation],
+			baseValue: slot.value,
+			value,
+			forceRender,
+		});
+	} else {
+		current.operations.push(operation);
+		current.value = value;
+		current.forceRender ||= forceRender;
+	}
+	slot.pendingActionBatch = batch;
+	slot.pendingActionValue = value;
+	return true;
+}
+
+function flushTransitionActionBatch(batch: TransitionActionBatch): void {
+	if (batch.flushed) return;
+	batch.flushed = true;
+	for (const update of batch.updates.values()) {
+		const { slot, block, forceRender } = update;
+		const value = rebaseTransitionActionUpdate(update);
+		if (slot.pendingActionBatch === batch) {
+			slot.pendingActionBatch = undefined;
+			slot.pendingActionValue = undefined;
+		}
+		if (block.disposed) continue;
+		const changed = !Object.is(slot.value, value);
+		if (!changed && !forceRender) continue;
+		if (changed) slot.value = value;
+		scheduleRender(block);
+	}
+	batch.updates.clear();
+	if (IN_FLIGHT_TRANSITION_ACTION_BATCH === batch) {
+		IN_FLIGHT_TRANSITION_ACTION_BATCH = null;
+	}
+}
+
+function flushTransitionActionBatchIfReady(batch: TransitionActionBatch): void {
+	if (batch.closed && batch.pendingActions === 0) flushTransitionActionBatch(batch);
+}
 /**
  * True only while useDeferredValue's spawned swap dispatches its re-render
  * (the microtask's startTransition(scheduleRender) call — see
@@ -1197,8 +1323,8 @@ function scheduleRender(block: Block): void {
 	const renderPhaseSelf = CURRENT_BLOCK === block;
 	const mode: 'urgent' | 'transition' =
 		TRANSITION_DEPTH > 0 ||
-		ASYNC_TRANSITION_COUNT > 0 ||
-		(renderPhaseSelf && block.currentRenderMode === 'transition')
+		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
+		(!syncFlush && ACTIVE_DISCRETE_EVENT_DEPTH === 0 && ASYNC_TRANSITION_COUNT > 0)
 			? 'transition'
 			: 'urgent';
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
@@ -3122,6 +3248,8 @@ interface StateSlot<T> {
 	setter: (next: T | ((prev: T) => T)) => void;
 	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => T;
+	pendingActionBatch?: TransitionActionBatch;
+	pendingActionValue?: T;
 }
 
 type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
@@ -3149,8 +3277,11 @@ export function useState<T>(initial?: T | (() => T), slot?: symbol): StateTuple<
 		s = {
 			value: initVal,
 			setter: (next) => {
-				const computed = typeof next === 'function' ? (next as (p: T) => T)(s!.value) : next;
-				if (Object.is(computed, s!.value)) return;
+				const previous = stagedTransitionValue(s!);
+				const operation = typeof next === 'function' ? (next as (p: T) => T) : () => next;
+				const computed = operation(previous);
+				if (Object.is(computed, previous)) return;
+				if (stageTransitionValue(s!, block, operation, computed)) return;
 				s!.value = computed;
 				scheduleRender(block);
 			},
@@ -3180,7 +3311,14 @@ export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): 
 	const resolved = resolveSlot(slot);
 	if (resolved === undefined) missingSlot('useState');
 	const s = CURRENT_SCOPE!.hooks!.get(resolved) as StateSlot<T>;
-	const getter = s.getter ?? (s.getter = () => s.value);
+	const getter =
+		s.getter ??
+		(s.getter = () => {
+			const batch = s.pendingActionBatch;
+			if (batch === undefined) return s.value;
+			const update = batch.updates.get(s) as TransitionActionUpdate<T> | undefined;
+			return update === undefined ? s.value : rebaseTransitionActionUpdate(update);
+		});
 	return [pair[0], pair[1], getter];
 }
 
@@ -3190,6 +3328,8 @@ interface ReducerSlot<S, A> {
 	reducer: (state: S, action: A) => S;
 	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => S;
+	pendingActionBatch?: TransitionActionBatch;
+	pendingActionValue?: S;
 }
 
 type ReducerTuple<S, A> = [S, (action: A) => void, () => S];
@@ -3231,7 +3371,11 @@ export function useReducer<S, A, I = S>(
 			// the component once (children then bail as usual). Per
 			// ReactHooksWithNoopRenderer-test.js:3889.
 			dispatch: (action) => {
-				s!.value = s!.reducer(s!.value, action);
+				const previous = stagedTransitionValue(s!);
+				const operation = (value: S) => s!.reducer(value, action);
+				const computed = operation(previous);
+				if (stageTransitionValue(s!, block, operation, computed, true)) return;
+				s!.value = computed;
 				scheduleRender(block);
 			},
 		};
@@ -3257,7 +3401,14 @@ export function __useReducerWithGetter<S, A, I = S>(
 	const resolved = resolveSlot(resolvedInput);
 	if (resolved === undefined) missingSlot('useReducer');
 	const s = CURRENT_SCOPE!.hooks!.get(resolved) as ReducerSlot<S, A>;
-	const getter = s.getter ?? (s.getter = () => s.value);
+	const getter =
+		s.getter ??
+		(s.getter = () => {
+			const batch = s.pendingActionBatch;
+			if (batch === undefined) return s.value;
+			const update = batch.updates.get(s) as TransitionActionUpdate<S> | undefined;
+			return update === undefined ? s.value : rebaseTransitionActionUpdate(update);
+		});
 	return [pair[0], pair[1], getter];
 }
 
@@ -6860,6 +7011,8 @@ function dispatchDelegated(event: Event): void {
 				}
 			: null;
 	if (submitRec !== null) ACTIVE_SUBMIT_DISPATCH = submitRec;
+	const discrete = DISCRETE_EVENTS.has(event.type);
+	if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH++;
 	try {
 		// CAPTURE_DELEGATED types have BOTH dispatchers attached as capture-phase
 		// listeners on the same root, so same-node registration ORDER — not phase —
@@ -6903,6 +7056,7 @@ function dispatchDelegated(event: Event): void {
 			publishManualFormPending(submitRec);
 		}
 		clearCurrentTarget(event);
+		if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH--;
 		_dispatchDepth--;
 		maybeFlushDiscrete(event.type);
 	}
@@ -6924,6 +7078,8 @@ function dispatchDelegatedCapture(event: Event): void {
 		node = node.$$portalParent ? node.$$portalParent : node.parentNode;
 	}
 	_dispatchDepth++;
+	const discrete = DISCRETE_EVENTS.has(event.type);
+	if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH++;
 	try {
 		for (let i = path.length - 1; i >= 0; i--) {
 			const slot = path[i][key] as EventSlot;
@@ -6936,6 +7092,7 @@ function dispatchDelegatedCapture(event: Event): void {
 		}
 	} finally {
 		clearCurrentTarget(event);
+		if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH--;
 		_dispatchDepth--;
 		maybeFlushDiscrete(event.type);
 	}
@@ -11831,6 +11988,11 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 	// Bump the priority flag FIRST so any scheduleRender calls fired by the
 	// listener notification (and by fn itself) are tagged as transition.
 	TRANSITION_DEPTH++;
+	const parentActionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+	const pendingActionBatch = IN_FLIGHT_TRANSITION_ACTION_BATCH;
+	const actionBatch = parentActionBatch ?? pendingActionBatch ?? createTransitionActionBatch();
+	const ownsActionBatch = parentActionBatch === null && pendingActionBatch === null;
+	ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
 	// A transition started synchronously during a form's submit dispatch
 	// entangles with that form's status (manual-action useFormStatus activation —
 	// see publishManualFormPending). Registered here; every settle path below
@@ -11842,7 +12004,22 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 		tickTransitionCount(+1);
 		try {
 			result = fn();
+			if (result != null && typeof (result as { then?: unknown }).then === 'function') {
+				actionBatch.pendingActions++;
+				IN_FLIGHT_TRANSITION_ACTION_BATCH = actionBatch;
+			}
+			if (ownsActionBatch) {
+				actionBatch.closed = true;
+				flushTransitionActionBatchIfReady(actionBatch);
+			}
+		} catch (error) {
+			if (ownsActionBatch) {
+				actionBatch.closed = true;
+				flushTransitionActionBatchIfReady(actionBatch);
+			}
+			throw error;
 		} finally {
+			ACTIVE_TRANSITION_ACTION_BATCH = parentActionBatch;
 			TRANSITION_DEPTH--;
 		}
 	} catch (err) {
@@ -11868,8 +12045,13 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 		const settle = () => {
 			if (settled) return;
 			settled = true;
-			ASYNC_TRANSITION_COUNT--;
+			actionBatch.pendingActions--;
+			flushTransitionActionBatchIfReady(actionBatch);
+			// Notify pending listeners while the async priority window is still
+			// active, so their render cannot upgrade the just-promoted Action batch
+			// to urgent before a suspending transition render gets to hold its DOM.
 			tickTransitionCount(-1);
+			ASYNC_TRANSITION_COUNT--;
 			if (submitRec !== null) settleSubmitTransition(submitRec);
 			// The action window (may have) closed — apply queued requestFormReset()s.
 			flushFormResets();

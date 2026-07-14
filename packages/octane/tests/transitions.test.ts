@@ -5,6 +5,7 @@ import {
 	TransitionBasics,
 	DeferredSpawnListenerApp,
 	TransitionKeepsDom,
+	AsyncActionKeepsCommittedState,
 	StandaloneStartTransition,
 	DeferredValueWithSuspense,
 	UrgentPreemptsTransition,
@@ -92,6 +93,55 @@ describe('useTransition — keeps prior DOM during suspended transition', () => 
 			d.resolve('first');
 		});
 		expect(r.find('#value').textContent).toBe('first');
+		r.unmount();
+	});
+});
+
+describe('useTransition — async Action commit atomicity', () => {
+	it('keeps parent state and suspended child on the committed screen until the Action settles', async () => {
+		const initial = deferred<string>();
+		const next = deferred<string>();
+		const stage = deferred<void>();
+		initial.resolve('overview-content');
+		await Promise.resolve();
+		const r = mount(AsyncActionKeepsCommittedState, {
+			initialSelection: { id: 'overview', promise: initial.promise },
+			nextSelection: { id: 'activity', promise: next.promise },
+			stageGate: stage.promise,
+		});
+		await act(() => {});
+		expect(r.find('#pending').textContent).toBe('idle');
+		expect(r.find('#parent-selection').textContent).toBe('overview');
+		expect(r.find('#reducer-selection').textContent).toBe('overview');
+		expect(r.find('#action-count').textContent).toBe('0');
+		expect(r.find('#action-value').textContent).toBe('overview-content');
+
+		r.click('#swap-action');
+		expect(r.find('#pending').textContent).toBe('pending');
+		expect(r.find('#parent-selection').textContent).toBe('overview');
+		expect(r.find('#reducer-selection').textContent).toBe('overview');
+		expect(r.find('#action-count').textContent).toBe('0');
+		expect(r.find('#action-value').textContent).toBe('overview-content');
+		expect(r.findAll('#action-fallback')).toHaveLength(0);
+
+		// A transition explicitly started after await joins the Action batch.
+		await act(() => stage.resolve());
+		expect(r.find('#parent-selection').textContent).toBe('overview');
+		expect(r.find('#reducer-selection').textContent).toBe('overview');
+		expect(r.find('#action-value').textContent).toBe('overview-content');
+
+		// A discrete urgent update still commits and the queued functional update
+		// rebases on top of it when the Action settles.
+		r.click('#urgent-count');
+		expect(r.find('#action-count').textContent).toBe('1');
+
+		await act(() => next.resolve('activity-content'));
+		expect(r.find('#pending').textContent).toBe('idle');
+		expect(r.find('#parent-selection').textContent).toBe('activity');
+		expect(r.find('#reducer-selection').textContent).toBe('activity');
+		expect(r.find('#action-count').textContent).toBe('11');
+		expect(r.find('#action-value').textContent).toBe('activity-content');
+		expect(r.findAll('#action-fallback')).toHaveLength(0);
 		r.unmount();
 	});
 });
