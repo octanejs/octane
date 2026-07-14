@@ -130,10 +130,13 @@ describe('Core APIs documentation', () => {
 		const { container } = await renderCoreApis();
 		const demo = container.querySelector<HTMLElement>('[data-demo="transition"]')!;
 		const dashboard = within(demo);
+		const overview = dashboard.getByRole('tab', { name: 'Overview' });
 		const activity = dashboard.getByRole('tab', { name: 'Activity' });
 		const region = demo.querySelector<HTMLElement>('section[aria-busy]')!;
 
 		expect(demo.querySelector('[data-report]')?.getAttribute('data-report')).toBe('overview');
+		expect(overview.getAttribute('aria-selected')).toBe('true');
+		expect(overview.getAttribute('class')).toContain('demo-tab-selected');
 		fireEvent.click(activity);
 
 		await waitFor(() =>
@@ -141,6 +144,9 @@ describe('Core APIs documentation', () => {
 		);
 		expect(region.getAttribute('aria-busy')).toBe('true');
 		expect(demo.querySelector('[data-report]')?.getAttribute('data-report')).toBe('overview');
+		expect(overview.getAttribute('aria-selected')).toBe('true');
+		expect(activity.getAttribute('aria-selected')).toBe('false');
+		expect(activity.getAttribute('class')).toContain('demo-tab-pending');
 		expect(demo.querySelector('.data-loading')).toBeNull();
 
 		await waitFor(
@@ -149,6 +155,8 @@ describe('Core APIs documentation', () => {
 			{ timeout: 2000 },
 		);
 		expect(region.getAttribute('aria-busy')).toBe('false');
+		expect(activity.getAttribute('aria-selected')).toBe('true');
+		expect(activity.getAttribute('class')).toContain('demo-tab-selected');
 		expect(demo.querySelector('.transition-status')?.textContent).toContain('Activity is ready');
 	});
 

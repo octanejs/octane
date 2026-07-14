@@ -128,6 +128,14 @@ describe('website routes', () => {
 		const { container } = await renderRoute(`/docs/${doc.slug}`);
 
 		expect(container.querySelector('.prose h1')?.textContent?.trim()).toBe(doc.title);
+		expect(container.querySelectorAll('.prose .doc-hero')).toHaveLength(1);
+		expect(container.querySelector('.prose .doc-lede')?.textContent?.trim()).toBeTruthy();
+		expect(doc.sections?.length).toBeGreaterThan(0);
+		const toc = container.querySelector('nav[aria-label="On this page"]')!;
+		for (const section of doc.sections ?? []) {
+			expect(findLink(toc, `#${section.id}`)?.textContent).toContain(section.title);
+			expect(container.querySelector(`h2#${section.id}`)).toBeTruthy();
+		}
 		const sidebar = container.querySelector('.sidebar-nav')!;
 		const sidebarLinks = Array.from(sidebar.querySelectorAll<HTMLAnchorElement>('a.sidebar-link'));
 		expect(sidebarLinks).toHaveLength(docs.length);
@@ -143,6 +151,46 @@ describe('website routes', () => {
 	it('/docs/quick-start renders highlighted MDX code', async () => {
 		const { container } = await renderRoute('/docs/quick-start');
 		expect(container.querySelector('.prose pre.shiki code')).toBeTruthy();
+	});
+
+	it('/docs/bindings links every first-party binding', async () => {
+		const { container } = await renderRoute('/docs/bindings');
+		const packages = [
+			'zustand',
+			'jotai',
+			'redux',
+			'redux-toolkit',
+			'tanstack-query',
+			'tanstack-router',
+			'remix-router',
+			'radix',
+			'base-ui',
+			'floating-ui',
+			'motion',
+			'dnd-kit',
+			'sonner',
+			'lucide',
+			'hook-form',
+			'lexical',
+			'mdx',
+			'i18next',
+			'tanstack-table',
+			'tanstack-virtual',
+			'recharts',
+			'stylex',
+			'testing-library',
+		];
+
+		const packageLinks = Array.from(
+			container.querySelectorAll<HTMLAnchorElement>('.doc-card a[href*="/packages/"]'),
+		);
+		expect(packageLinks).toHaveLength(packages.length);
+		for (const packageName of packages) {
+			const link = packageLinks.find((candidate) =>
+				candidate.getAttribute('href')?.endsWith(`/packages/${packageName}`),
+			);
+			expect(link?.textContent).toBe(`@octanejs/${packageName}`);
+		}
 	});
 
 	it('an unknown route renders the root notFoundComponent inside the layout', async () => {

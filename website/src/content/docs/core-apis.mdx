@@ -586,11 +586,17 @@ time, but the current view is still useful—opening a dashboard tab, moving bet
 pages, or applying a large filter.
 
 ```tsrx
-const [isPending, startTransition] = useTransition();
+export function ProjectTabs() @{
+	const [tab, setTab] = useState('overview');
+	const [isPending, startTransition] = useTransition();
 
-<button disabled={isPending} onClick={() => startTransition(() => setTab('activity'))}>
-	{isPending ? 'Opening…' : 'Open activity'}
-</button>
+	<>
+		<button onClick={() => startTransition(() => setTab('activity'))}>
+			{isPending ? 'Opening…' : 'Open activity'}
+		</button>
+		<TabPanel tab={tab} />
+	</>
+}
 ```
 
 The live example keeps the current report on screen while another one loads. The
@@ -612,14 +618,18 @@ box can receive every keystroke immediately while a slower result list continues
 the last useful result.
 
 ```tsrx
-const [query, setQuery] = useState('');
-const deferredQuery = useDeferredValue(query);
-const isStale = query !== deferredQuery;
+export function ProductSearch() @{
+	const [query, setQuery] = useState('');
+	const deferredQuery = useDeferredValue(query);
+	const isStale = query !== deferredQuery;
 
-<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
-<div aria-busy={isStale}>
-	<ProductResults query={deferredQuery} />
-</div>
+	<>
+		<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
+		<div aria-busy={isStale}>
+			<ProductResults query={deferredQuery} />
+		</div>
+	</>
+}
 ```
 
 Type “camera” or “desk” below. The input owns the current value; the catalogue receives
@@ -641,17 +651,21 @@ visually connect. Wrap the element whose appearance or position changes, then ma
 change inside a transition.
 
 ```tsrx
-const [visible, setVisible] = useState(true);
+export function SavedNotice() @{
+	const [visible, setVisible] = useState(true);
 
-<button onClick={() => startTransition(() => setVisible((value) => !value))}>
-	Toggle notice
-</button>
+	<>
+		<button onClick={() => startTransition(() => setVisible((value) => !value))}>
+			Toggle notice
+		</button>
 
-@if (visible) {
-	<ViewTransition enter="notice-in" exit="notice-out">
-		<p>Project saved.</p>
-	</ViewTransition>
-};
+		@if (visible) {
+			<ViewTransition enter="notice-in" exit="notice-out">
+				<p>Project saved.</p>
+			</ViewTransition>
+		}
+	</>
+}
 ```
 
 The lab below turns the three everyday patterns into controls you can try: an item

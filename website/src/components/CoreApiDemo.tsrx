@@ -278,10 +278,16 @@ const demoStyles = <style>
 		font-weight: 700;
 		cursor: pointer;
 	}
-	.demo :global(.demo-tab[aria-selected='true']) {
+	.demo :global(.demo-tab-selected) {
 		border-color: rgba(255, 65, 90, 0.48);
 		background: rgba(255, 65, 90, 0.13);
 		color: var(--text);
+	}
+	.demo :global(.demo-tab-pending) {
+		border-color: rgba(255, 65, 90, 0.34);
+		background: rgba(255, 65, 90, 0.07);
+		color: var(--text);
+		box-shadow: inset 0 0 0 1px rgba(255, 65, 90, 0.1);
 	}
 	.demo :global(.transition-status) {
 		min-height: 1.25rem;
@@ -358,7 +364,7 @@ const demoStyles = <style>
 		color: var(--text);
 		font-size: 0.84rem;
 	}
-	.demo :global(.product-result small) {
+	.demo :global(.product-category) {
 		display: block;
 		margin-top: 0.15rem;
 		color: var(--text-secondary);
@@ -787,18 +793,20 @@ export function TransitionDemo() @{
 		id: 'overview',
 		value: DASHBOARD_REPORTS.overview,
 	});
+	const [currentTab, setCurrentTab] = useState<DashboardTab>('overview');
 	const [isPending, startTransition] = useTransition();
 	const pendingTab = useRef<DashboardTab | null>(null);
 	const isLoading = isPending && pendingTab.current !== null;
 
 	const openReport = (next: DashboardTab) => {
-		if (selection.id === next || pendingTab.current !== null) return;
+		if (currentTab === next || pendingTab.current !== null) return;
 
 		const request = loadDashboardReport(next);
 		pendingTab.current = next;
 		startTransition(async () => {
 			setSelection({ id: next, value: request });
 			await request;
+			setCurrentTab(next);
 			pendingTab.current = null;
 		});
 	};
@@ -815,9 +823,13 @@ export function TransitionDemo() @{
 					<button
 						id={'dashboard-tab-' + tab}
 						type="button"
-						class="demo-tab"
+						class={[
+							'demo-tab',
+							currentTab === tab && 'demo-tab-selected',
+							isLoading && pendingTab.current === tab && 'demo-tab-pending',
+						]}
 						role="tab"
-						aria-selected={selection.id === tab}
+						aria-selected={currentTab === tab}
 						disabled={isLoading}
 						onClick={() => openReport(tab)}
 					>
@@ -829,12 +841,12 @@ export function TransitionDemo() @{
 				@if (isLoading && pendingTab.current !== null) {
 					<span>
 						{'Loading ' + DASHBOARD_REPORTS[pendingTab.current].label + ' — ' +
-							DASHBOARD_REPORTS[selection.id].label +
+							DASHBOARD_REPORTS[currentTab].label +
 							' stays on screen.'}
 					</span>
 				} @else {
 					<span>
-						{DASHBOARD_REPORTS[selection.id].label + ' is ready.'}
+						{DASHBOARD_REPORTS[currentTab].label + ' is ready.'}
 					</span>
 				}
 			</p>
@@ -901,8 +913,8 @@ function ProductResults(props: { query: string; isStale: boolean }) @{
 			@for (const product of products; key product.id) {
 				<li class="product-result">
 					{product.name as string}
-					<small>
-						{product.category as string}
+					<small class="product-category">
+						{'Category: ' + product.category}
 					</small>
 				</li>
 			} @empty {
