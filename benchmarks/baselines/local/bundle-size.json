@@ -6,118 +6,118 @@
       "name": "octane-tsrx",
       "ops": {
         "js_raw": {
-          "median": 88615,
-          "min": 88615,
+          "median": 93177,
+          "min": 93177,
           "samples": 1
         },
         "js_gzip": {
-          "median": 28883,
-          "min": 28883,
+          "median": 30443,
+          "min": 30443,
           "samples": 1
         },
         "js_brotli": {
-          "median": 25718,
-          "min": 25718,
+          "median": 27028,
+          "min": 27028,
           "samples": 1
         },
         "app_raw": {
-          "median": 7935,
-          "min": 7935,
+          "median": 7958,
+          "min": 7958,
           "samples": 1
         },
         "app_gzip": {
-          "median": 2706,
-          "min": 2706,
+          "median": 2713,
+          "min": 2713,
           "samples": 1
         },
         "app_brotli": {
-          "median": 2318,
-          "min": 2318,
+          "median": 2326,
+          "min": 2326,
           "samples": 1
         },
         "fw_raw": {
-          "median": 80680,
-          "min": 80680,
+          "median": 85219,
+          "min": 85219,
           "samples": 1
         },
         "fw_gzip": {
-          "median": 26177,
-          "min": 26177,
+          "median": 27730,
+          "min": 27730,
           "samples": 1
         },
         "fw_brotli": {
-          "median": 23400,
-          "min": 23400,
+          "median": 24702,
+          "min": 24702,
           "samples": 1
         },
         "todo_js_raw": {
-          "median": 87577,
-          "min": 87577,
+          "median": 92609,
+          "min": 92609,
           "samples": 1
         },
         "todo_js_gzip": {
-          "median": 28968,
-          "min": 28968,
+          "median": 30694,
+          "min": 30694,
           "samples": 1
         },
         "todo_js_brotli": {
-          "median": 25806,
-          "min": 25806,
+          "median": 27307,
+          "min": 27307,
           "samples": 1
         },
         "todo_app_raw": {
-          "median": 4684,
-          "min": 4684,
+          "median": 4698,
+          "min": 4698,
           "samples": 1
         },
         "todo_app_gzip": {
-          "median": 2200,
-          "min": 2200,
+          "median": 2206,
+          "min": 2206,
           "samples": 1
         },
         "todo_app_brotli": {
-          "median": 1878,
-          "min": 1878,
+          "median": 1885,
+          "min": 1885,
           "samples": 1
         },
         "todo_fw_raw": {
-          "median": 82893,
-          "min": 82893,
+          "median": 87911,
+          "min": 87911,
           "samples": 1
         },
         "todo_fw_gzip": {
-          "median": 26768,
-          "min": 26768,
+          "median": 28488,
+          "min": 28488,
           "samples": 1
         },
         "todo_fw_brotli": {
-          "median": 23928,
-          "min": 23928,
+          "median": 25422,
+          "min": 25422,
           "samples": 1
         },
         "chat_js_raw": {
-          "median": 88094,
-          "min": 88094,
+          "median": 93116,
+          "min": 93116,
           "samples": 1
         },
         "chat_js_gzip": {
-          "median": 29223,
-          "min": 29223,
+          "median": 30875,
+          "min": 30875,
           "samples": 1
         },
         "chat_js_brotli": {
-          "median": 26109,
-          "min": 26109,
+          "median": 27499,
+          "min": 27499,
           "samples": 1
         },
         "chat_app_raw": {
-          "median": 5674,
-          "min": 5674,
+          "median": 5689,
+          "min": 5689,
           "samples": 1
         },
         "chat_app_gzip": {
-          "median": 2616,
-          "min": 2616,
+          "median": 2621,
+          "min": 2621,
           "samples": 1
         },
         "chat_app_brotli": {
@@ -126,57 +126,57 @@
           "samples": 1
         },
         "chat_fw_raw": {
-          "median": 82420,
-          "min": 82420,
+          "median": 87427,
+          "min": 87427,
           "samples": 1
         },
         "chat_fw_gzip": {
-          "median": 26607,
-          "min": 26607,
+          "median": 28254,
+          "min": 28254,
           "samples": 1
         },
         "chat_fw_brotli": {
-          "median": 23775,
-          "min": 23775,
+          "median": 25165,
+          "min": 25165,
           "samples": 1
         }
       },
       "meta": {
         "files": [
           {
-            "file": "assets/framework-_3MhNy7t.js",
+            "file": "assets/framework-Bu-KRF8M.js",
             "bucket": "fw",
-            "bytes": 80680,
+            "bytes": 85219,
             "set": "js"
           },
           {
-            "file": "assets/index-BtPRppl1.js",
+            "file": "assets/index-Blx92nuN.js",
             "bucket": "app",
-            "bytes": 7935,
+            "bytes": 7958,
             "set": "js"
           },
           {
-            "file": "assets/framework-BUWyF1s9.js",
+            "file": "assets/framework-CywH5KZm.js",
             "bucket": "fw",
-            "bytes": 82893,
+            "bytes": 87911,
             "set": "todo_"
           },
           {
-            "file": "assets/index-VfzjyGqL.js",
+            "file": "assets/index-DsLEe0qN.js",
             "bucket": "app",
-            "bytes": 4684,
+            "bytes": 4698,
             "set": "todo_"
           },
           {
-            "file": "assets/framework-BTIutnF-.js",
+            "file": "assets/framework-BUvm1MsH.js",
             "bucket": "fw",
-            "bytes": 82420,
+            "bytes": 87427,
             "set": "chat_"
           },
           {
-            "file": "assets/index-DaJweD_O.js",
+            "file": "assets/index-BnoBS6Fi.js",
             "bucket": "app",
-            "bytes": 5674,
+            "bytes": 5689,
             "set": "chat_"
           }
         ]
@@ -186,63 +186,63 @@
       "name": "octane-jsx",
       "ops": {
         "js_raw": {
-          "median": 88574,
-          "min": 88574,
+          "median": 93159,
+          "min": 93159,
           "samples": 1
         },
         "js_gzip": {
-          "median": 28900,
-          "min": 28900,
+          "median": 30423,
+          "min": 30423,
           "samples": 1
         },
         "js_brotli": {
-          "median": 25695,
-          "min": 25695,
+          "median": 27097,
+          "min": 27097,
           "samples": 1
         },
         "app_raw": {
-          "median": 8167,
-          "min": 8167,
+          "median": 8189,
+          "min": 8189,
           "samples": 1
         },
         "app_gzip": {
-          "median": 2776,
-          "min": 2776,
+          "median": 2782,
+          "min": 2782,
           "samples": 1
         },
         "app_brotli": {
-          "median": 2360,
-          "min": 2360,
+          "median": 2363,
+          "min": 2363,
           "samples": 1
         },
         "fw_raw": {
-          "median": 80407,
-          "min": 80407,
+          "median": 84970,
+          "min": 84970,
           "samples": 1
         },
         "fw_gzip": {
-          "median": 26124,
-          "min": 26124,
+          "median": 27641,
+          "min": 27641,
           "samples": 1
         },
         "fw_brotli": {
-          "median": 23335,
-          "min": 23335,
+          "median": 24734,
+          "min": 24734,
           "samples": 1
         }
       },
       "meta": {
         "files": [
           {
-            "file": "assets/framework-Bwmrz-w7.js",
+            "file": "assets/framework-yPD2ZNQH.js",
             "bucket": "fw",
-            "bytes": 80407,
+            "bytes": 84970,
             "set": "js"
           },
           {
-            "file": "assets/index-B4IcWT6q.js",
+            "file": "assets/index-Lb5sKmbU.js",
             "bucket": "app",
-            "bytes": 8167,
+            "bytes": 8189,
             "set": "js"
           }
         ]

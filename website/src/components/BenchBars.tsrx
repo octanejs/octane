@@ -11,12 +11,49 @@
 // and the SSR/no-JS content is the card's data table, which carries every
 // number the chart draws.
 import { useEffect, useState } from 'octane';
-import { BarChart, Bar, XAxis, YAxis } from '@octanejs/recharts';
+import { BarChart, Bar, Rectangle, XAxis, YAxis } from '@octanejs/recharts';
 import type { BenchCard } from '../content/benchmarks.ts';
 
 const BAR_SIZE = 11;
 const GROUP_PAD = 16;
 const AXIS_TEXT = { fill: '#99a1b3', fontSize: 12 };
+const CHART_COLOR_PREFIX = '__benchChartColor:';
+
+// Recharts reserves one position per <Bar> even when a datum has no value.
+// Compact each row into centered chart-only slots so unsupported combinations
+// (currently Svelte/Vue Vapor streaming SSR) do not leave holes between bars.
+// The custom shape keeps the color attached to the framework as values move
+// slots; the table reads the original rows and therefore still renders “—”.
+export function compactChartRows(card: BenchCard): Array<Record<string, string | number>> {
+	return card.rows.map((row) => {
+		const values = card.series.flatMap((series) => {
+			const value = row[series.key];
+			return typeof value === 'number'
+				? [
+						{ value, color: series.color },
+					]
+				: [];
+		});
+		const start = Math.floor((card.series.length - values.length) / 2);
+		const compact: Record<string, string | number> = { op: row.op };
+		for (let i = 0; i < values.length; i++) {
+			const slot = card.series[start + i].key;
+			compact[slot] = values[i].value;
+			compact[CHART_COLOR_PREFIX + slot] = values[i].color;
+		}
+		return compact;
+	});
+}
+
+function BenchBarShape(props: Record<string, unknown>) {
+	const payload = props.payload;
+	const dataKey = String(props.dataKey);
+	const chartColor =
+		payload && typeof payload === 'object'
+			? (payload as Record<string, unknown>)[CHART_COLOR_PREFIX + dataKey]
+			: undefined;
+	return <Rectangle {...props} fill={typeof chartColor === 'string' ? chartColor : props.fill} />;
+}
 
 function fmt(value: unknown): string {
 	const n =
@@ -67,6 +104,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 	// Value labels at bar tips only where they stay readable (≤2 series);
 	// denser cards lean on the number axis + the table view instead.
 	const showValues = props.showValues ?? card.series.length <= 2;
+	const chartRows = compactChartRows(card);
 
 	// Keep dense seven/eight-series comparisons legible without making each
 	// operation group disproportionately tall.
@@ -105,7 +143,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 				<BarChart
 					width={chartWidth}
 					height={chartHeight}
-					data={card.rows}
+					data={chartRows}
 					layout="vertical"
 					barSize={barSize}
 					barGap={2}
@@ -135,6 +173,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 							radius={[0, 4, 4, 0]}
 							minPointSize={2}
 							label={valueLabel}
+							shape={BenchBarShape}
 						/>
 					}
 				</BarChart>

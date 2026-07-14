@@ -6,13 +6,13 @@
       "name": "source",
       "ops": {
         "raw": {
-          "median": 62886,
-          "min": 62886,
+          "median": 63880,
+          "min": 63880,
           "samples": 1
         },
         "gzip": {
-          "median": 21943,
-          "min": 21943,
+          "median": 22269,
+          "min": 22269,
           "samples": 1
         }
       }
@@ -21,18 +21,18 @@
       "name": "compiled",
       "ops": {
         "raw": {
-          "median": 118529,
-          "min": 118529,
+          "median": 121262,
+          "min": 121262,
           "samples": 1
         },
         "minified": {
-          "median": 61921,
-          "min": 61921,
+          "median": 63305,
+          "min": 63305,
           "samples": 1
         },
         "gzip": {
-          "median": 22849,
-          "min": 22849,
+          "median": 23242,
+          "min": 23242,
           "samples": 1
         }
       },
@@ -40,33 +40,33 @@
         "files": [
           {
             "file": "benchmarks/js-framework/octane-tsrx/src/Main.tsrx",
-            "source": 11022,
-            "compiled": 14114,
-            "minGz": 2798
+            "source": 11021,
+            "compiled": 14120,
+            "minGz": 2801
           },
           {
             "file": "benchmarks/todomvc/octane-tsrx/src/Main.tsrx",
             "source": 4929,
-            "compiled": 10068,
-            "minGz": 2195
+            "compiled": 10128,
+            "minGz": 2212
           },
           {
             "file": "benchmarks/chat-stream/octane-tsrx/src/Main.tsrx",
             "source": 3973,
-            "compiled": 6600,
-            "minGz": 1571
+            "compiled": 6727,
+            "minGz": 1592
           },
           {
             "file": "benchmarks/js-framework/octane-jsx/src/Main.tsx",
-            "source": 11975,
-            "compiled": 14052,
-            "minGz": 2762
+            "source": 11974,
+            "compiled": 14192,
+            "minGz": 2793
           },
           {
             "file": "benchmarks/js-framework/octane-tsrx-naive/src/Main.tsrx",
             "source": 9487,
-            "compiled": 13058,
-            "minGz": 2628
+            "compiled": 13104,
+            "minGz": 2643
           },
           {
             "file": "benchmarks/js-framework/octane-tsrx-naive/src/Row.tsrx",
@@ -77,14 +77,14 @@
           {
             "file": "packages/octane/tests/_fixtures/basic.tsrx",
             "source": 1500,
-            "compiled": 4563,
-            "minGz": 931
+            "compiled": 4617,
+            "minGz": 950
           },
           {
             "file": "packages/octane/tests/_fixtures/control.tsrx",
             "source": 2396,
-            "compiled": 7353,
-            "minGz": 1245
+            "compiled": 7467,
+            "minGz": 1281
           },
           {
             "file": "packages/octane/tests/_fixtures/attrs-events.tsrx",
@@ -101,14 +101,14 @@
           {
             "file": "packages/octane/tests/_fixtures/components.tsrx",
             "source": 2356,
-            "compiled": 8212,
-            "minGz": 1535
+            "compiled": 8294,
+            "minGz": 1554
           },
           {
             "file": "packages/octane/tests/_fixtures/context.tsrx",
-            "source": 5032,
-            "compiled": 15517,
-            "minGz": 2036
+            "source": 6028,
+            "compiled": 17621,
+            "minGz": 2268
           },
           {
             "file": "packages/octane/tests/_fixtures/clsx-class.tsrx",
