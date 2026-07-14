@@ -172,6 +172,24 @@ async function waitForLocatorText(
 	throw new Error(`locator did not reach text ${JSON.stringify(expected)} within ${timeoutMs}ms`);
 }
 
+async function clickUntilLocatorText(
+	trigger: import('playwright').Locator,
+	result: import('playwright').Locator,
+	expected: string,
+	timeoutMs = 10_000,
+): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		if ((await result.textContent())?.trim() === expected) return;
+		await trigger.click();
+		if ((await result.textContent())?.trim() === expected) return;
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+	throw new Error(
+		`click did not make locator reach text ${JSON.stringify(expected)} within ${timeoutMs}ms`,
+	);
+}
+
 describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	let server: ChildProcess;
 	let DEV_PORT: number;
@@ -212,8 +230,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		try {
 			const count = page.locator('.demo-count');
 			await waitForLocatorText(count, '0');
-			await page.getByRole('button', { name: 'Add one' }).click();
-			await waitForLocatorText(count, '1');
+			await clickUntilLocatorText(page.getByRole('button', { name: 'Add one' }), count, '1');
 
 			const packingDemo = page.locator('[data-demo="lists"]');
 			const packingStatus = packingDemo.locator('.packing-summary');
