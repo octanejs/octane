@@ -1,6 +1,14 @@
 // Small, real Octane components embedded throughout the Core APIs guide.
 // Each demo keeps one concept tangible without depending on a backend.
-import { use, useActionState, useEffect, useRef, useState } from 'octane';
+import {
+	use,
+	useActionState,
+	useDeferredValue,
+	useEffect,
+	useRef,
+	useState,
+	useTransition,
+} from 'octane';
 
 const demoStyles = <style>
 	.demo {
@@ -253,6 +261,117 @@ const demoStyles = <style>
 	.demo :global(.form-result) {
 		min-height: 1.35rem;
 	}
+	.demo :global(.demo-tabs) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.45rem;
+		margin-bottom: 0.85rem;
+	}
+	.demo :global(.demo-tab) {
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		padding: 0.45rem 0.8rem;
+		background: rgba(255, 255, 255, 0.035);
+		color: var(--text-secondary);
+		font: inherit;
+		font-size: 0.82rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+	.demo :global(.demo-tab[aria-selected='true']) {
+		border-color: rgba(255, 65, 90, 0.48);
+		background: rgba(255, 65, 90, 0.13);
+		color: var(--text);
+	}
+	.demo :global(.transition-status) {
+		min-height: 1.25rem;
+		margin: 0 0 0.65rem;
+	}
+	.demo :global(.report-card) {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 1rem;
+		min-height: 7.5rem;
+		border: 1px solid var(--border);
+		border-radius: 0.85rem;
+		padding: 1rem;
+		background: rgba(22, 24, 29, 0.58);
+	}
+	.demo :global(.report-name),
+	.demo :global(.report-detail),
+	.demo :global(.report-metric) {
+		margin: 0;
+	}
+	.demo :global(.report-name) {
+		margin-bottom: 0.25rem;
+		color: var(--text);
+		font-size: 0.95rem;
+		font-weight: 750;
+	}
+	.demo :global(.report-detail) {
+		color: var(--text-secondary);
+		font-size: 0.82rem;
+	}
+	.demo :global(.report-metric) {
+		color: #8ae8ae;
+		font-size: 1.8rem;
+		font-weight: 800;
+		letter-spacing: -0.04em;
+	}
+	.demo :global(.product-search) {
+		display: grid;
+		gap: 0.85rem;
+	}
+	.demo :global(.search-summary) {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		min-height: 1.3rem;
+	}
+	.demo :global(.search-summary span) {
+		color: var(--text-secondary);
+		font-size: 0.8rem;
+	}
+	.demo :global(.search-updating) {
+		color: #ff9baa;
+		font-weight: 750;
+	}
+	.demo :global(.product-results) {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.55rem;
+		transition: opacity 0.15s;
+	}
+	.demo :global(.product-results[data-stale='true']) {
+		opacity: 0.52;
+	}
+	.demo :global(.product-result) {
+		border: 1px solid var(--border);
+		border-radius: 0.7rem;
+		padding: 0.7rem 0.8rem;
+		background: rgba(22, 24, 29, 0.5);
+		color: var(--text);
+		font-size: 0.84rem;
+	}
+	.demo :global(.product-result small) {
+		display: block;
+		margin-top: 0.15rem;
+		color: var(--text-secondary);
+	}
+	.demo :global(.product-empty) {
+		grid-column: 1 / -1;
+		border: 1px dashed var(--border);
+		border-radius: 0.7rem;
+		padding: 1rem;
+		color: var(--text-secondary);
+		font-size: 0.84rem;
+		text-align: center;
+	}
 	.success {
 		color: #8ae8ae;
 	}
@@ -279,6 +398,13 @@ const demoStyles = <style>
 		.counterActions {
 			display: grid;
 			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.demo :global(.report-card),
+		.demo :global(.product-results) {
+			grid-template-columns: 1fr;
+		}
+		.demo :global(.report-metric) {
+			font-size: 1.45rem;
 		}
 	}
 </style>;
@@ -585,6 +711,239 @@ export function DataLoadingDemo() @{
 			>
 				Load profile
 			</button>
+		</div>
+	</DemoFrame>
+}
+
+type DashboardTab = 'overview' | 'activity' | 'deployments';
+
+interface DashboardReport {
+	id: DashboardTab;
+	label: string;
+	detail: string;
+	metric: string;
+}
+
+interface DashboardSelection {
+	id: DashboardTab;
+	value: DashboardReport | Promise<DashboardReport>;
+}
+
+const DASHBOARD_REPORTS: Record<DashboardTab, DashboardReport> = {
+	overview: {
+		id: 'overview',
+		label: 'Overview',
+		detail: 'Visitors across your active projects',
+		metric: '24.8k',
+	},
+	activity: {
+		id: 'activity',
+		label: 'Activity',
+		detail: 'Team changes during the last seven days',
+		metric: '184',
+	},
+	deployments: {
+		id: 'deployments',
+		label: 'Deployments',
+		detail: 'Successful production releases this month',
+		metric: '32',
+	},
+};
+
+const DASHBOARD_TABS: DashboardTab[] = ['overview', 'activity', 'deployments'];
+
+function loadDashboardReport(id: DashboardTab): Promise<DashboardReport> {
+	return new Promise((resolve) => {
+		setTimeout(() => resolve(DASHBOARD_REPORTS[id]), 700);
+	});
+}
+
+function DashboardReportPanel(props: { value: DashboardReport | Promise<DashboardReport> }) @{
+	const report =
+		props.value instanceof Promise ? use(props.value) : props.value;
+
+	<article
+		class="report-card"
+		role="tabpanel"
+		aria-labelledby={'dashboard-tab-' + report.id}
+		data-report={report.id}
+	>
+		<div>
+			<p class="report-name">
+				{report.label as string}
+			</p>
+			<p class="report-detail">
+				{report.detail as string}
+			</p>
+		</div>
+		<p class="report-metric">
+			{report.metric as string}
+		</p>
+	</article>
+}
+
+export function TransitionDemo() @{
+	const [selection, setSelection] = useState<DashboardSelection>({
+		id: 'overview',
+		value: DASHBOARD_REPORTS.overview,
+	});
+	const [isPending, startTransition] = useTransition();
+	const pendingTab = useRef<DashboardTab | null>(null);
+	const isLoading = isPending && pendingTab.current !== null;
+
+	const openReport = (next: DashboardTab) => {
+		if (selection.id === next || pendingTab.current !== null) return;
+
+		const request = loadDashboardReport(next);
+		pendingTab.current = next;
+		startTransition(async () => {
+			setSelection({ id: next, value: request });
+			await request;
+			pendingTab.current = null;
+		});
+	};
+
+	<DemoFrame
+		id="transition"
+		title="Project dashboard"
+		description="Open another report. The current one stays useful while its data loads."
+		hint="Try Activity"
+	>
+		<section aria-busy={isLoading}>
+			<div class="demo-tabs" role="tablist" aria-label="Project reports">
+				@for (const tab of DASHBOARD_TABS; key tab) {
+					<button
+						id={'dashboard-tab-' + tab}
+						type="button"
+						class="demo-tab"
+						role="tab"
+						aria-selected={selection.id === tab}
+						disabled={isLoading}
+						onClick={() => openReport(tab)}
+					>
+						{DASHBOARD_REPORTS[tab].label as string}
+					</button>
+				}
+			</div>
+			<p class="demo-status transition-status" aria-live="polite">
+				@if (isLoading && pendingTab.current !== null) {
+					<span>
+						{'Loading ' + DASHBOARD_REPORTS[pendingTab.current].label + ' — ' +
+							DASHBOARD_REPORTS[selection.id].label +
+							' stays on screen.'}
+					</span>
+				} @else {
+					<span>
+						{DASHBOARD_REPORTS[selection.id].label + ' is ready.'}
+					</span>
+				}
+			</p>
+			@try {
+				<DashboardReportPanel value={selection.value} />
+			} @pending {
+				<p class="data-loading">Loading the first report…</p>
+			}
+		</section>
+	</DemoFrame>
+}
+
+interface DemoProduct {
+	id: number;
+	name: string;
+	category: string;
+}
+
+const DEMO_PRODUCTS: DemoProduct[] = [
+	{ id: 1, name: 'Pocket camera', category: 'Photography' },
+	{ id: 2, name: 'Camera shoulder bag', category: 'Photography' },
+	{ id: 3, name: 'Oak standing desk', category: 'Workspace' },
+	{ id: 4, name: 'Desk task lamp', category: 'Workspace' },
+	{ id: 5, name: 'Travel headphones', category: 'Audio' },
+	{ id: 6, name: 'Studio microphone', category: 'Audio' },
+];
+
+const productSearchCache = new Map<string, Promise<DemoProduct[]>>();
+
+function searchDemoProducts(query: string): Promise<DemoProduct[]> {
+	const normalized = query.trim().toLowerCase();
+	let request = productSearchCache.get(normalized);
+	if (!request) {
+		request = new Promise((resolve) => {
+			setTimeout(() => {
+				resolve(
+					DEMO_PRODUCTS.filter(
+						(product) => (product.name + ' ' + product.category).toLowerCase().includes(normalized),
+					),
+				);
+			}, 650);
+		});
+		productSearchCache.set(normalized, request);
+	}
+	return request;
+}
+
+function ProductResults(props: { query: string; isStale: boolean }) @{
+	const products =
+		props.query === '' ? DEMO_PRODUCTS : use(searchDemoProducts(props.query));
+	const visibleQuery =
+		props.query === '' ? 'all products' : '“' + props.query + '”';
+
+	<section aria-busy={props.isStale}>
+		<div class="search-summary" aria-live="polite">
+			<span>
+				{'Showing results for ' + visibleQuery}
+			</span>
+			@if (props.isStale) {
+				<strong class="search-updating">Updating…</strong>
+			}
+		</div>
+		<ul class="product-results" data-stale={props.isStale}>
+			@for (const product of products; key product.id) {
+				<li class="product-result">
+					{product.name as string}
+					<small>
+						{product.category as string}
+					</small>
+				</li>
+			} @empty {
+				<li class="product-empty">No products match this search.</li>
+			}
+		</ul>
+	</section>
+}
+
+function DeferredProductResults(props: { query: string; isStale: boolean }) @{
+	@try {
+		<ProductResults query={props.query} isStale={props.isStale} />
+	} @pending {
+		<p class="data-loading">Searching the catalogue…</p>
+	}
+}
+
+export function DeferredSearchDemo() @{
+	const [query, setQuery] = useState('');
+	const deferredQuery = useDeferredValue(query);
+	const isStale = query !== deferredQuery;
+
+	<DemoFrame
+		id="deferred-value"
+		title="Product search"
+		description="The search box stays immediate while the slower result view catches up."
+		hint="Type camera or desk"
+	>
+		<div class="product-search">
+			<label class="demo-field" for="core-api-product-search">
+				Search products
+				<input
+					id="core-api-product-search"
+					class={['demo-input', demoStyles.input]}
+					type="search"
+					value={query}
+					placeholder="Try camera or desk"
+					onInput={(event) => setQuery(event.currentTarget.value)}
+				/>
+			</label>
+			<DeferredProductResults query={deferredQuery} isStale={isStale} />
 		</div>
 	</DemoFrame>
 }

@@ -3,27 +3,179 @@ title: Bindings
 ---
 
 <div className="doc-hero">
-	<p className="doc-eyebrow">Use the wider ecosystem</p>
+	<p className="doc-eyebrow">Bring your favourite libraries</p>
 	<h1>Bindings</h1>
 	<p className="doc-lede">
-		Bindings let libraries built for React work naturally with Octane. Pick one for the problem you
-		need to solve, install its <code>@octanejs</code> package, and keep using the library's familiar
-		API.
+		{
+			'A binding connects a library’s hooks and components to Octane. You keep the library’s familiar ideas and APIs; the binding replaces its React-facing layer.'
+		}
 	</p>
 </div>
 
 <aside className="doc-callout note">
-	<p className="doc-callout-title">You may not need a binding</p>
+	<p className="doc-callout-title">Most packages do not need a binding</p>
 	<p>
-		Ordinary JavaScript and TypeScript packages already work with Octane. A binding is only needed
-		when a library provides React hooks or components that must be connected to Octane's renderer.
+		{
+			'Date libraries, validators, API clients, and other plain JavaScript packages work as they are. Look for an @octanejs binding only when a package gives you React hooks or components.'
+		}
 	</p>
 </aside>
 
-<h2 id="find-a-binding">Find the right binding</h2>
+<h2 id="find-a-binding">Pick by the job</h2>
 
-If you are moving an existing React app, start with the libraries it already uses. The
-Octane package usually keeps the same concepts and API, with a different import:
+Moving an existing app? Start with the libraries it already uses. Starting fresh? Pick
+the group that matches the problem, then learn the library itself from its upstream
+documentation.
+
+<div className="api-index-grid binding-grid">
+	<section className="api-index-card binding-card">
+		<h3>Shared state</h3>
+		<ul>
+			<li>
+				<a href="https://github.com/octanejs/octane/tree/main/packages/zustand">
+					<code>@octanejs/zustand</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/jotai">
+					<code>@octanejs/jotai</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/redux">
+					<code>@octanejs/redux</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/redux-toolkit">
+					<code>@octanejs/redux-toolkit</code>
+				</a>
+				<span>Small stores, atoms, Redux, and RTK Query.</span>
+			</li>
+		</ul>
+	</section>
+	<section className="api-index-card binding-card">
+		<h3>Data and routing</h3>
+		<ul>
+			<li>
+				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-query">
+					<code>@octanejs/tanstack-query</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-router">
+					<code>@octanejs/tanstack-router</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/remix-router">
+					<code>@octanejs/remix-router</code>
+				</a>
+				<span>Server data, type-safe routes, and React Router-style APIs.</span>
+			</li>
+		</ul>
+	</section>
+	<section className="api-index-card binding-card">
+		<h3>UI and interaction</h3>
+		<ul>
+			<li>
+				<a href="https://github.com/octanejs/octane/tree/main/packages/radix">
+					<code>@octanejs/radix</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/base-ui">
+					<code>@octanejs/base-ui</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/floating-ui">
+					<code>@octanejs/floating-ui</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/motion">
+					<code>@octanejs/motion</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/dnd-kit">
+					<code>@octanejs/dnd-kit</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/sonner">
+					<code>@octanejs/sonner</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/lucide">
+					<code>@octanejs/lucide</code>
+				</a>
+				<span>Primitives, positioning, motion, drag and drop, toasts, and icons.</span>
+			</li>
+		</ul>
+	</section>
+	<section className="api-index-card binding-card">
+		<h3>Forms and content</h3>
+		<ul>
+			<li>
+				<a href="https://github.com/octanejs/octane/tree/main/packages/hook-form">
+					<code>@octanejs/hook-form</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/lexical">
+					<code>@octanejs/lexical</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/mdx">
+					<code>@octanejs/mdx</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/i18next">
+					<code>@octanejs/i18next</code>
+				</a>
+				<span>Forms, rich-text editing, MDX, and translations.</span>
+			</li>
+		</ul>
+	</section>
+	<section className="api-index-card binding-card">
+		<h3>Data-heavy screens</h3>
+		<ul>
+			<li>
+				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-table">
+					<code>@octanejs/tanstack-table</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-virtual">
+					<code>@octanejs/tanstack-virtual</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/recharts">
+					<code>@octanejs/recharts</code>
+				</a>
+				<span>Tables, large virtual lists, and charts. Recharts is currently partial.</span>
+			</li>
+		</ul>
+	</section>
+	<section className="api-index-card binding-card">
+		<h3>Styling and tests</h3>
+		<ul>
+			<li>
+				<a href="https://github.com/octanejs/octane/tree/main/packages/stylex">
+					<code>@octanejs/stylex</code>
+				</a>
+				{' / '}
+				<a href="https://github.com/octanejs/octane/tree/main/packages/testing-library">
+					<code>@octanejs/testing-library</code>
+				</a>
+				<span>Compiled StyleX and DOM-first component tests.</span>
+			</li>
+		</ul>
+	</section>
+</div>
+
+Base UI is currently alpha. Follow each package link for its README and exact supported
+surface.
+
+<h2 id="install-and-use">Install it, then change the import</h2>
+
+Install the Octane package instead of the React-facing one:
+
+```sh
+pnpm add @octanejs/zustand
+```
+
+The library API stays familiar; the import points at its Octane binding:
 
 ```ts
 // React
@@ -33,97 +185,29 @@ import { create } from 'zustand';
 import { create } from '@octanejs/zustand';
 ```
 
-If you are starting a new app, choose by the problem you need to solve:
+From there, use Zustand's store and selector APIs as usual. The same pattern applies to
+the other bindings: upstream docs teach the library, while the package README records
+anything Octane-specific.
 
-| What you need                     | Bindings                                                                                                                                         |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Shared state                      | `@octanejs/zustand`, `@octanejs/jotai`, `@octanejs/redux`, `@octanejs/redux-toolkit`                                                             |
-| Data fetching and caching         | `@octanejs/tanstack-query`                                                                                                                       |
-| Routing                           | `@octanejs/tanstack-router`, `@octanejs/remix-router` (React Router-style APIs)                                                                  |
-| UI and interaction                | `@octanejs/radix`, `@octanejs/base-ui`, `@octanejs/floating-ui`, `@octanejs/motion`, `@octanejs/dnd-kit`, `@octanejs/sonner`, `@octanejs/lucide` |
-| Forms and rich-text editing       | `@octanejs/hook-form`, `@octanejs/lexical`                                                                                                       |
-| Styling and localization          | `@octanejs/stylex`, `@octanejs/i18next`                                                                                                          |
-| Tables, virtual lists, and charts | `@octanejs/tanstack-table`, `@octanejs/tanstack-virtual`, `@octanejs/recharts`                                                                   |
-| Content and testing               | `@octanejs/mdx`, `@octanejs/testing-library`                                                                                                     |
+<h2 id="check-support">Check the part you plan to use</h2>
 
-Packages in the same row are not necessarily interchangeable. Use the upstream
-library's documentation to learn its concepts, then check the Octane binding's supported
-surface before relying on a particular API.
+Octane and its bindings are alpha software. Before building around one, check three
+things:
 
-<h2 id="install-and-use">Install and use a binding</h2>
-
-Install the `@octanejs` package alongside Octane. For example:
-
-```sh
-pnpm add @octanejs/zustand
-```
-
-Then import from the Octane package:
-
-```tsrx
-import { create } from '@octanejs/zustand';
-
-type CounterStore = {
-	count: number;
-	increment: () => void;
-};
-
-const useCounter = create<CounterStore>(
-	(set) => ({
-		count: 0,
-		increment: () => set((state) => ({ count: state.count + 1 })),
-	}),
-);
-
-export function Counter() @{
-	const count = useCounter((state) => state.count);
-	const increment = useCounter((state) => state.increment);
-
-	<button type="button" onClick={() => increment()}>
-		{'Clicked ' + count + ' times'}
-	</button>
-}
-```
-
-The store API is still Zustand's; the binding makes its hook work with Octane. The same
-idea applies to the other packages: learn the library from its upstream docs, then import
-its Octane binding in your app.
-
-<h2 id="check-support">Check support before shipping</h2>
-
-Octane and its bindings are alpha software. Some bindings cover their upstream library
-almost completely, while others intentionally support a smaller surface. Server rendering
-and hydration coverage also varies.
+1. Is the hook or component you need included?
+2. Does a known difference affect your code?
+3. If you render on the server, is SSR and hydration covered?
 
 The generated
 [bindings status table](https://github.com/octanejs/octane/blob/main/docs/bindings-status.md)
-is the source of truth for all 23 packages. It records:
+answers those questions for all 23 first-party bindings and is checked in CI.
 
-- the upstream version being ported;
-- which APIs are supported;
-- known differences from the React package;
-- server-rendering and hydration coverage;
-- when that evidence was last reviewed.
-
-A binding marked complete is complete for the version and surface described there. It is
-not a blanket promise about every React-specific edge case.
-
-<details className="deep-dive">
-	<summary>How does a binding work?</summary>
-	<div>
-		<p>
-			Many libraries split their framework-neutral logic from a thin React layer. Octane reuses the
-			neutral core and replaces the React hooks and providers with Octane equivalents.
-		</p>
-		<p>
-			The binding tests then run equivalent examples through Octane and the upstream React package.
-			That is why most usage feels familiar even though a different renderer is doing the work.
-		</p>
-	</div>
-</details>
-
-<h2 id="app-tooling">App tooling</h2>
-
-`@octanejs/vite-plugin` is app tooling rather than a library binding. It provides the
-development server, routing, server rendering, hydration wiring, and production build used
-by full Octane apps. The [quick start](/docs/quick-start) sets it up for you.
+<aside className="doc-callout tip">
+	<p className="doc-callout-title">App tooling is a separate layer</p>
+	<p>
+		<code>@octanejs/vite-plugin</code>
+		{
+			' provides routes, server rendering, hydration wiring, and a production build. The Quick start configures it; bindings are the library adapters you add afterwards.'
+		}
+	</p>
+</aside>
