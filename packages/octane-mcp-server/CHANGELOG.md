@@ -1,5 +1,35 @@
 # @octanejs/mcp-server
 
+## 0.2.3
+
+### Patch Changes
+
+- 15bad71: Add the Apollo Client 4.2.6 binding for Octane, including the complete client
+  hook and query-reference surface, Suspense integration, public declarations,
+  testing exports, and an Octane `MockedProvider`. Register Apollo in the MCP
+  compatibility catalog.
+- b41a91a: Add a bundler-neutral Octane compiler and app core, a low-level Rspack 2
+  compiler integration, and a full Rsbuild 2 metaframework plugin with routing,
+  streaming SSR, hydration, HMR, production client/server builds, preview, and
+  adapter support. Keep the existing Vite integration on the same shared core.
+- 95872c1: Add the `@octanejs/i18next` binding, porting react-i18next 17.0.9 hooks,
+  providers, rich translations, ICU declarations, HOCs, Suspense namespace
+  loading, and SSR integration onto Octane while reusing i18next unchanged.
+
+  Teach the MCP binding registry to route react-i18next users to the maintained
+  Octane package.
+
+- 2c90d45: Add Redux Toolkit and RTK Query bindings for Octane, including generated query,
+  mutation, infinite-query, prefetch, ApiProvider, and dynamic-middleware hooks.
+  Register the binding in the MCP compatibility catalog and binding documentation.
+- f96a1f9: Add the `@octanejs/sonner` port of Sonner 2.0.7, including the complete toast
+  API, Toaster UI and styles, promise and custom toasts, targeted toaster support,
+  SSR/hydration support, and differential parity coverage against real Sonner on
+  React. Register the new binding with the MCP package bridge.
+- d173805: Keep MCP package routing and hook guidance synchronized with the complete
+  workspace binding inventory and the public state-hook tuple, and declare the
+  Node 22 minimum runtime.
+
 ## 0.2.2
 
 ### Patch Changes
