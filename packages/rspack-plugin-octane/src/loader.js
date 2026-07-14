@@ -55,8 +55,10 @@ export default function octaneLoader(source, inputSourceMap) {
 		const dev =
 			environment === 'client' &&
 			(options.dev ?? (this.mode === undefined || this.mode !== 'production'));
+		const profile = environment === 'client' && options.profile === true;
 		const compiler = createOctaneCompiler({
 			root,
+			profile,
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
 			...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
 		});
@@ -65,6 +67,7 @@ export default function octaneLoader(source, inputSourceMap) {
 			environment,
 			hmr,
 			dev,
+			profile,
 			...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
 		});
 

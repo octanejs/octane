@@ -9,7 +9,7 @@
  */
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { compile } from './compile.js';
 import { slotHooks } from './slot-hooks.js';
 
@@ -118,6 +118,7 @@ class OctaneBundlerCompiler {
 			environment: options.environment ?? 'client',
 			hmr: normalizeHmrDialect(options.hmr),
 			dev: options.dev,
+			profile: options.profile === true,
 			parallelUse: options.parallelUse,
 		};
 		// Deliberately instance-scoped: separate projects/build environments must
@@ -166,6 +167,7 @@ class OctaneBundlerCompiler {
 			const manual = pkg.octane?.hookSlots?.manual;
 			result = {
 				rule: {
+					name: typeof pkg.name === 'string' ? pkg.name : null,
 					root: dir,
 					dirs: Array.isArray(manual) ? manual : [],
 					runtimeDependencies: [
@@ -228,6 +230,51 @@ class OctaneBundlerCompiler {
 		const lookup = this._nearestOctanePackageRule(dirname(absoluteFile));
 		addMetadata(collected, lookup);
 		return lookup.rule?.usesOctane === true;
+	}
+
+	_profileModuleId(file, collected) {
+		const absoluteFile = isAbsolute(file) ? resolve(file) : resolve(this.root, file);
+		const isInstalledPath = /(?:^|[\\/])node_modules(?:[\\/]|$)/.test(absoluteFile);
+		let containingRoot = null;
+		if (!isInstalledPath) {
+			if (isPathInside(this.root, absoluteFile)) containingRoot = this.root;
+			else if (isPathInside(this.realRoot, absoluteFile)) containingRoot = this.realRoot;
+		}
+		if (containingRoot !== null) return canonicalModuleId(absoluteFile, containingRoot);
+
+		// Linked and installed source packages need an ID portable across package
+		// managers and machines. Their nearest package manifest supplies both the
+		// public package name and the package-relative source path.
+		const lookup = this._nearestOctanePackageRule(dirname(absoluteFile));
+		addMetadata(collected, lookup);
+		if (lookup.rule?.name) {
+			const packagePath = normalizeModulePath(relative(lookup.rule.root, absoluteFile));
+			return `/@package/${encodeURIComponent(lookup.rule.name)}/${packagePath}`;
+		}
+
+		// Never embed an arbitrary absolute host path in profiling metadata. The
+		// basename fallback may collide, but remains useful and deliberately makes
+		// that limitation visible through the reserved external namespace.
+		return `/@external/${basename(absoluteFile)}`;
+	}
+
+	/**
+	 * Resolve the privacy-safe source identity used by profiling metadata.
+	 *
+	 * Kept on the shared compiler instance so non-TSRX transforms (notably MDX)
+	 * reuse the same real-root, package-manifest cache, and invalidation rules as
+	 * the core compiler. Callers may register the returned manifest dependencies
+	 * with their bundler watcher.
+	 */
+	resolveProfileModuleId(id) {
+		const collected = {
+			dependencies: new Set(),
+			missingDependencies: new Set(),
+		};
+		return {
+			id: this._profileModuleId(cleanModuleId(id), collected),
+			...finishMetadata(collected),
+		};
 	}
 
 	/**
@@ -333,6 +380,10 @@ class OctaneBundlerCompiler {
 		const requestedHmr = normalizeHmrDialect(options.hmr ?? this.defaults.hmr);
 		const hmr = environment === 'server' ? false : requestedHmr;
 		const dev = environment === 'server' ? false : (options.dev ?? this.defaults.dev ?? !!hmr);
+		// Profiling is a client-runtime build specialization, deliberately independent
+		// of both HMR and dev hydration diagnostics. Server transforms stay byte-for-
+		// byte identical even when a shared client/server bundler configuration opts in.
+		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
 		const parallelUse = options.parallelUse ?? this.defaults.parallelUse;
 		const filename = canonicalModuleId(file, this.root);
 
@@ -340,10 +391,13 @@ class OctaneBundlerCompiler {
 			file.endsWith('.tsrx') ||
 			(file.endsWith('.tsx') && this._isInstalledOctaneSource(file, collected));
 		if (fullCompile) {
+			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const out = compile(code, filename, {
 				hmr,
 				mode: environment,
 				dev,
+				profile,
+				profileFilename,
 				parallelUse: parallelUse !== false,
 			});
 			return {
@@ -365,7 +419,8 @@ class OctaneBundlerCompiler {
 			if (this._hasManualHookSlots(file, collected)) {
 				return this._passThrough(code, collected);
 			}
-			const out = slotHooks(code, filename, { hmr: !!hmr });
+			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
+			const out = slotHooks(code, filename, { hmr: !!hmr, profile, profileFilename });
 			if (out === null) return this._passThrough(code, collected);
 			return {
 				code: out.code,

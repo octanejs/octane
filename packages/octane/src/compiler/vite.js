@@ -12,12 +12,34 @@ import { createOctaneCompiler, discoverOctaneSourceDependencies } from './bundle
 
 export { discoverOctaneSourceDependencies };
 
+const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
+
+function assertProfilingDefineAvailable(definitions, enabled) {
+	if (
+		definitions === null ||
+		typeof definitions !== 'object' ||
+		!Object.prototype.hasOwnProperty.call(definitions, PROFILE_DEFINE)
+	) {
+		return;
+	}
+	const value = definitions[PROFILE_DEFINE];
+	if (value !== enabled && value !== JSON.stringify(enabled)) {
+		throw new TypeError(
+			`octane/compiler/vite: ${PROFILE_DEFINE} is reserved by Octane and conflicts with \`profile: ${enabled}\`. Remove the custom Vite define and configure profiling through octane().`,
+		);
+	}
+}
+
 export function octane(options = {}) {
 	let hmrEnabled = options.hmr;
+	// Profiling is intentionally independent of serve/HMR. `ssr: true` is the
+	// adapter's explicit server-only override, where client profiling must stay off.
+	const profileEnabled = options.profile === true && options.ssr !== true;
 	let projectRoot = resolve(process.cwd());
 	let compiler = createOctaneCompiler({
 		root: projectRoot,
 		exclude: options.exclude,
+		profile: profileEnabled,
 		parallelUse: options.parallelUse,
 	});
 	// An explicit override of Vite's per-module SSR auto-detection.
@@ -28,6 +50,7 @@ export function octane(options = {}) {
 		compiler = createOctaneCompiler({
 			root: projectRoot,
 			exclude: options.exclude,
+			profile: profileEnabled,
 			parallelUse: options.parallelUse,
 		});
 	};
@@ -36,9 +59,16 @@ export function octane(options = {}) {
 		name: 'octane',
 		enforce: 'pre',
 		config(config) {
+			assertProfilingDefineAvailable(config.define, profileEnabled);
 			resetCompiler(config.root ?? process.cwd());
 			const sourceDependencies = compiler.discoverSourceDependencies().packages;
 			return {
+				// The runtime uses this reserved constant to make normal builds erase
+				// profiling branches completely. Keep it defined in both modes so Vite's
+				// production optimizer never has to preserve a runtime feature check.
+				define: {
+					__OCTANE_PROFILE_ENABLED__: JSON.stringify(profileEnabled),
+				},
 				// Raw Octane dependencies must reach this plugin, never esbuild's dep
 				// prebundle or Node's SSR external loader. Dedupe the runtime as an
 				// additional guard for linked/local package layouts.
@@ -48,6 +78,9 @@ export function octane(options = {}) {
 			};
 		},
 		configResolved(config) {
+			// Re-check the final merged value so a later plugin cannot silently win the
+			// reserved definition and desynchronize compiler metadata from the runtime.
+			assertProfilingDefineAvailable(config.define, profileEnabled);
 			if (resolve(config.root) !== projectRoot) resetCompiler(config.root);
 			if (hmrEnabled === undefined) hmrEnabled = config.command === 'serve';
 		},
@@ -72,6 +105,7 @@ export function octane(options = {}) {
 				// Preserve the existing Vite gate: source locations are emitted only
 				// for a client serve transform where HMR is active.
 				dev: !server && !!hmrEnabled,
+				profile: !server && profileEnabled,
 				parallelUse: options.parallelUse,
 			});
 			if (result === null) return null;

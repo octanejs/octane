@@ -8,6 +8,7 @@ import {
 	createOctaneCompiler,
 	resolveOctaneRuntimeRequest,
 } from '../src/compiler/bundler.js';
+import { inspectProfileOutput, uniqueMetadata } from './_profile-output';
 
 const COMPONENT =
 	"import { useState } from 'octane';\n" +
@@ -18,6 +19,12 @@ const COMPONENT =
 
 const HOOK =
 	"import { useState } from 'octane';\n" + 'export function useCount() { return useState(0); }\n';
+
+function profileFiles(code: string | undefined): Set<string> {
+	if (code === undefined) return new Set();
+	const output = inspectProfileOutput(code);
+	return new Set(uniqueMetadata([...output.components, ...output.hooks]).map(({ file }) => file));
+}
 
 describe('bundler-neutral compiler integration', () => {
 	it('canonicalizes root files and strips bundler queries', () => {
@@ -51,6 +58,31 @@ describe('bundler-neutral compiler integration', () => {
 		expect(server?.kind).toBe('compile');
 		expect(server?.code).toContain("from 'octane/server'");
 		expect(server?.code).not.toContain('webpackHot');
+	});
+
+	it('applies profiling metadata only to client transforms', () => {
+		const compiler = createOctaneCompiler({ root: '/project', profile: true });
+		const client = compiler.transform(COMPONENT, '/project/src/App.tsrx', {
+			environment: 'client',
+			hmr: false,
+			dev: false,
+		});
+		const clientProfile = inspectProfileOutput(client!.code);
+		expect(uniqueMetadata(clientProfile.components)).toEqual([
+			expect.objectContaining({ name: 'App', file: '/src/App.tsrx', kind: 'component' }),
+		]);
+
+		const disabled = compiler.transform(COMPONENT, '/project/src/App.tsrx', {
+			environment: 'client',
+			profile: false,
+		});
+		expect(inspectProfileOutput(disabled!.code).profileImports).toEqual(new Set());
+
+		const server = compiler.transform(COMPONENT, '/project/src/App.tsrx', {
+			environment: 'server',
+			profile: true,
+		});
+		expect(inspectProfileOutput(server!.code).profileImports).toEqual(new Set());
 	});
 
 	it('exposes exact client/server runtime request mapping', () => {
@@ -149,6 +181,45 @@ describe('bundler-neutral compiler integration', () => {
 			expect(compiled?.kind).toBe('compile');
 			expect(compiled?.code).toContain('_$template("<p>octane</p>")');
 			expect(compiled?.dependencies).toContain(rawOctane.manifest);
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('uses portable source names in profile metadata', () => {
+		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-profile-source-'));
+		try {
+			const projectRoot = join(fixtureRoot, 'project');
+			const sourceRoot = join(projectRoot, 'src');
+			mkdirSync(sourceRoot, { recursive: true });
+			writeFileSync(join(projectRoot, 'package.json'), JSON.stringify({ name: 'app' }));
+			const linkedRoot = join(fixtureRoot, 'linked-project');
+			symlinkSync(projectRoot, linkedRoot, 'dir');
+			const realProjectRoot = realpathSync(projectRoot);
+
+			const compiler = createOctaneCompiler({ root: linkedRoot, profile: true });
+			const app = compiler.transform(COMPONENT, join(realProjectRoot, 'src/App.tsrx'));
+			expect(profileFiles(app?.code)).toEqual(new Set(['/src/App.tsrx']));
+
+			const packageRoot = join(fixtureRoot, 'shared-ui');
+			mkdirSync(join(packageRoot, 'src'), { recursive: true });
+			writeFileSync(
+				join(packageRoot, 'package.json'),
+				JSON.stringify({ name: '@scope/ui', peerDependencies: { octane: '*' } }),
+			);
+			const packaged = compiler.transform(COMPONENT, join(packageRoot, 'src/Card.tsx'));
+			expect(profileFiles(packaged?.code)).toEqual(
+				new Set(['/@package/%40scope%2Fui/src/Card.tsx']),
+			);
+			const packagedHook = compiler.transform(HOOK, join(packageRoot, 'src/useCount.ts'));
+			expect(profileFiles(packagedHook?.code)).toEqual(
+				new Set(['/@package/%40scope%2Fui/src/useCount.ts']),
+			);
+
+			const externalRoot = join(fixtureRoot, 'unowned');
+			mkdirSync(externalRoot);
+			const external = compiler.transform(COMPONENT, join(externalRoot, 'Loose.tsrx'));
+			expect(profileFiles(external?.code)).toEqual(new Set(['/@external/Loose.tsrx']));
 		} finally {
 			rmSync(fixtureRoot, { recursive: true, force: true });
 		}

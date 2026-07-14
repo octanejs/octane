@@ -11,6 +11,8 @@ export * from '@octanejs/app-core';
 export interface OctanePluginOptions {
 	/** Override the client HMR default (on in serve mode, off for SSR). */
 	hmr?: boolean;
+	/** Enable component profiling in client transforms. */
+	profile?: boolean;
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.
