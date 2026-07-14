@@ -1,0 +1,125 @@
+import * as React from 'octane';
+import { __DEV__ } from '@apollo/client/utilities/environment';
+import { canUseDOM } from '@apollo/client/utilities/internal';
+import { maybe } from '@apollo/client/utilities/internal/globals';
+import { invariant } from '@apollo/client/utilities/invariant';
+let didWarnUncachedGetSnapshot = false;
+// Prevent webpack from complaining about our feature detection of the
+// useSyncExternalStore property of the React namespace, which is expected not
+// to exist when using React 17 and earlier, and that's fine.
+const uSESKey = 'useSyncExternalStore';
+const realHook = React[uSESKey];
+const isReactNative = maybe(() => navigator.product) == 'ReactNative';
+const usingJSDOM =
+	// Following advice found in this comment from @domenic (maintainer of jsdom):
+	// https://github.com/jsdom/jsdom/issues/1537#issuecomment-229405327
+	//
+	// Since we control the version of Jest and jsdom used when running Apollo
+	// Client tests, and that version is recent enough to include " jsdom/x.y.z"
+	// at the end of the user agent string, I believe this case is all we need to
+	// check. Testing for "Node.js" was recommended for backwards compatibility
+	// with older version of jsdom, but we don't have that problem.
+	maybe(() => navigator.userAgent.indexOf('jsdom') >= 0) || false;
+// Our tests should all continue to pass if we remove this !usingJSDOM
+// condition, thereby allowing useLayoutEffect when using jsdom. Unfortunately,
+// if we allow useLayoutEffect, then useSyncExternalStore generates many
+// warnings about useLayoutEffect doing nothing on the server. While these
+// warnings are harmless, this !usingJSDOM condition seems to be the best way to
+// prevent them (i.e. skipping useLayoutEffect when using jsdom).
+const canUseLayoutEffect = (canUseDOM || isReactNative) && !usingJSDOM;
+// Adapted from https://www.npmjs.com/package/use-sync-external-store, with
+// Apollo Client deviations called out by "// DEVIATION ..." comments.
+// When/if React.useSyncExternalStore is defined, delegate fully to it.
+export const useSyncExternalStore =
+	realHook ||
+	((subscribe, getSnapshot, getServerSnapshot) => {
+		// Read the current snapshot from the store on every render. Again, this
+		// breaks the rules of React, and only works here because of specific
+		// implementation details, most importantly that updates are
+		// always synchronous.
+		const value = getSnapshot();
+		if (
+			// DEVIATION: Using __DEV__
+			__DEV__ &&
+			!didWarnUncachedGetSnapshot &&
+			// DEVIATION: Not using Object.is because we know our snapshots will never
+			// be exotic primitive values like NaN, which is !== itself.
+			value !== getSnapshot()
+		) {
+			didWarnUncachedGetSnapshot = true;
+			// DEVIATION: Using invariant.error instead of console.error directly.
+			invariant.error(34);
+		}
+		// Because updates are synchronous, we don't queue them. Instead we force a
+		// re-render whenever the subscribed state changes by updating an some
+		// arbitrary useState hook. Then, during render, we call getSnapshot to read
+		// the current value.
+		//
+		// Because we don't actually use the state returned by the useState hook, we
+		// can save a bit of memory by storing other stuff in that slot.
+		//
+		// To implement the early bailout, we need to track some things on a mutable
+		// object. Usually, we would put that in a useRef hook, but we can stash it in
+		// our useState hook instead.
+		//
+		// To force a re-render, we call forceUpdate({inst}). That works because the
+		// new object always fails an equality check.
+		const [{ inst }, forceUpdate] = React.useState({
+			inst: { value, getSnapshot },
+		});
+		// Track the latest getSnapshot function with a ref. This needs to be updated
+		// in the layout phase so we can access it during the tearing check that
+		// happens on subscribe.
+		if (canUseLayoutEffect) {
+			// DEVIATION: We avoid calling useLayoutEffect when !canUseLayoutEffect,
+			// which may seem like a conditional hook, but this code ends up behaving
+			// unconditionally (one way or the other) because canUseLayoutEffect is
+			// constant.
+			React.useLayoutEffect(() => {
+				Object.assign(inst, { value, getSnapshot });
+				// Whenever getSnapshot or subscribe changes, we need to check in the
+				// commit phase if there was an interleaved mutation. In concurrent mode
+				// this can happen all the time, but even in synchronous mode, an earlier
+				// effect may have mutated the store.
+				if (checkIfSnapshotChanged(inst)) {
+					// Force a re-render.
+					forceUpdate({ inst });
+				}
+				// React Hook React.useLayoutEffect has a missing dependency: 'inst'. Either include it or remove the dependency array.
+				// eslint-disable-next-line react-hooks/exhaustive-deps
+			}, [subscribe, value, getSnapshot]);
+		} else {
+			Object.assign(inst, { value, getSnapshot });
+		}
+		React.useEffect(() => {
+			// Check for changes right before subscribing. Subsequent changes will be
+			// detected in the subscription handler.
+			if (checkIfSnapshotChanged(inst)) {
+				// Force a re-render.
+				forceUpdate({ inst });
+			}
+			// Subscribe to the store and return a clean-up function.
+			return subscribe(function handleStoreChange() {
+				// TODO: Because there is no cross-renderer API for batching updates, it's
+				// up to the consumer of this library to wrap their subscription event
+				// with unstable_batchedUpdates. Should we try to detect when this isn't
+				// the case and print a warning in development?
+				// The store changed. Check if the snapshot changed since the last time we
+				// read from the store.
+				if (checkIfSnapshotChanged(inst)) {
+					// Force a re-render.
+					forceUpdate({ inst });
+				}
+			});
+			// React Hook React.useEffect has a missing dependency: 'inst'. Either include it or remove the dependency array.
+			// eslint-disable-next-line react-hooks/exhaustive-deps
+		}, [subscribe]);
+		return value;
+	});
+function checkIfSnapshotChanged({ value, getSnapshot }) {
+	try {
+		return value !== getSnapshot();
+	} catch {
+		return true;
+	}
+}

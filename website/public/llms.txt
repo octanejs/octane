@@ -68,7 +68,7 @@ Rspack usage: install `octane`, `@rspack/core`, and `@octanejs/rspack-plugin`, t
 Bindings — reach for these when asked about the React equivalent:
 
 - **State management** — `@octanejs/zustand`, `@octanejs/jotai`, and `@octanejs/redux` cover Zustand, Jotai, and React Redux-style state management.
-- **Data fetching / server state** — `@octanejs/tanstack-query` ports TanStack Query (React Query): `useQuery`, `useSuspenseQuery`, `useMutation`, `QueryClient`, over the verbatim `@tanstack/query-core`.
+- **Data fetching / server state** — `@octanejs/apollo-client` ports Apollo Client 4's complete client hook adapter over the verbatim Apollo core; `@octanejs/tanstack-query` ports TanStack Query (React Query): `useQuery`, `useSuspenseQuery`, `useMutation`, `QueryClient`, over the verbatim `@tanstack/query-core`.
 - **Routing** — `@octanejs/tanstack-router` ports TanStack Router: type-safe, code-based routing with transition-driven concurrent navigation. (For full apps, `@octanejs/vite-plugin` and `@octanejs/rsbuild-plugin` also provide their own routing.)
 - **Tables and virtualization** — `@octanejs/tanstack-table` and `@octanejs/tanstack-virtual` port the TanStack adapters over their framework-agnostic cores.
 - **Animation** — `@octanejs/motion` ports Motion / Framer Motion (`motion.*` components, `AnimatePreset`, gestures) on `motion-dom`.

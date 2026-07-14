@@ -57,6 +57,8 @@ overrides:
 
 catalogs:
   default:
+    '@apollo/client': 4.2.6
+    '@graphql-typed-document-node/core': ^3.1.1
     '@lucide/icons': 1.24.0
     '@babel/core': 7.29.7
     '@changesets/changelog-github': ^0.7.0
@@ -127,12 +129,15 @@ catalogs:
     '@tsrx/vite-plugin-solid': ^0.0.67
     '@types/babel__core': 7.20.5
     '@types/node': ^24.3.0
+    '@wry/equality': ^0.5.6
+    '@wry/trie': ^0.5.0
     '@preact/preset-vite': ^2.10.5
     '@sveltejs/vite-plugin-svelte': ^7.2.0
     '@vitejs/plugin-react': ^6.0.2
     devalue: ^5.8.1
     esbuild: ^0.28.1
     esrap: *esrap_common
+    graphql: ^16.11.0
     happy-dom: ^20.10.6
     html-parse-stringify: ^3.0.1
     i18next: 26.3.6
@@ -176,6 +181,7 @@ catalogs:
     react-dom: ^19.2.0
     react-i18next: 17.0.9
     ripple: ^0.3.86
+    rxjs: ^7.8.2
     rulesync: ^8.17.0
     solid-js: '2.0.0-beta.14'
     sonner: 2.0.7

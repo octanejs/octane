@@ -160,6 +160,7 @@ describe('website routes', () => {
 			'jotai',
 			'redux',
 			'redux-toolkit',
+			'apollo-client',
 			'tanstack-query',
 			'tanstack-router',
 			'remix-router',

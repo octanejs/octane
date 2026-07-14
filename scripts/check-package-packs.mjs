@@ -158,8 +158,12 @@ async function validatePackedConsumer(tempRoot, archives) {
 				type: 'module',
 				engines: { node: '>=22' },
 				dependencies: {
+					'@apollo/client': '4.2.6',
+					'@octanejs/apollo-client': `file:${requireArchive(archives, '@octanejs/apollo-client')}`,
 					'@octanejs/hook-form': `file:${requireArchive(archives, '@octanejs/hook-form')}`,
+					graphql: '^16.11.0',
 					octane: `file:${requireArchive(archives, 'octane')}`,
+					rxjs: '^7.8.2',
 				},
 			},
 			null,
@@ -168,13 +172,27 @@ async function validatePackedConsumer(tempRoot, archives) {
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'App.tsrx'),
-		`import { useForm } from '@octanejs/hook-form';
+		`import { ApolloClient, InMemoryCache } from '@octanejs/apollo-client';
+import { ApolloProvider, useApolloClient } from '@octanejs/apollo-client/react';
+import { useForm } from '@octanejs/hook-form';
+
+const client = new ApolloClient({ cache: new InMemoryCache() });
+
+function ApolloProbe() @{
+	const activeClient = useApolloClient();
+	<span data-apollo={activeClient === client ? 'connected' : 'missing'}>Apollo</span>
+}
 
 export function App() @{
 	const form = useForm({ defaultValues: { name: 'Ada' } });
-	<form data-probe="hook-form-ran">
-		<input {...form.register('name')} />
-	</form>
+	<div data-probe="bindings-ran">
+		<form>
+			<input {...form.register('name')} />
+		</form>
+		<ApolloProvider client={client}>
+			<ApolloProbe />
+		</ApolloProvider>
+	</div>
 }
 `,
 	);
@@ -267,12 +285,16 @@ export function renderProbe() {
 	const serverBundle = path.join(consumerDirectory, 'dist/server/entry.mjs');
 	const { renderProbe } = await import(pathToFileURL(serverBundle).href);
 	const html = renderProbe();
-	if (!html.includes('data-probe="hook-form-ran"') || !html.includes('name="name"')) {
+	if (
+		!html.includes('data-probe="bindings-ran"') ||
+		!html.includes('name="name"') ||
+		!html.includes('data-apollo="connected"')
+	) {
 		throw new Error(`executed Hook Form probe returned unexpected HTML: ${html}`);
 	}
 
 	console.log(
-		'installed packed octane + @octanejs/hook-form with one runtime; Vite client/server builds and executed Hook Form SSR passed',
+		'installed packed octane + Hook Form + Apollo Client without React; Vite client/server builds and executed binding SSR passed',
 	);
 }
 
