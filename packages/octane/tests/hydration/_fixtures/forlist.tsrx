@@ -1,7 +1,7 @@
 // SSR Phase 6 (M2) — @for hydration. The server wraps the whole @for in a
-// `<!--[-->…<!--]-->` range and EACH item in its own range; the client forBlock
-// adopts the outer range and mountItem adopts each item's range (threading the
-// hydration cursor), instead of cloning fresh + creating markers.
+// `<!--[-->…<!--]-->` range. Each proven direct-host item self-delimits via its
+// <li>, so the server emits no per-item pairs; the client adopts those roots as
+// keyed boundaries instead of cloning fresh or creating markers.
 
 export function List(props) @{
 	<ul id="list">

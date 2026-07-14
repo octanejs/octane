@@ -6,9 +6,9 @@ import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { List } from './_fixtures/forlist.tsrx';
 
-// SSR Phase 6 (M2) — a keyed @for list hydrates: the server wraps the @for and
-// each item in block ranges; the client adopts them (no rebuild) and per-item
-// event handlers attach to the adopted DOM.
+// SSR Phase 6 (M2) — a keyed @for list hydrates: the server wraps the @for in
+// one block range and lets each proven direct-host item self-delimit. The client
+// adopts those roots (no rebuild) and attaches per-item event handlers.
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/forlist.tsrx');
 
@@ -40,6 +40,7 @@ describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
 		];
 		const onPick = vi.fn();
 		const { html } = ServerRT.renderToString(server.List, { items, onPick: () => {} });
+		expect((html.match(/<!--\[/g) || []).length).toBe(1);
 
 		container.innerHTML = html;
 		const before = container.innerHTML;
@@ -65,6 +66,28 @@ describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
 		// octane's per-row event-bundle optimization calls fn(...args, event),
 		// so the row id is the first argument.
 		expect(onPick.mock.calls[0][0]).toBe(2);
+		root.unmount();
+	});
+
+	it('also adopts legacy per-item pairs when the client can self-delimit rows', () => {
+		const items = [
+			{ id: 1, name: 'Alpha' },
+			{ id: 2, name: 'Beta' },
+		];
+		const { html } = ServerRT.renderToString(server.List, { items, onPick: () => {} });
+		container.innerHTML = html;
+		const rows = [...container.querySelectorAll('li.row')];
+		for (const row of rows) {
+			row.parentNode!.insertBefore(document.createComment('['), row);
+			row.parentNode!.insertBefore(document.createComment(']'), row.nextSibling);
+		}
+		const before = container.innerHTML;
+
+		const root = hydrateRoot(container, List, { items, onPick: () => {} });
+		flushSync(() => {});
+
+		expect(container.innerHTML).toBe(before);
+		expect([...container.querySelectorAll('li.row')]).toEqual(rows);
 		root.unmount();
 	});
 });

@@ -73,7 +73,7 @@ The plan extends proven paths rather than inventing new invariants:
 | `componentSlotLite` | no Block, no markers at all (same-module hookless callees) |
 | `componentSlot(…, singleRoot)` | mints nothing; after render the single root ELEMENT is promoted to `startMarker === endMarker`; suspend-safe via the `finally` promotion + null-marker no-op teardown; transitions PROBE off-screen instead of committing a marker-pair WIP |
 | `renderBranchSlot` single-element branch | self-marks on the element; ALSO the borrowed-marker precedent: branch blocks reuse the slot's start/end with `exclusiveMarkers=true` |
-| forBlock `singleRoot` items (flags bit 1) | per-item pairs skipped on fresh client mounts; item's one element is start=end=reorder anchor. Client-mount ONLY — hydration adopts server pairs regardless |
+| forBlock `singleRoot` items (flags bit 1) | per-item pairs skipped on fresh client mounts; item's one element is start=end=reorder anchor. Direct-host SSR items now use the same boundary during hydration (flags bit 4); general shapes retain pairs. |
 | childSlot lazy markers | lone-pure-host regime is fully anchorless; markers minted only when the value shape demands them (one-way promotion around the live node) |
 | `childTextHole` | only-child primitives: zero slot state, zero comments, both sides |
 | `renderToStaticMarkup` | `MARKERS=false` drops every pair wholesale (non-hydratable output) |
@@ -490,10 +490,10 @@ normal app codegen is effectively unchanged.
 2. Component-bearing `it` pairs (145 on `/`) — required borrow ranges today.
 3. Sole-root `@switch` construct inherit + children-render-fn /
    value-position sole roots (M3 leftovers).
-4. SSR payload size: M6 removes redundant nodes only after successful
-   hydration. Omitting them from the wire would require a versioned,
-   server/client-symmetric encoding and streaming compatibility; it is not
-   needed to obtain the live-DOM reduction.
+4. Remaining SSR payload size: direct-host `@for` items now omit their pairs
+   symmetrically on the server and during hydration. Other M6 ranges still
+   compact only after successful hydration; omitting those from the wire needs
+   the same server/client ownership proof and streaming compatibility.
 
 ### Ordering & measured effect
 
@@ -524,11 +524,6 @@ coextensive wrapper stack.
 1. M5 now elides client-only inactive `@if` pairs and lets a guaranteed
    host-vs-host branch share a keyed-item boundary. General sole-root
    `@if`/`@switch` inheritance still needs a symmetric SSR/hydration design.
-2. Should `mountItem` under hydration ALSO skip adopting per-item pairs when
-   the server (post-M3 compiler) stopped emitting them for singleRoot @for
-   bodies? Natural extension of M3's flag to `ssrEmitFor` — folds the last
-   big pair population on SSR'd list pages. Proposal: yes, same mechanism,
-   after M3 core proves out.
-3. Empty branches still need one insertion anchor unless their position is
+2. Empty branches still need one insertion anchor unless their position is
    recoverable from siblings. M5 removes the redundant pair but deliberately
    retains that single anchor.

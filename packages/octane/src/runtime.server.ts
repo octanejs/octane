@@ -28,6 +28,8 @@
 import {
 	BLOCK_OPEN,
 	BLOCK_CLOSE,
+	FOR_BLOCK_OPEN_EMPTY,
+	FOR_BLOCK_OPEN_ITEMS,
 	EMPTY_COMMENT,
 	SUSPENSE_SCRIPT_ATTR,
 	SUSPENSE_SEED_WIRE_PREFIX,
@@ -715,6 +717,18 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
  */
 export function ssrBlock(content: string): string {
 	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : content;
+}
+
+/**
+ * Wrap an @for in its single outer pair and encode which arm the server chose.
+ * Markerless direct-host items make populated content indistinguishable from a
+ * single-root @empty arm otherwise; one bit on the existing open comment lets
+ * hydration recover server/client list-shape mismatches without extra nodes.
+ */
+export function ssrForBlock(content: string, hasItems: boolean): string {
+	return MARKERS
+		? (hasItems ? FOR_BLOCK_OPEN_ITEMS : FOR_BLOCK_OPEN_EMPTY) + content + BLOCK_CLOSE
+		: content;
 }
 
 // URI encoders reject lone UTF-16 surrogates, while UTF-8 encoders generally

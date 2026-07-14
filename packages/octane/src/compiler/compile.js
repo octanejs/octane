@@ -1579,6 +1579,21 @@ function isSingleHostIfRoot(node) {
 }
 
 /**
+ * True when an @for item is one direct host root on the wire.
+ *
+ * This is deliberately narrower than the client-only singleRoot proof below:
+ * a sole component or host-vs-host @if can self-delimit after a fresh client
+ * mount, but its current SSR representation still begins with that construct's
+ * own hydration markers. A direct host always begins with the row element, so
+ * the hydrator can use it as the keyed item boundary without an item pair.
+ */
+function isSsrMarkerlessForItem(node) {
+	const body = node?.body?.body || [];
+	const jsxChildren = body.filter((s) => isJsxNode(s));
+	return jsxChildren.length === 1 && isPlainHostRoot(jsxChildren[0]);
+}
+
+/**
  * Prove that a component always returns one host element.
  *
  * TSRX's `@{}` form carries that output as `body.render`. Ordinary TSX keeps a
@@ -3664,8 +3679,8 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		emptyCall = `_$ssrArm("empty", () => ${emptySub.fnName}(undefined, __s))`;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
+	ctx.runtimeNeeded.add('ssrForBlock');
 	ctx.runtimeNeeded.add('ssrControl');
-	ctx.runtimeNeeded.add('ssrArm');
 	let itemKey = '__it != null && __it.id != null ? __it.id : __it';
 	let explicitKey = null;
 	const firstEl = (node.body.body || []).find(
@@ -3694,12 +3709,32 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	} else if (node.index) {
 		itemKey = '__i';
 	}
-	const mapper = node.index
-		? `(__it, __i) => _$ssrArm((${itemKey}), () => _$ssrBlock(${itemSub.fnName}(__it, __i, __s)))`
-		: `(__it, __i) => _$ssrArm((${itemKey}), () => _$ssrBlock(${itemSub.fnName}(__it, __s)))`;
-	// Eager: render every item now and join. No keyed reconciliation server-side;
-	// each item gets its own block marker for a future hydrate to match.
-	return `_$ssrBlock(_$ssrControl("${ssrControlKey('for', node)}", () => { const __items = Array.from((${itemsExpr}) ?? []); return __items.length === 0 ? ${emptyCall} : __items.map(${mapper}).join(''); }))`;
+	const markerlessItem = isSsrMarkerlessForItem(node);
+	// ssrArm exists solely to make use()/component identity distinct per item.
+	// Skip it when the item is compiler-proven synchronous and transparent:
+	// no render-time calls, nested components/control flow, or renderable child
+	// helper that could execute an opaque descriptor. Property reads and text /
+	// attribute serialization stay on the allocation-free path, matching the
+	// client forBlock's existing PURE-body proof.
+	const itemNeedsIdentity =
+		containsComponentCallOrControlFlow(node.body.body) ||
+		containsRenderCall(node.body.body) ||
+		itemSub.fn.includes('_$ssrChild') ||
+		itemSub.fn.includes('_$ssrComponent');
+	const itemCall = node.index
+		? `${itemSub.fnName}(__it, __i, __s)`
+		: `${itemSub.fnName}(__it, __s)`;
+	const itemHtml = markerlessItem ? itemCall : `_$ssrBlock(${itemCall})`;
+	const renderItem = itemNeedsIdentity ? `_$ssrArm((${itemKey}), () => ${itemHtml})` : itemHtml;
+	if (node.empty || itemNeedsIdentity) ctx.runtimeNeeded.add('ssrArm');
+	// Render every item into one incrementally-built string. Avoid map().join():
+	// besides the mapper callback, it allocates an N-entry intermediate array and
+	// eagerly flattens the whole list string before the caller can consume it.
+	// A proven direct-host item uses that host as its hydration/reorder boundary,
+	// matching the client's existing singleRoot path; general item shapes retain
+	// their own block pair. Identity-transparent items also skip ssrArm; opaque or
+	// suspending bodies retain it so use() and child component frames stay keyed.
+	return `_$ssrControl("${ssrControlKey('for', node)}", () => { const __items = Array.from((${itemsExpr}) ?? []); if (__items.length === 0) return _$ssrForBlock(${emptyCall}, false); let __html = ''; for (let __i = 0; __i < __items.length; __i++) { const __it = __items[__i]; __html += ${renderItem}; } return _$ssrForBlock(__html, true); })`;
 }
 
 function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
@@ -7308,12 +7343,14 @@ function planJsx(jsxNodesRaw, ctx, componentName, inlinedSubs, parentNs = 'html'
 		//        bit 2 = depEligible (runtime compares deps array, upgrades to pure
 		//        for survivors when deps unchanged this render),
 		//        bit 3 = indexIndependent (body binds no `index` → a pure reorder
-		//        that only changes a survivor's position need not re-render it).
+		//        that only changes a survivor's position need not re-render it),
+		//        bit 4 = SSR emitted markerless direct-host items; hydrate them by root.
 		const flags =
 			(fc.pure ? 1 : 0) |
 			(fc.singleRoot ? 2 : 0) |
 			(fc.depEligible ? 4 : 0) |
-			(fc.indexIndependent ? 8 : 0);
+			(fc.indexIndependent ? 8 : 0) |
+			(fc.ssrMarkerless ? 16 : 0);
 		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, flags?, deps?,
 		// emptyBody?, anchor?, ownEnd?).
 		// Optional args backfill positionally: `flags`/`deps` placeholders
@@ -9749,6 +9786,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		pure,
 		singleRoot,
 		singleRootExpr,
+		ssrMarkerless: isSsrMarkerlessForItem(node),
 		// The env union doubles as the deps array: emitted whenever the helpers
 		// capture anything (Phase 2 — the runtime stamps it as block.extra), and
 		// ALSO compared for the dep-pure survivor short-circuit when depEligible.

@@ -19,6 +19,8 @@ import {
 	STREAM_SEED_COMMENT,
 	HYDRATION_START,
 	HYDRATION_END,
+	HYDRATION_FOR_EMPTY,
+	HYDRATION_FOR_ITEMS,
 	HYDRATION_TEXT_SEP,
 	POSITIVE_NUMERIC_ATTR_PROPS,
 	BOOLEAN_ATTR_PROPS,
@@ -5031,6 +5033,7 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 function hydrationMarkerMultiplicity(data: string, open: boolean): number {
 	const marker = open ? HYDRATION_START : HYDRATION_END;
 	if (data === marker) return 1;
+	if (open && (data === HYDRATION_FOR_EMPTY || data === HYDRATION_FOR_ITEMS)) return 1;
 	if (data.length < 2 || data.charCodeAt(0) !== marker.charCodeAt(0)) return 0;
 	// Canonical positive decimal: no signs, whitespace, zero, or leading zeroes.
 	const first = data.charCodeAt(1);
@@ -5050,7 +5053,7 @@ function hydrationMarkerMultiplicity(data: string, open: boolean): number {
 function isBlockOpen(node: Node | null): node is Comment {
 	if (node === null || node.nodeType !== 8) return false;
 	const data = (node as Comment).data;
-	return data === HYDRATION_START || hydrationMarkerMultiplicity(data, true) > 1;
+	return hydrationMarkerMultiplicity(data, true) > 0;
 }
 
 /** True if `node` is a legacy or counted block-close marker. */
@@ -5107,9 +5110,9 @@ function matchingClose(open: Node): Comment {
 			if (!close && !nestedOpen && data.length > 1) {
 				const first = data.charCodeAt(0);
 				if (first === HYDRATION_END.charCodeAt(0)) {
-					close = hydrationMarkerMultiplicity(data, false) > 1;
+					close = hydrationMarkerMultiplicity(data, false) > 0;
 				} else if (first === HYDRATION_START.charCodeAt(0)) {
-					nestedOpen = hydrationMarkerMultiplicity(data, true) > 1;
+					nestedOpen = hydrationMarkerMultiplicity(data, true) > 0;
 				}
 			}
 			if (close) {
@@ -5132,6 +5135,13 @@ function matchingClose(open: Node): Comment {
 		}
 		node = node.nextSibling as Node;
 	}
+}
+
+/** -1 = legacy/general marker, 0 = server @empty, 1 = server items. */
+function ssrForMarkerState(node: Node): -1 | 0 | 1 {
+	if (node.nodeType !== 8) return -1;
+	const data = (node as Comment).data;
+	return data === HYDRATION_FOR_EMPTY ? 0 : data === HYDRATION_FOR_ITEMS ? 1 : -1;
 }
 
 /** Logical index-0 child: `node.firstChild` for both client and hydration. */
@@ -13458,7 +13468,8 @@ export function forBlock<T>(
 	// Comment markers), bit 2 = depEligible (compare `deps` to cachedDeps and
 	// promote body to PURE when unchanged), bit 3 = indexIndependent (the body
 	// binds no `index` name → a pure reorder that only moves a survivor's
-	// position need not re-render it). Packed into one numeric literal.
+	// position need not re-render it), bit 4 = the server emitted direct-host
+	// items without per-item pairs. Packed into one numeric literal.
 	const parentBlock = parentScope.block;
 	let state = parentScope.slots[slotKey] as ForSlot | undefined;
 	if (state === undefined) {
@@ -13513,6 +13524,10 @@ export function forBlock<T>(
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
+	// New direct-host list output carries its server-selected arm on the existing
+	// outer open comment. Legacy/general list ranges return -1 and retain the
+	// content-shape checks used before markerless SSR items existed.
+	const serverMarkerState = hydrating ? ssrForMarkerState(state.start) : -1;
 	// The env tuple refreshes every parent render (the compiled call site
 	// re-evaluates the captured values); item/empty blocks pick it up at
 	// mount and at every survivor re-render below.
@@ -13539,7 +13554,11 @@ export function forBlock<T>(
 			// — a STRUCTURAL mismatch. Discard the server items and build @empty fresh with
 			// hydration suspended (so it client-mounts instead of mis-adopting an item).
 			let suspendForEmpty = false;
-			if (hydrating && isBlockOpen(state.start.nextSibling)) {
+			if (
+				hydrating &&
+				(serverMarkerState === 1 ||
+					(serverMarkerState === -1 && isBlockOpen(state.start.nextSibling)))
+			) {
 				// Prefer the @for's own compiled source loc (siteLoc; for-constructs carry
 				// `loc` in `__s.locs`) — the parent element's `__oct_loc` stamp exists only
 				// when the parent carries dynamic bindings.
@@ -13591,10 +13610,14 @@ export function forBlock<T>(
 	// stale @empty DOM and point the cursor at `end` so the reconcile client-mounts the items
 	// into a clean range (mountItem's no-marker guard handles the build).
 	if (
+		!isEmpty &&
 		hydrating &&
-		state.start.nextSibling !== null &&
-		state.start.nextSibling !== state.end &&
-		!isBlockOpen(state.start.nextSibling)
+		(serverMarkerState === 0 ||
+			(serverMarkerState === -1 &&
+				((flags || 0) & 16) === 0 &&
+				state.start.nextSibling !== null &&
+				state.start.nextSibling !== state.end &&
+				!isBlockOpen(state.start.nextSibling)))
 	) {
 		const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
 		if (mmLoc) warnHydrationStructuralMismatch(mmLoc, 'a populated list', 'an empty list (@empty)');
@@ -13634,6 +13657,7 @@ export function forBlock<T>(
 		(f & 2) !== 0,
 		lite,
 		(f & 8) !== 0,
+		(f & 16) !== 0,
 	);
 	// Advance the hydration cursor past the @for's `<!--]-->` so a later sibling's
 	// clone() starts after this block — covers the zero-item, no-@empty case where
@@ -13772,6 +13796,10 @@ function reconcileKeyed<T>(
 	singleRoot: boolean | 2,
 	lite: boolean = false,
 	indexIndependent: boolean = false,
+	// The matching server compiler proved a direct host root and omitted the
+	// item's hydration pair. Kept separate from singleRoot because sole-component
+	// and conditional roots are markerless only on fresh client mounts today.
+	ssrMarkerless: boolean = false,
 ): void {
 	const oldItems = state.items;
 	const oldSize = state.size;
@@ -13808,6 +13836,7 @@ function reconcileKeyed<T>(
 				itemBody,
 				state,
 				singleRoot,
+				ssrMarkerless,
 				adoptNode,
 			);
 			oldItems.set(key, block);
@@ -13900,6 +13929,7 @@ function reconcileKeyed<T>(
 				itemBody,
 				state,
 				singleRoot,
+				ssrMarkerless,
 			);
 			oldItems.set(key, block);
 			block.key = key;
@@ -13977,6 +14007,7 @@ function reconcileKeyed<T>(
 					itemBody,
 					state,
 					singleRoot,
+					ssrMarkerless,
 				);
 				oldItems.set(key, block);
 				block.key = key;
@@ -14180,6 +14211,7 @@ function reconcileKeyed<T>(
 					itemBody,
 					state,
 					singleRoot,
+					ssrMarkerless,
 				);
 				oldItems.set(key, block);
 				block.key = key;
@@ -14218,6 +14250,7 @@ function reconcileKeyed<T>(
 					itemBody,
 					state,
 					singleRoot,
+					ssrMarkerless,
 				);
 				oldItems.set(key, block);
 				block.key = key;
@@ -14308,6 +14341,9 @@ function mountItem<T>(
 	// component-bearing) keeps the `it` pair. A later shape flip promotes the
 	// self-marked block to a minted pair in place (see deoptItemBody).
 	singleRoot: boolean | 2,
+	// True only for compiled direct-host items whose SSR output omitted the item
+	// pair. Hydration can therefore adopt the existing host as start === end.
+	ssrMarkerless: boolean,
 	// Pure-host → blocks upgrade adoption: an existing raw child node this item
 	// should take over IN PLACE (self-marked directly, or markers minted around
 	// it, seeded as the item block's deoptNode so the body's pure path patches
@@ -14315,12 +14351,58 @@ function mountItem<T>(
 	adoptNode: Node | null = null,
 ): Block {
 	if (hydrating) {
-		// Hydration: the server wrapped EVERY item in its own `<!--[-->…<!--]-->`
-		// range (regardless of the client `singleRoot` optimization, which the
-		// server can't know). Adopt this item's markers off the cursor, point the
-		// cursor at its content for the body's clone(), then advance past it to the
-		// next item's marker. (Hydrated items thus carry markers — the singleRoot
-		// no-marker path is a client-mount-only optimization.)
+		if (ssrMarkerless && !isBlockOpen(hydrateNode)) {
+			// The outer @for pair is the only list framing on the wire. Each proven
+			// direct-host item self-delimits, exactly like the existing client-mount
+			// singleRoot path. If the client has more items than the server, the
+			// cursor has reached the outer close; fall through to a fresh mount.
+			if (hydrateNode !== null && hydrateNode !== forSlot.end) {
+				const root = hydrateNode;
+				const block = createBlock(
+					'control-flow',
+					parentBlock,
+					parentNode,
+					root,
+					root,
+					body as ComponentBody,
+					item,
+					forSlot.env,
+				);
+				block.forSlot = forSlot;
+				block.itemIndex = index;
+				renderBlock(block);
+				hydrateNode = block.endMarker?.nextSibling ?? root.nextSibling;
+				return block;
+			}
+			const mmLoc = (parentNode as any).__oct_loc;
+			if (mmLoc)
+				warnHydrationStructuralMismatch(
+					mmLoc,
+					'another list item',
+					describeHydrationNode(hydrateNode),
+				);
+			const saved = hydrating;
+			hydrating = false;
+			try {
+				return mountItem(
+					parentBlock,
+					parentNode,
+					anchor,
+					item,
+					index,
+					body,
+					forSlot,
+					singleRoot,
+					ssrMarkerless,
+				);
+			} finally {
+				hydrating = saved;
+			}
+		}
+		// Hydration: the server wraps each GENERAL-SHAPE item in its own
+		// `<!--[-->…<!--]-->` range. Also accept this legacy marked encoding
+		// when a current direct-host client could have adopted markerlessly, which
+		// keeps mixed-version/dev hydration recoverable.
 		if (!isBlockOpen(hydrateNode)) {
 			// STRUCTURAL list mismatch: the client renders more items than the server did,
 			// so the cursor isn't on an item's open marker (it's at the @for's end marker or
@@ -14337,7 +14419,17 @@ function mountItem<T>(
 			const saved = hydrating;
 			hydrating = false;
 			try {
-				return mountItem(parentBlock, parentNode, anchor, item, index, body, forSlot, singleRoot);
+				return mountItem(
+					parentBlock,
+					parentNode,
+					anchor,
+					item,
+					index,
+					body,
+					forSlot,
+					singleRoot,
+					ssrMarkerless,
+				);
 			} finally {
 				hydrating = saved;
 			}

@@ -6,6 +6,7 @@ type ProtocolMarker = {
 
 function protocolMarker(data: string): ProtocolMarker | null {
 	if (data === '[') return { data, kind: 'open', multiplicity: 1 };
+	if (data === '[f0' || data === '[f1') return { data, kind: 'open', multiplicity: 1 };
 	if (data === ']') return { data, kind: 'close', multiplicity: 1 };
 	const match = /^(\[|\])([1-9]\d*)$/.exec(data);
 	if (match === null) return null;
