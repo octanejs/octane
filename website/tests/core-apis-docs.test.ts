@@ -2,7 +2,7 @@
 // smoke suite checks every route; this file protects the learning structure,
 // local navigation, and the real interactive example embedded in the MDX.
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, waitFor } from '@octanejs/testing-library';
+import { cleanup, fireEvent, render, waitFor, within } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
 import { docs } from '../src/content/docs.ts';
@@ -55,6 +55,9 @@ describe('Core APIs documentation', () => {
 		const highlightedSource = Array.from(container.querySelectorAll('pre.shiki')).map(
 			(block) => block.textContent ?? '',
 		);
+		for (const marker of ['<<<<<<<', '=======', '>>>>>>>']) {
+			expect(highlightedSource.some((source) => source.includes(marker))).toBe(false);
+		}
 		expect(highlightedSource.some((source) => source.includes('export function Counter()'))).toBe(
 			true,
 		);
@@ -103,9 +106,10 @@ describe('Core APIs documentation', () => {
 
 	it('runs the lists and conditions example through packed and empty branches', async () => {
 		const { container } = await renderCoreApis();
-		const demo = container.querySelector('[data-demo="lists"]')!;
+		const demo = container.querySelector<HTMLElement>('[data-demo="lists"]')!;
+		const packing = within(demo);
 		const status = demo.querySelector('.packing-summary')!;
-		const packPassport = demo.querySelector<HTMLButtonElement>('[aria-label="Pack Passport"]')!;
+		const passport = packing.getByRole('checkbox', { name: 'Passport' }) as HTMLInputElement;
 		const clear = Array.from(demo.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
 			button.textContent?.includes('Clear list'),
 		)!;
@@ -114,16 +118,17 @@ describe('Core APIs documentation', () => {
 		)!;
 
 		expect(status.textContent).toContain('1 of 3 packed');
-		expect(packPassport.getAttribute('aria-pressed')).toBe('false');
+		expect(passport.checked).toBe(false);
+		expect(packing.queryByRole('button', { name: /^(Pack|Unpack) / })).toBeNull();
 
-		fireEvent.click(packPassport);
+		fireEvent.click(passport);
 		await waitFor(() => expect(status.textContent).toContain('2 of 3 packed'));
-		expect(packPassport.getAttribute('aria-pressed')).toBe('true');
+		expect(passport.checked).toBe(true);
 
-		const packNotebook = demo.querySelector<HTMLButtonElement>('[aria-label="Pack Notebook"]')!;
-		fireEvent.click(packNotebook);
+		const notebook = packing.getByRole('checkbox', { name: 'Notebook' }) as HTMLInputElement;
+		fireEvent.click(notebook);
 		await waitFor(() => expect(status.textContent).toContain('Everything is packed.'));
-		expect(packNotebook.getAttribute('aria-pressed')).toBe('true');
+		expect(notebook.checked).toBe(true);
 
 		fireEvent.click(clear);
 		await waitFor(() => expect(status.textContent).toContain('Your list is empty.'));
@@ -133,6 +138,10 @@ describe('Core APIs documentation', () => {
 		fireEvent.click(restore);
 		await waitFor(() => expect(demo.querySelectorAll('.packing-item')).toHaveLength(3));
 		expect(status.textContent).toContain('1 of 3 packed');
+		expect((packing.getByRole('checkbox', { name: 'Passport' }) as HTMLInputElement).checked).toBe(
+			false,
+		);
+		expect((packing.getByRole('checkbox', { name: 'Charger' }) as HTMLInputElement).checked).toBe(true);
 	});
 
 	it('runs the ref button and effect-owned keyboard shortcut', async () => {
@@ -187,6 +196,9 @@ describe('Core APIs documentation', () => {
 		const submit = demo.querySelector<HTMLButtonElement>('button[type="submit"]')!;
 		const result = demo.querySelector('.form-result')!;
 
+		expect(input.value).toBe('Ada Lovelace');
+		expect(result.textContent).toContain('Save the name above');
+		fireEvent.input(input, { target: { value: '' } });
 		fireEvent.submit(form);
 		await waitFor(() => expect(result.textContent).toContain('Enter a name'));
 

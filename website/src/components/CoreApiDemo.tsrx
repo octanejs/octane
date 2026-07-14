@@ -81,11 +81,6 @@ const demoStyles = <style>
 		background: rgba(255, 255, 255, 0.04);
 		color: var(--text);
 	}
-	.compact {
-		min-height: 2rem;
-		padding: 0.3rem 0.75rem;
-		font-size: 0.78rem;
-	}
 	.disabled {
 		opacity: 0.42;
 		cursor: not-allowed;
@@ -136,7 +131,7 @@ const demoStyles = <style>
 	}
 	.demo :global(.packing-item) {
 		display: grid;
-		grid-template-columns: auto minmax(0, 1fr) auto;
+		grid-template-columns: auto minmax(0, 1fr);
 		align-items: center;
 		gap: 0.75rem;
 		min-height: 3rem;
@@ -146,19 +141,14 @@ const demoStyles = <style>
 		background: rgba(22, 24, 29, 0.48);
 	}
 	.demo :global(.packing-check) {
-		display: inline-grid;
-		place-items: center;
-		width: 1.35rem;
-		height: 1.35rem;
-		border: 1px solid #677083;
-		border-radius: 999px;
-		color: transparent;
-		font-size: 0.75rem;
+		width: 1.15rem;
+		height: 1.15rem;
+		margin: 0;
+		accent-color: #63d391;
+		cursor: pointer;
 	}
-	.packedCheck {
-		border-color: #63d391;
-		background: rgba(99, 211, 145, 0.16);
-		color: #8ae8ae;
+	.demo :global(.packing-label) {
+		cursor: pointer;
 	}
 	.packedLabel {
 		color: var(--text-secondary);
@@ -290,12 +280,6 @@ const demoStyles = <style>
 			display: grid;
 			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
-		.demo :global(.packing-item) {
-			grid-template-columns: auto minmax(0, 1fr);
-		}
-		.packingToggle {
-			grid-column: 1 / -1;
-		}
 	}
 </style>;
 
@@ -408,33 +392,28 @@ export function ListConditionsDemo() @{
 		<ul class="packing-list">
 			@for (const item of items; key item.id) {
 				<li class="packing-item">
-					<span class={['packing-check', item.packed && demoStyles.packedCheck]} aria-hidden="true">
-						✓
-					</span>
-					<span class={['packing-label', item.packed && demoStyles.packedLabel]}>
-						{item.label as string}
-					</span>
-					<button
-						type="button"
-						class={[
-							'demo-button',
-							demoStyles.button,
-							demoStyles.compact,
-							demoStyles.secondary,
-							demoStyles.packingToggle,
-						]}
-						aria-label={(item.packed ? 'Unpack ' : 'Pack ') + item.label}
-						aria-pressed={item.packed}
-						onClick={() => setItems(
-							(current) => current.map(
-								(currentItem) => currentItem.id === item.id
-									? { ...currentItem, packed: !currentItem.packed }
-									: currentItem,
-							),
-						)}
+					<input
+						id={'packing-item-' + item.id}
+						class="packing-check"
+						type="checkbox"
+						checked={item.packed}
+						onInput={(event) => {
+							const packed = (event.target as HTMLInputElement).checked;
+							setItems(
+								(current) => current.map(
+									(currentItem) => currentItem.id === item.id
+										? { ...currentItem, packed }
+										: currentItem,
+								),
+							);
+						}}
+					/>
+					<label
+						for={'packing-item-' + item.id}
+						class={['packing-label', item.packed && demoStyles.packedLabel]}
 					>
-						{item.packed ? 'Unpack' : 'Pack'}
-					</button>
+						{item.label as string}
+					</label>
 				</li>
 			} @empty {
 				<li class="packing-empty">No items yet. Restore the list to keep packing.</li>
@@ -617,7 +596,7 @@ interface SaveNameResult {
 
 const INITIAL_SAVE_RESULT: SaveNameResult = {
 	status: 'idle',
-	message: 'Nothing saved yet.',
+	message: 'Save the name above, or clear it to try validation.',
 };
 
 async function saveDemoName(
@@ -636,9 +615,9 @@ export function FormActionDemo() @{
 
 	<DemoFrame
 		id="form"
-		title="Profile form"
-		description="The action validates FormData, reports pending work, and returns the next result."
-		hint="Save a name"
+		title="Async form action"
+		description="Save the prefilled name to see pending and success states, or clear it to see validation."
+		hint="Try both paths"
 	>
 		<form class="profile-form" action={submit} aria-busy={isPending}>
 			<div class="form-controls">
@@ -649,7 +628,7 @@ export function FormActionDemo() @{
 						class={['demo-input', demoStyles.input]}
 						name="name"
 						autocomplete="name"
-						placeholder="Ada Lovelace"
+						defaultValue="Ada Lovelace"
 					/>
 				</label>
 				<button
@@ -662,7 +641,7 @@ export function FormActionDemo() @{
 					]}
 					disabled={isPending}
 				>
-					{isPending ? 'Saving…' : 'Save profile'}
+					{isPending ? 'Saving…' : 'Save name'}
 				</button>
 			</div>
 			<p

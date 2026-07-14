@@ -396,11 +396,7 @@ export function ShortcutSearch() @{
 			const target = event.target;
 			const isTyping =
 				target instanceof HTMLElement &&
-<<<<<<< HEAD
 					(target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
-=======
-					target.matches('input, textarea, select, [contenteditable="true"]');
->>>>>>> f042f4705a79a627b461521266bc21085e08f071
 
 			if (
 				event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || event.isComposing ||
@@ -590,8 +586,9 @@ export function ProfileForm() @{
 }
 ```
 
-The example is fully interactive—the local delay stands in for a request so you can see
-pending, validation, and success states without a backend:
+The field starts with a real value. Choose **Save name** to watch the pending and success
+states, or clear the field and submit it to see validation. The local delay stands in for
+a request, so the whole example works without a backend:
 
 <FormActionDemo />
 
