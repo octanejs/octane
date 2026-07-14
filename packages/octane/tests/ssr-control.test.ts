@@ -25,6 +25,8 @@ const m = evalServer(readFileSync(join(FIXTURES, 'ssr-control.tsrx'), 'utf8'), '
 
 const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
+const FOR_EMPTY_OPEN = '<!--[f0-->';
+const FOR_ITEMS_OPEN = '<!--[f1-->';
 
 describe('SSR Phase 3 — control flow with block markers', () => {
 	it('@if / @else renders the chosen branch wrapped in markers', async () => {
@@ -38,13 +40,52 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		);
 	});
 
-	it('@for renders each item in its own marker; @empty when the list is empty', async () => {
+	it('@for uses direct host roots as item boundaries; @empty still uses the list range', async () => {
 		expect((await RT.renderToString(m.List, { items: ['a', 'b'] })).html).toBe(
-			`<ul>${OPEN}${OPEN}<li>a</li>${CLOSE}${OPEN}<li>b</li>${CLOSE}${CLOSE}</ul>`,
+			`<ul>${FOR_ITEMS_OPEN}<li>a</li><li>b</li>${CLOSE}</ul>`,
 		);
 		expect((await RT.renderToString(m.List, { items: [] })).html).toBe(
-			`<ul>${OPEN}<li class="empty">none</li>${CLOSE}</ul>`,
+			`<ul>${FOR_EMPTY_OPEN}<li class="empty">none</li>${CLOSE}</ul>`,
 		);
+	});
+
+	it('@for server code accumulates directly without a mapped string array', () => {
+		const source = readFileSync(join(FIXTURES, 'ssr-control.tsrx'), 'utf8');
+		const code = compile(source, 'ssr-control.tsrx', { mode: 'server' }).code;
+		expect(code).toContain('for (let __i = 0; __i < __items.length; __i++)');
+		expect(code).toContain('__html += __sitem');
+		expect(code).not.toContain('__items.map(');
+		expect(code).not.toContain(".join('')");
+		expect(code).not.toContain('() => _$ssrBlock(__sitem');
+	});
+
+	it('@for retains per-item async identity when an item can suspend', () => {
+		const source = `
+			import { use } from 'octane';
+			export function List(props) @{
+				<ul>
+					@for (const item of props.items; key item.id) {
+						<li>{use(item.value) as string}</li>
+					}
+				</ul>
+			}
+		`;
+		const code = compile(source, 'suspending-list.tsrx', { mode: 'server' }).code;
+		expect(code).toContain('__html += _$ssrArm');
+	});
+
+	it('@for retains per-item pairs for multi-root item bodies', () => {
+		const source = `
+			export function List(props) @{
+				<div>
+					@for (const item of props.items; key item) {
+						<><span>{item as string}</span><b>!</b></>
+					}
+				</div>
+			}
+		`;
+		const code = compile(source, 'multi-root-list.tsrx', { mode: 'server' }).code;
+		expect(code).toContain('__html += _$ssrBlock(__sitem');
 	});
 
 	it('@switch picks the matching case (or default)', async () => {

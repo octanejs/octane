@@ -117,6 +117,7 @@ export {
 	ssrOption,
 	ssrComponent,
 	ssrBlock,
+	ssrForBlock,
 	ssrControl,
 	ssrArm,
 	ssrTry,

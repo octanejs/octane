@@ -18,10 +18,19 @@ export const HYDRATION_START = '[';
 /** Single-character payload of a block-close comment. */
 export const HYDRATION_END = ']';
 
+/** @for outer-open payload: the server rendered its @empty arm. */
+export const HYDRATION_FOR_EMPTY = '[f0';
+/** @for outer-open payload: the server rendered one or more direct-host items. */
+export const HYDRATION_FOR_ITEMS = '[f1';
+
 /** Opens a hydratable block (component output / control-flow branch). */
 export const BLOCK_OPEN = `<!--${HYDRATION_START}-->`;
 /** Closes a hydratable block. */
 export const BLOCK_CLOSE = `<!--${HYDRATION_END}-->`;
+/** Opens an @for range whose server render selected @empty. */
+export const FOR_BLOCK_OPEN_EMPTY = `<!--${HYDRATION_FOR_EMPTY}-->`;
+/** Opens an @for range whose server render contains items. */
+export const FOR_BLOCK_OPEN_ITEMS = `<!--${HYDRATION_FOR_ITEMS}-->`;
 /** A bare anchor comment used where the client would otherwise clone a `<!>`. */
 export const EMPTY_COMMENT = '<!---->';
 
