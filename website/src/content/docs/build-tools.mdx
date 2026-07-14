@@ -2,14 +2,20 @@
 title: Build tools
 ---
 
-# Build tools
+<div className="doc-hero">
+	<p className="doc-eyebrow">Choose your build pipeline</p>
+	<h1>Build tools</h1>
+	<p className="doc-lede">
+		{
+			'Use the same Octane compiler with Vite or Rspack, then add the Vite or Rsbuild app integration when you need routing, streaming SSR, hydration, production builds, and preview.'
+		}
+	</p>
+</div>
 
-Octane has one compiler with thin bundler adapters. Vite and Rspack own source
-transforms; the Vite and Rsbuild metaframework plugins add routing, streaming
-SSR, hydration wiring, production client/server builds, preview, and deployment
-adapters.
+Octane has one compiler with thin bundler adapters. Choosing a bundler changes the
+build pipeline, not component semantics.
 
-## Choose an integration
+<h2 id="choose-an-integration">Choose an integration</h2>
 
 | Goal                                 | Package                    |
 | ------------------------------------ | -------------------------- |
@@ -22,7 +28,7 @@ All integrations use the same compiler, runtime selection, source maps, raw
 Octane dependency discovery, and cache dependencies. Choosing a bundler does
 not change component semantics.
 
-## Vite
+<h2 id="vite">Vite</h2>
 
 For an SPA, the compiler ships in `octane`:
 
@@ -54,7 +60,7 @@ export default defineConfig({ plugins: [octane()] });
 Existing Vite projects keep their current behavior, including Vite's
 `import.meta.hot` HMR dialect.
 
-## Rspack
+<h2 id="rspack">Rspack</h2>
 
 The Rspack package is deliberately low-level. It compiles `.tsrx`, eligible
 Octane `.tsx`, and raw Octane `.ts`/`.js` dependency sources, but leaves HTML,
@@ -89,7 +95,7 @@ disable component handoff, or `transpile: false` if another rule already strips
 TypeScript. The loader-only export at `@octanejs/rspack-plugin/loader` is
 available for custom rule composition.
 
-## Rsbuild
+<h2 id="rsbuild">Rsbuild</h2>
 
 Rsbuild is the closest equivalent to the full Vite metaframework integration.
 Its Environment API builds a browser hydration environment and a Node SSR
@@ -119,7 +125,7 @@ Rspack's generated runtime. Rsbuild accepts one ES level, `modules`, `false`, or
 esbuild-style browser targets such as `['chrome100', 'firefox100']`; do not mix
 ES levels and browser targets in the same array.
 
-## Full app configuration
+<h2 id="full-app-configuration">Full app configuration</h2>
 
 The config surface is shared by the Vite and Rsbuild integrations. Keep route
 module IDs project-root-relative and declarative so either bundler can turn
@@ -163,7 +169,7 @@ hook, and root boundaries. The generated server entry statically imports route
 and `module server` owners, supports streaming or buffered SSR, and exposes Web
 and Node request handlers.
 
-## Production and preview
+<h2 id="production-and-preview">Production and preview</h2>
 
 Use the normal Rsbuild commands:
 
@@ -186,7 +192,7 @@ within an already enabled app reload the browser. Changing `build.target`,
 `build.outDir`, `build.minify`, or adding the first route reshapes environments
 and needs a dev-server restart.
 
-## Renderer targets
+<h2 id="renderer-targets">Renderer targets</h2>
 
 Compiler and app-core options use declarative module IDs rather than bundler
 callbacks or instantiated renderer objects. That keeps DOM, Three, and future
