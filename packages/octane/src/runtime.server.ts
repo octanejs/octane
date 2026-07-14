@@ -1271,6 +1271,7 @@ function invokeComponentBody(
 	const jobsLen = jobs !== null ? jobs.length : 0;
 	const ctx0 = scope.$$ctxValues;
 	const vtTrySeq0 = VT_SSR_TRY_SEQ;
+	const vtHasCandidates0 = VT_SSR_HAS_CANDIDATES;
 	const vtStack0 = VT_SSR_STACK.map((candidate) => ({
 		candidate,
 		consumed: candidate.consumed,
@@ -1332,6 +1333,7 @@ function invokeComponentBody(
 			if (susp !== null) susp.length = suspLen;
 			if (jobs !== null) jobs.length = jobsLen;
 			VT_SSR_TRY_SEQ = vtTrySeq0;
+			VT_SSR_HAS_CANDIDATES = vtHasCandidates0;
 			VT_SSR_STACK.length = 0;
 			for (const snapshot of vtStack0) {
 				snapshot.candidate.consumed = snapshot.consumed;
@@ -1597,6 +1599,10 @@ interface VtSsrCandidate {
 }
 
 let VT_SSR_TRY_SEQ = 0;
+// True only when the active pass rendered a ViewTransition and therefore may
+// contain residual vt-enter-x / vt-exit-x attributes. Threaded into the pass
+// result so ordinary SSR can skip scanning the entire emitted HTML string.
+let VT_SSR_HAS_CANDIDATES = false;
 const VT_SSR_STACK: VtSsrCandidate[] = [];
 
 /** Resolve a class-prop value server-side (no types → maps use `default`). */
@@ -1734,6 +1740,7 @@ function vtSsrStrip(html: string): string {
  * with the Fizz-parity `vt-*` annotations described above.
  */
 export function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
+	VT_SSR_HAS_CANDIDATES = true;
 	const explicit = typeof props.name === 'string';
 	const frame = FRAME;
 	const cand: VtSsrCandidate = {
@@ -2853,6 +2860,9 @@ interface FullPassResult {
 	serial: unknown[];
 	suspended: SuspendedList;
 	deferred: Job[];
+	/** Whether this pass rendered ViewTransition candidate attributes that need
+	 *  the final residual-candidate cleanup scan. */
+	vtCandidates: boolean;
 	/** Per-hash scoped stylesheets from this pass — the streaming renderer diffs
 	 *  these against what it already flushed to emit late boundaries' styles. */
 	cssEntries: Map<string, string>;
@@ -2879,6 +2889,7 @@ interface Ambient {
 	parentScope: SSRScope | null;
 	asyncScope: string;
 	vtTrySeq: number;
+	vtHasCandidates: boolean;
 	vtStack: Array<{ candidate: VtSsrCandidate; consumed: boolean }>;
 }
 function saveAmbient(): Ambient {
@@ -2899,6 +2910,7 @@ function saveAmbient(): Ambient {
 		parentScope: CURRENT_PARENT_SCOPE,
 		asyncScope: ASYNC_SCOPE,
 		vtTrySeq: VT_SSR_TRY_SEQ,
+		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
 		vtStack: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed })),
 	};
 }
@@ -2919,6 +2931,7 @@ function restoreAmbient(a: Ambient): void {
 	CURRENT_PARENT_SCOPE = a.parentScope;
 	ASYNC_SCOPE = a.asyncScope;
 	VT_SSR_TRY_SEQ = a.vtTrySeq;
+	VT_SSR_HAS_CANDIDATES = a.vtHasCandidates;
 	VT_SSR_STACK.length = 0;
 	for (const snapshot of a.vtStack) {
 		snapshot.candidate.consumed = snapshot.consumed;
@@ -2949,6 +2962,7 @@ function runFullFramedPass(
 	ASYNC_SCOPE = '';
 	MARKERS = markers;
 	VT_SSR_TRY_SEQ = 0;
+	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
 	const cssMap = (CSS = new Map<string, string>());
 	const headBuf = (HEAD = { html: '', hints: new Set() });
@@ -2974,6 +2988,7 @@ function runFullFramedPass(
 	CURRENT_PROPS = props;
 	CURRENT_PARENT_SCOPE = null;
 	let body = '';
+	let vtCandidates = false;
 	try {
 		// Normalize the root's return the same way ssrComponent normalizes child
 		// components: a compiled component returns its HTML string, but a plain
@@ -2987,13 +3002,23 @@ function runFullFramedPass(
 		// throw is a genuine render failure — propagate it (the finally restores).
 		if (!ssrIsSuspense(err)) throw err;
 	} finally {
+		vtCandidates = VT_SSR_HAS_CANDIDATES;
 		restoreAmbient(saved);
 	}
 	let css = '';
 	for (const [hash, sheet] of cssMap) {
 		css += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
 	}
-	return { body, head: headBuf.html, css, serial, suspended, deferred, cssEntries: cssMap };
+	return {
+		body,
+		head: headBuf.html,
+		css,
+		serial,
+		suspended,
+		deferred,
+		vtCandidates,
+		cssEntries: cssMap,
+	};
 }
 
 // Re-run a set of discovery jobs (each an innermost suspending COMPONENT) in
@@ -3013,6 +3038,7 @@ function runDiscoveryRound(
 	ASYNC_SCOPE = '';
 	MARKERS = true;
 	VT_SSR_TRY_SEQ = 0;
+	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
 	CSS = new Map();
 	HEAD = { html: '', hints: new Set() };
@@ -3273,7 +3299,8 @@ function passToResult(pass: FullPassResult, nonceAttr: string): RenderResult {
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	// Unclaimed view-transition arm candidates strip at emission (see vtSsrStrip).
-	return { html: vtSsrStrip(spliceHead(body, pass.head)), css: pass.css };
+	const html = spliceHead(body, pass.head);
+	return { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
 }
 
 /**
@@ -3348,7 +3375,8 @@ export function renderToStaticMarkup(
 		throw err;
 	}
 	// No seeds (non-hydratable). Head is folded in without adoption markers.
-	return { html: vtSsrStrip(spliceHead(pass.body, pass.head)), css: pass.css };
+	const html = spliceHead(pass.body, pass.head);
+	return { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3860,7 +3888,7 @@ async function runStream(
 	const anyPending = stream.boundaries.size > 0;
 	if (anyPending) shell += '<script' + nonceAttr + '>' + STREAM_RUNTIME_JS + '</script>';
 	try {
-		const shellWrite = sink.write(vtSsrStrip(shell));
+		const shellWrite = sink.write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
 		if (shellWrite !== undefined) await shellWrite;
 	} catch (err) {
 		options?.onError?.(err);
@@ -3940,7 +3968,7 @@ async function runStream(
 			}
 			for (const b of done) chunk += segmentChunk(b, nonceAttr);
 			if (chunk !== '') {
-				const segmentWrite = sink.write(vtSsrStrip(chunk));
+				const segmentWrite = sink.write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
 				if (segmentWrite !== undefined) await segmentWrite;
 				// A boundary isn't considered flushed until the transport accepted its
 				// chunk through any active backpressure gate.

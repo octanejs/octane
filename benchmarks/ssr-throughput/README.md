@@ -37,7 +37,10 @@ compiled SSR) is `vite build`-t with
 an outDir override into `dist/news-{50,500}/<target>` here — **nothing under
 `benchmarks/news/` is modified** (its `src/data.js` is regenerated back to the
 tracked count-50 dataset afterwards; the generator is seeded, so the bytes are
-identical). Each config loops the built `renderApp()` for the time budget.
+identical). Each config loops the built `renderApp()` for the time budget and
+materializes the returned body with `Buffer.byteLength`. That charges every
+renderer for flattening/sizing its string as a real response writer must,
+instead of letting lazy rope construction move work outside the timer.
 
 A bad octane number here (relative to react/solid, or a regression vs an older
 run) points at the compiled `ssr*` helper emission or at `render()`'s per-pass
@@ -108,17 +111,6 @@ gate failure (and a non-zero exit).
 - Sub-millisecond configs (waterfall d1) rely on per-call `hrtime.bigint()`
   sampling; timer overhead (~0.1µs) is negligible at that scale, so no
   inner-loop division is needed.
-- **Octane bug found while authoring** (empirically confirmed by running the
-  compiled fixture against the raw server runtime; fixture kept faithful, not
-  worked around): `render()` does not normalize a ROOT component that returns a
-  `createElement` descriptor — `runtime.server.ts` uses the return value as
-  `body` directly (`body = component(props ?? {}, root, undefined) ?? ''`), so
-  a descriptor-returning root yields `body` = the descriptor OBJECT (which
-  stringifies to `[object Object]`), while `ssrComponent` normalizes child
-  components through `ssrChild`. `fixtures/src/entry-server.ts` documents this
-  and routes the plain deopt page through a one-line `ssrChild` shim that does
-  exactly what `render()` should (no per-node work is added, so the measured
-  workload is unchanged). When `render()` is fixed, drop the shim.
 - **If a run is killed mid-build** (SIGKILL — a thrown error is already
   handled), `benchmarks/news/*/src/data.js` may be left at count 500; run
   `node ../news/gen.mjs 50` to restore the tracked dataset.
