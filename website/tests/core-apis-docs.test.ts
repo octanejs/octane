@@ -182,7 +182,10 @@ describe('Core APIs documentation', () => {
 		expect(demo.querySelector('.search-updating')).toBeNull();
 		expect(
 			Array.from(demo.querySelectorAll('.product-result')).map((item) => item.textContent),
-		).toEqual(['Pocket cameraPhotography', 'Camera shoulder bagPhotography']);
+		).toEqual([
+			'Pocket cameraCategory: Photography',
+			'Camera shoulder bagCategory: Photography',
+		]);
 	});
 
 	it('runs the embedded state example', async () => {

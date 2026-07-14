@@ -314,7 +314,10 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
 			);
 			await activityTab.click();
-			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Loading Activity');
+			await waitForLocatorText(
+				transitionDemo.locator('.transition-status'),
+				'Loading Activity — Overview stays on screen.',
+			);
 			expect(await transitionDemo.locator('[data-report]').getAttribute('data-report')).toBe(
 				'overview',
 			);
@@ -322,7 +325,10 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				await deploymentsTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
 			);
 			await transitionDemo.locator('[data-report="activity"]').waitFor();
-			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Activity is ready');
+			await waitForLocatorText(
+				transitionDemo.locator('.transition-status'),
+				'Activity is ready.',
+			);
 			expect(await activityTab.getAttribute('aria-selected')).toBe('true');
 			expect(await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
 				await overviewTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
@@ -337,8 +343,8 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 					document.querySelectorAll('[data-demo="deferred-value"] .product-result').length === 2,
 			);
 			expect(await deferredDemo.locator('.product-result').allTextContents()).toEqual([
-				'Pocket cameraPhotography',
-				'Camera shoulder bagPhotography',
+				'Pocket cameraCategory: Photography',
+				'Camera shoulder bagCategory: Photography',
 			]);
 
 			await page.locator('#core-api-profile-name').fill('Grace Hopper');
