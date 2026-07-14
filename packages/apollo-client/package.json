@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/apollo-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
