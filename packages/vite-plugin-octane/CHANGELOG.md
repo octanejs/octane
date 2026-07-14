@@ -1,5 +1,41 @@
 # @octanejs/vite-plugin
 
+## 0.1.6
+
+### Patch Changes
+
+- d173805: Harden buffered and streaming SSR with render-scoped boundary IDs, Node and Web
+  backpressure/cancellation, request abort signals, and CSP nonces. Compile and
+  bundle `module server` RPC functions, load importable root boundaries across
+  development, production, and hydration, validate SSR templates, and preserve
+  stream lifecycle through HTML composition.
+
+  Keep async retry caches distinct across control arms, component keys/types, and
+  keyed value arrays; rewind discarded render-phase side effects; hydrate streamed
+  rejections through their server catch arm with catch-visible primitive,
+  plain-object, and Error reasons in collision-free seed metadata; and preserve
+  nested segment ordering and boundary-local IDs.
+
+  Update the Vercel output contract for response streaming and adjacent ISR
+  configuration, and publish the plugin/adapter with explicit peer, engine, and
+  tarball boundaries.
+
+- 4093775: Preserve Vite's standard SPA HTML handling when no `octane.config.ts` exists, so
+  the same recommended plugin works for client-only SPAs and routed full apps.
+- b41a91a: Add a bundler-neutral Octane compiler and app core, a low-level Rspack 2
+  compiler integration, and a full Rsbuild 2 metaframework plugin with routing,
+  streaming SSR, hydration, HMR, production client/server builds, preview, and
+  adapter support. Keep the existing Vite integration on the same shared core.
+- Updated dependencies [d173805]
+- Updated dependencies [85e589e]
+- Updated dependencies [2979f42]
+- Updated dependencies [b41a91a]
+- Updated dependencies [e55f6ed]
+- Updated dependencies [d173805]
+- Updated dependencies [813fd50]
+  - octane@0.1.6
+  - @octanejs/app-core@0.0.2
+
 ## 0.1.5
 
 ### Patch Changes

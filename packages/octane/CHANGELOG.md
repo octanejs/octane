@@ -1,5 +1,51 @@
 # octane
 
+## 0.1.6
+
+### Patch Changes
+
+- d173805: Harden buffered and streaming SSR with render-scoped boundary IDs, Node and Web
+  backpressure/cancellation, request abort signals, and CSP nonces. Compile and
+  bundle `module server` RPC functions, load importable root boundaries across
+  development, production, and hydration, validate SSR templates, and preserve
+  stream lifecycle through HTML composition.
+
+  Keep async retry caches distinct across control arms, component keys/types, and
+  keyed value arrays; rewind discarded render-phase side effects; hydrate streamed
+  rejections through their server catch arm with catch-visible primitive,
+  plain-object, and Error reasons in collision-free seed metadata; and preserve
+  nested segment ordering and boundary-local IDs.
+
+  Update the Vercel output contract for response streaming and adjacent ISR
+  configuration, and publish the plugin/adapter with explicit peer, engine, and
+  tarball boundaries.
+
+- 85e589e: Reduce client DOM bookkeeping for anchored lists, inactive conditionals,
+  `@empty` bodies, and compiler-proven single-root component or conditional keyed
+  items while preserving the existing SSR and hydration range protocol.
+- 2979f42: Reduce hydrated DOM bookkeeping by coalescing exactly coextensive range pairs
+  into counted comments while preserving independent ownership boundaries.
+- b41a91a: Add a bundler-neutral Octane compiler and app core, a low-level Rspack 2
+  compiler integration, and a full Rsbuild 2 metaframework plugin with routing,
+  streaming SSR, hydration, HMR, production client/server builds, preview, and
+  adapter support. Keep the existing Vite integration on the same shared core.
+- e55f6ed: Add complete modern dnd-kit bindings with sortable, sensor, overlay, SSR, hydration,
+  and React differential coverage. Preserve nested empty component ranges during
+  hydration so later updates can fill and clear them without mutating server markup.
+- d173805: Preserve compiler-driven state-hook getters on client and server while keeping
+  getter-free calls on the existing two-item path, including bounded server
+  render-phase updates and immediate getter reads. Isolate `useId` by root with
+  working identifier prefixes. Harden first-reveal ViewTransitions and compiler
+  hook discovery for aliases, namespaces, dependency inference, and plain-loop
+  errors.
+
+  Consume Octane as an exact singleton peer from every framework binding and
+  publish a Node 22 minimum engine requirement across core and the bindings.
+  Compile installed raw-source binding graphs through Vite while preserving
+  manifest-declared manual hook-slot directories.
+
+- 813fd50: Fix `<ViewTransition>` commits started from native discrete event handlers so transition-only work reaches `document.startViewTransition`, including work queued while an animation is already active. Use the broadly supported callback overload of the browser API, and correctly skip asynchronous native transitions when a commit activates no boundary.
+
 ## 0.1.5
 
 ### Patch Changes

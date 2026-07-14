@@ -1,5 +1,32 @@
 # @octanejs/adapter-vercel
 
+## 0.0.3
+
+### Patch Changes
+
+- d173805: Harden buffered and streaming SSR with render-scoped boundary IDs, Node and Web
+  backpressure/cancellation, request abort signals, and CSP nonces. Compile and
+  bundle `module server` RPC functions, load importable root boundaries across
+  development, production, and hydration, validate SSR templates, and preserve
+  stream lifecycle through HTML composition.
+
+  Keep async retry caches distinct across control arms, component keys/types, and
+  keyed value arrays; rewind discarded render-phase side effects; hydrate streamed
+  rejections through their server catch arm with catch-visible primitive,
+  plain-object, and Error reasons in collision-free seed metadata; and preserve
+  nested segment ordering and boundary-local IDs.
+
+  Update the Vercel output contract for response streaming and adjacent ISR
+  configuration, and publish the plugin/adapter with explicit peer, engine, and
+  tarball boundaries.
+
+- b41a91a: Add a bundler-neutral Octane compiler and app core, a low-level Rspack 2
+  compiler integration, and a full Rsbuild 2 metaframework plugin with routing,
+  streaming SSR, hydration, HMR, production client/server builds, preview, and
+  adapter support. Keep the existing Vite integration on the same shared core.
+- Updated dependencies [b41a91a]
+  - @octanejs/app-core@0.0.2
+
 ## 0.0.2
 
 ### Patch Changes

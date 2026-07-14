@@ -1,5 +1,31 @@
 # @octanejs/lexical
 
+## 0.1.5
+
+### Patch Changes
+
+- d173805: Preserve compiler-driven state-hook getters on client and server while keeping
+  getter-free calls on the existing two-item path, including bounded server
+  render-phase updates and immediate getter reads. Isolate `useId` by root with
+  working identifier prefixes. Harden first-reveal ViewTransitions and compiler
+  hook discovery for aliases, namespaces, dependency inference, and plain-loop
+  errors.
+
+  Consume Octane as an exact singleton peer from every framework binding and
+  publish a Node 22 minimum engine requirement across core and the bindings.
+  Compile installed raw-source binding graphs through Vite while preserving
+  manifest-declared manual hook-slot directories.
+
+- Updated dependencies [d173805]
+- Updated dependencies [85e589e]
+- Updated dependencies [2979f42]
+- Updated dependencies [b41a91a]
+- Updated dependencies [e55f6ed]
+- Updated dependencies [d173805]
+- Updated dependencies [813fd50]
+  - octane@0.1.6
+  - @octanejs/floating-ui@0.1.5
+
 ## 0.1.4
 
 ### Patch Changes
