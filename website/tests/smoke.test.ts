@@ -8,6 +8,7 @@ import { makeRouter } from '../src/app/router.ts';
 import { compactChartRows } from '../src/components/BenchBars.tsrx';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { FRAMEWORK_CARDS, HOME_SUMMARY, OCTANE_CARDS } from '../src/content/benchmarks.ts';
+import { createHomeSummary } from '../src/content/home-benchmark.ts';
 
 afterEach(cleanup);
 
@@ -32,6 +33,8 @@ async function renderRoute(url: string) {
 
 describe('website routes', () => {
 	it('publishes Preact and Svelte measurements for every supported comparison', () => {
+		expect(HOME_SUMMARY).toEqual(createHomeSummary(FRAMEWORK_CARDS));
+
 		for (const card of FRAMEWORK_CARDS) {
 			const keys = card.series.map((series) => series.key);
 			expect(keys, card.id).toContain('preact');

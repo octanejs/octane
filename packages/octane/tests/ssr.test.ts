@@ -117,17 +117,48 @@ describe('SSR Phase 1 — semantics', () => {
 		expect(Object.keys(out).sort()).toEqual(['css', 'html']);
 	});
 
-	it('still rejects truly-unsupported server constructs (e.g. <Activity>)', () => {
-		// Control flow is supported as of Phase 3; Activity is not.
+	it('renders visible Activity content and skips hidden Activity work', async () => {
+		const activity = evalServer(
+			`
+				import { Activity } from 'octane';
+				function Child(props) @{
+					props.onRender();
+					<span class="activity-child">{'child'}</span>
+				}
+				export function C(props) @{
+					<Activity mode={props.mode}><Child onRender={props.onRender} /></Activity>
+				}
+			`,
+			'activity-ssr.tsrx',
+		);
+		const onRender = vi.fn();
+		const visible = await RT.renderToString(activity.C, { mode: 'visible', onRender });
+		expect(visible.html).toContain('<span class="activity-child">child</span>');
+		expect(visible.html).toContain('<!--[-->');
+		expect(onRender).toHaveBeenCalledTimes(1);
+
+		onRender.mockClear();
+		const hidden = await RT.renderToString(activity.C, { mode: 'hidden', onRender });
+		expect(hidden.html).not.toContain('activity-child');
+		expect(hidden.html).toContain('<!--[--><!--]-->');
+		expect(onRender).not.toHaveBeenCalled();
+
+		expect(RT.renderToStaticMarkup(activity.C, { mode: 'visible', onRender }).html).toBe(
+			'<span class="activity-child">child</span>',
+		);
+		onRender.mockClear();
+		expect(RT.renderToStaticMarkup(activity.C, { mode: 'hidden', onRender }).html).toBe('');
+		expect(onRender).not.toHaveBeenCalled();
+	});
+
+	it('still rejects server-side Fragment refs', () => {
 		expect(() =>
 			compile(
-				`export function C(p) @{ <Activity mode="hidden"><span>{'a'}</span></Activity> }`,
-				'c.tsrx',
-				{
-					mode: 'server',
-				},
+				`export function C(p) @{ <Fragment ref={p.ref}><span>{'a'}</span></Fragment> }`,
+				'fragment-ref.tsrx',
+				{ mode: 'server' },
 			),
-		).toThrow(/does not support `<Activity>`/);
+		).toThrow(/does not support fragment refs/);
 	});
 });
 

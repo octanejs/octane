@@ -4700,6 +4700,13 @@ let hydrating = false;
 // templates the cursor is just the adopted root and the old raw path-walk
 // (`_root.firstChild.nextSibling…`) still resolves bindings correctly.
 let hydrateNode: Node | null = null;
+// Hidden server Activities serialize as empty ranges. Their client trees must
+// mount only AFTER the server-rendered siblings finish hydrating: mounting one
+// inline would consume root-local useId counters ahead of those siblings even
+// though the server never visited the hidden tree. hydrateRoot drains this
+// root-local queue at the end of its synchronous adoption pass with hydration
+// suspended, still before returning the live Root.
+let hydrationDeferredActivities: Array<() => void> | null = null;
 // Server-resolved `use(thenable)` values (SSR Phase 4), parsed from the inline
 // `<script data-octane-suspense>` in `hydrateRoot()` and consumed in render
 // order by `useThenable` so a hydrating boundary returns synchronously. Both are
@@ -5074,7 +5081,7 @@ function isTextSeparator(node: Node | null): node is Comment {
 
 /**
  * Resolve the server `<!--[-->` a control-flow slot (try / if / for / switch /
- * component) should ADOPT during hydration.
+ * Activity / component) should ADOPT during hydration.
  *
  * Two shapes reach here:
  *  - `anchor` IS the open marker — the slot sat at a `<!>` placeholder among
@@ -13091,10 +13098,21 @@ export function activityBlock(
 	let state = parentScope.slots[slotKey] as ActivitySlot | undefined;
 
 	if (state === undefined) {
-		const bStart = document.createComment('activity');
-		const bEnd = document.createComment('/activity');
-		domParent.insertBefore(bStart, anchor ?? null);
-		domParent.insertBefore(bEnd, anchor ?? null);
+		let bStart: Comment;
+		let bEnd: Comment;
+		// Hydration: visible Activities carry their server-rendered body inside one
+		// generic block range; hidden Activities carry the same EMPTY range because
+		// their body was intentionally skipped on the server. Adopt either shape.
+		const open = resolveHydrationOpen(anchor ?? null, domParent);
+		if (open !== null) {
+			bStart = open;
+			bEnd = matchingClose(open);
+		} else {
+			bStart = document.createComment('activity');
+			bEnd = document.createComment('/activity');
+			domParent.insertBefore(bStart, anchor ?? null);
+			domParent.insertBefore(bEnd, anchor ?? null);
+		}
 		const b = createBlock(
 			'control-flow',
 			parentBlock,
@@ -13114,6 +13132,31 @@ export function activityBlock(
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
+		const adopted = open !== null;
+		const serverRangeEmpty = adopted && bStart.nextSibling === bEnd;
+		if (adopted && !serverRangeEmpty) hydrateNode = bStart.nextSibling;
+		// A hidden server Activity has no body to hydrate. Mount its client tree
+		// freshly between the adopted markers with hydration suspended; this builds
+		// preserved state/DOM without making descendants consume unrelated server
+		// nodes. The same recovery handles a visible client over hidden server HTML.
+		const savedHydrating = hydrating;
+		if (serverRangeEmpty && savedHydrating) {
+			b.inactive = wantHidden;
+			state.hidden = wantHidden;
+			hydrationDeferredActivities!.push(() => {
+				if (b.disposed) return;
+				const wasHydrating = hydrating;
+				hydrating = false;
+				try {
+					renderBlock(b);
+				} finally {
+					hydrating = wasHydrating;
+				}
+				if (state!.hidden) hideActivityRange(state!);
+			});
+			hydrateNode = bEnd.nextSibling;
+			return;
+		}
 		if (wantHidden) {
 			// Mount while hidden: render children (creates state + DOM) but no
 			// effects — mark inactive BEFORE the render so enqueueEffect skips them.
@@ -13124,6 +13167,7 @@ export function activityBlock(
 		} else {
 			renderBlock(b);
 		}
+		if (adopted && savedHydrating) hydrateNode = bEnd.nextSibling;
 		return;
 	}
 
@@ -15121,6 +15165,8 @@ export function hydrateRoot(
 	rootBlock.idState = idState;
 	hydrationHasAdjacentRangePair = false;
 	hydrating = true;
+	const deferredActivities: Array<() => void> = [];
+	hydrationDeferredActivities = deferredActivities;
 	const liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	hydratedLiteRanges = liteRanges;
 	let hydrationCompleted = false;
@@ -15154,6 +15200,14 @@ export function hydrateRoot(
 	hydrateNode = firstNode;
 	try {
 		renderBlock(rootBlock);
+		// Empty server Activity ranges deliberately had no body to adopt. Mount
+		// those preserved client trees only after every server-rendered sibling has
+		// consumed its useId/seed positions, with hydration suspended for the new DOM.
+		if (deferredActivities.length !== 0) {
+			hydrating = false;
+			for (let i = 0; i < deferredActivities.length; i++) deferredActivities[i]();
+			hydrating = true;
+		}
 		hydrationCompleted = true;
 		shouldCoalesceRanges = hydrationHasAdjacentRangePair;
 	} finally {
@@ -15162,6 +15216,7 @@ export function hydrateRoot(
 		hydrateNode = null;
 		hydrationSeeds = null;
 		hydrationSeedCursor = 0;
+		hydrationDeferredActivities = null;
 		hydratedLiteRanges = null;
 	}
 	if (hydrationCompleted && shouldCoalesceRanges) coalesceHydratedRanges(rootBlock, liteRanges);

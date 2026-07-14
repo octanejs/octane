@@ -130,6 +130,11 @@ and the resolved server function share one SSR runtime.
 - Server-compiled components are string emitters: static HTML interleaved with
   helper calls for dynamic holes, wrapped in `<!--[-->`/`<!--]-->` hydration
   markers that the client cursor walks during `hydrateRoot`.
+- `<Activity mode="visible">` renders its children normally. A hidden Activity
+  does not evaluate or serialize its children on the server; hydratable output
+  retains only an empty internal range so `hydrateRoot` can build the preserved
+  hidden client tree without disturbing neighboring server DOM. Static markup
+  emits nothing for the hidden Activity.
 - Suspense: an unresolved `use(thenable)` renders the nearest `@pending`
   fallback and suspends the pass. `prerender` awaits what suspended, caches the
   resolved values, and re-renders. To avoid re-serializing the whole static bulk

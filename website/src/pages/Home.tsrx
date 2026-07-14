@@ -5,8 +5,8 @@
 // /benchmarks.
 import { Link } from '@octanejs/tanstack-router';
 import CodeSample from '../content/home-sample.mdx';
-import { BenchBars } from '../components/BenchBars.tsrx';
-import { HOME_SUMMARY } from '../content/benchmarks.ts';
+import { DeferredBenchBars } from '../components/DeferredBenchBars.tsrx';
+import { HOME_SUMMARY } from '../content/home-benchmark.ts';
 
 const FEATURES = [
 	{
@@ -53,8 +53,7 @@ export function Home() @{
 					>{'Inferno'}</a>
 					{', carrying its performance-first goal forward: React’s hooks, Suspense ' +
 						'and actions, compiled ahead of time. No virtual DOM. No rules of hooks. ' +
-						'No hand-maintained dependency arrays. Octane\'s compiler does all the heavy lifting.' +
-						'captures for you.'}
+						'No hand-maintained dependency arrays. Octane\'s compiler does all the heavy lifting for you.'}
 				</p>
 				<div class="hero-actions">
 					<Link to="/docs/quick-start" class="btn-primary">Get started</Link>
@@ -75,9 +74,9 @@ export function Home() @{
 		<section class="features">
 			@for (const feature of FEATURES; key feature.title) {
 				<article class="card">
-					<h3 class="card-title">
+					<h2 class="card-title">
 						{feature.title as string}
-					</h3>
+					</h2>
 					<p class="card-body">
 						{feature.body as string}
 					</p>
@@ -120,7 +119,7 @@ export function Home() @{
 				<Link to="/benchmarks" class="bench-all">All suites →</Link>
 			</div>
 			<div class="bench-grid">
-				<BenchBars card={HOME_SUMMARY} showValues={true} width={1100} />
+				<DeferredBenchBars card={HOME_SUMMARY} width={1100} />
 			</div>
 			<p class="bench-note">
 				{'Ratios are geometric means over each suite’s per-operation checked-in benchmark scores ('}
@@ -183,7 +182,7 @@ export function Home() @{
 			}
 			.hero-actions :global(a.btn-primary) {
 				background: #ff415a;
-				color: #f4eee8;
+				color: #16181d;
 				font-weight: 600;
 				padding: 0.7rem 1.4rem;
 				border-radius: 9999px;
@@ -336,6 +335,11 @@ export function Home() @{
 				color: #99a1b3;
 				font-size: 0.925rem;
 				max-width: 24rem;
+			}
+			.proven-label :global(a),
+			.bench-note :global(a) {
+				text-decoration: underline;
+				text-underline-offset: 0.16em;
 			}
 			.bench {
 				border-top: 1px solid rgba(255, 255, 255, 0.1);
