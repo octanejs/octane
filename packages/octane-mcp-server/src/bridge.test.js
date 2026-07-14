@@ -40,6 +40,7 @@ describe('scanSource', () => {
 
 describe('detectVanillaCore', () => {
 	it('prefers the known-core table', () => {
+		expect(detectVanillaCore('@apollo/client', {})).toBe('@apollo/client');
 		expect(detectVanillaCore('@tanstack/react-query', {})).toBe('@tanstack/query-core');
 		expect(detectVanillaCore('zustand', {})).toBe('zustand/vanilla');
 	});

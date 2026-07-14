@@ -1,0 +1,12 @@
+{
+  "upstream": { "package": "@apollo/client", "version": "4.2.6" },
+  "surface": "Complete published client adapter surface: all 18 @apollo/client/react runtime exports and their Apollo 4.2.6 TypeScript declarations, plus the framework-neutral root/testing exports and an Octane MockedProvider.",
+  "divergences": [
+    "Suspense unwraps stable Apollo promises through Octane use() instead of React's use() or a thrown-promise fallback.",
+    "The React class-based MockedProvider is an equivalent Octane function component.",
+    "React Server Components and Apollo's React Compiler-generated entry are intentionally not exposed."
+  ],
+  "ssr": "Core hooks use Octane's server hook implementations, but Apollo's multi-pass non-Suspense query prepass, cache extraction/restore integration, and dedicated SSR/hydration tests remain open.",
+  "verified": "2026-07-14",
+  "docs": ["docs/apollo-client-port-plan.md"]
+}

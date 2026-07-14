@@ -1,0 +1,77 @@
+{
+  "name": "@octanejs/apollo-client",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Apollo Client bindings for the octane renderer — reuses Apollo's framework-neutral core and ports its React adapter onto octane.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/apollo-client"
+  },
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./react": {
+      "types": "./src/react/index.d.ts",
+      "default": "./src/react/index.js"
+    },
+    "./react/internal": {
+      "types": "./src/react/internal/index.d.ts",
+      "default": "./src/react/internal/index.js"
+    },
+    "./testing": {
+      "types": "./src/testing/index.d.ts",
+      "default": "./src/testing/index.js"
+    },
+    "./testing/react": {
+      "types": "./src/testing/react/index.d.ts",
+      "default": "./src/testing/react/index.js"
+    }
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project apollo-client"
+  },
+  "dependencies": {
+    "@graphql-typed-document-node/core": "catalog:default",
+    "@wry/equality": "catalog:default",
+    "@wry/trie": "catalog:default"
+  },
+  "peerDependencies": {
+    "@apollo/client": ">=4.2.6 <4.3.0",
+    "graphql": "^16.0.0 || ^17.0.0",
+    "octane": "workspace:*",
+    "rxjs": "^7.3.0"
+  },
+  "devDependencies": {
+    "@apollo/client": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "graphql": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "rxjs": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

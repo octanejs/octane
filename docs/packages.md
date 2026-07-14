@@ -6,13 +6,14 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**30 publishable package(s), including 23 framework binding(s).**
+**31 publishable package(s), including 24 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
 | Package | Directory | Role | Version | Exported entry points |
 | --- | --- | --- | --- | --- |
 | `@octanejs/adapter-vercel` | [`packages/adapter-vercel`](../packages/adapter-vercel) | deployment adapter | `0.0.2` | 1 |
+| `@octanejs/apollo-client` | [`packages/apollo-client`](../packages/apollo-client) | framework binding | `0.1.0` | 5 |
 | `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.1` | 9 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.3` | 2 |
 | `@octanejs/dnd-kit` | [`packages/dnd-kit`](../packages/dnd-kit) | framework binding | `0.1.0` | 4 |

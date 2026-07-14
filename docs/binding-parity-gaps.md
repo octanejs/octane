@@ -11,10 +11,11 @@ it does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**8 active pin(s) across 23 binding package(s).**
+**8 active pin(s) across 24 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
+| `@octanejs/apollo-client` | 0 |
 | `@octanejs/base-ui` | 0 |
 | `@octanejs/dnd-kit` | 0 |
 | `@octanejs/floating-ui` | 0 |

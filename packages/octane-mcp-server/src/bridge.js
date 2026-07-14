@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
 	jotai: '@octanejs/jotai',
+	'@apollo/client': '@octanejs/apollo-client',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
 	'@tanstack/react-table': '@octanejs/tanstack-table',
@@ -40,6 +41,7 @@ export const KNOWN_BINDING_PACKAGE_DIRS = new Set(
 );
 
 export const KNOWN_VANILLA_CORES = {
+	'@apollo/client': '@apollo/client',
 	'@tanstack/react-query': '@tanstack/query-core',
 	'@tanstack/react-table': '@tanstack/table-core',
 	'@tanstack/react-virtual': '@tanstack/virtual-core',

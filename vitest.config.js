@@ -339,6 +339,51 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'apollo-client',
+					include: ['packages/apollo-client/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/apollo-client\/testing\/react$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/testing/react/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/react\/internal$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/internal/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/testing$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/testing/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/react$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client$/,
+							replacement: resolve(import.meta.dirname, 'packages/apollo-client/src/index.js'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'redux',
 					include: ['packages/redux/tests/**/*.test.ts'],
 					environment: 'jsdom',
