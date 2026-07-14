@@ -93,20 +93,24 @@ see [Differences from React](https://octanejs.dev/docs/differences-from-react).
 Octane's published packages require Node.js 22 or newer.
 
 ```bash
-pnpm add octane
+pnpm add octane @octanejs/vite-plugin
 ```
 
-For a Vite SPA, add the compiler plugin:
+For any Vite app, add Octane's Vite integration:
 
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite';
-import { octane } from 'octane/compiler/vite';
+import { octane } from '@octanejs/vite-plugin';
 
 export default defineConfig({
   plugins: [octane()],
 });
 ```
+
+Without `octane.config.ts`, the plugin compiles a normal client-only SPA and
+preserves Vite's standard HTML handling. Add an Octane config with routes to
+activate routing, streaming SSR, hydration, and client/server production builds.
 
 Octane also supports Rspack and Rsbuild 2.x. Use the low-level Rspack plugin
 when you own the application shell and entries yourself:
@@ -144,7 +148,8 @@ export default defineConfig({
 });
 ```
 
-`@octanejs/vite-plugin` provides the same app-level features for Vite. See the
+The same `@octanejs/vite-plugin` setup above provides these app-level features
+for Vite. See the
 [build tools guide](https://octanejs.dev/docs/build-tools) for SPA, SSR,
 client/server target, HMR, and config examples.
 
@@ -455,8 +460,9 @@ generated from the workspace manifests in
 - [`@octanejs/rspack-plugin`](./packages/rspack-plugin-octane) is the low-level
   Rspack compiler integration; [`@octanejs/rsbuild-plugin`](./packages/rsbuild-plugin-octane)
   is the full Rsbuild metaframework integration.
-- [`@octanejs/vite-plugin`](./packages/vite-plugin-octane) is the equivalent Vite
-  metaframework plugin, with dev SSR, routing, and hydration wiring for full apps;
+- [`@octanejs/vite-plugin`](./packages/vite-plugin-octane) is the recommended
+  integration for every Vite app: compiler integration for SPAs, plus dev SSR,
+  routing, hydration, and production server builds when app routes are configured;
   [`@octanejs/adapter-vercel`](./packages/adapter-vercel) deploys its build
   output to Vercel.
 - [`@octanejs/mcp-server`](./packages/octane-mcp-server) exposes octane docs and

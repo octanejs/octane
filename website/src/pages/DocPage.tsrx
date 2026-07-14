@@ -4,6 +4,16 @@
 import { Link, useParams } from '@octanejs/tanstack-router';
 import { docs, findDoc } from '../content/docs.ts';
 
+function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
+	const { children, ...tableProps } = props;
+
+	<div class="table-scroll">
+		<table {...tableProps}>{children}</table>
+	</div>
+}
+
+const docComponents = { table: DocTable };
+
 export function DocPage() @{
 	const params = useParams({ strict: false }) as { slug?: string };
 	const doc = findDoc(params.slug);
@@ -25,7 +35,7 @@ export function DocPage() @{
 			<article class="prose">
 				@if (Doc) {
 					<>
-						<Doc />
+						<Doc components={docComponents} />
 						@if (previous || next) {
 							<nav class="doc-pagination" aria-label="Previous and next documentation">
 								@if (previous) {
@@ -512,16 +522,18 @@ export function DocPage() @{
 				font-size: 0.82rem;
 				line-height: 1.45;
 			}
+			.prose :global(.table-scroll) {
+				width: 100%;
+				overflow-x: auto;
+				margin: 0 0 1.4rem;
+				border: 1px solid var(--border);
+				border-radius: 0.8rem;
+			}
 			.prose :global(table) {
 				border-collapse: separate;
 				border-spacing: 0;
 				width: 100%;
-				display: block;
-				overflow-x: auto;
 				font-size: 0.9rem;
-				margin: 0 0 1.4rem;
-				border: 1px solid var(--border);
-				border-radius: 0.8rem;
 			}
 			.prose :global(thead) {
 				background: rgba(255, 255, 255, 0.04);

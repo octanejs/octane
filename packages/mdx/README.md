@@ -22,7 +22,7 @@ codegen). Only @mdx-js/react's ~50-line provider layer is ported here.
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite';
-import { octane } from 'octane/compiler/vite'; // or @octanejs/vite-plugin
+import { octane } from '@octanejs/vite-plugin';
 import { octaneMdx } from '@octanejs/mdx/vite';
 
 export default defineConfig({

@@ -3,8 +3,11 @@
 // option forwarding to the bundled compiler, the appType default, and the
 // config resolution of `router.preHydrate` / RenderRoute `status`.
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
+import { createServer } from 'vite';
 import { octane, isViteOwnedUrl, resolveOctaneConfig, RenderRoute } from '../src/index.js';
 import { RESOLVED_ADAPTER_BROWSER_STUB_ID } from '../src/project-codegen.js';
 import type { Component } from '@octanejs/vite-plugin';
@@ -16,6 +19,7 @@ function url(u: string): URL {
 // Use this package as the fake Vite root: '/src/index.js' and '/types/index.d.ts'
 // are real files under it, '/docs/v2.0' etc. are not.
 const PKG_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const APP_FIXTURE_ROOT = fileURLToPath(new URL('./_fixtures/app', import.meta.url));
 
 describe('isViteOwnedUrl', () => {
 	it('skips Vite-internal namespaces and module/asset requests', () => {
@@ -85,23 +89,59 @@ describe('octane() plugin factory', () => {
 		expect(transform.call({}, code, '/repo/src/useThing.ts')).not.toBeNull();
 	});
 
-	it("defaults appType to 'custom' for dev, but respects the user and `vite preview`", async () => {
+	it("keeps Vite's SPA default without app config and uses 'custom' for routed apps", async () => {
 		const [, meta] = octane();
 		const config = meta.config as (
 			userConfig: object,
 			env: object,
 		) => Promise<{ appType?: string }>;
 
-		expect((await config({}, { command: 'serve', mode: 'development' })).appType).toBe('custom');
+		// With no octane.config.ts, Vite keeps its normal SPA HTML handling.
+		expect(
+			(await config({ root: PKG_ROOT }, { command: 'serve', mode: 'development' })).appType,
+		).toBe(undefined);
+		// A configured app opts into Octane's SSR router.
+		expect(
+			(await config({ root: APP_FIXTURE_ROOT }, { command: 'serve', mode: 'development' })).appType,
+		).toBe('custom');
 		// An explicit user appType wins.
 		expect(
-			(await config({ appType: 'spa' }, { command: 'serve', mode: 'development' })).appType,
+			(
+				await config(
+					{ root: APP_FIXTURE_ROOT, appType: 'spa' },
+					{ command: 'serve', mode: 'development' },
+				)
+			).appType,
 		).toBe(undefined);
 		// `vite preview` serves static files with Vite's own fallback; the
 		// production SSR build is previewed with `octane-preview` instead.
 		expect(
 			(await config({}, { command: 'serve', mode: 'production', isPreview: true })).appType,
 		).toBe(undefined);
+	});
+
+	it('serves the Vite SPA fallback when no octane.config.ts exists', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-spa-'));
+		await writeFile(join(root, 'index.html'), '<main>Octane SPA shell</main>');
+		const server = await createServer({
+			root,
+			configFile: false,
+			logLevel: 'silent',
+			plugins: [octane()],
+			server: { host: '127.0.0.1', port: 0 },
+		});
+
+		try {
+			await server.listen();
+			const address = server.httpServer?.address();
+			if (!address || typeof address !== 'object') throw new Error('dev server has no address');
+			const response = await fetch(`http://127.0.0.1:${address.port}/nested/spa-route`);
+			expect(response.status).toBe(200);
+			expect(await response.text()).toContain('Octane SPA shell');
+		} finally {
+			await server.close();
+			await rm(root, { recursive: true, force: true });
+		}
 	});
 });
 

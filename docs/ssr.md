@@ -33,8 +33,8 @@ hydrateRoot(document.getElementById('app')!, App, { title: 'Hi' });
 ```
 
 The server build must compile components with the Octane compiler in
-`mode: 'server'` (the Vite plugin and `octane/compiler/vite` handle this; SSR
-module loading through Vite picks the server transform automatically).
+`mode: 'server'` (`@octanejs/vite-plugin` handles this automatically; SSR module
+loading through Vite picks the server transform automatically).
 
 ## API
 
