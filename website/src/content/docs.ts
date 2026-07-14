@@ -27,6 +27,12 @@ export const docs: DocEntry[] = [
 		title: 'Quick start',
 		description: 'Install octane, mount a component, and learn the .tsrx essentials.',
 		group: 'Start here',
+		sections: [
+			{ id: 'install', title: 'Install and configure' },
+			{ id: 'first-component', title: 'Your first component' },
+			{ id: 'mount', title: 'Connect it to the page' },
+			{ id: 'tsrx-at-a-glance', title: 'TSRX at a glance' },
+		],
 		component: QuickStart as DocEntry['component'],
 	},
 	{
@@ -57,6 +63,12 @@ export const docs: DocEntry[] = [
 		title: 'TSRX vs TSX/JSX',
 		description: 'When to author in .tsrx versus standard .tsx/.jsx, and what each unlocks.',
 		group: 'Learn Octane',
+		sections: [
+			{ id: 'which-should-i-use', title: 'Which should I use?' },
+			{ id: 'component-bodies', title: 'Component bodies' },
+			{ id: 'rendered-control-flow', title: 'Rendered control flow' },
+			{ id: 'text-holes', title: 'Text holes' },
+		],
 		component: TsrxVsTsx as DocEntry['component'],
 	},
 	{
@@ -64,6 +76,13 @@ export const docs: DocEntry[] = [
 		title: 'Differences from React',
 		description: 'The deliberate divergences — everything else matching React is the point.',
 		group: 'Explore',
+		sections: [
+			{ id: 'hooks', title: 'Hooks' },
+			{ id: 'events-and-dom', title: 'Events and the DOM' },
+			{ id: 'async-work', title: 'Async work' },
+			{ id: 'errors-and-server', title: 'Errors and server rendering' },
+			{ id: 'not-supported', title: 'APIs left out' },
+		],
 		component: DifferencesFromReact as DocEntry['component'],
 	},
 	{
@@ -75,7 +94,6 @@ export const docs: DocEntry[] = [
 			{ id: 'find-a-binding', title: 'Find a binding' },
 			{ id: 'install-and-use', title: 'Install and use' },
 			{ id: 'check-support', title: 'Check support' },
-			{ id: 'app-tooling', title: 'App tooling' },
 		],
 		component: Bindings as DocEntry['component'],
 	},

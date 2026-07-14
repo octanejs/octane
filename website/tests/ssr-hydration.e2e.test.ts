@@ -19,7 +19,16 @@ import { join } from 'node:path';
 import { censusDomNodes, type DomNodeCensus } from '../../benchmarks/lib/dom-nodes.mjs';
 
 const WEBSITE = join(process.cwd(), 'website');
-const ROUTES = ['/', '/docs', '/docs/core-apis', '/benchmarks', '/playground'];
+const ROUTES = [
+	'/',
+	'/docs',
+	'/docs/core-apis',
+	'/docs/tsrx-vs-tsx',
+	'/docs/differences-from-react',
+	'/docs/bindings',
+	'/benchmarks',
+	'/playground',
+];
 
 // M0 of docs/comment-marker-elision-plan.md: per-route comment-node ceilings
 // (~15% above post-M4 2026-07-09 measurements: / 1,463 · /docs 361 ·
@@ -52,6 +61,9 @@ const COMMENT_CEILINGS: Record<string, number> = {
 	// and portal demos plus four dedicated API examples joined the guide. The
 	// ceiling retains roughly 15% headroom for the intentional content growth.
 	'/docs/core-apis': 895,
+	'/docs/tsrx-vs-tsx': 1000,
+	'/docs/differences-from-react': 1000,
+	'/docs/bindings': 1000,
 	'/benchmarks': 26100,
 	'/playground': 195,
 };
@@ -294,13 +306,27 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			);
 
 			const transitionDemo = page.locator('[data-demo="transition"]');
-			await transitionDemo.getByRole('tab', { name: 'Activity' }).click();
+			const overviewTab = transitionDemo.getByRole('tab', { name: 'Overview' });
+			const activityTab = transitionDemo.getByRole('tab', { name: 'Activity' });
+			const deploymentsTab = transitionDemo.getByRole('tab', { name: 'Deployments' });
+			expect(await overviewTab.getAttribute('aria-selected')).toBe('true');
+			expect(await overviewTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
+				await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
+			);
+			await activityTab.click();
 			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Loading Activity');
 			expect(await transitionDemo.locator('[data-report]').getAttribute('data-report')).toBe(
 				'overview',
 			);
+			expect(await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
+				await deploymentsTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
+			);
 			await transitionDemo.locator('[data-report="activity"]').waitFor();
 			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Activity is ready');
+			expect(await activityTab.getAttribute('aria-selected')).toBe('true');
+			expect(await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
+				await overviewTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
+			);
 
 			const deferredDemo = page.locator('[data-demo="deferred-value"]');
 			await deferredDemo.getByRole('searchbox', { name: 'Search products' }).fill('camera');
