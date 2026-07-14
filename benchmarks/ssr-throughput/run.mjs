@@ -27,9 +27,13 @@
 //                 stripping comment markers; headline = plain/compiled ratio.
 //   escape-heavy — 10k escape-needing text holes; isolates escapeHtml.
 //
-// Every config reports ops/sec, p50/p95/p99/min latency (ms), RSS + heapUsed
-// growth over up to 5k renders (process.memoryUsage deltas, NO forced gc),
-// body bytes, and hydration-marker-pair count ('<!--[' occurrences).
+// Every timed render materializes its returned body with Buffer.byteLength.
+// This makes every framework pay the string flatten/UTF-8 sizing work a real
+// response writer incurs; without it, a renderer returning a lazy rope can move
+// substantial work outside the timer while a renderer returning a flat string
+// cannot. Every config reports ops/sec, p50/p95/p99/min latency (ms), RSS +
+// heapUsed growth over up to 5k renders (process.memoryUsage deltas, NO forced
+// gc), body bytes, and hydration-marker-pair count ('<!--[' occurrences).
 //
 // Usage:  node run.mjs [seconds] [--no-build] [--quick]
 //   seconds   — timed-loop budget PER CONFIG (default 10, or 2 under --quick);
@@ -145,20 +149,32 @@ function summarize(samples) {
 	};
 }
 
+// Force every renderer's returned body into the same observable state. Node's
+// HTTP writers must determine the byte length/encoding before sending a string,
+// so this includes real response work while avoiding framework-specific rope
+// laziness in the comparison. Batch configs return arrays of render results.
+function materializeRenderOutput(result) {
+	if (Array.isArray(result)) {
+		for (let i = 0; i < result.length; i++) materializeRenderOutput(result[i]);
+		return;
+	}
+	if (result != null && typeof result.body === 'string') Buffer.byteLength(result.body);
+}
+
 // Warm up (≥3 runs, ~10% of the budget), then sample fn() latencies until the
 // budget elapses. All numbers are milliseconds.
 async function timeLoop(fn) {
 	const wEnd = hr() + BigInt(Math.round(Math.max(0.2, SECONDS * 0.1) * 1e9));
 	let w = 0;
 	while (w < 3 || hr() < wEnd) {
-		await fn();
+		materializeRenderOutput(await fn());
 		w++;
 	}
 	const samples = [];
 	const end = hr() + BigInt(Math.round(SECONDS * 1e9));
 	do {
 		const t0 = hr();
-		await fn();
+		materializeRenderOutput(await fn());
 		samples.push(Number(hr() - t0) / 1e6);
 	} while (hr() < end && samples.length < 200_000);
 	return summarize(samples);
@@ -171,7 +187,7 @@ async function memGrowth(fn, renders) {
 	const end = hr() + BigInt(MEM_TIME_CAP_MS) * 1_000_000n;
 	let done = 0;
 	while (done < renders && hr() < end) {
-		await fn();
+		materializeRenderOutput(await fn());
 		done++;
 	}
 	const after = process.memoryUsage();

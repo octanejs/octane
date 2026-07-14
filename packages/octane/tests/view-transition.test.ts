@@ -6,7 +6,7 @@
  * pseudo-element handles, cleanup-before-next-fire, and share viewport decay.
  * jsdom environment via the shared conformance mock helper.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act } from './_helpers';
 import { createRoot, startTransition, addTransitionType, type Root } from '../src/index.js';
 import { compile } from '../src/compiler/compile.js';
@@ -168,6 +168,37 @@ describe('ViewTransition server output', () => {
 		`,
 		'view-transition-ambient-state.tsrx',
 	);
+
+	it('skips the residual-candidate scan when no ViewTransition rendered', () => {
+		const mod = evalServer(
+			`
+        import { ViewTransition } from 'octane';
+        export function Plain() @{ <main><p>{'plain'}</p></main> }
+        export function WithTransition() @{
+          <ViewTransition><main><p>{'transition'}</p></main></ViewTransition>
+        }
+      `,
+			'view-transition-strip-fast-path.tsrx',
+		);
+		const indexOf = String.prototype.indexOf;
+		let scans = 0;
+		const spy = vi.spyOn(String.prototype, 'indexOf').mockImplementation(function (
+			this: string,
+			search: string,
+			position?: number,
+		) {
+			if (search === ' vt-e') scans++;
+			return indexOf.call(this, search, position);
+		});
+		try {
+			ServerRuntime.renderToString(mod.Plain);
+			expect(scans).toBe(0);
+			ServerRuntime.renderToString(mod.WithTransition);
+			expect(scans).toBe(1);
+		} finally {
+			spy.mockRestore();
+		}
+	});
 
 	it('strips unclaimed enter/exit candidates from static markup', () => {
 		const mod = evalServer(
