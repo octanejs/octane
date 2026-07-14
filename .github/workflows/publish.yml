@@ -1,0 +1,179 @@
+name: Publish
+
+on:
+  # Keep publishing in this file: npm's trusted-publisher identity includes the
+  # exact workflow filename. CI remains unprivileged; this workflow only gains
+  # write/OIDC permissions after the corresponding main-branch CI run finishes.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+  # Recovery path for a Version Packages CI run whose validation jobs passed
+  # but whose former inline publish job failed. The job below validates the run
+  # and derives its SHA; callers cannot supply an arbitrary commit to publish.
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: CI run ID containing the validated Version Packages SHA
+        required: true
+        type: string
+
+concurrency:
+  group: npm-publish
+
+permissions: {}
+
+jobs:
+  publish:
+    name: Publish validated SHA
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        contains(github.event.workflow_run.head_commit.message, 'Version Packages')
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+    env:
+      CI_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.ci_run_id || github.event.workflow_run.id }}
+
+    steps:
+      # workflow_run's GITHUB_SHA is the current default-branch head, not the
+      # triggering run's SHA. Resolve and validate the run before checkout so
+      # the privileged job can only execute a release commit that passed CI.
+      - name: Resolve validated SHA
+        id: release
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const runId = Number(process.env.CI_RUN_ID);
+            if (!Number.isSafeInteger(runId) || runId <= 0) {
+              throw new Error(`Invalid CI run ID: ${process.env.CI_RUN_ID}`);
+            }
+
+            const { owner, repo } = context.repo;
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              owner,
+              repo,
+              run_id: runId,
+            });
+
+            const expected = {
+              event: "push",
+              head_branch: "main",
+              head_repository: `${owner}/${repo}`,
+              path: ".github/workflows/ci.yml",
+            };
+            const actual = {
+              event: run.event,
+              head_branch: run.head_branch,
+              head_repository: run.head_repository?.full_name,
+              path: run.path,
+            };
+
+            for (const [field, value] of Object.entries(expected)) {
+              if (actual[field] !== value) {
+                throw new Error(
+                  `CI run ${runId} has ${field}=${actual[field]}, expected ${value}`,
+                );
+              }
+            }
+
+            if (!run.head_commit?.message.includes("Version Packages")) {
+              throw new Error(`CI run ${runId} is not a Version Packages run`);
+            }
+            if (!/^[0-9a-f]{40}$/.test(run.head_sha)) {
+              throw new Error(`CI run ${runId} returned an invalid head SHA`);
+            }
+
+            const jobs = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRun,
+              { owner, repo, run_id: runId, per_page: 100 },
+            );
+            const requiredJobs = new Set([
+              "lint",
+              "typecheck",
+              "validate publishable packages",
+              "test (22)",
+              "test (24)",
+            ]);
+
+            for (const job of jobs) {
+              if (requiredJobs.has(job.name) && job.conclusion === "success") {
+                requiredJobs.delete(job.name);
+              }
+            }
+            if (requiredJobs.size > 0) {
+              throw new Error(
+                `CI run ${runId} lacks successful jobs: ${[...requiredJobs].join(", ")}`,
+              );
+            }
+
+            if (run.conclusion !== "success") {
+              const unexpected = jobs.filter(
+                (job) =>
+                  job.conclusion !== "success" &&
+                  !(
+                    job.name === "publish validated SHA" &&
+                    job.conclusion === "failure"
+                  ),
+              );
+              if (unexpected.length > 0) {
+                throw new Error(
+                  `CI run ${runId} has non-publish failures: ${unexpected
+                    .map((job) => `${job.name} (${job.conclusion})`)
+                    .join(", ")}`,
+                );
+              }
+
+              const failedLegacyPublish = jobs.some(
+                (job) =>
+                  job.name === "publish validated SHA" &&
+                  job.conclusion === "failure",
+              );
+              if (!failedLegacyPublish) {
+                throw new Error(
+                  `CI run ${runId} failed for a reason other than the legacy publisher`,
+                );
+              }
+            }
+
+            core.setOutput("sha", run.head_sha);
+            core.info(`Publishing validated SHA ${run.head_sha} from CI run ${runId}`);
+
+      - name: Checkout validated SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.release.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+          # Do not enable dependency caching in this privileged workflow.
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Disallow major and minor bumps in changesets
+        run: pnpm changeset:check
+
+      - name: Publish to npm
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: pnpm changeset:publish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # npm trusted publishing via OIDC (id-token: write) — no NPM_TOKEN.
+          PNPM_CONFIG_PROVENANCE: true
+          NPM_CONFIG_PROVENANCE: true
