@@ -29,6 +29,32 @@ export function sha256Digest(value: string | Uint8Array): string {
 	return `sha256:${createHash('sha256').update(value).digest('hex')}`;
 }
 
+export interface WorkspaceDigestFile {
+	path: string;
+	content: string | Uint8Array;
+}
+
+/** Digest a template as a sorted path-to-content-digest map, independent of filesystem order. */
+export function digestWorkspaceFiles(files: readonly WorkspaceDigestFile[]): string {
+	const paths = new Set<string>();
+	const entries = files
+		.map((file) => {
+			if (
+				file.path.length === 0 ||
+				file.path.startsWith('/') ||
+				file.path.includes('\\') ||
+				file.path.split('/').includes('..')
+			) {
+				throw new TypeError(`Invalid workspace file path: ${file.path}`);
+			}
+			if (paths.has(file.path)) throw new TypeError(`Duplicate workspace file path: ${file.path}`);
+			paths.add(file.path);
+			return { path: file.path, digest: sha256Digest(file.content) };
+		})
+		.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
+	return sha256Digest(canonicalJson(entries));
+}
+
 /** Digest of sorted, canonical task records. Ordering the input cannot change the wave identity. */
 export function digestTaskManifests(tasks: readonly TaskManifest[]): string {
 	const records = [...tasks]

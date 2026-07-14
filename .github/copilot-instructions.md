@@ -74,9 +74,10 @@ workspace manifests in `docs/packages.md`:
 - `packages/octane-mcp-server/` (npm: `@octanejs/mcp-server`) — an MCP server
   exposing octane docs/compile tooling to AI agents.
 - `packages/octane-evals/` (private workspace package: `@octanejs/evals`) —
-  public schemas, development tasks, runners, and reporting tools for Octane,
-  TSRX, and integration evaluations. Active held-out prompts, tests, and gold
-  artifacts stay outside the repository.
+  standalone Octane application prompts, starter workspaces, behavioral
+  graders, public reference implementations, and reproducible evaluation
+  tooling. It measures framework use rather than monorepo repair. Active
+  held-out prompts, tests, and gold artifacts stay outside the repository.
 - `packages/{zustand,jotai,i18next,tanstack-query,apollo-client,motion,dnd-kit,stylex,tanstack-router,remix-router,tanstack-table,tanstack-virtual,lexical,floating-ui,radix,hook-form,base-ui,sonner,recharts,lucide,redux,redux-toolkit,testing-library,mdx}/`
   (npm: `@octanejs/*`) — framework bindings, each an octane port of a React
   library (state, data-fetching, animation, styling, routing, editor,

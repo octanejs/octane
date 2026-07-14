@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parsePublicTaskManifestJsonl, parseRetiredTaskManifestJsonl } from '../src/jsonl.js';
 
@@ -13,7 +13,7 @@ function listPublicPackageFiles(): string[] {
 	)
 		.trim()
 		.split('\n')
-		.filter(Boolean);
+		.filter((path) => path.length > 0 && existsSync(path));
 }
 
 describe('public package boundary', () => {

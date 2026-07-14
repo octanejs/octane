@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Public schemas, development tasks, and reporting tools for Octane and TSRX evaluations.",
+  "description": "Standalone Octane app training tasks, behavioral graders, and reproducible evaluation tooling.",
   "license": "MIT",
   "author": {
     "name": "Dominic Gannaway",
@@ -51,10 +51,16 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "cd ../.. && vitest run --project octane-evals",
+    "test": "cd ../.. && vitest run --project octane-evals --project octane-evals-user-apps",
+    "test:user-apps": "cd ../.. && vitest run --project octane-evals-user-apps",
+    "test:user-app-starters": "node scripts/verify-user-app-starters.mjs",
+    "grade:user-app": "node scripts/grade-user-app.mjs",
+    "corpus:generate": "node scripts/generate-user-app-corpus.mjs",
+    "corpus:check": "node scripts/generate-user-app-corpus.mjs --check",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@tsrx/core": "catalog:default",
     "@types/node": "catalog:default",
     "typescript": "catalog:default",
     "vitest": "catalog:default"
