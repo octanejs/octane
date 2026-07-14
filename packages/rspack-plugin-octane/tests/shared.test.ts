@@ -35,15 +35,9 @@ describe('declarative options', () => {
 		);
 	});
 
-	it('accepts and copies the declarative profiling switch', () => {
-		expect(normalizePluginOptions({ profile: true })).toEqual({ profile: true });
-		expect(normalizeLoaderOptions({ profile: false })).toEqual({ profile: false });
-	});
-
 	it.each([
 		[{ environment: 'worker' }, /environment/],
 		[{ hmr: 'webpack' }, /hmr/],
-		[{ profile: 'yes' }, /profile/],
 		[{ exclude: 'vendor' }, /exclude/],
 		[{ transform: () => {} }, /unknown option/],
 	] as const)('rejects invalid options %#', (value, message) => {

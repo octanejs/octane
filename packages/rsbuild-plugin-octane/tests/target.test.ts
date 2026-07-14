@@ -1,9 +1,16 @@
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+	mkdtempSync,
+	mkdirSync,
+	readFileSync,
+	readdirSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRsbuild } from '@rsbuild/core';
-import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pluginOctane } from '../src/index.js';
 
@@ -19,6 +26,19 @@ function link(root: string, packageName: string, target: string) {
 	const destination = join(root, 'node_modules', ...packageName.split('/'));
 	mkdirSync(dirname(destination), { recursive: true });
 	symlinkSync(target, destination, 'dir');
+}
+
+function readJavaScript(directory: string): string {
+	return readdirSync(directory, { withFileTypes: true })
+		.flatMap((entry) => {
+			const file = join(directory, entry.name);
+			return entry.isDirectory()
+				? readJavaScript(file)
+				: /\.m?js$/.test(entry.name)
+					? readFileSync(file, 'utf8')
+					: '';
+		})
+		.join('\n');
 }
 
 function writeApp(root: string, target: string) {
@@ -103,23 +123,19 @@ describe('Rsbuild build.target mapping', () => {
 		);
 	});
 
-	it('forwards profiling only to the client compiler environment', async () => {
+	it('emits profiling only in the client production bundle', async () => {
 		writeApp(root, JSON.stringify('es2022'));
 		const instance = await createRsbuild({
 			cwd: root,
 			rsbuildConfig: { plugins: [pluginOctane({ hmr: false, profile: true })] },
 		});
-		const configs = await instance.initConfigs({ action: 'build' });
-		const configured = configs.map((config) => ({
-			target: config.target,
-			plugin: config.plugins?.find((plugin) => plugin instanceof OctaneRspackPlugin),
-		}));
+		await instance.build();
 
-		expect(configured).toHaveLength(2);
-		for (const { target, plugin } of configured) {
-			expect(plugin).toBeInstanceOf(OctaneRspackPlugin);
-			const server = Array.isArray(target) ? target.includes('node') : target === 'node';
-			expect((plugin as OctaneRspackPlugin).options.profile).toBe(!server);
+		const client = readJavaScript(join(root, 'dist/client'));
+		const server = readJavaScript(join(root, 'dist/server'));
+		for (const marker of ['__OCTANE_PROFILER__', 'octane.component', '/src/Page.tsrx#Page']) {
+			expect(client).toContain(marker);
+			expect(server).not.toContain(marker);
 		}
 	});
 

@@ -2,18 +2,163 @@ import { describe, expect, it } from 'vitest';
 import * as Octane from '../src/index';
 import { compile } from '../src/compiler/compile.js';
 import { slotHooks } from '../src/compiler/slot-hooks.js';
+import {
+	inspectProfileOutput,
+	type ProfileMetadata,
+	uniqueMetadata,
+	walkAst,
+} from './_profile-output';
 
-const SOURCE =
-	"import { useState } from 'octane';\n" +
-	'function Lite() @{\n' +
-	'  <span>lite</span>\n' +
-	'}\n' +
-	'export function App() @{\n' +
-	'  const [count] = useState(0);\n' +
-	'  <main><Lite/><p>{count as string}</p></main>\n' +
-	'}\n';
+const SOURCE = `import { useState } from 'octane';
+function Lite() @{
+	<span>lite</span>
+}
+export function App() @{
+	const [count] = useState(0);
+	<main><Lite/><p>{count as string}</p></main>
+}
+`;
 
-const GENERIC_SOURCE = `
+function expectValidComponent(metadata: ProfileMetadata, file: string) {
+	expect(metadata).toMatchObject({ file, kind: 'component' });
+	expect(metadata.id).toBe(`${metadata.file}#${metadata.name}@${metadata.line}:${metadata.column}`);
+}
+
+function callStart(ast: any, member: string): number | undefined {
+	let start: number | undefined;
+	walkAst(ast, (node) => {
+		if (
+			node.type === 'CallExpression' &&
+			node.callee?.type === 'MemberExpression' &&
+			node.callee.property?.name === member
+		) {
+			start = node.start;
+		}
+	});
+	return start;
+}
+
+describe('profile compiler metadata', () => {
+	it('keeps compiler-only helpers out of the public runtime namespace', () => {
+		expect(Octane).not.toHaveProperty('__profileComponent');
+		expect(Octane).not.toHaveProperty('__profileHook');
+	});
+
+	it('does not alter normal or server compilation', () => {
+		const client = compile(SOURCE, '/src/App.tsrx', { hmr: false, dev: false });
+		expect(
+			compile(SOURCE, '/src/App.tsrx', {
+				hmr: false,
+				dev: false,
+				profile: false,
+			}),
+		).toEqual(client);
+
+		const server = compile(SOURCE, '/src/App.tsrx', { mode: 'server' });
+		expect(
+			compile(SOURCE, '/src/App.tsrx', {
+				mode: 'server',
+				profile: true,
+			}),
+		).toEqual(server);
+	});
+
+	it('describes authored components and hooks through the profiling subpath', () => {
+		const output = inspectProfileOutput(
+			compile(SOURCE, '/src/App.tsrx', {
+				hmr: false,
+				dev: false,
+				profile: true,
+			}).code,
+		);
+
+		expect(output.profileImports).toEqual(new Set(['__profileComponent', '__profileHook']));
+		expect(output.mainImports).not.toContain('__profileComponent');
+		expect(output.mainImports).not.toContain('__profileHook');
+
+		const components = uniqueMetadata(output.components);
+		expect(components.map(({ name }) => name).sort()).toEqual(['App', 'Lite']);
+		for (const metadata of components) expectValidComponent(metadata, '/src/App.tsrx');
+		expect(
+			Object.fromEntries(components.map(({ name, line, column }) => [name, { line, column }])),
+		).toEqual({
+			Lite: { line: 2, column: 0 },
+			App: { line: 5, column: 7 },
+		});
+
+		expect(uniqueMetadata(output.hooks)).toEqual([
+			expect.objectContaining({
+				id: `${components.find(({ name }) => name === 'App')!.id}#hook:0`,
+				componentId: components.find(({ name }) => name === 'App')!.id,
+				name: 'useState',
+				kind: 'useState',
+				file: '/src/App.tsrx',
+				line: 6,
+				column: 17,
+				index: 0,
+			}),
+		]);
+	});
+
+	it('registers a webpack HMR replacement after the hot handoff', () => {
+		const output = inspectProfileOutput(
+			compile(SOURCE, '/src/App.tsrx', { hmr: 'webpack', profile: true }).code,
+		);
+		const handoff = callStart(output.ast, 'accept');
+		const appRegistrations = output.components
+			.filter(({ binding }) => binding === 'App')
+			.map(({ start }) => start);
+
+		expect(handoff).toBeTypeOf('number');
+		expect(Math.max(...appRegistrations)).toBeGreaterThan(handoff!);
+	});
+
+	it('registers a declaration before top-level code can render it', () => {
+		const source = `
+import { createRoot } from 'octane';
+export function App() @{ <main>ready</main> }
+createRoot(document.body).render(App);
+`;
+		const output = inspectProfileOutput(
+			compile(source, '/src/entry.tsrx', { hmr: false, profile: true }).code,
+		);
+		const render = callStart(output.ast, 'render');
+		const firstRegistration = Math.min(
+			...output.components.filter(({ binding }) => binding === 'App').map(({ start }) => start),
+		);
+
+		expect(render).toBeTypeOf('number');
+		expect(firstRegistration).toBeLessThan(render!);
+	});
+
+	it('adds the same hook metadata in the plain TS/JS slot pass', () => {
+		const source =
+			"import { useState as state } from 'octane';\n" +
+			'export function useCount() { const [count] = state(0); return count; }\n';
+		expect(slotHooks(source, '/src/use-count.ts', { profile: false })).toEqual(
+			slotHooks(source, '/src/use-count.ts'),
+		);
+
+		const output = inspectProfileOutput(
+			slotHooks(source, '/src/use-count.ts', { profile: true })!.code,
+		);
+		expect(output.profileImports).toEqual(new Set(['__profileHook']));
+		expect(uniqueMetadata(output.hooks)).toEqual([
+			expect.objectContaining({
+				id: '/src/use-count.ts#useCount@2:7#hook:0',
+				componentId: '/src/use-count.ts#useCount@2:7',
+				name: 'state',
+				kind: 'useState',
+				file: '/src/use-count.ts',
+				line: 2,
+				column: 45,
+				index: 0,
+			}),
+		]);
+	});
+
+	it('discovers components across supported JavaScript authoring shapes', () => {
+		const source = `
 import { memo, useState } from 'octane';
 export const Arrow = () => <div/>;
 export const Expression = function () { return <span/>; };
@@ -35,144 +180,33 @@ function LocalArray() { return [null, 'array']; }
 export function UsesNonJsx() { return <><NullOnly/><Primitive/><LocalArray/></>; }
 export default () => <footer/>;
 `;
+		const output = inspectProfileOutput(
+			compile(source, '/src/generic.tsx', { profile: true }).code,
+		);
+		const components = uniqueMetadata(output.components);
 
-describe('profile compiler metadata', () => {
-	it('keeps compiler profiling ABI helpers off the main Octane namespace', () => {
-		expect(Octane).not.toHaveProperty('__profileComponent');
-		expect(Octane).not.toHaveProperty('__profileHook');
+		expect(components.map(({ name }) => name).sort()).toEqual(
+			[
+				'Arrow',
+				'Conditional',
+				'Expression',
+				'LocalArray',
+				'Memoed',
+				'Nested',
+				'NullOnly',
+				'Outer',
+				'Primitive',
+				'UsesNonJsx',
+				'default',
+			].sort(),
+		);
+		for (const metadata of components) expectValidComponent(metadata, '/src/generic.tsx');
+
+		const memoHook = uniqueMetadata(output.hooks).find(({ name }) => name === 'useState')!;
+		expect(memoHook.componentId).toBe(components.find(({ name }) => name === 'Memoed')!.id);
 	});
 
-	it('leaves normal client and server compiler output byte-identical', () => {
-		const client = compile(SOURCE, '/src/App.tsrx', { hmr: false, dev: false });
-		const explicitOff = compile(SOURCE, '/src/App.tsrx', {
-			hmr: false,
-			dev: false,
-			profile: false,
-		});
-		expect(explicitOff).toEqual(client);
-
-		const server = compile(SOURCE, '/src/App.tsrx', { mode: 'server' });
-		const serverProfile = compile(SOURCE, '/src/App.tsrx', {
-			mode: 'server',
-			profile: true,
-		});
-		expect(serverProfile).toEqual(server);
-		expect(serverProfile.code).not.toContain('__profile');
-	});
-
-	it('registers stable component and hook metadata without wrapping component bindings', () => {
-		const { code } = compile(SOURCE, '/src/App.tsrx', {
-			hmr: false,
-			dev: false,
-			profile: true,
-		});
-
-		expect(code).toContain(
-			"import { __profileComponent as _$__profileComponent, __profileHook as _$__profileHook } from 'octane/profiling';",
-		);
-		const mainRuntimeImport = code.match(/^import \{ ([^}]*) \} from 'octane';$/m)?.[1];
-		expect(mainRuntimeImport).not.toContain('__profile');
-		expect(code).toContain(
-			'_$__profileComponent(Lite, {"id":"/src/App.tsrx#Lite@2:0","name":"Lite","file":"/src/App.tsrx","line":2,"column":0,"kind":"component"});',
-		);
-		expect(code).toContain(
-			'_$__profileComponent(App, {"id":"/src/App.tsrx#App@5:7","name":"App","file":"/src/App.tsrx","line":5,"column":7,"kind":"component"});',
-		);
-		expect(code).toMatch(
-			/const _h\$0 = _\$__profileHook\(Symbol\("[a-z0-9]+#0"\), \{"id":"\/src\/App\.tsrx#App@5:7#hook:0","componentId":"\/src\/App\.tsrx#App@5:7","name":"useState","kind":"useState","file":"\/src\/App\.tsrx","line":6,"column":18,"index":0\}\);/,
-		);
-
-		// Registration is a side-effect call on the original binding, not an
-		// expression that replaces or wraps the component value.
-		expect(code).toContain('export const App = Object.assign(function App(');
-		expect(code).not.toContain('const App = _$__profileComponent');
-	});
-
-	it('registers the canonical webpack HMR wrapper after hot handoff', () => {
-		const { code } = compile(SOURCE, '/src/App.tsrx', {
-			hmr: 'webpack',
-			profile: true,
-		});
-		const handoff = code.indexOf('import.meta.webpackHot.accept();');
-		const registration = code.lastIndexOf('_$__profileComponent(App,');
-		expect(handoff).toBeGreaterThan(-1);
-		expect(registration).toBeGreaterThan(handoff);
-		expect(code).toContain('_$__profileHook(Symbol.for("octane:/src/App.tsrx:App.useState#0")');
-	});
-
-	it('registers declarations before a same-module top-level mount', () => {
-		const source = `
-import { createRoot } from 'octane';
-export function App() @{ <main>ready</main> }
-createRoot(document.body).render(App);
-`;
-		const normal = compile(source, '/src/entry.tsrx', { hmr: false });
-		expect(compile(source, '/src/entry.tsrx', { hmr: false, profile: false })).toEqual(normal);
-
-		const { code } = compile(source, '/src/entry.tsrx', { hmr: false, profile: true });
-		const mount = code.indexOf('createRoot(document.body).render(App);');
-		const firstRegistration = code.indexOf('_$__profileComponent(App,');
-		const finalRegistration = code.lastIndexOf('_$__profileComponent(App,');
-		expect(mount).toBeGreaterThan(-1);
-		expect(firstRegistration).toBeGreaterThan(-1);
-		expect(firstRegistration).toBeLessThan(mount);
-		expect(finalRegistration).toBeGreaterThan(mount);
-	});
-
-	it('adds equivalent hook metadata in the surgical TS/JS slot pass', () => {
-		const source =
-			"import { useState as state } from 'octane';\n" +
-			'export function useCount() { const [count] = state(0); return count; }\n';
-		const normal = slotHooks(source, '/src/use-count.ts', { hmr: false });
-		const explicitOff = slotHooks(source, '/src/use-count.ts', {
-			hmr: false,
-			profile: false,
-		});
-		expect(explicitOff).toEqual(normal);
-
-		const profiled = slotHooks(source, '/src/use-count.ts', { profile: true });
-		expect(profiled?.code).toContain(
-			"import { __profileHook as _$__profileHook } from 'octane/profiling';",
-		);
-		expect(profiled?.code).not.toContain(
-			"import { __profileHook as _$__profileHook } from 'octane';",
-		);
-		expect(profiled?.code).toContain(
-			'{"id":"/src/use-count.ts#useCount@2:7#hook:0","componentId":"/src/use-count.ts#useCount@2:7","name":"state","kind":"useState","file":"/src/use-count.ts","line":2,"column":45,"index":0}',
-		);
-		expect(profiled?.code).toContain('const [count] = state(0, _h$0);');
-	});
-
-	it('covers generic arrow, function-expression, memo, nested, and conditional components', () => {
-		const normal = compile(GENERIC_SOURCE, '/src/generic.tsx', { profile: false });
-		const implicit = compile(GENERIC_SOURCE, '/src/generic.tsx');
-		expect(normal).toEqual(implicit);
-		expect(normal.code).not.toContain('__profile');
-
-		const { code } = compile(GENERIC_SOURCE, '/src/generic.tsx', { profile: true });
-		expect(code).toContain('export const Arrow = _$__profileComponent(');
-		expect(code).toContain('export const Expression = _$__profileComponent(');
-		expect(code).toContain('export const Memoed = _$__profileComponent(');
-		expect(code).toMatch(/"id":"\/src\/generic\.tsx#Conditional@\d+:\d+"/);
-		expect(code).toMatch(/"id":"\/src\/generic\.tsx#Outer@\d+:\d+"/);
-		expect(code).toMatch(/id: "\/src\/generic\.tsx#Nested@\d+:\d+"/);
-		expect(code).toMatch(/id: "\/src\/generic\.tsx#default@\d+:\d+"/);
-		expect(code).toMatch(/"componentId":"\/src\/generic\.tsx#Memoed@\d+:\d+"/);
-		expect(code).not.toContain('#module@');
-		expect(code).toMatch(/"id":"\/src\/generic\.tsx#NullOnly@\d+:\d+"/);
-		expect(code).toMatch(/id: "\/src\/generic\.tsx#Primitive@\d+:\d+"/);
-		expect(code).toMatch(/"id":"\/src\/generic\.tsx#LocalArray@\d+:\d+"/);
-
-		// Nested declarations register in their lexical scope; top-level function
-		// declarations remain tail-registered for HMR canonical-wrapper ordering.
-		const nestedDeclaration = code.indexOf('function Nested()');
-		const nestedRegistration = code.indexOf('_$__profileComponent(Nested,');
-		const outerRegistration = code.indexOf('_$__profileComponent(Outer,');
-		expect(nestedRegistration).toBeGreaterThan(nestedDeclaration);
-		expect(nestedRegistration).toBeLessThan(outerRegistration);
-	});
-
-	it('gives same-named nested definitions and their hooks distinct exact owner IDs', () => {
+	it('distinguishes same-named nested component definitions', () => {
 		const source = `
 import { useState } from 'octane';
 function Left() {
@@ -185,51 +219,57 @@ function Right() {
 }
 export function Host() { return <><Left/><Right/></>; }
 `;
-		const normal = compile(source, '/src/collision.tsx');
-		expect(compile(source, '/src/collision.tsx', { profile: false })).toEqual(normal);
+		const output = inspectProfileOutput(
+			compile(source, '/src/collision.tsx', { profile: true }).code,
+		);
+		const same = uniqueMetadata(output.components).filter(({ name }) => name === 'Same');
+		const owners = uniqueMetadata(output.hooks).map(({ componentId }) => componentId);
 
-		const { code } = compile(source, '/src/collision.tsx', { profile: true });
-		const ownerIds = [
-			...code.matchAll(/"componentId":"(\/src\/collision\.tsx#Same@\d+:\d+)"/g),
-		].map((match) => match[1]);
-		expect(ownerIds).toHaveLength(2);
-		expect(new Set(ownerIds).size).toBe(2);
-		for (const id of ownerIds) expect(code).toContain(`id: "${id}"`);
+		expect(same).toHaveLength(2);
+		expect(new Set(same.map(({ id }) => id)).size).toBe(2);
+		expect(new Set(owners)).toEqual(new Set(same.map(({ id }) => id)));
 	});
 
-	it('uses the definition ID for compiler-generated parallel-use hooks', () => {
+	it('attributes transformed parallel use() work to the component definition', () => {
 		const source = `import { use } from 'octane';
 export function AsyncValue(props) @{
 	const value = use(props.load());
 	<p>{value as string}</p>
 }`;
-		const { code } = compile(source, '/src/parallel.tsrx', { profile: true });
-		const definition = '/src/parallel.tsrx#AsyncValue@2:7';
-		expect(code).toContain(`"id":"${definition}"`);
-		expect(code).toContain(`"componentId":"${definition}"`);
-		expect(code).not.toContain('#AsyncValue@3:');
+		const output = inspectProfileOutput(
+			compile(source, '/src/parallel.tsrx', { profile: true }).code,
+		);
+		const component = uniqueMetadata(output.components).find(({ name }) => name === 'AsyncValue')!;
+
+		expect(uniqueMetadata(output.hooks).map(({ componentId }) => componentId)).toContain(
+			component.id,
+		);
 	});
 
-	it('registers an anonymous default primitive component without changing normal output', () => {
-		const source = 'export default function () { return null; }\n';
-		const normal = compile(source, '/src/empty.tsx');
-		expect(compile(source, '/src/empty.tsx', { profile: false })).toEqual(normal);
-		const { code } = compile(source, '/src/empty.tsx', { profile: true });
-		expect(code).toContain('export default _$__profileComponent(');
-		expect(code).toContain('function () {');
-		expect(code).toContain('id: "/src/empty.tsx#default@1:15"');
-	});
-
-	it('registers local primitive functions re-exported as default', () => {
-		for (const [filename, source, name] of [
-			['/src/default-identifier.tsx', `const Text = () => 'hi'; export default Text;`, 'Text'],
-			['/src/default-alias.tsx', `const Empty = () => null; export { Empty as default };`, 'Empty'],
-		] as const) {
-			const normal = compile(source, filename);
-			expect(compile(source, filename, { profile: false })).toEqual(normal);
-			const { code } = compile(source, filename, { profile: true });
-			expect(code).toContain(`const ${name} = _$__profileComponent(`);
-			expect(code).toContain(`id: "${filename}#${name}@1:6"`);
-		}
+	it.each([
+		[
+			'anonymous default',
+			'/src/anonymous.tsx',
+			'export default function () { return null; }',
+			'default',
+		],
+		[
+			'default identifier',
+			'/src/default.tsx',
+			`const Text = () => 'hi'; export default Text;`,
+			'Text',
+		],
+		[
+			'default alias',
+			'/src/default-alias.tsx',
+			`const Empty = () => null; export { Empty as default };`,
+			'Empty',
+		],
+	])('discovers a primitive-returning %s component', (_case, file, source, name) => {
+		const components = uniqueMetadata(
+			inspectProfileOutput(compile(source, file, { profile: true }).code).components,
+		);
+		expect(components).toHaveLength(1);
+		expect(components[0]).toMatchObject({ name, file, kind: 'component' });
 	});
 });

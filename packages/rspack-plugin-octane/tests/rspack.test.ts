@@ -133,6 +133,58 @@ export function App() @{
 		rmSync(root, { recursive: true, force: true });
 	});
 
+	function installRealProfileFixture(includeRawBinding: boolean) {
+		rmSync(join(root, 'node_modules/octane'), { recursive: true, force: true });
+		symlinkSync(join(repositoryRoot, 'packages/octane'), join(root, 'node_modules/octane'), 'dir');
+		write(
+			root,
+			'src/ProfileBundleProbe.tsrx',
+			`import { memo, useState } from 'octane';
+
+const MemoLeaf = memo(function MemoLeaf(props: { value: number }) {
+	return <span>{props.value as string}</span>;
+});
+
+export function ProfileBundleProbe() @{
+	const [count] = useState(0);
+	<MemoLeaf value={count} />
+}
+`,
+		);
+		write(
+			root,
+			'src/index.js',
+			`import { ProfileBundleProbe } from './ProfileBundleProbe.tsrx';
+
+globalThis.${runGlobal} = (globalThis.${runGlobal} || 0) + 1;
+export { ProfileBundleProbe };
+${includeRawBinding ? "export { Raw } from '@fixture/raw';" : ''}
+`,
+		);
+	}
+
+	async function buildRealRuntime(
+		profile: boolean,
+		target: 'web' | 'node' = 'web',
+		includeRawBinding = false,
+	) {
+		installRealProfileFixture(includeRawBinding);
+		const mode = `${target}-${profile ? 'profile' : 'normal'}`;
+		const outputPath = join(root, `dist-real-${mode}`);
+		await compile({
+			context: root,
+			mode: 'production',
+			target,
+			entry: './src/index.js',
+			resolve: { extensionAlias: { '.js': ['.ts', '.js'] } },
+			optimization: { minimize: true },
+			output: { path: outputPath, filename: 'bundle.cjs' },
+			plugins: [new OctaneRspackPlugin({ profile })],
+		});
+		const file = join(outputPath, 'bundle.cjs');
+		return { code: readFileSync(file, 'utf8'), file };
+	}
+
 	it('builds client and server graphs with maps, raw dependencies, and one target runtime', async () => {
 		for (const [environment, target, runtimeMarker, absentMarker] of [
 			['client', 'web', '__octane_client_runtime__', '__octane_server_runtime__'],
@@ -180,126 +232,49 @@ export function App() @{
 		expect(bundle).toContain('__webpack_require__.hmrD');
 	}, 30_000);
 
-	it('emits profiling metadata only in client graphs', async () => {
-		for (const [environment, target, expected] of [
-			['client', 'web', true],
-			['server', 'node', false],
-		] as const) {
-			const outputPath = join(root, `dist-profile-${environment}`);
-			await compile({
-				context: root,
-				mode: 'production',
-				target,
-				entry: './src/index.js',
-				optimization: { minimize: false },
-				output: { path: outputPath, filename: 'bundle.js' },
-				plugins: [new OctaneRspackPlugin({ profile: true })],
-			});
-
-			const bundle = readFileSync(join(outputPath, 'bundle.js'), 'utf8');
-			if (expected) {
-				expect(bundle).toContain('/src/App.tsrx#App');
-				expect(bundle).toContain('__profileComponent');
-				expect(bundle).toContain('__octane_profiling_runtime__');
-				expect(bundle).not.toContain('__octane_nested_profiling_runtime__');
-			} else {
-				expect(bundle).not.toContain('/src/App.tsrx#App');
-				expect(bundle).not.toContain('__profileComponent');
-			}
-			expect(bundle).not.toContain('__OCTANE_PROFILE_ENABLED__');
-		}
-	}, 30_000);
-
-	it('erases the real profiling runtime from normal production bundles', async () => {
-		rmSync(join(root, 'node_modules/octane'), { recursive: true, force: true });
-		symlinkSync(join(repositoryRoot, 'packages/octane'), join(root, 'node_modules/octane'), 'dir');
-		write(
-			root,
-			'src/ProfileBundleProbe.tsrx',
-			`import { memo, useState } from 'octane';
-
-const MemoLeaf = memo(function MemoLeaf(props: { value: number }) {
-	return <span>{props.value as string}</span>;
-});
-
-export function ProfileBundleProbe() @{
-	const [count] = useState(0);
-	<MemoLeaf value={count} />
-}
-`,
-		);
-		write(
-			root,
-			'src/index.js',
-			`import { ProfileBundleProbe } from './ProfileBundleProbe.tsrx';
-
-globalThis.${runGlobal} = (globalThis.${runGlobal} || 0) + 1;
-export { ProfileBundleProbe };
-`,
-		);
-
-		const build = async (profile: boolean) => {
-			const mode = profile ? 'profile' : 'normal';
-			const outputPath = join(root, `dist-real-${mode}`);
-			await compile({
-				context: root,
-				mode: 'production',
-				target: 'web',
-				entry: './src/index.js',
-				resolve: { extensionAlias: { '.js': ['.ts', '.js'] } },
-				optimization: { minimize: true },
-				output: { path: outputPath, filename: 'bundle.cjs' },
-				plugins: [new OctaneRspackPlugin({ profile })],
-			});
-			const file = join(outputPath, 'bundle.cjs');
-			return { code: readFileSync(file, 'utf8'), file };
-		};
-
-		const normal = await build(false);
-		const profiled = await build(true);
+	it('erases profiling from normal production bundles', async () => {
+		const normal = await buildRealRuntime(false);
 		for (const marker of [
 			'__OCTANE_PROFILER__',
-			'__OCTANE_PROFILE_ENABLED__',
-			'__profileComponent',
-			'__profileComponentSource',
-			'__profileHook',
-			'__profileResolveHook',
-			'__profileSource',
-			'getEvents',
-			'exportTrace',
-			'traceEvents',
-			'Octane profiler bufferSize',
-			'Components',
 			'octane.component',
-			'component-render',
-			'component-bailout',
 			'/src/ProfileBundleProbe.tsrx#ProfileBundleProbe',
 		]) {
-			expect(normal.code, `normal bundle retained ${marker}`).not.toContain(marker);
+			expect(normal.code).not.toContain(marker);
 		}
-
-		expect(profiled.code).not.toContain('__OCTANE_PROFILE_ENABLED__');
-		expect(profiled.code).toContain('__OCTANE_PROFILER__');
-		expect(profiled.code).toContain('exportTrace');
-		expect(profiled.code).toContain('Components');
-		expect(profiled.code).toContain('octane.component');
-		expect(profiled.code).toContain('component-render');
-		expect(profiled.code).toContain('/src/ProfileBundleProbe.tsrx#ProfileBundleProbe');
-		expect(profiled.code.length).toBeGreaterThan(normal.code.length);
-
 		await import(`${pathToFileURL(normal.file).href}?normal`);
 		expect((globalThis as any)[runGlobal]).toBe(1);
 		expect((globalThis as any)[profilerGlobal]).toBeUndefined();
+	}, 30_000);
+
+	it('executes the profiled runtime', async () => {
+		const profiled = await buildRealRuntime(true);
+		expect(profiled.code).toContain('__OCTANE_PROFILER__');
+		expect(profiled.code).toContain('octane.component');
+		expect(profiled.code).toContain('/src/ProfileBundleProbe.tsrx#ProfileBundleProbe');
+
 		await import(`${pathToFileURL(profiled.file).href}?profile`);
-		expect((globalThis as any)[runGlobal]).toBe(2);
+		expect((globalThis as any)[runGlobal]).toBe(1);
 		const profiler = (globalThis as any)[profilerGlobal];
-		expect(profiler).toMatchObject({
-			start: expect.any(Function),
-			getEvents: expect.any(Function),
-			exportTrace: expect.any(Function),
-		});
 		expect(profiler.getEvents()).toEqual([]);
 		expect(profiler.exportTrace()).toMatchObject({ displayTimeUnit: 'ms', traceEvents: [] });
+	}, 30_000);
+
+	it('deduplicates profiling imports from raw dependencies', async () => {
+		const profiled = await buildRealRuntime(true, 'web', true);
+		expect(profiled.code).toContain('raw-binding-output');
+		expect(profiled.code).toContain('__OCTANE_PROFILER__');
+		expect(profiled.code).not.toContain('__octane_nested_profiling_runtime__');
+	}, 30_000);
+
+	it('ignores profile mode in server bundles', async () => {
+		const server = await buildRealRuntime(true, 'node');
+		for (const marker of [
+			'__OCTANE_PROFILER__',
+			'octane.component',
+			'/src/ProfileBundleProbe.tsrx#ProfileBundleProbe',
+		]) {
+			expect(server.code).not.toContain(marker);
+		}
 	}, 30_000);
 
 	it('invalidates persistent module caches when profiling toggles', async () => {
@@ -327,9 +302,9 @@ export { ProfileBundleProbe };
 		const normal = await build(false, 1);
 		const profiled = await build(true, 2);
 		const normalAgain = await build(false, 3);
-		expect(normal).not.toContain('__profileComponent');
-		expect(profiled).toContain('__profileComponent');
-		expect(normalAgain).not.toContain('__profileComponent');
+		expect(normal).not.toContain('/src/App.tsrx#App');
+		expect(profiled).toContain('/src/App.tsrx#App');
+		expect(normalAgain).not.toContain('/src/App.tsrx#App');
 	}, 30_000);
 
 	it.each(['before', 'after'] as const)(

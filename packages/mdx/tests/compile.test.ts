@@ -27,40 +27,24 @@ describe('compileMdxSync', () => {
 		expect(code).not.toContain(': _createMdxContent(');
 	});
 
-	it('registers the final exported MDX component after its HMR wrapper in profiling builds', () => {
+	it('adds document-level profiling only to client output', () => {
 		const { code } = compileMdxSync('# hi\n', '/docs/doc.mdx', {
 			hmr: true,
 			profile: true,
 		});
-		const hmrWrapper = code.indexOf('MDXContent = _$mdxHmr(MDXContent);');
-		const registration = code.indexOf('_$mdxProfile(MDXContent,');
+		const hmrWrapper = code.lastIndexOf('MDXContent =');
+		const documentIdentity = code.lastIndexOf('/docs/doc.mdx#MDXContent@1:0');
 
 		expect(hmrWrapper).toBeGreaterThan(-1);
-		expect(registration).toBeGreaterThan(hmrWrapper);
-		expect(code).toContain(
-			"import { __profileComponent as _$mdxProfile } from 'octane/profiling';",
-		);
-		expect(code).toContain(
-			'{"id":"/docs/doc.mdx#MDXContent@1:0","name":"MDXContent","file":"/docs/doc.mdx","line":1,"column":0,"kind":"component"}',
-		);
+		expect(documentIdentity).toBeGreaterThan(hmrWrapper);
+		expect(code).toContain("from 'octane/profiling'");
 
 		const server = compileMdxSync('# hi\n', '/docs/doc.mdx', {
 			mode: 'server',
 			profile: true,
 		});
-		expect(server.code).not.toContain('_$mdxProfile');
-	});
-
-	it('keeps authored hook metadata owned by the generated MDX body component', () => {
-		const { code } = compileMdxSync(
-			"import { useState } from 'octane'\n\n# {useState(0)[0]}\n",
-			'/docs/hook.mdx',
-			{ profile: true },
-		);
-		const body = code.match(/_\$__profileComponent\(_createMdxContent, \{"id":"([^"]+)"/)?.[1];
-		const hookOwner = code.match(/"componentId":"([^"]+)"/)?.[1];
-		expect(body).toMatch(/^\/docs\/hook\.mdx#_createMdxContent@\d+:\d+$/);
-		expect(hookOwner).toBe(body);
+		expect(server.code).not.toContain('octane/profiling');
+		expect(server.code).not.toContain('/docs/doc.mdx#MDXContent@1:0');
 	});
 
 	it('keeps explicit profile:false output and maps byte-identical', () => {

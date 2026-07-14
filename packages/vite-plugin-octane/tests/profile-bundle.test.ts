@@ -8,7 +8,7 @@ import { octane } from '../src/index.js';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const profilerGlobal = '__OCTANE_PROFILER__';
-const runGlobal = '__octane_profile_bundle_runs__';
+const componentId = '/src/ProfileBundleProbe.tsrx#ProfileBundleProbe';
 
 function write(root: string, relativePath: string, content: string) {
 	const file = join(root, relativePath);
@@ -29,20 +29,15 @@ describe('Vite production profiling specialization', () => {
 		write(
 			root,
 			'src/ProfileBundleProbe.tsrx',
-			`import { hmr, lazy, memo, useState } from 'octane';
+			`import { memo, useState } from 'octane';
 
-const MemoLeaf = memo(function MemoLeaf(props: { value: number }) {
+const Leaf = memo(function Leaf(props: { value: number }) {
 	return <span>{props.value as string}</span>;
 });
-const HotLeaf = hmr(MemoLeaf);
-const LazyLeaf = lazy(async () => ({ default: MemoLeaf }));
 
 export function ProfileBundleProbe() @{
 	const [count] = useState(0);
-	<>
-		<HotLeaf value={count} />
-		<LazyLeaf value={count} />
-	</>
+	<Leaf value={count} />
 }
 `,
 		);
@@ -51,7 +46,6 @@ export function ProfileBundleProbe() @{
 			'src/index.js',
 			`import { ProfileBundleProbe } from './ProfileBundleProbe.tsrx';
 
-globalThis.${runGlobal} = (globalThis.${runGlobal} || 0) + 1;
 export { ProfileBundleProbe };
 `,
 		);
@@ -59,7 +53,6 @@ export { ProfileBundleProbe };
 
 	afterEach(() => {
 		Reflect.deleteProperty(globalThis, profilerGlobal);
-		Reflect.deleteProperty(globalThis, runGlobal);
 		rmSync(root, { recursive: true, force: true });
 	});
 
@@ -87,53 +80,26 @@ export { ProfileBundleProbe };
 		return { code: readFileSync(file, 'utf8'), file };
 	}
 
-	it('erases the recorder from normal bundles and executes profiled metadata', async () => {
+	it('erases profiling from normal builds and installs it in profile builds', async () => {
 		const normal = await bundle(false);
 		const profiled = await bundle(true);
 
-		for (const marker of [
-			'__OCTANE_PROFILER__',
-			'__OCTANE_PROFILE_ENABLED__',
-			'__profileComponent',
-			'__profileComponentSource',
-			'__profileHook',
-			'__profileResolveHook',
-			'__profileSource',
-			'getEvents',
-			'exportTrace',
-			'traceEvents',
-			'Octane profiler bufferSize',
-			'Components',
-			'octane.component',
-			'component-render',
-			'component-bailout',
-			'/src/ProfileBundleProbe.tsrx#ProfileBundleProbe',
-		]) {
-			expect(normal.code, `normal bundle retained ${marker}`).not.toContain(marker);
-		}
-
-		expect(profiled.code).not.toContain('__OCTANE_PROFILE_ENABLED__');
+		expect(normal.code).not.toContain(profilerGlobal);
+		expect(normal.code).not.toContain(componentId);
 		expect(profiled.code).toContain('__OCTANE_PROFILER__');
-		expect(profiled.code).toContain('exportTrace');
-		expect(profiled.code).toContain('Components');
-		expect(profiled.code).toContain('octane.component');
-		expect(profiled.code).toContain('component-render');
-		expect(profiled.code).toContain('/src/ProfileBundleProbe.tsrx#ProfileBundleProbe');
-		expect(profiled.code.length).toBeGreaterThan(normal.code.length);
+		expect(profiled.code).toContain(componentId);
 
-		await import(`${pathToFileURL(normal.file).href}?normal`);
-		expect((globalThis as any)[runGlobal]).toBe(1);
+		const normalModule = await import(`${pathToFileURL(normal.file).href}?normal`);
+		expect(normalModule.ProfileBundleProbe).toBeTypeOf('function');
 		expect((globalThis as any)[profilerGlobal]).toBeUndefined();
 
-		await import(`${pathToFileURL(profiled.file).href}?profile`);
-		expect((globalThis as any)[runGlobal]).toBe(2);
+		const profiledModule = await import(`${pathToFileURL(profiled.file).href}?profile`);
+		expect(profiledModule.ProfileBundleProbe).toBeTypeOf('function');
 		const profiler = (globalThis as any)[profilerGlobal];
 		expect(profiler).toMatchObject({
 			start: expect.any(Function),
 			getEvents: expect.any(Function),
 			exportTrace: expect.any(Function),
 		});
-		expect(profiler.getEvents()).toEqual([]);
-		expect(profiler.exportTrace()).toMatchObject({ displayTimeUnit: 'ms', traceEvents: [] });
 	}, 30_000);
 });

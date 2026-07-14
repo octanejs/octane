@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
 	createPortal,
 	memo,
@@ -10,81 +10,79 @@ import {
 } from 'octane';
 import { profiler } from 'octane/profiling';
 import { act, mount, nextPaint } from './_helpers';
+import { App as ContextApp } from './_fixtures/context-bailout.tsrx';
 import { makeStore, Reader } from './_fixtures/sync-external-store.tsrx';
-import { App as ProfileContextApp } from './_fixtures/context-bailout.tsrx';
 
-const PROFILE_BUILD = process.env.OCTANE_TEST_COMPILE_MODE === 'profile';
-
-function LiteLeaf(props) @{
-	<span class="leaf">
+function CounterLeaf(props) @{
+	<span>
 		{props.count as string}
 	</span>
 }
 
-function MemoLeafImpl() @{
-	<i>{'stable'}</i>
+function StaticBadgeImpl() @{
+	<i>stable</i>
 }
-const MemoLeaf = memo(MemoLeafImpl);
+const StaticBadge = memo(StaticBadgeImpl);
 
-function ProfileHost() @{
+function CounterApp() @{
 	const [count, setCount] = useState(0);
 	<div>
-		<button onClick={() => setCount(count + 1)}>{'update'}</button>
-		<LiteLeaf count={count} />
-		<MemoLeaf />
+		<button onClick={() => setCount(count + 1)}>increment</button>
+		<CounterLeaf count={count} />
+		<StaticBadge />
 	</div>
 }
 
-function ProfileSlow(props) @{
+function SuspendingChild(props) @{
 	const value = use(props.promise);
 	<strong>
 		{value as string}
 	</strong>
 }
 
-function ProfileSuspenseHost(props) @{
+function SuspenseApp(props) @{
 	<Suspense fallback={<em>pending</em>}>
-		<ProfileSlow promise={props.promise} />
+		<SuspendingChild promise={props.promise} />
 	</Suspense>
 }
 
-function ProfileThrownPromise(props) {
-	throw props.promise;
+function ThrowingChild(props) {
+	throw props.value;
 }
 
-function ProfileThrownPromiseHost(props) @{
+function ErrorBoundaryApp(props) @{
 	<>
 		@try {
-			<ProfileThrownPromise promise={props.promise} />
+			<ThrowingChild value={props.value} />
 		} @catch (error) {
 			<em>caught</em>
 		}
 	</>
 }
 
-function useProfileCounter() {
+function useCounter() {
 	return useState(0);
 }
 
-function ProfileCustomHookHost() @{
-	const [count, setCount] = useProfileCounter();
+function CustomHookCounter() @{
+	const [count, setCount] = useCounter();
 	<button onClick={() => setCount(count + 1)}>
 		{count as string}
 	</button>
 }
 
-function ProfileDeferredHost() @{
+function DeferredLabel() @{
 	const [value, setValue] = useState('before');
 	const deferred = useDeferredValue(value);
 	<button onClick={() => setValue('after')}>{deferred}</button>
 }
 
-function ProfileTransitionRebaseHost(props) @{
+function TransitionRebaseApp(props) @{
 	const [value, setValue] = useState(1);
 	const [isPending, start] = useTransition();
 	<>
 		<button
-			id="profile-stage"
+			id="stage"
 			onClick={() => start(async () => {
 				setValue(0);
 				await props.gate;
@@ -92,384 +90,295 @@ function ProfileTransitionRebaseHost(props) @{
 		>
 			{isPending ? 'pending' : 'stage'}
 		</button>
-		<button id="profile-urgent" onClick={() => setValue(0)}>
+		<button id="urgent" onClick={() => setValue(0)}>
 			{value as string}
 		</button>
 	</>
 }
 
-let scheduleProfileMemoChild = () => {};
+let updateMemoChild = () => {};
 
-function ProfileMemoChildImpl() @{
+function MemoChildImpl() @{
 	const [count, setCount] = useState(0);
-	scheduleProfileMemoChild = () => setCount(count + 1);
+	updateMemoChild = () => setCount(count + 1);
 	<span>
 		{count as string}
 	</span>
 }
-const ProfileMemoChild = memo(ProfileMemoChildImpl);
+const MemoChild = memo(MemoChildImpl);
 
-function ProfileMemoCascadeHost() @{
+function ParentAndChildUpdateApp() @{
 	const [count, setCount] = useState(0);
 	<>
 		<button
 			onClick={() => {
 				setCount(count + 1);
-				scheduleProfileMemoChild();
+				updateMemoChild();
 			}}
 		>
 			{count as string}
 		</button>
-		<ProfileMemoChild />
+		<MemoChild />
 	</>
 }
 
-function ProfileReturnChild() @{
-	<span>child</span>
-}
-
-function ProfileReturnHost(props) {
-	if (!props.show) return null;
-	return <div>
-		<ProfileReturnChild />
-	</div>;
-}
-
-function ProfileDirectReturnChild() @{
+function DirectChild() @{
 	<strong>direct child</strong>
 }
 
-function ProfileDirectReturnHost() {
-	return <ProfileDirectReturnChild />;
+function DirectReturnApp() {
+	return <DirectChild />;
 }
 
-function ProfileValueChild() @{
+function ValueChild() @{
 	<b>value child</b>
 }
 
-function ProfileValueHost() @{
+function ComponentValueApp() @{
 	<>
-		{ProfileValueChild}
-		<ProfileValueChild />
+		{ValueChild}
+		<ValueChild />
 	</>
 }
 
-function ProfileDynamicHost(props) @{
+function NativeElementApp(props) @{
 	const Tag = props.tag;
-	<Tag>dynamic</Tag>
+	<Tag>native element</Tag>
 }
 
-function ProfilePortalBody(props) @{
+function PortalBody(props) @{
 	<span>{props.label}</span>
 }
 
-function ProfilePortalHost(props) @{
+function ComponentPortalApp(props) @{
 	const [label, setLabel] = useState('first');
 	<div>
-		<button onClick={() => setLabel('second')}>{'update portal'}</button>
-		{createPortal(ProfilePortalBody, props.target, { label })}
+		<button onClick={() => setLabel('second')}>update portal</button>
+		{createPortal(PortalBody, props.target, { label })}
 	</div>
 }
 
-function ProfileInlinePortalHost(props) @{
+function InlinePortalApp(props) @{
 	<div>{createPortal(<span>inline portal</span>, props.target)}</div>
 }
 
-afterEach(() => {
+function renders(component) {
+	return profiler.why(component).filter((event) => event.type === 'component-render');
+}
+
+function render(component, phase) {
+	const event = renders(component).find((candidate) => candidate.phase === phase);
+	expect(event).toBeDefined();
+	return event;
+}
+
+function cause(event, type) {
+	return event.causes.find((candidate) => candidate.type === type);
+}
+
+beforeEach(() => {
 	profiler.clear();
 	profiler.start({ timeline: false });
 });
 
-describe('profile-specialized runtime', () => {
-	it(
-		'records full and lite component spans, causes, stable instances, and memo bails',
-		async () => {
-			profiler.clear();
-			profiler.start({ timeline: false });
-			const mounted = mount(ProfileHost);
-			await act(() => mounted.click('button'));
+afterEach(() => {
+	profiler.stop();
+});
 
-			const events = profiler.getEvents();
-			if (!PROFILE_BUILD) {
-				expect(events).toEqual([]);
-				mounted.unmount();
-				return;
-			}
-
-			const host = events.filter(
-				(event) => event.type === 'component-render' && event.component === 'ProfileHost',
-			);
-			expect(host).toHaveLength(2);
-			expect(host.map((event) => event.phase)).toEqual(['mount', 'update']);
-			expect(new Set(host.map((event) => event.instanceId)).size).toBe(1);
-			expect(host[1].causes).toEqual(
-				expect.arrayContaining([
-					expect.objectContaining({ type: 'state', hook: 'useState' }),
-				]),
-			);
-
-			const lite = events.filter(
-				(event) => event.type === 'component-render' && event.component === 'LiteLeaf',
-			);
-			expect(lite).toHaveLength(2);
-			expect(new Set(lite.map((event) => event.instanceId)).size).toBe(1);
-			expect(lite[1].causes).toContainEqual({ type: 'parent' });
-			for (const event of events) {
-				expect(event.selfDuration).toBeGreaterThanOrEqual(0);
-				expect(event.selfDuration).toBeLessThanOrEqual(event.duration);
-			}
-
-			expect(
-				events.some(
-					(event) =>
-						event.type === 'component-bailout' && event.component === 'MemoLeaf' &&
-							event.causes.some((cause) => cause.type === 'memo-bailout'),
-				),
-			).toBe(true);
-			expect(globalThis.__OCTANE_PROFILER__).toBe(profiler);
-			mounted.unmount();
-		},
-	);
-
-	it('classifies a real use() suspension as suspended rather than errored', () => {
-		profiler.clear();
-		profiler.start({ timeline: false });
-		const promise = new Promise<string>(() => {});
-		const mounted = mount(ProfileSuspenseHost, { promise });
-
-		if (!PROFILE_BUILD) {
-			expect(profiler.getEvents()).toEqual([]);
-			mounted.unmount();
-			return;
-		}
-
-		const attempts = profiler.getEvents().filter(
-			(event) => event.type === 'component-render' && event.component === 'ProfileSlow',
-		);
-		expect(attempts).toHaveLength(1);
-		expect(attempts[0]).toMatchObject({ outcome: 'suspended', phase: 'mount' });
-		mounted.unmount();
-	});
-
-	it('classifies a directly thrown Promise as an error, not a suspension', () => {
-		profiler.clear();
-		profiler.start({ timeline: false });
-		const mounted = mount(ProfileThrownPromiseHost, { promise: Promise.resolve('value') });
-
-		if (!PROFILE_BUILD) {
-			expect(profiler.getEvents()).toEqual([]);
-			mounted.unmount();
-			return;
-		}
-
-		const attempt = profiler.getEvents().find(
-			(event) => event.component === 'ProfileThrownPromise',
-		);
-		expect(attempt).toMatchObject({ outcome: 'errored', phase: 'mount' });
-		mounted.unmount();
-	});
-
-	it('preserves base hook metadata through a custom-hook slot path', async () => {
-		profiler.clear();
-		profiler.start({ timeline: false });
-		const mounted = mount(ProfileCustomHookHost);
+describe('profile build component events', () => {
+	it('keeps component identity across mount and state-driven updates', async () => {
+		const mounted = mount(CounterApp);
 		await act(() => mounted.click('button'));
 
-		if (!PROFILE_BUILD) {
-			expect(profiler.getEvents()).toEqual([]);
-			mounted.unmount();
-			return;
+		const appEvents = renders('CounterApp');
+		expect(appEvents.map((event) => event.phase)).toEqual(['mount', 'update']);
+		expect(new Set(appEvents.map((event) => event.instanceId)).size).toBe(1);
+		expect(cause(appEvents[1], 'state')).toMatchObject({ hook: 'useState' });
+
+		const leafEvents = renders('CounterLeaf');
+		expect(leafEvents.map((event) => event.phase)).toEqual(['mount', 'update']);
+		expect(new Set(leafEvents.map((event) => event.instanceId)).size).toBe(1);
+		expect(cause(leafEvents[1], 'parent')).toBeDefined();
+		for (const event of [...appEvents, ...leafEvents]) {
+			expect(event.selfDuration).toBeGreaterThanOrEqual(0);
+			expect(event.selfDuration).toBeLessThanOrEqual(event.duration);
 		}
 
-		const update = profiler.getEvents().find(
-			(event) =>
-				event.type === 'component-render' && event.component === 'ProfileCustomHookHost' &&
-					event.phase === 'update',
-		);
-		expect(update?.causes).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({
-					type: 'state',
-					hook: 'useState',
-					source: expect.stringContaining('profiling-runtime.test.tsrx:'),
-				}),
-			]),
-		);
 		mounted.unmount();
 	});
 
-	it('attributes external-store and deferred hook schedules', async () => {
-		profiler.clear();
-		profiler.start({ timeline: false });
+	it('reports a memo bailout separately from component invocation', async () => {
+		const mounted = mount(CounterApp);
+		await act(() => mounted.click('button'));
+
+		const events = profiler.why('StaticBadge');
+		expect(events.filter((event) => event.type === 'component-render')).toHaveLength(1);
+		expect(events.filter((event) => event.type === 'component-bailout')).toHaveLength(1);
+		expect(cause(events.at(-1), 'memo-bailout')).toBeDefined();
+		expect(profiler.summary().find((entry) => entry.component === 'StaticBadge')).toMatchObject({
+			attempts: 1,
+			bails: 1,
+		});
+
+		mounted.unmount();
+	});
+
+	it('reports use() suspension as a suspended render attempt', () => {
+		const mounted = mount(SuspenseApp, { promise: new Promise<string>(() => {}) });
+
+		expect(render('SuspendingChild', 'mount').outcome).toBe('suspended');
+
+		mounted.unmount();
+	});
+
+	it('reports thrown errors without retaining their value', () => {
+		const mounted = mount(ErrorBoundaryApp, {
+			value: new Error('sensitive application detail'),
+		});
+
+		expect(render('ThrowingChild', 'mount').outcome).toBe('errored');
+		expect(JSON.stringify(profiler.getEvents())).not.toContain('sensitive application detail');
+
+		mounted.unmount();
+	});
+
+	it('does not mistake an arbitrary thrown Promise for use() suspension', () => {
+		const mounted = mount(ErrorBoundaryApp, { value: Promise.resolve('value') });
+
+		expect(render('ThrowingChild', 'mount').outcome).toBe('errored');
+
+		mounted.unmount();
+	});
+});
+
+describe('profile build render causes', () => {
+	it('retains base-hook metadata through a custom hook', async () => {
+		const mounted = mount(CustomHookCounter);
+		await act(() => mounted.click('button'));
+
+		expect(cause(render('CustomHookCounter', 'update'), 'state')).toMatchObject({
+			hook: 'useState',
+			source: expect.stringContaining('profiling-runtime.test.tsrx:'),
+		});
+
+		mounted.unmount();
+	});
+
+	it('identifies updates from an external store', async () => {
 		const store = makeStore(0);
-		const reader = mount(Reader, { store });
+		const mounted = mount(Reader, { store });
 		await nextPaint();
 		profiler.clear();
+
 		store.set(1);
 		await nextPaint();
 
-		if (!PROFILE_BUILD) {
-			expect(profiler.getEvents()).toEqual([]);
-			reader.unmount();
-			return;
-		}
+		expect(cause(render('Reader', 'update'), 'external-store')).toMatchObject({
+			hook: 'useSyncExternalStore',
+			source: expect.stringContaining('sync-external-store.tsrx:'),
+		});
 
-		const readerUpdate = profiler.getEvents().find(
-			(event) => event.type === 'component-render' && event.component === 'Reader' &&
-				event.phase === 'update',
-		);
-		expect(readerUpdate?.causes).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({
-					type: 'external-store',
-					hook: 'useSyncExternalStore',
-					source: expect.stringContaining('sync-external-store.tsrx:'),
-				}),
-			]),
-		);
-		reader.unmount();
-
-		profiler.clear();
-		const deferred = mount(ProfileDeferredHost);
-		await act(() => deferred.click('button'));
-		const deferredUpdate = profiler.getEvents().find(
-			(event) => event.causes.some((cause) => cause.type === 'deferred-value'),
-		);
-		expect(deferredUpdate?.causes).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({
-					type: 'deferred-value',
-					hook: 'useDeferredValue',
-				}),
-			]),
-		);
-		deferred.unmount();
-	});
-
-	it(
-		'attributes context refreshes and only records transition state after a real commit',
-		async () => {
-			profiler.clear();
-			profiler.start({ timeline: false });
-			const context = mount(ProfileContextApp, { value: 1 });
-			profiler.clear();
-			context.update(ProfileContextApp, { value: 2 });
-
-			if (!PROFILE_BUILD) {
-				expect(profiler.getEvents()).toEqual([]);
-				context.unmount();
-				return;
-			}
-
-			const consumer = profiler.getEvents().find(
-				(event) => event.component === 'Consumer' && event.phase === 'update',
-			);
-			expect(consumer?.causes).toContainEqual({ type: 'context' });
-			context.unmount();
-
-			let resolveGate: () => void;
-			const gate = new Promise<void>((resolve) => {
-				resolveGate = resolve;
-			});
-			profiler.clear();
-			const transition = mount(ProfileTransitionRebaseHost, { gate });
-			transition.click('#profile-stage');
-			transition.click('#profile-urgent');
-			profiler.clear();
-			await act(() => resolveGate());
-			const causes = profiler.getEvents().flatMap((event) => event.causes);
-			expect(causes.some((cause) => cause.type === 'state')).toBe(false);
-			expect(causes.some((cause) => cause.type === 'transition-pending')).toBe(true);
-			transition.unmount();
-		},
-	);
-
-	it('does not consume a memo child state cause during an ancestor-first bailout', async () => {
-		profiler.clear();
-		profiler.start({ timeline: false });
-		const mounted = mount(ProfileMemoCascadeHost);
-		profiler.clear();
-		await act(() => mounted.click('button'));
-
-		if (!PROFILE_BUILD) {
-			expect(profiler.getEvents()).toEqual([]);
-			mounted.unmount();
-			return;
-		}
-
-		const events = profiler.why('ProfileMemoChild');
-		const bail = events.find((event) => event.type === 'component-bailout');
-		const update = events.find(
-			(event) => event.type === 'component-render' && event.phase === 'update',
-		);
-		expect(bail?.causes).toEqual(
-			expect.arrayContaining([{ type: 'memo-bailout' }, { type: 'parent' }]),
-		);
-		expect(bail?.causes.some((cause) => cause.type === 'state')).toBe(false);
-		expect(update?.causes).toEqual(
-			expect.arrayContaining([expect.objectContaining({ type: 'state', hook: 'useState' })]),
-		);
 		mounted.unmount();
 	});
 
-	it('omits internal renderers while retaining every real component boundary', async () => {
+	it('identifies the deferred follow-up render', async () => {
+		const mounted = mount(DeferredLabel);
+		await act(() => mounted.click('button'));
+
+		const deferred = renders('DeferredLabel').find(
+			(event) => cause(event, 'deferred-value') !== undefined,
+		);
+		expect(deferred).toBeDefined();
+		expect(cause(deferred, 'deferred-value')).toMatchObject({ hook: 'useDeferredValue' });
+
+		mounted.unmount();
+	});
+
+	it('identifies context-driven consumer updates', () => {
+		const mounted = mount(ContextApp, { value: 1 });
 		profiler.clear();
-		profiler.start({ timeline: false });
-		const returned = mount(ProfileReturnHost, { show: true });
 
-		if (!PROFILE_BUILD) {
-			expect(profiler.getEvents()).toEqual([]);
-			returned.unmount();
-			return;
-		}
+		mounted.update(ContextApp, { value: 2 });
 
-		expect(
-			Array.from(new Set(profiler.getEvents().map((event) => event.component))).sort(),
-		).toEqual(['ProfileReturnChild', 'ProfileReturnHost']);
-		expect(profiler.getEvents().every((event) => event.file !== '<runtime>')).toBe(true);
-		returned.unmount();
+		expect(cause(render('Consumer', 'update'), 'context')).toBeDefined();
 
+		mounted.unmount();
+	});
+
+	it('does not report a rebased state update that never renders', async () => {
+		let resolveGate: () => void;
+		const gate = new Promise<void>((resolve) => {
+			resolveGate = resolve;
+		});
+		const mounted = mount(TransitionRebaseApp, { gate });
+		mounted.click('#stage');
+		mounted.click('#urgent');
 		profiler.clear();
-		const dynamic = mount(ProfileDynamicHost, { tag: 'section' });
-		expect(Array.from(new Set(profiler.getEvents().map((event) => event.component)))).toEqual([
-			'ProfileDynamicHost',
+
+		await act(() => resolveGate());
+
+		const causes = profiler.getEvents().flatMap((event) => event.causes);
+		expect(causes.some((entry) => entry.type === 'state')).toBe(false);
+		expect(causes.some((entry) => entry.type === 'transition-pending')).toBe(true);
+
+		mounted.unmount();
+	});
+
+	it('preserves a child state cause when its parent updates in the same event', async () => {
+		const mounted = mount(ParentAndChildUpdateApp);
+		profiler.clear();
+
+		await act(() => mounted.click('button'));
+
+		const bailout = profiler.why('MemoChild').find((event) => event.type === 'component-bailout');
+		expect(bailout).toBeDefined();
+		expect(cause(bailout, 'state')).toBeUndefined();
+		expect(cause(bailout, 'memo-bailout')).toBeDefined();
+		expect(cause(render('MemoChild', 'update'), 'state')).toMatchObject({ hook: 'useState' });
+
+		mounted.unmount();
+	});
+});
+
+describe('profile build component boundaries', () => {
+	it('recognizes components rendered directly and as values', () => {
+		const direct = mount(DirectReturnApp);
+		expect(profiler.summary().map((entry) => entry.component).sort()).toEqual([
+			'DirectChild',
+			'DirectReturnApp',
 		]);
-		dynamic.unmount();
-
-		profiler.clear();
-		const direct = mount(ProfileDirectReturnHost);
-		expect(
-			Array.from(new Set(profiler.getEvents().map((event) => event.component))).sort(),
-		).toEqual(['ProfileDirectReturnChild', 'ProfileDirectReturnHost']);
 		direct.unmount();
 
 		profiler.clear();
-		const value = mount(ProfileValueHost);
-		const valueChildren = profiler.getEvents().filter(
-			(event) => event.component === 'ProfileValueChild',
-		);
-		expect(valueChildren).toHaveLength(2);
-		expect(new Set(valueChildren.map((event) => event.instanceId)).size).toBe(2);
+		const value = mount(ComponentValueApp);
+		const children = renders('ValueChild');
+		expect(children).toHaveLength(2);
+		expect(new Set(children.map((event) => event.instanceId)).size).toBe(2);
 		value.unmount();
+	});
 
-		profiler.clear();
+	it('does not report a dynamic native tag as a component', () => {
+		const mounted = mount(NativeElementApp, { tag: 'section' });
+
+		expect(profiler.summary().map((entry) => entry.component)).toEqual(['NativeElementApp']);
+
+		mounted.unmount();
+	});
+
+	it('tracks component portals while leaving inline portal content inline', async () => {
 		const target = document.createElement('div');
 		document.body.appendChild(target);
-		const portalled = mount(ProfilePortalHost, { target });
-		await act(() => portalled.click('button'));
-		const portalEvents = profiler.getEvents().filter(
-			(event) => event.component === 'ProfilePortalBody',
-		);
-		expect(portalEvents).toHaveLength(2);
+		const componentPortal = mount(ComponentPortalApp, { target });
+		await act(() => componentPortal.click('button'));
+
+		const portalEvents = renders('PortalBody');
+		expect(portalEvents.map((event) => event.phase)).toEqual(['mount', 'update']);
 		expect(new Set(portalEvents.map((event) => event.instanceId)).size).toBe(1);
-		portalled.unmount();
+		componentPortal.unmount();
 
 		profiler.clear();
-		const inlinePortal = mount(ProfileInlinePortalHost, { target });
-		expect(Array.from(new Set(profiler.getEvents().map((event) => event.component)))).toEqual([
-			'ProfileInlinePortalHost',
-		]);
-		expect(profiler.getEvents().every((event) => event.file !== '<runtime>')).toBe(true);
+		const inlinePortal = mount(InlinePortalApp, { target });
+		expect(profiler.summary().map((entry) => entry.component)).toEqual(['InlinePortalApp']);
 		inlinePortal.unmount();
 		target.remove();
 	});

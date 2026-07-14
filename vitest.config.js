@@ -121,6 +121,7 @@ export default defineConfig({
 				test: {
 					name: 'octane',
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
+					exclude: [...configDefaults.exclude, 'packages/octane/tests/profiling-runtime.test.tsrx'],
 					environment: 'jsdom',
 					// Precompiles every fixture through @tsrx/react + esbuild before any
 					// test loads — runs in pure Node so esbuild's TextEncoder requirements
@@ -136,8 +137,8 @@ export default defineConfig({
 					// fetch-tree warming) runs at its DEFAULT (on). Tests that pin
 					// the opt-out output call compile() with `parallelUse: false`.
 					//
-					// No `exclude` lists anywhere in this config: bindings whose `.ts`
-					// sources hand-forward hook slots declare
+					// Bindings whose `.ts` sources hand-forward hook slots do not need
+					// package-specific exclusions: they declare
 					// `"octane": { "hookSlots": { "manual": ["src"] } }` in their own package.json and
 					// the plugin skips them automatically (nearest-manifest lookup) — the
 					// same declaration covers every project below, the website, examples,
@@ -158,6 +159,7 @@ export default defineConfig({
 				test: {
 					name: 'octane-prod',
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
+					exclude: [...configDefaults.exclude, 'packages/octane/tests/profiling-runtime.test.tsrx'],
 					environment: 'jsdom',
 					globalSetup: ['packages/octane/tests/differential/_setup.ts'],
 					setupFiles: ['packages/octane/tests/_per-test-setup.ts'],

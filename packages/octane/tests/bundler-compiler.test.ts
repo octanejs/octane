@@ -8,6 +8,7 @@ import {
 	createOctaneCompiler,
 	resolveOctaneRuntimeRequest,
 } from '../src/compiler/bundler.js';
+import { inspectProfileOutput, uniqueMetadata } from './_profile-output';
 
 const COMPONENT =
 	"import { useState } from 'octane';\n" +
@@ -18,6 +19,12 @@ const COMPONENT =
 
 const HOOK =
 	"import { useState } from 'octane';\n" + 'export function useCount() { return useState(0); }\n';
+
+function profileFiles(code: string | undefined): Set<string> {
+	if (code === undefined) return new Set();
+	const output = inspectProfileOutput(code);
+	return new Set(uniqueMetadata([...output.components, ...output.hooks]).map(({ file }) => file));
+}
 
 describe('bundler-neutral compiler integration', () => {
 	it('canonicalizes root files and strips bundler queries', () => {
@@ -53,28 +60,29 @@ describe('bundler-neutral compiler integration', () => {
 		expect(server?.code).not.toContain('webpackHot');
 	});
 
-	it('specializes profiling for client transforms independently of dev and HMR', () => {
+	it('applies profiling metadata only to client transforms', () => {
 		const compiler = createOctaneCompiler({ root: '/project', profile: true });
 		const client = compiler.transform(COMPONENT, '/project/src/App.tsrx', {
 			environment: 'client',
 			hmr: false,
 			dev: false,
 		});
-		expect(client?.code).toContain('__profileComponent');
-		expect(client?.code).toContain('"id":"/src/App.tsrx#App@2:7"');
-		expect(client?.code).not.toContain('__s.locs');
+		const clientProfile = inspectProfileOutput(client!.code);
+		expect(uniqueMetadata(clientProfile.components)).toEqual([
+			expect.objectContaining({ name: 'App', file: '/src/App.tsrx', kind: 'component' }),
+		]);
 
 		const disabled = compiler.transform(COMPONENT, '/project/src/App.tsrx', {
 			environment: 'client',
 			profile: false,
 		});
-		expect(disabled?.code).not.toContain('__profile');
+		expect(inspectProfileOutput(disabled!.code).profileImports).toEqual(new Set());
 
 		const server = compiler.transform(COMPONENT, '/project/src/App.tsrx', {
 			environment: 'server',
 			profile: true,
 		});
-		expect(server?.code).not.toContain('__profile');
+		expect(inspectProfileOutput(server!.code).profileImports).toEqual(new Set());
 	});
 
 	it('exposes exact client/server runtime request mapping', () => {
@@ -178,7 +186,7 @@ describe('bundler-neutral compiler integration', () => {
 		}
 	});
 
-	it('uses portable profile source IDs and redacts arbitrary external paths', () => {
+	it('uses portable source names in profile metadata', () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-profile-source-'));
 		try {
 			const projectRoot = join(fixtureRoot, 'project');
@@ -191,9 +199,7 @@ describe('bundler-neutral compiler integration', () => {
 
 			const compiler = createOctaneCompiler({ root: linkedRoot, profile: true });
 			const app = compiler.transform(COMPONENT, join(realProjectRoot, 'src/App.tsrx'));
-			expect(app?.code).toContain('"file":"/src/App.tsrx"');
-			expect(app?.code).not.toContain(realProjectRoot);
-			expect(app?.code).not.toContain(resolve(linkedRoot));
+			expect(profileFiles(app?.code)).toEqual(new Set(['/src/App.tsrx']));
 
 			const packageRoot = join(fixtureRoot, 'shared-ui');
 			mkdirSync(join(packageRoot, 'src'), { recursive: true });
@@ -202,17 +208,18 @@ describe('bundler-neutral compiler integration', () => {
 				JSON.stringify({ name: '@scope/ui', peerDependencies: { octane: '*' } }),
 			);
 			const packaged = compiler.transform(COMPONENT, join(packageRoot, 'src/Card.tsx'));
-			expect(packaged?.code).toContain('"file":"/@package/%40scope%2Fui/src/Card.tsx"');
-			expect(packaged?.code).not.toContain(packageRoot);
+			expect(profileFiles(packaged?.code)).toEqual(
+				new Set(['/@package/%40scope%2Fui/src/Card.tsx']),
+			);
 			const packagedHook = compiler.transform(HOOK, join(packageRoot, 'src/useCount.ts'));
-			expect(packagedHook?.code).toContain('"file":"/@package/%40scope%2Fui/src/useCount.ts"');
-			expect(packagedHook?.code).not.toContain(packageRoot);
+			expect(profileFiles(packagedHook?.code)).toEqual(
+				new Set(['/@package/%40scope%2Fui/src/useCount.ts']),
+			);
 
 			const externalRoot = join(fixtureRoot, 'unowned');
 			mkdirSync(externalRoot);
 			const external = compiler.transform(COMPONENT, join(externalRoot, 'Loose.tsrx'));
-			expect(external?.code).toContain('"file":"/@external/Loose.tsrx"');
-			expect(external?.code).not.toContain(externalRoot);
+			expect(profileFiles(external?.code)).toEqual(new Set(['/@external/Loose.tsrx']));
 		} finally {
 			rmSync(fixtureRoot, { recursive: true, force: true });
 		}

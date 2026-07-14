@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -12,12 +12,24 @@ function configure(options: Parameters<typeof octaneMdx>[0], root: string) {
 	return plugin;
 }
 
-async function transform(plugin: ReturnType<typeof octaneMdx>, id: string) {
-	return plugin.transform.call({ addWatchFile() {} }, SOURCE, id);
+async function transform(
+	plugin: ReturnType<typeof octaneMdx>,
+	id: string,
+	watchFiles: string[] = [],
+) {
+	return plugin.transform.call(
+		{ addWatchFile: (file: string) => watchFiles.push(file) },
+		SOURCE,
+		id,
+	);
+}
+
+function profileFiles(code: string | undefined) {
+	return new Set(Array.from(code?.matchAll(/"file":"([^"]+)"/g) ?? [], (match) => match[1]));
 }
 
 describe('octaneMdx() profile source privacy', () => {
-	it('emits portable project, package, and unowned external identities', async () => {
+	it('uses portable project, package, and external identities', async () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-mdx-profile-output-'));
 		try {
 			const projectRoot = join(fixtureRoot, 'project');
@@ -35,23 +47,24 @@ describe('octaneMdx() profile source privacy', () => {
 			mkdirSync(externalRoot);
 
 			const plugin = configure({ profile: true }, projectRoot);
-			const project = await transform(plugin, projectDocument);
-			expect(project?.code).toContain('"file":"/docs/App.mdx"');
-			expect(JSON.stringify(project)).not.toContain(fixtureRoot);
-
-			const packaged = await transform(plugin, packageDocument);
-			expect(packaged?.code).toContain('"file":"/@package/%40scope%2Fdocs/content/Guide.mdx"');
-			expect(JSON.stringify(packaged)).not.toContain(fixtureRoot);
-
-			const external = await transform(plugin, externalDocument);
-			expect(external?.code).toContain('"file":"/@external/Loose.mdx"');
-			expect(JSON.stringify(external)).not.toContain(fixtureRoot);
+			const watchFiles: string[] = [];
+			for (const [document, expected] of [
+				[projectDocument, '/docs/App.mdx'],
+				[packageDocument, '/@package/%40scope%2Fdocs/content/Guide.mdx'],
+				[externalDocument, '/@external/Loose.mdx'],
+			] as const) {
+				const result = await transform(plugin, document, watchFiles);
+				expect(profileFiles(result?.code)).toContain(expected);
+				expect(result?.code).not.toContain(fixtureRoot);
+				expect(result?.code).not.toContain(realpathSync(fixtureRoot));
+			}
+			expect(watchFiles).toContain(join(packageRoot, 'package.json'));
 		} finally {
 			rmSync(fixtureRoot, { recursive: true, force: true });
 		}
 	});
 
-	it('keeps normal and server adapter output byte-identical when profile is off', async () => {
+	it('leaves normal and server output unchanged', async () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-mdx-profile-off-'));
 		try {
 			const projectRoot = join(fixtureRoot, 'project');
