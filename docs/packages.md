@@ -42,7 +42,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.3` | 2 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.6` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.5` | 5 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.6` | 8 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.6` | 9 |
 
 ## Private packages
 

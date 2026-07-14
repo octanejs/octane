@@ -32,7 +32,15 @@ export function inferRspackEnvironment(target) {
 	return 'client';
 }
 
-const LOADER_OPTION_KEYS = new Set(['root', 'environment', 'hmr', 'dev', 'parallelUse', 'exclude']);
+const LOADER_OPTION_KEYS = new Set([
+	'root',
+	'environment',
+	'hmr',
+	'dev',
+	'profile',
+	'parallelUse',
+	'exclude',
+]);
 const PLUGIN_OPTION_KEYS = new Set([...LOADER_OPTION_KEYS, 'transpile']);
 
 function assertBooleanOption(options, key) {
@@ -64,6 +72,7 @@ function normalizeOptions(value, plugin) {
 	}
 	assertBooleanOption(options, 'hmr');
 	assertBooleanOption(options, 'dev');
+	assertBooleanOption(options, 'profile');
 	assertBooleanOption(options, 'parallelUse');
 	if (
 		options.exclude !== undefined &&
@@ -78,6 +87,7 @@ function normalizeOptions(value, plugin) {
 		...(options.environment === undefined ? null : { environment: options.environment }),
 		...(options.hmr === undefined ? null : { hmr: options.hmr }),
 		...(options.dev === undefined ? null : { dev: options.dev }),
+		...(options.profile === undefined ? null : { profile: options.profile }),
 		...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
 		...(options.exclude === undefined ? null : { exclude: [...options.exclude] }),
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),

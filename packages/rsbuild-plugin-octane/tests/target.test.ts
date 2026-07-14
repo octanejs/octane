@@ -1,4 +1,12 @@
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+	mkdtempSync,
+	mkdirSync,
+	readFileSync,
+	readdirSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +26,19 @@ function link(root: string, packageName: string, target: string) {
 	const destination = join(root, 'node_modules', ...packageName.split('/'));
 	mkdirSync(dirname(destination), { recursive: true });
 	symlinkSync(target, destination, 'dir');
+}
+
+function readJavaScript(directory: string): string {
+	return readdirSync(directory, { withFileTypes: true })
+		.flatMap((entry) => {
+			const file = join(directory, entry.name);
+			return entry.isDirectory()
+				? readJavaScript(file)
+				: /\.m?js$/.test(entry.name)
+					? readFileSync(file, 'utf8')
+					: '';
+		})
+		.join('\n');
 }
 
 function writeApp(root: string, target: string) {
@@ -100,6 +121,22 @@ describe('Rsbuild build.target mapping', () => {
 				['node', 'browserslist:chrome >= 100,firefox >= 100'],
 			]),
 		);
+	});
+
+	it('emits profiling only in the client production bundle', async () => {
+		writeApp(root, JSON.stringify('es2022'));
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ hmr: false, profile: true })] },
+		});
+		await instance.build();
+
+		const client = readJavaScript(join(root, 'dist/client'));
+		const server = readJavaScript(join(root, 'dist/server'));
+		for (const marker of ['__OCTANE_PROFILER__', 'octane.component', '/src/Page.tsrx#Page']) {
+			expect(client).toContain(marker);
+			expect(server).not.toContain(marker);
+		}
 	});
 
 	it('rejects ambiguous mixed ES and browser target arrays', async () => {

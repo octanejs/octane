@@ -229,7 +229,9 @@ function rejectTextareaValueChildren(tag, node, ctx) {
 // the component function, where a user binding with the same name would
 // silently shadow a bare helper (`const [text, setText] = useState('')` is the
 // canonical collision). Every name in `ctx.runtimeNeeded` is emitted aliased;
-// names the user's own code references (their preserved `octane` import
+// compiler-only profiling ABI names are tracked separately and imported from
+// `octane/profiling`, keeping them off the main React-shaped namespace. Names
+// the user's own code references (their preserved `octane` import
 // specifiers + slotted base-hook call sites) live in `ctx.userRuntimeNames`
 // and stay un-aliased. A name can appear in both (two import specifiers of
 // the same export — valid JS).
@@ -253,6 +255,13 @@ function buildRuntimeImport(ctx, moduleName) {
 		out += `import { ${[...specifiers].sort().join(', ')} } from '${moduleName}';\n`;
 	}
 	return out === '' ? '' : out + '\n';
+}
+
+function buildProfileRuntimeImport(ctx) {
+	const specifiers = [...ctx.profileRuntimeNeeded].map((name) => `${name} as ${rtAlias(name)}`);
+	return specifiers.length === 0
+		? ''
+		: `import { ${specifiers.sort().join(', ')} } from 'octane/profiling';\n\n`;
 }
 
 // Record a user `import { … } from 'octane'` declaration's specifiers so the
@@ -2167,11 +2176,391 @@ function devLoc(ctx, node) {
 	return l ? [l.line, l.column | 0] : undefined;
 }
 
+function profileSourceLoc(node) {
+	const loc = node?.loc?.start;
+	return {
+		line: loc?.line ?? 0,
+		column: loc?.column ?? 0,
+	};
+}
+
+function profileComponentId(ctx, componentName, node) {
+	const loc = profileSourceLoc(node);
+	return `${ctx.profileFilename || '<anon>'}#${componentName}@${loc.line}:${loc.column}`;
+}
+
+function profileOwner(ctx, node, name) {
+	return {
+		name,
+		id: profileComponentId(ctx, name, node),
+	};
+}
+
+function profileComponentMetadata(ctx, node, name, identityName = name) {
+	const loc = profileSourceLoc(node);
+	return {
+		id: profileComponentId(ctx, identityName, node),
+		name,
+		file: ctx.profileFilename || '<anon>',
+		line: loc.line,
+		column: loc.column,
+		kind: 'component',
+	};
+}
+
+function recordProfileComponent(ctx, node, name, identityName = name) {
+	if (!ctx.profile) return;
+	const metadata = profileComponentMetadata(ctx, node, name, identityName);
+	if (ctx.profileComponentIds.has(metadata.id)) return;
+	ctx.profileComponentIds.add(metadata.id);
+	ctx.profileComponents.push(metadata);
+}
+
+function profileMetadataAst(metadata) {
+	return {
+		type: 'ObjectExpression',
+		properties: Object.entries(metadata).map(([key, value]) => ({
+			type: 'Property',
+			key: { type: 'Identifier', name: key },
+			value: { type: 'Literal', value, raw: JSON.stringify(value) },
+			kind: 'init',
+			method: false,
+			shorthand: false,
+			computed: false,
+		})),
+	};
+}
+
+function profileRegistrationAst(bindingName, metadata) {
+	return {
+		type: 'ExpressionStatement',
+		expression: {
+			type: 'CallExpression',
+			callee: { type: 'Identifier', name: '_$__profileComponent' },
+			arguments: [{ type: 'Identifier', name: bindingName }, profileMetadataAst(metadata)],
+			optional: false,
+		},
+	};
+}
+
+function profileComponentCallAst(value, metadata) {
+	return {
+		type: 'CallExpression',
+		callee: { type: 'Identifier', name: '_$__profileComponent' },
+		arguments: [value, profileMetadataAst(metadata)],
+		optional: false,
+	};
+}
+
+function nodeContainsJsx(node) {
+	if (node == null || typeof node !== 'object') return false;
+	if (Array.isArray(node)) return node.some(nodeContainsJsx);
+	if (isJsxNode(node)) return true;
+	for (const key in node) {
+		if (AST_WALK_SKIP_KEYS.has(key)) continue;
+		if (nodeContainsJsx(node[key])) return true;
+	}
+	return false;
+}
+
+function functionProducesJsx(node) {
+	if (
+		!node ||
+		(node.type !== 'FunctionDeclaration' &&
+			node.type !== 'FunctionExpression' &&
+			node.type !== 'ArrowFunctionExpression')
+	) {
+		return false;
+	}
+	if (node.body?.type === 'JSXCodeBlock') return true;
+	if (node.type === 'ArrowFunctionExpression' && node.expression) {
+		return nodeContainsJsx(node.body);
+	}
+	if (node.body?.type !== 'BlockStatement') return false;
+
+	let found = false;
+	const visitStatement = (statement) => {
+		if (found || statement == null || typeof statement !== 'object') return;
+		if (
+			statement !== node.body &&
+			(statement.type === 'FunctionDeclaration' ||
+				statement.type === 'FunctionExpression' ||
+				statement.type === 'ArrowFunctionExpression')
+		) {
+			return;
+		}
+		if (statement.type === 'ReturnStatement' && nodeContainsJsx(statement.argument)) {
+			found = true;
+			return;
+		}
+		for (const key in statement) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			const value = statement[key];
+			if (Array.isArray(value)) {
+				for (const child of value) visitStatement(child);
+			} else {
+				visitStatement(value);
+			}
+		}
+	};
+	for (const statement of node.body.body || []) visitStatement(statement);
+	return found;
+}
+
+function profileFactoryName(node, ctx) {
+	const value = unwrapTsExpr(node);
+	if (!value || value.type !== 'CallExpression') return null;
+	const callee = value.callee;
+	if (callee?.type === 'Identifier') {
+		const imported = ctx.octaneImportLocals?.get(callee.name);
+		return imported === 'memo' || imported === 'lazy' ? imported : null;
+	}
+	if (
+		callee?.type === 'MemberExpression' &&
+		!callee.computed &&
+		callee.object?.type === 'Identifier' &&
+		callee.property?.type === 'Identifier' &&
+		ctx.octaneImportNamespaces?.has(callee.object.name) &&
+		(callee.property.name === 'memo' || callee.property.name === 'lazy')
+	) {
+		return callee.property.name;
+	}
+	return null;
+}
+
+function isProfileComponentValue(node, ctx, bindingName) {
+	const value = unwrapTsExpr(node);
+	const isFunction =
+		value?.type === 'FunctionDeclaration' ||
+		value?.type === 'FunctionExpression' ||
+		value?.type === 'ArrowFunctionExpression';
+	return (
+		functionProducesJsx(value) ||
+		(isFunction && bindingName !== undefined && ctx.profileComponentCandidates.has(bindingName)) ||
+		profileFactoryName(value, ctx) !== null
+	);
+}
+
+function collectProfileComponentCandidates(ast) {
+	const names = new Set();
+	const walk = (node) => {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if ((node.type === 'Element' || node.type === 'JSXElement') && isComponentTag(node)) {
+			const tag = node.openingElement?.name || node.id;
+			if (
+				(tag?.type === 'Identifier' || tag?.type === 'JSXIdentifier') &&
+				typeof tag.name === 'string'
+			) {
+				names.add(tag.name);
+			}
+		}
+		if (node.type === 'ExportNamedDeclaration') {
+			const declaration = node.declaration;
+			if (declaration?.type === 'FunctionDeclaration' && declaration.id?.name) {
+				names.add(declaration.id.name);
+			} else if (declaration?.type === 'VariableDeclaration') {
+				for (const item of declaration.declarations || []) {
+					if (item.id?.type === 'Identifier') names.add(item.id.name);
+				}
+			}
+			for (const specifier of node.specifiers || []) {
+				if (specifier.local?.name) names.add(specifier.local.name);
+			}
+		} else if (node.type === 'ExportDefaultDeclaration') {
+			const declaration = node.declaration;
+			if (declaration?.type === 'Identifier') names.add(declaration.name);
+			else names.add(declaration?.id?.name || 'default');
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key]);
+		}
+	};
+	walk(ast);
+	return names;
+}
+
+// Profile builds retain the lexical owner of hook calls in generic TS/TSX
+// function shapes. The normal compiler passes one owner name into a whole
+// passthrough statement, which is sufficient for slot identity but would label
+// hooks inside `const A = memo(() => …)` as belonging to `module` or its outer
+// function. A non-enumerable annotation keeps this profiling-only fact out of
+// printers, source maps, and ordinary compiler output.
+function annotateProfileHookOwners(root, ctx) {
+	const walk = (node, owner, boundOwner = false) => {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child, owner, false);
+			return;
+		}
+		if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
+			const init = unwrapTsExpr(node.init);
+			if (
+				init?.type === 'FunctionExpression' ||
+				init?.type === 'ArrowFunctionExpression' ||
+				profileFactoryName(init, ctx) !== null
+			) {
+				walk(node.init, profileOwner(ctx, node.id, node.id.name), true);
+				return;
+			}
+		}
+		if (
+			node.type === 'ExportDefaultDeclaration' &&
+			isProfileComponentValue(node.declaration, ctx, 'default')
+		) {
+			const name = node.declaration?.id?.name || 'default';
+			walk(node.declaration, profileOwner(ctx, node.declaration, name), true);
+			return;
+		}
+		let nextOwner = owner;
+		if (
+			(node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression') &&
+			node.id?.name &&
+			!boundOwner
+		) {
+			nextOwner = profileOwner(ctx, node, node.id.name);
+		}
+		if (node.type === 'CallExpression') {
+			Object.defineProperty(node, '_octaneProfileOwner', {
+				value: nextOwner,
+				configurable: true,
+			});
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			const value = node[key];
+			if (boundOwner && node.type === 'CallExpression' && profileFactoryName(node, ctx) !== null) {
+				if (key === 'arguments') {
+					const [component, ...rest] = value || [];
+					walk(component, nextOwner, true);
+					for (const child of rest) walk(child, owner, false);
+				} else {
+					walk(value, owner, false);
+				}
+				continue;
+			}
+			walk(value, nextOwner, false);
+		}
+	};
+	walk(root, profileOwner(ctx, null, 'module'), false);
+}
+
+// Register generic component forms which do not enter compileComponent or
+// compileReturnJsxFunction: expression-bodied arrows, function expressions,
+// conditional JSX returns, and memo/lazy wrappers. Variable-bound values are
+// registered inline at initialization (the helper returns the same identity);
+// declarations register immediately after their declaration, or at the module
+// tail for top-level/HMR-safe handoff ordering.
+function instrumentProfileComponents(ast, ctx) {
+	const visitStatementList = (statements, topLevel) => {
+		const output = [];
+		for (const statement of statements || []) {
+			visitNode(statement);
+			output.push(statement);
+			let declaration = statement;
+			if (
+				statement.type === 'ExportNamedDeclaration' ||
+				statement.type === 'ExportDefaultDeclaration'
+			) {
+				declaration = statement.declaration;
+			}
+			if (
+				declaration?.type === 'FunctionDeclaration' &&
+				declaration.id?.name &&
+				(functionProducesJsx(declaration) ||
+					ctx.profileComponentCandidates.has(declaration.id.name))
+			) {
+				const name = declaration.id.name;
+				if (topLevel) {
+					const metadata = profileComponentMetadata(ctx, declaration, name);
+					recordProfileComponent(ctx, declaration, name);
+					ctx.profileRuntimeNeeded.add('__profileComponent');
+					// A module may synchronously render a declaration from a later
+					// top-level statement. Register it here so that first mount has
+					// authored metadata; the retained module-tail registration still
+					// reattaches metadata to Rspack's post-handoff HMR wrapper.
+					output.push(profileRegistrationAst(name, metadata));
+				} else {
+					ctx.profileRuntimeNeeded.add('__profileComponent');
+					output.push(
+						profileRegistrationAst(name, profileComponentMetadata(ctx, declaration, name)),
+					);
+				}
+			}
+		}
+		statements.splice(0, statements.length, ...output);
+	};
+
+	const visitNode = (node) => {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visitNode(child);
+			return;
+		}
+		if (node.type === 'VariableDeclaration') {
+			for (const declaration of node.declarations || []) {
+				visitNode(declaration.init);
+				if (
+					declaration.id?.type === 'Identifier' &&
+					declaration.init &&
+					isProfileComponentValue(declaration.init, ctx, declaration.id.name)
+				) {
+					const name = declaration.id.name;
+					ctx.profileRuntimeNeeded.add('__profileComponent');
+					declaration.init = profileComponentCallAst(
+						declaration.init,
+						profileComponentMetadata(ctx, declaration.id, name),
+					);
+				}
+			}
+			return;
+		}
+		if (
+			node.type === 'ExportDefaultDeclaration' &&
+			isProfileComponentValue(node.declaration, ctx, 'default') &&
+			(node.declaration?.type !== 'FunctionDeclaration' || !node.declaration.id)
+		) {
+			visitNode(node.declaration);
+			ctx.profileRuntimeNeeded.add('__profileComponent');
+			const sourceDeclaration = node.declaration;
+			const componentValue =
+				sourceDeclaration.type === 'FunctionDeclaration'
+					? { ...sourceDeclaration, type: 'FunctionExpression' }
+					: sourceDeclaration;
+			node.declaration = profileComponentCallAst(
+				componentValue,
+				profileComponentMetadata(ctx, sourceDeclaration, sourceDeclaration?.id?.name || 'default'),
+			);
+			return;
+		}
+		if (node.type === 'BlockStatement' || node.type === 'JSXCodeBlock') {
+			visitStatementList(node.body || [], false);
+			if (node.render) visitNode(node.render);
+			return;
+		}
+		if (node.type === 'SwitchCase') {
+			visitNode(node.test);
+			visitStatementList(node.consequent || [], false);
+			return;
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			visitNode(node[key]);
+		}
+	};
+
+	visitStatementList(ast.body || [], true);
+}
+
 /**
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string }} [options] —
  *   `dev: true` emits dev-only hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`); strictly gated so production output is byte-identical.
  *   `hmr: true` (backwards-compatible shorthand for `hmr: 'vite'`) wraps each
@@ -2226,6 +2615,10 @@ export function compile(source, filename, options) {
 	// name), used by hydration-mismatch warnings and reusable by a future Chrome-DevTools
 	// element→source layer. Strictly dev-gated so PROD output is byte-identical (zero cost).
 	const devEnabled = !!(options && options.dev);
+	// Profiling is a separate production-capable specialization. Unlike `dev`, it
+	// emits component/hook identity metadata but no hydration-warning expandos.
+	// Server compilation returns above, so profile metadata is client-only.
+	const profileEnabled = !!(options && options.profile);
 	// parallelUse: the parallel-`use()` transform pipeline (auto-memoized
 	// creations → hoisted parallel starts → batched unwrap → __warm fetch
 	// plans; docs/suspense-parallel-use-plan.md). ON by default — pass
@@ -2236,11 +2629,14 @@ export function compile(source, filename, options) {
 
 	const ctx = {
 		filename,
+		profileFilename: (options && options.profileFilename) || filename,
 		mode,
 		dev: devEnabled,
+		profile: profileEnabled,
 		parallelUse: parallelUseEnabled,
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
+		profileRuntimeNeeded: new Set(), // compiler ABI helpers imported from `octane/profiling`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`
 		userRuntimeDefaults: new Set(), // preserved verbatim; package resolution owns validity
@@ -2250,6 +2646,7 @@ export function compile(source, filename, options) {
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
+		currentProfileComponentId: null,
 		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
 		nextHookSymId: 0,
 		nextPuId: 0, // parallel-use `__pu$N` hoisted-creation temps
@@ -2261,6 +2658,9 @@ export function compile(source, filename, options) {
 		// hookless lite path). Populated by the pre-pass below; read by
 		// makeCompCall to branch the call-site emit.
 		componentInfo: new Map(),
+		profileComponents: [],
+		profileComponentIds: new Set(),
+		profileComponentCandidates: new Set(),
 		// Source-map inputs, read by printNodeWithMap to ask esrap for real
 		// per-token mappings against the original .tsrx.
 		mapSource: source,
@@ -2273,6 +2673,11 @@ export function compile(source, filename, options) {
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
+	}
+	if (ctx.profile) {
+		ctx.profileComponentCandidates = collectProfileComponentCandidates(ast);
+		annotateProfileHookOwners(ast, ctx);
+		instrumentProfileComponents(ast, ctx);
 	}
 	// Imported local bindings (any source). Used by the M1 cross-module
 	// singleRoot sentinel: only an IMPORTED identifier is a stable component
@@ -2672,6 +3077,20 @@ export function compile(source, filename, options) {
 		}
 	}
 
+	// Profiling registrations intentionally run AFTER the HMR handoff block in
+	// the final output. On a webpack/Rspack update the local binding is reassigned
+	// to the previous canonical wrapper during that handoff; registering earlier
+	// would attach the fresh metadata to a short-lived replacement instead. The
+	// runtime helper records metadata without wrapping or replacing the function.
+	let profileBlock = '';
+	if (ctx.profileComponents.length > 0) {
+		ctx.profileRuntimeNeeded.add('__profileComponent');
+		profileBlock =
+			ctx.profileComponents
+				.map((meta) => `_$__profileComponent(${meta.name}, ${JSON.stringify(meta)});`)
+				.join('\n') + '\n';
+	}
+
 	// Cross-module singleRoot stamps (docs/comment-marker-elision-plan.md M1):
 	// a component whose body provably renders ONE plain element carries the
 	// marker on its BINDING, so a `componentSlot(…, 2)` call site in ANOTHER
@@ -2698,11 +3117,18 @@ export function compile(source, filename, options) {
 
 	// Built after HMR wiring so the import list includes `hmr`/`HMR` when needed.
 	const finalRuntimeImport = buildRuntimeImport(ctx, 'octane');
+	const finalProfileRuntimeImport = buildProfileRuntimeImport(ctx);
 
 	// Everything before `body` in the output — shifts every body segment's
 	// generated line down by the prelude's line count.
 	const prelude =
-		finalRuntimeImport + vtHintBlock + delegateCall + styleBlock + templatesBlock + helpersBlock;
+		finalRuntimeImport +
+		finalProfileRuntimeImport +
+		vtHintBlock +
+		delegateCall +
+		styleBlock +
+		templatesBlock +
+		helpersBlock;
 	const preludeLines = countNewlines(prelude);
 	const segments = bodySegments.map((s) => ({
 		genLine: s.genLine + preludeLines,
@@ -2712,7 +3138,7 @@ export function compile(source, filename, options) {
 	}));
 
 	return {
-		code: prelude + body + stampBlock + hmrBlock,
+		code: prelude + body + stampBlock + hmrBlock + profileBlock,
 		map: buildSourceMap(source, ctx.mapSourceName, segments),
 	};
 }
@@ -4041,6 +4467,7 @@ function applyCssScoping(componentNode, ctx) {
 function compileComponent(node, ctx, options) {
 	const name = node.id.name;
 	rejectAsyncOrGenerator(node, name);
+	recordProfileComponent(ctx, node, name);
 	const isExported = !!(node.export || node.default);
 	const isDefault = !!node.default;
 	const hmrWrap = !!(options && options.hmrWrap);
@@ -4071,8 +4498,10 @@ function compileComponent(node, ctx, options) {
 	// locals.
 	const prevLocals = ctx.currentComponentLocals;
 	const prevKnownStr = ctx.knownStringLocals;
+	const prevProfileComponentId = ctx.currentProfileComponentId;
 	ctx.currentComponentLocals = collectComponentLocals(node);
 	ctx.knownStringLocals = collectKnownStringLocals(node);
+	if (ctx.profile) ctx.currentProfileComponentId = profileComponentId(ctx, name, node);
 	let fn;
 	try {
 		// autoCallback: only top-level component bodies opt in. Item bodies and
@@ -4083,6 +4512,7 @@ function compileComponent(node, ctx, options) {
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.knownStringLocals = prevKnownStr;
+		ctx.currentProfileComponentId = prevProfileComponentId;
 	}
 
 	// parallelUse warm plan: attached to the INNER function object (not the
@@ -4532,7 +4962,12 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 	function rewriteUseCall(call) {
 		const arg = unwrapTsExpr(call.arguments[0]);
 		if (isTrivialUseArg(arg)) return call;
-		const symVar = allocHookSymbol(ctx, `${componentName}.use.memo#${ctx.nextHookSymId}`);
+		const symVar = allocHookSymbol(ctx, `${componentName}.use.memo#${ctx.nextHookSymId}`, {
+			componentName,
+			name: 'use() memo',
+			kind: 'useMemo',
+			node: call,
+		});
 		const deps = collectDepPaths(arg);
 		// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 		// SSRScope per pass makes client useMemo semantics useless there).
@@ -5221,6 +5656,8 @@ function rewriteHookCalls(node, ctx, componentName) {
 		}
 		if (n.type === 'CallExpression' && n.callee.type === 'Identifier') {
 			const localName = n.callee.name;
+			const annotatedOwner = ctx.profile ? n._octaneProfileOwner : null;
+			const profileOwner = annotatedOwner?.name || componentName;
 			const importedName = n._octaneImportedHook;
 			const shadowsImport = ctx.octaneImportLocals?.has(localName) && importedName === undefined;
 			const name = importedName ?? localName;
@@ -5256,9 +5693,15 @@ function rewriteHookCalls(node, ctx, componentName) {
 				if (isServerUse)
 					ctx.userRuntimeNames.add(localName === name ? 'use' : `use as ${localName}`);
 				const debug = isServerUse
-					? `${componentName}.use#${ctx.nextHookSymId}`
-					: `${componentName}.${name}#${ctx.nextHookSymId}`;
-				const symVar = allocHookSymbol(ctx, debug);
+					? `${profileOwner}.use#${ctx.nextHookSymId}`
+					: `${profileOwner}.${name}#${ctx.nextHookSymId}`;
+				const symVar = allocHookSymbol(ctx, debug, {
+					componentName: profileOwner,
+					componentId: annotatedOwner?.id,
+					name: localName,
+					kind: isServerUse ? 'use' : name,
+					node: n,
+				});
 				// mapAst does NOT recurse into a node we replace, so rewrite this call's
 				// ARGUMENTS ourselves — that's what gives a hook NESTED as an argument
 				// its own slot, e.g. `useStore(api, useShallow(sel))` or a hook in a deps
@@ -5316,9 +5759,17 @@ function rewriteHookCalls(node, ctx, componentName) {
 			const isBuiltin = HOOK_NAMES.has(name);
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isServerUse) {
+				const annotatedOwner = ctx.profile ? n._octaneProfileOwner : null;
+				const profileOwner = annotatedOwner?.name || componentName;
 				const getterHelper = n._octaneStateGetter ? STATE_GETTER_HELPERS[name] : null;
 				if (getterHelper !== null) ctx.runtimeNeeded.add(getterHelper);
-				const symVar = allocHookSymbol(ctx, `${componentName}.${name}#${ctx.nextHookSymId}`);
+				const symVar = allocHookSymbol(ctx, `${profileOwner}.${name}#${ctx.nextHookSymId}`, {
+					componentName: profileOwner,
+					componentId: annotatedOwner?.id,
+					name: `${n.callee.object.name}.${n.callee.property.name}`,
+					kind: name,
+					node: n,
+				});
 				const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName));
 				return {
 					...n,
@@ -5345,8 +5796,16 @@ function rewriteHookCalls(node, ctx, componentName) {
 			/^use[A-Z]/.test(n.callee.property.name) &&
 			n.callee.property.name !== 'useContext'
 		) {
-			const debug = `${componentName}.${n.callee.property.name}#${ctx.nextHookSymId}`;
-			const symVar = allocHookSymbol(ctx, debug);
+			const annotatedOwner = ctx.profile ? n._octaneProfileOwner : null;
+			const profileOwner = annotatedOwner?.name || componentName;
+			const debug = `${profileOwner}.${n.callee.property.name}#${ctx.nextHookSymId}`;
+			const symVar = allocHookSymbol(ctx, debug, {
+				componentName: profileOwner,
+				componentId: annotatedOwner?.id,
+				name: n.callee.property.name,
+				kind: n.callee.property.name,
+				node: n,
+			});
 			ctx.runtimeNeeded.add('withSlot');
 			const object = rewriteHookCalls(n.callee.object, ctx, componentName);
 			const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName));
@@ -5381,6 +5840,7 @@ function rewriteHookCalls(node, ctx, componentName) {
 // descriptor type identity). No component gate, no signature rewrite to (scope,props).
 function compileReturnJsxFunction(node, ctx, options) {
 	const name = node.id.name;
+	recordProfileComponent(ctx, node, name);
 	// A folded directive's branch helper functions (`__then$N`/`__else$N`) are
 	// collected here so they're emitted INSIDE this component function — preserving
 	// their closure over setup locals/props — and only their values + the control
@@ -6079,9 +6539,10 @@ export function hookSlotHash(filename) {
 	return (h >>> 0).toString(36);
 }
 
-function allocHookSymbol(ctx, debugName) {
+function allocHookSymbol(ctx, debugName, profile = null) {
 	const id = ctx.nextHookSymId++;
 	const name = `_h$${id}`;
+	let symbolExpr;
 	if (ctx.hmr) {
 		// HMR (dev serve): Symbol.for(stableKey) so re-imports produce the SAME
 		// Symbol identity, which keeps the existing hooks Map keys valid across
@@ -6090,15 +6551,36 @@ function allocHookSymbol(ctx, debugName) {
 		// name + call-site index — stable provided the user doesn't reorder hooks
 		// between renders (which would violate React's rules anyway).
 		const stableKey = `octane:${ctx.filename || '<anon>'}:${debugName}`;
-		ctx.hoistedHelpers.push(`const ${name} = Symbol.for(${JSON.stringify(stableKey)});`);
+		symbolExpr = `Symbol.for(${JSON.stringify(stableKey)})`;
 	} else {
 		// No HMR (prod builds, SSR, tests): nothing re-imports the module
 		// expecting registry identity, so a plain Symbol suffices — but it MUST
 		// carry a unique description (see hookSlotHash above). ~10 chars vs the
 		// ~100-char registry key, and no file path in shipped bundles.
 		if (ctx._hookHash === undefined) ctx._hookHash = hookSlotHash(ctx.filename);
-		ctx.hoistedHelpers.push(`const ${name} = Symbol(${JSON.stringify(`${ctx._hookHash}#${id}`)});`);
+		symbolExpr = `Symbol(${JSON.stringify(`${ctx._hookHash}#${id}`)})`;
 	}
+	if (ctx.profile) {
+		ctx.profileRuntimeNeeded.add('__profileHook');
+		const componentName = profile?.componentName || 'module';
+		const componentId =
+			profile?.componentId ||
+			ctx.currentProfileComponentId ||
+			profileComponentId(ctx, componentName, profile?.node);
+		const loc = profileSourceLoc(profile?.node);
+		const metadata = {
+			id: `${componentId}#hook:${id}`,
+			componentId,
+			name: profile?.name || profile?.kind || 'hook',
+			kind: profile?.kind || profile?.name || 'hook',
+			file: ctx.profileFilename || '<anon>',
+			line: loc.line,
+			column: loc.column,
+			index: id,
+		};
+		symbolExpr = `_$__profileHook(${symbolExpr}, ${JSON.stringify(metadata)})`;
+	}
+	ctx.hoistedHelpers.push(`const ${name} = ${symbolExpr};`);
 	return name;
 }
 

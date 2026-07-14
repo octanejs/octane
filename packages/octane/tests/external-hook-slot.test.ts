@@ -176,6 +176,25 @@ describe('vite plugin gate routing', () => {
 		expect(config.resolve.dedupe).toContain('octane');
 	});
 
+	it('protects the profiling build constant throughout Vite config resolution', () => {
+		const profiled = octane({ profile: true });
+		expect(() =>
+			(profiled.config as any)({
+				root: appRoot,
+				define: { __OCTANE_PROFILE_ENABLED__: 'false' },
+			}),
+		).toThrow(/__OCTANE_PROFILE_ENABLED__.*reserved/);
+
+		// The resolved check catches a plugin that overwrites Octane's earlier config.
+		expect(() =>
+			(profiled.configResolved as any)({
+				root: appRoot,
+				command: 'build',
+				define: { __OCTANE_PROFILE_ENABLED__: 'false' },
+			}),
+		).toThrow(/__OCTANE_PROFILE_ENABLED__.*reserved/);
+	});
+
 	it('recursively discovers raw Octane bindings behind another binding', () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-source-discovery-'));
 		try {

@@ -30,6 +30,14 @@ export default defineConfig({
 });
 ```
 
+Pass `profile: true` to both plugins for a browser profiling build:
+
+```ts
+plugins: [octaneMdx({ profile: true }), octane({ profile: true })];
+```
+
+Profiling metadata is never emitted by the MDX server transform.
+
 `octaneMdx()` claims `.mdx`/`.md` and produces final JS, so it composes with the
 octane plugin (which claims `.tsrx`/`.tsx`/`.ts`/`.js`) without ordering
 hazards. SSR target selection matches the octane plugin: per-module

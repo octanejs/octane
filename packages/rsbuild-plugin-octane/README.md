@@ -70,6 +70,7 @@ and browser targets cannot be mixed in the same array.
 Options are declarative and cache-stable:
 
 - `hmr` controls browser component handoff;
+- `profile` enables component profiling in the browser environment;
 - `parallelUse` controls the compiler's parallel `use()` transform;
 - `exclude` skips path fragments in the plain `.ts`/`.js` hook-slot pass; and
 - `clientEnvironment` / `serverEnvironment` rename the generated environments.

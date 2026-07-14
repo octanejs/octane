@@ -27,6 +27,32 @@ describe('compileMdxSync', () => {
 		expect(code).not.toContain(': _createMdxContent(');
 	});
 
+	it('adds document-level profiling only to client output', () => {
+		const { code } = compileMdxSync('# hi\n', '/docs/doc.mdx', {
+			hmr: true,
+			profile: true,
+		});
+		const hmrWrapper = code.lastIndexOf('MDXContent =');
+		const documentIdentity = code.lastIndexOf('/docs/doc.mdx#MDXContent@1:0');
+
+		expect(hmrWrapper).toBeGreaterThan(-1);
+		expect(documentIdentity).toBeGreaterThan(hmrWrapper);
+		expect(code).toContain("from 'octane/profiling'");
+
+		const server = compileMdxSync('# hi\n', '/docs/doc.mdx', {
+			mode: 'server',
+			profile: true,
+		});
+		expect(server.code).not.toContain('octane/profiling');
+		expect(server.code).not.toContain('/docs/doc.mdx#MDXContent@1:0');
+	});
+
+	it('keeps explicit profile:false output and maps byte-identical', () => {
+		const normal = compileMdxSync('# hi\n', '/docs/doc.mdx');
+		const explicitOff = compileMdxSync('# hi\n', '/docs/doc.mdx', { profile: false });
+		expect(explicitOff).toEqual(normal);
+	});
+
 	it('emits SERVER codegen with mode: server', () => {
 		const { code } = compileMdxSync('# hi\n', '/docs/doc.mdx', { mode: 'server' });
 		expect(code).toContain("from 'octane/server'");

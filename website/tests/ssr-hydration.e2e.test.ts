@@ -25,6 +25,7 @@ const ROUTES = [
 	'/docs/core-apis',
 	'/docs/tsrx-vs-tsx',
 	'/docs/differences-from-react',
+	'/docs/profiling',
 	'/docs/bindings',
 	'/benchmarks',
 	'/playground',

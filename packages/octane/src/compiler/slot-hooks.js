@@ -120,10 +120,15 @@ function collectStateGetterCalls(ast) {
 // — identical pre-order to rewriteHookCalls, so a base hook nested as an argument
 // (e.g. in a deps array) gets its own stable id. Collects insertion edits + the
 // `const _h$N = Symbol.for(...)` declarations.
-function walk(node, fnName, st) {
+function hookOwner(node, name) {
+	const loc = node?.loc?.start;
+	return { name, line: loc?.line ?? 0, column: loc?.column ?? 0 };
+}
+
+function walk(node, owner, st) {
 	if (!node || typeof node !== 'object') return;
 	if (Array.isArray(node)) {
-		for (const n of node) walk(n, fnName, st);
+		for (const n of node) walk(n, owner, st);
 		return;
 	}
 
@@ -135,10 +140,11 @@ function walk(node, fnName, st) {
 		node.id?.type === 'Identifier' &&
 		(node.init?.type === 'ArrowFunctionExpression' || node.init?.type === 'FunctionExpression')
 	) {
-		walk(node.init, node.id.name, st);
+		walk(node.init, hookOwner(node.id, node.id.name), st);
 		return; // the id is a binding, no hooks there
 	}
-	const childFn = node.type === 'FunctionDeclaration' && node.id ? node.id.name : fnName;
+	const childOwner =
+		node.type === 'FunctionDeclaration' && node.id ? hookOwner(node, node.id.name) : owner;
 
 	if (node.type === 'CallExpression') {
 		const imported = node._octaneImportedHook;
@@ -149,17 +155,34 @@ function walk(node, fnName, st) {
 					: `${node.callee?.object?.name || 'octane'}.${imported}`;
 			const id = st.nextId++;
 			const sym = `_h$${id}`;
+			let symbolExpr;
 			if (st.hmr) {
-				const key = `octane:${st.filename}:${fnName}.${local}#${id}`;
-				st.decls.push(`const ${sym} = Symbol.for(${JSON.stringify(key)});`);
+				const key = `octane:${st.filename}:${owner.name}.${local}#${id}`;
+				symbolExpr = `Symbol.for(${JSON.stringify(key)})`;
 			} else {
 				// The description must be UNIQUE and non-empty: the runtime composes
 				// custom-hook slot paths from slot DESCRIPTIONS (resolveSlot) — a bare
 				// Symbol() collapses those paths and collides state across call sites.
 				// Short filename hash + index; no module path in the output (see
 				// compile.js hookSlotHash for the full rationale).
-				st.decls.push(`const ${sym} = Symbol(${JSON.stringify(`${st.hash}#${id}`)});`);
+				symbolExpr = `Symbol(${JSON.stringify(`${st.hash}#${id}`)})`;
 			}
+			if (st.profile) {
+				const componentId = `${st.profileFilename || '<anon>'}#${owner.name}@${owner.line}:${owner.column}`;
+				const loc = node.loc?.start;
+				const metadata = {
+					id: `${componentId}#hook:${id}`,
+					componentId,
+					name: local,
+					kind: imported,
+					file: st.profileFilename || '<anon>',
+					line: loc?.line ?? 0,
+					column: loc?.column ?? 0,
+					index: id,
+				};
+				symbolExpr = `_$__profileHook(${symbolExpr}, ${JSON.stringify(metadata)})`;
+			}
+			st.decls.push(`const ${sym} = ${symbolExpr};`);
 			const inferred = st.inferred.get(node);
 			if (inferred !== undefined) {
 				// The dependency callback is already the final user argument. Insert
@@ -198,7 +221,7 @@ function walk(node, fnName, st) {
 	for (const k in node) {
 		if (k === 'type' || k === 'start' || k === 'end' || k === 'loc') continue;
 		const v = node[k];
-		if (v && typeof v === 'object') walk(v, childFn, st);
+		if (v && typeof v === 'object') walk(v, childOwner, st);
 	}
 }
 
@@ -209,7 +232,7 @@ function walk(node, fnName, st) {
  *
  * @param {string} source raw module text
  * @param {string} id     module id (embedded in the stable Symbol.for key)
- * @param {{ hmr?: boolean }} [options] `hmr: true` (dev serve) emits
+ * @param {{ hmr?: boolean, profile?: boolean, profileFilename?: string }} [options] `hmr: true` (dev serve) emits
  *   `Symbol.for(stableKey)` so a re-imported module resolves the same hook
  *   slots (state survives HMR); off (prod builds, SSR) emits
  *   `Symbol("<filenameHash>#<n>")` — module-instance-stable, smaller, no
@@ -237,13 +260,15 @@ export function slotHooks(source, id, options) {
 		getterCalls: collectStateGetterCalls(ast),
 		getterHelpers: new Map(),
 		filename: id,
+		profileFilename: (options && options.profileFilename) || id,
 		hmr: !!(options && options.hmr),
+		profile: !!(options && options.profile),
 		hash: hookSlotHash(id),
 		nextId: 0,
 		edits: [],
 		decls: [],
 	};
-	for (const node of ast.body || []) walk(node, 'module', st);
+	for (const node of ast.body || []) walk(node, hookOwner(null, 'module'), st);
 	if (st.edits.length === 0) return null;
 
 	// Apply insertions right-to-left so earlier offsets stay valid.
@@ -259,13 +284,17 @@ export function slotHooks(source, id, options) {
 	// side-effect-free and the consts are read only inside function bodies (which
 	// run after the module is fully evaluated, including cross-module imports), so
 	// trailing placement has no TDZ hazard for any valid hook usage.
+	const helperSpecifiers = [...st.getterHelpers].map(
+		([hook, local]) => `${STATE_GETTER_HELPERS[hook]} as ${local}`,
+	);
 	const helperImport =
-		st.getterHelpers.size === 0
+		helperSpecifiers.length === 0
 			? ''
-			: `import { ${[...st.getterHelpers]
-					.map(([hook, local]) => `${STATE_GETTER_HELPERS[hook]} as ${local}`)
-					.join(', ')} } from 'octane';\n`;
-	const block = helperImport + st.decls.join('\n') + '\n';
+			: `import { ${helperSpecifiers.join(', ')} } from 'octane';\n`;
+	const profileImport = st.profile
+		? "import { __profileHook as _$__profileHook } from 'octane/profiling';\n"
+		: '';
+	const block = helperImport + profileImport + st.decls.join('\n') + '\n';
 	code = code.endsWith('\n') ? code + block : code + '\n' + block;
 	return { code, map: null };
 }

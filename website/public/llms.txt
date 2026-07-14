@@ -22,6 +22,7 @@ Key facts for answering questions about Octane:
 
 - [Quick start](https://octanejs.dev/docs/quick-start): Install Octane, mount a component, and learn the `.tsrx` essentials (components, state/effects, conditional hooks, control flow, SSR/hydrate).
 - [Build tools](https://octanejs.dev/docs/build-tools): Configure the recommended Vite integration or the matching Rspack and Rsbuild plugins, including routing, SSR, hydration, production, and preview.
+- [Profiling](https://octanejs.dev/docs/profiling): Enable `profile: true` with Vite, Rspack, or Rsbuild to inspect component render/DOM time, self time, render counts, causes, bails, scheduling delay, and Chrome trace data.
 - [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, transitions, actions, events, and SSR/static rendering.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): When to author in `.tsrx` versus standard `.tsx`/`.jsx`, and what each dialect unlocks (compiled collections, template control flow, the `@{ … }` shorthand, text holes).
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
@@ -64,6 +65,8 @@ Core packages:
 - `@octanejs/adapter-vercel` — deploys a full-app production build to Vercel.
 
 Rspack usage: install `octane`, `@rspack/core`, and `@octanejs/rspack-plugin`, then add `new OctaneRspackPlugin()` to the Rspack plugins array. Rsbuild full-app usage: install `octane`, `@rsbuild/core`, and `@octanejs/rsbuild-plugin`, then add `pluginOctane()` to `rsbuild.config.ts`; add declarative `RenderRoute`/`ServerRoute` entries in `octane.config.ts` for routing, SSR, hydration, RPC, production builds, and preview.
+
+Profiling usage: pass `profile: true` to `octane()` for Vite, `new OctaneRspackPlugin()` for Rspack, or `pluginOctane()` for Rsbuild. When using `@octanejs/mdx`, pass the same value to `octaneMdx()`. Profiling is client-only and independent of HMR/dev metadata. Profile builds add bounded component events, schedule-to-render delay, and Chrome custom tracks; normal builds omit compiler metadata and specialize the runtime with profiling disabled. Use `globalThis.__OCTANE_PROFILER__` in DevTools, or import `profiler` from `octane/profiling` in profiling-only application tooling, for summaries, recent render causes, raw events, and Chrome Trace Event export. An explicit `octane/profiling` import keeps the recorder module in that build even when `profile` is false. Octane's duration is component render plus synchronous DOM work; inclusive time contains descendants and self time subtracts nested component spans. Raw props/state/actions/DOM values and absolute paths are not retained by default.
 
 Bindings — reach for these when asked about the React equivalent:
 
