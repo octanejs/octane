@@ -454,15 +454,9 @@ describe('DOMPropertyOperations — custom elements', () => {
 
 	// Per DOMPropertyOperations-test.js:235 — custom element custom events
 	// lowercase. React 19 attaches a real `customevent` listener when a custom
-	// element receives a function-valued lowercase on* prop; octane routes every
-	// lowercase on* name to setAttribute (its delegated-event system only handles
-	// React-shape `onXxx` props), so no listener exists and the handler never
-	// fires (the function value is now guarded and removed, so no attribute is
-	// written either).
-	// GAP (deferred — needs a maintainer decision on React-19 custom-element
-	// semantics): no custom-element event-listener path — eventSlot/isEventKey
-	// (runtime.ts) require the React `on[A-Z]` shape. Representative pin for the
-	// whole custom-element custom-event family (see the skip list below).
+	// element receives a function-valued lowercase on* prop. Octane's custom-
+	// element path now attaches the same listener; this is representative
+	// executable coverage for the wider custom-event family below.
 	it('function-valued lowercase on* on a custom element attaches a listener', () => {
 		const handler = vi.fn();
 		const r = mount(CustomElCustomEvent, { handler });
@@ -555,11 +549,9 @@ describe('DOMPropertyOperations — custom elements', () => {
 	 *  - :251 (uppercase onCustomevent), :267 (dashed oncustom-event),
 	 *    :283 (remove custom-event handler), :467 (remove/re-add custom-event
 	 *    listeners), :975 (custom events with capture listeners), :1126
-	 *    (handlers alternating string ↔ function) → all share the ONE root gap
-	 *    pinned by the :235 it.fails above: octane has no custom-element
-	 *    event-listener path for arbitrary lowercase on* props (delegation-only,
-	 *    React-shape `on[A-Z]` names). Porting each would add five more red
-	 *    variants of the same pin.
+	 *    (handlers alternating string ↔ function) → covered at the behavior seam
+	 *    by the passing :235 representative above; port each matrix variant only
+	 *    when its distinct add/remove/capture behavior needs dedicated coverage.
 	 *  - :493, :586, :670 (`<input is=…>` etc. onChange matrix), :748, :829,
 	 *    :866, :903, :940 (simulated-change targeting matrix) → intentional
 	 *    divergence (§2): React's SYNTHETIC onChange simulation (input→change

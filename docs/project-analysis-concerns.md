@@ -1,6 +1,6 @@
 # Project analysis concerns
 
-Status: source-backed risk register for the current worktree on 2026-07-13.
+Status: source-backed risk register for the current worktree on 2026-07-14.
 This is not a claim that every remaining item is a confirmed bug. Re-check the
 owning source and executable indexes before acting because Octane is moving
 quickly.
@@ -11,8 +11,7 @@ original audit snapshot:
 - the generated inventory contains 22 publishable packages, including 18
   framework bindings;
 - the core executable React-parity backlog is **0 pins**;
-- the binding executable backlog is **8 pins**, all in
-  `@octanejs/hook-form`;
+- the binding executable backlog is **0 pins**;
 - Node 22 and 24 are the tested releases, and every publishable manifest
   declares `engines.node: ">=22"`;
 - package inventory, binding status, core/binding failure pins, generated agent
@@ -92,7 +91,7 @@ copied into prose or scripts when the shared inventory can answer the question.
 
 ## 3. Executable React-parity backlog
 
-Status: **0 core pins; 8 binding pins**.
+Status: **0 core pins; 0 binding pins**.
 
 The old five-core-gap summary is obsolete. The generated core index currently
 contains no `it.fails(...)` or `test.fails(...)` cases. That means there is no
@@ -100,8 +99,8 @@ known failing behavior pinned in `packages/octane/tests`; it does **not** prove
 complete React equivalence. Intentional differences remain documented, and
 untested behavior can still diverge.
 
-The live binding index contains eight Hook Form pins. They cluster around four
-observable differences:
+The former eight Hook Form pins now run as ordinary passing tests that directly
+assert four documented, observable Octane differences:
 
 - automatic batching of notifications separated by effects or microtasks;
 - `act()` returning before a later fire-and-forget microtask chain schedules
@@ -111,11 +110,10 @@ observable differences:
 - Octane's eager bailout avoiding a React render-phase re-entry for an
   `Object.is`-equal update.
 
-The first two groups are plausible scheduler/test-harness improvement work.
-The latter two match documented platform choices and may remain executable
-binding divergences. Resolve pins by changing behavior or clearly classifying
-the divergence; do not weaken assertions merely to make the generated count
-fall.
+The first two groups remain plausible scheduler/test-harness improvement work.
+The latter two match documented platform choices. All four stay visible as
+explicit assertions and `OCTANE DIVERGENCE` rationale instead of being hidden
+behind expected-failure modifiers.
 
 Zero pins in a binding is also not a maturity claim. Use
 [`docs/bindings-status.md`](bindings-status.md) for scope and evidence.

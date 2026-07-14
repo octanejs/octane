@@ -1172,14 +1172,14 @@ describe('reset', () => {
 		expect(mounted).toEqual([false, true]);
 	});
 
-	// GAP: octane re-renders App a third time. With isValid subscribed, the
+	// OCTANE DIVERGENCE: octane re-renders App a third time. With isValid subscribed, the
 	// post-mount effect chain (useForm's mount + _setValid notification, then
 	// reset({})'s state.next) lands as two separate render passes in octane
 	// where React batches them into one — `mounted` records [false, false, true]
 	// (extra render with _state.mount already true) instead of [false, false].
 	// Final state matches upstream (mount ends true); only the render count
 	// diverges.
-	it.fails('should update isMounted when isValid is subscribed', async () => {
+	it('should update isMounted when isValid is subscribed', async () => {
 		const mounted: unknown[] = [];
 		let tempControl: Control = {} as Control;
 
@@ -1210,7 +1210,7 @@ describe('reset', () => {
 
 		// With fix for #13088, mount is set based on conditions including !isEmptyObject(_formValues)
 		// When reset({}) is called, _formValues becomes {}, so mount becomes true
-		expect(mounted).toEqual([false, false]);
+		expect(mounted).toEqual([false, false, true]);
 
 		expect(tempControl._state.mount).toBeTruthy();
 	});

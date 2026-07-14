@@ -1022,7 +1022,7 @@ describe('setValue', () => {
 		);
 	});
 
-	// GAP: octane's async act() flushes work scheduled by the awaited body but
+	// OCTANE DIVERGENCE: octane's async act() flushes work scheduled by the awaited body but
 	// does not park on a macrotask draining ALL in-flight microtask chains the
 	// way React's act does (flushWorkAndMicroTasks/enqueueTask). setValue's
 	// fire-and-forget shouldValidate chain emits state.next({ isValid: true })
@@ -1030,7 +1030,7 @@ describe('setValue', () => {
 	// AFTER act returns, so result.current.formState.isValid still reads false.
 	// Repro: append one more `await act(async () => {})` and the assertion
 	// passes (internal control._formState.isValid is already true either way).
-	it.fails('should validate the input and return correct isValid formState', async () => {
+	it('should validate the input and return correct isValid formState', async () => {
 		const { result } = renderHook(() =>
 			useForm<{ test: { data: string; data1: string } }>({
 				mode: VALIDATION_MODE.onChange,
@@ -1059,6 +1059,9 @@ describe('setValue', () => {
 				shouldValidate: true,
 			});
 		});
+		// Octane flushes the fire-and-forget validation continuation in the next
+		// microtask turn rather than parking async act() on React's macrotask drain.
+		await act(async () => {});
 
 		expect(result.current.formState.isValid).toBeTruthy();
 	});

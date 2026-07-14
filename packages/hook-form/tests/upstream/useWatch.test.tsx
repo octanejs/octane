@@ -221,56 +221,54 @@ describe('useWatch', () => {
 		expect(submitData).toEqual({});
 	});
 
-	// GAP: upstream fires an input event whose value equals the current value
+	// OCTANE DIVERGENCE: upstream fires an input event whose value equals the current value
 	// ('test' → 'test'). React's synthetic-event value tracker swallows that no-op
 	// event entirely (RHF's onChange never runs → 6 renders); octane events are
 	// native, so the `input` event is delivered, RHF notifies its values
 	// subscribers, and useWatch pushes one extra re-render (7 outputs). Intentional
 	// no-synthetic-events divergence, verified against react-hook-form under React 19.
-	it.fails(
-		'should return defaultValue with shouldUnregister set to true and keepDefaultValues',
-		() => {
-			const output: unknown[] = [];
+	it('should return defaultValue with shouldUnregister set to true and keepDefaultValues', () => {
+		const output: unknown[] = [];
 
-			function App() {
-				const { register, reset, control } = useForm({
-					defaultValues: { test: 'test' },
-					shouldUnregister: true,
-				});
-				const inputs = useWatch({ control });
-
-				output.push(inputs);
-
-				return (
-					<form>
-						<input {...register('test')} />
-						<button type="button" onClick={() => reset(undefined, { keepDefaultValues: true })}>
-							Reset
-						</button>
-					</form>
-				);
-			}
-
-			render(<App />);
-
-			fireEvent.click(screen.getByRole('button'));
-
-			fireEvent.input(screen.getByRole('textbox'), {
-				target: { value: 'test' },
+		function App() {
+			const { register, reset, control } = useForm({
+				defaultValues: { test: 'test' },
+				shouldUnregister: true,
 			});
+			const inputs = useWatch({ control });
 
-			fireEvent.click(screen.getByRole('button'));
+			output.push(inputs);
 
-			expect(output).toEqual([
-				{ test: 'test' },
-				{ test: 'test' },
-				{ test: 'test' },
-				{ test: 'test' },
-				{ test: 'test' },
-				{ test: 'test' },
-			]);
-		},
-	);
+			return (
+				<form>
+					<input {...register('test')} />
+					<button type="button" onClick={() => reset(undefined, { keepDefaultValues: true })}>
+						Reset
+					</button>
+				</form>
+			);
+		}
+
+		render(<App />);
+
+		fireEvent.click(screen.getByRole('button'));
+
+		fireEvent.input(screen.getByRole('textbox'), {
+			target: { value: 'test' },
+		});
+
+		fireEvent.click(screen.getByRole('button'));
+
+		expect(output).toEqual([
+			{ test: 'test' },
+			{ test: 'test' },
+			{ test: 'test' },
+			{ test: 'test' },
+			{ test: 'test' },
+			{ test: 'test' },
+			{ test: 'test' },
+		]);
+	});
 
 	it('should subscribe to exact input change', () => {
 		const App = () => {
@@ -524,7 +522,7 @@ describe('useWatch', () => {
 	});
 
 	describe('update', () => {
-		// GAP: after handleSubmit, RHF emits two state notifications in SEPARATE
+		// OCTANE DIVERGENCE: after handleSubmit, RHF emits two state notifications in SEPARATE
 		// microtasks ({ errors: {} } before `await onValid`, then the final
 		// submitted state). React 18+ coalesces both into ONE committed render
 		// (render work is scheduled on a macrotask after the microtask queue
@@ -532,7 +530,7 @@ describe('useWatch', () => {
 		// packages/octane/tests/conformance/scheduling-triage.test.ts), so the
 		// parent commits 2 renders instead of 1 and `waitFor(parentCount === 1)`
 		// never observes 1.
-		it.fails('should partial re-render', async () => {
+		it('should partial re-render', async () => {
 			type FormInputs = {
 				child: string;
 				parent: string;
@@ -585,8 +583,8 @@ describe('useWatch', () => {
 
 			fireEvent.submit(screen.getByRole('button', { name: /submit/i }));
 
-			await waitFor(() => expect(parentCount).toBe(1));
-			expect(childCount).toBe(1);
+			await waitFor(() => expect(parentCount).toBe(2));
+			expect(childCount).toBe(2);
 
 			parentCount = 0;
 			childCount = 0;
@@ -597,10 +595,10 @@ describe('useWatch', () => {
 			expect(childCount).toBe(1);
 		});
 
-		// GAP: same microtask-flush divergence as 'should partial re-render' above —
+		// OCTANE DIVERGENCE: same microtask-flush behavior as 'should partial re-render' above —
 		// handleSubmit's two microtask-spaced notifications commit as 2 parent
 		// renders under octane where React coalesces them into 1.
-		it.fails('should partial re-render with array name and exact option', async () => {
+		it('should partial re-render with array name and exact option', async () => {
 			type FormInputs = {
 				child: string;
 				childSecond: string;
@@ -668,9 +666,9 @@ describe('useWatch', () => {
 
 			fireEvent.submit(screen.getByRole('button', { name: /submit/i }));
 
-			await waitFor(() => expect(parentCount).toBe(1));
-			expect(childCount).toBe(1);
-			expect(childSecondCount).toBe(1);
+			await waitFor(() => expect(parentCount).toBe(2));
+			expect(childCount).toBe(2);
+			expect(childSecondCount).toBe(2);
 
 			parentCount = 0;
 			childCount = 0;
@@ -1944,7 +1942,7 @@ describe('useWatch', () => {
 	});
 
 	describe('compute ', () => {
-		// GAP: on the first input ('' → '12') compute yields `false`, equal to the
+		// OCTANE DIVERGENCE: on the first input ('' → '12') compute yields `false`, equal to the
 		// current useWatch state — React still re-enters the render phase once more
 		// before bailing out on an Object.is-equal setState (fiber double-buffering
 		// probe render), so upstream counts that phantom render (renderCount 4).
@@ -1952,7 +1950,7 @@ describe('useWatch', () => {
 		// (documented divergence, packages/octane/tests/conformance/eager-bailout.test.ts),
 		// so renderCount is 3. Verified against react-hook-form under React 19:
 		// distribution React [2 mount, 1 no-op input, 1 flip] vs octane [2, 0, 1].
-		it.fails('should only update when value changed within compute', () => {
+		it('should only update when value changed within compute', () => {
 			type FormValue = {
 				test: string;
 			};
@@ -1996,7 +1994,7 @@ describe('useWatch', () => {
 
 			screen.getByText('yes');
 
-			expect(renderCount).toEqual(4);
+			expect(renderCount).toEqual(3);
 
 			fireEvent.input(screen.getByRole('textbox'), {
 				target: { value: '12' },
@@ -2004,7 +2002,7 @@ describe('useWatch', () => {
 
 			screen.getByText('no');
 
-			expect(renderCount).toEqual(5);
+			expect(renderCount).toEqual(4);
 
 			fireEvent.input(screen.getByRole('textbox'), {
 				target: { value: '1' },
@@ -2012,7 +2010,7 @@ describe('useWatch', () => {
 
 			screen.getByText('no');
 
-			expect(renderCount).toEqual(5);
+			expect(renderCount).toEqual(4);
 		});
 	});
 });

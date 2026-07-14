@@ -16,12 +16,12 @@ let md = `# Binding parity gaps (generated)
 
 <!-- GENERATED FILE — do not edit. Regenerate with \`pnpm binding-parity:gaps\`. -->
 
-This is the executable failure-pin backlog for every framework binding discovered
+This is the executable failure-pin audit for every framework binding discovered
 from the workspace inventory. It includes \`it.fails(...)\` and
 \`test.fails(...)\` across JavaScript, TypeScript, TSX, and TSRX test files.
 
-Zero pins means only that a package has no executable expected-failure marker;
-it does **not** imply complete upstream parity. Consult
+Committed tests must run normally, so repository policy requires every row to
+remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [\`docs/bindings-status.md\`](bindings-status.md) for each binding's supported
 surface and evidence.
 

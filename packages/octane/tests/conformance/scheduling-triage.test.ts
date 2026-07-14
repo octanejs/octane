@@ -5,8 +5,9 @@
 // expiration. Most of React's scheduling suite exercises concurrent
 // mechanisms (mid-render yields, lane-separated work loops, expiration
 // clocks) that cannot exist here; this file ports the halves that ARE
-// observable in a synchronous scheduler and pins the genuine divergences
-// with `it.fails` + `// GAP:`. The complete per-`it` triage table for
+// observable in a synchronous scheduler and asserts intentional divergences
+// as ordinary passing tests with explicit rationale. The complete per-`it`
+// triage table for
 // ReactFlushSync-test.js, ReactBatching-test.internal.js,
 // ReactUpdatePriority-test.js, ReactIncrementalUpdates-test.js,
 // ReactInterleavedUpdates-test.js and ReactExpiration-test.js is the

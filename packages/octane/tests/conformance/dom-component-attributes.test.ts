@@ -27,8 +27,8 @@ import {
 // ReactDOMComponent-test.js — HTML attribute add/remove/change matrix
 // ============================================================================
 // NOTE: tests deliberately avoid `find('#id')` — jsdom resolves `#id` selectors
-// document-wide, and an `it.fails` port that dies mid-test leaves its container
-// (and its ids) attached. `container.firstElementChild` / tag selectors only.
+// document-wide, so a cleanup failure could make an unrelated container's ids
+// visible. Use `container.firstElementChild` / scoped tag selectors only.
 
 const first = (r: { container: HTMLElement }) => r.container.firstElementChild as HTMLElement;
 
@@ -418,7 +418,7 @@ describe('ReactDOMComponent — attribute-name injection (client)', () => {
  * ReactDOMComponent-test.js (React v19.2.7, 163 cases) — full port accounting
  * ============================================================================
  * Files: dom-component-{styles,attributes,children,custom-elements,events,ssr}.test.ts
- * "ported*" = ported as it.fails (genuine octane GAP, see the test's // GAP note).
+ * "ported*" = historically divergent cases that are now ordinary passing coverage.
  *
  *   :42   should handle className                                  → ported (styles)
  *   :63   should gracefully handle various style value types       → ported (styles; boolean-true arm ported* — style true not dropped)
@@ -585,10 +585,9 @@ describe('ReactDOMComponent — attribute-name injection (client)', () => {
  *   :3851 no onclick handler on the React root in legacy mode      → skipped (§2 — legacy/sync mode; octane is concurrent-root only)
  *
  * Totals: 95 ported — the 23 case-lines marked ported* (plus the partial arms
- * of :63 and :437) were ORIGINALLY pinned as it.fails across 15 tests; those
- * gaps have since been fixed and every pin flipped to a plain `it`, so the
- * ported* markers are a historical record of which cases once diverged, not a
- * live gap list (this family currently has zero it.fails) — 5
+ * of :63 and :437) were originally expected-failure cases across 15 tests;
+ * those gaps have since been fixed, so the ported* markers are only a
+ * historical record (this family has no skipped or expected-failure tests) — 5
  * covered-by-existing (:1538 :1861 :1870 :3136 :3168), 63 skipped.
  * The live parity backlog is generated into docs/parity-gaps.md
  * (`pnpm parity:gaps`).

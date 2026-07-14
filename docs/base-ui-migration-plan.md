@@ -93,9 +93,9 @@ work around it in the binding.**
 > Provider's children a STABLE descriptor shape both states (a no-DOM `DialogInteractions`/
 > `DialogChildren` wrapper). Full detail in memory `octane-provider-children-shape-flip`.
 
-> **Phase 3 OPEN path (part 2) — all Dialog parts + a functional open dialog landed (2026-07);
-> byte-parity blocked on porting Base UI's FloatingPortal + FFM. base-ui typecheck + suite (48 pass,
-> 1 skip) green.** Built the real `DialogInteractions` (wires `useDismiss` + `useScrollLock` +
+> **Historical Phase 3 OPEN checkpoint (part 2, 2026-07) — all Dialog parts + a functional open
+> dialog landed; byte parity was temporarily blocked on Base UI's FloatingPortal + FFM.** Built the
+> real `DialogInteractions` (wires `useDismiss` + `useScrollLock` +
 > `usePopupInteractionProps` + nested-dialog bookkeeping) and all remaining parts: `DialogPortal`
 > (+ `DialogPortalContext`, `InternalBackdrop`, `inertValue`), `DialogBackdrop`, `DialogPopup`,
 > `DialogTitle`, `DialogDescription`, `DialogClose`. A `defaultOpen` modal dialog now renders fully —
@@ -103,11 +103,9 @@ work around it in the binding.**
 > focus guards — and functionally focus-traps/dismisses. **KEY FINDING (corrects last turn's
 > assumption): `@octanejs/floating-ui` emits `data-floating-ui-*` attributes (portal/focus-guard/
 > inert) + a different FocusGuard style (`clip` vs `clip-path`) + role + container handling, whereas
-> Base UI emits `data-base-ui-*`.** So the FFM/Portal reuse-adapter renders a WORKING open dialog but
-> NOT byte-identical to Base UI — the open differential is `it.skip`ped with a GAP note. **Next: port
-> Base UI's own `FloatingPortal` (~307) + `FocusGuard` + `tabbable` (~282) + `FloatingFocusManager`
-> (~991, needs markOthers/enqueueFocus/nodes/composite/event utils) for `data-base-ui-*` parity, then
-> swap the two imports in `dialog.ts` and the open differential flips green.**
+> Base UI emits `data-base-ui-*`.** The repository subsequently ported the Base UI-specific portal
+> and focus-manager behavior; the open Dialog differential now executes normally and passes with
+> byte-identical markup.
 
 > **Phase 3 OPEN path (part 1) — the store-connected dismiss/scroll layer landed (2026-07). base-ui
 > typecheck + suite (48) green.** `utils/floating/useDismiss.ts` — the full store-based dismiss hook

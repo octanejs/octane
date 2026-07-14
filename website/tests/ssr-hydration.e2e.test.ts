@@ -9,8 +9,9 @@
 // — dev-gated — so there the gate is "no errors + routes render + client-side
 // nav works + the playground compiles, runs, and handles an iframe event").
 //
-// Runs inside the website vitest project (playwright as a library). Skips
-// loudly when Chromium isn't installed — CI installs it (see ci.yml).
+// Runs inside the website vitest project (playwright as a library). Chromium is
+// a required prerequisite; CI installs it (see ci.yml), and local runs fail
+// with the exact setup command when it is missing.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { rmSync } from 'node:fs';
@@ -84,18 +85,17 @@ function getFreePort(): Promise<number> {
 	});
 }
 
-// One shared browser; `null` means Chromium isn't available → tests skip.
-let chromium: typeof import('playwright').chromium | null = null;
-let browser: import('playwright').Browser | null = null;
+// One shared browser for both the development and production passes.
+let chromium: typeof import('playwright').chromium;
+let browser: import('playwright').Browser;
 
 beforeAll(async () => {
 	try {
 		({ chromium } = await import('playwright'));
 		browser = await chromium.launch({ headless: true });
 	} catch (error) {
-		// eslint-disable-next-line no-console
-		console.warn(
-			'[ssr-hydration.e2e] SKIPPED — Chromium unavailable ' +
+		throw new Error(
+			'[ssr-hydration.e2e] Chromium is required ' +
 				'(run `pnpm exec playwright install chromium`): ' +
 				(error instanceof Error ? error.message.split('\n')[0] : String(error)),
 		);
@@ -103,7 +103,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-	await browser?.close();
+	await browser.close();
 });
 
 // Spawn a server in its OWN process group so stop() can kill the whole tree.
@@ -252,8 +252,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	it.for(ROUTES)(
 		'%s hydrates with no mismatch and no page errors',
 		{ timeout: 30_000 },
-		async (route, ctx) => {
-			if (!browser) return ctx.skip();
+		async (route) => {
 			const { page, errors, main, comments, bodyDom, mainDom } = await loadRoute(
 				`http://localhost:${DEV_PORT}`,
 				route,
@@ -273,8 +272,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		},
 	);
 
-	it('the Core APIs live examples handle events after hydration', async (ctx) => {
-		if (!browser) return ctx.skip();
+	it('the Core APIs live examples handle events after hydration', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis');
 		try {
 			const count = page.locator('.demo-count');
@@ -385,8 +383,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
-	it('the embedded View Transitions controls run native transitions after hydration', async (ctx) => {
-		if (!browser) return ctx.skip();
+	it('the embedded View Transitions controls run native transitions after hydration', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis');
 		try {
 			const demo = page.locator('[data-demo="view-transitions"]');
@@ -442,7 +439,6 @@ describe.sequential('website production build → hydration (octane-preview)', (
 	let PREVIEW_PORT: number;
 
 	beforeAll(async () => {
-		if (!browser) return;
 		PREVIEW_PORT = await getFreePort();
 		await new Promise<void>((resolve, reject) => {
 			const build = spawn('pnpm', ['exec', 'vite', 'build'], { cwd: WEBSITE, stdio: 'ignore' });
@@ -458,8 +454,7 @@ describe.sequential('website production build → hydration (octane-preview)', (
 		await stop(server);
 	});
 
-	it.for(ROUTES)('%s renders and runs with no errors', { timeout: 30_000 }, async (route, ctx) => {
-		if (!browser) return ctx.skip();
+	it.for(ROUTES)('%s renders and runs with no errors', { timeout: 30_000 }, async (route) => {
 		const { page, errors, main, bodyDom, mainDom } = await loadRoute(
 			`http://localhost:${PREVIEW_PORT}`,
 			route,
@@ -473,8 +468,7 @@ describe.sequential('website production build → hydration (octane-preview)', (
 		}
 	});
 
-	it('client-side navigation works after hydration', { timeout: 30_000 }, async (ctx) => {
-		if (!browser) return ctx.skip();
+	it('client-side navigation works after hydration', { timeout: 30_000 }, async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/');
 		try {
 			await page.click('a.nav-link[href="/benchmarks"]');
@@ -490,8 +484,7 @@ describe.sequential('website production build → hydration (octane-preview)', (
 		}
 	});
 
-	it('playground compiles, runs, and handles an event inside its sandbox', async (ctx) => {
-		if (!browser) return ctx.skip();
+	it('playground compiles, runs, and handles an event inside its sandbox', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
 		try {
 			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });

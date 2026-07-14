@@ -492,10 +492,10 @@ describe('aborted off-screen (WIP) render is discarded', () => {
 //        reason as :1232.
 // :1320 'recovers from uncaught reconciler errors' — PORTED outcome (root
 //        usable after an uncaught mount error; cited on the :883 port).
-// :1338 'unmounts components with uncaught errors' — SPLIT: teardown
-//        continues past a throwing cleanup — PORTED (unmount-phase it);
-//        root tree removed on uncaught error — PINNED as the it.fails GAP;
-//        AggregateError surfacing — N/A (act/jest host surface).
+// :1338 'unmounts components with uncaught errors' — PORTED: teardown
+//        continues past a throwing cleanup and removes the root tree;
+//        AggregateError surfacing is intentionally replaced by Octane's
+//        console.error reporting contract (asserted by the unmount-phase test).
 // :1402 'does not interrupt unmounting if detaching a ref throws' — belongs
 //        to the refs cluster (plan §3 Tier 7 refs row). Octane's ref-detach
 //        teardown paths are exercised by conformance/refs-destruction.test.ts
