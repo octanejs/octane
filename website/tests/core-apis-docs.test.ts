@@ -141,7 +141,9 @@ describe('Core APIs documentation', () => {
 		expect((packing.getByRole('checkbox', { name: 'Passport' }) as HTMLInputElement).checked).toBe(
 			false,
 		);
-		expect((packing.getByRole('checkbox', { name: 'Charger' }) as HTMLInputElement).checked).toBe(true);
+		expect((packing.getByRole('checkbox', { name: 'Charger' }) as HTMLInputElement).checked).toBe(
+			true,
+		);
 	});
 
 	it('runs the ref button and effect-owned keyboard shortcut', async () => {

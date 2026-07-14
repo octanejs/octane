@@ -69,8 +69,14 @@ export const docs: DocEntry[] = [
 	{
 		slug: 'bindings',
 		title: 'Bindings',
-		description: 'The @octanejs/* ports of the React ecosystem.',
+		description: 'Find Octane bindings for state, data fetching, routing, UI, forms, and more.',
 		group: 'Explore',
+		sections: [
+			{ id: 'find-a-binding', title: 'Find a binding' },
+			{ id: 'install-and-use', title: 'Install and use' },
+			{ id: 'check-support', title: 'Check support' },
+			{ id: 'app-tooling', title: 'App tooling' },
+		],
 		component: Bindings as DocEntry['component'],
 	},
 ];

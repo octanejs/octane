@@ -2,80 +2,128 @@
 title: Bindings
 ---
 
-# Bindings
+<div className="doc-hero">
+	<p className="doc-eyebrow">Use the wider ecosystem</p>
+	<h1>Bindings</h1>
+	<p className="doc-lede">
+		Bindings let libraries built for React work naturally with Octane. Pick one for the problem you
+		need to solve, install its <code>@octanejs</code> package, and keep using the library's familiar
+		API.
+	</p>
+</div>
 
-The `@octanejs/*` packages are faithful octane ports of React libraries. Each
-one mirrors its upstream's architecture: the framework-agnostic core is reused
-verbatim wherever the upstream ships one, and only the thin React binding layer
-is reimplemented on octane's hooks — so most code works by changing the import.
+<aside className="doc-callout note">
+	<p className="doc-callout-title">You may not need a binding</p>
+	<p>
+		Ordinary JavaScript and TypeScript packages already work with Octane. A binding is only needed
+		when a library provides React hooks or components that must be connected to Octane's renderer.
+	</p>
+</aside>
 
-| Package                     | Ports                 | One-liner                                                                   |
-| --------------------------- | --------------------- | --------------------------------------------------------------------------- |
-| `@octanejs/zustand`         | zustand               | The bear-necessities state store, bound to octane's `useSyncExternalStore`. |
-| `@octanejs/redux`           | react-redux           | The react-redux hooks + `Provider` for any Redux/RTK store.                 |
-| `@octanejs/redux-toolkit`   | Redux Toolkit         | Toolkit core plus RTK Query and dynamic-middleware hooks for octane.        |
-| `@octanejs/tanstack-query`  | TanStack Query        | `useQuery`/`useSuspenseQuery` data fetching over the verbatim query-core.   |
-| `@octanejs/tanstack-router` | TanStack Router       | Code-based routing with concurrent, transition-driven navigation.           |
-| `@octanejs/motion`          | Motion (Framer)       | Animation primitives on motion-dom.                                         |
-| `@octanejs/stylex`          | StyleX                | Compiled atomic CSS via the StyleX babel pipeline.                          |
-| `@octanejs/lexical`         | @lexical/react        | The Lexical editor binding.                                                 |
-| `@octanejs/floating-ui`     | @floating-ui/react    | Positioning + interactions for tooltips, popovers, menus.                   |
-| `@octanejs/radix`           | Radix UI Primitives   | Accessible unstyled UI primitives.                                          |
-| `@octanejs/base-ui`         | Base UI               | Accessible unstyled UI primitives (`@base-ui/react`).                       |
-| `@octanejs/sonner`          | Sonner                | Opinionated toast notifications with promise and action support.            |
-| `@octanejs/hook-form`       | react-hook-form       | Performant forms with native-event validation and field arrays.             |
-| `@octanejs/recharts`        | Recharts              | Composable SVG charts.                                                      |
-| `@octanejs/lucide`          | Lucide React          | Tree-shakeable Lucide icons, aliases, providers, and dynamic loading.       |
-| `@octanejs/i18next`         | react-i18next         | Hooks, providers, rich translations, ICU, and SSR over unchanged i18next.   |
-| `@octanejs/mdx`             | @mdx-js/react         | MDX documents compiled to octane components (this page is one).             |
-| `@octanejs/testing-library` | react-testing-library | `render`/`renderHook`/`act` over the verbatim @testing-library/dom.         |
+<h2 id="find-a-binding">Find the right binding</h2>
 
-The bindings sit at different maturity levels — some are behaviorally complete
-ports, others are explicitly partial or alpha. The
-[bindings status table](https://github.com/octanejs/octane/blob/main/docs/bindings-status.md)
-is the generated, CI-checked source of truth: upstream version, supported
-surface, known divergences, SSR/hydration status, and the last parity
-verification date for every package.
+If you are moving an existing React app, start with the libraries it already uses. The
+Octane package usually keeps the same concepts and API, with a different import:
 
-Plus the metaframework plugin:
+```ts
+// React
+import { create } from 'zustand';
 
-- `@octanejs/vite-plugin` — dev SSR, routing, and hydration wiring for full
-  apps (this site runs on it).
+// Octane
+import { create } from '@octanejs/zustand';
+```
 
-## The porting recipe
+If you are starting a new app, choose by the problem you need to solve:
 
-Every binding follows the same plan (documented per-package in the repo):
+| What you need                     | Bindings                                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Shared state                      | `@octanejs/zustand`, `@octanejs/jotai`, `@octanejs/redux`, `@octanejs/redux-toolkit`                                                             |
+| Data fetching and caching         | `@octanejs/tanstack-query`                                                                                                                       |
+| Routing                           | `@octanejs/tanstack-router`, `@octanejs/remix-router` (React Router-style APIs)                                                                  |
+| UI and interaction                | `@octanejs/radix`, `@octanejs/base-ui`, `@octanejs/floating-ui`, `@octanejs/motion`, `@octanejs/dnd-kit`, `@octanejs/sonner`, `@octanejs/lucide` |
+| Forms and rich-text editing       | `@octanejs/hook-form`, `@octanejs/lexical`                                                                                                       |
+| Styling and localization          | `@octanejs/stylex`, `@octanejs/i18next`                                                                                                          |
+| Tables, virtual lists, and charts | `@octanejs/tanstack-table`, `@octanejs/tanstack-virtual`, `@octanejs/recharts`                                                                   |
+| Content and testing               | `@octanejs/mdx`, `@octanejs/testing-library`                                                                                                     |
 
-1. **Reuse the core.** zustand's vanilla store, `@tanstack/query-core`,
-   `@tanstack/router-core`, `@testing-library/dom`, `@mdx-js/mdx` — all
-   framework-agnostic, all reused unmodified.
-2. **Port only the React layer.** Usually a few hundred lines of hooks and
-   provider components, rewritten on octane's identical hook API.
-3. **Prove parity differentially.** The test suites run the same fixtures
-   through the octane binding and the real React library, asserting identical
-   DOM output after identical event sequences.
+Packages in the same row are not necessarily interchangeable. Use the upstream
+library's documentation to learn its concepts, then check the Octane binding's supported
+surface before relying on a particular API.
 
-## Using a binding
+<h2 id="install-and-use">Install and use a binding</h2>
+
+Install the `@octanejs` package alongside Octane. For example:
+
+```sh
+pnpm add @octanejs/zustand
+```
+
+Then import from the Octane package:
 
 ```tsrx
-import { useQuery, QueryClient, QueryClientProvider } from '@octanejs/tanstack-query';
+import { create } from '@octanejs/zustand';
 
-function Repos() @{
-	const { data, isPending } = useQuery({
-		queryKey: ['repos'],
-		queryFn: () => fetch('/api/repos').then((r) => r.json()),
-	});
+type CounterStore = {
+	count: number;
+	increment: () => void;
+};
 
-	@if (isPending) {
-		<p>Loading…</p>
-	} @else {
-		<ul>
-			@for (const repo of data; key repo.id) {
-				<li>
-					{repo.name as string}
-				</li>
-			}
-		</ul>
-	}
+const useCounter = create<CounterStore>(
+	(set) => ({
+		count: 0,
+		increment: () => set((state) => ({ count: state.count + 1 })),
+	}),
+);
+
+export function Counter() @{
+	const count = useCounter((state) => state.count);
+	const increment = useCounter((state) => state.increment);
+
+	<button type="button" onClick={() => increment()}>
+		{'Clicked ' + count + ' times'}
+	</button>
 }
 ```
+
+The store API is still Zustand's; the binding makes its hook work with Octane. The same
+idea applies to the other packages: learn the library from its upstream docs, then import
+its Octane binding in your app.
+
+<h2 id="check-support">Check support before shipping</h2>
+
+Octane and its bindings are alpha software. Some bindings cover their upstream library
+almost completely, while others intentionally support a smaller surface. Server rendering
+and hydration coverage also varies.
+
+The generated
+[bindings status table](https://github.com/octanejs/octane/blob/main/docs/bindings-status.md)
+is the source of truth for all 23 packages. It records:
+
+- the upstream version being ported;
+- which APIs are supported;
+- known differences from the React package;
+- server-rendering and hydration coverage;
+- when that evidence was last reviewed.
+
+A binding marked complete is complete for the version and surface described there. It is
+not a blanket promise about every React-specific edge case.
+
+<details className="deep-dive">
+	<summary>How does a binding work?</summary>
+	<div>
+		<p>
+			Many libraries split their framework-neutral logic from a thin React layer. Octane reuses the
+			neutral core and replaces the React hooks and providers with Octane equivalents.
+		</p>
+		<p>
+			The binding tests then run equivalent examples through Octane and the upstream React package.
+			That is why most usage feels familiar even though a different renderer is doing the work.
+		</p>
+	</div>
+</details>
+
+<h2 id="app-tooling">App tooling</h2>
+
+`@octanejs/vite-plugin` is app tooling rather than a library binding. It provides the
+development server, routing, server rendering, hydration wiring, and production build used
+by full Octane apps. The [quick start](/docs/quick-start) sets it up for you.
