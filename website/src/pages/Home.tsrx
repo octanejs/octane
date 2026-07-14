@@ -125,7 +125,7 @@ export function Home() @{
 			<p class="bench-note">
 				{'Ratios are geometric means over each suite’s per-operation checked-in benchmark scores ('}
 				<code>benchmarks/baselines/local</code>
-				{'), Octane .tsrx vs React 19.2, Solid 2.0 beta, Ripple 0.3 and Vue Vapor 3.6 beta. Reproduce with '}
+				{'), Octane .tsrx vs React 19.2, Solid 2.0 beta, Ripple 0.3 and Vue Vapor 3.6. Reproduce with '}
 				<code>pnpm bench:all -- --quick --ratios</code>
 				{', or see '}
 				<Link to="/benchmarks">absolute per-operation numbers for the charted suites</Link>
@@ -348,6 +348,7 @@ export function Home() @{
 				justify-content: space-between;
 				gap: 1rem;
 				flex-wrap: wrap;
+				padding-bottom: 1rem;
 			}
 			.bench-title {
 				margin: 0;

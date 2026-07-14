@@ -86,6 +86,7 @@ describe('website routes', () => {
 		for (const href of ['/docs', '/benchmarks', '/llms.txt']) {
 			expect(findLink(nav, href)).toBeTruthy();
 		}
+		expect(findLink(nav, '/view-transitions')).toBeUndefined();
 		expect(findLink(nav, 'https://github.com/octanejs/octane')).toBeTruthy();
 		expect(findLink(nav, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
 	});

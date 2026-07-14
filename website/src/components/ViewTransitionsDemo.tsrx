@@ -1,11 +1,6 @@
-// /view-transitions — a live demo of octane's <ViewTransition> boundary
-// (docs/view-transitions.md): enter/exit on a toggled card, a shared-element
-// "hero" morph between two layouts, and addTransitionType driving direction-
-// aware classes. Everything animates only in browsers with
-// document.startViewTransition (Chromium/Safari); elsewhere the UI still
-// works, it just commits instantly — the same progressive-enhancement story
-// as the API itself. The e2e suite drives this route in a real browser, so
-// the demo doubles as live coverage for the wrapped-commit path.
+// Embedded Core APIs demo for Octane's <ViewTransition> boundary: enter/exit
+// classes, a shared element, and addTransitionType-driven navigation. Browsers
+// without document.startViewTransition commit each state update immediately.
 import { useState, ViewTransition, startTransition, addTransitionType } from 'octane';
 
 const PANELS = ['Overview', 'Details', 'Reviews'];
@@ -18,111 +13,123 @@ export function ViewTransitionsDemo() @{
 	const [heroRight, setHeroRight] = useState(false);
 	const [panel, setPanel] = useState(0);
 
-	<div class="vtdemo">
-		<h1>View Transitions</h1>
-		<p class="vtdemo-sub">
-			{'React’s experimental '}
-			<code>{'<ViewTransition>'}</code>
-			{' API on octane — powered by the browser’s native View Transitions. '}
-			{'See '}
-			<a
-				href="https://github.com/octanejs/octane/blob/main/docs/view-transitions.md"
-			>{'docs/view-transitions.md'}</a>
-			{'.'}
-		</p>
-
-		<section class="vtdemo-block">
-			<h2>{'Enter / exit'}</h2>
-			<button
-				class="vtdemo-btn"
-				id="vt-toggle-card"
-				onClick={() => startTransition(() => {
-					addTransitionType('card-toggle');
-					setShowCard(!showCard);
-				})}
-			>
-				{showCard ? 'Remove card' : 'Add card'}
-			</button>
-			<div class="vtdemo-stage">
-				@if (showCard) {
-					<ViewTransition enter={CARD_ENTER} exit={CARD_EXIT} default="none">
-						<div class="vtdemo-card">{'I animate in and out'}</div>
-					</ViewTransition>
-				}
-			</div>
-		</section>
-
-		<section class="vtdemo-block">
-			<h2>{'Shared element'}</h2>
-			<button
-				class="vtdemo-btn"
-				id="vt-toggle-hero"
-				onClick={() => startTransition(() => {
-					addTransitionType('hero-move');
-					setHeroRight(!heroRight);
-				})}
-			>{'Move hero'}</button>
-			<div class="vtdemo-stage vtdemo-split">
-				@if (heroRight) {
-					<>
-						<div class="vtdemo-slot" />
-						<ViewTransition name="vt-demo-hero" share={HERO_SHARE} default="none">
-							<div class="vtdemo-hero vtdemo-hero-big">{'hero'}</div>
-						</ViewTransition>
-					</>
-				} @else {
-					<>
-						<ViewTransition name="vt-demo-hero" share={HERO_SHARE} default="none">
-							<div class="vtdemo-hero">{'hero'}</div>
-						</ViewTransition>
-						<div class="vtdemo-slot" />
-					</>
-				}
-			</div>
-		</section>
-
-		<section class="vtdemo-block">
-			<h2>{'Transition types'}</h2>
-			<div class="vtdemo-tabs">
-				@for (const name of PANELS; key name) {
-					<button
-						class={panel === PANELS.indexOf(name) ? 'vtdemo-tab active' : 'vtdemo-tab'}
-						onClick={() => {
-							const next = PANELS.indexOf(name);
-							if (next === panel) return;
-							startTransition(() => {
-								addTransitionType(next > panel ? 'nav-forward' : 'nav-back');
-								setPanel(next);
-							});
-						}}
-					>{name}</button>
-				}
-			</div>
-			<div class="vtdemo-stage">
-				<ViewTransition
-					update={{ 'nav-forward': 'vt-slide-fwd', 'nav-back': 'vt-slide-back', default: 'none' }}
-					default="none"
+	<section
+		class="vtdemo"
+		data-demo="view-transitions"
+		aria-label="Interactive View Transition examples"
+	>
+		<div class="vtdemo-grid">
+			<section class="vtdemo-block">
+				<h4>{'Enter and exit'}</h4>
+				<button
+					type="button"
+					class="vtdemo-btn"
+					id="vt-toggle-card"
+					onClick={() => startTransition(() => {
+						addTransitionType('card-toggle');
+						setShowCard((current) => !current);
+					})}
 				>
-					<div class="vtdemo-panel">{PANELS[panel]}</div>
-				</ViewTransition>
-			</div>
-		</section>
+					{showCard ? 'Remove card' : 'Add card'}
+				</button>
+				<div class="vtdemo-stage">
+					@if (showCard) {
+						<ViewTransition enter={CARD_ENTER} exit={CARD_EXIT} default="none">
+							<div class="vtdemo-card">{'I animate in and out'}</div>
+						</ViewTransition>
+					}
+				</div>
+			</section>
+
+			<section class="vtdemo-block">
+				<h4>{'Shared element'}</h4>
+				<button
+					type="button"
+					class="vtdemo-btn"
+					id="vt-toggle-hero"
+					aria-pressed={heroRight}
+					onClick={() => startTransition(() => {
+						addTransitionType('hero-move');
+						setHeroRight((current) => !current);
+					})}
+				>{'Move hero'}</button>
+				<div class="vtdemo-stage vtdemo-split">
+					@if (heroRight) {
+						<>
+							<div class="vtdemo-slot" />
+							<ViewTransition name="vt-demo-hero" share={HERO_SHARE} default="none">
+								<div class="vtdemo-hero vtdemo-hero-big">{'hero'}</div>
+							</ViewTransition>
+						</>
+					} @else {
+						<>
+							<ViewTransition name="vt-demo-hero" share={HERO_SHARE} default="none">
+								<div class="vtdemo-hero">{'hero'}</div>
+							</ViewTransition>
+							<div class="vtdemo-slot" />
+						</>
+					}
+				</div>
+			</section>
+
+			<section class="vtdemo-block vtdemo-block-wide">
+				<h4>{'Transition types'}</h4>
+				<div class="vtdemo-tabs" role="tablist" aria-label="Example sections">
+					@for (const name of PANELS; key name) {
+						<button
+							type="button"
+							role="tab"
+							aria-selected={panel === PANELS.indexOf(name)}
+							aria-controls="vt-demo-panel"
+							class={panel === PANELS.indexOf(name) ? 'vtdemo-tab active' : 'vtdemo-tab'}
+							onClick={() => {
+								const next = PANELS.indexOf(name);
+								if (next === panel) return;
+								startTransition(() => {
+									addTransitionType(next > panel ? 'nav-forward' : 'nav-back');
+									setPanel(next);
+								});
+							}}
+						>{name}</button>
+					}
+				</div>
+				<div class="vtdemo-stage">
+					<ViewTransition
+						update={{ 'nav-forward': 'vt-slide-fwd', 'nav-back': 'vt-slide-back', default: 'none' }}
+						default="none"
+					>
+						<div class="vtdemo-panel" id="vt-demo-panel" role="tabpanel">{PANELS[panel]}</div>
+					</ViewTransition>
+				</div>
+			</section>
+		</div>
 
 		<style>
 			.vtdemo {
-				max-width: 860px;
-				margin: 0 auto;
-				padding: 3rem 1.5rem 5rem;
+				margin: 1.4rem 0 1.75rem;
+				padding: 1rem;
+				border: 1px solid var(--border);
+				border-radius: 1rem;
+				background:
+					radial-gradient(circle at 95% 0%, rgba(255, 65, 90, 0.12), transparent 32%), var(--panel);
 			}
-			.vtdemo-sub {
-				color: #99a1b3;
-				margin: 0 0 2.5rem;
+			.vtdemo-grid {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 0.85rem;
 			}
 			.vtdemo-block {
-				margin-bottom: 3rem;
+				min-width: 0;
+				padding: 1rem;
+				border: 1px solid var(--border);
+				border-radius: 0.8rem;
+				background: rgba(15, 17, 22, 0.3);
 			}
-			.vtdemo-block h2 {
-				font-size: 1.1rem;
+			.vtdemo-block-wide {
+				grid-column: 1 / -1;
+			}
+			.vtdemo-block h4 {
+				font-size: 0.95rem;
 				margin: 0 0 0.75rem;
 			}
 			.vtdemo-btn {
@@ -191,7 +198,18 @@ export function ViewTransitionsDemo() @{
 				background: #23272f;
 				border: 1px solid #343a46;
 				border-radius: 12px;
-				padding: 2rem;
+				padding: 1.5rem;
+			}
+			@media (max-width: 620px) {
+				.vtdemo-grid {
+					grid-template-columns: 1fr;
+				}
+				.vtdemo-block-wide {
+					grid-column: auto;
+				}
+				.vtdemo-tabs {
+					flex-wrap: wrap;
+				}
 			}
 
 			/* The browser's transition pseudo-tree lives at the document root, so
@@ -281,5 +299,5 @@ export function ViewTransitionsDemo() @{
 				}
 			}
 		</style>
-	</div>
+	</section>
 }

@@ -9,6 +9,8 @@ import {
 	ListConditionsDemo,
 	RefEffectDemo,
 } from '../../components/CoreApiDemo.tsrx';
+import { PortalEventDemo } from '../../components/PortalEventDemo.tsrx';
+import { ViewTransitionsDemo } from '../../components/ViewTransitionsDemo.tsrx';
 
 <div className="doc-hero">
 	<p className="doc-eyebrow">Learn the essentials</p>
@@ -441,6 +443,55 @@ render.
 	</p>
 </aside>
 
+<h3 id="use-sync-external-store">
+	Subscribe to external state with <code>useSyncExternalStore</code>
+</h3>
+
+Use `useSyncExternalStore` when the source of truth lives outside Octane and already
+offers a subscription. Browser state, a framework-independent store, or a third-party
+cache can stay authoritative instead of being copied into component state by an effect.
+
+This status component subscribes to a real browser data source:
+
+```tsrx
+import { useSyncExternalStore } from 'octane';
+
+function subscribe(onStoreChange: () => void) {
+	window.addEventListener('online', onStoreChange);
+	window.addEventListener('offline', onStoreChange);
+
+	return () => {
+		window.removeEventListener('online', onStoreChange);
+		window.removeEventListener('offline', onStoreChange);
+	};
+}
+
+function getSnapshot() {
+	return navigator.onLine;
+}
+
+function getServerSnapshot() {
+	return true;
+}
+
+export function NetworkStatus() @{
+	const isOnline = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+	<p role="status">
+		{isOnline ? 'Online' : 'Offline — changes will sync when you reconnect.'}
+	</p>
+}
+```
+
+`subscribe` receives the notification function and returns its cleanup. `getSnapshot`
+reads the current value. Keep both functions stable when possible, and keep the same
+object identity for an object snapshot until its contents actually change.
+
+The optional third function supplies the server snapshot. Octane reads it during server
+rendering and hydration, then synchronizes to `getSnapshot` in the browser. This example
+uses a deterministic online server value; an application store can serialize its real
+server snapshot instead.
+
 `useLayoutEffect` runs earlier when you must measure or adjust layout before paint.
 `useInsertionEffect` is for styling libraries. `useEffectEvent` creates a stable callback
 that an effect can call without making the effect reactive to the callback's captures.
@@ -524,34 +575,173 @@ Some updates should feel immediate, such as typing. Others may reveal UI that ne
 wait for data. A **transition** marks the second kind so Octane can keep the previous UI
 visible instead of replacing it with a loading fallback too soon.
 
-```tsrx
-import { useState, useTransition } from 'octane';
+<h3 id="use-transition">
+	Keep the current screen with <code>useTransition</code>
+</h3>
 
-export function Tabs() @{
-	const [tab, setTab] = useState('overview');
+Use `useTransition` when an update can wait and the current screen is still useful. It
+returns an `isPending` flag and a function that marks state updates as transition work.
+
+```tsrx
+import { use, useState, useTransition } from 'octane';
+
+interface TabResource {
+	label: string;
+	content: Promise<string>;
+}
+
+function TabPanel(props: { tab: TabResource }) @{
+	const content = use(props.tab.content);
+
+	<article>
+		<h4>{props.tab.label}</h4>
+		<p>{content}</p>
+	</article>
+}
+
+export function ProjectTabs(props: { overview: TabResource; activity: TabResource }) @{
+	const [tab, setTab] = useState(props.overview);
 	const [isPending, startTransition] = useTransition();
 
-	<section>
-		<button onClick={() => startTransition(() => setTab('overview'))}>
-			Overview
-		</button>
-		<button onClick={() => startTransition(() => setTab('reviews'))}>
-			Reviews
-		</button>
-		<p aria-live="polite">
-			{isPending ? 'Loading the next tab…' : 'Showing ' + tab}
-		</p>
+	<section aria-busy={isPending}>
+		<div role="tablist" aria-label="Project sections">
+			<button
+				type="button"
+				role="tab"
+				aria-selected={tab === props.overview}
+				onClick={() => startTransition(() => setTab(props.overview))}
+			>
+				Overview
+			</button>
+			<button
+				type="button"
+				role="tab"
+				aria-selected={tab === props.activity}
+				onClick={() => startTransition(() => setTab(props.activity))}
+			>
+				Activity
+			</button>
+		</div>
+
+		<span aria-live="polite">
+			{isPending ? 'Loading the next tab…' : 'Tab ready'}
+		</span>
+
+		@try {
+			<TabPanel tab={tab} />
+		} @pending {
+			<p>Loading the first tab…</p>
+		}
 	</section>
 }
 ```
 
-Use `startTransition` outside a component, or `useTransition` when this component also
-needs an `isPending` flag. `useDeferredValue(value)` is convenient when a slow child can
-temporarily keep receiving an older value while an input stays current.
+The function passed to `startTransition` runs immediately; the updates it schedules are
+non-urgent. If the next panel suspends, Octane leaves the committed panel visible while
+`isPending` reports the work. The pending branch still handles the first load.
 
-Octane renders each pass synchronously to completion. Transition priority still controls
-the important visible behavior: if the replacement suspends, the previous UI remains in
-place until the new one is ready.
+Keep state that controls a text input urgent. A transition does not make a request or
+calculation faster, and Octane still renders each pass synchronously to completion. Use
+the standalone `startTransition` API outside a component when no pending flag is needed.
+
+<h3 id="use-deferred-value">
+	Let a slow view lag with <code>useDeferredValue</code>
+</h3>
+
+When one value must update immediately but a slower child can temporarily show its
+previous result, pass a deferred copy to that child. This product search keeps typing
+urgent while its result list catches up:
+
+```tsrx
+import { memo, useDeferredValue, useState } from 'octane';
+
+interface ResultsProps {
+	products: string[];
+	query: string;
+}
+
+function ResultsImpl(props: ResultsProps) @{
+	const query = props.query.toLowerCase();
+	const matches = props.products.filter((product) => product.toLowerCase().includes(query));
+
+	<ul>
+		@for (const product of matches; key product) {
+			<li>{product}</li>
+		} @empty {
+			<li>No matching products.</li>
+		}
+	</ul>
+}
+
+const Results = memo(ResultsImpl);
+
+export function ProductSearch(props: { products: string[] }) @{
+	const [query, setQuery] = useState('');
+	const deferredQuery = useDeferredValue(query);
+	const isStale = query !== deferredQuery;
+
+	<section>
+		<label>
+			Search products
+			<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
+		</label>
+
+		<div aria-busy={isStale} style={{ opacity: isStale ? 0.6 : 1 }}>
+			<Results products={props.products} query={deferredQuery} />
+		</div>
+	</section>
+}
+```
+
+The input always receives `query`; only the results receive `deferredQuery`. While the
+two values differ, the visible results are stale. `memo` matters here: the unchanged
+deferred prop lets the urgent input render skip the slow child, then Octane renders the
+new results at transition priority.
+
+`useDeferredValue(value, initialValue)` can provide a preview on the first render. It is
+not a debounce or rate limiter, so use another strategy when the goal is fewer requests.
+
+<h3 id="view-transitions">
+	Animate visual changes with <code>ViewTransition</code>
+</h3>
+
+Transition work can also use the browser's native View Transitions API. Wrap the part
+whose visual identity matters in `ViewTransition`, then schedule the state change with
+`startTransition`:
+
+```tsrx
+import { startTransition, useState, ViewTransition } from 'octane';
+
+export function SavedNotice() @{
+	const [visible, setVisible] = useState(true);
+
+	<section>
+		<button type="button" onClick={() => startTransition(() => setVisible((current) => !current))}>
+			{visible ? 'Hide notice' : 'Show notice'}
+		</button>
+
+		@if (visible) {
+			<ViewTransition enter="notice-in" exit="notice-out">
+				<p>Project saved.</p>
+			</ViewTransition>
+		}
+	</section>
+}
+```
+
+The `enter` and `exit` names become classes on the browser's transition pseudo-elements,
+which your CSS can target with `::view-transition-new(.notice-in)` and
+`::view-transition-old(.notice-out)`. A shared `name` animates the same visual element
+between layouts. `addTransitionType` lets one update select direction-aware class maps.
+
+Try all three patterns below. In a browser without `document.startViewTransition`, the
+same controls still work and commit immediately.
+
+<ViewTransitionsDemo />
+
+See the [full View Transitions guide](https://github.com/octanejs/octane/blob/main/docs/view-transitions.md)
+for lifecycle callbacks, typed class maps, shared elements, and imperative pseudo-element
+access.
 
 ### Forms and actions
 
@@ -625,10 +815,95 @@ Call `root.unmount()` when another system removes the whole app. If the server a
 sent this component's HTML, use `hydrateRoot(container, App)` instead; hydration adopts
 that DOM and attaches Octane's events rather than building the page again.
 
+<h3 id="create-portal">
+	Render an overlay with <code>createPortal</code>
+</h3>
+
+A portal places UI in another DOM container without moving it out of the component tree.
+This is useful for modals, menus, and notification layers that need to escape clipping or
+stacking contexts.
+
+```html
+<div id="app"></div>
+<div id="toast-root"></div>
+```
+
+```tsrx
+import { createPortal, useState } from 'octane';
+
+interface SavedToastProps {
+	target: HTMLElement;
+	onDismiss: () => void;
+}
+
+function ToastBody(props: { onDismiss: () => void }) @{
+	<aside class="toast" aria-label="Save notification">
+		<p role="status">Draft saved.</p>
+		<button type="button" onClick={props.onDismiss}>
+			Dismiss
+		</button>
+	</aside>
+}
+
+function SavedToast(props: SavedToastProps) {
+	return createPortal(ToastBody, props.target, {
+		onDismiss: props.onDismiss,
+	});
+}
+
+export function Editor(props: { toastRoot: HTMLElement }) @{
+	const [toastOpen, setToastOpen] = useState(false);
+	const [clicksSeen, setClicksSeen] = useState(0);
+
+	<>
+		<button type="button" onClick={() => setToastOpen(true)}>
+			Save draft
+		</button>
+
+		<section onClick={() => setClicksSeen((count) => count + 1)}>
+			<p>
+				{'Toast clicks handled by the editor: ' + clicksSeen}
+			</p>
+
+			@if (toastOpen) {
+				<SavedToast target={props.toastRoot} onDismiss={() => setToastOpen(false)} />
+			}
+		</section>
+	</>
+}
+```
+
+The toast is physically inside `#toast-root`, but it remains a logical child of the
+editor's `<section>`. Clicking **Dismiss** runs the button handler and then bubbles to
+the section handler, so its count increases. Context crosses the portal too, unmounting
+the owner removes the portalled DOM, and `stopPropagation()` stops the logical ascent.
+Native listeners installed separately with `addEventListener` still follow the physical
+DOM path.
+
+Try the same structure live. The toast appears in the right-hand DOM target; its dismiss
+event is observed by the logical parent on the left:
+
+<PortalEventDemo />
+
+For production notifications, [`@octanejs/sonner`](https://github.com/octanejs/octane/tree/main/packages/sonner)
+provides timers, stacking, actions, focus handling, and swipe dismissal:
+
+```tsrx
+import { Toaster, toast } from '@octanejs/sonner';
+
+export function App() @{
+	<main>
+		<button onClick={() => toast.success('Project saved')}>Save</button>
+		<Toaster position="top-right" richColors />
+	</main>
+}
+```
+
+Sonner positions the `<Toaster>` host where you mount it rather than calling
+`createPortal`; the direct example above is what demonstrates portal event bubbling.
+
 Other rendering tools are intentionally less common:
 
-- `createPortal(children, target)` puts UI into another DOM container—useful for a modal—
-  while keeping its context and event relationships.
 - `flushSync(callback)` forces pending work to finish before the next line. Reserve it for
   browser or third-party integrations that require the DOM immediately.
 - `act(callback)` flushes renders and effects in tests. Application code should not call it.
@@ -679,9 +954,13 @@ handlers; return here when you have a specific problem to solve.
 				<span>Create information a subtree can provide.</span>
 			</li>
 			<li>
-				<code>use</code> / <code>useContext</code>
+				<code>use</code>
+				{' / '}
+				<code>useContext</code>
 				<span>
-					Read context; <code>use</code> also reads Promises.
+					{'Read context; '}
+					<code>use</code>
+					{' also reads Promises.'}
 				</span>
 			</li>
 			<li>
@@ -801,7 +1080,9 @@ handlers; return here when you have a specific problem to solve.
 				<span>Render into another DOM container.</span>
 			</li>
 			<li>
-				<code>ViewTransition</code> / <code>addTransitionType</code>
+				<code>ViewTransition</code>
+				{' / '}
+				<code>addTransitionType</code>
 				<span>Coordinate browser View Transitions.</span>
 			</li>
 			<li>
@@ -814,27 +1095,41 @@ handlers; return here when you have a specific problem to solve.
 		<h3>Roots, resources, and library tools</h3>
 		<ul>
 			<li>
-				<code>createRoot</code> / <code>hydrateRoot</code>
+				<code>createRoot</code>
+				{' / '}
+				<code>hydrateRoot</code>
 				<span>Start a client tree or adopt server HTML.</span>
 			</li>
 			<li>
-				<code>preload</code> / <code>preinit</code>
+				<code>preload</code>
+				{' / '}
+				<code>preinit</code>
 				<span>Tell the browser about important resources early.</span>
 			</li>
 			<li>
-				<code>preconnect</code> / <code>prefetchDNS</code>
+				<code>preconnect</code>
+				{' / '}
+				<code>prefetchDNS</code>
 				<span>Warm a connection to another origin.</span>
 			</li>
 			<li>
-				<code>createElement</code> / <code>cloneElement</code>
+				<code>createElement</code>
+				{' / '}
+				<code>cloneElement</code>
 				<span>Create or adapt element descriptors; mainly for libraries.</span>
 			</li>
 			<li>
-				<code>isValidElement</code> / <code>isChildrenBlock</code> / <code>Children</code>
+				<code>isValidElement</code>
+				{' / '}
+				<code>isChildrenBlock</code>
+				{' / '}
+				<code>Children</code>
 				<span>Inspect component children in library code.</span>
 			</li>
 			<li>
-				<code>flushSync</code> / <code>act</code>
+				<code>flushSync</code>
+				{' / '}
+				<code>act</code>
 				<span>Integrate synchronous DOM work or test updates.</span>
 			</li>
 			<li>
@@ -842,7 +1137,9 @@ handlers; return here when you have a specific problem to solve.
 				<span>Compatibility hook; it currently has no visible runtime effect.</span>
 			</li>
 			<li>
-				<code>setSsrSuspenseTimeout</code> / <code>getSsrSuspenseTimeout</code>
+				<code>setSsrSuspenseTimeout</code>
+				{' / '}
+				<code>getSsrSuspenseTimeout</code>
 				<span>Configure the server's global deadline for unresolved async data.</span>
 			</li>
 			<li>

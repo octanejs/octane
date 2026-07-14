@@ -44,9 +44,26 @@ describe('Core APIs documentation', () => {
 		}
 
 		expect(container.querySelectorAll('.topic-grid a')).toHaveLength(6);
-		expect(container.querySelectorAll('[data-demo]')).toHaveLength(5);
-		for (const id of ['state', 'lists', 'refs-effects', 'data', 'form']) {
+		expect(container.querySelectorAll('[data-demo]')).toHaveLength(7);
+		for (const id of [
+			'state',
+			'lists',
+			'refs-effects',
+			'data',
+			'view-transitions',
+			'form',
+			'portal',
+		]) {
 			expect(container.querySelector(`[data-demo="${id}"]`)).toBeTruthy();
+		}
+		for (const id of [
+			'use-sync-external-store',
+			'use-transition',
+			'use-deferred-value',
+			'view-transitions',
+			'create-portal',
+		]) {
+			expect(container.querySelector(`h3#${id}`)).toBeTruthy();
 		}
 		expect(container.querySelectorAll('.doc-callout')).toHaveLength(4);
 		expect(container.querySelectorAll('details.deep-dive')).toHaveLength(2);
@@ -70,6 +87,29 @@ describe('Core APIs documentation', () => {
 		).toBe(true);
 		expect(highlightedSource.some((source) => source.includes('createRoot(container)'))).toBe(true);
 		expect(highlightedSource.some((source) => source.includes('renderToString(App'))).toBe(true);
+		for (const sourceMarker of [
+			'export function NetworkStatus()',
+			'export function ProjectTabs(',
+			'export function ProductSearch(',
+			'export function SavedNotice()',
+			'createPortal(',
+		]) {
+			expect(highlightedSource.some((source) => source.includes(sourceMarker))).toBe(true);
+		}
+
+		const apiRows = Array.from(container.querySelectorAll('.api-index-card li'));
+		expect(apiRows.length).toBeGreaterThan(30);
+		for (const row of apiRows) {
+			expect(row.querySelector(':scope > p')).toBeNull();
+			expect(row.querySelector(':scope > code')).toBeTruthy();
+			expect(row.querySelector(':scope > span')).toBeTruthy();
+		}
+		const groupedApiCodeCount = (needle: string) =>
+			apiRows.find((row) => row.textContent?.includes(needle))?.querySelectorAll(':scope > code')
+				.length;
+		expect(groupedApiCodeCount('useContext')).toBe(2);
+		expect(groupedApiCodeCount('addTransitionType')).toBe(2);
+		expect(groupedApiCodeCount('isChildrenBlock')).toBe(3);
 
 		const active = container.querySelector(
 			'a.sidebar-link[href="/docs/core-apis"][data-status="active"]',
@@ -210,6 +250,49 @@ describe('Core APIs documentation', () => {
 		expect(submit.disabled).toBe(true);
 		await waitFor(() => expect(result.textContent).toContain('Saved Grace Hopper.'));
 		expect(submit.disabled).toBe(false);
+	});
+
+	it('runs the embedded View Transitions controls as a progressive fallback', async () => {
+		const { container } = await renderCoreApis();
+		const demo = container.querySelector('[data-demo="view-transitions"]')!;
+		const cardToggle = demo.querySelector<HTMLButtonElement>('#vt-toggle-card')!;
+		const heroToggle = demo.querySelector<HTMLButtonElement>('#vt-toggle-hero')!;
+		const details = within(demo).getByRole('tab', { name: 'Details' });
+
+		expect(cardToggle.textContent).toContain('Remove card');
+		fireEvent.click(cardToggle);
+		await waitFor(() => expect(cardToggle.textContent).toContain('Add card'));
+
+		fireEvent.click(heroToggle);
+		await waitFor(() => expect(demo.querySelector('.vtdemo-hero-big')).toBeTruthy());
+
+		fireEvent.click(details);
+		await waitFor(() => expect(demo.querySelector('.vtdemo-panel')?.textContent).toBe('Details'));
+
+		const emittedStyles = Array.from(document.querySelectorAll('style'))
+			.map((style) => style.textContent ?? '')
+			.join('\n');
+		expect(emittedStyles).toContain('::view-transition-old(.vt-pop-out)');
+		expect(emittedStyles).toContain('::view-transition-new(.vt-slide-fwd)');
+	});
+
+	it('renders a toast into a portal target and bubbles its event through the logical parent', async () => {
+		const { container } = await renderCoreApis();
+		const demo = container.querySelector<HTMLElement>('[data-demo="portal"]')!;
+		const logicalParent = demo.querySelector<HTMLElement>('.portal-demo-parent')!;
+		const target = demo.querySelector<HTMLElement>('.portal-demo-layer')!;
+		const result = demo.querySelector('.portal-demo-result')!;
+
+		fireEvent.click(within(demo).getByRole('button', { name: 'Show saved toast' }));
+		await waitFor(() => expect(target.querySelector('.portal-demo-toast')).toBeTruthy());
+
+		const dismiss = within(target).getByRole('button', { name: 'Dismiss' });
+		expect(target.contains(dismiss)).toBe(true);
+		expect(logicalParent.contains(dismiss)).toBe(false);
+		fireEvent.click(dismiss);
+
+		await waitFor(() => expect(target.querySelector('.portal-demo-toast')).toBeNull());
+		expect(result.textContent).toContain('logical parent: 1');
 	});
 
 	it('collapses the mobile docs menu after choosing another page', async () => {
