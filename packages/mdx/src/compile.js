@@ -57,6 +57,7 @@ import { SourceMapGenerator } from 'source-map';
  * @property {'client' | 'server'} [mode] octane codegen target: `'client'` (DOM) or `'server'` (SSR HTML strings). Default `'client'`.
  * @property {boolean} [hmr] octane compiler HMR wrapping (client only; the vite plugin wires this to serve mode).
  * @property {boolean} [dev] octane compiler dev metadata (client only; same gate as `hmr`).
+ * @property {boolean} [profile] octane compiler profiling metadata (client only).
  * @property {string | null} [providerImportSource]
  *   Module the emitted document reads the provider mapping from
  *   (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /
@@ -152,6 +153,7 @@ function octaneStage(jsxSource, mdxMap, id, options) {
 		mode,
 		hmr: mode === 'client' && !!options.hmr,
 		dev: mode === 'client' && !!options.dev,
+		profile: mode === 'client' && !!options.profile,
 	});
 	// Two-stage sourcemap: octane's map targets the INTERMEDIATE JSX text;
 	// @mdx-js/mdx's map (via SourceMapGenerator) targets the original .mdx.
@@ -184,6 +186,28 @@ function octaneStage(jsxSource, mdxMap, id, options) {
 			'    module && MDXContent[_$mdxHMR].update(module.default);\n' +
 			'  });\n' +
 			'}\n';
+	}
+	// Register the final public binding after the MDX-specific HMR wrapper. The
+	// core compiler may also recognize the generated dispatcher, but its location
+	// belongs to intermediate JSX and its registration precedes this wrapper. This
+	// document-level registration deliberately overrides both with the authored
+	// `.mdx` identity and stable line-one location.
+	if (
+		mode === 'client' &&
+		options.profile &&
+		/\bexport default function MDXContent\b/.test(out.code)
+	) {
+		const metadata = {
+			id: `${id}#MDXContent@1:0`,
+			name: 'MDXContent',
+			file: id,
+			line: 1,
+			column: 0,
+			kind: 'component',
+		};
+		out.code +=
+			"\nimport { __profileComponent as _$mdxProfile } from 'octane/profiling';\n" +
+			`_$mdxProfile(MDXContent, ${JSON.stringify(metadata)});\n`;
 	}
 	return out;
 }

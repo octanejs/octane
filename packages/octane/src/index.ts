@@ -4,6 +4,9 @@ import pkg from '../package.json' with { type: 'json' };
 // package version (the previous hardcoded literal already had).
 export const version: string = pkg.version;
 
+// Profiling's application API and compiler ABI live at `octane/profiling`;
+// neither belongs on the React-shaped main namespace.
+
 // The export surface has exactly three tiers — keep new exports in the right one:
 //
 //  1. PUBLIC API — mirrors React's API, no octane-invented surface. If React

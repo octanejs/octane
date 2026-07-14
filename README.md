@@ -153,6 +153,13 @@ for Vite. See the
 [build tools guide](https://octanejs.dev/docs/build-tools) for SPA, SSR,
 client/server target, HMR, and config examples.
 
+Pass `profile: true` to the Vite, Rspack, or Rsbuild integration to create a
+client profiling build with component timing, render counts and causes,
+schedule-to-render delay, Chrome Performance tracks, and a bounded console API.
+Normal production builds omit the compiler metadata and tree-shake the recorder
+unless application code imports `octane/profiling` directly. See the
+[profiling guide](https://octanejs.dev/docs/profiling).
+
 ### Mount
 
 ```ts

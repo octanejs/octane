@@ -14,6 +14,8 @@ export interface OctaneMdxPluginOptions extends Omit<CompileMdxOptions, 'mode' |
 	md?: boolean;
 	/** octane HMR/dev metadata override; defaults to on in serve mode (client only). */
 	hmr?: boolean;
+	/** Enable component profiling metadata in client modules. */
+	profile?: boolean;
 }
 
 /**
@@ -23,9 +25,13 @@ export interface OctaneMdxPluginOptions extends Omit<CompileMdxOptions, 'mode' |
 export interface OctaneMdxPlugin {
 	name: string;
 	enforce: 'pre';
-	configResolved(config: { command: string }): void;
+	configResolved(config: { command: string; root?: string }): void;
+	watchChange(id: string): void;
 	transform(
-		this: unknown,
+		this: {
+			addWatchFile?(id: string): void;
+			environment?: { config?: { consumer?: string } };
+		},
 		code: string,
 		id: string,
 		options?: { ssr?: boolean },

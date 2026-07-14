@@ -15,6 +15,8 @@ export interface CompileMdxOptions {
 	hmr?: boolean;
 	/** octane compiler dev metadata (client only; same gate as `hmr`). */
 	dev?: boolean;
+	/** octane compiler profiling metadata (client only). */
+	profile?: boolean;
 	/**
 	 * Module the emitted document reads the provider mapping from
 	 * (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /

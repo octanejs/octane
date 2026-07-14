@@ -20,12 +20,14 @@
  * exactly as written and never applies TS-style `.js` → `.ts` mapping.
  */
 import { compileMdx } from './compile.js';
+import { createOctaneCompiler } from 'octane/compiler/bundler';
 
 /**
  * @typedef {Omit<import('./compile.js').CompileMdxOptions, 'mode' | 'hmr' | 'dev'> & {
  *   ssr?: boolean,
  *   md?: boolean,
  *   hmr?: boolean,
+ *   profile?: boolean,
  * }} OctaneMdxPluginOptions
  *
  * `ssr` forces the codegen target for EVERY module — `true` always server,
@@ -34,6 +36,7 @@ import { compileMdx } from './compile.js';
  * `md` also transforms `.md` modules (plain-markdown format). Default `true`.
  * `hmr` is the octane HMR/dev metadata override; defaults to on in serve mode
  * (client only).
+ * `profile` enables profiling metadata in client modules only.
  */
 
 /**
@@ -44,8 +47,9 @@ import { compileMdx } from './compile.js';
  * @typedef {{
  *   name: string,
  *   enforce: 'pre',
- *   configResolved(config: { command: string }): void,
- *   transform(code: string, id: string, options?: { ssr?: boolean }): Promise<{ code: string, map: unknown } | null>,
+ *   configResolved(config: { command: string, root?: string }): void,
+ *   watchChange(id: string): void,
+ *   transform(this: { addWatchFile?(id: string): void, environment?: { config?: { consumer?: string } } }, code: string, id: string, options?: { ssr?: boolean }): Promise<{ code: string, map: unknown } | null>,
  * }} OctaneMdxPlugin
  */
 
@@ -54,14 +58,21 @@ import { compileMdx } from './compile.js';
  * @returns {OctaneMdxPlugin}
  */
 export function octaneMdx(options = {}) {
-	const { ssr: forceSsr, md, hmr, ...compileOptions } = options;
+	const { ssr: forceSsr, md, hmr, profile, ...compileOptions } = options;
 	let hmrEnabled = hmr;
+	let projectRoot = process.cwd();
+	let profileIds = createOctaneCompiler({ root: projectRoot });
 	const includeMd = md !== false;
 	return {
 		name: 'octane-mdx',
 		enforce: 'pre',
 		configResolved(config) {
+			projectRoot = config.root ?? projectRoot;
+			profileIds = createOctaneCompiler({ root: projectRoot });
 			if (hmrEnabled === undefined) hmrEnabled = config.command === 'serve';
+		},
+		watchChange(id) {
+			profileIds.invalidate(id);
 		},
 		async transform(code, id, transformOptions) {
 			const [file, query = ''] = id.split('?'); // Vite ids carry ?v=/?used/?raw/… suffixes
@@ -76,11 +87,21 @@ export function octaneMdx(options = {}) {
 				forceSsr !== undefined
 					? forceSsr
 					: transformOptions?.ssr === true || this.environment?.config?.consumer === 'server';
-			return compileMdx(code, file, {
+			const profiling = !ssr && profile === true;
+			// Preserve the historical filename (and therefore output/source maps) in
+			// ordinary and server builds. Profile metadata needs the portable ID, so
+			// only the explicit client profiling specialization canonicalizes it.
+			const profileIdentity = profiling ? profileIds.resolveProfileModuleId(file) : null;
+			for (const dependency of profileIdentity?.dependencies ?? []) {
+				this.addWatchFile?.(dependency);
+			}
+			const compilerId = profileIdentity?.id ?? file;
+			return compileMdx(code, compilerId, {
 				...compileOptions,
 				mode: ssr ? 'server' : 'client',
 				hmr: !ssr && !!hmrEnabled,
 				dev: !ssr && !!hmrEnabled,
+				profile: profiling,
 			});
 		},
 	};

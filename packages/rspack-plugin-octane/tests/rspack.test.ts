@@ -1,9 +1,14 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import rspack from '@rspack/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { OctaneRspackPlugin } from '../src/index.js';
+
+const repositoryRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
+const profilerGlobal = '__OCTANE_PROFILER__';
+const runGlobal = '__octane_rspack_profile_bundle_runs__';
 
 function write(root: string, relativePath: string, content: string) {
 	const file = join(root, relativePath);
@@ -67,11 +72,16 @@ describe('programmatic Rspack integration', () => {
 			'node_modules/octane/package.json',
 			JSON.stringify({
 				name: 'octane',
-				exports: { '.': './client.cjs', './server': './server.cjs' },
+				exports: {
+					'.': './client.cjs',
+					'./server': './server.cjs',
+					'./profiling': './profiling.cjs',
+				},
 			}) + '\n',
 		);
 		write(root, 'node_modules/octane/client.cjs', runtimeSource('__octane_client_runtime__'));
 		write(root, 'node_modules/octane/server.cjs', runtimeSource('__octane_server_runtime__'));
+		write(root, 'node_modules/octane/profiling.cjs', runtimeSource('__octane_profiling_runtime__'));
 		write(
 			root,
 			'node_modules/@fixture/raw/package.json',
@@ -80,6 +90,19 @@ describe('programmatic Rspack integration', () => {
 				exports: './index.tsx',
 				dependencies: { octane: '*' },
 			}) + '\n',
+		);
+		write(
+			root,
+			'node_modules/@fixture/raw/node_modules/octane/package.json',
+			JSON.stringify({
+				name: 'octane',
+				exports: { './profiling': './profiling.cjs' },
+			}) + '\n',
+		);
+		write(
+			root,
+			'node_modules/@fixture/raw/node_modules/octane/profiling.cjs',
+			runtimeSource('__octane_nested_profiling_runtime__'),
 		);
 		write(
 			root,
@@ -105,6 +128,8 @@ export function App() @{
 	});
 
 	afterEach(() => {
+		Reflect.deleteProperty(globalThis, profilerGlobal);
+		Reflect.deleteProperty(globalThis, runGlobal);
 		rmSync(root, { recursive: true, force: true });
 	});
 
@@ -154,4 +179,177 @@ export function App() @{
 		expect(bundle).toContain('__octaneComponents');
 		expect(bundle).toContain('__webpack_require__.hmrD');
 	}, 30_000);
+
+	it('emits profiling metadata only in client graphs', async () => {
+		for (const [environment, target, expected] of [
+			['client', 'web', true],
+			['server', 'node', false],
+		] as const) {
+			const outputPath = join(root, `dist-profile-${environment}`);
+			await compile({
+				context: root,
+				mode: 'production',
+				target,
+				entry: './src/index.js',
+				optimization: { minimize: false },
+				output: { path: outputPath, filename: 'bundle.js' },
+				plugins: [new OctaneRspackPlugin({ profile: true })],
+			});
+
+			const bundle = readFileSync(join(outputPath, 'bundle.js'), 'utf8');
+			if (expected) {
+				expect(bundle).toContain('/src/App.tsrx#App');
+				expect(bundle).toContain('__profileComponent');
+				expect(bundle).toContain('__octane_profiling_runtime__');
+				expect(bundle).not.toContain('__octane_nested_profiling_runtime__');
+			} else {
+				expect(bundle).not.toContain('/src/App.tsrx#App');
+				expect(bundle).not.toContain('__profileComponent');
+			}
+			expect(bundle).not.toContain('__OCTANE_PROFILE_ENABLED__');
+		}
+	}, 30_000);
+
+	it('erases the real profiling runtime from normal production bundles', async () => {
+		rmSync(join(root, 'node_modules/octane'), { recursive: true, force: true });
+		symlinkSync(join(repositoryRoot, 'packages/octane'), join(root, 'node_modules/octane'), 'dir');
+		write(
+			root,
+			'src/ProfileBundleProbe.tsrx',
+			`import { memo, useState } from 'octane';
+
+const MemoLeaf = memo(function MemoLeaf(props: { value: number }) {
+	return <span>{props.value as string}</span>;
+});
+
+export function ProfileBundleProbe() @{
+	const [count] = useState(0);
+	<MemoLeaf value={count} />
+}
+`,
+		);
+		write(
+			root,
+			'src/index.js',
+			`import { ProfileBundleProbe } from './ProfileBundleProbe.tsrx';
+
+globalThis.${runGlobal} = (globalThis.${runGlobal} || 0) + 1;
+export { ProfileBundleProbe };
+`,
+		);
+
+		const build = async (profile: boolean) => {
+			const mode = profile ? 'profile' : 'normal';
+			const outputPath = join(root, `dist-real-${mode}`);
+			await compile({
+				context: root,
+				mode: 'production',
+				target: 'web',
+				entry: './src/index.js',
+				resolve: { extensionAlias: { '.js': ['.ts', '.js'] } },
+				optimization: { minimize: true },
+				output: { path: outputPath, filename: 'bundle.cjs' },
+				plugins: [new OctaneRspackPlugin({ profile })],
+			});
+			const file = join(outputPath, 'bundle.cjs');
+			return { code: readFileSync(file, 'utf8'), file };
+		};
+
+		const normal = await build(false);
+		const profiled = await build(true);
+		for (const marker of [
+			'__OCTANE_PROFILER__',
+			'__OCTANE_PROFILE_ENABLED__',
+			'__profileComponent',
+			'__profileComponentSource',
+			'__profileHook',
+			'__profileResolveHook',
+			'__profileSource',
+			'getEvents',
+			'exportTrace',
+			'traceEvents',
+			'Octane profiler bufferSize',
+			'Components',
+			'octane.component',
+			'component-render',
+			'component-bailout',
+			'/src/ProfileBundleProbe.tsrx#ProfileBundleProbe',
+		]) {
+			expect(normal.code, `normal bundle retained ${marker}`).not.toContain(marker);
+		}
+
+		expect(profiled.code).not.toContain('__OCTANE_PROFILE_ENABLED__');
+		expect(profiled.code).toContain('__OCTANE_PROFILER__');
+		expect(profiled.code).toContain('exportTrace');
+		expect(profiled.code).toContain('Components');
+		expect(profiled.code).toContain('octane.component');
+		expect(profiled.code).toContain('component-render');
+		expect(profiled.code).toContain('/src/ProfileBundleProbe.tsrx#ProfileBundleProbe');
+		expect(profiled.code.length).toBeGreaterThan(normal.code.length);
+
+		await import(`${pathToFileURL(normal.file).href}?normal`);
+		expect((globalThis as any)[runGlobal]).toBe(1);
+		expect((globalThis as any)[profilerGlobal]).toBeUndefined();
+		await import(`${pathToFileURL(profiled.file).href}?profile`);
+		expect((globalThis as any)[runGlobal]).toBe(2);
+		const profiler = (globalThis as any)[profilerGlobal];
+		expect(profiler).toMatchObject({
+			start: expect.any(Function),
+			getEvents: expect.any(Function),
+			exportTrace: expect.any(Function),
+		});
+		expect(profiler.getEvents()).toEqual([]);
+		expect(profiler.exportTrace()).toMatchObject({ displayTimeUnit: 'ms', traceEvents: [] });
+	}, 30_000);
+
+	it('invalidates persistent module caches when profiling toggles', async () => {
+		const cacheDirectory = join(root, '.rspack-profile-cache');
+		const build = async (profile: boolean, index: number) => {
+			const outputPath = join(root, `dist-profile-cache-${index}`);
+			await compile({
+				name: 'profile-cache-fixture',
+				context: root,
+				mode: 'production',
+				target: 'web',
+				entry: './src/index.js',
+				cache: {
+					type: 'persistent',
+					version: 'user-cache-v1',
+					storage: { type: 'filesystem', directory: cacheDirectory },
+				},
+				optimization: { minimize: false },
+				output: { path: outputPath, filename: 'bundle.js' },
+				plugins: [new OctaneRspackPlugin({ profile })],
+			});
+			return readFileSync(join(outputPath, 'bundle.js'), 'utf8');
+		};
+
+		const normal = await build(false, 1);
+		const profiled = await build(true, 2);
+		const normalAgain = await build(false, 3);
+		expect(normal).not.toContain('__profileComponent');
+		expect(profiled).toContain('__profileComponent');
+		expect(normalAgain).not.toContain('__profileComponent');
+	}, 30_000);
+
+	it.each(['before', 'after'] as const)(
+		'rejects a conflicting reserved define applied %s the Octane plugin',
+		async (order) => {
+			const outputPath = join(root, `dist-profile-define-${order}`);
+			const octane = new OctaneRspackPlugin({ profile: true });
+			const conflicting = new rspack.DefinePlugin({
+				__OCTANE_PROFILE_ENABLED__: JSON.stringify(false),
+			});
+			await expect(
+				compile({
+					context: root,
+					mode: 'production',
+					target: 'web',
+					entry: './src/index.js',
+					output: { path: outputPath, filename: 'bundle.js' },
+					plugins: order === 'before' ? [conflicting, octane] : [octane, conflicting],
+				}),
+			).rejects.toThrow(/__OCTANE_PROFILE_ENABLED__.*reserved/);
+		},
+	);
 });

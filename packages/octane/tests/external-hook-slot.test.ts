@@ -176,6 +176,48 @@ describe('vite plugin gate routing', () => {
 		expect(config.resolve.dedupe).toContain('octane');
 	});
 
+	it('defines and forwards the client profiling specialization independently of HMR', () => {
+		const profiled = octane({ hmr: false, profile: true });
+		const config = (profiled.config as any)({ root: appRoot });
+		expect(config.define.__OCTANE_PROFILE_ENABLED__).toBe('true');
+
+		const transformed = (profiled.transform as any).call(
+			{},
+			`export function App() { return <p>profiled</p>; }`,
+			join(appRoot, 'profiled.tsx'),
+		);
+		expect(transformed?.code).toContain('__profileComponent');
+
+		const normalConfig = (octane().config as any)({ root: appRoot });
+		expect(normalConfig.define.__OCTANE_PROFILE_ENABLED__).toBe('false');
+	});
+
+	it('rejects conflicting user definitions of the reserved profiling constant', () => {
+		const profiled = octane({ profile: true });
+		expect(() =>
+			(profiled.config as any)({
+				root: appRoot,
+				define: { __OCTANE_PROFILE_ENABLED__: 'false' },
+			}),
+		).toThrow(/__OCTANE_PROFILE_ENABLED__.*reserved/);
+
+		// A matching value is harmless, but the final resolved config is checked a
+		// second time so a later Vite plugin cannot silently replace Octane's value.
+		expect(() =>
+			(profiled.config as any)({
+				root: appRoot,
+				define: { __OCTANE_PROFILE_ENABLED__: 'true' },
+			}),
+		).not.toThrow();
+		expect(() =>
+			(profiled.configResolved as any)({
+				root: appRoot,
+				command: 'build',
+				define: { __OCTANE_PROFILE_ENABLED__: 'false' },
+			}),
+		).toThrow(/__OCTANE_PROFILE_ENABLED__.*reserved/);
+	});
+
 	it('recursively discovers raw Octane bindings behind another binding', () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-source-discovery-'));
 		try {

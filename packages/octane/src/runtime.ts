@@ -34,6 +34,58 @@ import {
 	// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
 	VOID_ELEMENTS,
 } from './constants.js';
+import {
+	__profileBail,
+	__profileBeginRender,
+	__profileComponentSource,
+	__profileEndRender,
+	__profileHasComponentMetadata,
+	__profileResolveHook,
+	__profileSchedule,
+	__profileTrackComponent,
+	type ProfileFrame,
+} from './profiling.js';
+
+declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
+let PROFILE_COMPONENT_OVERRIDE: { target: Function; component: Function | null } | null = null;
+
+function withProfileComponentOverride<T>(
+	target: Function,
+	component: Function | null,
+	run: () => T,
+): T {
+	const previous = PROFILE_COMPONENT_OVERRIDE;
+	PROFILE_COMPONENT_OVERRIDE = { target, component };
+	try {
+		return run();
+	} finally {
+		PROFILE_COMPONENT_OVERRIDE = previous;
+	}
+}
+
+function profileTrackComponent(subject: object, fallback: Function): void {
+	const override = PROFILE_COMPONENT_OVERRIDE;
+	__profileTrackComponent(
+		subject,
+		override !== null && override.target === fallback ? override.component : fallback,
+	);
+}
+
+function profilePortalComponent(rawBody: unknown): Function | null {
+	if (typeof rawBody === 'function' && __profileHasComponentMetadata(rawBody)) return rawBody;
+	const descriptor = rawBody as any;
+	return descriptor != null &&
+		descriptor.$$kind === ELEMENT_TAG &&
+		typeof descriptor.type === 'function'
+		? descriptor.type
+		: null;
+}
+
+// Bundler integrations replace the reserved constant in both normal and profile
+// builds. Each use retains a typeof guard so the unbundled source/dist entry stays
+// importable; using the define directly (instead of through a local const) lets
+// Vite/Rspack erase the branch and its profiling import from normal bundles.
 
 // ---------------------------------------------------------------------------
 // Types
@@ -534,6 +586,8 @@ interface TransitionActionUpdate<T = unknown> {
 	baseValue: T;
 	value: T;
 	forceRender: boolean;
+	profileType?: 'state' | 'reducer';
+	profileSlot?: symbol;
 }
 
 interface TransitionActionBatch {
@@ -635,6 +689,12 @@ function flushTransitionActionBatch(batch: TransitionActionBatch): void {
 		const changed = !Object.is(slot.value, value);
 		if (!changed && !forceRender) continue;
 		if (changed) slot.value = value;
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileSchedule(
+				block,
+				update.profileType ?? (forceRender ? 'reducer' : 'state'),
+				update.profileSlot,
+			);
 		scheduleRender(block);
 	}
 	batch.updates.clear();
@@ -2672,6 +2732,14 @@ export function renderBlock(block: Block): void {
 			: (prevBlock?.currentRenderDeferred ?? false);
 	block.pendingMode = null;
 	block.pendingDeferred = false;
+	const profileFrame: ProfileFrame | null =
+		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+		__OCTANE_PROFILE_ENABLED__ &&
+		(block.kind === 'root' || block.kind === 'dynamic' || block.kind === 'portal')
+			? __profileBeginRender(block, block.body, block.mounted)
+			: null;
+	let profileDidThrow = false;
+	let profileThrown: unknown;
 	try {
 		const out = (block.body as (p: any, s: Scope, e: any) => unknown)(
 			block.props,
@@ -2712,18 +2780,39 @@ export function renderBlock(block: Block): void {
 			}
 			if (useSingleRoot) {
 				const d = out as ElementDescriptor;
-				componentSlot(
-					block,
-					0,
-					block.parentNode,
-					d.type as ComponentBody,
-					d.props,
-					block.endMarker,
-					d.key ?? undefined,
-					true,
-					undefined,
-					hydrating && KEYED_ELEMENT_DESCRIPTORS.has(d),
-				);
+				if (
+					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+					__OCTANE_PROFILE_ENABLED__ &&
+					!__profileHasComponentMetadata(d.type as Function)
+				) {
+					withProfileComponentOverride(d.type as Function, null, () =>
+						componentSlot(
+							block,
+							0,
+							block.parentNode,
+							d.type as ComponentBody,
+							d.props,
+							block.endMarker,
+							d.key ?? undefined,
+							true,
+							undefined,
+							hydrating && KEYED_ELEMENT_DESCRIPTORS.has(d),
+						),
+					);
+				} else {
+					componentSlot(
+						block,
+						0,
+						block.parentNode,
+						d.type as ComponentBody,
+						d.props,
+						block.endMarker,
+						d.key ?? undefined,
+						true,
+						undefined,
+						hydrating && KEYED_ELEMENT_DESCRIPTORS.has(d),
+					);
+				}
 			} else {
 				// A nested return-based component whose server output is EMPTY owns an
 				// adjacent `<!--[--><!--]-->` range with no inner child range to adopt.
@@ -2768,7 +2857,17 @@ export function renderBlock(block: Block): void {
 		// Body completed without suspending: its use() episode is over — the
 		// next render (replay or not) must not reuse these entries.
 		(block as any).__thenableDone = true;
+	} catch (error) {
+		profileDidThrow = true;
+		profileThrown = error;
+		throw error;
 	} finally {
+		if (
+			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+			__OCTANE_PROFILE_ENABLED__ &&
+			profileFrame !== null
+		)
+			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
 	}
@@ -2922,10 +3021,24 @@ export function componentSlotLite<P>(
 	}
 	const prevScope = CURRENT_SCOPE;
 	CURRENT_SCOPE = scope;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileTrackComponent(scope, comp);
+	const profileFrame: ProfileFrame | null =
+		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__
+			? __profileBeginRender(scope, comp, scope.mounted)
+			: null;
+	let profileDidThrow = false;
+	let profileThrown: unknown;
 	try {
 		comp(props, scope, undefined);
 		if (!scope.mounted) scope.mounted = true;
+	} catch (error) {
+		profileDidThrow = true;
+		profileThrown = error;
+		throw error;
 	} finally {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
 		CURRENT_SCOPE = prevScope;
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the
@@ -3242,7 +3355,10 @@ function resolveSlot(slot: symbol | undefined): symbol | undefined {
 	const path = currentPathSlot();
 	if (path === undefined) return slot;
 	if (slot === undefined) return path;
-	return Symbol.for(path.description + '|' + slot.description);
+	const resolved = Symbol.for(path.description + '|' + slot.description);
+	return typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__
+		? __profileResolveHook(resolved, slot)
+		: resolved;
 }
 
 interface StateSlot<T> {
@@ -3283,8 +3399,25 @@ export function useState<T>(initial?: T | (() => T), slot?: symbol): StateTuple<
 				const operation = typeof next === 'function' ? (next as (p: T) => T) : () => next;
 				const computed = operation(previous);
 				if (Object.is(computed, previous)) return;
-				if (stageTransitionValue(s!, block, operation, computed)) return;
+				if (stageTransitionValue(s!, block, operation, computed)) {
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+						const update = s!.pendingActionBatch?.updates.get(s!) as
+							| TransitionActionUpdate<T>
+							| undefined;
+						if (update !== undefined) {
+							update.profileType = 'state';
+							update.profileSlot = slot;
+						}
+					}
+					return;
+				}
 				s!.value = computed;
+				if (
+					!block.disposed &&
+					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+					__OCTANE_PROFILE_ENABLED__
+				)
+					__profileSchedule(block, 'state', slot);
 				scheduleRender(block);
 			},
 		};
@@ -3376,8 +3509,25 @@ export function useReducer<S, A, I = S>(
 				const previous = stagedTransitionValue(s!);
 				const operation = (value: S) => s!.reducer(value, action);
 				const computed = operation(previous);
-				if (stageTransitionValue(s!, block, operation, computed, true)) return;
+				if (stageTransitionValue(s!, block, operation, computed, true)) {
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+						const update = s!.pendingActionBatch?.updates.get(s!) as
+							| TransitionActionUpdate<S>
+							| undefined;
+						if (update !== undefined) {
+							update.profileType = 'reducer';
+							update.profileSlot = slot;
+						}
+					}
+					return;
+				}
 				s!.value = computed;
+				if (
+					!block.disposed &&
+					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+					__OCTANE_PROFILE_ENABLED__
+				)
+					__profileSchedule(block, 'reducer', slot);
 				scheduleRender(block);
 			},
 		};
@@ -3753,7 +3903,13 @@ export function useSyncExternalStore<T>(
 			getSnapshot,
 			pending: value,
 			subscribe,
-			forceUpdate: () => scheduleRender(block),
+			forceUpdate:
+				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__
+					? () => {
+							if (!block.disposed) __profileSchedule(block, 'external-store', slot);
+							scheduleRender(block);
+						}
+					: () => scheduleRender(block),
 			onStoreChange: () => {
 				if (checkStoreChanged(created)) created.forceUpdate();
 			},
@@ -4608,6 +4764,10 @@ export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ def
 					// re-render takes the synchronous branch above.
 					try {
 						result = resolveLazyModule(mod);
+						// Profiling resolves metadata through the loaded component without
+						// wrapping it or changing the lazy wrapper's stable identity.
+						if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+							__profileComponentSource(lazyWrapper, result);
 						status = 'fulfilled';
 					} catch (err) {
 						result = err;
@@ -8113,6 +8273,9 @@ function renderPortalState(
 			norm.props,
 			env,
 		);
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+			__profileTrackComponent(block, profilePortalComponent(rawBody));
+		}
 		state = { __kind: 'portalSlotSlot', block, target, start, end };
 		// Portal target hosts handlers stamped via the same `el.$$click = …`
 		// mechanism as the main tree, so it needs the delegated event listeners too.
@@ -8124,6 +8287,9 @@ function renderPortalState(
 		state.block!.body = norm.body;
 		state.block!.props = norm.props;
 		state.block!.extra = env;
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+			__profileTrackComponent(state.block!, profilePortalComponent(rawBody));
+		}
 		renderBlock(state.block!);
 	}
 	// Stamp `$$portalParent` on every direct child the portal placed between its
@@ -8162,12 +8328,18 @@ function normalizePortalBody(rawBody: any, rawProps: any): { body: ComponentBody
 		return { body: rawBody as ComponentBody, props: rawProps };
 	}
 	if (rawBody != null && rawBody.$$kind === ELEMENT_TAG && typeof rawBody.type === 'function') {
-		return { body: rawBody.type as ComponentBody, props: rawBody.props };
+		return {
+			body: rawBody.type as ComponentBody,
+			props: rawBody.props,
+		};
 	}
 	// Host element / array / primitive / component-descriptor → render via childSlot
 	// inside the portal Block (genericPortalBody has stable identity, so the portal
 	// reconciles its content across re-renders rather than rebuilding).
-	return { body: genericPortalBody as unknown as ComponentBody, props: rawBody };
+	return {
+		body: genericPortalBody as unknown as ComponentBody,
+		props: rawBody,
+	};
 }
 
 function genericPortalBody(value: any, scope: Block): void {
@@ -8743,6 +8915,12 @@ export function componentSlot(
 				body,
 				renderProps,
 			);
+			if (
+				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+				__OCTANE_PROFILE_ENABLED__ &&
+				typeof comp === 'function'
+			)
+				profileTrackComponent(b, comp);
 			state.block = b;
 			try {
 				renderBlock(b);
@@ -8763,6 +8941,12 @@ export function componentSlot(
 				body,
 				renderProps,
 			);
+			if (
+				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+				__OCTANE_PROFILE_ENABLED__ &&
+				typeof comp === 'function'
+			)
+				profileTrackComponent(b, comp);
 			// Borrowed range (M3): teardown must sweep BETWEEN the parent's
 			// markers, never remove them (the branch-block precedent).
 			if (state.inherited) b.exclusiveMarkers = true;
@@ -8922,6 +9106,14 @@ function renderOffscreen(
 	const prev = WIP_CAPTURE;
 	WIP_CAPTURE = capture;
 	const block = createBlock(kind, parentBlock, domParent, start, end, body, props, env);
+	if (
+		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+		__OCTANE_PROFILE_ENABLED__ &&
+		kind === 'dynamic' &&
+		body !== (hostStringTagBody as unknown as ComponentBody) &&
+		body !== (hostElementBody as unknown as ComponentBody)
+	)
+		profileTrackComponent(block, body);
 	let suspended: any = null;
 	let error: any = null;
 	try {
@@ -10476,7 +10668,6 @@ export function childSlot(
 		comp = value.type as ComponentBody;
 		props = value.props;
 	}
-
 	if (comp !== null) {
 		// A bare render-FUNCTION child (a `.tsrx` `{children}` body forwarded onto a `.ts`
 		// component's host element via createElement) is re-created every render, so its
@@ -10521,7 +10712,15 @@ export function childSlot(
 			!hydrating &&
 			parentBlock.currentRenderMode === 'transition'
 		) {
-			const r = renderOffscreen(parentBlock, domParent, state.end!, comp, props);
+			const r =
+				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+				__OCTANE_PROFILE_ENABLED__ &&
+				isBodyFn &&
+				!__profileHasComponentMetadata(comp)
+					? withProfileComponentOverride(comp, null, () =>
+							renderOffscreen(parentBlock, domParent, state.end!, comp, props),
+						)
+					: renderOffscreen(parentBlock, domParent, state.end!, comp, props);
 			if (r.suspended || r.error) {
 				// Discard the partial; the OLD content was never touched, so it stays live.
 				// Re-throw so the enclosing tryBlock's existing catch holds the old content
@@ -10609,6 +10808,12 @@ export function childSlot(
 			domParent.insertBefore(state.start, state.end);
 		}
 		const b = createBlock('dynamic', parentBlock, domParent, state.start, state.end, comp, props);
+		if (
+			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+			__OCTANE_PROFILE_ENABLED__ &&
+			comp !== (hostElementBody as unknown as ComponentBody)
+		)
+			__profileTrackComponent(b, !isBodyFn || __profileHasComponentMetadata(comp) ? comp : null);
 		if (state.borrowed) b.exclusiveMarkers = true;
 		// Arm React's implicit same-element bailout: value-position mounts are the
 		// sites that can receive a CACHED descriptor back (provider children, `.ts`
@@ -10904,6 +11109,8 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	restampCtxDeps(block);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileBail(block, comp, 'memo-bailout');
 	return true;
 }
 
@@ -10920,6 +11127,8 @@ function tryImplicitBail(block: Block): boolean {
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	restampCtxDeps(block);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileBail(block, block.body, 'implicit-bailout');
 	return true;
 }
 
@@ -10960,6 +11169,8 @@ function refreshBlockForContext(block: Block): void {
 		// This child directly consumes the changed context (or shares its block
 		// with a lite descendant that does): re-run it. renderBlock re-renders its
 		// own subtree top-down, so nested consumers below it are reached normally.
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileSchedule(block, 'context');
 		renderBlock(block);
 	} else if ((block.body as any)?.__memo === true || block.$$implicitBail === true) {
 		// A memo'd (or implicit-bail-armed) pure indirection: its $$ctxReads is
@@ -11038,6 +11249,8 @@ export function memo<P>(
 		return component(props, scope, extra);
 	}
 	(memoWrapper as any).__memo = true;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileComponentSource(memoWrapper, component);
 	if (arePropsEqual) (memoWrapper as any).__compare = arePropsEqual;
 	return memoWrapper as ComponentBody<P>;
 }
@@ -11087,8 +11300,12 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			// the incoming function is itself an HMR wrapper (which it will be when
 			// the new module re-runs `Comp = hmr(Comp)`), unwrap it down to the
 			// raw fn — otherwise we'd nest wrappers on each edit.
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileComponentSource(wrapper, incoming);
 			const incomingMeta = (incoming as any)[HMR] as HmrMeta | undefined;
 			meta.fn = incomingMeta ? incomingMeta.fn : incoming;
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileComponentSource(wrapper, meta.fn);
 			// Keep the forwarded fetch plan in sync with the swapped body.
 			(wrapper as any).__warm = (meta.fn as any).__warm;
 			// Mutate every live block's body in place and schedule a re-render.
@@ -11102,6 +11319,8 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 					continue;
 				}
 				b.body = wrapper as unknown as ComponentBody<any>;
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileSchedule(b, 'hmr');
 				scheduleRender(b);
 			}
 		},
@@ -11115,6 +11334,8 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 		return meta.fn(props as any, scope, extra);
 	}
 	(wrapper as HmrWrapper)[HMR] = meta;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileComponentSource(wrapper, fn);
 	// Forward the parallel-use fetch plan (docs/suspense-parallel-use-plan.md):
 	// the compiler attaches `__warm` to the INNER function; cross-module
 	// consumers hold this wrapper, so warmChild must find the plan here too.
@@ -12098,7 +12319,11 @@ export function useTransition(
 			const next = TRANSITION_PENDING_COUNT > 0;
 			if (slotRef.isPending !== next) {
 				slotRef.isPending = next;
-				if (!block.disposed) scheduleRender(block);
+				if (!block.disposed) {
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileSchedule(block, 'transition-pending', slot);
+					scheduleRender(block);
+				}
 			}
 		};
 		TRANSITION_LISTENERS.add(listener);
@@ -12157,7 +12382,11 @@ export function useActionState<S>(
 		const setPending = (next: boolean): void => {
 			if (slotRef.isPending !== next) {
 				slotRef.isPending = next;
-				if (!block.disposed) scheduleRender(block);
+				if (!block.disposed) {
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileSchedule(block, 'action-state-pending', slot);
+					scheduleRender(block);
+				}
 			}
 		};
 		const dispatch = ((payload?: any): Promise<S> => {
@@ -12192,7 +12421,14 @@ export function useActionState<S>(
 								(result) => {
 									slotRef.state = result;
 									finish();
-									if (!block.disposed) scheduleRender(block);
+									if (!block.disposed) {
+										if (
+											typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+											__OCTANE_PROFILE_ENABLED__
+										)
+											__profileSchedule(block, 'action-state', slot);
+										scheduleRender(block);
+									}
 									resolveResult(result);
 								},
 								(err) => {
@@ -12269,7 +12505,11 @@ export function useFormStatus(slot?: symbol): FormStatus {
 		s.form = form;
 		if (form) {
 			const listener = (): void => {
-				if (!block.disposed) scheduleRender(block);
+				if (!block.disposed) {
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileSchedule(block, 'form-status', slot);
+					scheduleRender(block);
+				}
 			};
 			s.listener = listener;
 			let set = FORM_STATUS_LISTENERS.get(form);
@@ -12327,7 +12567,11 @@ export function useOptimistic<S, V = S>(
 			slotRef.armed = false;
 			if (slotRef.queue.length > 0) {
 				slotRef.queue.length = 0;
-				if (!block.disposed) scheduleRender(block);
+				if (!block.disposed) {
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileSchedule(block, 'optimistic-revert', slot);
+					scheduleRender(block);
+				}
 			}
 		};
 		const slotRef: OptimisticSlot<S, V> = {
@@ -12346,7 +12590,11 @@ export function useOptimistic<S, V = S>(
 					// reverts — never left stuck waiting on a transition that won't come.
 					queueMicrotask(clear);
 				}
-				if (!block.disposed) scheduleRender(block);
+				if (!block.disposed) {
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileSchedule(block, 'optimistic', slot);
+					scheduleRender(block);
+				}
 			},
 		};
 		s = slotRef;
@@ -12382,6 +12630,8 @@ interface DeferredSlot<T> {
 	next: T; // latest pending value
 	scheduled: boolean;
 	block: Block;
+	/** Profile-build-only hook source; the assignment is erased in normal bundles. */
+	profileSlot?: symbol;
 	/**
 	 * Whether this slot's LAST render ran inside a hidden <Activity>/suspended
 	 * subtree. Revealing a hidden tree is a fresh mount for this hook (React:
@@ -12414,7 +12664,10 @@ function spawnDeferredSwap<T>(s: DeferredSlot<T>): void {
 		startTransition(() => {
 			DEFERRED_SPAWN = true;
 			try {
-				scheduleRender(s.block);
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+					__profileSchedule(s.block, 'deferred-value', s.profileSlot);
+					scheduleRender(s.block);
+				} else scheduleRender(s.block);
 			} finally {
 				DEFERRED_SPAWN = false;
 			}
@@ -12444,7 +12697,15 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 			// React's "useDeferredValue with initialValue" contract: a UI that
 			// wants to show stable initial content while the expensive `value`
 			// computation settles in the background.
-			s = { current: initialValue as T, next: value, scheduled: false, block, wasHidden: hidden };
+			s = {
+				current: initialValue as T,
+				next: value,
+				scheduled: false,
+				block,
+				wasHidden: hidden,
+			};
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				s.profileSlot = slot;
 			ensureHooks(scope).set(slot, s);
 			if (!Object.is(initialValue as T, value)) spawnDeferredSwap(s);
 			return initialValue as T;
@@ -12454,6 +12715,8 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 		// value is adopted directly (React's anti-waterfall: only the first
 		// useDeferredValue level defers — ReactDeferredValue-test.js:564).
 		s = { current: value, next: value, scheduled: false, block, wasHidden: hidden };
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			s.profileSlot = slot;
 		ensureHooks(scope).set(slot, s);
 		return value;
 	}
@@ -12501,6 +12764,12 @@ function requestReset(state: TrySlot): void {
 	state.branch = -1;
 	state.err = null;
 	state.hasResolved = false;
+	if (
+		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+		__OCTANE_PROFILE_ENABLED__ &&
+		!state.parentBlock.disposed
+	)
+		__profileSchedule(state.parentBlock, 'error-boundary-reset');
 	scheduleRender(state.parentBlock);
 }
 
@@ -15005,6 +15274,8 @@ function makeRoot(
 			// is already false, so renderBlock reuses the adopted DOM, not rebuilds it.
 			if (rootBlock && currentBody === body) {
 				rootBlock.props = props;
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileSchedule(rootBlock, 'root-render');
 				scheduleRender(rootBlock);
 				return;
 			}
@@ -15015,6 +15286,8 @@ function makeRoot(
 			}
 			while (container.firstChild) container.removeChild(container.firstChild);
 			rootBlock = createBlock('root', null, container, null, null, body, props);
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileTrackComponent(rootBlock, body);
 			rootBlock.idState = idState;
 			currentBody = body;
 			// React parity: render() inside a transition never commits synchronously
@@ -15114,6 +15387,8 @@ export function hydrateRoot(
 	}
 	registerDelegationTarget(container);
 	const rootBlock = createBlock('root', null, container, null, null, body, props);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileTrackComponent(rootBlock, body);
 	const idState: RootIdState = {
 		prefix: rootOptions?.identifierPrefix ?? '',
 		next: 0,

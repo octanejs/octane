@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRsbuild } from '@rsbuild/core';
+import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pluginOctane } from '../src/index.js';
 
@@ -100,6 +101,26 @@ describe('Rsbuild build.target mapping', () => {
 				['node', 'browserslist:chrome >= 100,firefox >= 100'],
 			]),
 		);
+	});
+
+	it('forwards profiling only to the client compiler environment', async () => {
+		writeApp(root, JSON.stringify('es2022'));
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ hmr: false, profile: true })] },
+		});
+		const configs = await instance.initConfigs({ action: 'build' });
+		const configured = configs.map((config) => ({
+			target: config.target,
+			plugin: config.plugins?.find((plugin) => plugin instanceof OctaneRspackPlugin),
+		}));
+
+		expect(configured).toHaveLength(2);
+		for (const { target, plugin } of configured) {
+			expect(plugin).toBeInstanceOf(OctaneRspackPlugin);
+			const server = Array.isArray(target) ? target.includes('node') : target === 'node';
+			expect((plugin as OctaneRspackPlugin).options.profile).toBe(!server);
+		}
 	});
 
 	it('rejects ambiguous mixed ES and browser target arrays', async () => {

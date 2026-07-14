@@ -170,6 +170,21 @@ export default defineConfig({
 				plugins: [octane({ hmr: false })],
 			},
 			{
+				// Focused production-semantics profiling build. Keeping this to the
+				// profiling integration fixture proves the build-time define reaches both
+				// full Blocks and compiler-selected lite component scopes without running
+				// the entire Octane suite a third time.
+				test: {
+					name: 'octane-profile',
+					include: ['packages/octane/tests/profiling-runtime.test.tsrx'],
+					environment: 'jsdom',
+					setupFiles: ['packages/octane/tests/_per-test-setup.ts'],
+					globals: false,
+					env: { OCTANE_TEST_COMPILE_MODE: 'profile' },
+				},
+				plugins: [octane({ hmr: false, profile: true })],
+			},
+			{
 				test: {
 					name: 'zustand',
 					include: ['packages/zustand/tests/**/*.test.ts'],

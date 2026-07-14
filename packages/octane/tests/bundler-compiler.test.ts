@@ -53,6 +53,30 @@ describe('bundler-neutral compiler integration', () => {
 		expect(server?.code).not.toContain('webpackHot');
 	});
 
+	it('specializes profiling for client transforms independently of dev and HMR', () => {
+		const compiler = createOctaneCompiler({ root: '/project', profile: true });
+		const client = compiler.transform(COMPONENT, '/project/src/App.tsrx', {
+			environment: 'client',
+			hmr: false,
+			dev: false,
+		});
+		expect(client?.code).toContain('__profileComponent');
+		expect(client?.code).toContain('"id":"/src/App.tsrx#App@2:7"');
+		expect(client?.code).not.toContain('__s.locs');
+
+		const disabled = compiler.transform(COMPONENT, '/project/src/App.tsrx', {
+			environment: 'client',
+			profile: false,
+		});
+		expect(disabled?.code).not.toContain('__profile');
+
+		const server = compiler.transform(COMPONENT, '/project/src/App.tsrx', {
+			environment: 'server',
+			profile: true,
+		});
+		expect(server?.code).not.toContain('__profile');
+	});
+
 	it('exposes exact client/server runtime request mapping', () => {
 		expect(OCTANE_RUNTIME_REQUESTS).toEqual({ client: 'octane', server: 'octane/server' });
 		expect(resolveOctaneRuntimeRequest('octane', 'client')).toBe('octane');
@@ -149,6 +173,46 @@ describe('bundler-neutral compiler integration', () => {
 			expect(compiled?.kind).toBe('compile');
 			expect(compiled?.code).toContain('_$template("<p>octane</p>")');
 			expect(compiled?.dependencies).toContain(rawOctane.manifest);
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('uses portable profile source IDs and redacts arbitrary external paths', () => {
+		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-profile-source-'));
+		try {
+			const projectRoot = join(fixtureRoot, 'project');
+			const sourceRoot = join(projectRoot, 'src');
+			mkdirSync(sourceRoot, { recursive: true });
+			writeFileSync(join(projectRoot, 'package.json'), JSON.stringify({ name: 'app' }));
+			const linkedRoot = join(fixtureRoot, 'linked-project');
+			symlinkSync(projectRoot, linkedRoot, 'dir');
+			const realProjectRoot = realpathSync(projectRoot);
+
+			const compiler = createOctaneCompiler({ root: linkedRoot, profile: true });
+			const app = compiler.transform(COMPONENT, join(realProjectRoot, 'src/App.tsrx'));
+			expect(app?.code).toContain('"file":"/src/App.tsrx"');
+			expect(app?.code).not.toContain(realProjectRoot);
+			expect(app?.code).not.toContain(resolve(linkedRoot));
+
+			const packageRoot = join(fixtureRoot, 'shared-ui');
+			mkdirSync(join(packageRoot, 'src'), { recursive: true });
+			writeFileSync(
+				join(packageRoot, 'package.json'),
+				JSON.stringify({ name: '@scope/ui', peerDependencies: { octane: '*' } }),
+			);
+			const packaged = compiler.transform(COMPONENT, join(packageRoot, 'src/Card.tsx'));
+			expect(packaged?.code).toContain('"file":"/@package/%40scope%2Fui/src/Card.tsx"');
+			expect(packaged?.code).not.toContain(packageRoot);
+			const packagedHook = compiler.transform(HOOK, join(packageRoot, 'src/useCount.ts'));
+			expect(packagedHook?.code).toContain('"file":"/@package/%40scope%2Fui/src/useCount.ts"');
+			expect(packagedHook?.code).not.toContain(packageRoot);
+
+			const externalRoot = join(fixtureRoot, 'unowned');
+			mkdirSync(externalRoot);
+			const external = compiler.transform(COMPONENT, join(externalRoot, 'Loose.tsrx'));
+			expect(external?.code).toContain('"file":"/@external/Loose.tsrx"');
+			expect(external?.code).not.toContain(externalRoot);
 		} finally {
 			rmSync(fixtureRoot, { recursive: true, force: true });
 		}

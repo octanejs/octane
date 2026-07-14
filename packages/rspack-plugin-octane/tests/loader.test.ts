@@ -85,11 +85,11 @@ describe('octane Rspack loader', () => {
 		const output = runLoader({ hot: true });
 
 		expect(output.context.cacheable).toHaveBeenCalledWith(true);
-		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({ root: '/project' });
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({ root: '/project', profile: false });
 		expect(mocks.transform).toHaveBeenCalledWith(
 			'export function App() @{ <div /> }',
 			'/project/src/App.tsrx?cache=1',
-			{ environment: 'client', hmr: 'webpack', dev: true },
+			{ environment: 'client', hmr: 'webpack', dev: true, profile: false },
 		);
 		expect(output.dependencies).toEqual(['/project/package.json', '/project/src/package.json']);
 		expect(output.missingDependencies).toEqual(['/project/src/missing/package.json']);
@@ -133,11 +133,20 @@ describe('octane Rspack loader', () => {
 			dependencies: [],
 			missingDependencies: [],
 		});
-		runLoader({ target: ['es2022', 'node'], hot: true, options: { hmr: true, dev: true } });
+		runLoader({
+			target: ['es2022', 'node'],
+			hot: true,
+			options: { hmr: true, dev: true, profile: true },
+		});
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({
+			root: '/project',
+			profile: false,
+		});
 		expect(mocks.transform).toHaveBeenCalledWith(expect.any(String), expect.any(String), {
 			environment: 'server',
 			hmr: false,
 			dev: false,
+			profile: false,
 		});
 	});
 
@@ -148,6 +157,23 @@ describe('octane Rspack loader', () => {
 			environment: 'client',
 			hmr: false,
 			dev: true,
+			profile: false,
+		});
+	});
+
+	it('forwards profiling only for client transforms', () => {
+		mocks.transform.mockReturnValue(null);
+		runLoader({ options: { profile: true }, mode: 'production' });
+
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({
+			root: '/project',
+			profile: true,
+		});
+		expect(mocks.transform).toHaveBeenCalledWith(expect.any(String), expect.any(String), {
+			environment: 'client',
+			hmr: false,
+			dev: false,
+			profile: true,
 		});
 	});
 
@@ -156,6 +182,7 @@ describe('octane Rspack loader', () => {
 		runLoader({ options: { root: 'apps/site' } });
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({
 			root: '/project/apps/site',
+			profile: false,
 		});
 	});
 

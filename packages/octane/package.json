@@ -28,6 +28,7 @@
     "./server": "./src/server/index.ts",
     "./static": "./src/static/index.ts",
     "./constants": "./src/constants.ts",
+    "./profiling": "./src/profiling.ts",
     "./compiler": "./src/compiler/index.js",
     "./compiler/bundler": "./src/compiler/bundler.js",
     "./compiler/vite": "./src/compiler/vite.js",
@@ -54,6 +55,10 @@
       "./constants": {
         "types": "./dist/constants.d.ts",
         "default": "./dist/constants.js"
+      },
+      "./profiling": {
+        "types": "./dist/profiling.d.ts",
+        "default": "./dist/profiling.js"
       },
       "./compiler": "./dist/compiler/index.js",
       "./compiler/bundler": "./dist/compiler/bundler.js",

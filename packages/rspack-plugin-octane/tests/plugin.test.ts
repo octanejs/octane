@@ -24,6 +24,13 @@ function hook() {
 }
 
 function createCompiler(target: unknown = 'node') {
+	const profilingDefinitions: Record<string, string>[] = [];
+	class DefinePlugin {
+		constructor(definitions: Record<string, string>) {
+			profilingDefinitions.push(definitions);
+		}
+		apply() {}
+	}
 	return {
 		options: {
 			context: '/project',
@@ -36,6 +43,8 @@ function createCompiler(target: unknown = 'node') {
 			watchRun: hook(),
 			thisCompilation: hook(),
 		},
+		webpack: { DefinePlugin },
+		profilingDefinitions,
 	};
 }
 
@@ -64,7 +73,8 @@ describe('OctaneRspackPlugin', () => {
 		const plugin = new OctaneRspackPlugin();
 		plugin.apply(compiler as any);
 
-		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({ root: '/project' });
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({ root: '/project', profile: false });
+		expect(compiler.profilingDefinitions).toEqual([{ __OCTANE_PROFILE_ENABLED__: 'false' }]);
 		expect(mocks.resolveRuntimeRequest).toHaveBeenCalledWith('octane', 'server');
 		expect(compiler.options.resolve.extensions).toEqual(['.tsrx', '.tsx', '.ts', '.js']);
 		const aliases = compiler.options.resolve.alias as Record<string, string>;
@@ -72,11 +82,14 @@ describe('OctaneRspackPlugin', () => {
 		expect(aliases['octane$']).toMatch(
 			/(?:octane\/server|packages\/octane\/src\/server\/index\.ts)$/,
 		);
+		expect(aliases['octane/profiling$']).toMatch(
+			/(?:octane\/profiling|packages\/octane\/src\/profiling\.ts)$/,
+		);
 		expect(compiler.options.module.rules).toHaveLength(2);
 		expect(compiler.options.module.rules[0]).toMatchObject({
 			type: 'javascript/auto',
 			enforce: 'pre',
-			use: [{ options: { root: '/project', environment: 'server' } }],
+			use: [{ options: { root: '/project', environment: 'server', profile: false } }],
 		});
 		expect(compiler.options.module.rules[1]).toEqual({
 			test: expect.any(RegExp),
@@ -109,6 +122,7 @@ describe('OctaneRspackPlugin', () => {
 			environment: 'client',
 			hmr: false,
 			dev: true,
+			profile: true,
 			parallelUse: false,
 			exclude: ['generated'],
 			transpile: false,
@@ -116,14 +130,25 @@ describe('OctaneRspackPlugin', () => {
 		plugin.apply(compiler as any);
 
 		expect(mocks.resolveRuntimeRequest).toHaveBeenCalledWith('octane', 'client');
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({
+			root: '/project',
+			profile: true,
+			parallelUse: false,
+			exclude: ['generated'],
+		});
+		expect(compiler.profilingDefinitions).toEqual([{ __OCTANE_PROFILE_ENABLED__: 'true' }]);
 		const aliases = compiler.options.resolve.alias as Record<string, string>;
 		expect(aliases['octane$']).toMatch(/(?:^octane$|packages\/octane\/src\/index\.ts$)/);
+		expect(aliases['octane/profiling$']).toMatch(
+			/(?:octane\/profiling|packages\/octane\/src\/profiling\.ts)$/,
+		);
 		expect(compiler.options.module.rules).toHaveLength(1);
 		expect(compiler.options.module.rules[0].use[0].options).toEqual({
 			root: '/project',
 			environment: 'client',
 			hmr: false,
 			dev: true,
+			profile: true,
 			parallelUse: false,
 			exclude: ['generated'],
 		});
@@ -132,6 +157,54 @@ describe('OctaneRspackPlugin', () => {
 	it('resolves a relative root from the Rspack context', () => {
 		const compiler = createCompiler('web');
 		new OctaneRspackPlugin({ root: 'apps/site' }).apply(compiler as any);
-		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({ root: '/project/apps/site' });
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith({
+			root: '/project/apps/site',
+			profile: false,
+		});
+	});
+
+	it('forces profiling off for an explicit server compilation', () => {
+		const compiler = createCompiler('web');
+		new OctaneRspackPlugin({ environment: 'server', profile: true }).apply(compiler as any);
+
+		expect(compiler.profilingDefinitions).toEqual([{ __OCTANE_PROFILE_ENABLED__: 'false' }]);
+		expect(compiler.options.module.rules[0].use[0].options).toMatchObject({
+			environment: 'server',
+			profile: false,
+		});
+	});
+
+	it('rejects a conflicting user definition of the reserved profiling constant', () => {
+		const compiler = createCompiler('web');
+		(compiler.options as any).plugins = [
+			{
+				name: 'DefinePlugin',
+				_args: [{ __OCTANE_PROFILE_ENABLED__: 'false' }],
+			},
+		] as any;
+
+		expect(() => new OctaneRspackPlugin({ profile: true }).apply(compiler as any)).toThrow(
+			/__OCTANE_PROFILE_ENABLED__.*reserved/,
+		);
+	});
+
+	it('preserves and salts a persistent-cache version with effective compiler inputs', () => {
+		const profiled = createCompiler('web');
+		(profiled.options as any).mode = 'production';
+		(profiled.options as any).cache = { type: 'persistent', version: 'user-cache-v1' };
+		new OctaneRspackPlugin({ profile: true, parallelUse: false }).apply(profiled as any);
+
+		const normal = createCompiler('web');
+		(normal.options as any).mode = 'production';
+		(normal.options as any).cache = { type: 'persistent', version: 'user-cache-v1' };
+		new OctaneRspackPlugin({ profile: false, parallelUse: false }).apply(normal as any);
+
+		expect((profiled.options as any).cache.version).toMatch(
+			/^user-cache-v1\|octane-rspack@[^:]+:[a-f0-9]{16}$/,
+		);
+		expect((normal.options as any).cache.version).toMatch(
+			/^user-cache-v1\|octane-rspack@[^:]+:[a-f0-9]{16}$/,
+		);
+		expect((profiled.options as any).cache.version).not.toBe((normal.options as any).cache.version);
 	});
 });

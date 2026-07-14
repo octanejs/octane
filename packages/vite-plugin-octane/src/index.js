@@ -173,7 +173,7 @@ function has_route_config(config) {
  * as a compiler plugin inside a normal Vite SPA; configured routes activate the
  * metaframework layer.
  *
- * Returns an ARRAY: `[octaneCompiler({ hmr }), metaPlugin]`. The first element is
+ * Returns an ARRAY: `[octaneCompiler(options), metaPlugin]`. The first element is
  * octane/compiler's transform plugin — it owns ALL `.tsrx` compilation, picking
  * client vs server mode per-module from Vite's SSR signal (so the SAME file
  * compiles to a DOM-clone client body for the browser and to an HTML-building
@@ -188,7 +188,7 @@ function has_route_config(config) {
  * node builtins external) exporting `handler`/`nodeHandler` and auto-booting
  * under `node`. See server/virtual-entry.js and server/production.js.
  *
- * @param {{ hmr?: boolean, exclude?: string[] }} [inlineOptions]
+ * @param {{ hmr?: boolean, profile?: boolean, parallelUse?: boolean, exclude?: string[] }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -754,6 +754,9 @@ export function octane(inlineOptions = {}) {
 	// Other installed raw-source Octane packages are transformed automatically.
 	const compilerOptions = {};
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
+	if (inlineOptions.profile !== undefined) compilerOptions.profile = inlineOptions.profile;
+	if (inlineOptions.parallelUse !== undefined)
+		compilerOptions.parallelUse = inlineOptions.parallelUse;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
 	// The compiler plugin is untyped JS (its `enforce` infers as `string`).
 	return [/** @type {Plugin} */ (octaneCompiler(compilerOptions)), metaPlugin];
