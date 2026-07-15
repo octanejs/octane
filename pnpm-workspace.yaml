@@ -264,3 +264,4 @@ catalogs:
 
 patchedDependencies:
   '@tsrx/core@0.1.37': patches/@tsrx__core@0.1.37.patch
+  '@tsrx/core@0.1.38': patches/@tsrx__core@0.1.38.patch

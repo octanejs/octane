@@ -602,6 +602,7 @@ overrides:
 
 patchedDependencies:
   '@tsrx/core@0.1.37': 0b7535578a1327e33019974cc015cbaafbd88bc4a1f60997c23bfb979cd7a081
+  '@tsrx/core@0.1.38': a8a44e624bbfe3b4650f7ada014ec420ed663f99f1327b86e5e9044087ecbfc7
 
 importers:
 
@@ -11208,7 +11209,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/core@0.1.38':
+  '@tsrx/core@0.1.38(patch_hash=a8a44e624bbfe3b4650f7ada014ec420ed663f99f1327b86e5e9044087ecbfc7)':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
@@ -11225,7 +11226,7 @@ snapshots:
 
   '@tsrx/prettier-plugin@0.3.95(prettier@3.8.4)':
     dependencies:
-      '@tsrx/core': 0.1.38
+      '@tsrx/core': 0.1.38(patch_hash=a8a44e624bbfe3b4650f7ada014ec420ed663f99f1327b86e5e9044087ecbfc7)
       prettier: 3.8.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'

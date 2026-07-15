@@ -1,0 +1,29 @@
+diff --git a/src/plugin.js b/src/plugin.js
+index 9f4bd720b47ab4d16ec1b9fa72e7d565657c0577..e87b2b029492ce5c48d805f2c670ed38f70bf9f9 100644
+--- a/src/plugin.js
++++ b/src/plugin.js
+@@ -4419,2 +4419,22 @@ export function TSRXPlugin(config) {
+-				if (!is_fragment && open.selfClosing) {
+-					this.#path.pop();
++				if (!is_fragment && open.selfClosing) {
++					this.#path.pop();
++
++					// A self-closing element in EXPRESSION position has no children,
++					// but the lookahead after its `/>` was read while this element was
++					// still the current template node (jsx_parseOpeningElementAt's
++					// expect(jsxTagEnd) advances one token) — so unless the very next
++					// character closed the expression immediately, the lexer committed
++					// to a jsxText token spanning everything up to the next `<`/`{`.
++					// The standard prettier shape `=> (\n  <div />\n)` then dies with
++					// Unexpected token at the `)`. Rewind and re-lex that lookahead in
++					// script mode. nextToken() (not next()) keeps lastTok* pointing at
++					// the `/>` so the element's finishNode range stays correct.
++					const parentAfterSelfClose = this.#path.at(-1);
++					if (
++						!this.#isNativeTemplateNode(parentAfterSelfClose) &&
++						this.type === tstt.jsxText
++					) {
++						this.pos = this.start;
++						this.exprAllowed = false;
++						this.nextToken();
++					}
