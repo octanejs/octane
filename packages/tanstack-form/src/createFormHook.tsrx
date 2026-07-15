@@ -288,6 +288,252 @@ export interface WithFieldGroupProps<
 	>;
 }
 
+type UseAppForm<
+	TComponents extends Record<string, HookComponentType<any>>,
+	TFormComponents extends Record<string, HookComponentType<any>>,
+> = <
+	TFormData,
+	TOnMount extends undefined | FormValidateOrFn<TFormData>,
+	TOnChange extends undefined | FormValidateOrFn<TFormData>,
+	TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnBlur extends undefined | FormValidateOrFn<TFormData>,
+	TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnSubmit extends undefined | FormValidateOrFn<TFormData>,
+	TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
+	TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TSubmitMeta,
+>(
+	props: FormOptions<
+		TFormData,
+		TOnMount,
+		TOnChange,
+		TOnChangeAsync,
+		TOnBlur,
+		TOnBlurAsync,
+		TOnSubmit,
+		TOnSubmitAsync,
+		TOnDynamic,
+		TOnDynamicAsync,
+		TOnServer,
+		TSubmitMeta
+	>,
+) => AppFieldExtendedOctaneFormApi<
+	TFormData,
+	TOnMount,
+	TOnChange,
+	TOnChangeAsync,
+	TOnBlur,
+	TOnBlurAsync,
+	TOnSubmit,
+	TOnSubmitAsync,
+	TOnDynamic,
+	TOnDynamicAsync,
+	TOnServer,
+	TSubmitMeta,
+	TComponents,
+	TFormComponents
+>;
+
+type WithForm<
+	TComponents extends Record<string, HookComponentType<any>>,
+	TFormComponents extends Record<string, HookComponentType<any>>,
+> = <
+	TFormData,
+	TOnMount extends undefined | FormValidateOrFn<TFormData>,
+	TOnChange extends undefined | FormValidateOrFn<TFormData>,
+	TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnBlur extends undefined | FormValidateOrFn<TFormData>,
+	TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnSubmit extends undefined | FormValidateOrFn<TFormData>,
+	TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
+	TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TSubmitMeta,
+	TRenderProps extends object = {},
+>(
+	props: WithFormProps<
+		TFormData,
+		TOnMount,
+		TOnChange,
+		TOnChangeAsync,
+		TOnBlur,
+		TOnBlurAsync,
+		TOnSubmit,
+		TOnSubmitAsync,
+		TOnDynamic,
+		TOnDynamicAsync,
+		TOnServer,
+		TSubmitMeta,
+		TComponents,
+		TFormComponents,
+		TRenderProps
+	>,
+) => WithFormProps<
+	UnwrapOrAny<TFormData>,
+	UnwrapDefaultOrAny<undefined | FormValidateOrFn<TFormData>, TOnMount>,
+	UnwrapDefaultOrAny<undefined | FormValidateOrFn<TFormData>, TOnChange>,
+	UnwrapDefaultOrAny<undefined | FormValidateOrFn<TFormData>, TOnChangeAsync>,
+	UnwrapDefaultOrAny<undefined | FormValidateOrFn<TFormData>, TOnBlur>,
+	UnwrapDefaultOrAny<undefined | FormValidateOrFn<TFormData>, TOnBlurAsync>,
+	UnwrapDefaultOrAny<undefined | FormValidateOrFn<TFormData>, TOnSubmit>,
+	UnwrapDefaultOrAny<undefined | FormValidateOrFn<TFormData>, TOnSubmitAsync>,
+	UnwrapDefaultOrAny<undefined | FormValidateOrFn<TFormData>, TOnDynamic>,
+	UnwrapDefaultOrAny<undefined | FormValidateOrFn<TFormData>, TOnDynamicAsync>,
+	UnwrapDefaultOrAny<undefined | FormValidateOrFn<TFormData>, TOnServer>,
+	UnwrapOrAny<TSubmitMeta>,
+	UnwrapOrAny<TComponents>,
+	UnwrapOrAny<TFormComponents>,
+	UnwrapOrAny<TRenderProps>
+>['render'];
+
+type WithFieldGroup<
+	TComponents extends Record<string, HookComponentType<any>>,
+	TFormComponents extends Record<string, HookComponentType<any>>,
+> = <TFieldGroupData, TSubmitMeta, TRenderProps extends object = {}>(
+	props: WithFieldGroupProps<
+		TFieldGroupData,
+		TComponents,
+		TFormComponents,
+		TSubmitMeta,
+		TRenderProps
+	>,
+) => <
+	TFormData,
+	TFields extends
+		| DeepKeysOfType<TFormData, TFieldGroupData | null | undefined>
+		| FieldsMap<TFormData, TFieldGroupData>,
+	TOnMount extends undefined | FormValidateOrFn<TFormData>,
+	TOnChange extends undefined | FormValidateOrFn<TFormData>,
+	TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnBlur extends undefined | FormValidateOrFn<TFormData>,
+	TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnSubmit extends undefined | FormValidateOrFn<TFormData>,
+	TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
+	TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TFormSubmitMeta,
+>(
+	params: HookPropsWithChildren<
+		NoInfer<TRenderProps> & {
+			form:
+				| AppFieldExtendedOctaneFormApi<
+						TFormData,
+						TOnMount,
+						TOnChange,
+						TOnChangeAsync,
+						TOnBlur,
+						TOnBlurAsync,
+						TOnSubmit,
+						TOnSubmitAsync,
+						TOnDynamic,
+						TOnDynamicAsync,
+						TOnServer,
+						unknown extends TSubmitMeta ? TFormSubmitMeta : TSubmitMeta,
+						TComponents,
+						TFormComponents
+				  >
+				| AppFieldExtendedOctaneFieldGroupApi<
+						unknown,
+						TFormData,
+						string | FieldsMap<unknown, TFormData>,
+						any,
+						any,
+						any,
+						any,
+						any,
+						any,
+						any,
+						any,
+						any,
+						any,
+						unknown extends TSubmitMeta ? TFormSubmitMeta : TSubmitMeta,
+						TComponents,
+						TFormComponents
+				  >;
+			fields: TFields;
+		}
+	>,
+) => ReturnType<HookFunctionComponent>;
+
+type UseTypedAppFormContext<
+	TComponents extends Record<string, HookComponentType<any>>,
+	TFormComponents extends Record<string, HookComponentType<any>>,
+> = <
+	TFormData,
+	TOnMount extends undefined | FormValidateOrFn<TFormData>,
+	TOnChange extends undefined | FormValidateOrFn<TFormData>,
+	TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnBlur extends undefined | FormValidateOrFn<TFormData>,
+	TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnSubmit extends undefined | FormValidateOrFn<TFormData>,
+	TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
+	TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
+	TSubmitMeta,
+>(
+	props: FormOptions<
+		TFormData,
+		TOnMount,
+		TOnChange,
+		TOnChangeAsync,
+		TOnBlur,
+		TOnBlurAsync,
+		TOnSubmit,
+		TOnSubmitAsync,
+		TOnDynamic,
+		TOnDynamicAsync,
+		TOnServer,
+		TSubmitMeta
+	>,
+) => AppFieldExtendedOctaneFormApi<
+	TFormData,
+	TOnMount,
+	TOnChange,
+	TOnChangeAsync,
+	TOnBlur,
+	TOnBlurAsync,
+	TOnSubmit,
+	TOnSubmitAsync,
+	TOnDynamic,
+	TOnDynamicAsync,
+	TOnServer,
+	TSubmitMeta,
+	TComponents,
+	TFormComponents
+>;
+
+type FieldComponentExtension<TComponents extends Record<string, HookComponentType<any>>> =
+	Record<string, HookComponentType<any>> & {
+		[K in keyof TComponents]?: 'Error: field component names must be unique — this key already exists in the base form';
+	};
+
+type FormComponentExtension<TComponents extends Record<string, HookComponentType<any>>> =
+	Record<string, HookComponentType<any>> & {
+		[K in keyof TComponents]?: 'Error: form component names must be unique — this key already exists in the base form';
+	};
+
+export interface CreateFormHookReturn<
+	TComponents extends Record<string, HookComponentType<any>>,
+	TFormComponents extends Record<string, HookComponentType<any>>,
+> {
+	useAppForm: UseAppForm<TComponents, TFormComponents>;
+	withForm: WithForm<TComponents, TFormComponents>;
+	withFieldGroup: WithFieldGroup<TComponents, TFormComponents>;
+	useTypedAppFormContext: UseTypedAppFormContext<TComponents, TFormComponents>;
+	extendForm: <
+		TNewField extends FieldComponentExtension<TComponents>,
+		TNewForm extends FormComponentExtension<TFormComponents>,
+	>(extension: {
+		fieldComponents?: TNewField;
+		formComponents?: TNewForm;
+	}) => CreateFormHookReturn<TComponents & TNewField, TFormComponents & TNewForm>;
+}
+
 export function createFormHook<
 	TComponents extends Record<string, HookComponentType<any>>,
 	TFormComponents extends Record<string, HookComponentType<any>>,
@@ -296,7 +542,10 @@ export function createFormHook<
 	fieldContext,
 	formContext,
 	formComponents,
-}: CreateFormHookProps<TComponents, TFormComponents>) {
+}: CreateFormHookProps<TComponents, TFormComponents>): CreateFormHookReturn<
+	TComponents,
+	TFormComponents
+> {
 	function useAppForm<
 		TFormData,
 		TOnMount extends undefined | FormValidateOrFn<TFormData>,
@@ -585,13 +834,12 @@ export function createFormHook<
 	}
 
 	function extendForm<
-		TNewField extends Record<string, HookComponentType<any>> & {
-			[K in keyof TComponents]?: 'Error: field component names must be unique — this key already exists in the base form';
-		},
-		TNewForm extends Record<string, HookComponentType<any>> & {
-			[K in keyof TFormComponents]?: 'Error: form component names must be unique — this key already exists in the base form';
-		},
-	>(extension: { fieldComponents?: TNewField; formComponents?: TNewForm }) {
+		TNewField extends FieldComponentExtension<TComponents>,
+		TNewForm extends FormComponentExtension<TFormComponents>,
+	>(extension: {
+		fieldComponents?: TNewField;
+		formComponents?: TNewForm;
+	}): CreateFormHookReturn<TComponents & TNewField, TFormComponents & TNewForm> {
 		return createFormHook({
 			fieldContext,
 			formContext,
@@ -612,5 +860,5 @@ export function createFormHook<
 		withFieldGroup,
 		useTypedAppFormContext,
 		extendForm,
-	};
+	} as CreateFormHookReturn<TComponents, TFormComponents>;
 }

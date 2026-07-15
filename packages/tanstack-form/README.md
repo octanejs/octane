@@ -16,8 +16,10 @@ import { useForm } from '@octanejs/tanstack-form'
 ```
 
 The renderer-bearing adapter modules are authored as `.tsrx` and compiled by
-Octane. Matching `.tsrx.d.ts` companions preserve the complete upstream generic
-surface for TypeScript consumers.
+Octane. Matching `.tsrx.d.ts` companions are checked declaration emits of those
+implementations, preserving the complete generic surface for TypeScript
+consumers. Recursive contracts such as `extendForm` are named in the TSRX source
+rather than manually unrolled in declarations.
 
 Renderer-specific public types use Octane names, including `OctaneFormApi`,
 `OctaneFormExtendedApi`, `AppFieldExtendedOctaneFormApi`, and

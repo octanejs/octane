@@ -1,8 +1,8 @@
-// Declaration companion for useFieldGroup.tsrx, adapted from the
-// @tanstack/react-form 1.33.2 declaration surface to Octane renderer types.
-import { FieldGroupApi, DeepKeysOfType, FieldGroupState, FieldsMap, FormAsyncValidateOrFn, FormValidateOrFn } from '@tanstack/form-core';
-import { AppFieldExtendedOctaneFormApi } from './createFormHook.tsrx';
-import { LensFieldComponent } from './useField.tsrx';
+// Declaration companion generated from useFieldGroup.tsrx.
+import { FieldGroupApi } from '@tanstack/form-core';
+import type { DeepKeysOfType, FieldGroupState, FieldsMap, FormAsyncValidateOrFn, FormValidateOrFn } from '@tanstack/form-core';
+import type { AppFieldExtendedOctaneFormApi } from './createFormHook.tsrx';
+import type { LensFieldComponent } from './useField.tsrx';
 type FieldGroupRenderable = unknown;
 type FieldGroupPropsWithChildren<P = object> = P & {
     children?: FieldGroupRenderable;
@@ -34,3 +34,4 @@ export declare function useFieldGroup<TFormData, TFieldGroupData, TFields extend
     onSubmitMeta?: TSubmitMeta;
     formComponents: TFormComponents;
 }): AppFieldExtendedOctaneFieldGroupApi<TFormData, TFieldGroupData, TFields, TOnMount, TOnChange, TOnChangeAsync, TOnBlur, TOnBlurAsync, TOnSubmit, TOnSubmitAsync, TOnDynamic, TOnDynamicAsync, TOnServer, TSubmitMeta, TComponents, TFormComponents>;
+export {};

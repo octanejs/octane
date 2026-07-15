@@ -1005,5 +1005,24 @@ describe('createFormHook', () => {
 			});
 			expectTypeOf(doublyExtendedForm.AppField).toBeFunction();
 		});
+
+		it('should preserve its recursive type beyond the previous declaration cutoff', () => {
+			const deeplyExtended = baseHook
+				.extendForm({ fieldComponents: { Field01: Test } })
+				.extendForm({ fieldComponents: { Field02: Test } })
+				.extendForm({ fieldComponents: { Field03: Test } })
+				.extendForm({ fieldComponents: { Field04: Test } })
+				.extendForm({ fieldComponents: { Field05: Test } })
+				.extendForm({ fieldComponents: { Field06: Test } })
+				.extendForm({ fieldComponents: { Field07: Test } })
+				.extendForm({ fieldComponents: { Field08: Test } })
+				.extendForm({ fieldComponents: { Field09: Test } })
+				.extendForm({ fieldComponents: { Field10: Test } })
+				.extendForm({ fieldComponents: { Field11: Test } })
+				.extendForm({ fieldComponents: { Field12: Test } });
+
+			expectTypeOf(deeplyExtended).not.toBeAny();
+			expectTypeOf(deeplyExtended.extendForm).toBeFunction();
+		});
 	});
 });

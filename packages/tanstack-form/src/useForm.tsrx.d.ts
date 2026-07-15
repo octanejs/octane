@@ -1,8 +1,8 @@
-// Declaration companion for useForm.tsrx, adapted from the
-// @tanstack/react-form 1.33.2 declaration surface to Octane renderer types.
-import { FormApi, FormAsyncValidateOrFn, FormOptions, FormState, FormValidateOrFn } from '@tanstack/form-core';
-import { FormGroupComponent } from './useFormGroup.tsrx';
-import { FieldComponent } from './useField.tsrx';
+// Declaration companion generated from useForm.tsrx.
+import { FormApi } from '@tanstack/form-core';
+import type { FormGroupComponent } from './useFormGroup.tsrx';
+import type { FormAsyncValidateOrFn, FormOptions, FormState, FormValidateOrFn } from '@tanstack/form-core';
+import type { FieldComponent } from './useField.tsrx';
 type FormRenderable = unknown;
 type FormFunctionComponent<P = object> = (props: P) => FormRenderable;
 /**
@@ -32,3 +32,4 @@ export type OctaneFormExtendedApi<TFormData, TOnMount extends undefined | FormVa
  * This API encapsulates all the necessary functionalities related to the form. It allows you to manage form state, handle submissions, and interact with form fields
  */
 export declare function useForm<TFormData, TOnMount extends undefined | FormValidateOrFn<TFormData>, TOnChange extends undefined | FormValidateOrFn<TFormData>, TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>, TOnBlur extends undefined | FormValidateOrFn<TFormData>, TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>, TOnSubmit extends undefined | FormValidateOrFn<TFormData>, TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>, TOnDynamic extends undefined | FormValidateOrFn<TFormData>, TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>, TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>, TSubmitMeta>(opts?: FormOptions<TFormData, TOnMount, TOnChange, TOnChangeAsync, TOnBlur, TOnBlurAsync, TOnSubmit, TOnSubmitAsync, TOnDynamic, TOnDynamicAsync, TOnServer, TSubmitMeta>): OctaneFormExtendedApi<TFormData, TOnMount, TOnChange, TOnChangeAsync, TOnBlur, TOnBlurAsync, TOnSubmit, TOnSubmitAsync, TOnDynamic, TOnDynamicAsync, TOnServer, TSubmitMeta>;
+export {};

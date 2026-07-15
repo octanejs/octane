@@ -366,7 +366,7 @@ SSR / hydration: Supported and tested: fields and form subscriptions render thei
 
 Scope/evidence last checked: 2026-07-15.
 
-- Renderer-bearing adapter modules are authored as TSRX and ship matching declaration companions with inline renderer aliases and Octane-prefixed public adapter types.
+- Renderer-bearing adapter modules are authored as TSRX and ship checked declaration emits with inline renderer aliases, Octane-prefixed public adapter types, and source-owned recursive contracts.
 - The ported React adapter suite has 82 executable behavioral tests with no skipped, todo, or expected-failure cases; upstream compile-time tests cover hook, field, group, and component-composition inference.
 - Differential coverage compiles one shared form through this adapter and real @tanstack/react-form@1.33.2, comparing values, validation, array mutations, and reset output after every interaction.
 
