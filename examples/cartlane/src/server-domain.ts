@@ -117,6 +117,18 @@ export async function commitOrder(value: unknown): Promise<CheckoutState> {
 	}
 
 	const request = unverifiedRequest;
+	const existing = ordersByKey.get(request.idempotencyKey);
+	if (existing) {
+		existing.submissionCount += 1;
+		return {
+			status: 'success',
+			message: 'Duplicate request safely reused the original order.',
+			order: existing.receipt,
+			duplicate: true,
+			submissionCount: existing.submissionCount,
+		};
+	}
+
 	const errors = validate(request);
 	if (Object.keys(errors).length > 0) {
 		return { status: 'invalid', message: 'Check the highlighted details.', errors };
@@ -141,18 +153,6 @@ export async function commitOrder(value: unknown): Promise<CheckoutState> {
 			status: 'failure',
 			message: 'The fixture bank declined this card. Use 4242 4242 4242 4242 and retry.',
 			recoverable: true,
-		};
-	}
-
-	const existing = ordersByKey.get(request.idempotencyKey);
-	if (existing) {
-		existing.submissionCount += 1;
-		return {
-			status: 'success',
-			message: 'Duplicate request safely reused the original order.',
-			order: existing.receipt,
-			duplicate: true,
-			submissionCount: existing.submissionCount,
 		};
 	}
 

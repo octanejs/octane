@@ -269,16 +269,26 @@ test('queues rapid native submits and idempotently resolves them to one order', 
 	});
 
 	await page.locator('[data-checkout-form="true"]').evaluate((form) => {
-		(form as HTMLFormElement).requestSubmit();
-		(form as HTMLFormElement).requestSubmit();
+		const checkoutForm = form as HTMLFormElement;
+		const cardNumber = checkoutForm.elements.namedItem('cardNumber');
+		const cart = checkoutForm.elements.namedItem('cart');
+		if (!(cardNumber instanceof HTMLInputElement) || !(cart instanceof HTMLInputElement)) {
+			throw new Error('expected checkout inputs');
+		}
+		checkoutForm.requestSubmit();
+		cardNumber.value = '4000 0000 0000 0000';
+		checkoutForm.requestSubmit();
+		cardNumber.value = '4242 4242 4242 4242';
+		cart.value = JSON.stringify([{ productId: 'weekender', quantity: -2 }]);
+		checkoutForm.requestSubmit();
 	});
 	await expect(page.getByRole('button', { name: 'Placing your order…' })).toBeVisible();
 	await expect(page.getByText('Charged once.')).toBeVisible();
 	await expect(
-		page.getByText('2 matching submissions resolved to this single order.'),
+		page.getByText('3 matching submissions resolved to this single order.'),
 	).toBeVisible();
 	await expect(page.locator('[data-order-id]')).toHaveCount(1);
-	await expect.poll(() => checkoutPosts).toBe(2);
+	await expect.poll(() => checkoutPosts).toBe(3);
 	await expect(page.getByText('Paid once').locator('..')).toContainText('£148');
 	const firstOrderId = await page.locator('[data-order-id]').getAttribute('data-order-id');
 	await page.goBack();
