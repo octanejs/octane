@@ -3,8 +3,8 @@
 // sections: cross-framework comparisons, then the octane-internal de-opt
 // ("authoring cliff") suites. All numbers are the checked-in benchmark scores;
 // the page cannot drift from the repo because the JSON is imported at build time.
-import { BenchBars } from '../components/BenchBars.tsrx';
-import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../content/benchmarks.ts';
+import { BenchBars } from '../../components/BenchBars.tsrx';
+import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../../content/benchmarks.ts';
 
 export function Benchmarks() @{
 	<div class="benchpage">
