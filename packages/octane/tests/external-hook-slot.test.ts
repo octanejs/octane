@@ -183,7 +183,7 @@ describe('vite plugin gate routing', () => {
 		const websiteRoot = join(process.cwd(), 'website');
 		const discovered = discoverOctaneSourceDependencies(websiteRoot);
 		expect(discovered).toContain('octane');
-		expect(discovered).toContain('@octanejs/recharts');
+		expect(discovered).toContain('@octanejs/visx');
 		expect(discovered).toContain('@octanejs/tanstack-router');
 		expect(discovered).not.toContain('@octanejs/adapter-vercel');
 
