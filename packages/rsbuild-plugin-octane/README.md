@@ -78,10 +78,11 @@ Options are declarative and cache-stable:
 App mode currently serves from the root path and uses Rsbuild's default asset
 prefix. Keep `server.base` at `/` and `output.assetPrefix` at `auto` or `/`; for
 a subpath deployment, rewrite that prefix to the app root in the hosting proxy.
-Changing routes or server-render settings in `octane.config.ts` triggers a full
-browser reload within an already enabled app. Changing `build.target`,
-`build.outDir`, `build.minify`, or adding the first route reshapes Rsbuild
-environments and requires a dev-server restart.
+When `octane.config.ts` or one of its imported helpers changes, `rsbuild dev`
+restarts the dev server and applies the complete config atomically. This is
+required for `compiler.renderers`, because renderer selection is part of each
+Rspack compiler's cache and loader identity. Source-module edits continue to
+use the normal HMR or browser-reload path.
 
 The package follows the Rsbuild plugin model consumed by Rspeedy, but this
 release targets Octane's DOM renderer. Lynx renderer selection is future work.

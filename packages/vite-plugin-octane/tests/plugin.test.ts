@@ -89,6 +89,25 @@ describe('octane() plugin factory', () => {
 		expect(transform.call({}, code, '/repo/src/useThing.ts')).not.toBeNull();
 	});
 
+	it('forwards inline renderer rules to the bundled compiler', () => {
+		const [compiler] = octane({
+			hmr: false,
+			renderers: {
+				registry: { object: 'octane/universal' },
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		(compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+		const transform = compiler.transform as (code: string, id: string) => { code: string };
+		const result = transform.call(
+			{},
+			'export function Scene() @{ <node /> }',
+			'/repo/src/scenes/Scene.object.tsrx',
+		);
+
+		expect(result.code).toMatch(/from ["']octane\/universal["']/);
+	});
+
 	it("keeps Vite's SPA default without app config and uses 'custom' for routed apps", async () => {
 		const [, meta] = octane();
 		const config = meta.config as (

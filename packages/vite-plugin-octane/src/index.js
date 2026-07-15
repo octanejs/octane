@@ -188,7 +188,7 @@ function has_route_config(config) {
  * node builtins external) exporting `handler`/`nodeHandler` and auto-booting
  * under `node`. See server/virtual-entry.js and server/production.js.
  *
- * @param {{ hmr?: boolean, profile?: boolean, exclude?: string[] }} [inlineOptions]
+ * @param {{ hmr?: boolean, profile?: boolean, exclude?: string[], renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -756,6 +756,7 @@ export function octane(inlineOptions = {}) {
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
 	if (inlineOptions.profile !== undefined) compilerOptions.profile = inlineOptions.profile;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
+	if (inlineOptions.renderers !== undefined) compilerOptions.renderers = inlineOptions.renderers;
 	// The compiler plugin is untyped JS (its `enforce` infers as `string`).
 	return [/** @type {Plugin} */ (octaneCompiler(compilerOptions)), metaPlugin];
 }

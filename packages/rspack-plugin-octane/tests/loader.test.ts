@@ -82,11 +82,26 @@ describe('octane Rspack loader', () => {
 			dependencies: ['/project/package.json', '/project/src/package.json'],
 			missingDependencies: ['/project/src/missing/package.json'],
 		});
-		const output = runLoader({ hot: true });
+		const output = runLoader({
+			hot: true,
+			options: {
+				renderers: {
+					registry: { object: '/src/object-renderer.js' },
+					rules: [{ include: '**/*.object.tsrx', renderer: 'object' }],
+				},
+			},
+		});
 
 		expect(output.context.cacheable).toHaveBeenCalledWith(true);
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
-			expect.objectContaining({ root: '/project' }),
+			expect.objectContaining({
+				root: '/project',
+				renderers: expect.objectContaining({
+					registry: expect.objectContaining({
+						object: { module: '/src/object-renderer.js', target: 'universal' },
+					}),
+				}),
+			}),
 		);
 		expect(mocks.transform).toHaveBeenCalledWith(
 			'export function App() @{ <div /> }',

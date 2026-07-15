@@ -118,6 +118,10 @@ describe('OctaneRspackPlugin', () => {
 			dev: true,
 			parallelUse: false,
 			exclude: ['generated'],
+			renderers: {
+				registry: { object: '/src/object-renderer.js' },
+				rules: [{ include: '**/*.object.tsrx', renderer: 'object' }],
+			},
 			transpile: false,
 		});
 		plugin.apply(compiler as any);
@@ -133,7 +137,42 @@ describe('OctaneRspackPlugin', () => {
 			dev: true,
 			parallelUse: false,
 			exclude: ['generated'],
+			renderers: expect.objectContaining({
+				default: 'dom',
+				signature: expect.stringMatching(/^octane-renderers-v1:/),
+			}),
 		});
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
+			expect.objectContaining({
+				renderers: expect.objectContaining({
+					registry: expect.objectContaining({
+						object: { module: '/src/object-renderer.js', target: 'universal' },
+					}),
+				}),
+			}),
+		);
+	});
+
+	it('salts persistent caches with the normalized renderer configuration', () => {
+		const createCachedCompiler = () => {
+			const compiler = createCompiler('web');
+			(compiler.options as any).cache = { type: 'persistent', version: 'user-cache' };
+			return compiler;
+		};
+		const dom = createCachedCompiler();
+		const object = createCachedCompiler();
+
+		new OctaneRspackPlugin().apply(dom as any);
+		new OctaneRspackPlugin({
+			renderers: {
+				registry: { object: '/src/object-renderer.js' },
+				default: 'object',
+			},
+		}).apply(object as any);
+
+		expect((dom.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
+		expect((object.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
+		expect((object.options as any).cache.version).not.toBe((dom.options as any).cache.version);
 	});
 
 	it('resolves a relative root from the Rspack context', () => {

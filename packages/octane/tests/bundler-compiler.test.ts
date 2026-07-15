@@ -60,6 +60,34 @@ describe('bundler-neutral compiler integration', () => {
 		expect(server?.code).not.toContain('webpackHot');
 	});
 
+	it('selects a universal renderer by canonical filename without changing DOM output', () => {
+		const legacy = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const configured = createOctaneCompiler({
+			root: '/project',
+			hmr: false,
+			dev: false,
+			renderers: {
+				registry: { object: '/src/object-renderer.js' },
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+
+		const legacyDom = legacy.transform(COMPONENT, '/project/src/App.tsrx');
+		const configuredDom = configured.transform(COMPONENT, '/project/src/App.tsrx');
+		expect(configuredDom?.renderer).toEqual({ id: 'dom', module: 'octane', target: 'dom' });
+		// DOM output identity is an explicit compatibility gate for renderer selection.
+		expect(configuredDom?.code).toBe(legacyDom?.code);
+
+		const objectSource = 'export function Scene() @{ <node label="object" /> }\n';
+		const object = configured.transform(objectSource, '/project/src/scenes/Scene.object.tsrx?used');
+		expect(object?.renderer).toEqual({
+			id: 'object',
+			module: '/src/object-renderer.js',
+			target: 'universal',
+		});
+		expect(object?.code).toMatch(/from ["']\/src\/object-renderer\.js["']/);
+	});
+
 	it('specializes only disposable production roots with proven void imports', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-void-root-'));
 		try {

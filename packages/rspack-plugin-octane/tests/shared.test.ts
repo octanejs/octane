@@ -28,6 +28,27 @@ describe('declarative options', () => {
 		expect(Object.isFrozen(options.exclude)).toBe(true);
 	});
 
+	it('normalizes and deeply freezes declarative renderer options', () => {
+		const renderers = {
+			registry: { object: '/src/object-renderer.js' },
+			rules: [{ include: ['src/**/*.object.tsrx'], renderer: 'object' }],
+		};
+		const options = normalizePluginOptions({ renderers });
+		renderers.registry.object = '/src/later.js';
+		renderers.rules[0].include.push('src/**/*.later.tsrx');
+		const normalized = options.renderers!;
+
+		expect(normalized).toMatchObject({
+			registry: { object: { module: '/src/object-renderer.js', target: 'universal' } },
+			rules: [{ include: ['src/**/*.object.tsrx'], renderer: 'object' }],
+		});
+		expect(Object.isFrozen(normalized)).toBe(true);
+		expect(Object.isFrozen(normalized.registry)).toBe(true);
+		expect(Object.isFrozen(normalized.registry.object)).toBe(true);
+		expect(Object.isFrozen(normalized.rules)).toBe(true);
+		expect(Object.isFrozen(normalized.rules[0].include)).toBe(true);
+	});
+
 	it('accepts the plugin-only transpile switch', () => {
 		expect(normalizePluginOptions({ transpile: false })).toEqual({ transpile: false });
 		expect(() => normalizeLoaderOptions({ transpile: false })).toThrow(
@@ -39,6 +60,7 @@ describe('declarative options', () => {
 		[{ environment: 'worker' }, /environment/],
 		[{ hmr: 'webpack' }, /hmr/],
 		[{ exclude: 'vendor' }, /exclude/],
+		[{ renderers: { default: 'missing' } }, /default references unknown renderer/],
 		[{ transform: () => {} }, /unknown option/],
 	] as const)('rejects invalid options %#', (value, message) => {
 		expect(() => normalizePluginOptions(value)).toThrow(message);

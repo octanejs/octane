@@ -132,6 +132,7 @@ export class OctaneRspackPlugin {
 			profile,
 			parallelUse: this.options.parallelUse !== false,
 			exclude: this.options.exclude ?? [],
+			renderers: this.options.renderers?.signature,
 			transpile: this.options.transpile !== false,
 		});
 		installProfilingDefine(compiler, profile);
@@ -142,6 +143,7 @@ export class OctaneRspackPlugin {
 			...(this.options.parallelUse === undefined
 				? null
 				: { parallelUse: this.options.parallelUse }),
+			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
 		});
 		const runtimeRequest = neutralCompiler.resolveRuntimeRequest('octane', environment);
 
@@ -161,6 +163,7 @@ export class OctaneRspackPlugin {
 				? null
 				: { parallelUse: this.options.parallelUse }),
 			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),
+			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
 		};
 		compiler.options.module.rules.push({
 			test: OCTANE_RULE,

@@ -191,7 +191,17 @@ export default defineConfig({
 					// the plugin skips them automatically (nearest-manifest lookup) — the
 					// same declaration covers every project below, the website, examples,
 					// and builds.
-					octane(),
+					octane({
+						renderers: {
+							registry: { object: 'octane/universal' },
+							rules: [
+								{
+									include: 'packages/octane/tests/_fixtures/*.object.tsrx',
+									renderer: 'object',
+								},
+							],
+						},
+					}),
 				],
 			},
 			{
@@ -217,7 +227,20 @@ export default defineConfig({
 					// prod, like React's prod bundle): they conditionalize on this.
 					env: { OCTANE_TEST_COMPILE_MODE: 'prod' },
 				},
-				plugins: [octane({ hmr: false })],
+				plugins: [
+					octane({
+						hmr: false,
+						renderers: {
+							registry: { object: 'octane/universal' },
+							rules: [
+								{
+									include: 'packages/octane/tests/_fixtures/*.object.tsrx',
+									renderer: 'object',
+								},
+							],
+						},
+					}),
+				],
 			},
 			{
 				// Focused production-semantics profiling build. Keeping this to the

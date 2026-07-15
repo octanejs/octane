@@ -5,9 +5,9 @@
  * `createHandler(manifest, deps)` is the runtime entry the generated server
  * bundle (dist/server/entry.js) calls in production. It is designed to be
  * BUNDLED: platform-agnostic (no Node imports — platform capabilities come via
- * `manifest.runtime`), and free of vite / octane-compiler imports (which is why
- * `resolveOctaneConfig` is re-exported from resolve-config.js, not
- * load-config.js).
+ * `manifest.runtime`), and free of Vite / compiler-transform imports (which is
+ * why `resolveOctaneConfig` is re-exported from resolve-config.js, not
+ * config-loader.js). Its renderer config helper is dependency-free.
  *
  * The render path mirrors the DEV middleware's `handleRenderRoute`
  * (server/render-route.js) byte-for-byte in everything hydration can see —

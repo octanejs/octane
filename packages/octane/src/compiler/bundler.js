@@ -12,9 +12,17 @@ import { createRequire } from 'node:module';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseModule } from '@tsrx/core';
 import { compile, isVoidJsxCodeBlockFunction } from './compile.js';
+import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
 import { findVoidRootImports, slotHooks } from './slot-hooks.js';
 
 export { findVoidRootImports };
+export {
+	DOM_RENDERER_ID,
+	DOM_RENDERER_MODULE,
+	RENDERER_CONFIG_VERSION,
+	normalizeRendererConfig,
+	resolveRendererForFile,
+} from './renderers.js';
 
 const OCTANE_DEPENDENCY_FIELDS = [
 	'dependencies',
@@ -176,6 +184,7 @@ class OctaneBundlerCompiler {
 			profile: options.profile === true,
 			parallelUse: options.parallelUse,
 		};
+		this.renderers = normalizeRendererConfig(options.renderers);
 		// Deliberately instance-scoped: separate projects/build environments must
 		// never share nearest-manifest decisions.
 		this.manifestRuleCache = new Map();
@@ -447,6 +456,7 @@ class OctaneBundlerCompiler {
 			(file.endsWith('.tsx') && this._isInstalledOctaneSource(file, collected));
 		if (fullCompile) {
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
+			const renderer = resolveRendererForFile(this.renderers, filename);
 			const out = compile(code, filename, {
 				hmr,
 				mode: environment,
@@ -454,11 +464,16 @@ class OctaneBundlerCompiler {
 				profile,
 				profileFilename,
 				parallelUse: parallelUse !== false,
+				// Keep the established DOM compiler call byte-for-byte equivalent. A
+				// renderer descriptor is an orthogonal compiler input only for the
+				// universal branch selected at this template boundary.
+				...(renderer.target === 'dom' ? null : { renderer }),
 			});
 			return {
 				code: out.code,
 				map: out.map,
 				kind: 'compile',
+				renderer,
 				...(environment === 'client' && options.collectVoidComponentExports === true
 					? { voidComponentExports: findVoidComponentExports(code, filename) }
 					: {}),

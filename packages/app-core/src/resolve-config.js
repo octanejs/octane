@@ -2,15 +2,18 @@
 /**
  * Config validation + defaults — `resolveOctaneConfig` and its validators.
  *
- * Kept in a module with NO heavy imports (no bundler or octane/compiler) because
+ * Kept in a module with NO heavy imports (no bundler or compiler transform) because
  * it is part of the PRODUCTION server bundle's graph: the generated server
  * entry re-resolves octane.config.ts through it at boot, and the whole
  * `@octanejs/app-core/production` graph is bundled into dist/server/entry.js.
  * The file-loading half (`loadOctaneConfig`) lives in
- * `load-config.js` and re-exports everything here.
+ * `config-loader.js` and re-exports everything here.
+ * `octane/compiler/renderers` is intentionally a dependency-free config helper.
  */
 
 /** @import { OctaneConfigOptions, ResolvedOctaneConfig } from '@octanejs/app-core' */
+
+import { normalizeRendererConfig } from 'octane/compiler/renderers';
 
 import { DEFAULT_OUTDIR } from './constants.js';
 
@@ -122,6 +125,13 @@ export function resolveOctaneConfig(raw, options = {}) {
 		}
 	}
 
+	if (
+		raw.compiler !== undefined &&
+		(!raw.compiler || typeof raw.compiler !== 'object' || Array.isArray(raw.compiler))
+	) {
+		throw new Error('[octane] compiler must be an object when provided.');
+	}
+
 	if (raw.router?.routes !== undefined && !Array.isArray(raw.router.routes)) {
 		throw new Error('[octane] router.routes must be an array.');
 	}
@@ -160,6 +170,9 @@ export function resolveOctaneConfig(raw, options = {}) {
 			target: raw.build?.target,
 		},
 		adapter: raw.adapter,
+		compiler: {
+			renderers: normalizeRendererConfig(raw.compiler?.renderers),
+		},
 		router: {
 			routes: raw.router?.routes ?? [],
 			preHydrate: raw.router?.preHydrate,
