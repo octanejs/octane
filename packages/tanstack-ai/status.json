@@ -1,0 +1,19 @@
+{
+  "upstream": {
+    "package": "@tanstack/ai-react",
+    "version": "0.16.4"
+  },
+  "surface": "Ports the @tanstack/ai-react 0.16.4 hook surface (useChat, useRealtimeChat, useGeneration, useGenerateImage/Audio/Speech/Video, useTranscription, useSummarize, useAudioRecorder, useMcpAppBridge) while re-exporting @tanstack/ai 0.40.0 and @tanstack/ai-client 0.20.0 unchanged.",
+  "divergences": [
+    "The `./mcp-apps` subpath and its `MCPAppResource` component are not ported: they render `AppRenderer` from the React-only `@mcp-ui/client`, which has no Octane equivalent. The framework-agnostic `useMcpAppBridge` hook is ported and available on the main entry.",
+    "Octane uses native events: text/file/recorder inputs drive updates via `onInput`; there is no synthetic `onChange` layer.",
+    "Octane has no StrictMode double-invoke and always provides `useId`, so no random-id fallback is needed."
+  ],
+  "ssr": "Supported and tested: useChat renders its initial message snapshot through octane/server without a DOM.",
+  "notes": [
+    "Hook modules are authored as TSRX with checked declaration companions; no ported hook renders JSX or references React types in its public signature.",
+    "The ported suite reuses the upstream behavioral tests with no skipped, todo, or expected-failure cases.",
+    "Differential coverage runs one shared chat fixture through this binding and real @tanstack/ai-react@0.16.4, comparing streamed output after each step."
+  ],
+  "verified": "PENDING"
+}
