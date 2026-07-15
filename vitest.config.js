@@ -342,6 +342,58 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-form',
+					include: [
+						'packages/tanstack-form/tests/conformance/**/*.test.ts',
+						'packages/tanstack-form/tests/conformance/**/*.test.tsx',
+						'packages/tanstack-form/tests/differential/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/tanstack-form/tests/differential/_setup.ts'],
+					setupFiles: ['packages/tanstack-form/tests/conformance/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-form/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-form-ssr',
+					include: ['packages/tanstack-form/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-form/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
 					environment: 'jsdom',
