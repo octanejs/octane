@@ -101,6 +101,7 @@ export function octane(options = {}) {
 		exclude: options.exclude,
 		profile: profileEnabled,
 		parallelUse: options.parallelUse,
+		renderers: options.renderers,
 	});
 	// An explicit override of Vite's per-module SSR auto-detection.
 	const forceSsr = options.ssr;
@@ -112,6 +113,7 @@ export function octane(options = {}) {
 			exclude: options.exclude,
 			profile: profileEnabled,
 			parallelUse: options.parallelUse,
+			renderers: options.renderers,
 		});
 	};
 
