@@ -231,8 +231,9 @@ grouping and DOM-op ordering; the locals preserve statement order exactly and
 cost nothing post-minify. (2) ref/spread/fragmentRef fields keep long names +
 `bagOf` spill (see the corrected constraint above — the runtime's suspense-hide
 key scan reads them; a ref manifest is now a Phase 3 item). Runtime gained
-`bag0`…`bag16` + `bagOf` (tier-2 exports, +110 B gzip). Two compiled-output
-shape tests (event-bundle, helper-shadowing) updated to the new emission.
+`bag0`…`bag16` + `bagOf` (tier-2 exports, +110 B gzip). The emitted-size change
+is covered by the codegen-size corpus, while event behavior remains covered by
+the client, hydration, and browser suites.
 Measured: codegen-size corpus raw −10.9%, **minified −17.6%** (75,909 →
 62,522 B), gzip −5.5% (expansion 1.19× → **1.13×**); bundle-size app-chunk
 gzip −2.0% tsrx / −3.3% jsx (app/ripple **1.40×**, app/solid 1.63×). Perf:
@@ -361,7 +362,8 @@ Independent, individually-measurable items, roughly by value:
   matching fireEventSlot's dispatch switch; arity-0 descriptors share one
   empty args array. One bag field per binding (`_ev$N`, lettered) instead of
   el + fn + each arg. Registered in the runtimeNeeded loop (the emit fns
-  don't see ctx). Shape pins updated in event-bundle.test.ts.
+  don't see ctx). Event behavior is covered through public interactions; raw
+  output size is guarded by the codegen-size and bundle-size benchmarks.
   Original design:
   Mount: `_b.c = _$evt1(_el0, "$$click", setN, n + 1)` — helper builds
   `{ fn, args }`, assigns `el[key]`, returns the descriptor.

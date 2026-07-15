@@ -90,14 +90,13 @@ descriptors — the cross-module signaling channel exists.
   rows), count comment nodes in-page. Deterministic per framework → works
   with `--compare` AND cross-framework ratio guards (solid/ripple also use
   marker comments — honest comparison). Record baselines.
-- **Website e2e ceilings**: assert per-route comment-count ceilings in
-  `ssr-hydration.e2e.test.ts` (generous first — e.g. home ≤ 2,400 — ratchet
-  down as phases land).
-- **Structural pins**: a small marker-shape test that renders representative
-  fixtures (wrapper chain, @for, de-opt tree) three ways — client mount, SSR
-  string, hydrate — and asserts exact comment counts. Elision changes must
-  edit these pins deliberately. (The differential rig STRIPS comments before
-  comparing, so parity tests are blind to this by design.)
+- **Deterministic DOM-weight benchmarks**: measure comment-node weight in the
+  js-framework harness and ratio system. Keep performance thresholds out of
+  correctness suites so implementation-preserving marker changes do not
+  require browser-test churn.
+- **Behavioral hydration coverage**: render representative wrapper, keyed,
+  Suspense, and de-opt fixtures through SSR and hydration; assert DOM adoption,
+  state, identity, events, and mismatch diagnostics rather than marker spelling.
 
 **M0 LANDED 2026-07-09.** Three layers, all green in both compile modes:
 
@@ -106,21 +105,21 @@ descriptors — the cross-module signaling channel exists.
   ripple 0 · solid 0** — the 1,000-row grid is already almost marker-free
   (forBlock singleRoot at work), so this op is a singleRoot-regression
   TRIPWIRE (+1 comment fails the absolute compare), not a ratio (references
-  are 0 — no ratio guard possible). The wrapper/de-opt weight lives in the
-  ceilings + pins below.
-- Website e2e per-route ceilings (CI-enforced): `/` ≤ 2,450 (measured 2,123)
-  · `/docs` ≤ 450 (379) · `/benchmarks` ≤ 20,000 (**17,381** — the 12
-  recharts cards; the M2 number) · `/playground` ≤ 250 (185).
-- `tests/marker-shape.test.ts` + `_fixtures/marker-shape.tsrx`: exact
-  client/SSR/hydrate counts for the five regimes. Measured surprises now
-  pinned: same-module singleRoot ALREADY elides the Leaf layer of the chain
+  are 0 — no ratio guard possible). Wrapper/de-opt weight is tracked by the
+  broader DOM-weight benchmarks and validated behaviorally during hydration.
+- Historical per-route measurements at landing: `/` 2,123 · `/docs` 379 ·
+  `/benchmarks` **17,381** (the 12 recharts cards; the M2 number) ·
+  `/playground` 185. Current DOM-weight regression coverage lives in the
+  deterministic benchmark/ratio system rather than route-specific ceilings.
+- Historical client/SSR/hydrate counts covered five representative regimes.
+  Measurements showed that same-module singleRoot already elided the Leaf layer of the chain
   (client 2 vs SSR 4); an @if with a single-element branch client-mounts with
   ONE comment total (slot rides the template `<!>` anchor, branch
   self-marks) vs SSR 4; empty-`@for` SSR emits only the outer pair while the
   client mints an empty-branch pair (client 5 / ssr 2 / hydrate 4); the
-  de-opt tree hydrates to FEWER comments than SSR emitted (11 vs 14 —
-  adoption discards some pairs while re-anchoring). These asymmetries are
-  the baseline contract M1-M3 will edit deliberately.
+  de-opt tree hydrated to fewer comments than SSR emitted (11 vs 14 —
+  adoption discarded some pairs while re-anchoring). These measurements guided
+  M1-M3; current correctness tests assert the resulting behavior at the DOM boundary.
 
 ### M1 — Cross-module `$$singleRoot` stamps (small, contained)
 
@@ -151,8 +150,8 @@ fired for ANY unknown bare identifier — including per-render local variables
 (`const Comp = cond ? A : B`), whose identity changes across renders while
 the markerless regime is pinned at first mount (broke the transition-swap
 probe test). Restricted to imported bindings (immutable identity). SSR and
-hydration unchanged by design. Pinned by marker-shape case (a2): cross-module
-sole child = client 0 / ssr 2 / hydrate 2. Website home steady-state client
+hydration unchanged by design. The landing measurement for a cross-module
+sole child was client 0 / SSR 2 / hydrate 2. Website home steady-state client
 render: 1,996 → **1,900** comments (−5% — as projected, M2/M3 carry the bulk).
 Perf: same-session A/B neutral within noise.
 
@@ -194,7 +193,7 @@ single-descriptor sketch above:
   (pre-seeded slot state, the hydration-seed precedent) instead of minting an
   inner end-anchor + lazy start. The item block still owns the pair
   (inclusive teardown); `clearChildContent` sweeps between markers only.
-- Pinned by marker-shape case (e): Deopt client 12 → **8**, hydrate 11 → **9**
+- Landing measurement: Deopt client 12 → **8**, hydrate 11 → **9**
   (SSR unchanged at 14 by design). Website (dev-SSR e2e measurement):
   `/` 2,030 → **1,783**, `/benchmarks` 17,381 → **14,793** — e2e ceilings
   ratcheted to 2,050 / 17,000 (~15% headroom).
@@ -276,7 +275,7 @@ gated on the M0 pins + the full hydration/e2e/prod-mode suites.
   serialize identically and cross-reconnect CLEAN — the
   hydration-mismatch conformance divergence pin (Reconnecting:76/:91) flipped
   to a React-parity pass.
-- **Pins** (marker-shape): Chain 2/4/4 → **0/0/0**; ChainX 0/2/2 → **0/0/0**;
+- **Landing measurements**: Chain 2/4/4 → **0/0/0**; ChainX 0/2/2 → **0/0/0**;
   keyed keeps 2/2/2; `<Ctx.Provider>` root 0/2/2; aliased-Suspense 6/8/8
   symmetric decline; swap-in-place both regimes; adoption-identity + recovery.
 - **Website reality check** (dev-SSR e2e): `/` 1,783 → 1,743, `/benchmarks`
@@ -517,7 +516,7 @@ coextensive wrapper stack.
 - Perf: same-session A/B on js-framework/dbmon/effectful-list. Expected
   neutral-to-positive (fewer DOM nodes, shorter walks); the singleRoot item
   precedent showed no cost. Memory is where wins may show (dbmon).
-- Ratchet: `comments_1k` guards + e2e ceilings tighten per phase.
+- Ratchet: `comments_1k` and the deterministic DOM-weight ratio guards tighten per phase.
 
 ## 6. Open questions
 
