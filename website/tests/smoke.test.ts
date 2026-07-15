@@ -110,19 +110,29 @@ describe('website routes', () => {
 		}
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
-		// The checked-in benchmark summary reaches the chart and table renderers.
-		const summary = container.querySelector('figure.bench-card');
-		expect(summary?.querySelector('figcaption')).toBeTruthy();
-		expect(summary?.querySelector('svg')).toBeTruthy();
-		expect(summary?.querySelector('details table')).toBeTruthy();
+		// The checked-in benchmark summary reaches the interactive explorer, which
+		// links on to the full suite grid. Framework and suite labels are present in
+		// both the SSR fallback table and the mounted views, so this is stable
+		// regardless of mount timing.
+		const explorer = container.querySelector('section.explorer')!;
+		expect(explorer).toBeTruthy();
+		expect(explorer.querySelector('#explorer-heading')?.textContent?.trim()).toBeTruthy();
+		expect(findLink(explorer, '/benchmarks')).toBeTruthy();
+		expect(explorer.textContent).toContain('Octane (.tsrx)');
+		expect(explorer.textContent).toContain('js-framework');
 
+		// Section links sit with the wordmark on the left; search and the social
+		// icons form the right cluster.
 		const nav = container.querySelector('.navlinks')!;
 		for (const href of ['/docs', '/benchmarks', '/llms.txt']) {
 			expect(findLink(nav, href)).toBeTruthy();
 		}
 		expect(findLink(nav, '/view-transitions')).toBeUndefined();
-		expect(findLink(nav, 'https://github.com/octanejs/octane')).toBeTruthy();
-		expect(findLink(nav, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
+
+		const navRight = container.querySelector('.nav-right')!;
+		expect(navRight.querySelector('.search-trigger')).toBeTruthy();
+		expect(findLink(navRight, 'https://github.com/octanejs/octane')).toBeTruthy();
+		expect(findLink(navRight, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
 	});
 
 	it('/benchmarks renders every configured benchmark card', async () => {

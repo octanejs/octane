@@ -2,7 +2,7 @@
 // navigation supplied by the registry, and keep a local table of contents
 // beside longer guides.
 import { Link, useParams } from '@octanejs/tanstack-router';
-import { docs, findDoc } from '../content/docs.ts';
+import { docs, findDoc } from '../../content/docs.ts';
 
 function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
 	const { children, ...tableProps } = props;

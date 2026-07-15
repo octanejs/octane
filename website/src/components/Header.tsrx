@@ -1,23 +1,25 @@
-// Root layout: sticky top nav (wordmark + Docs / Blog / GitHub) over the routed
-// page. Styling is octane's scoped <style> — router <Link>s are separate
+// The sticky top bar: two clusters — wordmark + section links on the left,
+// search and the Discord/GitHub icons on the right. Router <Link>s are separate
 // components, so their classes are styled through :global() descendant holes.
-// Below 720px the link row collapses behind a hamburger into a dropdown panel.
+// Below 720px the left link row collapses behind a hamburger into a dropdown
+// panel, while search and the social icons stay in the bar as icons.
 import { useState } from 'octane';
-import { Link, Outlet, useLocation } from '@octanejs/tanstack-router';
+import { Link, useLocation } from '@octanejs/tanstack-router';
+import { DocsSearch } from './DocsSearch.tsrx';
 import logoUrl from '../assets/octane-logo.svg';
+import discordUrl from '../assets/discord.svg';
+import githubUrl from '../assets/github.svg';
 
-export function Layout() @{
+export function Header() @{
 	const [menuOpen, setMenuOpen] = useState(false);
-	// The playground fills the viewport below the nav — no footer under it.
+	// The docs section runs wider than the rest of the site; the bar matches it
+	// so the wordmark stays flush with the sidebar.
 	const pathname = useLocation({ select: (l: any) => l.pathname });
 	const isDocsPath = pathname === '/docs' || pathname.startsWith('/docs/');
-	const showFooter = pathname !== '/playground';
-	<div class="shell">
-		<header class="topnav">
-			<div class={['topnav-inner', isDocsPath && 'docs-width']}>
-				<Link to="/" class="wordmark" aria-label="Octane home">
-					<img src={logoUrl} alt="Octane" class="wordmark-img" />
-				</Link>
+
+	<header class="topnav">
+		<div class={['topnav-inner', isDocsPath && 'docs-width']}>
+			<div class="nav-left">
 				<button
 					type="button"
 					class="menu-btn"
@@ -44,6 +46,9 @@ export function Layout() @{
 						}
 					</svg>
 				</button>
+				<Link to="/" class="wordmark" aria-label="Octane home">
+					<img src={logoUrl} alt="Octane" class="wordmark-img" />
+				</Link>
 				<nav
 					id="site-nav"
 					class={['navlinks', menuOpen && 'open']}
@@ -56,46 +61,49 @@ export function Layout() @{
 					<a class="nav-link" href="/llms.txt" target="_blank" rel="noreferrer">
 						llms.txt
 					</a>
-					<a class="nav-link" href="https://discord.gg/8puY9fFqd9" target="_blank" rel="noreferrer">
-						Discord
-					</a>
-					<a
-						class="nav-link"
-						href="https://github.com/octanejs/octane"
-						target="_blank"
-						rel="noreferrer"
-					>
-						GitHub
-					</a>
 				</nav>
 			</div>
-		</header>
-		<main class="main">
-			<Outlet />
-		</main>
-		@if (showFooter) {
-			<footer class="footer">
-				<div class="footer-inner">
-					<span>{'MIT licensed. Built with Octane (TSRX).'}</span>
-					<a href="https://github.com/octanejs/octane" target="_blank" rel="noreferrer">
-						octanejs/octane
-					</a>
-				</div>
-			</footer>
-		}
+			<div class="nav-right">
+				<DocsSearch />
+				<span class="nav-sep" aria-hidden="true"></span>
+				<a
+					class="nav-icon"
+					href="https://discord.gg/8puY9fFqd9"
+					target="_blank"
+					rel="noreferrer"
+					title="Discord"
+					aria-label="Octane on Discord"
+				>
+					<span
+						class="nav-icon-glyph"
+						style={'--icon:url("' + discordUrl + '")'}
+						aria-hidden="true"
+					></span>
+				</a>
+				<a
+					class="nav-icon"
+					href="https://github.com/octanejs/octane"
+					target="_blank"
+					rel="noreferrer"
+					title="GitHub"
+					aria-label="Octane on GitHub"
+				>
+					<span
+						class="nav-icon-glyph"
+						style={'--icon:url("' + githubUrl + '")'}
+						aria-hidden="true"
+					></span>
+				</a>
+			</div>
+		</div>
 		<style>
-			.shell {
-				min-height: 100vh;
-				display: flex;
-				flex-direction: column;
-			}
 			.topnav {
 				position: sticky;
 				top: 0;
 				z-index: 10;
 				background: rgba(35, 39, 47, 0.85);
 				backdrop-filter: blur(12px);
-				border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+				border-bottom: 1px solid var(--border);
 			}
 			.topnav-inner {
 				max-width: 1200px;
@@ -105,9 +113,22 @@ export function Layout() @{
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
+				gap: 1rem;
 			}
 			.topnav-inner.docs-width {
 				max-width: 1420px;
+			}
+			.nav-left,
+			.nav-right {
+				display: flex;
+				align-items: center;
+				min-width: 0;
+			}
+			.nav-left {
+				gap: 1.5rem;
+			}
+			.nav-right {
+				gap: 0.25rem;
 			}
 			.topnav-inner :global(a.wordmark) {
 				display: inline-flex;
@@ -127,14 +148,15 @@ export function Layout() @{
 				justify-content: center;
 				width: 40px;
 				height: 40px;
+				margin-left: -0.5rem;
 				border: none;
 				border-radius: 10px;
 				background: transparent;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				cursor: pointer;
 			}
 			.menu-btn:hover {
-				color: #f4eee8;
+				color: var(--text);
 				background: rgba(255, 255, 255, 0.06);
 			}
 			.navlinks {
@@ -142,9 +164,48 @@ export function Layout() @{
 				align-items: center;
 				gap: 0.25rem;
 			}
+			.nav-sep {
+				width: 1px;
+				height: 20px;
+				margin: 0 0.5rem;
+				background: var(--border);
+			}
+			.nav-icon {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				width: 36px;
+				height: 36px;
+				border-radius: 9999px;
+				color: var(--text-secondary);
+				transition:
+					background 0.15s,
+					color 0.15s;
+			}
+			.nav-icon:hover {
+				color: var(--text);
+				background: rgba(255, 255, 255, 0.06);
+				text-decoration: none;
+			}
+			/* The brand svgs live in assets/ and are tinted through a mask, so they
+			   still follow the link's currentColor on hover. The url() in --icon
+			   MUST stay quoted: vite inlines these as data: URIs whose attributes
+			   carry raw ' quotes, which an unquoted url() token cannot hold — the
+			   mask would fall back to none and paint a solid box. */
+			.nav-icon-glyph {
+				width: 20px;
+				height: 20px;
+				flex: none;
+				background: currentColor;
+				mask: var(--icon) center / contain no-repeat;
+				-webkit-mask: var(--icon) center / contain no-repeat;
+			}
 			@media (max-width: 720px) {
 				.menu-btn {
 					display: inline-flex;
+				}
+				.nav-left {
+					gap: 0.5rem;
 				}
 				.navlinks {
 					display: none;
@@ -158,7 +219,7 @@ export function Layout() @{
 					padding: 0.75rem 1rem 1rem;
 					background: rgba(35, 39, 47, 0.97);
 					backdrop-filter: blur(12px);
-					border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+					border-bottom: 1px solid var(--border);
 				}
 				.navlinks.open {
 					display: flex;
@@ -167,9 +228,12 @@ export function Layout() @{
 					padding: 0.65rem 1rem;
 					border-radius: 12px;
 				}
+				.nav-sep {
+					margin: 0 0.25rem;
+				}
 			}
 			.navlinks :global(a.nav-link) {
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-weight: 500;
 				padding: 0.4rem 0.9rem;
 				border-radius: 9999px;
@@ -178,33 +242,14 @@ export function Layout() @{
 					color 0.15s;
 			}
 			.navlinks :global(a.nav-link:hover) {
-				color: #f4eee8;
+				color: var(--text);
 				background: rgba(255, 255, 255, 0.06);
 				text-decoration: none;
 			}
 			.navlinks :global(a.nav-link[data-status='active']) {
-				color: #ff5d72;
+				color: var(--accent-text);
 				background: rgba(255, 65, 90, 0.14);
 			}
-			.main {
-				flex: 1;
-				width: 100%;
-			}
-			.footer {
-				border-top: 1px solid rgba(255, 255, 255, 0.1);
-				margin-top: 4rem;
-			}
-			.footer-inner {
-				max-width: 1200px;
-				margin: 0 auto;
-				padding: 1.5rem;
-				display: flex;
-				justify-content: space-between;
-				flex-wrap: wrap;
-				gap: 0.5rem;
-				color: #99a1b3;
-				font-size: 0.875rem;
-			}
 		</style>
-	</div>
+	</header>
 }
