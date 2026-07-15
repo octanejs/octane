@@ -3,6 +3,31 @@ import { useLayoutEffect, useRef, useState } from 'octane';
 type StateUpdate<P, S> =
 	Partial<S> | S | ((state: Readonly<S>, props: Readonly<P>) => Partial<S> | S);
 
+const forceUpdateControllers = new WeakSet<object>();
+
+function shallowEqual(previous: unknown, next: unknown): boolean {
+	if (Object.is(previous, next)) return true;
+	if (
+		typeof previous !== 'object' ||
+		previous === null ||
+		typeof next !== 'object' ||
+		next === null
+	) {
+		return false;
+	}
+	const previousKeys = Object.keys(previous);
+	const nextKeys = Object.keys(next);
+	if (previousKeys.length !== nextKeys.length) return false;
+	return previousKeys.every(
+		(key) =>
+			Object.prototype.hasOwnProperty.call(next, key) &&
+			Object.is(
+				(previous as Record<string, unknown>)[key],
+				(next as Record<string, unknown>)[key],
+			),
+	);
+}
+
 /**
  * Small lifecycle adapter for the nine class implementations retained by Visx
  * upstream. Classes are controller objects only; Octane always renders the
@@ -22,6 +47,7 @@ export class Component<P = Record<string, never>, S = any> {
 	}
 
 	forceUpdate(callback?: () => void): void {
+		forceUpdateControllers.add(this);
 		this.__applyUpdate?.((state) => state, callback);
 	}
 }
@@ -46,9 +72,11 @@ type LegacyConstructor = {
 	name?: string;
 };
 
-function assignRef<T>(ref: unknown, value: T | null): void {
-	if (typeof ref === 'function') ref(value);
-	else if (ref && typeof ref === 'object' && 'current' in ref) (ref as {
+function assignRef<T>(ref: unknown, value: T | null): (() => void) | undefined {
+	if (typeof ref === 'function') {
+		const cleanup = ref(value);
+		return typeof cleanup === 'function' ? cleanup : undefined;
+	} else if (ref && typeof ref === 'object' && 'current' in ref) (ref as {
 		current: T | null;
 	}).current = value;
 }
@@ -63,6 +91,7 @@ export function legacyComponent<C extends LegacyConstructor>(Controller: C): ((p
 		const [, forceRender] = useState(0);
 		const controllerRef = useRef<InstanceType<C> | null>(null);
 		const committedRef = useRef<{ props: Readonly<any>; state: Readonly<any> } | null>(null);
+		const outputRef = useRef<unknown>(null);
 
 		const { ref, ...rawProps } = inputProps ?? {} as Record<string, unknown> & { ref?: unknown };
 		const props = { ...(Controller.defaultProps ?? {}), ...rawProps };
@@ -86,15 +115,31 @@ export function legacyComponent<C extends LegacyConstructor>(Controller: C): ((p
 
 		const previous = committedRef.current;
 		controller.props = props;
-		const output = controller.render();
+		const forceUpdateRequested = forceUpdateControllers.delete(controller);
+		const shouldRender =
+			previous === null ||
+			forceUpdateRequested ||
+			!(controller instanceof PureComponent) ||
+			!shallowEqual(previous.props, props) ||
+			!shallowEqual(previous.state, controller.state);
+		const rendered = { props: controller.props, state: controller.state };
+		if (shouldRender) outputRef.current = controller.render();
 
 		useLayoutEffect(() => {
-			assignRef(ref, controller);
-			if (previous === null) controller.componentDidMount?.();
-			else controller.componentDidUpdate?.(previous.props, previous.state);
-			committedRef.current = { props: controller.props, state: controller.state };
-			return () => assignRef(ref, null);
-		}, [controller, previous, ref]);
+			const cleanup = assignRef(ref, controller);
+			return () => {
+				if (cleanup) cleanup();
+				else assignRef(ref, null);
+			};
+		}, [controller, ref]);
+
+		useLayoutEffect(() => {
+			if (shouldRender) {
+				if (previous === null) controller.componentDidMount?.();
+				else controller.componentDidUpdate?.(previous.props, previous.state);
+			}
+			committedRef.current = rendered;
+		}, null);
 
 		useLayoutEffect(
 			() => () => {
@@ -103,7 +148,7 @@ export function legacyComponent<C extends LegacyConstructor>(Controller: C): ((p
 			[controller],
 		);
 
-		return output;
+		return outputRef.current;
 	}
 
 	LegacyComponent.displayName = Controller.displayName ?? Controller.name;

@@ -7,6 +7,7 @@ import {
 	BrushFixture,
 	DragFixture,
 	HookFamiliesFixture,
+	LegacyAdapterFixture,
 	MeasureLifecycleFixture,
 	ResponsiveFixture,
 	TooltipFixture,
@@ -155,6 +156,46 @@ describe('@octanejs/visx stateful behavior', () => {
 		vi.spyOn(secondTarget, 'getBoundingClientRect').mockReturnValue(new DOMRect(5, 7, 123, 45));
 		flushSync(() => observers[1].callback([], observers[1]));
 		expect(view.find('#measure-width').textContent).toBe('123');
+	});
+
+	it('preserves legacy refs across updates and implements PureComponent bailouts', () => {
+		const refs = [];
+		const onRef = vi.fn((value) => refs.push(value));
+		const onRender = vi.fn();
+		const onDidUpdate = vi.fn();
+		const onUnmount = vi.fn();
+		const view = render(LegacyAdapterFixture, {
+			controllerRef: onRef,
+			onRender,
+			onDidUpdate,
+			onUnmount,
+		});
+		const controller = refs[0];
+
+		expect(onRender).toHaveBeenCalledOnce();
+		expect(onRef).toHaveBeenCalledTimes(1);
+		flushSync(() => controller.setState({ count: 0 }));
+		expect(onRender).toHaveBeenCalledOnce();
+		expect(onDidUpdate).not.toHaveBeenCalled();
+		expect(onRef).toHaveBeenCalledTimes(1);
+
+		flushSync(() => controller.setState({ count: 1 }));
+		expect(onRender).toHaveBeenCalledTimes(2);
+		expect(onDidUpdate).toHaveBeenLastCalledWith(0);
+		expect(view.find('#legacy-pure-count').textContent).toBe('1');
+		expect(onRef).toHaveBeenCalledTimes(1);
+
+		flushSync(() => controller.forceUpdate());
+		expect(onRender).toHaveBeenCalledTimes(3);
+		expect(onDidUpdate).toHaveBeenLastCalledWith(1);
+		expect(onRef).toHaveBeenCalledTimes(1);
+
+		flushSync(() =>
+			view.find('#hide-legacy-probe').dispatchEvent(new MouseEvent('click', { bubbles: true })),
+		);
+		expect(onRef).toHaveBeenLastCalledWith(null);
+		expect(onRef).toHaveBeenCalledTimes(2);
+		expect(onUnmount).toHaveBeenCalledOnce();
 	});
 
 	it('preserves Brush class-controller state and reports native drag bounds', () => {

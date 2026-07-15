@@ -15,6 +15,7 @@ import { ThemeProvider, useTheme } from '@octanejs/visx/theme/react';
 import { useTooltip, useTooltipInPortal } from '@octanejs/visx/tooltip';
 import { useFloatingTooltip } from '@octanejs/visx/tooltip/floating';
 import { useVoronoi } from '@octanejs/visx/voronoi/react';
+import { PureComponent, legacyComponent } from '../../src/internal/legacy.tsrx';
 import useMeasure from '../../src/internal/useMeasure.tsrx';
 
 const points = [
@@ -88,6 +89,48 @@ export function MeasureLifecycleFixture({ ResizeObserverImpl }) {
 		<button id="toggle-measure-target" onClick={() => setShowTarget((show) => !show)}>Toggle</button>
 		{showTarget && <div id="measure-target" ref={measureRef} />}
 		<output id="measure-width">{bounds.width as string}</output>
+	</section>;
+}
+
+type LegacyPureProbeProps = {
+	onRender: (count: number) => void;
+	onDidUpdate: (previousCount: number) => void;
+	onUnmount: () => void;
+};
+
+class LegacyPureProbeController extends PureComponent {
+	constructor(props: LegacyPureProbeProps) {
+		super(props);
+		this.state = { count: 0 };
+	}
+
+	componentDidUpdate(_previousProps, previousState) {
+		this.props.onDidUpdate(previousState.count);
+	}
+
+	componentWillUnmount() {
+		this.props.onUnmount();
+	}
+
+	render() {
+		this.props.onRender(this.state.count);
+		return <output id="legacy-pure-count">{this.state.count as string}</output>;
+	}
+}
+
+const LegacyPureProbe = legacyComponent(LegacyPureProbeController);
+
+export function LegacyAdapterFixture({ controllerRef, onRender, onDidUpdate, onUnmount }) {
+	const [showProbe, setShowProbe] = useState(true);
+	return <section>
+		<button id="hide-legacy-probe" onClick={() => setShowProbe(false)}>Hide</button>
+		{showProbe &&
+			<LegacyPureProbe
+				ref={controllerRef}
+				onRender={onRender}
+				onDidUpdate={onDidUpdate}
+				onUnmount={onUnmount}
+			/>}
 	</section>;
 }
 
