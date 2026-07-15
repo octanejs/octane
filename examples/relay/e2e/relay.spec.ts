@@ -29,7 +29,7 @@ async function openGeneral(page: Page): Promise<void> {
 	await expect(page.getByRole('status', { name: 'Realtime connection: live' })).toBeVisible();
 }
 
-test('deep links across responsive channels and preserves a thread reply across reopen', async ({
+test('deep links across responsive channels, isolates thread drafts, and preserves a reply across reopen', async ({
 	page,
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
@@ -44,6 +44,23 @@ test('deep links across responsive channels and preserves a thread reply across 
 	await expect(page.getByRole('article', { name: 'Reply from Rowan Ellis' })).toBeVisible();
 
 	const reply = page.getByRole('textbox', { name: 'Reply to thread' });
+	await reply.fill('This draft belongs to the handoff checklist.');
+	await page.evaluate(() => {
+		history.pushState(null, '', '/channels/general/thread/g-013');
+		window.dispatchEvent(new PopStateEvent('popstate'));
+	});
+	await expect(page).toHaveURL(/\/channels\/general\/thread\/g-013$/);
+	await expect(
+		threadDialog.getByText('Two customers volunteered for the workflow follow-up next week.'),
+	).toBeVisible();
+	await expect(threadDialog.getByRole('article', { name: 'Reply from Maya Chen' })).toBeVisible();
+	await expect(reply).toHaveValue('');
+	await expect(threadDialog.getByRole('button', { name: 'Reply' })).toBeDisabled();
+	await page.goBack();
+	await expect(page).toHaveURL(/\/channels\/general\/thread\/g-014$/);
+	await expect(page.getByRole('article', { name: 'Reply from Rowan Ellis' })).toBeVisible();
+	await expect(threadHeading).toBeFocused();
+
 	await page.keyboard.press('Shift+Tab');
 	await expect(reply).toBeFocused();
 	await page.keyboard.press('Tab');

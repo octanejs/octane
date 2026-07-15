@@ -128,6 +128,7 @@ export const channelMessages = {
 			'Today 9:19',
 			13,
 			5,
+			1,
 		),
 		message(
 			'g-014',
@@ -254,6 +255,14 @@ export const channelMessages = {
 };
 
 export const threadReplies = {
+	'g-013': [
+		{
+			id: 'r-followup-1',
+			author: people.maya,
+			body: 'I’ll send both customers a calendar hold after the research sync.',
+			sentAt: 'Today 9:21',
+		},
+	],
 	'g-014': [
 		{
 			id: 'r-1',

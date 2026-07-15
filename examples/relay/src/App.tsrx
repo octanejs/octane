@@ -796,6 +796,7 @@ export function App() @{
 		<div class="activity-announcer" role="status" aria-live="polite">{activity}</div>
 		@if (route.threadId !== null) {
 			<ThreadPortal
+				key={route.threadId}
 				parent={currentThreadParent}
 				replies={visibleThreadReplies}
 				loading={threadLoading}
