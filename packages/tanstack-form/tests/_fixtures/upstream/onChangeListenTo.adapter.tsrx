@@ -1,8 +1,9 @@
+// Ported from @tanstack/react-form 1.33.2 to the Octane test renderer.
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render } from '@octanejs/testing-library';
 import { useSelector } from '@octanejs/tanstack-store';
 import { useForm } from '@octanejs/tanstack-form';
-import { sleep } from './utils';
+import { sleep } from '../../conformance/utils';
 import type { ReadonlyStore } from '@octanejs/tanstack-store';
 
 function DebugSubscribe({ store }: { store: ReadonlyStore<any> }) {

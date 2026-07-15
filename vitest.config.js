@@ -345,7 +345,6 @@ export default defineConfig({
 					name: 'tanstack-form',
 					include: [
 						'packages/tanstack-form/tests/conformance/**/*.test.ts',
-						'packages/tanstack-form/tests/conformance/**/*.test.tsx',
 						'packages/tanstack-form/tests/differential/**/*.test.ts',
 					],
 					environment: 'jsdom',
