@@ -194,6 +194,29 @@ export default defineConfig({
 					octane({
 						renderers: {
 							registry: { object: 'octane/universal' },
+							boundaries: {
+								'/packages/octane/tests/_fixtures/universal-owned-canvas.tsrx': {
+									Canvas: {
+										ownerRenderer: 'dom',
+										childRenderer: 'object',
+										prop: 'children',
+									},
+								},
+								'/packages/octane/tests/_fixtures/universal-renderer-boundaries.tsrx': {
+									Canvas: {
+										ownerRenderer: 'dom',
+										childRenderer: 'object',
+										prop: 'children',
+									},
+								},
+								'/packages/octane/tests/_fixtures/universal-renderer-boundaries.object.tsrx': {
+									Html: {
+										ownerRenderer: 'object',
+										childRenderer: 'dom',
+										prop: 'children',
+									},
+								},
+							},
 							rules: [
 								{
 									include: 'packages/octane/tests/_fixtures/*.object.tsrx',
@@ -232,6 +255,29 @@ export default defineConfig({
 						hmr: false,
 						renderers: {
 							registry: { object: 'octane/universal' },
+							boundaries: {
+								'/packages/octane/tests/_fixtures/universal-owned-canvas.tsrx': {
+									Canvas: {
+										ownerRenderer: 'dom',
+										childRenderer: 'object',
+										prop: 'children',
+									},
+								},
+								'/packages/octane/tests/_fixtures/universal-renderer-boundaries.tsrx': {
+									Canvas: {
+										ownerRenderer: 'dom',
+										childRenderer: 'object',
+										prop: 'children',
+									},
+								},
+								'/packages/octane/tests/_fixtures/universal-renderer-boundaries.object.tsrx': {
+									Html: {
+										ownerRenderer: 'object',
+										childRenderer: 'dom',
+										prop: 'children',
+									},
+								},
+							},
 							rules: [
 								{
 									include: 'packages/octane/tests/_fixtures/*.object.tsrx',

@@ -95,14 +95,15 @@ export default defineConfig({
 			'@octanejs/tanstack-router > @tanstack/store',
 			// Visx primitives are raw workspace sources; these are the runtime
 			// dependencies reached by the site's Bar/Axis/Group/Scale surface.
-			'classnames',
-			'd3-interpolate',
-			'd3-path',
-			'd3-scale',
-			'd3-shape',
-			'd3-time',
-			'reduce-css-calc',
-			'svg-path-properties',
+			// Resolve them through their owner under pnpm's isolated layout.
+			'@octanejs/visx > classnames',
+			'@octanejs/visx > d3-interpolate',
+			'@octanejs/visx > d3-path',
+			'@octanejs/visx > d3-scale',
+			'@octanejs/visx > d3-shape',
+			'@octanejs/visx > d3-time',
+			'@octanejs/visx > reduce-css-calc',
+			'@octanejs/visx > svg-path-properties',
 		],
 	},
 

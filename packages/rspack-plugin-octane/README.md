@@ -46,8 +46,26 @@ Set `transpile: false` when an existing rule already strips TypeScript. Set
 `hmr: false` to disable Octane HMR codegen even when Rspack HMR is active.
 Set `profile: true` to produce a client profiling build; server compilations
 always keep profiling disabled.
-Options contain only serializable strings, booleans, and string arrays, so the
-same configuration is safe to reuse across compiler environments and caches.
+The experimental `renderers` option accepts the same declarative registry,
+filename rules, and module/export boundary metadata as `compiler.renderers` in
+Octane app config:
+
+```js
+new OctaneRspackPlugin({
+	renderers: {
+		registry: { three: '@octanejs/three/renderer' },
+		boundaries: {
+			'@octanejs/three': {
+				Canvas: { ownerRenderer: 'dom', childRenderer: 'three', prop: 'children' },
+			},
+		},
+		rules: [{ include: 'src/scenes/**/*.tsrx', renderer: 'three' }],
+	},
+});
+```
+
+Options remain serializable data—there are no renderer callbacks—so the same
+configuration is safe to reuse across compiler environments and caches.
 
 Rspack's dev server enables the loader's hot context. If you run a custom dev
 server, add Rspack's `HotModuleReplacementPlugin` as usual.

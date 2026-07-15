@@ -87,6 +87,15 @@ describe('octane Rspack loader', () => {
 			options: {
 				renderers: {
 					registry: { object: '/src/object-renderer.js' },
+					boundaries: {
+						'/src/object-boundaries.js': {
+							Canvas: {
+								ownerRenderer: 'dom',
+								childRenderer: 'object',
+								prop: 'children',
+							},
+						},
+					},
 					rules: [{ include: '**/*.object.tsrx', renderer: 'object' }],
 				},
 			},
@@ -100,6 +109,15 @@ describe('octane Rspack loader', () => {
 					registry: expect.objectContaining({
 						object: { module: '/src/object-renderer.js', target: 'universal' },
 					}),
+					boundaries: {
+						'/src/object-boundaries.js': {
+							Canvas: {
+								ownerRenderer: 'dom',
+								childRenderer: 'object',
+								prop: 'children',
+							},
+						},
+					},
 				}),
 			}),
 		);

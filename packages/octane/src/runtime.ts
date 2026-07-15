@@ -97,6 +97,15 @@ type EffectFn = () => void | (() => void);
 type Cleanup = () => void;
 type HookSlot = symbol | number;
 
+/** @internal Cross-renderer parent ownership carried on compiler-created region props. */
+export interface RendererRegionOwnerBridge {
+	readonly active: boolean;
+	readContext<T>(context: Context<T>): T;
+	routeError(error: unknown): boolean;
+	routeSuspense(thenable: PromiseLike<unknown>): boolean;
+	registerDispose(dispose: () => void): () => void;
+}
+
 interface EffectEventCell {
 	impl: (...args: any[]) => any;
 	active: boolean;
@@ -572,6 +581,16 @@ interface PendingEffect {
 
 let CURRENT_SCOPE: Scope | null = null;
 let CURRENT_BLOCK: Block | null = null;
+const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
+const RENDERER_REGION_DOM_OWNERS = new WeakMap<Block, RendererRegionOwnerBridge>();
+const RENDERER_REGION_DOM_BINDINGS = new WeakMap<
+	Block,
+	{
+		bridge: RendererRegionOwnerBridge;
+		release: () => void;
+	}
+>();
+const DOM_ROOT_DISPOSERS = new WeakMap<Block, () => void>();
 // Public root diagnostics need to distinguish an ordinary imperative unmount
 // from one requested by an effect body while the commit lifecycle is active.
 // Passive effects may drain outside `inFlush`, so that scheduler flag alone is
@@ -2088,7 +2107,13 @@ function drainRefAttaches(): void {
 		// re-run on a torn-down node — firing a callback ref on a dead element and
 		// resurrecting an object ref the cleanup just nulled.
 		if (blockSubtreeDisposed(r.block)) continue;
-		r.fn();
+		try {
+			r.fn();
+		} catch (err) {
+			const handler = findTryHandler(r.block);
+			if (handler) handler(err);
+			else console.error(err);
+		}
 	}
 }
 
@@ -2350,7 +2375,9 @@ function fireEffectCleanup(e: PendingEffect): void {
 		try {
 			cleanup();
 		} catch (err) {
-			console.error(err);
+			const handler = findTryHandler(e.scope.block);
+			if (handler) handler(err);
+			else console.error(err);
 		}
 	}
 }
@@ -3255,7 +3282,9 @@ function dispatchTeardownErrors(): void {
 
 function unmountBlock(block: Block, detachDom: boolean = true): void {
 	if (block.disposed) return;
-	if (TEARDOWN_DEPTH === 0) TEARDOWN_HANDLER = findTryHandler(block.parentBlock);
+	if (TEARDOWN_DEPTH === 0) {
+		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+	}
 	TEARDOWN_DEPTH++;
 	try {
 		unmountBlockInner(block, detachDom);
@@ -4453,6 +4482,135 @@ export function useContext<T>(context: Context<T>): T {
 // resolved default is an O(1) hit rather than a re-walk to the root every read.
 const DEFAULT_CTX: unique symbol = Symbol('octane.ctx.default');
 
+function rendererRegionOwnerForBlock(block: Block | null): RendererRegionOwnerBridge | null {
+	let current = block;
+	while (current !== null) {
+		const bridge = RENDERER_REGION_DOM_OWNERS.get(current);
+		if (bridge !== undefined && bridge.active) return bridge;
+		current = current.parentBlock;
+	}
+	return null;
+}
+
+function rendererRegionTryHandler(block: Block | null): ((error: unknown) => void) | null {
+	const bridge = rendererRegionOwnerForBlock(block);
+	if (bridge === null) return null;
+	return (error) => {
+		if (!bridge.routeError(error)) throw error;
+	};
+}
+
+function rendererRegionSuspenseHandler(
+	block: Block | null,
+): ((thenable: PromiseLike<unknown>) => void) | null {
+	const bridge = rendererRegionOwnerForBlock(block);
+	if (bridge === null) return null;
+	return (thenable) => {
+		if (!bridge.routeSuspense(thenable)) throw new SuspenseException(thenable);
+	};
+}
+
+/**
+ * Compiler ABI for a DOM component materialized from a reverse renderer region.
+ * The bridge is deliberately attached only to the owning DOM root; normal DOM
+ * blocks retain no renderer fields or dispatch branches.
+ */
+export function bindRendererRegionOwner(props: unknown): void {
+	const bridge = (props as any)?.[RENDERER_REGION_OWNER] as RendererRegionOwnerBridge | undefined;
+	if (bridge === undefined) {
+		throw new Error('A renderer-owned DOM region is missing its universal owner bridge.');
+	}
+	if (CURRENT_BLOCK === null || CURRENT_SCOPE === null) {
+		throw new Error('bindRendererRegionOwner() must run while a DOM component is rendering.');
+	}
+	if (
+		CURRENT_BLOCK.kind !== 'root' ||
+		CURRENT_BLOCK.parentBlock !== null ||
+		CURRENT_SCOPE !== CURRENT_BLOCK
+	) {
+		throw new Error(
+			'bindRendererRegionOwner() must be the first call in a renderer-owned DOM root component.',
+		);
+	}
+	const root = CURRENT_BLOCK;
+	const disposeRoot = DOM_ROOT_DISPOSERS.get(root);
+	if (disposeRoot === undefined) {
+		throw new Error('A renderer-owned DOM region requires a live DOM root.');
+	}
+	const previous = RENDERER_REGION_DOM_BINDINGS.get(root);
+	if (previous?.bridge === bridge) return;
+	// A distinct callback avoids deleting a newly-registered disposer when two
+	// successive descriptor bridges share one committed lifecycle cell.
+	const dispose = () => disposeRoot();
+	const release = bridge.registerDispose(dispose);
+	previous?.release();
+	const binding = { bridge, release };
+	RENDERER_REGION_DOM_BINDINGS.set(root, binding);
+	RENDERER_REGION_DOM_OWNERS.set(root, bridge);
+	root.$$ctxCache?.clear();
+	if (previous === undefined) {
+		root.cleanups.push(() => {
+			const current = RENDERER_REGION_DOM_BINDINGS.get(root);
+			if (current === undefined) return;
+			current.release();
+			RENDERER_REGION_DOM_BINDINGS.delete(root);
+			RENDERER_REGION_DOM_OWNERS.delete(root);
+		});
+	}
+}
+
+function recordContextDependency(block: Block | null, context: Context<any>): void {
+	if (block === null || !block.memoInChain) return;
+	(block.$$ctxDirect ??= new Map()).set(context, context.$$version);
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		if ((current.body as any)?.__memo === true || current.$$implicitBail === true) {
+			(current.$$ctxReads ??= new Map()).set(context, context.$$version);
+		}
+	}
+}
+
+function readContextFrom<T>(reader: Scope | null, block: Block | null, context: Context<T>): T {
+	if (reader !== null && reader.$$ctxCache !== null) {
+		const hit = reader.$$ctxCache.get(context);
+		if (hit !== undefined) {
+			if (hit === DEFAULT_CTX) {
+				const bridge = rendererRegionOwnerForBlock(block);
+				return bridge === null ? context.defaultValue : bridge.readContext(context);
+			}
+			return (hit as Scope).$$ctxValues!.get(context) as T;
+		}
+	}
+
+	let scope: Scope | null = reader;
+	while (scope !== null) {
+		const values = scope.$$ctxValues;
+		if (values !== null && values.has(context)) {
+			if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, scope);
+			return values.get(context) as T;
+		}
+		scope = scope.parent;
+	}
+	let current = block?.parentBlock ?? null;
+	while (current !== null) {
+		const values = current.$$ctxValues;
+		if (values !== null && values.has(context)) {
+			if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, current);
+			return values.get(context) as T;
+		}
+		current = current.parentBlock;
+	}
+	const bridge = rendererRegionOwnerForBlock(block);
+	if (bridge !== null) return bridge.readContext(context);
+	if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, DEFAULT_CTX);
+	return context.defaultValue;
+}
+
+/** @internal Live context reader rooted at a captured DOM boundary scope. */
+export function readContextFromScope<T>(scope: Scope, context: Context<T>): T {
+	recordContextDependency(scope.block, context);
+	return readContextFrom(scope, scope.block, context);
+}
+
 function useContextInternal<T>(context: Context<T>): T {
 	// Record the context dependency on every enclosing memo() block, with the
 	// version read. The push-cascade re-renders a Provider's subtree top-down;
@@ -4465,60 +4623,8 @@ function useContextInternal<T>(context: Context<T>): T {
 	// would stamp nothing. `memoInChain` is precomputed at block creation, so the
 	// common no-memo tree pays a single boolean test instead of an ancestor walk
 	// per `use()` call.
-	if (CURRENT_BLOCK !== null && CURRENT_BLOCK.memoInChain) {
-		// DIRECT read: the block whose render this read happened in (its own body,
-		// or an inline lite descendant sharing the block) must re-run when this
-		// context changes — it can't be skipped past.
-		(CURRENT_BLOCK.$$ctxDirect ??= new Map()).set(context, context.$$version);
-		// TRANSITIVE: stamp every memo (or implicit-bail-armed) ancestor so the
-		// bailout knows a consumer lives below it and descends instead of skipping.
-		for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
-			if ((b.body as any)?.__memo === true || b.$$implicitBail === true) {
-				(b.$$ctxReads ??= new Map()).set(context, context.$$version);
-			}
-		}
-	}
-	// Fast path: a prior read from this consumer already resolved the provider.
-	// The (consumer → provider) mapping is invariant for the consumer's lifetime
-	// (see Scope.$$ctxCache), so re-read the live value straight from the cached
-	// scope and skip the ancestor walk entirely.
-	const reader = CURRENT_SCOPE;
-	if (reader !== null && reader.$$ctxCache !== null) {
-		const hit = reader.$$ctxCache.get(context);
-		if (hit !== undefined) {
-			if (hit === DEFAULT_CTX) return context.defaultValue;
-			// The cached resolver is always a live ancestor (resolution walks up;
-			// you can't unmount an ancestor while a descendant renders) and a
-			// provider scope's $$ctxValues retains its context for life (ProviderBody
-			// only `.set`s — never deletes or re-nulls). So the map and key are
-			// guaranteed present; read the live value with no recheck. A structural
-			// change that could move a consumer's provider also re-mounts the
-			// consumer (fresh cache), so a stale resolver can't be observed — see the
-			// "provider remounts under a consumer" regression test.
-			return (hit as Scope).$$ctxValues!.get(context) as T;
-		}
-	}
-
-	let s: Scope | null = reader;
-	while (s !== null) {
-		const m = s.$$ctxValues;
-		if (m !== null && m.has(context)) {
-			if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, s);
-			return m.get(context) as T;
-		}
-		s = s.parent;
-	}
-	let b: Block | null = CURRENT_BLOCK ? CURRENT_BLOCK.parentBlock : null;
-	while (b !== null) {
-		const m = b.$$ctxValues;
-		if (m !== null && m.has(context)) {
-			if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, b);
-			return m.get(context) as T;
-		}
-		b = b.parentBlock;
-	}
-	if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, DEFAULT_CTX);
-	return context.defaultValue;
+	recordContextDependency(CURRENT_BLOCK, context);
+	return readContextFrom(CURRENT_SCOPE, CURRENT_BLOCK, context);
 }
 
 // ---------------------------------------------------------------------------
@@ -7516,6 +7622,13 @@ const DISCRETE_EVENTS = new Set<string>([
  */
 let _dispatchDepth = 0;
 
+// Capture and bubble delegation use separate native root listeners, but a
+// bubbling event is one discrete update window. When the capture listener can
+// hand off to a registered bubble listener, that listener owns the synchronous
+// flush. The microtask is an unstarvable fallback for a descendant native
+// listener stopping propagation before the event returns to the root.
+let _captureFlushFallbackScheduled = false;
+
 // Stamps marking a native event whose delegated walk has already run, per phase. A
 // single native event can reach more than one delegation listener when targets nest —
 // a portal target inside a root, nested roots, or overlapping portal targets. Each
@@ -7615,6 +7728,20 @@ function maybeFlushDiscrete(type: string): void {
 	// edit (no onInput, or an Object.is-equal setState) schedules nothing and
 	// is exactly the case that must snap back (React's restoreControlledState).
 	if (pendingRestores.length > 0) restoreControlledStates();
+}
+
+function finishCaptureDispatch(event: Event): void {
+	const type = event.type;
+	if (!event.bubbles || event.cancelBubble || !_delegated.has(type)) {
+		maybeFlushDiscrete(type);
+		return;
+	}
+	if (!DISCRETE_EVENTS.has(type) || _captureFlushFallbackScheduled) return;
+	_captureFlushFallbackScheduled = true;
+	queueMicrotask(() => {
+		_captureFlushFallbackScheduled = false;
+		maybeFlushDiscrete(type);
+	});
 }
 
 function dispatchDelegated(event: Event): void {
@@ -7725,7 +7852,7 @@ function dispatchDelegatedCapture(event: Event): void {
 		clearCurrentTarget(event);
 		if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH--;
 		_dispatchDepth--;
-		maybeFlushDiscrete(event.type);
+		finishCaptureDispatch(event);
 	}
 }
 
@@ -8097,6 +8224,15 @@ const RESTORE_EVENTS = /* @__PURE__ */ new Set(RESTORE_EVENT_LIST);
 // dedupe: one event targets one element; nesting stays single-digit.
 let pendingRestores: Element[] = [];
 let restoreMicrotaskScheduled = false;
+
+// A native select choice emits `input` immediately followed by `change`. Octane
+// exposes native onChange, so restoring the controlled selection at the end of
+// the first dispatch would make the second handler observe the old value. Hold
+// select-input restores until the current task's native event pair completes.
+// The microtask still runs before the browser's next task, preserving the
+// controlled contract when no change event or accepting handler follows.
+let pendingSelectInputRestores: Element[] = [];
+let selectInputRestoreScheduled = false;
 
 // Commit-deferred controlled work, drained at the HEAD of commitEffects:
 //  - select re-projection: compiled binding mounts run BEFORE the same
@@ -8656,6 +8792,19 @@ function maybeEnqueueRestore(event: Event): void {
 	// (see the RESTORE_EVENT_LIST comment: restoring after the click flush
 	// would revert the toggle before the native handlers run).
 	if (event.type === 'click') return;
+	if (event.type === 'input' && t.localName === 'select') {
+		if (pendingSelectInputRestores.indexOf(t) === -1) pendingSelectInputRestores.push(t);
+		if (!selectInputRestoreScheduled) {
+			selectInputRestoreScheduled = true;
+			queueMicrotask(() => {
+				selectInputRestoreScheduled = false;
+				const list = pendingSelectInputRestores;
+				pendingSelectInputRestores = [];
+				for (let i = 0; i < list.length; i++) restoreControlledElement(list[i]);
+			});
+		}
+		return;
+	}
 	if (pendingRestores.indexOf(t) === -1) pendingRestores.push(t);
 }
 
@@ -13817,13 +13966,14 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 
 /** Walk Block.parentBlock chain looking for a `$$tryHandler` registration. */
 function findTryHandler(block: Block | null): ((err: any) => void) | null {
+	const origin = block;
 	let b: Block | null = block;
 	while (b) {
 		const h = (b as any).$$tryHandler;
 		if (h) return h;
 		b = b.parentBlock;
 	}
-	return null;
+	return rendererRegionTryHandler(origin);
 }
 
 /**
@@ -13842,6 +13992,11 @@ function handleRenderError(block: Block, err: any): void {
 				return;
 			}
 			b = b.parentBlock;
+		}
+		const external = rendererRegionSuspenseHandler(block);
+		if (external !== null) {
+			external(err.thenable);
+			return;
 		}
 		throw err;
 	}
@@ -16390,8 +16545,21 @@ function makeRoot(
 	outputHandler: OutputHandler | null,
 	ownerToken: object | null,
 ): Root {
+	let root!: Root;
 	let unmounted = false;
-	return {
+	const registerRootDisposer = (block: Block): void => {
+		let disposing = false;
+		DOM_ROOT_DISPOSERS.set(block, () => {
+			if (disposing || rootBlock !== block) return;
+			disposing = true;
+			try {
+				root.unmount();
+			} finally {
+				disposing = false;
+			}
+		});
+	};
+	root = {
 		render(bodyOrElement: unknown, props?: any) {
 			if (unmounted) throw new Error('Cannot update an unmounted root.');
 			// React-style `render(<App foo={x}/>)` arrives as an element descriptor:
@@ -16438,6 +16606,7 @@ function makeRoot(
 				return;
 			}
 			if (rootBlock) {
+				DOM_ROOT_DISPOSERS.delete(rootBlock);
 				unmountBlock(rootBlock);
 				rootBlock = null;
 				currentBody = null;
@@ -16458,6 +16627,7 @@ function makeRoot(
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileTrackComponent(rootBlock, body);
 			rootBlock.idState = idState;
+			registerRootDisposer(rootBlock);
 			currentBody = body;
 			currentKey = nextKey;
 			// React parity: render() inside a transition never commits synchronously
@@ -16474,7 +16644,14 @@ function makeRoot(
 				}
 				return;
 			}
-			renderBlock(rootBlock);
+			const mountedRoot = rootBlock;
+			try {
+				renderBlock(mountedRoot);
+			} catch (error) {
+				handleRenderError(mountedRoot, error);
+				root.unmount();
+				return;
+			}
 			// First render commits effects on next microtask flush.
 			if (!syncFlush && !scheduled) {
 				scheduled = true;
@@ -16496,6 +16673,7 @@ function makeRoot(
 			unmounted = true;
 			try {
 				if (rootBlock) {
+					DOM_ROOT_DISPOSERS.delete(rootBlock);
 					// Skip the per-Block DOM walk recursion (~3 removeChild ops × every
 					// Block in the tree). Run cleanups + scope teardown only, then clear
 					// the container in one shot. Portals self-detach during the recursive
@@ -16518,6 +16696,8 @@ function makeRoot(
 			}
 		},
 	};
+	if (rootBlock !== null) registerRootDisposer(rootBlock);
+	return root;
 }
 
 function createRootWithOutputHandler(
