@@ -2,10 +2,11 @@
   "upstream": { "package": "@dnd-kit/react", "version": "0.5.0" },
   "surface": "Complete modern dnd-kit React-adapter surface: DragDropProvider, DragOverlay, useDraggable/useDroppable, manager/monitor/operation hooks, PointerSensor/KeyboardSensor re-exports, the public signal-hook utilities, useSortable, and all four upstream entry points.",
   "divergences": [
-    "DragOverlay distinguishes octane compiled children blocks from function render props; ordinary typed usage is behaviorally equivalent."
+    "DragOverlay distinguishes octane compiled children blocks from function render props; ordinary typed usage is behaviorally equivalent.",
+    "useSortable retains the upstream keyboard plugin by default but omits OptimisticSortingPlugin because moving one host element before application state commits can split an Octane keyed DOM range; explicit plugin arrays remain authoritative."
   ],
   "ssr": "Static SSR and hydration are covered; DOM plugins initialize only after client refs register.",
-  "verified": "2026-07-13",
+  "verified": "2026-07-15",
   "notes": [
     "Targets the modern @dnd-kit/react API. The legacy @dnd-kit/core 6.x API is intentionally out of scope."
   ]
