@@ -123,6 +123,18 @@ export function Header() @{
 			.nav-right {
 				gap: 0.25rem;
 			}
+			.nav-left,
+			.nav-right {
+				display: flex;
+				align-items: center;
+				min-width: 0;
+			}
+			.nav-left {
+				gap: 1.5rem;
+			}
+			.nav-right {
+				gap: 0.25rem;
+			}
 			.topnav-inner :global(a.wordmark) {
 				display: inline-flex;
 				align-items: center;
