@@ -150,6 +150,7 @@ function configSignature(config) {
 		preHydrate: config.router.preHydrate,
 		rootBoundary: config.rootBoundary,
 		server: config.server,
+		compiler: { renderers: config.compiler.renderers.signature },
 	});
 }
 
@@ -489,6 +490,7 @@ export function pluginOctane(inlineOptions = {}) {
 							? null
 							: { parallelUse: inlineOptions.parallelUse }),
 						...(inlineOptions.exclude === undefined ? null : { exclude: inlineOptions.exclude }),
+						renderers: initialConfig?.compiler.renderers,
 					}),
 				);
 				config.resolve ??= {};

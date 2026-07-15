@@ -2,6 +2,29 @@ import type { Compiler, RspackPluginInstance } from '@rspack/core';
 
 export type OctaneRspackEnvironment = 'client' | 'server';
 
+export interface OctaneRendererRuleOptions {
+	/** Glob or globs matched against canonical project-relative module IDs. */
+	include: string | readonly string[];
+	/** Optional glob or globs that remove files from this rule. */
+	exclude?: string | readonly string[];
+	/** Renderer alias declared in `registry`, or the built-in `dom` alias. */
+	renderer: string;
+}
+
+export type OctaneRendererRegistryEntry =
+	| string
+	| {
+			module: string;
+			target?: 'dom' | 'universal';
+	  };
+
+/** @experimental Declarative renderer selection shared with other Octane compilers. */
+export interface OctaneRendererConfigOptions {
+	registry?: Readonly<Record<string, OctaneRendererRegistryEntry>>;
+	default?: string;
+	rules?: readonly OctaneRendererRuleOptions[];
+}
+
 export interface OctaneRspackLoaderOptions {
 	/** Project root used to canonicalize module IDs and discover package manifests. */
 	root?: string;
@@ -17,6 +40,8 @@ export interface OctaneRspackLoaderOptions {
 	parallelUse?: boolean;
 	/** Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. */
 	exclude?: string[];
+	/** @experimental Renderer registry and ordered per-file selection rules. */
+	renderers?: OctaneRendererConfigOptions;
 }
 
 export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
