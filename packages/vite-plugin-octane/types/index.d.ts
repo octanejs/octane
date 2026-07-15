@@ -1,6 +1,7 @@
 import type { Plugin, ViteDevServer } from 'vite';
 import type {
 	ConfigModuleRunner,
+	ExperimentalRendererConfigOptions,
 	LoadedOctaneConfig,
 	OctaneConfigOptions,
 	ResolvedOctaneConfig,
@@ -18,6 +19,8 @@ export interface OctanePluginOptions {
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.
 	 */
 	exclude?: string[];
+	/** @experimental Inline renderer selection until app-config loading moves before transforms. */
+	renderers?: ExperimentalRendererConfigOptions;
 }
 
 /** The Octane compiler plugin plus Vite app/metaframework integration. */

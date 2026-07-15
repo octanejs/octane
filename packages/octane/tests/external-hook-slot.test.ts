@@ -193,6 +193,27 @@ describe('vite plugin gate routing', () => {
 		expect(config.resolve.dedupe).toContain('octane');
 	});
 
+	it('forwards declarative renderer selection through the direct Vite adapter', () => {
+		const rendererPlugin = octane({
+			hmr: false,
+			renderers: {
+				registry: { object: '/src/object-renderer.js' },
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		(rendererPlugin.config as any)({ root: appRoot });
+		const transformed = (rendererPlugin.transform as any).call(
+			{},
+			'export function Scene() @{ <node /> }',
+			join(appRoot, 'src/Scene.object.tsrx'),
+		);
+
+		expect(transformed?.code).toMatch(/from ["']\/src\/object-renderer\.js["']/);
+		expect(() => octane({ renderers: { default: 'missing' } })).toThrow(
+			/default references unknown renderer "missing"/,
+		);
+	});
+
 	it('protects the profiling build constant throughout Vite config resolution', () => {
 		const profiled = octane({ profile: true });
 		expect(() =>

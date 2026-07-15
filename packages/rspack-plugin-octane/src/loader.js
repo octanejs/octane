@@ -61,6 +61,7 @@ export default function octaneLoader(source, inputSourceMap) {
 			profile,
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
 			...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
+			...(options.renderers === undefined ? null : { renderers: options.renderers }),
 		});
 		const id = this.resource ?? this.resourcePath;
 		const result = compiler.transform(String(source), id, {

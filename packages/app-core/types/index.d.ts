@@ -177,6 +177,62 @@ export interface RootBoundaryOptions {
 	catch?: RenderRouteEntry;
 }
 
+/**
+ * @experimental Universal renderer configuration is an internal-first API and
+ * may change while the first non-DOM renderer is validated.
+ */
+export interface ExperimentalRendererRuleOptions {
+	/** Glob or globs matched against canonical project-relative module IDs. */
+	include: string | readonly string[];
+	/** Optional glob or globs that remove files from this rule. */
+	exclude?: string | readonly string[];
+	/** Renderer alias declared in `registry`, or the built-in `dom` alias. */
+	renderer: string;
+}
+
+/**
+ * @experimental A string selects the universal compiler target. The object
+ * form carries explicit target metadata for normalized configs and future
+ * renderer integrations. The `dom` alias itself is reserved by Octane.
+ */
+export type ExperimentalRendererRegistryEntry =
+	| string
+	| {
+			module: string;
+			target?: 'dom' | 'universal';
+	  };
+
+/** @experimental See {@link ExperimentalRendererRuleOptions}. */
+export interface ExperimentalRendererConfigOptions {
+	/** Renderer aliases mapped to package/project-root module IDs or explicit descriptors. */
+	registry?: Record<string, ExperimentalRendererRegistryEntry>;
+	/** Renderer used when no rule matches. @default 'dom' */
+	default?: string;
+	/** Ordered filename rules. The first matching rule wins. */
+	rules?: readonly ExperimentalRendererRuleOptions[];
+}
+
+/** @experimental Canonical form used by compiler integrations and cache keys. */
+export interface ExperimentalResolvedRendererRule {
+	readonly include: readonly string[];
+	readonly exclude: readonly string[];
+	readonly renderer: string;
+}
+
+/** @experimental Canonical form used by compiler integrations and cache keys. */
+export interface ExperimentalResolvedRendererRegistryEntry {
+	readonly module: string;
+	readonly target: 'dom' | 'universal';
+}
+
+/** @experimental Canonical form used by compiler integrations and cache keys. */
+export interface ExperimentalResolvedRendererConfig {
+	readonly registry: Readonly<Record<string, ExperimentalResolvedRendererRegistryEntry>>;
+	readonly default: string;
+	readonly rules: readonly ExperimentalResolvedRendererRule[];
+	readonly signature: string;
+}
+
 export interface OctaneConfigOptions {
 	build?: {
 		/** Output directory for the production build. @default 'dist' */
@@ -185,6 +241,10 @@ export interface OctaneConfigOptions {
 		target?: BuildTarget;
 	};
 	adapter?: OctaneAdapter;
+	/** @experimental Compiler-owned configuration shared by all bundler integrations. */
+	compiler?: {
+		renderers?: ExperimentalRendererConfigOptions;
+	};
 	router?: {
 		routes: Route[];
 		/**
@@ -234,6 +294,9 @@ export interface ResolvedOctaneConfig {
 		target?: BuildTarget;
 	};
 	adapter?: OctaneAdapter;
+	compiler: {
+		renderers: ExperimentalResolvedRendererConfig;
+	};
 	router: {
 		routes: Route[];
 		preHydrate?: string;
