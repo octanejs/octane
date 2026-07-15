@@ -594,13 +594,17 @@ export function RefEffectDemo() @{
 				return;
 			}
 
+			// Capture phase + stopPropagation so this page-local shortcut wins over the
+			// global docs-search `/` handler (which listens on document during bubble
+			// and would otherwise open the palette and steal focus from this input).
 			event.preventDefault();
+			event.stopPropagation();
 			inputRef.current?.focus();
 			setShortcutUsed(true);
 		};
 
-		window.addEventListener('keydown', focusSearch);
-		return () => window.removeEventListener('keydown', focusSearch);
+		window.addEventListener('keydown', focusSearch, true);
+		return () => window.removeEventListener('keydown', focusSearch, true);
 	});
 
 	<DemoFrame

@@ -72,7 +72,8 @@ describe('website routes', () => {
 		const { container } = await renderRoute('/');
 
 		expect(container.querySelector('main .home')).toBeTruthy();
-		expect(container.querySelector('.topnav-inner.docs-width')).toBeNull();
+		// The redesign uses one full-width top bar across every route (no docs-only width).
+		expect(container.querySelector('.topnav-inner')).toBeTruthy();
 		expect(container.querySelector('.hero h1')?.textContent?.trim()).toBeTruthy();
 		expect(container.textContent).toContain('No hand-maintained dependency arrays');
 		const heroActions = container.querySelector('.hero-actions')!;
@@ -92,8 +93,20 @@ describe('website routes', () => {
 		}
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
-		// The decision section stays concise, accessible and ahead of the evidence it frames.
+		// The proven stat strip backs the feature claims with three headline numbers.
+		const proven = container.querySelector<HTMLElement>('section.proven')!;
+		expect(proven).toBeTruthy();
+		const provenStats = Array.from(proven.querySelectorAll('.proven-stat'));
+		expect(provenStats).toHaveLength(3);
+		for (const stat of provenStats) {
+			expect(stat.querySelector('.proven-number')?.textContent?.trim()).toBeTruthy();
+			expect(stat.querySelector('.proven-label')?.textContent?.trim()).toBeTruthy();
+		}
+
+		// The decision section frames the evidence below with two questions and a coda
+		// that links out to what TSRX adds.
 		const why = container.querySelector<HTMLElement>('section.why[aria-labelledby="why-heading"]')!;
+		expect(why).toBeTruthy();
 		expect(why.querySelector('#why-heading')?.textContent?.trim()).toBe(
 			'Fast should be how your app feels. Not a new way you have to think.',
 		);
@@ -104,29 +117,47 @@ describe('website routes', () => {
 			'Why should someone adopt Octane today?',
 			"Why isn't Octane's rendering powered by signals?",
 		]);
-		expect(why.querySelectorAll('.why-answer')).toHaveLength(3);
 		expect(why.querySelector('.why-coda')?.textContent?.trim()).toBeTruthy();
-		expect(why.querySelector('.why-list')).toBeNull();
 		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
-		const bench = container.querySelector<HTMLElement>('section.bench')!;
-		const homeSections = Array.from(container.querySelectorAll('main .home > section'));
-		expect(homeSections.indexOf(why)).toBeLessThan(homeSections.indexOf(bench));
 
-		// The checked-in benchmark summary reaches the chart and table renderers.
-		const summary = container.querySelector('figure.bench-card');
-		expect(summary?.querySelector('figcaption')).toBeTruthy();
-		expect(summary?.querySelector('svg.home-bench-chart')).toBeTruthy();
-		expect(summary?.querySelectorAll('.visx-bar')).toHaveLength(expectedBarCount(HOME_SUMMARY));
-		expect(summary?.querySelector('.recharts-wrapper')).toBeNull();
-		expect(summary?.querySelector('details table')).toBeTruthy();
+		// The home composes its sections in a fixed order: hero, features, proven, why,
+		// explorer. (Each section carries a compiler-added scoped class after its
+		// semantic one.)
+		const homeSections = Array.from(container.querySelectorAll('main .home > section')).map(
+			(section) => section.classList[0],
+		);
+		expect(homeSections).toEqual(['hero', 'features', 'proven', 'why', 'explorer']);
 
+		// The home page stages the interactive benchmark explorer over the checked-in
+		// ×-vs-Octane summary (HOME_SUMMARY). The explorer's own interactions live in
+		// benchmark-explorer.test.ts; here assert the section composes and the summary
+		// reaches the mounted views.
+		const explorer = container.querySelector('section.explorer')!;
+		expect(explorer).toBeTruthy();
+		expect(explorer.querySelector('#explorer-heading')?.textContent?.trim()).toBeTruthy();
+		expect(findLink(explorer, '/benchmarks')).toBeTruthy();
+		const bx = explorer.querySelector('.bx')!;
+		expect(bx).toBeTruthy();
+		// Interactive views are mount-gated: the SSR fallback table swaps for the bar
+		// chart + heatmap on mount. Wait for the plot, then assert every suite row of
+		// the summary reaches the heatmap.
+		await waitFor(() => {
+			if (!bx.querySelector('.bx-plot')) throw new Error('explorer not mounted');
+		});
+		expect(bx.querySelectorAll('.bx-heat tbody tr')).toHaveLength(HOME_SUMMARY.rows.length);
+
+		// Section links sit with the wordmark on the left; search and the social
+		// icons form the right cluster.
 		const nav = container.querySelector('.navlinks')!;
 		for (const href of ['/docs', '/benchmarks', '/llms.txt']) {
 			expect(findLink(nav, href)).toBeTruthy();
 		}
 		expect(findLink(nav, '/view-transitions')).toBeUndefined();
-		expect(findLink(nav, 'https://github.com/octanejs/octane')).toBeTruthy();
-		expect(findLink(nav, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
+
+		const navRight = container.querySelector('.nav-right')!;
+		expect(navRight.querySelector('.search-trigger')).toBeTruthy();
+		expect(findLink(navRight, 'https://github.com/octanejs/octane')).toBeTruthy();
+		expect(findLink(navRight, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
 	});
 
 	it('/benchmarks renders every configured benchmark card', async () => {
@@ -165,7 +196,8 @@ describe('website routes', () => {
 	it('/docs renders the configured default document', async () => {
 		const { container } = await renderRoute('/docs');
 		expect(container.querySelector('.prose h1')?.textContent?.trim()).toBe(defaultDoc.title);
-		expect(container.querySelector('.topnav-inner.docs-width')).toBeTruthy();
+		// Docs shares the same full-width top bar as every other route.
+		expect(container.querySelector('.topnav-inner')).toBeTruthy();
 	});
 
 	it.each(docs)('/docs/$slug renders its MDX document and active sidebar link', async (doc) => {
