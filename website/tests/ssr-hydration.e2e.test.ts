@@ -225,41 +225,19 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		},
 	);
 
-	it('the homepage Visx chart keeps its server geometry when scrolled into view', async () => {
+	it('the homepage benchmark explorer hydrates its SSR fallback into the interactive views', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/');
 		try {
-			const chart = page.locator('svg.home-bench-chart');
-			await chart.waitFor();
-			const serverChart = await chart.elementHandle();
-			expect(serverChart).toBeTruthy();
-			const geometry = await chart.evaluate((svg) => ({
-				width: svg.getAttribute('width'),
-				height: svg.getAttribute('height'),
-				viewBox: svg.getAttribute('viewBox'),
-				bars: svg.querySelectorAll('.visx-bar').length,
-			}));
+			const explorer = page.locator('section.explorer .bx');
+			await explorer.waitFor();
 
-			// This visibility transition used to replace the SSR SVG with a denser
-			// Recharts chart after an IntersectionObserver-driven lazy import.
-			await chart.scrollIntoViewIfNeeded();
-			await page.waitForTimeout(750);
+			// SSR ships the accessible fallback data table; hydration adopts it in
+			// place (identical DOM, no mismatch), then the mount effect swaps in the
+			// interactive bar chart + heatmap. Wait for the plot to prove the swap ran.
+			await page.locator('.bx-plot').waitFor();
+			expect(await page.locator('.bx-heat').count()).toBe(1);
+			expect(await page.locator('.bx-fallback-table').count()).toBe(0);
 
-			expect(await page.locator('.recharts-wrapper').count()).toBe(0);
-			expect(await page.locator('svg.home-bench-chart').count()).toBe(1);
-			expect(
-				await page.evaluate(
-					(original) => document.querySelector('svg.home-bench-chart') === original,
-					serverChart,
-				),
-			).toBe(true);
-			expect(
-				await chart.evaluate((svg) => ({
-					width: svg.getAttribute('width'),
-					height: svg.getAttribute('height'),
-					viewBox: svg.getAttribute('viewBox'),
-					bars: svg.querySelectorAll('.visx-bar').length,
-				})),
-			).toEqual(geometry);
 			const real = errors.filter((error) => !error.includes('Failed to load resource'));
 			expect(real).toEqual([]);
 		} finally {

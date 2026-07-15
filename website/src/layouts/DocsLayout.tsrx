@@ -1,13 +1,19 @@
 // Docs section shell: sidebar of documents (from the registry) + the routed
 // document via <Outlet/>.
-import { Link, Outlet } from '@octanejs/tanstack-router';
-import { docGroups } from '../content/docs.ts';
+import { Link, Outlet, useParams } from '@octanejs/tanstack-router';
+import { docGroups, defaultDoc } from '../content/docs.ts';
 
 export function DocsLayout() @{
 	const closeMobileNavigation = (event: Event) => {
 		const link = event.currentTarget as HTMLAnchorElement;
 		link.closest('details')?.removeAttribute('open');
 	};
+
+	// The Link's own data-status covers `/docs/$slug`, but the bare `/docs` index
+	// renders the default doc (quick-start) without a slug in the URL — so no link
+	// matches and the sidebar reads as inactive. Mark the default doc active there.
+	const params = useParams({ strict: false }) as { slug?: string };
+	const indexActive = (slug: string) => !params.slug && slug === defaultDoc.slug;
 
 	<div class="docs">
 		<aside class="sidebar">
@@ -22,7 +28,11 @@ export function DocsLayout() @{
 							<ul class="sidebar-list">
 								@for (const doc of group.docs; key doc.slug) {
 									<li>
-										<Link to="/docs/$slug" params={{ slug: doc.slug }} class="sidebar-link">
+										<Link
+											to="/docs/$slug"
+											params={{ slug: doc.slug }}
+											class={['sidebar-link', indexActive(doc.slug) && 'is-active']}
+										>
 											{doc.title as string}
 										</Link>
 									</li>
@@ -50,7 +60,7 @@ export function DocsLayout() @{
 											<Link
 												to="/docs/$slug"
 												params={{ slug: doc.slug }}
-												class="sidebar-link"
+												class={['sidebar-link', indexActive(doc.slug) && 'is-active']}
 												onClick={closeMobileNavigation}
 											>
 												{doc.title as string}
@@ -187,7 +197,8 @@ export function DocsLayout() @{
 				background: rgba(255, 255, 255, 0.06);
 				text-decoration: none;
 			}
-			.sidebar-list :global(a.sidebar-link[data-status='active']) {
+			.sidebar-list :global(a.sidebar-link[data-status='active']),
+			.sidebar-list :global(a.sidebar-link.is-active) {
 				color: var(--accent-text);
 				background: rgba(255, 65, 90, 0.14);
 			}

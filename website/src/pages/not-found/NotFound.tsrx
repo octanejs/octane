@@ -8,7 +8,7 @@ export function NotFound() @{
 		<Link to="/" class="notfound-home">Back to the homepage</Link>
 		<style>
 			.notfound {
-				max-width: 1200px;
+				max-width: 1420px;
 				margin: 0 auto;
 				padding: 6rem 1.5rem;
 				text-align: center;

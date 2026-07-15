@@ -56,9 +56,13 @@ describe('built SSR handler', () => {
 		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
 		expect(html).toContain('<main');
 		expect(classCount(html, 'home')).toBeGreaterThan(0);
-		// The homepage ships the real Visx SVG, not an empty client chart shell.
-		expect(classCount(html, 'home-bench-chart')).toBe(1);
-		expect(classCount(html, 'visx-bar')).toBeGreaterThan(0);
+		// The home benchmark explorer server-renders its accessible fallback data
+		// table (the interactive bar chart + heatmap swap in on mount); no client-only
+		// chart shell or charting-library markup is emitted server-side, so no-JS and
+		// crawlers still get every number.
+		expect(classCount(html, 'bx-fallback-table')).toBe(1);
+		expect(classCount(html, 'visx-bar')).toBe(0);
+		expect(classCount(html, 'home-bench-chart')).toBe(0);
 		expect(classCount(html, 'deferred-bench')).toBe(0);
 		expect(classCount(html, 'bench-plot-shell')).toBe(0);
 		// Hydration wiring: the data script names the app entry + preHydrate hook,

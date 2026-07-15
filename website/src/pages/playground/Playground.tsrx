@@ -18,13 +18,13 @@
 // on the consent overlay. Your own edits from the default sources auto-run as
 // before.
 import { useState, useRef, useEffect } from 'octane';
-import type { PlaygroundLang } from '../lib/playground.ts';
+import type { PlaygroundLang } from '../../lib/playground.ts';
 import {
 	decodePlaygroundHash,
 	encodePlaygroundHash,
 	MAX_PLAYGROUND_SOURCE_LENGTH,
 	PLAYGROUND_SOURCE_LIMIT_ERROR,
-} from '../lib/playground-hash.ts';
+} from '../../lib/playground-hash.ts';
 
 const HASH_DEBOUNCE_MS = 400;
 const COMPILE_DEBOUNCE_MS = 250;
@@ -79,8 +79,8 @@ export function Playground() @{
 					import('@codemirror/state'),
 					import('@codemirror/commands'),
 					import('@codemirror/view'),
-					import('../lib/shiki-codemirror.ts'),
-					import('../lib/playground.ts'),
+					import('../../lib/shiki-codemirror.ts'),
+					import('../../lib/playground.ts'),
 				]);
 			} catch (bootError) {
 				// A load failure after unmount (e.g. a test env torn down mid-import)
