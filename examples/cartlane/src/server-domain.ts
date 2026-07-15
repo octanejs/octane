@@ -5,7 +5,7 @@ import type {
 	FieldErrors,
 	OrderReceipt,
 } from './domain.ts';
-import { PRODUCTS } from './domain.ts';
+import { PRODUCTS, orderTotal } from './domain.ts';
 
 interface SavedOrder {
 	receipt: OrderReceipt;
@@ -102,14 +102,6 @@ function verifyCart(value: unknown): CartLine[] | null {
 	return lines;
 }
 
-function calculateTotal(lines: readonly CartLine[]): number {
-	const subtotal = lines.reduce((sum, line) => {
-		const product = PRODUCTS.find((candidate) => candidate.id === line.productId)!;
-		return sum + product.priceCents * line.quantity;
-	}, 0);
-	return subtotal + (subtotal >= 12000 || subtotal === 0 ? 0 : 600);
-}
-
 export async function commitOrder(value: unknown): Promise<CheckoutState> {
 	// This delay is deliberately deterministic so the browser can observe native
 	// form pending state and safely queue a second submit behind the first.
@@ -169,7 +161,7 @@ export async function commitOrder(value: unknown): Promise<CheckoutState> {
 		id: stableOrderId(request.idempotencyKey),
 		placedAt: '15 July 2026, 14:30',
 		lineCount,
-		totalCents: calculateTotal(verifiedLines),
+		totalCents: orderTotal(verifiedLines),
 		email: request.email,
 		deliveryLabel: `${request.city.trim()}, ${request.postalCode.trim().toUpperCase()}`,
 	};

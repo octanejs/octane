@@ -85,6 +85,16 @@ test('adopts a deep-linked product without losing pre-hydration quantity and add
 	).toBe(true);
 	await expect(quantity).toHaveValue('3');
 
+	await page.evaluate(() => {
+		history.pushState(null, '', '/products/field-notes');
+		window.dispatchEvent(new PopStateEvent('popstate'));
+	});
+	await expect(page.getByRole('heading', { name: 'Field notes folio', level: 1 })).toBeVisible();
+	await expect(page.locator('input[name="productId"]')).toHaveValue('field-notes');
+	await expect(quantity).toHaveValue('1');
+	await page.goBack();
+	await expect(page.getByRole('heading', { name: 'Arc task lamp', level: 1 })).toBeVisible();
+	await quantity.fill('3');
 	await quantity.focus();
 	await page.keyboard.press('Tab');
 	await expect(page.getByRole('button', { name: 'Add to basket' })).toBeFocused();
@@ -271,6 +281,9 @@ test('queues rapid native submits and idempotently resolves them to one order', 
 	await expect.poll(() => checkoutPosts).toBe(2);
 	await expect(page.getByText('Paid once').locator('..')).toContainText('£148');
 	const firstOrderId = await page.locator('[data-order-id]').getAttribute('data-order-id');
+	await page.goBack();
+	await expect(page).toHaveURL(/\/checkout$/);
+	await expect(page.getByRole('heading', { name: 'Your basket is empty.' })).toBeVisible();
 
 	// A completed key is rotated: a later genuine purchase in the same browser
 	// session must not be mistaken for a duplicate of the first order.

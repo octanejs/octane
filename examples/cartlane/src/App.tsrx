@@ -790,7 +790,10 @@ export function App(props) @{
 				const nextCheckoutKey = crypto.randomUUID();
 				sessionStorage.setItem(SESSION_STORAGE_KEY, nextCheckoutKey);
 				setCheckoutKey(nextCheckoutKey);
-				history.pushState(null, '', '/orders/' + result.order.id);
+				const orderPath = '/orders/' + result.order.id;
+				if (window.location.pathname !== orderPath) {
+					history.pushState(null, '', orderPath);
+				}
 				setRoute({ name: 'order', orderId: result.order.id });
 				window.scrollTo({ top: 0, behavior: 'instant' });
 			}
@@ -867,6 +870,7 @@ export function App(props) @{
 			/>
 		} @else if (route.name === 'product') {
 			<ProductDetail
+				key={route.productId}
 				product={getProduct(route.productId)}
 				navigate={navigate}
 				addToCart={addToCart}
