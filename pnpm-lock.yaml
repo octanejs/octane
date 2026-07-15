@@ -214,11 +214,11 @@ catalogs:
       specifier: ^6.9.1
       version: 6.9.1
     '@tsrx/core':
-      specifier: ^0.1.37
-      version: 0.1.37
+      specifier: ^0.1.40
+      version: 0.1.40
     '@tsrx/prettier-plugin':
-      specifier: ^0.3.95
-      version: 0.3.95
+      specifier: ^0.3.97
+      version: 0.3.97
     '@tsrx/react':
       specifier: ^0.2.37
       version: 0.2.37
@@ -618,7 +618,7 @@ importers:
         version: 2.31.0(@types/node@24.13.2)
       '@tsrx/prettier-plugin':
         specifier: catalog:default
-        version: 0.3.95(prettier@3.8.4)
+        version: 0.3.97(prettier@3.8.4)
       '@types/node':
         specifier: catalog:default
         version: 24.13.2
@@ -2878,7 +2878,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.1.37(patch_hash=0b7535578a1327e33019974cc015cbaafbd88bc4a1f60997c23bfb979cd7a081)
+        version: 0.1.40
       devalue:
         specifier: catalog:default
         version: 5.8.1
@@ -2909,7 +2909,7 @@ importers:
     devDependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.1.37(patch_hash=0b7535578a1327e33019974cc015cbaafbd88bc4a1f60997c23bfb979cd7a081)
+        version: 0.1.40
       '@types/node':
         specifier: catalog:default
         version: 24.13.2
@@ -3644,7 +3644,7 @@ importers:
         version: 3.23.0
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.1.37(patch_hash=0b7535578a1327e33019974cc015cbaafbd88bc4a1f60997c23bfb979cd7a081)
+        version: 0.1.40
       esrap:
         specifier: ^2.2.9
         version: 2.2.11
@@ -5655,11 +5655,11 @@ packages:
   '@tsrx/core@0.1.37':
     resolution: {integrity: sha512-slL2jcSqJ6nbsAA/dOAkp/1+QQiVViq54WilX7E/rJeBtFRMVBmmLM2q2HFLMu9IC1iJq8ch67fGsqmyYXsTBA==}
 
-  '@tsrx/core@0.1.38':
-    resolution: {integrity: sha512-yQRYnWEkFDflXBe62qkIqskf2yVrPvC8HmXZXvmrPYzIne5AGNFDVw4VdE0C8iRr2GTW9s7c97goee359c56+g==}
+  '@tsrx/core@0.1.40':
+    resolution: {integrity: sha512-JLvoVchSw3qVgrMj6hEPqhF4iojAasENLuyohWkKoF9k6Sk3nFR3puBE2++iL67g2RuvhQ7sLfKQg2VUxcdGUQ==}
 
-  '@tsrx/prettier-plugin@0.3.95':
-    resolution: {integrity: sha512-GjGaeDD2buU/bUNzOF14rsQhqklrHZAZ4TdULftuZdS8qpQMxiJu4XW9DbL7MC4DX0hia2PJhtnFXCzxZ1DSwg==}
+  '@tsrx/prettier-plugin@0.3.97':
+    resolution: {integrity: sha512-UwTBmM51FmY7drR2HNXugPQAE1fr7bQENKzdcQ0t/rMg6ssJ2Z//zpXwfnlyOa7gID7YoMkZ/2FBmKsWrzN9zg==}
     peerDependencies:
       prettier: '>=2.0.0'
 
@@ -11352,7 +11352,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/core@0.1.38':
+  '@tsrx/core@0.1.40':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
@@ -11367,9 +11367,9 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/prettier-plugin@0.3.95(prettier@3.8.4)':
+  '@tsrx/prettier-plugin@0.3.97(prettier@3.8.4)':
     dependencies:
-      '@tsrx/core': 0.1.38
+      '@tsrx/core': 0.1.40
       prettier: 3.8.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
