@@ -484,11 +484,11 @@ export function App() @{
 	}, [navigate, route.channel]);
 
 	const closeThread = useCallback(() => {
-		navigate({ channel: route.channel, threadId: null });
+		navigate({ channel: readRoute().channel, threadId: null });
 		requestAnimationFrame(
 			() => (threadReturnFocusRef.current ?? channelHeadingRef.current)?.focus(),
 		);
-	}, [navigate, route.channel]);
+	}, [navigate]);
 
 	const loadEarlier = useCallback(() => {
 		const first = messages[0];

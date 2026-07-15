@@ -74,6 +74,8 @@ test('adopts a deep-linked product without losing pre-hydration quantity and add
 	await page.goto('/products/arc-lamp?hydrateDelay=650', { waitUntil: 'domcontentloaded' });
 	await expect(page.getByRole('heading', { name: 'Arc task lamp', level: 1 })).toBeVisible();
 	await expect(page.locator('[data-hydrated="false"]')).toBeVisible();
+	const artworkLabel = page.locator('.product-detail .product-art__label');
+	await expect(artworkLabel).toHaveText('Cartlane / 01');
 	const quantity = page.getByRole('spinbutton', { name: 'Quantity' });
 	await quantity.fill('3');
 	await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
@@ -90,6 +92,7 @@ test('adopts a deep-linked product without losing pre-hydration quantity and add
 		window.dispatchEvent(new PopStateEvent('popstate'));
 	});
 	await expect(page.getByRole('heading', { name: 'Field notes folio', level: 1 })).toBeVisible();
+	await expect(artworkLabel).toHaveText('Cartlane / 02');
 	await expect(page.locator('input[name="productId"]')).toHaveValue('field-notes');
 	await expect(quantity).toHaveValue('1');
 	await page.goBack();

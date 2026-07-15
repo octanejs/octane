@@ -42,6 +42,22 @@ test('deep links across responsive channels, isolates thread drafts, and preserv
 	const threadDialog = page.getByRole('dialog', { name: 'Thread' });
 	await expect(threadDialog).toBeVisible();
 	await expect(page.getByRole('article', { name: 'Reply from Rowan Ellis' })).toBeVisible();
+	await page.evaluate(() => {
+		history.pushState(null, '', '/channels/design/thread/g-014');
+		window.dispatchEvent(new PopStateEvent('popstate'));
+	});
+	await expect(page).toHaveURL(/\/channels\/design\/thread\/g-014$/);
+	const designHeading = page.getByRole('heading', { name: '# design' });
+	await expect(designHeading).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(page).toHaveURL(/\/channels\/design$/);
+	await page.evaluate(() => {
+		history.pushState(null, '', '/channels/general/thread/g-014');
+		window.dispatchEvent(new PopStateEvent('popstate'));
+	});
+	await expect(page).toHaveURL(/\/channels\/general\/thread\/g-014$/);
+	await expect(page.getByRole('article', { name: 'Reply from Rowan Ellis' })).toBeVisible();
+	await expect(threadHeading).toBeFocused();
 
 	const reply = page.getByRole('textbox', { name: 'Reply to thread' });
 	await reply.fill('This draft belongs to the handoff checklist.');

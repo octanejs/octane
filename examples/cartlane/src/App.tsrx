@@ -80,8 +80,7 @@ function ProductArtwork(props) @{
 		<span class="product-art__halo"></span>
 		<span class="product-art__glyph">{props.product.glyph}</span>
 		<span class="product-art__label">
-			Cartlane / 0
-			{props.index + 1}
+			{'Cartlane / ' + String(props.index + 1).padStart(2, '0')}
 		</span>
 	</div>
 }
