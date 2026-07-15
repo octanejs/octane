@@ -356,6 +356,36 @@ describe('React parity validators', () => {
 		}
 	});
 
+	test('allows covered priority cases to refine portable versus adaptable classification', () => {
+		const root = mkdtempSync(path.join(os.tmpdir(), 'octane-react-ledger-portability-'));
+		try {
+			const { inventory, upstreams, entry } = priorityValidatorFixture();
+			const relativeFile = 'packages/octane/tests/example.test.ts';
+			mkdirSync(path.dirname(path.join(root, relativeFile)), { recursive: true });
+			writeFileSync(path.join(root, relativeFile), `it('portable behavior', () => {});\n`);
+			const errors = validateLedger(
+				{
+					schemaVersion: 1,
+					entries: [
+						{
+							...entry,
+							status: 'covered',
+							classification: 'portable',
+							evidence: [{ file: relativeFile, testName: 'portable behavior' }],
+						},
+					],
+				},
+				[inventory],
+				root,
+				upstreams,
+			);
+
+			assert.deepEqual(errors, []);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test('rejects priority classification and risk overrides outside a documented disposition', () => {
 		for (const status of ['planned', 'covered']) {
 			const { inventory, upstreams, entry } = priorityValidatorFixture();
@@ -474,6 +504,30 @@ describe('React parity validators', () => {
 			);
 			assert(errors.some((error) => error.includes('evidence test is stale')));
 			assert(errors.some((error) => error.includes('evidence has invalid file')));
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test('accepts evidence from first-party workspace package tests', () => {
+		const root = mkdtempSync(path.join(os.tmpdir(), 'octane-react-ledger-binding-'));
+		try {
+			const { inventory, upstreams, entry } = validatorFixture();
+			const relativeFile = 'packages/redux/tests/conformance/selector.test.ts';
+			mkdirSync(path.dirname(path.join(root, relativeFile)), { recursive: true });
+			writeFileSync(path.join(root, relativeFile), `it('selector stays current', () => {});\n`);
+			const covered = {
+				...entry,
+				status: 'covered',
+				classification: 'adaptable',
+				risk: 'low',
+				evidence: [{ file: relativeFile, testName: 'selector stays current' }],
+			};
+
+			assert.deepEqual(
+				validateLedger({ schemaVersion: 1, entries: [covered] }, [inventory], root, upstreams),
+				[],
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
