@@ -1,12 +1,6 @@
-import { Component, legacyComponent } from '../../internal/legacy.tsrx';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'octane';
 import type { ComponentType, CSSProperties } from 'react';
-import type {
-	DebounceSettings,
-	Simplify,
-	PrivateWindow,
-	ResizeObserverPolyfill,
-	ResizeObserver,
-} from '../types';
+import type { DebounceSettings, Simplify, PrivateWindow, ResizeObserverPolyfill } from '../types';
 import { debounce } from '../utils/debounce';
 
 const CONTAINER_STYLES: CSSProperties = {
@@ -24,16 +18,13 @@ const MEASUREMENT_STYLES: CSSProperties = {
 	overflow: 'hidden',
 };
 
-/**
- * @deprecated
- * @TODO remove in the next major version - exported for backwards compatibility
- */
+/** @deprecated @TODO remove in the next major version - exported for backwards compatibility */
 export type WithParentSizeProps = DebounceSettings;
 
 type WithParentSizeConfig = {
-		initialWidth?: number;
-		initialHeight?: number;
-	} & DebounceSettings;
+	initialWidth?: number;
+	initialHeight?: number;
+} & DebounceSettings;
 
 type WithParentSizeState = {
 	parentWidth?: number;
@@ -42,78 +33,69 @@ type WithParentSizeState = {
 
 export type WithParentSizeProvidedProps = WithParentSizeState;
 
-type WithParentSizeComponentProps<P extends WithParentSizeProvidedProps> =
-	Simplify<Omit<P, keyof WithParentSizeProvidedProps> & WithParentSizeConfig>;
+type WithParentSizeComponentProps<P extends WithParentSizeProvidedProps> = Simplify<
+	Omit<P, keyof WithParentSizeProvidedProps> & WithParentSizeConfig
+>;
 
 export default function withParentSize<P extends WithParentSizeProvidedProps>(
 	BaseComponent: ComponentType<P>,
-	/** Optionally inject a ResizeObserver polyfill, else this *must* be globally available. */
 	resizeObserverPolyfill?: ResizeObserverPolyfill,
 ): ComponentType<WithParentSizeComponentProps<P>> {
-	class WrappedComponent extends Component {
-		displayName = `withParentSize(${
-			BaseComponent.displayName ?? BaseComponent.name ?? 'Component'
-		})`;
-		state = {
-			parentWidth: undefined,
-			parentHeight: undefined,
-		};
-		animationFrameID: number = 0;
-		resizeObserver: ResizeObserver | undefined;
-		container: HTMLDivElement | null = null;
+	function WrappedComponent(props: WithParentSizeComponentProps<P>) {
+		const [size, setSize] = useState<WithParentSizeState>({});
+		const containerRef = useRef<HTMLDivElement | null>(null);
+		const animationFrameRef = useRef(0);
+		const resize = useMemo(
+			() =>
+				debounce(
+					({ width, height }: { width: number; height: number }) => {
+						setSize({ parentWidth: width, parentHeight: height });
+					},
+					props.debounceTime ?? 300,
+					{ leading: props.enableDebounceLeadingCall ?? true },
+				),
+			[props.debounceTime, props.enableDebounceLeadingCall],
+		);
+		const setContainerRef = useCallback((node: HTMLDivElement | null) => {
+			containerRef.current = node;
+		}, []);
 
-		componentDidMount() {
+		useEffect(() => {
 			const ResizeObserverLocal =
 				resizeObserverPolyfill || (window as unknown as PrivateWindow).ResizeObserver;
-
-			this.resizeObserver = new ResizeObserverLocal((entries) => {
+			const observer = new ResizeObserverLocal((entries) => {
 				entries.forEach((entry) => {
 					const { width, height } = entry.contentRect;
-					this.animationFrameID = window.requestAnimationFrame(() => {
-						this.resize({
-							width,
-							height,
-						});
+					animationFrameRef.current = window.requestAnimationFrame(() => {
+						resize({ width, height });
 					});
 				});
 			});
-			if (this.container) this.resizeObserver.observe(this.container);
-		}
+			if (containerRef.current) observer.observe(containerRef.current);
+			return () => {
+				window.cancelAnimationFrame(animationFrameRef.current);
+				observer.disconnect();
+				resize.cancel();
+			};
+		}, [resize]);
 
-		componentWillUnmount() {
-			window.cancelAnimationFrame(this.animationFrameID);
-			if (this.resizeObserver) this.resizeObserver.disconnect();
-			this.resize.cancel();
-		}
-
-		setRef = (ref: HTMLDivElement) => {
-			this.container = ref;
-		};
-
-		resize = debounce(// eslint-disable-next-line unicorn/consistent-function-scoping
-		({ width, height }: { width: number; height: number }) => {
-			this.setState({
-				parentWidth: width,
-				parentHeight: height,
-			});
-		}, this.props.debounceTime ?? 300, { leading: this.props.enableDebounceLeadingCall ?? true });
-
-		render() {
-			const { initialWidth, initialHeight } = this.props;
-			const { parentWidth = initialWidth, parentHeight = initialHeight } = this.state;
-			return <div style={CONTAINER_STYLES}>
-				<div style={MEASUREMENT_STYLES} ref={this.setRef}>
-					{parentWidth != null && parentHeight != null &&
+		const parentWidth = size.parentWidth ?? props.initialWidth;
+		const parentHeight = size.parentHeight ?? props.initialHeight;
+		return (
+			<div style={CONTAINER_STYLES}>
+				<div style={MEASUREMENT_STYLES} ref={setContainerRef}>
+					{parentWidth != null && parentHeight != null && (
 						<BaseComponent
 							parentWidth={parentWidth}
 							parentHeight={parentHeight}
-							{...this.props as P}
-						/>}
+							{...(props as P)}
+						/>
+					)}
 				</div>
-			</div>;
-		}
+			</div>
+		);
 	}
-	return legacyComponent(
-		WrappedComponent,
-	) as unknown as ComponentType<WithParentSizeComponentProps<P>>;
+
+	WrappedComponent.displayName = `withParentSize(${BaseComponent.displayName ?? BaseComponent.name ?? 'Component'})`;
+	return WrappedComponent as ComponentType<WithParentSizeComponentProps<P>>;
 }

@@ -1,5 +1,4 @@
 /* eslint react/jsx-handler-names: 0 */
-import { Component, legacyComponent } from '../internal/legacy.tsrx';
 import type { CSSProperties } from 'react';
 import type { HandlerArgs as DragArgs } from '@octanejs/visx/drag';
 import { Drag } from '@octanejs/visx/drag';
@@ -20,13 +19,9 @@ export type BrushCornerProps = {
 
 export type BrushCornerState = {};
 
-class BrushCorner extends Component {
-	static defaultProps = {
-		style: {},
-	};
-
-	cornerDragMove = (drag: DragArgs) => {
-		const { updateBrush, type } = this.props;
+export default function BrushCorner(props: BrushCornerProps) {
+	function cornerDragMove(drag: DragArgs) {
+		const { updateBrush, type } = props;
 		if (!drag.isDragging) return;
 
 		updateBrush((prevBrush: Readonly<BrushState>) => {
@@ -108,10 +103,10 @@ class BrushCorner extends Component {
 					return prevBrush;
 			}
 		});
-	};
+	}
 
-	cornerDragEnd = () => {
-		const { updateBrush, onBrushEnd } = this.props;
+	function cornerDragEnd() {
+		const { updateBrush, onBrushEnd } = props;
 
 		updateBrush((prevBrush: Readonly<BrushState>) => {
 			const { start, end, extent } = prevBrush;
@@ -134,45 +129,45 @@ class BrushCorner extends Component {
 
 			return nextBrush;
 		});
-	};
+	}
 
-	render() {
-		const { type, brush, stageWidth, stageHeight, style: styleProp, corner } = this.props;
-		const cursor =
-			styleProp?.cursor ||
-				(type === 'topLeft' || type === 'bottomRight' ? 'nwse-resize' : 'nesw-resize');
-		const pointerEvents =
-			brush.activeHandle || brush.isBrushing ? 'none' : 'all';
+	const { type, brush, stageWidth, stageHeight, style: styleProp = {}, corner } = props;
+	const cursor =
+		styleProp?.cursor ||
+		(type === 'topLeft' || type === 'bottomRight' ? 'nwse-resize' : 'nesw-resize');
+	const pointerEvents = brush.activeHandle || brush.isBrushing ? 'none' : 'all';
 
-		return <Drag
+	return (
+		<Drag
 			width={stageWidth}
 			height={stageHeight}
-			onDragMove={this.cornerDragMove}
-			onDragEnd={this.cornerDragEnd}
+			onDragMove={cornerDragMove}
+			onDragEnd={cornerDragEnd}
 			resetOnStart
 		>
-			{({ dragMove, dragEnd, dragStart, isDragging }) => <g>
-				{isDragging &&
+			{({ dragMove, dragEnd, dragStart, isDragging }) => (
+				<g>
+					{isDragging && (
+						<rect
+							fill="transparent"
+							width={stageWidth}
+							height={stageHeight}
+							style={{ cursor }}
+							onPointerMove={dragMove}
+							onPointerUp={dragEnd}
+						/>
+					)}
 					<rect
 						fill="transparent"
-						width={stageWidth}
-						height={stageHeight}
-						style={{ cursor }}
+						onPointerDown={dragStart}
 						onPointerMove={dragMove}
 						onPointerUp={dragEnd}
-					/>}
-				<rect
-					fill="transparent"
-					onPointerDown={dragStart}
-					onPointerMove={dragMove}
-					onPointerUp={dragEnd}
-					className={`visx-brush-corner-${type}`}
-					style={{ cursor, pointerEvents, ...styleProp }}
-					{...corner}
-				/>
-			</g>}
-		</Drag>;
-	}
+						className={`visx-brush-corner-${type}`}
+						style={{ cursor, pointerEvents, ...styleProp }}
+						{...corner}
+					/>
+				</g>
+			)}
+		</Drag>
+	);
 }
-
-export default legacyComponent(BrushCorner)

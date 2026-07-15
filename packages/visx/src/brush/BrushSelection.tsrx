@@ -1,5 +1,4 @@
 /* eslint react/jsx-handler-names: 0 */
-import { Component, legacyComponent } from '../internal/legacy.tsrx';
 import type { SVGProps, PointerEvent } from 'react';
 import type { HandlerArgs as DragArgs } from '@octanejs/visx/drag';
 import { Drag } from '@octanejs/visx/drag';
@@ -23,25 +22,18 @@ export type BrushSelectionProps = {
 	onBrushStart?: (brush: DragArgs) => void;
 	onBrushEnd?: (brush: BrushState) => void;
 	disableDraggingSelection: boolean;
-	onMouseLeave: PointerHandler;
-	onMouseMove: PointerHandler;
-	onMouseUp: PointerHandler;
-	onClick: PointerHandler;
+	onMouseLeave?: PointerHandler;
+	onMouseMove?: PointerHandler;
+	onMouseUp?: PointerHandler;
+	onClick?: PointerHandler;
 	selectedBoxStyle: SVGProps<SVGRectElement>;
 	isControlled?: boolean;
 	isDragInProgress?: boolean;
 };
 
-class BrushSelection extends Component {
-	static defaultProps = {
-		onMouseLeave: null,
-		onMouseUp: null,
-		onMouseMove: null,
-		onClick: null,
-	};
-
-	selectionDragStart = (drag: DragArgs) => {
-		const { onMoveSelectionChange, onBrushStart } = this.props;
+export default function BrushSelection(props: BrushSelectionProps) {
+	function selectionDragStart(drag: DragArgs) {
+		const { onMoveSelectionChange, onBrushStart } = props;
 
 		if (onMoveSelectionChange) {
 			onMoveSelectionChange('move', getPageCoordinates(drag.event));
@@ -49,10 +41,10 @@ class BrushSelection extends Component {
 		if (onBrushStart) {
 			onBrushStart(drag);
 		}
-	};
+	}
 
-	selectionDragMove = (drag: DragArgs) => {
-		const { updateBrush, isControlled } = this.props;
+	function selectionDragMove(drag: DragArgs) {
+		const { updateBrush, isControlled } = props;
 
 		if (isControlled) return;
 
@@ -81,10 +73,10 @@ class BrushSelection extends Component {
 				},
 			};
 		});
-	};
+	}
 
-	selectionDragEnd = () => {
-		const { updateBrush, onBrushEnd, onMoveSelectionChange, isControlled } = this.props;
+	function selectionDragEnd() {
+		const { updateBrush, onBrushEnd, onMoveSelectionChange, isControlled } = props;
 
 		if (!isControlled) {
 			updateBrush((prevBrush: BrushState) => {
@@ -112,77 +104,78 @@ class BrushSelection extends Component {
 		if (onMoveSelectionChange) {
 			onMoveSelectionChange();
 		}
-	};
+	}
 
-	render() {
-		const {
-			width,
-			height,
-			stageWidth,
-			stageHeight,
-			brush,
-			disableDraggingSelection,
-			onMouseLeave,
-			onMouseMove,
-			onMouseUp,
-			onClick,
-			selectedBoxStyle,
-			isControlled,
-			isDragInProgress,
-		} = this.props;
+	const {
+		width,
+		height,
+		stageWidth,
+		stageHeight,
+		brush,
+		disableDraggingSelection,
+		onMouseLeave,
+		onMouseMove,
+		onMouseUp,
+		onClick,
+		selectedBoxStyle,
+		isControlled,
+		isDragInProgress,
+	} = props;
 
-		return <Drag
+	return (
+		<Drag
 			width={width}
 			height={height}
 			resetOnStart
-			onDragStart={this.selectionDragStart}
-			onDragMove={this.selectionDragMove}
-			onDragEnd={this.selectionDragEnd}
+			onDragStart={selectionDragStart}
+			onDragMove={selectionDragMove}
+			onDragEnd={selectionDragEnd}
 			isDragging={isControlled ? isDragInProgress : undefined}
 		>
-			{({ isDragging, dragStart, dragEnd, dragMove }) => <g>
-				{isDragging &&
+			{({ isDragging, dragStart, dragEnd, dragMove }) => (
+				<g>
+					{isDragging && (
+						<rect
+							width={stageWidth}
+							height={stageHeight}
+							fill="transparent"
+							onPointerUp={isControlled ? undefined : dragEnd}
+							onPointerMove={dragMove}
+							onPointerLeave={isControlled ? undefined : dragEnd}
+							style={DRAGGING_OVERLAY_STYLES}
+						/>
+					)}
 					<rect
-						width={stageWidth}
-						height={stageHeight}
-						fill="transparent"
-						onPointerUp={isControlled ? undefined : dragEnd}
-						onPointerMove={dragMove}
-						onPointerLeave={isControlled ? undefined : dragEnd}
-						style={DRAGGING_OVERLAY_STYLES}
-					/>}
-				<rect
-					x={Math.min(brush.extent.x0, brush.extent.x1)}
-					y={Math.min(brush.extent.y0, brush.extent.y1)}
-					width={width}
-					height={height}
-					className="visx-brush-selection"
-					onPointerDown={disableDraggingSelection ? undefined : dragStart}
-					onPointerLeave={(event) => {
-						if (onMouseLeave) onMouseLeave(event);
-					}}
-					onPointerMove={(event) => {
-						dragMove(event);
-						if (onMouseMove) onMouseMove(event);
-					}}
-					onPointerUp={(event) => {
-						if (!isControlled) {
-							dragEnd(event);
-						}
-						if (onMouseUp) onMouseUp(event);
-					}}
-					onClick={(event) => {
-						if (onClick) onClick(event as PointerEvent<SVGRectElement>);
-					}}
-					style={{
-						pointerEvents: brush.isBrushing || brush.activeHandle ? 'none' : 'all',
-						cursor: disableDraggingSelection ? undefined : 'move',
-					}}
-					{...selectedBoxStyle}
-				/>
-			</g>}
-		</Drag>;
-	}
+						x={Math.min(brush.extent.x0, brush.extent.x1)}
+						y={Math.min(brush.extent.y0, brush.extent.y1)}
+						width={width}
+						height={height}
+						className="visx-brush-selection"
+						onPointerDown={disableDraggingSelection ? undefined : dragStart}
+						onPointerLeave={(event) => {
+							if (onMouseLeave) onMouseLeave(event);
+						}}
+						onPointerMove={(event) => {
+							dragMove(event);
+							if (onMouseMove) onMouseMove(event);
+						}}
+						onPointerUp={(event) => {
+							if (!isControlled) {
+								dragEnd(event);
+							}
+							if (onMouseUp) onMouseUp(event);
+						}}
+						onClick={(event) => {
+							if (onClick) onClick(event as PointerEvent<SVGRectElement>);
+						}}
+						style={{
+							pointerEvents: brush.isBrushing || brush.activeHandle ? 'none' : 'all',
+							cursor: disableDraggingSelection ? undefined : 'move',
+						}}
+						{...selectedBoxStyle}
+					/>
+				</g>
+			)}
+		</Drag>
+	);
 }
-
-export default legacyComponent(BrushSelection)

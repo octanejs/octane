@@ -1,4 +1,4 @@
-import { Component, legacyComponent } from '../internal/legacy.tsrx';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'octane';
 import type { PointerEvent, SVGProps, ReactNode } from 'react';
 import { Group } from '@octanejs/visx/group';
 import type { HandlerArgs as DragArgs } from '@octanejs/visx/drag';
@@ -21,6 +21,9 @@ import type {
 import { debounce, getPageCoordinates, normalizeBrushStartEnd } from './utils';
 
 type PointerHandlerEvent = PointerEvent<SVGRectElement>;
+
+const DEFAULT_MARGIN = { left: 0, top: 0, right: 0, bottom: 0 };
+const DEFAULT_RESIZE_TRIGGER_AREAS: ResizeTriggerAreas[] = ['left', 'right'];
 
 export type BaseBrushProps = {
 	brushDirection?: 'horizontal' | 'vertical' | 'both';
@@ -49,664 +52,516 @@ export type BaseBrushProps = {
 };
 
 export type BaseBrushState = BrushShape & {
-		activeHandle: ResizeTriggerAreas | null;
-		isBrushing: boolean;
-		brushPageOffset?: BrushPageOffset;
-		brushingType?: BrushingType;
-	};
+	activeHandle: ResizeTriggerAreas | null;
+	isBrushing: boolean;
+	brushPageOffset?: BrushPageOffset;
+	brushingType?: BrushingType;
+};
 
 export type UpdateBrush =
 	| BaseBrushState
 	| ((prevState: Readonly<BaseBrushState>, props: Readonly<BaseBrushProps>) => BaseBrushState);
 
-export class BaseBrush extends Component {
-	constructor(props: BaseBrushProps) {
-		super(props);
-		const { initialBrushPosition } = props;
-		const extent =
-			initialBrushPosition
-				? this.getExtent(initialBrushPosition.start, initialBrushPosition.end)
-				: {
-						x0: -1,
-						x1: -1,
-						y0: -1,
-						y1: -1,
-					};
-		this.state = {
-			start: { x: Math.max(0, extent.x0), y: Math.max(0, extent.y0) },
-			end: { x: Math.max(0, extent.x1), y: Math.max(0, extent.y1) },
-			extent,
-			bounds: {
-				x0: 0,
-				x1: this.props.width,
-				y0: 0,
-				y1: this.props.height,
-			},
-			isBrushing: false,
-			brushingType: undefined,
-			activeHandle: null,
-		};
-	}
-
-	private mouseUpTime: number = 0;
-	private mouseDownTime: number = 0;
-
-	static defaultProps = {
-		brushDirection: 'both',
-		inheritedMargin: {
-			left: 0,
-			top: 0,
-			right: 0,
-			bottom: 0,
-		},
-		onChange: null,
-		handleSize: 4,
-		resizeTriggerAreas: ['left', 'right'],
-		onBrushStart: null,
-		onBrushEnd: null,
-		onMouseLeave: null,
-		onMouseUp: null,
-		onMouseMove: null,
-		onClick: null,
-		disableDraggingSelection: false,
-		disableDraggingOverlay: false,
-		clickSensitivity: 200,
-		resetOnEnd: false,
-		initialBrushPosition: null,
-		useWindowMoveEvents: false,
-		renderBrushHandles: null,
+export function BaseBrush(inputProps: BaseBrushProps) {
+	const props: BaseBrushProps = {
+		...inputProps,
+		brushDirection: inputProps.brushDirection ?? 'both',
+		inheritedMargin: inputProps.inheritedMargin ?? DEFAULT_MARGIN,
+		handleSize: inputProps.handleSize ?? 4,
+		resizeTriggerAreas: inputProps.resizeTriggerAreas ?? DEFAULT_RESIZE_TRIGGER_AREAS,
+		clickSensitivity: inputProps.clickSensitivity ?? 200,
+		disableDraggingSelection: inputProps.disableDraggingSelection ?? false,
+		disableDraggingOverlay: inputProps.disableDraggingOverlay ?? false,
+		resetOnEnd: inputProps.resetOnEnd ?? false,
+		useWindowMoveEvents: inputProps.useWindowMoveEvents ?? false,
 	};
+	const propsRef = useRef(props);
+	propsRef.current = props;
+	const mouseUpTimeRef = useRef(0);
+	const mouseDownTimeRef = useRef(0);
 
-	getIdleState = () => {
-		const { width, height } = this.props;
+	const getExtent = useCallback((start: Partial<Point>, end: Partial<Point>) => {
+		const { brushDirection, width, height } = propsRef.current;
+		return {
+			x0: brushDirection === 'vertical' ? 0 : Math.min(start.x || 0, end.x || 0),
+			x1: brushDirection === 'vertical' ? width : Math.max(start.x || 0, end.x || 0),
+			y0: brushDirection === 'horizontal' ? 0 : Math.min(start.y || 0, end.y || 0),
+			y1: brushDirection === 'horizontal' ? height : Math.max(start.y || 0, end.y || 0),
+		};
+	}, []);
+
+	const getIdleState = useCallback((): BaseBrushState => {
+		const { width, height } = propsRef.current;
 		return {
 			start: { x: 0, y: 0 },
 			end: { x: 0, y: 0 },
-			extent: {
-				x0: -1,
-				x1: -1,
-				y0: -1,
-				y1: -1,
-			},
-			bounds: {
-				x0: 0,
-				x1: width,
-				y0: 0,
-				y1: height,
-			},
+			extent: { x0: -1, x1: -1, y0: -1, y1: -1 },
+			bounds: { x0: 0, x1: width, y0: 0, y1: height },
 			isBrushing: false,
 			brushPageOffset: undefined,
 			activeHandle: null,
 			brushingType: undefined,
 		};
-	};
+	}, []);
 
-	componentDidUpdate(prevProps: BaseBrushProps) {
-		if (this.props.width !== prevProps.width || this.props.height !== prevProps.height) {
-			this.setState((prevBrush: BaseBrushState) => {
-				let { start, end, extent } = prevBrush;
+	const [brush, setBrush, getBrush] = useState<BaseBrushState>(() => {
+		const { initialBrushPosition, width, height } = props;
+		const extent = initialBrushPosition
+			? getExtent(initialBrushPosition.start, initialBrushPosition.end)
+			: { x0: -1, x1: -1, y0: -1, y1: -1 };
+		return {
+			start: { x: Math.max(0, extent.x0), y: Math.max(0, extent.y0) },
+			end: { x: Math.max(0, extent.x1), y: Math.max(0, extent.y1) },
+			extent,
+			bounds: { x0: 0, x1: width, y0: 0, y1: height },
+			isBrushing: false,
+			brushingType: undefined,
+			activeHandle: null,
+		};
+	});
 
+	const updateBrush = useCallback((updater: UpdateBrush) => {
+		setBrush((previous) => {
+			const next = typeof updater === 'function' ? updater(previous, propsRef.current) : updater;
+			propsRef.current.onChange?.(next);
+			return next;
+		});
+	}, []);
+
+	const previousSizeRef = useRef({ width: props.width, height: props.height });
+	useLayoutEffect(() => {
+		const previousSize = previousSizeRef.current;
+		if (props.width !== previousSize.width || props.height !== previousSize.height) {
+			setBrush((previous) => {
+				let { start, end, extent } = previous;
 				if (!(extent.x0 === -1 && extent.x1 === -1 && extent.y0 === -1 && extent.y1 === -1)) {
-					const widthRatio = this.props.width / prevProps.width;
-					const heightRatio = this.props.height / prevProps.height;
-
-					start = {
-						x: widthRatio * extent.x0,
-						y: heightRatio * extent.y0,
-					};
-
-					end = {
-						x: widthRatio * extent.x1,
-						y: heightRatio * extent.y1,
-					};
-
-					extent = this.getExtent(start, end);
+					const widthRatio = props.width / previousSize.width;
+					const heightRatio = props.height / previousSize.height;
+					start = { x: widthRatio * extent.x0, y: heightRatio * extent.y0 };
+					end = { x: widthRatio * extent.x1, y: heightRatio * extent.y1 };
+					extent = getExtent(start, end);
 				}
-
 				return {
+					...previous,
 					start,
 					end,
 					extent,
-					bounds: {
-						x0: 0,
-						x1: this.props.width,
-						y0: 0,
-						y1: this.props.height,
-					},
+					bounds: { x0: 0, x1: props.width, y0: 0, y1: props.height },
 				};
 			});
 		}
-	}
+		previousSizeRef.current = { width: props.width, height: props.height };
+	}, [props.width, props.height, getExtent]);
 
-	componentDidMount() {
-		if (this.props.useWindowMoveEvents) {
-			window.addEventListener('mouseup', this.handleWindowPointerUp);
-			window.addEventListener('mousemove', this.debouncedHandleWindowPointerMove);
-		}
-	}
-
-	componentWillUnmount() {
-		if (this.props.useWindowMoveEvents) {
-			window.removeEventListener('mouseup', this.handleWindowPointerUp);
-			window.removeEventListener('mousemove', this.debouncedHandleWindowPointerMove);
-		}
-	}
-
-	handleWindowPointerUp = () => {
-		const { useWindowMoveEvents, onBrushEnd, resetOnEnd } = this.props;
-		const { brushingType } = this.state;
-
-		if (useWindowMoveEvents && brushingType) {
-			this.updateBrush((prevBrush: BaseBrushState) => {
-				const { start, end, extent } = prevBrush;
-
-				normalizeBrushStartEnd(start, end, extent);
-
-				let newState = {
-					...prevBrush,
-					activeHandle: null,
-					isBrushing: false,
-					brushingType: undefined,
-				};
-
-				if (onBrushEnd) {
-					onBrushEnd(newState);
-				}
-
-				if (resetOnEnd) {
-					newState = {
-						...newState,
-						...this.getIdleState(),
-					};
-				}
-
-				return newState;
-			});
-		}
-	};
-
-	handleWindowPointerMove = (event: MouseEvent) => {
-		const { useWindowMoveEvents } = this.props;
-		const { brushingType, isBrushing, brushPageOffset, start } = this.state;
-
-		if (!useWindowMoveEvents || !isBrushing) return;
-
-		/* We use event page coordinates to calculate the offset between the initial pointer position and
-   the current pointer position so Brush could be resized/moved relatively. */
-		const offsetX = event.pageX - (brushPageOffset?.pageX || 0);
-		const offsetY = event.pageY - (brushPageOffset?.pageY || 0);
-
-		if (['left', 'right', 'top', 'bottom'].includes(brushingType ?? '')) {
-			this.updateBrush((prevBrush: BaseBrushState) => {
-				const { x: x0, y: y0 } = prevBrush.start;
-				const { x: x1, y: y1 } = prevBrush.end;
-
-				return {
-					...prevBrush,
-					isBrushing: true,
-					extent: {
-						...prevBrush.extent,
-						...this.getExtent(
-							{
-								x: brushingType === 'left'
-									? Math.min(Math.max(x0 + offsetX, prevBrush.bounds.x0), prevBrush.bounds.x1)
-									: x0,
-								y: brushingType === 'top'
-									? Math.min(Math.max(y0 + offsetY, prevBrush.bounds.y0), prevBrush.bounds.y1)
-									: y0,
-							},
-							{
-								x: brushingType === 'right'
-									? Math.min(Math.max(x1 + offsetX, prevBrush.bounds.x0), prevBrush.bounds.x1)
-									: x1,
-								y: brushingType === 'bottom'
-									? Math.min(Math.max(y1 + offsetY, prevBrush.bounds.y0), prevBrush.bounds.y1)
-									: y1,
-							},
-						),
-					},
-				};
-			});
-		}
-
-		if (brushingType === 'move') {
-			this.updateBrush((prevBrush: BaseBrushState) => {
-				const { x: x0, y: y0 } = prevBrush.start;
-				const { x: x1, y: y1 } = prevBrush.end;
-				const validDx =
-					offsetX > 0
-						? Math.min(offsetX, prevBrush.bounds.x1 - x1)
-						: Math.max(offsetX, prevBrush.bounds.x0 - x0);
-
-				const validDy =
-					offsetY > 0
-						? Math.min(offsetY, prevBrush.bounds.y1 - y1)
-						: Math.max(offsetY, prevBrush.bounds.y0 - y0);
-
-				return {
-					...prevBrush,
-					isBrushing: true,
-					extent: {
-						...prevBrush.extent,
-						x0: x0 + validDx,
-						y0: y0 + validDy,
-						x1: x1 + validDx,
-						y1: y1 + validDy,
-					},
-				};
-			});
-		}
-
-		if (brushingType === 'select') {
-			this.updateBrush((prevBrush: BaseBrushState) => {
-				const { x: x0, y: y0 } = prevBrush.start;
-				const newEnd = {
-					x: Math.min(Math.max(x0 + offsetX, prevBrush.bounds.x0), prevBrush.bounds.x1),
-					y: Math.min(Math.max(y0 + offsetY, prevBrush.bounds.y0), prevBrush.bounds.y1),
-				};
-				const extent = this.getExtent(start, newEnd);
-
-				const newState = {
-					...prevBrush,
-					end: newEnd,
-					extent,
-				};
-
-				return newState;
-			});
-		}
-	};
-
-	debouncedHandleWindowPointerMove = debounce(this.handleWindowPointerMove, 1);
-
-	getExtent = (start: Partial<Point>, end: Partial<Point>) => {
-		const { brushDirection, width, height } = this.props;
-		const x0 =
-			brushDirection === 'vertical' ? 0 : Math.min(start.x || 0, end.x || 0);
-		const x1 =
-			brushDirection === 'vertical' ? width : Math.max(start.x || 0, end.x || 0);
-		const y0 =
-			brushDirection === 'horizontal' ? 0 : Math.min(start.y || 0, end.y || 0);
-		const y1 =
-			brushDirection === 'horizontal' ? height : Math.max(start.y || 0, end.y || 0);
-
-		return {
-			x0,
-			x1,
-			y0,
-			y1,
-		};
-	};
-
-	handleDragStart = (draw: DragArgs) => {
-		const { onBrushStart, left, top, inheritedMargin, useWindowMoveEvents } = this.props;
-		const marginLeft = inheritedMargin?.left ? inheritedMargin.left : 0;
-		const marginTop = inheritedMargin?.top ? inheritedMargin.top : 0;
-		const start = {
-			x: (draw.x || 0) + draw.dx - left - marginLeft,
-			y: (draw.y || 0) + draw.dy - top - marginTop,
-		};
-		const end = { ...start };
-
-		if (onBrushStart) {
-			onBrushStart(start);
-		}
-
-		this.updateBrush(
-			(prevBrush: BaseBrushState) => ({
-				...prevBrush,
+	const handleWindowPointerUp = useCallback(() => {
+		const { useWindowMoveEvents, onBrushEnd, resetOnEnd } = propsRef.current;
+		if (!useWindowMoveEvents || !getBrush().brushingType) return;
+		updateBrush((previous) => {
+			const start = { ...previous.start };
+			const end = { ...previous.end };
+			normalizeBrushStartEnd(start, end, previous.extent);
+			let next = {
+				...previous,
 				start,
 				end,
-				extent: {
-					x0: -1,
-					x1: -1,
-					y0: -1,
-					y1: -1,
-				},
-				isBrushing: true,
-				brushingType: 'select',
-				brushPageOffset: useWindowMoveEvents ? getPageCoordinates(draw.event) : undefined,
-			}),
-		);
-	};
-
-	handleBrushStart = (drag: DragArgs) => {
-		const { onBrushStart, left, top, inheritedMargin } = this.props;
-
-		if (onBrushStart) {
-			const marginLeft = inheritedMargin?.left ? inheritedMargin.left : 0;
-			const marginTop = inheritedMargin?.top ? inheritedMargin.top : 0;
-			const start = {
-				x: (drag.x || 0) + drag.dx - left - marginLeft,
-				y: (drag.y || 0) + drag.dy - top - marginTop,
+				activeHandle: null,
+				isBrushing: false,
+				brushingType: undefined,
 			};
-			onBrushStart(start);
-		}
-	};
-
-	handleDragMove = (drag: DragArgs) => {
-		const { left, top, inheritedMargin, useWindowMoveEvents } = this.props;
-		if (!drag.isDragging || useWindowMoveEvents) return;
-		const marginLeft = inheritedMargin?.left || 0;
-		const marginTop = inheritedMargin?.top || 0;
-		const end = {
-			x: (drag.x || 0) + drag.dx - left - marginLeft,
-			y: (drag.y || 0) + drag.dy - top - marginTop,
-		};
-		this.updateBrush((prevBrush: BaseBrushState) => {
-			const { start } = prevBrush;
-			const extent = this.getExtent(start, end);
-			return {
-				...prevBrush,
-				end,
-				extent,
-			};
+			onBrushEnd?.(next);
+			if (resetOnEnd) next = { ...next, ...getIdleState() };
+			return next;
 		});
-	};
+	}, [getBrush, getIdleState, updateBrush]);
 
-	handleDragEnd = () => {
-		const { onBrushEnd, resetOnEnd, useWindowMoveEvents } = this.props;
+	const handleWindowPointerMove = useCallback(
+		(event: MouseEvent) => {
+			const current = getBrush();
+			const { useWindowMoveEvents } = propsRef.current;
+			const { brushingType, isBrushing, brushPageOffset } = current;
+			if (!useWindowMoveEvents || !isBrushing) return;
+			const offsetX = event.pageX - (brushPageOffset?.pageX || 0);
+			const offsetY = event.pageY - (brushPageOffset?.pageY || 0);
 
-		if (!useWindowMoveEvents) {
-			this.updateBrush((prevBrush: BaseBrushState) => {
-				const { extent } = prevBrush;
-				let newState = {
-					...prevBrush,
-					start: {
-						x: extent.x0,
-						y: extent.y0,
-					},
-					end: {
-						x: extent.x1,
-						y: extent.y1,
-					},
-					isBrushing: false,
-					brushingType: undefined,
-					activeHandle: null,
-				};
-
-				if (onBrushEnd) {
-					onBrushEnd(newState);
-				}
-
-				if (resetOnEnd) {
-					newState = {
-						...newState,
-						...this.getIdleState(),
+			if (['left', 'right', 'top', 'bottom'].includes(brushingType ?? '')) {
+				updateBrush((previous) => {
+					const { x: x0, y: y0 } = previous.start;
+					const { x: x1, y: y1 } = previous.end;
+					return {
+						...previous,
+						isBrushing: true,
+						extent: {
+							...previous.extent,
+							...getExtent(
+								{
+									x:
+										brushingType === 'left'
+											? Math.min(Math.max(x0 + offsetX, previous.bounds.x0), previous.bounds.x1)
+											: x0,
+									y:
+										brushingType === 'top'
+											? Math.min(Math.max(y0 + offsetY, previous.bounds.y0), previous.bounds.y1)
+											: y0,
+								},
+								{
+									x:
+										brushingType === 'right'
+											? Math.min(Math.max(x1 + offsetX, previous.bounds.x0), previous.bounds.x1)
+											: x1,
+									y:
+										brushingType === 'bottom'
+											? Math.min(Math.max(y1 + offsetY, previous.bounds.y0), previous.bounds.y1)
+											: y1,
+								},
+							),
+						},
 					};
-				}
-
-				return newState;
-			});
-		}
-	};
-
-	getBrushWidth = () => {
-		const { extent } = this.state;
-		const { x0, x1 } = extent;
-
-		return Math.max(Math.max(x0, x1) - Math.min(x0, x1), 0);
-	};
-
-	getBrushHeight = () => {
-		const { extent } = this.state;
-		const { y1, y0 } = extent;
-
-		return Math.max(Math.max(y0, y1) - Math.min(y0, y1), 0);
-	};
-
-	handles = (): Partial<{ [key in ResizeTriggerAreas]: {
-		x: number;
-		y: number;
-		height: number;
-		width: number;
-	} }> => {
-		const { handleSize } = this.props;
-		const { extent } = this.state;
-		const { x0, x1, y0, y1 } = extent;
-		const offset = handleSize / 2;
-		const width = this.getBrushWidth();
-		const height = this.getBrushHeight();
-
-		return {
-			top: {
-				x: x0 - offset,
-				y: y0 - offset,
-				height: handleSize,
-				width: width + handleSize,
-			},
-			bottom: {
-				x: x0 - offset,
-				y: y1 - offset,
-				height: handleSize,
-				width: width + handleSize,
-			},
-			right: {
-				x: x1 - offset,
-				y: y0 - offset,
-				height: height + handleSize,
-				width: handleSize,
-			},
-			left: {
-				x: x0 - offset,
-				y: y0 - offset,
-				height: height + handleSize,
-				width: handleSize,
-			},
-		};
-	};
-
-	corners = (): Partial<{ [key in ResizeTriggerAreas]: {
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-	} }> => {
-		const { handleSize } = this.props;
-		const { extent } = this.state;
-		const { x0, x1, y0, y1 } = extent;
-		const offset = handleSize / 2;
-		const width = handleSize;
-		const height = handleSize;
-
-		return {
-			topLeft: {
-				x: Math.min(x0, x1) - offset,
-				y: Math.min(y0, y1) - offset,
-				width,
-				height,
-			},
-			topRight: {
-				x: Math.max(x0, x1) - offset,
-				y: Math.min(y0, y1) - offset,
-				width,
-				height,
-			},
-			bottomLeft: {
-				x: Math.min(x0, x1) - offset,
-				y: Math.max(y0, y1) - offset,
-				width,
-				height,
-			},
-			bottomRight: {
-				x: Math.max(x0, x1) - offset,
-				y: Math.max(y0, y1) - offset,
-				width,
-				height,
-			},
-		};
-	};
-
-	updateBrush = (updater: UpdateBrush) => {
-		const { onChange } = this.props;
-		this.setState(updater, () => {
-			if (onChange) {
-				onChange(this.state);
+				});
 			}
+
+			if (brushingType === 'move') {
+				updateBrush((previous) => {
+					const { x: x0, y: y0 } = previous.start;
+					const { x: x1, y: y1 } = previous.end;
+					const validDx =
+						offsetX > 0
+							? Math.min(offsetX, previous.bounds.x1 - x1)
+							: Math.max(offsetX, previous.bounds.x0 - x0);
+					const validDy =
+						offsetY > 0
+							? Math.min(offsetY, previous.bounds.y1 - y1)
+							: Math.max(offsetY, previous.bounds.y0 - y0);
+					return {
+						...previous,
+						isBrushing: true,
+						extent: {
+							...previous.extent,
+							x0: x0 + validDx,
+							y0: y0 + validDy,
+							x1: x1 + validDx,
+							y1: y1 + validDy,
+						},
+					};
+				});
+			}
+
+			if (brushingType === 'select') {
+				updateBrush((previous) => {
+					const newEnd = {
+						x: Math.min(
+							Math.max(previous.start.x + offsetX, previous.bounds.x0),
+							previous.bounds.x1,
+						),
+						y: Math.min(
+							Math.max(previous.start.y + offsetY, previous.bounds.y0),
+							previous.bounds.y1,
+						),
+					};
+					return {
+						...previous,
+						end: newEnd,
+						extent: getExtent(previous.start, newEnd),
+					};
+				});
+			}
+		},
+		[getBrush, getExtent, updateBrush],
+	);
+
+	const debouncedHandleWindowPointerMove = useMemo(
+		() => debounce(handleWindowPointerMove, 1),
+		[handleWindowPointerMove],
+	);
+
+	useEffect(() => {
+		if (!props.useWindowMoveEvents) return;
+		window.addEventListener('mouseup', handleWindowPointerUp);
+		window.addEventListener('mousemove', debouncedHandleWindowPointerMove);
+		return () => {
+			window.removeEventListener('mouseup', handleWindowPointerUp);
+			window.removeEventListener('mousemove', debouncedHandleWindowPointerMove);
+		};
+	}, [props.useWindowMoveEvents, handleWindowPointerUp, debouncedHandleWindowPointerMove]);
+
+	function handleDragStart(draw: DragArgs) {
+		const { onBrushStart, left, top, inheritedMargin, useWindowMoveEvents } = propsRef.current;
+		const start = {
+			x: (draw.x || 0) + draw.dx - left - (inheritedMargin?.left || 0),
+			y: (draw.y || 0) + draw.dy - top - (inheritedMargin?.top || 0),
+		};
+		onBrushStart?.(start);
+		updateBrush((previous) => ({
+			...previous,
+			start,
+			end: { ...start },
+			extent: { x0: -1, x1: -1, y0: -1, y1: -1 },
+			isBrushing: true,
+			brushingType: 'select',
+			brushPageOffset: useWindowMoveEvents ? getPageCoordinates(draw.event) : undefined,
+		}));
+	}
+
+	function handleBrushStart(drag: DragArgs) {
+		const { onBrushStart, left, top, inheritedMargin } = propsRef.current;
+		if (!onBrushStart) return;
+		onBrushStart({
+			x: (drag.x || 0) + drag.dx - left - (inheritedMargin?.left || 0),
+			y: (drag.y || 0) + drag.dy - top - (inheritedMargin?.top || 0),
 		});
-	};
+	}
 
-	reset = () => this.updateBrush(() => this.getIdleState());
+	function handleDragMove(drag: DragArgs) {
+		const { left, top, inheritedMargin, useWindowMoveEvents } = propsRef.current;
+		if (!drag.isDragging || useWindowMoveEvents) return;
+		const end = {
+			x: (drag.x || 0) + drag.dx - left - (inheritedMargin?.left || 0),
+			y: (drag.y || 0) + drag.dy - top - (inheritedMargin?.top || 0),
+		};
+		updateBrush((previous) => ({
+			...previous,
+			end,
+			extent: getExtent(previous.start, end),
+		}));
+	}
 
-	handleBrushingTypeChange = (type?: BrushingType, brushPageOffset?: BrushPageOffset) => {
-		this.updateBrush((prevBrush: BaseBrushState) => {
+	function handleDragEnd() {
+		const { onBrushEnd, resetOnEnd, useWindowMoveEvents } = propsRef.current;
+		if (useWindowMoveEvents) return;
+		updateBrush((previous) => {
+			let next = {
+				...previous,
+				start: { x: previous.extent.x0, y: previous.extent.y0 },
+				end: { x: previous.extent.x1, y: previous.extent.y1 },
+				isBrushing: false,
+				brushingType: undefined,
+				activeHandle: null,
+			};
+			onBrushEnd?.(next);
+			if (resetOnEnd) next = { ...next, ...getIdleState() };
+			return next;
+		});
+	}
+
+	function reset() {
+		updateBrush(getIdleState());
+	}
+
+	function handleBrushingTypeChange(type?: BrushingType, brushPageOffset?: BrushPageOffset) {
+		updateBrush((previous) => {
 			const next = {
-				...prevBrush,
+				...previous,
 				brushingType: type,
 				isBrushing: type !== undefined,
 			};
-
-			if (brushPageOffset || type === undefined) {
-				next.brushPageOffset = brushPageOffset;
-			}
-
+			if (brushPageOffset || type === undefined) next.brushPageOffset = brushPageOffset;
 			return next;
 		});
+	}
+
+	const {
+		top,
+		left,
+		width: stageWidth,
+		height: stageHeight,
+		onMouseLeave,
+		onMouseUp,
+		onMouseMove,
+		onBrushEnd,
+		onClick,
+		resizeTriggerAreas = DEFAULT_RESIZE_TRIGGER_AREAS,
+		selectedBoxStyle,
+		disableDraggingSelection,
+		disableDraggingOverlay,
+		clickSensitivity,
+		useWindowMoveEvents,
+		renderBrushHandle,
+		handleSize,
+	} = props;
+	const { start, end, extent, brushingType } = brush;
+	const width = Math.max(Math.max(extent.x0, extent.x1) - Math.min(extent.x0, extent.x1), 0);
+	const height = Math.max(Math.max(extent.y0, extent.y1) - Math.min(extent.y0, extent.y1), 0);
+	const offset = handleSize / 2;
+	const handles: Partial<
+		Record<ResizeTriggerAreas, { x: number; y: number; width: number; height: number }>
+	> = {
+		top: {
+			x: extent.x0 - offset,
+			y: extent.y0 - offset,
+			height: handleSize,
+			width: width + handleSize,
+		},
+		bottom: {
+			x: extent.x0 - offset,
+			y: extent.y1 - offset,
+			height: handleSize,
+			width: width + handleSize,
+		},
+		right: {
+			x: extent.x1 - offset,
+			y: extent.y0 - offset,
+			height: height + handleSize,
+			width: handleSize,
+		},
+		left: {
+			x: extent.x0 - offset,
+			y: extent.y0 - offset,
+			height: height + handleSize,
+			width: handleSize,
+		},
 	};
+	const corners: Partial<
+		Record<ResizeTriggerAreas, { x: number; y: number; width: number; height: number }>
+	> = {
+		topLeft: {
+			x: Math.min(extent.x0, extent.x1) - offset,
+			y: Math.min(extent.y0, extent.y1) - offset,
+			width: handleSize,
+			height: handleSize,
+		},
+		topRight: {
+			x: Math.max(extent.x0, extent.x1) - offset,
+			y: Math.min(extent.y0, extent.y1) - offset,
+			width: handleSize,
+			height: handleSize,
+		},
+		bottomLeft: {
+			x: Math.min(extent.x0, extent.x1) - offset,
+			y: Math.max(extent.y0, extent.y1) - offset,
+			width: handleSize,
+			height: handleSize,
+		},
+		bottomRight: {
+			x: Math.max(extent.x0, extent.x1) - offset,
+			y: Math.max(extent.y0, extent.y1) - offset,
+			width: handleSize,
+			height: handleSize,
+		},
+	};
+	const resizeTriggerAreaSet = new Set(resizeTriggerAreas);
 
-	render() {
-		const { start, end } = this.state;
-		const {
-			top,
-			left,
-			width: stageWidth,
-			height: stageHeight,
-			onMouseLeave,
-			onMouseUp,
-			onMouseMove,
-			onBrushEnd,
-			onClick,
-			resizeTriggerAreas,
-			selectedBoxStyle,
-			disableDraggingSelection,
-			disableDraggingOverlay,
-			clickSensitivity,
-			useWindowMoveEvents,
-			renderBrushHandle,
-		} = this.props;
-
-		const { brushingType } = this.state;
-
-		const handles = this.handles();
-		const corners = this.corners();
-		const width = this.getBrushWidth();
-		const height = this.getBrushHeight();
-		const resizeTriggerAreaSet = new Set(resizeTriggerAreas);
-
-		return <Group className="visx-brush" top={top} left={left}>
-			{disableDraggingOverlay
-				? <BrushOverlay
-						width={stageWidth}
-						height={stageHeight}
-						onClick={(event) => {
-							const duration = this.mouseUpTime - this.mouseDownTime;
-							if (onClick && duration < clickSensitivity) onClick(event);
-						}}
-						style={{ cursor: 'default' }}
-					/>
-				: <Drag
-						width={stageWidth}
-						height={stageHeight}
-						resetOnStart
-						onDragStart={this.handleDragStart}
-						onDragMove={this.handleDragMove}
-						onDragEnd={this.handleDragEnd}
-						isDragging={useWindowMoveEvents ? brushingType === 'select' : undefined}
-					>
-						{({ dragStart, isDragging, dragMove, dragEnd }) => <BrushOverlay
+	return (
+		<Group className="visx-brush" top={top} left={left}>
+			{disableDraggingOverlay ? (
+				<BrushOverlay
+					width={stageWidth}
+					height={stageHeight}
+					onClick={(event) => {
+						const duration = mouseUpTimeRef.current - mouseDownTimeRef.current;
+						if (onClick && duration < clickSensitivity) onClick(event);
+					}}
+					style={{ cursor: 'default' }}
+				/>
+			) : (
+				<Drag
+					width={stageWidth}
+					height={stageHeight}
+					resetOnStart
+					onDragStart={handleDragStart}
+					onDragMove={handleDragMove}
+					onDragEnd={handleDragEnd}
+					isDragging={useWindowMoveEvents ? brushingType === 'select' : undefined}
+				>
+					{({ dragStart, isDragging, dragMove, dragEnd }) => (
+						<BrushOverlay
 							width={stageWidth}
 							height={stageHeight}
-							onDoubleClick={() => this.reset()}
+							onDoubleClick={reset}
 							onClick={(event: PointerHandlerEvent) => {
-								const duration = this.mouseUpTime - this.mouseDownTime;
+								const duration = mouseUpTimeRef.current - mouseDownTimeRef.current;
 								if (onClick && duration < clickSensitivity) onClick(event);
 							}}
 							onPointerDown={(event: PointerHandlerEvent) => {
-								this.mouseDownTime = Date.now();
+								mouseDownTimeRef.current = Date.now();
 								dragStart(event);
 							}}
-							onPointerLeave={(event: PointerHandlerEvent) => {
-								if (onMouseLeave) onMouseLeave(event);
-							}}
+							onPointerLeave={(event: PointerHandlerEvent) => onMouseLeave?.(event)}
 							onPointerMove={(event: PointerHandlerEvent) => {
-								if (!isDragging && onMouseMove) onMouseMove(event);
+								if (!isDragging) onMouseMove?.(event);
 								if (isDragging) dragMove(event);
 							}}
 							onPointerUp={(event: PointerHandlerEvent) => {
-								this.mouseUpTime = Date.now();
-								if (onMouseUp) onMouseUp(event);
+								mouseUpTimeRef.current = Date.now();
+								onMouseUp?.(event);
 								dragEnd(event);
 							}}
 							style={{ cursor: 'crosshair' }}
-						/>}
-					</Drag>}
+						/>
+					)}
+				</Drag>
+			)}
 
-			{/* selection */}
-			{start && end &&
+			{start && end && (
 				<BrushSelection
-					updateBrush={this.updateBrush}
+					updateBrush={updateBrush}
 					width={width}
 					height={height}
 					stageWidth={stageWidth}
 					stageHeight={stageHeight}
-					brush={this.state}
+					brush={brush}
 					disableDraggingSelection={disableDraggingSelection}
 					onBrushEnd={onBrushEnd}
-					onBrushStart={this.handleBrushStart}
+					onBrushStart={handleBrushStart}
 					onMouseLeave={onMouseLeave}
 					onMouseMove={onMouseMove}
 					onMouseUp={onMouseUp}
-					onMoveSelectionChange={this.handleBrushingTypeChange}
+					onMoveSelectionChange={handleBrushingTypeChange}
 					onClick={onClick}
 					selectedBoxStyle={selectedBoxStyle}
 					isControlled={useWindowMoveEvents}
 					isDragInProgress={useWindowMoveEvents ? brushingType === 'move' : undefined}
-				/>}
-			{/* handles */}
-			{start && end &&
-				(Object.keys(handles) as ResizeTriggerAreas[]).filter(
-					(handleKey) => resizeTriggerAreaSet.has(handleKey),
-				).map((handleKey) => {
-					const handle = handles[handleKey];
+				/>
+			)}
 
-					return handle &&
-						<BrushHandle
-							key={`handle-${handleKey}`}
-							type={handleKey}
-							handle={handle}
-							stageWidth={stageWidth}
-							stageHeight={stageHeight}
-							updateBrush={this.updateBrush}
-							brush={this.state}
-							onBrushStart={this.handleBrushStart}
-							onBrushEnd={onBrushEnd}
-							isControlled={useWindowMoveEvents}
-							isDragInProgress={useWindowMoveEvents ? brushingType === handleKey : undefined}
-							onBrushHandleChange={this.handleBrushingTypeChange}
-							renderBrushHandle={renderBrushHandle}
-						/>;
-				})}
-			{/* corners */}
-			{start && end &&
-				(Object.keys(corners) as ResizeTriggerAreas[]).filter(
-					(cornerKey) => resizeTriggerAreaSet.has(cornerKey),
-				).map((cornerKey) => {
-					const corner = corners[cornerKey];
+			{start &&
+				end &&
+				(Object.keys(handles) as ResizeTriggerAreas[])
+					.filter((handleKey) => resizeTriggerAreaSet.has(handleKey))
+					.map((handleKey) => {
+						const handle = handles[handleKey];
+						return (
+							handle && (
+								<BrushHandle
+									key={`handle-${handleKey}`}
+									type={handleKey}
+									handle={handle}
+									stageWidth={stageWidth}
+									stageHeight={stageHeight}
+									updateBrush={updateBrush}
+									brush={brush}
+									onBrushStart={handleBrushStart}
+									onBrushEnd={onBrushEnd}
+									isControlled={useWindowMoveEvents}
+									isDragInProgress={useWindowMoveEvents ? brushingType === handleKey : undefined}
+									onBrushHandleChange={handleBrushingTypeChange}
+									renderBrushHandle={renderBrushHandle}
+								/>
+							)
+						);
+					})}
 
-					return corner &&
-						<BrushCorner
-							key={`corner-${cornerKey}`}
-							type={cornerKey}
-							brush={this.state}
-							updateBrush={this.updateBrush}
-							stageWidth={stageWidth}
-							stageHeight={stageHeight}
-							corner={corner}
-							onBrushEnd={onBrushEnd}
-						/>;
-				})}
-		</Group>;
-	}
+			{start &&
+				end &&
+				(Object.keys(corners) as ResizeTriggerAreas[])
+					.filter((cornerKey) => resizeTriggerAreaSet.has(cornerKey))
+					.map((cornerKey) => {
+						const corner = corners[cornerKey];
+						return (
+							corner && (
+								<BrushCorner
+									key={`corner-${cornerKey}`}
+									type={cornerKey}
+									brush={brush}
+									updateBrush={updateBrush}
+									stageWidth={stageWidth}
+									stageHeight={stageHeight}
+									corner={corner}
+									onBrushEnd={onBrushEnd}
+								/>
+							)
+						);
+					})}
+		</Group>
+	);
 }
 
-export default legacyComponent(BaseBrush)
+export default BaseBrush;

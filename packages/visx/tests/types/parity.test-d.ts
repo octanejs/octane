@@ -13,7 +13,17 @@ type _Annotation = Assert<
 	>
 >;
 type _Axis = Assert<Equal<Local['Axis'], Upstream['Axis']>>;
-type _Bounds = Assert<Equal<Local['Bounds'], Upstream['Bounds']>>;
+type _Bounds = Assert<
+	Equal<Omit<Local['Bounds'], 'withBoundingRects'>, Omit<Upstream['Bounds'], 'withBoundingRects'>>
+>;
+type _FunctionalWithBoundingRects = Assert<
+	Equal<
+		Local['Bounds']['withBoundingRects'],
+		<Props extends object = {}>(
+			BaseComponent: import('react').ComponentType<Props>,
+		) => import('react').ComponentType<Props>
+	>
+>;
 type _ClipPath = Assert<Extends<Local['ClipPath'], Upstream['ClipPath']>>;
 type _Curve = Assert<Equal<Local['Curve'], Upstream['Curve']>>;
 type _Drag = Assert<Equal<Local['Drag'], Upstream['Drag']>>;
@@ -112,9 +122,7 @@ import type { DataContextType as UpstreamDataContextType } from '@visx/xychart';
 type _AnnotationContextValue = Assert<
 	Equal<LocalAnnotationContextType, UpstreamAnnotationContextType>
 >;
-type _BrushProps = Assert<
-	Equal<Omit<LocalBrushProps, 'innerRef'>, Omit<UpstreamBrushProps, 'innerRef'>>
->;
+type _BrushProps = Assert<Equal<LocalBrushProps, Omit<UpstreamBrushProps, 'innerRef'>>>;
 type _TooltipPositionContextValue = Assert<
 	Equal<LocalTooltipPositionContextType, UpstreamTooltipPositionContextType>
 >;

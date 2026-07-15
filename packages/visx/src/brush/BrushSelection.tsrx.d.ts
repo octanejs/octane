@@ -15,23 +15,13 @@ export type BrushSelectionProps = {
     onBrushStart?: (brush: DragArgs) => void;
     onBrushEnd?: (brush: BrushState) => void;
     disableDraggingSelection: boolean;
-    onMouseLeave: PointerHandler;
-    onMouseMove: PointerHandler;
-    onMouseUp: PointerHandler;
-    onClick: PointerHandler;
+    onMouseLeave?: PointerHandler;
+    onMouseMove?: PointerHandler;
+    onMouseUp?: PointerHandler;
+    onClick?: PointerHandler;
     selectedBoxStyle: SVGProps<SVGRectElement>;
     isControlled?: boolean;
     isDragInProgress?: boolean;
 };
-declare const _default: ((props: Record<string, never> & {
-    ref?: unknown;
-}) => any) & {
-    displayName?: string;
-    defaultProps: {
-        onMouseLeave: null;
-        onMouseUp: null;
-        onMouseMove: null;
-        onClick: null;
-    };
-};
-export default _default;
+export default function BrushSelection(props: BrushSelectionProps): import("react").JSX.Element;
+export {};

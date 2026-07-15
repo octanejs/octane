@@ -1,6 +1,5 @@
-/* eslint react/no-did-mount-set-state: 0 */
-import { PureComponent, createRef, legacyComponent } from '../../internal/legacy.tsrx';
-import type { ComponentClass, ComponentType, RefObject } from 'react';
+import { memo, useCallback, useLayoutEffect, useRef, useState } from 'octane';
+import type { ComponentType, RefObject } from 'react';
 
 const emptyRect = {
 	top: 0,
@@ -27,49 +26,34 @@ export type WithBoundingRectsProps = {
 	nodeRef?: RefObject<HTMLElement>;
 };
 
-export default function withBoundingRects<Props extends object = {}>(BaseComponent: ComponentType<Props>): ComponentClass<Props> {
-	class WrappedComponent extends PureComponent {
-		static displayName = `withBoundingRects(${BaseComponent.displayName || ''})`;
-		node: HTMLElement | undefined | null;
-		nodeRef: RefObject<HTMLElement | null>;
-		constructor(props: Props) {
-			super(props);
-			this.state = {
-				rect: undefined,
-				parentRect: undefined,
-			};
-			this.nodeRef = createRef();
-			this.getRects = this.getRects.bind(this);
-		}
+export default function withBoundingRects<Props extends object = {}>(
+	BaseComponent: ComponentType<Props>,
+): ComponentType<Props> {
+	function WrappedComponent(props: Props) {
+		const nodeRef = useRef<HTMLElement | null>(null);
+		const [rects, setRects, getRectsState] = useState<{
+			rect?: rectShape;
+			parentRect?: rectShape;
+		}>({ rect: undefined, parentRect: undefined });
 
-		componentDidMount() {
-			this.node = this.nodeRef?.current || null;
-			this.setState(() => this.getRects());
-		}
-
-		getRects() {
-			if (!this.node) return this.state;
-
-			const { node } = this;
+		const getRects = useCallback(() => {
+			const node = nodeRef.current;
+			if (!node) return getRectsState() as { rect: rectShape; parentRect: rectShape };
 			const parentNode = node.parentNode as HTMLElement | null;
-
-			const rect =
-				node.getBoundingClientRect ? node.getBoundingClientRect() : emptyRect;
-
-			const parentRect =
-				parentNode?.getBoundingClientRect ? parentNode.getBoundingClientRect() : emptyRect;
-
+			const rect = node.getBoundingClientRect ? node.getBoundingClientRect() : emptyRect;
+			const parentRect = parentNode?.getBoundingClientRect
+				? parentNode.getBoundingClientRect()
+				: emptyRect;
 			return { rect, parentRect };
-		}
+		}, [getRectsState]);
 
-		render() {
-			return <BaseComponent
-				nodeRef={this.nodeRef}
-				getRects={this.getRects}
-				{...this.state}
-				{...this.props}
-			/>;
-		}
+		useLayoutEffect(() => {
+			setRects(getRects());
+		}, [getRects]);
+
+		return <BaseComponent nodeRef={nodeRef} getRects={getRects} {...rects} {...props} />;
 	}
-	return legacyComponent(WrappedComponent) as unknown as ComponentClass<Props>;
+
+	WrappedComponent.displayName = `withBoundingRects(${BaseComponent.displayName || ''})`;
+	return memo(WrappedComponent) as unknown as ComponentType<Props>;
 }

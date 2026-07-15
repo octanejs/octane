@@ -3,7 +3,7 @@ import { withBoundingRects } from '@octanejs/visx/bounds';
 import { Brush } from '@octanejs/visx/brush';
 import { Drag } from '@octanejs/visx/drag';
 import { Zoom } from '@octanejs/visx/zoom';
-import { ParentSize } from '@octanejs/visx/responsive';
+import { ParentSize, withParentSize, withScreenSize } from '@octanejs/visx/responsive';
 import { useChartA11y } from '@octanejs/visx/a11y/react';
 import { useAxis } from '@octanejs/visx/axis/react';
 import { useChartDimensions } from '@octanejs/visx/chart';
@@ -15,7 +15,6 @@ import { ThemeProvider, useTheme } from '@octanejs/visx/theme/react';
 import { useTooltip, useTooltipInPortal } from '@octanejs/visx/tooltip';
 import { useFloatingTooltip } from '@octanejs/visx/tooltip/floating';
 import { useVoronoi } from '@octanejs/visx/voronoi/react';
-import { PureComponent, legacyComponent } from '../../src/internal/legacy.tsrx';
 import useMeasure from '../../src/internal/useMeasure.tsrx';
 
 const points = [
@@ -51,7 +50,6 @@ export function DragFixture() {
 		</Drag>
 	</svg>;
 }
-
 export function ZoomFixture() {
 	return <Zoom width={200} height={120}>
 		{(zoom) => <svg
@@ -78,6 +76,24 @@ export function ResponsiveFixture({ ResizeObserverImpl }) {
 	</ParentSize>;
 }
 
+function ParentSizeEnhancerProbe({ parentWidth, parentHeight }) {
+	return <output id="parent-size-enhancer">{`${parentWidth}x${parentHeight}`}</output>;
+}
+
+function ScreenSizeEnhancerProbe({ screenWidth, screenHeight }) {
+	return <output id="screen-size-enhancer">{`${screenWidth}x${screenHeight}`}</output>;
+}
+
+const ScreenSizeEnhancer = withScreenSize(ScreenSizeEnhancerProbe);
+
+export function ResponsiveEnhancersFixture({ ResizeObserverImpl }) {
+	const ParentSizeEnhancer = withParentSize(ParentSizeEnhancerProbe, ResizeObserverImpl);
+	return <section>
+		<ParentSizeEnhancer initialWidth={90} initialHeight={45} debounceTime={0} />
+		<ScreenSizeEnhancer debounceTime={0} />
+	</section>;
+}
+
 export function MeasureLifecycleFixture({ ResizeObserverImpl }) {
 	const [showTarget, setShowTarget] = useState(true);
 	const [measureRef, bounds] = useMeasure({
@@ -89,48 +105,6 @@ export function MeasureLifecycleFixture({ ResizeObserverImpl }) {
 		<button id="toggle-measure-target" onClick={() => setShowTarget((show) => !show)}>Toggle</button>
 		{showTarget && <div id="measure-target" ref={measureRef} />}
 		<output id="measure-width">{bounds.width as string}</output>
-	</section>;
-}
-
-type LegacyPureProbeProps = {
-	onRender: (count: number) => void;
-	onDidUpdate: (previousCount: number) => void;
-	onUnmount: () => void;
-};
-
-class LegacyPureProbeController extends PureComponent {
-	constructor(props: LegacyPureProbeProps) {
-		super(props);
-		this.state = { count: 0 };
-	}
-
-	componentDidUpdate(_previousProps, previousState) {
-		this.props.onDidUpdate(previousState.count);
-	}
-
-	componentWillUnmount() {
-		this.props.onUnmount();
-	}
-
-	render() {
-		this.props.onRender(this.state.count);
-		return <output id="legacy-pure-count">{this.state.count as string}</output>;
-	}
-}
-
-const LegacyPureProbe = legacyComponent(LegacyPureProbeController);
-
-export function LegacyAdapterFixture({ controllerRef, onRender, onDidUpdate, onUnmount }) {
-	const [showProbe, setShowProbe] = useState(true);
-	return <section>
-		<button id="hide-legacy-probe" onClick={() => setShowProbe(false)}>Hide</button>
-		{showProbe &&
-			<LegacyPureProbe
-				ref={controllerRef}
-				onRender={onRender}
-				onDidUpdate={onDidUpdate}
-				onUnmount={onUnmount}
-			/>}
 	</section>;
 }
 

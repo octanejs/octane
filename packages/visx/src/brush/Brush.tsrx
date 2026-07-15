@@ -1,11 +1,6 @@
-import { Component, legacyComponent } from '../internal/legacy.tsrx';
-import type { MutableRefObject, ReactNode, SVGProps } from 'react';
+import type { ReactNode, SVGProps } from 'react';
 import BaseBrush from './BaseBrush.tsrx';
-import type {
-	BaseBrush as BaseBrushInstance,
-	BaseBrushProps,
-	BaseBrushState,
-} from './BaseBrush.tsrx';
+import type { BaseBrushProps, BaseBrushState } from './BaseBrush.tsrx';
 import type { BrushHandleRenderProps } from './BrushHandle.tsrx';
 import type {
 	Bounds,
@@ -19,6 +14,15 @@ import { scaleInvert, getDomainFromExtent } from './utils';
 
 const SAFE_PIXEL = 2;
 const DEFAULT_COLOR = 'steelblue';
+const DEFAULT_MARGIN = { top: 0, left: 0, right: 0, bottom: 0 };
+const DEFAULT_RESIZE_TRIGGER_AREAS: ResizeTriggerAreas[] = ['left', 'right'];
+const DEFAULT_SELECTED_BOX_STYLE = {
+	fill: DEFAULT_COLOR,
+	fillOpacity: 0.2,
+	stroke: DEFAULT_COLOR,
+	strokeWidth: 1,
+	strokeOpacity: 0.8,
+};
 
 export type BrushProps = {
 	/** Style object for the Brush selection rect. */
@@ -65,73 +69,43 @@ export type BrushProps = {
 	resetOnEnd?: boolean;
 	/** Size of Brush handles, applies to all `resizeTriggerAreas`. */
 	handleSize: number;
-	/** Reference to the BaseBrush component. */
-	innerRef?: MutableRefObject<BaseBrushInstance | null>;
 	/** Prevent drag end on mouse leaving from brush stage. */
 	useWindowMoveEvents?: boolean;
 	/** Render function for custom brush handles. */
 	renderBrushHandle?: (props: BrushHandleRenderProps) => ReactNode;
 };
 
-class Brush extends Component {
-	static defaultProps = {
-		xScale: null,
-		yScale: null,
-		onChange: null,
-		height: 0,
-		width: 0,
-		selectedBoxStyle: {
-			fill: DEFAULT_COLOR,
-			fillOpacity: 0.2,
-			stroke: DEFAULT_COLOR,
-			strokeWidth: 1,
-			strokeOpacity: 0.8,
-		},
-		margin: {
-			top: 0,
-			left: 0,
-			right: 0,
-			bottom: 0,
-		},
-		handleSize: 4,
-		brushDirection: 'horizontal',
-		initialBrushPosition: null,
-		resizeTriggerAreas: ['left', 'right'],
-		brushRegion: 'chart',
-		yAxisOrientation: 'right',
-		xAxisOrientation: 'bottom',
-		onBrushStart: null,
-		onBrushEnd: null,
-		disableDraggingSelection: false,
-		resetOnEnd: false,
-		onMouseMove: null,
-		onMouseLeave: null,
-		onClick: null,
-		useWindowMoveEvents: false,
-		renderBrushHandles: null,
-	};
-
-	handleChange = (brush: BaseBrushState) => {
-		const { onChange } = this.props;
-		if (!onChange) return;
-		const { x0 } = brush.extent;
-		if (typeof x0 === 'undefined' || x0 < 0) {
-			onChange(null);
-
-			return;
-		}
-		const domain = this.convertRangeToDomain(brush);
-		onChange(domain);
-	};
-
-	convertRangeToDomain(brush: BaseBrushState) {
-		const { xScale, yScale } = this.props;
+export default function Brush({
+	xScale,
+	yScale,
+	height = 0,
+	width = 0,
+	onChange,
+	onBrushStart,
+	onBrushEnd,
+	onMouseMove,
+	onMouseLeave,
+	onClick,
+	margin = DEFAULT_MARGIN,
+	brushDirection = 'horizontal',
+	initialBrushPosition,
+	resizeTriggerAreas = DEFAULT_RESIZE_TRIGGER_AREAS,
+	brushRegion = 'chart',
+	yAxisOrientation = 'right',
+	xAxisOrientation = 'bottom',
+	disableDraggingSelection = false,
+	disableDraggingOverlay = false,
+	resetOnEnd = false,
+	handleSize = 4,
+	selectedBoxStyle = DEFAULT_SELECTED_BOX_STYLE,
+	useWindowMoveEvents = false,
+	renderBrushHandle,
+}: BrushProps) {
+	function convertRangeToDomain(brush: BaseBrushState): Bounds {
 		const { x0, x1, y0, y1 } = brush.extent;
-
 		const xDomain = getDomainFromExtent(xScale, x0 || 0, x1 || 0, SAFE_PIXEL);
 		const yDomain = getDomainFromExtent(yScale, y0 || 0, y1 || 0, SAFE_PIXEL);
-
-		const domain: Bounds = {
+		return {
 			x0: xDomain.start || 0,
 			x1: xDomain.end || 0,
 			xValues: xDomain.values,
@@ -139,103 +113,84 @@ class Brush extends Component {
 			y1: yDomain.end || 0,
 			yValues: yDomain.values,
 		};
-
-		return domain;
 	}
 
-	handleBrushStart = (point: Point) => {
-		const { onBrushStart } = this.props;
-		if (!onBrushStart) return;
-		const { x, y } = point;
-		const { xScale, yScale } = this.props;
-		const invertedX = scaleInvert(xScale, x);
-		const invertedY = scaleInvert(yScale, y);
-		onBrushStart({
-			x: 'invert' in xScale && typeof xScale.invert !== 'undefined'
-				? invertedX
-				: xScale.domain()[invertedX],
-			y: 'invert' in yScale && typeof yScale.invert !== 'undefined'
-				? invertedY
-				: yScale.domain()[invertedY],
-		});
-	};
+	function handleChange(brush: BaseBrushState) {
+		if (!onChange) return;
+		const { x0 } = brush.extent;
+		if (typeof x0 === 'undefined' || x0 < 0) {
+			onChange(null);
+			return;
+		}
+		onChange(convertRangeToDomain(brush));
+	}
 
-	handleBrushEnd = (brush: BaseBrushState) => {
-		const { onBrushEnd } = this.props;
+	function handleBrushStart(point: Point) {
+		if (!onBrushStart) return;
+		const invertedX = scaleInvert(xScale, point.x);
+		const invertedY = scaleInvert(yScale, point.y);
+		onBrushStart({
+			x:
+				'invert' in xScale && typeof xScale.invert !== 'undefined'
+					? invertedX
+					: xScale.domain()[invertedX],
+			y:
+				'invert' in yScale && typeof yScale.invert !== 'undefined'
+					? invertedY
+					: yScale.domain()[invertedY],
+		});
+	}
+
+	function handleBrushEnd(brush: BaseBrushState) {
 		if (!onBrushEnd) return;
 		const { x0 } = brush.extent;
 		if (typeof x0 === 'undefined' || x0 < 0) {
 			onBrushEnd(null);
 			return;
 		}
-		const domain = this.convertRangeToDomain(brush);
-		onBrushEnd(domain);
-	};
+		onBrushEnd(convertRangeToDomain(brush));
+	}
 
-	render() {
-		const {
-			xScale,
-			yScale,
-			height,
-			width,
-			margin,
-			brushDirection,
-			initialBrushPosition,
-			innerRef,
-			resizeTriggerAreas,
-			brushRegion,
-			yAxisOrientation,
-			xAxisOrientation,
-			selectedBoxStyle,
-			disableDraggingSelection,
-			disableDraggingOverlay,
-			resetOnEnd,
-			onMouseLeave,
-			onMouseMove,
-			onClick,
-			handleSize,
-			useWindowMoveEvents,
-			renderBrushHandle,
-		} = this.props;
-		if (!xScale || !yScale) return null;
+	if (!xScale || !yScale) return null;
 
-		let brushRegionWidth;
-		let brushRegionHeight;
-		let left;
-		let top;
-		const marginLeft = margin?.left ? margin.left : 0;
-		const marginTop = margin?.top ? margin.top : 0;
-		const marginRight = margin?.right ? margin.right : 0;
-		const marginBottom = margin?.bottom ? margin.bottom : 0;
+	let brushRegionWidth;
+	let brushRegionHeight;
+	let left;
+	let top;
+	const marginLeft = margin.left || 0;
+	const marginTop = margin.top || 0;
+	const marginRight = margin.right || 0;
+	const marginBottom = margin.bottom || 0;
 
-		if (brushRegion === 'chart') {
-			left = 0;
-			top = 0;
-			brushRegionWidth = width;
-			brushRegionHeight = height;
-		} else if (brushRegion === 'yAxis') {
-			top = 0;
-			brushRegionHeight = height;
-			if (yAxisOrientation === 'right') {
-				left = width;
-				brushRegionWidth = marginRight;
-			} else {
-				left = -marginLeft;
-				brushRegionWidth = marginLeft;
-			}
+	if (brushRegion === 'chart') {
+		left = 0;
+		top = 0;
+		brushRegionWidth = width;
+		brushRegionHeight = height;
+	} else if (brushRegion === 'yAxis') {
+		top = 0;
+		brushRegionHeight = height;
+		if (yAxisOrientation === 'right') {
+			left = width;
+			brushRegionWidth = marginRight;
 		} else {
-			left = 0;
-			brushRegionWidth = width;
-			if (xAxisOrientation === 'bottom') {
-				top = height;
-				brushRegionHeight = marginBottom;
-			} else {
-				top = -marginTop;
-				brushRegionHeight = marginTop;
-			}
+			left = -marginLeft;
+			brushRegionWidth = marginLeft;
 		}
+	} else {
+		left = 0;
+		brushRegionWidth = width;
+		if (xAxisOrientation === 'bottom') {
+			top = height;
+			brushRegionHeight = marginBottom;
+		} else {
+			top = -marginTop;
+			brushRegionHeight = marginTop;
+		}
+	}
 
-		return <BaseBrush
+	return (
+		<BaseBrush
 			width={brushRegionWidth}
 			height={brushRegionHeight}
 			left={left}
@@ -246,20 +201,17 @@ class Brush extends Component {
 			handleSize={handleSize}
 			inheritedMargin={margin}
 			initialBrushPosition={initialBrushPosition}
-			ref={innerRef}
 			resetOnEnd={resetOnEnd}
 			resizeTriggerAreas={resizeTriggerAreas}
 			selectedBoxStyle={selectedBoxStyle}
-			onBrushEnd={this.handleBrushEnd}
-			onBrushStart={this.handleBrushStart}
-			onChange={this.handleChange}
+			onBrushEnd={handleBrushEnd}
+			onBrushStart={handleBrushStart}
+			onChange={handleChange}
 			onClick={onClick}
 			onMouseLeave={onMouseLeave}
 			onMouseMove={onMouseMove}
 			useWindowMoveEvents={useWindowMoveEvents}
 			renderBrushHandle={renderBrushHandle}
-		/>;
-	}
+		/>
+	);
 }
-
-export default legacyComponent(Brush)

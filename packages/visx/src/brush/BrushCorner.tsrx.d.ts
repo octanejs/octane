@@ -18,12 +18,4 @@ export type BrushCornerProps = {
     };
 };
 export type BrushCornerState = {};
-declare const _default: ((props: Record<string, never> & {
-    ref?: unknown;
-}) => any) & {
-    displayName?: string;
-    defaultProps: {
-        style: {};
-    };
-};
-export default _default;
+export default function BrushCorner(props: BrushCornerProps): import("react").JSX.Element;

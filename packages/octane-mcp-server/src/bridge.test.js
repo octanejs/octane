@@ -145,16 +145,13 @@ describe('bridgeReport', () => {
 });
 
 describe('KNOWN_BINDINGS', () => {
-	it('maps every public Visx feature package to the aggregate Octane port', async () => {
+	it('maps every public Visx entry point to the aggregate Octane port', async () => {
 		const packagesRoot = fileURLToPath(new URL('../..', import.meta.url));
 		const manifest = JSON.parse(await readFile(join(packagesRoot, 'visx', 'package.json'), 'utf8'));
-		const upstreamPackages = [
-			'@visx/visx',
-			...Object.keys(manifest.exports)
-				.filter((entry) => /^\.\/[a-z0-9-]+$/.test(entry))
-				.map((entry) => `@visx/${entry.slice(2)}`),
-		];
-		expect(upstreamPackages).toHaveLength(41);
+		const upstreamPackages = Object.keys(manifest.exports).map((entry) =>
+			entry === '.' ? '@visx/visx' : `@visx/${entry.slice(2)}`,
+		);
+		expect(upstreamPackages).toHaveLength(49);
 		expect(upstreamPackages.every((name) => KNOWN_BINDINGS[name] === '@octanejs/visx')).toBe(true);
 	});
 

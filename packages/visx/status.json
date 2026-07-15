@@ -3,7 +3,7 @@
   "surface": "Complete current Visx 4.x web runtime surface: the exact 35-namespace aggregate, all 40 feature entry points, and the eight public a11y/react, a11y/server, axis/react, scale/react, shape/react, theme/react, tooltip/floating, and voronoi/react subpaths. Released-only packages chord, delaunay, react-spring, sankey, and stats remain directly importable exactly as upstream specifies.",
   "divergences": [
     "Interaction callbacks receive native DOM events through Octane's delegated event system instead of React synthetic events.",
-    "Refs are ordinary props and the nine retained upstream class controllers are exposed through functional Octane lifecycle adapters; React context/class/forwardRef object identities are therefore intentionally not type-identical.",
+    "All React class controllers and class-instance refs are replaced by native functional TSRX hooks; Brush intentionally omits upstream's legacy innerRef instance handle.",
     "Deterministic text metrics and annotation bounds, pure SplitLinePath SVG sampling, and collision-aware estimated wordcloud rectangles replace browser-only measurement/canvas paths so fixed-size output is identical during SSR and first hydration. Font-specific wrapping, browser-specific path length rounding, and pixel-exact d3-cloud packing can differ.",
     "The react-spring entry point uses a deterministic requestAnimationFrame numeric interpolator rather than spring-physics timing, and Zoom uses native wheel/pointer/touch listeners rather than @use-gesture/react at runtime. Their public Visx props and exports are retained; Zoom imports framework-neutral @use-gesture/core types only."
   ],

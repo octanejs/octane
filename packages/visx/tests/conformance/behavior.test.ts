@@ -7,8 +7,8 @@ import {
 	BrushFixture,
 	DragFixture,
 	HookFamiliesFixture,
-	LegacyAdapterFixture,
 	MeasureLifecycleFixture,
+	ResponsiveEnhancersFixture,
 	ResponsiveFixture,
 	TooltipFixture,
 	ZoomFixture,
@@ -112,6 +112,35 @@ describe('@octanejs/visx stateful behavior', () => {
 		expect(view.find('[data-testid="responsive-output"]').textContent).toBe('260x140');
 	});
 
+	it('runs responsive enhancers through functional effects and state', () => {
+		vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+			callback(0);
+			return 1;
+		});
+		Object.defineProperties(window, {
+			innerWidth: { configurable: true, value: 1024 },
+			innerHeight: { configurable: true, value: 768 },
+		});
+		let callback;
+		const observe = vi.fn();
+		class ResizeObserverImpl {
+			constructor(next) {
+				callback = next;
+			}
+			observe = observe;
+			disconnect() {}
+		}
+
+		const view = render(ResponsiveEnhancersFixture, { ResizeObserverImpl });
+		expect(view.find('#parent-size-enhancer').textContent).toBe('90x45');
+		settle();
+		expect(observe).toHaveBeenCalledOnce();
+		expect(view.find('#screen-size-enhancer').textContent).toBe('1024x768');
+
+		flushSync(() => callback([{ contentRect: { width: 180, height: 90 } }]));
+		expect(view.find('#parent-size-enhancer').textContent).toBe('180x90');
+	});
+
 	it('rebinds measurement observers and listeners when its ref target remounts', () => {
 		vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
 			callback(0);
@@ -158,47 +187,7 @@ describe('@octanejs/visx stateful behavior', () => {
 		expect(view.find('#measure-width').textContent).toBe('123');
 	});
 
-	it('preserves legacy refs across updates and implements PureComponent bailouts', () => {
-		const refs = [];
-		const onRef = vi.fn((value) => refs.push(value));
-		const onRender = vi.fn();
-		const onDidUpdate = vi.fn();
-		const onUnmount = vi.fn();
-		const view = render(LegacyAdapterFixture, {
-			controllerRef: onRef,
-			onRender,
-			onDidUpdate,
-			onUnmount,
-		});
-		const controller = refs[0];
-
-		expect(onRender).toHaveBeenCalledOnce();
-		expect(onRef).toHaveBeenCalledTimes(1);
-		flushSync(() => controller.setState({ count: 0 }));
-		expect(onRender).toHaveBeenCalledOnce();
-		expect(onDidUpdate).not.toHaveBeenCalled();
-		expect(onRef).toHaveBeenCalledTimes(1);
-
-		flushSync(() => controller.setState({ count: 1 }));
-		expect(onRender).toHaveBeenCalledTimes(2);
-		expect(onDidUpdate).toHaveBeenLastCalledWith(0);
-		expect(view.find('#legacy-pure-count').textContent).toBe('1');
-		expect(onRef).toHaveBeenCalledTimes(1);
-
-		flushSync(() => controller.forceUpdate());
-		expect(onRender).toHaveBeenCalledTimes(3);
-		expect(onDidUpdate).toHaveBeenLastCalledWith(1);
-		expect(onRef).toHaveBeenCalledTimes(1);
-
-		flushSync(() =>
-			view.find('#hide-legacy-probe').dispatchEvent(new MouseEvent('click', { bubbles: true })),
-		);
-		expect(onRef).toHaveBeenLastCalledWith(null);
-		expect(onRef).toHaveBeenCalledTimes(2);
-		expect(onUnmount).toHaveBeenCalledOnce();
-	});
-
-	it('preserves Brush class-controller state and reports native drag bounds', () => {
+	it('preserves functional Brush state and reports native drag bounds', () => {
 		const view = render(BrushFixture);
 		const selection = view.find('.visx-brush-selection');
 		expect(selection.getAttribute('x')).toBe('20');
@@ -226,7 +215,7 @@ describe('@octanejs/visx stateful behavior', () => {
 		expect(view.find('#brush-bounds').textContent).toBe('4,36,4,31');
 	});
 
-	it('measures bounds after mount through the Octane lifecycle adapter', () => {
+	it('measures bounds after mount through native Octane layout effects', () => {
 		vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
 			return this.id === 'bounds-parent'
 				? new DOMRect(0, 0, 300, 200)

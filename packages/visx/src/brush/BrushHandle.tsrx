@@ -1,5 +1,4 @@
 /* eslint react/jsx-handler-names: 0 */
-import { Component, legacyComponent } from '../internal/legacy.tsrx';
 import type { ReactNode } from 'react';
 import type { HandlerArgs as DragArgs } from '@octanejs/visx/drag';
 import { Drag } from '@octanejs/visx/drag';
@@ -30,15 +29,15 @@ export type BrushHandleProps = {
 };
 
 export type BrushHandleRenderProps = HandleProps & {
-		/** if brush extent is not active this prop is set to false */
-		isBrushActive: boolean;
-		className: string;
-	};
+	/** if brush extent is not active this prop is set to false */
+	isBrushActive: boolean;
+	className: string;
+};
 
 /** BrushHandle's are placed along the bounds of the brush and handle Drag events which update the passed brush. */
-class BrushHandle extends Component {
-	handleDragStart = (drag: DragArgs) => {
-		const { onBrushHandleChange, type, onBrushStart } = this.props;
+export default function BrushHandle(props: BrushHandleProps) {
+	function handleDragStart(drag: DragArgs) {
+		const { onBrushHandleChange, type, onBrushStart } = props;
 
 		if (onBrushHandleChange) {
 			onBrushHandleChange(type, getPageCoordinates(drag.event));
@@ -46,10 +45,10 @@ class BrushHandle extends Component {
 		if (onBrushStart) {
 			onBrushStart(drag);
 		}
-	};
+	}
 
-	handleDragMove = (drag: DragArgs) => {
-		const { updateBrush, type, isControlled } = this.props;
+	function handleDragMove(drag: DragArgs) {
+		const { updateBrush, type, isControlled } = props;
 		if (!drag.isDragging || isControlled) return;
 
 		updateBrush((prevBrush: BrushState) => {
@@ -113,10 +112,10 @@ class BrushHandle extends Component {
 					return prevBrush;
 			}
 		});
-	};
+	}
 
-	handleDragEnd = () => {
-		const { updateBrush, onBrushEnd, onBrushHandleChange, isControlled } = this.props;
+	function handleDragEnd() {
+		const { updateBrush, onBrushEnd, onBrushHandleChange, isControlled } = props;
 
 		if (!isControlled) {
 			updateBrush((prevBrush: BrushState) => {
@@ -146,74 +145,78 @@ class BrushHandle extends Component {
 		if (onBrushHandleChange) {
 			onBrushHandleChange();
 		}
-	};
+	}
 
-	render() {
-		const {
-			stageWidth,
-			stageHeight,
-			brush,
-			type,
-			handle,
-			isControlled,
-			isDragInProgress,
-			renderBrushHandle,
-		} = this.props;
-		const { x, y, width, height } = handle;
-		const cursor =
-			type === 'right' || type === 'left' ? 'ew-resize' : 'ns-resize';
-		return <Drag
+	const {
+		stageWidth,
+		stageHeight,
+		brush,
+		type,
+		handle,
+		isControlled,
+		isDragInProgress,
+		renderBrushHandle,
+	} = props;
+	const { x, y, width, height } = handle;
+	const cursor = type === 'right' || type === 'left' ? 'ew-resize' : 'ns-resize';
+	return (
+		<Drag
 			width={stageWidth}
 			height={stageHeight}
-			onDragStart={this.handleDragStart}
-			onDragMove={this.handleDragMove}
-			onDragEnd={this.handleDragEnd}
+			onDragStart={handleDragStart}
+			onDragMove={handleDragMove}
+			onDragEnd={handleDragEnd}
 			resetOnStart
 			isDragging={isControlled ? isDragInProgress : undefined}
 		>
-			{({ dragStart, dragEnd, dragMove, isDragging }) => <g>
-				{/** capture mouse events while dragging */}
-				{isDragging &&
-					<rect
-						fill="transparent"
-						width={stageWidth}
-						height={stageHeight}
-						style={{ cursor }}
-						onPointerMove={dragMove}
-						onPointerUp={isControlled ? undefined : dragEnd}
-						onPointerLeave={isControlled ? undefined : dragEnd}
-					/>}
-				{!renderBrushHandle &&
-					<rect
-						x={x}
-						y={y}
-						width={width}
-						height={height}
-						fill="transparent"
-						className={`visx-brush-handle-${type}`}
-						onPointerDown={dragStart}
-						onPointerMove={dragMove}
-						onPointerUp={isControlled ? undefined : dragEnd}
-						style={{
-							cursor,
-							pointerEvents: !!brush.activeHandle || !!brush.isBrushing ? 'none' : 'all',
-						}}
-					/>}
-				{renderBrushHandle &&
-					<g
-						onPointerDown={dragStart}
-						onPointerMove={dragMove}
-						onPointerUp={isControlled ? undefined : dragEnd}
-					>{renderBrushHandle({
-						...this.props.handle,
-						height: stageHeight,
-						className: `visx-brush-handle-${type}`,
+			{({ dragStart, dragEnd, dragMove, isDragging }) => (
+				<g>
+					{/** capture mouse events while dragging */}
+					{isDragging && (
+						<rect
+							fill="transparent"
+							width={stageWidth}
+							height={stageHeight}
+							style={{ cursor }}
+							onPointerMove={dragMove}
+							onPointerUp={isControlled ? undefined : dragEnd}
+							onPointerLeave={isControlled ? undefined : dragEnd}
+						/>
+					)}
+					{!renderBrushHandle && (
+						<rect
+							x={x}
+							y={y}
+							width={width}
+							height={height}
+							fill="transparent"
+							className={`visx-brush-handle-${type}`}
+							onPointerDown={dragStart}
+							onPointerMove={dragMove}
+							onPointerUp={isControlled ? undefined : dragEnd}
+							style={{
+								cursor,
+								pointerEvents: !!brush.activeHandle || !!brush.isBrushing ? 'none' : 'all',
+							}}
+						/>
+					)}
+					{renderBrushHandle && (
+						<g
+							onPointerDown={dragStart}
+							onPointerMove={dragMove}
+							onPointerUp={isControlled ? undefined : dragEnd}
+						>
+							{renderBrushHandle({
+								...props.handle,
+								height: stageHeight,
+								className: `visx-brush-handle-${type}`,
 
-						isBrushActive: brush.extent.x0 !== -1 && brush.extent.x1 !== -1,
-					})}</g>}
-			</g>}
-		</Drag>;
-	}
+								isBrushActive: brush.extent.x0 !== -1 && brush.extent.x1 !== -1,
+							})}
+						</g>
+					)}
+				</g>
+			)}
+		</Drag>
+	);
 }
-
-export default legacyComponent(BrushHandle)

@@ -28,10 +28,6 @@ export type BrushHandleRenderProps = HandleProps & {
     isBrushActive: boolean;
     className: string;
 };
-declare const _default: ((props: Record<string, never> & {
-    ref?: unknown;
-}) => any) & {
-    displayName?: string;
-    defaultProps: unknown;
-};
-export default _default;
+/** BrushHandle's are placed along the bounds of the brush and handle Drag events which update the passed brush. */
+export default function BrushHandle(props: BrushHandleProps): import("react").JSX.Element;
+export {};

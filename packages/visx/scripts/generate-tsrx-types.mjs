@@ -107,11 +107,7 @@ if (convertingHooks) {
 	const hooks = filesUnder(sourceRoot).filter((file) => {
 		if (!file.endsWith('.ts') || file.endsWith('.d.ts')) return false;
 		const name = basename(file);
-		return (
-			/^use[A-Z].*\.ts$/.test(name) ||
-			file.endsWith('/internal/legacy.ts') ||
-			file.endsWith('/internal/spring.ts')
-		);
+		return /^use[A-Z].*\.ts$/.test(name) || file.endsWith('/internal/spring.ts');
 	});
 	const hookSet = new Set(hooks);
 

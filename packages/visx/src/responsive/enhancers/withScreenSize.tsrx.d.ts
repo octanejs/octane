@@ -5,10 +5,7 @@ type WithScreenSizeConfig = {
     /** @deprecated use `debounceTime` instead */
     windowResizeDebounceTime?: number;
 } & DebounceSettings;
-/**
- * @deprecated
- * @TODO remove in the next major version - exported for backwards compatibility
- */
+/** @deprecated @TODO remove in the next major version - exported for backwards compatibility */
 export type WithParentSizeProps = Omit<WithScreenSizeConfig, 'debounceTime'>;
 type WithScreenSizeState = {
     screenWidth?: number;
