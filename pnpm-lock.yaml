@@ -3473,6 +3473,9 @@ importers:
       '@octanejs/tanstack-router':
         specifier: workspace:*
         version: link:../packages/tanstack-router
+      '@octanejs/visx':
+        specifier: workspace:*
+        version: link:../packages/visx
       '@octanejs/vite-plugin':
         specifier: workspace:*
         version: link:../packages/vite-plugin-octane
