@@ -2,17 +2,26 @@
 // two environments: the server builds a per-request router over a memory
 // history (see router-server.ts), the client builds a singleton over the
 // browser history (router-client.ts).
-import { createRouter, createRootRoute, createRoute, lazyRouteComponent } from '@octanejs/tanstack-router';
+import {
+	createRouter,
+	createRootRoute,
+	createRoute,
+	lazyRouteComponent,
+} from '@octanejs/tanstack-router';
 import { MainLayout } from '../layouts/MainLayout.tsrx';
 import { Home } from '../pages/home/Home.tsrx';
 
-
-const Benchmarks = lazyRouteComponent(() => import('../pages/benchmarks/Benchmarks.tsrx'), 'Benchmarks');
-const Playground = lazyRouteComponent(() => import('../pages/playground/Playground.tsrx'), 'Playground');
+const Benchmarks = lazyRouteComponent(
+	() => import('../pages/benchmarks/Benchmarks.tsrx'),
+	'Benchmarks',
+);
+const Playground = lazyRouteComponent(
+	() => import('../pages/playground/Playground.tsrx'),
+	'Playground',
+);
 const DocsLayout = lazyRouteComponent(() => import('../layouts/DocsLayout.tsrx'), 'DocsLayout');
 const DocPage = lazyRouteComponent(() => import('../pages/doc-page/DocPage.tsrx'), 'DocPage');
 const NotFound = lazyRouteComponent(() => import('../pages/not-found/NotFound.tsrx'), 'NotFound');
-
 
 export interface RouterEnv {
 	/** A history instance (memory on the server, browser default on the client). */
