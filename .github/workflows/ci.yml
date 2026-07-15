@@ -140,7 +140,8 @@ jobs:
       - name: Build octane package and verify dist
         run: pnpm build
 
-  typecheck:
+  typecheck_run:
+    name: typecheck packages, website, and examples
     runs-on: ubuntu-latest
 
     steps:
@@ -161,6 +162,52 @@ jobs:
 
       - name: Type check
         run: pnpm typecheck
+
+  examples:
+    name: example apps
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --prod false --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter hacker-news-example exec playwright install --with-deps chromium
+
+      - name: Validate example catalog, helpers, types, and production builds
+        run: pnpm examples:check
+
+      - name: Run example browser journeys
+        run: pnpm examples:e2e
+
+  # Keep the existing protected `typecheck` context stable while the actual
+  # typecheck and browser-heavy example gate run in parallel. `always()` turns
+  # either failed dependency into a failed required check instead of a skip.
+  typecheck:
+    needs: [typecheck_run, examples]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify typecheck and example apps passed
+        env:
+          TYPECHECK_RESULT: ${{ needs.typecheck_run.result }}
+          EXAMPLES_RESULT: ${{ needs.examples.result }}
+        run: |
+          test "$TYPECHECK_RESULT" = success
+          test "$EXAMPLES_RESULT" = success
 
   package:
     name: validate publishable packages
