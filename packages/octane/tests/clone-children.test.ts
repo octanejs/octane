@@ -67,8 +67,10 @@ describe('Children', () => {
 	const c = createElement('i', { key: 'c' }, 'c');
 
 	it('toArray flattens nested arrays and drops nullish/boolean', () => {
-		expect(Children.toArray([a, null, [b, false, [c]], undefined])).toEqual([a, b, c]);
-		expect(Children.toArray(a)).toEqual([a]);
+		const flattened = Children.toArray([a, null, [b, false, [c]], undefined]);
+		expect(flattened.map((child) => child.key)).toEqual(['.$a', '.2:$b', '.2:2:$c']);
+		expect(flattened.map((child) => child.props.children)).toEqual(['a', 'b', 'c']);
+		expect(Children.toArray(a)[0]).toMatchObject({ key: '.$a', type: 'i' });
 		expect(Children.toArray(null)).toEqual([]);
 	});
 
@@ -85,7 +87,8 @@ describe('Children', () => {
 			seen.push([child, i]);
 			return child; // null child → null result → dropped
 		});
-		expect(out).toEqual([a, b]);
+		expect(out?.map((child) => child.key)).toEqual(['.$a', '.$b']);
+		expect(out?.map((child) => child.props.children)).toEqual(['a', 'b']);
 		expect(seen).toEqual([
 			[a, 0],
 			[null, 1],

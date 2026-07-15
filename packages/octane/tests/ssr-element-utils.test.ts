@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as Server from 'octane/server';
 
 // `octane/server` must export the React-compatible element utilities the
@@ -17,9 +17,21 @@ const {
 	renderToStaticMarkup,
 } = Server as any;
 
+function captureThrown(run: () => unknown): unknown {
+	try {
+		run();
+	} catch (error) {
+		return error;
+	}
+	throw new Error('Expected callback to throw');
+}
+
 describe('octane/server element utilities', () => {
 	it('isValidElement recognizes server createElement descriptors only', () => {
-		expect(isValidElement(createElement('li', { class: 'row' }, 'x'))).toBe(true);
+		const element = createElement('li', { class: 'row' }, 'x');
+		expect(isValidElement(element)).toBe(true);
+		expect(Object.isFrozen(element)).toBe(true);
+		expect(Object.isFrozen(element.props)).toBe(true);
 		expect(isValidElement({ type: 'li', props: {} })).toBe(false);
 		expect(isValidElement(null)).toBe(false);
 		expect(isValidElement('li')).toBe(false);
@@ -42,7 +54,13 @@ describe('octane/server element utilities', () => {
 	it('positional children replace the originals; none passed keeps them', () => {
 		const base = createElement('g', null, 'one');
 		expect(cloneElement(base, null, 'two').children).toBe('two');
-		expect(cloneElement(base, null, 'a', 'b').children).toEqual(['a', 'b']);
+		const clonedChildren = cloneElement(base, null, 'a', 'b').children;
+		expect(clonedChildren).toEqual(['a', 'b']);
+		expect(Object.isFrozen(clonedChildren)).toBe(false);
+		clonedChildren.push('c');
+		expect(clonedChildren).toEqual(['a', 'b', 'c']);
+		const createdChildren = createElement('g', null, 'a', 'b').children;
+		expect(Object.isFrozen(createdChildren)).toBe(true);
 		expect(cloneElement(base, { 'data-x': '1' }).children).toBe('one');
 	});
 
@@ -62,13 +80,65 @@ describe('octane/server element utilities', () => {
 		// 5 visited leaves (null and false ARE visited, as `null` — React parity).
 		const kids = [createElement('a'), null, [createElement('b'), false], 'txt'];
 		expect(Children.count(kids)).toBe(5);
-		expect(Children.toArray(kids).length).toBe(3);
+		const flattened = Children.toArray(kids);
+		expect(flattened.length).toBe(3);
+		expect(Object.isFrozen(flattened[0])).toBe(true);
+		expect(Object.isFrozen(flattened[0].props)).toBe(true);
 		const mapped = Children.map(kids, (c: unknown) => (c == null ? null : 'x'));
 		expect(mapped).toEqual(['x', 'x', 'x']);
 		expect(Children.map(null, () => 'x')).toBe(null);
 		const only = createElement('g');
 		expect(Children.only(only)).toBe(only);
 		expect(() => Children.only([only])).toThrow(/single element/);
+	});
+
+	it('Children ignores callable iterables like the client and React', () => {
+		const callable = Object.assign(function callable() {}, {
+			*[Symbol.iterator]() {
+				yield createElement('i');
+			},
+		});
+		const callback = vi.fn((child) => child);
+		expect(Children.toArray(callable)).toEqual([]);
+		expect(Children.count(callable)).toBe(0);
+		expect(Children.map(callable, callback)).toEqual([]);
+		expect(callback).not.toHaveBeenCalled();
+	});
+
+	it('Children direct calls unwrap fulfilled and rejected promises without leaking SSR state', async () => {
+		const pending = new Promise(() => {});
+		expect(captureThrown(() => Children.toArray(pending))).toBe(pending);
+
+		const fulfilled = Promise.resolve(createElement('i', { key: 'ready' }));
+		expect(captureThrown(() => Children.toArray(fulfilled))).toBe(fulfilled);
+		await fulfilled;
+		const resolved = Children.toArray(fulfilled);
+		expect(resolved).toHaveLength(1);
+		expect(resolved[0].type).toBe('i');
+
+		const reason = new Error('no children');
+		const rejected = Promise.reject(reason);
+		expect(captureThrown(() => Children.toArray(rejected))).toBe(rejected);
+		await rejected.catch(() => {});
+		expect(captureThrown(() => Children.toArray(rejected))).toBe(reason);
+	});
+
+	it('Children promises keep SSR boundary suspension bookkeeping during render', () => {
+		const promise = new Promise(() => {});
+		const App = (props: { promise: Promise<unknown> }, scope: unknown) =>
+			(Server as any).ssrTry(
+				scope,
+				'children-promise',
+				() => {
+					Children.toArray(props.promise);
+					return '<strong>ready</strong>';
+				},
+				() => '<em>loading</em>',
+				null,
+			);
+		const { html } = renderToStaticMarkup(App, { promise });
+		expect(html).toContain('<em>loading</em>');
+		expect(html).not.toContain('<strong>ready</strong>');
 	});
 
 	it('createPortal descriptors SSR as a bare site anchor (content is client-side)', () => {
