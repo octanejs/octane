@@ -5,9 +5,13 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
-import { compactChartRows } from '../src/components/BenchBars.tsrx';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
-import { FRAMEWORK_CARDS, HOME_SUMMARY, OCTANE_CARDS } from '../src/content/benchmarks.ts';
+import {
+	FRAMEWORK_CARDS,
+	HOME_SUMMARY,
+	OCTANE_CARDS,
+	type BenchCard,
+} from '../src/content/benchmarks.ts';
 import { createHomeSummary } from '../src/content/home-benchmark.ts';
 
 afterEach(cleanup);
@@ -15,6 +19,14 @@ afterEach(cleanup);
 function findLink(root: ParentNode, href: string): HTMLAnchorElement | undefined {
 	return Array.from(root.querySelectorAll<HTMLAnchorElement>('a')).find(
 		(link) => link.getAttribute('href') === href,
+	);
+}
+
+function expectedBarCount(card: BenchCard): number {
+	return card.rows.reduce(
+		(count, row) =>
+			count + card.series.filter((series) => typeof row[series.key] === 'number').length,
+		0,
 	);
 }
 
@@ -54,36 +66,6 @@ describe('website routes', () => {
 
 		const summaryKeys = HOME_SUMMARY.series.map((series) => series.key);
 		expect(summaryKeys).toEqual(expect.arrayContaining(['preact', 'svelte']));
-
-		// Unsupported summary combinations remain absent from the table data, but
-		// the chart packs the remaining framework bars into contiguous slots.
-		const streamingRow = HOME_SUMMARY.rows.find((row) => row.op === 'streaming-ssr')!;
-		const compactStreamingRow = compactChartRows(HOME_SUMMARY).find(
-			(row: Record<string, string | number>) => row.op === 'streaming-ssr',
-		)!;
-		const originalValues = HOME_SUMMARY.series.flatMap((series) =>
-			typeof streamingRow[series.key] === 'number' ? [streamingRow[series.key]] : [],
-		);
-		const occupiedSlots = HOME_SUMMARY.series.flatMap((series, index) =>
-			typeof compactStreamingRow[series.key] === 'number' ? [index] : [],
-		);
-		expect(occupiedSlots).toEqual(
-			Array.from({ length: originalValues.length }, (_, index) => occupiedSlots[0] + index),
-		);
-		expect(
-			HOME_SUMMARY.series.flatMap((series) =>
-				typeof compactStreamingRow[series.key] === 'number'
-					? [compactStreamingRow[series.key]]
-					: [],
-			),
-		).toEqual(originalValues);
-		expect(
-			Object.values(compactStreamingRow).filter((value) => /^#[0-9a-f]{6}$/.test(String(value))),
-		).toEqual(
-			HOME_SUMMARY.series.flatMap((series) =>
-				typeof streamingRow[series.key] === 'number' ? [series.color] : [],
-			),
-		);
 	});
 
 	it('/ renders the home experience and primary navigation', async () => {
@@ -114,12 +96,7 @@ describe('website routes', () => {
 		const summary = container.querySelector('figure.bench-card');
 		expect(summary?.querySelector('figcaption')).toBeTruthy();
 		expect(summary?.querySelector('svg.home-bench-chart')).toBeTruthy();
-		const expectedBars = HOME_SUMMARY.rows.reduce(
-			(count, row) =>
-				count + HOME_SUMMARY.series.filter((series) => typeof row[series.key] === 'number').length,
-			0,
-		);
-		expect(summary?.querySelectorAll('.visx-bar')).toHaveLength(expectedBars);
+		expect(summary?.querySelectorAll('.visx-bar')).toHaveLength(expectedBarCount(HOME_SUMMARY));
 		expect(summary?.querySelector('.recharts-wrapper')).toBeNull();
 		expect(summary?.querySelector('details table')).toBeTruthy();
 
@@ -134,13 +111,10 @@ describe('website routes', () => {
 
 	it('/benchmarks renders every configured benchmark card', async () => {
 		const { container } = await renderRoute('/benchmarks');
-		// Recharts settles over microtask/raf rounds through autoBatch.
-		for (let round = 0; round < 12; round++) {
-			await new Promise((resolve) => setTimeout(resolve, 0));
-			await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
-		}
 
 		expect(container.querySelector('main .benchpage')).toBeTruthy();
+		expect(container.querySelector('.recharts-wrapper')).toBeNull();
+		expect(container.querySelector('.bench-plot-shell')).toBeNull();
 		const sections = [
 			{ id: 'bench-frameworks', cards: FRAMEWORK_CARDS },
 			{ id: 'bench-internal', cards: OCTANE_CARDS },
@@ -151,9 +125,18 @@ describe('website routes', () => {
 			expect(section.querySelector(`#${id}`)).toBeTruthy();
 			const figures = Array.from(section.querySelectorAll('figure.bench-card'));
 			expect(figures).toHaveLength(cards.length);
-			for (const figure of figures) {
+			for (let index = 0; index < figures.length; index++) {
+				const figure = figures[index];
+				const card = cards[index];
 				expect(figure.querySelector('figcaption')).toBeTruthy();
-				expect(figure.querySelector('svg')).toBeTruthy();
+				expect(figure.querySelector('svg.bench-chart')).toBeTruthy();
+				expect(figure.querySelectorAll('.visx-bar')).toHaveLength(expectedBarCount(card));
+				if (card.series.length <= 2) {
+					expect(figure.querySelectorAll('.value-label')).toHaveLength(expectedBarCount(card));
+					expect(figure.querySelector('.visx-axis-bottom')).toBeNull();
+				} else {
+					expect(figure.querySelector('.visx-axis-bottom')).toBeTruthy();
+				}
 				expect(figure.querySelector('details.bench-table table')).toBeTruthy();
 			}
 		}

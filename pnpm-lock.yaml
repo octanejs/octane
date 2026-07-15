@@ -3467,9 +3467,6 @@ importers:
       '@octanejs/mdx':
         specifier: workspace:*
         version: link:../packages/mdx
-      '@octanejs/recharts':
-        specifier: workspace:*
-        version: link:../packages/recharts
       '@octanejs/tanstack-router':
         specifier: workspace:*
         version: link:../packages/tanstack-router

@@ -13,7 +13,7 @@ import { Home } from '../pages/Home.tsrx';
 
 // The home route stays eager because it is the site's dominant entry point.
 // Everything else is a route chunk, so landing on / does not download the
-// playground/compiler, the docs corpus, or the full Recharts benchmark stack.
+// playground/compiler, the docs corpus, or the full Visx benchmark stack.
 const Benchmarks = lazyRouteComponent(() => import('../pages/Benchmarks.tsrx'), 'Benchmarks');
 const Playground = lazyRouteComponent(() => import('../pages/Playground.tsrx'), 'Playground');
 const DocsLayout = lazyRouteComponent(() => import('../pages/DocsLayout.tsrx'), 'DocsLayout');

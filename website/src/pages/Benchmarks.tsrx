@@ -1,5 +1,5 @@
 // /benchmarks — the checked-in runtime, SSR, async and size baselines, charted
-// with @octanejs/recharts (the site dogfoods its own charting binding). Two
+// with deterministic @octanejs/visx SVG (the site dogfoods its own charting binding). Two
 // sections: cross-framework comparisons, then the octane-internal de-opt
 // ("authoring cliff") suites. All numbers are the checked-in benchmark scores;
 // the page cannot drift from the repo because the JSON is imported at build time.

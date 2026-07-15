@@ -1,7 +1,6 @@
 // The home-page benchmark overview uses deterministic Visx scales and SVG
 // primitives. Unlike Recharts' effect-populated store, this exact chart renders
-// during SSR and hydration adopts it without swapping renderers. The full
-// /benchmarks route retains Recharts for its richer charts, and the exact data
+// during SSR and hydration adopts it without swapping renderers. The exact data
 // remains available in the native details/table immediately below the SVG.
 import { Group } from '@octanejs/visx/group';
 import { scaleLinear } from '@octanejs/visx/scale';
