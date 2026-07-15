@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -16,11 +16,23 @@ const UPSTREAMS_PATH = path.join(AUDIT, 'react-upstreams.json');
 const LEDGER_PATH = path.join(AUDIT, 'react-conformance-ledger.json');
 const REPORT_PATH = path.join(REPO, 'docs/react-parity-coverage.md');
 const errors = [];
+// The home marketing surface was split from a single Home.tsrx into per-section
+// .tsrx files, so scan the whole home directory — a new section can't smuggle in
+// a misleading claim.
+function listTsrxFiles(relativeDir) {
+	const absoluteDir = path.join(REPO, relativeDir);
+	if (!existsSync(absoluteDir)) return [];
+	return readdirSync(absoluteDir, { recursive: true, withFileTypes: true })
+		.filter((entry) => entry.isFile() && entry.name.endsWith('.tsrx'))
+		.map((entry) => path.relative(REPO, path.join(entry.parentPath ?? entry.path, entry.name)))
+		.sort();
+}
+
 const CLAIM_FILES = [
 	'README.md',
 	'docs/differences-from-react.md',
 	'website/public/llms.txt',
-	'website/src/pages/Home.tsrx',
+	...listTsrxFiles('website/src/pages/home'),
 ];
 const MISLEADING_CLAIMS = [
 	/2[,.]?200\+[\s\S]{0,120}React conformance/i,
