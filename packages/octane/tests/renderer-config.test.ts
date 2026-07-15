@@ -14,14 +14,64 @@ describe('renderer configuration', () => {
 		expect(config).toMatchObject({
 			default: DOM_RENDERER_ID,
 			registry: { dom: { module: DOM_RENDERER_MODULE, target: 'dom' } },
+			boundaries: {},
 			rules: [],
 		});
-		expect(config.signature).toMatch(/^octane-renderers-v1:/);
+		expect(config.signature).toMatch(/^octane-renderers-v2:/);
 		expect(resolveRendererForFile(config, '/src/App.tsrx')).toEqual({
 			id: 'dom',
 			module: 'octane',
 			target: 'dom',
 		});
+	});
+
+	it('normalizes renderer-owned child regions by stable module and export identity', () => {
+		const config = normalizeRendererConfig({
+			registry: { three: '@octanejs/three/renderer' },
+			boundaries: {
+				'@octanejs/three': {
+					Html: {
+						ownerRenderer: 'three',
+						childRenderer: 'dom',
+						prop: 'children',
+					},
+					Canvas: {
+						ownerRenderer: 'dom',
+						childRenderer: 'three',
+						prop: 'children',
+					},
+				},
+			},
+		});
+
+		expect(config.boundaries).toEqual({
+			'@octanejs/three': {
+				Canvas: {
+					ownerRenderer: 'dom',
+					childRenderer: 'three',
+					prop: 'children',
+				},
+				Html: {
+					ownerRenderer: 'three',
+					childRenderer: 'dom',
+					prop: 'children',
+				},
+			},
+		});
+		expect(Object.isFrozen(config.boundaries)).toBe(true);
+		expect(Object.isFrozen(config.boundaries['@octanejs/three'])).toBe(true);
+		expect(Object.isFrozen(config.boundaries['@octanejs/three'].Canvas)).toBe(true);
+
+		const reordered = normalizeRendererConfig({
+			registry: { three: '@octanejs/three/renderer' },
+			boundaries: {
+				'@octanejs/three': {
+					Canvas: config.boundaries['@octanejs/three'].Canvas,
+					Html: config.boundaries['@octanejs/three'].Html,
+				},
+			},
+		});
+		expect(reordered.signature).toBe(config.signature);
 	});
 
 	it('uses ordered first-match rules across portable module IDs', () => {
@@ -108,5 +158,49 @@ describe('renderer configuration', () => {
 				rules: [{ include: '**/*.{tsrx}', renderer: 'three' }],
 			}),
 		).toThrow(/braces must contain two or more/);
+		expect(() =>
+			normalizeRendererConfig({
+				registry: { three: '@octanejs/three/renderer' },
+				boundaries: {
+					'@octanejs/three': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'missing',
+							prop: 'children',
+						},
+					},
+				},
+			}),
+		).toThrow(/childRenderer references unknown renderer "missing"/);
+		expect(() =>
+			normalizeRendererConfig({
+				registry: { three: '@octanejs/three/renderer' },
+				boundaries: {
+					'@octanejs/three': {
+						Canvas: {
+							ownerRenderer: 'three',
+							childRenderer: 'three',
+							prop: 'children',
+						},
+					},
+				},
+			}),
+		).toThrow(/must switch renderers/);
+		for (const prop of ['key', '__proto__']) {
+			expect(() =>
+				normalizeRendererConfig({
+					registry: { three: '@octanejs/three/renderer' },
+					boundaries: {
+						'@octanejs/three': {
+							Canvas: {
+								ownerRenderer: 'dom',
+								childRenderer: 'three',
+								prop,
+							},
+						},
+					},
+				}),
+			).toThrow(new RegExp(`\\.prop cannot be "${prop}".*cannot carry`));
+		}
 	});
 });

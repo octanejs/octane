@@ -457,6 +457,7 @@ class OctaneBundlerCompiler {
 		if (fullCompile) {
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const renderer = resolveRendererForFile(this.renderers, filename);
+			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
 			const out = compile(code, filename, {
 				hmr,
 				mode: environment,
@@ -468,6 +469,12 @@ class OctaneBundlerCompiler {
 				// renderer descriptor is an orthogonal compiler input only for the
 				// universal branch selected at this template boundary.
 				...(renderer.target === 'dom' ? null : { renderer }),
+				// Boundary metadata is a lexical compiler input even in a DOM-owned
+				// module: a matching imported component can delegate one prop region to
+				// another renderer. Keep the option absent for the normal empty-config
+				// DOM path so its compiler invocation and output remain unchanged.
+				...(hasRendererBoundaries ? { rendererBoundaries: this.renderers.boundaries } : null),
+				...(hasRendererBoundaries ? { rendererRegistry: this.renderers.registry } : null),
 			});
 			return {
 				code: out.code,

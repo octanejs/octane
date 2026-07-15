@@ -21,12 +21,17 @@ function link(root: string, packageName: string, target: string) {
 	symlinkSync(target, destination, 'dir');
 }
 
-function writeRendererConfig(root: string, module = '/src/object-renderer.js') {
+function writeRendererConfig(root: string, module = '/src/object-renderer.js', prop = 'children') {
 	write(
 		root,
 		'renderer.config.ts',
 		`export const renderers = {
 	registry: { object: ${JSON.stringify(module)} },
+	boundaries: {
+		'/src/object-boundaries.js': {
+			Canvas: { ownerRenderer: 'dom', childRenderer: 'object', prop: ${JSON.stringify(prop)} },
+		},
+	},
 	rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
 };
 `,
@@ -91,6 +96,15 @@ describe('Rsbuild renderer configuration', () => {
 					registry: {
 						object: { module: '/src/object-renderer.js', target: 'universal' },
 					},
+					boundaries: {
+						'/src/object-boundaries.js': {
+							Canvas: {
+								ownerRenderer: 'dom',
+								childRenderer: 'object',
+								prop: 'children',
+							},
+						},
+					},
 					rules: [{ include: ['src/**/*.object.tsrx'], renderer: 'object' }],
 				});
 			}
@@ -123,7 +137,7 @@ describe('Rsbuild renderer configuration', () => {
 		};
 
 		const [initialPlugin] = await createCompilerPlugins();
-		writeRendererConfig(root, '/src/updated-object-renderer.js');
+		writeRendererConfig(root, '/src/updated-object-renderer.js', 'content');
 		const [restartedPlugin] = await createCompilerPlugins();
 
 		expect(initialPlugin.options.renderers).toMatchObject({
@@ -131,6 +145,9 @@ describe('Rsbuild renderer configuration', () => {
 		});
 		expect(restartedPlugin.options.renderers).toMatchObject({
 			registry: { object: { module: '/src/updated-object-renderer.js' } },
+			boundaries: {
+				'/src/object-boundaries.js': { Canvas: { prop: 'content' } },
+			},
 		});
 		expect(restartedPlugin.options.renderers).not.toEqual(initialPlugin.options.renderers);
 	});
