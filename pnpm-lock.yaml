@@ -3124,9 +3124,6 @@ importers:
 
   packages/tanstack-store:
     dependencies:
-      '@octanejs/redux':
-        specifier: workspace:*
-        version: link:../redux
       '@tanstack/store':
         specifier: 0.11.0
         version: 0.11.0
