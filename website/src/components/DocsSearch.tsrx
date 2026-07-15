@@ -215,14 +215,16 @@ function SearchDialog(props: DialogProps) @{
 				</div>
 			} @else {
 				<p class="search-empty">
-					@if (query.trim().length < 2) {
-						<span>
-							{ready ? 'Type to search the documentation.' : 'Loading the index…'}
-						</span>
+					@if (!ready) {
+						<span>Loading the index…</span>
 					} @else {
-						<span>
-							{'No matches for “' + query.trim() + '”.'}
-						</span>
+						@if (query.trim().length < 2) {
+							<span>Type to search the documentation.</span>
+						} @else {
+							<span>
+								{'No matches for “' + query.trim() + '”.'}
+							</span>
+						}
 					}
 				</p>
 			}

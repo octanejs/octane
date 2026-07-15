@@ -17,8 +17,9 @@ const LEDGER_PATH = path.join(AUDIT, 'react-conformance-ledger.json');
 const REPORT_PATH = path.join(REPO, 'docs/react-parity-coverage.md');
 const errors = [];
 // The home marketing surface was split from a single Home.tsrx into per-section
-// .tsrx files, so scan the whole home directory — a new section can't smuggle in
-// a misleading claim.
+// .tsrx files, and its benchmark/marketing copy also moved into shared components
+// (BenchmarkExplorer, BenchBars, …). Scan both trees so a misleading claim can't
+// slip in via a new section or a shared home component.
 function listTsrxFiles(relativeDir) {
 	const absoluteDir = path.join(REPO, relativeDir);
 	if (!existsSync(absoluteDir)) return [];
@@ -33,6 +34,7 @@ const CLAIM_FILES = [
 	'docs/differences-from-react.md',
 	'website/public/llms.txt',
 	...listTsrxFiles('website/src/pages/home'),
+	...listTsrxFiles('website/src/components'),
 ];
 const MISLEADING_CLAIMS = [
 	/2[,.]?200\+[\s\S]{0,120}React conformance/i,
