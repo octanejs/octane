@@ -31,20 +31,42 @@ describe('declarative options', () => {
 	it('normalizes and deeply freezes declarative renderer options', () => {
 		const renderers = {
 			registry: { object: '/src/object-renderer.js' },
+			boundaries: {
+				'/src/object-boundaries.js': {
+					Canvas: {
+						ownerRenderer: 'dom',
+						childRenderer: 'object',
+						prop: 'children',
+					},
+				},
+			},
 			rules: [{ include: ['src/**/*.object.tsrx'], renderer: 'object' }],
 		};
 		const options = normalizePluginOptions({ renderers });
 		renderers.registry.object = '/src/later.js';
+		renderers.boundaries['/src/object-boundaries.js'].Canvas.prop = 'content';
 		renderers.rules[0].include.push('src/**/*.later.tsrx');
 		const normalized = options.renderers!;
 
 		expect(normalized).toMatchObject({
 			registry: { object: { module: '/src/object-renderer.js', target: 'universal' } },
+			boundaries: {
+				'/src/object-boundaries.js': {
+					Canvas: {
+						ownerRenderer: 'dom',
+						childRenderer: 'object',
+						prop: 'children',
+					},
+				},
+			},
 			rules: [{ include: ['src/**/*.object.tsrx'], renderer: 'object' }],
 		});
 		expect(Object.isFrozen(normalized)).toBe(true);
 		expect(Object.isFrozen(normalized.registry)).toBe(true);
 		expect(Object.isFrozen(normalized.registry.object)).toBe(true);
+		expect(Object.isFrozen(normalized.boundaries)).toBe(true);
+		expect(Object.isFrozen(normalized.boundaries['/src/object-boundaries.js'])).toBe(true);
+		expect(Object.isFrozen(normalized.boundaries['/src/object-boundaries.js'].Canvas)).toBe(true);
 		expect(Object.isFrozen(normalized.rules)).toBe(true);
 		expect(Object.isFrozen(normalized.rules[0].include)).toBe(true);
 	});

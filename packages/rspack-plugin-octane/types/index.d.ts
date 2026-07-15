@@ -18,9 +18,18 @@ export type OctaneRendererRegistryEntry =
 			target?: 'dom' | 'universal';
 	  };
 
+/** Static metadata for a component prop lowered for another renderer. */
+export interface OctaneRendererBoundaryOptions {
+	ownerRenderer: string;
+	childRenderer: string;
+	prop: string;
+}
+
 /** @experimental Declarative renderer selection shared with other Octane compilers. */
 export interface OctaneRendererConfigOptions {
 	registry?: Readonly<Record<string, OctaneRendererRegistryEntry>>;
+	/** Boundary metadata keyed by stable module ID and export name. */
+	boundaries?: Readonly<Record<string, Readonly<Record<string, OctaneRendererBoundaryOptions>>>>;
 	default?: string;
 	rules?: readonly OctaneRendererRuleOptions[];
 }

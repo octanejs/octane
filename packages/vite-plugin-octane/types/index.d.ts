@@ -19,7 +19,10 @@ export interface OctanePluginOptions {
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.
 	 */
 	exclude?: string[];
-	/** @experimental Inline renderer selection until app-config loading moves before transforms. */
+	/**
+	 * @experimental Full renderer-config override. When omitted, the compiler
+	 * reads `compiler.renderers` from `octane.config.ts` before transforming modules.
+	 */
 	renderers?: ExperimentalRendererConfigOptions;
 }
 

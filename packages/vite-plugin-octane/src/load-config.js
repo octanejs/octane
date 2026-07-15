@@ -1,5 +1,7 @@
 // @ts-check
 
+import fs from 'node:fs';
+
 import {
 	getOctaneConfigPath,
 	loadOctaneConfig as loadCoreOctaneConfig,
@@ -78,9 +80,7 @@ async function withDefaultViteRunner(projectRoot, options, loader) {
 	try {
 		return await loader(projectRoot, {
 			...options,
-			moduleRunner: {
-				loadModule: (/** @type {string} */ id) => tempVite.ssrLoadModule(id),
-			},
+			moduleRunner: viteConfigModuleRunner(tempVite),
 		});
 	} finally {
 		await tempVite.close();
@@ -93,8 +93,51 @@ function withViteModuleRunner(options) {
 	const { vite, ...rest } = options;
 	return {
 		...rest,
-		moduleRunner: {
-			loadModule: (/** @type {string} */ id) => vite.ssrLoadModule(id),
+		moduleRunner: viteConfigModuleRunner(vite),
+	};
+}
+
+/**
+ * Adapt Vite's SSR runner and module graph to app-core's config-loader
+ * contract. Config evaluation itself is not enough: integrations also need
+ * the transitive file set so edits to imported renderer rules/boundary tables
+ * invalidate the compiler snapshot.
+ *
+ * @param {import('vite').ViteDevServer} vite
+ * @returns {import('@octanejs/app-core').ConfigModuleRunner}
+ */
+function viteConfigModuleRunner(vite) {
+	return {
+		loadModule: (/** @type {string} */ id) => vite.ssrLoadModule(id),
+		getDependencies(id) {
+			const graph = vite.environments.ssr.moduleGraph;
+			const roots = new Set();
+			const candidates = new Set([id]);
+			try {
+				// Vite canonicalizes graph IDs through realpath. Preserve the
+				// config loader's lexical path in its own metadata, but use both
+				// forms to find the root (notably /var -> /private/var on macOS).
+				candidates.add(fs.realpathSync(id));
+			} catch {
+				// The config loader reports the useful missing-file error.
+			}
+			for (const candidate of candidates) {
+				const byId = graph.getModuleById(candidate);
+				if (byId) roots.add(byId);
+				for (const module of graph.getModulesByFile(candidate) ?? []) roots.add(module);
+			}
+
+			const seen = new Set();
+			const dependencies = new Set();
+			/** @param {import('vite').EnvironmentModuleNode} module */
+			function visit(module) {
+				if (seen.has(module)) return;
+				seen.add(module);
+				if (module.file) dependencies.add(module.file);
+				for (const imported of module.importedModules) visit(imported);
+			}
+			for (const root of roots) visit(root);
+			return [...dependencies];
 		},
 	};
 }

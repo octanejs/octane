@@ -3,10 +3,10 @@
 // option forwarding to the bundled compiler, the appType default, and the
 // config resolution of `router.preHydrate` / RenderRoute `status`.
 import { fileURLToPath } from 'node:url';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createServer } from 'vite';
 import { octane, isViteOwnedUrl, resolveOctaneConfig, RenderRoute } from '../src/index.js';
 import { RESOLVED_ADAPTER_BROWSER_STUB_ID } from '../src/project-codegen.js';
@@ -94,6 +94,15 @@ describe('octane() plugin factory', () => {
 			hmr: false,
 			renderers: {
 				registry: { object: 'octane/universal' },
+				boundaries: {
+					'@octanejs/object-renderer': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'object',
+							prop: 'children',
+						},
+					},
+				},
 				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
 			},
 		});
@@ -106,6 +115,98 @@ describe('octane() plugin factory', () => {
 		);
 
 		expect(result.code).toMatch(/from ["']octane\/universal["']/);
+		expect(() =>
+			octane({
+				renderers: {
+					boundaries: {
+						'@octanejs/object-renderer': {
+							Canvas: {
+								ownerRenderer: 'dom',
+								childRenderer: 'missing',
+								prop: 'children',
+							},
+						},
+					},
+				},
+			}),
+		).toThrow(/childRenderer references unknown renderer "missing"/);
+	});
+
+	it('loads app renderer metadata before transforms and restarts for imported config changes', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-renderers-'));
+		const configPath = join(root, 'octane.config.ts');
+		const rendererConfigPath = join(root, 'renderer.config.ts');
+		try {
+			await writeFile(
+				rendererConfigPath,
+				`export const renderers = {
+	registry: { object: 'octane/universal' },
+	boundaries: {
+		'@octanejs/object-renderer': {
+			Canvas: { ownerRenderer: 'dom', childRenderer: 'object', prop: 'children' },
+		},
+	},
+	rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+};
+`,
+			);
+			await writeFile(
+				configPath,
+				`import { renderers } from './renderer.config.ts';
+export default { compiler: { renderers } };
+`,
+			);
+			const watchedRendererConfigPath = await realpath(rendererConfigPath);
+
+			const [compiler, meta] = octane({ hmr: false });
+			await (compiler.config as (config: { root: string }) => unknown)({ root });
+			const transform = compiler.transform as (code: string, id: string) => { code: string };
+			const appConfigured = transform.call(
+				{},
+				'export function Scene() @{ <node /> }',
+				join(root, 'src/scenes/Scene.object.tsrx'),
+			);
+			expect(appConfigured.code).toMatch(/from ["']octane\/universal["']/);
+			expect(appConfigured.code).toContain('"object"');
+
+			const add = vi.fn();
+			(meta.configureServer as (server: unknown) => void)({
+				watcher: { add },
+				middlewares: { use: vi.fn() },
+			});
+			expect(add).toHaveBeenCalledWith(
+				expect.arrayContaining([configPath, watchedRendererConfigPath]),
+			);
+
+			const restart = vi.fn(async () => undefined);
+			const hotUpdate = meta.hotUpdate as {
+				handler(context: unknown): Promise<unknown>;
+			};
+			await hotUpdate.handler.call(
+				{ environment: { name: 'client' } },
+				{ file: watchedRendererConfigPath, modules: [], server: { restart } },
+			);
+			expect(restart).toHaveBeenCalledOnce();
+
+			const [inlineCompiler] = octane({
+				hmr: false,
+				renderers: {
+					registry: { inline: 'octane/universal' },
+					rules: [{ include: 'src/**/*.object.tsrx', renderer: 'inline' }],
+				},
+			});
+			await (inlineCompiler.config as (config: { root: string }) => unknown)({ root });
+			const inlineConfigured = (
+				inlineCompiler.transform as (code: string, id: string) => { code: string }
+			).call(
+				{},
+				'export function Scene() @{ <node /> }',
+				join(root, 'src/scenes/Scene.object.tsrx'),
+			);
+			expect(inlineConfigured.code).toContain('"inline"');
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
 	});
 
 	it("keeps Vite's SPA default without app config and uses 'custom' for routed apps", async () => {

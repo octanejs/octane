@@ -8,12 +8,15 @@
 
 export const DOM_RENDERER_ID = 'dom';
 export const DOM_RENDERER_MODULE = 'octane';
-export const RENDERER_CONFIG_VERSION = 1;
+export const RENDERER_CONFIG_VERSION = 2;
 
 const RENDERER_ID = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
-const CONFIG_KEYS = new Set(['default', 'registry', 'rules', 'signature']);
+const MODULE_EXPORT_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const PROP_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const CONFIG_KEYS = new Set(['boundaries', 'default', 'registry', 'rules', 'signature']);
 const RULE_KEYS = new Set(['exclude', 'include', 'renderer']);
 const REGISTRY_ENTRY_KEYS = new Set(['module', 'target']);
+const BOUNDARY_ENTRY_KEYS = new Set(['childRenderer', 'ownerRenderer', 'prop']);
 
 function configError(message) {
 	return new Error(`octane/compiler/renderers: ${message}`);
@@ -82,6 +85,81 @@ function normalizeRegistryEntry(id, value, path) {
 	}
 
 	return Object.freeze({ module: moduleId, target });
+}
+
+function normalizeBoundaries(value, registry) {
+	if (value === undefined) return Object.freeze({});
+	if (!isRecord(value)) {
+		throw configError(
+			'compiler.renderers.boundaries must be an object keyed by module ID and export name.',
+		);
+	}
+
+	const modules = [];
+	for (const [moduleValue, rawExports] of Object.entries(value).sort(([a], [b]) =>
+		a < b ? -1 : a > b ? 1 : 0,
+	)) {
+		const moduleId = validateModuleId(
+			moduleValue,
+			`compiler.renderers.boundaries module ${JSON.stringify(moduleValue)}`,
+		);
+		const modulePath = `compiler.renderers.boundaries[${JSON.stringify(moduleId)}]`;
+		if (!isRecord(rawExports) || Object.keys(rawExports).length === 0) {
+			throw configError(`${modulePath} must contain at least one boundary export.`);
+		}
+
+		const exports = [];
+		for (const [exportName, rawBoundary] of Object.entries(rawExports).sort(([a], [b]) =>
+			a < b ? -1 : a > b ? 1 : 0,
+		)) {
+			const path = `${modulePath}[${JSON.stringify(exportName)}]`;
+			if (!MODULE_EXPORT_NAME.test(exportName)) {
+				throw configError(
+					`${path} must use a JavaScript export name (for example "Canvas", "Html", or "default").`,
+				);
+			}
+			if (!isRecord(rawBoundary)) {
+				throw configError(`${path} must be a renderer boundary metadata object.`);
+			}
+			assertKnownKeys(rawBoundary, BOUNDARY_ENTRY_KEYS, path);
+
+			const ownerRenderer = validateRendererId(rawBoundary.ownerRenderer, `${path}.ownerRenderer`);
+			const childRenderer = validateRendererId(rawBoundary.childRenderer, `${path}.childRenderer`);
+			if (!Object.hasOwn(registry, ownerRenderer)) {
+				throw configError(
+					`${path}.ownerRenderer references unknown renderer ${JSON.stringify(ownerRenderer)}.`,
+				);
+			}
+			if (!Object.hasOwn(registry, childRenderer)) {
+				throw configError(
+					`${path}.childRenderer references unknown renderer ${JSON.stringify(childRenderer)}.`,
+				);
+			}
+			if (ownerRenderer === childRenderer) {
+				throw configError(
+					`${path} must switch renderers; ownerRenderer and childRenderer are both ${JSON.stringify(ownerRenderer)}.`,
+				);
+			}
+			if (typeof rawBoundary.prop !== 'string' || !PROP_NAME.test(rawBoundary.prop)) {
+				throw configError(
+					`${path}.prop must be a JavaScript prop name (for example "children" or "content").`,
+				);
+			}
+			if (rawBoundary.prop === 'key' || rawBoundary.prop === '__proto__') {
+				throw configError(
+					`${path}.prop cannot be ${JSON.stringify(rawBoundary.prop)} because that name cannot carry a renderer-owned component prop.`,
+				);
+			}
+
+			exports.push([
+				exportName,
+				Object.freeze({ ownerRenderer, childRenderer, prop: rawBoundary.prop }),
+			]);
+		}
+		modules.push([moduleId, Object.freeze(Object.fromEntries(exports))]);
+	}
+
+	return Object.freeze(Object.fromEntries(modules));
 }
 
 function normalizePattern(value, path) {
@@ -277,6 +355,7 @@ export function normalizeRendererConfig(input = {}) {
 	}
 	entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 	const registry = Object.fromEntries(entries);
+	const boundaries = normalizeBoundaries(input.boundaries, registry);
 
 	const defaultRenderer = validateRendererId(
 		input.default ?? DOM_RENDERER_ID,
@@ -313,11 +392,21 @@ export function normalizeRendererConfig(input = {}) {
 		default: defaultRenderer,
 		registry: entries.map(([id, { module, target }]) => [id, module, target]),
 		rules: rules.map(({ renderer, include, exclude }) => [renderer, include, exclude]),
+		boundaries: Object.entries(boundaries).flatMap(([moduleId, exports]) =>
+			Object.entries(exports).map(([exportName, { ownerRenderer, childRenderer, prop }]) => [
+				moduleId,
+				exportName,
+				ownerRenderer,
+				childRenderer,
+				prop,
+			]),
+		),
 	});
 	return Object.freeze({
 		default: defaultRenderer,
 		registry: Object.freeze(registry),
 		rules: Object.freeze(rules),
+		boundaries,
 		signature,
 	});
 }

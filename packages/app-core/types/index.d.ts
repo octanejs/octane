@@ -202,10 +202,31 @@ export type ExperimentalRendererRegistryEntry =
 			target?: 'dom' | 'universal';
 	  };
 
+/**
+ * @experimental Static metadata for a component prop whose contents are owned
+ * by another renderer. Boundary declarations are keyed by the component's
+ * public module ID and export name in {@link ExperimentalRendererConfigOptions}.
+ */
+export interface ExperimentalRendererBoundaryOptions {
+	/** Renderer that owns the boundary component itself. */
+	ownerRenderer: string;
+	/** Renderer used to lower and execute the declared child region. */
+	childRenderer: string;
+	/** Component prop containing the renderer-owned region, usually `children`. */
+	prop: string;
+}
+
 /** @experimental See {@link ExperimentalRendererRuleOptions}. */
 export interface ExperimentalRendererConfigOptions {
 	/** Renderer aliases mapped to package/project-root module IDs or explicit descriptors. */
 	registry?: Record<string, ExperimentalRendererRegistryEntry>;
+	/**
+	 * Boundary metadata keyed first by stable package/project-root module ID,
+	 * then by the component's export name (`default` for a default export).
+	 */
+	boundaries?: Readonly<
+		Record<string, Readonly<Record<string, ExperimentalRendererBoundaryOptions>>>
+	>;
 	/** Renderer used when no rule matches. @default 'dom' */
 	default?: string;
 	/** Ordered filename rules. The first matching rule wins. */
@@ -225,9 +246,19 @@ export interface ExperimentalResolvedRendererRegistryEntry {
 	readonly target: 'dom' | 'universal';
 }
 
+/** @experimental Canonical renderer-owned child-region metadata. */
+export interface ExperimentalResolvedRendererBoundary {
+	readonly ownerRenderer: string;
+	readonly childRenderer: string;
+	readonly prop: string;
+}
+
 /** @experimental Canonical form used by compiler integrations and cache keys. */
 export interface ExperimentalResolvedRendererConfig {
 	readonly registry: Readonly<Record<string, ExperimentalResolvedRendererRegistryEntry>>;
+	readonly boundaries: Readonly<
+		Record<string, Readonly<Record<string, ExperimentalResolvedRendererBoundary>>>
+	>;
 	readonly default: string;
 	readonly rules: readonly ExperimentalResolvedRendererRule[];
 	readonly signature: string;
