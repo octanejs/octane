@@ -267,6 +267,48 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
+	it('the benchmark Visx charts preserve their server geometry through hydration', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
+		try {
+			const charts = page.locator('svg.bench-chart');
+			expect(await charts.count()).toBe(18);
+			const firstChart = charts.first();
+			const serverChart = await firstChart.elementHandle();
+			expect(serverChart).toBeTruthy();
+			const geometry = await firstChart.evaluate((svg) => ({
+				width: svg.getAttribute('width'),
+				height: svg.getAttribute('height'),
+				viewBox: svg.getAttribute('viewBox'),
+				bars: svg.querySelectorAll('.visx-bar').length,
+			}));
+
+			await page.waitForTimeout(750);
+
+			expect(await page.locator('.recharts-wrapper').count()).toBe(0);
+			expect(await page.locator('.bench-plot-shell').count()).toBe(0);
+			expect(await charts.count()).toBe(18);
+			expect(
+				await page.evaluate(
+					(original) => document.querySelector('svg.bench-chart') === original,
+					serverChart,
+				),
+			).toBe(true);
+			expect(
+				await firstChart.evaluate((svg) => ({
+					width: svg.getAttribute('width'),
+					height: svg.getAttribute('height'),
+					viewBox: svg.getAttribute('viewBox'),
+					bars: svg.querySelectorAll('.visx-bar').length,
+				})),
+			).toEqual(geometry);
+			expect(geometry.bars).toBeGreaterThan(0);
+			const real = errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
 	it('the Core APIs live examples handle events after hydration', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis');
 		try {

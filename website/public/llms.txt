@@ -80,7 +80,7 @@ Bindings — reach for these when asked about the React equivalent:
 - **Positioning** — `@octanejs/floating-ui` ports `@floating-ui/react`: positioning plus interactions for tooltips, popovers, dropdowns, and menus.
 - **Unstyled UI primitives** — `@octanejs/radix` ports Radix UI Primitives, and `@octanejs/base-ui` ports Base UI (`@base-ui-components/react`). Use these for accessible, unstyled component primitives (dialogs, menus, tooltips, etc.).
 - **Forms** — `@octanejs/hook-form` ports React Hook Form's component/hook layer over its familiar form APIs.
-- **Charts** — `@octanejs/recharts` ports Recharts for composable SVG charts.
+- **Charts** — `@octanejs/visx` exposes the complete Visx 4.x web surface; `@octanejs/recharts` ports Recharts' composable chart API.
 - **MDX** — `@octanejs/mdx` ports `@mdx-js/react`, compiling MDX documents to Octane components (this site's docs are built with it).
 - **Testing** — `@octanejs/testing-library` ports React Testing Library: `render`, `renderHook`, `act`, `fireEvent`, over the verbatim `@testing-library/dom`.
 
