@@ -116,20 +116,20 @@
       "workstream": "External stores",
       "filePattern": "/useSyncExternalStoreShared-test\\.js$",
       "risk": "high",
-      "status": "planned",
+      "status": "covered",
       "classification": "portable",
       "owner": "runtime",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Seventeen snapshot, notification, selector, error, and hydration outcomes have executable evidence; React 17 legacy-shim timing and selector invocation-count optimization are documented non-goals."
     },
     {
       "id": "update-reconciliation",
       "workstream": "Update reconciliation",
       "filePattern": "/ReactUpdates[^/]*-test(?:\\.internal)?\\.js$",
       "risk": "high",
-      "status": "planned",
+      "status": "covered",
       "classification": "adaptable",
       "owner": "runtime",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Twenty-five function/hook batching, ordering, deletion, re-entry, and loop-stability outcomes have executable evidence; synchronous first-mount timing is an executable documented divergence and twenty-one class, legacy, Fiber, or owner-stack cases are documented non-goals."
     },
     {
       "id": "fizz-streaming",
@@ -163,19 +163,19 @@
     }
   ],
   "octaneSuiteBaseline": {
-    "normalCoreCases": 2480,
+    "normalCoreCases": 2591,
     "normalCoreBreakdown": {
-      "conformance": 1171,
-      "differential": 136,
+      "conformance": 1219,
+      "differential": 137,
       "hydration": 135,
-      "other": 1038
+      "other": 1100
     },
     "profilingOnlyCases": 14,
-    "distinctCoreCasesIncludingProfiling": 2494,
-    "productionModeReruns": 2480,
-    "allWorkspaceExecutions": 7584,
-    "reactSourceAttributedFileUpperBound": 1154,
-    "reactSourceAttributedFiles": 72,
+    "distinctCoreCasesIncludingProfiling": 2605,
+    "productionModeReruns": 2591,
+    "allWorkspaceExecutions": 7813,
+    "reactSourceAttributedFileUpperBound": 1202,
+    "reactSourceAttributedFiles": 74,
     "reactSourceAttributedDefinition": "Every collected normal-core case in a local file containing at least one React upstream *-test.js or *-test.ts filename citation; this is a generous file-level upper bound, not a one-to-one port count.",
     "measuredOn": "2026-07-15"
   }

@@ -81,7 +81,7 @@
       "additionalProperties": false,
       "required": ["file", "testName"],
       "properties": {
-        "file": { "type": "string", "pattern": "^packages/octane/tests/" },
+        "file": { "type": "string", "pattern": "^packages/[^/]+/tests/" },
         "testName": { "type": "string", "minLength": 1 },
         "modes": {
           "type": "array",

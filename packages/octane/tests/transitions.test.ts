@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mount, act, createLog } from './_helpers';
 import { flushSync } from '../src/index.js';
 import {
@@ -67,20 +67,30 @@ describe('useTransition — keeps prior DOM during suspended transition', () => 
 		expect(r.find('#pending').textContent).toBe('idle');
 		expect(r.findAll('#fallback')).toHaveLength(0);
 
-		// Swap inside startTransition. d2 is still pending — the render suspends
-		// but DOM stays mounted (no fallback) and isPending flips true.
-		r.click('#swap');
-		expect(r.find('#value').textContent).toBe('one'); // OLD value held
-		expect(r.findAll('#fallback')).toHaveLength(0); // no fallback flash
-		expect(r.find('#pending').textContent).toBe('pending');
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			// Swap inside startTransition. d2 is still pending — the render suspends
+			// but DOM stays mounted (no fallback) and isPending flips true.
+			r.click('#swap');
+			expect(r.find('#value').textContent).toBe('one'); // OLD value held
+			expect(r.findAll('#fallback')).toHaveLength(0); // no fallback flash
+			expect(r.find('#pending').textContent).toBe('pending');
 
-		// Resolve d2 — DOM updates to new value, isPending returns to idle.
-		await act(() => {
-			d2.resolve('two');
-		});
-		expect(r.find('#value').textContent).toBe('two');
-		expect(r.find('#pending').textContent).toBe('idle');
-		r.unmount();
+			// Resolve d2 — DOM updates to new value, isPending returns to idle.
+			await act(() => {
+				d2.resolve('two');
+			});
+			expect(r.find('#value').textContent).toBe('two');
+			expect(r.find('#pending').textContent).toBe('idle');
+			expect(
+				error.mock.calls.filter(([message]) =>
+					String(message).includes('Cannot update a component'),
+				),
+			).toEqual([]);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
 	});
 
 	it('initial mount that suspends — even inside a transition — still shows fallback', async () => {

@@ -4,7 +4,7 @@
 // selection matches the previous one, the previous REFERENCE is kept so the
 // store's uSES doesn't re-render.
 import { useSyncExternalStore, useRef, useMemo, useEffect } from 'octane';
-import { subSlot } from '../internal';
+import { splitSlot, subSlot } from '../internal';
 
 const objectIs: (x: unknown, y: unknown) => boolean =
 	typeof Object.is === 'function'
@@ -16,9 +16,14 @@ export function useSyncExternalStoreWithSelector<Snapshot, Selection>(
 	getSnapshot: () => Snapshot,
 	getServerSnapshot: undefined | null | (() => Snapshot),
 	selector: (snapshot: Snapshot) => Selection,
-	isEqual?: (a: Selection, b: Selection) => boolean,
-	slot?: symbol,
+	...rest: [isEqual?: (a: Selection, b: Selection) => boolean, slot?: symbol]
 ): Selection {
+	// A compiled direct call that omits the optional equality function arrives as
+	// `[slot]`, while binding-internal calls arrive as `[isEqual, slot]`. Split the
+	// compiler-owned tail before interpreting the user argument so a Symbol can
+	// never be mistaken for an equality function.
+	const [userArgs, slot] = splitSlot(rest);
+	const isEqual = userArgs[0] as ((a: Selection, b: Selection) => boolean) | undefined;
 	const instRef = useRef<{ hasValue: boolean; value: Selection | null } | null>(
 		null,
 		subSlot(slot, 'ws:inst'),

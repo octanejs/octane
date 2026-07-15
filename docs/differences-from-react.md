@@ -188,6 +188,11 @@ compiled-component entry point, `root.render(App, props)`, which avoids creating
 an element descriptor at application bootstrap. A bare function passed to
 `root.render` is therefore intentional, not an invalid-child warning.
 
+The first `root.render()` mounts synchronously. React's concurrent root queues
+its initial mount, so a render followed by an unmount in the same surrounding
+batch exposes no intermediate DOM there; Octane may expose the mounted DOM
+before its synchronous unmount leaves the same empty final state.
+
 After `root.unmount()`, the root is permanently closed. If outside code removes
 some of a root's managed DOM first, unmount still performs safe cleanup instead
 of surfacing the browser's incidental `NotFoundError` from removing an already
