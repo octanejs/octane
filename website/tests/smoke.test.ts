@@ -92,13 +92,23 @@ describe('website routes', () => {
 		}
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
-		// The checked-in benchmark summary reaches the chart and table renderers.
-		const summary = container.querySelector('figure.bench-card');
-		expect(summary?.querySelector('figcaption')).toBeTruthy();
-		expect(summary?.querySelector('svg.home-bench-chart')).toBeTruthy();
-		expect(summary?.querySelectorAll('.visx-bar')).toHaveLength(expectedBarCount(HOME_SUMMARY));
-		expect(summary?.querySelector('.recharts-wrapper')).toBeNull();
-		expect(summary?.querySelector('details table')).toBeTruthy();
+		// The home page stages the interactive benchmark explorer over the checked-in
+		// ×-vs-Octane summary (HOME_SUMMARY). The explorer's own interactions live in
+		// benchmark-explorer.test.ts; here assert the section composes and the summary
+		// reaches the mounted views.
+		const explorer = container.querySelector('section.explorer')!;
+		expect(explorer).toBeTruthy();
+		expect(explorer.querySelector('#explorer-heading')?.textContent?.trim()).toBeTruthy();
+		expect(findLink(explorer, '/benchmarks')).toBeTruthy();
+		const bx = explorer.querySelector('.bx')!;
+		expect(bx).toBeTruthy();
+		// Interactive views are mount-gated: the SSR fallback table swaps for the bar
+		// chart + heatmap on mount. Wait for the plot, then assert every suite row of
+		// the summary reaches the heatmap.
+		await waitFor(() => {
+			if (!bx.querySelector('.bx-plot')) throw new Error('explorer not mounted');
+		});
+		expect(bx.querySelectorAll('.bx-heat tbody tr')).toHaveLength(HOME_SUMMARY.rows.length);
 
 		// Section links sit with the wordmark on the left; search and the social
 		// icons form the right cluster.
