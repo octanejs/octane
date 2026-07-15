@@ -225,9 +225,45 @@ interface ElementDescriptor {
 	// React-style `key`, lifted out of props (consulted by the client's de-opt list
 	// path on hydration; the server only renders it into markup).
 	key: any;
+	// React 19 ref-as-prop plus the deprecated element-level alias.
+	ref: any;
 	// `createElement(type, props, ...children)` children for the host form; `null`
 	// for the component-value form (children flow through the component's props).
 	children: any;
+}
+
+function hasElementConfigKey(config: any): boolean {
+	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
+	const own = Object.getOwnPropertyDescriptor(config, 'key');
+	if (own?.get != null && (own.get as any).isReactWarning) return false;
+	return config.key !== undefined;
+}
+
+function copyElementConfig(config: any): any {
+	const props: any = {};
+	if (config == null) return props;
+	for (const name in config) {
+		if (name !== 'key' && Object.prototype.hasOwnProperty.call(config, name)) {
+			props[name] = config[name];
+		}
+	}
+	return props;
+}
+
+function applyElementDefaultProps(type: any, props: any): void {
+	const defaults = type?.defaultProps;
+	if (defaults == null) return;
+	for (const name in defaults) {
+		if (props[name] === undefined) props[name] = defaults[name];
+	}
+}
+
+function finalizeElementDescriptor(descriptor: ElementDescriptor): ElementDescriptor {
+	if (process.env.NODE_ENV !== 'production') {
+		Object.freeze(descriptor.props);
+		Object.freeze(descriptor);
+	}
+	return descriptor;
 }
 
 // Server `createElement(type, props, ...children)` — produces the SAME descriptor
@@ -241,28 +277,24 @@ export function createElement(
 	...children: any[]
 ): ElementDescriptor {
 	const src = (props ?? null) as any;
-	const key = src != null && src.key != null ? src.key : null;
-	const kids =
-		children.length > 0 ? (children.length === 1 ? children[0] : children) : src?.children;
+	const key = hasElementConfigKey(src) ? '' + src.key : null;
+	let kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : src?.children;
+	if (children.length > 1 && process.env.NODE_ENV !== 'production') Object.freeze(children);
 	// Lift `key` OUT of props (React semantics — key is never a real prop), and mirror
 	// positional children into `props.children` for the same React element shape as the
 	// client runtime. Positional children override an explicit `props.children`.
-	let p = src ?? {};
-	const stripKey = src != null && 'key' in src;
-	const addChildren = children.length > 0;
-	if (stripKey || addChildren) {
-		// Manual copy-minus-key, NOT spread + delete: `delete` drops the object
-		// into V8 dictionary mode, slowing every later for-in over these props
-		// (mirrors the client createElement; own-key guard matches spread).
-		p = {};
-		if (src != null) {
-			for (const k in src) {
-				if (k !== 'key' && Object.prototype.hasOwnProperty.call(src, k)) p[k] = src[k];
-			}
-		}
-		if (addChildren) p.children = kids;
-	}
-	return { $$kind: ELEMENT_TAG, type, props: p, key, children: kids ?? null };
+	const p = copyElementConfig(src);
+	if (children.length > 0) p.children = kids;
+	applyElementDefaultProps(type, p);
+	kids = p.children;
+	return finalizeElementDescriptor({
+		$$kind: ELEMENT_TAG,
+		type,
+		props: p,
+		key,
+		ref: p.ref !== undefined ? p.ref : null,
+		children: kids ?? null,
+	});
 }
 
 // Server half of the client runtime's `positionalChildren` (see runtime.ts): the
@@ -308,12 +340,13 @@ export function cloneElement(
 			'cloneElement: the first argument must be an element (from createElement / JSX).',
 		);
 	}
-	const props: any = { ...(element.props as any) };
+	const props = copyElementConfig(element.props);
 	let key = element.key;
 	if (config != null) {
-		if (config.key !== undefined && config.key !== null) key = config.key;
+		if (hasElementConfigKey(config)) key = '' + config.key;
 		for (const name in config) {
 			if (name === 'key') continue;
+			if (name === 'ref' && config.ref === undefined) continue;
 			if (Object.prototype.hasOwnProperty.call(config, name)) props[name] = config[name];
 		}
 	}
@@ -327,53 +360,214 @@ export function cloneElement(
 		// No new children: reuse `config.children` (now merged into props) or the original.
 		kids = 'children' in props ? props.children : element.children;
 	}
-	if (kids !== undefined) props.children = kids;
-	return { $$kind: ELEMENT_TAG, type: element.type, props, key, children: kids ?? null };
+	if (n > 0) props.children = kids;
+	return finalizeElementDescriptor({
+		$$kind: ELEMENT_TAG,
+		type: element.type,
+		props,
+		key,
+		ref: props.ref !== undefined ? props.ref : null,
+		children: kids ?? null,
+	});
 }
 
-// Visit each leaf of `children` (flattening arrays), passing empties through as
-// `null`. Matches the client runtime's `traverseChildren` (see runtime.ts).
-function traverseChildren(children: any, fn: (child: any, index: number) => void): number {
-	if (children == null) return 0;
-	let index = 0;
-	const walk = (node: any): void => {
-		if (Array.isArray(node)) {
-			for (let i = 0; i < node.length; i++) walk(node[i]);
-			return;
+function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): ElementDescriptor {
+	return finalizeElementDescriptor({
+		$$kind: ELEMENT_TAG,
+		type: element.type,
+		props: element.props,
+		key,
+		ref: element.ref,
+		children: element.children,
+	});
+}
+
+function escapeElementKey(key: string): string {
+	return '$' + key.replace(/[=:]/g, (match) => (match === '=' ? '=0' : '=2'));
+}
+
+function escapeMappedElementKey(key: string): string {
+	return key.replace(/\/+/g, '$&/');
+}
+
+function childElementKey(child: any, index: number): string {
+	return child != null && typeof child === 'object' && child.key != null
+		? escapeElementKey('' + child.key)
+		: index.toString(36);
+}
+
+function childrenIterator(children: any): (() => Iterator<any>) | null {
+	if (children == null || typeof children !== 'object') return null;
+	const iterator =
+		(typeof Symbol === 'function' && (children as any)[Symbol.iterator]) ||
+		(children as any)['@@iterator'];
+	return typeof iterator === 'function' ? iterator : null;
+}
+
+interface ChildrenThenable<T = any> extends PromiseLike<T> {
+	status?: 'pending' | 'fulfilled' | 'rejected';
+	value?: T;
+	reason?: any;
+}
+
+function resolveChildrenThenable(thenable: ChildrenThenable): any {
+	// Inside an SSR pass, route through use() so the active @try/Suspense
+	// boundary receives the private sentinel and render() records the promise for
+	// a retry. A direct public Children call has no such boundary: track the
+	// thenable in React's public shape and throw the pending thenable itself,
+	// never leaking Octane's server-only sentinel to userland.
+	if (FRAME !== null) return use(thenable);
+	if (thenable.status === undefined) {
+		thenable.status = 'pending';
+		thenable.then(
+			(value) => {
+				thenable.status = 'fulfilled';
+				thenable.value = value;
+			},
+			(reason) => {
+				thenable.status = 'rejected';
+				thenable.reason = reason;
+			},
+		);
+	}
+	if (thenable.status === 'fulfilled') return thenable.value;
+	if (thenable.status === 'rejected') throw thenable.reason;
+	throw thenable;
+}
+
+function invalidChildError(child: object): Error {
+	const rendered = String(child);
+	const found =
+		rendered === '[object Object]'
+			? 'object with keys {' + Object.keys(child).join(', ') + '}'
+			: rendered;
+	return new Error(
+		'Objects are not valid as an Octane child (found: ' +
+			found +
+			'). If you meant to render a collection of children, use an array instead.',
+	);
+}
+
+function mapIntoChildren(
+	children: any,
+	out: any[],
+	escapedPrefix: string,
+	nameSoFar: string,
+	callback: (child: any) => any,
+): number {
+	let type = typeof children;
+	if (type === 'undefined' || type === 'boolean') {
+		children = null;
+		type = 'object';
+	}
+	const isLeaf =
+		children === null ||
+		type === 'string' ||
+		type === 'number' ||
+		type === 'bigint' ||
+		isElementDescriptor(children) ||
+		(children != null && children.$$kind === PORTAL_TAG);
+	if (isLeaf) {
+		const child = children;
+		let mapped = callback(child);
+		const childKey = nameSoFar === '' ? '.' + childElementKey(child, 0) : nameSoFar;
+		if (Array.isArray(mapped)) {
+			mapIntoChildren(mapped, out, escapeMappedElementKey(childKey) + '/', '', (value) => value);
+		} else if (mapped != null) {
+			if (isElementDescriptor(mapped)) {
+				const mappedKey = mapped.key;
+				mapped = cloneAndReplaceElementKey(
+					mapped,
+					escapedPrefix +
+						(mappedKey != null && (!child || child.key !== mappedKey)
+							? escapeMappedElementKey('' + mappedKey) + '/'
+							: '') +
+						childKey,
+				);
+			}
+			out.push(mapped);
 		}
-		fn(node == null || typeof node === 'boolean' ? null : node, index++);
-	};
-	walk(children);
-	return index;
+		return 1;
+	}
+
+	let count = 0;
+	const nextPrefix = nameSoFar === '' ? '.' : nameSoFar + ':';
+	if (Array.isArray(children)) {
+		for (let i = 0; i < children.length; i++) {
+			const child = children[i];
+			count += mapIntoChildren(
+				child,
+				out,
+				escapedPrefix,
+				nextPrefix + childElementKey(child, i),
+				callback,
+			);
+		}
+		return count;
+	}
+
+	const iterator = childrenIterator(children);
+	if (iterator !== null) {
+		const cursor = iterator.call(children);
+		let step: IteratorResult<any>;
+		let i = 0;
+		while (!(step = cursor.next()).done) {
+			const child = step.value;
+			count += mapIntoChildren(
+				child,
+				out,
+				escapedPrefix,
+				nextPrefix + childElementKey(child, i++),
+				callback,
+			);
+		}
+		return count;
+	}
+
+	if (type === 'object') {
+		if (typeof children.then === 'function') {
+			return mapIntoChildren(
+				resolveChildrenThenable(children),
+				out,
+				escapedPrefix,
+				nameSoFar,
+				callback,
+			);
+		}
+		throw invalidChildError(children);
+	}
+	return 0;
 }
 
 // Server half of the client runtime's React-compatible `Children` — identical
 // pure descriptor-value logic (see runtime.ts for the semantics comments).
 export const Children = {
-	forEach(children: any, fn: (child: any, index: number) => void): void {
-		traverseChildren(children, fn);
+	forEach(children: any, fn: (child: any, index: number) => void, context?: any): void {
+		if (children == null) return;
+		let index = 0;
+		mapIntoChildren(children, [], '', '', (child) => {
+			fn.call(context, child, index++);
+			return null;
+		});
 	},
-	map<T>(children: any, fn: (child: any, index: number) => T): T[] | null | undefined {
+	map<T>(
+		children: any,
+		fn: (child: any, index: number) => T,
+		context?: any,
+	): T[] | null | undefined {
 		if (children == null) return children as null | undefined;
 		const out: T[] = [];
-		traverseChildren(children, (child, i) => {
-			const mapped = fn(child, i);
-			if (Array.isArray(mapped)) {
-				for (const m of mapped) if (m != null && typeof m !== 'boolean') out.push(m as T);
-			} else if (mapped != null && typeof mapped !== 'boolean') {
-				out.push(mapped);
-			}
-		});
+		let index = 0;
+		mapIntoChildren(children, out, '', '', (child) => fn.call(context, child, index++));
 		return out;
 	},
 	count(children: any): number {
-		return traverseChildren(children, () => {});
+		if (children == null) return 0;
+		return mapIntoChildren(children, [], '', '', () => null);
 	},
 	toArray(children: any): any[] {
 		const out: any[] = [];
-		traverseChildren(children, (child) => {
-			if (child != null) out.push(child);
-		});
+		if (children != null) mapIntoChildren(children, out, '', '', (child) => child);
 		return out;
 	},
 	only<T>(children: T): T {
@@ -2419,6 +2613,45 @@ export function warmChild(comp: any, props: any): void {
 // lives on the wrapper itself (module-level, like the client), so the key only
 // has to be unique per lazy() call — not per frame like use()'s data keys.
 let LAZY_ID = 0;
+const LAZY_COMPONENT = Symbol.for('octane.lazy');
+
+function lazyResolvedProps(comp: ServerComponent, props: any): any {
+	const defaults = (comp as any).defaultProps;
+	if (defaults == null || typeof defaults !== 'object') return props;
+	let resolved = props;
+	for (const key of Object.keys(defaults)) {
+		if (props == null || props[key] === undefined) {
+			if (resolved === props) resolved = props == null ? {} : { ...props };
+			resolved[key] = defaults[key];
+		}
+	}
+	return resolved;
+}
+
+function resolveLazyModule(mod: any): ServerComponent {
+	let comp = mod;
+	if (mod != null) {
+		const defaultExport = mod.default;
+		if (defaultExport !== undefined) comp = defaultExport;
+	}
+	if (typeof comp !== 'function' || (comp as any)[LAZY_COMPONENT] === true) {
+		throw new Error(
+			'lazy: expected the load() promise to resolve to a component function or a ' +
+				"module with a component as its default export, got '" +
+				((comp as any)?.[LAZY_COMPONENT] === true ? 'lazy component' : typeof comp) +
+				"'",
+		);
+	}
+	return comp as ServerComponent;
+}
+
+function callLazyComponent(mod: any, props: any, scope: SSRScope, extra?: any): unknown {
+	// Resolve `.default` at render time. If an accessor throws, a later render
+	// reads it again without re-running the already-fulfilled loader, matching the
+	// client and React payload semantics.
+	const comp = resolveLazyModule(mod);
+	return comp(lazyResolvedProps(comp, props), scope, extra);
+}
 
 /**
  * React's `lazy(load)` — the server mirror of the client wrapper. Unresolved,
@@ -2431,36 +2664,44 @@ let LAZY_ID = 0;
  */
 export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
 	let status: 'uninitialized' | 'pending' | 'fulfilled' | 'rejected' = 'uninitialized';
-	let result: any = null; // fulfilled → component; rejected → the reason
+	let result: any = null; // fulfilled → module value; rejected → the reason
 	let promise: PromiseLike<unknown> | null = null;
 	const key = '|lazy#' + LAZY_ID++;
 	const lazyWrapper = (props: any, scope: SSRScope, extra?: any): unknown => {
-		if (status === 'fulfilled') return (result as ServerComponent)(props, scope, extra);
+		if (status === 'fulfilled') {
+			return callLazyComponent(result as ServerComponent, props, scope, extra);
+		}
 		if (status === 'rejected') throw result;
 		if (status === 'uninitialized') {
-			status = 'pending';
-			promise = load();
-			promise.then(
-				(mod: any) => {
-					const comp = mod != null && mod.default !== undefined ? mod.default : mod;
-					if (typeof comp !== 'function') {
-						status = 'rejected';
-						result = new Error(
-							'lazy: expected the load() promise to resolve to a component function or a ' +
-								"module with a component as its default export, got '" +
-								typeof comp +
-								"'",
-						);
-					} else {
-						status = 'fulfilled';
-						result = comp;
-					}
-				},
-				(err: any) => {
-					status = 'rejected';
-					result = err;
-				},
-			);
+			try {
+				const loaded = load();
+				promise = loaded;
+				loaded.then(
+					(mod: any) => {
+						if (status === 'uninitialized' || status === 'pending') {
+							status = 'fulfilled';
+							result = mod;
+						}
+					},
+					(err: any) => {
+						if (status === 'uninitialized' || status === 'pending') {
+							status = 'rejected';
+							result = err;
+						}
+					},
+				);
+			} catch (error) {
+				// Do not publish a pending payload until loader and subscription setup
+				// both complete. Synchronous failures are retried on the next render.
+				if (status === 'uninitialized') promise = null;
+				throw error;
+			}
+			if (status === 'uninitialized') status = 'pending';
+			const settledStatus = status as 'pending' | 'fulfilled' | 'rejected';
+			if (settledStatus === 'fulfilled') {
+				return callLazyComponent(result as ServerComponent, props, scope, extra);
+			}
+			if (settledStatus === 'rejected') throw result;
 		}
 		// Same suspend bookkeeping as use(thenable), minus the SERIAL seed push.
 		if (SUSPENDED !== null) SUSPENDED.push({ promise: promise!, key });
@@ -2476,6 +2717,7 @@ export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
 		}
 		throw SSR_SUSPENSE;
 	};
+	Object.defineProperty(lazyWrapper, LAZY_COMPONENT, { value: true });
 	return lazyWrapper as unknown as C;
 }
 

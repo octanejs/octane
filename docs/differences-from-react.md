@@ -181,6 +181,30 @@ vite plugin for React-timing waterfall semantics). Idiomatic sequential
   thenable ("uncached promise" dev warning), and a replay that discovers a new
   pending `use()` behind a data dependency gets a dev waterfall diagnostic.
 
+## Root component entry points and container ownership
+
+`root.render(<App />)` is React-compatible. Octane also retains its original
+compiled-component entry point, `root.render(App, props)`, which avoids creating
+an element descriptor at application bootstrap. A bare function passed to
+`root.render` is therefore intentional, not an invalid-child warning.
+
+After `root.unmount()`, the root is permanently closed. If outside code removes
+some of a root's managed DOM first, unmount still performs safe cleanup instead
+of surfacing the browser's incidental `NotFoundError` from removing an already
+detached node.
+
+## `lazy()` module resolution
+
+Like React, `lazy(load)` accepts a thenable that resolves to a module object with
+a `default` component. Octane additionally accepts a bare component as the
+resolved value, making named dynamic imports usable without a default-export
+shim. Nested lazy wrappers are rejected.
+
+React's Suspense and ViewTransition values are exotic element types and React
+rejects wrapping them in `lazy()`. Octane exposes those boundaries as ordinary
+component functions, so a lazy wrapper preserves their normal component
+behavior.
+
 ## Errors: `@try` / `@catch`, not class boundaries
 
 `@catch (err, reset)` (and the JSX `<ErrorBoundary>`) replaces class
@@ -203,9 +227,9 @@ rather than throwing.
 
 ## Not implemented (by design)
 
-Class components, Server Components/RSC, `StrictMode` double-invoke,
+Class components, legacy `ReactDOM.render` roots, Server Components/RSC, `StrictMode` double-invoke,
 `Profiler`, `SuspenseList`, `forwardRef`/`createRef` (refs are props),
-`useDebugValue` is a no-op, `cache()`, `React.Children` beyond the basics.
+`useDebugValue` is a no-op, and `cache()`.
 Resource hints ARE supported
 (`preload`/`preinit`/`preconnect`/`prefetchDNS`). React-19 custom-element
 listener semantics ARE supported (a function-valued lowercase `on*` prop on a

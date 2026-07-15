@@ -262,6 +262,32 @@ function validatorFixture() {
 	return { inventory, upstreams, entry };
 }
 
+function priorityValidatorFixture() {
+	const fixture = validatorFixture();
+	fixture.upstreams.triagePolicies = [
+		{
+			id: 'example-policy',
+			filePattern: '/Example-test\\.js$',
+			status: 'planned',
+			classification: 'adaptable',
+			risk: 'high',
+			owner: 'runtime',
+			workstream: 'Example behavior',
+			rationale: 'Exercise the observable example behavior.',
+		},
+	];
+	fixture.entry = {
+		...fixture.entry,
+		status: 'planned',
+		classification: 'adaptable',
+		risk: 'high',
+		owner: 'runtime',
+		workstream: 'Example behavior',
+		rationale: 'Exercise the observable example behavior.',
+	};
+	return fixture;
+}
+
 describe('React parity validators', () => {
 	test('rejects duplicate, missing, and unknown ledger IDs', () => {
 		const { inventory, upstreams, entry } = validatorFixture();
@@ -303,6 +329,127 @@ describe('React parity validators', () => {
 		);
 
 		assert(errors.some((error) => error.includes('must be triaged')));
+	});
+
+	test('allows documented priority cases to override classification and risk', () => {
+		for (const classification of ['divergence', 'non_goal']) {
+			const { inventory, upstreams, entry } = priorityValidatorFixture();
+			const errors = validateLedger(
+				{
+					schemaVersion: 1,
+					entries: [
+						{
+							...entry,
+							status: 'documented',
+							classification,
+							risk: 'low',
+							rationale: 'This supported surface intentionally differs from React.',
+						},
+					],
+				},
+				[inventory],
+				process.cwd(),
+				upstreams,
+			);
+
+			assert.deepEqual(errors, []);
+		}
+	});
+
+	test('rejects priority classification and risk overrides outside a documented disposition', () => {
+		for (const status of ['planned', 'covered']) {
+			const { inventory, upstreams, entry } = priorityValidatorFixture();
+			const errors = validateLedger(
+				{
+					schemaVersion: 1,
+					entries: [
+						{
+							...entry,
+							status,
+							classification: 'divergence',
+							risk: 'low',
+							rationale: 'This is not a documented disposition.',
+						},
+					],
+				},
+				[inventory],
+				process.cwd(),
+				upstreams,
+			);
+
+			assert(
+				errors.includes(
+					`Priority case ${entry.caseId} does not satisfy example-policy classification.`,
+				),
+			);
+			assert(
+				errors.includes(`Priority case ${entry.caseId} does not satisfy example-policy risk.`),
+			);
+		}
+	});
+
+	test('rejects malformed documented priority overrides and preserves policy ownership', () => {
+		const malformedCases = [
+			{
+				classification: 'divergence',
+				risk: 'low',
+				rationale: '',
+			},
+			{
+				classification: 'portable',
+				risk: 'low',
+				rationale: 'A portable classification is not an intentional override.',
+			},
+			{
+				classification: 'non_goal',
+				risk: 'unassessed',
+				rationale: 'A documented disposition must carry an assessed risk.',
+			},
+		];
+
+		for (const malformed of malformedCases) {
+			const { inventory, upstreams, entry } = priorityValidatorFixture();
+			const errors = validateLedger(
+				{
+					schemaVersion: 1,
+					entries: [{ ...entry, ...malformed, status: 'documented' }],
+				},
+				[inventory],
+				process.cwd(),
+				upstreams,
+			);
+
+			assert(
+				errors.some((error) =>
+					error.startsWith(`Priority case ${entry.caseId} does not satisfy example-policy`),
+				),
+			);
+		}
+
+		const { inventory, upstreams, entry } = priorityValidatorFixture();
+		const ownershipErrors = validateLedger(
+			{
+				schemaVersion: 1,
+				entries: [
+					{
+						...entry,
+						status: 'documented',
+						classification: 'divergence',
+						risk: 'low',
+						owner: 'someone else',
+						rationale: 'The classification is intentional, but ownership cannot drift.',
+					},
+				],
+			},
+			[inventory],
+			process.cwd(),
+			upstreams,
+		);
+		assert(
+			ownershipErrors.includes(
+				`Priority case ${entry.caseId} does not satisfy example-policy owner.`,
+			),
+		);
 	});
 
 	test('rejects missing and renamed local evidence without throwing on malformed evidence', () => {

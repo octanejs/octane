@@ -169,11 +169,20 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   batch replay counts, or prefetch behavior toward React
   (docs/suspense-parallel-use-plan.md). True data dependencies stay sequential;
   unwrap order, hydration-seed order, and rejection routing match React.
+- **Root component entry point and safe external-DOM cleanup.** In addition to
+  `root.render(<App />)`, Octane intentionally supports `root.render(App, props)`.
+  A root whose managed DOM was externally removed unmounts safely instead of
+  surfacing the browser's incidental `NotFoundError` for an already-detached node.
+- **`lazy()` accepts bare components and component-form boundaries.** React's
+  module `{ default }` shape works, and Octane additionally accepts a component
+  directly from the loader. Suspense and ViewTransition are ordinary Octane
+  components, so wrapping them in `lazy()` is valid; nested lazy wrappers are not.
 - **`class` / `className` compose clsx-style.** Strings, numbers, arrays, objects,
   and nesting all compose into a class string (falsy drops out), at every apply site
   (client, spread, SVG, scoped `<style>`, SSR) via `normalizeClass`. React coerces an
   array `className` to `"a,b"`; Octane yields `"a b"`. A plain string is the fast path.
-- **No class components, no Server Components, no StrictMode double-invoke.**
+- **No class components, legacy `ReactDOM.render` roots, Server Components, or
+  StrictMode double-invoke.**
 - Octane otherwise matches React's observable hook/effect/Suspense/transition
   semantics — including effect ordering (child-first on mount, parent-first cleanup
   on deletion) and `useId` stability across server/client hydration.
