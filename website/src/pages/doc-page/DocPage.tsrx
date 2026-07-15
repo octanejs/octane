@@ -3,6 +3,7 @@
 // beside longer guides.
 import { Link, useParams } from '@octanejs/tanstack-router';
 import { docs, findDoc } from '../../content/docs.ts';
+import { CodeBlock } from '../../components/CodeBlock.tsrx';
 
 function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
 	const { children, ...tableProps } = props;
@@ -12,7 +13,20 @@ function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
 	</div>
 }
 
-const docComponents = { table: DocTable };
+// Every fenced code block (the Shiki `<pre>`) is wrapped in the shared CodeBlock
+// so doc snippets get a one-click copy button. `bare` keeps it chrome-free — just
+// the floating button over the code. Inline `code` is untouched; only block
+// `pre` maps here. The children are static Shiki markup, so there is no prop-slot
+// component to break SSR/hydration.
+function DocPre(props: { children?: unknown; [key: string]: unknown }) @{
+	const { children, ...preProps } = props;
+
+	<CodeBlock variant="bare">
+		<pre {...preProps}>{children}</pre>
+	</CodeBlock>
+}
+
+const docComponents = { table: DocTable, pre: DocPre };
 
 export function DocPage() @{
 	const params = useParams({ strict: false }) as { slug?: string };
@@ -294,6 +308,14 @@ export function DocPage() @{
 			}
 			.prose :global(pre) {
 				margin: 0 0 1.4rem;
+			}
+			/* Fenced code blocks are wrapped in CodeBlock (the copy-button panel), so
+			   the block spacing moves to the wrapper and the inner pre sits flush. */
+			.prose :global(.codeblock) {
+				margin: 0 0 1.4rem;
+			}
+			.prose :global(.codeblock pre) {
+				margin: 0;
 			}
 			.prose :global(blockquote) {
 				border-left: 3px solid var(--accent);

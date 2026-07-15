@@ -8,7 +8,6 @@ import {
 	createRoute,
 	lazyRouteComponent,
 } from '@octanejs/tanstack-router';
-import { MainLayout } from '../layouts/MainLayout.tsrx';
 import { Home } from '../pages/home/Home.tsrx';
 
 // The home route stays eager because it is the site's dominant entry point.
@@ -23,6 +22,7 @@ const Playground = lazyRouteComponent(
 	'Playground',
 );
 const DocsLayout = lazyRouteComponent(() => import('../layouts/DocsLayout.tsrx'), 'DocsLayout');
+const MainLayout = lazyRouteComponent(() => import('../layouts/MainLayout.tsrx'), 'MainLayout');
 const DocPage = lazyRouteComponent(() => import('../pages/doc-page/DocPage.tsrx'), 'DocPage');
 const NotFound = lazyRouteComponent(() => import('../pages/not-found/NotFound.tsrx'), 'NotFound');
 
