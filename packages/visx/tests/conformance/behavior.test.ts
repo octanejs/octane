@@ -7,6 +7,7 @@ import {
 	BrushFixture,
 	DragFixture,
 	HookFamiliesFixture,
+	MeasureLifecycleFixture,
 	ResponsiveFixture,
 	TooltipFixture,
 	ZoomFixture,
@@ -108,6 +109,52 @@ describe('@octanejs/visx stateful behavior', () => {
 		settle();
 		flushSync(() => callback([{ contentRect: { width: 260, height: 140, top: 5, left: 7 } }]));
 		expect(view.find('[data-testid="responsive-output"]').textContent).toBe('260x140');
+	});
+
+	it('rebinds measurement observers and listeners when its ref target remounts', () => {
+		vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+			callback(0);
+			return 1;
+		});
+		const addEventListener = vi.spyOn(window, 'addEventListener');
+		const removeEventListener = vi.spyOn(window, 'removeEventListener');
+		const observers = [];
+		class ResizeObserverImpl {
+			callback;
+			observe = vi.fn();
+			disconnect = vi.fn();
+
+			constructor(callback) {
+				this.callback = callback;
+				observers.push(this);
+			}
+		}
+
+		const view = render(MeasureLifecycleFixture, { ResizeObserverImpl });
+		const firstTarget = view.find('#measure-target');
+		expect(observers).toHaveLength(1);
+		expect(observers[0].observe).toHaveBeenCalledWith(firstTarget);
+		const resizeHandler = addEventListener.mock.calls.find(([type]) => type === 'resize')?.[1];
+		const scrollHandler = addEventListener.mock.calls.find(([type]) => type === 'scroll')?.[1];
+
+		flushSync(() =>
+			view.find('#toggle-measure-target').dispatchEvent(new MouseEvent('click', { bubbles: true })),
+		);
+		expect(observers[0].disconnect).toHaveBeenCalledOnce();
+		expect(removeEventListener).toHaveBeenCalledWith('resize', resizeHandler);
+		expect(removeEventListener).toHaveBeenCalledWith('scroll', scrollHandler, true);
+
+		flushSync(() =>
+			view.find('#toggle-measure-target').dispatchEvent(new MouseEvent('click', { bubbles: true })),
+		);
+		const secondTarget = view.find('#measure-target');
+		expect(secondTarget).not.toBe(firstTarget);
+		expect(observers).toHaveLength(2);
+		expect(observers[1].observe).toHaveBeenCalledWith(secondTarget);
+
+		vi.spyOn(secondTarget, 'getBoundingClientRect').mockReturnValue(new DOMRect(5, 7, 123, 45));
+		flushSync(() => observers[1].callback([], observers[1]));
+		expect(view.find('#measure-width').textContent).toBe('123');
 	});
 
 	it('preserves Brush class-controller state and reports native drag bounds', () => {

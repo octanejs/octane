@@ -15,6 +15,7 @@ import { ThemeProvider, useTheme } from '@octanejs/visx/theme/react';
 import { useTooltip, useTooltipInPortal } from '@octanejs/visx/tooltip';
 import { useFloatingTooltip } from '@octanejs/visx/tooltip/floating';
 import { useVoronoi } from '@octanejs/visx/voronoi/react';
+import useMeasure from '../../src/internal/useMeasure.tsrx';
 
 const points = [
 	{ x: 10, y: 20, value: 1 },
@@ -74,6 +75,20 @@ export function ResponsiveFixture({ ResizeObserverImpl }) {
 	>
 		{({ width, height }) => <output data-testid="responsive-output">{`${width}x${height}`}</output>}
 	</ParentSize>;
+}
+
+export function MeasureLifecycleFixture({ ResizeObserverImpl }) {
+	const [showTarget, setShowTarget] = useState(true);
+	const [measureRef, bounds] = useMeasure({
+		polyfill: ResizeObserverImpl,
+		scroll: true,
+	});
+
+	return <section>
+		<button id="toggle-measure-target" onClick={() => setShowTarget((show) => !show)}>Toggle</button>
+		{showTarget && <div id="measure-target" ref={measureRef} />}
+		<output id="measure-width">{bounds.width as string}</output>
+	</section>;
 }
 
 export function BrushFixture() {

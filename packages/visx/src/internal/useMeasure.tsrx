@@ -45,6 +45,7 @@ function sameRect(a: RectReadOnly, b: RectReadOnly): boolean {
 export default function useMeasure(options: Options = {}) {
 	const elementRef = useRef<HTMLElement | SVGElement | null>(null);
 	const frameRef = useRef<number | null>(null);
+	const cleanupRef = useRef<(() => void) | null>(null);
 	const [bounds, setBounds] = useState<RectReadOnly>(ZERO_RECT);
 
 	const refresh = useCallback(() => {
@@ -84,27 +85,36 @@ export default function useMeasure(options: Options = {}) {
 		});
 	}, [refresh]);
 
-	const ref = useCallback((element: HTMLElement | SVGElement | null) => {
-		elementRef.current = element;
-		if (element) scheduleRefresh();
-	}, [scheduleRefresh]);
+	const detach = useCallback(() => {
+		cleanupRef.current?.();
+		cleanupRef.current = null;
+	}, []);
 
-	useEffect(() => {
-		const element = elementRef.current;
+	const ref = useCallback((element: HTMLElement | SVGElement | null) => {
+		detach();
+		elementRef.current = element;
 		if (!element || typeof window === 'undefined') return;
+
 		const ResizeObserverImpl = options.polyfill ?? window.ResizeObserver;
 		const observer = ResizeObserverImpl ? new ResizeObserverImpl(scheduleRefresh) : null;
 		observer?.observe(element);
 		window.addEventListener('resize', scheduleRefresh);
 		if (options.scroll) window.addEventListener('scroll', scheduleRefresh, true);
 		scheduleRefresh();
-		return () => {
+
+		cleanupRef.current = () => {
 			observer?.disconnect();
 			window.removeEventListener('resize', scheduleRefresh);
 			if (options.scroll) window.removeEventListener('scroll', scheduleRefresh, true);
-			if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
+			if (frameRef.current != null) {
+				cancelAnimationFrame(frameRef.current);
+				frameRef.current = null;
+			}
+			if (elementRef.current === element) elementRef.current = null;
 		};
-	}, [options.polyfill, options.scroll, scheduleRefresh]);
+	}, [detach, options.polyfill, options.scroll, scheduleRefresh]);
+
+	useEffect(() => () => detach(), [detach]);
 
 	return [ref, bounds, refresh] as const;
 }
