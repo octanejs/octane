@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Neon tides</title>
+  <desc id="desc">An abstract magenta city reflected over dark water.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#10142c"/>
+      <stop offset=".48" stop-color="#391847"/>
+      <stop offset="1" stop-color="#ff4f83"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#151935"/>
+      <stop offset="1" stop-color="#06070d"/>
+    </linearGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="18"/></filter>
+  </defs>
+  <rect width="1280" height="720" fill="url(#sky)"/>
+  <circle cx="984" cy="174" r="92" fill="#ffd7e6" opacity=".88"/>
+  <g fill="#10111f" opacity=".92">
+    <path d="M0 334h132v-85h54v85h96V190h82v144h68V232h92v102h92V166h116v168h68V252h62v82h146v-98h102v98h192v98H0z"/>
+  </g>
+  <rect y="430" width="1280" height="290" fill="url(#water)"/>
+  <g filter="url(#blur)" opacity=".72">
+    <path d="M70 482h770l-216 28H120z" fill="#ff5b8d"/>
+    <path d="M430 542h760l-330 36H350z" fill="#8e72ff"/>
+    <path d="M680 624h480l-170 32H590z" fill="#ffb4cb"/>
+  </g>
+  <g fill="none" stroke-linecap="round">
+    <path d="M44 484c144-20 230 18 372 0s241 24 386 0 271 15 434-2" stroke="#ff91b1" stroke-width="7" opacity=".7"/>
+    <path d="M28 568c145-18 274 23 418 0s256 20 410-2 240 18 388-5" stroke="#7968e8" stroke-width="5" opacity=".64"/>
+    <path d="M94 649c138-12 222 17 360 0s252 16 382 0 228 10 350-2" stroke="#edc4ff" stroke-width="3" opacity=".42"/>
+  </g>
+</svg>
