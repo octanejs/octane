@@ -64,6 +64,19 @@ export function CustomHookUpdater() @{
 	<span>{'Count: ' + count}</span>
 }
 
+function useCell(initial) {
+	const [value] = useState(initial);
+	return value;
+}
+export function ConditionalCustomHooks() @{
+	const [showFirst, setShowFirst] = useState(true);
+	let first = -1;
+	if (showFirst) first = useCell(10);
+	const second = useCell(20);
+	if (showFirst) setShowFirst(false);
+	<span>{first + '/' + second}</span>
+}
+
 export function TwoCells() @{
 	const [a, setA] = useState(0);
 	const [b, setB] = useState(0);
@@ -150,6 +163,10 @@ describe('SSR render-phase state updates — rewind bookkeeping', () => {
 
 	it('keys custom-hook state through withSlot — the loop converges', () => {
 		expect(RT.renderToString(mod.CustomHookUpdater).html).toContain('Count: 4');
+	});
+
+	it('keeps repeated custom-hook calls independent when a retry skips the first call', () => {
+		expect(RT.renderToString(mod.ConditionalCustomHooks).html).toContain('-1/20');
 	});
 
 	it('converges chained updates across two independent cells', () => {

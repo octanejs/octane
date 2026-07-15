@@ -92,6 +92,11 @@ export function MaybeControlled(props) @{
 export function DefaultsInput(props) @{
 	<input id="dvi" defaultValue={props.dv} />
 }
+// A spread can introduce a controlled value writer, so the following direct
+// defaultValue must retain the full value/default cascade.
+export function SpreadDefaultInput(props) @{
+	<input id="sdi" {...props.sp} defaultValue={props.dv} />
+}
 export function DefaultsCheckbox(props) @{
 	<input id="dci" type="checkbox" defaultChecked={props.dc} />
 }

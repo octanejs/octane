@@ -7,7 +7,7 @@ import { mount, act } from './_helpers';
 // arrive as `useState(slot)` with the symbol in the initial-value position;
 // the runtime must reinterpret the trailing symbol (same ABI rule as
 // resolveHookArgs for optional-deps effects). Regression: before the
-// reinterpretation, `useState<T>()` threw "called without a slot symbol".
+// reinterpretation, `useState<T>()` threw "called without a hook slot".
 
 function ZeroArgState() @{
 	const [value, setValue] = useState<string | undefined>();

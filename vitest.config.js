@@ -148,8 +148,8 @@ export default defineConfig({
 			},
 			{
 				// The SAME octane test files compiled in PRODUCTION mode (`hmr: false`
-				// → no HMR wrapper, no dev LOC metadata, plain Symbol("<hash>#<n>")
-				// hook slots). Vitest runs the plugin in serve mode, so without this
+				// → no HMR wrapper, no dev LOC metadata, numeric module-range hook
+				// slots). Vitest runs the plugin in serve mode, so without this
 				// project the prod compile branch has ZERO runtime coverage — which is
 				// how the 2026-07-08 bare-Symbol() slot regression shipped past 2,400
 				// green tests and broke website hydration on every route. Any test

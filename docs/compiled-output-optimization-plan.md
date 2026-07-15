@@ -1,8 +1,11 @@
 # Compiled Output Optimization Plan — size, allocation, and closure churn
 
-Status: Phases 0 + 1 + 2 + 3b + 3c + 3h LANDED (2026-07-08/09) — measurement suites + guards, and
-the bag-factory codegen (see the LANDED notes in each phase). Phases 2–3
-proposed. Author context: follow-up to the binding-bag pre-shape change
+Status: Phases 0 + 1 + 2 + 3b + 3c + 3d + 3h–3n LANDED
+(2026-07-08–15) — measurement suites + guards, bag-factory codegen, hoisted
+helpers, compact production hook slots, binding-lifetime specialization,
+mount-only callback sinking, hydration isolation, and compiler-proven void
+render paths (see the LANDED notes in each phase). Remaining candidates are
+tracked below. Author context: follow-up to the binding-bag pre-shape change
 (superseded by Phase 1).
 
 ## 1. Problem statement
@@ -162,8 +165,9 @@ targets is app code at **1.43× ripple / 1.66× solid / 1.53× react**.
 | bundle-size `js_gzip` octane-tsrx / solid | **1.80×** (26,465 / 14,732 B) | 1.9 |
 | codegen-size `gzip` compiled / source | **1.19×** (21,822 / 18,321 B) | 1.25 |
 
-0c (svelte-jsbench app) remains open. Editing the codegen-size corpus
-invalidates its baseline — re-record deliberately.
+0c subsequently landed, including Svelte 5 variants for the rows, TodoMVC, and
+chat-stream bundle-size surfaces. Editing the codegen-size corpus invalidates
+its baseline — re-record deliberately.
 
 ---
 
@@ -408,8 +412,11 @@ Independent, individually-measurable items, roughly by value:
   **3,172 B** (app/ripple **1.37×**, app/solid 1.59×). Cumulative Phase 1 +
   3c vs baseline: **minified −27.3%, gzip −9.0%**, app/ripple 1.43× → 1.37×.
   Guards: codegen gzip → 1.12, app/ripple → 1.40, app/solid → 1.65.
-- **3d. Emit `const __block = __s.block;` only when referenced** (today
-  unconditional, compile.js:3276; Phase 1 factories remove most uses).
+- **3d. Emit `const __block = __s.block;` only when referenced — LANDED
+  2026-07-15.** The compiler now adds the alias after planning only when the
+  final body references it, and adjusts setup source-map lines when the header
+  is absent. This removes a property read that minifiers must otherwise retain
+  because `__s.block` could be an accessor.
 - **3e. Deferred-mount seeds** (`{ _b._el$N = el; _b._prev$N = undefined; }`)
   fold into the Phase-1 factory args (el + `undefined`) — free once 1 lands.
 - **3f. Update-diff helpers for attr/class/style — MEASURE FIRST, likely skip.**
@@ -429,10 +436,162 @@ Independent, individually-measurable items, roughly by value:
   a production build. Measured: framework chunk **23,262 → 21,648 B gzip
   (−6.9%)**, totals 26.4 → 24.8 KB (octane/ripple total 2.06× → **1.94×**).
   Guards ratcheted: total js_gzip vs ripple 2.2 → 2.05, vs solid 1.9 → 1.8.
+- **3i. Binding-lifetime specialization — LANDED 2026-07-15.** The compiler
+  proves the identity of state/reducer dispatchers, getters, refs,
+  `useEffectEvent`, explicit invariant `useCallback` results, and
+  compiler-memoized local callbacks. A spread-free event using only those
+  values installs once at mount and no longer stores an element/descriptor in
+  the binding bag or emits an update helper. Any spread on the same host keeps
+  the event live so JSX source order is re-applied after spread updates.
+  Syntactically fresh class object/array/function values also skip an
+  impossible identity comparison and its previous-value bag field while
+  retaining the same setter frequency. The same pass completed 3d, moved the
+  remaining hydration/controlled/use() diagnostics behind inline production
+  gates, and isolated the package `version` JSON import behind a tree-shakable
+  module boundary.
+
+  Intermediate normalized bundle results, before 3j–3n: rows app gzip
+  **2,714 → 2,459 B** (−9.4%), versus
+  Svelte 5 at 2,301 B (**1.07×**); TodoMVC **2,207 → 2,053 B**, versus Svelte
+  at 1,511 B (1.36×); chat-stream **2,624 → 2,608 B**, versus Svelte at 2,279 B
+  (1.14×). Rows total gzip fell **30,632 → 29,423 B** (−3.9%); its remaining
+  gap to Svelte is predominantly the framework chunk (26,964 vs 15,980 B), not
+  compiled app code. The fixed codegen corpus' compiled/source gzip expansion
+  moved from 1.04× to **1.02×** (the event-order regression fixtures added in
+  this phase change both sides of the corpus, so absolute corpus bytes are not
+  directly comparable). Direct Svelte guards now cap rows total/app at
+  1.65×/1.10×, TodoMVC at 1.65×/1.40×, and chat-stream at 1.62×/1.18×.
+
+  A same-session normal-iteration main→candidate A/B for 3i on js-framework, dbmon,
+  and effectful-list found no regression: dbmon stayed within 3.5% on every
+  operation, effectful-list within 8.1% (0.007 ms on the no-deps micro-op), and
+  rows within the noise-aware threshold (the largest score swing was `clear`
+  at +11.6%, while its median changed only 22.0 → 22.4 ms).
+- **3j. Numeric production hook slots + composable range ABI — LANDED
+  2026-07-15.** Direct base-hook sites in a compiler-owned `@{}` render scope
+  now use small integer keys. A scope owns its hook map, so those integers need
+  be unique only within that compiled body; HMR and profiling retain Symbols,
+  as do nested/arbitrary callables and custom-hook boundaries whose identity
+  can cross a scope or module. The client and server runtimes accept
+  number-or-Symbol hook keys and length/type-prefix composed custom-hook paths
+  so a numeric segment cannot alias a described Symbol.
+
+  Plain `.js`/`.ts` hook sites and compiler helpers that need globally
+  composable Symbol descriptions reserve a disjoint production range with
+  `hookSlots(count)` and use the reserved numbers as short descriptions. This
+  preserves cross-module and duplicate-module-instance isolation without
+  shipping filename hashes per site. Optional argument positions are padded
+  before a numeric trailing slot where necessary, while rest-shaped hooks read
+  the final argument, preserving zero-argument hooks and number-valued user
+  arguments. Spread calls and any proof boundary fail closed to Symbols.
+- **3k. Mount-only compiler callback sinking — LANDED 2026-07-15.** A
+  compiler-owned, non-escaping arrow/function used exclusively by native event
+  slots whose handler and bundled arguments are proven lifetime-invariant no
+  longer needs an auto-generated `useCallback` site. One consumer receives the
+  function expression directly in the mount assignment; multiple consumers
+  share a `const` allocated inside the mount branch. HMR/profile builds,
+  spreads, component/children ownership boundaries, refs, directive/dynamic
+  uses, unstable captures, duplicate writers, and any setup escape keep the
+  original declaration and hook lowering. Observable callback identities are
+  therefore unchanged.
+- **3l. Hydration capability isolation — LANDED 2026-07-15.** Adoption cursor,
+  mismatch recovery, seeded previous values, and hydration-aware DOM writes now
+  live behind a `HydrationCapability` constructed only by `hydrateRoot`.
+  Shared DOM helpers make a nullable capability dispatch, but an ordinary
+  `createRoot` bundle no longer roots the hydration implementation graph and a
+  production bundler can eliminate it. Hydration state remains scoped across
+  nested/foreign-root re-entry, and hydration-specific behavior continues
+  through the same capability boundary rather than being weakened for size.
+- **3m. Compiler-proven void output paths — LANDED 2026-07-15.** Blocks now
+  carry a nullable output handler. Generic `createRoot`, `hydrateRoot`, and
+  component sites install the handler that reconciles arbitrary JavaScript
+  returns; compiler-proven imperative bodies install none, so their bundles do
+  not retain descriptor/array/primitive return reconciliation merely because
+  every block shares `renderBlock`.
+
+  The compiler selects `componentSlotVoid` only for an `@{}` body with no
+  value-bearing return in its own function. Nested-function returns do not
+  poison the proof, a bare `return;` is safe, and any syntactic value return is
+  conservatively generic without attempting control-flow reachability. HMR
+  also remains generic because a later module version may change the return
+  contract. Functions that return hosts, primitives, `null`, arrays, or element
+  descriptors keep the full public behavior.
+
+  The plain-module production transform can similarly replace the narrow
+  `createRoot(target).render(ImportedComponent[, props])` bootstrap with the
+  compiler-only `__createVoidRoot`. Vite resolves and loads the actual imported
+  module through its module graph, then accepts Octane's direct-export metadata
+  only while a fingerprint of the final transformed code still matches. Alias
+  targets and virtual modules therefore prove their own contract; a raw disk
+  lookalike is never evidence. Unknown files, re-exports, indirect calls,
+  escaping roots, server/dev/HMR/profile builds, watch builds, downstream code
+  mutation, and value-returning components stay on `createRoot`. The neutral
+  compiler and Rspack also fail closed unless a caller supplies an equivalent
+  trusted proof; Rspack's available `importModule` route was rejected because
+  it would evaluate user code during the build. Evaluation order and the public
+  `Root` object remain unchanged.
+- **3n. Narrow expression and DOM helper proofs — LANDED 2026-07-15.** A
+  conditional expression is now a known string only when both arms are known
+  strings, allowing the string-hole path without widening the existing type
+  proof. Dynamic, statically named lowercase HTML `data-*` attributes with a
+  proven-string expression use `setStringData`, which omits generic property,
+  alias, namespace, and name-validity routing while retaining hydration,
+  removal, coercion, and development-warning semantics for an inaccurate type
+  assertion.
+
+  Two controlled-form cases receive similarly strict helpers. An
+  `<input>`/`<textarea>` with exactly one `defaultValue`, no `value`, and no
+  spread uses the uncontrolled default-value writer without allocating a
+  controlled-state record or composition listeners. An `<input>` with one
+  `checked`, one static `type="checkbox"|"radio"`, and no spread uses the
+  checkable writer, retaining restoration and controlled-state semantics while
+  omitting impossible text-composition listeners. Selects, duplicate or
+  conflicting writers, dynamic types, and spread-bearing elements remain on
+  the generic helpers.
 - **3g. Runtime property names (`parentNode`, `endMarker`) — REJECTED for
   renaming.** They're public Block fields used across runtime.ts; compiled
   code's remaining references after 1+3a are few (noTemplate hosts, anchor
   fallback). Not worth an API break; revisit only if 0a says otherwise.
+
+### Current checkpoint and next measured candidates (2026-07-15)
+
+The final normalized production builds are smaller than their Svelte 5
+equivalents on all three measured surfaces:
+
+| surface | Octane gzip | Svelte 5 gzip | delta |
+| --- | ---: | ---: | ---: |
+| rows | **17,448 B** | 18,281 B | **−833 B** |
+| TodoMVC | **18,408 B** | 18,481 B | **−73 B** |
+| chat-stream | **18,878 B** | 19,123 B | **−245 B** |
+
+The rows app chunk is also smaller than Svelte's (2,234 vs 2,301 B gzip), while
+Todo and chat still spend more bytes in app plumbing (1,906 vs 1,511 B and
+2,523 vs 2,279 B respectively) but make that back in the reachable framework
+chunk. Across the fixed 16-file codegen corpus, gzip(minified compiled output)
+is now **22,512 B** versus **22,840 B** for source (**0.986×**). The checked-in
+ratio guards were ratcheted to these final baselines.
+
+Focused normal/production validation is green for the hook-slot ABI, callback
+sinking, resolved-module root proof, generic value-return transitions,
+known-string classification, controlled forms, and hydration adoption/re-entry.
+The combined 3j–3n same-session main→candidate A/B found no performance
+regression. The 30-sample dbmon medians were identical on five of six
+operations, with mount moving 3.5 → 3.6 ms; effectful-list was identical on
+four of six operations, with remount moving 8.6 → 8.7 ms and the no-deps update
+improving 0.10 → 0.08 ms. In the shorter eight-sample rows run, the largest
+slower median was 4.4%, while update and swap improved. Repository-wide
+validation then passed: `pnpm typecheck`, the production package build, and
+all **900 test files / 6,988 tests**, including the real dev/prod website
+hydration browser gate.
+
+The main deferred size candidate is a **shape-aware/no-else `@if`
+specialization** for compiler-proven, non-suspending host-only arms. It is
+higher risk than the landed reachability cuts: today's `ifBlock` also preserves
+transition offscreen state, suspension/error atomicity, hydration adoption,
+shared-boundary propagation, and exact unmount semantics. Do not split that
+helper graph until a narrow proof and behavior tests cover every one of those
+contracts. Smaller host-cache/fresh-binding extensions remain measurement-led
+follow-ups, not assumed wins.
 
 ---
 
@@ -451,21 +610,20 @@ For each landing:
 
 ### Success criteria
 
-- octane-tsrx js-framework bundle (normalized minify, gzip) moves measurably
-  toward ripple's; concrete target set once 0a records honest gzip numbers
-  (raw-byte gap today is 2.1×; the plan aims to close the *app-code* share
-  of it — runtime size is out of scope here).
+- The normalized Octane rows, TodoMVC, and chat-stream bundles approach Svelte
+  5's total gzip size without relaxing semantics. All three are now smaller,
+  with final proof fixes, baselines, and ratio guards recorded.
 - Zero per-render closure allocations for static branches; one array per
   capturing construct otherwise.
 - No perf regression outside noise on the three suites, judged by same-session
-  A/B.
+  A/B. The combined 3j–3n A/B is neutral within measurement noise.
 - No absolute paths in prod output.
 
-### Execution order
+### Execution record
 
-0 → 3c (independent, trivial, immediate size+privacy win) → 1 → 3b/3d/3e →
-2 → 3f only if measurement says so. Each phase: own PR, own changeset (patch),
-own A/B numbers in the PR description.
+0 → 3c → 1 → 3b/3d/3h → 2 → 3i → 3j/3k → 3l/3m → 3n. Phase
+3f remains measurement-gated, 3g was rejected, and the shape-aware `@if`
+candidate remains deferred behind its full semantic proof.
 
 ### Open questions (maintainer input wanted)
 

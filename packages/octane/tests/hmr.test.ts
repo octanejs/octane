@@ -253,14 +253,12 @@ describe('hmr — runtime wrapper', () => {
 		expect(code).not.toMatch(/import\.meta\.hot/);
 	});
 
-	it('hmr option off → hook slots are Symbol("<hash>#<n>"), no registry key, no file path', async () => {
-		// Only HMR's re-import needs Symbol.for's registry identity; prod output
-		// uses plain Symbol with a SHORT UNIQUE description — smaller, and the
-		// module id (an ABSOLUTE path under vite) never leaks into shipped
-		// bundles. The description must NOT be empty: the runtime composes
-		// custom-hook slot paths from slot descriptions (resolveSlot), and bare
-		// Symbol() collapsed those paths — custom-hook state collided across call
-		// sites (broke the router's useStore → website-wide hydration mismatch).
+	it('hmr option off → proven render-scope hooks use tiny local numbers', async () => {
+		// Only HMR's re-import needs Symbol.for registry identity. Production
+		// component bodies run in a fresh Scope, so direct base hooks need only a
+		// local integer. The app output carries neither a range reservation nor the
+		// module id (an absolute Vite path). Arbitrary helpers and custom-hook
+		// boundaries retain runtime-ranged Symbols.
 		const { compile } = await import('octane/compiler');
 		const src =
 			"import { useState } from 'octane';\n" +
@@ -269,8 +267,10 @@ describe('hmr — runtime wrapper', () => {
 			'  <button onClick={() => setN(n + 1)}>{n as string}</button>\n' +
 			'}\n';
 		const { code } = compile(src, '/abs/path/to/file.tsrx'); // no { hmr: true }
-		expect(code).toMatch(/const _h\$0 = Symbol\("[a-z0-9]+#0"\);/);
-		expect(code).not.toMatch(/Symbol\(\)/); // description is load-bearing
+		expect(code).toMatch(/useState\(0, 0\)/);
+		expect(code).not.toMatch(/const _h\$\d+ = \d+;/);
+		expect(code).not.toContain('_$hookSlots');
+		expect(code).not.toMatch(/Symbol\(/);
 		expect(code).not.toMatch(/Symbol\.for/);
 		expect(code).not.toMatch(/abs\/path/);
 	});
@@ -286,7 +286,60 @@ describe('hmr — runtime wrapper', () => {
 		const dev = slotHooks(src, '/abs/custom.ts', { hmr: true });
 		expect(dev?.code).toMatch(/Symbol\.for\("octane:\/abs\/custom\.ts:useCounter\.useState#0"\)/);
 		const prod = slotHooks(src, '/abs/custom.ts');
-		expect(prod?.code).toMatch(/const _h\$0 = Symbol\("[a-z0-9]+#0"\);/);
-		expect(prod?.code).not.toMatch(/Symbol\(\)|Symbol\.for|abs\/custom/);
+		expect(prod?.code).toMatch(/_\$hookSlots\(1\)/);
+		expect(prod?.code).toMatch(/const _h\$0 = Symbol\(_hs\$\);/);
+		expect(prod?.code).not.toMatch(/Symbol\.for|abs\/custom/);
+	});
+
+	it('slots first-class subtemplate hooks once with the callable-helper ABI', async () => {
+		const { compile } = await import('octane/compiler');
+		const { code } = compile(
+			`import { useState } from 'octane';
+			 export function App() @{
+			   const child = () => @{ const [value] = useState(1); <span>{value as string}</span> };
+			   <div>{child}</div>
+			 }`,
+			'subtemplate-slots.tsrx',
+			{ hmr: false },
+		);
+		const call = code.match(/useState\(1, ([^)]+)\)/);
+		expect(call?.[1]).toMatch(/^_h\$\d+$/);
+		expect(code).not.toMatch(/useState\(1, _h\$\d+, _h\$\d+\)/);
+		expect(code).toMatch(/const _h\$\d+ = Symbol\(_hs\$(?: \+ \d+)?\);/);
+	});
+
+	it('avoids user bindings when naming full-compiler and surgical slot declarations', async () => {
+		const { compile } = await import('octane/compiler');
+		const source = `import { useState } from 'octane';
+			const _hs$ = 'user base';
+			const _$hookSlots = 'user helper';
+			export function helper() { const _h$0 = 'user site'; return useState(1); }`;
+		const full = compile(source, 'slot-names.tsrx', { hmr: false }).code;
+		expect(full).toContain('hookSlots as _$hookSlots$');
+		expect(full).toContain('const _hs$$ = /* @__PURE__ */ _$hookSlots$(1);');
+		expect(full).toMatch(/const _h\$0\$ = Symbol\(_hs\$\$\);/);
+		expect(full).toContain('useStateWithGetter(1, _h$0$)');
+
+		const { slotHooks } = await import('../src/compiler/slot-hooks.js');
+		const surgical = slotHooks(source, 'slot-names.ts')!.code;
+		expect(surgical).toContain('hookSlots as _$hookSlots$');
+		expect(surgical).toContain('const _hs$$ = /* @__PURE__ */ _$hookSlots$(1);');
+		expect(surgical).toMatch(/const _h\$0\$ = Symbol\(_hs\$\$\);/);
+		expect(surgical).toContain('useStateWithGetter(1, _h$0$)');
+	});
+
+	it('avoids a hookSlots helper collision in client and server component output', async () => {
+		const { compile } = await import('octane/compiler');
+		const source = `import { useState } from 'octane';
+			const _$hookSlots = 'user helper';
+			export function App() {
+				const state = useState(1);
+				return <div>{state[0] as string}</div>;
+			}`;
+		for (const mode of ['client', 'server'] as const) {
+			const code = compile(source, `slot-helper-${mode}.tsrx`, { mode, hmr: false }).code;
+			expect(code).toContain('hookSlots as _$hookSlots$');
+			expect(code).toContain('/* @__PURE__ */ _$hookSlots$(1)');
+		}
 	});
 });

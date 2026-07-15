@@ -13,7 +13,12 @@ import { join } from 'node:path';
 import { mount } from './_helpers';
 import { slotHooks } from '../src/compiler/slot-hooks.js';
 import { discoverOctaneSourceDependencies, octane } from '../src/compiler/vite.js';
-import { TsrxSingle, TsrxReuse, TsrxNested } from './_fixtures/external-hook-callers.tsrx';
+import {
+	TsrxSingle,
+	TsrxReuse,
+	TsrxNested,
+	TsrxCrossModule,
+} from './_fixtures/external-hook-callers.tsrx';
 import { TsxApp, TsxReuse } from './_fixtures/external-hook-tsx.tsx';
 
 // Cross-file "hooks everywhere": a custom hook in a plain .ts module gets its base
@@ -45,6 +50,16 @@ describe('.ts custom hook consumed from .tsrx', () => {
 		expect(r.find('.n').textContent).toBe('x:5');
 		r.click('.n');
 		expect(r.find('.n').textContent).toBe('x:6');
+		r.unmount();
+	});
+
+	it('nested plain-TS hooks from separate modules receive disjoint production ranges', () => {
+		const r = mount(TsrxCrossModule as any);
+		expect([r.find('.left').textContent, r.find('.right').textContent]).toEqual(['1', '100']);
+		r.click('.right');
+		expect([r.find('.left').textContent, r.find('.right').textContent]).toEqual(['1', '101']);
+		r.click('.left');
+		expect([r.find('.left').textContent, r.find('.right').textContent]).toEqual(['2', '101']);
 		r.unmount();
 	});
 });
@@ -89,10 +104,12 @@ describe('slotHooks surgical pass', () => {
 		// custom-hook calls are NOT wrapped here (the .tsrx/.tsx caller does that)
 		expect(code).not.toContain('withSlot(');
 		// Apart from inferred dependency arrays, the transform remains surgical:
-		// stripping slots restores every original byte. (Default = no HMR →
-		// Symbol("<hash>#<n>") declarations; Symbol.for is dev-serve only.)
+		// stripping slots restores every original byte. (Default = no HMR → one
+		// runtime-reserved Symbol range; Symbol.for is dev-serve only.)
 		const stripped = code
-			.replace(/^const _h\$\d+ = Symbol\("[^"]*"\);\n/gm, '')
+			.replace(/^import \{ hookSlots as _\$hookSlots \} from 'octane';\n/gm, '')
+			.replace(/^const _hs\$ = \/\* @__PURE__ \*\/ _\$hookSlots\(\d+\);\n/gm, '')
+			.replace(/^const _h\$\d+ = Symbol\(_hs\$(?: \+ \d+)?\);\n/gm, '')
 			.replace(/, _h\$\d+(?=[),])/g, '');
 		expect(stripped).toBe(
 			SRC.replace("useCallback(() => 'nd:' + label)", "useCallback(() => 'nd:' + label, [label])"),
@@ -231,6 +248,106 @@ describe('vite plugin gate routing', () => {
 			{ ssr: true },
 		);
 		expect(resolved).toBe('/consumer/node_modules/octane/server/index.js');
+	});
+
+	it('follows resolved and virtual module output when specializing production roots', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-vite-root-proof-'));
+		try {
+			const src = join(root, 'src');
+			mkdirSync(src);
+			writeFileSync(join(root, 'package.json'), '{"name":"root-proof","private":true}\n');
+			const entry = join(src, 'main.js');
+			const requested = join(src, 'Main.tsrx');
+			const aliased = join(src, 'Aliased.tsrx');
+			const entrySource =
+				"import { createRoot } from 'octane';\n" +
+				"import Main from './Main.tsrx';\n" +
+				'createRoot(document.body).render(Main);\n';
+			const plugin = octane({ hmr: false });
+			(plugin.configResolved as any)({ root, command: 'build', define: {} });
+
+			// The requested disk file returns a value, but Vite aliases the import to
+			// a compiled void component. The resolved module is authoritative.
+			writeFileSync(requested, "export default function Main() { return 'disk value'; }\n");
+			const aliasedModule = await (plugin.transform as any).call(
+				{},
+				'export default function Main() @{ <main>alias</main> }\n',
+				aliased,
+			);
+			const aliasedEntry = await (plugin.transform as any).call(
+				{
+					resolve: async () => ({ id: aliased }),
+					load: async () => ({
+						id: aliased,
+						code: aliasedModule.code,
+						meta: aliasedModule.meta,
+					}),
+				},
+				entrySource,
+				entry,
+			);
+			expect(aliasedEntry?.code).toContain('__createVoidRoot');
+			const changedAfterOctane = await (plugin.transform as any).call(
+				{
+					resolve: async () => ({ id: aliased }),
+					load: async () => ({
+						id: aliased,
+						code: aliasedModule.code + '\n// changed by a later transform',
+						meta: aliasedModule.meta,
+					}),
+				},
+				entrySource,
+				entry,
+			);
+			expect(changedAfterOctane).toBeNull();
+
+			// Conversely, a virtual loader can replace a void-looking disk file with
+			// a value-returning component. That actual loaded module must stay on the
+			// generic root contract.
+			writeFileSync(requested, 'export default function Main() @{ <main>disk</main> }\n');
+			const virtualId = '\0virtual:Main.tsrx';
+			const virtualModule = await (plugin.transform as any).call(
+				{},
+				"export default function Main() { return 'virtual value'; }\n",
+				virtualId,
+			);
+			const virtualEntry = await (plugin.transform as any).call(
+				{
+					resolve: async () => ({ id: virtualId }),
+					load: async () => ({
+						id: virtualId,
+						code: virtualModule.code,
+						meta: virtualModule.meta,
+					}),
+				},
+				entrySource,
+				entry,
+			);
+			expect(virtualEntry).toBeNull();
+
+			const watchPlugin = octane({ hmr: false });
+			(watchPlugin.configResolved as any)({
+				root,
+				command: 'build',
+				build: { watch: {} },
+				define: {},
+			});
+			const watchedEntry = await (watchPlugin.transform as any).call(
+				{
+					resolve: async () => ({ id: aliased }),
+					load: async () => ({
+						id: aliased,
+						code: aliasedModule.code,
+						meta: aliasedModule.meta,
+					}),
+				},
+				entrySource,
+				entry,
+			);
+			expect(watchedEntry).toBeNull();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	it('honors the // octane-no-slot opt-out and skips non-octane files', () => {

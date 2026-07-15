@@ -13,6 +13,12 @@ export function TextInput(props) @{
 	<input id="fi" defaultValue="Hello" />
 }
 
+// Dynamic uncontrolled default — hydration adopts the live value, while later
+// default changes update only the reset/attribute baseline of a dirty input.
+export function DynamicDefaultTextInput(props) @{
+	<input id="fi" defaultValue={props.v} />
+}
+
 // CONTROLLED text input (value binding arms at hydration mount, zero writes).
 export function DynamicTextInput(props) @{
 	<input id="fi" value={props.v} onInput={props.onInput} />
