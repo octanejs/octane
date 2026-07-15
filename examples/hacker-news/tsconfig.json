@@ -10,7 +10,8 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "jsx": "preserve"
+    "jsx": "preserve",
+    "types": ["node"]
   },
-  "include": ["shared/**/*", "react/**/*", "tsrx/**/*", "e2e/**/*"]
+  "include": ["shared/**/*", "jsx/**/*", "tsrx/**/*", "e2e/**/*", "env.d.ts"]
 }

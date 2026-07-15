@@ -1,13 +1,14 @@
-import { test, expect, chromium, type Browser } from '@playwright/test';
+import { test, expect } from './test.ts';
+import fixture from './fixtures/hacker-news.json' with { type: 'json' };
 
-// SSR proof. The mocked nav/feed/pagination specs run against the CLIENT-ONLY dev
-// servers (where `page.route()` can stub the HN Firebase API). This spec instead
-// targets the dev SSR servers (`node server.mjs <app>`), which server-render each
-// route with its data resolved and dehydrated, then hydrate.
+// SSR proof. The nav/feed/pagination specs run against the client-only Vite
+// servers. This spec targets the source-driven SSR servers (`node server.mjs
+// <app>`) under production runtime semantics; they render each route with its
+// data resolved and dehydrated, then hydrate.
 //
-// The SSR servers' fetches happen in Node, so Playwright can't stub them — this spec
-// therefore uses LIVE Hacker News data and asserts PRESENCE (server-rendered rows
-// exist), not exact stubbed counts.
+// Browser and Node SSR requests both use the local fixture API, so this suite is
+// deterministic and works without network access. Exact fixture content can be
+// asserted on both sides of hydration.
 //
 // BOTH apps SSR — the React-style `.tsx` app (SSR on :5193) and the TSRX app (SSR on
 // :5194) over the same octane core — so this spec runs once per project. The SAME
@@ -19,26 +20,35 @@ function ssrBase(baseURL: string | undefined): string {
 	return `http://localhost:${port + 2}`;
 }
 
-test.describe('SSR: rows arrive in the server HTML, then hydrate', () => {
+const FIRST_PAGE_SIZE = 30;
+const LEAD_TITLE = fixture.items['101'].title;
+
+test.describe('SSR: rows arrive in the server HTML without JavaScript', () => {
+	test.use({ browserDiagnostics: false });
+
 	test('home story rows are present with JavaScript disabled (server-rendered)', async ({
 		baseURL,
+		browser,
 	}) => {
 		const SSR_BASE = ssrBase(baseURL);
 		// A fresh browser with JS turned OFF: nothing can client-render, so any rows
 		// present came straight from the server's HTML response.
-		const browser: Browser = await chromium.launch();
 		const context = await browser.newContext({ javaScriptEnabled: false });
 		try {
 			const page = await context.newPage();
 			await page.goto(SSR_BASE + '/', { waitUntil: 'domcontentloaded' });
 
-			// The server-rendered stories list and ≥1 row are in the static HTML.
+			// The exact first fixture page is present in the static HTML.
 			await expect(page.getByTestId('stories-page')).toBeVisible();
 			const rows = page.getByTestId('story-row');
-			expect(await rows.count()).toBeGreaterThan(0);
-
-			// The dehydrated query cache is inlined for the client to hydrate from.
-			await expect(page.locator('#__octane_data')).toHaveCount(1);
+			await expect(rows).toHaveCount(FIRST_PAGE_SIZE);
+			const leadTitle = page.getByRole('link', { name: LEAD_TITLE });
+			await expect(leadTitle).toHaveAttribute('href', 'https://example.com/octane');
+			// This anchor has a literal class followed by a StyleX spread. Its
+			// computed first-paint style proves SSR kept the spread's effective class;
+			// production hydration cannot silently repair a missing server class here.
+			await expect(leadTitle).toHaveCSS('font-size', '14px');
+			await expect(leadTitle).toHaveCSS('text-decoration-line', 'none');
 
 			// The header chrome is server-rendered too (not a client-only shell).
 			await expect(page.locator('header a[href="/newest"]')).toBeVisible();
@@ -49,61 +59,53 @@ test.describe('SSR: rows arrive in the server HTML, then hydrate', () => {
 			await expect(page.locator('main')).toHaveCSS('background-color', 'rgb(246, 246, 239)');
 		} finally {
 			await context.close();
-			await browser.close();
 		}
 	});
+});
 
-	test('the page hydrates cleanly and becomes interactive', async ({ baseURL }) => {
+test.describe('SSR: server rows hydrate and become interactive', () => {
+	test('the page adopts server rows cleanly and becomes interactive', async ({ baseURL, page }) => {
 		const SSR_BASE = ssrBase(baseURL);
-		const browser: Browser = await chromium.launch();
-		const context = await browser.newContext(); // JS enabled
-		try {
-			const page = await context.newPage();
-			// A desynced hydration cursor surfaces as a console.error from a boundary
-			// (`… setAttribute is not a function`) and DOUBLES the rows — catch both.
-			const consoleErrors: string[] = [];
-			page.on('console', (m) => {
-				if (m.type() === 'error') consoleErrors.push(m.text());
+		await page.addInitScript(() => {
+			const probe = globalThis as typeof globalThis & { e2eServerFirstStory?: Element };
+			const observer = new MutationObserver(() => {
+				probe.e2eServerFirstStory ??=
+					document.querySelector('[data-testid="story-row"]') ?? undefined;
 			});
-			await page.goto(SSR_BASE + '/', { waitUntil: 'networkidle' });
-			await page.waitForTimeout(500);
+			observer.observe(document, { childList: true, subtree: true });
+		});
 
-			// The server rows are ADOPTED by hydration (still present, NOT doubled).
-			await expect(page.getByTestId('story-row').first()).toBeVisible();
-			expect(await page.getByTestId('story-row').count()).toBe(30);
-			expect(consoleErrors).toEqual([]);
+		await page.goto(SSR_BASE + '/', { waitUntil: 'networkidle' });
 
-			// Interactive: a client-side feed navigation works post-hydration. The
-			// router holds the current page in a transition until the next feed's data
-			// resolves, so `toHaveAttribute` (auto-retrying) waits for the swap.
-			await page.locator('header a[href="/newest"]').click();
-			await expect(page).toHaveURL(/\/newest(\?page=1)?$/);
-			await expect(page.getByTestId('stories-page')).toHaveAttribute('data-feed', 'new');
-			expect(await page.getByTestId('story-row').count()).toBeGreaterThan(0);
-		} finally {
-			await context.close();
-			await browser.close();
-		}
+		// Hydration preserves the server-created lead row instead of replacing it.
+		await expect(page.getByTestId('story-row').first()).toBeVisible();
+		await expect(page.getByTestId('story-row')).toHaveCount(FIRST_PAGE_SIZE);
+		const adoptedServerRow = await page.evaluate(() => {
+			const probe = globalThis as typeof globalThis & { e2eServerFirstStory?: Element };
+			return probe.e2eServerFirstStory === document.querySelector('[data-testid="story-row"]');
+		});
+		expect(adoptedServerRow).toBe(true);
+
+		// Interactive: a client-side feed navigation works post-hydration. The
+		// router holds the current page in a transition until the next feed's data
+		// resolves, so `toHaveAttribute` (auto-retrying) waits for the swap.
+		await page.locator('header a[href="/newest"]').click();
+		await expect(page).toHaveURL(/\/newest(\?page=1)?$/);
+		await expect(page.getByTestId('stories-page')).toHaveAttribute('data-feed', 'new');
+		await expect(page.getByTestId('story-row')).toHaveCount(fixture.feeds.new.length);
+		await expect(page.getByText(fixture.items['301'].title)).toBeVisible();
 	});
 
-	test('navigating to an item page works (SSR + hydrate)', async ({ baseURL }) => {
+	test('navigating to an item page works after hydration', async ({ baseURL, page }) => {
 		const SSR_BASE = ssrBase(baseURL);
-		const browser: Browser = await chromium.launch();
-		const context = await browser.newContext();
-		try {
-			const page = await context.newPage();
-			await page.goto(SSR_BASE + '/', { waitUntil: 'networkidle' });
-			await expect(page.getByTestId('story-row').first()).toBeVisible();
+		await page.goto(SSR_BASE + '/', { waitUntil: 'networkidle' });
+		await expect(page.getByTestId('story-row').first()).toBeVisible();
 
-			// Follow the first row's comments link to its /item/:id page.
-			const link = page.getByTestId('story-row').first().locator('a[href^="/item/"]').first();
-			const href = await link.getAttribute('href');
-			await link.click();
-			await expect(page).toHaveURL(new RegExp(href!.replace(/\//g, '\\/')));
-			await expect(page.getByTestId('item-page')).toBeVisible();
-		} finally {
-			await context.close();
-			await browser.close();
-		}
+		// Follow the known lead story's comments link.
+		await page.getByTestId('story-row').first().locator('a[href="/item/101"]').click();
+		await expect(page).toHaveURL(/\/item\/101$/);
+		await expect(page.getByTestId('item-page')).toBeVisible();
+		await expect(page.getByRole('heading', { name: LEAD_TITLE })).toBeVisible();
+		await expect(page.getByTestId('comment')).toHaveCount(2);
 	});
 });

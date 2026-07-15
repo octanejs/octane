@@ -1,0 +1,202 @@
+{
+  "feeds": {
+    "top": [
+      101, 102, 103, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015,
+      1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023, 1024, 1025, 1026, 1027, 1028, 1029, 1030,
+      1031, 1032, 1033, 1034, 1035, 1036, 1037, 1038, 1039, 1040, 1041, 1042, 1043, 1044, 1045,
+      1046, 1047, 1048, 1049, 1050, 1051, 1052, 1053, 1054, 1055, 1056, 1057, 1058, 1059
+    ],
+    "new": [301, 302],
+    "ask": [401, 402, 403, 404],
+    "show": [501],
+    "jobs": [601, 602, 603, 604, 605]
+  },
+  "items": {
+    "101": {
+      "id": 101,
+      "type": "story",
+      "by": "alice",
+      "time": 1700000000,
+      "title": "Octane: React parity, compiled ahead of time",
+      "url": "https://example.com/octane",
+      "score": 256,
+      "descendants": 2,
+      "kids": [201, 202]
+    },
+    "102": {
+      "id": 102,
+      "type": "story",
+      "by": "bob",
+      "time": 1700000100,
+      "title": "Show HN: A tiny TSRX playground",
+      "url": "https://github.com/octane/playground",
+      "score": 128,
+      "descendants": 0,
+      "kids": []
+    },
+    "103": {
+      "id": 103,
+      "type": "story",
+      "by": "carol",
+      "time": 1700000200,
+      "title": "Ask HN: Favorite compiler tricks?",
+      "score": 64,
+      "descendants": 0,
+      "kids": []
+    },
+    "201": {
+      "id": 201,
+      "type": "comment",
+      "by": "dan",
+      "time": 1700000300,
+      "text": "This is the <i>first</i> comment about octane.",
+      "kids": [],
+      "parent": 101
+    },
+    "202": {
+      "id": 202,
+      "type": "comment",
+      "by": "erin",
+      "time": 1700000400,
+      "text": "And here is a second top-level comment.",
+      "kids": [],
+      "parent": 101
+    },
+    "301": {
+      "id": 301,
+      "type": "story",
+      "by": "nina",
+      "time": 1700001000,
+      "title": "New: freshly submitted to octane",
+      "url": "https://example.com/new",
+      "score": 3,
+      "descendants": 0,
+      "kids": []
+    },
+    "302": {
+      "id": 302,
+      "type": "story",
+      "by": "ned",
+      "time": 1700001100,
+      "title": "New: another fresh submission",
+      "score": 1,
+      "descendants": 0,
+      "kids": []
+    },
+    "401": {
+      "id": 401,
+      "type": "story",
+      "by": "amy",
+      "time": 1700002000,
+      "title": "Ask HN: how does the LIS reconciler work?",
+      "score": 42,
+      "descendants": 0,
+      "kids": []
+    },
+    "402": {
+      "id": 402,
+      "type": "story",
+      "by": "amy",
+      "time": 1700002100,
+      "title": "Ask HN: two",
+      "score": 5,
+      "descendants": 0,
+      "kids": []
+    },
+    "403": {
+      "id": 403,
+      "type": "story",
+      "by": "amy",
+      "time": 1700002200,
+      "title": "Ask HN: three",
+      "score": 6,
+      "descendants": 0,
+      "kids": []
+    },
+    "404": {
+      "id": 404,
+      "type": "story",
+      "by": "amy",
+      "time": 1700002300,
+      "title": "Ask HN: four",
+      "score": 7,
+      "descendants": 0,
+      "kids": []
+    },
+    "501": {
+      "id": 501,
+      "type": "story",
+      "by": "sam",
+      "time": 1700003000,
+      "title": "Show HN: octane hacker-news demo",
+      "url": "https://example.com/show",
+      "score": 88,
+      "descendants": 0,
+      "kids": []
+    },
+    "601": {
+      "id": 601,
+      "type": "job",
+      "by": "jobsbot",
+      "time": 1700004000,
+      "title": "Octane is hiring compiler engineers",
+      "url": "https://example.com/jobs",
+      "score": 1,
+      "descendants": 0,
+      "kids": []
+    },
+    "602": {
+      "id": 602,
+      "type": "job",
+      "by": "jobsbot",
+      "time": 1700004100,
+      "title": "Octane job two",
+      "score": 1,
+      "descendants": 0,
+      "kids": []
+    },
+    "603": {
+      "id": 603,
+      "type": "job",
+      "by": "jobsbot",
+      "time": 1700004200,
+      "title": "Octane job three",
+      "score": 1,
+      "descendants": 0,
+      "kids": []
+    },
+    "604": {
+      "id": 604,
+      "type": "job",
+      "by": "jobsbot",
+      "time": 1700004300,
+      "title": "Octane job four",
+      "score": 1,
+      "descendants": 0,
+      "kids": []
+    },
+    "605": {
+      "id": 605,
+      "type": "job",
+      "by": "jobsbot",
+      "time": 1700004400,
+      "title": "Octane job five",
+      "score": 1,
+      "descendants": 0,
+      "kids": []
+    }
+  },
+  "users": {
+    "alice": {
+      "id": "alice",
+      "created": 1500000000,
+      "karma": 4242,
+      "about": "Maintainer of nothing in particular."
+    },
+    "dan": {
+      "id": "dan",
+      "created": 1520000000,
+      "karma": 99
+    }
+  }
+}

@@ -20,26 +20,28 @@ apps.
   `useParams`; concurrent navigation driven by transitions.
 - **[@octanejs/tanstack-query](../../packages/tanstack-query)** — `useSuspenseQuery` over plain
   query-option factories.
-- **[octane](../../packages/octane) Suspense** — each story row and each comment
-  is its own Suspense unit, so a slow item never blocks the list.
+- **[octane](../../packages/octane) Suspense** — route-level pending skeletons,
+  dependent feed/page queries, and isolated recursive comment boundaries.
 - **[@octanejs/stylex](../../packages/stylex)** — compiled atomic CSS.
 
 Routes: `/` (top stories), `/newest` / `/ask` / `/show` / `/jobs` (the other HN
-feeds), `/item/$id` (a story + its comment tree), `/user/$id` (a profile). Data
-comes from the public HN Firebase API (`https://hacker-news.firebaseio.com/v0/...`).
+feeds), `/item/$id` (a story + its comment tree), `/user/$id` (a profile). The
+interactive example uses the public HN Firebase API by default. Playwright
+overrides `VITE_HN_API_BASE` with a deterministic local fixture API, so browser
+and server-rendering tests never require internet access.
 
 ## Feeds
 
 The orange header nav works. The four feed words map to **real internal feed
 routes** that all render the same `StoriesPage` over a different HN feed endpoint:
 
-| nav    | route      | HN feed endpoint                 |
-| ------ | ---------- | -------------------------------- |
-| (logo) | `/`        | `/v0/topstories.json`            |
-| new    | `/newest`  | `/v0/newstories.json`            |
-| ask    | `/ask`     | `/v0/askstories.json`            |
-| show   | `/show`    | `/v0/showstories.json`           |
-| jobs   | `/jobs`    | `/v0/jobstories.json`            |
+| nav    | route     | HN feed endpoint       |
+| ------ | --------- | ---------------------- |
+| (logo) | `/`       | `/v0/topstories.json`  |
+| new    | `/newest` | `/v0/newstories.json`  |
+| ask    | `/ask`    | `/v0/askstories.json`  |
+| show   | `/show`   | `/v0/showstories.json` |
+| jobs   | `/jobs`   | `/v0/jobstories.json`  |
 
 `StoriesPage` derives its feed from the active pathname (`feedForPath`) and reads
 `storiesQuery(feed)`, so a single page component serves every feed route. The
@@ -50,18 +52,29 @@ active pathname to each link's target; the router `<Link>` also sets
 ## Run it
 
 ```bash
-pnpm dev:jsx     # the React-style .tsx app, CLIENT-only  -> http://localhost:5173
-pnpm dev:tsrx    # the .tsrx app, CLIENT-only
-node server.mjs jsx     # the .tsx app, SSR + hydrate  -> http://localhost:5170
-node server.mjs tsrx    # the .tsrx app, SSR + hydrate  (PORT=… to override)
-pnpm e2e         # the Playwright suite (boots both apps client + SSR)
+pnpm dev            # the .tsrx app, SSR + hydrate -> http://localhost:5170
+pnpm dev:jsx        # the React-style .tsx app, SSR + hydrate
+pnpm dev:tsrx       # the .tsrx app, SSR + hydrate
+pnpm typecheck      # strict TypeScript check for shared, JSX, glue, and E2E code
+pnpm build          # production client builds for both authoring dialects
+pnpm test:e2e       # build + Playwright parity/SSR journeys for both apps
+pnpm test:e2e:dev   # optional fast pass from source-serving Vite clients
 ```
 
-`pnpm e2e` boots each app's Vite dev server itself (jsx on `:5191`, tsrx on
-`:5192`) and stubs the HN API, so the nav-parity suite needs no network and no
-servers running up front. It also boots the two SSR servers (`:5193` jsx, `:5194`
-tsrx) for `ssr.spec.ts`. If you already have a server up locally on those ports it
-is reused.
+The two E2E commands use POSIX inline environment syntax and are supported on
+macOS/Linux (CI runs Ubuntu). The ordinary `dev`, `typecheck`, and `build`
+commands do not require that launcher syntax.
+
+`pnpm test:e2e` boots a local HN-compatible fixture API on `:5190`, each app's
+production client build through Vite preview (`:5191` JSX, `:5192` TSRX), and
+both source-driven SSR servers (`:5193` JSX, `:5194` TSRX). The fixture base is
+baked into the production clients before Playwright starts. The same data drives
+browser and Node SSR fetches, so no external API or manually started server is
+required. The SSR servers use Vite middleware for source loading but set
+`NODE_ENV=production`, keeping this release gate on production runtime behavior.
+The fast E2E variant serves client modules from source but keeps the same
+production runtime semantics and strict diagnostic gate. `pnpm e2e` remains as
+a convenience alias.
 
 ## SSR & hydration
 
@@ -99,7 +112,7 @@ are set by the shell, not per route.
 
 ```
 shared/        # IDENTICAL for both apps — the entire "core"
-  api.ts       #   HN Firebase client: topStories(), item(id), user(id)
+  api.ts       #   HN API client: topStories(), item(id), user(id)
   types.ts     #   API shapes
   format.ts    #   relativeTime / hostname / pluralize
   queries.ts   #   @octanejs/tanstack-query option factories
@@ -110,6 +123,11 @@ jsx/           # ONLY the views differ between the two apps...
   *.tsx        #   React-style views + queryClient + routes wiring
 tsrx/
   *.tsrx       #   the same views in .tsrx directive syntax
+
+e2e/
+  fixtures/    #   fixed feed, item, comment, and user data
+  fixture-server.mjs # local HN-compatible API used by browser and Node SSR
+  *.spec.ts    #   parity, pagination, SSR, hydration, and interaction journeys
 ```
 
 `shared/routes.ts` exposes `createAppRouter(components)`; each app passes its own
@@ -132,11 +150,16 @@ export function StoryRow({ rank, story }: { rank: number; story: Story }) {
 			<div {...stylex.props(styles.row)}>
 				<span {...stylex.props(styles.rank)}>{rank}.</span>
 				{story.url ? (
-					<a href={story.url} {...stylex.props(styles.titleLink)}>
+					<a href={story.url} className="story-title" {...stylex.props(styles.titleLink)}>
 						{story.title}
 					</a>
 				) : (
-					<Link to="/item/$id" params={{ id: String(story.id) }} {...stylex.props(styles.titleLink)}>
+					<Link
+						to="/item/$id"
+						params={{ id: String(story.id) }}
+						className="story-title"
+						{...stylex.props(styles.titleLink)}
+					>
 						{story.title}
 					</Link>
 				)}
@@ -158,11 +181,16 @@ export function StoryRow({ rank, story }: { rank: number; story: Story }) @{
 		<div {...stylex.props(styles.row)}>
 			<span {...stylex.props(styles.rank)}>{rank + '.' as string}</span>
 			@if (story.url) {
-				<a href={story.url} {...stylex.props(styles.titleLink)}>
+				<a href={story.url} class="story-title" {...stylex.props(styles.titleLink)}>
 					{story.title as string}
 				</a>
 			} @else {
-				<Link to="/item/$id" params={{ id: String(story.id) }} {...stylex.props(styles.titleLink)}>
+				<Link
+					to="/item/$id"
+					params={{ id: String(story.id) }}
+					class="story-title"
+					{...stylex.props(styles.titleLink)}
+				>
 					{story.title as string}
 				</Link>
 			}
@@ -178,12 +206,12 @@ export function StoryRow({ rank, story }: { rank: number; story: Story }) @{
 ## Parity proof
 
 `e2e/nav.spec.ts` is a single spec run once per project (`jsx` against `:5191`,
-`tsrx` against `:5192`, via `e2e/playwright.config.ts`). It stubs the HN Firebase
-API with tiny fixed fixtures and a small artificial delay (so the Suspense
-skeleton is exercised), then asserts the same things in both apps:
+`tsrx` against `:5192`, via `e2e/playwright.config.ts`). It reads from the same
+fixed fixture API as SSR, with a small artificial delay so the Suspense skeleton
+is exercised, then asserts the same things in both apps:
 
-- `/` renders the stubbed stories (`[data-testid="story-row"]` count, a known
-  title, an external story link with the stubbed `href`);
+- `/` renders the fixture stories (`[data-testid="story-row"]` count, a known
+  title, an external story link with the fixture `href`);
 - the pending skeleton (`[data-testid="pending"]`) shows, then resolves to rows;
 - clicking a story's comments link navigates to `/item/<id>`, the header renders,
   the comments render **including their `innerHTML` bodies** (the body text and
@@ -191,22 +219,35 @@ skeleton is exercised), then asserts the same things in both apps:
 - clicking an author navigates to `/user/<id>` and the karma renders;
 - the header nav links are present, and the feed links (new / ask / show / jobs)
   swap the feed, its content, and the active-link highlight;
-- each feed endpoint is stubbed with a distinct id list, so clicking a feed link
+- each feed endpoint has a distinct fixture id list, so clicking a feed link
   is verified to actually change the rendered list, not just the URL.
+
+`page-more-hold.spec.ts` delays the second fixture page and verifies that the
+first page stays visible without a pending-skeleton flash until its replacement
+is ready. `ssr.spec.ts` verifies exact server HTML with JavaScript disabled,
+inline first-paint styles, adoption of a server-created row, clean hydration
+diagnostics, and post-hydration navigation. These journeys execute for both
+authoring dialects.
+
+Every JavaScript-enabled journey also shares one strict browser-diagnostics
+gate: unexpected console errors, page errors, and hydration mismatch warnings
+fail the test after the page has settled. The JavaScript-disabled SSR proof is
+the sole intentional exemption.
 
 The same assertions passing under **both** projects is the `.tsx` ≡ `.tsrx`
 parity result.
 
 ```
-12 passed
-  [jsx]  6 passed
-  [tsrx] 6 passed
+20 passed
+  [jsx]  10 passed
+  [tsrx] 10 passed
 ```
 
 ### Notes on selectors
 
-The apps spread StyleX onto their anchors (`{...stylex.props(...)}`), which owns
-the `className`, and router `<Link>`s render plain `<a href>`s. So the spec
+The story links intentionally put a literal `story-title` class before a StyleX
+spread; the later spread owns the effective class while normalizing its value
+clsx-style. Router `<Link>`s render plain `<a href>`s. The spec deliberately
 addresses links by **role / `href`** (e.g. `a[href="/item/101"]`,
 `a[href="/user/alice"]`) and structural `data-testid`s
 (`story-row`, `stories-page`, `item-page`, `comment`, `user-page`, `pending`) —

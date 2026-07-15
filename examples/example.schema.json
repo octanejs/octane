@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://octanejs.dev/schemas/example.schema.json",
+  "title": "Octane example manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "title",
+    "summary",
+    "status",
+    "renderModes",
+    "dialects",
+    "bindings",
+    "octaneFeatures",
+    "commands",
+    "journeys",
+    "faultScenarios"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../example.schema.json"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "$ref": "#/$defs/slug"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 20
+    },
+    "status": {
+      "enum": ["active", "experimental"]
+    },
+    "renderModes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["client", "ssr", "streaming-ssr", "hydration", "static"]
+      }
+    },
+    "dialects": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["tsrx", "tsx"]
+      }
+    },
+    "bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^@octanejs/[a-z0-9][a-z0-9-]*$"
+      }
+    },
+    "octaneFeatures": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/slug"
+      }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["build", "typecheck", "e2e"],
+      "properties": {
+        "build": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "const": "build"
+          }
+        },
+        "typecheck": {
+          "const": "typecheck"
+        },
+        "e2e": {
+          "const": "test:e2e"
+        }
+      }
+    },
+    "journeys": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "kind", "spec", "critical"],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/slug"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": ["health", "golden", "resilience", "ssr-hydration"]
+          },
+          "spec": {
+            "type": "string",
+            "pattern": "^e2e/[A-Za-z0-9_./-]+\\.spec\\.ts$"
+          },
+          "critical": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "faultScenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description"],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/slug"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "scriptName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9:-]*$"
+    }
+  }
+}

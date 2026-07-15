@@ -30,6 +30,24 @@ export function SpreadClass(props) @{
 	<div {...props}>{'x'}</div>
 }
 
+// A later spread owns the final class value when it supplies either `class` or
+// `className`. The class value itself still uses octane's clsx-style composition.
+export function ExplicitThenSpreadClass(props) @{
+	<a href={props.href} class="story-title" {...props.attrs}>{'x'}</a>
+}
+
+// A later explicit class owns the final value when an earlier spread supplies class.
+// Hydration must not replay the spread's intermediate class onto the adopted node.
+export function SpreadThenExplicitClass(props) @{
+	<div {...props.attrs} class={props.cls}>{'x'}</div>
+}
+
+// Class ownership follows authored order across any number of spreads. Non-class
+// attributes retain their authored serialization positions.
+export function MultipleClassSpreads(props) @{
+	<div class={props.base} {...props.first} data-own="own" {...props.second}>{'x'}</div>
+}
+
 // SVGElement.className is a read-only SVGAnimatedString, so the compiler routes this
 // through setAttribute('class', normalizeClass(...)).
 export function SvgClass(props) @{

@@ -11,7 +11,13 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '../_helpers';
-import { DeoptList, DeoptListStateful, DeoptUnkeyed, JsxList } from '../_fixtures/deopt-list.tsrx';
+import {
+	DeoptList,
+	DeoptListStateful,
+	DeoptUnkeyed,
+	DestructuredJsxList,
+	JsxList,
+} from '../_fixtures/deopt-list.tsrx';
 
 const items = (...ids: number[]) => ids.map((id) => ({ id, label: String.fromCharCode(96 + id) }));
 const rows = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
@@ -55,6 +61,13 @@ describe('de-opt array child — keyed reconciliation', () => {
 describe('de-opt array child — plain JSX `.map` (compiler lowering)', () => {
 	it('compiles `{items.map((it) => <li key={it.id}>{it.label}</li>)}` and renders it', () => {
 		const r = mount(JsxList, { items: items(1, 2, 3) });
+		expect(rows(r)).toEqual(['a', 'b', 'c']);
+		expect(r.find('li').hasAttribute('key')).toBe(false);
+		r.unmount();
+	});
+
+	it('renders a keyed JSX list when the component destructures typed props', () => {
+		const r = mount(DestructuredJsxList, { items: items(1, 2, 3) });
 		expect(rows(r)).toEqual(['a', 'b', 'c']);
 		expect(r.find('li').hasAttribute('key')).toBe(false);
 		r.unmount();

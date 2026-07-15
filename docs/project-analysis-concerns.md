@@ -136,8 +136,10 @@ Dedicated conformance, identity, behavioral hydration, streaming, and
 browser tests cover many of these axes. The website browser suite now checks
 all public routes in development and production, fails on page/hydration
 errors, exercises client navigation, and interacts with the sandboxed
-playground. It still does not replace the Hacker News or Lexical example E2E
-suites, which are not part of root `pnpm test`.
+playground. A separate example-app CI job now builds Hacker News and Lexical
+Playground and runs their Playwright journeys; its result is aggregated by the
+protected `typecheck` context. Keeping it outside the sharded `pnpm test`
+command avoids repeating each browser suite per shard.
 
 When adding a feature, choose the suite by observable rather than assuming a
 final-HTML differential test is sufficient.
@@ -373,8 +375,8 @@ compiler requirements change.
 
 - keep streaming changes covered through core Node/Web transports, plugin HTML
   composition, cancellation, nonce emission, and real hydration;
-- add release-gated browser coverage for examples when changes touch their
-  router/query/style/editor integrations;
+- keep the release-gated example browser job deterministic as new router,
+  query, style, editor, and product-shaped fixtures join it;
 - keep marker topology and DOM identity assertions beside normalized
   differential tests.
 

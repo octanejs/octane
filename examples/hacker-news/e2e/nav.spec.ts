@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './test.ts';
+import fixture from './fixtures/hacker-news.json' with { type: 'json' };
 
 // Navigation parity e2e. This ONE spec runs once per Playwright project (`jsx`
 // on :5191, `tsrx` on :5192). The two apps share the whole octane core (router +
@@ -7,206 +8,49 @@ import { test, expect, type Page } from '@playwright/test';
 // proof that the React-style `.tsx` views and the `.tsrx` directive views are
 // observably equivalent.
 //
-// Every test is deterministic and offline: the HN Firebase API is stubbed via
-// page.route() with tiny fixed fixtures, plus a small artificial delay so the
-// Suspense skeleton/pending state is actually exercised before data resolves.
+// Every test is deterministic and offline: browser and SSR requests use the
+// local HN-compatible fixture API started by playwright.config.ts. Its small
+// response delay also makes the Suspense pending state observable.
 
 // --- Fixtures -------------------------------------------------------------
 
-// Each feed endpoint (/v0/<feed>.json) returns a DISTINCT, fixed id list so the
-// nav can be proven to actually swap feeds (not just navigate). The ids are
-// disjoint per feed and map to the items below, so each feed shows a different,
-// recognizable headline.
-const TOP_IDS = [101, 102, 103];
-const NEW_IDS = [301, 302];
-const ASK_IDS = [401, 402, 403, 404];
-const SHOW_IDS = [501];
-const JOB_IDS = [601, 602, 603, 604, 605];
-
-// The /v0/<feed>.json endpoints, keyed by request pathname.
-const FEED_LISTS: Record<string, number[]> = {
-	'/v0/topstories.json': TOP_IDS,
-	'/v0/newstories.json': NEW_IDS,
-	'/v0/askstories.json': ASK_IDS,
-	'/v0/showstories.json': SHOW_IDS,
-	'/v0/jobstories.json': JOB_IDS,
-};
-
-// A recognizable lead title per feed — used to prove the list content swapped.
-const NEW_LEAD_TITLE = 'New: freshly submitted to octane';
-const ASK_LEAD_TITLE = 'Ask HN: how does the LIS reconciler work?';
-const SHOW_LEAD_TITLE = 'Show HN: octane hacker-news demo';
-const JOBS_LEAD_TITLE = 'Octane is hiring compiler engineers';
-
-// One story WITH an external url (so its title is an external link) and kids
-// (comment ids). The other two round out the list.
-const ITEMS: Record<number, unknown> = {
-	101: {
-		id: 101,
-		type: 'story',
-		by: 'alice',
-		time: 1700000000,
-		title: 'Octane: React parity, compiled ahead of time',
-		url: 'https://example.com/octane',
-		score: 256,
-		descendants: 2,
-		kids: [201, 202],
+// The top feed has two pages; this spec validates the first one while the
+// pagination contract has its own focused journey.
+const TOP_IDS = fixture.feeds.top.slice(0, 30);
+const FEED_CASES = [
+	{
+		href: '/newest',
+		url: /\/newest(\?page=1)?$/,
+		feed: 'new',
+		ids: fixture.feeds.new,
+		leadTitle: fixture.items['301'].title,
 	},
-	102: {
-		id: 102,
-		type: 'story',
-		by: 'bob',
-		time: 1700000100,
-		title: 'Show HN: A tiny TSRX playground',
-		url: 'https://github.com/octane/playground',
-		score: 128,
-		descendants: 0,
-		kids: [],
+	{
+		href: '/ask',
+		url: /\/ask(\?page=1)?$/,
+		feed: 'ask',
+		ids: fixture.feeds.ask,
+		leadTitle: fixture.items['401'].title,
 	},
-	103: {
-		id: 103,
-		type: 'story',
-		by: 'carol',
-		time: 1700000200,
-		title: 'Ask HN: Favorite compiler tricks?',
-		// No url -> title becomes an internal <Link> to /item/103.
-		score: 64,
-		descendants: 0,
-		kids: [],
+	{
+		href: '/show',
+		url: /\/show(\?page=1)?$/,
+		feed: 'show',
+		ids: fixture.feeds.show,
+		leadTitle: fixture.items['501'].title,
 	},
-	// Comments on story 101. Bodies are HTML (as the real HN API returns) bound
-	// with innerHTML — now that that binding works, the body text renders.
-	201: {
-		id: 201,
-		type: 'comment',
-		by: 'dan',
-		time: 1700000300,
-		text: 'This is the <i>first</i> comment about octane.',
-		kids: [],
-		parent: 101,
+	{
+		href: '/jobs',
+		url: /\/jobs(\?page=1)?$/,
+		feed: 'jobs',
+		ids: fixture.feeds.jobs,
+		leadTitle: fixture.items['601'].title,
 	},
-	202: {
-		id: 202,
-		type: 'comment',
-		by: 'erin',
-		time: 1700000400,
-		text: 'And here is a second top-level comment.',
-		kids: [],
-		parent: 101,
-	},
-	// --- new feed (NEW_IDS) ---
-	301: {
-		id: 301,
-		type: 'story',
-		by: 'nina',
-		time: 1700001000,
-		title: NEW_LEAD_TITLE,
-		url: 'https://example.com/new',
-		score: 3,
-		descendants: 0,
-		kids: [],
-	},
-	302: {
-		id: 302,
-		type: 'story',
-		by: 'ned',
-		time: 1700001100,
-		title: 'New: another fresh submission',
-		score: 1,
-		descendants: 0,
-		kids: [],
-	},
-	// --- ask feed (ASK_IDS) ---
-	401: {
-		id: 401,
-		type: 'story',
-		by: 'amy',
-		time: 1700002000,
-		title: ASK_LEAD_TITLE,
-		score: 42,
-		descendants: 0,
-		kids: [],
-	},
-	402: { id: 402, type: 'story', by: 'amy', time: 1700002100, title: 'Ask HN: two', score: 5 },
-	403: { id: 403, type: 'story', by: 'amy', time: 1700002200, title: 'Ask HN: three', score: 6 },
-	404: { id: 404, type: 'story', by: 'amy', time: 1700002300, title: 'Ask HN: four', score: 7 },
-	// --- show feed (SHOW_IDS) ---
-	501: {
-		id: 501,
-		type: 'story',
-		by: 'sam',
-		time: 1700003000,
-		title: SHOW_LEAD_TITLE,
-		url: 'https://example.com/show',
-		score: 88,
-		descendants: 0,
-		kids: [],
-	},
-	// --- jobs feed (JOB_IDS) ---
-	601: {
-		id: 601,
-		type: 'job',
-		by: 'jobsbot',
-		time: 1700004000,
-		title: JOBS_LEAD_TITLE,
-		url: 'https://example.com/jobs',
-		score: 1,
-	},
-	602: { id: 602, type: 'job', by: 'jobsbot', time: 1700004100, title: 'Octane job two' },
-	603: { id: 603, type: 'job', by: 'jobsbot', time: 1700004200, title: 'Octane job three' },
-	604: { id: 604, type: 'job', by: 'jobsbot', time: 1700004300, title: 'Octane job four' },
-	605: { id: 605, type: 'job', by: 'jobsbot', time: 1700004400, title: 'Octane job five' },
-};
-
-const USERS: Record<string, unknown> = {
-	alice: {
-		id: 'alice',
-		created: 1500000000,
-		karma: 4242,
-		about: 'Maintainer of nothing in particular.',
-	},
-	dan: { id: 'dan', created: 1520000000, karma: 99 },
-};
-
-// --- Stubbing -------------------------------------------------------------
-
-// Tiny delay so the pending/skeleton UI renders before data arrives.
-const delay = () => new Promise((r) => setTimeout(r, 80));
-
-/** Route every HN Firebase request to the fixtures above. */
-async function stubHackerNews(page: Page) {
-	await page.route('**/hacker-news.firebaseio.com/**', async (route) => {
-		const path = new URL(route.request().url()).pathname; // e.g. /v0/item/101.json
-		await delay();
-
-		// Feed id lists: /v0/{top,new,ask,show,job}stories.json -> distinct ids.
-		if (path in FEED_LISTS) {
-			return route.fulfill({ json: FEED_LISTS[path] });
-		}
-
-		const itemMatch = path.match(/^\/v0\/item\/(\d+)\.json$/);
-		if (itemMatch) {
-			const item = ITEMS[Number(itemMatch[1])];
-			return item ? route.fulfill({ json: item }) : route.fulfill({ json: null });
-		}
-
-		const userMatch = path.match(/^\/v0\/user\/([^/]+)\.json$/);
-		if (userMatch) {
-			const user = USERS[userMatch[1]];
-			return user ? route.fulfill({ json: user }) : route.fulfill({ json: null });
-		}
-
-		return route.fulfill({ json: null });
-	});
-}
-
-test.beforeEach(async ({ page }) => {
-	await stubHackerNews(page);
-});
+] as const;
 
 // --- Tests ----------------------------------------------------------------
 
-test('home renders the stubbed top stories', async ({ page }) => {
+test('home renders the fixture top stories', async ({ page }) => {
 	await page.goto('/');
 
 	const rows = page.getByTestId('story-row');
@@ -216,7 +60,7 @@ test('home renders the stubbed top stories', async ({ page }) => {
 	await expect(page.getByText('Octane: React parity, compiled ahead of time')).toBeVisible();
 
 	// The first story has a url, so its title is an external link pointing at the
-	// stubbed href. (StyleX owns `className` on these anchors, so they're
+	// fixture href. (StyleX owns `className` on these anchors, so they're
 	// addressed by role/href rather than a class — stable and identical in both
 	// the .tsx and .tsrx apps.)
 	const externalTitle = page.getByRole('link', {
@@ -226,12 +70,27 @@ test('home renders the stubbed top stories', async ({ page }) => {
 });
 
 test('the skeleton/pending state shows before data, then resolves to rows', async ({ page }) => {
+	// Hold the feed response until the fallback is observed. This makes the
+	// assertion scheduling-independent instead of relying on a short fixed delay.
+	let releaseFeed!: () => void;
+	const feedGate = new Promise<void>((resolve) => {
+		releaseFeed = resolve;
+	});
+	await page.route('**/v0/topstories.json', async (route) => {
+		await feedGate;
+		await route.continue();
+	});
+
 	// Don't await the load — assert the pending skeleton appears first.
 	const navigation = page.goto('/');
 
 	// Route-level pending skeleton ([data-testid="pending"]) is shown while the
 	// top-stories id list is still loading.
-	await expect(page.getByTestId('pending')).toBeVisible();
+	try {
+		await expect(page.getByTestId('pending')).toBeVisible();
+	} finally {
+		releaseFeed();
+	}
 
 	await navigation;
 
@@ -321,38 +180,29 @@ test('the feed nav links swap the feed, its content, and the active highlight', 
 	// The header feed links render as plain <a href> (the router <Link> drops
 	// data-testid), so address them by href.
 	const header = page.locator('header');
-	const newLink = header.locator('a[href="/newest"]');
-	const askLink = header.locator('a[href="/ask"]');
+	for (const feedCase of FEED_CASES) {
+		const activeLink = header.locator(`a[href="${feedCase.href}"]`);
 
-	// new -> /newest: URL, distinct new-feed content, and active marking. The
-	// feed routes validate `?page=N`, so the router normalizes the URL to carry
-	// the default `?page=1` — accept it (with or without the query).
-	await newLink.click();
-	await expect(page).toHaveURL(/\/newest(\?page=1)?$/);
-	await expect(storiesPage).toHaveAttribute('data-feed', 'new');
-	await expect(page.getByTestId('story-row')).toHaveCount(NEW_IDS.length);
-	await expect(page.getByText(NEW_LEAD_TITLE)).toBeVisible();
-	// Top-feed lead title is gone — the list genuinely swapped.
+		// Every feed route must swap URL, content, row count, and active state.
+		// The router may normalize the default page into `?page=1`.
+		await activeLink.click();
+		await expect(page).toHaveURL(feedCase.url);
+		await expect(storiesPage).toHaveAttribute('data-feed', feedCase.feed);
+		await expect(page.getByTestId('story-row')).toHaveCount(feedCase.ids.length);
+		await expect(page.getByText(feedCase.leadTitle)).toBeVisible();
+		await expect(activeLink).toHaveAttribute('aria-current', 'page');
+		await expect(activeLink).toHaveAttribute('data-status', 'active');
+		await expect(activeLink).toHaveCSS('font-weight', '700');
+		await expect(activeLink).toHaveCSS('text-decoration-line', 'underline');
+
+		for (const siblingCase of FEED_CASES) {
+			if (siblingCase === feedCase) continue;
+			const siblingLink = header.locator(`a[href="${siblingCase.href}"]`);
+			await expect(siblingLink).not.toHaveAttribute('aria-current', 'page');
+			await expect(siblingLink).toHaveCSS('font-weight', '400');
+		}
+	}
+
+	// The final jobs feed is genuinely distinct from the original top list.
 	await expect(page.getByText('Octane: React parity, compiled ahead of time')).toHaveCount(0);
-	// The active link is marked by the router (aria-current/data-status) AND by
-	// the visible headerLinkActive style (bold + underline).
-	await expect(newLink).toHaveAttribute('aria-current', 'page');
-	await expect(newLink).toHaveAttribute('data-status', 'active');
-	await expect(newLink).toHaveCSS('font-weight', '700');
-	await expect(newLink).toHaveCSS('text-decoration-line', 'underline');
-	// A sibling feed link is NOT active.
-	await expect(askLink).not.toHaveAttribute('aria-current', 'page');
-	await expect(askLink).toHaveCSS('font-weight', '400');
-
-	// ask -> /ask: URL, distinct ask-feed content, active swaps to ask.
-	await askLink.click();
-	await expect(page).toHaveURL(/\/ask(\?page=1)?$/);
-	await expect(storiesPage).toHaveAttribute('data-feed', 'ask');
-	await expect(page.getByTestId('story-row')).toHaveCount(ASK_IDS.length);
-	await expect(page.getByText(ASK_LEAD_TITLE)).toBeVisible();
-	await expect(askLink).toHaveAttribute('aria-current', 'page');
-	await expect(askLink).toHaveCSS('font-weight', '700');
-	// new is no longer active.
-	await expect(newLink).not.toHaveAttribute('aria-current', 'page');
-	await expect(newLink).toHaveCSS('font-weight', '400');
 });

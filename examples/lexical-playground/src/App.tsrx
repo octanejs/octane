@@ -50,7 +50,11 @@ export function App() @{
 					<RichTextPlugin
 						contentEditable={<div class="editor-scroller">
 							<div class="editor">
-								<ContentEditable class="ContentEditable__root" placeholder={placeholder} />
+								<ContentEditable
+									aria-label="Rich text editor"
+									class="ContentEditable__root"
+									placeholder={placeholder}
+								/>
 							</div>
 						</div>}
 						ErrorBoundary={LexicalErrorBoundary}

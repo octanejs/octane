@@ -981,11 +981,41 @@ function ssrAttrEntry(k: string, v: unknown, tag?: string): string {
 	return '';
 }
 
+/**
+ * Resolve direct and spread class writers to one native `class` attribute.
+ * `sources` are `[isSpread, value]` pairs in authoring order. A spread only
+ * participates when it actually enumerates `class` or `className`; the last
+ * participating writer wins, matching the client's source-ordered setters.
+ */
+export function ssrClass(sources: Array<[boolean, unknown]>): string {
+	let found = false;
+	let value: unknown;
+	for (const [isSpread, source] of sources) {
+		if (!isSpread) {
+			found = true;
+			value = source;
+			continue;
+		}
+		if (source == null || (typeof source !== 'object' && typeof source !== 'function')) continue;
+		for (const key in source as Record<string, unknown>) {
+			if (key === 'class' || key === 'className') {
+				found = true;
+				value = (source as Record<string, unknown>)[key];
+			}
+		}
+	}
+	return found ? ssrAttr('class', value) : '';
+}
+
 /** A spread `{...obj}`: serialize attr-like keys; drop events/refs/key/children. */
-export function ssrSpread(obj: unknown, tag?: string): string {
+export function ssrSpread(obj: unknown, tag?: string, skipClass = false): string {
 	if (obj == null || typeof obj !== 'object') return '';
 	let out = '';
 	for (const k in obj as Record<string, unknown>) {
+		// When direct and spread class writers coexist, the compiler emits one
+		// ssrClass call after all sources. Do not manufacture duplicate native
+		// class attributes here: HTML parsing would keep the wrong (first) one.
+		if (skipClass && (k === 'class' || k === 'className')) continue;
 		// A spread `dangerouslySetInnerHTML` is element content, not an attribute —
 		// the compiler collects it at the emit site (compile.js `htmlSources`, which
 		// feeds `ssrInnerHtml`), so the attr serializer drops it here.

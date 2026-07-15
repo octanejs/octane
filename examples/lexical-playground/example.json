@@ -1,0 +1,48 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "lexical-playground",
+  "title": "Lexical Playground",
+  "summary": "A production-built rich-text editor exercising the Octane Lexical binding through real browser interactions.",
+  "status": "active",
+  "renderModes": ["client"],
+  "dialects": ["tsrx"],
+  "bindings": ["@octanejs/lexical"],
+  "octaneFeatures": [
+    "contenteditable",
+    "effects",
+    "native-events",
+    "portals",
+    "refs-as-props",
+    "tsrx-control-flow"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "format-selected-text",
+      "title": "Type text, select it, and apply an accessible formatting toggle",
+      "kind": "golden",
+      "spec": "e2e/editor.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "undo-redo-document",
+      "title": "Undo and redo visible editor content without losing the document",
+      "kind": "golden",
+      "spec": "e2e/editor.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "insert-from-slash-picker",
+      "title": "Open the portaled slash picker and insert a heading block",
+      "kind": "golden",
+      "spec": "e2e/editor.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": []
+}

@@ -7,6 +7,11 @@ coverage
 .vite
 *.log
 
+# Example-app browser and TSRX tooling outputs
+**/test-results/
+**/playwright-report/
+examples/**/*.d.tsrx.ts
+
 # Vercel Build Output (@octanejs/adapter-vercel writes {root}/.vercel/output on build)
 .vercel/
 

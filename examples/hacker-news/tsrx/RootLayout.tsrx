@@ -6,9 +6,11 @@ import { ErrorFallback } from './Pending.tsrx';
 export function RootLayout() @{
 	// Navigation is concurrent (the router drives startTransition), so `isLoading`
 	// is true while the next route's query loads — render a thin top progress bar.
-	const isLoading = useRouterState({ select: (s) => s.isLoading });
+	const isLoading = useRouterState({ select: (s: { isLoading: boolean }) => s.isLoading });
 	// The active pathname drives which feed link is highlighted.
-	const pathname = useRouterState({ select: (s) => s.location.pathname });
+	const pathname = useRouterState({
+		select: (s: { location: { pathname: string } }) => s.location.pathname,
+	});
 
 	<div {...stylex.props(styles.app)}>
 		@if (isLoading) {

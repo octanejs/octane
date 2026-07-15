@@ -507,7 +507,7 @@ Octane uses [pnpm](https://pnpm.io) for package management and workspace scripts
 ```bash
 pnpm install      # install workspace dependencies
 pnpm test         # run the test suite
-pnpm typecheck    # type-check the packages
+pnpm typecheck    # type-check packages, website, and examples
 pnpm format       # format with Prettier
 ```
 
@@ -519,6 +519,13 @@ lists, conditional rendering, `@switch`, dynamic components, and suspense:
 ```bash
 pnpm --filter octane-playground dev
 ```
+
+### Product examples
+
+The applications under [`examples/`](./examples) are runnable demonstrations
+and Playwright-backed regression fixtures. Validate their manifests, tooling
+contracts, strict TypeScript support code, and production builds with
+`pnpm examples:check`; run their browser journeys with `pnpm examples:e2e`.
 
 ## License
 

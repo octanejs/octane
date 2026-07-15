@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "vite --host --port 5210 --strictPort",
     "build": "vite build",
-    "preview": "vite preview --port 5210 --strictPort"
+    "preview": "vite preview --host --port 5210 --strictPort",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@lexical/code": "catalog:default",
@@ -22,6 +25,9 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
     "vite": "catalog:default"
   }
 }
