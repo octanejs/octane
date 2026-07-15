@@ -7622,6 +7622,13 @@ const DISCRETE_EVENTS = new Set<string>([
  */
 let _dispatchDepth = 0;
 
+// Capture and bubble delegation use separate native root listeners, but a
+// bubbling event is one discrete update window. When the capture listener can
+// hand off to a registered bubble listener, that listener owns the synchronous
+// flush. The microtask is an unstarvable fallback for a descendant native
+// listener stopping propagation before the event returns to the root.
+let _captureFlushFallbackScheduled = false;
+
 // Stamps marking a native event whose delegated walk has already run, per phase. A
 // single native event can reach more than one delegation listener when targets nest —
 // a portal target inside a root, nested roots, or overlapping portal targets. Each
@@ -7721,6 +7728,20 @@ function maybeFlushDiscrete(type: string): void {
 	// edit (no onInput, or an Object.is-equal setState) schedules nothing and
 	// is exactly the case that must snap back (React's restoreControlledState).
 	if (pendingRestores.length > 0) restoreControlledStates();
+}
+
+function finishCaptureDispatch(event: Event): void {
+	const type = event.type;
+	if (!event.bubbles || event.cancelBubble || !_delegated.has(type)) {
+		maybeFlushDiscrete(type);
+		return;
+	}
+	if (!DISCRETE_EVENTS.has(type) || _captureFlushFallbackScheduled) return;
+	_captureFlushFallbackScheduled = true;
+	queueMicrotask(() => {
+		_captureFlushFallbackScheduled = false;
+		maybeFlushDiscrete(type);
+	});
 }
 
 function dispatchDelegated(event: Event): void {
@@ -7831,7 +7852,7 @@ function dispatchDelegatedCapture(event: Event): void {
 		clearCurrentTarget(event);
 		if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH--;
 		_dispatchDepth--;
-		maybeFlushDiscrete(event.type);
+		finishCaptureDispatch(event);
 	}
 }
 
@@ -8203,6 +8224,15 @@ const RESTORE_EVENTS = /* @__PURE__ */ new Set(RESTORE_EVENT_LIST);
 // dedupe: one event targets one element; nesting stays single-digit.
 let pendingRestores: Element[] = [];
 let restoreMicrotaskScheduled = false;
+
+// A native select choice emits `input` immediately followed by `change`. Octane
+// exposes native onChange, so restoring the controlled selection at the end of
+// the first dispatch would make the second handler observe the old value. Hold
+// select-input restores until the current task's native event pair completes.
+// The microtask still runs before the browser's next task, preserving the
+// controlled contract when no change event or accepting handler follows.
+let pendingSelectInputRestores: Element[] = [];
+let selectInputRestoreScheduled = false;
 
 // Commit-deferred controlled work, drained at the HEAD of commitEffects:
 //  - select re-projection: compiled binding mounts run BEFORE the same
@@ -8762,6 +8792,19 @@ function maybeEnqueueRestore(event: Event): void {
 	// (see the RESTORE_EVENT_LIST comment: restoring after the click flush
 	// would revert the toggle before the native handlers run).
 	if (event.type === 'click') return;
+	if (event.type === 'input' && t.localName === 'select') {
+		if (pendingSelectInputRestores.indexOf(t) === -1) pendingSelectInputRestores.push(t);
+		if (!selectInputRestoreScheduled) {
+			selectInputRestoreScheduled = true;
+			queueMicrotask(() => {
+				selectInputRestoreScheduled = false;
+				const list = pendingSelectInputRestores;
+				pendingSelectInputRestores = [];
+				for (let i = 0; i < list.length; i++) restoreControlledElement(list[i]);
+			});
+		}
+		return;
+	}
 	if (pendingRestores.indexOf(t) === -1) pendingRestores.push(t);
 }
 

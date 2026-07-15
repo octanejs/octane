@@ -2,6 +2,142 @@
   "schemaVersion": 1,
   "examples": [
     {
+      "directory": "examples/cinebase",
+      "id": "cinebase",
+      "title": "Cinebase",
+      "summary": "A streaming film and television catalog exercising Apollo cache isolation, SSR, hydration, and resilient navigation.",
+      "status": "active",
+      "renderModes": ["client", "streaming-ssr", "hydration"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/apollo-client"],
+      "octaneFeatures": [
+        "hydration",
+        "keyed-lists",
+        "native-events",
+        "streaming-ssr",
+        "suspense",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "browse-and-open-title",
+          "title": "Filter the catalog and open a title with keyboard navigation",
+          "kind": "golden",
+          "spec": "e2e/catalog.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "isolate-overlapping-searches",
+          "title": "Keep the latest Apollo result when searches resolve out of order",
+          "kind": "resilience",
+          "spec": "e2e/catalog.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "recover-catalog",
+          "title": "Render empty and offline states and retry a failed GraphQL request",
+          "kind": "resilience",
+          "spec": "e2e/catalog.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "persist-watchlist",
+          "title": "Add, reload, and remove a title from a device watchlist",
+          "kind": "golden",
+          "spec": "e2e/watchlist.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "stream-and-adopt",
+          "title": "Stream real server content and adopt input without losing user state",
+          "kind": "ssr-hydration",
+          "spec": "e2e/ssr.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "out-of-order-search",
+          "description": "The fixture transport lets both superseded searches complete; the moon query resolves after the harbor query so the visible Apollo result must remain isolated to the latest variables."
+        },
+        {
+          "id": "catalog-outage",
+          "description": "The outage query returns a deterministic GraphQL error until the user retries it."
+        },
+        {
+          "id": "delayed-hydration",
+          "description": "An opt-in delay allows a user edit to server HTML before Octane adopts the input."
+        }
+      ]
+    },
+    {
+      "directory": "examples/flowboard",
+      "id": "flowboard",
+      "title": "Flowboard",
+      "summary": "A production-built issue board proving Octane drag and drop, portaled routes, refs, keyed identity, and recovery behavior.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/dnd-kit"],
+      "octaneFeatures": [
+        "controlled-inputs",
+        "keyed-reconciliation",
+        "native-events",
+        "portals",
+        "refs-as-props",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "seeded-board-and-empty-filter",
+          "title": "Load deterministic issues and recover from an empty filtered board",
+          "kind": "golden",
+          "spec": "e2e/board.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "portaled-issue-route",
+          "title": "Open, deep-link, dismiss, and restore focus from a portaled issue dialog",
+          "kind": "golden",
+          "spec": "e2e/board.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "pointer-move-and-survivor",
+          "title": "Pointer-drag an issue while an unaffected keyed card retains DOM identity",
+          "kind": "golden",
+          "spec": "e2e/board.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "keyboard-cross-column-move",
+          "title": "Keyboard-drag across columns, retain keyed survivors, and restore focus with the native move control",
+          "kind": "golden",
+          "spec": "e2e/board.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "failure-retry-offline-interleaving",
+          "title": "Retry an initial fixture failure and apply rapid local moves while offline",
+          "kind": "resilience",
+          "spec": "e2e/board.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "initial-load-failure",
+          "description": "The scenario query fails the first deterministic load and succeeds on explicit retry."
+        },
+        {
+          "id": "offline-local-moves",
+          "description": "The browser disconnects while several issue moves remain usable and visibly queued locally."
+        }
+      ]
+    },
+    {
       "directory": "examples/hacker-news",
       "id": "hacker-news",
       "title": "Hacker News",
@@ -104,6 +240,76 @@
         }
       ],
       "faultScenarios": []
+    },
+    {
+      "directory": "examples/threadline",
+      "id": "threadline",
+      "title": "Threadline",
+      "summary": "A production-built social timeline exercising Zustand external state, optimistic mutations, and keyed survivor identity.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/zustand"],
+      "octaneFeatures": [
+        "external-store",
+        "keyed-reconciliation",
+        "native-events",
+        "optimistic-updates",
+        "refs-as-props",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deep-linked-timelines",
+          "title": "Navigate and follow from responsive deep-linked profiles, saved posts, and an empty profile",
+          "kind": "golden",
+          "spec": "e2e/threadline.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "keyed-live-prepend",
+          "title": "Preserve a survivor node, focused composer, and draft across keyed prepends",
+          "kind": "golden",
+          "spec": "e2e/threadline.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "offline-mutation-recovery",
+          "title": "Roll back an optimistic post and concurrent likes, then retry every mutation after reconnecting",
+          "kind": "resilience",
+          "spec": "e2e/threadline.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "out-of-order-likes",
+          "title": "Settle rapid optimistic reactions acknowledged out of order",
+          "kind": "resilience",
+          "spec": "e2e/threadline.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "initial-load-retry",
+          "title": "Retain a rapid optimistic publish across initial load failure and seed recovery",
+          "kind": "resilience",
+          "spec": "e2e/threadline.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "initial-load-failure",
+          "description": "The fault=initial-load URL fails once, preserves an optimistic publish, and merges it ahead of the seed after retry."
+        },
+        {
+          "id": "offline-mutation-rollback",
+          "description": "Posts and concurrent reactions update optimistically while offline, roll back visibly, and retain an independent retry action."
+        },
+        {
+          "id": "out-of-order-acknowledgements",
+          "description": "Two rapid reactions complete on deliberately different delays without clobbering one another."
+        }
+      ]
     }
   ]
 }
