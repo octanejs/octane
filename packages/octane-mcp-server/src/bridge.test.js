@@ -145,6 +145,19 @@ describe('bridgeReport', () => {
 });
 
 describe('KNOWN_BINDINGS', () => {
+	it('maps every public Visx feature package to the aggregate Octane port', async () => {
+		const packagesRoot = fileURLToPath(new URL('../..', import.meta.url));
+		const manifest = JSON.parse(await readFile(join(packagesRoot, 'visx', 'package.json'), 'utf8'));
+		const upstreamPackages = [
+			'@visx/visx',
+			...Object.keys(manifest.exports)
+				.filter((entry) => /^\.\/[a-z0-9-]+$/.test(entry))
+				.map((entry) => `@visx/${entry.slice(2)}`),
+		];
+		expect(upstreamPackages).toHaveLength(41);
+		expect(upstreamPackages.every((name) => KNOWN_BINDINGS[name] === '@octanejs/visx')).toBe(true);
+	});
+
 	it('covers every published @octanejs binding (derived from workspace manifests)', async () => {
 		// The expected set is DERIVED from packages/*/package.json rather than
 		// hand-maintained, so publishing a new binding without registering it in

@@ -24,6 +24,54 @@ const USER_APP_EVAL_TASKS = resolve(
 	import.meta.dirname,
 	'packages/octane-evals/datasets/train/user-apps-v1/tasks',
 );
+const VISX_SOURCE = resolve(import.meta.dirname, 'packages/visx/src');
+const VISX_ALIASES = [
+	{
+		find: /^@octanejs\/visx$/,
+		replacement: resolve(VISX_SOURCE, 'index.ts'),
+	},
+	{
+		find: /^@octanejs\/visx\/a11y\/server$/,
+		replacement: resolve(VISX_SOURCE, 'a11y/server.ts'),
+	},
+	{
+		find: /^@octanejs\/visx\/(.*)$/,
+		replacement: `${VISX_SOURCE}/$1/index.ts`,
+	},
+	{
+		find: /^@octanejs\/floating-ui$/,
+		replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+	},
+];
+
+// Octane's template source map contains zero-width generated segments that are
+// valid in Vite but currently rejected by Vitest's Istanbul/V8 remappers. The
+// Visx coverage project measures the compiled package source directly instead;
+// tests and production builds retain the normal source maps.
+function visxCoverageSource() {
+	return {
+		name: 'visx-coverage-source',
+		enforce: 'post',
+		transform(code, id) {
+			if (!id.split('?', 1)[0].startsWith(VISX_SOURCE)) {
+				return null;
+			}
+			return {
+				code,
+				map: {
+					version: 3,
+					sources: [id.split('?', 1)[0]],
+					sourcesContent: [code],
+					names: [],
+					mappings: code
+						.split('\n')
+						.map((_, index) => (index === 0 ? 'AAAA' : 'AACA'))
+						.join(';'),
+				},
+			};
+		},
+	};
+}
 
 function userAppEvalModuleIds(id) {
 	let cleanId = id.split(/[?#]/, 1)[0];
@@ -737,6 +785,41 @@ export default defineConfig({
 							find: /^recharts$/,
 							replacement: 'recharts/es6/index.js',
 						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'visx',
+					include: [
+						'packages/visx/tests/conformance/**/*.test.ts',
+						'packages/visx/tests/differential/**/*.test.ts',
+						'packages/visx/tests/hydration/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/visx/tests/differential/_setup.ts'],
+					globals: false,
+					testTimeout: 30_000,
+					server: { deps: { inline: [/^@visx\//] } },
+				},
+				plugins: [octane(), visxCoverageSource()],
+				resolve: { alias: VISX_ALIASES },
+			},
+			{
+				test: {
+					name: 'visx-ssr',
+					include: ['packages/visx/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true }), visxCoverageSource()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						...VISX_ALIASES,
 					],
 				},
 			},
