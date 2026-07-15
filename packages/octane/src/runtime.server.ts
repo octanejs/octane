@@ -1155,11 +1155,22 @@ interface GetterHookRec extends HookRec {
 	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => unknown;
 }
+type ServerHookSlot = symbol | string | number;
+
+// Server twin of the client helper/custom-hook ABI. Modules reserve a range
+// only when globally composable Symbol descriptions are required.
+let nextHookSlot = 0;
+export function hookSlots(count: number): number {
+	const base = nextHookSlot;
+	nextHookSlot += count;
+	return base;
+}
+
 interface HookPass {
 	/** Slot → occurrence-indexed records, persisting across this body's passes. */
-	hooks: Map<symbol | string, HookRec[]>;
+	hooks: Map<ServerHookSlot, HookRec[]>;
 	/** Per-pass occurrence counters (fresh each pass, like Frame.occ). */
-	occ: Map<symbol | string, number>;
+	occ: Map<ServerHookSlot, number>;
 	/** A dispatch fired during the current pass → re-invoke the body. */
 	update: boolean;
 }
@@ -1167,11 +1178,44 @@ interface HookPass {
 // restored synchronously around each body invocation, so a captured dispatch can
 // tell "my component, mid-render" (queue) from anything else (inert).
 let HOOK_PASS: HookPass | null = null;
-// The `withSlot` call-site symbol, ambient while the wrapped custom hook runs —
-// its slot-less useState/useReducer calls adopt it as their key.
-let PENDING_SLOT: symbol | string | undefined;
+// Custom-hook call-site path. A base hook reached through withSlot combines
+// every enclosing custom-hook boundary with its own compiler site. This mirrors
+// the client runtime: two calls to the same custom hook stay independent even
+// when a conditional render-phase retry changes their occurrence order.
+const HOOK_SLOT_PATH: ServerHookSlot[] = [];
 // Key for slot-less hook calls outside any withSlot (plain call-order keying).
 const NO_SLOT = '@state';
+
+function appendHookSlotPath(key: string, slot: ServerHookSlot): string {
+	let type: string;
+	let value: string;
+	if (typeof slot === 'number') {
+		type = 'n';
+		value = String(slot);
+	} else if (typeof slot === 'symbol') {
+		type = 's';
+		value = slot.description ?? '';
+	} else {
+		type = 't';
+		value = slot;
+	}
+	return key + type + value.length + ':' + value;
+}
+
+function resolveHookSlot(slot: unknown): ServerHookSlot {
+	const own: ServerHookSlot | undefined =
+		typeof slot === 'symbol' || typeof slot === 'string' || typeof slot === 'number'
+			? slot
+			: undefined;
+	const depth = HOOK_SLOT_PATH.length;
+	if (depth === 0) return own ?? NO_SLOT;
+	if (own === undefined && depth === 1) return HOOK_SLOT_PATH[0];
+
+	let key = '@octane:hook:';
+	for (let i = 0; i < depth; i++) key = appendHookSlotPath(key, HOOK_SLOT_PATH[i]);
+	if (own !== undefined) key = appendHookSlotPath(key, own);
+	return Symbol.for(key);
+}
 
 // React's cap (and message shape): a dispatch that fires unconditionally during
 // render never converges — fail loudly instead of hanging the render.
@@ -1198,8 +1242,7 @@ function stateHook<S, A>(
 		const value = create();
 		return withGetter ? [value, NOOP, () => value] : [value, NOOP];
 	}
-	const key: symbol | string =
-		typeof slot === 'symbol' || typeof slot === 'string' ? slot : (PENDING_SLOT ?? NO_SLOT);
+	const key = resolveHookSlot(slot);
 	const n = hp.occ.get(key) ?? 0;
 	hp.occ.set(key, n + 1);
 	let list = hp.hooks.get(key);
@@ -2069,7 +2112,8 @@ function recordHydrationRejection(reason: unknown): void {
 	if (SERIAL !== null) SERIAL.push(hydrationRejectionSeed(reason));
 }
 
-export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: string | symbol): T {
+export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: symbol | string): T;
+export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHookSlot): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) return readContext(usable as Context<T>);
 	// A thenable. Key it by the current FRAME path + the compiler-injected
 	// call-site key + a per-frame occurrence index (so a use() inside an @for gets
@@ -2172,7 +2216,7 @@ let PU_ID = 0;
  * the same in-flight/settled promise instance, which is what lets puBatch and
  * use() resolve by identity and what stops re-runs duplicating network calls.
  */
-export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: string | symbol): T {
+export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot): T {
 	const res = RESOLVED as ResolvedMap | null;
 	if (res === null) return fn();
 	const base =
@@ -2283,7 +2327,7 @@ const WARM_SLOT_CAP = 64;
  * its unwraps then resolve by identity (resolvedT). Speculative: a throwing
  * creation is simply not warmed.
  */
-export function warmMemo(compute: () => unknown, deps: unknown[], slot: symbol | string): void {
+export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHookSlot): void {
 	const res = RESOLVED;
 	if (res === null) return;
 	const warm = res.pu.warm;
@@ -2418,11 +2462,11 @@ export function useState<T = undefined>(): [
 ];
 export function useState<T>(
 	initial: T | (() => T),
-	slot?: symbol | string,
+	slot?: symbol,
 ): [T, (next: T | ((value: T) => T)) => void, () => T];
 export function useState<T>(
 	initial?: T | (() => T),
-	slot?: symbol | string,
+	slot?: ServerHookSlot,
 ): [T, (next: T | ((value: T) => T)) => void, () => T] {
 	// A compiled zero-argument call is emitted as `useState(slot)`. Mirror the
 	// client trailing-slot ABI so the injected symbol is not mistaken for state.
@@ -2451,7 +2495,11 @@ type _ServerUseStateAcceptsNoArguments = AssertServerUseStateType<
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(
 	initial: T | (() => T),
-	slot?: symbol | string,
+	slot?: symbol,
+): [T, (next: any) => void, () => T];
+export function __useStateWithGetter<T>(
+	initial: T | (() => T),
+	slot?: ServerHookSlot,
 ): [T, (next: any) => void, () => T] {
 	// A compiled zero-argument call is emitted as `__useStateWithGetter(slot)`.
 	// Mirror the public hook's trailing-slot ABI before creating the getter cell.
@@ -2470,11 +2518,17 @@ export function __useStateWithGetter<T>(
 export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
+	initOrSlot?: ((arg: I) => S) | symbol,
+	maybeSlot?: symbol,
+): [S, (action: A) => void, () => S];
+export function useReducer<S, A, I = S>(
+	reducer: (s: S, a: A) => S,
+	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol | string,
-	maybeSlot?: symbol | string,
+	maybeSlot?: ServerHookSlot,
 ): [S, (action: A) => void, () => S] {
 	const init = typeof initOrSlot === 'function' ? initOrSlot : undefined;
-	const slot = init !== undefined ? maybeSlot : initOrSlot;
+	const slot = maybeSlot !== undefined ? maybeSlot : initOrSlot;
 	return stateHook<S, A>(
 		reducer,
 		() => (init ? init(initialArg) : (initialArg as unknown as S)),
@@ -2486,11 +2540,17 @@ export function useReducer<S, A, I = S>(
 export function __useReducerWithGetter<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
+	initOrSlot?: ((arg: I) => S) | symbol,
+	maybeSlot?: symbol,
+): [S, (action: A) => void, () => S];
+export function __useReducerWithGetter<S, A, I = S>(
+	reducer: (s: S, a: A) => S,
+	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol | string,
-	maybeSlot?: symbol | string,
+	maybeSlot?: ServerHookSlot,
 ): [S, (action: A) => void, () => S] {
 	const init = typeof initOrSlot === 'function' ? initOrSlot : undefined;
-	const slot = init !== undefined ? maybeSlot : initOrSlot;
+	const slot = maybeSlot !== undefined ? maybeSlot : initOrSlot;
 	return stateHook<S, A>(
 		reducer,
 		() => (init ? init(initialArg) : (initialArg as unknown as S)),
@@ -2514,7 +2574,12 @@ export function useCallback<F>(fn: F): F {
 	return fn;
 }
 
-export function useRef<T>(initial: T): { current: T } {
+export function useRef<T = undefined>(): { current: T | undefined };
+export function useRef<T>(initial: T, slot?: symbol): { current: T };
+export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | undefined } {
+	// A spread-shaped zero-argument call cannot be padded positionally, so the
+	// compiler retains the self-identifying Symbol ABI: `useRef(slot)`.
+	if (slot === undefined && typeof initial === 'symbol') initial = undefined;
 	return { current: initial };
 }
 
@@ -2582,20 +2647,17 @@ export function memo<P>(component: P): P {
 }
 
 // Custom-hook wrapper. The compiler emits each hook call reached THROUGH a custom
-// hook as `withSlot(sym, hook, ...args)` (see runtime.ts) in BOTH modes, so the
-// server build of a `.tsrx` that defines/uses custom hooks must resolve `withSlot`
-// from here. The call-site symbol is held ambient while the wrapped hook runs so
-// the custom hook's slot-less useState/useReducer calls key their render-phase
-// records off it (occurrence-indexed — two cells in one custom hook stay
-// distinct). Signature-compatible with the client so the same lowered call
-// resolves to either per build.
-export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T {
-	const prev = PENDING_SLOT;
-	PENDING_SLOT = sym;
+// hook as `withSlot(sym, hook, ...args)` (see runtime.ts) in BOTH modes. Keep the
+// whole nested call-site path ambient while the wrapped hook runs so its base
+// hooks resolve by definition site + every call boundary, rather than by a
+// render-pass occurrence that can shift when a conditional call disappears.
+export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
+export function withSlot<T>(sym: ServerHookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
+	HOOK_SLOT_PATH.push(sym);
 	try {
 		return fn(...args);
 	} finally {
-		PENDING_SLOT = prev;
+		HOOK_SLOT_PATH.pop();
 	}
 }
 
@@ -2860,7 +2922,7 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 		// Warm-walk prefetches (warmMemo), keyed by the creation's SLOT symbol —
 		// deps-matched, TRANSFER semantics: the descendant's real puMemo adopts
 		// (and removes) its entry, so a warmed fetch is consumed exactly once.
-		warm: Map<symbol | string, { deps: unknown[]; value: unknown }[]>;
+		warm: Map<ServerHookSlot, { deps: unknown[]; value: unknown }[]>;
 	};
 };
 function newResolvedMap(): ResolvedMap {

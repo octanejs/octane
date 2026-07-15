@@ -28,6 +28,7 @@ const fixture = (name: string) => readFileSync(join(FIXTURES, `${name}.tsrx`), '
 
 const basic = evalServer(fixture('basic'), 'basic.tsrx');
 const ssr = evalServer(fixture('ssr'), 'ssr.tsrx');
+const spreadHooks = evalServer(fixture('spread-hook-args'), 'spread-hook-args.tsrx');
 
 describe('SSR Phase 1 — basic fixtures', () => {
 	it('renders static markup, dynamic text, and attributes', async () => {
@@ -110,6 +111,10 @@ describe('SSR Phase 1 — semantics', () => {
 		expect(out.html).toContain('<span class="d">14</span>'); // useMemo ran once
 		expect(out.html).toMatch(/id=":in-[0-9a-z]+:"/); // deterministic useId
 		expect(onEffect).not.toHaveBeenCalled(); // useEffect is a no-op on the server
+	});
+
+	it('keeps an omitted useRef value distinct from a spread-site slot', () => {
+		expect(RT.renderToString(spreadHooks.SpreadRef).html).toContain('>u</p>');
 	});
 
 	it('returns the { html, css } shape', async () => {

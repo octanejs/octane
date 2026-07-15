@@ -307,6 +307,17 @@ function buildScopes(ast, onlyImported) {
 			// copied with the call AST when the full compiler lowers setup statements.
 			const importedName = canonicalHookName(node, scope, true);
 			if (importedName !== null) node._octaneImportedHook = importedName;
+			// The auto-callback stability pass also preserves Octane's historical
+			// unbound-hook shorthand (`useState(...)` without an import). Record that
+			// fact from this lexical scope walk so it can distinguish a genuinely
+			// unbound shorthand from a same-named parameter/local/module binding.
+			// Absence is intentionally meaningful: a lexically bound non-Octane
+			// callee must never inherit stability merely because its spelling looks
+			// like a built-in hook.
+			const callee = unwrapValue(node.callee);
+			if (callee?.type === 'Identifier' && resolveBinding(scope, callee.name) === null) {
+				node._octaneUnboundCallee = true;
+			}
 			const name = canonicalHookName(node, scope, onlyImported);
 			const config = DEPENDENCY_HOOKS.get(name);
 			if (config && node.arguments.length === config.deps) {

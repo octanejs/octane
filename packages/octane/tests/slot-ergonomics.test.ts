@@ -27,7 +27,7 @@ import {
 
 describe('slot ergonomics — public signature hides the compiler-injected slot', () => {
 	it('useState without a slot throws a clear, actionable error', () => {
-		expect(() => useState(0)).toThrow(/useState was called without a slot symbol/);
+		expect(() => useState(0)).toThrow(/useState was called without a hook slot/);
 		expect(() => useState(0)).toThrow(/octane\/compiler\/vite/);
 		expect(() => useState(0)).toThrow(/Symbol\.for/);
 	});
@@ -54,6 +54,6 @@ describe('slot ergonomics — public signature hides the compiler-injected slot'
 				),
 		],
 	])('%s without a slot throws naming the hook', (name, call) => {
-		expect(call).toThrow(new RegExp(`${name} was called without a slot symbol`));
+		expect(call).toThrow(new RegExp(`${name} was called without a hook slot`));
 	});
 });

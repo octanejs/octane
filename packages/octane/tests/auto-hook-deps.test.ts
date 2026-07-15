@@ -26,7 +26,7 @@ describe('automatic hook dependencies — full compiler', () => {
     `);
 
 		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[props\.onValue, props\.value, count\],\s*_h\$\d+\s*\)/,
+			/useEffect\([\s\S]*?,\s*\[props\.onValue, props\.value, count\],\s*\d+\s*\)/,
 		);
 	});
 
@@ -72,7 +72,7 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(/useEffect\([\s\S]*?,\s*\[local, outer, props\.log\],\s*_h\$\d+\s*\)/);
+		expect(code).toMatch(/useEffect\([\s\S]*?,\s*\[local, outer, props\.log\],\s*\d+\s*\)/);
 	});
 
 	it('tracks lexical bindings declared directly in switch cases', () => {
@@ -107,7 +107,7 @@ describe('automatic hook dependencies — full compiler', () => {
     `);
 
 		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[props\.user, props\.order, props\.value\],\s*_h\$\d+\s*\)/,
+			/useEffect\([\s\S]*?,\s*\[props\.user, props\.order, props\.value\],\s*\d+\s*\)/,
 		);
 	});
 
@@ -127,7 +127,7 @@ describe('automatic hook dependencies — full compiler', () => {
     `);
 
 		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[\s*props\.value,\s*props\.box,\s*props\.other,\s*props\.key,\s*props\.dynamic,\s*props\.total,\s*props\.delta\s*\],\s*_h\$\d+\s*\)/,
+			/useEffect\([\s\S]*?,\s*\[\s*props\.value,\s*props\.box,\s*props\.other,\s*props\.key,\s*props\.dynamic,\s*props\.total,\s*props\.delta\s*\],\s*\d+\s*\)/,
 		);
 		expect(code).not.toMatch(/\[\s*ref\.current/);
 	});
@@ -147,7 +147,7 @@ describe('automatic hook dependencies — full compiler', () => {
     `);
 
 		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[props\.log, moduleValue, moduleObject\.value\],\s*_h\$\d+\s*\)/,
+			/useEffect\([\s\S]*?,\s*\[props\.log, moduleValue, moduleObject\.value\],\s*\d+\s*\)/,
 		);
 	});
 
@@ -160,7 +160,7 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(/useMemo\(\(\) => props\?\.user\?\.name, \[props\?\.user\], _h\$\d+\)/);
+		expect(code).toMatch(/useMemo\(\(\) => props\?\.user\?\.name, \[props\?\.user\], \d+\)/);
 	});
 
 	it('infers [] for capture-free callbacks and honors every explicit second argument', () => {
@@ -177,12 +177,12 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(/useEffect\(\(\) => console\.log\('once'\), \[], _h\$\d+\)/);
-		expect(code).toMatch(/useEffect\(\(\) => console\.log\(props\.a\), \[], _h\$\d+\)/);
-		expect(code).toMatch(/useEffect\(\(\) => console\.log\(props\.b\), \[props\.b\], _h\$\d+\)/);
-		expect(code).toMatch(/useEffect\(\(\) => console\.log\(props\.c\), null, _h\$\d+\)/);
-		expect(code).toMatch(/useMemo\(\(\) => 1, \[], _h\$\d+\)/);
-		expect(code).toMatch(/useCallback\(\(\) => 2, \[], _h\$\d+\)/);
+		expect(code).toMatch(/useEffect\(\(\) => console\.log\('once'\), \[], \d+\)/);
+		expect(code).toMatch(/useEffect\(\(\) => console\.log\(props\.a\), \[], \d+\)/);
+		expect(code).toMatch(/useEffect\(\(\) => console\.log\(props\.b\), \[props\.b\], \d+\)/);
+		expect(code).toMatch(/useEffect\(\(\) => console\.log\(props\.c\), null, \d+\)/);
+		expect(code).toMatch(/useMemo\(\(\) => 1, \[], \d+\)/);
+		expect(code).toMatch(/useCallback\(\(\) => 2, \[], \d+\)/);
 	});
 
 	it('uses a referenced callback identity and rejects opaque callback creation', () => {
@@ -195,10 +195,8 @@ describe('automatic hook dependencies — full compiler', () => {
         <div />
       }
     `);
-		expect(referenced).toMatch(
-			/useEffect\(props\?\.api\?\.run, \[props\?\.api\?\.run\], _h\$\d+\)/,
-		);
-		expect(referenced).toMatch(/useEffect\(ref\.current, \[ref\.current\], _h\$\d+\)/);
+		expect(referenced).toMatch(/useEffect\(props\?\.api\?\.run, \[props\?\.api\?\.run\], \d+\)/);
+		expect(referenced).toMatch(/useEffect\(ref\.current, \[ref\.current\], \d+\)/);
 
 		for (const callback of [
 			'props.makeEffect()',
@@ -228,7 +226,7 @@ describe('automatic hook dependencies — full compiler', () => {
       `,
 			{ mode: 'server' },
 		);
-		expect(code).toMatch(/useMemo\(\(\) => props\.value \* 2, \[props\.value\], _h\$\d+\)/);
+		expect(code).toMatch(/useMemo\(\(\) => props\.value \* 2, \[props\.value\], \d+\)/);
 	});
 
 	it('infers dependencies for namespace imports without crossing lexical shadows', () => {
@@ -244,7 +242,7 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 		expect(code).toMatch(
-			/Octane\.useEffect\(\(\) => console\.log\(props\.value\), \[props\.value\], _h\$\d+\)/,
+			/Octane\.useEffect\(\(\) => console\.log\(props\.value\), \[props\.value\], \d+\)/,
 		);
 		expect(code).not.toContain('[props.shadowed]');
 	});
@@ -314,5 +312,17 @@ export function run(value: string) {
 }
 `;
 		expect(slotHooks(source, 'shadowed-namespace.ts')).toBeNull();
+	});
+
+	it('keeps the self-identifying Symbol ABI for runtime-variable spread arity', () => {
+		const source = `
+import { useState } from 'octane';
+export function useThing(args: [] | [number]) {
+  return useState(...args);
+}
+`;
+		const code = slotHooks(source, 'spread-hook.ts')!.code;
+		expect(code).toMatch(/(?:useState|_\$__useStateWithGetter)\(\.\.\.args, _h\$0\)/);
+		expect(code).toContain('const _h$0 = Symbol(_hs$);');
 	});
 });

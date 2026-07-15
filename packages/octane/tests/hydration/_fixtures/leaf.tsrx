@@ -30,6 +30,21 @@ export function Attrs(props) @{
 	</div>
 }
 
+// The client compiler proves this data-* value is already a string and uses
+// its narrow attribute path. Server serialization stays on the normal ssrAttr
+// path; hydration must still adopt, recover, warn, and suppress identically.
+export function StringData(props) @{
+	<div id="string-data" data-state={props.value as string}>{'data'}</div>
+}
+
+export function SuppressedStringData(props) @{
+	<div
+		id="suppressed-string-data"
+		suppressHydrationWarning
+		data-state={props.value as string}
+	>{'data'}</div>
+}
+
 // Nested ELEMENTS (not components), each with a single text child — element
 // paths align; each text child is adopted independently.
 export function Mixed() @{

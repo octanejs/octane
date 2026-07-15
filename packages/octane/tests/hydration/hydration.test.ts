@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
@@ -7,7 +7,15 @@ import * as ServerRT from 'octane/server';
 // CLIENT-compiled variants (the normal .tsrx import path, client mode). The
 // onClick handler in Counter makes this module call delegateEvents(['click']) at
 // load, so click delegation is registered for hydrated containers.
-import { StaticText, Attrs, Mixed, Counter, StoreView } from './_fixtures/leaf.tsrx';
+import {
+	StaticText,
+	Attrs,
+	StringData,
+	SuppressedStringData,
+	Mixed,
+	Counter,
+	StoreView,
+} from './_fixtures/leaf.tsrx';
 
 // SSR Phase 2 — client hydration. Server-render a fixture to HTML, put it in a
 // container, hydrateRoot with the CLIENT component, and assert (1) the DOM is NOT
@@ -58,6 +66,105 @@ describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 		const { html, before, after } = await setup('Attrs', Attrs, { id: 'a', cls: 'c', text: 'hi' });
 		expect(html).toBe('<div id="a" class="c" data-kind="leaf">hi</div>');
 		expect(after).toBe(before);
+	});
+
+	it('adopts a matching string-valued data attribute', async () => {
+		const { html } = ServerRT.renderToString(server.StringData, { value: 'same' });
+		container.innerHTML = html;
+		const element = container.querySelector('#string-data');
+		const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const root = hydrateRoot(container, StringData, { value: 'same' });
+			flushSync(() => {});
+			expect(container.querySelector('#string-data')).toBe(element);
+			expect(element!.getAttribute('data-state')).toBe('same');
+			expect(warn).not.toHaveBeenCalled();
+			root.unmount();
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
+	it('adopts data attributes using their runtime coercion semantics', async () => {
+		const values: Array<[unknown, string | null]> = [
+			[null, null],
+			[undefined, null],
+			[() => 'ignored', null],
+			[Symbol('ignored'), null],
+			[false, 'false'],
+			[true, 'true'],
+			[0, '0'],
+			[{ toString: () => 'object-value' }, 'object-value'],
+		];
+		for (const [value, expected] of values) {
+			const { html } = ServerRT.renderToString(server.StringData, { value });
+			container.innerHTML = html;
+			const element = container.querySelector('#string-data');
+			const root = hydrateRoot(container, StringData, { value });
+			flushSync(() => {});
+			expect(container.querySelector('#string-data')).toBe(element);
+			expect(element!.getAttribute('data-state')).toBe(expected);
+			root.unmount();
+		}
+	});
+
+	it('removes a server data attribute when the client value is nullish', async () => {
+		const { html } = ServerRT.renderToString(server.StringData, { value: 'server' });
+		container.innerHTML = html;
+		const element = container.querySelector('#string-data');
+		const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const root = hydrateRoot(container, StringData, { value: null });
+			flushSync(() => {});
+			expect(container.querySelector('#string-data')).toBe(element);
+			expect(element!.hasAttribute('data-state')).toBe(false);
+			if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
+				expect(warn).not.toHaveBeenCalled();
+			} else {
+				expect(warn.mock.calls.flat().join(' ')).toContain('attribute `data-state`');
+			}
+			root.unmount();
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
+	it('patches and reports a mismatched string-valued data attribute', async () => {
+		const { html } = ServerRT.renderToString(server.StringData, { value: 'server' });
+		container.innerHTML = html;
+		const element = container.querySelector('#string-data');
+		const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const root = hydrateRoot(container, StringData, { value: 'client' });
+			flushSync(() => {});
+			expect(container.querySelector('#string-data')).toBe(element);
+			expect(element!.getAttribute('data-state')).toBe('client');
+			if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
+				expect(warn).not.toHaveBeenCalled();
+			} else {
+				expect(warn.mock.calls.flat().join(' ')).toContain('attribute `data-state`');
+			}
+			root.unmount();
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
+	it('keeps a suppressed server data attribute without warning', async () => {
+		const { html } = ServerRT.renderToString(server.SuppressedStringData, { value: 'server' });
+		container.innerHTML = html;
+		const element = container.querySelector('#suppressed-string-data');
+		const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const root = hydrateRoot(container, SuppressedStringData, { value: 'client' });
+			flushSync(() => {});
+			expect(container.querySelector('#suppressed-string-data')).toBe(element);
+			expect(element!.getAttribute('data-state')).toBe('server');
+			expect(warn).not.toHaveBeenCalled();
+			root.unmount();
+		} finally {
+			warn.mockRestore();
+		}
 	});
 
 	it('nested elements with text children', async () => {

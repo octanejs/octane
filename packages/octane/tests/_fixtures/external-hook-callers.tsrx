@@ -1,4 +1,5 @@
 import { useExternalCounter, useLabelled } from './external-hook.ts';
+import { useCrossModuleCounters } from './external-hook-composed.ts';
 
 // `.tsrx` components consuming a custom hook that lives in a plain `.ts` module.
 export function TsrxSingle() @{
@@ -26,4 +27,16 @@ export function TsrxNested() @{
 	<button class="n" onClick={c.inc}>
 		{c.text as string}
 	</button>
+}
+
+export function TsrxCrossModule() @{
+	const pair = useCrossModuleCounters();
+	<div>
+		<button class="left" onClick={pair.left.inc}>
+			{pair.left.n as string}
+		</button>
+		<button class="right" onClick={() => pair.setRight(pair.right + 1)}>
+			{pair.right as string}
+		</button>
+	</div>
 }

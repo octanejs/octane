@@ -23,12 +23,14 @@ function transform({
 	source,
 	target = 'web',
 	hot = false,
+	mode = 'development',
 }: {
 	root: string;
 	resourcePath: string;
 	source: string;
 	target?: unknown;
 	hot?: boolean;
+	mode?: string;
 }) {
 	const dependencies: string[] = [];
 	const missingDependencies: string[] = [];
@@ -41,7 +43,7 @@ function transform({
 			resourcePath,
 			target,
 			hot,
-			mode: 'development',
+			mode,
 			sourceMap: true,
 			_module: module,
 			cacheable() {},
@@ -136,6 +138,23 @@ describe('loader with the neutral compiler', () => {
 		});
 		expect(String(result.content)).toContain('_$template("<span>raw</span>")');
 		expect(result.dependencies).toContain(join(packageRoot, 'package.json'));
+	});
+
+	it('keeps production roots generic when the loader cannot prove resolved module output', () => {
+		write(
+			root,
+			'src/Main.tsrx',
+			'export default function Main() @{ <main>disk component</main> }\n',
+		);
+		const source =
+			"import { createRoot } from 'octane';\n" +
+			"import Main from './Main.tsrx';\n" +
+			'createRoot(document.body).render(Main);\n';
+		const resourcePath = write(root, 'src/main.js', source);
+		const result = transform({ root, resourcePath, source, mode: 'production' });
+
+		expect(result.content).toBe(source);
+		expect(result.dependencies).not.toContain(join(root, 'src/Main.tsrx'));
 	});
 
 	it('watches a manual-slot manifest that changes a plain TypeScript decision', () => {

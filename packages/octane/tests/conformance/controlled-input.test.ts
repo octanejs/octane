@@ -10,6 +10,7 @@ import {
 	RadioGroup,
 	MaybeControlled,
 	DefaultsInput,
+	SpreadDefaultInput,
 	DefaultsCheckbox,
 	SpreadInput,
 } from './_fixtures/controlled-forms.tsrx';
@@ -266,6 +267,24 @@ describe('conformance: defaultValue / defaultChecked (uncontrolled)', () => {
 		r.update(DefaultsInput, { dv: 'two' });
 		expect(el.getAttribute('value')).toBe('two');
 		expect(el.value).toBe('typed');
+		r.unmount();
+	});
+
+	it('a spread-provided value retains ownership over a later defaultValue', () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(SpreadDefaultInput, {
+			sp: { value: 'controlled' },
+			dv: 'fallback',
+		});
+		const el = r.find('#sdi') as HTMLInputElement;
+		expect(el.value).toBe('controlled');
+		expect(el.defaultValue).toBe('controlled');
+		r.update(SpreadDefaultInput, {
+			sp: { value: 'controlled' },
+			dv: 'changed-fallback',
+		});
+		expect(el.value).toBe('controlled');
+		expect(el.defaultValue).toBe('controlled');
 		r.unmount();
 	});
 

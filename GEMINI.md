@@ -225,7 +225,8 @@ Two regression layers beyond the octane project:
 
 - **`octane-prod` vitest project** — re-runs the SAME octane test files with the
   plugin forced to `hmr: false` (production compile: no HMR wrapper, no dev LOC
-  metadata, `Symbol("<hash>#<n>")` hook slots). Vitest otherwise compiles
+  metadata, scope-local numeric base-hook slots plus runtime-ranged Symbols for
+  callable/custom-hook boundaries). Vitest otherwise compiles
   everything in serve mode, so without this the prod compile branch has no
   runtime coverage. Tests asserting DEV-ONLY warnings conditionalize on
   `process.env.OCTANE_TEST_COMPILE_MODE === 'prod'`.

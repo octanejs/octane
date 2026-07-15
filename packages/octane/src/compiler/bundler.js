@@ -10,8 +10,11 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { compile } from './compile.js';
-import { slotHooks } from './slot-hooks.js';
+import { parseModule } from '@tsrx/core';
+import { compile, isVoidJsxCodeBlockFunction } from './compile.js';
+import { findVoidRootImports, slotHooks } from './slot-hooks.js';
+
+export { findVoidRootImports };
 
 const OCTANE_DEPENDENCY_FIELDS = [
 	'dependencies',
@@ -103,6 +106,58 @@ function normalizeHmrDialect(value) {
 	throw new Error(
 		`Unknown Octane HMR dialect ${JSON.stringify(value)} — expected false, 'vite', or 'webpack'.`,
 	);
+}
+
+/**
+ * Classify only direct function exports whose TSRX body never returns a value.
+ * This fact is attached to the module by bundler adapters after compiling the
+ * exact source those adapters loaded. Re-exports and indirect bindings remain
+ * deliberately unknown.
+ */
+export function findVoidComponentExports(source, id) {
+	let ast;
+	try {
+		ast = parseModule(source, id);
+	} catch {
+		return [];
+	}
+	const exports = [];
+	for (const node of ast.body || []) {
+		if (node.type === 'ExportDefaultDeclaration') {
+			const declaration = node.declaration;
+			if (
+				(declaration?.type === 'FunctionDeclaration' ||
+					declaration?.type === 'FunctionExpression' ||
+					declaration?.type === 'ArrowFunctionExpression') &&
+				isVoidJsxCodeBlockFunction(declaration)
+			) {
+				exports.push('default');
+			}
+			continue;
+		}
+		if (node.type !== 'ExportNamedDeclaration') continue;
+		const declaration = node.declaration;
+		if (
+			declaration?.type === 'FunctionDeclaration' &&
+			declaration.id?.name &&
+			isVoidJsxCodeBlockFunction(declaration)
+		) {
+			exports.push(declaration.id.name);
+			continue;
+		}
+		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const item of declaration.declarations || []) {
+			if (
+				item.id?.type === 'Identifier' &&
+				(item.init?.type === 'FunctionExpression' ||
+					item.init?.type === 'ArrowFunctionExpression') &&
+				isVoidJsxCodeBlockFunction(item.init)
+			) {
+				exports.push(item.id.name);
+			}
+		}
+	}
+	return exports;
 }
 
 class OctaneBundlerCompiler {
@@ -404,6 +459,9 @@ class OctaneBundlerCompiler {
 				code: out.code,
 				map: out.map,
 				kind: 'compile',
+				...(environment === 'client' && options.collectVoidComponentExports === true
+					? { voidComponentExports: findVoidComponentExports(code, filename) }
+					: {}),
 				...finishMetadata(collected),
 			};
 		}
@@ -420,7 +478,18 @@ class OctaneBundlerCompiler {
 				return this._passThrough(code, collected);
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
-			const out = slotHooks(code, filename, { hmr: !!hmr, profile, profileFilename });
+			const specializeVoidRoot =
+				environment === 'client' && hmr === false && dev === false && profile === false;
+			const out = slotHooks(code, filename, {
+				hmr: !!hmr,
+				profile,
+				profileFilename,
+				...(specializeVoidRoot
+					? {
+							isVoidComponentImport: options.isVoidComponentImport,
+						}
+					: {}),
+			});
 			if (out === null) return this._passThrough(code, collected);
 			return {
 				code: out.code,

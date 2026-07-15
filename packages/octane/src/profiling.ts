@@ -342,8 +342,8 @@ export function __profileHook(slot: symbol, metadata: HookProfileMetadata): symb
 }
 
 /** Runtime ABI: carry a base hook's metadata onto its custom-hook path symbol. */
-export function __profileResolveHook(slot: symbol, sourceSlot: symbol): symbol {
-	const metadata = hookMetadata.get(sourceSlot);
+export function __profileResolveHook(slot: symbol, sourceSlot?: symbol): symbol {
+	const metadata = sourceSlot === undefined ? undefined : hookMetadata.get(sourceSlot);
 	if (metadata !== undefined) hookMetadata.set(slot, metadata);
 	return slot;
 }
@@ -360,14 +360,14 @@ export function __profileTrackComponent(subject: object, component: Function | n
 }
 
 /** Runtime ABI: merge a scheduling reason without retaining the updated value. */
-export function __profileSchedule(subject: object, type: string, slot?: symbol): void {
+export function __profileSchedule(subject: object, type: string, slot?: symbol | number): void {
 	if (!active) return;
 	let entry = pending.get(subject);
 	if (entry === undefined) {
 		entry = { causes: new Map(), scheduledAt: now() };
 		pending.set(subject, entry);
 	}
-	const hook = slot === undefined ? undefined : hookMetadata.get(slot);
+	const hook = typeof slot === 'symbol' ? hookMetadata.get(slot) : undefined;
 	addCause(entry.causes, {
 		type,
 		...(hook === undefined

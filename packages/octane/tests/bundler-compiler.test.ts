@@ -60,6 +60,121 @@ describe('bundler-neutral compiler integration', () => {
 		expect(server?.code).not.toContain('webpackHot');
 	});
 
+	it('specializes only disposable production roots with proven void imports', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-void-root-'));
+		try {
+			const src = join(root, 'src');
+			mkdirSync(src);
+			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
+			const component = join(src, 'Main.tsrx');
+			const entry = join(src, 'main.js');
+			const defaultEntry =
+				"import { createRoot } from 'octane';\n" +
+				"import Main from './Main.tsrx';\n" +
+				'createRoot(document.body).render(Main);\n';
+			const defaultComponent = 'export default function Main() @{ <main>ready</main> }\n';
+			writeFileSync(component, defaultComponent);
+			writeFileSync(entry, defaultEntry);
+
+			const compiler = createOctaneCompiler({ root, hmr: false, dev: false });
+			// The neutral compiler cannot know what a bundler alias or virtual load
+			// makes this request mean, so an on-disk lookalike is never proof.
+			const unproven = compiler.transform(defaultEntry, entry);
+			expect(unproven).toMatchObject({ kind: 'none', code: defaultEntry });
+			expect(unproven?.dependencies).not.toContain(component);
+
+			const compiledDefault = compiler.transform(defaultComponent, component, {
+				hmr: false,
+				dev: false,
+				collectVoidComponentExports: true,
+			});
+			expect(compiledDefault?.voidComponentExports).toEqual(['default']);
+			const proveDefault = (request: string, imported: string) =>
+				request === './Main.tsrx' && imported === 'default';
+			const specialized = compiler.transform(defaultEntry, entry, {
+				isVoidComponentImport: proveDefault,
+			});
+			expect(specialized?.kind).toBe('slots');
+			expect(specialized?.code).toContain('__createVoidRoot');
+			expect(specialized?.code).not.toContain('hookSlots');
+			const server = compiler.transform(defaultEntry, entry, {
+				environment: 'server',
+				dev: false,
+				hmr: false,
+				isVoidComponentImport: proveDefault,
+			});
+			expect(server).toMatchObject({ kind: 'none', code: defaultEntry });
+			expect(server?.code).not.toContain('__createVoidRoot');
+
+			// Dev/HMR keeps the public generic root because a hot replacement can
+			// change the component's return contract without changing its identity.
+			expect(
+				compiler.transform(defaultEntry, entry, {
+					dev: true,
+					hmr: false,
+					isVoidComponentImport: proveDefault,
+				}),
+			).toMatchObject({ kind: 'none', code: defaultEntry });
+			expect(
+				compiler.transform(defaultEntry, entry, {
+					hmr: 'vite',
+					isVoidComponentImport: proveDefault,
+				}),
+			).toMatchObject({ kind: 'none', code: defaultEntry });
+
+			// A component-owned value return makes both default and named exports
+			// ineligible. Nested function returns are a separate scope and stay safe.
+			writeFileSync(
+				component,
+				"export default function Main(p) @{ if (p.early) return 'early'; <main>ready</main> }\n",
+			);
+			const valueReturning = compiler.transform(
+				"export default function Main(p) @{ if (p.early) return 'early'; <main>ready</main> }\n",
+				component,
+				{ collectVoidComponentExports: true },
+			);
+			expect(valueReturning?.voidComponentExports).toEqual([]);
+
+			const namedEntry =
+				"import { createRoot as root } from 'octane';\n" +
+				"import { Main as Entry } from './Main.tsrx';\n" +
+				'root(document.body).render(Entry);\n';
+			writeFileSync(
+				component,
+				"export function Main() @{ const nested = () => { return 'nested'; }; <main>{nested() as string}</main> }\n",
+			);
+			const named = compiler.transform(namedEntry, entry, {
+				isVoidComponentImport: (request, imported) =>
+					request === './Main.tsrx' && imported === 'Main',
+			});
+			expect(named?.kind).toBe('slots');
+			expect(named?.code).toContain('__createVoidRoot');
+
+			// Specialize the proven disposable expression without changing a
+			// neighboring unknown render or a root retained for later renders.
+			const unknown = join(src, 'Unknown.js');
+			writeFileSync(unknown, 'export function Unknown() { return null; }\n');
+			const mixedEntry =
+				"import { createRoot } from 'octane';\n" +
+				"import { Main } from './Main.tsrx';\n" +
+				"import { Unknown } from './Unknown.js';\n" +
+				'createRoot(document.body).render(Main);\n' +
+				'createRoot(document.documentElement).render(Unknown);\n' +
+				'const retained = createRoot(document.body);\n' +
+				'retained.render(Main);\n';
+			const mixed = compiler.transform(mixedEntry, entry, {
+				isVoidComponentImport: (request, imported) =>
+					request === './Main.tsrx' && imported === 'Main',
+			});
+			expect(mixed?.kind).toBe('slots');
+			expect(mixed?.code.match(/_\$createVoidRoot\(/g)).toHaveLength(1);
+			expect(mixed?.code).toContain('createRoot(document.documentElement).render(Unknown)');
+			expect(mixed?.code).toContain('const retained = createRoot(document.body)');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('applies profiling metadata only to client transforms', () => {
 		const compiler = createOctaneCompiler({ root: '/project', profile: true });
 		const client = compiler.transform(COMPONENT, '/project/src/App.tsrx', {
