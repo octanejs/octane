@@ -1,0 +1,21 @@
+// @octanejs/visx/curve
+export {
+	curveBasis,
+	curveBasisClosed,
+	curveBasisOpen,
+	curveStep,
+	curveStepAfter,
+	curveStepBefore,
+	curveBundle,
+	curveLinear,
+	curveLinearClosed,
+	curveCardinal,
+	curveCardinalClosed,
+	curveCardinalOpen,
+	curveCatmullRom,
+	curveCatmullRomClosed,
+	curveCatmullRomOpen,
+	curveMonotoneX,
+	curveMonotoneY,
+	curveNatural,
+} from 'd3-shape';

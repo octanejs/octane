@@ -1,0 +1,7 @@
+import type { AxisScale } from '@octanejs/visx/axis';
+import type { BaseLineSeriesProps } from './private/BaseLineSeries.tsrx';
+import BaseLineSeries from './private/BaseLineSeries.tsrx';
+
+export default function LineSeries<XScale extends AxisScale, YScale extends AxisScale, Datum extends object>(props: Omit<BaseLineSeriesProps<XScale, YScale, Datum>, 'PathComponent'>) {
+	return <BaseLineSeries {...props} />;
+}

@@ -1,0 +1,41 @@
+import { createElement } from 'octane';
+import type { FunctionComponent, ComponentClass } from 'react';
+import cx from 'classnames';
+import { Group } from '@octanejs/visx/group';
+
+import DefaultNode from './DefaultNode.tsrx';
+import type { NodeProvidedProps } from './types';
+
+export type NodeProps<Node> = {
+	/** Array of links to render. */
+	nodes?: Node[];
+	/** Component for rendering a single link. */
+	nodeComponent: | FunctionComponent<NodeProvidedProps<Node>>
+	| ComponentClass<NodeProvidedProps<Node>>;
+	/** Classname to add to each node parent g element. */
+	className?: string;
+	/** Returns the center x coordinate of a node. */
+	x?: (d: Node) => number;
+	/** Returns the center y coordinate of a node. */
+	y?: (d: Node) => number;
+};
+
+export default function Nodes<Node>({
+	nodes = [],
+	nodeComponent = DefaultNode,
+	className,
+	x = (d: any) => d?.x || 0, // eslint-disable-line @typescript-eslint/no-explicit-any
+	y = (d: any) => d?.y || 0, // eslint-disable-line @typescript-eslint/no-explicit-any
+}: NodeProps<Node>) {
+	return <>
+		{nodes.map(
+			(node, i) =>
+				<Group
+					key={`network-node-${i}`}
+					className={cx('visx-network-node', className)}
+					left={x(node)}
+					top={y(node)}
+				>{createElement(nodeComponent, { node })}</Group>,
+		)}
+	</>;
+}
