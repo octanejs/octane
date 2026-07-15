@@ -1,4 +1,4 @@
-import { useMemo, Fragment } from 'octane';
+import { useMemo } from 'octane';
 import type { ReactNode, SVGProps } from 'react';
 import type { GetLineSegmentsConfig } from '../util/getSplitLineSegments';
 import getSplitLineSegments from '../util/getSplitLineSegments';
@@ -69,11 +69,11 @@ export default function SplitLinePath<Datum>({
 
 	return <g>{splitLineSegments.map(
 		(segment, index) => children
-			? <Fragment key={index}>{children({
+			? children({
 					index,
 					segment,
 					styles: styles[index] || styles[index % styles.length],
-				})}</Fragment>
+				})
 			: <LinePath
 					key={index}
 					className={className}

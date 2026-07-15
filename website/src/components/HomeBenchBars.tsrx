@@ -1,15 +1,16 @@
-// A dependency-free version of the home-page benchmark overview. The full
-// /benchmarks route uses Recharts for its richer charts; this below-the-fold
-// teaser stays static so charting and state-management runtimes are not part
-// of the home page's hydration path. The exact data remains available in the
-// native details/table immediately below the SVG.
+// The home-page benchmark overview uses deterministic Visx scales and SVG
+// primitives. Unlike Recharts' effect-populated store, this exact chart renders
+// during SSR and hydration adopts it without swapping renderers. The full
+// /benchmarks route retains Recharts for its richer charts, and the exact data
+// remains available in the native details/table immediately below the SVG.
+import { Group } from '@octanejs/visx/group';
+import { scaleLinear } from '@octanejs/visx/scale';
+import { Bar } from '@octanejs/visx/shape';
 import type { BenchCard, BenchRow, SeriesDef } from '../content/benchmarks.ts';
 
 const CHART_WIDTH = 1100;
 const LABEL_WIDTH = 170;
 const PLOT_WIDTH = 820;
-// Match BenchBars' Recharts geometry so swapping the fallback in place does
-// not shift the document when it approaches the viewport.
 const BAR_HEIGHT = 11;
 const BAR_GAP = 2;
 const GROUP_GAP = 16;
@@ -36,8 +37,8 @@ function maxValue(card: BenchCard): number {
 	return max;
 }
 
-function barWidth(value: number, max: number): number {
-	return Math.max(2, (value / max) * PLOT_WIDTH);
+function barWidth(value: number, widthScale: (value: number) => number): number {
+	return Math.max(2, widthScale(value));
 }
 
 function indexedRows(card: BenchCard): Array<{ row: BenchRow; index: number }> {
@@ -54,7 +55,10 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 	const series = indexedSeries(card);
 	const groupHeight = card.series.length * (BAR_HEIGHT + BAR_GAP) + GROUP_GAP;
 	const chartHeight = card.rows.length * groupHeight + 24;
-	const max = maxValue(card);
+	const widthScale = scaleLinear<number>({
+		domain: [0, maxValue(card)],
+		range: [0, PLOT_WIDTH],
+	});
 	<figure class="bench-card">
 		<figcaption class="bench-card-head">
 			<span class="bench-card-title">
@@ -81,38 +85,32 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 				focusable="false"
 			>
 				@for (const rowEntry of rows; key rowEntry.row.op) {
-					<>
-						<text
-							class="op-label"
-							x={LABEL_WIDTH - 12}
-							y={rowEntry.index * groupHeight + 14}
-							text-anchor="end"
-						>
+					<Group top={rowEntry.index * groupHeight}>
+						<text class="op-label" x={LABEL_WIDTH - 12} y={14} text-anchor="end">
 							{rowEntry.row.op as string}
 						</text>
 						@for (const seriesEntry of series; key seriesEntry.series.key) {
 							@if (typeof rowEntry.row[seriesEntry.series.key] === 'number') {
 								<>
-									<rect
+									<Bar
 										x={LABEL_WIDTH}
-										y={rowEntry.index * groupHeight + seriesEntry.index * (BAR_HEIGHT + BAR_GAP) +
-											3}
-										width={barWidth(rowEntry.row[seriesEntry.series.key] as number, max)}
+										y={seriesEntry.index * (BAR_HEIGHT + BAR_GAP) + 3}
+										width={barWidth(rowEntry.row[seriesEntry.series.key] as number, widthScale)}
 										height={BAR_HEIGHT}
 										rx="3"
 										fill={seriesEntry.series.color}
-									></rect>
+									/>
 									<text
 										class="value-label"
-										x={LABEL_WIDTH + barWidth(rowEntry.row[seriesEntry.series.key] as number, max) +
+										x={LABEL_WIDTH +
+											barWidth(rowEntry.row[seriesEntry.series.key] as number, widthScale) +
 											7}
-										y={rowEntry.index * groupHeight + seriesEntry.index * (BAR_HEIGHT + BAR_GAP) +
-											11}
+										y={seriesEntry.index * (BAR_HEIGHT + BAR_GAP) + 11}
 									>{fmtX(rowEntry.row[seriesEntry.series.key])}</text>
 								</>
 							}
 						}
-					</>
+					</Group>
 				}
 			</svg>
 		</div>

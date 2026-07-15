@@ -113,7 +113,14 @@ describe('website routes', () => {
 		// The checked-in benchmark summary reaches the chart and table renderers.
 		const summary = container.querySelector('figure.bench-card');
 		expect(summary?.querySelector('figcaption')).toBeTruthy();
-		expect(summary?.querySelector('svg')).toBeTruthy();
+		expect(summary?.querySelector('svg.home-bench-chart')).toBeTruthy();
+		const expectedBars = HOME_SUMMARY.rows.reduce(
+			(count, row) =>
+				count + HOME_SUMMARY.series.filter((series) => typeof row[series.key] === 'number').length,
+			0,
+		);
+		expect(summary?.querySelectorAll('.visx-bar')).toHaveLength(expectedBars);
+		expect(summary?.querySelector('.recharts-wrapper')).toBeNull();
 		expect(summary?.querySelector('details table')).toBeTruthy();
 
 		const nav = container.querySelector('.navlinks')!;
