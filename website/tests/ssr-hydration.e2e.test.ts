@@ -344,8 +344,8 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			);
 			expect(supported).toBe(true);
 
-			// Wrap the native API after hydration so this observes Octane's controller
-			// without replacing Chromium's snapshots or animations.
+			// Wrap the native API before the first hydrated interaction so this observes
+			// Octane's controller without replacing Chromium's snapshots or animations.
 			await page.evaluate(() => {
 				const original = (document as any).startViewTransition.bind(document);
 				(window as any).__octaneViewTransitionCalls = 0;
@@ -366,8 +366,8 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				await page.evaluate(() => (window as any).__octaneViewTransitionFinished);
 			};
 
-			await demo.locator('#vt-toggle-card').click();
-			await waitForLocatorText(demo.locator('#vt-toggle-card'), 'Add card');
+			const cardToggle = demo.locator('#vt-toggle-card');
+			await clickUntilLocatorText(cardToggle, cardToggle, 'Add card');
 			await finishTransition(1);
 
 			await demo.locator('#vt-toggle-hero').click();
