@@ -38,6 +38,7 @@ import {
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { applyHookDependencies } from './hook-deps.js';
+import { compileUniversal } from './compile-universal.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -2914,7 +2915,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, renderer?: { id: string, module: string, target: 'dom' | 'universal' } }} [options] —
  *   `dev: true` emits dev-only hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`); strictly gated so production output is byte-identical.
  *   `hmr: true` (backwards-compatible shorthand for `hmr: 'vite'`) wraps each
@@ -2935,12 +2936,23 @@ export function compile(source, filename, options) {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
 	}
 	if (mode === 'server') {
+		if (options?.renderer?.target === 'universal') {
+			throw new Error(
+				`Renderer ${JSON.stringify(options.renderer.id)} does not provide the serialization/hydration capability required by server compilation.`,
+			);
+		}
 		// Server (SSR) codegen: static markup + dynamic holes + control flow +
 		// nested components + scoped CSS, emitted as HTML-string-building bodies
 		// (with hydration markers) importing the server runtime from 'octane/server'.
 		// Fragment refs remain client-only because there is no server-side DOM range
 		// object for their imperative API.
 		return compileServer(source, filename, options);
+	}
+	if (options?.renderer?.target === 'universal') {
+		const renderer = options.renderer;
+		return compileUniversal(source, filename, renderer, (lowered) =>
+			compile(lowered, filename, { ...options, renderer: undefined }),
+		);
 	}
 	const ast = parseModule(source, filename);
 	// Drop type-only statements (interface / type / declare / import-export type)
