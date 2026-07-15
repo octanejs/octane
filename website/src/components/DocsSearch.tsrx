@@ -402,7 +402,13 @@ export function DocsSearch() @{
 	useEffect(() => {
 		setMac(isMac());
 		const onKey = (event: KeyboardEvent) => {
-			const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((event.target as HTMLElement)?.tagName ?? '');
+			// contentEditable surfaces (e.g. the CodeMirror editor on /playground) are
+			// typing targets too — otherwise `/` there opens the palette instead of
+			// inserting the character.
+			const target = event.target;
+			const typing =
+				target instanceof HTMLElement &&
+					(target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 			if ((event.key === 'k' || event.key === 'K') && (event.metaKey || event.ctrlKey)) {
 				event.preventDefault();
 				setOpen((o) => !o);
