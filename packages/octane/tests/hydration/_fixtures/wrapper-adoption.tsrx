@@ -1,9 +1,7 @@
 import { Suspense, useState } from 'octane';
 
-// Plain return-JSX wrappers intentionally do not receive the compiler's M3
-// sole-`@{}` inheritance stamp. SSR therefore emits one logical component
-// range per layer. Those ranges are exactly coextensive and are the canonical
-// hydration-time coalescing case.
+// Nested return-JSX wrappers exercise hydration adoption through component
+// layers without exposing the framework's ownership representation.
 function InteractiveLeaf(props: { label: string; className: string }) {
 	const [count, setCount] = useState(0);
 	return <button class={props.className} onClick={() => setCount(count + 1)}>
@@ -19,9 +17,7 @@ function InteractiveOuter(props: { label: string; className: string }) {
 	return <InteractiveMiddle label={props.label} className={props.className} />;
 }
 
-// SafeFragment-style template pass-through. Its binding bag contains a sole
-// renderable-hole slot, so the compiler supplies the additional proof needed
-// for that slot to join an exactly coextensive hydrated range group.
+// A fragment-style pass-through adds another component layer around children.
 function PassThrough(props: { children?: unknown }) @{
 	<>
 		{props.children}
@@ -98,9 +94,8 @@ export function SuspenseWrapperChain() @{
 	</section>
 }
 
-// A plain return-based component hands this Suspense descriptor back to
-// renderBlock, whose return slot routes it through childSlot. Keeping the
-// builtin out of the component's direct template is important to this case.
+// Return Suspense as a component value rather than placing it directly in the
+// parent's template.
 function ReturnedSuspenseValue() {
 	return <Suspense fallback={<i class="returned-pending">pending</i>}>
 		<PassThrough>

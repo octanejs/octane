@@ -6,7 +6,7 @@
  * pseudo-element handles, cleanup-before-next-fire, and share viewport decay.
  * jsdom environment via the shared conformance mock helper.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { act } from './_helpers';
 import { createRoot, startTransition, addTransitionType, type Root } from '../src/index.js';
 import { compile } from '../src/compiler/compile.js';
@@ -36,93 +36,6 @@ function evalServer(source: string, filename: string): Record<string, any> {
 	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
 	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
 }
-
-describe('ViewTransition compiler hints', () => {
-	const expectHint = (source: string, filename: string) => {
-		const code = compile(source, filename).code;
-		expect(code).toContain('__vtSeen as _$__vtSeen');
-		expect(code).toContain('_$__vtSeen();');
-	};
-
-	const expectNoHint = (source: string, filename: string) => {
-		expect(compile(source, filename).code).not.toContain('__vtSeen');
-	};
-
-	it('does not arm transitions for an unrelated Octane namespace import', () => {
-		expectNoHint(
-			`import * as Octane from 'octane'; export function App() @{ <p>{Octane.useId()}</p> }`,
-			'namespace-hook.tsrx',
-		);
-	});
-
-	it('arms transitions for a namespace ViewTransition tag', () => {
-		expectHint(
-			`import * as Octane from 'octane'; export function App() @{ <Octane.ViewTransition><p /></Octane.ViewTransition> }`,
-			'namespace-view-transition.tsrx',
-		);
-	});
-
-	it.each([
-		['stable', 'ViewTransition'],
-		['unstable', 'unstable_ViewTransition'],
-		['computed stable', "['ViewTransition']"],
-		['computed unstable', "['unstable_ViewTransition']"],
-	])('arms transitions for a top-level %s namespace destructuring alias', (_, property) => {
-		expectHint(
-			`import * as Octane from 'octane'; const { ${property}: VT } = Octane; export function App() @{ <VT><p /></VT> }`,
-			'namespace-destructure.tsrx',
-		);
-	});
-
-	it('does not treat destructuring from another object as an Octane alias', () => {
-		expectNoHint(
-			`import * as Octane from 'octane'; const other = { ViewTransition: () => null }; const { ViewTransition: VT } = other; export function App() @{ <p /> }`,
-			'namespace-destructure-other.tsrx',
-		);
-	});
-
-	it('does not arm for a lexically shadowed namespace member', () => {
-		expectNoHint(
-			`import * as Octane from 'octane'; function read(Octane: { ViewTransition: unknown }) { return Octane.ViewTransition; } export function App() @{ <p /> }`,
-			'namespace-shadowed.tsrx',
-		);
-	});
-
-	it('arms transitions through transitive module-level namespace aliases', () => {
-		expectHint(
-			`import * as Octane from 'octane'; const Short = Octane; const UI = Short; export function App() @{ <UI.ViewTransition><p /></UI.ViewTransition> }`,
-			'namespace-transitive-alias.tsrx',
-		);
-	});
-
-	it('does not arm for an unused namespace alias or its shadowed member', () => {
-		expectNoHint(
-			`import * as Octane from 'octane'; const UI = Octane; function read(UI: { ViewTransition: unknown }) { return UI.ViewTransition; } export function App() @{ <p /> }`,
-			'namespace-alias-shadowed.tsrx',
-		);
-	});
-
-	it.each(['ViewTransition as VT', 'unstable_ViewTransition as VT'])(
-		'arms transitions for a direct Octane barrel export: %s',
-		(specifier) => {
-			expectHint(`export { ${specifier} } from 'octane';`, 'view-transition-barrel.tsrx');
-		},
-	);
-
-	it.each([`export * from 'octane';`, `export * as Octane from 'octane';`])(
-		'arms transitions for an Octane star barrel: %s',
-		(source) => {
-			expectHint(source, 'view-transition-star-barrel.tsrx');
-		},
-	);
-
-	it('ignores type-only ViewTransition namespace and barrel exports', () => {
-		expectNoHint(
-			`import type * as Octane from 'octane'; type VT = typeof Octane.ViewTransition; export type { ViewTransition } from 'octane';`,
-			'view-transition-type-only.tsrx',
-		);
-	});
-});
 
 describe('ViewTransition server output', () => {
 	const ambient = evalServer(
@@ -168,37 +81,6 @@ describe('ViewTransition server output', () => {
 		`,
 		'view-transition-ambient-state.tsrx',
 	);
-
-	it('skips the residual-candidate scan when no ViewTransition rendered', () => {
-		const mod = evalServer(
-			`
-        import { ViewTransition } from 'octane';
-        export function Plain() @{ <main><p>{'plain'}</p></main> }
-        export function WithTransition() @{
-          <ViewTransition><main><p>{'transition'}</p></main></ViewTransition>
-        }
-      `,
-			'view-transition-strip-fast-path.tsrx',
-		);
-		const indexOf = String.prototype.indexOf;
-		let scans = 0;
-		const spy = vi.spyOn(String.prototype, 'indexOf').mockImplementation(function (
-			this: string,
-			search: string,
-			position?: number,
-		) {
-			if (search === ' vt-e') scans++;
-			return indexOf.call(this, search, position);
-		});
-		try {
-			ServerRuntime.renderToString(mod.Plain);
-			expect(scans).toBe(0);
-			ServerRuntime.renderToString(mod.WithTransition);
-			expect(scans).toBe(1);
-		} finally {
-			spy.mockRestore();
-		}
-	});
 
 	it('strips unclaimed enter/exit candidates from static markup', () => {
 		const mod = evalServer(

@@ -113,8 +113,8 @@ What shipped, and where it deviates from the phases as written:
   its parent's plan (same as the client).
 - **Default flipped 2026-07-09** (same day, after the full-suite soak):
   `parallelUse` defaults to true in `compile()` and the vite plugin;
-  `parallelUse: false` opts out (pinned inert in
-  `tests/compile-parallel-use.test.ts`). The homepage "Compiled templates"
+  `parallelUse: false` opts out (covered behaviorally by the server and
+  Suspense suites). The homepage "Compiled templates"
   copy and the RuleSync intentional-divergence entry (AGENTS/CLAUDE/etc.)
   shipped with the flip.
 - **Decision points resolved:** (1) DEFAULT-ON, opt-out via
@@ -293,8 +293,7 @@ assumption React already bakes into `use()` replay.
   agreed insertion point in `compileFunctionBody` (after autoCallback, before
   `rewriteHookCalls`; runs on every function body including hoisted `@try`
   sub-bodies, where `use()` actually lives). Identity pass until Phase 1;
-  byte-identical output pinned by `tests/compile-parallel-use.test.ts` —
-  those equality pins flip into shape assertions as phases land.
+  the opt-out behavior is covered by executing compiled Suspense fixtures.
 - **Replay-churn pin** (`ReplayChurnBody` fixture + "replay churn" test in
   `tests/suspense.test.ts`): two pre-existing promises cost three body
   attempts on mount and three more on a promise-swapping update (one attempt

@@ -132,7 +132,7 @@ residue. It compares sampled `innerHTML`, so it cannot observe:
 - listener phase/order when final markup is unchanged;
 - intermediate Suspense/transition states that a fixture does not sample.
 
-Dedicated conformance, identity, hydration, marker-shape, streaming, and
+Dedicated conformance, identity, behavioral hydration, streaming, and
 browser tests cover many of these axes. The website browser suite now checks
 all public routes in development and production, fails on page/hydration
 errors, exercises client navigation, and interacts with the sandboxed
@@ -155,9 +155,9 @@ trimming path.
 
 Hook compilation has also become more explicit:
 
-- public `useState` and `useReducer` retain their physical two-item fast path;
-- the compiler selects getter-enabled helpers only when tuple index 2 is
-  observed or the tuple escapes ambiguously;
+- ordinary two-item `useState` and `useReducer` destructuring keeps the lean path;
+- observing tuple index 2, including through an escaped tuple, exposes the
+  current-state getter;
 - named aliases, namespace imports, and default imports are discovered;
 - slot-keyed hooks in plain JavaScript loops are compile errors;
 - manual slot-forwarding packages declare their source directories in their
@@ -213,8 +213,9 @@ coupling**.
 [`docs/comment-marker-elision-plan.md`](comment-marker-elision-plan.md) is the
 current detailed record. The old statement that M3 remained to land is stale:
 M3 inherited sole-component ranges across client, server, and hydration, and
-M4 removed additional chart-internal client-mount markers. Exact marker-shape
-tests and per-route browser ceilings remain deliberate contracts.
+M4 removed additional chart-internal client-mount markers. Marker weight is
+now tracked by deterministic benchmark ratios, while browser and hydration
+suites assert adoption, identity, live state, events, and mismatch diagnostics.
 
 The remaining buckets are order- or ownership-sensitive:
 

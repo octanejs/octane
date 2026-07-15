@@ -1,3 +1,10 @@
+Please also reference the following rules as needed. The list below is provided in TOON format, and `@` stands for the project root directory.
+
+rules[1]:
+  - path: @.agents/memories/testing.md
+    description: Octane test quality and observation-boundary rules
+    applyTo[5]: **/*.test.*,**/*.spec.*,**/tests/**,**/_fixtures/**,benchmarks/**
+
 # Additional Conventions Beyond the Built-in Functions
 
 As this project's AI coding tool, you must follow the additional conventions below, in addition to the built-in functions.

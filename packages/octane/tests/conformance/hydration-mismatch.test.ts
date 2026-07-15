@@ -275,9 +275,8 @@ describe('conformance: hydration mismatch (ReactDOMHydrationDiff + ReactDOMServe
 		// marker-elision M3 (2026-07-09): CompForm's `<Leaf/>` is the sole root of
 		// its body, so the server skips the frame pair and the client inherits the
 		// parent range — the two forms now serialize identically and cross-reconnect
-		// CLEAN, matching React. (A component that is NOT its body's sole root still
-		// carries a pair and still structurally diverges — marker-shape.test.ts pins
-		// where pairs remain.)
+		// CLEAN, matching React. Components that are not their body's sole root still
+		// retain independent ownership, covered by the behavioral hydration suites.
 		it('component-form ↔ bare-form reconnects clean since M3 (Per :76)', async () => {
 			await crossReconnect('CompForm', 'BareForm', {});
 			expect(container.querySelector('#leaf.leaf')!.textContent).toBe('ok');

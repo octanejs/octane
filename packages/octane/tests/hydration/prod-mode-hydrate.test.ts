@@ -58,14 +58,6 @@ function ssrHtml(): string {
 }
 
 describe('prod compile mode (hmr:false) — hydration smoke', () => {
-	it('prod-compiled slots carry unique descriptions (composition contract)', () => {
-		const { code } = compile(SOURCE, 'prod-hooks.tsrx', { mode: 'client', hmr: false });
-		// Two withSlot call sites, each with a DESCRIBED plain symbol.
-		expect(code).toMatch(/const _h\$0 = Symbol\("[a-z0-9]+#0"\);/);
-		expect(code).toMatch(/const _h\$1 = Symbol\("[a-z0-9]+#1"\);/);
-		expect(code).not.toMatch(/Symbol\(\)/);
-	});
-
 	it('server render has independent custom-hook state per call site', () => {
 		const html = ssrHtml();
 		expect(html).toContain('a:1');

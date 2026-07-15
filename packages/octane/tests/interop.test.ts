@@ -90,13 +90,6 @@ it('createElement does NOT mutate the caller-supplied props object', () => {
 	expect(el.props).not.toBe(caller);
 });
 
-it('createElement keeps the hot 2-arg path allocation-free (props passed through)', () => {
-	const caller = { foo: 1 } as any; // no key, no positional children
-	const el = createElement(Comp, caller);
-	expect(el.props).toBe(caller); // same reference — no copy
-	expect(el.key).toBe(null);
-});
-
 it('createElement mirrors positional children into host props.children', () => {
 	const el = createElement('button', { type: 'button' } as any, 'Save');
 	expect((el.props as any).children).toBe('Save');
