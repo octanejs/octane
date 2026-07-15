@@ -489,7 +489,8 @@ generated from the workspace manifests in
   [`lexical`](./packages/lexical), [`floating-ui`](./packages/floating-ui),
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
   [`base-ui`](./packages/base-ui), [`sonner`](./packages/sonner),
-  [`recharts`](./packages/recharts), [`lucide`](./packages/lucide),
+  [`recharts`](./packages/recharts), [`visx`](./packages/visx),
+  [`lucide`](./packages/lucide),
   [`redux`](./packages/redux), [`redux-toolkit`](./packages/redux-toolkit),
   [`testing-library`](./packages/testing-library),
   [`i18next`](./packages/i18next), and [`mdx`](./packages/mdx).
