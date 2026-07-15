@@ -4,7 +4,7 @@
 // Below 720px the left link row collapses behind a hamburger into a dropdown
 // panel, while search and the social icons stay in the bar as icons.
 import { useState } from 'octane';
-import { Link, useLocation } from '@octanejs/tanstack-router';
+import { Link } from '@octanejs/tanstack-router';
 import { DocsSearch } from './DocsSearch.tsrx';
 import logoUrl from '../assets/octane-logo.svg';
 import discordUrl from '../assets/discord.svg';
@@ -12,13 +12,9 @@ import githubUrl from '../assets/github.svg';
 
 export function Header() @{
 	const [menuOpen, setMenuOpen] = useState(false);
-	// The docs section runs wider than the rest of the site; the bar matches it
-	// so the wordmark stays flush with the sidebar.
-	const pathname = useLocation({ select: (l: any) => l.pathname });
-	const isDocsPath = pathname === '/docs' || pathname.startsWith('/docs/');
 
 	<header class="topnav">
-		<div class={['topnav-inner', isDocsPath && 'docs-width']}>
+		<div class="topnav-inner">
 			<div class="nav-left">
 				<button
 					type="button"
@@ -106,7 +102,7 @@ export function Header() @{
 				border-bottom: 1px solid var(--border);
 			}
 			.topnav-inner {
-				max-width: 1200px;
+				max-width: 1420px;
 				margin: 0 auto;
 				padding: 0 1.5rem;
 				height: 60px;
@@ -114,9 +110,6 @@ export function Header() @{
 				align-items: center;
 				justify-content: space-between;
 				gap: 1rem;
-			}
-			.topnav-inner.docs-width {
-				max-width: 1420px;
 			}
 			.nav-left,
 			.nav-right {

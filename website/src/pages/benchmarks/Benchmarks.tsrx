@@ -54,7 +54,7 @@ export function Benchmarks() @{
 
 		<style>
 			.benchpage {
-				max-width: 1200px;
+				max-width: 1420px;
 				margin: 0 auto;
 				padding: 3rem 1.5rem 0;
 			}
