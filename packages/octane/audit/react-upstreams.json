@@ -76,40 +76,40 @@
       "workstream": "Root semantics",
       "filePattern": "/ReactDOMRoot[^/]*-test(?:\\.internal)?\\.js$",
       "risk": "high",
-      "status": "planned",
+      "status": "covered",
       "classification": "adaptable",
       "owner": "runtime",
-      "rationale": "Port public createRoot, update, unmount, error, and scheduling outcomes while filtering renderer internals."
+      "rationale": "Twenty-five public root cases have exact-title client and production-compile evidence; the component-body render entry point and safe teardown after external DOM removal are executable, documented divergences."
     },
     {
       "id": "fragments",
       "workstream": "Fragment reconciliation",
       "filePattern": "/React(?:TopLevel)?Fragment[^/]*-test(?:\\.internal)?\\.js$",
       "risk": "high",
-      "status": "planned",
+      "status": "covered",
       "classification": "adaptable",
       "owner": "runtime",
-      "rationale": "Expand fragment reconciliation, ref, nesting, and top-level outcome coverage."
+      "rationale": "Twenty-eight fragment identity and reconciliation cases have exact-title client and production-compile evidence; React's internal lazy-to-element shape has a documented non-goal disposition and executable component-module adaptation."
     },
     {
       "id": "element-children-api",
       "workstream": "Element and Children APIs",
       "filePattern": "/React(?:Children|CreateElement|Element|ElementClone)[^/]*-test(?:\\.internal)?\\.js$",
       "risk": "high",
-      "status": "planned",
+      "status": "covered",
       "classification": "adaptable",
       "owner": "public API",
-      "rationale": "Audit and port observable Children, element creation, JSX-element, and clone behavior against Octane's public API."
+      "rationale": "Ninety-five public Children, element creation, clone, validation, iterable, thenable, key, ref, freezing, and function-default-prop cases have executable evidence; sixteen React owner/component-stack, legacy-transform, class, and private-element diagnostics are documented non-goals."
     },
     {
       "id": "lazy",
       "workstream": "Lazy components",
       "filePattern": "/ReactLazy[^/]*-test(?:\\.internal)?\\.js$",
       "risk": "high",
-      "status": "planned",
+      "status": "covered",
       "classification": "adaptable",
       "owner": "runtime",
-      "rationale": "Expand lazy resolution, rejection, retry, default-export, and Suspense interaction coverage."
+      "rationale": "Nineteen lazy resolution, rejection, function-component default-prop, memo, identity, and reorder cases have executable evidence; three ergonomic/component-form differences and twenty unsupported class, forwardRef, legacy-root, owner-stack, or exotic-type cases have durable documented dispositions."
     },
     {
       "id": "external-store",
@@ -163,19 +163,19 @@
     }
   ],
   "octaneSuiteBaseline": {
-    "normalCoreCases": 2260,
+    "normalCoreCases": 2480,
     "normalCoreBreakdown": {
-      "conformance": 985,
+      "conformance": 1171,
       "differential": 136,
       "hydration": 135,
-      "other": 1004
+      "other": 1038
     },
     "profilingOnlyCases": 14,
-    "distinctCoreCasesIncludingProfiling": 2274,
-    "productionModeReruns": 2260,
-    "allWorkspaceExecutions": 7135,
-    "reactSourceAttributedFileUpperBound": 968,
-    "reactSourceAttributedFiles": 68,
+    "distinctCoreCasesIncludingProfiling": 2494,
+    "productionModeReruns": 2480,
+    "allWorkspaceExecutions": 7584,
+    "reactSourceAttributedFileUpperBound": 1154,
+    "reactSourceAttributedFiles": 72,
     "reactSourceAttributedDefinition": "Every collected normal-core case in a local file containing at least one React upstream *-test.js or *-test.ts filename citation; this is a generous file-level upper bound, not a one-to-one port count.",
     "measuredOn": "2026-07-15"
   }

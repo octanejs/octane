@@ -17,6 +17,11 @@ packages/visx/**/*.tsrx.d.ts
 # upstream React-shaped TypeScript/JSX constructs used by the Visx port.
 packages/visx/**/*.tsrx
 
+# The fragment conformance fixture intentionally mirrors React's nested
+# return-position JSX Fragment/array ternaries, which the current TSRX Prettier
+# parser cannot parse even though the compiler accepts and executes them.
+packages/octane/tests/conformance/_fixtures/fragment-reconciliation.tsrx
+
 # Generated bench datasets (written by benchmarks/news/gen.mjs)
 benchmarks/news/*/src/data.js
 
