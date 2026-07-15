@@ -304,6 +304,7 @@ export function App() @{
 	const [composer, setComposer] = useState('');
 	const [activity, setActivity] = useState('Opening Relay');
 	const [threadReplies, setThreadReplies] = useState<ThreadReply[]>([]);
+	const [localThreadReplies, setLocalThreadReplies] = useState<Record<string, ThreadReply[]>>({});
 	const [threadLoading, setThreadLoading] = useState(false);
 	const sessionRef = useRef(`relay-${crypto.randomUUID()}`);
 	const sequenceByChannelRef = useRef(new Map<ChannelId, number>());
@@ -554,23 +555,42 @@ export function App() @{
 	}, []);
 
 	const addThreadReply = useCallback((body: string) => {
-		setThreadReplies(
-			(current) => [
+		const threadId = route.threadId;
+		if (threadId === null) return;
+		const reply: ThreadReply = {
+			id: `local-reply-${++requestCounterRef.current}`,
+			author: CURRENT_USER,
+			body,
+			sentAt: 'Just now',
+		};
+		setLocalThreadReplies(
+			(current) => ({
 				...current,
-				{
-					id: `local-reply-${requestCounterRef.current++}`,
-					author: CURRENT_USER,
-					body,
-					sentAt: 'Just now',
-				},
-			],
+				[threadId]: [...(current[threadId] ?? []), reply],
+			}),
 		);
 		setActivity('Reply added to thread');
-	}, []);
+	}, [route.threadId]);
+
+	const visibleMessages = useMemo(
+		() => messages.map((message) => {
+			const addedReplies = localThreadReplies[message.id]?.length ?? 0;
+			return addedReplies === 0
+				? message
+				: { ...message, threadCount: message.threadCount + addedReplies };
+		}),
+		[messages, localThreadReplies],
+	);
+	const visibleThreadReplies = useMemo(
+		() => route.threadId === null
+			? threadReplies
+			: [...threadReplies, ...(localThreadReplies[route.threadId] ?? [])],
+		[localThreadReplies, route.threadId, threadReplies],
+	);
 
 	const currentThreadParent = useMemo(
-		() => messages.find((message) => message.id === route.threadId) ?? null,
-		[messages, route.threadId],
+		() => visibleMessages.find((message) => message.id === route.threadId) ?? null,
+		[route.threadId, visibleMessages],
 	);
 	<div class="relay-shell" data-testid="relay-ready">
 		<a class="skip-link" href="#conversation">Skip to conversation</a>
@@ -683,7 +703,7 @@ export function App() @{
 						<div class="date-divider">
 							<span>Today</span>
 						</div>
-						@for (const message of messages; key message.id) {
+						@for (const message of visibleMessages; key message.id) {
 							<MessageRow message={message} onOpenThread={openThread} onReact={reactToMessage} />
 						}
 					</>
@@ -740,7 +760,7 @@ export function App() @{
 		@if (route.threadId !== null) {
 			<ThreadPortal
 				parent={currentThreadParent}
-				replies={threadReplies}
+				replies={visibleThreadReplies}
 				loading={threadLoading}
 				onClose={closeThread}
 				onReply={addThreadReply}

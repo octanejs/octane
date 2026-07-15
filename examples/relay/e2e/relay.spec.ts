@@ -29,7 +29,7 @@ async function openGeneral(page: Page): Promise<void> {
 	await expect(page.getByRole('status', { name: 'Realtime connection: live' })).toBeVisible();
 }
 
-test('deep links across responsive channels and completes a thread by keyboard', async ({
+test('deep links across responsive channels and preserves a thread reply across reopen', async ({
 	page,
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
@@ -39,7 +39,8 @@ test('deep links across responsive channels and completes a thread by keyboard',
 	const threadHeading = page.getByRole('heading', { name: 'Thread' });
 	await expect(threadHeading).toBeVisible();
 	await expect(threadHeading).toBeFocused();
-	await expect(page.getByRole('dialog', { name: 'Thread' })).toBeVisible();
+	const threadDialog = page.getByRole('dialog', { name: 'Thread' });
+	await expect(threadDialog).toBeVisible();
 	await expect(page.getByRole('article', { name: 'Reply from Rowan Ellis' })).toBeVisible();
 
 	const reply = page.getByRole('textbox', { name: 'Reply to thread' });
@@ -47,15 +48,30 @@ test('deep links across responsive channels and completes a thread by keyboard',
 	await expect(reply).toBeFocused();
 	await page.keyboard.press('Tab');
 	await expect(page.getByRole('button', { name: 'Close thread' })).toBeFocused();
-	await reply.fill('I’ll add the release owner before handoff.');
+	const replyBody = 'I’ll add the release owner before handoff.';
+	await reply.fill(replyBody);
 	await reply.press('ControlOrMeta+Enter');
-	await expect(page.getByRole('article', { name: 'Reply from Avery Stone' })).toContainText(
-		'I’ll add the release owner before handoff.',
-	);
-	await expect(page.getByText('4 replies', { exact: true })).toBeVisible();
+	const authoredReply = threadDialog
+		.getByRole('article', { name: 'Reply from Avery Stone' })
+		.filter({ hasText: replyBody });
+	await expect(authoredReply).toBeVisible();
+	await expect(threadDialog.getByText('4 replies', { exact: true })).toBeVisible();
 	await reply.press('Escape');
 	await expect(page).toHaveURL(/\/channels\/general$/);
 	await expect(page.getByRole('heading', { name: '# general' })).toBeFocused();
+
+	const threadLink = page
+		.locator('[data-message-id="g-014"]')
+		.getByRole('link', { name: '4 replies', exact: true });
+	await expect(threadLink).toBeVisible();
+	await threadLink.click();
+	await expect(page).toHaveURL(/\/channels\/general\/thread\/g-014$/);
+	await expect(threadHeading).toBeFocused();
+	await expect(authoredReply).toBeVisible();
+	await expect(threadDialog.getByRole('article')).toHaveCount(4);
+	await page.keyboard.press('Escape');
+	await expect(page).toHaveURL(/\/channels\/general$/);
+	await expect(threadLink).toBeFocused();
 
 	const mobileChannels = page.getByRole('navigation', { name: 'Mobile channels' });
 	await mobileChannels.getByRole('link', { name: 'design' }).click();
