@@ -31,7 +31,7 @@ const FEATURES = [
 		title: 'Familiar model',
 		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms ' +
 			'and Suspense all behave the way you expect. Events are native, refs are ' +
-			'just props, and 17 first-party bindings cover the libraries you already use.',
+			'just props, and first-party bindings cover the libraries you already use.',
 	},
 ];
 
@@ -105,11 +105,52 @@ export function Home() @{
 				</span>
 			</div>
 			<div class="proven-stat">
-				<span class="proven-number">18</span>
+				<span class="proven-number">25</span>
 				<span class="proven-label">
-					{'ecosystem ports — Zustand, TanStack Query & Router, Radix, Lucide, '}
+					{'framework bindings — Zustand, TanStack Query & Router, Radix, Lucide, '}
 					<Link to="/docs/bindings">Recharts and more</Link>
 				</span>
+			</div>
+		</section>
+
+		<section class="why" aria-labelledby="why-heading">
+			<div class="why-copy">
+				<h2 id="why-heading" class="why-title">
+					{'Fast should be how your app feels. '}
+					<span class="why-accent">Not a new way you have to think.</span>
+				</h2>
+				<h3 class="why-question">Why should someone adopt Octane today?</h3>
+				<p class="why-answer">
+					{'Because adoption should build on what you already know. Octane keeps the ' +
+						'component-and-hooks mental model familiar, so developers carry over their ' +
+						'hard-won intuition.'}
+				</p>
+				<p class="why-answer">
+					{'For the large proportion of React codebases centered on function components ' +
+						'and hooks, that continuity also makes migration especially straightforward for ' +
+						'AI agents: they can preserve the app’s component boundaries and reasoning instead ' +
+						'of redesigning it around a new reactive model. Begin with standard TSX, then opt ' +
+						'into TSRX one component at a time; fewer rules and dependency lists let related ' +
+						'code stay together. Octane changes the machinery beneath your app without asking ' +
+						'everyone who works on it to start over.'}
+				</p>
+				<h3 class="why-question">Why isn't Octane's rendering powered by signals?</h3>
+				<p class="why-answer">
+					{'Signals are good. They make updates wonderfully precise, and you can still use ' +
+						'them in an Octane app when that model fits the problem. But powering the framework ' +
+						'with signals would make them more than an optional tool; they would become part of ' +
+						'how every application represents and reads state. Octane makes a different trade: ' +
+						'components stay as familiar functions you can read from top to bottom, while the ' +
+						'compiler and runtime carry the complexity instead of spreading it through the ' +
+						'application.'}
+				</p>
+				<p class="why-coda">
+					<strong>The trade holds up.</strong>
+					{' Signals still win the workloads built for them, but across the checked-in ' +
+						'suites below, Octane’s tightly tuned compiler and runtime largely keep pace — ' +
+						'without asking you to rewire how you think. '}
+					<Link to="/docs/tsrx-vs-tsx">See what TSRX adds →</Link>
+				</p>
 			</div>
 		</section>
 
@@ -124,7 +165,7 @@ export function Home() @{
 			<p class="bench-note">
 				{'Ratios are geometric means over each suite’s per-operation checked-in benchmark scores ('}
 				<code>benchmarks/baselines/local</code>
-				{'), Octane .tsrx vs React 19.2, Solid 2.0 beta, Ripple 0.3 and Vue Vapor 3.6. Reproduce with '}
+				{'), Octane .tsrx vs React 19.2, Solid 2.0 beta, Ripple 0.3 and Vue Vapor 3.6 beta. Reproduce with '}
 				<code>pnpm bench:all -- --quick --ratios</code>
 				{', or see '}
 				<Link to="/benchmarks">absolute per-operation numbers for the charted suites</Link>
@@ -160,14 +201,6 @@ export function Home() @{
 			}
 			.hero-accent {
 				color: #ff415a;
-			}
-			.hero-kicker {
-				color: #ff657a;
-				font-size: 0.75rem;
-				font-weight: 800;
-				letter-spacing: 0.14em;
-				text-transform: uppercase;
-				margin: 0 0 0.85rem;
 			}
 			.hero-sub {
 				color: #99a1b3;
@@ -337,14 +370,74 @@ export function Home() @{
 				max-width: 24rem;
 			}
 			.proven-label :global(a),
+			.why-coda :global(a),
 			.bench-note :global(a) {
 				text-decoration: underline;
 				text-underline-offset: 0.16em;
 			}
+			.why-coda :global(a) {
+				display: inline-block;
+				white-space: nowrap;
+			}
+			.why {
+				border-top: 1px solid rgba(255, 255, 255, 0.1);
+				padding: 4rem 0;
+				margin-top: 2rem;
+			}
+			.why-copy {
+				max-width: 50rem;
+			}
+			.why-title {
+				font-size: 2.4rem;
+				line-height: 1.12;
+				letter-spacing: -0.03em;
+				margin: 0;
+				font-weight: 800;
+				max-width: 48rem;
+				scroll-margin-top: 5.5rem;
+			}
+			.why-accent {
+				display: block;
+				color: #ff415a;
+			}
+			.why-question {
+				color: #f4eee8;
+				font-size: 1.2rem;
+				letter-spacing: -0.015em;
+				margin: 2rem 0 0;
+			}
+			.why-answer {
+				color: #c4c9d4;
+				font-size: 1.05rem;
+				margin: 0.65rem 0 0;
+				max-width: 48rem;
+			}
+			.why-answer + .why-answer {
+				margin-top: 0.85rem;
+			}
+			.why-coda {
+				color: #99a1b3;
+				font-size: 0.875rem;
+				margin: 1.75rem 0 0;
+				padding-left: 1rem;
+				border-left: 2px solid rgba(255, 65, 90, 0.65);
+				max-width: 48rem;
+			}
+			.why-coda strong {
+				color: #f4eee8;
+			}
+			@media (max-width: 560px) {
+				.why {
+					padding: 3rem 0;
+				}
+				.why-title {
+					font-size: 2rem;
+				}
+			}
 			.bench {
 				border-top: 1px solid rgba(255, 255, 255, 0.1);
 				padding: 2.5rem 0 3rem;
-				margin-top: 2rem;
+				margin-top: 0;
 			}
 			.bench-head {
 				display: flex;

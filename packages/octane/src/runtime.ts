@@ -4970,6 +4970,13 @@ interface HydratedLiteRange {
 	end: Comment;
 }
 
+interface PendingHydrationClassWrite {
+	next: string | null;
+	absentIsEmpty: boolean;
+	useAttribute: boolean;
+	remove: boolean;
+}
+
 let currentHydration: HydrationCapability | null = null;
 
 function activeHydration(): HydrationCapability | null {
@@ -4988,6 +4995,7 @@ class HydrationCapability {
 	hasAdjacentRangePair = false;
 	readonly deferredActivities: Array<() => void> = [];
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
+	readonly classWrites = new Map<Element, PendingHydrationClassWrite>();
 
 	constructor(
 		readonly rootBlock: Block,
@@ -5174,6 +5182,38 @@ class HydrationCapability {
 		if (process.env.NODE_ENV !== 'production')
 			warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', server, next);
 		return true;
+	}
+
+	queueClass(
+		el: Element,
+		next: string | null,
+		absentIsEmpty: boolean,
+		useAttribute: boolean,
+		remove: boolean,
+	): void {
+		// Class can be authored by any combination of direct bindings and spreads.
+		// During hydration only the last writer is observable: the server has already
+		// serialized that final value, so replaying intermediate writers would produce
+		// false mismatch warnings and transient DOM mutations on the adopted element.
+		this.classWrites.set(el, { next, absentIsEmpty, useAttribute, remove });
+	}
+
+	flushClassWrites(): void {
+		try {
+			for (const [el, write] of this.classWrites) {
+				const rawTarget = write.remove ? null : write.next;
+				// The common hydration-parity path performs no DOM write at all. Besides
+				// avoiding work, this keeps MutationObserver consumers from seeing a class
+				// value that never existed in either the server or final client output.
+				if (el.getAttribute('class') === rawTarget) continue;
+				if (!this.allowClass(el, write.next, write.absentIsEmpty)) continue;
+				if (write.remove) el.removeAttribute('class');
+				else if (write.useAttribute) el.setAttribute('class', write.next!);
+				else (el as any).className = write.next!;
+			}
+		} finally {
+			this.classWrites.clear();
+		}
 	}
 
 	applyStyle(el: HTMLElement | SVGElement, value: any, prev: any): boolean {
@@ -6496,13 +6536,11 @@ export function setClassName(el: Element, value: unknown): void {
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write).
 	const cls = normalizeClass(value);
-	// Hydration VALUE-mismatch detection for `class` (parity with `setAttribute`): the write
-	// below patches to the client value; here we (dev) warn on a server/client divergence and
-	// honor `suppressHydrationWarning` (keep the server class). `hydrationMismatchMode` skips
-	// the compare unless dev or suppressed so a non-suppressed prod hydration adds no cost.
-	// Guarded by `hydrating`.
 	const hydration = activeHydration();
-	if (hydration !== null && !hydration.allowClass(el, cls, true)) return;
+	if (hydration !== null) {
+		hydration.queueClass(el, cls, true, false, value == null || value === false);
+		return;
+	}
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
 	// because SVGElement.className is a read-only SVGAnimatedString and assignment
@@ -6523,12 +6561,11 @@ export function setClassName(el: Element, value: unknown): void {
 // existed).
 export function setClassAttr(el: Element, value: unknown): void {
 	const cls = value == null || value === false ? null : normalizeClass(value);
-	// Hydration VALUE-mismatch handling, mirroring `setClassName`: honor
-	// `suppressHydrationWarning` (keep the server class) and dev-warn on a divergence —
-	// so SVG/spread classes get the same suppress/warn semantics as an HTML `className`
-	// binding instead of silently clobbering the adopted server class.
 	const hydration = activeHydration();
-	if (hydration !== null && !hydration.allowClass(el, cls)) return;
+	if (hydration !== null) {
+		hydration.queueClass(el, cls, false, true, cls === null);
+		return;
+	}
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
 }
@@ -15839,6 +15876,10 @@ export function hydrateRoot(
 					hydration.deferredActivities[i]();
 			});
 		}
+		// Direct class bindings and spreads are separate client writers, while SSR
+		// serializes only their final authored value. Resolve the last writer once so
+		// a matching server class is adopted without warnings or transient mutations.
+		hydration.flushClassWrites();
 		hydrationCompleted = true;
 	} finally {
 		currentHydration = previousHydration;

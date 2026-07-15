@@ -5,11 +5,17 @@
   "type": "module",
   "description": "Hacker News reader built twice — React-style .tsx and TSRX — over a shared octane core, proving octane's JSX backwards-compatibility.",
   "scripts": {
+    "dev": "pnpm dev:tsrx",
     "dev:jsx": "node server.mjs jsx",
     "dev:tsrx": "node server.mjs tsrx",
+    "build": "pnpm build:jsx && pnpm build:tsrx",
+    "build:e2e": "VITE_HN_API_BASE=http://127.0.0.1:${HN_FIXTURE_PORT:-5190}/v0 pnpm build",
     "build:jsx": "vite build --config jsx/vite.config.ts",
     "build:tsrx": "vite build --config tsrx/vite.config.ts",
-    "e2e": "playwright test --config e2e/playwright.config.ts"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build:e2e && playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "HN_E2E_CLIENT_MODE=dev playwright test --config e2e/playwright.config.ts",
+    "e2e": "pnpm test:e2e"
   },
   "dependencies": {
     "octane": "workspace:*",
@@ -19,6 +25,7 @@
   },
   "devDependencies": {
     "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
     "typescript": "catalog:default",
     "vite": "catalog:default"
   }

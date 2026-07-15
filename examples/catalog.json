@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "examples": [
+    {
+      "directory": "examples/hacker-news",
+      "id": "hacker-news",
+      "title": "Hacker News",
+      "summary": "One routed news reader implemented in both React-style TSX and TSRX over the same Octane data layer.",
+      "status": "active",
+      "renderModes": ["client", "ssr", "hydration"],
+      "dialects": ["tsx", "tsrx"],
+      "bindings": ["@octanejs/stylex", "@octanejs/tanstack-query", "@octanejs/tanstack-router"],
+      "octaneFeatures": [
+        "error-boundaries",
+        "hydration",
+        "jsx-compatibility",
+        "native-events",
+        "ssr",
+        "suspense",
+        "transitions",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "browse-feeds",
+          "title": "Browse distinct story feeds and follow story, comment, and user links",
+          "kind": "golden",
+          "spec": "e2e/nav.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "observe-pending-content",
+          "title": "Show useful pending content before a delayed feed resolves",
+          "kind": "resilience",
+          "spec": "e2e/nav.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "hold-current-page",
+          "title": "Keep the current page visible while delayed pagination resolves",
+          "kind": "resilience",
+          "spec": "e2e/page-more-hold.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "server-render-and-hydrate",
+          "title": "Deliver styled server content and adopt it into an interactive client",
+          "kind": "ssr-hydration",
+          "spec": "e2e/ssr.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "delayed-feed",
+          "description": "The fixture API delays feed responses so pending UI is observable."
+        },
+        {
+          "id": "delayed-pagination",
+          "description": "Second-page item responses are delayed while the committed first page must remain usable."
+        }
+      ]
+    },
+    {
+      "directory": "examples/lexical-playground",
+      "id": "lexical-playground",
+      "title": "Lexical Playground",
+      "summary": "A production-built rich-text editor exercising the Octane Lexical binding through real browser interactions.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/lexical"],
+      "octaneFeatures": [
+        "contenteditable",
+        "effects",
+        "native-events",
+        "portals",
+        "refs-as-props",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "format-selected-text",
+          "title": "Type text, select it, and apply an accessible formatting toggle",
+          "kind": "golden",
+          "spec": "e2e/editor.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "undo-redo-document",
+          "title": "Undo and redo visible editor content without losing the document",
+          "kind": "golden",
+          "spec": "e2e/editor.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "insert-from-slash-picker",
+          "title": "Open the portaled slash picker and insert a heading block",
+          "kind": "golden",
+          "spec": "e2e/editor.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": []
+    }
+  ]
+}
