@@ -969,6 +969,9 @@ The remaining foundation limitations are capability/scheduler boundaries:
 
 Build the smallest real Three package on the implemented seam:
 
+The R3F compatibility target, ABI gates, implementation phases, effort, and
+validation matrix are tracked in [`three-port-plan.md`](./three-port-plan.md).
+
 - a typed Three intrinsic catalog and concrete `Canvas` root/container;
 - Three object creation, prop application/diffing, insert/move/remove, disposal,
   and public instances;
