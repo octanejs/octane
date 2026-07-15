@@ -200,7 +200,10 @@ Vite, Rspack, Rsbuild, and future Volar integration.
 
 The normalized signature is part of transform cache identity. A renderer
 module ID is intentionally data, not a callback: changing it changes the
-signature and invalidates compilation in every adapter in the same way.
+signature and invalidates compilation in every adapter. `rsbuild dev` watches
+the Octane config and its imported helpers with Rsbuild's `reload-server` mode
+so all Rspack compilers are reconstructed atomically with the new renderer
+snapshot.
 
 ### Server-mode rule
 

@@ -21,22 +21,31 @@ function link(root: string, packageName: string, target: string) {
 	symlinkSync(target, destination, 'dir');
 }
 
+function writeRendererConfig(root: string, module = '/src/object-renderer.js') {
+	write(
+		root,
+		'renderer.config.ts',
+		`export const renderers = {
+	registry: { object: ${JSON.stringify(module)} },
+	rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+};
+`,
+	);
+}
+
 function writeProject(root: string, withRoute: boolean) {
 	write(root, 'package.json', JSON.stringify({ private: true, type: 'module' }) + '\n');
 	write(root, 'index.html', '<body><div id="root"><!--ssr-body--></div></body>\n');
 	write(root, 'src/Page.tsrx', 'export function Page() @{ <main>ready</main> }\n');
+	writeRendererConfig(root);
 	write(
 		root,
 		'octane.config.ts',
 		`import { defineConfig, RenderRoute } from '@octanejs/rsbuild-plugin';
+import { renderers } from './renderer.config.ts';
 
 export default defineConfig({
-	compiler: {
-		renderers: {
-			registry: { object: '/src/object-renderer.js' },
-			rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
-		},
-	},
+	compiler: { renderers },
 	router: { routes: ${withRoute ? "[new RenderRoute({ path: '/', entry: '/src/Page.tsrx' })]" : '[]'} },
 });
 `,
@@ -65,7 +74,10 @@ describe('Rsbuild renderer configuration', () => {
 			writeProject(root, withRoute);
 			const instance = await createRsbuild({
 				cwd: root,
-				rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+				rsbuildConfig: {
+					dev: { watchFiles: { paths: 'content/**/*.md', type: 'reload-page' } },
+					plugins: [pluginOctane({ hmr: false })],
+				},
 			});
 			const configs = await instance.initConfigs({ action: 'build' });
 			const plugins = configs
@@ -82,6 +94,44 @@ describe('Rsbuild renderer configuration', () => {
 					rules: [{ include: ['src/**/*.object.tsrx'], renderer: 'object' }],
 				});
 			}
+
+			expect(instance.getNormalizedConfig().dev.watchFiles).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ paths: 'content/**/*.md', type: 'reload-page' }),
+					expect.objectContaining({
+						paths: expect.arrayContaining([
+							join(root, 'octane.config.ts'),
+							join(root, 'renderer.config.ts'),
+						]),
+						type: 'reload-server',
+					}),
+				]),
+			);
 		},
 	);
+
+	it('applies renderer config changes after Rsbuild restarts', async () => {
+		writeProject(root, false);
+		const createCompilerPlugins = async () => {
+			const instance = await createRsbuild({
+				cwd: root,
+				rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+			});
+			return (await instance.initConfigs({ action: 'dev' }))
+				.flatMap((config) => config.plugins ?? [])
+				.filter((plugin): plugin is OctaneRspackPlugin => plugin instanceof OctaneRspackPlugin);
+		};
+
+		const [initialPlugin] = await createCompilerPlugins();
+		writeRendererConfig(root, '/src/updated-object-renderer.js');
+		const [restartedPlugin] = await createCompilerPlugins();
+
+		expect(initialPlugin.options.renderers).toMatchObject({
+			registry: { object: { module: '/src/object-renderer.js' } },
+		});
+		expect(restartedPlugin.options.renderers).toMatchObject({
+			registry: { object: { module: '/src/updated-object-renderer.js' } },
+		});
+		expect(restartedPlugin.options.renderers).not.toEqual(initialPlugin.options.renderers);
+	});
 });

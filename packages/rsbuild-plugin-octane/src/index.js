@@ -335,8 +335,23 @@ export function pluginOctane(inlineOptions = {}) {
 			}
 
 			api.modifyRsbuildConfig((config, { mergeRsbuildConfig }) => {
-				if (!appEnabled) return config;
-				assertRootPublicPaths(config, clientEnvironment);
+				// Renderer selection is serialized into each Rspack compiler's loader
+				// options, so a browser reload cannot apply config changes safely. Ask
+				// Rsbuild to reconstruct the dev server (and therefore every compiler)
+				// whenever the Octane config or one of its imported helpers changes.
+				// This also covers compiler-only projects without application routes.
+				const watchedConfig = initialLoaded
+					? mergeRsbuildConfig(config, {
+							dev: {
+								watchFiles: {
+									paths: [...initialLoaded.dependencies],
+									type: 'reload-server',
+								},
+							},
+						})
+					: config;
+				if (!appEnabled) return watchedConfig;
+				assertRootPublicPaths(watchedConfig, clientEnvironment);
 				const productionBuild = isProductionBuild();
 				const octaneConfig = /** @type {import('@octanejs/app-core').ResolvedOctaneConfig} */ (
 					initialConfig
@@ -355,7 +370,7 @@ export function pluginOctane(inlineOptions = {}) {
 				const targetOutput = buildTargetPlan?.browserslist
 					? { overrideBrowserslist: buildTargetPlan.browserslist }
 					: {};
-				return mergeRsbuildConfig(config, {
+				return mergeRsbuildConfig(watchedConfig, {
 					server: { htmlFallback: false, historyApiFallback: false },
 					environments: {
 						[clientEnvironment]: {
