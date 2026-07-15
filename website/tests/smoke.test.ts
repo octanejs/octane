@@ -92,23 +92,33 @@ describe('website routes', () => {
 		}
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
-		// The home page stages the interactive benchmark explorer over the checked-in
-		// ×-vs-Octane summary (HOME_SUMMARY). The explorer's own interactions live in
-		// benchmark-explorer.test.ts; here assert the section composes and the summary
-		// reaches the mounted views.
-		const explorer = container.querySelector('section.explorer')!;
-		expect(explorer).toBeTruthy();
-		expect(explorer.querySelector('#explorer-heading')?.textContent?.trim()).toBeTruthy();
-		expect(findLink(explorer, '/benchmarks')).toBeTruthy();
-		const bx = explorer.querySelector('.bx')!;
-		expect(bx).toBeTruthy();
-		// Interactive views are mount-gated: the SSR fallback table swaps for the bar
-		// chart + heatmap on mount. Wait for the plot, then assert every suite row of
-		// the summary reaches the heatmap.
-		await waitFor(() => {
-			if (!bx.querySelector('.bx-plot')) throw new Error('explorer not mounted');
-		});
-		expect(bx.querySelectorAll('.bx-heat tbody tr')).toHaveLength(HOME_SUMMARY.rows.length);
+		// The decision section stays concise, accessible and ahead of the evidence it frames.
+		const why = container.querySelector<HTMLElement>('section.why[aria-labelledby="why-heading"]')!;
+		expect(why.querySelector('#why-heading')?.textContent?.trim()).toBe(
+			'Fast should be how your app feels. Not a new way you have to think.',
+		);
+		const whyQuestions = Array.from(why.querySelectorAll('.why-question')).map((question) =>
+			question.textContent?.trim(),
+		);
+		expect(whyQuestions).toEqual([
+			'Why should someone adopt Octane today?',
+			"Why isn't Octane's rendering powered by signals?",
+		]);
+		expect(why.querySelectorAll('.why-answer')).toHaveLength(3);
+		expect(why.querySelector('.why-coda')?.textContent?.trim()).toBeTruthy();
+		expect(why.querySelector('.why-list')).toBeNull();
+		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
+		const bench = container.querySelector<HTMLElement>('section.bench')!;
+		const homeSections = Array.from(container.querySelectorAll('main .home > section'));
+		expect(homeSections.indexOf(why)).toBeLessThan(homeSections.indexOf(bench));
+
+		// The checked-in benchmark summary reaches the chart and table renderers.
+		const summary = container.querySelector('figure.bench-card');
+		expect(summary?.querySelector('figcaption')).toBeTruthy();
+		expect(summary?.querySelector('svg.home-bench-chart')).toBeTruthy();
+		expect(summary?.querySelectorAll('.visx-bar')).toHaveLength(expectedBarCount(HOME_SUMMARY));
+		expect(summary?.querySelector('.recharts-wrapper')).toBeNull();
+		expect(summary?.querySelector('details table')).toBeTruthy();
 
 		// Section links sit with the wordmark on the left; search and the social
 		// icons form the right cluster.
