@@ -4017,6 +4017,20 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
 	);
+	// A spread and a direct `class`/`className` writer can target the same native
+	// attribute. Emitting each source as a separate HTML attribute is not source-
+	// ordered: the HTML parser keeps the FIRST duplicate, while the client applies
+	// setters in order and the LAST writer wins. Collect those class sources and
+	// serialize one effective class instead (still normalized clsx-style).
+	const resolveClassAcrossSpreads =
+		firstSpreadIdx !== -1 &&
+		attrs.some(
+			(a) =>
+				(a.type === 'Attribute' || a.type === 'JSXAttribute') &&
+				(jsxAttrRawName(a) === 'class' || jsxAttrRawName(a) === 'className'),
+		);
+	const classSources = [];
+	let classPartIndex = -1;
 	// Spreads are bound to temps (so their value is evaluated ONCE even though we
 	// read it both for ssrSpread and for a possible `.dangerouslySetInnerHTML`).
 	// `htmlSources` are the raw-HTML source exprs in source order (explicit
@@ -4042,7 +4056,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 				tempName: tmp,
 				argExpr: printExprWithTsrx(attr.argument, ctx, name, inlinedSubs),
 			});
-			parts.push(`_$ssrSpread(${tmp}, ${JSON.stringify(tag)})`);
+			parts.push(
+				`_$ssrSpread(${tmp}, ${JSON.stringify(tag)}${resolveClassAcrossSpreads ? ', true' : ''})`,
+			);
+			if (resolveClassAcrossSpreads) classSources.push(`[true, ${tmp}]`);
 			// The spread may carry `dangerouslySetInnerHTML` — record it as a raw-HTML
 			// source (at this source position) so it participates in last-wins ordering.
 			htmlSources.push(`(${tmp} != null ? ${tmp}.dangerouslySetInnerHTML : void 0)`);
@@ -4076,6 +4093,28 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			// element's (unescaped) inner content.
 			const obj = val.type === 'JSXExpressionContainer' ? val.expression : val;
 			htmlSources.push(printExpr(rewriteHookCalls(obj, ctx, name)));
+			continue;
+		}
+
+		if (resolveClassAcrossSpreads && attrName === 'class') {
+			if (classPartIndex === -1) {
+				flush();
+				classPartIndex = parts.length;
+				parts.push('');
+			}
+			const classExpr =
+				val == null
+					? 'true'
+					: printExprWithTsrx(
+							resolveStyleExpr(
+								val.type === 'JSXExpressionContainer' ? val.expression : val,
+								cssHash,
+							),
+							ctx,
+							name,
+							inlinedSubs,
+						);
+			classSources.push(`[false, (${classExpr})]`);
 			continue;
 		}
 
@@ -4245,6 +4284,11 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		parts.push(
 			`_$ssrAttr(${JSON.stringify(attrName)}, ${printExprWithTsrx(inner, ctx, name, inlinedSubs)}, ${JSON.stringify(tag)})`,
 		);
+	}
+
+	if (resolveClassAcrossSpreads) {
+		ctx.runtimeNeeded.add('ssrClass');
+		parts[classPartIndex] = `_$ssrClass([${classSources.join(', ')}])`;
 	}
 
 	// Void elements: `<tag …/>`, no children.
@@ -6463,8 +6507,16 @@ function compileReturnJsxFunction(node, ctx, options) {
 	const mappings = printed.mappings;
 	if (compInlinedSubs.length) {
 		// Helpers are hoisted function declarations → position-independent; splice them
-		// in right after the function's opening `{` so they're in the component scope.
-		const i = code.indexOf('{');
+		// in right after the FUNCTION BODY's opening `{` so they're in the component
+		// scope. The first `{` is not necessarily the body: a destructured parameter
+		// (or an object/function default inside one) can contain braces first. Printing
+		// the body alone gives us the exact suffix boundary emitted by esrap without
+		// having to parse the generated function text again.
+		const printedBody = printNode(fn.body);
+		const i = code.length - printedBody.length;
+		if (i < 0 || code.slice(i) !== printedBody) {
+			throw new Error(`Unable to locate the generated body for component \`${name}\`.`);
+		}
 		const subs = compInlinedSubs.map((s) => '  ' + s.replace(/\n/g, '\n  ')).join('\n');
 		// The splice inserts `'\n' + subs` after the `{`: every printed line below
 		// the splice line shifts down by the inserted line count. Keep the map in
@@ -9496,6 +9548,13 @@ function emitElementHtml(
 		const val = attr.value;
 		// If this attr comes AFTER a spread, we MUST emit as a binding (later wins).
 		const isAfterSpread = firstSpreadIdx !== -1 && attrI > firstSpreadIdx;
+		// A direct class before the first spread must also be a runtime writer. SSR
+		// resolves the source-ordered class writers to one final attribute; emitting
+		// the direct value as a binding gives hydration the same baseline writer
+		// before a spread optionally overwrites it. If the client spread omits class,
+		// that baseline can warn about and patch a server-only spread class.
+		const classBeforeSpread =
+			attrName === 'class' && firstSpreadIdx !== -1 && attrI < firstSpreadIdx;
 
 		// Attribute-level `ref={expr}` (new TSRX) — replaces the removed
 		// `{ref expr}` child intrinsic. Routes to the existing `kind: 'ref'`
@@ -9595,15 +9654,16 @@ function emitElementHtml(
 		}
 
 		if (val == null) {
-			if (isAfterSpread) {
+			if (isAfterSpread || classBeforeSpread) {
 				// Boolean attr after spread → emit as `true` binding.
 				bindings.push({
 					id: bindings.length,
-					kind: 'attr',
+					kind: attrName === 'class' ? 'class' : 'attr',
 					name: attrName,
 					expr: 'true',
 					path,
 					ns: hostNs,
+					fresh: false,
 				});
 			} else {
 				attrHtml += ` ${attrName}`;
@@ -9638,7 +9698,7 @@ function emitElementHtml(
 		// bakeStaticAttr applies the shared React-parity value tables (aria-*/
 		// enumerated/data-* booleans stringify, boolean attrs canonicalize to
 		// `attr=""`/absent, booleans on non-boolean attrs drop).
-		if (inner.type === 'Literal' && !isAfterSpread) {
+		if (inner.type === 'Literal' && !isAfterSpread && !classBeforeSpread) {
 			attrHtml += bakeStaticAttr(attrName, inner.value, tag);
 			continue;
 		}

@@ -91,7 +91,7 @@ const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
 	{ key: 'svelte', label: 'Svelte 5', color: '#f57547' },
 	{ key: 'ripple', label: 'Ripple 0.3', color: '#9085e9' },
-	{ key: 'vue-vapor', label: 'Vue Vapor 3.6', color: '#e06ec4' },
+	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 beta', color: '#e06ec4' },
 ];
 
 // Octane-internal variants — ordinal ramp of the brand hue, validated with
