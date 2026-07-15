@@ -438,11 +438,14 @@ Independent, individually-measurable items, roughly by value:
   Guards ratcheted: total js_gzip vs ripple 2.2 → 2.05, vs solid 1.9 → 1.8.
 - **3i. Binding-lifetime specialization — LANDED 2026-07-15.** The compiler
   proves the identity of state/reducer dispatchers, getters, refs,
-  `useEffectEvent`, explicit invariant `useCallback` results, and
-  compiler-memoized local callbacks. A spread-free event using only those
-  values installs once at mount and no longer stores an element/descriptor in
-  the binding bag or emits an update helper. Any spread on the same host keeps
-  the event live so JSX source order is re-applied after spread updates.
+  explicit invariant `useCallback` results, and compiler-memoized local
+  callbacks. It separately recognizes `useEffectEvent` wrappers as
+  behaviorally non-reactive for event bindings: wrapper identity is fresh, but
+  every committed wrapper dispatches through the same committed body. A
+  spread-free event using only those values installs once at mount and no
+  longer stores an element/descriptor in the binding bag or emits an update
+  helper. Any spread on the same host keeps the event live so JSX source order
+  is re-applied after spread updates.
   Syntactically fresh class object/array/function values also skip an
   impossible identity comparison and its previous-value bag field while
   retaining the same setter frequency. The same pass completed 3d, moved the

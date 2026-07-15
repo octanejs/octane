@@ -27,7 +27,7 @@ const CONFORMANCE = resolve(__dirname, '../_fixtures/react-conformance.tsrx');
 const ATTRS_EVENTS = resolve(__dirname, '../_fixtures/attrs-events.tsrx');
 const FRAGMENTS = resolve(__dirname, '../_fixtures/fragments.tsrx');
 
-describe('differential: callbacks.tsrx — useCallback / useEffectEvent identity parity', () => {
+describe('differential: callbacks.tsrx — useCallback / useEffectEvent rendering parity', () => {
 	it('CallbackIdentity: useCallback identity stable across re-renders (DOM parity proxy)', async () => {
 		// The fixture pushes the callback identity into props.observe on every
 		// render. Both runtimes call the same observer (shared closure); we
