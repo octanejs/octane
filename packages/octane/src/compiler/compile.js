@@ -53,6 +53,7 @@ import {
 	cssStyleValue,
 	hyphenateStyleName,
 } from '../dom-tables.js';
+import { sanitizeURLAttribute } from '../sanitize-url.js';
 
 // React parity: a void element must neither have children nor use
 // `dangerouslySetInnerHTML` — React throws (ReactDOMComponent-test.js:1794/:1807).
@@ -179,7 +180,10 @@ function bakeStaticAttr(attrName, lv, tag) {
 	if (!isCustom && (BOOLEAN_ATTR_PROPS.has(lower) || MUST_USE_PROPERTY_PROPS.has(lower))) {
 		return lv ? ` ${lower}=""` : '';
 	}
-	if (typeof lv === 'string') return ` ${attrName}="${escapeAttr(lv)}"`;
+	if (typeof lv === 'string') {
+		const value = sanitizeURLAttribute(tag, attrName, lv);
+		return ` ${attrName}="${escapeAttr(value)}"`;
+	}
 	if (typeof lv === 'number') return ` ${attrName}="${lv}"`;
 	return '';
 }
@@ -913,7 +917,7 @@ function collectComponentLocals(componentNode) {
  * Stability sources:
  *   - useState / useReducer setters and state getters (second/third slots)
  *   - useRef returns (the ref object itself, not .current)
- *   - useCallback / useEffectEvent returns
+ *   - useCallback returns
  *   - Arrows previously declared in this body whose free vars are themselves
  *     all stable — transitive (auto-callback adds them back into the set)
  *
@@ -955,10 +959,10 @@ function computeStableLocals(statements, componentLocals) {
 					stable.add(decl.id.elements[2].name);
 				}
 				if (callName === 'useState' || callName === 'useReducer') continue;
-				// x = useRef(...) / useCallback(...) / useEffectEvent(...) — the
+				// x = useRef(...) / useCallback(...) — the
 				// return value is stable for the lifetime of the component.
 				if (
-					(callName === 'useRef' || callName === 'useCallback' || callName === 'useEffectEvent') &&
+					(callName === 'useRef' || callName === 'useCallback') &&
 					decl.id.type === 'Identifier'
 				) {
 					stable.add(decl.id.name);
@@ -1017,10 +1021,7 @@ function computeInvariantLocals(statements, componentLocals, autoCallback) {
 					if (getter?.type === 'Identifier') invariant.add(getter.name);
 					continue;
 				}
-				if (
-					(callName === 'useRef' || callName === 'useEffectEvent') &&
-					decl.id.type === 'Identifier'
-				) {
+				if (callName === 'useRef' && decl.id.type === 'Identifier') {
 					invariant.add(decl.id.name);
 					continue;
 				}
@@ -1043,6 +1044,32 @@ function computeInvariantLocals(statements, componentLocals, autoCallback) {
 		}
 	}
 	return invariant;
+}
+
+/**
+ * Values that are safe to install once specifically as native event handlers.
+ * This is a strict superset of identity invariants: useEffectEvent deliberately
+ * returns a fresh wrapper each render, but every wrapper for one hook cell calls
+ * through the same latest-committed implementation. Keeping the mount wrapper
+ * installed is therefore behaviorally invariant even though observing or
+ * passing the freshly returned wrapper must retain its React identity semantics.
+ */
+function computeEventInvariantLocals(statements, identityInvariant) {
+	const eventInvariant = new Set(identityInvariant);
+	for (const stmt of statements) {
+		if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') continue;
+		for (const decl of stmt.declarations || []) {
+			if (decl.id.type !== 'Identifier') continue;
+			const init = unwrapTsExpr(decl.init);
+			if (!init) continue;
+			if (init.type === 'CallExpression' && stableHookCallName(init) === 'useEffectEvent') {
+				eventInvariant.add(decl.id.name);
+			} else if (init.type === 'Identifier' && eventInvariant.has(init.name)) {
+				eventInvariant.add(decl.id.name);
+			}
+		}
+	}
+	return eventInvariant;
 }
 
 // Resolve only hook identities whose lexical provenance is trustworthy for
@@ -3002,6 +3029,7 @@ export function compile(source, filename, options) {
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
 		currentInvariantLocals: null, // Set<string> of component-lifetime-stable local values
+		currentEventInvariantLocals: null, // Set<string> safe to retain in native event slots
 		currentProfileComponentId: null,
 		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
 		nextHookSymId: 0,
@@ -5108,7 +5136,9 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// Keep the lifetime-stability proof live only while planning this body's JSX.
 	// Nested hoisted helpers derive a filtered inherited set in hoistBodyHelper.
 	const prevInvariantLocals = ctx.currentInvariantLocals;
+	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
 	const invariantLocals = new Set(prevInvariantLocals || []);
+	const eventInvariantLocals = new Set(prevEventInvariantLocals || []);
 	if (ctx.currentComponentLocals) {
 		const bodyInvariants =
 			bodyInvariantLocals ||
@@ -5120,8 +5150,12 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		for (const local of bodyInvariants) {
 			invariantLocals.add(local);
 		}
+		for (const local of computeEventInvariantLocals(statements, bodyInvariants)) {
+			eventInvariantLocals.add(local);
+		}
 	}
 	ctx.currentInvariantLocals = invariantLocals;
+	ctx.currentEventInvariantLocals = eventInvariantLocals;
 	// M3 inherit-range: only a real `@{ … }` (JSXCodeBlock) component body spans
 	// its block's whole range — synthetic sub-bodies (@if/@for/@try arms,
 	// children render-fns) pass statement arrays and stay unflagged. planJsx
@@ -5130,6 +5164,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx._inheritBody = !!(node.body && node.body.type === 'JSXCodeBlock');
 	const plan = planJsx(jsxNodes, ctx, name, inlinedSubs, parentNs, cssHash, mountCallbackSinks);
 	ctx.currentInvariantLocals = prevInvariantLocals;
+	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	ctx._inheritBody = prevInheritBody;
 	ctx._foldedDirectiveCalls = prevFDC;
 
@@ -5288,6 +5323,21 @@ function isInvariantBindingExpr(node, ctx) {
 	return (
 		isInvariantLiteral(value) ||
 		(value && value.type === 'Identifier' && ctx.currentInvariantLocals?.has(value.name) === true)
+	);
+}
+
+// Native event slots may retain a useEffectEvent wrapper even though its
+// per-render return identity is fresh: every wrapper dispatches through the
+// hook cell's latest committed body. This proof must never feed general JSX
+// props, memo bailouts, callback inference, or event-bundle arguments.
+function isEventHandlerInvariantExpr(node, ctx) {
+	if (ctx.hmr) return false;
+	const value = unwrapTsExpr(node);
+	return (
+		isInvariantLiteral(value) ||
+		(value &&
+			value.type === 'Identifier' &&
+			ctx.currentEventInvariantLocals?.has(value.name) === true)
 	);
 }
 
@@ -9733,7 +9783,7 @@ function emitElementHtml(
 						printExprWithTsrx(a, ctx, componentName, inlinedSubs),
 					),
 					mountOnly:
-						isInvariantBindingExpr(bundleInfo.callee, ctx) &&
+						isEventHandlerInvariantExpr(bundleInfo.callee, ctx) &&
 						bundleInfo.args.every((arg) => isInvariantBindingExpr(arg, ctx)),
 				});
 			} else {
@@ -9745,7 +9795,7 @@ function emitElementHtml(
 					eventName,
 					slotKey,
 					ns: hostNs,
-					mountOnly: isInvariantBindingExpr(inner, ctx),
+					mountOnly: isEventHandlerInvariantExpr(inner, ctx),
 				});
 			}
 		} else if (attrName === 'class') {
@@ -10297,11 +10347,15 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 	// helper's env values are emitted as plain identifiers at its call site.)
 	const prevLocals = ctx.currentComponentLocals;
 	const prevInvariantLocals = ctx.currentInvariantLocals;
+	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
 	const extended = new Set(prevLocals);
 	for (const n of collectComponentLocals(fake)) extended.add(n);
 	ctx.currentComponentLocals = extended;
 	ctx.currentInvariantLocals = new Set(
 		(envNames || []).filter((name) => prevInvariantLocals?.has(name) === true),
+	);
+	ctx.currentEventInvariantLocals = new Set(
+		(envNames || []).filter((name) => prevEventInvariantLocals?.has(name) === true),
 	);
 	let code;
 	try {
@@ -10309,6 +10363,7 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentInvariantLocals = prevInvariantLocals;
+		ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	}
 	ctx.hoistedHelpers.push(code + ';');
 	return helperName;

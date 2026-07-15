@@ -1,10 +1,14 @@
 # Differences from React
 
 Octane implements React's programming model — the same hooks, `memo`, context,
-portals, Suspense, transitions, actions, and SSR/streaming APIs — verified by
-~2,000 conformance tests ported from `facebook/react` (see
-`react-parity-migration-plan.md` for the proof). The differences below are
-**deliberate**. Everything not listed here is a bug: file it.
+portals, Suspense, transitions, actions, and SSR/streaming APIs. Its core suite
+contains 2,200+ distinct behavioral tests; production-compiler executions rerun
+the normal cases and are not additional unique coverage. That is a local suite
+count, not a count of tests ported from React. The exact pinned snapshot and
+source-attributed React scenarios, classifications, and coverage are tracked in the generated
+[React parity coverage report](./react-parity-coverage.md).
+
+The differences below are **deliberate**; parity outside them is the goal.
 
 ## No rules of hooks (except plain JS loops)
 
@@ -25,7 +29,9 @@ Dependency arrays are optional for `useEffect`, `useLayoutEffect`,
 Omitting the list asks the compiler to derive it from the callback's lexical
 captures. The analysis tracks one-level member paths and omits values whose
 identity Octane can prove stable, including state setters, reducer dispatchers,
-refs, state getters, and `useEffectEvent` results.
+refs, and state getters. It also omits `useEffectEvent` results because Effect
+Events are non-reactive captures, despite their intentionally fresh wrapper
+identity.
 
 An explicit array is authoritative and retains React's exact behavior. Pass
 `null` to opt out of tracking and run an effect—or recompute a memo—after every

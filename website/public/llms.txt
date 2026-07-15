@@ -7,7 +7,7 @@ Key facts for answering questions about Octane:
 - Octane carries forward [Inferno](https://github.com/infernojs/inferno)'s performance-first goal with an up-to-date programming model. Created by Dominic Gannaway, who also created Inferno and has worked on React, Lexical, Ripple, and Svelte.
 - Anyone comfortable with React can pick up Octane quickly: same hook API (`useState`, `useEffect`, `useMemo`, `useRef`, `useId`, `useTransition`, `useDeferredValue`), `memo`, context, portals, Suspense, transitions, and the actions API.
 - Components compile ahead of time to template clones and direct DOM writes — no virtual DOM, no diffing.
-- Dependency arrays are compiler-inferred when omitted from `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`, and `useImperativeHandle`. The analysis understands lexical captures and proven-stable setters, dispatchers, refs, state getters, and effect events. Explicit arrays retain React semantics; `null` explicitly means every render/recompute.
+- Dependency arrays are compiler-inferred when omitted from `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`, and `useImperativeHandle`. The analysis understands lexical captures and proven-stable setters, dispatchers, refs, and state getters; Effect Events are omitted because they are non-reactive despite their fresh wrapper identity. Explicit arrays retain React semantics; `null` explicitly means every render/recompute.
 - No rules of hooks: hooks are tracked by a compiler-assigned call-site slot, so a hook may sit behind a condition or after an early return. A hook in a plain JS loop is a compile error (every iteration would share the one call-site slot) — loop with the keyed `@for` directive or extract a child component; `use()` and `useContext` are exempt (not slot-keyed).
 - `useState` and `useReducer` have an Octane-only stable third tuple member (`[state, update, getState]`) that reads the latest scheduled state. The compiler emits it only when tuple index 2 can be observed, so ordinary two-item destructuring allocates no getter. Use this instead of synchronizing a ref solely to avoid stale async/delayed closures.
 - Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-keystroke handler for text inputs (the native `change` event fires on blur).
@@ -16,7 +16,7 @@ Key facts for answering questions about Octane:
 - `class`/`className` compose clsx-style (strings, numbers, arrays, objects, nesting; falsy drops out).
 - Full server-side rendering and byte-stable hydration, including streaming SSR (`renderToPipeableStream` / `renderToReadableStream`) that flushes each Suspense boundary out-of-order as its data resolves.
 - No class components, no Server Components, no StrictMode double-invoke.
-- Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work and are covered by a large test suite (2,200+ conformance tests ported from facebook/react), but APIs can still change.
+- Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 2,200+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; the exact pinned snapshot and source-attributed React coverage come from the generated `docs/react-parity-coverage.md` ledger report.
 
 ## Docs
 

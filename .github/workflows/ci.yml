@@ -114,6 +114,15 @@ jobs:
       - name: Check parity-gap index is current
         run: pnpm parity:gaps:check
 
+      # React's stable release and current main are inventoried separately at
+      # pinned commits. This network-free gate checks the extracted case IDs,
+      # ledger dispositions/evidence, and generated coverage report so public
+      # parity claims cannot drift away from their source data.
+      - name: Check React parity inventory and ledger
+        run: |
+          pnpm react-parity:test
+          pnpm react-parity:check
+
       # Package discovery is shared by every package-wide repository check.
       # This generated inventory catches unreviewed package additions and stale
       # hard-coded package counts before they spread to docs and tooling.
