@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**31 publishable package(s), including 24 framework binding(s).**
+**32 publishable package(s), including 25 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -37,6 +37,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.5` | 2 |
 | `@octanejs/tanstack-query` | [`packages/tanstack-query`](../packages/tanstack-query) | framework binding | `0.1.5` | 1 |
 | `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.5` | 2 |
+| `@octanejs/tanstack-store` | [`packages/tanstack-store`](../packages/tanstack-store) | framework binding | `0.0.1` | 1 |
 | `@octanejs/tanstack-table` | [`packages/tanstack-table`](../packages/tanstack-table) | framework binding | `0.1.3` | 1 |
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.3` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.3` | 2 |

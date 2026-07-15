@@ -300,6 +300,48 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-store',
+					include: [
+						'packages/tanstack-store/tests/conformance/**/*.test.ts',
+						'packages/tanstack-store/tests/differential/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/tanstack-store/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-store-ssr',
+					include: ['packages/tanstack-store/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
 					environment: 'jsdom',
