@@ -137,3 +137,8 @@ Transformed Rspack modules receive a serializable `buildInfo.octane` record
 containing `canonicalId`, `transformKind`, and `serverRpc`. App integrations can
 read the validated value with `getOctaneRspackBuildInfo(module)` without
 depending on compiler output parsing for module identity.
+
+When a renderer is declared `server: 'client-only'`, client compilations also
+emit `octane-client-references.json`. Its stable reference IDs map each omitted
+server module to the JavaScript chunks that contain its browser implementation;
+server compilations retain the same ID on the export-preserving inert stub.

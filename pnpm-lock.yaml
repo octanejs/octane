@@ -3069,6 +3069,9 @@ importers:
       octane:
         specifier: workspace:*
         version: link:../octane
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
       type-fest:
         specifier: catalog:default
         version: 5.7.0
@@ -3492,6 +3495,9 @@ importers:
       octane:
         specifier: workspace:*
         version: link:../octane
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
       type-fest:
         specifier: catalog:default
         version: 5.7.0

@@ -51,6 +51,8 @@ export default defineConfig({
 					target: 'universal',
 					server: 'client-only',
 					intrinsics: '@octanejs/three/intrinsics',
+					text: 'ignore',
+					capabilities: ['visibility'],
 				},
 			},
 			rules: [{ include: 'src/**/*.three.tsrx', renderer: 'three' }],
@@ -69,9 +71,10 @@ export default defineConfig({
 });
 ```
 
-`server` and `intrinsics` are Phase 0 descriptor extensions in this plan, not
-part of today's merged config shape. The eventual `@octanejs/three/config`
-export supplies this serializable descriptor/boundary data. A Vite app installs
+`server`, `intrinsics`, `text`, and `capabilities` are normalized renderer
+descriptor fields supplied by the Milestone 1 SDK. The eventual
+`@octanejs/three/config` export supplies this serializable descriptor/boundary
+data. A Vite app installs
 `octane()` separately in `vite.config.ts`; an Rsbuild app imports `defineConfig`
 from `@octanejs/rsbuild-plugin` instead. The low-level Rspack plugin receives the
 same renderer data through its `renderers` option, but it owns compilation/HMR
@@ -480,6 +483,11 @@ decision and tests.
   Octane/R3F mesh fixture.
 
 ### Milestone 1 — renderer SDK extensions (3–5 engineer-weeks)
+
+Status: implemented. The generic object-driver, mixed-intrinsic, and
+Vite/Rspack/Rsbuild fixtures close this milestone's exit gate. Three-specific
+host behavior begins in Milestone 2; cross-boundary pending/Activity projection
+and HMR remain in their later milestones.
 
 - Implement/test `recreate` and ref churn, prepared-host acceptance, lifecycle
   delivery, local host callbacks, event scopes, retained/offscreen semantics,

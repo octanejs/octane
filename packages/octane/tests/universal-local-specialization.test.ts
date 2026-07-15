@@ -18,7 +18,7 @@ import { LocalSpecializationApp } from './_fixtures/universal-local-specializati
 const CANVAS_MODULE = '/packages/octane/tests/_fixtures/universal-renderer-boundaries.tsrx';
 const HTML_MODULE = '/packages/octane/tests/_fixtures/universal-renderer-boundaries.object.tsrx';
 const rendererConfig = normalizeRendererConfig({
-	registry: { object: 'octane/universal' },
+	registry: { object: { module: 'octane/universal', text: 'host' } },
 	boundaries: {
 		[CANVAS_MODULE]: {
 			Canvas: { ownerRenderer: 'dom', childRenderer: 'object', prop: 'children' },
@@ -275,7 +275,12 @@ export function Scene(props) @{
 `;
 		const result = compile(source, '/src/alternating.object.tsrx', {
 			hmr: 'webpack',
-			renderer: { id: 'object', module: 'octane/universal', target: 'universal' },
+			renderer: {
+				id: 'object',
+				module: 'octane/universal',
+				target: 'universal',
+				text: 'host',
+			},
 			rendererBoundaries: rendererConfig.boundaries,
 			rendererRegistry: rendererConfig.registry,
 		});

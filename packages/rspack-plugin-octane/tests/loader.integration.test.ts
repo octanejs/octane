@@ -1,8 +1,9 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import octaneLoader from '../src/loader.js';
+import { getOctaneRspackBuildInfo } from '../src/shared.js';
 
 interface LoaderOutput {
 	error: Error | null;
@@ -24,6 +25,7 @@ function transform({
 	target = 'web',
 	hot = false,
 	mode = 'development',
+	options = {},
 }: {
 	root: string;
 	resourcePath: string;
@@ -31,6 +33,7 @@ function transform({
 	target?: unknown;
 	hot?: boolean;
 	mode?: string;
+	options?: Record<string, unknown>;
 }) {
 	const dependencies: string[] = [];
 	const missingDependencies: string[] = [];
@@ -47,7 +50,7 @@ function transform({
 			sourceMap: true,
 			_module: module,
 			cacheable() {},
-			getOptions: () => ({}),
+			getOptions: () => options,
 			addDependency: (dependency: string) => dependencies.push(dependency),
 			addMissingDependency: (dependency: string) => missingDependencies.push(dependency),
 			callback: (error: Error | null, content?: string | Buffer, map?: unknown) => {
@@ -108,6 +111,39 @@ describe('loader with the neutral compiler', () => {
 		expect(code).not.toContain('webpackHot');
 	});
 
+	it('attaches the same client-reference metadata to client code and its server stub', () => {
+		const source = `import './authored-setup.js';\nexport default function Scene() @{ <node /> }\n`;
+		const resourcePath = write(root, 'src/Scene.object.tsrx', source);
+		const options = {
+			renderers: {
+				registry: {
+					object: {
+						module: '@fixture/object-renderer',
+						server: 'client-only',
+					},
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		};
+		const client = transform({ root, resourcePath, source, options });
+		const server = transform({ root, resourcePath, source, target: 'node22', options });
+
+		const clientInfo = getOctaneRspackBuildInfo(client.module)!;
+		const serverInfo = getOctaneRspackBuildInfo(server.module)!;
+		expect(clientInfo).toMatchObject({
+			transformKind: 'compile',
+			clientReference: {
+				moduleId: '/src/Scene.object.tsrx',
+				renderer: 'object',
+			},
+		});
+		expect(serverInfo).toMatchObject({
+			transformKind: 'client-only-stub',
+			clientReference: clientInfo.clientReference,
+		});
+		expect(String(server.content)).not.toContain('authored-setup');
+	});
+
 	it('marks module-server owners in server build metadata', () => {
 		const source = `module server {
 	export async function save(value: string) { return value; }
@@ -137,7 +173,7 @@ describe('loader with the neutral compiler', () => {
 			source: `export function Raw() { return <span>raw</span>; }\n`,
 		});
 		expect(String(result.content)).toContain('_$template("<span>raw</span>")');
-		expect(result.dependencies).toContain(join(packageRoot, 'package.json'));
+		expect(result.dependencies).toContain(realpathSync(join(packageRoot, 'package.json')));
 	});
 
 	it('keeps production roots generic when the loader cannot prove resolved module output', () => {
@@ -167,14 +203,14 @@ describe('loader with the neutral compiler', () => {
 		const resourcePath = write(root, 'src/pkg/hooks/hook.ts', source);
 		const skipped = transform({ root, resourcePath, source });
 		expect(skipped.content).toBe(source);
-		expect(skipped.dependencies).toContain(manifest);
+		expect(skipped.dependencies).toContain(realpathSync(manifest));
 		expect(skipped.module.buildInfo).not.toHaveProperty('octane');
 
 		writeFileSync(manifest, '{"name":"nested","octane":{"hookSlots":{"manual":[]}}}\n');
 		const compiled = transform({ root, resourcePath, source });
 		expect(String(compiled.content)).toContain('useState(1, _h$0)');
 		expect(String(compiled.content)).toContain('const _h$0 = Symbol(');
-		expect(compiled.dependencies).toContain(manifest);
+		expect(compiled.dependencies).toContain(realpathSync(manifest));
 		expect(compiled.module.buildInfo.octane).toMatchObject({ transformKind: 'slots' });
 	});
 });
