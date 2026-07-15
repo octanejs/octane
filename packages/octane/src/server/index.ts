@@ -108,6 +108,7 @@ export {
 	ssrAttr,
 	normalizeClass,
 	ssrStyle,
+	ssrClass,
 	ssrSpread,
 	ssrInnerHtml,
 	// Controlled form serialization (value/checked attrs, textarea content,
