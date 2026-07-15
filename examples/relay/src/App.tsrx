@@ -501,8 +501,11 @@ export function App() @{
 		const anchor = conversation.querySelector<HTMLElement>(`[data-message-id="${first.id}"]`);
 		if (anchor === null) return;
 		const request: PendingHistoryLoad = { channel, generation, before: first.id };
+		const snapshot: PrependSnapshot = {
+			messageId: first.id,
+			top: anchor.getBoundingClientRect().top,
+		};
 		pendingHistoryLoadRef.current = request;
-		prependSnapshotRef.current = { messageId: first.id, top: anchor.getBoundingClientRect().top };
 		setLoadingOlder(true);
 		const historyRequest = loadHistory(sessionRef.current, request.channel, {
 			before: request.before,
@@ -513,6 +516,7 @@ export function App() @{
 					conversationGenerationRef.current !== request.generation
 			) return;
 			pendingHistoryLoadRef.current = null;
+			prependSnapshotRef.current = snapshot;
 			setMessages((current) => normalizeMessages([...page.messages, ...current]));
 			setHasMore(page.hasMore);
 			setLoadingOlder(false);

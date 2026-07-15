@@ -173,10 +173,27 @@ test('prepends earlier history without moving or replacing the visible survivor'
 		await loadEarlier.press('Enter');
 		await settleBrowserFrames(page);
 		expect(earlierRequestCount).toBe(1);
+
+		const demoResponse = page.waitForResponse(
+			(response) => new URL(response.url()).pathname === '/api/demo',
+		);
+		await page.getByRole('button', { name: 'Bring in a teammate update' }).evaluate((element) => {
+			(element as HTMLButtonElement).click();
+		});
+		expect((await demoResponse).status()).toBe(202);
+		await expect(
+			page.getByText('Live update: the launch checklist review starts in ten minutes.'),
+		).toBeVisible();
+		await expect(page.locator('.activity-announcer')).toHaveText('Maya Chen posted in #general');
+		await expect(loadEarlier).toHaveText('Loading earlier messages…');
+		await expect(loadEarlier).toBeFocused();
 	} finally {
 		releaseInitialHistory?.();
 	}
 	await expect(page.locator('[data-message-id="g-005"]')).toBeAttached();
+	await expect(page.locator('.activity-announcer')).toHaveText(
+		'Earlier messages loaded without moving your place',
+	);
 	await page.unroute('**/api/history**');
 	await expect(loadEarlier).toBeEnabled();
 	await expect(loadEarlier).toBeFocused();
