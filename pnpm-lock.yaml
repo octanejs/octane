@@ -171,6 +171,9 @@ catalogs:
     '@sveltejs/vite-plugin-svelte':
       specifier: ^7.2.0
       version: 7.2.0
+    '@tanstack/form-core':
+      specifier: 1.33.2
+      version: 1.33.2
     '@tanstack/history':
       specifier: 1.162.0
       version: 1.162.0
@@ -2901,7 +2904,7 @@ importers:
         specifier: workspace:*
         version: link:../tanstack-store
       '@tanstack/form-core':
-        specifier: 1.33.2
+        specifier: catalog:default
         version: 1.33.2
     devDependencies:
       '@octanejs/testing-library':

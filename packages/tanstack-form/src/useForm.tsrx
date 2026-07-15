@@ -14,13 +14,16 @@ import type {
 	FormState,
 	FormValidateOrFn,
 } from '@tanstack/form-core';
-import type { FunctionComponent, PropsWithChildren, ReactNode } from './octane-types';
 import type { FieldComponent } from './useField.tsrx';
+
+type FormRenderable = unknown;
+type FormPropsWithChildren<P = object> = P & { children?: FormRenderable };
+type FormFunctionComponent<P = object> = (props: P) => FormRenderable;
 
 /**
  * Fields that are added onto the `FormAPI` from `@tanstack/form-core` and returned from `useForm`
  */
-export interface ReactFormApi<
+export interface OctaneFormApi<
 	in out TFormData,
 	in out TOnMount extends undefined | FormValidateOrFn<TFormData>,
 	in out TOnChange extends undefined | FormValidateOrFn<TFormData>,
@@ -102,14 +105,14 @@ export interface ReactFormApi<
 				>
 			>,
 		) => TSelected;
-		children: ((state: NoInfer<TSelected>) => ReactNode) | ReactNode;
-	}) => ReturnType<FunctionComponent>;
+		children: ((state: NoInfer<TSelected>) => FormRenderable) | FormRenderable;
+	}) => ReturnType<FormFunctionComponent>;
 }
 
 /**
- * An extended version of the `FormApi` class that includes React-specific functionalities from `ReactFormApi`
+ * An extended version of the `FormApi` class that includes renderer-specific components from `OctaneFormApi`
  */
-export type ReactFormExtendedApi<
+export type OctaneFormExtendedApi<
 	TFormData,
 	TOnMount extends undefined | FormValidateOrFn<TFormData>,
 	TOnChange extends undefined | FormValidateOrFn<TFormData>,
@@ -136,7 +139,7 @@ export type ReactFormExtendedApi<
 	TOnServer,
 	TSubmitMeta
 > &
-	ReactFormApi<
+	OctaneFormApi<
 		TFormData,
 		TOnMount,
 		TOnChange,
@@ -155,10 +158,10 @@ function LocalSubscribe({
 	form,
 	selector = (state) => state,
 	children,
-}: PropsWithChildren<{
+}: FormPropsWithChildren<{
 	form: AnyFormApi;
 	selector?: (state: AnyFormState) => AnyFormState;
-}>): ReturnType<FunctionComponent> {
+}>): ReturnType<FormFunctionComponent> {
 	const data = useSelector(form.store, selector);
 
 	return <>{functionalUpdate(children, data)}</>;
@@ -225,7 +228,7 @@ export function useForm<
 	}
 
 	const extendedFormApi = useMemo(() => {
-		const extendedApi: ReactFormExtendedApi<
+		const extendedApi: OctaneFormExtendedApi<
 			TFormData,
 			TOnMount,
 			TOnChange,

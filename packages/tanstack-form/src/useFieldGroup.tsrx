@@ -10,23 +10,22 @@ import type {
 	FormAsyncValidateOrFn,
 	FormValidateOrFn,
 } from '@tanstack/form-core';
-import type { AppFieldExtendedReactFormApi } from './createFormHook.tsrx';
-import type {
-	ComponentType,
-	FunctionComponent,
-	PropsWithChildren,
-	ReactNode,
-} from './octane-types';
+import type { AppFieldExtendedOctaneFormApi } from './createFormHook.tsrx';
 import type { LensFieldComponent } from './useField.tsrx';
+
+type FieldGroupRenderable = unknown;
+type FieldGroupPropsWithChildren<P = object> = P & { children?: FieldGroupRenderable };
+type FieldGroupFunctionComponent<P = object> = (props: P) => FieldGroupRenderable;
+type FieldGroupComponentType<P = object> = FieldGroupFunctionComponent<P>;
 
 function LocalSubscribe({
 	lens,
 	selector = (state) => state,
 	children,
-}: PropsWithChildren<{
+}: FieldGroupPropsWithChildren<{
 	lens: AnyFieldGroupApi;
 	selector?: (state: FieldGroupState<any>) => FieldGroupState<any>;
-}>): ReturnType<FunctionComponent> {
+}>): ReturnType<FieldGroupFunctionComponent> {
 	const data = useSelector(lens.store, selector);
 
 	return <>{functionalUpdate(children, data)}</>;
@@ -35,7 +34,7 @@ function LocalSubscribe({
 /**
  * @private
  */
-export type AppFieldExtendedReactFieldGroupApi<
+export type AppFieldExtendedOctaneFieldGroupApi<
 	TFormData,
 	TFieldGroupData,
 	TFields extends
@@ -52,8 +51,8 @@ export type AppFieldExtendedReactFieldGroupApi<
 	TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
 	TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
 	TSubmitMeta,
-	TFieldComponents extends Record<string, ComponentType<any>>,
-	TFormComponents extends Record<string, ComponentType<any>>,
+	TFieldComponents extends Record<string, FieldGroupComponentType<any>>,
+	TFormComponents extends Record<string, FieldGroupComponentType<any>>,
 > = FieldGroupApi<
 	TFormData,
 	TFieldGroupData,
@@ -72,7 +71,7 @@ export type AppFieldExtendedReactFieldGroupApi<
 > &
 	NoInfer<TFormComponents> & {
 		AppField: LensFieldComponent<TFieldGroupData, TSubmitMeta, NoInfer<TFieldComponents>>;
-		AppForm: ComponentType<PropsWithChildren<{}>>;
+		AppForm: FieldGroupComponentType<FieldGroupPropsWithChildren<{}>>;
 		/**
 		 * A component to render form fields. With this, you can render and manage individual form fields.
 		 */
@@ -83,8 +82,8 @@ export type AppFieldExtendedReactFieldGroupApi<
 		 */
 		Subscribe: <TSelected = NoInfer<FieldGroupState<TFieldGroupData>>>(props: {
 			selector?: (state: NoInfer<FieldGroupState<TFieldGroupData>>) => TSelected;
-			children: ((state: NoInfer<TSelected>) => ReactNode) | ReactNode;
-		}) => ReturnType<FunctionComponent>;
+			children: ((state: NoInfer<TSelected>) => FieldGroupRenderable) | FieldGroupRenderable;
+		}) => ReturnType<FieldGroupFunctionComponent>;
 	};
 
 export function useFieldGroup<
@@ -103,12 +102,12 @@ export function useFieldGroup<
 	TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
 	TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
 	TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
-	TComponents extends Record<string, ComponentType<any>>,
-	TFormComponents extends Record<string, ComponentType<any>>,
+	TComponents extends Record<string, FieldGroupComponentType<any>>,
+	TFormComponents extends Record<string, FieldGroupComponentType<any>>,
 	TSubmitMeta = never,
 >(opts: {
 	form:
-		| AppFieldExtendedReactFormApi<
+		| AppFieldExtendedOctaneFormApi<
 				TFormData,
 				TOnMount,
 				TOnChange,
@@ -124,7 +123,7 @@ export function useFieldGroup<
 				TComponents,
 				TFormComponents
 		  >
-		| AppFieldExtendedReactFieldGroupApi<
+		| AppFieldExtendedOctaneFieldGroupApi<
 				// Since this only occurs if you nest it within other form lenses, it can be more
 				// lenient with the types.
 				unknown,
@@ -148,7 +147,7 @@ export function useFieldGroup<
 	defaultValues?: TFieldGroupData;
 	onSubmitMeta?: TSubmitMeta;
 	formComponents: TFormComponents;
-}): AppFieldExtendedReactFieldGroupApi<
+}): AppFieldExtendedOctaneFieldGroupApi<
 	TFormData,
 	TFieldGroupData,
 	TFields,
@@ -170,7 +169,7 @@ export function useFieldGroup<
 		const api = new FieldGroupApi(opts);
 		const form =
 			opts.form instanceof FieldGroupApi
-				? (opts.form.form as AppFieldExtendedReactFormApi<
+				? (opts.form.form as AppFieldExtendedOctaneFormApi<
 						TFormData,
 						TOnMount,
 						TOnChange,
@@ -188,7 +187,7 @@ export function useFieldGroup<
 					>)
 				: opts.form;
 
-		const extendedApi: AppFieldExtendedReactFieldGroupApi<
+		const extendedApi: AppFieldExtendedOctaneFieldGroupApi<
 			TFormData,
 			TFieldGroupData,
 			TFields,
@@ -227,7 +226,7 @@ export function useFieldGroup<
 
 		return Object.assign(extendedApi, {
 			...opts.formComponents,
-		}) as AppFieldExtendedReactFieldGroupApi<
+		}) as AppFieldExtendedOctaneFieldGroupApi<
 			TFormData,
 			TFieldGroupData,
 			TFields,

@@ -13,8 +13,10 @@ import type {
 	FormAsyncValidateOrFn,
 	FormValidateOrFn,
 } from '@tanstack/form-core';
-import type { FunctionComponent, ReactNode } from './octane-types';
 import type { UseFieldOptions, UseFieldOptionsBound } from './types';
+
+type FieldRenderable = unknown;
+type FieldFunctionComponent<P = object> = (props: P) => FieldRenderable;
 
 /**
  * A type representing a hook for using a field in a form with the given form data type.
@@ -350,7 +352,7 @@ interface FieldComponentProps<
 			TPatentSubmitMeta
 		> &
 			ExtendedApi,
-	) => ReactNode;
+	) => FieldRenderable;
 }
 
 interface FieldComponentBoundProps<
@@ -419,7 +421,7 @@ interface FieldComponentBoundProps<
 			TPatentSubmitMeta
 		> &
 			ExtendedApi,
-	) => ReactNode;
+	) => FieldRenderable;
 }
 
 /**
@@ -479,7 +481,7 @@ export type FieldComponent<
 	TFormOnServer,
 	TPatentSubmitMeta,
 	ExtendedApi
->) => ReturnType<FunctionComponent>;
+>) => ReturnType<FieldFunctionComponent>;
 
 /**
  * A type alias representing a field component for a form lens data type.
@@ -559,7 +561,7 @@ export type LensFieldComponent<
 		 */
 		onBlurListenTo?: DeepKeys<TLensData>[];
 	};
-}) => ReturnType<FunctionComponent>;
+}) => ReturnType<FieldFunctionComponent>;
 
 /**
  * A function component that takes field options and a render function as children.
@@ -617,7 +619,7 @@ export const Field = (<
 	TFormOnDynamicAsync,
 	TFormOnServer,
 	TPatentSubmitMeta
->): ReturnType<FunctionComponent> => {
+>): ReturnType<FieldFunctionComponent> => {
 	const fieldApi = useField(fieldOptions as any);
 
 	const jsxToDisplay = useMemo(
@@ -625,7 +627,7 @@ export const Field = (<
 		[children, fieldApi],
 	);
 	return (<>{jsxToDisplay}</>) as never;
-}) satisfies FunctionComponent<
+}) satisfies FieldFunctionComponent<
 	FieldComponentProps<
 		any,
 		any,

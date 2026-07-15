@@ -12,7 +12,9 @@ import type {
 	FormGroupValidateOrFn,
 	FormValidateOrFn,
 } from '@tanstack/form-core';
-import type { FunctionComponent, ReactNode } from './octane-types';
+
+type FormGroupRenderable = unknown;
+type FormGroupFunctionComponent<P = object> = (props: P) => FormGroupRenderable;
 
 export type UseFormGroup<
 	TParentData,
@@ -394,7 +396,7 @@ interface FormGroupComponentProps<
 			TParentSubmitMeta
 		> &
 			ExtendedApi,
-	) => ReactNode;
+	) => FormGroupRenderable;
 }
 
 interface FormGroupComponentBoundProps<
@@ -477,7 +479,7 @@ interface FormGroupComponentBoundProps<
 			TParentSubmitMeta
 		> &
 			ExtendedApi,
-	) => ReactNode;
+	) => FormGroupRenderable;
 }
 
 export type FormGroupComponent<
@@ -536,7 +538,7 @@ export type FormGroupComponent<
 	TFormOnServer,
 	TParentSubmitMeta,
 	ExtendedApi
->) => ReturnType<FunctionComponent>;
+>) => ReturnType<FormGroupFunctionComponent>;
 
 export const FormGroup = (<
 	TParentData,
@@ -591,7 +593,7 @@ export const FormGroup = (<
 	TFormOnDynamicAsync,
 	TFormOnServer,
 	TParentSubmitMeta
->): ReturnType<FunctionComponent> => {
+>): ReturnType<FormGroupFunctionComponent> => {
 	const formGroupApi = useFormGroup(formGroupOptions as any);
 
 	const jsxToDisplay = useMemo(
@@ -599,7 +601,7 @@ export const FormGroup = (<
 		[children, formGroupApi],
 	);
 	return (<>{jsxToDisplay}</>) as never;
-}) satisfies FunctionComponent<
+}) satisfies FormGroupFunctionComponent<
 	FormGroupComponentProps<
 		any,
 		any,

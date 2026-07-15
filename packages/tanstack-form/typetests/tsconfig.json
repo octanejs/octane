@@ -14,5 +14,5 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["../src/env.d.ts", "./**/*.test-d.ts", "./**/*.test-d.tsx", "./__fixtures__/**/*.ts"]
+  "include": ["./**/*.test-d.ts", "./**/*.test-d.tsx", "./__fixtures__/**/*.ts"]
 }

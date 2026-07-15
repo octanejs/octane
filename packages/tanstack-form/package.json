@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "@octanejs/tanstack-store": "workspace:*",
-    "@tanstack/form-core": "1.33.2"
+    "@tanstack/form-core": "catalog:default"
   },
   "peerDependencies": {
     "octane": "workspace:*"

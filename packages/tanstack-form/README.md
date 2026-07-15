@@ -19,6 +19,10 @@ The renderer-bearing adapter modules are authored as `.tsrx` and compiled by
 Octane. Matching `.tsrx.d.ts` companions preserve the complete upstream generic
 surface for TypeScript consumers.
 
+Renderer-specific public types use Octane names, including `OctaneFormApi`,
+`OctaneFormExtendedApi`, `AppFieldExtendedOctaneFormApi`, and
+`AppFieldExtendedOctaneFieldGroupApi`.
+
 ```tsx
 import { useForm } from '@octanejs/tanstack-form'
 

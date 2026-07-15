@@ -1,4 +1,3 @@
-/* eslint-disable @eslint-react/no-context-provider */
 import { createContext, useContext, useMemo } from 'octane';
 import { useForm } from './useForm.tsrx';
 import { useFieldGroup } from './useFieldGroup.tsrx';
@@ -13,10 +12,15 @@ import type {
 	FormOptions,
 	FormValidateOrFn,
 } from '@tanstack/form-core';
-import type { ComponentType, Context, FunctionComponent, PropsWithChildren } from './octane-types';
+import type { Context } from 'octane';
 import type { FieldComponent } from './useField.tsrx';
-import type { ReactFormExtendedApi } from './useForm.tsrx';
-import type { AppFieldExtendedReactFieldGroupApi } from './useFieldGroup.tsrx';
+import type { OctaneFormExtendedApi } from './useForm.tsrx';
+import type { AppFieldExtendedOctaneFieldGroupApi } from './useFieldGroup.tsrx';
+
+type HookRenderable = unknown;
+type HookPropsWithChildren<P = object> = P & { children?: HookRenderable };
+type HookFunctionComponent<P = object> = (props: P) => HookRenderable;
+type HookComponentType<P = object> = HookFunctionComponent<P>;
 
 // We should never hit the `null` case here
 const fieldContext = createContext<AnyFieldApi>(null as never);
@@ -69,7 +73,7 @@ function useFormContext() {
 		);
 	}
 
-	return form as ReactFormExtendedApi<
+	return form as OctaneFormExtendedApi<
 		// If you need access to the form data, you need to use `withForm` instead
 		Record<string, never>,
 		any,
@@ -128,8 +132,8 @@ export function createFormHookContexts() {
 }
 
 interface CreateFormHookProps<
-	TFieldComponents extends Record<string, ComponentType<any>>,
-	TFormComponents extends Record<string, ComponentType<any>>,
+	TFieldComponents extends Record<string, HookComponentType<any>>,
+	TFormComponents extends Record<string, HookComponentType<any>>,
 > {
 	fieldComponents: TFieldComponents;
 	fieldContext: Context<AnyFieldApi>;
@@ -140,7 +144,7 @@ interface CreateFormHookProps<
 /**
  * @private
  */
-export type AppFieldExtendedReactFormApi<
+export type AppFieldExtendedOctaneFormApi<
 	TFormData,
 	TOnMount extends undefined | FormValidateOrFn<TFormData>,
 	TOnChange extends undefined | FormValidateOrFn<TFormData>,
@@ -153,9 +157,9 @@ export type AppFieldExtendedReactFormApi<
 	TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
 	TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
 	TSubmitMeta,
-	TFieldComponents extends Record<string, ComponentType<any>>,
-	TFormComponents extends Record<string, ComponentType<any>>,
-> = ReactFormExtendedApi<
+	TFieldComponents extends Record<string, HookComponentType<any>>,
+	TFormComponents extends Record<string, HookComponentType<any>>,
+> = OctaneFormExtendedApi<
 	TFormData,
 	TOnMount,
 	TOnChange,
@@ -185,9 +189,9 @@ export type AppFieldExtendedReactFormApi<
 			TSubmitMeta,
 			NoInfer<TFieldComponents>
 		>;
-		AppForm: ComponentType<
+		AppForm: HookComponentType<
 			// Keep children optional in the renderer-facing component props.
-			PropsWithChildren<{}>
+			HookPropsWithChildren<{}>
 		>;
 	};
 
@@ -204,8 +208,8 @@ export interface WithFormProps<
 	TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
 	TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
 	TSubmitMeta,
-	TFieldComponents extends Record<string, ComponentType<any>>,
-	TFormComponents extends Record<string, ComponentType<any>>,
+	TFieldComponents extends Record<string, HookComponentType<any>>,
+	TFormComponents extends Record<string, HookComponentType<any>>,
 	TRenderProps extends object = Record<string, never>,
 > extends FormOptions<
 	TFormData,
@@ -223,10 +227,10 @@ export interface WithFormProps<
 > {
 	// Optional, but adds props to the `render` function outside of `form`
 	props?: TRenderProps;
-	render: FunctionComponent<
-		PropsWithChildren<
+	render: HookFunctionComponent<
+		HookPropsWithChildren<
 			NoInfer<TRenderProps> & {
-				form: AppFieldExtendedReactFormApi<
+				form: AppFieldExtendedOctaneFormApi<
 					TFormData,
 					TOnMount,
 					TOnChange,
@@ -249,17 +253,17 @@ export interface WithFormProps<
 
 export interface WithFieldGroupProps<
 	TFieldGroupData,
-	TFieldComponents extends Record<string, ComponentType<any>>,
-	TFormComponents extends Record<string, ComponentType<any>>,
+	TFieldComponents extends Record<string, HookComponentType<any>>,
+	TFormComponents extends Record<string, HookComponentType<any>>,
 	TSubmitMeta,
 	TRenderProps extends object = Record<string, never>,
 > extends BaseFormOptions<TFieldGroupData, TSubmitMeta> {
 	// Optional, but adds props to the `render` function outside of `form`
 	props?: TRenderProps;
-	render: FunctionComponent<
-		PropsWithChildren<
+	render: HookFunctionComponent<
+		HookPropsWithChildren<
 			NoInfer<TRenderProps> & {
-				group: AppFieldExtendedReactFieldGroupApi<
+				group: AppFieldExtendedOctaneFieldGroupApi<
 					unknown,
 					TFieldGroupData,
 					string | FieldsMap<unknown, TFieldGroupData>,
@@ -285,8 +289,8 @@ export interface WithFieldGroupProps<
 }
 
 export function createFormHook<
-	TComponents extends Record<string, ComponentType<any>>,
-	TFormComponents extends Record<string, ComponentType<any>>,
+	TComponents extends Record<string, HookComponentType<any>>,
+	TFormComponents extends Record<string, HookComponentType<any>>,
 >({
 	fieldComponents,
 	fieldContext,
@@ -321,7 +325,7 @@ export function createFormHook<
 			TOnServer,
 			TSubmitMeta
 		>,
-	): AppFieldExtendedReactFormApi<
+	): AppFieldExtendedOctaneFormApi<
 		TFormData,
 		TOnMount,
 		TOnChange,
@@ -340,7 +344,7 @@ export function createFormHook<
 		const form = useForm(props);
 
 		// Keep children optional in the renderer-facing component props.
-		const AppForm = useMemo<ComponentType<PropsWithChildren<{}>>>(() => {
+		const AppForm = useMemo<HookComponentType<HookPropsWithChildren<{}>>>(() => {
 			return ({ children }) => {
 				return <formContext.Provider value={form}>{children}</formContext.Provider>;
 			};
@@ -468,10 +472,10 @@ export function createFormHook<
 		TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
 		TFormSubmitMeta,
 	>(
-		params: PropsWithChildren<
+		params: HookPropsWithChildren<
 			NoInfer<TRenderProps> & {
 				form:
-					| AppFieldExtendedReactFormApi<
+					| AppFieldExtendedOctaneFormApi<
 							TFormData,
 							TOnMount,
 							TOnChange,
@@ -487,7 +491,7 @@ export function createFormHook<
 							TComponents,
 							TFormComponents
 					  >
-					| AppFieldExtendedReactFieldGroupApi<
+					| AppFieldExtendedOctaneFieldGroupApi<
 							// Since this only occurs if you nest it within other field groups, it can be more
 							// lenient with the types.
 							unknown,
@@ -510,7 +514,7 @@ export function createFormHook<
 				fields: TFields;
 			}
 		>,
-	) => ReturnType<FunctionComponent> {
+	) => ReturnType<HookFunctionComponent> {
 		return function Render(innerProps) {
 			const fieldGroupProps = useMemo(() => {
 				return {
@@ -559,7 +563,7 @@ export function createFormHook<
 			TOnServer,
 			TSubmitMeta
 		>,
-	): AppFieldExtendedReactFormApi<
+	): AppFieldExtendedOctaneFormApi<
 		TFormData,
 		TOnMount,
 		TOnChange,
@@ -581,10 +585,10 @@ export function createFormHook<
 	}
 
 	function extendForm<
-		TNewField extends Record<string, ComponentType<any>> & {
+		TNewField extends Record<string, HookComponentType<any>> & {
 			[K in keyof TComponents]?: 'Error: field component names must be unique — this key already exists in the base form';
 		},
-		TNewForm extends Record<string, ComponentType<any>> & {
+		TNewForm extends Record<string, HookComponentType<any>> & {
 			[K in keyof TFormComponents]?: 'Error: form component names must be unique — this key already exists in the base form';
 		},
 	>(extension: { fieldComponents?: TNewField; formComponents?: TNewForm }) {
