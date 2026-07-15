@@ -77,11 +77,40 @@ function SuspenseReader(props: { queryFn: () => Promise<string> }) @{
 	</span>
 }
 
+function SequentialSuspenseReader(props: {
+	queryFnA: () => Promise<string>;
+	queryFnB: () => Promise<string>;
+}) @{
+	const a = useSuspenseQuery({ queryKey: ['susq-a'], queryFn: props.queryFnA, retry: false });
+	const b = useSuspenseQuery({ queryKey: ['susq-b'], queryFn: props.queryFnB, retry: false });
+	<span id="sequential-data">
+		{a.data + '/' + b.data as string}
+	</span>
+}
+
 export function SuspenseQApp(props: { client: unknown; queryFn: () => Promise<string> }) @{
 	<QueryClientProvider client={props.client}>
 		<Suspense fallback={<span id="fallback">loading</span>}>
 			<SuspenseReader queryFn={props.queryFn} />
 		</Suspense>
+	</QueryClientProvider>
+}
+
+export function SequentialSuspenseQApp(props: {
+	client: unknown;
+	queryFnA: () => Promise<string>;
+	queryFnB: () => Promise<string>;
+}) @{
+	<QueryClientProvider client={props.client}>
+		@try {
+			<SequentialSuspenseReader queryFnA={props.queryFnA} queryFnB={props.queryFnB} />
+		} @pending {
+			<span id="sequential-fallback">loading</span>
+		} @catch (error) {
+			<span id="sequential-error">
+				{'error:' + (error as Error).message as string}
+			</span>
+		}
 	</QueryClientProvider>
 }
 

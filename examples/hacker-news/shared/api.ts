@@ -2,7 +2,7 @@
 // https://github.com/HackerNews/API
 import type { Story, Comment, User } from './types.js';
 
-const BASE = 'https://hacker-news.firebaseio.com/v0';
+const BASE = import.meta.env.VITE_HN_API_BASE || 'https://hacker-news.firebaseio.com/v0';
 
 async function getJSON<T>(path: string): Promise<T> {
 	const res = await fetch(`${BASE}/${path}.json`);

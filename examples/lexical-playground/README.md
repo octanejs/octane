@@ -1,42 +1,60 @@
-# Lexical Playground — octane
+# Lexical Playground — Octane
 
-The octane counterpart of [facebook/lexical's `lexical-playground`](https://github.com/facebook/lexical/tree/main/packages/lexical-playground):
-the same Lexical rich-text editor, but rendered by **octane** via
-[`@octanejs/lexical`](../../packages/lexical) instead of React. If this works, the
-binding works.
+An Octane rich-text editor built with
+[`@octanejs/lexical`](../../packages/lexical). It is a focused counterpart to
+[Lexical Playground](https://github.com/facebook/lexical/tree/main/packages/lexical-playground):
+large enough to exercise the binding through real editor interactions without
+claiming every feature in the upstream showcase.
 
 ```bash
-pnpm --filter lexical-playground-example dev   # http://localhost:5210
+pnpm --filter lexical-playground-example dev
+# http://localhost:5210
 ```
 
-## What it exercises
+## Wired features
 
-Everything in `@octanejs/lexical` Phases 1–3, in a real app:
+- `LexicalComposer`, `ContentEditable`, `RichTextPlugin`, the Octane error
+  boundary, editor theme, placeholder, and autofocus.
+- History with working undo and redo.
+- Paragraph, heading, quote, ordered-list, unordered-list, and checklist blocks.
+- Bold, italic, underline, strikethrough, inline code, links, and hashtags.
+- Tab indentation, Markdown shortcuts, and horizontal-rule decorator portals.
+- A `/` component picker built with `LexicalTypeaheadMenuPlugin`. It can insert
+  paragraphs, headings, quotes, lists, and dividers.
 
-- **Editor core** — `LexicalComposer`, `ContentEditable`, `RichTextPlugin`,
-  `LexicalErrorBoundary`, the playground theme + placeholder.
-- **Plugins** — History (undo/redo), List + CheckList, Link, Hashtag,
-  TabIndentation, Markdown shortcuts, HorizontalRule (a decorator node, rendered
-  through the decorator portal), AutoFocus.
-- **A formatting toolbar** that tracks the selection's text formats + block type
-  (via `registerUpdateListener`) and dispatches Lexical core commands — the same
-  pattern as the playground's `ToolbarPlugin`.
+Try typing some text and selecting it before using the formatting toolbar. Type
+`/heading` or `/list` to filter the component picker, then choose an option.
+Markdown shortcuts such as `# `, `- `, `> `, and `---` are also active.
 
-Try: type Markdown (`# `, `- `, `> `, `---`, `` ` ``), `#hashtags`, toggle formats
-and block types from the toolbar, undo/redo.
+## Validation
 
-## Not yet wired here
+The example is a browser-level fixture as well as a demo:
 
-The full playground has more surface than this example currently exercises. Two
-distinct reasons:
+```bash
+pnpm --filter lexical-playground-example typecheck
+pnpm --filter lexical-playground-example build
+pnpm --filter lexical-playground-example test:e2e
+pnpm --filter lexical-playground-example test:e2e:dev
+```
 
-- **Ported, just not wired in yet** — the binding plugins exist in `@octanejs/lexical`
-  (`LexicalTypeaheadMenuPlugin`, `LexicalDraggableBlockPlugin`, `LexicalTablePlugin`,
-  the node-menu / context-menu family). Mentions/emoji typeahead, draggable blocks, and
-  the tables UI can be built on top of them here.
-- **Playground-specific custom nodes** — image & equation nodes, comments, etc. are the
-  playground's own `DecoratorNode`s, not `@lexical/react` modules; they'd be ported as
-  app code.
+The E2E launch commands use POSIX inline environment syntax and are supported
+on macOS/Linux (CI runs Ubuntu); `dev`, `typecheck`, and `build` are unaffected.
 
-Real-time collaboration is the one feature still blocked on a binding module
-(`LexicalCollaborationPlugin`). This example grows as these land.
+The deterministic Playwright journeys verify typing and formatting, history
+undo/redo, and slash-picker block insertion. They also fail on uncaught page
+errors and browser console errors. `test:e2e` builds the application first and
+runs the contract against Vite's production preview server. `test:e2e:dev` runs
+the same tests against Vite's development server for faster iteration.
+
+## Not wired in this example
+
+`@octanejs/lexical` has additional bindings that this focused application does
+not currently render, including tables and table-of-contents UI, draggable
+blocks, auto-embed, character limits, node menus, and nested composers. The
+table node classes are registered so pasted/imported table content is valid,
+but there is no table insertion UI here.
+
+The binding itself does not yet provide real-time collaboration, the newer
+extension-composer wrappers, or Lexical's React-based debug tree viewer. See the
+[`@octanejs/lexical` status](../../packages/lexical/README.md#status) for the
+current package-wide surface and known divergences.

@@ -1,69 +1,51 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './test.ts';
+import fixture from './fixtures/hacker-news.json' with { type: 'json' };
 
-// Phase-2 independent browser verification of the transition-held /
-// urgent-resuspend fix, through the REAL useSuspenseQuery + router concurrent
-// navigation path. A top feed of 60 ids = two pages of 30. Page 1 commits;
-// clicking "more ›" starts a router navigation transition that re-suspends
-// StoriesPage on the page-2 batch query. The query observer notifies on a
-// setTimeout(0) macrotask AFTER the transition window has closed, so the
-// re-suspend re-render is URGENT — pre-fix this flashed the 30-row skeleton.
-// React (and now octane) HOLDS the 30 page-1 rows until page 2 is ready.
+// Pagination runs through the real router + useSuspenseQuery path. The second
+// fixture page is deliberately slow so the browser can verify the user-facing
+// contract: the current stories stay visible and no fallback flashes while the
+// next page loads.
 
 const PAGE_SIZE = 30;
-const TOP_IDS = Array.from({ length: 60 }, (_, i) => 1000 + i); // 1000..1059
-
-function makeStory(id: number) {
-	return {
-		id,
-		type: 'story',
-		by: 'user' + id,
-		time: 1700000000 + id,
-		title: 'Story #' + id,
-		url: 'https://example.com/' + id,
-		score: id,
-		descendants: 0,
-		kids: [],
-	};
-}
+const TOP_IDS = fixture.feeds.top;
+const SECOND_PAGE_IDS = new Set(TOP_IDS.slice(PAGE_SIZE));
+const FIRST_PAGE_TITLE = fixture.items['101'].title;
 
 // A larger artificial delay so the in-flight window is wide enough to sample.
 const ITEM_DELAY_MS = 600;
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function stubHackerNews(page: Page) {
-	await page.route('**/hacker-news.firebaseio.com/**', async (route) => {
+async function delaySecondPage(page: Page) {
+	await page.route('**/v0/item/*.json', async (route) => {
 		const path = new URL(route.request().url()).pathname;
 		const itemMatch = path.match(/^\/v0\/item\/(\d+)\.json$/);
-		if (path === '/v0/topstories.json') {
-			await delay(80);
-			return route.fulfill({ json: TOP_IDS });
-		}
-		if (itemMatch) {
-			// Item fetches are the page batch — delay them so the page-2 batch query
-			// stays in flight long enough to observe the hold.
+		if (itemMatch && SECOND_PAGE_IDS.has(Number(itemMatch[1]))) {
 			await delay(ITEM_DELAY_MS);
-			return route.fulfill({ json: makeStory(Number(itemMatch[1])) });
 		}
-		return route.fulfill({ json: null });
+		await route.continue();
 	});
 }
 
-test('clicking "more ›" HOLDS the page-1 rows (no skeleton flash) until page 2 resolves', async ({
-	page,
-}) => {
-	await stubHackerNews(page);
+test('pagination keeps page-1 stories visible without a skeleton flash', async ({ page }) => {
+	await delaySecondPage(page);
 	await page.goto('/');
 
-	// Page 1: exactly 30 rows, first title is Story #1000.
+	// Page 1: exactly 30 rows with the recognizable lead fixture story.
 	await expect(page.getByTestId('story-row')).toHaveCount(PAGE_SIZE);
 	const firstTitleP1 = await page.getByTestId('story-row').first().textContent();
-	expect(firstTitleP1).toContain('Story #1000');
+	expect(firstTitleP1).toContain(FIRST_PAGE_TITLE);
 	await expect(page.getByTestId('page-indicator')).toHaveText('page 1');
 	await expect(page.getByTestId('row-skeleton')).toHaveCount(0);
 
 	// Click "more ›" but DON'T await navigation — sample the DOM during the
 	// in-flight window. Begin sampling immediately.
-	const samples: Array<{ rows: number; skeletons: number; firstTitle: string | null }> = [];
+	const samples: Array<{
+		rows: number;
+		skeletons: number;
+		firstTitle: string | null;
+		pageIndicator: string | null;
+	}> = [];
 	let sampling = true;
 	const sampler = (async () => {
 		while (sampling) {
@@ -80,7 +62,11 @@ test('clicking "more ›" HOLDS the page-1 rows (no skeleton flash) until page 2
 				.first()
 				.textContent()
 				.catch(() => null);
-			samples.push({ rows, skeletons, firstTitle });
+			const pageIndicator = await page
+				.getByTestId('page-indicator')
+				.textContent()
+				.catch(() => null);
+			samples.push({ rows, skeletons, firstTitle, pageIndicator });
 			await delay(40);
 		}
 	})();
@@ -99,21 +85,26 @@ test('clicking "more ›" HOLDS the page-1 rows (no skeleton flash) until page 2
 	// Across the WHOLE in-flight window:
 	//  - story-row count never dropped below 30 (page-1 rows HELD, never torn down).
 	//  - the row skeleton NEVER appeared (no fallback flash).
-	//  - the page-1 first title (Story #1000) stayed visible until the swap.
+	//  - the page-1 first title stayed visible until the swap.
 	const minRows = Math.min(...samples.map((s) => s.rows).filter((n) => n >= 0));
 	const maxSkeletons = Math.max(...samples.map((s) => s.skeletons).filter((n) => n >= 0), 0);
 	const everSawSkeleton = samples.some((s) => s.skeletons > 0);
-	const heldFirstTitle = samples.some((s) => s.firstTitle?.includes('Story #1000'));
+	const pageOneSamples = samples.filter((s) => s.pageIndicator?.includes('page 1'));
 
 	expect(
 		minRows,
-		'story-row count must never drop below 30 during the move',
+		'story-row count must never drop below 30 during the page load',
 	).toBeGreaterThanOrEqual(PAGE_SIZE);
-	expect(maxSkeletons, 'row-skeleton must never appear during the move').toBe(0);
+	expect(maxSkeletons, 'row-skeleton must never appear during the page load').toBe(0);
 	expect(everSawSkeleton, 'the @pending skeleton must never flash').toBe(false);
-	expect(heldFirstTitle, 'page-1 first title (Story #1000) must stay visible while held').toBe(
-		true,
-	);
+	expect(
+		pageOneSamples.length,
+		'the delayed request must expose the in-flight page',
+	).toBeGreaterThan(0);
+	expect(
+		pageOneSamples.every((sample) => sample.firstTitle?.includes(FIRST_PAGE_TITLE)),
+		'page-1 lead story must stay visible throughout the in-flight page',
+	).toBe(true);
 
 	// Final state: page 2, 30 rows, Story #1030 first.
 	await expect(page.getByTestId('story-row')).toHaveCount(PAGE_SIZE);

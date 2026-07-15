@@ -4,7 +4,7 @@
 // changes through useEffect. The single compiler-injected slot is split into
 // distinct sub-slots for each internal base hook, the same way the zustand
 // `traditional` binding does.
-import { useState, useCallback, useSyncExternalStore, useEffect, use } from 'octane';
+import { useState, useCallback, useSyncExternalStore, useEffect } from 'octane';
 import { environmentManager, noop, notifyManager } from '@tanstack/query-core';
 import { resolveClient } from './context';
 import { useIsRestoring } from './isRestoring';
@@ -16,6 +16,7 @@ import {
 	getHasError,
 	shouldSuspend,
 	subSlot,
+	useSuspensePromise,
 	willFetch,
 } from './internal';
 
@@ -104,15 +105,17 @@ export function useBaseQuery(
 		oq('eff'),
 	);
 
-	// Suspense: suspend on the in-flight promise via `use(thenable)` (octane's
-	// suspend primitive — NOT a raw `throw promise`). fetchOptimistic clears the
-	// reset boundary on error (upstream suspense.ts), so a reset→retry that fails
-	// again re-throws to the boundary on replay instead of falling through with
-	// undefined data. The promise resolves even on error; the replay surfaces the
-	// error through the error-boundary throw below.
-	if (shouldSuspend(defaultedOptions, result)) {
-		use(fetchOptimistic(defaultedOptions, observer, errorResetBoundary));
-	}
+	// Suspend on a promise retained for this query-hook call site. Keeping the
+	// settled promise in the dynamic use() sequence prevents a later sequential
+	// query from taking this query's replay position. fetchOptimistic clears the
+	// reset boundary on error; the replay surfaces that error through the
+	// error-boundary throw below.
+	useSuspensePromise(
+		shouldSuspend(defaultedOptions, result),
+		defaultedOptions.queryHash,
+		() => fetchOptimistic(defaultedOptions, observer, errorResetBoundary),
+		oq('sus'),
+	);
 
 	// Error boundary: throw so the nearest @try/@catch (or <ErrorBoundary>) handles
 	// it, when the query errored and the options opt into throwing.
