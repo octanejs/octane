@@ -92,6 +92,26 @@ describe('website routes', () => {
 		}
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
+		// The decision section stays concise, accessible and ahead of the evidence it frames.
+		const why = container.querySelector<HTMLElement>('section.why[aria-labelledby="why-heading"]')!;
+		expect(why.querySelector('#why-heading')?.textContent?.trim()).toBe(
+			'Fast should be how your app feels. Not a new way you have to think.',
+		);
+		const whyQuestions = Array.from(why.querySelectorAll('.why-question')).map((question) =>
+			question.textContent?.trim(),
+		);
+		expect(whyQuestions).toEqual([
+			'Why should someone adopt Octane today?',
+			"Why isn't Octane's rendering powered by signals?",
+		]);
+		expect(why.querySelectorAll('.why-answer')).toHaveLength(3);
+		expect(why.querySelector('.why-coda')?.textContent?.trim()).toBeTruthy();
+		expect(why.querySelector('.why-list')).toBeNull();
+		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
+		const bench = container.querySelector<HTMLElement>('section.bench')!;
+		const homeSections = Array.from(container.querySelectorAll('main .home > section'));
+		expect(homeSections.indexOf(why)).toBeLessThan(homeSections.indexOf(bench));
+
 		// The checked-in benchmark summary reaches the chart and table renderers.
 		const summary = container.querySelector('figure.bench-card');
 		expect(summary?.querySelector('figcaption')).toBeTruthy();
