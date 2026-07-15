@@ -56,15 +56,6 @@ export function Proven() @{
 				border-radius: 1rem;
 				overflow: hidden;
 			}
-			/* A short accent rule sits above each number as a shared eyebrow. */
-			.proven-stat::before {
-				content: '';
-				width: 2rem;
-				height: 2px;
-				border-radius: 2px;
-				background: var(--accent);
-				opacity: 0.7;
-			}
 			.proven-number {
 				font-size: 2.75rem;
 				line-height: 1;

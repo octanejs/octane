@@ -67,35 +67,31 @@ export function Why() @{
 				padding: 4rem 0;
 				margin-top: 2rem;
 			}
-			/* The title is centered over the grid below it. */
+			/* The title is left-aligned over the column below it. */
 			.why-title {
 				font-size: 2.4rem;
 				line-height: 1.12;
 				letter-spacing: -0.03em;
-				margin: 0 auto;
+				margin: 0;
 				font-weight: 800;
 				max-width: 48rem;
-				text-align: center;
 				scroll-margin-top: 5.5rem;
 			}
 			.why-accent {
 				display: block;
 				color: var(--accent);
 			}
-			/* Each row is a two-column grid: the question labels a left rail, its
-			   prose fills the wider right column. A top rule per row (after the first)
-			   keeps the pairs visually separate. */
+			/* A single left-aligned column: the question sits over its prose, with a
+			   top rule per row (after the first) keeping the pairs visually separate. */
 			.why-grid {
-				max-width: 64rem;
-				margin: 2.75rem auto 0;
+				max-width: 48rem;
+				margin: 2.75rem 0 0;
 				display: grid;
 				gap: 2.25rem;
 			}
 			.why-row {
 				display: grid;
-				grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.5fr);
-				gap: 1.5rem 3rem;
-				align-items: start;
+				gap: 0.6rem;
 			}
 			.why-row + .why-row {
 				padding-top: 2.25rem;
@@ -120,8 +116,8 @@ export function Why() @{
 			/* The coda is a pull-quote: an accent rail on the left, a faint accent
 			   wash, and roomier type set it apart from the answers above. */
 			.why-coda {
-				max-width: 64rem;
-				margin: 3rem auto 0;
+				max-width: 48rem;
+				margin: 3rem 0 0;
 				padding: 1.25rem 1.75rem;
 				border-left: 3px solid var(--accent);
 				border-radius: 0 0.75rem 0.75rem 0;
@@ -139,14 +135,6 @@ export function Why() @{
 				color: var(--accent-text);
 				text-decoration: underline;
 				text-underline-offset: 0.16em;
-			}
-			/* Below the two-column threshold the question stacks above its prose and
-			   the row rule becomes the only separator. */
-			@media (max-width: 760px) {
-				.why-row {
-					grid-template-columns: 1fr;
-					gap: 0.6rem;
-				}
 			}
 			@media (max-width: 560px) {
 				.why {
