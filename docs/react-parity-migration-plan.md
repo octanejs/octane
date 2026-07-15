@@ -71,6 +71,7 @@ explain the old plan; they are no longer current scope decisions.
 | Class components, `createClass`, `this.refs`, string refs | Octane has no class components. *Port the underlying reconciler/effect OUTCOME via function components + hooks where the behavior is renderer-level.* |
 | `componentDidCatch` / `getDerivedStateFromError` mechanics | Octane uses `@try`/`@catch`. Port the catch OUTCOME, not the lifecycle. |
 | Legacy / sync mode, legacy roots | Octane is concurrent-root only. |
+| Initial concurrent-root mount batching | **Intentional divergence.** Octane's first `root.render()` mounts synchronously. A render followed by `root.unmount()` in the same surrounding batch can therefore expose intermediate DOM before the synchronous unmount leaves an empty final state; React's concurrent root can elide that mount. |
 | Rules-of-hooks enforcement, hook-order warnings | **Intentional divergence** — Octane tracks hooks by call site; conditional hooks are legal. |
 | Omitted dependency arrays | **Intentional divergence** — for effect-family hooks, `useMemo`, `useCallback`, and `useImperativeHandle`, omission asks the compiler to infer dependencies from lexical captures. Explicit arrays retain React semantics; `null` is the explicit every-render/recompute form. |
 | StrictMode double-invoke of effects/render | Octane has no StrictMode (verified: no `StrictMode`/double-invoke in runtime). |

@@ -291,15 +291,15 @@
     },
     {
       "caseId": "react-case-v1:012b8690ce728b06acea",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "warns about potential infinite loop if there's a synchronous render phase update on another component",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Canary-only replacement for the stable sync loop case, gated by experimental enableInfiniteRenderLoopDetection and asserting warn-vs-throw policy. Cover the stable function loop outcome instead."
     },
     {
       "caseId": "react-case-v1:013009de95bc28c93593",
@@ -678,15 +678,15 @@
     },
     {
       "caseId": "react-case-v1:02cfe64f15536cb00824",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "does not re-render if state update is null",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Returning null from a class setState updater means no update; useState(null) is valid state in hooks, so copying this would be incorrect."
     },
     {
       "caseId": "react-case-v1:02d6a7aeb3a14f412454",
@@ -4188,7 +4188,7 @@
     },
     {
       "caseId": "react-case-v1:150bad2ce41d37c321fa",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "uses the latest getSnapshot, even if it changed in the same batch as a store update",
@@ -4196,7 +4196,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "uses the latest getSnapshot, even if it changed in the same batch as a store update",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:150c5be0e58f4643717e",
@@ -5144,15 +5151,15 @@
     },
     {
       "caseId": "react-case-v1:1a544b805a00a3ec0f15",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "does not update one component twice in a batch (#2410)",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "The regression is expressed entirely through class forceUpdate, UNSAFE_componentWillUpdate, and class commit callbacks. Generic overlapping parent/child coalescing is already covered."
     },
     {
       "caseId": "react-case-v1:1a6127eadc07efb813c7",
@@ -5291,7 +5298,7 @@
     },
     {
       "caseId": "react-case-v1:1af9005f386e214b9c95",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "basic usage",
@@ -5299,7 +5306,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "basic usage",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1af9f6d3987b85fe5cfc",
@@ -6259,15 +6273,15 @@
     },
     {
       "caseId": "react-case-v1:1fb74dc87f631c307023",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "warns about potential infinite loop if there's an async render phase update on another component",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Canary-only transition warning policy is gated by React’s experimental loop detector and phase classification. Octane has no lanes/flag."
     },
     {
       "caseId": "react-case-v1:1fbd097cd25c532caa14",
@@ -6347,7 +6361,7 @@
     },
     {
       "caseId": "react-case-v1:2003c68b13ee3d6ea04d",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should not reconcile children passed via props",
@@ -6355,7 +6369,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "should not reconcile children passed via props",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:200db26f06a04208267b",
@@ -8053,15 +8074,22 @@
     },
     {
       "caseId": "react-case-v1:288a6dfd3c7551aca302",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "can have nested updates if they do not cross the limit",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "portable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "can have nested updates if they do not cross the limit",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:288ac1015253ed5c72ca",
@@ -8845,15 +8873,22 @@
     },
     {
       "caseId": "react-case-v1:2d1116918edc6c7795fb",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "selector can throw on update",
       "baselines": ["canary", "stable"],
-      "classification": "portable",
+      "classification": "adaptable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/redux/tests/conformance/external-store-shared.test.ts",
+          "testName": "selector can throw on update",
+          "modes": ["client"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2d1716f9e65c5fad1c9b",
@@ -9377,15 +9412,22 @@
     },
     {
       "caseId": "react-case-v1:30417bc18598f473bdb0",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should batch parent/child state updates together",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "portable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "should batch parent/child state updates together",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:30475fe693989f9e8b26",
@@ -9405,15 +9447,22 @@
     },
     {
       "caseId": "react-case-v1:3059161b7fb41f4d9157",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "can have many updates inside useEffect without triggering a warning",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "portable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "can have many updates inside useEffect without triggering a warning",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:307b65bc1696b8488364",
@@ -9461,15 +9510,15 @@
     },
     {
       "caseId": "react-case-v1:30b73e228199cd33b2ea",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "throws in forceUpdate if the update callback is not a function",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "forceUpdate and its callback argument have no Octane API counterpart."
     },
     {
       "caseId": "react-case-v1:30caf56b4bf6331b3444",
@@ -9541,7 +9590,7 @@
     },
     {
       "caseId": "react-case-v1:314a7c6decf226ef7b5f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "handles reentrant mounting in synchronous mode",
@@ -9549,7 +9598,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "handles reentrant mounting in synchronous mode",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:315aad2bf54299e97eaa",
@@ -11255,15 +11311,15 @@
     },
     {
       "caseId": "react-case-v1:38f452e55923410eac93",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should queue updates from during mount",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "The behavior depends entirely on UNSAFE_componentWillMount scheduling another class instance’s setState."
     },
     {
       "caseId": "react-case-v1:390d5e656eec6583357b",
@@ -11363,7 +11419,7 @@
     },
     {
       "caseId": "react-case-v1:395d8195007062e53883",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "basic server hydration",
@@ -11371,19 +11427,26 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "basic server hydration",
+          "modes": ["client", "server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3961b29e6075b30c9435",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "throws when sync render-phase update loop is detected with force-throw enabled",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Experimental force-throw feature-flag behavior for React’s sync nested-update detector is not an Octane public contract."
     },
     {
       "caseId": "react-case-v1:3966f5d39e963ba1cd4b",
@@ -11467,15 +11530,22 @@
     },
     {
       "caseId": "react-case-v1:39bbdbd31719bc62c73b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "does not fall into an infinite update loop with useLayoutEffect",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "portable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "does not fall into an infinite update loop with useLayoutEffect",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:39d42099bcf41e05cbff",
@@ -12077,15 +12147,15 @@
     },
     {
       "caseId": "react-case-v1:3cf6ae075fd28517b64e",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "does not fall into an infinite update loop",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "This is the class componentDidMount/componentDidUpdate version of the infinite layout-update loop. The function-hook case is separately in scope."
     },
     {
       "caseId": "react-case-v1:3cf6cbcf26e63fcdf593",
@@ -12707,15 +12777,15 @@
     },
     {
       "caseId": "react-case-v1:3febfdef511f15bedff2",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should flush updates in the correct order",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Exact order depends on class componentDidUpdate and setState completion callbacks, APIs Octane intentionally omits. Hook layout/passive scheduling has separate tests."
     },
     {
       "caseId": "react-case-v1:3ff3cc5a90632de29ea5",
@@ -12899,16 +12969,16 @@
     },
     {
       "caseId": "react-case-v1:40cb0cdb675fae5718b6",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": null,
       "titleExpression": "\"compares to current state before bailing out, even when there's a \" + 'mutation in between the sync and passive effects'",
       "baselines": ["canary", "stable"],
-      "classification": "portable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Upstream explicitly gates this to the React 17 userspace shim and legacy-root passive-subscription timing. Octane has concurrent roots and a native hook only."
     },
     {
       "caseId": "react-case-v1:40dfbc063f18aa97a8d0",
@@ -13248,15 +13318,15 @@
     },
     {
       "caseId": "react-case-v1:42ddffc6ca56d78effb9",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "throws when phase-spawn update loop is detected with force-throw enabled",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Experimental force-throw behavior for React’s PHASE_SPAWN lane category is Fiber/lane-internal and excluded."
     },
     {
       "caseId": "react-case-v1:42e0d0a720f59f2dce1d",
@@ -13392,7 +13462,7 @@
     },
     {
       "caseId": "react-case-v1:4361d0e4ad6f14410581",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "can schedule ridiculously many updates within the same batch without triggering a maximum update error",
@@ -13400,7 +13470,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "can schedule ridiculously many updates within the same batch without triggering a maximum update error",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:436a8ac885670ed9cb1b",
@@ -14261,7 +14338,7 @@
     },
     {
       "caseId": "react-case-v1:4819254bd8c822ccd2b6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "prevents infinite update loop triggered by synchronous updates in useEffect",
@@ -14269,7 +14346,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "prevents infinite update loop triggered by synchronous updates in useEffect",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4820f3ea782530be714d",
@@ -14892,7 +14976,7 @@
     },
     {
       "caseId": "react-case-v1:4b31ccedd7fb9e7e7b0c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "can render ridiculously large number of roots without triggering infinite update loop error",
@@ -14900,7 +14984,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "can render 1200 roots without triggering an infinite update loop error",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4b3bbdd7989478d513b5",
@@ -17955,15 +18046,22 @@
     },
     {
       "caseId": "react-case-v1:5b2fcaf876ab1b4785a6",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "mounts and unmounts are batched",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Octane intentionally mounts the first root render synchronously, so it may expose intermediate DOM that React's concurrent batch elides; the executable test asserts Octane's synchronous mount and the same empty final state after unmount.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "synchronously mounts and unmounts inside one outer batch",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5b3a32b47b9c454e51ac",
@@ -20106,7 +20204,7 @@
     },
     {
       "caseId": "react-case-v1:65cdee02baf0042eef36",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "does not infinite loop if there's an async render phase update on another component",
@@ -20114,7 +20212,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "does not infinite loop if there's an async render phase update on another component",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:65e40cd7ad7a9d7334bb",
@@ -25107,15 +25212,15 @@
     },
     {
       "caseId": "react-case-v1:8064ce5579b96e6b3698",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "warns about a deferred infinite update loop with useEffect",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "The assertion is React’s DEV warning plus native debug stack and captureOwnerStack formatting. Octane does not expose owner-stack diagnostics; generic passive-effect loop termination can be covered without this case."
     },
     {
       "caseId": "react-case-v1:8065dbc4dabf42f2e8d3",
@@ -26027,15 +26132,15 @@
     },
     {
       "caseId": "react-case-v1:85588cc2ffa7d100e98f",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should flush updates in the correct order across roots",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "The case is a nested-root class componentDidMount/forceUpdate ordering test. forceUpdate and class mount callbacks are unsupported."
     },
     {
       "caseId": "react-case-v1:858364b169d839c51e10",
@@ -26120,15 +26225,15 @@
     },
     {
       "caseId": "react-case-v1:861305e35d561a623682",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "delays sync updates inside hidden subtrees in Concurrent Mode",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "This uses unstable_LegacyHidden and Concurrent lane deferral. Octane has Activity, not LegacyHidden or React lanes."
     },
     {
       "caseId": "react-case-v1:8613109d899016e1844a",
@@ -27829,15 +27934,15 @@
     },
     {
       "caseId": "react-case-v1:8e29c094776a25bcaf70",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should queue nested updates",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "The update is triggered from UNSAFE_componentWillUpdate and class forceUpdate across roots; it is lifecycle mechanics, not a hook renderer contract."
     },
     {
       "caseId": "react-case-v1:8e32f918dbc3820f6eb8",
@@ -27853,7 +27958,7 @@
     },
     {
       "caseId": "react-case-v1:8e43f4883750df5ff7b4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "getSnapshot can return NaN without infinite loop warning",
@@ -27861,7 +27966,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "getSnapshot can return NaN without infinite loop warning",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8e54381aaf6471956648",
@@ -28140,15 +28252,22 @@
     },
     {
       "caseId": "react-case-v1:8fbd3294cbf6f8ce284b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "handles errors thrown by getSnapshot",
       "baselines": ["canary", "stable"],
-      "classification": "portable",
+      "classification": "adaptable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "handles errors thrown by getSnapshot",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8fcc601cdbebdccd4964",
@@ -28585,15 +28704,22 @@
     },
     {
       "caseId": "react-case-v1:921c892a933afeb4c1a1",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "does not infinite loop if there's a synchronous render phase update on another component",
       "baselines": ["stable"],
-      "classification": "adaptable",
+      "classification": "portable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "does not infinite loop if there's a synchronous render phase update on another component",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9230ff165a89361a34c5",
@@ -29549,15 +29675,15 @@
     },
     {
       "caseId": "react-case-v1:97a11eaf7bbfedaa1f21",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "does not update one component twice in a batch (#6371)",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "The case combines componentDidMount, componentWillUnmount, forceUpdate, and a class-only subscription pattern."
     },
     {
       "caseId": "react-case-v1:97acaa3261f711c00f18",
@@ -29792,15 +29918,15 @@
     },
     {
       "caseId": "react-case-v1:993a6da91f202a9118f7",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "throws in setState if the update callback is not a function",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Validating the optional class setState callback argument has no Octane API counterpart."
     },
     {
       "caseId": "react-case-v1:99510f761a2cc59e1e75",
@@ -30477,15 +30603,15 @@
     },
     {
       "caseId": "react-case-v1:9d58a572916355e57ca8",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should flow updates correctly",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "This matrix asserts UNSAFE_componentWillUpdate/componentDidUpdate ordering and owner/class instance relationships. Hook effect order is covered independently."
     },
     {
       "caseId": "react-case-v1:9d5a92ed5f849bc2bcd5",
@@ -30561,7 +30687,7 @@
     },
     {
       "caseId": "react-case-v1:9d9a8dcb09d1b80e010f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "resets the update counter for unrelated updates",
@@ -30569,7 +30695,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "resets the update counter for unrelated updates",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9da92f652156161a9906",
@@ -30641,7 +30774,7 @@
     },
     {
       "caseId": "react-case-v1:9e00734362096fac8b7f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "does not bail out if the previous update hasn't finished yet",
@@ -30649,7 +30782,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "does not bail out if the previous update hasn't finished yet",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9e0dd4edeca9c46246c9",
@@ -30669,7 +30809,7 @@
     },
     {
       "caseId": "react-case-v1:9e2a9659f89d9f9a1a58",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "does not call render after a component as been deleted",
@@ -30677,7 +30817,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "does not call render after a component as been deleted",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9e41641ad7534b61bb1f",
@@ -31226,15 +31373,22 @@
     },
     {
       "caseId": "react-case-v1:a10d104c6e31a1965abd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "compares selection to rendered selection even if selector changes",
       "baselines": ["canary", "stable"],
-      "classification": "portable",
+      "classification": "adaptable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/redux/tests/conformance/external-store-shared.test.ts",
+          "testName": "compares selection to rendered selection even if selector changes",
+          "modes": ["client"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a1121b8d91f78be424ed",
@@ -32360,15 +32514,22 @@
     },
     {
       "caseId": "react-case-v1:a6b8e80ea67e620352d6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should batch state and props together",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "portable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "should batch state and props together",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a6ca21c6fafb87a5f450",
@@ -32433,15 +32594,15 @@
     },
     {
       "caseId": "react-case-v1:a73369e6a71614e6a4c3",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "memoized selectors are only called once per update",
       "baselines": ["canary", "stable"],
-      "classification": "portable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "The exact upstream oracle is selector invocation count, an optimization/side-effect observation. Octane testing rules forbid pinning helper call counts absent a public guarantee; semantic selection reuse and bailout are covered by the isEqual and changing-selector cases."
     },
     {
       "caseId": "react-case-v1:a7451cc9802474b43c1b",
@@ -32853,15 +33014,22 @@
     },
     {
       "caseId": "react-case-v1:a927b0369daf43871303",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should batch state when updating state twice",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "portable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "should batch state when updating state twice",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a947fc1a0904cd13806c",
@@ -34526,15 +34694,15 @@
     },
     {
       "caseId": "react-case-v1:b2c508f39a50c8f1f2a3",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should batch forceUpdate together",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "forceUpdate, shouldComponentUpdate bypass, and class update callbacks do not exist in Octane."
     },
     {
       "caseId": "react-case-v1:b2c70cdfd69af03c1744",
@@ -34670,7 +34838,7 @@
     },
     {
       "caseId": "react-case-v1:b3476240bad3064ce955",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "does not fall into an infinite error loop",
@@ -34678,7 +34846,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "does not fall into an infinite error loop",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b35380e216bdfeca08d6",
@@ -34913,15 +35088,22 @@
     },
     {
       "caseId": "react-case-v1:b4905d0d2039aca03d43",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should batch child/parent state updates together",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "portable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "should batch child/parent state updates together",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b49e9c982e2e800c63f6",
@@ -36001,15 +36183,22 @@
     },
     {
       "caseId": "react-case-v1:b9258e4c605f4a2be1e1",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "isEqual can throw on update",
       "baselines": ["canary", "stable"],
-      "classification": "portable",
+      "classification": "adaptable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/redux/tests/conformance/external-store-shared.test.ts",
+          "testName": "isEqual can throw on update",
+          "modes": ["client"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b942e5b2c9ad90c83d9f",
@@ -36370,15 +36559,22 @@
     },
     {
       "caseId": "react-case-v1:bb95fb5e096cd338fac8",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should batch state when updating two different states",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "portable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "should batch state when updating two different states",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:bbba7967ad7b749d323f",
@@ -38916,7 +39112,7 @@
     },
     {
       "caseId": "react-case-v1:c75fc76336e1a6b66f8d",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "regression test for #23150",
@@ -38924,7 +39120,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "regression test for #23150",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c761671d55f3a2a0379a",
@@ -39971,7 +40174,7 @@
     },
     {
       "caseId": "react-case-v1:cc3ee924cf06ec02b0ae",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "prevents infinite update loop triggered by too many updates in ref callbacks",
@@ -39979,7 +40182,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "prevents infinite update loop triggered by too many updates in ref callbacks",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:cc4374d3a0bce010d25b",
@@ -42175,7 +42385,7 @@
     },
     {
       "caseId": "react-case-v1:d76e94c3098c790dc750",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "mutating the store in between render and commit when getSnapshot has changed",
@@ -42183,7 +42393,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "mutating the store in between render and commit when getSnapshot has changed",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d777a4de4ef1970e5ec6",
@@ -42445,7 +42662,7 @@
     },
     {
       "caseId": "react-case-v1:d8b6faff61583902381c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "uses correct base state for setState inside render phase",
@@ -42453,7 +42670,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "uses correct base state for setState inside render phase",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d8d42281a83467c3bf65",
@@ -42844,15 +43068,15 @@
     },
     {
       "caseId": "react-case-v1:db2834183c82bdbcd15f",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should support chained state updates",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "The assertion is specifically about class setState callbacks chaining further setState callbacks. Octane has no class callback API; hook updater ordering is separately covered."
     },
     {
       "caseId": "react-case-v1:db35180f5eefc2e76eda",
@@ -42936,7 +43160,7 @@
     },
     {
       "caseId": "react-case-v1:db96157f51b336e314bc",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "selecting a specific value inside getSnapshot",
@@ -42944,7 +43168,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "selecting a specific value inside getSnapshot",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:dba34354327ffe9c93a3",
@@ -43991,7 +44222,7 @@
     },
     {
       "caseId": "react-case-v1:e115e784dc3897990d33",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "can recover after falling into an infinite update loop",
@@ -43999,7 +44230,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "can recover after falling into an infinite update loop",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e11ca0da960c4e4a104c",
@@ -44375,7 +44613,7 @@
     },
     {
       "caseId": "react-case-v1:e300153ea2f9cd040ecd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "Infinite loop if getSnapshot keeps returning new reference",
@@ -44383,7 +44621,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "Infinite loop if getSnapshot keeps returning new reference",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e30d123da05420ee5d75",
@@ -44729,7 +44974,7 @@
     },
     {
       "caseId": "react-case-v1:e4a27c81b84de4a1b0db",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should queue mount-ready handlers across different roots",
@@ -44737,7 +44982,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "should queue mount-ready handlers across different roots",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e4b0dc62a93b17f53418",
@@ -44773,15 +45025,22 @@
     },
     {
       "caseId": "react-case-v1:e4e6ed2e35d7cd27514a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "synchronously renders hidden subtrees",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "portable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "synchronously renders hidden subtrees",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e4eaca47bdc5959ffa49",
@@ -45696,15 +45955,22 @@
     },
     {
       "caseId": "react-case-v1:e9f56c8bfa7737a4c533",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "Using isEqual to bailout",
       "baselines": ["canary", "stable"],
-      "classification": "portable",
+      "classification": "adaptable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/redux/tests/conformance/external-store-shared.test.ts",
+          "testName": "Using isEqual to bailout",
+          "modes": ["client"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ea1957d3e444c7e254ab",
@@ -45955,15 +46221,15 @@
     },
     {
       "caseId": "react-case-v1:eb3f36d77660a212d183",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "warns instead of throwing when infinite Suspense ping loop is detected via enableInfiniteRenderLoopDetection during commit phase",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "This canary case explicitly tests Fiber Suspense ping listener order, CommitContext, and an experimental detector instrumentation flag. Those internals are excluded."
     },
     {
       "caseId": "react-case-v1:eb4654fc3d7eab26c9ce",
@@ -46191,15 +46457,15 @@
     },
     {
       "caseId": "react-case-v1:ec729db758f571b8169f",
-      "status": "planned",
-      "risk": "high",
+      "status": "documented",
+      "risk": "low",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "calls componentWillReceiveProps setState callback properly",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Explicit componentWillReceiveProps plus class setState callback semantics are unsupported legacy React APIs."
     },
     {
       "caseId": "react-case-v1:ec792363aa773e23f7a0",
@@ -46407,7 +46673,7 @@
     },
     {
       "caseId": "react-case-v1:ed9c50190e3b2085dd2a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "skips re-rendering if nothing changes",
@@ -46415,7 +46681,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "skips re-rendering if nothing changes",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:edafd6b26b92c7198b8a",
@@ -46773,7 +47046,7 @@
     },
     {
       "caseId": "react-case-v1:ef1a5a03e90eba813dc6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "switch to a different store",
@@ -46781,7 +47054,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "switch to a different store",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ef1dae51aa167893dbae",
@@ -47902,7 +48182,7 @@
     },
     {
       "caseId": "react-case-v1:f4c3e9775075af6327fb",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShared-test.js",
       "title": "mutating the store in between render and commit when getSnapshot has _not_ changed",
@@ -47910,7 +48190,14 @@
       "classification": "portable",
       "owner": "runtime",
       "workstream": "External stores",
-      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+      "rationale": "Executable stable/canary ports cover snapshot selection, notification deduplication, render-to-commit consistency, errors, hydration, and public with-selector behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "mutating the store in between render and commit when getSnapshot has _not_ changed",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f4cdbc269065737169a9",
@@ -48224,7 +48511,7 @@
     },
     {
       "caseId": "react-case-v1:f67f682f8a1732873b45",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "should update children even if parent blocks updates",
@@ -48232,7 +48519,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "should update children even if parent blocks updates",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f68b7dcd084a30c019ff",
@@ -48568,7 +48862,7 @@
     },
     {
       "caseId": "react-case-v1:f8747626519510e7f140",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactUpdates-test.js",
       "title": "does not fall into mutually recursive infinite update loop with same container",
@@ -48576,7 +48870,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "Update reconciliation",
-      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+      "rationale": "Executable function/hook adaptations cover batching, cross-root commit ordering, deletion, re-entry, bounded nested updates and recovery, finite and wide batches, and cross-component render diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "does not fall into mutually recursive infinite update loop with same container",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f896a076e6319fdadb78",

@@ -515,6 +515,12 @@ export interface Block extends Scope {
 	 */
 	drainStamp: number;
 	drainRenders: number;
+	/** True when the queued render came from a different component's render body. */
+	crossRenderUpdate: boolean;
+	/** Commit-callback loop guard, scoped to one externally-started update chain. */
+	nestedUpdateChain: number;
+	nestedUpdateCount: number;
+	nestedUpdateError: boolean;
 	/**
 	 * useEffectEvent updates publish only for the latest render of this block that
 	 * completed. Zero means this block has never called useEffectEvent. Keeping the
@@ -592,10 +598,19 @@ const RENDERER_REGION_DOM_BINDINGS = new WeakMap<
 >();
 const DOM_ROOT_DISPOSERS = new WeakMap<Block, () => void>();
 // Public root diagnostics need to distinguish an ordinary imperative unmount
-// from one requested by an effect body while the commit lifecycle is active.
+// from one requested by an effect setup/cleanup while commit lifecycle work is active.
 // Passive effects may drain outside `inFlush`, so that scheduler flag alone is
 // insufficient for the observable root warning.
 let EFFECT_BODY_DEPTH = 0;
+// Callback refs are commit-phase callbacks too. Track them separately from
+// effect callbacks so an attach that repeatedly schedules its owner participates
+// in the same bounded nested-update policy without conflating arbitrary commit
+// plumbing (notably useSyncExternalStore consistency checks) with user callbacks.
+let REF_CALLBACK_DEPTH = 0;
+// Store consistency checks are commit-spawned updates as well. Keeping a
+// distinct depth lets unstable getSnapshot values share the nested-update guard
+// without pretending the store check itself is a user effect or ref callback.
+let STORE_SYNC_DEPTH = 0;
 // Octane discovers deletion destroys while reconciling a parent, but those
 // callbacks are semantically mutation-phase work. Effect Events may be called
 // from them even though CURRENT_SCOPE still reflects the eager parent render.
@@ -607,6 +622,18 @@ function runEffectLifecycleCallback(callback: Cleanup): void {
 		callback();
 	} finally {
 		EFFECT_EVENT_LIFECYCLE_DEPTH--;
+	}
+}
+
+// Layout/passive/insertion cleanups are commit callbacks just like their setup
+// bodies. Keep their scheduled updates in the same bounded nested-update chain,
+// while leaving runEffectLifecycleCallback's Effect Event permission intact.
+function runEffectCleanupCallback(callback: Cleanup): void {
+	EFFECT_BODY_DEPTH++;
+	try {
+		runEffectLifecycleCallback(callback);
+	} finally {
+		EFFECT_BODY_DEPTH--;
 	}
 }
 
@@ -797,6 +824,12 @@ let DEFERRED_SPAWN = false;
  */
 let TRANSITION_PENDING_COUNT = 0;
 const TRANSITION_LISTENERS = new Set<() => void>();
+// useTransition/useOptimistic listeners are runtime-owned publication work.
+// When a transition boundary changes the pending count while another component
+// is rendering, their scheduled refreshes must not be diagnosed as userland
+// cross-component render updates. Keep this depth scoped to listener invocation;
+// startTransition's user callback runs only after tickTransitionCount returns.
+let TRANSITION_LISTENER_PUBLISH_DEPTH = 0;
 
 // ── Global commit coordination (entangled transitions) ──────────────────────
 // React commits a transition's whole tree atomically: when one startTransition
@@ -1273,12 +1306,17 @@ function vtWouldWrapResume(): boolean {
 function tickTransitionCount(delta: number): void {
 	TRANSITION_PENDING_COUNT += delta;
 	if (TRANSITION_PENDING_COUNT < 0) TRANSITION_PENDING_COUNT = 0;
-	for (const fn of TRANSITION_LISTENERS) {
-		try {
-			fn();
-		} catch (err) {
-			console.error(err);
+	TRANSITION_LISTENER_PUBLISH_DEPTH++;
+	try {
+		for (const fn of TRANSITION_LISTENERS) {
+			try {
+				fn();
+			} catch (err) {
+				console.error(err);
+			}
 		}
+	} finally {
+		TRANSITION_LISTENER_PUBLISH_DEPTH--;
 	}
 }
 
@@ -1444,6 +1482,50 @@ export function setIsOctaneActEnvironment(value: boolean): void {
 	IS_OCTANE_ACT_ENVIRONMENT = value;
 }
 
+const NESTED_UPDATE_LIMIT = 50;
+const ACT_DRAIN_LIMIT = NESTED_UPDATE_LIMIT + 50;
+let UPDATE_CHAIN_ID = 0;
+
+function inNestedUpdateCallback(): boolean {
+	return EFFECT_BODY_DEPTH > 0 || REF_CALLBACK_DEPTH > 0 || STORE_SYNC_DEPTH > 0;
+}
+
+class MaximumUpdateDepthError extends Error {}
+
+function maximumUpdateDepthError(): Error {
+	return new MaximumUpdateDepthError(
+		'Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.',
+	);
+}
+
+let CROSS_RENDER_WARNINGS: WeakMap<ComponentBody, WeakSet<ComponentBody>> | null = null;
+
+function componentName(block: Block): string {
+	let body = block.body as ComponentBody & { displayName?: string };
+	// A displayName assigned to the public wrapper is user-authored and wins
+	// over the wrapped body's fallback name.
+	if (body.displayName) return body.displayName;
+	// The dev compiler installs an identity-stable HMR wrapper around exported
+	// components. Diagnostics should name the authored body it delegates to, not
+	// the generated `wrapper` implementation.
+	const hmr = (body as any)[HMR] as HmrMeta | undefined;
+	if (hmr !== undefined) body = hmr.fn as typeof body;
+	return body.displayName || body.name || 'Unknown';
+}
+
+function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
+	if (process.env.NODE_ENV === 'production') return;
+	const warnings = (CROSS_RENDER_WARNINGS ??= new WeakMap());
+	let sources = warnings.get(target.body);
+	if (sources === undefined) warnings.set(target.body, (sources = new WeakSet()));
+	if (sources.has(source.body)) return;
+	sources.add(source.body);
+	console.error(
+		`Cannot update a component (\`${componentName(target)}\`) while rendering a different component ` +
+			`(\`${componentName(source)}\`). Move the update out of the rendering component body.`,
+	);
+}
+
 function scheduleRender(block: Block): void {
 	if (block.disposed) return;
 	// Test-env warning: a state update happened with no flushSync or act()
@@ -1477,6 +1559,12 @@ function scheduleRender(block: Block): void {
 	// transition priority (and useDeferredValue in the replay doesn't defer) —
 	// per ReactDeferredValue-test.js:232.
 	const renderPhaseSelf = CURRENT_BLOCK === block;
+	const renderPhaseOther =
+		CURRENT_BLOCK !== null && !renderPhaseSelf && TRANSITION_LISTENER_PUBLISH_DEPTH === 0;
+	if (renderPhaseOther) {
+		block.crossRenderUpdate = true;
+		warnCrossComponentRenderUpdate(block, CURRENT_BLOCK!);
+	}
 	const mode: 'urgent' | 'transition' =
 		TRANSITION_DEPTH > 0 ||
 		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
@@ -1490,6 +1578,24 @@ function scheduleRender(block: Block): void {
 			block.pendingDeferred = false;
 		}
 		return;
+	}
+	if (inNestedUpdateCallback()) {
+		if (block.nestedUpdateChain !== UPDATE_CHAIN_ID) {
+			block.nestedUpdateChain = UPDATE_CHAIN_ID;
+			block.nestedUpdateCount = 0;
+		}
+		if (++block.nestedUpdateCount > NESTED_UPDATE_LIMIT) block.nestedUpdateError = true;
+	} else if (CURRENT_BLOCK === null) {
+		// A user/root update starts a new chain. This prevents fifty unrelated
+		// events, roots, or wide-batch members from sharing the recursion budget
+		// while preserving the count across scheduler drains for callback-scheduled
+		// work. Updates scheduled while rendering inherit the active chain: otherwise an
+		// effect -> render-phase update -> effect cycle could reset its budget on
+		// every pass. Pure render-phase loops retain the separate drain guard below.
+		UPDATE_CHAIN_ID++;
+		block.nestedUpdateChain = UPDATE_CHAIN_ID;
+		block.nestedUpdateCount = 0;
+		block.nestedUpdateError = false;
 	}
 	block.pending = true;
 	block.pendingMode = mode;
@@ -1548,10 +1654,21 @@ function drainQueue(): { err: any } | null {
 		const block = QUEUE[i];
 		// Skip if an ancestor's cascade already re-rendered this block this flush
 		// (renderBlock cleared its `pending`) — avoids a redundant standalone render.
-		if (!block.pending) continue;
+		// A max-depth flag is not redundant work, however: it must still surface
+		// after an ancestor coalesces the flagged child's pending render.
+		if (!block.pending && !block.nestedUpdateError) continue;
 		block.pending = false;
-		if (block.disposed) continue;
+		if (block.disposed) {
+			block.nestedUpdateError = false;
+			continue;
+		}
+		const crossRenderUpdate = block.crossRenderUpdate;
+		block.crossRenderUpdate = false;
 		try {
+			if (block.nestedUpdateError) {
+				block.nestedUpdateError = false;
+				throw maximumUpdateDepthError();
+			}
 			// An update to a block inside a SUSPENSE-HIDDEN subtree (its boundary's
 			// try content is soft-detached into savedDom while the fallback shows):
 			// don't render it in place — its geometry is detached, and a fresh mount
@@ -1570,9 +1687,11 @@ function drainQueue(): { err: any } | null {
 			// ErrorBoundary, like React's equivalent) instead of hanging.
 			if (block.drainStamp === drainId) {
 				if (++block.drainRenders > RENDER_PHASE_UPDATE_LIMIT) {
-					throw new Error(
-						'Too many re-renders. Octane limits the number of renders to prevent an infinite loop.',
-					);
+					throw crossRenderUpdate
+						? maximumUpdateDepthError()
+						: new Error(
+								'Too many re-renders. Octane limits the number of renders to prevent an infinite loop.',
+							);
 				}
 			} else {
 				block.drainStamp = drainId;
@@ -1971,17 +2090,17 @@ export function flushSync<T>(fn: () => T): T {
 			// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
 			// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
 			// needed so derived layout state (e.g. a presence/exit-animation gate) is committed
-			// before flushSync returns. But octane also deliberately FORGIVES non-convergent
-			// cascades (an unstable `useSyncExternalStore` getSnapshot re-scheduling its component
-			// from every layout pass — React throws "maximum update depth"/"getSnapshot should be
-			// cached"; octane must neither hang nor burst-render). Discriminate by CONVERGENCE:
+			// before flushSync returns. Non-convergent commit cascades (for example an
+			// unstable `useSyncExternalStore` snapshot or an every-render layout update)
+			// must not monopolize this synchronous stack. Discriminate by CONVERGENCE:
 			// keep draining while each pass schedules only blocks not yet seen in this flushSync
 			// (a finite cascade propagating through the tree — it exhausts quickly since
 			// Object.is-equal setStates bail); the moment a block re-schedules ITSELF a second
 			// time, the cascade is non-convergent — stop and hand the remainder to the async
-			// scheduler, which advances it lazily (one render per microtask), exactly the
-			// pre-existing behavior divergent stores rely on. LAYOUT_CASCADE_LIMIT backstops
-			// pathological wide-but-finite chains.
+			// scheduler. Commit-spawned updates retain their per-chain count across those
+			// microtasks and surface MaximumUpdateDepthError at the bounded limit instead of
+			// starving the event loop. LAYOUT_CASCADE_LIMIT backstops pathological
+			// wide-but-finite chains.
 			if (QUEUE.length > 0) {
 				const seen = new Set<Block>(QUEUE);
 				let defer = false;
@@ -2083,8 +2202,14 @@ function drainRefDetaches(): void {
 	const q = refDetachQueue.splice(0);
 	for (let i = 0; i < q.length; i += 3) {
 		try {
-			attachRef(q[i], null, q[i + 1]);
+			REF_CALLBACK_DEPTH++;
+			try {
+				attachRef(q[i], null, q[i + 1]);
+			} finally {
+				REF_CALLBACK_DEPTH--;
+			}
 		} catch (err) {
+			if (err instanceof MaximumUpdateDepthError) throw err;
 			// A throwing ref detach must not abort the commit (the remaining detaches
 			// + attaches still run) — route to the deletion's boundary like React.
 			const handler = q[i + 2] as ((e: any) => void) | null;
@@ -2108,8 +2233,14 @@ function drainRefAttaches(): void {
 		// resurrecting an object ref the cleanup just nulled.
 		if (blockSubtreeDisposed(r.block)) continue;
 		try {
-			r.fn();
+			REF_CALLBACK_DEPTH++;
+			try {
+				r.fn();
+			} finally {
+				REF_CALLBACK_DEPTH--;
+			}
 		} catch (err) {
+			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = findTryHandler(r.block);
 			if (handler) handler(err);
 			else console.error(err);
@@ -2261,7 +2392,7 @@ function drainEffectEventUpdates(): void {
  * dev warning is suppressed (see `IS_OCTANE_ACT_ENVIRONMENT` and
  * `setIsOctaneActEnvironment`).
  *
- * The async double-loop (5 microtask ticks × up to 50 outer iterations)
+ * The async double-loop (5 microtask ticks × up to ACT_DRAIN_LIMIT iterations)
  * drains cascades like `use(promise)` → status flip → retry → renderBlock
  * that wouldn't settle in a single tick.
  */
@@ -2278,13 +2409,13 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 		return (async () => {
 			try {
 				const value = await (result as Promise<T>);
-				for (let i = 0; i < 50; i++) {
+				for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 					for (let j = 0; j < 5; j++) await Promise.resolve();
 					drainPassiveEffects();
 					if (!hasPendingWork()) return value;
 				}
 				throw new Error(
-					'act(): scheduler did not stabilize after 50 iterations — likely an infinite render loop',
+					`act(): scheduler did not stabilize after ${ACT_DRAIN_LIMIT} iterations — likely an infinite render loop`,
 				);
 			} finally {
 				actScopeDepth--;
@@ -2298,35 +2429,40 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 	// the callback queued (an in-flight thenable from `use(promise)`, an
 	// awaited async validation) can't be reached synchronously; the returned
 	// promise continues the async drain for callers that DO await.
-	for (let i = 0; i < 50; i++) {
-		// A transition-lane drain that would be wrapped in a view transition must
-		// route through flush() — flushSync is the urgent path and deliberately
-		// SKIPS the wrap. Under the test mock, startViewTransition runs its update
-		// callback synchronously, so this stays a synchronous drain; a REAL async
-		// startViewTransition under sync act() cannot be awaited here (use the
-		// async act form, which drains through the scheduled microtask flush).
-		if (vtWouldWrap()) flush();
-		else flushSync(() => {});
-		drainPassiveEffects();
-		if (!hasPendingWork()) break;
-		if (i === 49) {
-			actScopeDepth--;
-			return Promise.reject(
-				new Error(
-					'act(): scheduler did not stabilize after 50 iterations — likely an infinite render loop',
-				),
-			);
+	try {
+		for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
+			// A transition-lane drain that would be wrapped in a view transition must
+			// route through flush() — flushSync is the urgent path and deliberately
+			// SKIPS the wrap. Under the test mock, startViewTransition runs its update
+			// callback synchronously, so this stays a synchronous drain; a REAL async
+			// startViewTransition under sync act() cannot be awaited here (use the
+			// async act form, which drains through the scheduled microtask flush).
+			if (vtWouldWrap()) flush();
+			else flushSync(() => {});
+			drainPassiveEffects();
+			if (!hasPendingWork()) break;
+			if (i === ACT_DRAIN_LIMIT - 1) {
+				throw new Error(
+					`act(): scheduler did not stabilize after ${ACT_DRAIN_LIMIT} iterations — likely an infinite render loop`,
+				);
+			}
 		}
+	} catch (err) {
+		// Flush/commit failures follow the same thenable contract as callback
+		// failures. Balance the scope here because the async continuation below
+		// is never created on this path.
+		actScopeDepth--;
+		return Promise.reject(err);
 	}
 	return (async () => {
 		try {
-			for (let i = 0; i < 50; i++) {
+			for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 				for (let j = 0; j < 5; j++) await Promise.resolve();
 				drainPassiveEffects();
 				if (!hasPendingWork()) return result as T;
 			}
 			throw new Error(
-				'act(): scheduler did not stabilize after 50 iterations — likely an infinite render loop',
+				`act(): scheduler did not stabilize after ${ACT_DRAIN_LIMIT} iterations — likely an infinite render loop`,
 			);
 		} finally {
 			actScopeDepth--;
@@ -2373,8 +2509,9 @@ function fireEffectCleanup(e: PendingEffect): void {
 		const cleanup = slot.cleanup;
 		slot.cleanup = undefined;
 		try {
-			cleanup();
+			runEffectCleanupCallback(cleanup);
 		} catch (err) {
+			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = findTryHandler(e.scope.block);
 			if (handler) handler(err);
 			else console.error(err);
@@ -2386,16 +2523,17 @@ function fireEffectCleanup(e: PendingEffect): void {
 function runEffectBody(e: PendingEffect): void {
 	let cleanup: void | Cleanup;
 	try {
-		if (process.env.NODE_ENV !== 'production') EFFECT_BODY_DEPTH++;
+		EFFECT_BODY_DEPTH++;
 		try {
 			// Spread deps as positional args (see PendingEffect.args). A no-deps
 			// effect has args === undefined, so the body is called with zero args.
 			// eslint-disable-next-line prefer-spread
 			cleanup = e.fn.apply(null, (e.args ?? []) as []);
 		} finally {
-			if (process.env.NODE_ENV !== 'production') EFFECT_BODY_DEPTH--;
+			EFFECT_BODY_DEPTH--;
 		}
 	} catch (err) {
+		if (err instanceof MaximumUpdateDepthError) throw err;
 		// Route effect errors to the nearest enclosing tryBlock, if any.
 		const handler = findTryHandler(e.scope.block);
 		if (handler) handler(err);
@@ -2547,8 +2685,9 @@ function drainDeferredPassiveUnmounts(): void {
 	const q = pendingPassiveUnmounts.splice(0);
 	for (let i = 0; i < q.length; i += 2) {
 		try {
-			(q[i] as Cleanup)();
+			runEffectCleanupCallback(q[i] as Cleanup);
 		} catch (err) {
+			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = q[i + 1] as ((err: any) => void) | null;
 			if (handler !== null) handler(err);
 			else console.error(err);
@@ -2581,14 +2720,19 @@ function drainStoreSyncs(): void {
 	// synchronously re-enter this drain; it must see only entries queued AFTER this
 	// point, never re-process the batch we already own.
 	const q = storeSyncQueue.splice(0);
-	for (let i = 0; i < q.length; i++) {
-		const inst = q[i];
-		inst.queued = false;
-		// Skip a consumer whose block was unmounted, or hidden by <Activity>, between
-		// enqueue and now — same guards the effect drains apply to effects.
-		if (inst.block.disposed || inInactiveSubtree(inst.block)) continue;
-		inst.value = inst.pending;
-		if (checkStoreChanged(inst)) inst.forceUpdate();
+	STORE_SYNC_DEPTH++;
+	try {
+		for (let i = 0; i < q.length; i++) {
+			const inst = q[i];
+			inst.queued = false;
+			// Skip a consumer whose block was unmounted, or hidden by <Activity>, between
+			// enqueue and now — same guards the effect drains apply to effects.
+			if (inst.block.disposed || inInactiveSubtree(inst.block)) continue;
+			inst.value = inst.pending;
+			if (checkStoreChanged(inst)) inst.forceUpdate();
+		}
+	} finally {
+		STORE_SYNC_DEPTH--;
 	}
 }
 
@@ -2686,6 +2830,10 @@ class BlockImpl {
 	// Render-loop guard bookkeeping (see the Block interface).
 	drainStamp: number;
 	drainRenders: number;
+	crossRenderUpdate: boolean;
+	nestedUpdateChain: number;
+	nestedUpdateCount: number;
+	nestedUpdateError: boolean;
 	effectEventRenderVersion: number;
 	effectEventCompletedVersion: number;
 	// De-opt host node managed by this Block (deoptItemBody / hostElementBody), reused
@@ -2756,6 +2904,10 @@ class BlockImpl {
 		this.__thenableIdx = 0;
 		this.drainStamp = 0;
 		this.drainRenders = 0;
+		this.crossRenderUpdate = false;
+		this.nestedUpdateChain = -1;
+		this.nestedUpdateCount = 0;
+		this.nestedUpdateError = false;
 		this.effectEventRenderVersion = 0;
 		this.effectEventCompletedVersion = 0;
 		this.deoptNode = null;
@@ -3383,7 +3535,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				if (!passiveScheduled) schedulePassiveFlush();
 			} else {
 				try {
-					runEffectLifecycleCallback(cleanup);
+					runEffectCleanupCallback(cleanup);
 				} catch (err) {
 					reportTeardownError(err);
 				}
@@ -9958,10 +10110,10 @@ interface ChildSlot {
 	block: Block | null;
 	text: Text | null;
 	currentComp: ComponentBody | null;
-	// True when `currentComp` is a bare render-FUNCTION child (a `.tsrx` `{children}`
-	// body, whose identity changes every render) rather than a stable component
-	// reference. Lets the reconcile swap the block body in place by SLOT instead of
-	// re-mounting on every identity change (which loops when effects re-render).
+	// True when `currentComp` is a render-FUNCTION child rather than a component
+	// reference. Render bodies can change identity every parent render, so reconcile
+	// them by SLOT. Tagged compiler children additionally bail when the SAME function
+	// is passed through unchanged (see the component path below).
 	currentIsBodyFn: boolean;
 	// Non-null while the slot is rendering an ARRAY value via the de-opt keyed
 	// list path (reuses reconcileKeyed). Torn down when the value stops being an
@@ -11729,6 +11881,25 @@ export function childSlot(
 		// loops unboundedly). Component switches arrive as DESCRIPTORS (comp = value.type),
 		// never as a bare function, so this never short-circuits a real component swap.
 		if (isBodyFn && state.block !== null && state.currentIsBodyFn) {
+			// Compiler-generated children are render functions too, so a fresh parent
+			// render must still swap their body in place (preserving descendant state).
+			// But an identity-equal tagged function is the exact same cached child value:
+			// take React's implicit same-element bailout, with lazy context propagation.
+			const taggedChildren = isChildrenBlock(comp);
+			const wasImplicitlyArmed = state.block.$$implicitBail;
+			if (taggedChildren && !wasImplicitlyArmed) {
+				// The slot previously hosted an arbitrary render function. Arm before
+				// rendering the tagged body so its context reads stamp this block.
+				state.block.$$implicitBail = true;
+				state.block.memoInChain = true;
+			}
+			if (
+				wasImplicitlyArmed &&
+				taggedChildren &&
+				comp === state.currentComp &&
+				tryImplicitBail(state.block)
+			)
+				return;
 			state.block.body = comp;
 			renderBlock(state.block);
 			state.currentComp = comp;
@@ -11893,8 +12064,9 @@ export function childSlot(
 		// must stamp ancestors (memoInChain, like memo blocks) for the bail's lazy
 		// consumer refresh to be sound. Set BEFORE renderBlock so the first render
 		// stamps. Body-fn children re-create identity per render — no bail is ever
-		// possible, so they skip the stamping cost.
-		if (!isBodyFn) {
+		// possible, so untagged ones skip the stamping cost. Tagged compiler children
+		// can be passed through with stable identity and therefore need the same stamps.
+		if (!isBodyFn || isChildrenBlock(comp)) {
 			b.$$implicitBail = true;
 			b.memoInChain = true;
 		}
@@ -12181,6 +12353,9 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 // bailing it could strand consumers. Returns true when the update was handled.
 function tryImplicitBail(block: Block): boolean {
 	if (block.$$implicitBail !== true) return false;
+	// A first attempt that suspended or threw has no committed output to reuse.
+	// Its identity-equal retry must execute until this Block mounts successfully.
+	if (!block.mounted) return false;
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	restampCtxDeps(block);
@@ -14761,8 +14936,9 @@ function deactivateScope(scope: Scope): void {
 					// no cleanup and won't re-run it.
 					e.cleanup = undefined;
 					try {
-						runEffectLifecycleCallback(cleanup);
+						runEffectCleanupCallback(cleanup);
 					} catch (err) {
+						if (err instanceof MaximumUpdateDepthError) throw err;
 						const handler = findTryHandler(scope.block);
 						if (handler !== null) handler(err);
 						else console.error(err);
@@ -16547,6 +16723,8 @@ function makeRoot(
 ): Root {
 	let root!: Root;
 	let unmounted = false;
+	let nestedRootRenderChain = -1;
+	let nestedRootRenderCount = 0;
 	const registerRootDisposer = (block: Block): void => {
 		let disposing = false;
 		DOM_ROOT_DISPOSERS.set(block, () => {
@@ -16562,6 +16740,26 @@ function makeRoot(
 	root = {
 		render(bodyOrElement: unknown, props?: any) {
 			if (unmounted) throw new Error('Cannot update an unmounted root.');
+			if (inNestedUpdateCallback() || CURRENT_BLOCK !== null) {
+				if (nestedRootRenderChain !== UPDATE_CHAIN_ID) {
+					nestedRootRenderChain = UPDATE_CHAIN_ID;
+					nestedRootRenderCount = 0;
+				}
+				if (++nestedRootRenderCount > NESTED_UPDATE_LIMIT) {
+					// Surface the failure through the ordinary render-error path on the
+					// next drain. Throwing directly here could be swallowed by effect
+					// error routing or unwind an active render replacement half-finished.
+					if (rootBlock !== null && !rootBlock.disposed) {
+						rootBlock.nestedUpdateError = true;
+						scheduleRender(rootBlock);
+					}
+					return;
+				}
+			} else {
+				UPDATE_CHAIN_ID++;
+				nestedRootRenderChain = UPDATE_CHAIN_ID;
+				nestedRootRenderCount = 0;
+			}
 			// React-style `render(<App foo={x}/>)` arrives as an element descriptor:
 			// unwrap to (type, props). The `render(body, props)` form passes through.
 			let body: ComponentBody;
@@ -16598,7 +16796,12 @@ function makeRoot(
 			// Same component as the live root (incl. a just-hydrated root): update
 			// props in place and schedule. This is a NORMAL client render — `hydrating`
 			// is already false, so renderBlock reuses the adopted DOM, not rebuilds it.
-			if (rootBlock && currentBody === body && Object.is(currentKey, nextKey)) {
+			if (
+				rootBlock &&
+				!rootBlock.disposed &&
+				currentBody === body &&
+				Object.is(currentKey, nextKey)
+			) {
 				rootBlock.props = props;
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileSchedule(rootBlock, 'root-render');
@@ -16661,6 +16864,18 @@ function makeRoot(
 		unmount() {
 			if (arguments.length > 0) warnRootUnmountArgument();
 			if (unmounted) return;
+			// A public, externally initiated unmount is a new update boundary. Its
+			// effect cleanups may schedule other live roots, and must not inherit a
+			// nearly-exhausted chain from earlier work. Nested unmounts during an
+			// active render/commit lifecycle keep the current chain instead.
+			if (
+				!inFlush &&
+				CURRENT_BLOCK === null &&
+				!inNestedUpdateCallback() &&
+				EFFECT_EVENT_LIFECYCLE_DEPTH === 0
+			) {
+				UPDATE_CHAIN_ID++;
+			}
 			if (
 				process.env.NODE_ENV !== 'production' &&
 				(inFlush ||
