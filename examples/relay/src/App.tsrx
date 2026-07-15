@@ -26,24 +26,43 @@ interface PrependSnapshot {
 	top: number;
 }
 
+interface PendingHistoryLoad {
+	channel: ChannelId;
+	generation: number;
+	before: string;
+}
+
+function compareMessages(left: Message, right: Message): number {
+	return left.order - right.order || left.id.localeCompare(right.id);
+}
+
 function normalizeMessages(messages: readonly Message[]): Message[] {
 	const byId = new Map<string, Message>();
 	for (const message of messages) byId.set(message.id, message);
-	const confirmedRequests = new Set([...byId.values()].filter(
-		(message) => message.clientRequestId && message.delivery === undefined,
-	).map((message) => message.clientRequestId));
-	return [...byId.values()].filter(
-		(message) => message.delivery === undefined || !confirmedRequests.has(message.clientRequestId),
-	).sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+	const confirmedByRequest = new Map<string, Message>();
+	for (const message of byId.values()) {
+		const requestId = message.clientRequestId;
+		if (requestId === undefined || message.delivery !== undefined) continue;
+		const confirmed = confirmedByRequest.get(requestId);
+		if (confirmed === undefined || compareMessages(confirmed, message) < 0) {
+			confirmedByRequest.set(requestId, message);
+		}
+	}
+	return [...byId.values()].filter((message) => {
+		const requestId = message.clientRequestId;
+		if (requestId === undefined) return true;
+		const confirmed = confirmedByRequest.get(requestId);
+		return confirmed === undefined || confirmed === message;
+	}).sort(compareMessages);
 }
 
 function mergeIncoming(messages: readonly Message[], incoming: Message): Message[] {
 	return normalizeMessages([
 		...messages.filter(
 			(message) =>
-				message.id !== incoming.id ||
-					message.clientRequestId !== undefined &&
-						message.clientRequestId !== incoming.clientRequestId,
+				message.id !== incoming.id &&
+					(incoming.clientRequestId === undefined ||
+						message.clientRequestId !== incoming.clientRequestId),
 		),
 		incoming,
 	]);
@@ -310,6 +329,7 @@ export function App() @{
 	const sequenceByChannelRef = useRef(new Map<ChannelId, number>());
 	const requestCounterRef = useRef(0);
 	const conversationGenerationRef = useRef(0);
+	const pendingHistoryLoadRef = useRef<PendingHistoryLoad | null>(null);
 	const faultPendingRef = useRef(
 		new URLSearchParams(window.location.search).get('fault') === 'history',
 	);
@@ -343,6 +363,7 @@ export function App() @{
 		const failOnce = faultPendingRef.current;
 		faultPendingRef.current = false;
 		prependSnapshotRef.current = null;
+		pendingHistoryLoadRef.current = null;
 		setLoadingOlder(false);
 		setLoadState('loading');
 		setMessages([]);
@@ -474,27 +495,38 @@ export function App() @{
 		const channel = route.channel;
 		const generation = conversationGenerationRef.current;
 		const conversation = conversationRef.current;
-		if (first === undefined || conversation === null || loadingOlder) return;
+		if (first === undefined || conversation === null || pendingHistoryLoadRef.current !== null) {
+			return;
+		}
 		const anchor = conversation.querySelector<HTMLElement>(`[data-message-id="${first.id}"]`);
 		if (anchor === null) return;
+		const request: PendingHistoryLoad = { channel, generation, before: first.id };
+		pendingHistoryLoadRef.current = request;
 		prependSnapshotRef.current = { messageId: first.id, top: anchor.getBoundingClientRect().top };
 		setLoadingOlder(true);
-		void loadHistory(sessionRef.current, channel, { before: first.id }).then((page) => {
+		const historyRequest = loadHistory(sessionRef.current, request.channel, {
+			before: request.before,
+		});
+		void historyRequest.then((page) => {
 			if (
-				readRoute().channel !== channel || conversationGenerationRef.current !== generation
+				pendingHistoryLoadRef.current !== request || readRoute().channel !== request.channel ||
+					conversationGenerationRef.current !== request.generation
 			) return;
+			pendingHistoryLoadRef.current = null;
 			setMessages((current) => normalizeMessages([...page.messages, ...current]));
 			setHasMore(page.hasMore);
 			setLoadingOlder(false);
 		}).catch(() => {
 			if (
-				readRoute().channel !== channel || conversationGenerationRef.current !== generation
+				pendingHistoryLoadRef.current !== request || readRoute().channel !== request.channel ||
+					conversationGenerationRef.current !== request.generation
 			) return;
+			pendingHistoryLoadRef.current = null;
 			prependSnapshotRef.current = null;
 			setLoadingOlder(false);
 			setActivity('Earlier messages could not be loaded');
 		});
-	}, [loadingOlder, messages, route.channel]);
+	}, [messages, route.channel]);
 
 	const submitMessage = useCallback((event: SubmitEvent) => {
 		event.preventDefault();
@@ -693,6 +725,7 @@ export function App() @{
 									type="button"
 									onClick={loadEarlier}
 									aria-busy={loadingOlder ? 'true' : 'false'}
+									aria-disabled={loadingOlder ? 'true' : undefined}
 								>
 									{loadingOlder ? 'Loading earlier messages…' : 'Load earlier messages'}
 								</button>

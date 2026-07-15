@@ -133,10 +133,52 @@ test('prepends earlier history without moving or replacing the visible survivor'
 		scrollTop: element.closest('#conversation')?.scrollTop ?? 0,
 	}));
 
-	const loadEarlier = page.getByRole('button', { name: 'Load earlier messages' });
+	let earlierRequestCount = 0;
+	let releaseInitialHistory: (() => void) | undefined;
+	const initialHistoryGate = new Promise<void>((resolve) => {
+		releaseInitialHistory = resolve;
+	});
+	let markInitialHistoryHeld: (() => void) | undefined;
+	const initialHistoryHeld = new Promise<void>((resolve) => {
+		markInitialHistoryHeld = resolve;
+	});
+	await page.route('**/api/history**', async (route) => {
+		const requestURL = new URL(route.request().url());
+		if (
+			requestURL.searchParams.get('channel') !== 'general' ||
+			requestURL.searchParams.get('before') !== 'g-011'
+		) {
+			await route.continue();
+			return;
+		}
+		earlierRequestCount++;
+		const response = await route.fetch();
+		markInitialHistoryHeld?.();
+		await initialHistoryGate;
+		await route.fulfill({ response });
+	});
+	const loadEarlier = page.getByRole('button', { name: /earlier messages/i });
 	await loadEarlier.focus();
-	await loadEarlier.click();
+	await loadEarlier.evaluate((element) => {
+		const button = element as HTMLButtonElement;
+		button.click();
+		button.click();
+	});
+	await initialHistoryHeld;
+	try {
+		await expect(loadEarlier).toHaveText('Loading earlier messages…');
+		await expect(loadEarlier).toHaveAttribute('aria-busy', 'true');
+		await expect(loadEarlier).toHaveAttribute('aria-disabled', 'true');
+		await expect(loadEarlier).toBeFocused();
+		await loadEarlier.press('Enter');
+		await settleBrowserFrames(page);
+		expect(earlierRequestCount).toBe(1);
+	} finally {
+		releaseInitialHistory?.();
+	}
 	await expect(page.locator('[data-message-id="g-005"]')).toBeAttached();
+	await page.unroute('**/api/history**');
+	await expect(loadEarlier).toBeEnabled();
 	await expect(loadEarlier).toBeFocused();
 	const survivorAfter = await survivor.elementHandle();
 	if (survivorAfter === null) throw new Error('expected the recent message after history prepend');
@@ -199,7 +241,7 @@ test('prepends earlier history without moving or replacing the visible survivor'
 	await expect(designHeading).toBeFocused();
 });
 
-test('replays missed updates once and settles rapid sends acknowledged out of order', async ({
+test('replays missed updates once and converges retried and out-of-order sends', async ({
 	page,
 }) => {
 	await openGeneral(page);
@@ -225,10 +267,27 @@ test('replays missed updates once and settles rapid sends acknowledged out of or
 	await expect(secondReplay).toHaveCount(1);
 	await expect(composer).toHaveValue('A draft that must survive reconnect');
 
+	let markRepeatedPublish: (() => void) | undefined;
+	const repeatedPublish = new Promise<void>((resolve) => {
+		markRepeatedPublish = resolve;
+	});
+	await page.route('**/api/messages', async (route) => {
+		const payload = route.request().postDataJSON() as { body?: unknown };
+		if (payload.body !== 'Second fast acknowledgement') {
+			await route.continue();
+			return;
+		}
+		const firstResponse = await route.fetch();
+		await route.fetch();
+		await route.fulfill({ response: firstResponse });
+		markRepeatedPublish?.();
+	});
+
 	await composer.fill('First slow acknowledgement');
 	await composer.press('ControlOrMeta+Enter');
 	await composer.fill('Second fast acknowledgement');
 	await composer.press('ControlOrMeta+Enter');
+	await repeatedPublish;
 	const first = page
 		.getByRole('article', { name: 'Message from Avery Stone' })
 		.filter({ hasText: 'First slow acknowledgement' });
@@ -256,6 +315,14 @@ test('replays missed updates once and settles rapid sends acknowledged out of or
 	await page.getByRole('button', { name: 'Pause live updates' }).click();
 	await page.getByRole('button', { name: 'Reconnect' }).click();
 	await expect(page.getByRole('status', { name: 'Realtime connection: live' })).toBeVisible();
+	await expect(first).toHaveCount(1);
+	await expect(second).toHaveCount(1);
+
+	const channels = page.getByRole('navigation', { name: 'Workspace channels' });
+	await channels.getByRole('link', { name: 'design', exact: true }).click();
+	await expect(page.getByRole('heading', { name: '# design' })).toBeFocused();
+	await channels.getByRole('link', { name: 'general' }).click();
+	await expect(page.getByRole('heading', { name: '# general' })).toBeFocused();
 	await expect(first).toHaveCount(1);
 	await expect(second).toHaveCount(1);
 });
