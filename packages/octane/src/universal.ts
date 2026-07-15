@@ -1538,7 +1538,8 @@ interface HostBoundaryProps {
 interface HostBoundaryState {
 	root: UniversalRootImpl<any, any>;
 	owner: BoundaryOwner;
-	committed: boolean;
+	/** The DOM owner reached layout commit; this does not imply that a host batch ran. */
+	ownerCommitted: boolean;
 	pending: UniversalPreparedAttempt | null;
 }
 
@@ -1570,7 +1571,7 @@ export function createUniversalHostBoundary(renderer: string): ((
 			state = {
 				root: props.root as UniversalRootImpl<any, any>,
 				owner,
-				committed: false,
+				ownerCommitted: false,
 				pending: null,
 			};
 			boundaryStates.set(scope, state);
@@ -1582,7 +1583,7 @@ export function createUniversalHostBoundary(renderer: string): ((
 		try {
 			attempt = state.root.prepare(props.component, props.props);
 		} catch (error) {
-			if (!state.committed) {
+			if (!state.ownerCommitted) {
 				boundaryStates.delete(scope);
 				state.root.clearBridge(state.owner);
 			}
@@ -1594,7 +1595,10 @@ export function createUniversalHostBoundary(renderer: string): ((
 				if (state!.pending !== attempt) return;
 				try {
 					if (attempt.status === 'prepared') attempt.commit();
-					state!.committed = true;
+					// Suspension commits the DOM owner's lifetime without accepting a
+					// universal host batch. Retain its bridge so settlement can retry with
+					// the same context and error owner.
+					state!.ownerCommitted = true;
 					state!.pending = null;
 				} catch (error) {
 					boundaryStates.delete(scope);
@@ -1628,7 +1632,7 @@ export function createUniversalHostBoundary(renderer: string): ((
 			if (state!.pending !== attempt) return;
 			attempt.abort();
 			state!.pending = null;
-			if (!state!.committed) {
+			if (!state!.ownerCommitted) {
 				boundaryStates.delete(scope);
 				state!.root.clearBridge(state!.owner);
 			}

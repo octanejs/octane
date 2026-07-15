@@ -835,4 +835,46 @@ describe('mixed DOM and universal ownership', () => {
 		mounted.unmount();
 		root.unmount();
 	});
+
+	it('retains suspended ownership for retry and tears it down when the retry errors', async () => {
+		const { container, root } = objectRoot();
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [['value', 0]],
+		});
+		let failRetry = false;
+		let resolve!: (value: string) => void;
+		const pending = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const SuspendsThenThrows = defineUniversalComponent('object', () => {
+			if (failRetry) throw new Error('object retry failed');
+			return universalValue(plan, [use(pending)]);
+		});
+		const Safe = defineUniversalComponent('object', () => universalValue(plan, ['safe']));
+
+		const mounted = mount(UniversalBoundaryFixture, {
+			root,
+			component: SuspendsThenThrows,
+			childProps: {},
+			theme: 'dark',
+			log: () => {},
+			failAfterPrepare: false,
+		});
+		expect(container.commits).toHaveLength(0);
+		expect(container.instanceCount).toBe(0);
+
+		failRetry = true;
+		resolve('ready');
+		await pending;
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(mounted.find('.caught').textContent).toBe('caught: object retry failed');
+		expect(container.commits).toHaveLength(0);
+		expect(container.instanceCount).toBe(0);
+		expect(() => root.render(Safe, undefined)).toThrow(/unmounted universal root/);
+		mounted.unmount();
+	});
 });
