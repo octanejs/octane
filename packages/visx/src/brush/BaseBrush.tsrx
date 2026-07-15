@@ -18,7 +18,7 @@ import type {
 	BrushingType,
 	BrushPageOffset,
 } from './types';
-import { debounce, getPageCoordinates } from './utils';
+import { debounce, getPageCoordinates, normalizeBrushStartEnd } from './utils';
 
 type PointerHandlerEvent = PointerEvent<SVGRectElement>;
 
@@ -200,10 +200,7 @@ export class BaseBrush extends Component {
 			this.updateBrush((prevBrush: BaseBrushState) => {
 				const { start, end, extent } = prevBrush;
 
-				start.x = Math.min(extent.x0, extent.x1);
-				start.y = Math.min(extent.y0, extent.y0);
-				end.x = Math.max(extent.x0, extent.x1);
-				end.y = Math.max(extent.y0, extent.y1);
+				normalizeBrushStartEnd(start, end, extent);
 
 				let newState = {
 					...prevBrush,

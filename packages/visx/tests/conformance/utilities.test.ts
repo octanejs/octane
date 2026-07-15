@@ -20,6 +20,7 @@ import {
 	buildFloatingTooltipMiddleware,
 	getTooltipAnchorReference,
 } from '@octanejs/visx/tooltip/floating';
+import { normalizeBrushStartEnd } from '../../src/brush/utils';
 import getSplitLineSegments from '../../src/shape/util/getSplitLineSegments';
 
 describe('@octanejs/visx framework-neutral utilities', () => {
@@ -33,6 +34,21 @@ describe('@octanejs/visx framework-neutral utilities', () => {
 		vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 20, 100, 80));
 		const point = localPoint(node, new MouseEvent('pointermove', { clientX: 25, clientY: 47 }));
 		expect(point?.value()).toEqual({ x: 15, y: 27 });
+	});
+
+	it('normalizes brush endpoints across reversed x and y extents', () => {
+		const start = { x: 0, y: 0 };
+		const end = { x: 0, y: 0 };
+
+		normalizeBrushStartEnd(start, end, {
+			x0: 80,
+			x1: 20,
+			y0: 70,
+			y1: 10,
+		});
+
+		expect(start).toEqual({ x: 20, y: 10 });
+		expect(end).toEqual({ x: 80, y: 70 });
 	});
 
 	it('re-exports the upstream D3 curves and deterministic mock-data generators', () => {

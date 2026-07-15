@@ -1,6 +1,13 @@
 import type { MouseTouchOrPointerEvent } from '@octanejs/visx/drag';
 import type { PointerEvent } from 'react';
-import type { Scale } from './types';
+import type { Bounds, Point, Scale } from './types';
+
+export function normalizeBrushStartEnd(start: Point, end: Point, extent: Bounds): void {
+	start.x = Math.min(extent.x0, extent.x1);
+	start.y = Math.min(extent.y0, extent.y1);
+	end.x = Math.max(extent.x0, extent.x1);
+	end.y = Math.max(extent.y0, extent.y1);
+}
 
 export function scaleInvert(scale: Scale, value: number) {
 	// Test if the scale is an ordinalScale or not,

@@ -5,7 +5,7 @@ import type { HandlerArgs as DragArgs } from '@octanejs/visx/drag';
 import { Drag } from '@octanejs/visx/drag';
 import type { BaseBrushState as BrushState, UpdateBrush } from './BaseBrush.tsrx';
 import type { BrushPageOffset, BrushingType, ResizeTriggerAreas } from './types';
-import { getPageCoordinates } from './utils';
+import { getPageCoordinates, normalizeBrushStartEnd } from './utils';
 
 type HandleProps = {
 	x: number;
@@ -121,10 +121,7 @@ class BrushHandle extends Component {
 		if (!isControlled) {
 			updateBrush((prevBrush: BrushState) => {
 				const { start, end, extent } = prevBrush;
-				start.x = Math.min(extent.x0, extent.x1);
-				start.y = Math.min(extent.y0, extent.y0);
-				end.x = Math.max(extent.x0, extent.x1);
-				end.y = Math.max(extent.y0, extent.y1);
+				normalizeBrushStartEnd(start, end, extent);
 				const nextBrush: BrushState = {
 					...prevBrush,
 					start,
