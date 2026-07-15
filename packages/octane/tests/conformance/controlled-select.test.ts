@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount } from '../_helpers';
 import {
 	StaticSelect,
+	CaptureSelect,
 	DisabledFirstSelect,
 	ForSelect,
 	MultiSelect,
@@ -61,6 +62,19 @@ describe('conformance: controlled <select> (single)', () => {
 		r.unmount();
 	});
 
+	// The browser normally follows select input with change in the same task.
+	// If change never arrives, the deferred restore still settles the controlled
+	// element before the next task rather than abandoning the rendered value.
+	it('reverts an unhandled input-only pick at the microtask boundary', async () => {
+		const r = mount(StaticSelect, { value: 'a' });
+		const sel = r.find('#ss') as HTMLSelectElement;
+		sel.value = 'b';
+		sel.dispatchEvent(new Event('input', { bubbles: true }));
+		await Promise.resolve();
+		expect(sel.value).toBe('a');
+		r.unmount();
+	});
+
 	it('an accepting onInput keeps the pick', () => {
 		let r = mount(StaticSelect, {
 			value: 'a',
@@ -75,6 +89,25 @@ describe('conformance: controlled <select> (single)', () => {
 		sel.value = 'b';
 		sel.dispatchEvent(new Event('input', { bubbles: true }));
 		expect(sel.value).toBe('b');
+		r.unmount();
+	});
+
+	it('settles a rejected pick when native propagation stops after capture', async () => {
+		let captured = '';
+		const r = mount(CaptureSelect, {
+			value: 'a',
+			onChangeCapture: (e: Event) => {
+				captured = (e.target as HTMLSelectElement).value;
+			},
+			onChange: () => {},
+		});
+		const sel = r.find('#cs') as HTMLSelectElement;
+		sel.addEventListener('change', (event) => event.stopPropagation());
+		sel.value = 'b';
+		sel.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(captured).toBe('b');
+		await Promise.resolve();
+		expect(sel.value).toBe('a');
 		r.unmount();
 	});
 });

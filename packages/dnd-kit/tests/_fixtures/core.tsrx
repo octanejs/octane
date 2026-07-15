@@ -1,7 +1,8 @@
-import { useLayoutEffect } from 'octane';
+import { useLayoutEffect, useState } from 'octane';
 import {
 	DragDropProvider,
 	DragOverlay,
+	KeyboardSensor,
 	useDragDropManager,
 	useDragDropMonitor,
 	useDragOperation,
@@ -160,6 +161,68 @@ export function SortableFixture(props) @{
 			type={props.type}
 			captureInstances={props.captureInstances}
 		/>
+	</DragDropProvider>
+}
+
+const keyboardSensors = [KeyboardSensor];
+
+function KeyboardSortableItem(props) @{
+	const sortable = useSortable({
+		id: props.id,
+		index: props.index,
+		group: props.group,
+		data: { id: props.id, group: props.group },
+	});
+
+	<li id={`keyboard-sort-${props.id}`} ref={sortable.ref}>
+		<button id={`keyboard-sort-${props.id}-handle`} ref={sortable.handleRef}>
+			{props.id as string}
+		</button>
+	</li>
+}
+
+export function SortableGroupsFixture(props) @{
+	const [groups, setGroups] = useState({ left: ['one', 'two'], right: ['three'] });
+
+	<DragDropProvider
+		sensors={keyboardSensors}
+		plugins={[]}
+		modifiers={[]}
+		onDragEnd={(event) => {
+			if (event.canceled) return;
+			const source = event.operation.source?.data;
+			const target = event.operation.target?.data;
+			if (!source || !target) return;
+			setGroups((current) => {
+				const next = { left: [...current.left], right: [...current.right] };
+				const sourceGroup =
+					source.group === 'right' ? next.right : next.left;
+				const targetGroup =
+					target.group === 'right' ? next.right : next.left;
+				const sourceIndex = sourceGroup.indexOf(source.id);
+				if (sourceIndex < 0) return current;
+				const [moved] = sourceGroup.splice(sourceIndex, 1);
+				const targetIndex = targetGroup.indexOf(target.id);
+				targetGroup.splice(targetIndex < 0 ? targetGroup.length : targetIndex, 0, moved);
+				return next;
+			});
+		}}
+	>
+		<ManagerCapture capture={props.captureManager} />
+		<section aria-label="Left column">
+			<ol id="keyboard-sort-left">
+				@for (const id of groups.left; key id) {
+					<KeyboardSortableItem id={id} index={groups.left.indexOf(id)} group="left" />
+				}
+			</ol>
+		</section>
+		<section aria-label="Right column">
+			<ol id="keyboard-sort-right">
+				@for (const id of groups.right; key id) {
+					<KeyboardSortableItem id={id} index={groups.right.indexOf(id)} group="right" />
+				}
+			</ol>
+		</section>
 	</DragDropProvider>
 }
 
