@@ -168,10 +168,7 @@ export function Features() @{
 			}
 			.mark-code {
 				color: var(--accent-text);
-<<<<<<< HEAD
 				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-=======
->>>>>>> d189915 (feat(website): add interactive benchmark explorer to home page)
 				font-size: 0.875em;
 				white-space: nowrap;
 			}

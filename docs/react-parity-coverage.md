@@ -11,16 +11,16 @@ This report separates distinct Octane tests, React upstream scenarios, renderer/
 
 | Measure | Count |
 | --- | ---: |
-| Normal core cases | 2,260 |
-| ↳ conformance | 985 |
+| Normal core cases | 2,480 |
+| ↳ conformance | 1,171 |
 | ↳ differential | 136 |
 | ↳ hydration | 135 |
-| ↳ other runtime/compiler/SSR | 1,004 |
+| ↳ other runtime/compiler/SSR | 1,038 |
 | Profiling-only cases | 14 |
-| Distinct core cases including profiling | 2,274 |
-| Production-compile reruns of normal core | 2,260 |
-| All workspace executions | 7,135 |
-| React-source-attributed file upper bound | 968 cases in 68 files |
+| Distinct core cases including profiling | 2,494 |
+| Production-compile reruns of normal core | 2,480 |
+| All workspace executions | 7,584 |
+| React-source-attributed file upper bound | 1,154 cases in 72 files |
 
 The production project reruns the same normal core cases in another compile mode; it is not another set of conformance ports. The React-source-attributed definition is: Every collected normal-core case in a local file containing at least one React upstream *-test.js or *-test.ts filename citation; this is a generous file-level upper bound, not a one-to-one port count. Counts were measured on 2026-07-15.
 
@@ -85,8 +85,8 @@ Every concrete case in either pinned inventory has exactly one ledger dispositio
 
 | Baseline | Cases | Untriaged | Planned | In progress | Covered | Documented | Blocked |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| stable | 5,345 | 4,449 | 862 | 0 | 29 | 5 | 0 |
-| canary | 5,413 | 4,506 | 868 | 0 | 34 | 5 | 0 |
+| stable | 5,345 | 4,449 | 655 | 0 | 194 | 47 | 0 |
+| canary | 5,413 | 4,506 | 660 | 0 | 200 | 47 | 0 |
 
 Classifications are `portable`, `adaptable`, `divergence`, and `non_goal`. A covered case requires live local test evidence; divergence and non-goal dispositions require a rationale.
 
@@ -98,10 +98,10 @@ Suite policies are machine-readable in `react-upstreams.json`; the first matchin
 | --- | ---: | ---: | --- | --- | --- | --- |
 | Effect Event semantics | 12 / 12 | 17 / 17 | critical | covered | runtime | Executable stable/canary adaptations cover fresh wrapper identity, render-call guards, commit-time publication, effect ordering, Activity/context integration, and suspended or failed renders. |
 | Untrusted URL security | 17 / 77 | 17 / 77 | critical | covered | runtime + SSR | An executable render-mode matrix covers one shared javascript: URL sanitizer across client, compiler-baked literals, SSR, streaming, updates, SVG, forms, and hydration. |
-| Root semantics | 27 / 27 | 27 / 27 | high | planned | runtime | Port public createRoot, update, unmount, error, and scheduling outcomes while filtering renderer internals. |
-| Fragment reconciliation | 29 / 29 | 29 / 29 | high | planned | runtime | Expand fragment reconciliation, ref, nesting, and top-level outcome coverage. |
-| Element and Children APIs | 111 / 111 | 111 / 111 | high | planned | public API | Audit and port observable Children, element creation, JSX-element, and clone behavior against Octane's public API. |
-| Lazy components | 40 / 40 | 41 / 41 | high | planned | runtime | Expand lazy resolution, rejection, retry, default-export, and Suspense interaction coverage. |
+| Root semantics | 27 / 27 | 27 / 27 | high | covered | runtime | Twenty-five public root cases have exact-title client and production-compile evidence; the component-body render entry point and safe teardown after external DOM removal are executable, documented divergences. |
+| Fragment reconciliation | 29 / 29 | 29 / 29 | high | covered | runtime | Twenty-eight fragment identity and reconciliation cases have exact-title client and production-compile evidence; React's internal lazy-to-element shape has a documented non-goal disposition and executable component-module adaptation. |
+| Element and Children APIs | 111 / 111 | 111 / 111 | high | covered | public API | Ninety-five public Children, element creation, clone, validation, iterable, thenable, key, ref, freezing, and function-default-prop cases have executable evidence; sixteen React owner/component-stack, legacy-transform, class, and private-element diagnostics are documented non-goals. |
+| Lazy components | 40 / 40 | 41 / 41 | high | covered | runtime | Nineteen lazy resolution, rejection, function-component default-prop, memo, identity, and reorder cases have executable evidence; three ergonomic/component-form differences and twenty unsupported class, forwardRef, legacy-root, owner-stack, or exotic-type cases have durable documented dispositions. |
 | External stores | 19 / 19 | 19 / 19 | high | planned | runtime | Port store mutation, snapshot consistency, selector, error, and hydration outcomes. |
 | Update reconciliation | 42 / 42 | 45 / 45 | high | planned | runtime | Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes. |
 | Fizz streaming | 207 / 207 | 207 / 207 | high | planned | SSR + hydration | Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior. |
@@ -111,7 +111,7 @@ Suite policies are machine-readable in `react-upstreams.json`; the first matchin
 ### Migration sequence and exit criteria
 
 1. **Wave 1 — critical blockers (completed 2026-07-15):** Effect Event semantics and shared untrusted-URL sanitization are implemented, ported, and linked to executable ledger evidence.
-2. **Wave 2 — public API and reconciliation:** root, fragment, element/Children, and lazy-component outcomes.
+2. **Wave 2 — public API and reconciliation (completed 2026-07-15):** supported root, fragment, element/Children, and lazy-component outcomes have live evidence; excluded outcomes have durable divergence/non-goal dispositions.
 3. **Wave 3 — scheduling and stores:** update reconciliation and external-store consistency.
 4. **Wave 4 — server matrix:** applicable Fizz streaming cases, then the five-mode server integration matrix.
 5. **Residual audit:** assign risk and a durable disposition to every remaining untriaged case, with canary drift reviewed continuously.

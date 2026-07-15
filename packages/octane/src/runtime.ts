@@ -572,6 +572,11 @@ interface PendingEffect {
 
 let CURRENT_SCOPE: Scope | null = null;
 let CURRENT_BLOCK: Block | null = null;
+// Public root diagnostics need to distinguish an ordinary imperative unmount
+// from one requested by an effect body while the commit lifecycle is active.
+// Passive effects may drain outside `inFlush`, so that scheduler flag alone is
+// insufficient for the observable root warning.
+let EFFECT_BODY_DEPTH = 0;
 // Octane discovers deletion destroys while reconciling a parent, but those
 // callbacks are semantically mutation-phase work. Effect Events may be called
 // from them even though CURRENT_SCOPE still reflects the eager parent render.
@@ -2354,10 +2359,15 @@ function fireEffectCleanup(e: PendingEffect): void {
 function runEffectBody(e: PendingEffect): void {
 	let cleanup: void | Cleanup;
 	try {
-		// Spread deps as positional args (see PendingEffect.args). A no-deps
-		// effect has args === undefined, so the body is called with zero args.
-		// eslint-disable-next-line prefer-spread
-		cleanup = e.fn.apply(null, (e.args ?? []) as []);
+		if (process.env.NODE_ENV !== 'production') EFFECT_BODY_DEPTH++;
+		try {
+			// Spread deps as positional args (see PendingEffect.args). A no-deps
+			// effect has args === undefined, so the body is called with zero args.
+			// eslint-disable-next-line prefer-spread
+			cleanup = e.fn.apply(null, (e.args ?? []) as []);
+		} finally {
+			if (process.env.NODE_ENV !== 'production') EFFECT_BODY_DEPTH--;
+		}
 	} catch (err) {
 		// Route effect errors to the nearest enclosing tryBlock, if any.
 		const handler = findTryHandler(e.scope.block);
@@ -2944,6 +2954,7 @@ function renderReturnedValue(block: Block, out: unknown): void {
 	const useSingleRoot =
 		out !== null &&
 		(out as any).$$kind === ELEMENT_TAG &&
+		(out as any).key == null &&
 		typeof (out as any).type === 'function' &&
 		(out as any).type.$$singleRoot === true;
 	// The private return slot holds EITHER a componentSlotSlot (singleRoot
@@ -4949,6 +4960,21 @@ function adoptWarmValue(slot: HookSlot, deps: any[]): any {
 // lazy — React's code-splitting component wrapper.
 // ---------------------------------------------------------------------------
 
+const LAZY_COMPONENT = Symbol.for('octane.lazy');
+
+function lazyResolvedProps(comp: ComponentBody<any>, props: any): any {
+	const defaults = (comp as any).defaultProps;
+	if (defaults == null || typeof defaults !== 'object') return props;
+	let resolved = props;
+	for (const key of Object.keys(defaults)) {
+		if (props == null || props[key] === undefined) {
+			if (resolved === props) resolved = props == null ? {} : { ...props };
+			resolved[key] = defaults[key];
+		}
+	}
+	return resolved;
+}
+
 /**
  * Resolve a lazy module payload to its component. Accepts React's canonical
  * `{ default: Component }` (a dynamic `import()` namespace) and — as a
@@ -4956,12 +4982,16 @@ function adoptWarmValue(slot: HookSlot, deps: any[]): any {
  * import('./x').then((m) => m.Named))` works without a `{ default }` shim.
  */
 function resolveLazyModule(mod: any): ComponentBody<any> {
-	const comp = mod != null && mod.default !== undefined ? mod.default : mod;
-	if (typeof comp !== 'function') {
+	let comp = mod;
+	if (mod != null) {
+		const defaultExport = mod.default;
+		if (defaultExport !== undefined) comp = defaultExport;
+	}
+	if (typeof comp !== 'function' || (comp as any)[LAZY_COMPONENT] === true) {
 		throw new Error(
 			'lazy: expected the load() promise to resolve to a component function or a ' +
 				"module with a component as its default export, got '" +
-				typeof comp +
+				((comp as any)?.[LAZY_COMPONENT] === true ? 'lazy component' : typeof comp) +
 				"'",
 		);
 	}
@@ -4987,40 +5017,98 @@ function resolveLazyModule(mod: any): ComponentBody<any> {
  */
 export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ default: C } | C>): C {
 	let status: 'uninitialized' | 'pending' | 'fulfilled' | 'rejected' = 'uninitialized';
-	let result: any = null; // fulfilled → component; rejected → the reason
+	let result: any = null; // fulfilled → module value; rejected → the reason
 	let thenable: TrackedThenable<any> | null = null;
-	const lazyWrapper = (props: any, scope: Scope, extra: any): unknown => {
-		if (status === 'fulfilled') return (result as ComponentBody<any>)(props, scope, extra);
+	let profiledComponent: ComponentBody<any> | null = null;
+	let memoMetadataInstalled = false;
+	let lazyWrapper!: ComponentBody<any>;
+
+	const callResolvedComponent = (props: any, scope: Scope, extra: any): unknown => {
+		// Keep the module object, rather than only its current `.default` value. A
+		// throwing/accessor default export is a render-time failure in React: a later
+		// render reads it again without re-running the loader.
+		const comp = resolveLazyModule(result);
+		if ((comp as any).__memo === true) {
+			// The lazy wrapper owns the live Block, so a resolved memo wrapper would
+			// otherwise be tail-called below the place where componentSlot performs its
+			// bailout. Publish equivalent metadata on this wrapper once the module has
+			// resolved. The comparator resolves defaultProps at the same public boundary
+			// as the component invocation.
+			if (!memoMetadataInstalled) {
+				(lazyWrapper as any).__memo = true;
+				(lazyWrapper as any).__compare = (prev: any, next: any): boolean => {
+					const current = resolveLazyModule(result);
+					const compare = (current as any).__compare as
+						| ((previous: any, incoming: any) => boolean)
+						| undefined;
+					const previous = lazyResolvedProps(current, prev);
+					const incoming = lazyResolvedProps(current, next);
+					return compare ? compare(previous, incoming) : shallowEqualProps(previous, incoming);
+				};
+				memoMetadataInstalled = true;
+			}
+			// The Block was created while the payload was unresolved, before it could
+			// inherit memo metadata. Arm context dependency stamping before executing
+			// the resolved memo body.
+			scope.block.memoInChain = true;
+		}
+		if (
+			profiledComponent !== comp &&
+			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+			__OCTANE_PROFILE_ENABLED__
+		) {
+			__profileComponentSource(lazyWrapper, comp);
+			profiledComponent = comp;
+		}
+		return comp(lazyResolvedProps(comp, props), scope, extra);
+	};
+
+	lazyWrapper = (props: any, scope: Scope, extra: any): unknown => {
+		if (status === 'fulfilled') {
+			return callResolvedComponent(props, scope, extra);
+		}
 		if (status === 'rejected') throw result;
 		if (status === 'uninitialized') {
-			status = 'pending';
-			const p = load();
-			thenable = p as TrackedThenable<any>;
-			p.then(
-				(mod: any) => {
-					// This handler was attached FIRST, so by the time the boundary's retry
-					// listener fires the payload is already fulfilled/rejected and the
-					// re-render takes the synchronous branch above.
-					try {
-						result = resolveLazyModule(mod);
-						// Profiling resolves metadata through the loaded component without
-						// wrapping it or changing the lazy wrapper's stable identity.
-						if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-							__profileComponentSource(lazyWrapper, result);
-						status = 'fulfilled';
-					} catch (err) {
-						result = err;
-						status = 'rejected';
-					}
-				},
-				(err: any) => {
-					result = err;
-					status = 'rejected';
-				},
-			);
+			try {
+				const p = load();
+				thenable = p as TrackedThenable<any>;
+				p.then(
+					(mod: any) => {
+						// This handler was attached FIRST, so by the time the boundary's retry
+						// listener fires the payload is already fulfilled/rejected and the
+						// re-render takes the synchronous branch above.
+						if (status === 'uninitialized' || status === 'pending') {
+							result = mod;
+							status = 'fulfilled';
+						}
+					},
+					(err: any) => {
+						if (status === 'uninitialized' || status === 'pending') {
+							result = err;
+							status = 'rejected';
+						}
+					},
+				);
+			} catch (error) {
+				// React does not publish Pending until both load() and `.then(...)`
+				// registration return. A synchronous throw is therefore retryable on the
+				// next render instead of poisoning the wrapper with a null thenable.
+				if (status === 'uninitialized') thenable = null;
+				throw error;
+			}
+			if (status === 'uninitialized') status = 'pending';
+			// PromiseLike is permitted to settle while `then` is registering. Match
+			// React's synchronous-thenable contract: render or throw immediately rather
+			// than briefly committing a fallback (or leaving partial sibling work).
+			const settledStatus = status as 'pending' | 'fulfilled' | 'rejected';
+			if (settledStatus === 'fulfilled') {
+				return callResolvedComponent(props, scope, extra);
+			}
+			if (settledStatus === 'rejected') throw result;
 		}
 		throw new SuspenseException(thenable!);
 	};
+	Object.defineProperty(lazyWrapper, LAZY_COMPONENT, { value: true });
 	return lazyWrapper as unknown as C;
 }
 
@@ -8801,20 +8889,61 @@ const ELEMENT_TAG = Symbol.for('octane.element');
 // independent reconciliation boundary without adding an observable descriptor
 // field or penalizing unkeyed descriptors with extra object shape.
 const KEYED_ELEMENT_DESCRIPTORS = new WeakSet<object>();
+// Children.map/toArray synthesize stable traversal keys. Keep the original
+// missing-key validation state out of band so rebasing an unkeyed element from
+// a dynamic collection does not accidentally silence the renderer warning.
+const ELEMENTS_MISSING_LIST_KEY = new WeakSet<object>();
 export interface ElementDescriptor<P = any> {
 	$$kind: typeof ELEMENT_TAG;
 	// A compiled ComponentBody (the fast/common case, e.g. `root.render(<App/>)`)
 	// OR a host tag string (`'li'`) — the latter is produced when host JSX appears
 	// at a VALUE position (a `.map(...)` callback, a function return, an array
 	// literal) and is rendered by the runtime de-opt path (see `renderDeopt`).
-	type: ComponentBody<P> | string;
+	type: ComponentBody<P> | string | typeof Fragment;
 	props: P;
 	// React-style `key`, lifted out of props. Consulted by the de-opt list path
 	// when this descriptor is an item of an array child.
 	key: any;
+	// React 19 treats refs as ordinary props. Keep the deprecated element-level
+	// alias too so code which still inspects `element.ref` observes the same value.
+	ref: any;
 	// Children passed to `createElement(type, props, ...children)` (host de-opt).
 	// `null` for the component-value form (children flow through the component).
 	children: any;
+}
+
+function hasElementConfigKey(config: any): boolean {
+	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
+	const own = Object.getOwnPropertyDescriptor(config, 'key');
+	// React's development-only props.key warning getter is not a real key. This
+	// matters when an element's props object is fed back into createElement.
+	if (own?.get != null && (own.get as any).isReactWarning) return false;
+	return config.key !== undefined;
+}
+
+function copyElementConfig(config: any): any {
+	const props: any = {};
+	if (config == null) return props;
+	for (const name in config) {
+		if (name !== 'key' && hasOwnProp.call(config, name)) props[name] = config[name];
+	}
+	return props;
+}
+
+function applyElementDefaultProps(type: any, props: any): void {
+	const defaults = type?.defaultProps;
+	if (defaults == null) return;
+	for (const name in defaults) {
+		if (props[name] === undefined) props[name] = defaults[name];
+	}
+}
+
+function finalizeElementDescriptor<P>(descriptor: ElementDescriptor<P>): ElementDescriptor<P> {
+	if (process.env.NODE_ENV !== 'production') {
+		Object.freeze(descriptor.props);
+		Object.freeze(descriptor);
+	}
+	return descriptor;
 }
 // React-shape `createElement(type, props, ...children)`. Two-arg calls
 // (`createElement(Comp, props)`) stay the component-value form the compiler emits
@@ -8822,19 +8951,23 @@ export interface ElementDescriptor<P = any> {
 // host descriptor for the runtime de-opt renderer. `key` is lifted out of props
 // (React semantics — `key` is never a real prop).
 export function createElement<P>(
-	type: ComponentBody<P> | string,
+	type: ComponentBody<P> | string | typeof Fragment,
 	props?: P,
 	...children: any[]
 ): ElementDescriptor<P> {
 	const src = (props ?? null) as any;
-	const key = src != null && src.key != null ? src.key : null;
+	const hasKey = hasElementConfigKey(src);
+	const key = hasKey ? '' + src.key : null;
 	const hasPositional = children.length > 0;
-	const kids = hasPositional ? (children.length === 1 ? children[0] : children) : src?.children;
+	let kids = hasPositional ? (children.length === 1 ? children[0] : children) : src?.children;
 	// Multiple positional children → a fresh array of FIXED siblings (never reordered).
 	// Tag it so the de-opt list keys them by index without the missing-key warning that
 	// is meant for `.map()` results. (A single child is passed through as-is — a lone
 	// `.map()` array stays untagged and keeps the warning.)
-	if (children.length > 1) POSITIONAL_CHILDREN.add(children);
+	if (children.length > 1) {
+		POSITIONAL_CHILDREN.add(children);
+		if (process.env.NODE_ENV !== 'production') Object.freeze(children);
+	}
 	// Build the descriptor's props WITHOUT mutating the caller's object, with `key`
 	// lifted OUT of props (React semantics — `key` is never a real prop).
 	//
@@ -8846,37 +8979,25 @@ export function createElement<P>(
 	// clone/render-prop patterns in React ecosystem bindings preserve host children.
 	// Positional children override an explicit `props.children`, matching React.
 	//
-	// We copy-on-write: a fresh props object is allocated only when there's a `key` to
-	// strip or positional children to fold in, so the compiler's hot 2-arg
-	// `createElement(Comp, props)` path stays allocation-free and never touches the
-	// caller's object.
-	const stripKey = src != null && 'key' in src;
-	const addChildren = hasPositional;
-	let p: any = src ?? {};
-	if (stripKey || addChildren) {
-		// Manual copy-minus-key, NOT `{...src}` + `delete p.key`: deleting a
-		// property drops the object into V8 dictionary mode (no enum cache),
-		// which makes every later for-in/spread over these props slow — memo's
-		// shallowEqualProps measurably regressed on value-position rows with it.
-		p = {};
-		if (src != null) {
-			// hasOwn guard: spread copies OWN enumerable keys only; for-in would
-			// also pick up inherited enumerables.
-			for (const k in src) {
-				if (k !== 'key' && hasOwnProp.call(src, k)) p[k] = (src as any)[k];
-			}
-		}
-		if (addChildren) p.children = kids;
-	}
+	// createElement is callable userland API, so it must snapshot config even on
+	// the common two-argument path. Mutating the caller's object after creation
+	// must not retroactively mutate the element.
+	const keyWasProvided =
+		src != null && (typeof src === 'object' || typeof src === 'function') && 'key' in src;
+	const p = copyElementConfig(src);
+	if (hasPositional) p.children = kids;
+	applyElementDefaultProps(type, p);
+	kids = p.children;
 	const descriptor: ElementDescriptor<P> = {
 		$$kind: ELEMENT_TAG,
 		type,
 		props: p as P,
 		key,
+		ref: p.ref !== undefined ? p.ref : null,
 		children: kids ?? null,
 	};
-	if (stripKey) KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
-	return descriptor;
+	if (keyWasProvided) KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	return finalizeElementDescriptor(descriptor);
 }
 function isElementDescriptor(v: any): v is ElementDescriptor {
 	return v != null && v.$$kind === ELEMENT_TAG;
@@ -8917,13 +9038,18 @@ export function cloneElement<P>(
 			'cloneElement: the first argument must be an element (from createElement / JSX).',
 		);
 	}
-	const props: any = { ...(element.props as any) };
+	const props = copyElementConfig(element.props);
 	let key = element.key;
+	let hasKeyOverride = false;
 	if (config != null) {
-		if (config.key !== undefined && config.key !== null) key = config.key;
+		hasKeyOverride = hasElementConfigKey(config);
+		if (hasKeyOverride) key = '' + config.key;
 		for (const name in config) {
 			if (name === 'key') continue;
-			if (Object.prototype.hasOwnProperty.call(config, name)) props[name] = config[name];
+			// React 19 keeps refs as props, but cloneElement treats an explicitly
+			// undefined ref as absent for backwards compatibility.
+			if (name === 'ref' && config.ref === undefined) continue;
+			if (hasOwnProp.call(config, name)) props[name] = config[name];
 		}
 	}
 	const n = children.length;
@@ -8937,15 +9063,13 @@ export function cloneElement<P>(
 		// No new children: reuse `config.children` (now merged into props) or the original.
 		kids = 'children' in props ? props.children : element.children;
 	}
-	// Components read `props.children`; host descriptors carry children on the descriptor
-	// and never fold them into props (the de-opt reconciler owns them) — mirror createElement.
-	if (typeof element.type === 'function') props.children = kids;
-	else if ('children' in props) delete props.children;
+	if (n > 0) props.children = kids;
 	const descriptor: ElementDescriptor<P> = {
 		$$kind: ELEMENT_TAG,
 		type: element.type,
 		props,
 		key,
+		ref: props.ref !== undefined ? props.ref : null,
 		children: kids ?? null,
 	};
 	if (
@@ -8954,54 +9078,208 @@ export function cloneElement<P>(
 	) {
 		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
 	}
-	return descriptor;
+	// A mapped/toArray descriptor retains its missing-key provenance when it is
+	// cloned unchanged. Supplying a real replacement key fixes that diagnostic,
+	// just as React.cloneElement(mappedChild, {key}) does.
+	if (ELEMENTS_MISSING_LIST_KEY.has(element) && !hasKeyOverride) {
+		ELEMENTS_MISSING_LIST_KEY.add(descriptor);
+	}
+	return finalizeElementDescriptor(descriptor);
 }
 
-// Visit each leaf of `children` (flattening arrays), passing empties through as `null`.
-// A top-level nullish `children` visits nothing (React returns 0). Returns the visit count.
-function traverseChildren(children: any, fn: (child: any, index: number) => void): number {
-	if (children == null) return 0;
-	let index = 0;
-	const walk = (node: any): void => {
-		if (Array.isArray(node)) {
-			for (let i = 0; i < node.length; i++) walk(node[i]);
-			return;
-		}
-		fn(node == null || typeof node === 'boolean' ? null : node, index++);
+function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): ElementDescriptor {
+	const descriptor: ElementDescriptor = {
+		$$kind: ELEMENT_TAG,
+		type: element.type,
+		props: element.props,
+		key,
+		ref: element.ref,
+		children: element.children,
 	};
-	walk(children);
-	return index;
+	KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	if (ELEMENTS_MISSING_LIST_KEY.has(element)) ELEMENTS_MISSING_LIST_KEY.add(descriptor);
+	return finalizeElementDescriptor(descriptor);
+}
+
+function escapeElementKey(key: string): string {
+	return '$' + key.replace(/[=:]/g, (match) => (match === '=' ? '=0' : '=2'));
+}
+
+function escapeMappedElementKey(key: string): string {
+	return key.replace(/\/+/g, '$&/');
+}
+
+function childElementKey(child: any, index: number): string {
+	return child != null && typeof child === 'object' && child.key != null
+		? escapeElementKey('' + child.key)
+		: index.toString(36);
+}
+
+function childrenIterator(children: any): (() => Iterator<any>) | null {
+	// React's getIteratorFn deliberately accepts objects only. Functions are
+	// ignored children even when userland attaches Symbol.iterator to one.
+	if (children == null || typeof children !== 'object') return null;
+	const iterator =
+		(typeof Symbol === 'function' && (children as any)[Symbol.iterator]) ||
+		(children as any)['@@iterator'];
+	return typeof iterator === 'function' ? iterator : null;
+}
+
+function resolveChildrenThenable(thenable: TrackedThenable): any {
+	// During a component render, use the same tracked call-order storage and
+	// Suspense sentinel as use(). This lets a cached promise in Children.map
+	// suspend and replay through the nearest Octane boundary.
+	if (CURRENT_BLOCK !== null) return useThenable(thenable);
+	trackThenable(thenable);
+	if (thenable.status === 'fulfilled') return thenable.value;
+	if (thenable.status === 'rejected') throw thenable.reason;
+	throw thenable;
+}
+
+function invalidChildError(child: object): Error {
+	const rendered = String(child);
+	const found =
+		rendered === '[object Object]'
+			? 'object with keys {' + Object.keys(child).join(', ') + '}'
+			: rendered;
+	return new Error(
+		'Objects are not valid as an Octane child (found: ' +
+			found +
+			'). If you meant to render a collection of children, use an array instead.',
+	);
+}
+
+function mapIntoChildren(
+	children: any,
+	out: any[],
+	escapedPrefix: string,
+	nameSoFar: string,
+	callback: (child: any) => any,
+	validateKey = false,
+): number {
+	let type = typeof children;
+	if (type === 'undefined' || type === 'boolean') {
+		children = null;
+		type = 'object';
+	}
+
+	const isLeaf =
+		children === null ||
+		type === 'string' ||
+		type === 'number' ||
+		type === 'bigint' ||
+		isElementDescriptor(children) ||
+		(children != null && children.$$kind === PORTAL_TAG);
+	if (isLeaf) {
+		const child = children;
+		let mapped = callback(child);
+		const childKey = nameSoFar === '' ? '.' + childElementKey(child, 0) : nameSoFar;
+		if (Array.isArray(mapped)) {
+			mapIntoChildren(mapped, out, escapeMappedElementKey(childKey) + '/', '', (value) => value);
+		} else if (mapped != null) {
+			if (isElementDescriptor(mapped)) {
+				const mappedKey = mapped.key;
+				mapped = cloneAndReplaceElementKey(
+					mapped,
+					escapedPrefix +
+						(mappedKey != null && (!child || child.key !== mappedKey)
+							? escapeMappedElementKey('' + mappedKey) + '/'
+							: '') +
+						childKey,
+				);
+				if (validateKey && isElementDescriptor(child) && child.key == null) {
+					ELEMENTS_MISSING_LIST_KEY.add(mapped);
+				}
+			}
+			out.push(mapped);
+		}
+		return 1;
+	}
+
+	let count = 0;
+	const nextPrefix = nameSoFar === '' ? '.' : nameSoFar + ':';
+	if (Array.isArray(children)) {
+		const validateItems = validateKey || !POSITIONAL_CHILDREN.has(children);
+		for (let i = 0; i < children.length; i++) {
+			const child = children[i];
+			count += mapIntoChildren(
+				child,
+				out,
+				escapedPrefix,
+				nextPrefix + childElementKey(child, i),
+				callback,
+				validateItems,
+			);
+		}
+		return count;
+	}
+
+	const iterator = childrenIterator(children);
+	if (iterator !== null) {
+		const cursor = iterator.call(children);
+		let step: IteratorResult<any>;
+		let i = 0;
+		while (!(step = cursor.next()).done) {
+			const child = step.value;
+			count += mapIntoChildren(
+				child,
+				out,
+				escapedPrefix,
+				nextPrefix + childElementKey(child, i++),
+				callback,
+				true,
+			);
+		}
+		return count;
+	}
+
+	if (type === 'object') {
+		if (typeof children.then === 'function') {
+			return mapIntoChildren(
+				resolveChildrenThenable(children),
+				out,
+				escapedPrefix,
+				nameSoFar,
+				callback,
+				validateKey,
+			);
+		}
+		throw invalidChildError(children);
+	}
+	return 0;
 }
 
 export const Children = {
-	/** Iterate children, flattening arrays; empties are visited as `null` (React parity). */
-	forEach(children: any, fn: (child: any, index: number) => void): void {
-		traverseChildren(children, fn);
+	/** Iterate children, flattening collections; empties are visited as `null`. */
+	forEach(children: any, fn: (child: any, index: number) => void, context?: any): void {
+		if (children == null) return;
+		let index = 0;
+		mapIntoChildren(children, [], '', '', (child) => {
+			fn.call(context, child, index++);
+			return null;
+		});
 	},
-	/** Map children to a flat array; empty inputs are visited, empty results are dropped. */
-	map<T>(children: any, fn: (child: any, index: number) => T): T[] | null | undefined {
+	/** Map children to a flat, React-keyed array; empty results are dropped. */
+	map<T>(
+		children: any,
+		fn: (child: any, index: number) => T,
+		context?: any,
+	): T[] | null | undefined {
 		if (children == null) return children as null | undefined;
 		const out: T[] = [];
-		traverseChildren(children, (child, i) => {
-			const mapped = fn(child, i);
-			if (Array.isArray(mapped)) {
-				for (const m of mapped) if (m != null && typeof m !== 'boolean') out.push(m as T);
-			} else if (mapped != null && typeof mapped !== 'boolean') {
-				out.push(mapped);
-			}
-		});
+		let index = 0;
+		mapIntoChildren(children, out, '', '', (child) => fn.call(context, child, index++));
 		return out;
 	},
 	/** Number of children `map`/`forEach` would visit (empties included, like React). */
 	count(children: any): number {
-		return traverseChildren(children, () => {});
+		if (children == null) return 0;
+		return mapIntoChildren(children, [], '', '', () => null);
 	},
-	/** Flatten children into an array, dropping `null`/`undefined`/boolean entries. */
+	/** Flatten children into a React-keyed array, dropping empty entries. */
 	toArray(children: any): any[] {
 		const out: any[] = [];
-		traverseChildren(children, (child) => {
-			if (child != null) out.push(child);
-		});
+		if (children != null) mapIntoChildren(children, out, '', '', (child) => child);
 		return out;
 	},
 	/** Assert `children` is a single element and return it (`React.Children.only`). */
@@ -9170,6 +9448,7 @@ function componentSlotImpl(
 			type: comp,
 			props,
 			key: null,
+			ref: props != null && props.ref !== undefined ? props.ref : null,
 			children: props != null ? props.children : null,
 		} satisfies ElementDescriptor;
 	}
@@ -9758,21 +10037,37 @@ function clearChildContent(state: ChildSlot): void {
 // path) so their hooks/state reconcile too.
 // ---------------------------------------------------------------------------
 
-let _deoptKeyWarned = false;
+// React dedupes missing-key diagnostics by render owner/source. Octane does not
+// carry owner stacks, so use the closest durable equivalent: once per rendering
+// Block. This avoids both global suppression (one list hiding every later bug)
+// and repeated warnings from updates of the same component instance.
+const DEOPT_KEY_WARNED_BLOCKS = new WeakSet<object>();
+let DEOPT_KEY_WARNED_WITHOUT_BLOCK = false;
 function deoptKey(item: any, index: number): any {
-	if (item != null && item.$$kind === ELEMENT_TAG && item.key != null) return item.key;
-	// React parity: unkeyed array children fall back to the index, with a one-time
-	// dev warning. (Suppressed during hydration adoption — markers drive matching.)
-	if (process.env.NODE_ENV !== 'production' && !_deoptKeyWarned && activeHydration() === null) {
-		_deoptKeyWarned = true;
-		console.warn(
-			'Octane: each element in an array child should have a unique "key" prop ' +
-				'(e.g. `items.map((x) => <li key={x.id}>…</li>)`). Falling back to the array ' +
-				'index, which can reconcile incorrectly on reorder — for keyed lists prefer ' +
-				'`@for (...; key ...)`.',
-		);
+	const element = item != null && item.$$kind === ELEMENT_TAG;
+	if (element && item.key != null && !ELEMENTS_MISSING_LIST_KEY.has(item)) return item.key;
+	// React parity: unkeyed array children fall back to the index, with a deduplicated
+	// dev warning. Only ELEMENTS need keys: empty slots, primitives, and nested
+	// iterables are legal list members and must not produce a missing-key warning.
+	// (Suppressed during hydration adoption — markers drive matching.)
+	if (element && process.env.NODE_ENV !== 'production' && activeHydration() === null) {
+		const owner = CURRENT_BLOCK;
+		const warned =
+			owner === null
+				? DEOPT_KEY_WARNED_WITHOUT_BLOCK
+				: DEOPT_KEY_WARNED_BLOCKS.has(owner as object);
+		if (!warned) {
+			if (owner === null) DEOPT_KEY_WARNED_WITHOUT_BLOCK = true;
+			else DEOPT_KEY_WARNED_BLOCKS.add(owner as object);
+			console.warn(
+				'Octane: each element in an array child should have a unique "key" prop ' +
+					'(e.g. `items.map((x) => <li key={x.id}>…</li>)`). Missing keys can reconcile ' +
+					'incorrectly on reorder — for keyed lists prefer ' +
+					'`@for (...; key ...)`.',
+			);
+		}
 	}
-	return index;
+	return element && item.key != null ? item.key : index;
 }
 
 // `createElement(tag, props, a, b, …)` collapses MULTIPLE positional children into a
@@ -10049,47 +10344,138 @@ function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 	(el as Element & DeoptStamped)[DEOPT_DESC] = d;
 }
 
-// Flatten a possibly-nested array child into one item per LEAF, KEEPING empties
-// (they occupy an index slot; see the childSlot array branch). Distinct from
-// flattenDeoptChildren below, which serves the raw host-children reconciler and
-// DROPS empties.
-function flattenChildItems(out: any[], v: any[]): void {
-	for (let i = 0; i < v.length; i++) {
-		const item = v[i];
-		if (Array.isArray(item)) flattenChildItems(out, item);
-		else out.push(item);
+type DeoptWrapperKind = 'array' | 'fragment';
+
+interface PreparedDeoptList {
+	items: any[];
+	keys: any[];
+}
+
+function isFragmentDescriptor(value: any): value is ElementDescriptor {
+	return isElementDescriptor(value) && value.type === Fragment;
+}
+
+function fragmentDescriptorChildren(value: ElementDescriptor): any[] {
+	const children = value.children;
+	if (children == null) return [];
+	return Array.isArray(children) ? children : [children];
+}
+
+function deoptWrapperKind(value: any[]): DeoptWrapperKind {
+	return POSITIONAL_CHILDREN.has(value as object) ? 'fragment' : 'array';
+}
+
+function scopedDeoptKey(
+	path: readonly (string | number)[],
+	item: any,
+	index: number,
+	key: any,
+): string {
+	// Reconciliation keys are an internal encoding, not raw user strings. Encode
+	// both wrapper path and leaf-key KIND so an implicit index 0 cannot alias an
+	// explicit key="0", and a user key that resembles a serialized wrapper path
+	// cannot alias a nested child. JSON quoting makes arbitrary user strings data,
+	// never structure, while remaining stable across renders without an intern map.
+	const explicit = isElementDescriptor(item) && item.key != null;
+	return JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]);
+}
+
+// Flatten arrays and Fragment descriptors to renderable leaves while retaining
+// React's public state-preservation boundaries in their reconciliation keys.
+// One top-level array/Fragment layer is transparent; a nested wrapper with the
+// opposite kind is also transparent when it is the sole child. Equal adjacent
+// wrappers form a real boundary. This is the observable rule behind React's
+// single-child <-> Fragment/array preservation and its two-level remount cases.
+function flattenReactChildContainer(
+	outItems: any[],
+	outKeys: any[],
+	children: any[],
+	kind: DeoptWrapperKind,
+	path: readonly (string | number)[],
+): void {
+	const keyFn = kind === 'fragment' ? deoptKeyPositional : deoptKey;
+	const count = children.length;
+	for (let i = 0; i < count; i++) {
+		const item = children[i];
+		if (isFragmentDescriptor(item)) {
+			const nested = fragmentDescriptorChildren(item);
+			if (item.key != null) {
+				flattenReactChildContainer(outItems, outKeys, nested, 'fragment', [
+					...path,
+					'keyed-fragment',
+					item.key,
+				]);
+			} else {
+				const nestedPath =
+					kind === 'fragment'
+						? [...path, 'wrapper', count === 1 ? 0 : i]
+						: count === 1
+							? path
+							: [...path, 'position', i, 'fragment'];
+				flattenReactChildContainer(outItems, outKeys, nested, 'fragment', nestedPath);
+			}
+			continue;
+		}
+		if (Array.isArray(item)) {
+			const nestedKind = deoptWrapperKind(item);
+			const nestedPath =
+				nestedKind === kind
+					? [...path, 'wrapper', count === 1 ? 0 : i]
+					: count === 1
+						? path
+						: [...path, 'position', i, nestedKind];
+			flattenReactChildContainer(outItems, outKeys, item, nestedKind, nestedPath);
+			continue;
+		}
+		outItems.push(item);
+		outKeys.push(scopedDeoptKey(path, item, i, keyFn(item, i)));
 	}
 }
 
-// Flatten a MIXED children array (fragment leaves + nested `.map()` arrays)
-// into sibling items WITH React's identity semantics: each top-level position
-// is its own reconciliation slot, and a nested array's leaves are keyed WITHIN
-// that slot (compound `<pos>:<innerKey>` keys, like React's `.$` implicit-key
-// prefixes). Without this, flat positional indices shift every sibling's
-// implicit key when a nested list changes length — remounting stable siblings
-// React would keep (e.g. `<>{items.map(...)}<button/></>`: the button must not
-// remount on append). Empties are kept as items (see the childSlot array-path
-// comment). Keys land in `outKeys`, parallel to `outItems`.
-function flattenChildItemsKeyed(
-	outItems: any[],
-	outKeys: any[],
-	v: any[],
-	keyFn: (item: any, index: number) => any,
-	prefix: string,
-): void {
-	for (let i = 0; i < v.length; i++) {
-		const item = v[i];
-		if (Array.isArray(item)) {
-			// A nested array is a `.map()` result (or fragment) — its OWN slot.
-			// Inner unkeyed leaves fall back to their index within the array
-			// (deoptKey's warning already fired at the outer level if relevant).
-			flattenChildItemsKeyed(outItems, outKeys, item, deoptKeyPositional, prefix + i + ':');
-		} else {
-			outItems.push(item);
-			const k = keyFn(item, i);
-			outKeys.push(prefix === '' ? k : prefix + String(k));
-		}
+function prepareDeoptList(
+	value: any,
+	forceSingle: boolean = false,
+	includeKeyedSingle: boolean = true,
+): PreparedDeoptList | null {
+	const items: any[] = [];
+	const keys: any[] = [];
+	if (isFragmentDescriptor(value)) {
+		const path = value.key == null ? [] : ['keyed-fragment', value.key];
+		flattenReactChildContainer(items, keys, fragmentDescriptorChildren(value), 'fragment', path);
+		return { items, keys };
 	}
+	if (Array.isArray(value)) {
+		flattenReactChildContainer(items, keys, value, deoptWrapperKind(value), []);
+		return { items, keys };
+	}
+	if (includeKeyedSingle && isElementDescriptor(value) && value.key != null) {
+		items.push(value);
+		keys.push(scopedDeoptKey([], value, 0, value.key));
+		return { items, keys };
+	}
+	if (forceSingle) {
+		items.push(value);
+		keys.push(scopedDeoptKey([], value, 0, deoptKeyPositional(value, 0)));
+		return { items, keys };
+	}
+	return null;
+}
+
+function iterableChildArray(value: any): any[] | null {
+	if (
+		value == null ||
+		typeof value === 'string' ||
+		Array.isArray(value) ||
+		isElementDescriptor(value)
+	)
+		return null;
+	const iterator = childrenIterator(value);
+	if (iterator === null) return null;
+	const out: any[] = [];
+	const cursor = iterator.call(value);
+	let step: IteratorResult<any>;
+	while (!(step = cursor.next()).done) out.push(step.value);
+	return out;
 }
 
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
@@ -10117,6 +10503,7 @@ function flattenDeoptChildren(out: any[], v: any): void {
 function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefix: string): void {
 	if (v == null || v === false || v === true || v === '') return;
 	if (Array.isArray(v)) {
+		const keyForItem = POSITIONAL_CHILDREN.has(v) ? deoptKeyPositional : deoptKey;
 		for (let i = 0; i < v.length; i++) {
 			const item = v[i];
 			if (Array.isArray(item)) {
@@ -10125,7 +10512,7 @@ function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefi
 				// empty — consumes its position, emits nothing
 			} else {
 				outVals.push(item);
-				const k = item.$$kind === ELEMENT_TAG && item.key != null ? item.key : i;
+				const k = keyForItem(item, i);
 				outKeys.push(prefix === '' ? k : prefix + String(k));
 			}
 		}
@@ -10467,7 +10854,20 @@ function deoptItemBody(item: any, scope: Scope): void {
 			detachDeoptTreeRefs(transfer, null);
 			transfer.parentNode.removeChild(transfer);
 		}
-		childSlot(scope, 0, block.parentNode, item, block.endMarker);
+		// The surrounding list already consumed this descriptor's key. Suppress
+		// the keyed-single list normalization in the nested slot or the same
+		// descriptor would recursively wrap itself forever.
+		childSlot(
+			scope,
+			0,
+			block.parentNode,
+			item,
+			block.endMarker,
+			undefined,
+			undefined,
+			undefined,
+			false,
+		);
 		return;
 	}
 	// Switching Blocks → pure: unmount the childSlot content the Blocks path mounted
@@ -10532,6 +10932,10 @@ function descNeedsBlocks(value: any): boolean {
 		return false;
 	}
 	if (value.$$kind === ELEMENT_TAG) {
+		// A Fragment descriptor is reconciled by childSlot's fragment-aware list
+		// path. If it appears below a host descriptor, keep that host on the Block
+		// path so the Fragment boundary is not mistaken for a raw host node.
+		if (value.type === Fragment) return true;
 		// A component descriptor (function `type`) always needs a Block; a host
 		// descriptor needs one only if its own children do (recurse).
 		return typeof value.type === 'function' || descNeedsBlocks(value.children);
@@ -10599,7 +11003,8 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		// rather than mis-adopt). Recovery runs in dev + prod; the warning is dev-only.
 		if (process.env.NODE_ENV !== 'production') {
 			const mmLoc = (hydration.node.parentNode as any)?.__oct_loc;
-			if (mmLoc) hydration.warnStructural(mmLoc, `<${d.type}>`, hydration.describe(hydration.node));
+			if (mmLoc)
+				hydration.warnStructural(mmLoc, `<${String(d.type)}>`, hydration.describe(hydration.node));
 		}
 		const stale = hydration.node;
 		if (hydration.isOpen(stale)) {
@@ -10809,18 +11214,11 @@ function buildDeoptAdoptQueue(
 	start: Comment,
 	end: Comment,
 ): Array<{ key: any; node: Node }> {
-	const oldArr = Array.isArray(oldChildren) ? oldChildren : [oldChildren];
-	const keyFn = !Array.isArray(oldChildren)
-		? deoptKeyPositional
-		: POSITIONAL_CHILDREN.has(oldChildren as object)
-			? deoptKeyPositional
-			: deoptKey;
 	// SAME flatten + keying as the childSlot array path (incl. compound
 	// slot-scoped keys for nested arrays) — the queue's keys must match the
 	// keys the incoming items will get, or nothing adopts.
-	const items: any[] = [];
-	const keys: any[] = [];
-	flattenChildItemsKeyed(items, keys, oldArr, keyFn, '');
+	const prepared = prepareDeoptList(oldChildren, true)!;
+	const { items, keys } = prepared;
 	const queue: Array<{ key: any; node: Node }> = [];
 	let cursor: Node | null = start.nextSibling;
 	for (let i = 0; i < items.length; i++) {
@@ -10860,14 +11258,21 @@ export function childSlot(
 	// Compiler proof that this renderable hole is the body's entire output.
 	// Used only by the post-hydration exact-range compactor.
 	compactable?: boolean,
+	// Internal: a de-opt list item has already consumed its element key, so its
+	// nested child slot must render the descriptor directly rather than wrap it
+	// in another one-item list.
+	includeKeyedSingle: boolean = true,
 ): void {
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
+	const iterable = iterableChildArray(value);
+	if (iterable !== null) value = iterable;
+	const preparedList = prepareDeoptList(value, false, includeKeyedSingle);
 	// A LONE PURE-HOST descriptor (host/text-only subtree — no components, no
 	// portals, no render functions). Computed once per call: the slot init below
 	// uses it to pick the ANCHORLESS regime, the promotion after it to detect a
 	// mode flip out of that regime, and the classifier to route the value.
-	const pureHost = isHostDescriptor(value) && !descNeedsBlocks(value);
+	const pureHost = preparedList === null && isHostDescriptor(value) && !descNeedsBlocks(value);
 	let state = parentScope.slots[slotKey] as ChildSlot | undefined;
 	if (state === undefined) {
 		let start: Comment | null;
@@ -11003,9 +11408,10 @@ export function childSlot(
 		return;
 	}
 
-	// Array child → de-opt keyed list (sound: handles `.map()` results, arrays
-	// through props, and any array-valued child uniformly, by RUNTIME type).
-	if (Array.isArray(value)) {
+	// Arrays, iterables, Fragment descriptors, and a lone explicitly-keyed
+	// element share one keyed-list regime. Keeping a keyed single child in this
+	// regime is what lets it retain state when a sibling is added around it.
+	if (preparedList !== null) {
 		if (state.forSlot === null) {
 			// Drop any prior block/text content — EXCEPT while hydrating, where the
 			// server emitted one `<!--[-->…<!--]-->` range per item between our adopted
@@ -11047,33 +11453,8 @@ export function childSlot(
 				state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
 			}
 		}
-		// A NESTED array member is a fragment (React parity): its leaves render as
-		// SIBLING items of this list, one item per leaf. Flatten before keying —
-		// without this a nested-array item reaches deoptItemBody as an array, which
-		// the pure host reconciler renders as NOTHING (content silently dropped).
-		// Empties (null/false) are KEPT as items: they occupy an index slot (React's
-		// array-diff semantics) and mirror the server's one-`<!--[-->…<!--]-->`-per-
-		// leaf emission (ssrChildItem serializes an empty leaf as an EMPTY block),
-		// so hydration adopts item ranges 1:1. The positional-key choice is made on
-		// the ORIGINAL array — the flattened copy is a fresh, untagged allocation.
-		const keyFn = POSITIONAL_CHILDREN.has(value as object) ? deoptKeyPositional : deoptKey;
-		let items: any[] = value;
-		let flatKeys: any[] | null = null;
-		for (let i = 0; i < items.length; i++) {
-			if (Array.isArray(items[i])) {
-				// Compound slot-scoped keys (React identity semantics): the nested
-				// array's leaves key WITHIN their top-level position, so a length
-				// change in one list never shifts a SIBLING's implicit key (which
-				// would remount it) — see flattenChildItemsKeyed.
-				const fi: any[] = [];
-				const fk: any[] = [];
-				flattenChildItemsKeyed(fi, fk, value, keyFn, '');
-				items = fi;
-				flatKeys = fk;
-				break;
-			}
-		}
-		const getKey = flatKeys === null ? keyFn : (_item: any, i: number) => flatKeys[i];
+		const { items, keys } = preparedList;
+		const getKey = (_item: any, i: number) => keys[i];
 		// singleRoot=2 (marker-elision M4): pure single-element items self-mark —
 		// no `it` pair per item — resolved per item value in mountItem; shape
 		// flips promote to a minted pair in place (deoptItemBody).
@@ -11624,6 +12005,10 @@ function refreshContextConsumers(block: Block): void {
 // diffing against it next time is what makes the memo terminate.
 function tryMemoBail(block: Block, comp: any, props: any): boolean {
 	if ((comp as any).__memo !== true) return false;
+	// A memo body that suspended or threw on its initial attempt has no committed
+	// props/output to reuse. This also makes lazy-resolved memo metadata safe to
+	// publish during that attempt: the retry must execute until the Block mounts.
+	if (!block.mounted) return false;
 	const compare = (comp as any).__compare as ((prev: any, next: any) => boolean) | undefined;
 	// React.memo's optional comparator: returns true when props are equal
 	// (→ skip the render). Falls back to a shallow Object.is comparison.
@@ -11772,6 +12157,17 @@ export function memo<P>(
 		return component(props, scope, extra);
 	}
 	(memoWrapper as any).__memo = true;
+	// `createElement(memo(Component), …)` and `lazy(() => ({default:
+	// memo(Component)}))` resolve defaults at the public wrapper boundary. Keep the
+	// property live so a component that updates its defaultProps between renders
+	// has the same observable behavior through memo as it does directly.
+	Object.defineProperty(memoWrapper, 'defaultProps', {
+		configurable: true,
+		get: () => (component as any).defaultProps,
+		set: (value) => {
+			(component as any).defaultProps = value;
+		},
+	});
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileComponentSource(memoWrapper, component);
 	if (arePropsEqual) (memoWrapper as any).__compare = arePropsEqual;
@@ -14707,37 +15103,56 @@ function reconcileKeyed<T>(
 		// fresh — the unconsumed nodes are swept by the caller.
 		const adopt = state.adopt;
 		let prev: Block | null = null;
-		for (let i = 0; i < newLen; i++) {
-			const item = items[i];
-			const key = getKey(item, i);
-			let adoptNode: Node | null = null;
-			let anchor: Node = state.end;
-			if (adopt !== null && adopt.length !== 0) {
-				if (adopt[0].key === key) adoptNode = adopt.shift()!.node;
-				else anchor = adopt[0].node;
+		const mounted: Block[] = [];
+		try {
+			for (let i = 0; i < newLen; i++) {
+				const item = items[i];
+				const key = getKey(item, i);
+				let adoptNode: Node | null = null;
+				let anchor: Node = state.end;
+				if (adopt !== null && adopt.length !== 0) {
+					if (adopt[0].key === key) adoptNode = adopt.shift()!.node;
+					else anchor = adopt[0].node;
+				}
+				const block = mountItem(
+					parentBlock,
+					parentNode,
+					anchor,
+					item,
+					i,
+					itemBody,
+					state,
+					singleRoot,
+					ssrMarkerless,
+					adoptNode,
+				);
+				mounted.push(block);
+				oldItems.set(key, block);
+				block.key = key;
+				block.prevSibling = prev;
+				block.nextSibling = null;
+				if (prev) prev.nextSibling = block;
+				else state.head = block;
+				prev = block;
 			}
-			const block = mountItem(
-				parentBlock,
-				parentNode,
-				anchor,
-				item,
-				i,
-				itemBody,
-				state,
-				singleRoot,
-				ssrMarkerless,
-				adoptNode,
-			);
-			oldItems.set(key, block);
-			block.key = key;
-			block.prevSibling = prev;
-			block.nextSibling = null;
-			if (prev) prev.nextSibling = block;
-			else state.head = block;
-			prev = block;
+			state.tail = prev;
+			state.size = newLen;
+		} catch (error) {
+			// A list item may suspend while mounting (most visibly a lazy
+			// component). None of this empty->fill pass has committed yet: discard
+			// every completed prefix item, while mountItem discards the throwing
+			// item itself. A retry then starts from a genuinely empty list instead
+			// of duplicating the completed prefix and overwriting its Map entry.
+			for (let i = mounted.length - 1; i >= 0; i--) {
+				const block = mounted[i];
+				oldItems.delete(block.key);
+				unmountBlock(block, true);
+			}
+			state.head = null;
+			state.tail = null;
+			state.size = 0;
+			throw error;
 		}
-		state.tail = prev;
-		state.size = newLen;
 		return;
 	}
 	// Fast path: clear all.
@@ -15413,7 +15828,15 @@ function mountItem<T>(
 	block.forSlot = forSlot;
 	block.itemIndex = index;
 	if (adoptNode !== null) block.deoptNode = adoptNode;
-	renderBlock(block);
+	try {
+		renderBlock(block);
+	} catch (error) {
+		// The caller cannot receive/register a Block whose initial render threw.
+		// Remove its owned range and hook scopes now; a Suspense retry will mount
+		// it afresh as part of the list transaction.
+		unmountBlock(block, true);
+		throw error;
+	}
 	return block;
 }
 
@@ -15835,7 +16258,17 @@ export interface Root {
 	 * Re-rendering with the same component (`type`/body) updates props in place;
 	 * a different component tears down and remounts.
 	 */
-	render(element: ElementDescriptor): void;
+	render(
+		element:
+			| ElementDescriptor
+			| string
+			| number
+			| bigint
+			| boolean
+			| null
+			| undefined
+			| readonly unknown[],
+	): void;
 	render(body: ComponentBody, props?: any): void;
 	unmount(): void;
 }
@@ -15846,6 +16279,97 @@ export interface RootOptions {
 	 * client-root namespace; hydrateRoot uses it verbatim to match server output.
 	 */
 	identifierPrefix?: string;
+}
+
+// One live public root owns a container at a time. React still returns a second
+// root for a duplicate createRoot call, but publishes a diagnostic because two
+// independent owners can otherwise race over the same DOM. Tokens make release
+// safe when an older duplicate root unmounts after the newer one was created.
+let ROOT_CONTAINER_OWNERS: WeakMap<Element, object> | null = null;
+
+// Generic public renderables (host descriptors, strings, null, and so on) run
+// through the ordinary return-value reconciler. Compiled component bodies stay
+// on the direct fast path and retain Octane's body+props root overload.
+const ROOT_RENDERABLE_BODY = ((value: unknown) =>
+	value === undefined ? null : value) as ComponentBody;
+const EMPTY_ROOT_BODY = (() => undefined) as ComponentBody;
+
+function assertValidRootContainer(container: unknown): asserts container is Element {
+	if (container === null || typeof container !== 'object' || (container as Node).nodeType !== 1) {
+		throw new Error('Target container is not a DOM element.');
+	}
+}
+
+function claimRootContainer(container: Element): object | null {
+	if (process.env.NODE_ENV === 'production') return null;
+	const owners = (ROOT_CONTAINER_OWNERS ??= new WeakMap());
+	if (owners.has(container)) {
+		console.error(
+			'You are calling createRoot() on a container that has already been passed to ' +
+				'createRoot() before. Instead, call root.render() on the existing root instead if ' +
+				'you want to update it.',
+		);
+	}
+	const token = {};
+	owners.set(container, token);
+	return token;
+}
+
+function releaseRootContainer(container: Element, token: object | null): void {
+	if (token !== null && ROOT_CONTAINER_OWNERS?.get(container) === token) {
+		ROOT_CONTAINER_OWNERS.delete(container);
+	}
+}
+
+function warnCreateRootElementOption(options: RootOptions | undefined): RootOptions | undefined {
+	if (isElementDescriptor(options)) {
+		if (process.env.NODE_ENV !== 'production') {
+			console.error(
+				'You passed a JSX element to createRoot. You probably meant to call root.render instead. ' +
+					'Example usage:\n\n  let root = createRoot(domContainer);\n  root.render(<App />);',
+			);
+		}
+		return undefined;
+	}
+	return options;
+}
+
+function warnRootRenderSecondArgument(second: unknown, container: Element): void {
+	if (process.env.NODE_ENV === 'production') return;
+	if (typeof second === 'function') {
+		console.error(
+			'does not support the second callback argument. To execute a side effect after ' +
+				'rendering, declare it in a component body with useEffect().',
+		);
+	} else if (second === container) {
+		console.error(
+			"You passed a container to the second argument of root.render(...). You don't need to " +
+				'pass it again since you already passed it to create the root.',
+		);
+	} else {
+		console.error(
+			'You passed a second argument to root.render(...) but it only accepts one argument.',
+		);
+	}
+}
+
+function warnRootUnmountArgument(): void {
+	if (process.env.NODE_ENV !== 'production') {
+		console.error(
+			'does not support a callback argument. To execute a side effect after rendering, ' +
+				'declare it in a component body with useEffect().',
+		);
+	}
+}
+
+function warnRootLifecycleUnmount(): void {
+	if (process.env.NODE_ENV !== 'production') {
+		console.error(
+			'Attempted to synchronously unmount a root while Octane was already rendering. ' +
+				'Octane cannot finish unmounting the root until the current render has completed, ' +
+				'which may lead to a race condition.',
+		);
+	}
 }
 
 // Shared Root factory behind both `createRoot` and `hydrateRoot`. The
@@ -15861,26 +16385,52 @@ function makeRoot(
 	container: Element,
 	rootBlock: Block | null,
 	currentBody: ComponentBody | null,
+	currentKey: any,
 	idState: RootIdState,
 	outputHandler: OutputHandler | null,
+	ownerToken: object | null,
 ): Root {
+	let unmounted = false;
 	return {
-		render(bodyOrElement: ComponentBody | ElementDescriptor, props?: any) {
+		render(bodyOrElement: unknown, props?: any) {
+			if (unmounted) throw new Error('Cannot update an unmounted root.');
 			// React-style `render(<App foo={x}/>)` arrives as an element descriptor:
 			// unwrap to (type, props). The `render(body, props)` form passes through.
 			let body: ComponentBody;
+			let nextKey: any = null;
 			if (isElementDescriptor(bodyOrElement)) {
-				// At a root, the descriptor is always a component value (`render(<App/>)`),
-				// never a host tag — host descriptors only arise at child positions.
-				body = bodyOrElement.type as ComponentBody;
-				props = bodyOrElement.props;
+				if (arguments.length > 1) warnRootRenderSecondArgument(props, container);
+				nextKey = bodyOrElement.key ?? null;
+				if (typeof bodyOrElement.type === 'function') {
+					body = bodyOrElement.type as ComponentBody;
+					props = bodyOrElement.props;
+				} else {
+					// Host JSX at a root is a normal React renderable. Feed the whole
+					// descriptor to the return-value reconciler instead of calling its tag.
+					body = ROOT_RENDERABLE_BODY;
+					props = bodyOrElement;
+				}
+			} else if (typeof bodyOrElement === 'function') {
+				// OCTANE API: a compiled component body plus props is a supported root
+				// overload, unlike React where a bare function is an invalid child.
+				body = bodyOrElement as ComponentBody;
 			} else {
-				body = bodyOrElement;
+				body = ROOT_RENDERABLE_BODY;
+				if (typeof bodyOrElement === 'symbol') {
+					if (process.env.NODE_ENV !== 'production') {
+						console.error(
+							`Symbols are not valid as an Octane child.\n  root.render(${String(bodyOrElement)})`,
+						);
+					}
+					props = null;
+				} else {
+					props = bodyOrElement;
+				}
 			}
 			// Same component as the live root (incl. a just-hydrated root): update
 			// props in place and schedule. This is a NORMAL client render — `hydrating`
 			// is already false, so renderBlock reuses the adopted DOM, not rebuilds it.
-			if (rootBlock && currentBody === body) {
+			if (rootBlock && currentBody === body && Object.is(currentKey, nextKey)) {
 				rootBlock.props = props;
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileSchedule(rootBlock, 'root-render');
@@ -15891,6 +16441,7 @@ function makeRoot(
 				unmountBlock(rootBlock);
 				rootBlock = null;
 				currentBody = null;
+				currentKey = null;
 			}
 			while (container.firstChild) container.removeChild(container.firstChild);
 			rootBlock = createBlock(
@@ -15908,6 +16459,7 @@ function makeRoot(
 				__profileTrackComponent(rootBlock, body);
 			rootBlock.idState = idState;
 			currentBody = body;
+			currentKey = nextKey;
 			// React parity: render() inside a transition never commits synchronously
 			// — schedule at transition priority so the commit is view-transition-
 			// wrappable (boundaries mounting WITH the initial content enter-animate,
@@ -15930,21 +16482,40 @@ function makeRoot(
 			}
 		},
 		unmount() {
-			if (rootBlock) {
-				// Skip the per-Block DOM walk recursion (~3 removeChild ops × every
-				// Block in the tree). Run cleanups + scope teardown only, then clear
-				// the container in one shot. Portals self-detach during the recursive
-				// teardown because their DOM lives in a foreign target — see the
-				// portalSlotSlot branch in unmountScope.
-				unmountBlock(rootBlock, /*detachDom*/ false);
-				// Root unmount runs outside any flush, so no commit follows — drain the
-				// teardown ref detaches queued above directly.
-				drainRefDetaches();
-				container.textContent = '';
-				rootBlock = null;
-				currentBody = null;
+			if (arguments.length > 0) warnRootUnmountArgument();
+			if (unmounted) return;
+			if (
+				process.env.NODE_ENV !== 'production' &&
+				(inFlush ||
+					CURRENT_BLOCK !== null ||
+					EFFECT_BODY_DEPTH > 0 ||
+					EFFECT_EVENT_LIFECYCLE_DEPTH > 0)
+			) {
+				warnRootLifecycleUnmount();
 			}
-			unregisterDelegationTarget(container);
+			unmounted = true;
+			try {
+				if (rootBlock) {
+					// Skip the per-Block DOM walk recursion (~3 removeChild ops × every
+					// Block in the tree). Run cleanups + scope teardown only, then clear
+					// the container in one shot. Portals self-detach during the recursive
+					// teardown because their DOM lives in a foreign target — see the
+					// portalSlotSlot branch in unmountScope. This also deliberately makes
+					// unmount safe after external DOM removal instead of surfacing the
+					// renderer-specific NotFoundError React happens to expose.
+					unmountBlock(rootBlock, /*detachDom*/ false);
+					// Root unmount runs outside any flush, so no commit follows — drain the
+					// teardown ref detaches queued above directly.
+					drainRefDetaches();
+					container.textContent = '';
+					rootBlock = null;
+					currentBody = null;
+					currentKey = null;
+				}
+			} finally {
+				unregisterDelegationTarget(container);
+				releaseRootContainer(container, ownerToken);
+			}
 		},
 	};
 }
@@ -15954,6 +16525,9 @@ function createRootWithOutputHandler(
 	options: RootOptions | undefined,
 	outputHandler: OutputHandler | null,
 ): Root {
+	assertValidRootContainer(container);
+	options = warnCreateRootElementOption(options);
+	const ownerToken = claimRootContainer(container);
 	// Register the container as an event-delegation target up front. Listeners
 	// for all currently-known delegated events attach now; any new event types
 	// registered later (via `delegateEvents`) will back-attach automatically.
@@ -15963,11 +16537,13 @@ function createRootWithOutputHandler(
 		container,
 		null,
 		null,
+		null,
 		{
 			prefix: (options?.identifierPrefix ?? '') + 'r' + (nextClientRootId++).toString(36) + '-',
 			next: 0,
 		},
 		outputHandler,
+		ownerToken,
 	);
 }
 
@@ -16012,16 +16588,37 @@ export function hydrateRoot(
 	propsOrOptions?: any,
 	rootOptions?: RootOptions,
 ): Root {
+	assertValidRootContainer(container);
 	let body: ComponentBody;
 	let props: any;
+	let rootKey: any = null;
 	if (isElementDescriptor(bodyOrElement)) {
-		body = bodyOrElement.type as ComponentBody;
-		props = bodyOrElement.props;
+		rootKey = bodyOrElement.key ?? null;
+		if (typeof bodyOrElement.type === 'function') {
+			body = bodyOrElement.type as ComponentBody;
+			props = bodyOrElement.props;
+		} else {
+			body = ROOT_RENDERABLE_BODY;
+			props = bodyOrElement;
+		}
 		rootOptions = propsOrOptions as RootOptions | undefined;
-	} else {
+	} else if (bodyOrElement === undefined) {
+		if (process.env.NODE_ENV !== 'production') {
+			console.error(
+				'Must provide initial children as second argument to hydrateRoot. ' +
+					'Example usage: hydrateRoot(domContainer, <App />)',
+			);
+		}
+		body = EMPTY_ROOT_BODY;
+		props = undefined;
+	} else if (typeof bodyOrElement === 'function') {
 		body = bodyOrElement;
 		props = propsOrOptions;
+	} else {
+		body = ROOT_RENDERABLE_BODY;
+		props = bodyOrElement;
 	}
+	const ownerToken = claimRootContainer(container);
 	registerDelegationTarget(container);
 	const rootBlock = createBlock(
 		'root',
@@ -16100,7 +16697,7 @@ export function hydrateRoot(
 	// the root behaves exactly like a `createRoot` root — a `.render()` with the
 	// same component updates props on the adopted DOM (same-body fast path), a
 	// different component tears down and remounts.
-	return makeRoot(container, rootBlock, body, idState, renderReturnedValue);
+	return makeRoot(container, rootBlock, body, rootKey, idState, renderReturnedValue, ownerToken);
 }
 
 // ---------------------------------------------------------------------------

@@ -1069,7 +1069,18 @@ export function validateLedger(ledger, inventories, repoRoot, upstreams) {
 			if (policy) {
 				if (entry.status === 'untriaged')
 					errors.push(`Priority case ${entry.caseId} may not remain untriaged.`);
-				for (const name of ['classification', 'risk', 'owner', 'workstream']) {
+				const hasDocumentedPolicyOverride =
+					entry.status === 'documented' &&
+					(entry.classification === 'divergence' || entry.classification === 'non_goal') &&
+					LEDGER_RISKS.has(entry.risk) &&
+					entry.risk !== 'unassessed' &&
+					typeof entry.rationale === 'string' &&
+					entry.rationale.trim().length > 0;
+				for (const name of ['classification', 'risk']) {
+					if (entry[name] !== policy[name] && !hasDocumentedPolicyOverride)
+						errors.push(`Priority case ${entry.caseId} does not satisfy ${policy.id} ${name}.`);
+				}
+				for (const name of ['owner', 'workstream']) {
 					if (entry[name] !== policy[name])
 						errors.push(`Priority case ${entry.caseId} does not satisfy ${policy.id} ${name}.`);
 				}
@@ -1270,7 +1281,7 @@ export function renderCoverageReport({ upstreams, inventories, ledger }) {
 	}
 	markdown += `\n### Migration sequence and exit criteria\n\n`;
 	markdown += `1. **Wave 1 — critical blockers (completed 2026-07-15):** Effect Event semantics and shared untrusted-URL sanitization are implemented, ported, and linked to executable ledger evidence.\n`;
-	markdown += `2. **Wave 2 — public API and reconciliation:** root, fragment, element/Children, and lazy-component outcomes.\n`;
+	markdown += `2. **Wave 2 — public API and reconciliation (completed 2026-07-15):** supported root, fragment, element/Children, and lazy-component outcomes have live evidence; excluded outcomes have durable divergence/non-goal dispositions.\n`;
 	markdown += `3. **Wave 3 — scheduling and stores:** update reconciliation and external-store consistency.\n`;
 	markdown += `4. **Wave 4 — server matrix:** applicable Fizz streaming cases, then the five-mode server integration matrix.\n`;
 	markdown += `5. **Residual audit:** assign risk and a durable disposition to every remaining untriaged case, with canary drift reviewed continuously.\n\n`;
