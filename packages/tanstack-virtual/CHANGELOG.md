@@ -1,5 +1,16 @@
 # @octanejs/tanstack-virtual
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [eaacd17]
+- Updated dependencies [93dcb81]
+- Updated dependencies [6852df7]
+- Updated dependencies [b00cd74]
+- Updated dependencies [e9852d4]
+  - octane@0.1.7
+
 ## 0.1.3
 
 ### Patch Changes
