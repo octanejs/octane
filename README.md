@@ -22,8 +22,10 @@ bookkeeping, and hand-maintained dependency arrays before your app ships.
 
 If you know React, you already know Octane. `useState`, `useEffect`, `memo`,
 context, portals, Suspense, transitions — same API, same mental model, checked
-the boring way against 2,200+ conformance tests lifted straight from
-`facebook/react`. Your React knowledge just works.
+the boring way against a large behavioral test suite. React-derived coverage is
+tracked case-by-case in the generated
+[React parity coverage report](./docs/react-parity-coverage.md), rather than
+inferred from the size of the whole suite. Your React knowledge just works.
 
 Speed was never going to be enough on its own, though. The reason to reach for
 Octane is the day-to-day feel:
@@ -62,6 +64,14 @@ Inferno and has worked on React, Lexical, Ripple, and Svelte.
 ## Status
 
 Octane is currently in alpha development.
+
+The core suite contains **2,200+ distinct behavioral tests** across conformance,
+differential, hydration, runtime, compiler, and SSR coverage. The `octane-prod`
+project reruns the normal suite against the production compiler path, so those
+executions are valuable mode coverage but are not counted again as unique tests.
+This is an Octane suite count, not a claim that every test was ported from React;
+the exact pinned snapshot and source-attributed React counts come from the
+[coverage ledger and report](./docs/react-parity-coverage.md).
 
 ## At a glance
 
@@ -316,7 +326,9 @@ Dependency arrays are optional in Octane. When one is omitted from
 `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`,
 or `useImperativeHandle`, the compiler derives it from the callback's reactive
 captures. It understands member reads and stable hook results such as state
-setters, reducer dispatchers, refs, state getters, and `useEffectEvent`.
+setters, reducer dispatchers, refs, and state getters. It also omits
+`useEffectEvent` results because Effect Events are non-reactive captures, even
+though React-compatible wrappers have a fresh identity on each render.
 
 Explicit arrays keep their React meaning and are never rewritten. Pass `null`
 for the uncommon every-render form:

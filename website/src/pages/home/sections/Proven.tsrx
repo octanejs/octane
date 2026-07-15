@@ -4,11 +4,15 @@ import { Link } from '@octanejs/tanstack-router';
 export function Proven() @{
 	<section class="proven">
 		<div class="proven-stat">
-			<span class="proven-number">6,000+</span>
+			<span class="proven-number">7,000+</span>
 			<span class="proven-label">
-				{'tests across the runtime, compiler, SSR and bindings — including 2,200+ ' +
-					'React conformance cases; '}
-				<Link to="/docs/differences-from-react">see what diverges, on purpose</Link>
+				{'test executions across the runtime, compiler, SSR and bindings, including ' +
+						'compiler-mode reruns; the core suite has 2,200+ distinct cases. '}
+				<a
+				href="https://github.com/octanejs/octane/blob/main/docs/react-parity-coverage.md"
+						target="_blank"
+						rel="noreferrer"
+					>React-derived coverage is tracked case by case</a>
 			</span>
 		</div>
 		<div class="proven-stat">
@@ -18,7 +22,7 @@ export function Proven() @{
 			</span>
 		</div>
 		<div class="proven-stat">
-			<span class="proven-number">18</span>
+			<span class="proven-number">25</span>
 			<span class="proven-label">
 				{'ecosystem ports — Zustand, TanStack Query & Router, Radix, Lucide, '}
 				<Link to="/docs/bindings">Recharts and more</Link>

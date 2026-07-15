@@ -45,6 +45,7 @@ import {
 	__profileTrackComponent,
 	type ProfileFrame,
 } from './profiling.js';
+import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -95,6 +96,18 @@ export type ComponentBody<P = any, E = any> = (props: P, scope: Scope, extra: E)
 type EffectFn = () => void | (() => void);
 type Cleanup = () => void;
 type HookSlot = symbol | number;
+
+interface EffectEventCell {
+	impl: (...args: any[]) => any;
+	active: boolean;
+}
+
+interface PendingEffectEvent {
+	cell: EffectEventCell;
+	nextImpl: (...args: any[]) => any;
+	block: Block;
+	renderVersion: number;
+}
 
 export interface Scope {
 	block: Block;
@@ -493,6 +506,14 @@ export interface Block extends Scope {
 	 */
 	drainStamp: number;
 	drainRenders: number;
+	/**
+	 * useEffectEvent updates publish only for the latest render of this block that
+	 * completed. Zero means this block has never called useEffectEvent. Keeping the
+	 * attempt/completion counters on the block makes aborted-render filtering
+	 * allocation-free for components that do not use the hook.
+	 */
+	effectEventRenderVersion: number;
+	effectEventCompletedVersion: number;
 }
 
 interface EffectSlot {
@@ -551,6 +572,19 @@ interface PendingEffect {
 
 let CURRENT_SCOPE: Scope | null = null;
 let CURRENT_BLOCK: Block | null = null;
+// Octane discovers deletion destroys while reconciling a parent, but those
+// callbacks are semantically mutation-phase work. Effect Events may be called
+// from them even though CURRENT_SCOPE still reflects the eager parent render.
+let EFFECT_EVENT_LIFECYCLE_DEPTH = 0;
+
+function runEffectLifecycleCallback(callback: Cleanup): void {
+	EFFECT_EVENT_LIFECYCLE_DEPTH++;
+	try {
+		callback();
+	} finally {
+		EFFECT_EVENT_LIFECYCLE_DEPTH--;
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Scheduler — microtask-flushed queue with React-18-shaped automatic batching
@@ -1230,6 +1264,16 @@ const INSERTION = 0,
 type Phase = 0 | 1 | 2;
 
 const effectQueues: [PendingEffect[], PendingEffect[], PendingEffect[]] = [[], [], []];
+// useEffectEvent callback bodies are render output: updates become observable at
+// commit, before insertion/layout effects, and are discarded with an aborted
+// render. The wrapper returned by the hook is deliberately fresh each render;
+// every wrapper closes over the same committed cell.
+const effectEventQueue: PendingEffectEvent[] = [];
+// Commit actions that must run after the callback bodies above publish. Activity
+// uses this for visible→hidden deactivation+DOM hiding so its cleanup sees the
+// fresh body while the range is still connected. Actions share the render/WIP
+// transaction below, so an aborted enclosing render drops them.
+const effectEventCommitActions: Array<() => void> = [];
 let passiveScheduled = false;
 // Monotonic enqueue counter — tags each PendingEffect AND deferred ref attach with its
 // DFS pre-order position so the commit drains them in React's post-order (see
@@ -1311,6 +1355,8 @@ const refAttachQueue: RefAttach[] = [];
 // single-threaded, so every effect enqueued while the buffer is set belongs to the WIP.
 interface OffscreenCapture {
 	effects: [PendingEffect[], PendingEffect[], PendingEffect[]];
+	events: PendingEffectEvent[];
+	eventActions: Array<() => void>;
 	refs: RefAttach[];
 	// uSES store-syncs enqueued during this off-screen render (see storeSyncQueue).
 	// Spliced into the live queue on commit, dropped on dispose — a WIP that never
@@ -1319,6 +1365,14 @@ interface OffscreenCapture {
 	stores: StoreInst<any>[];
 }
 let WIP_CAPTURE: OffscreenCapture | null = null;
+
+// Active append targets for Effect Event render output. renderBlockInner takes
+// length checkpoints and truncates on throw, so a later sibling suspension rolls
+// back every completed descendant without allocating a transaction object/array
+// for the overwhelmingly common no-Effect-Event render. renderOffscreen swaps
+// these targets to its existing WIP capture.
+let EFFECT_EVENT_RENDER_TARGET = effectEventQueue;
+let EFFECT_EVENT_ACTION_TARGET = effectEventCommitActions;
 
 // A subtree rendered off-screen by `renderOffscreen` (its DOM sits between owned
 // `start`/`end` markers, outside the committed slot range, with its effects captured).
@@ -2044,6 +2098,14 @@ function blockSubtreeDisposed(block: Block | null): boolean {
 }
 
 function commitEffects(): void {
+	// React publishes every Effect Event body before any insertion/layout effect
+	// can call an already-registered wrapper. Entries from failed or suspended
+	// renders are filtered by their block's completed render version.
+	drainEffectEventUpdates();
+	// Activity visible→hidden work is transactionally deferred until the event
+	// bodies above publish. Its layout cleanup therefore sees the fresh body while
+	// the preserved DOM range is still connected, then the action hides that range.
+	drainEffectEventCommitActions();
 	// Controlled-form commit work FIRST: select projections must see the
 	// options this render just built, and the dev missing-onInput check must
 	// see the element's full listener set (see drainControlledSyncs).
@@ -2114,6 +2176,8 @@ export function drainPassiveEffects(): void {
 export function hasPendingWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
+		effectEventQueue.length > 0 ||
+		effectEventCommitActions.length > 0 ||
 		effectQueues[INSERTION].length > 0 ||
 		effectQueues[LAYOUT].length > 0 ||
 		effectQueues[PASSIVE].length > 0 ||
@@ -2121,6 +2185,30 @@ export function hasPendingWork(): boolean {
 		storeSyncQueue.length > 0 ||
 		hasControlledSyncs()
 	);
+}
+
+function drainEffectEventUpdates(): void {
+	if (effectEventQueue.length === 0) return;
+	const q = effectEventQueue.splice(0);
+	for (let i = 0; i < q.length; i++) {
+		const entry = q[i];
+		const block = entry.block;
+		if (
+			!entry.cell.active ||
+			blockSubtreeDisposed(block) ||
+			// Independently scheduled siblings may complete before another child
+			// suspends their shared boundary. That boundary soft-detaches the try
+			// subtree, so its completed payload is still uncommitted. Do not use the
+			// broader inactive check: hidden Activity renders intentionally publish
+			// fresh Effect Event bodies while their DOM/effects stay preserved.
+			findSuspenseHiddenTry(block) !== null ||
+			block.effectEventRenderVersion !== entry.renderVersion ||
+			block.effectEventCompletedVersion !== entry.renderVersion
+		) {
+			continue;
+		}
+		entry.cell.impl = entry.nextImpl;
+	}
 }
 
 /**
@@ -2397,6 +2485,18 @@ function drainPassivePhase(): void {
 	}
 }
 
+function drainEffectEventCommitActions(): void {
+	if (effectEventCommitActions.length === 0) return;
+	const q = effectEventCommitActions.splice(0);
+	for (let i = 0; i < q.length; i++) {
+		try {
+			q[i]();
+		} catch (err) {
+			console.error(err);
+		}
+	}
+}
+
 // Passive destroys of DELETED scopes, deferred past the sync phase (React
 // defers them to flushPassiveEffects — commitPassiveUnmountEffects). Flat
 // [cleanup, boundary-handler] pairs, pushed by unmountScope's effect-slot walk
@@ -2549,6 +2649,8 @@ class BlockImpl {
 	// Render-loop guard bookkeeping (see the Block interface).
 	drainStamp: number;
 	drainRenders: number;
+	effectEventRenderVersion: number;
+	effectEventCompletedVersion: number;
 	// De-opt host node managed by this Block (deoptItemBody / hostElementBody), reused
 	// across renders. Null for all other blocks; declared so the shape stays monomorphic.
 	deoptNode: Node | null;
@@ -2617,6 +2719,8 @@ class BlockImpl {
 		this.__thenableIdx = 0;
 		this.drainStamp = 0;
 		this.drainRenders = 0;
+		this.effectEventRenderVersion = 0;
+		this.effectEventCompletedVersion = 0;
 		this.deoptNode = null;
 		this.slots = [];
 		this.forSlot = null;
@@ -2708,11 +2812,31 @@ export function renderBlock(block: Block): void {
 	renderBlockInner(block);
 }
 
+function enqueueEffectEventUpdate(entry: PendingEffectEvent): void {
+	EFFECT_EVENT_RENDER_TARGET.push(entry);
+}
+
+function enqueueEffectEventCommitAction(action: () => void): void {
+	EFFECT_EVENT_ACTION_TARGET.push(action);
+}
+
 function renderBlockInner(block: Block): void {
 	const prevScope = CURRENT_SCOPE;
 	const prevBlock = CURRENT_BLOCK;
+	const prevEffectEventTarget = EFFECT_EVENT_RENDER_TARGET;
+	const prevEffectEventActionTarget = EFFECT_EVENT_ACTION_TARGET;
+	const effectEventTarget = WIP_CAPTURE?.events ?? prevEffectEventTarget;
+	const effectEventActionTarget = WIP_CAPTURE?.eventActions ?? prevEffectEventActionTarget;
+	const effectEventCheckpoint = effectEventTarget.length;
+	const effectEventActionCheckpoint = effectEventActionTarget.length;
 	CURRENT_SCOPE = block;
 	CURRENT_BLOCK = block;
+	EFFECT_EVENT_RENDER_TARGET = effectEventTarget;
+	EFFECT_EVENT_ACTION_TARGET = effectEventActionTarget;
+	// Invalidate any Effect Event payload queued by an earlier render in this
+	// commit. A hook call lazily starts version 1; subsequent attempts advance it
+	// here even if they suspend before reaching the hook again.
+	if (block.effectEventRenderVersion !== 0) block.effectEventRenderVersion++;
 	// Cascade coalescing: clear the queued flag now. A block dequeued by flush()
 	// gets re-rendered here; a block reached as a descendant of some OTHER queued
 	// block's cascade is also brought up to date here, so flush() can skip its
@@ -2770,6 +2894,7 @@ function renderBlockInner(block: Block): void {
 			: null;
 	let profileDidThrow = false;
 	let profileThrown: unknown;
+	let renderCompleted = false;
 	try {
 		const out = (block.body as (p: any, s: Scope, e: any) => unknown)(
 			block.props,
@@ -2778,6 +2903,10 @@ function renderBlockInner(block: Block): void {
 		);
 		if (out !== undefined && block.outputHandler !== null) block.outputHandler(block, out);
 		if (!block.mounted) block.mounted = true;
+		if (block.effectEventRenderVersion !== 0) {
+			block.effectEventCompletedVersion = block.effectEventRenderVersion;
+		}
+		renderCompleted = true;
 		// Body completed without suspending: its use() episode is over — the
 		// next render (replay or not) must not reuse these entries.
 		(block as any).__thenableDone = true;
@@ -2792,6 +2921,12 @@ function renderBlockInner(block: Block): void {
 			profileFrame !== null
 		)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
+		if (!renderCompleted) {
+			effectEventTarget.length = effectEventCheckpoint;
+			effectEventActionTarget.length = effectEventActionCheckpoint;
+		}
+		EFFECT_EVENT_RENDER_TARGET = prevEffectEventTarget;
+		EFFECT_EVENT_ACTION_TARGET = prevEffectEventActionTarget;
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
 	}
@@ -3208,7 +3343,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				if (!passiveScheduled) schedulePassiveFlush();
 			} else {
 				try {
-					cleanup();
+					runEffectLifecycleCallback(cleanup);
 				} catch (err) {
 					reportTeardownError(err);
 				}
@@ -3230,7 +3365,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	SUPPRESS_UNCOMMITTED_REF_DETACH = (scope as any).mounted !== true;
 	for (let i = c.length - 1; i >= 0; i--) {
 		try {
-			c[i]();
+			runEffectLifecycleCallback(c[i]);
 		} catch (err) {
 			// Route to the boundary enclosing the DELETION (collected + dispatched
 			// after the walk — see reportTeardownError); React parity: an error in a
@@ -4020,26 +4155,42 @@ export function useSyncExternalStore<T>(
 }
 
 /**
- * React 19 `useEffectEvent` — returns a stable function whose body always
- * reflects the latest version of `fn`. Use inside `useEffect` deps to escape
- * the "must re-create the effect just because a closure-captured value changed"
- * trap. The returned function has the same identity across renders; calling it
- * invokes the most-recent `fn` (i.e., it always sees fresh closure values).
+ * React 19 `useEffectEvent` — returns a fresh wrapper each render whose shared
+ * cell invokes the latest COMMITTED `fn`. Effect Events are non-reactive (the
+ * compiler omits them from inferred dependencies), but their wrapper identity
+ * is intentionally not stable. Publishing the cell in commit prevents a
+ * suspended or failed render from leaking an uncommitted closure.
  */
 export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: symbol): F;
 export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: HookSlot): F {
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useEffectEvent');
 	const scope = CURRENT_SCOPE!;
-	let s = scope.hooks?.get(slot) as { current: F; stable: F } | undefined;
+	const block = scope.block;
+	if (block.effectEventRenderVersion === 0) block.effectEventRenderVersion = 1;
+	let s = scope.hooks?.get(slot) as EffectEventCell | undefined;
 	if (s === undefined) {
-		const stable = ((...args: any[]) => s!.current.apply(null, args)) as F;
-		s = { current: fn, stable };
+		s = { impl: fn, active: true };
 		ensureHooks(scope).set(slot, s);
+		const cell = s;
+		scope.cleanups.push(() => {
+			cell.active = false;
+		});
 	} else {
-		s.current = fn;
+		enqueueEffectEventUpdate({
+			cell: s,
+			nextImpl: fn,
+			block,
+			renderVersion: block.effectEventRenderVersion,
+		});
 	}
-	return s.stable;
+	const cell = s;
+	return ((...args: any[]) => {
+		if (CURRENT_SCOPE !== null && EFFECT_EVENT_LIFECYCLE_DEPTH === 0) {
+			throw new Error("A function wrapped in useEffectEvent can't be called during rendering.");
+		}
+		return cell.impl.apply(undefined, args);
+	}) as F;
 }
 
 // ---------------------------------------------------------------------------
@@ -6343,7 +6494,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// disagree with what actually lands in the DOM — and the value rules mirror
 	// the server's ssrAttr exactly (shared tables in constants.ts), so SSR
 	// presence/absence and the client write always agree.
-	const next = coerceAttrValue(el, name, value);
+	let next = coerceAttrValue(el, name, value);
+	// URL validation consumes the already-coerced string so an observable
+	// toString() runs exactly once across validation, hydration comparison, and
+	// the final write. The same helper is used by compiler-baked and SSR attrs.
+	if (next !== null) next = sanitizeURLAttribute(el.localName, name, next);
 	// Hydration VALUE-mismatch handling. The normal write below already PATCHES the adopted
 	// element to the client value (so prod recovers for free); here we only (dev) warn on a
 	// server/client divergence and (dev+prod) honor `suppressHydrationWarning` by keeping the
@@ -9441,7 +9596,13 @@ function renderOffscreen(
 	const ref = afterNode.nextSibling;
 	domParent.insertBefore(start, ref);
 	domParent.insertBefore(end, ref);
-	const capture: OffscreenCapture = { effects: [[], [], []], refs: [], stores: [] };
+	const capture: OffscreenCapture = {
+		effects: [[], [], []],
+		events: [],
+		eventActions: [],
+		refs: [],
+		stores: [],
+	};
 	const prev = WIP_CAPTURE;
 	WIP_CAPTURE = capture;
 	const block = createBlock(
@@ -9485,6 +9646,12 @@ function spliceWipCapture(wip: OffscreenWip): void {
 	for (let p = 0 as Phase; p < 3; p++) {
 		const src = wip.capture.effects[p];
 		for (let i = 0; i < src.length; i++) effectQueues[p].push(src[i]);
+	}
+	for (let i = 0; i < wip.capture.events.length; i++) {
+		enqueueEffectEventUpdate(wip.capture.events[i]);
+	}
+	for (let i = 0; i < wip.capture.eventActions.length; i++) {
+		enqueueEffectEventCommitAction(wip.capture.eventActions[i]);
 	}
 	for (let i = 0; i < wip.capture.refs.length; i++) refAttachQueue.push(wip.capture.refs[i]);
 	// Store-syncs enqueued off-screen now belong to committed DOM — hand them to the
@@ -13683,6 +13850,10 @@ interface ActivitySlot {
 	__kind: 'activityBlockSlot';
 	block: Block | null;
 	hidden: boolean;
+	/** Invalidates a queued visible→hidden commit when a newer render wins. */
+	commitVersion: number;
+	/** The visible effects still need their commit-phase deactivation. */
+	deactivationPending: boolean;
 	/** Direct child elements we hid → their prior inline `display`, for restore. */
 	savedDisplay: Map<HTMLElement, string>;
 	/**
@@ -13723,6 +13894,30 @@ function showActivityRange(state: ActivitySlot): void {
 	state.savedDisplay.clear();
 	for (const [t, data] of state.savedText) t.nodeValue = data;
 	state.savedText.clear();
+}
+
+function queueActivityDeactivation(state: ActivitySlot, block: Block, commitVersion: number): void {
+	enqueueEffectEventCommitAction(() => {
+		if (
+			state.block !== block ||
+			blockSubtreeDisposed(block) ||
+			state.commitVersion !== commitVersion ||
+			!state.hidden ||
+			!state.deactivationPending ||
+			// An independently scheduled sibling may have suspended the shared
+			// boundary after this Activity completed. Its outer Suspense
+			// deactivation already tore the effects down using the old committed
+			// Event body; retain the pending bit for the eventual Activity replay.
+			findSuspenseHiddenTry(block) !== null
+		) {
+			return;
+		}
+		// Event bodies were published before commit actions drain. Destroy while
+		// the DOM is still connected, then hide the preserved range.
+		deactivateScope(block);
+		hideActivityRange(state);
+		state.deactivationPending = false;
+	});
 }
 
 export function activityBlock(
@@ -13770,6 +13965,8 @@ export function activityBlock(
 			__kind: 'activityBlockSlot',
 			block: b,
 			hidden: false,
+			commitVersion: 0,
+			deactivationPending: false,
 			savedDisplay: new Map(),
 			savedText: new Map(),
 		};
@@ -13810,21 +14007,27 @@ export function activityBlock(
 	const b = state.block!;
 	b.body = body;
 	b.extra = env;
+	const commitVersion = ++state.commitVersion;
 
 	if (wantHidden) {
 		if (!state.hidden) {
 			// visible → hidden: prerender latest content with effects suppressed,
-			// tear down the previously-mounted effects (cleanups BEFORE hiding the
-			// DOM, matching React), then hide.
+			// then commit deactivation after Effect Event publication and before
+			// hiding the still-connected DOM range.
 			b.inactive = true;
-			renderBlock(b);
-			deactivateScope(b);
-			hideActivityRange(state);
 			state.hidden = true;
+			state.deactivationPending = true;
+			queueActivityDeactivation(state, b, commitVersion);
+			renderBlock(b);
 		} else {
 			// hidden → hidden: prerender (no effects), then hide any new children.
+			// If a prior visible→hidden attempt has not committed yet, replace its
+			// versioned action so the latest render owns the deactivation.
+			if (state.deactivationPending) {
+				queueActivityDeactivation(state, b, commitVersion);
+			}
 			renderBlock(b);
-			hideActivityRange(state);
+			if (!state.deactivationPending) hideActivityRange(state);
 		}
 	} else {
 		if (state.hidden) {
@@ -13833,6 +14036,7 @@ export function activityBlock(
 			showActivityRange(state);
 			b.inactive = false;
 			state.hidden = false;
+			state.deactivationPending = false;
 			renderBlock(b);
 		} else {
 			// visible → visible: ordinary re-render in place.
@@ -14006,9 +14210,11 @@ function deactivateScope(scope: Scope): void {
 					// no cleanup and won't re-run it.
 					e.cleanup = undefined;
 					try {
-						cleanup();
+						runEffectLifecycleCallback(cleanup);
 					} catch (err) {
-						console.error(err);
+						const handler = findTryHandler(scope.block);
+						if (handler !== null) handler(err);
+						else console.error(err);
 					}
 				}
 				// Force the setup to re-enqueue + re-fire when the subtree reactivates.
@@ -15907,12 +16113,22 @@ const _resourceHints = new Set<string>();
 
 function insertHeadHint(key: string, build: () => Element): void {
 	if (typeof document === 'undefined' || _resourceHints.has(key)) return;
-	_resourceHints.add(key);
-	// SSR dedupe: the server may have emitted this hint already.
-	if (document.head.querySelector('[data-oct-hint="' + key + '"]') !== null) return;
+	// SSR dedupe: compare exact attribute VALUES rather than interpolating an
+	// href-derived key into a CSS selector. Quotes/brackets are valid URL text;
+	// treating them as selector syntax could throw before the hint is inserted.
+	const existing = document.head.querySelectorAll('[data-oct-hint]');
+	for (let i = 0; i < existing.length; i++) {
+		if (existing[i].getAttribute('data-oct-hint') === key) {
+			_resourceHints.add(key);
+			return;
+		}
+	}
 	const el = build();
 	el.setAttribute('data-oct-hint', key);
 	document.head.appendChild(el);
+	// Publish dedupe state only after every DOM operation succeeds, so a failed
+	// build/append cannot poison the key and suppress a later valid retry.
+	_resourceHints.add(key);
 }
 
 function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined): void {
@@ -15920,20 +16136,21 @@ function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined):
 	for (const k in opts) {
 		const v = (opts as any)[k];
 		if (v == null || v === false) continue;
-		el.setAttribute(
-			k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase(),
-			v === true ? '' : String(v),
-		);
+		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
+		const value = v === true ? '' : String(v);
+		el.setAttribute(name, sanitizeURLAttribute(el.localName, name, value));
 	}
 }
 
 /** React DOM `preload(href, {as, …})` — `<link rel="preload">`. */
 export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
 	if (!href || !options?.as) return;
-	insertHeadHint('preload:' + options.as + ':' + href, () => {
+	const rawHref = typeof href === 'string' ? href : String(href);
+	const safeHref = sanitizeURL(rawHref);
+	insertHeadHint('preload:' + options.as + ':' + rawHref, () => {
 		const l = document.createElement('link');
 		l.rel = 'preload';
-		l.href = href;
+		l.href = safeHref;
 		applyHintAttrs(l, options);
 		return l;
 	});
@@ -15943,16 +16160,18 @@ export function preload(href: string, options: { as: string } & Record<string, u
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
 	if (!href || !options?.as) return;
 	const as = options.as;
-	insertHeadHint('preinit:' + as + ':' + href, () => {
+	const rawHref = typeof href === 'string' ? href : String(href);
+	const safeHref = sanitizeURL(rawHref);
+	insertHeadHint('preinit:' + as + ':' + rawHref, () => {
 		if (as === 'style') {
 			const l = document.createElement('link');
 			l.rel = 'stylesheet';
-			l.href = href;
+			l.href = safeHref;
 			applyHintAttrs(l, { ...options, as: undefined });
 			return l;
 		}
 		const s = document.createElement('script');
-		(s as HTMLScriptElement).src = href;
+		(s as HTMLScriptElement).src = safeHref;
 		(s as HTMLScriptElement).async = true;
 		applyHintAttrs(s, { ...options, as: undefined });
 		return s;
@@ -15962,10 +16181,12 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 /** React DOM `preconnect(href, {crossOrigin?})` — `<link rel="preconnect">`. */
 export function preconnect(href: string, options?: { crossOrigin?: string }): void {
 	if (!href) return;
-	insertHeadHint('preconnect:' + href, () => {
+	const rawHref = typeof href === 'string' ? href : String(href);
+	const safeHref = sanitizeURL(rawHref);
+	insertHeadHint('preconnect:' + rawHref, () => {
 		const l = document.createElement('link');
 		l.rel = 'preconnect';
-		l.href = href;
+		l.href = safeHref;
 		applyHintAttrs(l, options);
 		return l;
 	});
@@ -15974,10 +16195,12 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 /** React DOM `prefetchDNS(href)` — `<link rel="dns-prefetch">`. */
 export function prefetchDNS(href: string): void {
 	if (!href) return;
-	insertHeadHint('dns-prefetch:' + href, () => {
+	const rawHref = typeof href === 'string' ? href : String(href);
+	const safeHref = sanitizeURL(rawHref);
+	insertHeadHint('dns-prefetch:' + rawHref, () => {
 		const l = document.createElement('link');
 		l.rel = 'dns-prefetch';
-		l.href = href;
+		l.href = safeHref;
 		return l;
 	});
 }

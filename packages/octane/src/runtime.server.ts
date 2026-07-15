@@ -52,6 +52,7 @@ import {
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
 // hyphenated style keys stay byte-equal across the two runtimes).
 import { normalizeClass, styleName } from './css.js';
+import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 export { normalizeClass };
 
 interface SSRScope {
@@ -927,7 +928,7 @@ export function ssrAttr(name: string, v: unknown, tag?: string): string {
 		return '';
 	}
 	if (v === true) return ' ' + name;
-	return ' ' + name + '="' + escapeAttr(s) + '"';
+	return ' ' + name + '="' + escapeAttr(sanitizeURLAttribute(tag, name, s)) + '"';
 }
 
 function styleObjectToCss(obj: Record<string, unknown>): string {
@@ -2628,8 +2629,16 @@ export function useId(): string {
 	return ':' + ID_PREFIX + 'in-' + (ID_COUNTER++).toString(36) + ':';
 }
 
-export function useEffectEvent<F>(fn: F): F {
-	return fn;
+function throwOnServerEffectEventCall(): never {
+	throw new Error("A function wrapped in useEffectEvent can't be called during rendering.");
+}
+
+export function useEffectEvent<F>(_fn: F): F {
+	// A server pass may declare an Effect Event so the same component can hydrate,
+	// but invoking it during render is forbidden. React deliberately returns one
+	// shared thrower here, so server-rendered Effect Event identities are not a
+	// meaningful contract either.
+	return throwOnServerEffectEventCall as unknown as F;
 }
 
 export function useTransition(): [boolean, (fn: () => void | Promise<unknown>) => void] {
@@ -2773,7 +2782,12 @@ export function ssrHeadEl(
 			// (`<link href="">`, `<base href="">`) — strip like ssrAttr does; head
 			// tags are never <a>/<area>, so the href exemption doesn't apply here.
 			if (v === '' && (k === 'src' || k === 'href')) continue;
-			s += v === true ? ' ' + k : ' ' + k + '="' + escapeAttr(v) + '"';
+			if (v === true) {
+				s += ' ' + k;
+			} else {
+				const value = typeof v === 'string' ? v : String(v);
+				s += ' ' + k + '="' + escapeAttr(sanitizeURLAttribute(tag, k, value)) + '"';
+			}
 		}
 	}
 	if (HEAD_VOID_ELEMENTS.has(tag)) {
@@ -4523,7 +4537,11 @@ function emitHeadHint(key: string, html: string): void {
 	HEAD.html += html;
 }
 
-function hintAttrs(opts: Record<string, unknown> | undefined, skipAs: boolean): string {
+function hintAttrs(
+	opts: Record<string, unknown> | undefined,
+	skipAs: boolean,
+	tag: 'link' | 'script',
+): string {
 	let out = '';
 	if (opts == null) return out;
 	for (const k in opts) {
@@ -4531,21 +4549,34 @@ function hintAttrs(opts: Record<string, unknown> | undefined, skipAs: boolean): 
 		const v = (opts as any)[k];
 		if (v == null || v === false) continue;
 		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
-		out += ' ' + name + (v === true ? '' : '="' + escapeAttr(v) + '"');
+		if (v === true) {
+			out += ' ' + name;
+		} else {
+			const value = typeof v === 'string' ? v : String(v);
+			out += ' ' + name + '="' + escapeAttr(sanitizeURLAttribute(tag, name, value)) + '"';
+		}
 	}
 	return out;
 }
 
+function coerceHintHref(href: unknown): string | null {
+	if (!href) return null;
+	const value = typeof href === 'string' ? href : String(href);
+	return value === '' ? null : value;
+}
+
 /** React DOM `preload(href, {as, …})`. */
 export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
-	if (!href || !options?.as) return;
-	const key = 'preload:' + options.as + ':' + href;
+	const value = coerceHintHref(href);
+	if (value === null || !options?.as) return;
+	const key = 'preload:' + options.as + ':' + value;
+	const safeHref = sanitizeURL(value);
 	emitHeadHint(
 		key,
 		'<link rel="preload" href="' +
-			escapeAttr(href) +
+			escapeAttr(safeHref) +
 			'"' +
-			hintAttrs(options, false) +
+			hintAttrs(options, false, 'link') +
 			' data-oct-hint="' +
 			escapeAttr(key) +
 			'">',
@@ -4554,22 +4585,24 @@ export function preload(href: string, options: { as: string } & Record<string, u
 
 /** React DOM `preinit(href, {as: 'style'|'script', …})`. */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
-	if (!href || !options?.as) return;
-	const key = 'preinit:' + options.as + ':' + href;
+	const value = coerceHintHref(href);
+	if (value === null || !options?.as) return;
+	const key = 'preinit:' + options.as + ':' + value;
+	const safeHref = sanitizeURL(value);
 	const hint = ' data-oct-hint="' + escapeAttr(key) + '"';
 	emitHeadHint(
 		key,
 		options.as === 'style'
 			? '<link rel="stylesheet" href="' +
-					escapeAttr(href) +
+					escapeAttr(safeHref) +
 					'"' +
-					hintAttrs(options, true) +
+					hintAttrs(options, true, 'link') +
 					hint +
 					'>'
 			: '<script src="' +
-					escapeAttr(href) +
+					escapeAttr(safeHref) +
 					'" async' +
-					hintAttrs(options, true) +
+					hintAttrs(options, true, 'script') +
 					hint +
 					'></script>',
 	);
@@ -4577,14 +4610,16 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 
 /** React DOM `preconnect(href, {crossOrigin?})`. */
 export function preconnect(href: string, options?: { crossOrigin?: string }): void {
-	if (!href) return;
-	const key = 'preconnect:' + href;
+	const value = coerceHintHref(href);
+	if (value === null) return;
+	const key = 'preconnect:' + value;
+	const safeHref = sanitizeURL(value);
 	emitHeadHint(
 		key,
 		'<link rel="preconnect" href="' +
-			escapeAttr(href) +
+			escapeAttr(safeHref) +
 			'"' +
-			hintAttrs(options, false) +
+			hintAttrs(options, false, 'link') +
 			' data-oct-hint="' +
 			escapeAttr(key) +
 			'">',
@@ -4593,12 +4628,14 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 
 /** React DOM `prefetchDNS(href)`. */
 export function prefetchDNS(href: string): void {
-	if (!href) return;
-	const key = 'dns-prefetch:' + href;
+	const value = coerceHintHref(href);
+	if (value === null) return;
+	const key = 'dns-prefetch:' + value;
+	const safeHref = sanitizeURL(value);
 	emitHeadHint(
 		key,
 		'<link rel="dns-prefetch" href="' +
-			escapeAttr(href) +
+			escapeAttr(safeHref) +
 			'" data-oct-hint="' +
 			escapeAttr(key) +
 			'">',

@@ -1,164 +1,273 @@
 #!/usr/bin/env node
 /**
- * scaffold-react-port — turn a facebook/react test file into a tagged Octane
- * port skeleton, so migrating a file becomes "fill in the blanks" instead of
- * "read 2000 lines and decide what matters".
+ * Build a review checklist from a facebook/react test file.
+ *
+ * The shared inventory extractor owns test-registration discovery. This script
+ * deliberately does not decide whether a case is portable: title matching can
+ * add a review suggestion, but every discovered or dynamic registration stays
+ * visible in the generated checklist until a person records its disposition in
+ * the parity ledger.
  *
  * Usage:
  *   node scripts/scaffold-react-port.mjs <path-to-react-test-file> [--out <file>]
- *
- * It extracts every it()/test()/itRenders()/itThrowsWhenRendering() title with
- * its line number, classifies each as in-scope or out-of-scope for Octane using
- * the keyword rules from docs/react-parity-migration-plan.md §2, and prints a
- * Vitest `describe` skeleton: in-scope cases become `it.todo(...)` citing the
- * source line; out-of-scope cases are listed in a trailing comment block with
- * the reason they were skipped.
- *
- * This does NOT write tests for you — it gives you the correct, de-duplicated,
- * pre-triaged checklist so nothing is silently dropped.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { basename, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import {
+	extractTestCases,
+	findPossibleUnexpandedRegistrars,
+} from './react-parity/inventory-lib.mjs';
 
-// ── Out-of-scope rules. Order matters: first match wins, most specific first.
-// Each rule: [regex tested against the lowercased title, reason]. Titles that
-// match none are treated as in-scope.
-const OUT_OF_SCOPE_RULES = [
-	[/strictmode|double[- ]?invoke|double invoking/, 'StrictMode double-invoke (Octane has none)'],
-	[/legacy|legacyhidden|sync mode/, 'legacy / sync mode (Octane is concurrent-root only)'],
-	[/suspenselist|revealorder|\btail\b/, 'SuspenseList (not in Octane)'],
-	[/profiler|actualduration|treebaseduration|onrender/, 'Profiler (not supported)'],
+// These are review prompts, not scope decisions. In particular, renderer-level
+// outcomes often remain portable even when the React fixture uses an API that
+// Octane does not expose.
+const TRIAGE_SUGGESTION_RULES = [
+	[
+		/strictmode|double[- ]?invoke|double invoking/,
+		'Review as an intentional divergence: Octane does not double-invoke for StrictMode.',
+	],
+	[
+		/legacy|legacyhidden|sync mode/,
+		'Review whether the observable outcome applies to concurrent roots.',
+	],
+	[
+		/suspenselist|revealorder|\btail\b/,
+		'Review API availability: Octane does not expose SuspenseList.',
+	],
+	[
+		/profiler|actualduration|treebaseduration|onrender/,
+		'Review API availability: Profiler is unsupported.',
+	],
 	[
 		/devtools|component stack|displayname|owner stack|\.stack\b/,
-		'DevTools / component-stack formatting',
+		"Review against Octane's public diagnostic and DevTools contracts.",
 	],
 	[
 		/getderivedstatefromerror|componentdidcatch/,
-		'class error-boundary lifecycle (port OUTCOME via @try/@catch)',
+		'Adapt the renderer-level error-boundary outcome through @try/@catch when applicable.',
 	],
 	[
 		/getderivedstatefromprops|componentwill|componentdid|shouldcomponentupdate|\bsetstate\b.*callback|replacestate|forceupdate|this\.refs|string ref/,
-		'class lifecycle / API (port OUTCOME via hooks if renderer-level)',
+		'Adapt the observable outcome through function components and hooks when applicable.',
 	],
 	[
 		/\bclass(es)?\b|purecomponent|createclass|\bes6 class\b/,
-		'class component (Octane is function-components only)',
+		'Adapt the observable outcome through function components when applicable.',
 	],
 	[
 		/\bwarn(s|ing)?\b|invariant|errors? (if|when|on)|throws? (in dev|when|if)/,
-		'DEV warning / error-message (Octane warning policy differs)',
+		"Review against Octane's public diagnostic policy instead of copying message text.",
 	],
-	[/server component|\brsc\b|flight/, 'Server Components / RSC (not supported)'],
 	[
-		/fizz|renderto(pipeable|readable)stream|streaming|shell hydrat|selective hydrat|progressive/,
-		'Fizz streaming (Octane SSR is non-streaming)',
+		/server component|\brsc\b|flight/,
+		'Review as a likely non-goal: Server Components are unsupported.',
 	],
-	// ViewTransitions rule removed 2026-07-11 — now planned (docs/view-transitions-plan.md).
-	[/float|preinit|preload|hoistable|singleton resource/, 'Float / resource hoisting (out)'],
 	[
 		/cpu[- ]?bound|expectedloadtime|suspensey|avoidthisfallback|suspensecallback/,
-		'unstable Suspense API (out)',
-	],
-	[
-		/react\.children|children\.(map|foreach|toarray|count|only)/,
-		'React.Children utility (Octane uses @for)',
+		'Review whether this unstable Suspense API has an Octane-facing observable outcome.',
 	],
 	[
 		/multiple renderers|multi-renderer|two renderers/,
-		'multi-renderer internals (single DOM renderer)',
+		'Review whether this depends on multi-renderer internals rather than a DOM-visible outcome.',
 	],
-	[/shouldyield|mock scheduler|scheduler module/, 'Scheduler-internals test'],
+	[
+		/shouldyield|mock scheduler|scheduler module/,
+		'Port only a public scheduling outcome, not scheduler internals.',
+	],
 	[
 		/rules of hooks|hook order|ordered hooks|fewer hooks|more hooks/,
-		'rules-of-hooks (intentional divergence — Octane tracks by call site)',
+		'Review as an intentional divergence: Octane identifies hooks by compiler call site.',
 	],
 ];
 
-const TITLE_RE =
-	/(?:^|\s)(it|test|itRenders|itRendersWithoutSSR|itThrowsWhenRendering)\s*(?:\.\s*(?:only|skip|failing))?\s*\(\s*(['"`])((?:\\.|(?!\2).)*)\2/g;
-
-function classify(title) {
-	const t = title.toLowerCase();
-	for (const [re, reason] of OUT_OF_SCOPE_RULES) {
-		if (re.test(t)) return { scope: 'out', reason };
+export function suggestTriage(title) {
+	const normalizedTitle = typeof title === 'string' ? title.toLowerCase() : '';
+	for (const [pattern, suggestion] of TRIAGE_SUGGESTION_RULES) {
+		if (pattern.test(normalizedTitle)) return suggestion;
 	}
-	return { scope: 'in', reason: null };
+	return null;
 }
 
-function lineOf(source, index) {
-	let line = 1;
-	for (let i = 0; i < index && i < source.length; i++) if (source.charCodeAt(i) === 10) line++;
-	return line;
+function asList(value) {
+	if (value == null || value === false) return [];
+	return Array.isArray(value) ? value.filter(Boolean) : [value];
 }
 
-function extract(source) {
-	const out = [];
-	const seen = new Set();
-	let m;
-	while ((m = TITLE_RE.exec(source)) !== null) {
-		const title = m[3].replace(/\\(['"`])/g, '$1');
-		const line = lineOf(source, m.index);
-		const key = title + '@' + line;
-		if (seen.has(key)) continue;
-		seen.add(key);
-		out.push({ kind: m[1], title, line, ...classify(title) });
+function describeValue(value) {
+	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+		return String(value);
 	}
-	return out;
+	if (value && typeof value === 'object') {
+		return Object.entries(value)
+			.filter(([, item]) => item != null && item !== false && item !== '')
+			.map(([key, item]) => `${key}=${Array.isArray(item) ? item.join(', ') : String(item)}`)
+			.join('; ');
+	}
+	return '';
 }
 
-function render(cases, reactFile) {
-	const inScope = cases.filter((c) => c.scope === 'in');
-	const outScope = cases.filter((c) => c.scope === 'out');
-	const slug = basename(reactFile).replace(/-test(\.internal)?\.js$/, '');
-	const esc = (s) => s.replace(/'/g, "\\'");
+function commentText(value) {
+	return describeValue(value).replace(/\r?\n/g, ' ').replace(/\*\//g, '* /');
+}
 
+function caseIsManual(testCase) {
+	return (
+		testCase.manual === true ||
+		testCase.dynamic === true ||
+		Boolean(testCase.manualReviewReason) ||
+		testCase.status === 'manual' ||
+		testCase.extraction === 'manual' ||
+		typeof testCase.title !== 'string' ||
+		testCase.title.length === 0
+	);
+}
+
+function manualReason(testCase) {
+	return (
+		testCase.manualReviewReason ??
+		testCase.manualReason ??
+		testCase.reason ??
+		testCase.dynamicExpression ??
+		testCase.titleExpression ??
+		'dynamic test registration'
+	);
+}
+
+function todoTitle(testCase, reactFile) {
+	if (!caseIsManual(testCase)) return testCase.title;
+	const kind = testCase.kind || 'test';
+	const location = `${basename(reactFile)}:${testCase.line ?? '?'}`;
+	return `[manual review] ${kind} at ${location} — ${commentText(manualReason(testCase))}`;
+}
+
+function metadataLines(testCase) {
 	const lines = [];
-	lines.push(`/**`);
-	lines.push(` * Port of ${basename(reactFile)} — generated by scripts/scaffold-react-port.mjs.`);
-	lines.push(` * ${inScope.length} in-scope cases, ${outScope.length} skipped (see bottom).`);
-	lines.push(` * Each it.todo cites the source line; replace with a real test + .tsrx fixture.`);
-	lines.push(` */`);
-	lines.push(`import { describe, it, expect } from 'vitest';`);
-	lines.push(`import { mount, act, createLog } from '../_helpers';`);
-	lines.push(``);
-	lines.push(`describe('${esc(slug)} (ported)', () => {`);
-	for (const c of inScope) {
-		lines.push(`\t// ${basename(reactFile)}:${c.line}`);
-		lines.push(`\tit.todo('${esc(c.title)}');`);
+	const modifiers = asList(testCase.modifiers).map(commentText).filter(Boolean);
+	if (modifiers.length > 0) lines.push(`Upstream modifiers: ${modifiers.join(', ')}`);
+
+	const rawGate = testCase.gate ?? testCase.gates;
+	const gateValues =
+		rawGate && typeof rawGate === 'object' && !Array.isArray(rawGate)
+			? (rawGate.expressions ?? rawGate.expression ?? rawGate)
+			: rawGate;
+	const gates = asList(gateValues).map(commentText).filter(Boolean);
+	if (gates.length > 0) lines.push(`Feature gate: ${gates.join(' | ')}`);
+
+	if (testCase.parameterization) {
+		lines.push(`Parameterization: ${commentText(testCase.parameterization)}`);
 	}
-	lines.push(`});`);
-	lines.push(``);
-	if (outScope.length) {
-		lines.push(`/* Out of scope — intentionally NOT ported:`);
-		for (const c of outScope) {
-			lines.push(` *  - [${c.line}] ${c.title}`);
-			lines.push(` *      → ${c.reason}`);
-		}
-		lines.push(` */`);
+	if (testCase.helperExpansion) {
+		lines.push(`Helper expansion: ${commentText(testCase.helperExpansion)}`);
 	}
-	return lines.join('\n') + '\n';
+	if (testCase.estimatedRegistrations > 1) {
+		lines.push(`Expands to ${commentText(testCase.estimatedRegistrations)} upstream registrations`);
+	}
+	const evidenceKey = testCase.caseId ?? testCase.evidenceKey;
+	if (evidenceKey) lines.push(`Evidence key: ${commentText(evidenceKey)}`);
+	if (caseIsManual(testCase)) lines.push(`MANUAL REVIEW: ${commentText(manualReason(testCase))}`);
+	return lines;
 }
 
-function main() {
-	const args = process.argv.slice(2);
-	if (args.length === 0 || args.includes('-h') || args.includes('--help')) {
-		console.error('usage: node scripts/scaffold-react-port.mjs <react-test-file> [--out <file>]');
-		process.exit(args.length === 0 ? 1 : 0);
+export function renderScaffold(cases, reactFile) {
+	const slug = basename(reactFile).replace(/-test(\.internal)?\.(?:coffee|[cm]?js)$/, '');
+	const manualCount = cases.filter(caseIsManual).length;
+	const suggestionCount = cases.filter((testCase) => suggestTriage(testCase.title)).length;
+	const lines = [];
+
+	lines.push('/**');
+	lines.push(` * Port checklist for ${basename(reactFile)}.`);
+	lines.push(
+		` * ${cases.length} test declarations discovered; ${manualCount} require manual extraction review; ${suggestionCount} have automated triage suggestions.`,
+	);
+	lines.push(' * Suggestions are not scope decisions. Resolve every entry in the parity ledger.');
+	lines.push(
+		' * Replace each todo with an executable behavioral test or a ledger-backed disposition.',
+	);
+	lines.push(' */');
+	lines.push("import { describe, it } from 'vitest';");
+	lines.push('');
+	lines.push(`describe(${JSON.stringify(`${slug} (ported)`)}, () => {`);
+	for (const testCase of cases) {
+		lines.push(`\t// Source: ${basename(reactFile)}:${testCase.line ?? '?'}`);
+		for (const metadata of metadataLines(testCase)) lines.push(`\t// ${metadata}`);
+		const suggestion = suggestTriage(testCase.title);
+		if (suggestion) lines.push(`\t// Automated triage suggestion: ${commentText(suggestion)}`);
+		lines.push(`\tit.todo(${JSON.stringify(todoTitle(testCase, reactFile))});`);
 	}
-	const outIdx = args.indexOf('--out');
-	const outFile = outIdx >= 0 ? args[outIdx + 1] : null;
-	const reactFile = args.find((a, i) => !a.startsWith('--') && (outIdx < 0 || i !== outIdx + 1));
+	lines.push('});');
+	return `${lines.join('\n')}\n`;
+}
+
+export function scaffoldReactPort(reactFile) {
 	const source = readFileSync(reactFile, 'utf8');
-	const cases = extract(source);
-	const skeleton = render(cases, reactFile);
-	const inN = cases.filter((c) => c.scope === 'in').length;
-	if (outFile) {
-		writeFileSync(outFile, skeleton);
-		console.error(`wrote ${outFile} — ${inN}/${cases.length} in scope`);
+	const normalizedFile = reactFile.replaceAll('\\', '/');
+	const inventoryPath =
+		normalizedFile.match(/(?:^|\/)((?:packages|scripts)\/.*)$/)?.[1] ?? reactFile;
+	const extracted = extractTestCases(source, { file: inventoryPath });
+	const extractedCases = Array.isArray(extracted) ? extracted : extracted.cases;
+	const registrarCandidates = findPossibleUnexpandedRegistrars(source).map((candidate) => ({
+		kind: candidate.name,
+		title: null,
+		line: null,
+		manualReviewReason: `Possible custom registrar appears ${candidate.occurrences} time(s); inspect its definition and expand every registered case.`,
+	}));
+	const cases = Array.isArray(extractedCases)
+		? [...extractedCases, ...registrarCandidates]
+		: extractedCases;
+	if (!Array.isArray(cases)) {
+		throw new TypeError(
+			'extractTestCases() must return a case array or an object with a cases array',
+		);
+	}
+	return { cases, skeleton: renderScaffold(cases, reactFile) };
+}
+
+function parseArgs(args) {
+	if (args.length === 0 || args.includes('-h') || args.includes('--help')) return null;
+	const positional = [];
+	let outFile = null;
+	for (let index = 0; index < args.length; index++) {
+		const arg = args[index];
+		if (arg === '--out') {
+			outFile = args[++index];
+			if (!outFile) throw new Error('--out requires a file path');
+		} else if (arg.startsWith('--')) {
+			throw new Error(`unknown option: ${arg}`);
+		} else {
+			positional.push(arg);
+		}
+	}
+	if (positional.length !== 1) throw new Error('expected exactly one React test file');
+	return { reactFile: positional[0], outFile };
+}
+
+export function main(args = process.argv.slice(2)) {
+	const options = parseArgs(args);
+	if (options === null) {
+		console.error('usage: node scripts/scaffold-react-port.mjs <react-test-file> [--out <file>]');
+		return args.length === 0 ? 1 : 0;
+	}
+	const { cases, skeleton } = scaffoldReactPort(options.reactFile);
+	const manualCount = cases.filter(caseIsManual).length;
+	if (options.outFile) {
+		writeFileSync(options.outFile, skeleton);
+		console.error(
+			`wrote ${options.outFile} — ${cases.length} test declarations (${manualCount} manual review)`,
+		);
 	} else {
 		process.stdout.write(skeleton);
-		console.error(`\n# ${inN}/${cases.length} in scope (${cases.length - inN} skipped)`);
+		console.error(`\n# ${cases.length} test declarations (${manualCount} manual review)`);
 	}
+	return 0;
 }
 
-main();
+const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : null;
+if (invokedPath === import.meta.url) {
+	try {
+		process.exitCode = main();
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : error);
+		process.exitCode = 1;
+	}
+}
