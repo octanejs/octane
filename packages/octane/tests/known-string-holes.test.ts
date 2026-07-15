@@ -49,6 +49,14 @@ describe('text holes — `as string` cast is optional when provably a string', (
 		expect(classify(`{'Hi ' + props.name}`)).toBe('text');
 	});
 
+	it('conditional with two string arms → text (no cast)', () => {
+		expect(classify(`{n === 1 ? ' item left' : ' items left'}`)).toBe('text');
+	});
+
+	it('conditional with an unproven arm stays renderable', () => {
+		expect(classify(`{n === 1 ? ' item left' : props.label}`)).toBe('renderable');
+	});
+
 	it('explicit `as string` cast → text', () => {
 		expect(classify('{n as string}')).toBe('text');
 	});

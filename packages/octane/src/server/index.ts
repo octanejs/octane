@@ -61,6 +61,7 @@ export {
 	useDebugValue,
 	memo,
 	lazy,
+	hookSlots,
 	withSlot,
 	startTransition,
 	flushSync,

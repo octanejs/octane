@@ -8,8 +8,9 @@ import { App as DevApp } from './_fixtures/prod-hooks.tsrx';
 
 // PROD-compile-mode smoke test. Every fixture in this suite is otherwise
 // compiled by the vitest plugin in SERVE mode (hmr:true → Symbol.for hook
-// slots), so the production compile options (`hmr:false` → plain
-// Symbol("<hash>#<n>") slots) had ZERO runtime coverage — which let the
+// slots), so the production compile options (`hmr:false` → scope-local numeric
+// base slots, with runtime-ranged Symbols for callable/custom-hook boundaries)
+// need their own runtime coverage. The prior gap let the
 // 2026-07-08 regression ship: description-less Symbol() slots collapsed the
 // runtime's description-based custom-hook slot composition (resolveSlot),
 // collided custom-hook state across call sites, and broke hydration on every

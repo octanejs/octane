@@ -55,6 +55,11 @@ describe('built SSR handler', () => {
 		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
 		expect(html).toContain('<main');
 		expect(classCount(html, 'home')).toBeGreaterThan(0);
+		// The homepage ships the real Visx SVG, not an empty client chart shell.
+		expect(classCount(html, 'home-bench-chart')).toBe(1);
+		expect(classCount(html, 'visx-bar')).toBeGreaterThan(0);
+		expect(classCount(html, 'deferred-bench')).toBe(0);
+		expect(classCount(html, 'bench-plot-shell')).toBe(0);
 		// Hydration wiring: the data script names the app entry + preHydrate hook,
 		// and the template carries the built hydrate script.
 		expect(html).toContain('"entry":"/src/app/App.tsrx"');

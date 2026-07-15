@@ -94,6 +94,27 @@ describe('conformance: hydration must not blow away user input (ReactDOMServerIn
 	it('uncontrolled text input (Per :297)', () =>
 		preserveUserInput('TextInput', 'value', 'Hello', 'Goodbye'));
 
+	it('dynamic defaultValue adopts input and later updates only its default', async () => {
+		const props = { v: 'Hello' };
+		const { html } = await ServerRT.renderToString(server.DynamicDefaultTextInput, props);
+		container.innerHTML = html;
+		const field = container.querySelector('#fi') as HTMLInputElement;
+		field.value = 'Goodbye';
+
+		const root = hydrateRoot(container, client.DynamicDefaultTextInput, props);
+		flushSync(() => {});
+		expect(container.querySelector('#fi')).toBe(field);
+		expect(field.value).toBe('Goodbye');
+		expect(warns()).toEqual([]);
+
+		root.render(client.DynamicDefaultTextInput, { v: 'Changed' });
+		flushSync(() => {});
+		expect(field.value).toBe('Goodbye');
+		expect(field.defaultValue).toBe('Changed');
+		expect(field.getAttribute('value')).toBe('Changed');
+		root.unmount();
+	});
+
 	it('CONTROLLED text input adopts without writes (Per :300)', () =>
 		preserveUserInput('DynamicTextInput', 'value', 'Hello', 'Goodbye', {
 			v: 'Hello',
@@ -120,6 +141,21 @@ describe('conformance: hydration must not blow away user input (ReactDOMServerIn
 });
 
 describe('conformance: controlled fields reassert AFTER adoption (React parity)', () => {
+	it('a controlled checkbox restores after its first post-hydration input event', async () => {
+		const props = { c: true, onClick: () => {} };
+		const { html } = await ServerRT.renderToString(server.ControlledCheckbox, props);
+		container.innerHTML = html;
+		const field = container.querySelector('#fi') as HTMLInputElement;
+		field.checked = false;
+
+		const root = hydrateRoot(container, client.ControlledCheckbox, props);
+		flushSync(() => {});
+		expect(field.checked).toBe(false);
+		field.dispatchEvent(new Event('input', { bubbles: true }));
+		expect(field.checked).toBe(true);
+		root.unmount();
+	});
+
 	// The adopted pre-hydration value survives only until the element's first
 	// real commit — a post-hydration re-render reasserts the rendered value.
 	it('the first post-hydration commit reasserts the rendered value', async () => {

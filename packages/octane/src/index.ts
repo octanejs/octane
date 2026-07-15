@@ -1,8 +1,6 @@
-import pkg from '../package.json' with { type: 'json' };
-
-// Source the version from package.json so it can't drift from the published
-// package version (the previous hardcoded literal already had).
-export const version: string = pkg.version;
+// Keep package metadata behind an isolated re-export: applications that do not
+// read `version` can tree-shake this module and the package.json payload in full.
+export { version } from './version.js';
 
 // Profiling's application API and compiler ABI live at `octane/profiling`;
 // neither belongs on the React-shaped main namespace.
@@ -23,7 +21,7 @@ export {
 	act,
 	type Root,
 	type RootOptions,
-	// Hooks (octane extension: each accepts a trailing slot symbol — required
+	// Hooks (octane extension: each accepts a trailing compiler slot — required
 	// when calling from plain .ts, injected by the compiler in .tsrx/.tsx)
 	useState,
 	useReducer,
@@ -87,6 +85,7 @@ export {
 	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)
 	__useStateWithGetter,
 	__useReducerWithGetter,
+	__createVoidRoot,
 	// Module-load "this module uses <ViewTransition>" hint (view-transitions plan).
 	__vtSeen,
 	template,
@@ -128,6 +127,7 @@ export {
 	sibling,
 	setText,
 	setAttribute,
+	setStringData,
 	setClassName,
 	setClassAttr,
 	normalizeClass,
@@ -139,8 +139,10 @@ export {
 	// native events).
 	setValue,
 	setChecked,
+	setCheckedCheckable,
 	setSelectValue,
 	setDefaultValue,
+	setDefaultValueUncontrolled,
 	setDefaultChecked,
 	// autoFocus (commit-phase focus on mount; never an attribute)
 	setAutoFocus,
@@ -157,6 +159,7 @@ export {
 	switchBlock,
 	activityBlock,
 	componentSlot,
+	componentSlotVoid,
 	componentSlotLite,
 	markChildrenBlock,
 	childSlot,
@@ -167,6 +170,7 @@ export {
 	hostComponent,
 	renderBlock,
 	portal,
+	hookSlots,
 	withSlot,
 	// Parallel use() (compiler parallelUse pipeline): batched stratum unwrap +
 	// fetch-tree warming (docs/suspense-parallel-use-plan.md).

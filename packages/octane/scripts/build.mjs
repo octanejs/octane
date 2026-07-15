@@ -4,8 +4,9 @@
 //
 // Three steps, matching the two source shapes:
 //   1. The `.ts` runtime → ESM `.js`, transpiled PER FILE (no bundling) so the module
-//      structure and the `import … from '../package.json' with { type: 'json' }` attribute
-//      both survive intact for a plain Node ESM consumer.
+//      structure and version.ts's
+//      `import … from '../package.json' with { type: 'json' }` attribute both survive
+//      intact for a plain Node ESM consumer.
 //   2. The compiler is already plain `.js` (its only deps are `@tsrx/core` + `esrap`) — copy
 //      it verbatim.
 //   3. Type declarations (`tsc --emitDeclarationOnly`) alongside the JS.

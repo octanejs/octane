@@ -1,11 +1,11 @@
 // Home: hero + side-by-side .tsrx sample, feature cards, and the "proven" stat
 // strip. The code sample is an .mdx module so it rides the same Shiki pipeline
-// as the docs. The bench teaser charts are @octanejs/recharts over the
+// as the docs. The bench teaser is deterministic @octanejs/visx SVG over the
 // checked-in benchmark scores (content/benchmarks.ts) — the full set lives at
 // /benchmarks.
 import { Link } from '@octanejs/tanstack-router';
 import CodeSample from '../content/home-sample.mdx';
-import { DeferredBenchBars } from '../components/DeferredBenchBars.tsrx';
+import { HomeBenchBars } from '../components/HomeBenchBars.tsrx';
 import { HOME_SUMMARY } from '../content/home-benchmark.ts';
 
 const FEATURES = [
@@ -119,7 +119,7 @@ export function Home() @{
 				<Link to="/benchmarks" class="bench-all">All suites →</Link>
 			</div>
 			<div class="bench-grid">
-				<DeferredBenchBars card={HOME_SUMMARY} width={1100} />
+				<HomeBenchBars card={HOME_SUMMARY} />
 			</div>
 			<p class="bench-note">
 				{'Ratios are geometric means over each suite’s per-operation checked-in benchmark scores ('}

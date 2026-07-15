@@ -39,4 +39,5 @@ surface and evidence.
 | `@octanejs/tanstack-table` | 0 |
 | `@octanejs/tanstack-virtual` | 0 |
 | `@octanejs/testing-library` | 0 |
+| `@octanejs/visx` | 0 |
 | `@octanejs/zustand` | 0 |
