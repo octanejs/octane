@@ -90,10 +90,20 @@ function SearchDialog(props: DialogProps) @{
 		});
 		// The router restores scroll position rather than honouring the hash on a
 		// client navigation, so land on the section ourselves once it is painted.
+		// DocPage and its MDX are lazy-loaded, so the target can take many frames to
+		// mount — poll for it (bounded) instead of assuming a single frame is enough.
 		if (group.id) {
-			requestAnimationFrame(() => {
-				document.getElementById(group.id)?.scrollIntoView({ block: 'start' });
-			});
+			const id = group.id;
+			let frames = 0;
+			const scrollToSection = () => {
+				const el = document.getElementById(id);
+				if (el) {
+					el.scrollIntoView({ block: 'start' });
+				} else if (frames++ < 120) {
+					requestAnimationFrame(scrollToSection);
+				}
+			};
+			requestAnimationFrame(scrollToSection);
 		}
 	};
 
