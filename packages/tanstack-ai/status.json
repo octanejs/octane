@@ -3,17 +3,18 @@
     "package": "@tanstack/ai-react",
     "version": "0.16.4"
   },
-  "surface": "Ports the @tanstack/ai-react 0.16.4 hook surface (useChat, useRealtimeChat, useGeneration, useGenerateImage/Audio/Speech/Video, useTranscription, useSummarize, useAudioRecorder, useMcpAppBridge) while re-exporting @tanstack/ai 0.40.0 and @tanstack/ai-client 0.20.0 unchanged.",
+  "surface": "Ports the @tanstack/ai-react 0.16.4 hook surface (useChat, useRealtimeChat, useGeneration, useGenerateImage/Audio/Speech/Video, useTranscription, useSummarize, useAudioRecorder, useMcpAppBridge) while re-exporting @tanstack/ai 0.40.0 and @tanstack/ai-client 0.20.0 unchanged, including all 30 @tanstack/ai-client convenience re-exports from the upstream index.",
   "divergences": [
     "The `./mcp-apps` subpath and its `MCPAppResource` component are not ported: they render `AppRenderer` from the React-only `@mcp-ui/client`, which has no Octane equivalent. The framework-agnostic `useMcpAppBridge` hook is ported and available on the main entry.",
     "Octane uses native events: text/file/recorder inputs drive updates via `onInput`; there is no synthetic `onChange` layer.",
-    "Octane has no StrictMode double-invoke and always provides `useId`, so no random-id fallback is needed."
+    "Octane has no StrictMode double-invoke and always provides `useId`, so no random-id fallback is needed.",
+    "One upstream `useChat` test case (\"auto-resume on mount / when the browser comes back online\") is omitted: it targets `ChatClient.prototype.maybeAutoResume`, an API absent from the pinned (and latest published) `@tanstack/ai-client@0.20.0` and never invoked by `useChat`. It is untestable in this binding until that dependency ships the method."
   ],
   "ssr": "Supported and tested: useChat renders its initial message snapshot through octane/server without a DOM.",
   "notes": [
     "Hook modules are authored as TSRX with checked declaration companions; no ported hook renders JSX or references React types in its public signature.",
-    "The ported suite reuses the upstream behavioral tests with no skipped, todo, or expected-failure cases.",
-    "Differential coverage runs one shared chat fixture through this binding and real @tanstack/ai-react@0.16.4, comparing streamed output after each step."
+    "137 tanstack-ai tests plus 1 SSR test pass, reusing the upstream behavioral tests with no skipped, todo, or expected-failure cases.",
+    "Differential coverage runs one shared chat fixture through this binding and real @tanstack/ai-react@0.16.4, comparing streamed output after each step; output is byte-equal."
   ],
-  "verified": "PENDING"
+  "verified": "2026-07-15"
 }
