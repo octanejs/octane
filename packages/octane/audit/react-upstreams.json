@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/facebook/react.git",
+  "capturedOn": "2026-07-15",
+  "baselines": {
+    "stable": {
+      "version": "v19.2.7",
+      "ref": "refs/tags/v19.2.7",
+      "commit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+    },
+    "canary": {
+      "version": "main@2026-07-15",
+      "ref": "refs/heads/main",
+      "commit": "b740af2510de1e19fcb399abb862af26ff95ac80"
+    }
+  },
+  "discovery": {
+    "configPath": "scripts/jest/config.source.js",
+    "roots": ["packages", "scripts"],
+    "testPattern": "/__tests__/[^/]*(\\.js|\\.coffee|[^d]\\.ts)$",
+    "excludePathPatterns": [
+      "scripts/rollup/shims",
+      "scripts/bench",
+      "packages/eslint-plugin-react-hooks",
+      "packages/react-devtools-extensions",
+      "packages/react-devtools-facade",
+      "packages/react-devtools-shared",
+      "packages/react-devtools-cdt-mcp"
+    ]
+  },
+  "helperExpansions": {
+    "itRenders": 5,
+    "itClientRenders": 3,
+    "itRendersWithoutSSR": 3,
+    "itThrowsWhenRendering": 3
+  },
+  "expectedInventories": {
+    "stable": {
+      "fingerprint": "cbb5086e5a286c249c0b545a067ee91883d3ef2f809a876d44bc7a488f806c1f",
+      "suites": 326,
+      "directDeclarations": 5020,
+      "helperDeclarations": 325,
+      "minimumRegistrations": 6603
+    },
+    "canary": {
+      "fingerprint": "6c5cccf268b5f5db88afc06e1ec5f416abd774edef764242be5427ecf5481f84",
+      "suites": 326,
+      "directDeclarations": 5086,
+      "helperDeclarations": 327,
+      "minimumRegistrations": 6679
+    }
+  },
+  "triagePolicies": [
+    {
+      "id": "effect-event-semantics",
+      "workstream": "Effect Event semantics",
+      "filePattern": "/useEffectEvent-test\\.js$",
+      "risk": "critical",
+      "status": "covered",
+      "classification": "adaptable",
+      "owner": "runtime",
+      "rationale": "Executable stable/canary adaptations cover fresh wrapper identity, render-call guards, commit-time publication, effect ordering, Activity/context integration, and suspended or failed renders."
+    },
+    {
+      "id": "untrusted-url-security",
+      "workstream": "Untrusted URL security",
+      "filePattern": "/ReactDOMServerIntegrationUntrustedURL-test\\.js$",
+      "risk": "critical",
+      "status": "covered",
+      "classification": "portable",
+      "owner": "runtime + SSR",
+      "rationale": "An executable render-mode matrix covers one shared javascript: URL sanitizer across client, compiler-baked literals, SSR, streaming, updates, SVG, forms, and hydration."
+    },
+    {
+      "id": "root-semantics",
+      "workstream": "Root semantics",
+      "filePattern": "/ReactDOMRoot[^/]*-test(?:\\.internal)?\\.js$",
+      "risk": "high",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "runtime",
+      "rationale": "Port public createRoot, update, unmount, error, and scheduling outcomes while filtering renderer internals."
+    },
+    {
+      "id": "fragments",
+      "workstream": "Fragment reconciliation",
+      "filePattern": "/React(?:TopLevel)?Fragment[^/]*-test(?:\\.internal)?\\.js$",
+      "risk": "high",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "runtime",
+      "rationale": "Expand fragment reconciliation, ref, nesting, and top-level outcome coverage."
+    },
+    {
+      "id": "element-children-api",
+      "workstream": "Element and Children APIs",
+      "filePattern": "/React(?:Children|CreateElement|Element|ElementClone)[^/]*-test(?:\\.internal)?\\.js$",
+      "risk": "high",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "public API",
+      "rationale": "Audit and port observable Children, element creation, JSX-element, and clone behavior against Octane's public API."
+    },
+    {
+      "id": "lazy",
+      "workstream": "Lazy components",
+      "filePattern": "/ReactLazy[^/]*-test(?:\\.internal)?\\.js$",
+      "risk": "high",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "runtime",
+      "rationale": "Expand lazy resolution, rejection, retry, default-export, and Suspense interaction coverage."
+    },
+    {
+      "id": "external-store",
+      "workstream": "External stores",
+      "filePattern": "/useSyncExternalStoreShared-test\\.js$",
+      "risk": "high",
+      "status": "planned",
+      "classification": "portable",
+      "owner": "runtime",
+      "rationale": "Port store mutation, snapshot consistency, selector, error, and hydration outcomes."
+    },
+    {
+      "id": "update-reconciliation",
+      "workstream": "Update reconciliation",
+      "filePattern": "/ReactUpdates[^/]*-test(?:\\.internal)?\\.js$",
+      "risk": "high",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "runtime",
+      "rationale": "Port renderer-observable update ordering, batching, interruption, and reconciliation outcomes."
+    },
+    {
+      "id": "fizz-streaming",
+      "workstream": "Fizz streaming",
+      "filePattern": "/ReactDOMFizzServer[^/]*-test(?:\\.internal)?\\.js$",
+      "risk": "high",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "SSR + hydration",
+      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+    },
+    {
+      "id": "server-integration-matrix",
+      "workstream": "Server integration matrix",
+      "filePattern": "/ReactDOMServerIntegration[^/]*-test(?:\\.internal)?\\.js$",
+      "risk": "high",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "SSR + hydration",
+      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+    },
+    {
+      "id": "react-repo-eslint-rules",
+      "workstream": "React repository lint rules",
+      "filePattern": "^scripts/eslint-rules/__tests__/",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "tooling",
+      "rationale": "React's internal ESLint RuleTester fixtures validate repository tooling, not observable UI framework behavior in Octane."
+    }
+  ],
+  "octaneSuiteBaseline": {
+    "normalCoreCases": 2260,
+    "normalCoreBreakdown": {
+      "conformance": 985,
+      "differential": 136,
+      "hydration": 135,
+      "other": 1004
+    },
+    "profilingOnlyCases": 14,
+    "distinctCoreCasesIncludingProfiling": 2274,
+    "productionModeReruns": 2260,
+    "allWorkspaceExecutions": 7135,
+    "reactSourceAttributedFileUpperBound": 968,
+    "reactSourceAttributedFiles": 68,
+    "reactSourceAttributedDefinition": "Every collected normal-core case in a local file containing at least one React upstream *-test.js or *-test.ts filename citation; this is a generous file-level upper bound, not a one-to-one port count.",
+    "measuredOn": "2026-07-15"
+  }
+}

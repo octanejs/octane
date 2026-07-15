@@ -1,21 +1,27 @@
 # React → Octane Test-Parity Migration Plan
 
-> **STATUS: COMPLETE (2026-07-05; executable-pin audit refreshed 2026-07-14).**
-> Every phase and tier below is ported or accounted, and the committed suite now
-> has zero skipped or expected-failure tests. Historical checkpoint counts below
-> record the migration as it happened. The distilled, user-facing summary of every intentional
-> divergence is **[differences-from-react.md](./differences-from-react.md)** —
-> keep that page current when a divergence is added or closed; this document is
-> the historical execution record and porting methodology.
+> **STATUS: HISTORICAL EXECUTION RECORD.** This migration was marked complete on
+> 2026-07-05 (with its executable-pin audit refreshed on 2026-07-14), meaning
+> every phase and tier defined by its then-current scope was ported or accounted.
+> It was not a complete enumeration of React's current test inventory and must not
+> be used as the source for React-derived test counts. Current upstream pins,
+> case-level classifications, and coverage totals live in the generated
+> **[React parity coverage report](./react-parity-coverage.md)**. Historical
+> checkpoint counts below record the migration as it happened. The distilled,
+> user-facing summary of intentional divergences is
+> **[differences-from-react.md](./differences-from-react.md)**; keep that page
+> current when a divergence is added or closed.
 
-> Goal: systematically port the *in-scope* unit-test behaviors from `facebook/react`
+> Original goal: systematically port the *in-scope* unit-test behaviors from `facebook/react`
 > into Octane's `.tsrx` test suite, and close the runtime gaps those tests expose —
 > so "you can swap React for Octane" is proven, not asserted.
 
-This plan was produced by cross-referencing the **entire React test inventory**
-(76 react-reconciler + 129 react-dom + 25 react-core test files, ~230 files) against
-Octane's current 97 test files, and verifying the highest-stakes findings against
-`packages/octane/src/runtime.ts`.
+This plan was originally produced by cross-referencing its **then-current React
+test inventory** (76 react-reconciler + 129 react-dom + 25 react-core test files,
+~230 files) against Octane's then-current 97 test files, and verifying the
+highest-stakes findings against `packages/octane/src/runtime.ts`. Treat that
+inventory and every count below as a historical checkpoint; use the live report
+linked above for current accounting.
 
 ---
 
@@ -57,6 +63,9 @@ Octane is function-components + hooks + concurrent-root + DOM + SSR/hydration. T
 following React test areas are **out of scope by design** — document the divergence,
 don't port:
 
+Rows explicitly marked **historical exclusion, superseded** are retained only to
+explain the old plan; they are no longer current scope decisions.
+
 | React area | Why out of scope |
 |---|---|
 | Class components, `createClass`, `this.refs`, string refs | Octane has no class components. *Port the underlying reconciler/effect OUTCOME via function components + hooks where the behavior is renderer-level.* |
@@ -72,13 +81,13 @@ don't port:
 | **`useSyncExternalStore` commit-time getSnapshot re-read** (the `useSyncExternalStore-test.js` `:144` tearing check) | **Intentional divergence (decided 2026-07-03).** React's `updateSyncExternalStore` re-pushes `updateStoreInstance` whenever `inst.getSnapshot !== getSnapshot`, giving a commit-time snapshot re-read even for an unchanged value. Octane drops that: getSnapshot is refreshed in RENDER, and the commit-time store-sync (drainStoreSyncs) only runs when the read snapshot actually moved off the last-committed value (or the store was swapped) — so an unchanged snapshot with an unstable inline getSnapshot (the zustand/query pattern) enqueues nothing. Consequence: a store that mutates WITHOUT notifying in the render→commit window is no longer caught on a render where ONLY getSnapshot identity changed. Octane's synchronous renderer closes React's motivating concurrent-interleaving window, and any store that actually notifies is unaffected (onStoreChange compares against the render-fresh getSnapshot). Do NOT "fix" this back toward React's per-render commit re-read. See `useSyncExternalStore` in `runtime.ts`. |
 | Owner-based identity (`should NOT replace children with different owners`) | Modern React already dropped owner identity — confirm Octane matches (mount=1, unmount=0) but it's a 1-test check, not an area. |
 | Server Components / RSC / Flight | Not supported. |
-| Fizz **streaming** APIs (renderToPipeableStream, progressive chunks, shell hydration, selective/priority hydration of streamed boundaries) | Octane SSR is non-streaming. *Salvage the OUTCOME-level hydration tests (mismatch recovery, useId match, input value preservation), skip the streaming machinery.* |
+| Fizz **streaming** APIs (renderToPipeableStream, progressive chunks, shell hydration, selective/priority hydration of streamed boundaries) | **Historical exclusion, superseded.** Octane now ships `renderToPipeableStream` and `renderToReadableStream`; Fizz cases require case-by-case triage in the [live coverage report](./react-parity-coverage.md). Selective hydration's synthetic-event replay remains outside Octane's native-event model. |
 | `SuspenseList` (`revealOrder`/`tail`) | Not in Octane's component set (verify, then skip the whole `ReactSuspenseList-test.js`, the SuspenseList parts of `ReactDOMUseId`/`ReactContextPropagation`). |
 | CPU Suspense (`unstable_expectedLoadTime`), Suspensey commit phase (suspend-on-resource-load during commit), `unstable_avoidThisFallback`, `unstable_suspenseCallback` | Unstable/unsupported APIs. |
 | Profiler (`actualDuration`/`treeBaseDuration`), DevTools component-stack/displayName | Not supported. |
-| ViewTransitions | **Planned** — see `docs/view-transitions-plan.md` (conformance skeleton landed; phases pending). |
-| Float/resource hoisting (`ReactDOMFloat`) | Out (Octane has limited head-singleton support only). |
-| `React.Children.*` utilities (`ReactChildren-test.js`) | Octane uses `@for`. Only the missing-key-warning *policy* is conceptually portable. |
+| ViewTransitions | **Historical exclusion, superseded.** The implementation and its in-scope React ports are complete; see [view-transitions-plan.md](./view-transitions-plan.md) and the live ledger. |
+| Float/resource hoisting (`ReactDOMFloat`) | **Historical blanket exclusion, superseded.** Resource hints and head hoisting now exist, so these cases must be triaged individually against the supported surface. |
+| `React.Children.*` utilities (`ReactChildren-test.js`) | **Historical exclusion, superseded.** Octane now exports `Children`, `createElement`, and `cloneElement`; their upstream cases belong in the live inventory. |
 
 **Verify-existence flags** before porting their files: `useEffectEvent` (exists —
 `callbacks.test.ts`), `useMemoCache`/React-Compiler `c()` cache (likely absent →

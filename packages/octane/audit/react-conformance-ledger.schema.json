@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://octanejs.dev/schemas/react-conformance-ledger.schema.json",
+  "title": "Octane React conformance case ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "entries"],
+  "properties": {
+    "$schema": { "const": "./react-conformance-ledger.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "sourceFile", "title", "baselines", "status", "risk"],
+      "properties": {
+        "caseId": { "type": "string", "pattern": "^react-case-v1:[0-9a-f]{20}$" },
+        "sourceFile": { "type": "string", "pattern": "^(packages|scripts)/" },
+        "title": { "type": ["string", "null"] },
+        "titleExpression": { "type": "string", "minLength": 1 },
+        "baselines": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["stable", "canary"] }
+        },
+        "status": {
+          "enum": ["untriaged", "planned", "in_progress", "covered", "documented", "blocked"]
+        },
+        "classification": {
+          "enum": ["portable", "adaptable", "divergence", "non_goal"]
+        },
+        "risk": { "enum": ["unassessed", "critical", "high", "medium", "low"] },
+        "owner": { "type": "string", "minLength": 1 },
+        "workstream": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence" },
+          "minItems": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "untriaged" } } },
+          "then": { "not": { "required": ["classification"] } },
+          "else": { "required": ["classification"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "covered" } } },
+          "then": { "required": ["evidence"] }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": { "enum": ["planned", "in_progress", "blocked"] }
+            }
+          },
+          "then": { "required": ["owner", "rationale"] }
+        },
+        {
+          "if": { "properties": { "title": { "type": "null" } } },
+          "then": { "required": ["titleExpression"] }
+        },
+        {
+          "if": {
+            "required": ["classification"],
+            "properties": { "classification": { "enum": ["divergence", "non_goal"] } }
+          },
+          "then": { "required": ["rationale"] }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "testName"],
+      "properties": {
+        "file": { "type": "string", "pattern": "^packages/octane/tests/" },
+        "testName": { "type": "string", "minLength": 1 },
+        "modes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "client",
+              "server-string",
+              "server-stream",
+              "hydrate-match",
+              "hydrate-mismatch",
+              "production-compile"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
