@@ -39,6 +39,7 @@ function compileFixture(sourcePath: string): void {
 }
 
 function findFixtures(directory: string): string[] {
+	if (!existsSync(directory)) return [];
 	return readdirSync(directory).flatMap((name) => {
 		const path = join(directory, name);
 		return statSync(path).isDirectory() ? findFixtures(path) : path.endsWith('.tsrx') ? [path] : [];
