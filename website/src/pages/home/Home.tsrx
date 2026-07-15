@@ -4,7 +4,6 @@
 import { Hero } from './sections/Hero.tsrx';
 import { Features } from './sections/Features.tsrx';
 import { Proven } from './sections/Proven.tsrx';
-import { Bench } from './sections/Bench.tsrx';
 import { Explorer } from './sections/Explorer.tsrx';
 
 export function Home() @{
