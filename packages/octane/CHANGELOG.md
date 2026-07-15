@@ -1,5 +1,18 @@
 # octane
 
+## 0.1.7
+
+### Patch Changes
+
+- eaacd17: Add opt-in client profiling builds across Vite, Rspack, Rsbuild, and MDX, with component timings, render causes, Chrome custom tracks, and a bounded console and trace API.
+- 93dcb81: Reduce server-rendered `@for` overhead by accumulating item HTML directly, omitting per-item hydration markers for proven direct-host rows, and skipping keyed async-identity bookkeeping for compiler-proven synchronous items.
+- 6852df7: Reduce production output size with compact numeric base-hook slots and collision-free ranges for composable custom hooks, mount-only event-callback sinking, and tree-shakable hydration capabilities.
+
+  Production builds now prove direct imported TSRX roots and component bodies are void before selecting lean return-free render paths. Conditional string holes, statically named string `data-*` attributes, and statically safe uncontrolled `defaultValue` and checkbox/radio `checked` bindings also use smaller helpers, while ambiguous imports, spreads, dynamic return values, HMR, and profiling retain the generic behavior.
+
+- b00cd74: Skip the full-response View Transition candidate scan for SSR passes that did not render a View Transition.
+- e9852d4: Support server rendering and hydration for React-compatible `<Activity>` boundaries, including omitted hidden content and preserved offscreen client state.
+
 ## 0.1.6
 
 ### Patch Changes

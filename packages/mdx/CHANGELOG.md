@@ -1,5 +1,17 @@
 # @octanejs/mdx
 
+## 0.1.4
+
+### Patch Changes
+
+- eaacd17: Add opt-in client profiling builds across Vite, Rspack, Rsbuild, and MDX, with component timings, render causes, Chrome custom tracks, and a bounded console and trace API.
+- Updated dependencies [eaacd17]
+- Updated dependencies [93dcb81]
+- Updated dependencies [6852df7]
+- Updated dependencies [b00cd74]
+- Updated dependencies [e9852d4]
+  - octane@0.1.7
+
 ## 0.1.3
 
 ### Patch Changes
