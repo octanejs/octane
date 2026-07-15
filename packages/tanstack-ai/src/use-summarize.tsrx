@@ -101,7 +101,8 @@ export function useSummarize<TTransformed = void>(
 > {
   const devtools = {
     ...options.devtools,
-    framework: 'react',
+    // OCTANE DIVERGENCE: identify this binding as Octane (not 'react') in TanStack AI Devtools.
+    framework: 'octane',
     hookName: 'useSummarize',
     outputKind: 'text' as const,
   }

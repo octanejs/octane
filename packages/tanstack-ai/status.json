@@ -8,6 +8,7 @@
     "The `./mcp-apps` subpath and its `MCPAppResource` component are not ported: they render `AppRenderer` from the React-only `@mcp-ui/client`, which has no Octane equivalent. The framework-agnostic `useMcpAppBridge` hook is ported and available on the main entry.",
     "Octane uses native events: text/file/recorder inputs drive updates via `onInput`; there is no synthetic `onChange` layer.",
     "Octane has no StrictMode double-invoke and always provides `useId`, so no random-id fallback is needed.",
+    "The TanStack AI Devtools bridge is tagged `framework: 'octane'` (upstream `@tanstack/ai-react` sends `'react'`), so the devtools identify this binding correctly.",
     "One upstream `useChat` test case (\"auto-resume on mount / when the browser comes back online\") is omitted: it targets `ChatClient.prototype.maybeAutoResume`, an API absent from the pinned (and latest published) `@tanstack/ai-client@0.20.0` and never invoked by `useChat`. It is untestable in this binding until that dependency ships the method."
   ],
   "ssr": "Supported and tested: useChat renders its initial message snapshot through octane/server without a DOM.",

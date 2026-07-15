@@ -98,7 +98,8 @@ export function useChat<
       }),
       devtools: {
         ...initialOptions.devtools,
-        framework: 'react',
+        // OCTANE DIVERGENCE: identify this binding as Octane (not 'react') in TanStack AI Devtools.
+        framework: 'octane',
         hookName: 'useChat',
         outputKind: initialOptions.outputSchema ? 'structured' : 'chat',
       },

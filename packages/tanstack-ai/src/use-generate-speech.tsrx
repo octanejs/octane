@@ -98,7 +98,8 @@ export function useGenerateSpeech<TTransformed = void>(
 > {
   const devtools = {
     ...options.devtools,
-    framework: 'react',
+    // OCTANE DIVERGENCE: identify this binding as Octane (not 'react') in TanStack AI Devtools.
+    framework: 'octane',
     hookName: 'useGenerateSpeech',
     outputKind: 'audio' as const,
   }

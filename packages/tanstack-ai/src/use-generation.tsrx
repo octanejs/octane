@@ -128,7 +128,8 @@ export function useGeneration<
       devtoolsBridgeFactory: createGenerationDevtoolsBridge,
       devtools: {
         hookName: 'useGeneration',
-        framework: 'react',
+        // OCTANE DIVERGENCE: identify this binding as Octane (not 'react') in TanStack AI Devtools.
+        framework: 'octane',
         ...opts.devtools,
       },
       // The transform's raw return type (`TTransformed`) and the stored output
