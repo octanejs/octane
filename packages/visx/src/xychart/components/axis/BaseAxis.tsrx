@@ -1,0 +1,94 @@
+import { useMemo, useContext } from 'octane';
+import type { FC } from 'react';
+import type { AxisScale, TickLabelProps, AxisProps as VxAxisProps } from '@octanejs/visx/axis';
+import type { ScaleInput } from '@octanejs/visx/scale';
+import DataContext from '../../context/DataContext.tsrx';
+
+export type BaseAxisProps<Scale extends AxisScale> = Omit<
+  VxAxisProps<Scale>,
+  'scale' | 'orientation'
+> & {
+  /** Required axis orientation. */
+  orientation: NonNullable<VxAxisProps<Scale>['orientation']>;
+} & {
+  /** Rendered component which is passed VxAxisProps by BaseAxis after processing. */
+  AxisComponent: FC<VxAxisProps<Scale>>;
+};
+
+/**
+ * Component which handles all xychart-specific logic for axes,
+ * and passes processed props to a specified Axis / AnimatedAxis component.
+ */
+export default function BaseAxis<Scale extends AxisScale>({
+  AxisComponent,
+  ...props
+}: BaseAxisProps<Scale>) {
+  const { theme, xScale, yScale, margin, width, height, dataRegistry } = useContext(DataContext);
+  const { orientation } = props;
+
+  const axisStyles = useMemo(
+    () =>
+      orientation === 'left' || orientation === 'right'
+        ? theme?.axisStyles?.y?.[orientation]
+        : theme?.axisStyles?.x?.[orientation],
+    [theme, orientation],
+  );
+
+  const maybeTickLabelProps = props.tickLabelProps;
+  const tickLabelProps = useMemo<TickLabelProps<ScaleInput<Scale>> | undefined>(
+    () =>
+      maybeTickLabelProps || axisStyles // construct from props + theme if possible
+        ? (value, index, values) =>
+            // by default, wrap vertical-axis tick labels within the allotted margin space
+            // this does not currently account for axis label
+            ({
+              ...axisStyles?.tickLabel,
+              width:
+                orientation === 'left' || orientation === 'right'
+                  ? margin?.[orientation]
+                  : undefined,
+              ...(typeof maybeTickLabelProps === 'function'
+                ? maybeTickLabelProps(value, index, values)
+                : maybeTickLabelProps),
+            })
+        : undefined,
+    [maybeTickLabelProps, axisStyles, orientation, margin],
+  );
+
+  const topOffset =
+    orientation === 'bottom'
+      ? (height ?? 0) - (margin?.bottom ?? 0)
+      : orientation === 'top'
+      ? margin?.top ?? 0
+      : 0;
+  const leftOffset =
+    orientation === 'left'
+      ? margin?.left ?? 0
+      : orientation === 'right'
+      ? (width ?? 0) - (margin?.right ?? 0)
+      : 0;
+
+  const scale = (orientation === 'left' || orientation === 'right' ? yScale : xScale) as
+    | Scale
+    | undefined;
+
+  // Don't render axis until data is registered with non-empty data, otherwise the
+  // fallback scaleLinear() with domain [0,1] will cause tickFormat to receive
+  // incorrect intermediate values.
+  const hasRegisteredData = dataRegistry?.entries().some((entry) => entry.data.length > 0) ?? false;
+
+  return scale && hasRegisteredData ? (
+    <AxisComponent
+      top={topOffset}
+      left={leftOffset}
+      labelProps={axisStyles?.axisLabel}
+      stroke={axisStyles?.axisLine?.stroke}
+      strokeWidth={axisStyles?.axisLine?.strokeWidth}
+      tickLength={axisStyles?.tickLength}
+      tickStroke={axisStyles?.tickLine?.stroke}
+      {...props}
+      tickLabelProps={tickLabelProps}
+      scale={scale}
+    />
+  ) : null;
+}
