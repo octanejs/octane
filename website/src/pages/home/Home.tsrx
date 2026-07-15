@@ -4,6 +4,7 @@
 import { Hero } from './sections/Hero.tsrx';
 import { Features } from './sections/Features.tsrx';
 import { Proven } from './sections/Proven.tsrx';
+import { Why } from './sections/Why.tsrx';
 import { Explorer } from './sections/Explorer.tsrx';
 
 export function Home() @{
@@ -11,6 +12,7 @@ export function Home() @{
 		<Hero />
 		<Features />
 		<Proven />
+		<Why />
 		<Explorer />
 		<style>
 			.home {

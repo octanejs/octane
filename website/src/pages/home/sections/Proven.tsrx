@@ -7,12 +7,12 @@ export function Proven() @{
 			<span class="proven-number">7,000+</span>
 			<span class="proven-label">
 				{'test executions across the runtime, compiler, SSR and bindings, including ' +
-						'compiler-mode reruns; the core suite has 2,200+ distinct cases. '}
+					'compiler-mode reruns; the core suite has 2,200+ distinct cases. '}
 				<a
-				href="https://github.com/octanejs/octane/blob/main/docs/react-parity-coverage.md"
-						target="_blank"
-						rel="noreferrer"
-					>React-derived coverage is tracked case by case</a>
+					href="https://github.com/octanejs/octane/blob/main/docs/react-parity-coverage.md"
+					target="_blank"
+					rel="noreferrer"
+				>React-derived coverage is tracked case by case</a>
 			</span>
 		</div>
 		<div class="proven-stat">

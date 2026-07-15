@@ -58,7 +58,7 @@ const FEATURES = [
 			t('. Events are '),
 			k('native'),
 			t(', refs are just props, and '),
-			k('18 first-party bindings'),
+			k('25 first-party bindings'),
 			t(' cover the libraries you already use.'),
 		],
 	},
