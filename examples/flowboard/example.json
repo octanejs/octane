@@ -1,0 +1,71 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "flowboard",
+  "title": "Flowboard",
+  "summary": "A production-built issue board proving Octane drag and drop, portaled routes, refs, keyed identity, and recovery behavior.",
+  "status": "active",
+  "renderModes": ["client"],
+  "dialects": ["tsrx"],
+  "bindings": ["@octanejs/dnd-kit"],
+  "octaneFeatures": [
+    "controlled-inputs",
+    "keyed-reconciliation",
+    "native-events",
+    "portals",
+    "refs-as-props",
+    "tsrx-control-flow"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "seeded-board-and-empty-filter",
+      "title": "Load deterministic issues and recover from an empty filtered board",
+      "kind": "golden",
+      "spec": "e2e/board.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "portaled-issue-route",
+      "title": "Open, deep-link, dismiss, and restore focus from a portaled issue dialog",
+      "kind": "golden",
+      "spec": "e2e/board.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "pointer-move-and-survivor",
+      "title": "Pointer-drag an issue while an unaffected keyed card retains DOM identity",
+      "kind": "golden",
+      "spec": "e2e/board.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "keyboard-cross-column-move",
+      "title": "Keyboard-drag across columns, retain keyed survivors, and restore focus with the native move control",
+      "kind": "golden",
+      "spec": "e2e/board.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "failure-retry-offline-interleaving",
+      "title": "Retry an initial fixture failure and apply rapid local moves while offline",
+      "kind": "resilience",
+      "spec": "e2e/board.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "initial-load-failure",
+      "description": "The scenario query fails the first deterministic load and succeeds on explicit retry."
+    },
+    {
+      "id": "offline-local-moves",
+      "description": "The browser disconnects while several issue moves remain usable and visibly queued locally."
+    }
+  ]
+}

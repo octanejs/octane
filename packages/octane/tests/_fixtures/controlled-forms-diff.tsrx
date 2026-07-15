@@ -65,6 +65,32 @@ export function SelectPick() @{
 	</select>
 }
 
+// Both native phases must observe the same user selection. In particular, the
+// capture handler may schedule unrelated state without causing the controlled
+// value to be restored before the bubble handler accepts it.
+export function SelectCapturePick() @{
+	const [v, setV] = useState('two');
+	const [captured, setCaptured] = useState('none');
+	const [bubbled, setBubbled] = useState('none');
+	<section>
+		<select
+			id="scp"
+			value={v}
+			onChangeCapture={(e) => setCaptured(e.target.value)}
+			onChange={(e) => {
+				const next = e.target.value;
+				setBubbled(next);
+				setV(next);
+			}}
+		>
+			<option value="one">one</option>
+			<option value="two">two</option>
+			<option value="three">three</option>
+		</select>
+		<output id="select-phases">{`capture:${captured};bubble:${bubbled}`}</output>
+	</section>
+}
+
 // Controlled textarea.
 export function Area() @{
 	const [v, setV] = useState('hello');

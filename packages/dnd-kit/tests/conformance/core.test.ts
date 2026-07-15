@@ -9,6 +9,7 @@ import {
 	InteractionFixture,
 	MonitorOutsideProvider,
 	RegistryFixture,
+	SortableGroupsFixture,
 	SortableFixture,
 	StaticOverlayFixture,
 } from '../_fixtures/core.tsrx';
@@ -291,6 +292,38 @@ describe('sortable', () => {
 		expect(instances.first.sortable.source).toBeUndefined();
 		expect(instances.first.sortable.target).toBeUndefined();
 		mounted.unmount();
+	});
+
+	it('commits a sortable move across groups without replacing keyed survivors', async () => {
+		let manager: Manager | null = null;
+		const mounted = mount(SortableGroupsFixture, {
+			captureManager(value: Manager) {
+				manager = value;
+			},
+		});
+		await settle();
+		const one = mounted.find('#keyboard-sort-one');
+		const two = mounted.find('#keyboard-sort-two');
+		const three = mounted.find('#keyboard-sort-three');
+		try {
+			setRect(one, { left: 0, top: 0 });
+			setRect(two, { left: 0, top: 60 });
+			setRect(three, { left: 120, top: 0 });
+
+			await manager!.actions.start({ source: 'one', coordinates: { x: 20, y: 20 } });
+			await settle();
+			await manager!.actions.setDropTarget('three');
+			await settle();
+			manager!.actions.stop();
+			await waitForIdle(manager!);
+
+			expect(mounted.find('#keyboard-sort-left').textContent).toBe('two');
+			expect(mounted.find('#keyboard-sort-right').textContent).toBe('onethree');
+			expect(mounted.find('#keyboard-sort-two')).toBe(two);
+			expect(mounted.find('#keyboard-sort-three')).toBe(three);
+		} finally {
+			mounted.unmount();
+		}
 	});
 });
 

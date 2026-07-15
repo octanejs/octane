@@ -40,5 +40,12 @@ The public entry points mirror `@dnd-kit/react@0.5.0`:
 - `@octanejs/dnd-kit/sortable`
 - `@octanejs/dnd-kit/utilities`
 
+Octane's default `useSortable` plugins retain dnd-kit's keyboard mechanics but
+omit `OptimisticSortingPlugin`. That upstream plugin reparents the single host
+element before application state commits; doing so can split an Octane keyed
+item's owned DOM range. Update list state from the drag events as in the example
+above and Octane performs the visible keyed move. An explicit `plugins` array is
+still used exactly as supplied.
+
 This package targets the modern dnd-kit API. The legacy `@dnd-kit/core` 6.x
 API is not included.

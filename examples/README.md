@@ -14,8 +14,11 @@ the planned application waves.
 
 | Application | Purpose | Validation |
 | --- | --- | --- |
+| [Cinebase](cinebase) | A film and television catalog using Apollo Client, request-scoped data, streaming SSR, and hydration | Strict TypeScript support code, production TSRX client build, deterministic server fixtures, and SSR/hydration Playwright journeys |
+| [Flowboard](flowboard) | An issue and project board using dnd-kit, refs, keyed identity, and portaled interaction surfaces | Strict TypeScript support code, production TSRX build, and pointer, keyboard, identity, and recovery Playwright journeys |
 | [Hacker News](hacker-news) | The same routed reader in React-style TSX and TSRX, with Suspense, StyleX, deterministic data, SSR, and hydration | Strict TypeScript support code, both production client builds, shared Playwright journeys across both dialects |
 | [Lexical Playground](lexical-playground) | A real rich-text editor using the Octane Lexical binding, including history, formatting, decorator portals, and a slash picker | Strict TypeScript support code, production TSRX build, production-preview Playwright journeys |
+| [Threadline](threadline) | A social timeline using Zustand, optimistic mutations, keyed prepends, and live composer state | Strict TypeScript support code, production TSRX build, and navigation, identity, rapid-interleaving, and rollback Playwright journeys |
 
 ## Repository commands
 

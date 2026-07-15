@@ -42,6 +42,10 @@ or assets to copy.
 | 4 | Mailroom | Email client | Router fetchers, blockers, drafts and offline outbox |
 | 4 | Wayfinder | Travel planner | Parallel `use()`, out-of-order streaming, abort and CSP |
 
+Wave 0 and Wave 1 are implemented as release-gated fixtures. Waves 2–4 remain
+planned work; their product names and evidence targets reserve distinct regression
+responsibilities rather than prescribing a specific visual design.
+
 Hacker News remains the dedicated `.tsx` and `.tsrx` parity application.
 Duplicating every new application in both dialects would double maintenance
 without giving each example a distinct regression responsibility.

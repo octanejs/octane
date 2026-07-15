@@ -110,6 +110,19 @@ export function StaticSelect(props) @{
 	</select>
 }
 
+export function CaptureSelect(props) @{
+	<select
+		id="cs"
+		value={props.value}
+		onChangeCapture={props.onChangeCapture}
+		onChange={props.onChange}
+	>
+		<option value="a">A</option>
+		<option value="b">B</option>
+		<option value="c">C</option>
+	</select>
+}
+
 // No-match fallback: the FIRST NON-DISABLED option wins (React updateOptions).
 export function DisabledFirstSelect(props) @{
 	<select id="dfs" value={props.value}>

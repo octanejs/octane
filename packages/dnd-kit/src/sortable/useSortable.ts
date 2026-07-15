@@ -1,6 +1,6 @@
 import { useCallback } from 'octane';
-import type { Data } from '@dnd-kit/abstract';
-import { Sortable, defaultSortableTransition } from '@dnd-kit/dom/sortable';
+import type { Customizable, Data, Plugins } from '@dnd-kit/abstract';
+import { Sortable, SortableKeyboardPlugin, defaultSortableTransition } from '@dnd-kit/dom/sortable';
 import type { SortableInput } from '@dnd-kit/dom/sortable';
 import { batch, deepEqual } from '@dnd-kit/state';
 import { useInstance } from '../core/hooks/useInstance';
@@ -21,6 +21,19 @@ export interface UseSortableInput<T extends Data = Data> extends Omit<
 	target?: RefOrValue<Element>;
 }
 
+// The DOM core's other default sortable plugin optimistically reparents only
+// the referenced host Element. Octane keyed items can own a wider marker range,
+// so that move splits the framework-owned range before application state has
+// committed and makes the subsequent keyed reconciliation unsafe. Keep the
+// keyboard mechanics by default and let Octane perform the visible move from
+// the consumer's drag handler. Explicit plugin arrays remain authoritative.
+const OCTANE_SORTABLE_DEFAULT_PLUGINS: Plugins = [SortableKeyboardPlugin];
+
+function resolveSortablePlugins(value: Customizable<Plugins> | undefined): Plugins {
+	if (value === undefined) return OCTANE_SORTABLE_DEFAULT_PLUGINS;
+	return typeof value === 'function' ? value([...OCTANE_SORTABLE_DEFAULT_PLUGINS]) : value;
+}
+
 export function useSortable<T extends Data = Data>(input: UseSortableInput<T>, slot?: symbol) {
 	const {
 		accept,
@@ -39,12 +52,14 @@ export function useSortable<T extends Data = Data>(input: UseSortableInput<T>, s
 		type,
 		plugins,
 	} = input;
+	const resolvedPlugins = resolveSortablePlugins(plugins);
 	const transition = { ...defaultSortableTransition, ...input.transition };
 	const sortable = useInstance(
 		(manager) =>
 			new Sortable(
 				{
 					...input,
+					plugins: resolvedPlugins,
 					transition,
 					register: false,
 					handle: currentValue(handle),
@@ -116,8 +131,8 @@ export function useSortable<T extends Data = Data>(input: UseSortableInput<T>, s
 		subSlot(slot, 'priority'),
 	);
 	useOnValueChange(
-		plugins,
-		() => (sortable.plugins = plugins),
+		resolvedPlugins,
+		() => (sortable.plugins = resolvedPlugins),
 		undefined,
 		deepEqual,
 		subSlot(slot, 'plugins'),

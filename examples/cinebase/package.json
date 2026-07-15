@@ -1,0 +1,27 @@
+{
+  "name": "cinebase-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A streaming SSR film and television catalog proving Octane's Apollo Client integration.",
+  "scripts": {
+    "dev": "node server.mjs",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build && playwright test --config e2e/playwright.config.ts",
+    "e2e": "pnpm test:e2e"
+  },
+  "dependencies": {
+    "@apollo/client": "catalog:default",
+    "@octanejs/apollo-client": "workspace:*",
+    "graphql": "catalog:default",
+    "octane": "workspace:*",
+    "rxjs": "catalog:default"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

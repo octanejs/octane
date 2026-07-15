@@ -40,10 +40,14 @@ async function typeBoth(i: DiffMount, r: DiffMount, sel: string, text: string): 
 async function pickBoth(i: DiffMount, r: DiffMount, sel: string, value: string): Promise<void> {
 	const iEl = i.find(sel) as HTMLSelectElement;
 	iEl.value = value;
+	// A real select interaction emits input immediately before change. The
+	// controlled restore must leave that selection observable to native onChange.
+	iEl.dispatchEvent(new Event('input', { bubbles: true }));
 	iEl.dispatchEvent(new Event('change', { bubbles: true }));
 	const rEl = r.find(sel) as HTMLSelectElement;
 	await reactAct(async () => {
 		rEl.value = value;
+		rEl.dispatchEvent(new Event('input', { bubbles: true }));
 		rEl.dispatchEvent(new Event('change', { bubbles: true }));
 	});
 	expect(iEl.value).toBe(rEl.value);
@@ -119,6 +123,19 @@ describe('differential: controlled-forms-diff.tsrx — controlled semantics matc
 			expect((r.find('select') as HTMLSelectElement).value).toBe('two');
 		});
 		await d.step('pick three', (i, r) => pickBoth(i, r, 'select', 'three'));
+		d.unmount();
+	});
+
+	it('SelectCapturePick: capture work does not hide the pick from the bubble handler', async () => {
+		const d = await mountDifferential(FIX, 'SelectCapturePick');
+		await d.step('pick three', async (i, r) => {
+			await pickBoth(i, r, 'select', 'three');
+		});
+		await d.step('both phases observed the pick', (i, r) => {
+			for (const side of [i, r]) {
+				expect(side.find('output').textContent).toBe('capture:three;bubble:three');
+			}
+		});
 		d.unmount();
 	});
 

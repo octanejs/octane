@@ -2225,6 +2225,59 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  examples/cinebase:
+    dependencies:
+      '@apollo/client':
+        specifier: catalog:default
+        version: 4.2.6(graphql@16.14.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rxjs@7.8.2)
+      '@octanejs/apollo-client':
+        specifier: workspace:*
+        version: link:../../packages/apollo-client
+      graphql:
+        specifier: catalog:default
+        version: 16.14.2
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+      rxjs:
+        specifier: catalog:default
+        version: 7.8.2
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/flowboard:
+    dependencies:
+      '@octanejs/dnd-kit':
+        specifier: workspace:*
+        version: link:../../packages/dnd-kit
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   examples/hacker-news:
     dependencies:
       '@octanejs/stylex':
@@ -2282,6 +2335,28 @@ importers:
       lexical:
         specifier: catalog:default
         version: 0.46.0(typescript@5.9.3)
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/threadline:
+    dependencies:
+      '@octanejs/zustand':
+        specifier: workspace:*
+        version: link:../../packages/zustand
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
