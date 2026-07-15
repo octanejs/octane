@@ -123,13 +123,18 @@ describe('website routes', () => {
 		expect(summary?.querySelector('.recharts-wrapper')).toBeNull();
 		expect(summary?.querySelector('details table')).toBeTruthy();
 
+		// Section links sit with the wordmark on the left; search and the social
+		// icons form the right cluster.
 		const nav = container.querySelector('.navlinks')!;
 		for (const href of ['/docs', '/benchmarks', '/llms.txt']) {
 			expect(findLink(nav, href)).toBeTruthy();
 		}
 		expect(findLink(nav, '/view-transitions')).toBeUndefined();
-		expect(findLink(nav, 'https://github.com/octanejs/octane')).toBeTruthy();
-		expect(findLink(nav, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
+
+		const navRight = container.querySelector('.nav-right')!;
+		expect(navRight.querySelector('.search-trigger')).toBeTruthy();
+		expect(findLink(navRight, 'https://github.com/octanejs/octane')).toBeTruthy();
+		expect(findLink(navRight, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
 	});
 
 	it('/benchmarks renders every configured benchmark card', async () => {
