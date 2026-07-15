@@ -2,10 +2,10 @@ export * from '@tanstack/form-core';
 
 export { useSelector, useStore } from '@octanejs/tanstack-store';
 
-export * from './createFormHook';
+export * from './createFormHook.tsrx';
 export * from './types';
-export * from './useField';
-export * from './useFieldGroup';
-export * from './useForm';
-export * from './useFormGroup';
+export * from './useField.tsrx';
+export * from './useFieldGroup.tsrx';
+export * from './useForm.tsrx';
+export * from './useFormGroup.tsrx';
 export * from './useIsomorphicLayoutEffect';

@@ -21,6 +21,13 @@ benchmarks/news/*/src/data.js
 # Prettier's multi-line attribute/child wrap would reintroduce. Keep it as-is.
 benchmarks/js-framework/octane-jsx/src/Main.tsx
 
+# TanStack Form's renderer modules preserve upstream's deeply generic inline
+# component signatures. The TSRX Prettier plugin currently strips required
+# parentheses from typed arrow expressions and duplicates nested JSDoc on each
+# pass; keep the clean source stable until that formatter bug is fixed.
+packages/tanstack-form/src/*.tsrx
+packages/tanstack-form/src/*.tsrx.d.ts
+
 # Dependencies
 **/node_modules/
 

@@ -1,6 +1,5 @@
-// Octane's `.tsrx` tooling supplies JSX types in editors. This adapter keeps
-// upstream's `.tsx` source layout, so it needs a small standalone ambient JSX
-// namespace for package typechecking without depending on React's types.
+// Octane's `.tsrx` tooling supplies JSX types in editors. This standalone
+// ambient namespace lets package typechecking run without React's types.
 declare namespace JSX {
 	type Element = unknown;
 

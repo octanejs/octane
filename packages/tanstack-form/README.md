@@ -15,6 +15,10 @@ import { useForm } from '@tanstack/react-form'
 import { useForm } from '@octanejs/tanstack-form'
 ```
 
+The renderer-bearing adapter modules are authored as `.tsrx` and compiled by
+Octane. Matching `.tsrx.d.ts` companions preserve the complete upstream generic
+surface for TypeScript consumers.
+
 ```tsx
 import { useForm } from '@octanejs/tanstack-form'
 

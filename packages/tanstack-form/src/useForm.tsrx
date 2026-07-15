@@ -1,13 +1,11 @@
-'use client';
-
 import { FormApi, functionalUpdate, mergeAndUpdate } from '@tanstack/form-core';
 import { useSelector } from '@octanejs/tanstack-store';
 import { useMemo, useRef, useState } from 'octane';
-import { Field } from './useField';
+import { Field } from './useField.tsrx';
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
 import { useFormId } from './useFormId';
-import { FormGroup } from './useFormGroup';
-import type { FormGroupComponent } from './useFormGroup';
+import { FormGroup } from './useFormGroup.tsrx';
+import type { FormGroupComponent } from './useFormGroup.tsrx';
 import type {
 	AnyFormApi,
 	AnyFormState,
@@ -17,7 +15,7 @@ import type {
 	FormValidateOrFn,
 } from '@tanstack/form-core';
 import type { FunctionComponent, PropsWithChildren, ReactNode } from './octane-types';
-import type { FieldComponent } from './useField';
+import type { FieldComponent } from './useField.tsrx';
 
 /**
  * Fields that are added onto the `FormAPI` from `@tanstack/form-core` and returned from `useForm`

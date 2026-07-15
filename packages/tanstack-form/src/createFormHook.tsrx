@@ -1,8 +1,7 @@
-'use client';
 /* eslint-disable @eslint-react/no-context-provider */
 import { createContext, useContext, useMemo } from 'octane';
-import { useForm } from './useForm';
-import { useFieldGroup } from './useFieldGroup';
+import { useForm } from './useForm.tsrx';
+import { useFieldGroup } from './useFieldGroup.tsrx';
 import type {
 	AnyFieldApi,
 	AnyFormApi,
@@ -15,9 +14,9 @@ import type {
 	FormValidateOrFn,
 } from '@tanstack/form-core';
 import type { ComponentType, Context, FunctionComponent, PropsWithChildren } from './octane-types';
-import type { FieldComponent } from './useField';
-import type { ReactFormExtendedApi } from './useForm';
-import type { AppFieldExtendedReactFieldGroupApi } from './useFieldGroup';
+import type { FieldComponent } from './useField.tsrx';
+import type { ReactFormExtendedApi } from './useForm.tsrx';
+import type { AppFieldExtendedReactFieldGroupApi } from './useFieldGroup.tsrx';
 
 // We should never hit the `null` case here
 const fieldContext = createContext<AnyFieldApi>(null as never);

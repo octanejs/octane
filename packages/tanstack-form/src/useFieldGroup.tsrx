@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'octane';
 import { useSelector } from '@octanejs/tanstack-store';
 import { FieldGroupApi, functionalUpdate } from '@tanstack/form-core';
@@ -12,14 +10,14 @@ import type {
 	FormAsyncValidateOrFn,
 	FormValidateOrFn,
 } from '@tanstack/form-core';
-import type { AppFieldExtendedReactFormApi } from './createFormHook';
+import type { AppFieldExtendedReactFormApi } from './createFormHook.tsrx';
 import type {
 	ComponentType,
 	FunctionComponent,
 	PropsWithChildren,
 	ReactNode,
 } from './octane-types';
-import type { LensFieldComponent } from './useField';
+import type { LensFieldComponent } from './useField.tsrx';
 
 function LocalSubscribe({
 	lens,

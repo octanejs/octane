@@ -1,5 +1,3 @@
-'use client';
-
 import { useMemo, useState } from 'octane';
 import { useSelector } from '@octanejs/tanstack-store';
 import { FieldApi, functionalUpdate } from '@tanstack/form-core';
