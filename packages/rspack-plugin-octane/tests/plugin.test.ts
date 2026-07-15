@@ -120,6 +120,15 @@ describe('OctaneRspackPlugin', () => {
 			exclude: ['generated'],
 			renderers: {
 				registry: { object: '/src/object-renderer.js' },
+				boundaries: {
+					'/src/object-boundaries.js': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'object',
+							prop: 'children',
+						},
+					},
+				},
 				rules: [{ include: '**/*.object.tsrx', renderer: 'object' }],
 			},
 			transpile: false,
@@ -139,7 +148,16 @@ describe('OctaneRspackPlugin', () => {
 			exclude: ['generated'],
 			renderers: expect.objectContaining({
 				default: 'dom',
-				signature: expect.stringMatching(/^octane-renderers-v1:/),
+				signature: expect.stringMatching(/^octane-renderers-v2:/),
+				boundaries: {
+					'/src/object-boundaries.js': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'object',
+							prop: 'children',
+						},
+					},
+				},
 			}),
 		});
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
@@ -161,6 +179,7 @@ describe('OctaneRspackPlugin', () => {
 		};
 		const dom = createCachedCompiler();
 		const object = createCachedCompiler();
+		const boundedObject = createCachedCompiler();
 
 		new OctaneRspackPlugin().apply(dom as any);
 		new OctaneRspackPlugin({
@@ -169,10 +188,29 @@ describe('OctaneRspackPlugin', () => {
 				default: 'object',
 			},
 		}).apply(object as any);
+		new OctaneRspackPlugin({
+			renderers: {
+				registry: { object: '/src/object-renderer.js' },
+				default: 'object',
+				boundaries: {
+					'/src/object-boundaries.js': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'object',
+							prop: 'children',
+						},
+					},
+				},
+			},
+		}).apply(boundedObject as any);
 
 		expect((dom.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((object.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
+		expect((boundedObject.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((object.options as any).cache.version).not.toBe((dom.options as any).cache.version);
+		expect((boundedObject.options as any).cache.version).not.toBe(
+			(object.options as any).cache.version,
+		);
 	});
 
 	it('resolves a relative root from the Rspack context', () => {

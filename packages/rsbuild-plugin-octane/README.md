@@ -84,5 +84,7 @@ required for `compiler.renderers`, because renderer selection is part of each
 Rspack compiler's cache and loader identity. Source-module edits continue to
 use the normal HMR or browser-reload path.
 
-The package follows the Rsbuild plugin model consumed by Rspeedy, but this
-release targets Octane's DOM renderer. Lynx renderer selection is future work.
+The package forwards normalized `compiler.renderers` registry, filename-rule,
+and renderer-boundary metadata through the same Rspack compiler path used by
+Vite and direct compilation. This enables the experimental universal client
+target; a concrete Lynx runtime and cross-thread transport remain future work.

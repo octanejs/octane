@@ -68,6 +68,15 @@ describe('bundler-neutral compiler integration', () => {
 			dev: false,
 			renderers: {
 				registry: { object: '/src/object-renderer.js' },
+				boundaries: {
+					'/src/object-boundaries.js': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'object',
+							prop: 'children',
+						},
+					},
+				},
 				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
 			},
 		});
