@@ -55,6 +55,20 @@ function Rethrow(props) {
 	throw props.err;
 }
 
+// The router MatchesInner shape: the outer boundary's try arm mounts an @if
+// whose branch renders the rethrowing inner boundary. The rethrown error must
+// unwind PAST the @if's still-live mount frames before the outer boundary
+// switches arms — a synchronous outer switch would sweep the @if's insertion
+// anchors while its mount is still on the stack, and the resulting DOM
+// bookkeeping error would REPLACE the original error.
+export function RethrowingCatchUnderIf(props) @{
+	<ErrorBoundary fallback={(e) => 'outer:' + (e as Error).message}>
+		@if (props.on) {
+			<InnerRethrow bang={props.bang} />
+		}
+	</ErrorBoundary>
+}
+
 // A suspending leaf under passthroughs + a host, with the boundary ABOVE them:
 // fallback → content swap must not corrupt DOM bookkeeping (and any teardown
 // error must not escape into the resolver's caller — the router loader-pipeline

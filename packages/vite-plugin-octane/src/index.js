@@ -169,6 +169,31 @@ function has_route_config(config) {
 }
 
 /**
+ * Every module path the server can name in #__octane_data — page entries,
+ * layouts, the preHydrate hook, and root boundaries. The generated hydrate
+ * entry maps each as a LITERAL `() => import('/src/…')`. Production needs the
+ * map so Rollup chunks and hashes the modules; dev needs it so the imports go
+ * through Vite's import analysis and share URL identity with every other
+ * importer (see the hydrate-entry load hook).
+ *
+ * @param {ResolvedOctaneConfig | null} config
+ * @returns {string[]}
+ */
+function collect_hydrate_module_paths(config) {
+	if (!has_route_config(config)) return [];
+	const cfg = /** @type {ResolvedOctaneConfig} */ (config);
+	const entries = cfg.router.routes
+		.filter((r) => r.type === 'render')
+		.flatMap((r) => [get_route_entry_path(/** @type {RenderRoute} */ (r).entry), r.layout]);
+	if (cfg.router.preHydrate) entries.push(cfg.router.preHydrate);
+	entries.push(
+		get_route_entry_path(cfg.rootBoundary.pending),
+		get_route_entry_path(cfg.rootBoundary.catch),
+	);
+	return [...new Set(entries.filter((e) => typeof e === 'string'))];
+}
+
+/**
  * The recommended Octane Vite integration. With no octane.config.ts it behaves
  * as a compiler plugin inside a normal Vite SPA; configured routes activate the
  * metaframework layer.
@@ -319,16 +344,7 @@ export function octane(inlineOptions = {}) {
 		buildStart() {
 			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
 			serverModuleModules.clear();
-			const cfg = /** @type {ResolvedOctaneConfig} */ (buildOctaneConfig);
-			const entries = cfg.router.routes
-				.filter((r) => r.type === 'render')
-				.flatMap((r) => [get_route_entry_path(/** @type {RenderRoute} */ (r).entry), r.layout]);
-			if (cfg.router.preHydrate) entries.push(cfg.router.preHydrate);
-			entries.push(
-				get_route_entry_path(cfg.rootBoundary.pending),
-				get_route_entry_path(cfg.rootBoundary.catch),
-			);
-			staticEntries = [...new Set(entries.filter((e) => typeof e === 'string'))];
+			staticEntries = collect_hydrate_module_paths(buildOctaneConfig);
 		},
 
 		async configResolved(resolvedConfig) {
@@ -352,16 +368,29 @@ export function octane(inlineOptions = {}) {
 				return create_adapter_browser_stub_source();
 			}
 			if (id === RESOLVED_VIRTUAL_HYDRATE_ID) {
-				// Dev: dynamic import() of the route entry works through Vite, so the
-				// static import map stays empty (the codegen falls back to a dynamic
-				// import per entry). Production builds pass the routes' module paths
-				// (collected in buildStart) so Rollup bundles them.
+				// Production builds pass the routes' module paths (collected in
+				// buildStart) so Rollup bundles them. Dev ALSO needs the literal map —
+				// not for chunking (dev serves any module by URL) but for MODULE
+				// IDENTITY on a hot server: the codegen's fallback `dynamicImport(path)`
+				// is hidden from Vite's import analysis, so it fetches the BARE url
+				// while the page's own import chain fetches the analyzed url (`?import`
+				// for non-JS extensions, `?t=` stamps after an HMR invalidation). Two
+				// urls = two browser module instances — e.g. two app-router singletons,
+				// where preHydrate commits matches on one and the page renders the
+				// empty other, breaking hydration on every reload until the dev server
+				// restarts. Literal `import('/src/…')` entries go through import
+				// analysis and share url identity with every other importer.
+				let entries = staticEntries;
+				if (!isBuild) {
+					const loaded = octaneConfig ?? (await loadStartupConfig(root))?.config ?? null;
+					entries = collect_hydrate_module_paths(loaded);
+				}
 				const file = write_project_generated_file(
 					config,
 					'client-entry.js',
 					create_client_entry_source({
 						configPath: to_vite_root_import(getOctaneConfigPath(root), root),
-						staticEntries,
+						staticEntries: entries,
 					}),
 				);
 				return fs.readFileSync(file, 'utf-8');
