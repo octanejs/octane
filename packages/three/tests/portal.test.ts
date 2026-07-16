@@ -193,6 +193,108 @@ describe('Three portals', () => {
 		expect(root.store.getState().size).toEqual({ width: 100, height: 50, top: 6, left: 8 });
 	});
 
+	it('applies accepted injected-state updates to the existing portal enclave immediately', async () => {
+		const target = new THREE.Group();
+		const targetRefs = refs();
+		const layouts: LayoutObservation[] = [];
+		const onLayout = (value: LayoutObservation) => layouts.push(value);
+		const onFrame = () => {};
+		const firstCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+		firstCamera.position.z = 4;
+		const firstControls = new THREE.EventDispatcher();
+		const firstCompute = (_event: DomEvent, _state: RootState) => {};
+		const root = await createThreeTestRenderer(PortalScene, {
+			...baseProps(target, targetRefs),
+			portalState: {
+				camera: firstCamera,
+				controls: firstControls,
+				flat: false,
+				size: { width: 240, height: 120, top: 1, left: 2 },
+				events: { enabled: true, priority: 8, compute: firstCompute },
+			},
+			onLayout,
+			onFrame,
+		});
+		mountedTestRoots.push(root);
+
+		const enclave = layouts.at(-1)!.store;
+		const portalMesh = targetRefs.mesh!;
+		const firstProjection = firstCamera.projectionMatrix.clone();
+		const nextCamera = new THREE.PerspectiveCamera(60, 1, 0.1, 100);
+		nextCamera.position.z = 9;
+		const nextProjection = nextCamera.projectionMatrix.clone();
+		const nextControls = new THREE.EventDispatcher();
+		const nextCompute = (_event: DomEvent, _state: RootState) => {};
+
+		root.update(PortalScene, {
+			...baseProps(target, targetRefs),
+			portalState: {
+				camera: nextCamera,
+				controls: nextControls,
+				flat: true,
+				size: { width: 360, height: 120, top: 5, left: 6 },
+				events: { enabled: false, priority: 0, compute: nextCompute },
+			},
+			onLayout,
+			onFrame,
+		});
+
+		const state = enclave.getState();
+		const committedLayout = layouts.at(-1)!;
+		expect(targetRefs.mesh).toBe(portalMesh);
+		expect(getRootState(portalMesh)).toBe(state);
+		expect(committedLayout.store).toBe(enclave);
+		expect(committedLayout.state).toBe(state);
+		expect(committedLayout.cameraAspect).toBe(3);
+		expect(state.scene).toBe(target);
+		expect(state.camera).toBe(nextCamera);
+		expect(state.controls).toBe(nextControls);
+		expect(state.flat).toBe(true);
+		expect(state.events.enabled).toBe(false);
+		expect(state.events.priority).toBe(0);
+		expect(state.events.compute).toBe(nextCompute);
+		expect(state.size).toEqual({ width: 360, height: 120, top: 5, left: 6 });
+		expect(state.viewport.aspect).toBe(3);
+		expect(state.viewport.distance).toBeCloseTo(9);
+		expect(state.viewport.height).toBeCloseTo(2 * Math.tan(Math.PI / 6) * 9);
+		expect(state.viewport.width).toBeCloseTo(state.viewport.height * 3);
+		expect(nextCamera.aspect).toBe(3);
+		expect(nextCamera.projectionMatrix.equals(nextProjection)).toBe(false);
+		expect(firstCamera.aspect).toBe(2);
+		expect(firstCamera.projectionMatrix.equals(firstProjection)).toBe(true);
+
+		const parentState = root.store.getState();
+		root.update(PortalScene, {
+			...baseProps(target, targetRefs),
+			portalState: { events: { priority: 4 } },
+			onLayout,
+			onFrame,
+		});
+
+		const fallbackState = enclave.getState();
+		const fallbackLayout = layouts.at(-1)!;
+		expect(targetRefs.mesh).toBe(portalMesh);
+		expect(fallbackLayout.store).toBe(enclave);
+		expect(fallbackLayout.state).toBe(fallbackState);
+		expect(fallbackLayout.cameraAspect).toBe(
+			(parentState.camera as THREE.PerspectiveCamera).aspect,
+		);
+		expect(fallbackState.scene).toBe(target);
+		expect(fallbackState.camera).toBe(parentState.camera);
+		expect(fallbackState.controls).toBe(parentState.controls);
+		expect(fallbackState.flat).toBe(parentState.flat);
+		expect(fallbackState.size).toEqual(parentState.size);
+		expect(fallbackState.viewport).toMatchObject({
+			width: parentState.viewport.width,
+			height: parentState.viewport.height,
+			aspect: parentState.viewport.aspect,
+			distance: parentState.viewport.distance,
+		});
+		expect(fallbackState.events.enabled).toBe(parentState.events.enabled);
+		expect(fallbackState.events.priority).toBe(4);
+		expect(fallbackState.events.compute).toBe(parentState.events.compute);
+	});
+
 	it('routes portal handlers through the outer event scope and tears down only owned children', async () => {
 		vi.useFakeTimers();
 		const target = new THREE.Group();
@@ -506,24 +608,34 @@ describe('Three portals', () => {
 		let lowMesh: THREE.Mesh | null = null;
 		let highMesh: THREE.Mesh | null = null;
 		const log: string[] = [];
-		const computations: Array<{ state: RootState; previous: RootState | undefined }> = [];
-		const compute = (event: DomEvent, state: RootState, previous?: RootState) => {
-			computations.push({ state, previous });
-			state.pointer.set(
-				(event.offsetX / state.size.width) * 2 - 1,
-				-(event.offsetY / state.size.height) * 2 + 1,
-			);
-			state.raycaster.setFromCamera(state.pointer, state.camera);
-		};
+		const computations: Array<{
+			name: string;
+			state: RootState;
+			previous: RootState | undefined;
+		}> = [];
+		const createCompute =
+			(name: string) => (event: DomEvent, state: RootState, previous?: RootState) => {
+				computations.push({ name, state, previous });
+				state.pointer.set(
+					(event.offsetX / state.size.width) * 2 - 1,
+					-(event.offsetY / state.size.height) * 2 + 1,
+				);
+				state.raycaster.setFromCamera(state.pointer, state.camera);
+			};
+		const initialCompute = createCompute('initial');
+		const lowRef = (value: THREE.Mesh | null) => (lowMesh = value);
+		const highRef = (value: THREE.Mesh | null) => (highMesh = value);
+		const onLowPointerDown = () => log.push('low');
+		const onHighPointerDown = () => log.push('high');
 		root.render(PortalEventLayersScene, {
 			lowTarget,
 			highTarget,
 			lowState: { camera, events: { priority: 1 } },
-			highState: { camera, events: { priority: 10, compute } },
-			lowRef: (value: THREE.Mesh | null) => (lowMesh = value),
-			highRef: (value: THREE.Mesh | null) => (highMesh = value),
-			onLowPointerDown: () => log.push('low'),
-			onHighPointerDown: () => log.push('high'),
+			highState: { camera, events: { enabled: true, priority: 10, compute: initialCompute } },
+			lowRef,
+			highRef,
+			onLowPointerDown,
+			onHighPointerDown,
 		});
 		lowTarget.updateMatrixWorld(true);
 		highTarget.updateMatrixWorld(true);
@@ -531,15 +643,55 @@ describe('Three portals', () => {
 		dispatchPointer(canvas, 'pointerdown', 50, 50);
 		expect(log).toEqual(['high', 'low']);
 		expect(computations).toHaveLength(1);
+		expect(computations[0].name).toBe('initial');
 		expect(computations[0].state).toBe(getRootState(highMesh!));
 		expect(computations[0].previous).toBe(root.store.getState());
 
 		log.length = 0;
-		getRootState(highMesh!)!.setEvents({ enabled: false });
+		const updatedCompute = createCompute('updated');
+		root.render(PortalEventLayersScene, {
+			lowTarget,
+			highTarget,
+			lowState: { camera, events: { priority: 1 } },
+			highState: { camera, events: { enabled: true, priority: 0, compute: updatedCompute } },
+			lowRef,
+			highRef,
+			onLowPointerDown,
+			onHighPointerDown,
+		});
+		expect(getRootState(highMesh!)!.events.enabled).toBe(true);
+		expect(getRootState(highMesh!)!.events.priority).toBe(0);
+		expect(getRootState(highMesh!)!.events.compute).toBe(updatedCompute);
+		dispatchPointer(canvas, 'pointerdown', 50, 50);
+		expect(log).toEqual(['low', 'high']);
+		expect(computations.map(({ name }) => name)).toEqual(['initial', 'updated']);
+
+		log.length = 0;
+		const disabledCompute = createCompute('disabled');
+		root.render(PortalEventLayersScene, {
+			lowTarget,
+			highTarget,
+			lowState: { camera, events: { priority: 1 } },
+			highState: { camera, events: { enabled: false, priority: 20, compute: disabledCompute } },
+			lowRef,
+			highRef,
+			onLowPointerDown,
+			onHighPointerDown,
+		});
+		expect(getRootState(highMesh!)!.events.enabled).toBe(false);
+		expect(getRootState(highMesh!)!.events.priority).toBe(20);
+		expect(getRootState(highMesh!)!.events.compute).toBe(disabledCompute);
 		dispatchPointer(canvas, 'pointerdown', 50, 50);
 		expect(log).toEqual(['low']);
-		expect(computations).toHaveLength(1);
+		expect(computations.map(({ name }) => name)).toEqual(['initial', 'updated']);
 		expect(getRootState(lowMesh!)!.previousRoot).toBe(root.store);
+
+		log.length = 0;
+		getRootState(highMesh!)!.setEvents({ enabled: true });
+		expect(getRootState(highMesh!)!.events.enabled).toBe(true);
+		dispatchPointer(canvas, 'pointerdown', 50, 50);
+		expect(log).toEqual(['high', 'low']);
+		expect(computations.map(({ name }) => name)).toEqual(['initial', 'updated', 'disabled']);
 	});
 
 	it('routes child errors to the authored boundary and cleans up portal-owned effects', async () => {
@@ -570,6 +722,94 @@ describe('Three portals', () => {
 		expect(root.scene.children.map((child) => child.name)).toEqual(['caught:portal-owned-boom']);
 		expect(fallback?.name).toBe('caught:portal-owned-boom');
 		expect(effects).toEqual(['mount', 'cleanup']);
+	});
+
+	it('does not publish injected state from a rejected portal transaction', async () => {
+		const foreignTarget = new THREE.Group();
+		const owner = await createThreeTestRenderer(PortalScene, baseProps(foreignTarget));
+		mountedTestRoots.push(owner);
+
+		const lowTarget = new THREE.Group();
+		const highTarget = new THREE.Group();
+		let lowMesh: THREE.Mesh | null = null;
+		let highMesh: THREE.Mesh | null = null;
+		const lowRef = (value: THREE.Mesh | null) => (lowMesh = value);
+		const highRef = (value: THREE.Mesh | null) => (highMesh = value);
+		const onLowPointerDown = () => {};
+		const onHighPointerDown = () => {};
+		const acceptedCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+		acceptedCamera.position.z = 5;
+		const acceptedControls = new THREE.EventDispatcher();
+		const acceptedCompute = (_event: DomEvent, _state: RootState) => {};
+		const acceptedState = {
+			camera: acceptedCamera,
+			controls: acceptedControls,
+			flat: false,
+			size: { width: 200, height: 100, top: 1, left: 2 },
+			events: { enabled: true, priority: 6, compute: acceptedCompute },
+		};
+		const root = await createThreeTestRenderer(PortalEventLayersScene, {
+			lowTarget,
+			highTarget,
+			lowState: acceptedState,
+			highState: { camera: acceptedCamera, events: { priority: 1 } },
+			lowRef,
+			highRef,
+			onLowPointerDown,
+			onHighPointerDown,
+		});
+		mountedTestRoots.push(root);
+
+		const acceptedLowMesh = lowMesh!;
+		const acceptedHighMesh = highMesh!;
+		const rejectedCamera = new THREE.PerspectiveCamera(70, 1, 0.1, 100);
+		rejectedCamera.position.z = 11;
+		const rejectedProjection = rejectedCamera.projectionMatrix.clone();
+		const rejectedControls = new THREE.EventDispatcher();
+		const rejectedCompute = (_event: DomEvent, _state: RootState) => {};
+		const rejectedState = {
+			camera: rejectedCamera,
+			controls: rejectedControls,
+			flat: true,
+			size: { width: 400, height: 100, top: 7, left: 8 },
+			events: { enabled: false, priority: 0, compute: rejectedCompute },
+		};
+
+		expect(() =>
+			root.update(PortalEventLayersScene, {
+				lowTarget,
+				highTarget: foreignTarget,
+				lowState: rejectedState,
+				highState: { camera: acceptedCamera, events: { priority: 1 } },
+				lowRef,
+				highRef,
+				onLowPointerDown,
+				onHighPointerDown,
+			}),
+		).toThrow(/leased by another root/);
+
+		const assertAcceptedState = () => {
+			const state = getRootState(acceptedLowMesh)!;
+			expect(state.camera).toBe(acceptedCamera);
+			expect(state.controls).toBe(acceptedControls);
+			expect(state.flat).toBe(false);
+			expect(state.size).toEqual({ width: 200, height: 100, top: 1, left: 2 });
+			expect(state.events.enabled).toBe(true);
+			expect(state.events.priority).toBe(6);
+			expect(state.events.compute).toBe(acceptedCompute);
+		};
+		assertAcceptedState();
+		expect(lowTarget.children).toEqual([acceptedLowMesh]);
+		expect(highTarget.children).toEqual([acceptedHighMesh]);
+		expect(rejectedCamera.aspect).toBe(1);
+		expect(rejectedCamera.projectionMatrix.equals(rejectedProjection)).toBe(true);
+
+		// A rejected render must not leave a staged injection visible to the
+		// accepted layer when its parent store next mirrors state.
+		root.store.getState().setSize(640, 320, 9, 10);
+		assertAcceptedState();
+		expect(rejectedCamera.aspect).toBe(1);
+		expect(rejectedCamera.projectionMatrix.equals(rejectedProjection)).toBe(true);
 	});
 
 	it('rejects invalid and cross-root targets without mutating either scene', async () => {
