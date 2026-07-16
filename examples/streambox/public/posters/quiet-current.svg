@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Quiet current</title>
+  <desc id="desc">A green river winding between layered pine forests.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c2eee0"/><stop offset="1" stop-color="#6da887"/></linearGradient>
+    <linearGradient id="river" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a9ebdc"/><stop offset="1" stop-color="#236d66"/></linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#sky)"/>
+  <circle cx="978" cy="146" r="74" fill="#fff3c9" opacity=".85"/>
+  <path d="M0 332 168 182l98 83 98-128 146 171 108-72 166 96 122-158 170 137 204-90v499H0z" fill="#4c8067"/>
+  <path d="M0 405 180 278l104 94 160-114 148 146 174-120 164 102 152-124 198 139v319H0z" fill="#285c50"/>
+  <path d="M586 343c160 58 241 97 152 166-78 61-174 90-74 211h382c-162-130-86-182 26-243 72-39 53-91-55-134z" fill="url(#river)"/>
+  <g fill="#173c36">
+    <path d="m91 484 49-123 49 123h-30l38 89H83l38-89z"/>
+    <path d="m270 498 56-144 56 144h-33l42 102H262l42-102z"/>
+    <path d="m1030 456 45-112 45 112h-27l35 82h-106l34-82z"/>
+    <path d="m1130 516 58-151 58 151h-35l43 104h-133l44-104z"/>
+  </g>
+</svg>

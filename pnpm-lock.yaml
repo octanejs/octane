@@ -2225,6 +2225,28 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  examples/cartlane:
+    dependencies:
+      '@octanejs/vite-plugin':
+        specifier: workspace:*
+        version: link:../../packages/vite-plugin-octane
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   examples/cinebase:
     dependencies:
       '@apollo/client':
@@ -2345,6 +2367,50 @@ importers:
       '@types/node':
         specifier: catalog:default
         version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/relay:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/streambox:
+    dependencies:
+      '@octanejs/tanstack-virtual':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-virtual
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      fix-webm-duration:
+        specifier: 1.0.6
+        version: 1.0.6
       typescript:
         specifier: catalog:default
         version: 5.9.3
@@ -7020,6 +7086,9 @@ packages:
   find-up@4.1.0:
     resolution: {integrity: sha512-PpOwAdQ/YlXQ2vj8a3h8IipDuYRi3wceVQQGYWxNINccq40Anw7BlsEXCMbt1Zt+OLA6Fq9suIpIWD0OsnISlw==}
     engines: {node: '>=8'}
+
+  fix-webm-duration@1.0.6:
+    resolution: {integrity: sha512-zVAqi4gE+8ywxJuAyV/rlJVX6CMtvyapEbQx6jyoeX9TMjdqAlt/FdG5d7rXSSkDVzTvS0H7CtwzHcH/vh4FPA==}
 
   follow-redirects@1.16.0:
     resolution: {integrity: sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw==}
@@ -12868,6 +12937,8 @@ snapshots:
     dependencies:
       locate-path: 5.0.0
       path-exists: 4.0.0
+
+  fix-webm-duration@1.0.6: {}
 
   follow-redirects@1.16.0(debug@4.4.3):
     optionalDependencies:
