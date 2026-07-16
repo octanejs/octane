@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 25 `@octanejs/*` framework bindings.
+The central status table for the 26 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -41,6 +41,7 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/tanstack-table`](#octanejstanstack-table) | `@tanstack/react-table@8.21.3` | Complete 1:1 port: the framework-agnostic `@tanstack/table-core` (createTable + all feature row models) is reused verbatim; the ~100-line React adapter (`useReactTable`, `flexRender`) is transcribed onto octane hooks, preserving upstream's useState-based state wiring. | `flexRender`'s class-component and `react.memo`/`forwardRef` exotic-component branches are dropped — octane has no class components or forwardRef, and octane's `memo()` returns a plain function, so `typeof === 'function'` covers every component | No SSR-specific surface; table-core is pure computation. | 2026-07-11 |
 | [`@octanejs/tanstack-virtual`](#octanejstanstack-virtual) | `@tanstack/react-virtual@3.14.5` | Complete 1:1 port: the framework-agnostic `@tanstack/virtual-core` (Virtualizer + observers + windowing math) is reused verbatim; the React adapter (`useVirtualizer`, `useWindowVirtualizer`, incl. `useFlushSync` and the experimental `directDomUpdates` surface) is transcribed onto octane hooks, preserving upstream's force-update + flushSync-on-sync-scroll wiring and layout-effect lifecycle. | octane's `flushSync` called while a flush is already on the stack degrades to a plain call drained by the ambient flush (re-entrancy guard) — sync scroll notifies dispatched from inside a discrete-event flush land at that flush's boundary instead of nested; consumer-invisible, pinned by a conformance test | SSR-safe: `useIsomorphicLayoutEffect` degrades to `useEffect` without `document`; the first paint windows from `initialRect`/`initialOffset` exactly as upstream. No dedicated SSR tests. | 2026-07-12 |
 | [`@octanejs/testing-library`](#octanejstesting-library) | `@testing-library/react` (unpinned) | `render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. | `fireEvent` dispatches real native events — no React remappings (`fireEvent.change` fires a native `change`, not `input`) and no enter/leave/focus double-dispatch; Not ported: the `ReactStrictMode` wrapper, `legacyRoot`, and the `onCaughtError`/`onRecoverableError` options | `hydrate: true` adopts octane SSR output via `hydrateRoot`. | 2026-07-09 |
+| [`@octanejs/three`](#octanejsthree) | `@react-three/fiber@9.6.1 (2a528745)` | Experimental Milestones 0 and 2 surface: renderer configuration, compiler ABI, renderer-local Three intrinsic types, the pinned upstream evidence crosswalk, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, and ownership-aware disposal. Canvas, the root store/configuration, frame loop/hooks, and pointer events are deferred to Milestone 3 and later. | Octane owns component execution, hooks, context, scheduling, Suspense, refs, and effects instead of embedding React Reconciler; The forthcoming programmatic root API will render an Octane component plus props rather than a React element descriptor; Removing a pierced prop resets its original nested target; R3F 9.6.1 mistakenly writes that default to the leaf key on the root object | The current Three scene surface is client-only. Canvas begins in Milestone 3; its DOM server shell, omitted child-region streaming, and hydration adoption are planned for Milestone 7. | 2026-07-16 |
 | [`@octanejs/visx`](#octanejsvisx) | `@visx/visx@4.0.0 + master@485c035` | Complete current Visx 4.x web runtime surface: the exact 35-namespace aggregate, all 40 feature entry points, and the eight public a11y/react, a11y/server, axis/react, scale/react, shape/react, theme/react, tooltip/floating, and voronoi/react subpaths. Released-only packages chord, delaunay, react-spring, sankey, and stats remain directly importable exactly as upstream specifies. | Interaction callbacks receive native DOM events through Octane's delegated event system instead of React synthetic events; All React class controllers and class-instance refs are replaced by native functional TSRX hooks; Brush intentionally omits upstream's legacy innerRef instance handle; Deterministic text metrics and annotation bounds, pure SplitLinePath SVG sampling, and collision-aware estimated wordcloud rectangles replace browser-only measurement/canvas paths so fixed-size output is identical during SSR and first hydration. Font-specific wrapping, browser-specific path length rounding, and pixel-exact d3-cloud packing can differ; The react-spring entry point uses a deterministic requestAnimationFrame numeric interpolator rather than spring-physics timing, and Zoom uses native wheel/pointer/touch listeners rather than @use-gesture/react at runtime. Their public Visx props and exports are retained; Zoom imports framework-neutral @use-gesture/core types only | Fixed-dimension primitives, wrapped XYChart series, annotations, text, and wordclouds emit complete deterministic SVG on the server. Real hydrateRoot adoption preserves the same SVG/definition/axis/text/series/annotation/wordcloud nodes without warnings, replacement, or post-effect markup changes; generated IDs, measurement fallbacks, portals, and responsive initial sizes are covered. | 2026-07-14 |
 | [`@octanejs/zustand`](#octanejszustand) | `zustand@5.0.14` | Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux). | Unstable selectors (a new reference every render) settle after a bounded number of re-renders instead of hitting React's `useSyncExternalStore` warning loop — still prefer `useShallow` | No SSR-specific surface; no dedicated SSR tests. | 2026-07-06 |
 
@@ -435,6 +436,29 @@ Scope/evidence last checked: 2026-07-09.
 - The reused framework-agnostic core is `@testing-library/dom@^10.4.1`; the ported react-testing-library layer tracks upstream behavior rather than a pinned release.
 
 See also: [`docs/testing-library-migration-plan.md`](testing-library-migration-plan.md)
+
+## @octanejs/three
+
+[`packages/three`](../packages/three) `0.1.0` — ports `@react-three/fiber@9.6.1 (2a528745)`. Status data: [`packages/three/status.json`](../packages/three/status.json).
+
+Experimental Milestones 0 and 2 surface: renderer configuration, compiler ABI, renderer-local Three intrinsic types, the pinned upstream evidence crosswalk, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, and ownership-aware disposal. Canvas, the root store/configuration, frame loop/hooks, and pointer events are deferred to Milestone 3 and later.
+
+Known divergences:
+
+- Octane owns component execution, hooks, context, scheduling, Suspense, refs, and effects instead of embedding React Reconciler.
+- The forthcoming programmatic root API will render an Octane component plus props rather than a React element descriptor.
+- Removing a pierced prop resets its original nested target; R3F 9.6.1 mistakenly writes that default to the leaf key on the root object.
+
+SSR / hydration: The current Three scene surface is client-only. Canvas begins in Milestone 3; its DOM server shell, omitted child-region streaming, and hydration adoption are planned for Milestone 7.
+
+Scope/evidence last checked: 2026-07-16.
+
+- The behavioral oracle is pinned to three@0.172.0; the broad upstream three >=0.156 range is not advertised until a minimum-version lane passes.
+- The checked-in crosswalk classifies 90 upstream public exports and 157 executable upstream tests with zero unclassified cases; current Milestone 2 evidence contains 18 passing tests across public host behavior, prepared driver transitions, exact lifecycle ordering, and a same-source compiled R3F differential scene.
+- Canvas, createRoot/root configuration, the root store, frame loop, and hooks are Milestone 3 work; ray and pointer events begin in Milestone 4.
+- React Native/Expo, R3F 10 WebGPU/TSL APIs, and Drei are outside this package's current compatibility target.
+
+See also: [`docs/three-port-plan.md`](three-port-plan.md), [`packages/three/UPSTREAM.md`](../packages/three/UPSTREAM.md)
 
 ## @octanejs/visx
 

@@ -26,6 +26,7 @@ export const KNOWN_BINDINGS = {
 	'@dnd-kit/react': '@octanejs/dnd-kit',
 	sonner: '@octanejs/sonner',
 	recharts: '@octanejs/recharts',
+	'@react-three/fiber': '@octanejs/three',
 	'@visx/visx': '@octanejs/visx',
 	'@visx/a11y': '@octanejs/visx',
 	'@visx/a11y/react': '@octanejs/visx',
