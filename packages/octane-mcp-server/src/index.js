@@ -236,7 +236,7 @@ function registerUserTools(server, repoRoot, repoMode) {
 		{
 			title: 'Octane skill',
 			description:
-				'Return an Octane agent skill by name. Bundled skills cover working WITH octane in any project: bridging React packages, migrating React components to .tsrx, intentional React divergences, and SSR setup.' +
+				'Return an Octane agent skill by name. Bundled skills cover working WITH octane in any project: running React packages on Octane (and Octane inside React), migrating React components to .tsrx, intentional React divergences, and SSR setup.' +
 				(repoMode ? ' Repo skills cover octane maintainer workflows.' : ''),
 			inputSchema: {
 				name: z.enum(Object.keys(skills)),
@@ -252,9 +252,9 @@ function registerUserTools(server, repoRoot, repoMode) {
 	server.registerTool(
 		'octane_bridge_react_package',
 		{
-			title: 'Bridge a React package to Octane',
+			title: 'Check a React package against Octane',
 			description:
-				'Scan a React package (from node_modules by name, or any source directory by path) for React API usage and return an Octane compatibility report: which APIs map 1:1, which need rewrites (forwardRef, useDebugValue, lazy, class components), whether a framework-agnostic core can be reused verbatim, whether an official @octanejs binding already exists, and a step-by-step bridge plan. Follow up with the bridge-react-package skill for the full workflow.',
+				'Scan a React package (from node_modules by name, or any source directory by path) for React API usage and return an Octane compatibility report. React packages run unmodified on Octane through @octanejs/react-compat; the report says whether this one works out of the box, which contracts are partial or unsupported (legacy class lifecycles, streaming SSR, findDOMNode), whether an official @octanejs binding exists, and the optional Octane-native performance path. Follow up with the bridge-react-package skill for the full workflow.',
 			inputSchema: {
 				package: z
 					.string()
@@ -288,7 +288,7 @@ function registerUserTools(server, repoRoot, repoMode) {
 		{
 			title: 'List official Octane bindings',
 			description:
-				'Return the map of React packages that already have maintained @octanejs/* Octane ports. Check here before bridging by hand.',
+				'Return the map of React packages that already have maintained @octanejs/* Octane-native ports — the performance option. The React originals also run unmodified through @octanejs/react-compat.',
 			inputSchema: {},
 		},
 		async () => text(JSON.stringify(KNOWN_BINDINGS, null, 2)),

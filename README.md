@@ -251,8 +251,8 @@ and client render compose byte-identically, so hydration never mismatches).
 
 ## Packages
 
-This is a pnpm monorepo with ten publishable packages — the core runtime+compiler, the
-metaframework plugin, and eight framework bindings:
+This is a pnpm monorepo with twelve publishable packages — the core runtime+compiler,
+the metaframework plugin, the bi-directional React bridge, and eight framework bindings:
 
 - [`octane`](./packages/octane) is the runtime and the compiler together. It covers
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
@@ -260,7 +260,13 @@ metaframework plugin, and eight framework bindings:
   `octane/compiler/vite` for the build transform).
 - [`@octanejs/vite-plugin`](./packages/vite-plugin-octane) is the optional metaframework
   plugin, with dev SSR, routing, and hydration wiring for full apps.
-- The `@octanejs/*` framework bindings — each a faithful octane port of a React library:
+- The bi-directional React bridge:
+  [`@octanejs/react-compat`](./packages/react-compat) runs unmodified React packages
+  **on Octane** (out of the box, via `octane({ compat: [react()] })`), and
+  [`@octanejs/react-wrapper`](./packages/react-wrapper) mounts Octane components
+  **inside a React app** for incremental adoption.
+- The `@octanejs/*` framework bindings — each a faithful octane port of a React library,
+  the native performance option next to `react-compat`'s out-of-the-box path:
   [`zustand`](./packages/zustand), [`query`](./packages/query),
   [`motion`](./packages/motion), [`stylex`](./packages/stylex),
   [`router`](./packages/router), [`lexical`](./packages/lexical),

@@ -96,3 +96,12 @@ on commit (native change), not per keystroke.
 
 React 19 style. `ref={cb}` with optional cleanup return, `ref={refObject}`, or
 an array `ref={[a, b]}` to compose. No `forwardRef` anywhere.
+
+## Incremental migration
+
+A React app does not have to convert everything at once. Mount already-migrated
+Octane components inside the remaining React tree with
+`@octanejs/react-wrapper`: `wrapOctane(Component)` returns a first-class React
+component (props pass through; React children bridge into the Octane
+`children` hole). Migrate leaf components first, wrap them, and move the
+boundary upward.

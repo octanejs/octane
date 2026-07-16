@@ -1,10 +1,10 @@
 # Skill: React-like package bridge/port into Octane compatibility
 
-Use this when asked to port or bridge a React ecosystem package into Octane, add an `@octanejs/*` binding, or evaluate whether a React package can run on Octane.
+Use this when asked to port a React ecosystem package into an `@octanejs/*` native binding. Note the baseline first: unmodified React packages already run on Octane through `@octanejs/react-compat` (`octane({ compat: [react()] })`), so a native port is the **performance option**, not a prerequisite for adoption — evaluate a package's out-of-the-box status with the MCP `octane_bridge_react_package` tool before porting anything.
 
 ## Mental model
 
-Do **not** assume React component code can run unchanged. Octane is compiler-first:
+A native binding does not go through the compatibility runtime. On this path, do **not** assume React component code can run unchanged. Octane is compiler-first:
 
 - React JSX output and slotless hook calls are not valid Octane component runtime input.
 - Reuse framework-agnostic cores unchanged.

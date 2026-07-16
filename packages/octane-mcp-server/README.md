@@ -59,12 +59,15 @@ maintainer tools):
 ### `octane_bridge_react_package`
 
 Scans a React package (by name from `node_modules`, or any source directory by
-path) for React API usage and returns an Octane compatibility report: which
-APIs map one-to-one, which need rewrites (`forwardRef`, `useDebugValue`,
-`lazy`, class components, synthetic `onChange`), whether a framework-agnostic
-core can be reused verbatim, whether an official `@octanejs/*` binding already
-exists, an overall verdict (`bridgeable`, `bridgeable-with-rewrites`,
-`needs-rework`), and a step-by-step plan.
+path) for React API usage and returns an Octane compatibility report. React
+packages run unmodified on Octane through `@octanejs/react-compat`
+(`octane({ compat: [react()] })` in the Vite config); the report says whether
+this one works out of the box, which contracts are partial (class bailout
+timing) or unsupported (legacy class lifecycles, streaming SSR,
+`findDOMNode`), whether a framework-agnostic core can back an Octane-native
+entry, whether an official `@octanejs/*` binding already exists, an overall
+verdict (`works-out-of-the-box`, `works-with-caveats`,
+`has-unsupported-apis`), and a step-by-step plan.
 
 ```json
 { "package": "jotai", "projectRoot": "/path/to/my-app" }
@@ -72,14 +75,17 @@ exists, an overall verdict (`bridgeable`, `bridgeable-with-rewrites`,
 
 ### `octane_bindings`
 
-Returns the map of React packages with maintained `@octanejs/*` ports
-(zustand, query, motion, stylex, router, lexical, floating-ui, radix).
+Returns the map of React packages with maintained `@octanejs/*` native ports
+(zustand, query, motion, stylex, router, lexical, floating-ui, radix) — the
+performance option; the React originals also run through
+`@octanejs/react-compat`.
 
 ### `octane_skill`
 
 Returns a skill by name. Bundled skills (shipped with this package):
 
-- `bridge-react-package` — the full workflow for porting a React library.
+- `bridge-react-package` — running React packages on Octane out of the box,
+  plus the native-port and Octane-inside-React paths.
 - `migrate-react-component` — React JSX to `.tsrx` conversion reference.
 - `react-divergences` — Octane's intentional differences from React.
 - `setup-ssr` — server rendering and hydration setup.

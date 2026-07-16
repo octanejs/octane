@@ -47,7 +47,6 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
-    "esbuild": "catalog:default",
     "jotai": "^2.20.1",
     "react": "catalog:default",
     "react-dom": "catalog:default",

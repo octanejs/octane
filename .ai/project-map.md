@@ -21,7 +21,9 @@ Always prefer current source over summaries:
 
 - `packages/octane/` (`octane`) — core runtime, compiler, SSR, tests.
 - `packages/vite-plugin-octane/` (`@octanejs/vite-plugin`) — optional metaframework/plugin surface.
-- `packages/{zustand,query,motion,stylex,router,lexical,floating-ui,radix}/` — Octane ports/bindings for React ecosystem libraries.
+- `packages/react-compat/` (`@octanejs/react-compat`) — React runtime compatibility: unmodified React packages run on Octane via `octane({ compat: [react()] })`.
+- `packages/react-wrapper/` (`@octanejs/react-wrapper`) — the reverse bridge: mount Octane components inside a real React app.
+- `packages/{zustand,query,motion,stylex,router,lexical,floating-ui,radix}/` — Octane-native ports/bindings for React ecosystem libraries (the performance option next to react-compat).
 - `packages/octane-mcp-server/` (`@octanejs/mcp-server`) — MCP server: user-facing bridge/migration/SSR skills plus repo automation tools.
 - `benchmarks/` — perf harnesses: news, js-framework, recursive-context, signal-favoring, dbmon.
 - `examples/`, `playground/` — runnable apps and manual validation.

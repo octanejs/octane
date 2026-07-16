@@ -5,6 +5,13 @@ without porting their source. Package code continues to import `react`,
 `react/jsx-runtime` and `react-dom`; the Vite plugin resolves those imports to
 small Octane facades.
 
+This is one half of Octane's bi-directional React bridge:
+
+- `@octanejs/react-compat` — run unmodified React packages **on Octane** (this
+  package).
+- [`@octanejs/react-wrapper`](../react-wrapper) — mount Octane components
+  **inside a React app**, for incremental adoption from the React side.
+
 ## Usage
 
 ```js

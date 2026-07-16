@@ -127,6 +127,25 @@ export const REACT_API_MAP = {
 	},
 };
 
+// Legacy pre-render class lifecycles: react-compat rejects these with a
+// targeted error instead of silently approximating React, so they are the one
+// class-component pattern that genuinely blocks the out-of-the-box path.
+// (`\b`-anchored scanning means the UNSAFE_ aliases need their own entries.)
+for (const name of [
+	'getSnapshotBeforeUpdate',
+	'componentWillMount',
+	'componentWillReceiveProps',
+	'componentWillUpdate',
+	'UNSAFE_componentWillMount',
+	'UNSAFE_componentWillReceiveProps',
+	'UNSAFE_componentWillUpdate',
+]) {
+	REACT_API_MAP[name] = {
+		status: 'unsupported',
+		note: 'Legacy pre-render class lifecycle: react-compat throws a targeted error. Port the component to hooks or an Octane-native entry.',
+	};
+}
+
 const IMPORT_SOURCES = [
 	'react',
 	'react-dom',
@@ -210,12 +229,21 @@ function apiRows(totals) {
 		.sort((a, b) => b.count - a.count);
 }
 
+// The verdict describes what happens under `@octanejs/react-compat` at
+// runtime — NOT how hard a hand-port would be (react-compat absorbs the
+// 'rewrite'-status APIs automatically; they only matter for a native entry):
+//  - works-out-of-the-box: nothing in the scan needs attention.
+//  - works-with-caveats: partial contracts (class bailout timing, Children
+//    traversal idioms) or class components — supported subsets, verify behavior.
+//  - has-unsupported-apis: the scan found APIs react-compat refuses (legacy
+//    lifecycles, streaming SSR, findDOMNode, …). These throw targeted errors,
+//    so the package still works when the code path is never exercised.
 function verdictFor(rows, classComponents) {
-	if (classComponents || rows.some((row) => row.status === 'unsupported')) return 'needs-rework';
-	if (rows.some((row) => row.status === 'rewrite' || row.status === 'partial')) {
-		return 'bridgeable-with-rewrites';
+	if (rows.some((row) => row.status === 'unsupported')) return 'has-unsupported-apis';
+	if (classComponents || rows.some((row) => row.status === 'partial')) {
+		return 'works-with-caveats';
 	}
-	return 'bridgeable';
+	return 'works-out-of-the-box';
 }
 
 export async function readPackageJson(dir) {
@@ -281,37 +309,34 @@ function planFor(report) {
 	const steps = [];
 	if (report.existingBinding) {
 		steps.push(
-			`An official Octane binding already exists: ${report.existingBinding}. Prefer installing it over bridging by hand.`,
-		);
-	}
-	if (report.vanillaCore) {
-		steps.push(
-			`Reuse the framework-agnostic core '${report.vanillaCore}' unchanged; it has no React imports and runs on Octane as-is.`,
+			`An official Octane-native binding exists: ${report.existingBinding}. It is the fastest option; the unmodified React build also runs through @octanejs/react-compat.`,
 		);
 	}
 	steps.push(
-		'Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).',
+		"Default path — run the package unmodified: add the compatibility entry to the Octane Vite plugin (`import { react } from '@octanejs/react-compat/vite'`; `octane({ compat: [react()] })`). No codemod, no transformed copy, no per-library configuration; SSR resolves to the server facade automatically.",
 	);
-	const rewrites = (report.apis ?? []).filter(
-		(row) => row.status === 'rewrite' || row.status === 'partial',
-	);
-	for (const row of rewrites) {
-		steps.push(`${row.name} (${row.count}x): ${row.note}`);
+	const unsupported = (report.apis ?? []).filter((row) => row.status === 'unsupported');
+	for (const row of unsupported) {
+		steps.push(
+			`Unsupported under react-compat — ${row.name} (${row.count}x): ${row.note} The error is targeted, so the package still works if this code path is never exercised.`,
+		);
+	}
+	const partial = (report.apis ?? []).filter((row) => row.status === 'partial');
+	for (const row of partial) {
+		steps.push(`Caveat — ${row.name} (${row.count}x): ${row.note}`);
 	}
 	if (report.classComponents) {
 		steps.push(
-			'Class components detected: rewrite each as a function component; error boundaries become the @try/@catch directive or the ErrorBoundary component.',
+			'Class components detected: react-compat supports state, commit lifecycles, contextType, class defaultProps, refs and class Error Boundaries; PureComponent/shouldComponentUpdate bailout timing is not emulated and legacy pre-render lifecycles throw targeted errors.',
 		);
 	}
-	const unsupported = (report.apis ?? []).filter((row) => row.status === 'unsupported');
-	for (const row of unsupported) {
-		steps.push(`${row.name} (${row.count}x): ${row.note}`);
-	}
 	steps.push(
-		'Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).',
+		report.vanillaCore
+			? `Performance ceiling (optional): publish an Octane-native entry behind the \`octane\` export condition — reuse the framework-agnostic core '${report.vanillaCore}' unchanged and re-implement the thin React binding with Octane hooks (see the bridge-react-package skill). Consumers without it keep using the React build through react-compat.`
+			: 'Performance ceiling (optional): publish an Octane-native entry behind the `octane` export condition using compiled .tsrx and Octane hooks (see the bridge-react-package skill). Consumers without it keep using the React build through react-compat.',
 	);
 	steps.push(
-		'Validate with tests that drive real DOM events and compare behavior against the React original where possible.',
+		'Validate with tests that drive real DOM events against the package running on Octane, and compare behavior with the React original where possible.',
 	);
 	return steps;
 }

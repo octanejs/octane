@@ -343,6 +343,19 @@ export default defineConfig({
 				},
 				plugins: [react()],
 			},
+			{
+				// The reverse bridge direction: REAL react/react-dom host an Octane
+				// root. No compat aliasing here — `react` must stay React; the octane
+				// plugin only compiles the `.tsrx` fixtures.
+				root: resolve(import.meta.dirname, 'packages/react-wrapper'),
+				test: {
+					name: 'react-wrapper',
+					include: ['tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
 		],
 	},
 });

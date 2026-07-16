@@ -87,6 +87,8 @@ catalogs:
     '@tsrx/vite-plugin-react': ^0.0.65
     '@tsrx/vite-plugin-solid': ^0.0.63
     '@types/babel__core': 7.20.5
+    '@types/react': ^19.2.0
+    '@types/react-dom': ^19.2.0
     '@types/node': ^24.3.0
     '@vitejs/plugin-react': ^6.0.2
     devalue: ^5.8.1

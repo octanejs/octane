@@ -51,9 +51,9 @@ pnpm rules:generate
 
 ## Repo Map
 
-This is a pnpm monorepo with ten publishable packages — the core `octane`
-runtime+compiler, the `@octanejs/vite-plugin` metaframework, and eight `@octanejs/*`
-framework bindings:
+This is a pnpm monorepo with twelve publishable packages — the core `octane`
+runtime+compiler, the `@octanejs/vite-plugin` metaframework, the bi-directional
+React bridge, and eight `@octanejs/*` framework bindings:
 
 - `packages/octane/` (npm: `octane`) — the runtime **and** the compiler together.
   - `src/runtime.ts` — client runtime.
@@ -62,9 +62,15 @@ framework bindings:
   - `tests/` — the test suite (see Validation).
 - `packages/vite-plugin-octane/` (npm: `@octanejs/vite-plugin`) — the optional
   metaframework plugin (dev SSR, routing, hydration wiring for full apps).
+- The bi-directional React bridge: `packages/react-compat/`
+  (npm: `@octanejs/react-compat`) runs unmodified React packages ON Octane
+  (out of the box via `octane({ compat: [react()] })`); `packages/react-wrapper/`
+  (npm: `@octanejs/react-wrapper`) mounts Octane components INSIDE a React app
+  (real react/react-dom peers) for incremental adoption.
 - `packages/{zustand,query,motion,stylex,router,lexical,floating-ui,radix}/` (npm:
   `@octanejs/*`) — framework bindings, each a faithful octane port of a React library
   (state, data-fetching, animation, styling, routing, editor, positioning, UI primitives).
+  These are the native performance option next to `react-compat`'s out-of-the-box path.
 
 `benchmarks/`, `playground/`, and `scripts/` hold local examples, perf harnesses,
 and tooling. Route a change to the package that owns the behavior; prefer editing
