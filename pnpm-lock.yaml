@@ -2458,6 +2458,28 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  examples/mailroom:
+    dependencies:
+      '@octanejs/remix-router':
+        specifier: workspace:*
+        version: link:../../packages/remix-router
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   examples/pagecraft:
     dependencies:
       '@lexical/list':
@@ -2475,6 +2497,34 @@ importers:
       lexical:
         specifier: catalog:default
         version: 0.46.0(typescript@5.9.3)
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/pulseboard:
+    dependencies:
+      '@octanejs/tanstack-table':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-table
+      '@octanejs/tanstack-virtual':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-virtual
+      '@octanejs/visx':
+        specifier: workspace:*
+        version: link:../../packages/visx
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -2541,6 +2591,28 @@ importers:
       '@octanejs/zustand':
         specifier: workspace:*
         version: link:../../packages/zustand
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/wayfinder:
+    dependencies:
+      '@octanejs/vite-plugin':
+        specifier: workspace:*
+        version: link:../../packages/vite-plugin-octane
       octane:
         specifier: workspace:*
         version: link:../../packages/octane

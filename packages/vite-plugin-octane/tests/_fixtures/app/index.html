@@ -3,6 +3,23 @@
 	<head>
 		<meta charset="utf-8" />
 		<title>Fixture</title>
+		<script nonce="fixture-nonce">
+			const observer = new MutationObserver(() => {
+				const hydrationEntry = document.querySelector('[data-octane-hydrate]');
+				const source = hydrationEntry?.getAttribute('src');
+				if (!source) return;
+				observer.disconnect();
+				hydrationEntry.src = new URL(source, location.href).href;
+				for (const resource of document.querySelectorAll('link[href]')) {
+					const href = resource.getAttribute('href');
+					if (href) resource.href = new URL(href, location.href).href;
+				}
+				const base = document.createElement('base');
+				base.href = 'https://hostile-base.invalid/nested/';
+				document.head.append(base);
+			});
+			observer.observe(document.documentElement, { childList: true, subtree: true });
+		</script>
 		<!--ssr-head-->
 	</head>
 	<body>

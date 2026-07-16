@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { createServer } from 'vite';
+import type { RenderBuiltAssetUrl, UserConfig } from 'vite';
 import { octane, isViteOwnedUrl, resolveOctaneConfig, RenderRoute } from '../src/index.js';
 import { RESOLVED_ADAPTER_BROWSER_STUB_ID } from '../src/project-codegen.js';
 import type { Component } from '@octanejs/vite-plugin';
@@ -238,6 +239,61 @@ export default { compiler: { renderers } };
 		expect(
 			(await config({}, { command: 'serve', mode: 'production', isPreview: true })).appType,
 		).toBe(undefined);
+	});
+
+	it('keeps routed production chunk URLs independent of the document base', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-built-urls-'));
+		const userRenderBuiltUrl = vi.fn<RenderBuiltAssetUrl>((filename) =>
+			filename === 'assets/custom.js' ? 'https://cdn.example/custom.js' : undefined,
+		);
+		try {
+			await writeFile(join(root, 'index.html'), '<main id="root"></main>');
+			await writeFile(
+				join(root, 'octane.config.ts'),
+				`export default {
+	router: {
+		routes: [{ type: 'render', path: '/', entry: '/src/Page.tsrx', before: [] }],
+	},
+};
+`,
+			);
+			const [, meta] = octane();
+			const config = meta.config as (
+				userConfig: UserConfig,
+				env: { command: 'build'; mode: string },
+			) => Promise<UserConfig>;
+			const result = await config(
+				{
+					root,
+					experimental: {
+						importGlobRestoreExtension: true,
+						renderBuiltUrl: userRenderBuiltUrl,
+					},
+				},
+				{ command: 'build', mode: 'production' },
+			);
+
+			expect(result.experimental?.importGlobRestoreExtension).toBe(true);
+			const renderBuiltUrl = result.experimental?.renderBuiltUrl;
+			expect(renderBuiltUrl).toBeTypeOf('function');
+			const clientJsAsset = {
+				type: 'asset',
+				hostId: 'assets/hydrate.js',
+				hostType: 'js',
+				ssr: false,
+			} as const;
+			expect(renderBuiltUrl?.('assets/custom.js', clientJsAsset)).toBe(
+				'https://cdn.example/custom.js',
+			);
+			expect(renderBuiltUrl?.('assets/Page.js', clientJsAsset)).toEqual({ relative: true });
+			expect(renderBuiltUrl?.('assets/Page.css', { ...clientJsAsset, hostType: 'css' })).toBe(
+				undefined,
+			);
+			expect(renderBuiltUrl?.('assets/server.js', { ...clientJsAsset, ssr: true })).toBe(undefined);
+			expect(renderBuiltUrl?.('favicon.svg', { ...clientJsAsset, type: 'public' })).toBe(undefined);
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
 	});
 
 	it('serves the Vite SPA fallback when no octane.config.ts exists', async () => {
