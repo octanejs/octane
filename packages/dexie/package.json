@@ -52,8 +52,10 @@
     "esbuild": "catalog:default",
     "fake-indexeddb": "catalog:default",
     "octane": "workspace:*",
+    "playwright": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "vite": "catalog:default",
     "vitest": "catalog:default"
   }
 }

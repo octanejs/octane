@@ -387,7 +387,10 @@ export default defineConfig({
 				test: {
 					name: 'dexie',
 					include: ['packages/dexie/tests/**/*.test.ts'],
-					exclude: ['packages/dexie/tests/ssr/**/*.test.ts'],
+					exclude: [
+						'packages/dexie/tests/ssr/**/*.test.ts',
+						'packages/dexie/tests/browser/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					setupFiles: ['packages/dexie/tests/_setup.ts'],
 					globals: false,
@@ -400,6 +403,16 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/dexie/src/index.ts'),
 						},
 					],
+				},
+			},
+			{
+				test: {
+					name: 'dexie-browser',
+					include: ['packages/dexie/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
 				},
 			},
 			{
