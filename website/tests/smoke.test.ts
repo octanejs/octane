@@ -155,8 +155,22 @@ describe('website routes', () => {
 
 		const navRight = container.querySelector('.nav-right')!;
 		expect(navRight.querySelector('.search-trigger')).toBeTruthy();
+		expect(findLink(navRight, 'https://x.com/octanejs')).toBeTruthy();
 		expect(findLink(navRight, 'https://github.com/octanejs/octane')).toBeTruthy();
 		expect(findLink(navRight, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
+
+		// The footer mirrors the header's social set — X, Discord, GitHub, in that
+		// order — as an icon list beside the license line.
+		const footer = container.querySelector('footer')!;
+		expect(footer.textContent).toContain('MIT licensed');
+		const social = Array.from(footer.querySelectorAll<HTMLAnchorElement>('.footer-social a')).map(
+			(link) => link.getAttribute('href'),
+		);
+		expect(social).toEqual([
+			'https://x.com/octanejs',
+			'https://discord.gg/8puY9fFqd9',
+			'https://github.com/octanejs/octane',
+		]);
 	});
 
 	it('/benchmarks renders every configured benchmark card', async () => {
