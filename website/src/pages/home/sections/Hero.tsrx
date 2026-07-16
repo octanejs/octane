@@ -118,7 +118,7 @@ export function Hero() @{
 			}
 			.hero-actions :global(a.btn-primary) {
 				background: var(--accent);
-				color: var(--text);
+				color: var(--on-accent);
 				font-weight: 600;
 				padding: 0.7rem 1.4rem;
 				border-radius: 9999px;

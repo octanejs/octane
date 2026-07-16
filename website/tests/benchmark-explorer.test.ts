@@ -1,18 +1,19 @@
 // The benchmark explorer's two linked views over the checked-in ×-vs-Octane
-// matrix (HOME_SUMMARY). These drive the mounted, interactive views the way a
+// matrix (HOME_SUMMARY). These drive the interactive views the way a
 // reader does: choosing frameworks and a suite for the bar chart, re-baselining
-// the heatmap, and hovering for the custom tooltip. The SSR/no-JS fallback
-// table is covered by the SSR suites; here we assert the client behavior.
+// the heatmap, and hovering for the custom tooltip. SSR parity is covered by
+// the real-browser suite; here we assert the client behavior.
 import { describe, it, expect, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@octanejs/testing-library';
 import { BenchmarkExplorer } from '../src/components/BenchmarkExplorer.tsrx';
-import { HOME_SUMMARY } from '../src/content/benchmarks.ts';
+import { HOME_SUMMARY } from '../src/content/home-benchmark.ts';
 
 afterEach(cleanup);
 
 async function mountExplorer() {
 	const utils = render(BenchmarkExplorer as any, { props: { card: HOME_SUMMARY } });
-	// Interactive views are mount-gated; wait for the bar plot to swap in.
+	// The plot is present from the first render; waitFor also flushes the test
+	// renderer before the interaction assertions below.
 	await waitFor(() => expect(utils.container.querySelector('.bx-plot')).toBeTruthy());
 	const { container } = utils;
 	const barLabels = () =>

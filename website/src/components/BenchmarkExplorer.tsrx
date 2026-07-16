@@ -8,13 +8,12 @@
 //   2. a heatmap of the whole grid, toggleable between "vs Octane" (raw) and
 //      "vs fastest" (each row re-baselined to its fastest framework).
 //
-// The interactive views are client-mounted over an accessible SSR data table
-// (the BenchBars / /benchmarks-chart pattern): the server and first client
-// render are the plain table, so hydration adopts identical DOM, then the
-// chart + heatmap swap in on mount. No-JS and crawlers still get every number.
+// Both views are deterministic from the checked-in matrix, so the server and
+// client render the same controls, chart, and accessible data table. Hydration
+// can therefore adopt the complete explorer without changing page geometry.
 // The cursor-following tooltip is positioned imperatively through a ref, so a
 // mousemove never re-renders the 100-cell grid.
-import { useEffect, useMemo, useRef, useState } from 'octane';
+import { useMemo, useRef, useState } from 'octane';
 import type { BenchCard } from '../content/benchmarks.ts';
 
 // ×-vs-Octane ratios: 12.3 → "12×", 2.64 → "2.6×", 1 → "1×", 0.9 → "0.90×".
@@ -72,15 +71,6 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 	const [suite, setSuite] = useState(card.rows[0].op as string);
 	const [mode, setMode] = useState('A' as 'A' | 'B');
 	const [hovered, setHovered] = useState(null as Tip | null);
-
-	// The interactive views (dynamic tints, bar widths, a cursor-following
-	// tooltip) are client-mounted over an accessible SSR data table — the same
-	// shape BenchBars and every /benchmarks chart use. The server and the first
-	// client render are the plain table, so hydration adopts identical DOM with
-	// no dynamic-style mismatch; the chart + heatmap swap in on mount. No-JS and
-	// crawlers still get every number.
-	const [mounted, setMounted] = useState(false);
-	useEffect(() => setMounted(true), []);
 
 	const toggleFramework = (key: string) => {
 		const next = new Set(selected);
@@ -239,275 +229,238 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 	const hide = () => setHovered(null);
 
 	<div class="bx" onMouseMove={onMove}>
-		@if (mounted) {
-			<>
-				<div class="bx-panel">
-					<div class="bx-controls">
-						<div class="bx-ctl">
-							<span class="bx-ctl-label" id="bx-fw-label">frameworks</span>
-							<div class="bx-chips" role="group" aria-labelledby="bx-fw-label">
-								@for (const s of card.series; key s.key) {
-									<button
-										type="button"
-										class={['bx-chip', { 'bx-chip-on': selected.has(s.key) }]}
-										aria-pressed={selected.has(s.key)}
-										onClick={() => toggleFramework(s.key)}
-									>
-										<span class="bx-swatch" style={'background:' + s.color}></span>
-										{s.label as string}
-									</button>
-								}
-							</div>
-						</div>
-						<div class="bx-ctl">
-							<span class="bx-ctl-label" id="bx-suite-label">suite</span>
-							<div class="bx-suites" role="group" aria-labelledby="bx-suite-label">
-								@for (const r of card.rows; key r.op) {
-									<button
-										type="button"
-										class={['bx-suite', { 'bx-suite-on': r.op === suite }]}
-										aria-pressed={r.op === suite}
-										onClick={() => setSuite(r.op as string)}
-									>
-										{r.op as string}
-									</button>
-								}
-							</div>
+		<>
+			<div class="bx-panel">
+				<div class="bx-controls">
+					<div class="bx-ctl">
+						<span class="bx-ctl-label" id="bx-fw-label">frameworks</span>
+						<div class="bx-chips" role="group" aria-labelledby="bx-fw-label">
+							@for (const s of card.series; key s.key) {
+								<button
+									type="button"
+									class={['bx-chip', { 'bx-chip-on': selected.has(s.key) }]}
+									aria-pressed={selected.has(s.key)}
+									onClick={() => toggleFramework(s.key)}
+								>
+									<span class="bx-swatch" style={'background:' + s.color}></span>
+									{s.label as string}
+								</button>
+							}
 						</div>
 					</div>
-
-					<div
-						class="bx-plot"
-						role="img"
-						aria-label={'Bar chart for the ' + suite + ' suite, × vs Octane, lower is better'}
-					>
-						<div
-							class="bx-refline"
-							style={'left:calc(var(--bx-label) + (100% - var(--bx-label)) * ' + bars.refFraction +
-								')'}
-						>
-							<span class="bx-refcap">1× Octane</span>
+					<div class="bx-ctl">
+						<span class="bx-ctl-label" id="bx-suite-label">suite</span>
+						<div class="bx-suites" role="group" aria-labelledby="bx-suite-label">
+							@for (const r of card.rows; key r.op) {
+								<button
+									type="button"
+									class={['bx-suite', { 'bx-suite-on': r.op === suite }]}
+									aria-pressed={r.op === suite}
+									onClick={() => setSuite(r.op as string)}
+								>
+									{r.op as string}
+								</button>
+							}
 						</div>
-						@for (const item of bars.present; key item.key) {
-							<div
-								class="bx-row"
-								onMouseEnter={(e: MouseEvent) => show(e, {
-									fw: item.label,
-									suite,
-									primary: fmtX(item.value) + ' vs Octane',
-									secondary: item.value < 0.98
-										? 'faster than Octane'
-										: item.value > 1.02
-											? 'slower than Octane'
-											: 'matches Octane',
-									fastest: '',
-								})}
-								onMouseLeave={hide}
-							>
-								<span class="bx-row-label">
-									{item.label as string}
-								</span>
-								<div class="bx-track">
-									<div
-										class="bx-fill"
-										style={'width:' + (item.value / bars.scaleMax) * 100 + '%;background:' +
-											item.color}
-									></div>
-									<span
-										class={[
-											'bx-val',
-											item.value / bars.scaleMax > 0.62 ? 'bx-val-in' : 'bx-val-out',
-										]}
-										style={'left:' + (item.value / bars.scaleMax) * 100 + '%'}
-									>
-										{fmtX(item.value) as string}
-									</span>
-								</div>
-							</div>
-						}
-						@for (const item of bars.missing; key item.key) {
-							<div class="bx-row bx-row-empty">
-								<span class="bx-row-label">
-									{item.label as string}
-								</span>
-								<div class="bx-track">
-									<span class="bx-val bx-val-out bx-muted" style="left:0">{'—'}</span>
-								</div>
-							</div>
-						}
-						@if (bars.present.length === 0 && bars.missing.length === 0) {
-							<p class="bx-empty">Select at least one framework to compare.</p>
-						}
 					</div>
 				</div>
 
-				<div class="bx-panel">
-					<div class="bx-heat-head">
-						<span class="bx-ctl-label">all suites</span>
-						<div class="bx-seg" role="group" aria-label="Heatmap normalization">
-							<button
-								type="button"
-								class={['bx-seg-btn', { 'bx-seg-on': mode === 'A' }]}
-								aria-pressed={mode === 'A'}
-								onClick={() => setMode('A')}
-							>
-								vs Octane
-							</button>
-							<button
-								type="button"
-								class={['bx-seg-btn', { 'bx-seg-on': mode === 'B' }]}
-								aria-pressed={mode === 'B'}
-								onClick={() => setMode('B')}
-							>
-								vs fastest
-							</button>
-						</div>
+				<div
+					class="bx-plot"
+					role="img"
+					aria-label={'Bar chart for the ' + suite + ' suite, × vs Octane, lower is better'}
+				>
+					<div
+						class="bx-refline"
+						style={'left:calc(var(--bx-label) + (100% - var(--bx-label)) * ' + bars.refFraction +
+							')'}
+					>
+						<span class="bx-refcap">1× Octane</span>
 					</div>
+					@for (const item of bars.present; key item.key) {
+						<div
+							class="bx-row"
+							onMouseEnter={(e: MouseEvent) => show(e, {
+								fw: item.label,
+								suite,
+								primary: fmtX(item.value) + ' vs Octane',
+								secondary: item.value < 0.98
+									? 'faster than Octane'
+									: item.value > 1.02
+										? 'slower than Octane'
+										: 'matches Octane',
+								fastest: '',
+							})}
+							onMouseLeave={hide}
+						>
+							<span class="bx-row-label">
+								{item.label as string}
+							</span>
+							<div class="bx-track">
+								<div
+									class="bx-fill"
+									style={'width:' + (item.value / bars.scaleMax) * 100 + '%;background:' +
+										item.color}
+								></div>
+								<span
+									class={['bx-val', item.value / bars.scaleMax > 0.62 ? 'bx-val-in' : 'bx-val-out']}
+									style={'left:' + (item.value / bars.scaleMax) * 100 + '%'}
+								>
+									{fmtX(item.value) as string}
+								</span>
+							</div>
+						</div>
+					}
+					@for (const item of bars.missing; key item.key) {
+						<div class="bx-row bx-row-empty">
+							<span class="bx-row-label">
+								{item.label as string}
+							</span>
+							<div class="bx-track">
+								<span class="bx-val bx-val-out bx-muted" style="left:0">{'—'}</span>
+							</div>
+						</div>
+					}
+					@if (bars.present.length === 0 && bars.missing.length === 0) {
+						<p class="bx-empty">Select at least one framework to compare.</p>
+					}
+				</div>
+			</div>
 
-					<div class="bx-heat-scroll">
-						<table class="bx-heat">
-							<thead>
-								<tr>
-									<th scope="col" class="bx-corner">suite</th>
-									@for (const s of card.series; key s.key) {
-										<th scope="col">
-											<span class="bx-th">
-												<span class="bx-swatch" style={'background:' + s.color}></span>
-												{s.label as string}
-											</span>
-										</th>
-									}
-								</tr>
-							</thead>
-							<tbody>
-								@for (const r of heat.rows; key r.op) {
-									<tr>
-										<th scope="row" class="bx-rowhead">
-											{r.op as string}
-										</th>
-										@for (const cell of r.cells; key cell.key) {
-											@switch (cell.kind) {
-												@case 'null': {
-													<td class="bx-cell bx-cell-null" aria-label="no data">{'—'}</td>
-												}
-												@case 'ref': {
-													<td class="bx-cell bx-cell-ref">
-														{cell.text as string}
-													</td>
-												}
-												@default: {
-													<td
-														class={['bx-cell', { 'bx-cell-fastest': cell.isFastest }]}
-														style={'background:' + cell.tint}
-														onMouseEnter={(e: MouseEvent) => show(e, {
-															fw: cell.label,
-															suite: cell.suite,
-															primary: cell.primary,
-															secondary: cell.secondary,
-															fastest: cell.fastest,
-														})}
-														onMouseLeave={hide}
-													>
-														{cell.text as string}
-													</td>
-												}
-											}
-										}
-									</tr>
+			<div class="bx-panel">
+				<div class="bx-heat-head">
+					<span class="bx-ctl-label">all suites</span>
+					<div class="bx-seg" role="group" aria-label="Heatmap normalization">
+						<button
+							type="button"
+							class={['bx-seg-btn', { 'bx-seg-on': mode === 'A' }]}
+							aria-pressed={mode === 'A'}
+							onClick={() => setMode('A')}
+						>
+							vs Octane
+						</button>
+						<button
+							type="button"
+							class={['bx-seg-btn', { 'bx-seg-on': mode === 'B' }]}
+							aria-pressed={mode === 'B'}
+							onClick={() => setMode('B')}
+						>
+							vs fastest
+						</button>
+					</div>
+				</div>
+
+				<div class="bx-heat-scroll">
+					<table class="bx-heat">
+						<thead>
+							<tr>
+								<th scope="col" class="bx-corner">suite</th>
+								@for (const s of card.series; key s.key) {
+									<th scope="col">
+										<span class="bx-th">
+											<span class="bx-swatch" style={'background:' + s.color}></span>
+											{s.label as string}
+										</span>
+									</th>
 								}
-							</tbody>
-							<tfoot>
+							</tr>
+						</thead>
+						<tbody>
+							@for (const r of heat.rows; key r.op) {
 								<tr>
-									<th scope="row" class="bx-rowhead bx-geo-head">geomean</th>
-									@for (const g of heat.geoRow; key g.key) {
+									<th scope="row" class="bx-rowhead">
+										{r.op as string}
+									</th>
+									@for (const cell of r.cells; key cell.key) {
 										<td
-											class={['bx-cell', 'bx-geo', { 'bx-cell-ref': g.isRef }]}
-											style={g.tint ? 'background:' + g.tint : ''}
+											class={[
+												'bx-cell',
+												{
+													'bx-cell-null': cell.kind === 'null',
+													'bx-cell-ref': cell.kind === 'ref',
+													'bx-cell-fastest': cell.isFastest,
+												},
+											]}
+											style={cell.kind === 'data' ? 'background:' + cell.tint : undefined}
+											aria-label={cell.kind === 'null' ? 'no data' : undefined}
+											onMouseEnter={(e: MouseEvent) => {
+												if (cell.kind === 'data') show(e, {
+													fw: cell.label,
+													suite: cell.suite,
+													primary: cell.primary,
+													secondary: cell.secondary,
+													fastest: cell.fastest,
+												});
+											}}
+											onMouseLeave={() => {
+												if (cell.kind === 'data') hide();
+											}}
 										>
-											{g.text as string}
+											{cell.text as string}
 										</td>
 									}
 								</tr>
-							</tfoot>
-						</table>
-					</div>
-					<p class="bx-caption">
-						{mode === 'A'
-							? 'Each cell is that framework’s score relative to Octane (1×), geometric mean across the suite’s operations. Green is faster, red is slower.'
-							: 'Each row is re-baselined so its fastest framework is 1×; every other cell is a multiple of that fastest time. The outlined cell wins the row.'}
-					</p>
-					<div class="bx-legend">
-						<span class="bx-legend-item">
-							<span class="bx-legend-label">Faster</span>
-							<span class="bx-legend-scale" aria-hidden="true"></span>
-							<span class="bx-legend-label">Slower</span>
-						</span>
-						<span class="bx-legend-item">
-							<span class="bx-legend-swatch" aria-hidden="true"></span>
-							Octane = 1× baseline
-						</span>
-					</div>
-				</div>
-
-				@if (hovered) {
-					<div class="bx-tip" role="tooltip" ref={mountTip}>
-						<div class="bx-tip-head">
-							<span class="bx-tip-fw">
-								{hovered.fw as string}
-							</span>
-							<span class="bx-tip-suite">
-								{hovered.suite as string}
-							</span>
-						</div>
-						<div class="bx-tip-primary">
-							{hovered.primary as string}
-						</div>
-						@if (hovered.secondary) {
-							<div class="bx-tip-sec">
-								{hovered.secondary as string}
-							</div>
-						}
-						@if (hovered.fastest) {
-							<div class="bx-tip-fast">
-								{'fastest: ' + hovered.fastest}
-							</div>
-						}
-					</div>
-				}
-			</>
-		} @else {
-			<div class="bx-panel bx-fallback">
-				<table class="bx-fallback-table">
-					<caption
-						class="bx-fallback-cap"
-					>{'× vs Octane — geometric mean across each suite’s operations. Lower is better.'}</caption>
-					<thead>
-						<tr>
-							<th scope="col">suite</th>
-							@for (const s of card.series; key s.key) {
-								<th scope="col">
-									{s.label as string}
-								</th>
 							}
-						</tr>
-					</thead>
-					<tbody>
-						@for (const r of grid; key r.op) {
+						</tbody>
+						<tfoot>
 							<tr>
-								<th scope="row">
-									{r.op as string}
-								</th>
-								@for (const c of r.cells; key c.key) {
-									<td>
-										{(c.raw == null ? '—' : fmtX(c.raw)) as string}
+								<th scope="row" class="bx-rowhead bx-geo-head">geomean</th>
+								@for (const g of heat.geoRow; key g.key) {
+									<td
+										class={['bx-cell', 'bx-geo', { 'bx-cell-ref': g.isRef }]}
+										style={g.tint ? 'background:' + g.tint : ''}
+									>
+										{g.text as string}
 									</td>
 								}
 							</tr>
-						}
-					</tbody>
-				</table>
+						</tfoot>
+					</table>
+				</div>
+				<p class="bx-caption">
+					{mode === 'A'
+						? 'Each cell is that framework’s score relative to Octane (1×), geometric mean across the suite’s operations. Green is faster, red is slower.'
+						: 'Each row is re-baselined so its fastest framework is 1×; every other cell is a multiple of that fastest time. The outlined cell wins the row.'}
+				</p>
+				<div class="bx-legend">
+					<span class="bx-legend-item">
+						<span class="bx-legend-label">Faster</span>
+						<span class="bx-legend-scale" aria-hidden="true"></span>
+						<span class="bx-legend-label">Slower</span>
+					</span>
+					<span class="bx-legend-item">
+						<span class="bx-legend-swatch" aria-hidden="true"></span>
+						Octane = 1× baseline
+					</span>
+				</div>
 			</div>
-		}
+
+			@if (hovered) {
+				<div class="bx-tip" role="tooltip" ref={mountTip}>
+					<div class="bx-tip-head">
+						<span class="bx-tip-fw">
+							{hovered.fw as string}
+						</span>
+						<span class="bx-tip-suite">
+							{hovered.suite as string}
+						</span>
+					</div>
+					<div class="bx-tip-primary">
+						{hovered.primary as string}
+					</div>
+					@if (hovered.secondary) {
+						<div class="bx-tip-sec">
+							{hovered.secondary as string}
+						</div>
+					}
+					@if (hovered.fastest) {
+						<div class="bx-tip-fast">
+							{'fastest: ' + hovered.fastest}
+						</div>
+					}
+				</div>
+			}
+		</>
 
 		<style>
 			.bx {
@@ -524,44 +477,6 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				padding: 1.25rem;
 			}
 
-			/* SSR / no-JS fallback: the full matrix as a plain accessible table.
-			   Swapped for the interactive views on mount. */
-			.bx-fallback {
-				overflow-x: auto;
-			}
-			.bx-fallback-table {
-				border-collapse: collapse;
-				width: 100%;
-				min-width: max-content;
-				font-variant-numeric: tabular-nums;
-			}
-			.bx-fallback-cap {
-				caption-side: top;
-				text-align: left;
-				color: var(--text-secondary);
-				font-size: 0.8rem;
-				line-height: 1.5;
-				margin-bottom: 0.75rem;
-			}
-			.bx-fallback-table th,
-			.bx-fallback-table td {
-				padding: 0.35rem 0.6rem;
-				text-align: right;
-				border-bottom: 1px solid var(--border);
-				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-				font-size: 0.78rem;
-				color: var(--text);
-				white-space: nowrap;
-			}
-			.bx-fallback-table thead th {
-				color: var(--text-secondary);
-				font-weight: 500;
-			}
-			.bx-fallback-table th[scope='row'] {
-				text-align: left;
-				color: var(--text-secondary);
-				font-weight: 400;
-			}
 			.bx-ctl-label {
 				display: block;
 				font-size: 0.7rem;
@@ -653,7 +568,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 			}
 			.bx-suite-on {
 				background: rgba(255, 65, 90, 0.16);
-				color: var(--accent-text);
+				color: var(--text);
 			}
 
 			/* Bar chart */
