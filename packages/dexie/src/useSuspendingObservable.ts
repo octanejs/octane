@@ -147,6 +147,11 @@ export function useSuspendingObservable<T>(
 				},
 			});
 		});
+		// Octane's use() may reuse a prior promise on replay and abandon a freshly
+		// created one after handleFinalize cleared entry.promise. Attach a sink so
+		// that wasted rejection is not reported as unhandled (the active use()
+		// slot still observes the settled promise).
+		entry.promise.catch(() => {});
 	}
 
 	const initialValue = use(entry.promise);

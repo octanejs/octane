@@ -34,6 +34,10 @@ function FriendList() @{
 The suspending hooks use Octane's `use()` integration and work with Octane
 Suspense or `@try` / `@pending` / `@catch` boundaries.
 
+Conformance coverage includes the upstream `dexie-react-hooks` QUnit integration
+scenarios (list/live-query mutations, suspending item loader, next/first
+navigation with cached updates, and invalid-key error recovery).
+
 Dexie only observes changes made through Dexie. For async work outside Dexie
 inside a live query, follow Dexie's guidance and wrap the returned promise with
 `Promise.resolve()` so the observation context remains active.
