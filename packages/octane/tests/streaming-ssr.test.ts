@@ -10,6 +10,7 @@ import { prerender } from 'octane/static';
 import {
 	Boundary,
 	IdBoundary,
+	LateStyledBoundary,
 	NestedStreamSeedScopes,
 	ReasonBoundary,
 	Siblings,
@@ -76,12 +77,12 @@ function errorCall(id: string): string {
 }
 
 /** Execute the stream's inline scripts the way a browser would (in order). */
-function activate(container: HTMLElement): void {
+function activate(container: HTMLElement, removeScripts = true): void {
 	for (const s of Array.from(container.querySelectorAll('script'))) {
 		if (s.getAttribute('type') === 'application/json') continue;
 		// eslint-disable-next-line no-eval
 		(0, eval)(s.textContent || '');
-		s.remove();
+		if (removeScripts) s.remove();
 	}
 }
 
@@ -126,13 +127,13 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		d.resolve('streamed!');
 		await c.ended;
 		expect(events).toEqual(['shell', 'all']);
-		const tail = c.chunks.slice(1).join('');
-		expect(tail).toContain('<div hidden data-oct-s="' + id + '">');
-		expect(tail).toContain('class="ok"');
-		expect(tail).toContain('streamed!');
-		// The boundary's use() seed rides in the segment, not the shell.
-		expect(tail).toContain('data-oct-seed');
-		expect(tail).toContain(swapCall(id));
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		expect(container.querySelector('.loading')).toBeNull();
+		expect(container.querySelector('.ok')?.textContent).toBe('streamed!');
+		// The boundary's use() value is available to hydration only after its
+		// segment has been activated.
+		expect((window as any).$OCTS[id]).toContain('streamed!');
 		expect(shell).not.toContain('streamed!');
 	});
 
@@ -192,6 +193,55 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(tail).toContain('data-oct-s="' + bId + '"');
 		expect(tail).toContain('alpha');
 		expect(tail).toContain('beta');
+	});
+
+	it('keeps a transient object @for key stable across streaming passes', async () => {
+		const value = deferred<string>();
+		const c = collector();
+		ServerRT.renderToPipeableStream(server.TransientObjectKeyBoundary, {
+			promise: value.promise,
+		}).pipe(c.dest);
+		expect(c.chunks[0]).toContain('transient-object-loading');
+		value.resolve('object key ready');
+		await c.ended;
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		expect(container.querySelector('.transient-object-loading')).toBeNull();
+		expect(container.querySelector('.transient-object-ready')?.textContent).toBe(
+			'object key ready',
+		);
+	});
+
+	it('keeps stable @for keys attached to their streamed boundaries after a reorder', async () => {
+		const a = deferred<string>();
+		const b = deferred<string>();
+		const props = {
+			items: [
+				{ id: 'a', promise: a.promise },
+				{ id: 'b', promise: b.promise },
+			],
+		};
+		const c = collector();
+		const onError = vi.fn();
+		ServerRT.renderToPipeableStream(server.StableKeyReorderBoundary, props, {
+			onError,
+		}).pipe(c.dest);
+		expect(c.chunks[0]).toContain('a:loading');
+		expect(c.chunks[0]).toContain('b:loading');
+
+		props.items.reverse();
+		a.resolve('alpha');
+		b.resolve('beta');
+		await c.ended;
+		expect(onError).not.toHaveBeenCalled();
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		expect(
+			Array.from(container.querySelectorAll('.stable-key-ready'), (node) => node.textContent),
+		).toEqual(['a:alpha', 'b:beta']);
+		expect(container.querySelector('.stable-key-loading')).toBeNull();
 	});
 
 	it('uses opaque render-scoped ids when two streams share one document', async () => {
@@ -344,11 +394,14 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		inner.resolve('two');
 		await c.ended;
 		const tail = c.chunks.slice(1).join('');
-		const [innerId] = protocolIds(tail);
-		// The outer segment carries the INNER boundary's template; the inner
-		// segment swaps into it afterwards (parent-first discovery order).
-		expect(tail.indexOf(swapCall(outerId))).toBeLessThan(tail.indexOf(swapCall(innerId)));
-		expect(tail).toContain('one:two');
+		const [emittedOuterId, innerId] = protocolIds(tail, 'data-oct-s');
+		// The outer segment introduces the inner boundary, so its carrier must be
+		// emitted first even though both promises resolved in the same wave.
+		expect(emittedOuterId).toBe(outerId);
+		expect(innerId).toBeTruthy();
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		expect(container.querySelector('.both')?.textContent).toContain('one:two');
 	});
 
 	it('defers an inner segment until its outer segment introduces the template', async () => {
@@ -392,9 +445,9 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		outer.resolve('outside');
 		await c.ended;
 		const tail = c.chunks.slice(1).join('');
-		const [innerId] = protocolIds(tail);
+		const [emittedOuterId, innerId] = protocolIds(tail, 'data-oct-s');
+		expect(emittedOuterId).toBe(outerId);
 		expect(innerId).toBeTruthy();
-		expect(tail.indexOf(swapCall(outerId))).toBeLessThan(tail.indexOf(swapCall(innerId)));
 
 		container.innerHTML = c.chunks.join('');
 		activate(container);
@@ -409,12 +462,12 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		pipe(c.dest);
 		d.reject(new Error('nope'));
 		await c.ended;
-		const tail = c.chunks.slice(1).join('');
-		expect(tail).toContain('class="err"');
-		expect(tail).toContain('nope');
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		expect(container.querySelector('.err')?.textContent).toContain('nope');
 	});
 
-	it('abort landing during a wave coalesce cancels the pass — no post-abort segment', async () => {
+	it('abort landing during a wave coalesce cancels the pass and completes once', async () => {
 		const d = deferred<string>();
 		const c = collector();
 		const onError = vi.fn();
@@ -442,7 +495,9 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(tail).not.toContain('data-oct-s=');
 		expect(tail).not.toContain('too late');
 		expect(tail).toContain(errorCall(id));
-		expect(events).not.toContain('all');
+		// Per ReactDOMFizzServerNode-test.js:328, a post-shell abort is terminal
+		// readiness even though its pending boundary degrades to client rendering.
+		expect(events).toEqual(['all']);
 		expect(onError).toHaveBeenCalled();
 	});
 
@@ -582,7 +637,9 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		await new Promise((resolve) => setTimeout(resolve, 20));
 		expect(chunks).toHaveLength(1);
 		expect(chunks.join('')).not.toContain('must-not-render');
-		expect(onAllReady).not.toHaveBeenCalled();
+		// Per ReactDOMFizzServerNode-test.js:641, an unexpectedly closed
+		// destination cancels remaining work and completes renderer readiness.
+		expect(onAllReady).toHaveBeenCalledOnce();
 		expect(end).not.toHaveBeenCalled();
 	});
 
@@ -778,23 +835,49 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		);
 
 		const seen: Array<[string, string]> = [];
-		const clientPending = new Promise<string>(() => {});
+		const clientPending = deferred<string>();
 		// A still-pending shell intentionally takes mountTry's documented degraded
 		// client-render path; keep its expected structural warning out of test output.
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const root = hydrateRoot(
 			container,
 			IdBoundary as any,
-			{ promise: clientPending, onId: (arm: string, value: string) => seen.push([arm, value]) },
+			{
+				promise: clientPending.promise,
+				onId: (arm: string, value: string) => seen.push([arm, value]),
+			},
 			{ identifierPrefix: 'page-' },
 		);
-		flushSync(() => {});
-		errSpy.mockRestore();
-		expect(seen).toContainEqual(['root', rootId]);
-		expect(seen).toContainEqual(['pending', boundaryId]);
-		root.unmount();
-		render.abort(new Error('test complete'));
-		await c.ended;
+		try {
+			flushSync(() => {});
+			expect(seen).toContainEqual(['root', rootId]);
+			expect(seen).toContainEqual(['pending', boundaryId]);
+			expect(container.querySelectorAll('.id-loading')).toHaveLength(1);
+			expect(container.querySelector('template[data-oct-b]')).toBeNull();
+
+			clientPending.resolve('client-ready');
+			await Promise.resolve();
+			flushSync(() => {});
+			expect(container.querySelectorAll('.id-ok')).toHaveLength(1);
+			expect(container.querySelector('.id-ok')?.textContent).toBe('client-ready');
+			expect(container.querySelector('.id-loading')).toBeNull();
+			expect(container.querySelector('template[data-oct-b]')).toBeNull();
+			expect(seen.some(([arm]) => arm === 'content')).toBe(true);
+
+			// If the server finishes after hydration claimed the still-pending shell,
+			// its obsolete carrier is discarded rather than leaking hidden DOM.
+			d.resolve('server-late');
+			await c.ended;
+			container.insertAdjacentHTML('beforeend', c.chunks.slice(1).join(''));
+			activate(container);
+			expect(container.querySelector('[data-oct-s]')).toBeNull();
+			expect(container.querySelector('.id-ok')?.textContent).toBe('client-ready');
+		} finally {
+			errSpy.mockRestore();
+			root.unmount();
+			render.abort(new Error('test complete'));
+			await c.ended;
+		}
 	});
 
 	it('hydrates a streamed catch arm from a rejection seed without replacing its DOM', async () => {
@@ -914,7 +997,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		root.unmount();
 	});
 
-	it('hydrates a shell whose leading <style data-octane> tags precede the body', async () => {
+	it('hydrates streams with both shell-leading and late revealed scoped styles', async () => {
 		// The shell flushes scoped styles BEFORE the body markup (so painted
 		// fallbacks are styled) — the container's first children are <style>
 		// tags, and hydrateRoot must skip them when positioning the cursor.
@@ -929,7 +1012,9 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		expect(c.chunks[0].startsWith('<style data-octane=')).toBe(true);
 
 		container.innerHTML = c.chunks.join('');
-		activate(container);
+		// Real browsers retain executed inline scripts. Leave them in place so
+		// hydrateRoot proves it ignores only renderer-owned protocol sidecars.
+		activate(container, false);
 		expect(container.firstElementChild!.tagName).toBe('STYLE');
 		expect(container.querySelector('.ok')!.textContent).toBe('styled!');
 
@@ -942,6 +1027,38 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		expect(errSpy).not.toHaveBeenCalled();
 		errSpy.mockRestore();
 		root.unmount();
+
+		container.replaceChildren();
+		const late = deferred<string>();
+		const lateCollector = collector();
+		ServerRT.renderToPipeableStream(server.LateStyledBoundary, {
+			promise: late.promise,
+		}).pipe(lateCollector.dest);
+		expect(lateCollector.chunks[0]).not.toContain('rgb(4, 5, 6)');
+		late.resolve('late styled!');
+		await lateCollector.ended;
+
+		container.innerHTML = lateCollector.chunks.join('');
+		activate(container, false);
+		const lateContent = container.querySelector('.late-content');
+		const lateStyle = Array.from(container.querySelectorAll('style')).find((style) =>
+			style.textContent?.includes('rgb(4, 5, 6)'),
+		);
+		expect(lateContent?.textContent).toBe('late styled!');
+		expect(lateStyle).toBeDefined();
+
+		const lateErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const lateClientPending = new Promise<string>(() => {});
+		const lateRoot = hydrateRoot(container, LateStyledBoundary as any, {
+			promise: lateClientPending,
+		});
+		flushSync(() => {});
+		expect(container.querySelector('.late-content')).toBe(lateContent);
+		expect(Array.from(container.querySelectorAll('style'))).toContain(lateStyle);
+		expect(lateStyle!.textContent).toContain('rgb(4, 5, 6)');
+		expect(lateErrorSpy).not.toHaveBeenCalled();
+		lateErrorSpy.mockRestore();
+		lateRoot.unmount();
 	});
 
 	it('hydrates two streamed sibling boundaries, each from its own seed scope', async () => {

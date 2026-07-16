@@ -86,4 +86,16 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 		expect(locLine).toMatch(/\[3, \d+\]/);
 		expect(locLine).toMatch(/\[4, \d+\]/);
 	});
+
+	it('preserves anonymous default-export function identity while embedding root LOC', () => {
+		const arrow = dev('export default () => null;');
+		expect(arrow).toMatch(/export default \(\) => \{/);
+		expect(arrow).toContain('__octane_loc:');
+		expect(arrow).not.toContain('__component');
+
+		const declaration = dev('export default function() { return null; }');
+		expect(declaration).toMatch(/export default function\s*\(\)\s*\{/);
+		expect(declaration).toContain('__octane_loc:');
+		expect(declaration).not.toContain('export default (');
+	});
 });

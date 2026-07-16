@@ -3,6 +3,7 @@ import * as ClientRT from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { prerender } from 'octane/static';
 import { loadServerFixture } from '../_server-fixture.js';
+import { collectPipeableStream, collectReadableStream } from '../_server-stream.js';
 import * as client from './_fixtures/untrusted-url.tsrx';
 
 const FIXTURE = 'packages/octane/tests/conformance/_fixtures/untrusted-url.tsrx';
@@ -78,25 +79,6 @@ function renderDetached(component: any, props: any, containerTag = 'div') {
 	root.render(component, props);
 	ClientRT.flushSync(() => {});
 	return { container, root };
-}
-
-function collectPipeable(component: any, props: any): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const chunks: string[] = [];
-		ServerRT.renderToPipeableStream(component, props, { onError: reject }).pipe({
-			write(chunk: string) {
-				chunks.push(chunk);
-			},
-			end() {
-				resolve(chunks.join(''));
-			},
-		});
-	});
-}
-
-async function collectReadable(component: any, props: any): Promise<string> {
-	const stream = await ServerRT.renderToReadableStream(component, props);
-	return new Response(stream).text();
 }
 
 function assertServerObservation(
@@ -196,11 +178,11 @@ async function expectInRenderMatrix(entry: MatrixCase): Promise<void> {
 
 	if (modes.includes('server-stream')) {
 		let props = entry.props();
-		let html = await collectPipeable(server[entry.component], props);
+		let html = (await collectPipeableStream(server[entry.component], props)).html;
 		assertServerObservation(entry, 'server-stream', 'renderToPipeableStream', html, props);
 
 		props = entry.props();
-		html = await collectReadable(server[entry.component], props);
+		html = (await collectReadableStream(server[entry.component], props)).html;
 		assertServerObservation(entry, 'server-stream', 'renderToReadableStream', html, props);
 	}
 

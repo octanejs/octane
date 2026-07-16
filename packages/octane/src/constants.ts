@@ -92,6 +92,8 @@ export const STREAM_BOUNDARY_ATTR = 'data-oct-b';
 export const STREAM_SEGMENT_ATTR = 'data-oct-s';
 /** Per-boundary seed-JSON script attribute (inside the segment). */
 export const STREAM_SEED_ATTR = 'data-oct-seed';
+/** Renderer-owned executable/data scripts emitted by the streaming protocol. */
+export const STREAM_SCRIPT_ATTR = 'data-octane-stream';
 /** Comment-data prefix left in a swapped boundary for hydration seed scoping. */
 export const STREAM_SEED_COMMENT = 'oct-seed:';
 

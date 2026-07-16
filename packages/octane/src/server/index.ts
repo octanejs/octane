@@ -111,6 +111,7 @@ export {
 	ssrClass,
 	ssrSpread,
 	ssrInnerHtml,
+	ssrScriptInnerHtml,
 	// Controlled form serialization (value/checked attrs, textarea content,
 	// select option-projection scope)
 	ssrValueAttr,
@@ -119,6 +120,8 @@ export {
 	ssrSelectScope,
 	ssrOption,
 	ssrComponent,
+	ssrComponentNS,
+	ssrInNamespace,
 	ssrBlock,
 	ssrActivity,
 	ssrForBlock,
