@@ -113,6 +113,7 @@ catalogs:
     '@tanstack/query-core': ^5.0.0
     '@tanstack/react-query': ^5.0.0
     '@tanstack/react-router': 1.170.16
+    '@tanstack/react-store': ^0.11.0
     '@tanstack/react-table': 8.21.3
     '@tanstack/react-virtual': 3.14.5
     '@tanstack/router-core': 1.171.13

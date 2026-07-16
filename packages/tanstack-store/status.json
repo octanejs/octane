@@ -1,0 +1,16 @@
+{
+  "upstream": {
+    "package": "@tanstack/react-store",
+    "version": "0.11.0"
+  },
+  "surface": "Re-exports `@tanstack/store@0.11.0` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.",
+  "divergences": [
+    "The upstream experimental `_useStore` hook is intentionally omitted; use `useSelector` with `store.actions` or `store.setState` instead."
+  ],
+  "ssr": "Supported: selectors, writable atoms, and store context read their current snapshots during server rendering; the adapter has no browser-only initialization.",
+  "notes": [
+    "Differential coverage runs one shared fixture through this adapter and real `@tanstack/react-store@0.11.0`, covering selectors, comparator bailouts, atom writes, component-created atoms and stores, actions, and context.",
+    "Behavioral conformance coverage additionally checks source replacement, independent call sites, nested provider resolution, subscription cleanup, deprecated `useStore`, and server output; type tests cover all overload families."
+  ],
+  "verified": "2026-07-15"
+}
