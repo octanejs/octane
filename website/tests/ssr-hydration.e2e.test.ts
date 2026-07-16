@@ -14,7 +14,7 @@
 // with the exact setup command when it is missing.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 
@@ -491,6 +491,62 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			await page.close();
 		}
 	}, 30_000);
+
+	// HOT-server regression: editing app modules (HMR update + ssr page reload)
+	// stamps `?t=` cache-busting timestamps onto the modules' importer chains.
+	// The generated hydrate entry must keep loading the SAME browser module
+	// instances as the page's own import chain afterwards — a bare
+	// (analysis-hidden) dynamic import fetched timestamp-less URLs, splitting
+	// the app-router singleton in two (preHydrate committed matches on one
+	// instance, the page rendered the empty other) and breaking hydration on
+	// EVERY reload until the dev server was restarted. Touching router.ts — a
+	// plain .ts module with no self-accepting HMR handler — deterministically
+	// propagates the invalidation up the client chain; the route module edit is
+	// the shape from the original report. Deliberately LAST in this describe:
+	// the invalidation stamps persist in the dev server for the rest of its life.
+	it('hydrates cleanly on reload after HMR edits (hot server)', async () => {
+		const files = [
+			join(WEBSITE, 'src/pages/benchmarks/Benchmarks.tsrx'),
+			join(WEBSITE, 'src/app/router.ts'),
+		];
+		const originals = files.map((f) => readFileSync(f, 'utf8'));
+		const restore = () => files.forEach((f, i) => writeFileSync(f, originals[i]));
+		try {
+			// Prime the dev server's client + SSR module graphs and keep the page —
+			// with its live HMR websocket — OPEN while editing (the editing-session
+			// shape: the route is on screen while its files are edited). A plain
+			// navigation: this first visit may race Vite's dependency-optimization
+			// reload, which is irrelevant to the assertion below.
+			const primer = await browser.newPage();
+			await primer.goto(`http://localhost:${DEV_PORT}/benchmarks`, { waitUntil: 'networkidle' });
+
+			// Touch each file — every write triggers the paired `(client) hmr
+			// update` / full-reload + `(ssr) page reload` invalidations.
+			for (let i = 0; i < files.length; i++) {
+				writeFileSync(files[i], originals[i] + `\n// e2e-hmr-touch ${i}\n`);
+				await new Promise((r) => setTimeout(r, 700));
+			}
+			restore();
+			await new Promise((r) => setTimeout(r, 700));
+			await primer.close();
+
+			// A FULL reload after the edits must hydrate the route cleanly. Let the
+			// module fetches + preHydrate router load finish before judging —
+			// hydration (and its mismatch warnings) lands well after `load` here.
+			const { page, errors, main } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
+			try {
+				await page.waitForLoadState('networkidle');
+				await page.waitForTimeout(500);
+				const real = errors.filter((e) => !e.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+				expect(main).toContain('Benchmark');
+			} finally {
+				await page.close();
+			}
+		} finally {
+			restore();
+		}
+	}, 45_000);
 });
 
 describe.sequential('website production build → hydration (octane-preview)', () => {

@@ -15774,6 +15774,24 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 	const bStart = adoptedStart ?? document.createComment('catch-b');
 	const bEnd = adoptedEnd ?? document.createComment('/catch-b');
 	if (!adopting) {
+		if (hydration !== null) {
+			// Hydrating, but the server rendered a DIFFERENT arm in this slot (the
+			// try body threw on the CLIENT), so the catch arm is a client-fresh
+			// build. The aborted try adoption consumed only part of the server range
+			// and its teardown removed only the nodes its own block had claimed —
+			// discard whatever server content is left inside the slot and park the
+			// cursor on the slot's close marker so FOLLOWING siblings keep adopting
+			// from an aligned position (same convention as the abandoned-adoption
+			// pending swap). Only an adopted slot pair bounds server DOM; a slot
+			// that minted fresh markers under hydration owns no server range.
+			if (hydration.isClose(state.end)) {
+				removeRange(state.start.nextSibling, state.end);
+				hydration.node = state.end;
+			}
+			// Client-built replacement markers survive root-remainder sweeps.
+			hydration.markFresh(bStart);
+			hydration.markFresh(bEnd);
+		}
 		state.domParent.insertBefore(bStart, state.end);
 		state.domParent.insertBefore(bEnd, state.end);
 	} else if (hydration !== null) {
@@ -15793,7 +15811,11 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 	b.idState = state.idState;
 	state.block = b;
 	try {
-		renderBlock(b);
+		// A client-fresh catch build during hydration must not read the adoption
+		// cursor — the server rendered the try arm here, so adopting would consume
+		// (and warn about) another slot's server DOM. Suspend for the subtree.
+		if (!adopting && hydration !== null) hydration.suspend(() => renderBlock(b));
+		else renderBlock(b);
 	} catch (e2) {
 		// Catch body itself threw — bubble to next enclosing tryBlock.
 		const rethrowsHydrationReason = hydrationRejection && Object.is(e2, caughtError);
@@ -15803,10 +15825,25 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 			state.block = null;
 		}
 		const propagated = rethrowsHydrationReason ? err : e2;
-		// An exact rethrow of the raw catch reason must retain the private hydration
-		// token while the render stack unwinds. The outer mountTry can then adopt its
-		// own server catch range instead of rebuilding it.
-		if (rethrowsHydrationReason && CURRENT_BLOCK !== null) throw propagated;
+		// Mid-render (a component render stack is live) with an outer boundary to
+		// take the error: RETHROW instead of delegating synchronously — the same
+		// rule as the no-catch-arm path above. The outer boundary's switch sweeps
+		// the DOM of every frame between this boundary and itself; delegating here
+		// and returning would let those still-on-stack frames keep rendering into
+		// the swept range (stale anchors → NotFoundError, and the bookkeeping
+		// error would REPLACE the original). The rethrow unwinds them; the outer
+		// boundary catches it at its own tryBlock frame. A hydration-rejection
+		// rethrow additionally retains the private hydration token so the outer
+		// mountTry can adopt its own server catch range instead of rebuilding it
+		// — that rethrow stays unconditional (hydrateRoot owns the unwind). With
+		// NO outer handler the error must not escape to the render caller: fall
+		// through to the console.error surface below (the boundary's content is
+		// already torn down — no content, no fallback).
+		if (
+			CURRENT_BLOCK !== null &&
+			(rethrowsHydrationReason || findTryHandler(state.parentBlock) !== null)
+		)
+			throw propagated;
 		const parent = findTryHandler(state.parentBlock);
 		if (parent) parent(propagated);
 		else console.error('catch body threw, no outer tryBlock:', e2);
