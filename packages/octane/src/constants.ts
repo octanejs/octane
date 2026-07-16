@@ -117,6 +117,7 @@ import {
 	VOID_ELEMENTS as _VOID_ELEMENTS,
 	BOOLEAN_ATTR_PROPS as _BOOLEAN_ATTR_PROPS,
 	MUST_USE_PROPERTY_PROPS as _MUST_USE_PROPERTY_PROPS,
+	POSITIVE_NUMERIC_ATTR_PROPS as _POSITIVE_NUMERIC_ATTR_PROPS,
 	SVG_ONLY_TAGS as _SVG_ONLY_TAGS,
 	ATTRIBUTE_ALIASES as _ATTRIBUTE_ALIASES,
 	isEnumeratedBooleanAttr as _isEnumeratedBooleanAttr,
@@ -137,7 +138,7 @@ export const MUST_USE_PROPERTY_PROPS: Set<string> = _MUST_USE_PROPERTY_PROPS;
  * React's POSITIVE-numeric props: values below 1 (incl. 0 and non-numeric)
  * drop — `size="0"` is invalid per the HTML spec (size must be > 0).
  */
-export const POSITIVE_NUMERIC_ATTR_PROPS = new Set(['size', 'cols', 'rows', 'span']);
+export const POSITIVE_NUMERIC_ATTR_PROPS: Set<string> = _POSITIVE_NUMERIC_ATTR_PROPS;
 
 /**
  * Legal HTML attribute name: non-empty, no ASCII whitespace, `"`, `'`, `>`,

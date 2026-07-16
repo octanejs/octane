@@ -295,14 +295,11 @@ function isHydrationSuppressed(el: Node | null): boolean {
 }
 
 /**
- * Shared preamble for the hydration VALUE-mismatch write sites (`setAttribute` /
- * `setClassName` / `setClassAttr` / `setStyle`): decides whether the site must pay the
- * server-value read + compare at all. Only two things ever require it: the element
- * opted out via `suppressHydrationWarning` (read in dev AND prod — suppression keeps
- * the SERVER value, changing the recovery, not just the warning), or a dev source loc
- * is stamped (`__oct_loc` exists only in dev-compiled output, so a non-suppressed prod
- * hydration pays nothing for the warning path). Returns the disposition:
- *   0 — plain apply: no compare needed, the client write itself patches/recovers.
+ * Shared preamble for hydration VALUE-mismatch write sites. Most class/style paths
+ * only pay the server-value comparison when suppression or a dev source location
+ * requires it. Attributes additionally compare in production because HTML parser
+ * normalization can affect either the server or client value. Returns the disposition:
+ *   0 — plain apply: after any site-required comparison, the client write patches/recovers.
  *   1 — suppressed: compare, and on divergence KEEP the server value (skip the write).
  *   2 — dev-warn: compare, warn on divergence, then apply the client value.
  */
@@ -3902,6 +3899,10 @@ interface ReducerSlot<S, A> {
 	value: S;
 	dispatch: (action: A) => void;
 	reducer: (state: S, action: A) => S;
+	/** Render-phase actions are reduced by the reducer from the replaying render. */
+	renderPhaseActions?: A[];
+	/** Latest scheduled value for the compiler-selected third tuple member. */
+	renderPhaseValue?: S;
 	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => S;
 	pendingActionBatch?: TransitionActionBatch;
@@ -3954,6 +3955,23 @@ export function useReducer<S, A, I = S>(
 			// the component once (children then bail as usual). Per
 			// ReactHooksWithNoopRenderer-test.js:3889.
 			dispatch: (action) => {
+				// React queues a render-phase reducer action and applies it with the
+				// reducer supplied by the replaying render. Reducing eagerly here uses
+				// the previous pass's reducer when that reducer changes alongside state.
+				if (CURRENT_BLOCK === block) {
+					const actions = (s!.renderPhaseActions ??= []);
+					const previous = actions.length === 0 ? s!.value : (s!.renderPhaseValue as S);
+					actions.push(action);
+					// Preserve Octane's current-state getter without evaluating reducers
+					// twice for the ordinary two-item tuple path. The action-list length,
+					// rather than nullishness, distinguishes the first result: null and
+					// undefined are both valid reducer states.
+					if (s!.getter !== undefined) {
+						s!.renderPhaseValue = s!.reducer(previous, action);
+					}
+					scheduleRender(block);
+					return;
+				}
 				const previous = stagedTransitionValue(s!);
 				const operation = (value: S) => s!.reducer(value, action);
 				const computed = operation(previous);
@@ -3983,6 +4001,14 @@ export function useReducer<S, A, I = S>(
 	} else {
 		// Allow reducer reference to update across renders.
 		s.reducer = reducer;
+		const actions = s.renderPhaseActions;
+		if (actions !== undefined) {
+			let value = s.value;
+			for (let i = 0; i < actions.length; i++) value = reducer(value, actions[i]);
+			s.value = value;
+			s.renderPhaseActions = undefined;
+			s.renderPhaseValue = undefined;
+		}
 	}
 	// See useState: the compiler selects __useReducerWithGetter whenever the
 	// source can observe the third tuple member.
@@ -4010,6 +4036,9 @@ export function __useReducerWithGetter<S, A, I = S>(
 	const getter =
 		s.getter ??
 		(s.getter = () => {
+			// Action presence is the sentinel; the reduced value may legitimately be
+			// null or undefined.
+			if (s.renderPhaseActions !== undefined) return s.renderPhaseValue as S;
 			const batch = s.pendingActionBatch;
 			if (batch === undefined) return s.value;
 			const update = batch.updates.get(s) as TransitionActionUpdate<S> | undefined;
@@ -4480,6 +4509,7 @@ const CONTEXT_TAG = Symbol.for('octane.context');
 let COMPILER_CACHE_CONTEXT_EPOCH = 0;
 
 export interface Context<T> {
+	(props: { value: T; children?: any }, scope: Scope, extra?: unknown): void;
 	$$kind: typeof CONTEXT_TAG;
 	defaultValue: T;
 	Provider: ComponentBody<{ value: T; children?: any }>;
@@ -4497,10 +4527,10 @@ export interface Context<T> {
  * walks the Block parent chain to find the nearest Provider for that context.
  */
 export function createContext<T>(defaultValue: T): Context<T> {
-	const ctx = { $$kind: CONTEXT_TAG, defaultValue, $$version: 0 } as Context<T>;
-	// A Provider is a built-in component that stamps the value on its Block
-	// and renders its `children` body inside its scope.
-	ctx.Provider = function ProviderBody(props, scope) {
+	// React 19 lets the Context itself serve as its Provider. Make the callable
+	// provider the context object, then retain `.Provider` as an identity alias
+	// for existing code and React 18-shaped libraries.
+	const ctx = function ProviderBody(props, scope) {
 		// Stash on the scope (not block) so siblings of the Provider don't see it.
 		// $$ctxValues is pre-initialised to null on every Scope/Block so this
 		// assignment is a hidden-class-stable update (not a late stamp).
@@ -4529,7 +4559,11 @@ export function createContext<T>(defaultValue: T): Context<T> {
 		if (props.children != null) {
 			childrenAsBody(props.children)(undefined, scope, undefined);
 		}
-	};
+	} as Context<T>;
+	ctx.$$kind = CONTEXT_TAG;
+	ctx.defaultValue = defaultValue;
+	ctx.$$version = 0;
+	ctx.Provider = ctx;
 	return ctx;
 }
 
@@ -5919,7 +5953,11 @@ class HydrationCapability {
 		const first = el.firstChild;
 		if (first !== null && first.nodeType === 3) {
 			const server = (first as Text).nodeValue;
-			if (server !== text && !isCRLFNormalizedMatch(server, text) && !isHydrationSuppressed(el)) {
+			if (
+				server !== text &&
+				!isTextParserNormalizedMatch(server, text) &&
+				!isHydrationSuppressed(el)
+			) {
 				if (process.env.NODE_ENV !== 'production')
 					this.recordTextMismatch(first as Text, loc || (el as any).__oct_loc, server);
 				(first as Text).nodeValue = text;
@@ -5934,7 +5972,7 @@ class HydrationCapability {
 	htextSwap(posNode: Node | null, text: string): Text {
 		if (posNode !== null && posNode.nodeType === 3) {
 			const server = (posNode as Text).nodeValue;
-			if (server !== text && !isCRLFNormalizedMatch(server, text)) {
+			if (server !== text && !isTextParserNormalizedMatch(server, text)) {
 				const host = posNode.parentNode;
 				if (!isHydrationSuppressed(host)) {
 					if (process.env.NODE_ENV !== 'production')
@@ -5985,12 +6023,16 @@ class HydrationCapability {
 
 	allowAttribute(el: Element, name: string, next: string | null): boolean {
 		const mode = hydrationMismatchMode(el);
-		if (mode === 0) return true;
+		// Parser normalization is symmetric: the server DOM may contain U+FFFD even
+		// when the client value does not. Read once in production too so either side's
+		// CR/NUL/replacement artifacts can compare equal before the normal patch path.
 		const ns = attrNamespace(name);
 		const server = ns
 			? el.getAttributeNS(ns, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
 			: el.getAttribute(name);
 		if (server === next) return true;
+		if (next !== null && isAttributeParserNormalizedMatch(server, next)) return false;
+		if (mode === 0) return true;
 		if (mode === 1) return false;
 		if (process.env.NODE_ENV !== 'production')
 			warnHydrationValueMismatch((el as any).__oct_loc, `attribute \`${name}\``, server, next);
@@ -6223,16 +6265,20 @@ function coerceText(value: unknown): string {
 }
 
 /**
- * The HTML parser normalizes `\r` / `\r\n` in source markup to `\n`, so an
- * adopted server text node differing from the client value ONLY by that
- * normalization is NOT a real hydration mismatch (React parity) — adopt the
- * server node silently, no warn, no patch. Cheap gate: values without a CR
- * can't be a normalization artifact.
+ * Match ReactDOMComponent's hydration comparison: the HTML parser normalizes
+ * CR/CRLF and can either drop U+0000 or turn it into U+FFFD, so both values are
+ * normalized by folding newlines and removing null/replacement characters.
  */
-function isCRLFNormalizedMatch(server: string | null, client: string): boolean {
-	return (
-		server !== null && client.indexOf('\r') !== -1 && server === client.replace(/\r\n?/g, '\n')
-	);
+function normalizeParserText(value: string): string {
+	return value.replace(/\r\n?/g, '\n').replace(/[\u0000\uFFFD]/g, '');
+}
+
+function isTextParserNormalizedMatch(server: string | null, client: string): boolean {
+	return server !== null && normalizeParserText(server) === normalizeParserText(client);
+}
+
+function isAttributeParserNormalizedMatch(server: string | null, client: string): boolean {
+	return server !== null && normalizeParserText(server) === normalizeParserText(client);
 }
 
 /**
@@ -6457,23 +6503,169 @@ export function setScriptText(el: Element, value: any): void {
 	el.textContent = value == null ? '' : String(value);
 }
 
+/** Parse raw HTML in its authored host context for hydration comparison. */
+function normalizeHTMLForHydration(parent: Element, html: string): string {
+	// Match React's comparison boundary: the browser canonicalizes equivalent
+	// spellings such as `<span/>` and `<span></span>` when parsing server HTML.
+	const doc = parent.ownerDocument;
+	const ns = parent.namespaceURI;
+	const testElement =
+		ns === 'http://www.w3.org/2000/svg' || ns === 'http://www.w3.org/1998/Math/MathML'
+			? doc.createElementNS(ns, parent.tagName)
+			: doc.createElement(parent.tagName);
+	testElement.innerHTML = html;
+	return testElement.innerHTML;
+}
+
 /** React-compatible hydration for `dangerouslySetInnerHTML`. */
 export function setHTML(el: Element, value: any): void {
 	const next = value == null ? '' : String(value);
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.isFresh(el)) {
 		const server = el.localName === 'script' ? (el.textContent ?? '') : el.innerHTML;
-		if (server === next || isHydrationSuppressed(el)) return;
+		const expected = el.localName === 'script' ? next : normalizeHTMLForHydration(el, next);
+		if (server === expected || isHydrationSuppressed(el)) return;
 		warnHydrationKeptServerValue(
 			(el as any).__oct_loc,
 			'`dangerouslySetInnerHTML` content',
 			server,
-			next,
+			expected,
 		);
 		return;
 	}
 	if (el.localName === 'script') setScriptText(el, next);
 	else el.innerHTML = next;
+}
+
+const DANGER_HTML_ACTIVE = '__oct_dangerHTML';
+const DANGER_HTML_STATIC_CHILD = '__oct_dangerChild';
+const DANGER_HTML_SPREAD_CHILD = '__oct_dangerSpreadChild';
+const DANGER_HTML_RESOLVED_VALUE = '__oct_dangerResolved';
+const DANGER_HTML_RESOLVED_CHILD = '__oct_dangerResolvedChild';
+
+function dangerHtmlChildrenError(): Error {
+	return new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+}
+
+function validateDangerouslySetInnerHTMLValue(value: unknown): void {
+	if (value != null && (typeof value !== 'object' || !('__html' in value))) {
+		throw new Error('`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`');
+	}
+}
+
+/** Complete validated write used by direct, spread, and html-only compiler paths. */
+export function setDangerouslySetInnerHTML(el: Element, value: any): void {
+	validateDangerouslySetInnerHTMLValue(value);
+	const wasActive = (el as any)[DANGER_HTML_ACTIVE] === true;
+	if (value == null) {
+		(el as any)[DANGER_HTML_ACTIVE] = false;
+		// A nullish writer on a never-raw host is semantically absent and must not
+		// erase ordinary children. Transitioning away from an active writer clears
+		// the raw content it owned.
+		if (wasActive) setHTML(el, null);
+		return;
+	}
+	if (value != null && VOID_ELEMENTS.has(el.localName)) {
+		throw new Error(
+			`\`${el.localName}\` is a void element tag and must neither have ` +
+				'`children` nor use `dangerouslySetInnerHTML`.',
+		);
+	}
+	if (
+		value != null &&
+		((el as any)[DANGER_HTML_STATIC_CHILD] === true ||
+			(el as any)[DANGER_HTML_SPREAD_CHILD] != null)
+	) {
+		throw dangerHtmlChildrenError();
+	}
+	(el as any)[DANGER_HTML_ACTIVE] = true;
+	setHTML(el, value.__html);
+}
+
+/** Resolve source-ordered direct/spread raw-HTML writers and apply only the winner. */
+export function setDangerouslySetInnerHTMLSources(
+	el: Element,
+	sources: readonly (readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown])[],
+	ignoreSourceChildren = false,
+): void {
+	let foundDanger = false;
+	let danger: unknown = null;
+	let foundChild = false;
+	let child: unknown = null;
+	for (const source of sources) {
+		const [isSpread, sourceOrName] = source;
+		if (!isSpread) {
+			// The original danger-only compiler ABI used `[false, value]`. The
+			// source-set host ABI uses `[false, name, value]` so `children` can be
+			// resolved by the same final commit.
+			if (source.length === 2) {
+				foundDanger = true;
+				danger = sourceOrName;
+			} else if (sourceOrName === 'dangerouslySetInnerHTML') {
+				foundDanger = true;
+				danger = source[2];
+			} else if (!ignoreSourceChildren && sourceOrName === 'children') {
+				foundChild = true;
+				child = source[2];
+			}
+			continue;
+		}
+		if (
+			sourceOrName == null ||
+			(typeof sourceOrName !== 'object' && typeof sourceOrName !== 'function')
+		)
+			continue;
+		for (const key of Object.keys(Object(sourceOrName))) {
+			if (key === 'dangerouslySetInnerHTML') {
+				foundDanger = true;
+				danger = (sourceOrName as Record<string, unknown>)[key];
+			} else if (!ignoreSourceChildren && key === 'children') {
+				foundChild = true;
+				child = (sourceOrName as Record<string, unknown>)[key];
+			}
+		}
+	}
+	const resolved = foundDanger && danger != null ? danger : null;
+	const resolvedChild = foundChild ? child : null;
+	if (VOID_ELEMENTS.has(el.localName) && (resolved !== null || resolvedChild != null)) {
+		throw new Error(
+			`\`<${el.localName}>\` is a void element tag and must neither have children nor use ` +
+				'`dangerouslySetInnerHTML`.',
+		);
+	}
+	if (resolved !== null && resolvedChild != null) throw dangerHtmlChildrenError();
+	validateDangerouslySetInnerHTMLValue(resolved);
+	if (
+		Object.prototype.hasOwnProperty.call(el, DANGER_HTML_RESOLVED_VALUE) &&
+		Object.is((el as any)[DANGER_HTML_RESOLVED_VALUE], resolved) &&
+		Object.is((el as any)[DANGER_HTML_RESOLVED_CHILD], resolvedChild)
+	) {
+		return;
+	}
+	// Stamp only the FINAL child source. Spread-local validation runs too early:
+	// when a render transitions raw HTML -> ordinary children, the old raw-HTML
+	// active bit is still present until this commit disables it.
+	(el as any)[DANGER_HTML_SPREAD_CHILD] = resolvedChild;
+	setDangerouslySetInnerHTML(el, resolved);
+	(el as any)[DANGER_HTML_RESOLVED_VALUE] = resolved;
+	(el as any)[DANGER_HTML_RESOLVED_CHILD] = resolvedChild;
+}
+
+/** Stamp a compiler-proven non-nullish child onto a potential raw-HTML host. */
+export function markDangerouslySetInnerHTMLChildren(el: Element): void {
+	(el as any)[DANGER_HTML_STATIC_CHILD] = true;
+	if ((el as any)[DANGER_HTML_ACTIVE] === true) throw dangerHtmlChildrenError();
+}
+
+/**
+ * Validate a dynamic JSX child and report whether raw HTML owns the host.
+ * Null/undefined are the only accepted coexisting values; callers skip normal
+ * child reconciliation in that case so it cannot erase the raw HTML.
+ */
+function dangerouslySetInnerHTMLOwnsChild(parent: Node, value: unknown): boolean {
+	if (parent.nodeType !== 1 || (parent as any)[DANGER_HTML_ACTIVE] !== true) return false;
+	if (value !== null && value !== undefined) throw dangerHtmlChildrenError();
+	return true;
 }
 
 // Apply a ref attachment. Accepts the three supported shapes:
@@ -7046,6 +7238,13 @@ const XMLNS_NS = 'http://www.w3.org/2000/xmlns/';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
+// A hyphen only marks a custom element in the HTML namespace. SVG contains
+// native hyphenated tags (`font-face`, `missing-glyph`, …), which must keep the
+// ordinary native alias/value tables instead of custom-element raw semantics.
+function isHtmlCustomElement(el: Element): boolean {
+	return el.namespaceURI === HTML_NS && el.localName.indexOf('-') !== -1;
+}
+
 // Namespace for a de-opt host tag: `<svg>` always opens SVG; an SVG-ONLY tag
 // (`g`, `rect`, `path`, … — SVG_ONLY_TAGS in constants.ts) implies SVG when no
 // namespace was inherited (a component root, a value-position descriptor,
@@ -7078,27 +7277,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// `.__html` off the value object and assign the property. A literal
 	// `setAttribute('dangerouslySetInnerHTML', …)` would only add a dead attribute.
 	if (name === 'dangerouslySetInnerHTML') {
-		// React parity: the value must be `{__html: …}` — anything else is a
-		// programming error worth failing loudly on (a plain string here usually
-		// means the author thought dSIH takes HTML directly).
-		if (value != null && (typeof value !== 'object' || !('__html' in value))) {
-			throw new Error('`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`');
-		}
-		// React parity: void elements have no content model — an innerHTML write on
-		// `<input>`/`<br>`/… is invisible-content corruption, so fail loudly like
-		// React (ReactDOMComponent-test.js:1807). Explicit dSIH on a void tag is
-		// already a compile-time error; this arm guards the routes the compiler
-		// can't see — spreads and de-opt (createElement) descriptors.
-		if (value != null && VOID_ELEMENTS.has(el.localName)) {
-			throw new Error(
-				`\`${el.localName}\` is a void element tag and must neither have ` +
-					'`children` nor use `dangerouslySetInnerHTML`.',
-			);
-		}
-		const html = value == null ? null : value.__html;
-		// `__html: false` renders 'false' (React coerces; only null/undefined clear) —
-		// keeps this path consistent with the compiled htmlOnlyChild path.
-		setHTML(el, html);
+		setDangerouslySetInnerHTML(el, value);
 		return;
 	}
 	// Never a DOM attribute — a React warning-suppression hint (octane doesn't emit
@@ -7118,7 +7297,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				const t = el.localName;
 				if (t === 'input' || t === 'textarea') return setValue(el, value);
 				if (t === 'select') return setSelectValue(el, value);
-			} else if (name === 'muted' && el.localName.indexOf('-') === -1) {
+			} else if (name === 'muted' && !isHtmlCustomElement(el)) {
 				// mustUseProperty (React parity): the muted ATTRIBUTE doesn't
 				// reflect to the live property post-creation — a dynamic write
 				// must set the property or a playing element never (un)mutes.
@@ -7130,7 +7309,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 			if (name === 'checked' && el.localName === 'input') return setChecked(el, value);
 			break;
 		case 8:
-			if ((name === 'multiple' || name === 'selected') && el.localName.indexOf('-') === -1) {
+			if ((name === 'multiple' || name === 'selected') && !isHtmlCustomElement(el)) {
 				// mustUseProperty like `muted`. `multiple` reflects back to the
 				// attribute; `selected` is live option state (the controlled
 				// <select> projection owns it when a select value is armed).
@@ -7139,7 +7318,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 			}
 			break;
 		case 9:
-			if (name === 'autoFocus' && el.localName.indexOf('-') === -1) {
+			if (name === 'autoFocus' && !isHtmlCustomElement(el)) {
 				// React parity: never an attribute — the element is focused in
 				// the commit phase on mount (see setAutoFocus).
 				return setAutoFocus(el, value);
@@ -7189,7 +7368,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		name.length > 2 &&
 		name.charCodeAt(0) === 111 /* o */ &&
 		name.charCodeAt(1) === 110 /* n */ &&
-		el.localName.indexOf('-') !== -1 &&
+		isHtmlCustomElement(el) &&
 		(typeof value === 'function' || (el as any).$$ceListeners?.[name] !== undefined)
 	) {
 		const type = name.slice(2);
@@ -7212,7 +7391,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// lowercase, so an unaliased `strokeWidth` would land verbatim and never
 	// style the element. Custom elements keep names VERBATIM (raw props, no
 	// alias tables) — parity with the server's ssrAttr gate.
-	if (el.localName.indexOf('-') === -1) {
+	if (!isHtmlCustomElement(el)) {
 		const alias = ATTRIBUTE_ALIASES.get(name);
 		if (alias !== undefined) name = alias;
 	}
@@ -7325,7 +7504,7 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 	// removes them); stringifying a function would leak its source into the DOM.
 	if (t === 'function' || t === 'symbol') return null;
 	// React's value-type tables — custom elements are exempt (raw semantics).
-	if (el.localName.indexOf('-') === -1) {
+	if (!isHtmlCustomElement(el)) {
 		const lower = name.toLowerCase();
 		// React's boolean-attr table (constants.ts — REVERSES the 2026-06
 		// native-write adjudication): ANY truthy value renders the canonical
@@ -7395,13 +7574,15 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 		);
 	}
 	const v = value === true ? '' : String(value);
-	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers will
+	// An empty `src`/`href`/`<object data>` resolves to the CURRENT PAGE's URL — browsers will
 	// re-fetch the whole document as an image/script/stylesheet. React strips
 	// these (dev AND prod); so do we. `<a href="">` (and `<area>`) stays — an
 	// empty href is a legitimate "link to this page".
 	if (
 		v === '' &&
-		(name === 'src' || (name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA'))
+		(name === 'src' ||
+			(name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA') ||
+			(name === 'data' && el.nodeName === 'OBJECT'))
 	) {
 		return null;
 	}
@@ -7618,17 +7799,180 @@ function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, null, prevValue);
 	} else if (name === 'dangerouslySetInnerHTML') {
-		setHTML(el, null);
+		setDangerouslySetInnerHTML(el, null);
 	} else if (name === 'suppressHydrationWarning') {
 		(el as any).__oct_suppress = false;
 	} else {
+		const actionName = formActionAttributeName(el, name);
+		if (actionName !== null) {
+			setFormAction(
+				el as HTMLFormElement | HTMLButtonElement | HTMLInputElement,
+				actionName,
+				null,
+				prevValue,
+			);
+			return;
+		}
 		const ev = eventSlot(name);
 		if (ev) (el as any)[ev.key] = null;
 		else setAttribute(el, name, null);
 	}
 }
 
-export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope): void {
+/** Snapshot a JSX spread with own-enumerable Object.assign semantics. */
+export function snapshotSpread(value: unknown): Record<string, unknown> | null {
+	if (value == null) return null;
+	const source = Object(value) as Record<PropertyKey, unknown>;
+	const snapshot: Record<string, unknown> = Object.create(null);
+	for (const key of Reflect.ownKeys(source)) {
+		if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
+		const next = source[key];
+		// JSX spread evaluates enumerable symbol getters, but DOM prop routing has
+		// no symbol-key surface. Preserve the observable read and discard the key.
+		if (typeof key === 'string') snapshot[key] = next;
+	}
+	return snapshot;
+}
+
+type HostPropSource = readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown];
+
+function formActionAttributeName(el: Element, name: string): string | null {
+	if (el.localName === 'form' && name === 'action') return 'action';
+	if (
+		(el.localName === 'button' || el.localName === 'input') &&
+		(name === 'formAction' || name === 'formaction')
+	)
+		return 'formaction';
+	return null;
+}
+
+function isHostPropIdentityKey(name: string): boolean {
+	if (
+		name === 'ref' ||
+		name === 'children' ||
+		name === 'dangerouslySetInnerHTML' ||
+		name === 'suppressHydrationWarning' ||
+		name === 'suppressContentEditableWarning' ||
+		name === 'autoFocus' ||
+		name === 'value' ||
+		name === 'defaultValue' ||
+		name === 'checked' ||
+		name === 'defaultChecked' ||
+		name === 'multiple'
+	)
+		return true;
+	return isEventKey(name);
+}
+
+function normalizedHostProp(
+	el: Element,
+	rawName: string,
+): readonly [identity: string, name: string] {
+	if (rawName === 'class' || rawName === 'className') return ['class', 'class'];
+	const actionName = formActionAttributeName(el, rawName);
+	if (actionName !== null) return [actionName, actionName];
+	if (isHostPropIdentityKey(rawName)) return [rawName, rawName];
+	let name = rawName;
+	if (!isHtmlCustomElement(el)) name = ATTRIBUTE_ALIASES.get(name) ?? name;
+	const identity = el.namespaceURI === 'http://www.w3.org/1999/xhtml' ? name.toLowerCase() : name;
+	return [identity, name];
+}
+
+/**
+ * Resolve a spread-bearing compiled host's complete prop set before touching
+ * the DOM. JSX spread merging is last-writer-wins, but aliases such as
+ * className/class, htmlFor/for, and xlinkHref/xlink:href target one native
+ * property. Canonical identities ensure a vanished earlier source cannot
+ * remove an unchanged later winner, and hydration compares only the final
+ * client value against the final server value.
+ */
+export function setHostPropSources(
+	el: Element,
+	sources: readonly HostPropSource[],
+	prev: Record<string, unknown> | undefined,
+	scope: Scope,
+	hasNestedChildren = false,
+): Record<string, unknown> {
+	interface PropWriter {
+		rawName: string;
+		value: unknown;
+		firstOrder: number;
+		lastOrder: number;
+	}
+	const props = new Map<string, PropWriter>();
+	let sourceOrder = 0;
+	const record = (rawName: unknown, value: unknown): void => {
+		if (typeof rawName !== 'string') return;
+		const order = sourceOrder++;
+		const previous = props.get(rawName);
+		props.set(rawName, {
+			rawName,
+			value,
+			firstOrder: previous?.firstOrder ?? order,
+			lastOrder: order,
+		});
+	};
+
+	for (const source of sources) {
+		if (!source[0]) {
+			record(source[1], source[2]);
+			continue;
+		}
+		const spread = source[1];
+		if (spread == null || (typeof spread !== 'object' && typeof spread !== 'function')) continue;
+		for (const name of Object.keys(Object(spread))) {
+			record(name, (spread as Record<string, unknown>)[name]);
+		}
+	}
+
+	const values = new Map<
+		string,
+		readonly [name: string, value: unknown, firstOrder: number, lastOrder: number]
+	>();
+	for (const writer of props.values()) {
+		if (writer.rawName === 'key') continue;
+		const [identity, name] = normalizedHostProp(el, writer.rawName);
+		const previous = values.get(identity);
+		if (previous === undefined || previous[3] < writer.lastOrder) {
+			values.set(identity, [name, writer.value, writer.firstOrder, writer.lastOrder]);
+		}
+	}
+	const resolved: Record<string, unknown> = Object.create(null);
+	const ordered = [...values.values()].sort((a, b) => a[2] - b[2]);
+	for (const [name, value] of ordered) resolved[name] = value;
+	const formHost =
+		el.localName === 'input' || el.localName === 'textarea' || el.localName === 'select';
+	setSpread(el, resolved, prev, scope, true, formHost);
+	setDangerouslySetInnerHTMLSources(el, sources, hasNestedChildren);
+	if (formHost) setFormControlSources(el, sources);
+	return resolved;
+}
+
+function isAggregatedFormControlProp(el: Element, name: string): boolean {
+	switch (el.localName) {
+		case 'input':
+			return (
+				name === 'value' ||
+				name === 'defaultValue' ||
+				name === 'checked' ||
+				name === 'defaultChecked'
+			);
+		case 'textarea':
+			return name === 'value' || name === 'defaultValue';
+		case 'select':
+			return name === 'value' || name === 'defaultValue' || name === 'multiple';
+	}
+	return false;
+}
+
+export function setSpread(
+	el: Element,
+	value: any,
+	prev: any,
+	mountScope?: Scope,
+	skipDangerouslySetInnerHTML = false,
+	skipFormControls = false,
+): void {
 	// `mountScope` is passed only on the mount call (not on updates). When present
 	// a spread-supplied ref attach is DEFERRED to commit so a callback ref sees a
 	// connected node — same React-19 timing as element/fragment refs. Updates
@@ -7641,15 +7985,33 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 	// de-opt/host paths, and ssrSpread (which skips the key entirely, so writing an
 	// attribute here would itself manufacture the very server/client divergence the
 	// flag exists to suppress). A vanished key is reset by the removal loop below.
-	if (value != null && 'suppressHydrationWarning' in value) {
+	if (
+		value != null &&
+		Object.prototype.propertyIsEnumerable.call(Object(value), 'suppressHydrationWarning')
+	) {
 		(el as any).__oct_suppress = value.suppressHydrationWarning !== false;
+	}
+	if (!skipDangerouslySetInnerHTML) {
+		if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), 'children')) {
+			(el as any)[DANGER_HTML_SPREAD_CHILD] = value.children;
+			if (value.children != null && (el as any)[DANGER_HTML_ACTIVE] === true) {
+				throw dangerHtmlChildrenError();
+			}
+		} else if (
+			prev != null &&
+			Object.prototype.propertyIsEnumerable.call(Object(prev), 'children')
+		) {
+			(el as any)[DANGER_HTML_SPREAD_CHILD] = undefined;
+		}
 	}
 	// Remove keys present in prev but absent in value (removeHostProp routes each to
 	// the removal that mirrors its SET path — class, style, innerHTML, suppress flag,
 	// event slot, aliased/namespaced attribute).
 	if (prev) {
-		for (const k in prev) {
+		for (const k of Object.keys(Object(prev))) {
 			if (k === 'key' || k === 'children') continue;
+			if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
+			if (skipFormControls && isAggregatedFormControlProp(el, k)) continue;
 			if (k === 'ref') {
 				// Detach the prior ref when it's removed from the spread or its
 				// identity changed (the value loop re-attaches a changed ref).
@@ -7664,13 +8026,15 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 				if (prev.ref != null && prev.ref !== nextRef) queueRefDetach(prev.ref, el);
 				continue;
 			}
-			if (value && k in value) continue;
+			if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), k)) continue;
 			removeHostProp(el, k, prev[k]);
 		}
 	}
 	if (value == null) return;
-	for (const k in value) {
+	for (const k of Object.keys(Object(value))) {
 		if (k === 'key' || k === 'children') continue;
+		if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
+		if (skipFormControls && isAggregatedFormControlProp(el, k)) continue;
 		const v = value[k];
 		const pv = prev ? prev[k] : undefined;
 		if (k === 'ref') {
@@ -7696,6 +8060,24 @@ export function setSpread(el: Element, value: any, prev: any, mountScope?: Scope
 		}
 		if (k === 'style') {
 			setStyle(el as HTMLElement, v, pv);
+			continue;
+		}
+		// Presence matters for raw HTML: an own key whose value is undefined
+		// explicitly disables an earlier JSX writer. It must not be identity-skipped
+		// against the absent previous value on mount.
+		if (k === 'dangerouslySetInnerHTML') {
+			setDangerouslySetInnerHTML(el, v);
+			continue;
+		}
+		const actionName = formActionAttributeName(el, k);
+		if (actionName !== null) {
+			if (v === pv) continue;
+			setFormAction(
+				el as HTMLFormElement | HTMLButtonElement | HTMLInputElement,
+				actionName,
+				v,
+				pv,
+			);
 			continue;
 		}
 		const ev = eventSlot(k);
@@ -8727,8 +9109,15 @@ interface ControlledState {
 	composing: boolean;
 	/** Select re-projection already queued for the pending commit. */
 	queued: boolean;
-	/** Dev missing-onInput warning already evaluated for this element. */
+	/** Dev missing-native-handler warning already evaluated for this element. */
 	devChecked: boolean;
+	/** Whether the compiler's spread-aware form aggregation path has committed. */
+	formSeen: boolean;
+	/** Previous final default props, needed for React's removal cascades. */
+	formDefaultValue: unknown;
+	formDefaultChecked: unknown;
+	/** Previous final <select multiple> mode. */
+	formMultiple: boolean;
 }
 
 /**
@@ -8772,9 +9161,9 @@ let selectInputRestoreScheduled = false;
 //    post-mount the same way).
 //  - select defaultValue: same ordering problem, projected with
 //    defaultSelected stamped.
-//  - dev missing-onInput checks: evaluated only after ALL of the element's
-//    bindings mounted (the onInput slot may be stamped after the value
-//    binding in source order).
+//  - dev missing-native-handler checks: evaluated only after ALL of the
+//    element's bindings mounted (an event slot may be stamped after the
+//    value/checked binding in source order).
 let SELECT_SYNCS: HTMLSelectElement[] = [];
 let SELECT_DEFAULT_SYNCS: { el: HTMLSelectElement; value: unknown }[] = [];
 let DEV_CTRL_CHECKS: Element[] = [];
@@ -8803,7 +9192,7 @@ export function setAutoFocus(el: Element, value: unknown): void {
 	if (value) AUTOFOCUS_QUEUE.push(el);
 }
 
-/** Text-entry controls (IME-capable; the dev missing-onInput warning's scope). */
+/** Text-entry controls (IME-capable; their diagnostic specifically requires onInput). */
 function isTextEntry(el: Element): boolean {
 	if (el.localName === 'textarea') return true;
 	if (el.localName !== 'input') return false;
@@ -8860,6 +9249,10 @@ function armControlledBase(el: Element): ControlledState {
 			composing: false,
 			queued: false,
 			devChecked: false,
+			formSeen: false,
+			formDefaultValue: UNCONTROLLED,
+			formDefaultChecked: UNCONTROLLED,
+			formMultiple: false,
 		};
 		(el as any).$$ctrl = ctrl;
 		// The restore pass rides the delegated dispatchers — an armed control
@@ -8920,12 +9313,11 @@ function devWarnControlledFlip(el: Element, toControlled: boolean): void {
 	);
 }
 
-// DEV: queue the missing-onInput check for this commit (runs after all of the
+// DEV: queue the missing-handler check for this commit (runs after all of the
 // element's bindings mounted — see drainControlledSyncs).
 function queueDevControlledCheck(el: Element, ctrl: ControlledState): void {
 	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	if (ctrl.devChecked || (el as any).__oct_loc === undefined) return;
-	if (!isTextEntry(el)) return;
 	DEV_CTRL_CHECKS.push(el);
 }
 
@@ -8997,6 +9389,7 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 	const b = !!value;
 	if (first) {
 		ctrl.c = b;
+		if (process.env.NODE_ENV !== 'production') queueDevControlledCheck(input, ctrl);
 		const hydration = activeHydration();
 		if (hydration !== null && !hydration.isFresh(input)) return;
 		// PROPERTY first (marks checkedness dirty — see setValue), then the
@@ -9043,6 +9436,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 	}
 	if (process.env.NODE_ENV !== 'production' && !first && ctrl.sv === null)
 		devWarnControlledFlip(el, true);
+	if (first && process.env.NODE_ENV !== 'production') queueDevControlledCheck(el, ctrl);
 	if (sel.multiple) {
 		if (!Array.isArray(value)) {
 			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
@@ -9119,7 +9513,8 @@ function projectSelectValue(
  */
 export function setDefaultValue(el: Element, value: unknown): void {
 	const ctrl = armControlled(el);
-	if (activeHydration() !== null || value == null) return;
+	const hydration = activeHydration();
+	if ((hydration !== null && !hydration.isFresh(el)) || value == null) return;
 	if (el.localName === 'select') {
 		// Commit-deferred like the controlled projection (options may not
 		// exist yet); a controlled `value` wins at drain time. Re-projected
@@ -9145,7 +9540,8 @@ export function setDefaultValue(el: Element, value: unknown): void {
  * it needs neither a controlled-state record nor edit/composition listeners.
  */
 export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
-	if (activeHydration() !== null || value == null) return;
+	const hydration = activeHydration();
+	if ((hydration !== null && !hydration.isFresh(el)) || value == null) return;
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	const s = toControlledString(value);
 	if (input.defaultValue !== s) input.defaultValue = s;
@@ -9154,12 +9550,133 @@ export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 /** Compiler-emitted binding for `defaultChecked` (uncontrolled checkables). */
 export function setDefaultChecked(el: Element, value: unknown): void {
 	const ctrl = armControlled(el);
-	if (activeHydration() !== null || value == null) return;
+	const hydration = activeHydration();
+	if ((hydration !== null && !hydration.isFresh(el)) || value == null) return;
 	// A controlled `checked` owns the attribute baseline (React's cascade).
 	if (ctrl.c !== -1) return;
 	const input = el as HTMLInputElement;
 	const b = !!value;
 	if (input.defaultChecked !== b) input.defaultChecked = b;
+}
+
+/**
+ * Apply the final form-control prop set for a compiled host containing JSX
+ * spreads. Each direct source is `[false, name, value]`; each snapshotted
+ * spread is `[true, object]`. Resolving all sources first makes the controlled
+ * cascades independent of object-key order (`multiple` before select `value`,
+ * controlled value before its default fallback) while the compiler-owned
+ * source bindings preserve authored evaluation order and single getter reads.
+ */
+export function setFormControlSources(
+	el: Element,
+	sources: ReadonlyArray<readonly [boolean, unknown, unknown?]>,
+): void {
+	let value: unknown;
+	let defaultValue: unknown;
+	let checked: unknown;
+	let defaultChecked: unknown;
+	let multiple: unknown;
+	const tag = el.localName;
+
+	const assign = (name: string, next: unknown) => {
+		switch (name) {
+			case 'value':
+				value = next;
+				break;
+			case 'defaultValue':
+				defaultValue = next;
+				break;
+			case 'checked':
+				if (tag === 'input') checked = next;
+				break;
+			case 'defaultChecked':
+				if (tag === 'input') defaultChecked = next;
+				break;
+			case 'multiple':
+				if (tag === 'select') multiple = next;
+				break;
+		}
+	};
+
+	for (let i = 0; i < sources.length; i++) {
+		const source = sources[i];
+		if (!source[0]) {
+			assign(source[1] as string, source[2]);
+			continue;
+		}
+		const spread = source[1];
+		if (spread == null || (typeof spread !== 'object' && typeof spread !== 'function')) continue;
+		const object = Object(spread) as Record<string, unknown>;
+		if (Object.prototype.propertyIsEnumerable.call(object, 'value')) assign('value', object.value);
+		if (Object.prototype.propertyIsEnumerable.call(object, 'defaultValue'))
+			assign('defaultValue', object.defaultValue);
+		if (tag === 'input') {
+			if (Object.prototype.propertyIsEnumerable.call(object, 'checked'))
+				assign('checked', object.checked);
+			if (Object.prototype.propertyIsEnumerable.call(object, 'defaultChecked'))
+				assign('defaultChecked', object.defaultChecked);
+		} else if (tag === 'select' && Object.prototype.propertyIsEnumerable.call(object, 'multiple')) {
+			assign('multiple', object.multiple);
+		}
+	}
+
+	const ctrl = armControlled(el);
+	const first = !ctrl.formSeen;
+	const previousDefaultValue = ctrl.formDefaultValue;
+	const previousDefaultChecked = ctrl.formDefaultChecked;
+	const previousMultiple = ctrl.formMultiple;
+	ctrl.formSeen = true;
+	ctrl.formDefaultValue = defaultValue;
+	ctrl.formDefaultChecked = defaultChecked;
+
+	if (tag === 'input') {
+		const input = el as HTMLInputElement;
+		// React initInput normalizes the default before the controlled value even
+		// though the controlled writer owns the final baseline. Preserve that
+		// observable coercion order, and reuse the normalized default when it is
+		// the uncontrolled fallback so a custom toString runs exactly once.
+		const defaultString = defaultValue == null ? null : toControlledString(defaultValue);
+		setValue(input, value);
+		if (value == null) {
+			if (defaultString !== null) setDefaultValue(input, defaultString);
+			else if (!first && previousDefaultValue !== UNCONTROLLED && previousDefaultValue != null)
+				input.removeAttribute('value');
+		}
+		setChecked(input, checked);
+		if (checked == null && defaultChecked != null) setDefaultChecked(input, defaultChecked);
+		if (
+			!first &&
+			defaultChecked == null &&
+			previousDefaultChecked !== UNCONTROLLED &&
+			previousDefaultChecked != null
+		) {
+			input.defaultChecked = false;
+		}
+		return;
+	}
+
+	if (tag === 'textarea') {
+		const textarea = el as HTMLTextAreaElement;
+		setValue(textarea, value);
+		if (value == null) {
+			if (defaultValue != null) setDefaultValue(textarea, defaultValue);
+			else if (!first && textarea.defaultValue !== '') textarea.defaultValue = '';
+		}
+		return;
+	}
+
+	const select = el as HTMLSelectElement;
+	const multipleType = typeof multiple;
+	const nextMultiple = !!multiple && multipleType !== 'function' && multipleType !== 'symbol';
+	ctrl.formMultiple = nextMultiple;
+	if (select.multiple !== nextMultiple) select.multiple = nextMultiple;
+	if (!first && previousMultiple !== nextMultiple && value == null) {
+		if (defaultValue != null) ctrl.dvv = UNCONTROLLED;
+		else projectSelectValue(select, nextMultiple ? new Set<string>() : '', false);
+	}
+	setSelectValue(select, value);
+	if (defaultValue != null) setDefaultValue(select, defaultValue);
+	else ctrl.dvv = UNCONTROLLED;
 }
 
 /**
@@ -9213,19 +9730,49 @@ function drainControlledSyncs(): void {
 			const ctrl = el.$$ctrl as ControlledState | undefined;
 			if (ctrl === undefined || ctrl.devChecked) continue;
 			ctrl.devChecked = true;
-			if (ctrl.v === UNCONTROLLED) continue; // became uncontrolled before commit
-			if (el.$$input !== undefined || el['$$capture:input'] !== undefined) continue;
-			if (el.readOnly === true || el.disabled === true) continue;
+			if (
+				el.readOnly === true ||
+				el.disabled === true ||
+				el.hasAttribute('readonly') ||
+				el.hasAttribute('disabled')
+			)
+				continue;
+			const hasInput = el.$$input !== undefined || el['$$capture:input'] !== undefined;
+			const hasChange = el.$$change !== undefined || el['$$capture:change'] !== undefined;
+			if (isTextEntry(el)) {
+				if (ctrl.v === UNCONTROLLED || hasInput) continue;
+				console.error(
+					hasChange
+						? 'You provided a `value` prop to a form field with an `onChange` handler but no ' +
+								'`onInput`. octane events are NATIVE: `change` fires on blur/commit, not per ' +
+								'keystroke, so typing will appear to do nothing (each keystroke reverts to the ' +
+								'rendered value). Use `onInput` for per-keystroke updates, or `defaultValue` ' +
+								'for an uncontrolled field.'
+						: 'You provided a `value` prop to a form field without an `onInput` handler. This ' +
+								'will render a read-only field. If the field should be mutable use ' +
+								'`defaultValue`. Otherwise, set either `onInput` or `readOnly`.',
+				);
+				continue;
+			}
+			if (el.localName === 'select') {
+				if (ctrl.sv === null || hasInput || hasChange) continue;
+				console.error(
+					'You provided a `value` prop to a select without an `onInput` or `onChange` ' +
+						'handler. This will render a read-only field. Set a usable native handler, ' +
+						'`readOnly`, or use `defaultValue` for an uncontrolled field.',
+				);
+				continue;
+			}
+			const input = el as HTMLInputElement;
+			const checkable =
+				input.localName === 'input' && (input.type === 'checkbox' || input.type === 'radio');
+			if (!checkable || ctrl.c === -1) continue;
+			const hasClick = el.$$click !== undefined || el['$$capture:click'] !== undefined;
+			if (hasClick || hasInput || hasChange) continue;
 			console.error(
-				el.$$change !== undefined || el['$$capture:change'] !== undefined
-					? 'You provided a `value` prop to a form field with an `onChange` handler but no ' +
-							'`onInput`. octane events are NATIVE: `change` fires on blur/commit, not per ' +
-							'keystroke, so typing will appear to do nothing (each keystroke reverts to the ' +
-							'rendered value). Use `onInput` for per-keystroke updates, or `defaultValue` ' +
-							'for an uncontrolled field.'
-					: 'You provided a `value` prop to a form field without an `onInput` handler. This ' +
-							'will render a read-only field. If the field should be mutable use ' +
-							'`defaultValue`. Otherwise, set either `onInput` or `readOnly`.',
+				'You provided a `checked` prop to a checkbox or radio without an `onClick`, ' +
+					'`onInput`, or `onChange` handler. This will render a read-only field. Set a ' +
+					'usable native handler, `readOnly`, or use `defaultChecked` for an uncontrolled field.',
 			);
 		}
 	}
@@ -9820,16 +10367,39 @@ function resolveChildrenThenable(thenable: TrackedThenable): any {
 	throw thenable;
 }
 
+function describeObjectForError(value: object): string {
+	let rendered: string;
+	try {
+		rendered = String(value);
+	} catch {
+		return 'object with keys {' + Object.keys(value).join(', ') + '}';
+	}
+	return rendered === '[object Object]'
+		? 'object with keys {' + Object.keys(value).join(', ') + '}'
+		: rendered;
+}
+
 function invalidChildError(child: object): Error {
-	const rendered = String(child);
-	const found =
-		rendered === '[object Object]'
-			? 'object with keys {' + Object.keys(child).join(', ') + '}'
-			: rendered;
+	const found = describeObjectForError(child);
 	return new Error(
 		'Objects are not valid as an Octane child (found: ' +
 			found +
 			'). If you meant to render a collection of children, use an array instead.',
+	);
+}
+
+function invalidElementTypeError(type: unknown): Error {
+	const found =
+		type === null
+			? 'null'
+			: type === undefined
+				? 'undefined'
+				: typeof type === 'object'
+					? describeObjectForError(type as object)
+					: JSON.stringify(type);
+	return new Error(
+		'Element type is invalid: expected a string (for a built-in element) or a function ' +
+			`(for a component), but got: ${found}.`,
 	);
 }
 
@@ -10110,13 +10680,19 @@ function componentSlotImpl(
 	// explicit `key={undefined}` from an unkeyed call.
 	hasKey?: boolean,
 ): void {
+	if (typeof comp !== 'function' && typeof comp !== 'string') {
+		throw invalidElementTypeError(comp);
+	}
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	// A component nested inside a client-built replacement range must mount as
 	// ordinary client DOM. Its fresh anchor is not server output to adopt; keep
 	// the outer hydration cursor active for later server-owned siblings while
 	// suspending adoption only for this component subtree.
-	if (hydration !== null && anchor != null && hydration.isFresh(anchor)) {
+	if (
+		hydration !== null &&
+		((anchor != null && hydration.isFresh(anchor)) || hydration.isFresh(domParent))
+	) {
 		hydration.suspend(() =>
 			componentSlotImpl(
 				outputHandler,
@@ -10862,8 +11438,9 @@ function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): v
 // raw HTML win would hide the author's dead `children`).
 function hasDangerHTML(props: any): boolean {
 	if (props == null || props.dangerouslySetInnerHTML == null) return false;
+	validateDangerouslySetInnerHTMLValue(props.dangerouslySetInnerHTML);
 	if (props.children != null) {
-		throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+		throw dangerHtmlChildrenError();
 	}
 	return true;
 }
@@ -11322,7 +11899,8 @@ function reconcileDeoptNode(
 				'(should have been routed through a Block via hostElementBody/componentSlot).',
 		);
 	}
-	return null; // unknown object — render nothing (resilient; React would throw).
+	if (t === 'object') throw invalidChildError(value);
+	return null;
 }
 
 // Reconcile a host element's children in place, reusing existing child nodes: keyed
@@ -11985,6 +12563,16 @@ function buildDeoptAdoptQueue(
 	return queue;
 }
 
+// A portal target is a container, not a host element receiving JSX `children`.
+// React therefore permits portals into Lexical-owned void nodes such as `<hr>`;
+// keep the void-host validation for actual authored/de-opt host children only.
+function isPortalTarget(block: Block, domParent: Node): boolean {
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		if (current.kind === 'portal' && current.parentNode === domParent) return true;
+	}
+	return false;
+}
+
 export function childSlot(
 	parentScope: Scope,
 	slotKey: number,
@@ -12009,13 +12597,28 @@ export function childSlot(
 	// in another one-item list.
 	includeKeyedSingle: boolean = true,
 ): void {
+	if (
+		domParent.nodeType === 1 &&
+		VOID_ELEMENTS.has((domParent as Element).localName) &&
+		!isPortalTarget(parentScope.block, domParent) &&
+		value != null
+	) {
+		throw new Error(
+			`\`<${(domParent as Element).localName}>\` is a void element tag and must neither have ` +
+				'`children` nor use `dangerouslySetInnerHTML`.',
+		);
+	}
+	if (dangerouslySetInnerHTMLOwnsChild(domParent, value)) return;
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	// A placeholder from a client-built mismatch clone belongs to the replacement
 	// template; it is an insertion anchor, not server DOM to adopt. Scope the
 	// suspension to this slot so the enclosing hydration cursor remains live for
 	// later server-owned siblings and root-remainder cleanup.
-	if (hydration !== null && anchor != null && hydration.isFresh(anchor)) {
+	if (
+		hydration !== null &&
+		((anchor != null && hydration.isFresh(anchor)) || hydration.isFresh(domParent))
+	) {
 		hydration.suspend(() =>
 			childSlot(
 				parentScope,
@@ -12035,7 +12638,7 @@ export function childSlot(
 	// them before choosing a child regime; repeated unwrapping supports shapes
 	// such as Promise<Context<T>> while preserving the normal Suspense route for
 	// a pending thenable and the normal context dependency tracking for Context.
-	while (value !== null && typeof value === 'object') {
+	while (value !== null && (typeof value === 'object' || typeof value === 'function')) {
 		if ((value as any).$$kind === CONTEXT_TAG) {
 			value = useContextInternal(value as Context<unknown>);
 			continue;
@@ -12404,6 +13007,9 @@ export function childSlot(
 		comp = value as ComponentBody;
 		isBodyFn = true;
 	} else if (isElementDescriptor(value)) {
+		if (typeof value.type !== 'function' && typeof value.type !== 'string') {
+			throw invalidElementTypeError(value.type);
+		}
 		comp = value.type as ComponentBody;
 		props = value.props;
 	}
@@ -12615,6 +13221,7 @@ export function childSlot(
 	}
 
 	// Text / empty.
+	if (value !== null && typeof value === 'object') throw invalidChildError(value);
 	// Swapped away from a component OR a pure-host de-opt node → tear it down first.
 	if (state.block !== null || state.hostNode !== null) clearChildContent(state);
 	const str = coerceChildText(value);
@@ -12667,6 +13274,7 @@ export function textSlot(
 	ownEnd?: boolean,
 	compactable?: boolean,
 ): void {
+	if (dangerouslySetInnerHTMLOwnsChild(domParent, value)) return;
 	const vt = typeof value;
 	if (vt === 'object' || vt === 'function') {
 		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, undefined, compactable);
@@ -12744,6 +13352,18 @@ export function childTextHole(
 	value: unknown,
 	cachedNode: Text | null,
 ): Text | null {
+	if (
+		domParent.nodeType === 1 &&
+		VOID_ELEMENTS.has((domParent as Element).localName) &&
+		!isPortalTarget(parentScope.block, domParent) &&
+		value != null
+	) {
+		throw new Error(
+			`\`<${(domParent as Element).localName}>\` is a void element tag and must neither have ` +
+				'`children` nor use `dangerouslySetInnerHTML`.',
+		);
+	}
+	if (dangerouslySetInnerHTMLOwnsChild(domParent, value)) return null;
 	const vt = typeof value;
 	const state = parentScope.slots[slotKey] as ChildSlot | undefined;
 	if (state === undefined && vt !== 'object' && vt !== 'function') {

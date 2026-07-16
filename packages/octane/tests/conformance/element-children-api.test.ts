@@ -570,6 +570,39 @@ describe('ReactChildren public behavior', () => {
 	it('should throw on regex', () => {
 		expect(() => Children.forEach(/abc/, () => {})).toThrow(/\/abc\//);
 	});
+
+	// Per onlyChild-test.js:29.
+	it('should fail when passed two children', () => {
+		expect(() => Children.only([createElement('div'), createElement('span')])).toThrow(
+			/single element child/,
+		);
+	});
+
+	// Per onlyChild-test.js:41.
+	it('should fail when passed nully values', () => {
+		expect(() => Children.only(null)).toThrow(/single element child/);
+		expect(() => Children.only(undefined)).toThrow(/single element child/);
+	});
+
+	// Per onlyChild-test.js:53. An array remains a collection even when it has
+	// one keyed element; callers must pass the element itself.
+	it('should fail when key/value objects', () => {
+		expect(() => Children.only([createElement('span', { key: 'abc' })])).toThrow(
+			/single element child/,
+		);
+	});
+
+	// Per onlyChild-test.js:60.
+	it('should not fail when passed interpolated single child', () => {
+		const child = createElement('span');
+		expect(() => Children.only(child)).not.toThrow();
+	});
+
+	// Per onlyChild-test.js:67.
+	it('should return the only child', () => {
+		const child = createElement('span');
+		expect(Children.only(child)).toBe(child);
+	});
 });
 
 describe('ReactCreateElement public behavior', () => {
@@ -670,6 +703,9 @@ describe('ReactCreateElement public behavior', () => {
 	// Per ReactCreateElement-test.js:244.
 	it('merges an additional argument onto the children prop', () => {
 		expect(createElement(Component, { children: 'text' } as any, 1).props.children).toBe(1);
+		expect(
+			createElement(Component, { children: 'text' } as any, undefined).props.children,
+		).toBeUndefined();
 	});
 
 	// Per ReactCreateElement-test.js:256.

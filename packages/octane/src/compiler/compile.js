@@ -59,6 +59,7 @@ import {
 	VOID_ELEMENTS,
 	BOOLEAN_ATTR_PROPS,
 	MUST_USE_PROPERTY_PROPS,
+	POSITIVE_NUMERIC_ATTR_PROPS,
 	SVG_ONLY_TAGS,
 	ATTRIBUTE_ALIASES,
 	isEnumeratedBooleanAttr,
@@ -87,23 +88,28 @@ function rejectVoidElementContent(tag, node, ctx) {
 		if (c.type === 'JSXText') {
 			if (/^\s*$/.test(c.value)) continue;
 		} else if (c.type === 'JSXExpressionContainer') {
-			if (!c.expression || c.expression.type === 'JSXEmptyExpression') continue;
+			// A single dynamic child is validated at render/commit time: null and
+			// undefined are inactive, every other value is invalid. Definitely
+			// non-nullish expressions can still fail early.
+			if (!isDefinitelyNonNullishJsxExpression(c.expression)) continue;
 		} else if (c.type === 'JSXStyleElement') {
 			continue;
 		}
 		offending = true;
 		break;
 	}
-	if (!offending) {
-		const attrs = node.attributes || node.openingElement?.attributes || [];
-		for (const a of attrs) {
-			if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
-			if (jsxAttrRawName(a) === 'dangerouslySetInnerHTML') {
-				offending = true;
-				break;
-			}
-		}
-	}
+	// Two semantic JSX children become a non-nullish `children` array even if
+	// each individual expression later evaluates nullish.
+	if (!offending && semanticJsxChildCount(node.children || []) > 1) offending = true;
+	if (!offending && hasDefinitelyPresentDirectDangerouslySetInnerHTML(node)) offending = true;
+	// Nested JSX children are the transform's final `children` writer. Only a
+	// direct/spread prop is effective when there is no semantic nested child.
+	if (
+		!offending &&
+		!hasSemanticJsxChildren(node.children || []) &&
+		hasDefinitelyPresentDirectChildrenProp(node)
+	)
+		offending = true;
 	if (!offending) return;
 	const l = node.loc && node.loc.start;
 	const at = l ? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})` : '';
@@ -162,10 +168,17 @@ const CONTROLLED_KIND_HELPERS = {
 // (falsy drops; overloaded download/capture keep string payloads), booleans
 // on non-boolean attrs DROP (React: `title={true}` never renders), everything
 // else escapes as before. Custom elements keep raw semantics.
-function bakeStaticAttr(attrName, lv, tag) {
+function bakeStaticAttr(attrName, lv, tag, namespace = 'html') {
 	if (lv == null) return '';
-	const isCustom = tag !== undefined && tag.includes('-');
+	const isCustom = namespace === 'html' && tag !== undefined && tag.includes('-');
 	const lower = attrName.toLowerCase();
+	// class/className compose clsx-style at every apply site. Literal false/null
+	// drop above/below; every other literal writes the normalized class string.
+	if (attrName === 'class') {
+		if (lv === false) return '';
+		const value = lv === true || lv === 0 ? '' : String(lv);
+		return ` class="${escapeAttr(value)}"`;
+	}
 	if (typeof lv === 'boolean') {
 		if (attrName.startsWith('aria-') || attrName.startsWith('data-')) {
 			return ` ${attrName}="${lv}"`;
@@ -193,10 +206,23 @@ function bakeStaticAttr(attrName, lv, tag) {
 		return lv ? ` ${lower}=""` : '';
 	}
 	if (typeof lv === 'string') {
+		if (!isCustom && POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && !(Number(lv) >= 1)) return '';
+		if (
+			!isCustom &&
+			lv === '' &&
+			(attrName === 'src' ||
+				(attrName === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area') ||
+				(attrName === 'data' && tag === 'object'))
+		) {
+			return '';
+		}
 		const value = sanitizeURLAttribute(tag, attrName, lv);
 		return ` ${attrName}="${escapeAttr(value)}"`;
 	}
-	if (typeof lv === 'number') return ` ${attrName}="${lv}"`;
+	if (typeof lv === 'number') {
+		if (!isCustom && POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && !(lv >= 1)) return '';
+		return ` ${attrName}="${lv}"`;
+	}
 	return '';
 }
 
@@ -239,6 +265,213 @@ function rejectTextareaValueChildren(tag, node, ctx) {
 		'`<textarea>` must not have children when it uses `value` or `defaultValue` — ' +
 			`the prop owns the content. Move the text into the prop.${at}`,
 	);
+}
+
+// React's raw-HTML contract is mutually exclusive with a non-nullish child.
+// Static TSRX can reject definitely contradictory shapes before either the
+// client or server renderer runs them. Preserve React's accepted null/undefined
+// cases (used by option text supplied entirely through raw HTML); dynamic
+// spreads and descriptor props retain the runtime validation in hasDangerHTML.
+function isDefinitelyNullishJsxExpression(expression) {
+	return (
+		!expression ||
+		expression.type === 'JSXEmptyExpression' ||
+		(expression.type === 'Literal' && expression.value == null) ||
+		(expression.type === 'Identifier' && expression.name === 'undefined') ||
+		(expression.type === 'UnaryExpression' && expression.operator === 'void')
+	);
+}
+
+function isDefinitelyNonNullishJsxExpression(expression) {
+	if (!expression || expression.type === 'JSXEmptyExpression') return false;
+	if (expression.type === 'Literal') return expression.value != null;
+	if (
+		expression.type === 'ObjectExpression' ||
+		expression.type === 'ArrayExpression' ||
+		expression.type === 'FunctionExpression' ||
+		expression.type === 'ArrowFunctionExpression' ||
+		expression.type === 'ClassExpression' ||
+		expression.type === 'TemplateLiteral'
+	)
+		return true;
+	return false;
+}
+
+function isSideEffectFreeDefinitelyNullishJsxExpression(expression) {
+	return (
+		!expression ||
+		expression.type === 'JSXEmptyExpression' ||
+		(expression.type === 'Literal' && expression.value == null)
+	);
+}
+
+function hasPotentialDangerouslySetInnerHTML(node) {
+	const attrs = node.attributes || node.openingElement?.attributes || [];
+	return attrs.some(
+		(attr) =>
+			attr.type === 'SpreadAttribute' ||
+			attr.type === 'JSXSpreadAttribute' ||
+			((attr.type === 'Attribute' || attr.type === 'JSXAttribute') &&
+				jsxAttrRawName(attr) === 'dangerouslySetInnerHTML'),
+	);
+}
+
+function hasDefinitelyPresentDirectDangerouslySetInnerHTML(node) {
+	const attrs = node.attributes || node.openingElement?.attributes || [];
+	let state = false;
+	for (const attr of attrs) {
+		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
+			// A later spread may overwrite or introduce the prop, so the effective
+			// writer is no longer statically known. A following direct writer can
+			// establish certainty again.
+			state = null;
+			continue;
+		}
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		if (jsxAttrRawName(attr) !== 'dangerouslySetInnerHTML') continue;
+		const value = attr.value;
+		if (value == null) {
+			state = true;
+			continue;
+		}
+		const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
+		if (isDefinitelyNonNullishJsxExpression(expression)) state = true;
+		else if (isDefinitelyNullishJsxExpression(expression)) state = false;
+		else state = null;
+	}
+	return state === true;
+}
+
+function hasDefinitelyPresentDirectChildrenProp(node) {
+	const attrs = node.attributes || node.openingElement?.attributes || [];
+	let state = false;
+	for (const attr of attrs) {
+		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
+			state = null;
+			continue;
+		}
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		if (jsxAttrRawName(attr) !== 'children') continue;
+		const value = attr.value;
+		if (value == null) {
+			state = true;
+			continue;
+		}
+		const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
+		if (isDefinitelyNonNullishJsxExpression(expression)) state = true;
+		else if (isDefinitelyNullishJsxExpression(expression)) state = false;
+		else state = null;
+	}
+	return state === true;
+}
+
+function hasOnlyDefinitelyNullishJsxChildren(children) {
+	for (const child of children || []) {
+		if (!child) continue;
+		if (child.type === 'JSXText' && /^\s*$/.test(child.value)) continue;
+		if (child.type === 'JSXStyleElement') continue;
+		if (
+			child.type === 'JSXExpressionContainer' &&
+			isSideEffectFreeDefinitelyNullishJsxExpression(child.expression)
+		)
+			continue;
+		return false;
+	}
+	return true;
+}
+
+// A void host may contain syntactic children that normalize to no content.
+// Keep `void expr` in this set even though it can have side effects: the emitters
+// still evaluate the expression once, after the attributes, before self-closing.
+function hasOnlyPotentiallyNullishVoidChildren(children) {
+	for (const child of children || []) {
+		if (!child) continue;
+		if (child.type === 'JSXText' && /^\s*$/.test(child.value)) continue;
+		if (child.type === 'JSXStyleElement') continue;
+		if (
+			child.type === 'JSXExpressionContainer' &&
+			!isDefinitelyNonNullishJsxExpression(child.expression)
+		)
+			continue;
+		return false;
+	}
+	return true;
+}
+
+function semanticJsxChildCount(children) {
+	let count = 0;
+	for (const child of children || []) {
+		if (!child) continue;
+		if (child.type === 'JSXText' && /^\s*$/.test(child.value)) continue;
+		if (child.type === 'JSXStyleElement') continue;
+		if (
+			child.type === 'JSXExpressionContainer' &&
+			(!child.expression || child.expression.type === 'JSXEmptyExpression')
+		)
+			continue;
+		count++;
+	}
+	return count;
+}
+
+// Whether JSX supplied an actual nested `children` writer. Whitespace-only text,
+// comments, and style intrinsics are absent; a nullish expression is still a
+// writer and therefore overwrites an earlier `children=` attribute/spread.
+function hasSemanticJsxChildren(children) {
+	return semanticJsxChildCount(children) > 0;
+}
+
+function hasDefinitelyNonNullishJsxChild(children, knownStringLocals) {
+	for (const child of children || []) {
+		if (!child) continue;
+		if (child.type === 'JSXText') {
+			if (!/^\s*$/.test(child.value)) return true;
+			continue;
+		}
+		if (child.type === 'JSXStyleElement') continue;
+		if (child.type === 'Element' || child.type === 'JSXElement') return true;
+		if (
+			child.type === 'IfStatement' ||
+			child.type === 'JSXIfExpression' ||
+			child.type === 'ForOfStatement' ||
+			child.type === 'JSXForExpression' ||
+			child.type === 'TryStatement' ||
+			child.type === 'JSXTryExpression' ||
+			child.type === 'SwitchStatement' ||
+			child.type === 'JSXSwitchExpression' ||
+			child.type === 'ActivityStatement' ||
+			child.type === 'FoldedDirective'
+		)
+			return true;
+		if (child.type === 'JSXExpressionContainer') {
+			if (isDefinitelyNonNullishJsxExpression(child.expression)) return true;
+			continue;
+		}
+		if (child.type === 'Text') {
+			if (
+				isDefinitelyNonNullishJsxExpression(child.expression) ||
+				isKnownStringExpression(child.expression, knownStringLocals)
+			)
+				return true;
+		}
+	}
+	return false;
+}
+
+function rejectDangerouslySetInnerHTMLChildren(_tag, node, ctx) {
+	if (!hasDefinitelyPresentDirectDangerouslySetInnerHTML(node)) return;
+	const hasNestedChildren = hasSemanticJsxChildren(node.children || []);
+	if (
+		(hasNestedChildren || !hasDefinitelyPresentDirectChildrenProp(node)) &&
+		!hasDefinitelyNonNullishJsxChild(node.children || [], ctx.knownStringLocals)
+	)
+		return;
+
+	const loc = node.loc?.start;
+	const at = loc
+		? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${loc.line}:${loc.column})`
+		: '';
+	throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.' + at);
 }
 
 // Compiler-generated code references runtime helpers under a collision-proof
@@ -810,11 +1043,11 @@ function jsxAttrRawName(attr) {
 // know which setter to pick). Custom elements keep every name VERBATIM (raw
 // props, no alias tables) — the same gate the runtimes' setAttribute/ssrAttr
 // apply to dynamic values.
-function normalizeJsxAttrName(raw, tag) {
+function normalizeJsxAttrName(raw, tag, namespace = 'html') {
 	// `className` → `class` applies EVERYWHERE, custom elements included (React
 	// special-cases it in setPropOnCustomElement); only the alias table is raw.
 	if (raw === 'className') return 'class';
-	if (tag !== undefined && tag.includes('-')) return raw;
+	if (namespace === 'html' && tag !== undefined && tag.includes('-')) return raw;
 	return ATTRIBUTE_ALIASES.get(raw) || raw;
 }
 
@@ -2204,31 +2437,6 @@ function mapCallToForOf(expr) {
 		key: keyExpr,
 		index: params[1] || null,
 		empty: null,
-	};
-}
-
-// Extract the `__html` expression from a React `dangerouslySetInnerHTML` value.
-// For the canonical inline object `{{__html: expr}}` it's `expr`; for anything
-// else (a variable holding the `{__html}` object) it's a `.__html` member access
-// evaluated at runtime. Returns null when there's no value.
-function dangerHtmlExpr(node) {
-	if (!node) return null;
-	if (node.type === 'ObjectExpression') {
-		const prop = (node.properties || []).find(
-			(p) =>
-				(p.type === 'Property' || p.type === 'ObjectProperty') &&
-				!p.computed &&
-				p.key &&
-				(p.key.name === '__html' || p.key.value === '__html'),
-		);
-		if (prop) return prop.value;
-	}
-	return {
-		type: 'MemberExpression',
-		object: node,
-		property: { type: 'Identifier', name: '__html' },
-		computed: false,
-		optional: false,
 	};
 }
 
@@ -4911,6 +5119,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const tag = elementTagName(node);
 	rejectVoidElementContent(tag, node, ctx);
 	rejectTextareaValueChildren(tag, node, ctx);
+	rejectDangerouslySetInnerHTMLChildren(tag, node, ctx);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	// NB: the ns helpers take the TAG STRING (passing the node silently returns
 	// the inherited ns — svg subtrees would never enter the svg namespace).
@@ -4950,30 +5159,62 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	let ctlDefault = null; // textarea/select captured `defaultValue` expr
 	let selMultiple = 'false'; // select `multiple` expr (constant or temp)
 	let optValue = null; // option `value` expr (constant or temp); null = no value attr
-
+	// TSRX accepts repeated attributes. JSX prop construction is last-writer-wins,
+	// but literal HTML duplicates are parser-first-wins, so duplicate native
+	// identities need the same source resolver as spreads (aliases included).
+	const directAttributeIdentities = new Set();
+	let hasDuplicateDirectAttribute = false;
+	for (const attr of attrs) {
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		let identity = normalizeJsxAttrName(jsxAttrRawName(attr), tag, selfNs);
+		if (selfNs === 'html') identity = identity.toLowerCase();
+		if (directAttributeIdentities.has(identity)) hasDuplicateDirectAttribute = true;
+		else directAttributeIdentities.add(identity);
+	}
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
 	);
-	// A spread and a direct `class`/`className` writer can target the same native
-	// attribute. Emitting each source as a separate HTML attribute is not source-
-	// ordered: the HTML parser keeps the FIRST duplicate, while the client applies
-	// setters in order and the LAST writer wins. Collect those class sources and
-	// serialize one effective class instead (still normalized clsx-style).
-	const resolveClassAcrossSpreads =
-		firstSpreadIdx !== -1 &&
-		attrs.some(
-			(a) =>
-				(a.type === 'Attribute' || a.type === 'JSXAttribute') &&
-				(jsxAttrRawName(a) === 'class' || jsxAttrRawName(a) === 'className'),
-		);
-	const classSources = [];
-	let classPartIndex = -1;
+	// A spread can carry a native form control's value/default writers (plus
+	// checked for input and multiple for select). Serializing each source as a
+	// generic attribute either creates first-wins duplicates or puts state in the
+	// wrong place entirely: textarea value is content and select value projects
+	// onto options. Resolve the effective props once whenever one has a spread.
+	const resolveFormControlsAcrossSpreads =
+		(firstSpreadIdx !== -1 || hasDuplicateDirectAttribute) &&
+		(tag === 'input' || tag === 'textarea' || tag === 'select');
+	const formControlSources = [];
+	let formControlPart = -1;
+	// Any spread may collide with any direct or spread-supplied native attribute.
+	// HTML parsing keeps the FIRST duplicate, while JSX uses the final writer, so
+	// spread-bearing hosts serialize one source-resolved attribute set. Dedicated
+	// form/content channels are filtered by ssrAttrs and resolved separately.
+	const resolveAttrsAcrossSpreads = firstSpreadIdx !== -1 || hasDuplicateDirectAttribute;
+	const attrSources = [];
+	let attrPart = -1;
 	// Spreads are bound to temps (so their value is evaluated ONCE even though we
-	// read it both for ssrSpread and for a possible `.dangerouslySetInnerHTML`).
-	// `htmlSources` are the raw-HTML source exprs in source order (explicit
-	// `dangerouslySetInnerHTML={…}` objects + spread `.dangerouslySetInnerHTML`).
+	// read it for ssrAttrs and the form/content resolution channels).
+	// `htmlSources` are `[present, value]` pairs in source order. Presence must be
+	// retained separately: a later explicit/spread `undefined` disables an earlier
+	// raw-HTML writer, while a spread that omits the key does not.
 	const spreadTemps = [];
 	const htmlSources = [];
+	const childrenPropSources = [];
+	const bindAttributeEvaluation = (argExpr) => {
+		const tempName = `__sp${spreadTemps.length}`;
+		spreadTemps.push({ tempName, argExpr });
+		return tempName;
+	};
+	const bindDiscardedAttributeValue = (value) => {
+		if (!resolveAttrsAcrossSpreads || value == null) return;
+		const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
+		bindAttributeEvaluation(printExprWithTsrx(expression, ctx, name, inlinedSubs));
+	};
+	const ensureAttrPart = () => {
+		if (attrPart !== -1) return;
+		flush();
+		attrPart = parts.length;
+		parts.push('');
+	};
 	// Wrap the assembled string in an IIFE that binds the spread temps when any
 	// exist (so the temp names resolve); otherwise return the bare concatenation.
 	const finalize = () => {
@@ -4999,72 +5240,90 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	for (let attrI = 0; attrI < attrs.length; attrI++) {
 		const attr = attrs[attrI];
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			flush();
-			ctx.runtimeNeeded.add('ssrSpread');
-			const tmp = `__sp${spreadTemps.length}`;
-			spreadTemps.push({
-				tempName: tmp,
-				argExpr: printExprWithTsrx(attr.argument, ctx, name, inlinedSubs),
-			});
-			parts.push(
-				`_$ssrSpread(${tmp}, ${JSON.stringify(tag)}${resolveClassAcrossSpreads ? ', true' : ''})`,
+			ensureAttrPart();
+			ctx.runtimeNeeded.add('ssrAttrs');
+			ctx.runtimeNeeded.add('ssrSnapshotSpread');
+			const tmp = bindAttributeEvaluation(
+				`_$ssrSnapshotSpread(${printExprWithTsrx(attr.argument, ctx, name, inlinedSubs)})`,
 			);
-			if (resolveClassAcrossSpreads) classSources.push(`[true, ${tmp}]`);
-			// The spread may carry `dangerouslySetInnerHTML` — record it as a raw-HTML
-			// source (at this source position) so it participates in last-wins ordering.
-			htmlSources.push(`(${tmp} != null ? ${tmp}.dangerouslySetInnerHTML : void 0)`);
+			if (resolveFormControlsAcrossSpreads) {
+				if (tag !== 'textarea' && formControlPart === -1) {
+					formControlPart = parts.length;
+					parts.push('');
+				}
+				formControlSources.push(`[true, ${tmp}]`);
+			}
+			attrSources.push(`[true, ${tmp}]`);
+			// The spread may carry `dangerouslySetInnerHTML` — record both own-key
+			// presence and value so an explicit `undefined` overwrites an earlier writer.
+			htmlSources.push(
+				`[${tmp} != null && Object.prototype.propertyIsEnumerable.call(${tmp}, "dangerouslySetInnerHTML"), ${tmp} != null ? ${tmp}.dangerouslySetInnerHTML : void 0]`,
+			);
+			childrenPropSources.push(
+				`[${tmp} != null && Object.prototype.propertyIsEnumerable.call(${tmp}, "children"), ${tmp} != null ? ${tmp}.children : void 0]`,
+			);
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const rawAttrName = jsxAttrRawName(attr);
-		if (rawAttrName === 'key') continue;
+		if (rawAttrName === 'key') {
+			bindDiscardedAttributeValue(attr.value);
+			continue;
+		}
 		// React-only hints — never serialize (`suppressHydrationWarning` is the
 		// client hydration opt-out; `suppressContentEditableWarning` suppresses a
 		// React DEV warning octane doesn't emit, but the key must not land in the
 		// markup either — mirrors the client setAttribute skip).
-		if (rawAttrName === 'suppressHydrationWarning') continue;
-		if (rawAttrName === 'suppressContentEditableWarning') continue;
+		if (rawAttrName === 'suppressHydrationWarning') {
+			bindDiscardedAttributeValue(attr.value);
+			continue;
+		}
+		if (rawAttrName === 'suppressContentEditableWarning') {
+			bindDiscardedAttributeValue(attr.value);
+			continue;
+		}
 		// Events and refs have no server semantics — dropped.
-		if (rawAttrName === 'ref') continue;
-		if (isEventAttrName(rawAttrName)) continue;
+		if (rawAttrName === 'ref') {
+			bindDiscardedAttributeValue(attr.value);
+			continue;
+		}
+		if (isEventAttrName(rawAttrName)) {
+			bindDiscardedAttributeValue(attr.value);
+			continue;
+		}
 		// `autoFocus` never serializes (React DOM server parity — the client
 		// focuses at its mount commit; custom elements keep raw props).
-		if (rawAttrName === 'autoFocus' && !tag.includes('-')) continue;
+		if (rawAttrName === 'autoFocus' && !(selfNs === 'html' && tag.includes('-'))) {
+			bindDiscardedAttributeValue(attr.value);
+			continue;
+		}
 		// Custom elements keep names VERBATIM (React parity — they get raw props,
 		// no alias tables; `className`→`class` still applies); ssrAttr applies
 		// the same gate for dynamic values.
-		const attrName = normalizeJsxAttrName(rawAttrName, tag);
+		const attrName = normalizeJsxAttrName(rawAttrName, tag, selfNs);
 		const val = attr.value;
 		const isAfterSpread = firstSpreadIdx !== -1 && attrI > firstSpreadIdx;
-
-		if (attrName === 'dangerouslySetInnerHTML' && val) {
-			// React-style raw HTML: record the `{__html}` object as a raw-HTML source
-			// (in source order); ssrInnerHtml reads `.__html` and emits it as the
-			// element's (unescaped) inner content.
-			const obj = val.type === 'JSXExpressionContainer' ? val.expression : val;
-			htmlSources.push(printExpr(rewriteHookCalls(obj, ctx, name)));
+		if (rawAttrName === 'children') {
+			const childInner =
+				val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
+			const childExpr = bindAttributeEvaluation(
+				childInner === null
+					? 'true'
+					: printExprWithTsrx(rewriteJsxValues(childInner, ctx), ctx, name, inlinedSubs),
+			);
+			childrenPropSources.push(`[true, ${childExpr}]`);
 			continue;
 		}
 
-		if (resolveClassAcrossSpreads && attrName === 'class') {
-			if (classPartIndex === -1) {
-				flush();
-				classPartIndex = parts.length;
-				parts.push('');
-			}
-			const classExpr =
-				val == null
-					? 'true'
-					: printExprWithTsrx(
-							resolveStyleExpr(
-								val.type === 'JSXExpressionContainer' ? val.expression : val,
-								cssHash,
-							),
-							ctx,
-							name,
-							inlinedSubs,
-						);
-			classSources.push(`[false, (${classExpr})]`);
+		if (attrName === 'dangerouslySetInnerHTML') {
+			// React-style raw HTML: record the `{__html}` object as a raw-HTML source
+			// (in source order); ssrInnerHtml reads `.__html` and emits it as the
+			// element's (unescaped) inner content.
+			const obj = val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
+			const tmp = bindAttributeEvaluation(
+				obj === null ? 'true' : printExpr(rewriteHookCalls(obj, ctx, name)),
+			);
+			htmlSources.push(`[true, ${tmp}]`);
 			continue;
 		}
 
@@ -5078,47 +5337,51 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			const ctlInner =
 				val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
 			if (tag === 'input') {
-				// defaultValue/defaultChecked serialize as the NATIVE attrs;
-				// dynamic value/checked go through serializers that mirror the
-				// client helpers byte-for-byte (value={false} → value="false",
-				// checked truthy → bare presence).
-				const isCheck = attrName === 'checked' || attrName === 'defaultChecked';
-				if (ctlInner === null && !isAfterSpread) {
-					// Bare boolean prop (`<input checked/>`) → static presence
-					// (`value` bare mirrors the client's String(true)).
-					lit += isCheck ? ' checked' : ' value="true"';
-					continue;
-				}
-				if (ctlInner !== null && ctlInner.type === 'Literal' && !isAfterSpread) {
-					const lv = ctlInner.value;
-					if (isCheck) {
-						if (lv != null && lv !== false) lit += ' checked';
-					} else if (lv != null) {
-						lit += ` value="${escapeAttr(String(lv))}"`;
-					}
-					continue;
-				}
-				flush();
 				const ctlExpr =
 					ctlInner === null ? 'true' : printExprWithTsrx(ctlInner, ctx, name, inlinedSubs);
-				if (isCheck) {
-					ctx.runtimeNeeded.add('ssrCheckedAttr');
-					parts.push(`_$ssrCheckedAttr(${ctlExpr})`);
-				} else {
-					ctx.runtimeNeeded.add('ssrValueAttr');
-					parts.push(`_$ssrValueAttr(${ctlExpr})`);
+				if (formControlPart === -1) {
+					flush();
+					formControlPart = parts.length;
+					parts.push('');
 				}
+				// Bind every writer in authored order, even when a controlled value
+				// ultimately wins over its default. Besides preserving side effects,
+				// this lets spread snapshots run between surrounding direct writers.
+				const tmp = bindAttributeEvaluation(ctlExpr);
+				formControlSources.push(`[false, ${JSON.stringify(attrName)}, ${tmp}]`);
 				continue;
 			}
 			// textarea / select: value/defaultValue never serialize as attributes —
 			// captured for the content position (textarea) / projection scope (select).
-			const ctlExpr =
-				ctlInner === null ? 'true' : printExprWithTsrx(ctlInner, ctx, name, inlinedSubs);
-			if (attrName === 'value') ctlValue = ctlExpr;
+			const ctlExpr = bindAttributeEvaluation(
+				ctlInner === null ? 'true' : printExprWithTsrx(ctlInner, ctx, name, inlinedSubs),
+			);
+			if (resolveFormControlsAcrossSpreads) {
+				if (tag === 'select' && formControlPart === -1) {
+					flush();
+					formControlPart = parts.length;
+					parts.push('');
+				}
+				formControlSources.push(`[false, ${JSON.stringify(attrName)}, ${ctlExpr}]`);
+			} else if (attrName === 'value') ctlValue = ctlExpr;
 			else ctlDefault = ctlExpr;
 			continue;
 		}
 		if (tag === 'select' && attrName === 'multiple') {
+			if (resolveFormControlsAcrossSpreads) {
+				const mInner =
+					val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
+				const multipleExpr = bindAttributeEvaluation(
+					mInner === null ? 'true' : printExprWithTsrx(mInner, ctx, name, inlinedSubs),
+				);
+				if (formControlPart === -1) {
+					flush();
+					formControlPart = parts.length;
+					parts.push('');
+				}
+				formControlSources.push(`[false, "multiple", ${multipleExpr}]`);
+				continue;
+			}
 			// Serialize the attribute normally AND capture the value for the
 			// option-projection scope — a dynamic value binds to a temp so the
 			// expression evaluates once.
@@ -5135,18 +5398,26 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				else if (typeof mInner.value === 'number') lit += ` multiple="${mInner.value}"`;
 				continue;
 			}
-			const tmp = `__sp${spreadTemps.length}`;
-			spreadTemps.push({
-				tempName: tmp,
-				argExpr: printExprWithTsrx(mInner, ctx, name, inlinedSubs),
-			});
+			const tmp = bindAttributeEvaluation(printExprWithTsrx(mInner, ctx, name, inlinedSubs));
 			selMultiple = tmp;
 			flush();
 			ctx.runtimeNeeded.add('ssrAttr');
-			parts.push(`_$ssrAttr('multiple', ${tmp}, ${JSON.stringify(tag)})`);
+			parts.push(
+				`_$ssrAttr('multiple', ${tmp}, ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)})`,
+			);
 			continue;
 		}
 		if (tag === 'option' && attrName === 'value') {
+			if (resolveAttrsAcrossSpreads) {
+				ensureAttrPart();
+				const oInner =
+					val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
+				const optionExpr = bindAttributeEvaluation(
+					oInner === null ? 'true' : printExprWithTsrx(oInner, ctx, name, inlinedSubs),
+				);
+				attrSources.push(`[false, "value", ${optionExpr}]`);
+				continue;
+			}
 			// The option's value feeds BOTH the attribute and the select-scope
 			// compare — a dynamic value binds to a temp for single evaluation.
 			if (val == null) {
@@ -5162,15 +5433,29 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				else if (oInner.value === true) lit += ' value';
 				continue;
 			}
-			const tmp = `__sp${spreadTemps.length}`;
-			spreadTemps.push({
-				tempName: tmp,
-				argExpr: printExprWithTsrx(oInner, ctx, name, inlinedSubs),
-			});
+			const tmp = bindAttributeEvaluation(printExprWithTsrx(oInner, ctx, name, inlinedSubs));
 			optValue = tmp;
 			flush();
 			ctx.runtimeNeeded.add('ssrAttr');
-			parts.push(`_$ssrAttr('value', ${tmp}, ${JSON.stringify(tag)})`);
+			parts.push(`_$ssrAttr('value', ${tmp}, ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)})`);
+			continue;
+		}
+
+		if (resolveAttrsAcrossSpreads) {
+			ensureAttrPart();
+			let attrExpr;
+			if (val == null) {
+				attrExpr = 'true';
+			} else {
+				const attrInner = resolveStyleExpr(
+					val.type === 'JSXExpressionContainer' ? val.expression : val,
+					cssHash,
+				);
+				attrExpr = printExprWithTsrx(attrInner, ctx, name, inlinedSubs);
+			}
+			attrSources.push(
+				`[false, ${JSON.stringify(rawAttrName)}, ${bindAttributeEvaluation(attrExpr)}]`,
+			);
 			continue;
 		}
 
@@ -5195,7 +5480,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			}
 			flush();
 			ctx.runtimeNeeded.add('ssrStyle');
-			parts.push(`_$ssrStyle(${printExprWithTsrx(inner, ctx, name, inlinedSubs)})`);
+			parts.push(
+				`_$ssrStyle(${bindAttributeEvaluation(printExprWithTsrx(inner, ctx, name, inlinedSubs))})`,
+			);
 			continue;
 		}
 
@@ -5203,7 +5490,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		// bakeStaticAttr applies the shared React-parity value tables (client
 		// bake stays byte-identical — hydration parity).
 		if (!isAfterSpread && inner.type === 'Literal') {
-			lit += bakeStaticAttr(attrName, inner.value, tag);
+			lit += bakeStaticAttr(attrName, inner.value, tag, selfNs);
 			continue;
 		}
 
@@ -5222,8 +5509,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			flush();
 			ctx.runtimeNeeded.add('ssrAttr');
 			const outName = tag === 'form' ? 'action' : 'formaction';
+			const valueExpr = bindAttributeEvaluation(printExprWithTsrx(inner, ctx, name, inlinedSubs));
 			parts.push(
-				`_$ssrAttr(${JSON.stringify(outName)}, ((__v) => (typeof __v === 'function' ? null : __v))(${printExprWithTsrx(inner, ctx, name, inlinedSubs)}), ${JSON.stringify(tag)})`,
+				`_$ssrAttr(${JSON.stringify(outName)}, ((__v) => (typeof __v === 'function' ? null : __v))(${valueExpr}), ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)})`,
 			);
 			continue;
 		}
@@ -5231,18 +5519,61 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		// Dynamic attribute (or literal after a spread).
 		flush();
 		ctx.runtimeNeeded.add('ssrAttr');
+		const valueExpr = bindAttributeEvaluation(printExprWithTsrx(inner, ctx, name, inlinedSubs));
 		parts.push(
-			`_$ssrAttr(${JSON.stringify(attrName)}, ${printExprWithTsrx(inner, ctx, name, inlinedSubs)}, ${JSON.stringify(tag)})`,
+			`_$ssrAttr(${JSON.stringify(attrName)}, ${valueExpr}, ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)})`,
 		);
 	}
-
-	if (resolveClassAcrossSpreads) {
-		ctx.runtimeNeeded.add('ssrClass');
-		parts[classPartIndex] = `_$ssrClass([${classSources.join(', ')}])`;
+	if (formControlPart !== -1) {
+		if (tag === 'input') {
+			ctx.runtimeNeeded.add('ssrInputAttrs');
+			const inputAttrs = `_$ssrInputAttrs([${formControlSources.join(', ')}])`;
+			// React serializes/coerces ordinary attributes before projecting the
+			// effective checked/value state. Expressions and spread getters have
+			// already run into temps in authored order; move only this serialization
+			// helper after the generic attr channel.
+			parts.splice(formControlPart, 1);
+			if (attrPart > formControlPart) attrPart--;
+			flush();
+			parts.push(inputAttrs);
+		} else {
+			ctx.runtimeNeeded.add('ssrSelectAttrs');
+			parts[formControlPart] = `_$ssrSelectAttrs([${formControlSources.join(', ')}])`;
+		}
+	}
+	if (attrPart !== -1) {
+		ctx.runtimeNeeded.add('ssrAttrs');
+		parts[attrPart] =
+			`_$ssrAttrs([${attrSources.join(', ')}], ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)}, ${resolveFormControlsAcrossSpreads ? 'true' : 'false'})`;
 	}
 
-	// Void elements: `<tag …/>`, no children.
-	if (VOID_ELEMENTS.has(tag) && (node.children || []).length === 0) {
+	// Void elements may contain syntactic whitespace/comments/nullish holes. They
+	// still self-close, while every nullish expression evaluates once in normal
+	// JSX order (attributes first, then children).
+	if (VOID_ELEMENTS.has(tag) && hasOnlyPotentiallyNullishVoidChildren(node.children || [])) {
+		const nestedVoidChildrenSources = [];
+		for (const child of node.children || []) {
+			if (
+				child?.type === 'JSXExpressionContainer' &&
+				child.expression &&
+				child.expression.type !== 'JSXEmptyExpression'
+			) {
+				const childValue = bindAttributeEvaluation(
+					printExprWithTsrx(rewriteJsxValues(child.expression, ctx), ctx, name, inlinedSubs),
+				);
+				nestedVoidChildrenSources.push(`[true, ${childValue}]`);
+			}
+		}
+		const effectiveVoidChildrenSources = hasSemanticJsxChildren(node.children || [])
+			? nestedVoidChildrenSources
+			: childrenPropSources;
+		if (htmlSources.length > 0 || effectiveVoidChildrenSources.length > 0) {
+			flush();
+			ctx.runtimeNeeded.add('ssrVoidContent');
+			parts.push(
+				`_$ssrVoidContent(${JSON.stringify(tag)}, [${htmlSources.join(', ')}], [${effectiveVoidChildrenSources.join(', ')}])`,
+			);
+		}
 		lit += '/>';
 		flush();
 		return finalize();
@@ -5250,6 +5581,12 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 
 	if (tag !== 'option') lit += '>'; // option: ssrOption assembles the tag (attrs-only here)
 	const normChildren = normalizeChildren(node.children || [], childNs === 'svg');
+	const hasNestedChildren = normChildren.length > 0;
+	const effectiveChildrenPropSources = hasNestedChildren ? [] : childrenPropSources;
+	const definitelyHasDangerChild = hasDefinitelyNonNullishJsxChild(
+		node.children || [],
+		ctx.knownStringLocals,
+	);
 	// Only-child renderable `{expr}` → markerless `ssrChildText` (mirrors the client's
 	// markerless `childTextHole` mount: a primitive is the host's bare text, an object
 	// still gets a `<!--[-->…<!--]-->` block). Must match the client's only-child
@@ -5286,22 +5623,36 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			nlGuardFirst,
 		);
 	}
+	// `children=` and spread-held children are content props, not attributes.
+	// With no nested JSX children, the last present writer renders as the host's
+	// sole child. A nested JSX child (including `{null}`) is the transform's final
+	// writer and therefore leaves these earlier attribute sources inactive.
+	if (effectiveChildrenPropSources.length > 0) {
+		ctx.runtimeNeeded.add('ssrChildrenSources');
+		childrenExpr = `_$ssrChildrenSources([${effectiveChildrenPropSources.join(', ')}], () => (${childrenExpr}), __s)`;
+	}
 	// Controlled `<textarea value/defaultValue>`: the prop IS the content
 	// (children were rejected at compile time) — value wins over defaultValue,
 	// a nullish value falls through to the default (the client cascade).
-	if (tag === 'textarea' && (ctlValue !== null || ctlDefault !== null)) {
+	if (tag === 'textarea' && resolveFormControlsAcrossSpreads) {
+		ctx.runtimeNeeded.add('ssrTextareaValueSources');
+		childrenExpr = `(_$ssrTextareaValueSources([${formControlSources.join(', ')}]) ?? (${childrenExpr}))`;
+	} else if (tag === 'textarea' && (ctlValue !== null || ctlDefault !== null)) {
 		ctx.runtimeNeeded.add('ssrTextareaValue');
 		const src =
 			ctlValue !== null && ctlDefault !== null
 				? `(${ctlValue}) ?? (${ctlDefault})`
 				: (ctlValue ?? ctlDefault);
-		childrenExpr = `_$ssrTextareaValue(${src})`;
+		childrenExpr = `((${src}) == null ? (${childrenExpr}) : _$ssrTextareaValue(${src}))`;
 	}
 	// Controlled `<select value/defaultValue>`: push the option-projection
 	// scope around the children serialization — every compiled/de-opt
 	// `<option>` inside (across component boundaries and @for bodies; SSR is a
 	// synchronous nested call tree) consults it via ssrOption.
-	if (tag === 'select' && (ctlValue !== null || ctlDefault !== null)) {
+	if (tag === 'select' && resolveFormControlsAcrossSpreads) {
+		ctx.runtimeNeeded.add('ssrSelectScopeSources');
+		childrenExpr = `_$ssrSelectScopeSources([${formControlSources.join(', ')}], () => (${childrenExpr}))`;
+	} else if (tag === 'select' && (ctlValue !== null || ctlDefault !== null)) {
 		ctx.runtimeNeeded.add('ssrSelectScope');
 		childrenExpr = `_$ssrSelectScope(${ctlValue ?? 'void 0'}, ${ctlDefault ?? 'void 0'}, ${selMultiple}, () => (${childrenExpr}))`;
 	}
@@ -5311,13 +5662,18 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		let contentExpr = childrenExpr;
 		if (htmlSources.length > 0) {
 			ctx.runtimeNeeded.add('ssrInnerHtml');
-			contentExpr = `(_$ssrInnerHtml([${htmlSources.join(', ')}]) ?? (${childrenExpr}))`;
+			contentExpr = `(_$ssrInnerHtml([${htmlSources.join(', ')}], () => (${childrenExpr}), ${definitelyHasDangerChild}, [${effectiveChildrenPropSources.join(', ')}]) ?? (${childrenExpr}))`;
 		}
 		flush();
 		const attrsExpr = parts.length > 0 ? parts.join(' + ') : "''";
 		parts.length = 0;
 		ctx.runtimeNeeded.add('ssrOption');
-		parts.push(`_$ssrOption(${optValue ?? 'void 0'}, ${attrsExpr}, ${contentExpr})`);
+		let optionValueExpr = optValue ?? 'void 0';
+		if (resolveAttrsAcrossSpreads) {
+			ctx.runtimeNeeded.add('ssrOptionValueSources');
+			optionValueExpr = `_$ssrOptionValueSources([${attrSources.join(', ')}])`;
+		}
+		parts.push(`_$ssrOption(${optionValueExpr}, ${attrsExpr}, ${contentExpr})`);
 		return finalize();
 	}
 	if (htmlSources.length > 0) {
@@ -5326,7 +5682,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		const innerHtmlHelper = tag === 'script' ? 'ssrScriptInnerHtml' : 'ssrInnerHtml';
 		ctx.runtimeNeeded.add(innerHtmlHelper);
 		flush();
-		parts.push(`(_$${innerHtmlHelper}([${htmlSources.join(', ')}]) ?? (${childrenExpr}))`);
+		parts.push(
+			`(_$${innerHtmlHelper}([${htmlSources.join(', ')}], () => (${childrenExpr}), ${definitelyHasDangerChild}, [${effectiveChildrenPropSources.join(', ')}]) ?? (${childrenExpr}))`,
+		);
 	} else if (childrenExpr !== "''") {
 		flush();
 		parts.push(childrenExpr);
@@ -8518,7 +8876,10 @@ function jsxElementToCreateElement(node, ctx) {
 	const compNode = isComponentTag(node)
 		? jsxNameToExpr(nameNode)
 		: { type: 'Literal', value: nameNode.name != null ? nameNode.name : String(nameNode) };
-	if (!isComponentTag(node)) rejectVoidElementContent(compNode.value, node, ctx);
+	if (!isComponentTag(node)) {
+		rejectVoidElementContent(compNode.value, node, ctx);
+		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
+	}
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const properties = [];
 	for (const attr of attrs) {
@@ -9709,7 +10070,10 @@ function planJsx(
 		// Multiple explicit writers for the same slot have the same constraint:
 		// every writer must stay live so the last one in JSX order keeps winning.
 		if ((sharesSpreadHost || sharesEventSlot) && b.mountOnly) b.mountOnly = false;
-		b.deferred = DEFERRABLE_MOUNT_KINDS.has(b.kind) && !sharesSpreadHost;
+		b.deferred =
+			DEFERRABLE_MOUNT_KINDS.has(b.kind) &&
+			!sharesSpreadHost &&
+			b.name !== 'dangerouslySetInnerHTML';
 	}
 
 	// Materialize compiler-owned event callbacks only where the DOM installs
@@ -9799,7 +10163,14 @@ function planJsx(
 		}
 		if (b.kind === 'style') ctx.runtimeNeeded.add('setStyle');
 		if (b.kind === 'formAction') ctx.runtimeNeeded.add('setFormAction');
-		if (b.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setHTML');
+		if (b.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setDangerouslySetInnerHTML');
+		if (b.kind === 'dangerCommit') ctx.runtimeNeeded.add('setDangerouslySetInnerHTMLSources');
+		if (b.kind === 'formCommit') ctx.runtimeNeeded.add('setFormControlSources');
+		if (b.kind === 'hostCommit') {
+			ctx.runtimeNeeded.add('setHostPropSources');
+			ctx.runtimeNeeded.add('queueRefDetach');
+		}
+		if (b.kind === 'dangerChild') ctx.runtimeNeeded.add('markDangerouslySetInnerHTMLChildren');
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
 			// the update helper but still share the compact mount helper call.
@@ -9920,6 +10291,8 @@ function planJsx(
 					rm.push('r', bag.letter(`_ref$${b.id}`), bag.letter(`_el$${b.id}`));
 				} else if (b.kind === 'spread') {
 					rm.push('s', bag.letter(`_sp$${b.id}`), bag.letter(`_el$${b.id}`));
+				} else if (b.kind === 'hostCommit') {
+					rm.push('s', bag.letter(`_host$${b.id}`), bag.letter(`_el$${b.id}`));
 				} else if (b.kind === 'fragmentRef') {
 					rm.push('f', bag.letter(`_fi$${b.id}`), '');
 				}
@@ -10126,6 +10499,12 @@ function planJsx(
 	for (const cc of compCalls) {
 		const slotIndex = cc.slotIndex;
 		const hostExpr = hostExprFor(`_compHost$${cc.id}`);
+		if (cc.hostChildrenBinding != null) {
+			const props = `_b.${bag.letter(`_host$${cc.hostChildrenBinding.id}`)}`;
+			cc.valueExpr = `Object.prototype.propertyIsEnumerable.call(${props}, "children") ? ${props}.children : undefined`;
+		} else if (cc.directChildrenBinding != null) {
+			cc.valueExpr = `_b.${bag.letter(`_prev$${cc.directChildrenBinding.id}`)}`;
+		}
 		// Renderable `{expr}` hole — dispatch the value at runtime (component /
 		// element → block; primitive → text; nullish/boolean/'' → nothing). Shares
 		// the host/`<!>`-anchor resolution + hole-aware hydration walk with real
@@ -10136,13 +10515,24 @@ function planJsx(
 			// like a `.tsrx` only-child text binding — and fall back to `childTextHole`
 			// (→ childSlot, lazy markers) only for objects / first render / mode switch.
 			if (cc.onlyChildText && !noTemplate) {
-				ctx.runtimeNeeded.add('setText');
 				ctx.runtimeNeeded.add('childTextHole');
 				const chp = `_b.${bag.letter(`_chp$${cc.id}`)}`;
 				const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
+				// A host that can receive dangerouslySetInnerHTML must validate its
+				// current child on EVERY render. The ordinary primitive fast path can
+				// identity-skip an unchanged child while a raw-HTML writer activates in
+				// the same render, bypassing childTextHole's mutual-exclusion check.
+				if (cc.potentialDangerouslySetInnerHTML) {
+					pushAfter(
+						cc.id,
+						`  { const _v = (${cc.valueExpr}); ${chv} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, ${chv}); ${chp} = _v; }`,
+					);
+					continue;
+				}
+				ctx.runtimeNeeded.add('setText');
 				pushAfter(
 					cc.id,
-					`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); } }`,
+					`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); ${chp} = _v; } }`,
 				);
 				continue;
 			}
@@ -10175,7 +10565,6 @@ function planJsx(
 			// changed-context consumers below (a stable `{children}` passthrough under
 			// a re-rendering Provider), so an inline identity skip would strand them.
 			// Only unchanged primitives/null (no consumers possible) skip the call.
-			ctx.runtimeNeeded.add('setText');
 			ctx.runtimeNeeded.add('textHole');
 			// When the slot has its OWN `<!>` placeholder, tell textHole/childSlot to
 			// reuse it as the end marker (no second comment minted) — `ownEnd`.
@@ -10183,6 +10572,14 @@ function planJsx(
 			const coalesceArg = cc.coalesceRange ? (cc.anchorVar ? ', true' : ', undefined, true') : '';
 			const chp = `_b.${bag.letter(`_chp$${cc.id}`)}`;
 			const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
+			if (cc.potentialDangerouslySetInnerHTML) {
+				pushAfter(
+					cc.id,
+					`  { const _v = (${cc.valueExpr}); ${chp} = _v; ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}${coalesceArg}); }`,
+				);
+				continue;
+			}
+			ctx.runtimeNeeded.add('setText');
 			pushAfter(
 				cc.id,
 				`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}${coalesceArg}); } }`,
@@ -10466,6 +10863,7 @@ function emitBindingMount(b, elVar, bag) {
 	// `suppressHydrationWarning`: stamp a JS flag (NOT a DOM attribute) the runtime reads to
 	// keep the server value + skip the warning on a hydration mismatch for this element.
 	if (b.kind === 'suppress') return `    ${elVar}.__oct_suppress = true;`;
+	if (b.kind === 'dangerChild') return `    _$markDangerouslySetInnerHTMLChildren(${elVar});`;
 	const E = `(${b.expr})`;
 	switch (b.kind) {
 		case 'textOnlyChild': {
@@ -10483,9 +10881,61 @@ function emitBindingMount(b, elVar, bag) {
 		case 'htmlOnlyChild': {
 			return `    {
       const _v = ${E};
-      _$setHTML(${elVar}, _v);
+      _$setDangerouslySetInnerHTML(${elVar}, _v);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
+    }`;
+		}
+		case 'dangerValue': {
+			return `    ${bag.local(`_prev$${b.id}`)} = ${E};`;
+		}
+		case 'formValue':
+		case 'hostValue': {
+			return `    ${bag.local(`_prev$${b.id}`)} = ${E};`;
+		}
+		case 'hostSpread': {
+			return `    ${bag.local(`_sp$${b.id}`)} = ${E};`;
+		}
+		case 'dangerCommit': {
+			const sources = b.sources
+				.map(({ spread, binding }) => {
+					const prefix = spread ? '_sp' : '_prev';
+					return `[${spread ? 'true' : 'false'}, ${bag.local(`${prefix}$${binding.id}`)}]`;
+				})
+				.join(', ');
+			return `    {
+      _$setDangerouslySetInnerHTMLSources(${elVar}, [${sources}]);
+			  ${bag.local(`_el$${b.id}`)} = ${elVar};
+    }`;
+		}
+		case 'formCommit': {
+			const sources = b.sources
+				.map(({ spread, name, binding }) => {
+					const prefix = spread ? '_sp' : '_prev';
+					const value = bag.local(`${prefix}$${binding.id}`);
+					return spread ? `[true, ${value}]` : `[false, ${JSON.stringify(name)}, ${value}]`;
+				})
+				.join(', ');
+			return `    {
+      _$setFormControlSources(${elVar}, [${sources}]);
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
+    }`;
+		}
+		case 'hostCommit': {
+			const sources = b.sources
+				.map(({ spread, name, binding }) => {
+					const value = bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`);
+					return spread ? `[true, ${value}]` : `[false, ${JSON.stringify(name)}, ${value}]`;
+				})
+				.join(', ');
+			const el = bag.local(`_el$${b.id}`);
+			const props = bag.local(`_host$${b.id}`);
+			const propsField = bag.letter(`_host$${b.id}`);
+			const elField = bag.letter(`_el$${b.id}`);
+			return `    {
+      ${el} = ${elVar};
+      ${props} = _$setHostPropSources(${elVar}, [${sources}], undefined, __s, ${b.hasNestedChildren ? 'true' : 'false'});
+      __s.cleanups.push(() => { const _p = _b.${propsField}; if (_p != null && Object.prototype.propertyIsEnumerable.call(_p, 'ref') && _p.ref != null) _$queueRefDetach(_p.ref, _b.${elField}); });
     }`;
 		}
 		case 'text': {
@@ -10578,12 +11028,17 @@ function emitBindingMount(b, elVar, bag) {
 			// The cleanup closure reads the bag through the captured `_b` — the bag
 			// exists by the time any cleanup runs (committed at mount end), and the
 			// `_sp$` field is re-written by updates, so the read must be live.
+			const flags = b.skipFormControls
+				? `, ${b.skipDangerouslySetInnerHTML ? 'true' : 'false'}, true`
+				: b.skipDangerouslySetInnerHTML
+					? ', true'
+					: '';
 			return `    {
       const _v = ${E};
-      _$setSpread(${elVar}, _v, undefined, __s);
+      _$setSpread(${elVar}, _v, undefined, __s${flags});
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_sp$${b.id}`)} = _v;
-      __s.cleanups.push(() => { const _sp = _b.${bag.letter(`_sp$${b.id}`)}; if (_sp != null && _sp.ref != null) _$queueRefDetach(_sp.ref, _b.${bag.letter(`_el$${b.id}`)}); });
+      __s.cleanups.push(() => { const _sp = _b.${bag.letter(`_sp$${b.id}`)}; if (_sp != null && Object.prototype.propertyIsEnumerable.call(Object(_sp), 'ref') && _sp.ref != null) _$queueRefDetach(_sp.ref, _b.${bag.letter(`_el$${b.id}`)}); });
     }`;
 		}
 		case 'event': {
@@ -10674,7 +11129,45 @@ function emitBindingUpdate(b, bag) {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setText(${F('_txt')}, _v); ${F('_prev')} = _v; } }`;
 		}
 		case 'htmlOnlyChild': {
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setHTML(${F('_el')}, _v); ${F('_prev')} = _v; } }`;
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setDangerouslySetInnerHTML(${F('_el')}, _v); ${F('_prev')} = _v; } }`;
+		}
+		case 'dangerValue': {
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) ${F('_prev')} = _v; }`;
+		}
+		case 'formValue':
+		case 'hostValue': {
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) ${F('_prev')} = _v; }`;
+		}
+		case 'hostSpread': {
+			return `    ${F('_sp')} = ${E};`;
+		}
+		case 'dangerCommit': {
+			const sources = b.sources
+				.map(({ spread, binding }) => {
+					const prefix = spread ? '_sp' : '_prev';
+					return `[${spread ? 'true' : 'false'}, _b.${bag.letter(`${prefix}$${binding.id}`)}]`;
+				})
+				.join(', ');
+			return `    _$setDangerouslySetInnerHTMLSources(${F('_el')}, [${sources}]);`;
+		}
+		case 'formCommit': {
+			const sources = b.sources
+				.map(({ spread, name, binding }) => {
+					const prefix = spread ? '_sp' : '_prev';
+					const value = `_b.${bag.letter(`${prefix}$${binding.id}`)}`;
+					return spread ? `[true, ${value}]` : `[false, ${JSON.stringify(name)}, ${value}]`;
+				})
+				.join(', ');
+			return `    _$setFormControlSources(${F('_el')}, [${sources}]);`;
+		}
+		case 'hostCommit': {
+			const sources = b.sources
+				.map(({ spread, name, binding }) => {
+					const value = `_b.${bag.letter(`${spread ? '_sp' : '_prev'}$${binding.id}`)}`;
+					return spread ? `[true, ${value}]` : `[false, ${JSON.stringify(name)}, ${value}]`;
+				})
+				.join(', ');
+			return `    ${F('_host')} = _$setHostPropSources(${F('_el')}, [${sources}], ${F('_host')}, __s, ${b.hasNestedChildren ? 'true' : 'false'});`;
 		}
 		case 'attr': {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
@@ -10718,7 +11211,12 @@ function emitBindingUpdate(b, bag) {
 			// `__s` rides along on updates too so a spread-supplied ref's attach is
 			// deferred to commit (after all queued detaches) — same phasing as the
 			// direct `ref` binding above.
-			return `    { const _v = ${E}; if (${F('_sp')} !== _v) { _$setSpread(${F('_el')}, _v, ${F('_sp')}, __s); ${F('_sp')} = _v; } }`;
+			const flags = b.skipFormControls
+				? `, ${b.skipDangerouslySetInnerHTML ? 'true' : 'false'}, true`
+				: b.skipDangerouslySetInnerHTML
+					? ', true'
+					: '';
+			return `    { const _v = ${E}; if (${F('_sp')} !== _v) { _$setSpread(${F('_el')}, _v, ${F('_sp')}, __s${flags}); ${F('_sp')} = _v; } }`;
 		}
 		case 'event': {
 			return `    ${F('_el')}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
@@ -10964,6 +11462,7 @@ function emitElementHtml(
 	if (!tag) throw new Error('Element without tag');
 	rejectVoidElementContent(tag, node, ctx);
 	rejectTextareaValueChildren(tag, node, ctx);
+	rejectDangerouslySetInnerHTMLChildren(tag, node, ctx);
 
 	// The host element's own namespace (e.g. `<svg>` is in SVG ns even if its
 	// parent context is HTML); its descendants' inherited ns may differ
@@ -10973,6 +11472,14 @@ function emitElementHtml(
 
 	// Collect attributes.
 	const attrs = node.attributes || node.openingElement?.attributes || [];
+	// A null/undefined child alongside direct raw HTML is semantically absent.
+	// Suppress its child binding so hydration cannot clear the raw HTML that the
+	// preceding binding just adopted/applied.
+	const potentialDangerouslySetInnerHTML = hasPotentialDangerouslySetInnerHTML(node);
+	const sourceChildren =
+		potentialDangerouslySetInnerHTML && hasOnlyDefinitelyNullishJsxChildren(node.children || [])
+			? []
+			: node.children || [];
 	// React convention: later attributes win on collision. If ANY spread is
 	// present, attributes that come AFTER the first spread can't be inlined
 	// into the template HTML (the spread would clobber them at runtime) —
@@ -10980,12 +11487,47 @@ function emitElementHtml(
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
 	);
+	const directPropIdentities = new Set();
+	let hasDuplicateDirectProp = false;
+	for (const attr of attrs) {
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		const rawName = jsxAttrRawName(attr);
+		if (rawName === 'key') continue;
+		const name = normalizeJsxAttrName(rawName, tag, hostNs);
+		const identity = hostNs === 'html' ? name.toLowerCase() : name;
+		if (directPropIdentities.has(identity)) hasDuplicateDirectProp = true;
+		else directPropIdentities.add(identity);
+	}
+	const directPropNames = new Set(
+		attrs
+			.filter((attr) => attr.type === 'Attribute' || attr.type === 'JSXAttribute')
+			.map((attr) => normalizeJsxAttrName(jsxAttrRawName(attr), tag, hostNs)),
+	);
+	const hasDirectFormCascade =
+		((tag === 'input' || tag === 'textarea' || tag === 'select') &&
+			directPropNames.has('value') &&
+			directPropNames.has('defaultValue')) ||
+		(tag === 'input' && directPropNames.has('checked') && directPropNames.has('defaultChecked')) ||
+		(tag === 'select' &&
+			directPropNames.has('multiple') &&
+			(directPropNames.has('value') || directPropNames.has('defaultValue')));
+	const resolveHostPropsAcrossSources =
+		firstSpreadIdx !== -1 || hasDuplicateDirectProp || hasDirectFormCascade;
+	const hostClientSources = [];
+	let directChildrenClientBinding = null;
+	let hostCommitClientBinding = null;
+	const hasNestedJsxChildren = normalizeChildren(node.children || [], childNs === 'svg').length > 0;
+	const resolveDangerouslySetInnerHTMLAcrossSpreads = firstSpreadIdx !== -1;
+	const dangerHtmlClientSources = [];
+	const resolveFormControlsAcrossSpreads =
+		firstSpreadIdx !== -1 && (tag === 'input' || tag === 'textarea' || tag === 'select');
+	const formControlClientSources = [];
 	// Strict whole-element proofs for the two lean controlled-form helpers. A
 	// spread or duplicate/conflicting writer makes source-order ownership
 	// ambiguous, so those elements keep the generic helpers. Select is excluded:
 	// its default projection is commit-deferred and option-aware.
 	const directAttrs = attrs.filter((a) => a.type === 'Attribute' || a.type === 'JSXAttribute');
-	const directAttrName = (a) => normalizeJsxAttrName(jsxAttrRawName(a), tag);
+	const directAttrName = (a) => normalizeJsxAttrName(jsxAttrRawName(a), tag, hostNs);
 	const valueWriters = directAttrs.filter((a) => directAttrName(a) === 'value');
 	const defaultValueWriters = directAttrs.filter((a) => directAttrName(a) === 'defaultValue');
 	const checkedWriters = directAttrs.filter((a) => directAttrName(a) === 'checked');
@@ -11017,12 +11559,54 @@ function emitElementHtml(
 		// routes each key (class / style / on… / attr / ref) and diffs against
 		// the prior spread object to clear removed keys.
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			const expr = printExprWithTsrx(attr.argument, ctx, componentName, inlinedSubs);
-			bindings.push({ id: bindings.length, kind: 'spread', expr, path, ns: hostNs });
+			ctx.runtimeNeeded.add('snapshotSpread');
+			const expr = `_$snapshotSpread(${printExprWithTsrx(attr.argument, ctx, componentName, inlinedSubs)})`;
+			const binding = {
+				id: bindings.length,
+				kind: 'hostSpread',
+				expr,
+				path,
+				ns: hostNs,
+			};
+			bindings.push(binding);
+			hostClientSources.push({ spread: true, binding });
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const rawAttrName = jsxAttrRawName(attr);
+		if (resolveHostPropsAcrossSources) {
+			if (rawAttrName === 'ref') {
+				if (sawRef) {
+					throw new Error(
+						'Element has multiple `ref={…}` attributes; an element may have ' +
+							'at most one. Use a single array-valued ref to attach multiple, ' +
+							'e.g. `ref={[a, b]}` (attachRef in the runtime iterates the array).',
+					);
+				}
+				sawRef = true;
+			}
+			const val = attr.value;
+			let expr;
+			if (val == null) {
+				expr = 'true';
+			} else {
+				const inner = resolveStyleExpr(
+					val.type === 'JSXExpressionContainer' ? val.expression : val,
+					cssHash,
+				);
+				expr = printExprWithTsrx(inner, ctx, componentName, inlinedSubs);
+			}
+			const binding = {
+				id: bindings.length,
+				kind: 'hostValue',
+				name: rawAttrName,
+				expr,
+				path,
+			};
+			bindings.push(binding);
+			hostClientSources.push({ spread: false, name: rawAttrName, binding });
+			continue;
+		}
 		// `key` on a regular element:
 		//   - inside @for: consumed by the keyFn (keyed reconciliation drives
 		//     this).
@@ -11046,9 +11630,30 @@ function emitElementHtml(
 			if (!isFalse) bindings.push({ id: bindings.length, kind: 'suppress', path });
 			continue;
 		}
-		const attrName = normalizeJsxAttrName(rawAttrName, tag);
+		const attrName = normalizeJsxAttrName(rawAttrName, tag, hostNs);
 
 		const val = attr.value;
+		if (rawAttrName === 'children') {
+			const childExpr =
+				val == null
+					? 'true'
+					: printExprWithTsrx(
+							val.type === 'JSXExpressionContainer' ? val.expression : val,
+							ctx,
+							componentName,
+							inlinedSubs,
+						);
+			const binding = {
+				id: bindings.length,
+				kind: 'hostValue',
+				name: 'children',
+				expr: childExpr,
+				path,
+			};
+			bindings.push(binding);
+			directChildrenClientBinding = binding;
+			continue;
+		}
 		// If this attr comes AFTER a spread, we MUST emit as a binding (later wins).
 		const isAfterSpread = firstSpreadIdx !== -1 && attrI > firstSpreadIdx;
 		// A direct class before the first spread must also be a runtime writer. SSR
@@ -11088,18 +11693,32 @@ function emitElementHtml(
 		}
 		// React-style raw HTML: `dangerouslySetInnerHTML={{ __html: expr }}`. When the
 		// element has no other children (and no spread that could clobber it), take the
-		// `htmlOnlyChild` fast path on the extracted `__html` expression. Otherwise pass
+		// `htmlOnlyChild` fast path on the complete value object. Keeping the object
+		// intact lets the runtime validate malformed values before reading `.__html`.
+		// Otherwise pass
 		// the `{__html}` object through a regular attr binding; the runtime's
 		// `dangerouslySetInnerHTML` property path reads `.__html` and sets innerHTML.
-		if (attrName === 'dangerouslySetInnerHTML' && val) {
-			const obj = val.type === 'JSXExpressionContainer' ? val.expression : val;
+		if (attrName === 'dangerouslySetInnerHTML') {
+			const obj = val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
+			const expr = obj === null ? 'true' : printExprWithTsrx(obj, ctx, componentName, inlinedSubs);
+			if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
+				const binding = {
+					id: bindings.length,
+					kind: 'dangerValue',
+					expr,
+					path,
+				};
+				bindings.push(binding);
+				dangerHtmlClientSources.push({ spread: false, binding });
+				continue;
+			}
 			const noChildren =
-				(node.children || []).length === 0 || normalizeChildren(node.children || []).length === 0;
+				sourceChildren.length === 0 || normalizeChildren(sourceChildren).length === 0;
 			if (noChildren && !isAfterSpread) {
 				bindings.push({
 					id: bindings.length,
 					kind: 'htmlOnlyChild',
-					expr: printExpr(dangerHtmlExpr(obj)),
+					expr,
 					script: tag === 'script',
 					path,
 				});
@@ -11109,7 +11728,7 @@ function emitElementHtml(
 				id: bindings.length,
 				kind: 'attr',
 				name: 'dangerouslySetInnerHTML',
-				expr: printExprWithTsrx(obj, ctx, componentName, inlinedSubs),
+				expr,
 				path,
 				ns: hostNs,
 			});
@@ -11120,6 +11739,30 @@ function emitElementHtml(
 		// literals and bare booleans (`<input checked/>`) included; nothing
 		// bakes into the template HTML (see controlledKindFor).
 		let ctlKind = controlledKindFor(tag, attrName);
+		if (
+			resolveFormControlsAcrossSpreads &&
+			(ctlKind !== null || (tag === 'select' && attrName === 'multiple'))
+		) {
+			const formExpr =
+				val == null
+					? 'true'
+					: printExprWithTsrx(
+							val.type === 'JSXExpressionContainer' ? val.expression : val,
+							ctx,
+							componentName,
+							inlinedSubs,
+						);
+			const binding = {
+				id: bindings.length,
+				kind: 'formValue',
+				name: attrName,
+				expr: formExpr,
+				path,
+			};
+			bindings.push(binding);
+			formControlClientSources.push({ spread: false, name: attrName, binding });
+			continue;
+		}
 		if (ctlKind !== null) {
 			if (ctlKind === 'defaultValue' && leanDefaultValue) {
 				ctlKind = 'defaultValueUncontrolled';
@@ -11138,7 +11781,7 @@ function emitElementHtml(
 		}
 		// `autoFocus` never bakes/writes an attribute — React parity: the
 		// runtime focuses the element in its mount commit (setAutoFocus).
-		if (attrName === 'autoFocus' && !tag.includes('-')) {
+		if (attrName === 'autoFocus' && !(hostNs === 'html' && tag.includes('-'))) {
 			bindings.push({
 				id: bindings.length,
 				kind: 'autoFocus',
@@ -11203,7 +11846,7 @@ function emitElementHtml(
 		// enumerated/data-* booleans stringify, boolean attrs canonicalize to
 		// `attr=""`/absent, booleans on non-boolean attrs drop).
 		if (inner.type === 'Literal' && !isAfterSpread && !classBeforeSpread) {
-			attrHtml += bakeStaticAttr(attrName, inner.value, tag);
+			attrHtml += bakeStaticAttr(attrName, inner.value, tag, hostNs);
 			continue;
 		}
 
@@ -11314,15 +11957,51 @@ function emitElementHtml(
 			bindings.push({ id: bindings.length, kind: 'attr', name: attrName, expr, path, ns: hostNs });
 		}
 	}
-
-	const isVoid = VOID_ELEMENTS.has(tag) && (node.children || []).length === 0;
-	if (isVoid) {
-		return `<${tag}${attrHtml}/>`;
+	if (resolveHostPropsAcrossSources) {
+		hostCommitClientBinding = {
+			id: bindings.length,
+			kind: 'hostCommit',
+			path,
+			sources: hostClientSources,
+			hasNestedChildren: hasNestedJsxChildren,
+		};
+		bindings.push(hostCommitClientBinding);
+	} else if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
+		bindings.push({
+			id: bindings.length,
+			kind: 'dangerCommit',
+			path,
+			sources: dangerHtmlClientSources,
+		});
+	}
+	if (!resolveHostPropsAcrossSources && resolveFormControlsAcrossSpreads) {
+		bindings.push({
+			id: bindings.length,
+			kind: 'formCommit',
+			path,
+			sources: formControlClientSources,
+		});
+	}
+	if (
+		!hasNestedJsxChildren &&
+		(hostCommitClientBinding !== null || directChildrenClientBinding !== null)
+	) {
+		compCalls.push({
+			id: ctx.nextHelperId++,
+			loc: devLoc(ctx, node),
+			isChild: true,
+			hostPath: path,
+			onlyChildText: true,
+			potentialDangerouslySetInnerHTML,
+			hostChildrenBinding: hostCommitClientBinding,
+			directChildrenBinding: directChildrenClientBinding,
+		});
 	}
 
-	let html = `<${tag}${attrHtml}>`;
+	const isVoid = VOID_ELEMENTS.has(tag);
+	let html = isVoid ? `<${tag}${attrHtml}/>` : `<${tag}${attrHtml}>`;
 
-	const children = normalizeChildren(node.children || [], childNs === 'svg');
+	const children = normalizeChildren(sourceChildren, childNs === 'svg');
 	// Special case: a single Text child (only-child text fast path).
 	if (children.length === 1 && children[0].type === 'Text') {
 		const txtChild = children[0];
@@ -11355,6 +12034,7 @@ function emitElementHtml(
 			const ch = makeChildCall(txtChild.expression, ctx, componentName, inlinedSubs, cssHash);
 			ch.hostPath = path;
 			ch.onlyChildText = true;
+			ch.potentialDangerouslySetInnerHTML = potentialDangerouslySetInnerHTML;
 			compCalls.push(ch);
 		}
 	} else {
@@ -11657,6 +12337,7 @@ function emitElementHtml(
 					const ch = makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash);
 					ch.hostPath = path;
 					ch.anchorPath = [...path, childIdx];
+					ch.potentialDangerouslySetInnerHTML = potentialDangerouslySetInnerHTML;
 					compCalls.push(ch);
 					html += '<!>';
 					childIdx++;
@@ -11664,8 +12345,20 @@ function emitElementHtml(
 			}
 		}
 	}
+	if (
+		potentialDangerouslySetInnerHTML &&
+		hasDefinitelyNonNullishJsxChild(node.children || [], ctx.knownStringLocals)
+	) {
+		bindings.push({
+			id: bindings.length,
+			kind: 'dangerChild',
+			expr: 'true',
+			path,
+			mountOnly: true,
+		});
+	}
 
-	html += `</${tag}>`;
+	if (!isVoid) html += `</${tag}>`;
 	return html;
 }
 

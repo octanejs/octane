@@ -22,7 +22,7 @@ import {
 // ---------------------------------------------------------------------------
 describe('React conformance — setter identity', () => {
 	it('returns the same updater function every time', () => {
-		// Per ReactHooksWithNoopRenderer-test.js:311 — useState's setter is a
+		// Per ReactHooksWithNoopRenderer-test.js:314 (stable; canary :311) — useState's setter is a
 		// stable reference so consumers can safely include it in dep arrays.
 		const observe = vi.fn();
 		const r = mount(SetterIdentity, { observe });

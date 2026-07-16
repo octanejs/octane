@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as ServerRuntime from 'octane/server';
 import { mount } from './_helpers';
-import { ReducerGetter, StateGetter } from './_fixtures/state-getter.tsrx';
+import {
+	ReducerGetter,
+	RenderPhaseNullableReducerGetter,
+	StateGetter,
+} from './_fixtures/state-getter.tsrx';
 
 function evalServer(source: string, filename: string): Record<string, any> {
 	let code = compile(source, filename, { mode: 'server' }).code;
@@ -49,6 +53,21 @@ describe('state getter runtime semantics', () => {
 		expect(r.find('#reducer').textContent).toBe('16');
 		expect(getters.every((getter) => getter === getters[0])).toBe(true);
 		expect(getters[0]()).toBe(16);
+		r.unmount();
+	});
+
+	it.each([
+		{ label: 'null', empty: null, expected: 'saw:null' },
+		{ label: 'undefined', empty: undefined, expected: 'saw:undefined' },
+	])('preserves a $label reducer result in render-phase getter reads', ({ empty, expected }) => {
+		const observed: unknown[] = [];
+		const r = mount(RenderPhaseNullableReducerGetter, {
+			empty,
+			observe: (value: unknown) => observed.push(value),
+		});
+
+		expect(observed).toEqual([empty, expected]);
+		expect(r.find('#nullable-reducer').textContent).toBe(expected);
 		r.unmount();
 	});
 
