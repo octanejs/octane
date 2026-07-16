@@ -69,6 +69,8 @@ catalogs:
     '@floating-ui/dom': ^1.7.0
     '@floating-ui/react': 0.27.19
     '@floating-ui/utils': ^0.2.11
+    '@tanstack/form-core': 1.33.2
+    '@tanstack/react-form': 1.33.2
     'aria-hidden': ^1.2.6
     'tabbable': ^6.5.0
     '@lexical/code': 0.46.0

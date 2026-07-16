@@ -504,7 +504,8 @@ generated from the workspace manifests in
   held-out material stays outside the repository.
 - The `@octanejs/*` framework bindings — each an octane port of a React library:
   [`zustand`](./packages/zustand), [`jotai`](./packages/jotai),
-  [`query`](./packages/tanstack-query), [`apollo-client`](./packages/apollo-client),
+  [`query`](./packages/tanstack-query), [`store`](./packages/tanstack-store),
+  [`form`](./packages/tanstack-form), [`apollo-client`](./packages/apollo-client),
   [`motion`](./packages/motion),
   [`stylex`](./packages/stylex), [`router`](./packages/tanstack-router),
   [`remix-router`](./packages/remix-router),
