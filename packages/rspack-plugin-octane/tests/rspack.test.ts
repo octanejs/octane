@@ -181,7 +181,7 @@ export function App() @{
 	afterEach(() => {
 		Reflect.deleteProperty(globalThis, profilerGlobal);
 		Reflect.deleteProperty(globalThis, runGlobal);
-		rmSync(root, { recursive: true, force: true });
+		rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	});
 
 	function installRealProfileFixture(includeRawBinding: boolean) {
