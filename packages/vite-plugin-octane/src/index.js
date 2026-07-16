@@ -1,5 +1,5 @@
 // @ts-check
-/** @import {Plugin, ResolvedConfig, ViteDevServer, UserConfig} from 'vite' */
+/** @import {Plugin, RenderBuiltAssetUrl, ResolvedConfig, ViteDevServer, UserConfig} from 'vite' */
 /** @import {LoadedOctaneConfig, OctaneConfigOptions, ResolvedOctaneConfig, RenderRoute} from '@octanejs/vite-plugin' */
 
 import fs from 'node:fs';
@@ -302,7 +302,28 @@ export function octane(inlineOptions = {}) {
 						if (buildOctaneConfig.build.target !== undefined) {
 							buildConfig.target = buildOctaneConfig.build.target;
 						}
-						return { ...base, build: buildConfig };
+						const userRenderBuiltUrl = userConfig.experimental?.renderBuiltUrl;
+						/** @type {RenderBuiltAssetUrl} */
+						const renderBuiltUrl = (filename, context) => {
+							const userResult = userRenderBuiltUrl?.(filename, context);
+							if (userResult !== undefined) return userResult;
+
+							// Vite's production module-preload helper otherwise resolves its
+							// root-relative dependency URLs through document.baseURI. Generate
+							// module-relative JS asset URLs so an authored <base> cannot redirect
+							// route, layout, or pre-hydrate chunk preloads off the app origin.
+							if (!context.ssr && context.type === 'asset' && context.hostType === 'js') {
+								return { relative: true };
+							}
+						};
+						return {
+							...base,
+							build: buildConfig,
+							experimental: {
+								...userConfig.experimental,
+								renderBuiltUrl,
+							},
+						};
 					}
 				}
 			}

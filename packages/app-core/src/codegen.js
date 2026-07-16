@@ -95,9 +95,17 @@ export function write_project_generated_file(options, name, source) {
  * `staticEntries` (production builds) lists every module path the server can
  * name in #__octane_data — page entries, layouts, and the preHydrate hook.
  * Each becomes a STATIC `() => import('/src/…')` in a lookup map, so Rollup
- * sees, chunks, and hashes them; the runtime falls back to the hidden dynamic
+ * sees, chunks, and hashes them; the runtime falls back to a native dynamic
  * import only for paths outside the map (the dev case, where the map is empty
- * and the integration serves any module by URL).
+ * and the integration serves any module by URL). The fallback resolves the
+ * project-root ID against the browsing context's real location. Project IDs
+ * are root-absolute, so this has the same URL semantics as importing from this
+ * generated module while remaining immune to an authored `<base>` element.
+ * (Rspack rewrites `import.meta.url` to `document.baseURI` in classic output,
+ * so it cannot be used directly here.) Vite serves `.tsrx` modules through its
+ * canonical `?import` URL but leaves ordinary JavaScript/TypeScript URLs
+ * unchanged, while Rspack honors its ignore hint. Keeping the import native
+ * avoids requiring `unsafe-eval` under a nonce-based Content Security Policy.
  *
  * octane specifics:
  *   - `import { hydrateRoot } from 'octane'` (NO `mount`).
@@ -154,11 +162,20 @@ const routeModules = {
 ${static_map_lines}
 };
 
-// Keep the fallback hidden from static import analysis. Some integrations
-// rewrite variable dynamic imports into queried URLs, which can evaluate as a
-// SECOND browser module instance and stop pages/preHydrate hooks sharing
-// singletons with statically imported copies of the same files.
-const dynamicImport = new Function('specifier', 'return import(specifier)');
+// Keep the fallback native and canonical. Vite serves static \`.tsrx\` imports
+// through \`?import\`, but ordinary JS/TS imports without it. Resolve that same
+// root-absolute URL against the browsing context's real location (not a
+// possibly-authored document <base>) so Vite's variable-import helper leaves
+// it unchanged; Rspack honors webpackIgnore. Pages/preHydrate hooks then share
+// module singletons with static imports. A Function constructor breaks CSP.
+const dynamicImport = (specifier) => {
+  const url = new URL(specifier, globalThis.location.href);
+  if (url.pathname.endsWith('.tsrx') && !url.searchParams.has('import')) {
+    const query = url.search.slice(1);
+    url.search = query ? '?import&' + query : '?import';
+  }
+  return import(/* @vite-ignore */ /* webpackIgnore: true */ url.href);
+};
 
 function importModule(path) {
   const loader = routeModules[path];

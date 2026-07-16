@@ -804,7 +804,10 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		const root = hydrateRoot(
 			container,
 			IdBoundary as any,
-			{ promise: clientPending, onId: (arm: string, value: string) => seen.push([arm, value]) },
+			{
+				promise: clientPending,
+				onId: (arm: string, value: string) => seen.push([arm, value]),
+			},
 			{ identifierPrefix: 'page-' },
 		);
 		flushSync(() => {});
@@ -855,7 +858,14 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			expect(container.querySelectorAll('.id-loading')).toHaveLength(1);
 			expect(container.querySelector('template[data-oct-b]')).toBeNull();
 
-			clientPending.resolve('client-ready');
+			const replacement = deferred<string>();
+			flushSync(() => {
+				root.render(IdBoundary as any, {
+					promise: replacement.promise,
+					onId: (arm: string, value: string) => seen.push([arm, value]),
+				});
+			});
+			replacement.resolve('client-ready');
 			await Promise.resolve();
 			flushSync(() => {});
 			expect(container.querySelectorAll('.id-ok')).toHaveLength(1);
@@ -872,6 +882,11 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			activate(container);
 			expect(container.querySelector('[data-oct-s]')).toBeNull();
 			expect(container.querySelector('.id-ok')?.textContent).toBe('client-ready');
+
+			clientPending.resolve('obsolete-client-result');
+			await Promise.resolve();
+			flushSync(() => {});
+			expect(container.querySelector('.id-ok')?.textContent).toBe('client-ready');
 		} finally {
 			errSpy.mockRestore();
 			root.unmount();
@@ -880,7 +895,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		}
 	});
 
-	it('hydrates a streamed catch arm from a rejection seed without replacing its DOM', async () => {
+	it('hydrates a streamed catch arm in place and consumes the superseded client rejection', async () => {
 		const d = deferred<string>();
 		const c = collector();
 		const { pipe } = ServerRT.renderToPipeableStream(
@@ -903,21 +918,43 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 
 		const seen: Array<[string, string]> = [];
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const clientPending = new Promise<string>(() => {});
+		const clientPending = deferred<string>();
+		const unhandledClientRejections: unknown[] = [];
+		const onUnhandledRejection = (reason: unknown, promise: Promise<unknown>) => {
+			if (promise === clientPending.promise) unhandledClientRejections.push(reason);
+		};
+		process.on('unhandledRejection', onUnhandledRejection);
 		const root = hydrateRoot(
 			container,
 			IdBoundary as any,
-			{ promise: clientPending, onId: (arm: string, value: string) => seen.push([arm, value]) },
+			{
+				promise: clientPending.promise,
+				onId: (arm: string, value: string) => seen.push([arm, value]),
+			},
 			{ identifierPrefix: 'page-' },
 		);
-		flushSync(() => {});
-		expect(container.querySelector('.id-error')).toBe(errorSpan);
-		expect(container.querySelector('.id-loading')).toBeNull();
-		expect(seen).toContainEqual(['root', rootId]);
-		expect(seen).toContainEqual(['catch', boundaryId]);
-		expect(errSpy).not.toHaveBeenCalled();
-		errSpy.mockRestore();
-		root.unmount();
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('.id-error')).toBe(errorSpan);
+			expect(container.querySelector('.id-loading')).toBeNull();
+			expect(seen).toContainEqual(['root', rootId]);
+			expect(seen).toContainEqual(['catch', boundaryId]);
+			expect(errSpy).not.toHaveBeenCalled();
+
+			// The server rejection remains authoritative for this hydration episode,
+			// but the client-created request still settles later. Wait through a host
+			// task boundary so an unobserved promise would emit `unhandledRejection`.
+			clientPending.reject(new Error('client request also rejected'));
+			await new Promise<void>((resolve) => setTimeout(resolve, 0));
+			expect(unhandledClientRejections).toEqual([]);
+			expect(container.querySelector('.id-error')).toBe(errorSpan);
+			expect(errorSpan!.textContent).toBe('server-no');
+			expect(errSpy).not.toHaveBeenCalled();
+		} finally {
+			process.off('unhandledRejection', onUnhandledRejection);
+			errSpy.mockRestore();
+			root.unmount();
+		}
 	});
 
 	it('preserves primitive and plain-object reasons in streamed catch hydration', async () => {

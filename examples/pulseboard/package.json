@@ -1,0 +1,27 @@
+{
+  "name": "pulseboard-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A deterministic analytics console exercising responsive Visx SVG measurement, TanStack Table state, and TanStack Virtual logs in Octane.",
+  "scripts": {
+    "dev": "vite --host --port 5229 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --host --port 5229 --strictPort",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "playwright test --config e2e/playwright.config.ts"
+  },
+  "dependencies": {
+    "@octanejs/tanstack-table": "workspace:*",
+    "@octanejs/tanstack-virtual": "workspace:*",
+    "@octanejs/visx": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

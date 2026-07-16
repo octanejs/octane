@@ -4061,19 +4061,24 @@ function ssrCompileBody(
 				// return-JSX form: the returned host element (+ its directive children) is
 				// the render output — route it to jsxNodes so it flows through ssrEmitNode
 				// (byte-identical SSR to the `@{}` form), not printed as `return <jsx>`.
-				// EXCEPT a returned FRAGMENT: the client VALUE-lowers `return <>…</>` to an
-				// array of createElement descriptors (rewriteJsxValues), mounted by the
-				// return-slot childSlot — whose hydration adopts ONE `<!--[-->…<!--]-->`
-				// range for the slot plus one range PER ITEM (including text items). The
-				// template walk would instead concatenate children with markerless text
-				// separators and no slot range, desyncing the hydration cursor. Route the
-				// whole fragment through the same value hole (`ssrChild(loweredArray)`) so
-				// the runtime's ssrChild array branch emits the exact per-item shape the
-				// client adopts.
-				if (child.argument.type === 'JSXFragment' || child.argument.type === 'Fragment') {
+				// EXCEPT returned value roots whose client lowering owns a descriptor
+				// boundary. Ordinary shorthand fragments lower to positional arrays (one
+				// range per item); fragments or component/sentinel roots containing
+				// template-only syntax lower to one compiled renderer component. Route both
+				// through ssrEmitTsrxExpression so the server mirrors that exact boundary.
+				const returnedHostRoot =
+					(child.argument.type === 'Element' || child.argument.type === 'JSXElement') &&
+					!isComponentTag(child.argument);
+				if (
+					child.argument.type === 'JSXFragment' ||
+					child.argument.type === 'Fragment' ||
+					isFragmentLongForm(child.argument) ||
+					(!returnedHostRoot && requiresTemplateNormalization(child.argument))
+				) {
 					jsxNodes.push({
 						type: 'TSRXExpression',
 						expression: child.argument,
+						returnedJsxValue: true,
 						loc: child.argument.loc,
 					});
 				} else {
@@ -4312,7 +4317,7 @@ function ssrEmitNode(
 				return ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 			return ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'TSRXExpression':
-			return ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash, componentNs);
+			return ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'IfStatement':
 			return ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'ForOfStatement':
@@ -5124,9 +5129,24 @@ function ssrControlKey(kind, node) {
 // VALUE-position JSX hole: lower its JSX to `createElement(...)` descriptors (via
 // rewriteJsxValues, exactly like the client's makeChildCall) and route through
 // ssrChild, which renders the resulting host/component descriptors (array → one
-// hydration block per item, host → `<tag>…</tag>`, primitive → text).
-function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash, componentNs) {
+// hydration block per item, host → `<tag>…</tag>`, primitive → text). A returned
+// JSX value containing template-only syntax instead mirrors the client's compiled
+// renderer component so its template scopes and hydration range both survive.
+function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const expr = node.expression;
+	if (node.returnedJsxValue === true && requiresTemplateNormalization(expr)) {
+		// A returned JSX value that contains template-only syntax is one compiled
+		// renderer on the client (rather than a descriptor array whose value
+		// lowering cannot represent directives, sentinels, head hoists, or child
+		// code blocks). Mirror that component boundary on the server: the local
+		// sub-function keeps access to the
+		// enclosing return component's props/locals, while ssrComponent emits the
+		// range the client descriptor adopts during hydration.
+		const sub = ssrCompileSub([expr], ctx, '__sfragment', [], cssHash, parentNs, componentNs);
+		inlinedSubs.push(sub.fn + ';');
+		ctx.runtimeNeeded.add('ssrComponent');
+		return `_$ssrComponent(__s, ${sub.fnName}, {})`;
+	}
 	if (
 		expr &&
 		expr.type === 'CallExpression' &&
@@ -5257,8 +5277,73 @@ function wrapScopedClassExprs(node, ctx) {
 }
 
 /**
- * Walk a new-TSRX component (its `JSXCodeBlock` body) for `JSXStyleElement`
- * nodes. For each one found:
+ * Find the JSX render roots owned by a component. `@{}` components expose one
+ * `JSXCodeBlock.render`; React-style functions can return JSX from any block in
+ * their own body. Nested functions are separate component/value boundaries and
+ * must not donate styles to their enclosing component.
+ */
+function componentStyleRoots(componentNode) {
+	const body = componentNode.body;
+	if (!body) return [];
+	if (body.type === 'JSXCodeBlock') {
+		return body.render
+			? [
+					{
+						node: body.render,
+						replace(next) {
+							body.render = next;
+						},
+					},
+				]
+			: [];
+	}
+	if (body.type !== 'BlockStatement') return [];
+
+	const roots = [];
+	function visit(node) {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'ArrowFunctionExpression'
+		) {
+			return;
+		}
+		if (node.type === 'ReturnStatement') {
+			if (node.argument && isJsxNode(node.argument)) {
+				roots.push({
+					node: node.argument,
+					replace(next) {
+						node.argument = next;
+					},
+				});
+			}
+			return;
+		}
+		for (const key of Object.keys(node)) {
+			if (
+				key === 'loc' ||
+				key === 'start' ||
+				key === 'end' ||
+				key === 'parent' ||
+				key === 'metadata' ||
+				key === 'css'
+			)
+				continue;
+			visit(node[key]);
+		}
+	}
+	visit(body);
+	return roots;
+}
+
+/**
+ * Walk a component's owned render roots for `JSXStyleElement` nodes. For each
+ * one found:
  *   - Pull the pre-parsed `StyleSheet` AST out of its children.
  *   - Run `prepareStylesheetForRender` (rewrites `.foo` → `.foo.<hash>` —
  *     mutates the sheet in place).
@@ -5271,57 +5356,73 @@ function wrapScopedClassExprs(node, ctx) {
  *
  * Returns the hash, or `null` when no `<style>` blocks are present.
  *
- * The first `JSXStyleElement` we see contributes the canonical hash for the
- * whole component — multiple `<style>` blocks share it; that matches Ripple's
- * `annotate_component_with_hash`.
+ * The first `JSXStyleElement` contributes the canonical hash for the whole
+ * component. @tsrx/core hashes individual style tags by source position, so
+ * multiple blocks are explicitly rebased onto that canonical component hash
+ * before selector rendering. Every rendered root receives the same hash class.
  */
 function applyCssScoping(componentNode, ctx) {
-	if (!componentNode.body || componentNode.body.type !== 'JSXCodeBlock') return null;
+	const roots = componentStyleRoots(componentNode);
+	if (roots.length === 0) return null;
 	let cssHash = null;
-	const styleSheets = [];
+	const styles = [];
 	function collect(node) {
 		if (!node || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
 			for (const i of node) collect(i);
 			return;
 		}
+		if (
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'ArrowFunctionExpression'
+		) {
+			return;
+		}
 		if (node.type === 'JSXStyleElement') {
 			const sheet = (node.children || []).find((c) => c && c.type === 'StyleSheet');
 			if (sheet) {
-				styleSheets.push(sheet);
+				styles.push({ node, sheet });
 				if (!cssHash) cssHash = node.metadata?.styleScopeHash || sheet.hash || null;
 			}
 			return;
 		}
 		for (const key of Object.keys(node)) {
-			if (key === 'loc' || key === 'start' || key === 'end' || key === 'parent') continue;
+			if (
+				key === 'loc' ||
+				key === 'start' ||
+				key === 'end' ||
+				key === 'parent' ||
+				key === 'metadata' ||
+				key === 'css'
+			)
+				continue;
 			const v = node[key];
 			if (v && typeof v === 'object') collect(v);
 		}
 	}
-	collect(componentNode.body);
-	if (!cssHash || styleSheets.length === 0) return null;
-	for (const sheet of styleSheets) {
+	for (const root of roots) collect(root.node);
+	if (!cssHash || styles.length === 0) return null;
+	for (const style of styles) {
+		// A component has one scope even when its CSS is split for readability.
+		// Rebase before analyze/render: selector and keyframe rewriting read
+		// `sheet.hash`, while DOM annotation below uses `cssHash`.
+		style.sheet.hash = cssHash;
+		if (style.node.metadata) style.node.metadata.styleScopeHash = cssHash;
 		// Mark `:global(...)` selectors before scoping so they render unscoped.
-		analyzeCss(sheet);
-		prepareStylesheetForRender(sheet);
+		analyzeCss(style.sheet);
+		prepareStylesheetForRender(style.sheet);
 	}
-	const css = renderStylesheets(styleSheets);
+	const css = renderStylesheets(styles.map((style) => style.sheet));
 	ctx.cssInjections.push({ hash: cssHash, css });
 	ctx.runtimeNeeded.add('injectStyle');
-	// Mutate the render tree: add hash class to every native element AND
-	// strip JSXStyleElement nodes (annotateWithHash returns null for them when
-	// preserve_style_elements=false, so we filter nulls out of children).
-	if (componentNode.body.render) {
+	// Mutate every owned render root: add the canonical hash class to native
+	// elements and strip JSXStyleElement nodes from DOM output.
+	for (const root of roots) {
 		// Normalize dynamic class exprs BEFORE the hash is appended (see helper), so
 		// clsx array/object values compose correctly alongside the scope hash.
-		wrapScopedClassExprs(componentNode.body.render, ctx);
-		componentNode.body.render = annotateWithHash(
-			componentNode.body.render,
-			cssHash,
-			'class',
-			false,
-		);
+		wrapScopedClassExprs(root.node, ctx);
+		root.replace(annotateWithHash(root.node, cssHash, 'class', false));
 	}
 	return cssHash;
 }
@@ -7253,6 +7354,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 function compileReturnJsxFunction(node, ctx, options) {
 	const name = node.id.name;
 	recordProfileComponent(ctx, node, name);
+	const cssHash = applyCssScoping(node, ctx);
 	// A folded directive's branch helper functions (`__then$N`/`__else$N`) are
 	// collected here so they're emitted INSIDE this component function — preserving
 	// their closure over setup locals/props — and only their values + the control
@@ -7265,7 +7367,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 		// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
 		// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
 		if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
-			return { ...h, argument: lowerReturnJsx(h.argument, ctx, compInlinedSubs) };
+			return { ...h, argument: lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash) };
 		}
 		return rewriteJsxValues(h, ctx);
 	});
@@ -7337,13 +7439,80 @@ function compileReturnJsxFunction(node, ctx, options) {
 	return code;
 }
 
-// Lower a JSX value at return position. A HOST element becomes a compiled-fragment
-// descriptor (`createElement(_frag$N, holeProps)`) so it rides childSlot's reconcile
-// path; a component element / fragment / directive keeps the existing value-lowering
-// (components already reconcile by identity).
-function lowerReturnJsx(node, ctx, compInlinedSubs) {
+function hasJsxAttribute(node, name) {
+	return (node.attributes || node.openingElement?.attributes || []).some(
+		(attr) =>
+			(attr.type === 'Attribute' || attr.type === 'JSXAttribute') && jsxAttrRawName(attr) === name,
+	);
+}
+
+// Activity is always compiler-owned template syntax. Long-form Fragment only
+// needs template routing when it carries a ref (marker-pair expansion) or owns a
+// descendant that itself needs normalization. An ordinary/no-ref/keyed Fragment
+// remains a runtime descriptor so its explicit reconciliation boundary survives.
+function isLongFormTemplateSentinel(node, parentNs = 'html') {
+	if (isActivityLongForm(node)) return true;
+	if (!isFragmentLongForm(node)) return false;
+	if (hasJsxAttribute(node, 'ref')) return true;
+	return (node.children || []).some((child) => requiresTemplateNormalization(child, parentNs));
+}
+
+// Value-position JSX lowering can represent hosts, components, ordinary
+// Fragments, and expressions, but it cannot represent syntax consumed only by
+// normalizeChildren. Detect those constructs recursively so a React-style
+// `return <...>` subtree stays in the template compiler instead of silently
+// dropping or misinterpreting them. Namespace tracking keeps SVG <title> in the
+// SVG tree; only HTML metadata is a document-head hoist.
+//
+// JSXStyleElement is intentionally absent. Returned scoped style needs the
+// component-level CSS scoping/hash pipeline, not merely template routing.
+function requiresTemplateNormalization(node, parentNs = 'html') {
+	if (!node) return false;
+	const t = node.type;
+	if (
+		t === 'IfStatement' ||
+		t === 'JSXIfExpression' ||
+		t === 'ForOfStatement' ||
+		t === 'JSXForExpression' ||
+		t === 'SwitchStatement' ||
+		t === 'JSXSwitchExpression' ||
+		t === 'TryStatement' ||
+		t === 'JSXTryExpression' ||
+		t === 'ActivityStatement' ||
+		t === 'FragmentStart' ||
+		t === 'FragmentEnd' ||
+		t === 'FoldedDirective' ||
+		t === 'HeadHoist' ||
+		t === 'JSXCodeBlock'
+	) {
+		return true;
+	}
+	if (t === 'Fragment' || t === 'JSXFragment' || t === 'Tsx' || t === 'Tsrx') {
+		return (node.children || []).some((child) => requiresTemplateNormalization(child, parentNs));
+	}
+	if (t !== 'Element' && t !== 'JSXElement') return false;
+	if (isLongFormTemplateSentinel(node, parentNs)) return true;
+
+	const tag = jsxTagName(node) || elementTagName(node);
+	const selfNs = typeof tag === 'string' ? nsForSelf(tag, parentNs) : parentNs;
+	if (tag === 'head') return true;
+	if (selfNs !== 'svg' && HOISTABLE_HEAD_TAGS.has(tag)) return true;
+
+	const childNs =
+		typeof tag === 'string' && !isComponentTag(node) ? nsForChildren(tag, parentNs) : parentNs;
+	return (node.children || []).some((child) => requiresTemplateNormalization(child, childNs));
+}
+
+// Lower JSX at return position. Host roots always use the compiled-fragment
+// path. Any other root whose subtree contains template-only syntax uses it too.
+// Ordinary component/Fragment values retain descriptor lowering and its identity
+// or key boundary.
+function lowerReturnJsx(node, ctx, compInlinedSubs, cssHash = null) {
 	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
-		return lowerHostFragment(node, ctx, compInlinedSubs, 'html', null);
+		return lowerHostFragment(node, ctx, compInlinedSubs, 'html', cssHash);
+	}
+	if (requiresTemplateNormalization(node)) {
+		return lowerHostFragment(node, ctx, compInlinedSubs, 'html', cssHash);
 	}
 	return rewriteJsxValues(node, ctx);
 }
@@ -7373,12 +7542,13 @@ function objectProp(hn, valNode) {
 	};
 }
 
-// Walk a host element, replacing each DYNAMIC part (an attribute/child expression)
-// with `props.hN` and collecting `{ hN: <originalExpr> }` into `holeProps`. Static
-// structure (tag, literal attrs, text, nested host elements) stays in the template;
-// nested component children become renderable holes. The result is a self-contained
-// fragment whose only inputs are its props — compilable as an ordinary renderer.
-function extractFragment(node, ctx, holeProps) {
+// Walk a host element or JSX fragment, replacing each DYNAMIC part (an
+// attribute/child expression) with `props.hN` and collecting
+// `{ hN: <originalExpr> }` into `holeProps`. Static structure (tag, literal attrs,
+// text, nested host elements/fragments) stays in the template; nested component
+// children become renderable holes. The result is a self-contained fragment whose
+// only inputs are its props — compilable as an ordinary renderer.
+function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const newAttrs = [];
 	for (const attr of attrs) {
@@ -7438,6 +7608,11 @@ function extractFragment(node, ctx, holeProps) {
 					: child,
 			)
 		: node.children || [];
+	const nodeTag = jsxTagName(node) || elementTagName(node);
+	const childNs =
+		typeof nodeTag === 'string' && !isComponentTag(node)
+			? nsForChildren(nodeTag, parentNs)
+			: parentNs;
 	for (const child of fragChildren) {
 		const t = child && child.type;
 		if (t === 'JSXText' || t === 'Text') {
@@ -7477,13 +7652,40 @@ function extractFragment(node, ctx, holeProps) {
 				newChildren.push({ type: 'JSXExpressionContainer', expression: rendered });
 			}
 		} else if (t === 'Element' || t === 'JSXElement') {
-			if (isComponentTag(child)) {
+			if (isLongFormTemplateSentinel(child, childNs)) {
+				newChildren.push(extractFragment(child, ctx, holeProps, childNs));
+			} else if (
+				isComponentTag(child) &&
+				ctx._foldCtx?.templateComponentChildren === true &&
+				requiresTemplateNormalization(child, childNs)
+			) {
+				// Component children normally become descriptor children at return-value
+				// position. A directive cannot be represented by lowerJsxChild, though, so
+				// keep this component in the extracted TEMPLATE and fold its children into
+				// the component's children block. Thread the component expression itself as
+				// a hole too, since it may be a local/member/dynamic tag that the hoisted
+				// renderer cannot reference directly.
+				newChildren.push(extractFragmentComponent(child, ctx, holeProps, childNs));
+			} else if (isComponentTag(child)) {
 				const hn = `h${holeProps.length}`;
 				holeProps.push(objectProp(hn, jsxElementToCreateElement(child, ctx)));
 				newChildren.push({ type: 'JSXExpressionContainer', expression: memberProps(hn, child) });
 			} else {
-				newChildren.push(extractFragment(child, ctx, holeProps));
+				newChildren.push(extractFragment(child, ctx, holeProps, childNs));
 			}
+		} else if (t === 'Fragment' || t === 'JSXFragment') {
+			// A fragment nested inside the returned fragment shares the hoisted
+			// renderer. Extract its dynamic values/directives too; leaving it raw would
+			// make authored outer locals resolve against the renderer's hole-props object.
+			newChildren.push(extractFragment(child, ctx, holeProps, childNs));
+		} else if (t === 'JSXCodeBlock' && (child.body || []).length === 0 && child.render) {
+			// A render-only child block is transparent template grouping. Extract its
+			// render root too so expressions still evaluate in the outer component and
+			// arrive as ordered hole props in the hoisted renderer.
+			newChildren.push({
+				...child,
+				render: extractFragmentRoot(child.render, ctx, holeProps, childNs),
+			});
 		} else if ((t === 'IfStatement' || t === 'JSXIfExpression') && ctx._foldCtx) {
 			// FOLD a directive: lower its branch bodies on the COMPONENT side (so the
 			// `__then$N`/`__else$N` helpers keep their closure over setup locals/props),
@@ -7698,7 +7900,43 @@ function extractFragment(node, ctx, holeProps) {
 	return out;
 }
 
-// A host JSX element → a hoisted compiled renderer + `createElement(_frag$N, {...})`.
+function extractFragmentComponent(node, ctx, holeProps, parentNs = 'html') {
+	const sourceName = node.openingElement?.name || node.id;
+	const componentHole = `h${holeProps.length}`;
+	// JSX evaluates the component tag before its attributes and children. Reserve
+	// and append that hole first so a member getter or dynamic tag expression keeps
+	// the authored order even though the component remains in the hoisted template.
+	holeProps.push(objectProp(componentHole, rewriteJsxValues(jsxNameToExpr(sourceName), ctx)));
+	const extracted = extractFragment(node, ctx, holeProps, parentNs);
+	const dynamicName = {
+		type: 'JSXExpressionContainer',
+		expression: memberProps(componentHole, sourceName),
+		isDynamic: true,
+	};
+	const out = { ...extracted, id: dynamicName };
+	if (extracted.openingElement) {
+		out.openingElement = { ...extracted.openingElement, name: dynamicName };
+	}
+	if (extracted.closingElement) {
+		out.closingElement = { ...extracted.closingElement, name: dynamicName };
+	}
+	return out;
+}
+
+function extractFragmentRoot(node, ctx, holeProps, parentNs = 'html') {
+	if (
+		(node.type === 'Element' || node.type === 'JSXElement') &&
+		isComponentTag(node) &&
+		!isActivityLongForm(node) &&
+		!isFragmentLongForm(node)
+	) {
+		return extractFragmentComponent(node, ctx, holeProps, parentNs);
+	}
+	return extractFragment(node, ctx, holeProps, parentNs);
+}
+
+// A host JSX element or directive-bearing JSX fragment → a hoisted compiled
+// renderer + `createElement(_frag$N, {...})`.
 // `compInlinedSubs` is the COMPONENT's inlinedSubs: a folded directive's branch
 // helper functions are emitted there (closure preserved), not in the renderer.
 function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHash = null) {
@@ -7707,9 +7945,18 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 	// extractFragment reads `ctx._foldCtx` for any directive child it folds (and to
 	// route helper defs into the component). Save/restore so it never leaks.
 	const prevFold = ctx._foldCtx;
+	const templateComponentChildren = requiresTemplateNormalization(node, parentNs);
 	ctx._foldCtx =
-		compInlinedSubs !== undefined ? { compInlinedSubs, directiveCalls, parentNs, cssHash } : null;
-	const rendererEl = extractFragment(node, ctx, holeProps);
+		compInlinedSubs !== undefined
+			? {
+					compInlinedSubs,
+					directiveCalls,
+					parentNs,
+					cssHash,
+					templateComponentChildren,
+				}
+			: null;
+	const rendererEl = extractFragmentRoot(node, ctx, holeProps, parentNs);
 	ctx._foldCtx = prevFold;
 	const fragName = `_frag$${ctx.nextFragId++}`;
 	const synthFn = {
@@ -7723,10 +7970,13 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 		body: { type: 'JSXCodeBlock', body: [], render: rendererEl, foldedDirectives: directiveCalls },
 	};
 	ctx.hoistedHelpers.push(compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash));
-	// A host fragment is a SINGLE root element, so it can mount markerless (the
-	// element self-delimits) — matching `@{}`'s inline render exactly (no extra
-	// comment markers), which is required for byte-equal DOM when folding `@{}`.
-	ctx.hoistedHelpers.push(`${fragName}.$$singleRoot = true;`);
+	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
+		// A host fragment is a SINGLE root element, so it can mount markerless (the
+		// element self-delimits) — matching `@{}`'s inline render exactly (no extra
+		// comment markers), which is required for byte-equal DOM when folding `@{}`.
+		// A returned JSX fragment may have multiple roots and must retain its range.
+		ctx.hoistedHelpers.push(`${fragName}.$$singleRoot = true;`);
+	}
 	ctx.runtimeNeeded.add('createElement');
 	return {
 		type: 'CallExpression',
@@ -8805,7 +9055,8 @@ function planJsx(
 		n.type === 'ActivityStatement' ||
 		n.type === 'ForOfStatement' ||
 		n.type === 'TryStatement' ||
-		n.type === 'SwitchStatement';
+		n.type === 'SwitchStatement' ||
+		n.type === 'FoldedDirective';
 	const hasStaticRoot = jsxNodes.some(
 		(n) => !isConstructNode(n) && !(n.type === 'Element' && isComponentTag(n)),
 	);
@@ -10209,6 +10460,25 @@ function emitNodeHtml(
 			makeSwitchCall(node, ctx, inlinedSubs, parentNs, cssHash),
 			ctx._switchCalls,
 		);
+	}
+	if (node.type === 'FoldedDirective') {
+		// A returned fragment can put a folded directive at its ROOT, alongside
+		// fixed siblings. Its branch helpers and control expressions were already
+		// extracted component-side; register the pre-built call exactly as the
+		// in-element child path does below.
+		const dc = ctx._foldedDirectiveCalls;
+		if (node.kind === 'if') {
+			return registerConstruct(dc.ifCalls[node.recordIndex], ifCalls);
+		}
+		if (node.kind === 'for') {
+			return registerConstruct(dc.forCalls[node.recordIndex], forCalls);
+		}
+		if (node.kind === 'switch') {
+			return registerConstruct(dc.switchCalls[node.recordIndex], ctx._switchCalls);
+		}
+		if (node.kind === 'try') {
+			return registerConstruct(dc.tryCalls[node.recordIndex], tryCalls);
+		}
 	}
 	return '';
 }
@@ -12046,6 +12316,7 @@ function rewriteEarlyExits(body) {
 function isJsxNode(node) {
 	if (!node) return false;
 	if (node.type === 'Element' || node.type === 'Text') return true;
+	if (node.type === 'FoldedDirective') return true;
 	if (node.type === 'Tsx' || node.type === 'Tsrx') return true;
 	if (node.type === 'JSXElement' || node.type === 'JSXFragment') return true;
 	// New TSRX directive nodes — always JSX-position. normalizeChildren will
