@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+	<url><loc>https://octanejs.dev/</loc></url>
+	<url><loc>https://octanejs.dev/docs</loc></url>
+	<url><loc>https://octanejs.dev/docs/quick-start</loc></url>
+	<url><loc>https://octanejs.dev/docs/build-tools</loc></url>
+	<url><loc>https://octanejs.dev/docs/core-apis</loc></url>
+	<url><loc>https://octanejs.dev/docs/tsrx-vs-tsx</loc></url>
+	<url><loc>https://octanejs.dev/docs/differences-from-react</loc></url>
+	<url><loc>https://octanejs.dev/docs/profiling</loc></url>
+	<url><loc>https://octanejs.dev/docs/bindings</loc></url>
+	<url><loc>https://octanejs.dev/benchmarks</loc></url>
+	<url><loc>https://octanejs.dev/playground</loc></url>
+</urlset>

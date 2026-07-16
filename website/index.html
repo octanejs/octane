@@ -8,7 +8,14 @@
 			content="Octane — React's programming model, compiled ahead of time. No VDOM, no rules of hooks."
 		/>
 		<title>Octane — React's programming model, compiled</title>
+		<!-- The .ico carries 16/32/48 frames (48 is the multiple-of-48 square Google
+		     Search wants); SVG is listed after it so browsers that support SVG
+		     favicons pick it, while legacy UAs and crawlers keep the .ico. -->
+		<link rel="icon" href="/favicon.ico" sizes="48x48 32x32 16x16" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/site.webmanifest" />
+		<meta name="theme-color" content="#23272f" />
 		<style>
 			/* Global base — everything component-scoped lives in scoped <style> blocks;
 			   only the document-level reset/palette belongs here (inline so the SSR
