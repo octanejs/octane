@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'octane';
+import { useInsertionEffect, useLayoutEffect, useRef, useState } from 'octane';
 import { createUniversalHostBoundary } from 'octane/universal';
 import type { RendererRegion } from 'octane/universal';
 import type { ComputeFunction, DomEvent } from '../core/events.js';
@@ -186,7 +186,10 @@ export function Canvas({
 		});
 	}, [resize]);
 
-	useLayoutEffect(() => {
+	// A DOM Suspense or Activity boundary disconnects layout effects while its
+	// content is hidden. Root ownership must survive that retained state and
+	// end only when the Canvas is actually deleted.
+	useInsertionEffect(() => {
 		return () => {
 			const root = rootRef.current;
 			rootRef.current = null;

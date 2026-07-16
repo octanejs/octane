@@ -590,6 +590,16 @@ closed by Milestone 6.
 
 ### Milestone 5 — assets, Suspense, Activity, and errors (2–3 engineer-weeks)
 
+Status: implemented. The keyed loader cache supports constructor and existing
+loader instances, scalar and array inputs, extensions/progress, GLTF graph
+augmentation, `preload`, exact-key `clear`, and cached rejection routing.
+Retained Three Suspense/Activity evidence proves initial allocation safety,
+hidden update identity and fallback visibility, resolve/reject teardown, and
+caller-owned primitive preservation. Client Three root suspension and errors
+project to the nearest DOM pending/catch boundary without tearing down a
+retained Canvas root, and a production-browser fixture performs a real asset
+request. Canvas streaming SSR/hydration remains Milestone 7.
+
 - Keyed loader cache and `useLoader` helpers, browser loader path, visibility,
   fallback/retained content, aborted resource safety, and Three-to-DOM error and
   pending projection.

@@ -17,7 +17,9 @@ import {
 	type Scope,
 	createContext as createDomContext,
 	readContextFromScope,
+	useInsertionEffect as useDomInsertionEffect,
 	useLayoutEffect as useDomLayoutEffect,
+	useRendererThenable as useDomRendererThenable,
 	useState as useDomState,
 } from './runtime.js';
 import {
@@ -4646,6 +4648,8 @@ interface HostBoundaryState {
 	owner: BoundaryOwner;
 	/** The DOM owner reached layout commit; this does not imply that a host batch ran. */
 	ownerCommitted: boolean;
+	/** The DOM owner installed its deletion lifetime, including while Suspense-hidden. */
+	lifetimeCommitted: boolean;
 	pending: UniversalPreparedAttempt | null;
 }
 
@@ -4705,6 +4709,7 @@ export function createUniversalHostBoundary(renderer: string): ((
 				root: props.root as UniversalRootImpl<any, any>,
 				owner,
 				ownerCommitted: false,
+				lifetimeCommitted: false,
 				pending: null,
 			};
 			boundaryStates.set(scope, state);
@@ -4747,16 +4752,29 @@ export function createUniversalHostBoundary(renderer: string): ((
 			[attempt],
 			BOUNDARY_COMMIT_SLOT,
 		);
-		useDomLayoutEffect(
-			() => () => {
-				boundaryStates.delete(scope);
-				const pending = state!.pending;
-				state!.pending = null;
-				runCommitTasks([
-					() => pending?.abort(),
-					() => state!.root.unmount(),
-					() => state!.root.clearBridge(state!.owner),
-				]);
+		// Host-root ownership must survive DOM Suspense/Activity deactivation.
+		// Insertion effects stay connected while retained content is hidden and
+		// still clean up on actual deletion, which is exactly this lifetime.
+		useDomInsertionEffect(
+			() => {
+				// A boundary that completed its own render owns a deletion lifetime
+				// even if a later sibling suspends before layout. A boundary that
+				// itself suspended is still abandoned and released by the microtask.
+				if (attempt.status === 'prepared') state!.lifetimeCommitted = true;
+				return () => {
+					// Resolve through the map defensively so a failed render can never
+					// leave a newer owner bridge captured by this effect's first closure.
+					const ownedState = boundaryStates.get(scope) ?? state!;
+					boundaryStates.delete(scope);
+					ownedState.lifetimeCommitted = false;
+					const pending = ownedState.pending;
+					ownedState.pending = null;
+					runCommitTasks([
+						() => pending?.abort(),
+						() => ownedState.root.unmount(),
+						() => ownedState.root.clearBridge(ownedState.owner),
+					]);
+				};
 			},
 			[],
 			BOUNDARY_LIFETIME_SLOT,
@@ -4767,13 +4785,23 @@ export function createUniversalHostBoundary(renderer: string): ((
 			runCommitTasks([
 				() => attempt.abort(),
 				() => {
-					if (!state!.ownerCommitted) {
-						boundaryStates.delete(scope);
+					// Insertion ownership commits even when a later sibling suspends
+					// before layout. Preserve that stable bridge for retry and let its
+					// deletion cleanup release it. Only a render with no lifetime is
+					// truly abandoned here.
+					if (!state!.ownerCommitted && !state!.lifetimeCommitted) {
+						if (boundaryStates.get(scope) === state) boundaryStates.delete(scope);
 						state!.root.clearBridge(state!.owner);
 					}
 				},
 			]);
 		});
+		// A root-level suspension has no universal @pending arm of its own. Project
+		// it through the DOM owner so the nearest authored DOM @pending boundary can
+		// hide the Canvas shell and render its fallback. The queued abort above
+		// releases an abandoned initial attempt; a committed boundary keeps its
+		// bridge and retries from the DOM boundary when the thenable settles.
+		if (attempt.status === 'suspended') useDomRendererThenable(attempt.thenable);
 	}) as ((props: HostBoundaryProps, scope: Scope) => void) & {
 		readonly [UNIVERSAL_BOUNDARY]: UniversalBoundaryMetadata;
 	};
