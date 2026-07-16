@@ -13,6 +13,7 @@ import type {
 	UniversalHostDriver,
 	UniversalListenerDescriptor,
 } from 'octane/universal';
+import type { RootStore } from './store.js';
 import { createThreeObject, registerThreeNamespace, THREE_RENDERER_ID } from './catalogue.js';
 import {
 	attachString,
@@ -98,6 +99,8 @@ interface ThreeDriverState {
 export interface ThreeHostEnvironment {
 	/** Called once after an accepted host batch, without requiring WebGL. */
 	invalidate?(): void;
+	/** Root state associated with a configured managed scene. */
+	readonly store?: RootStore;
 	/** Disable the default managed-root sRGB texture conversion. */
 	linear?: boolean;
 	/** Schedule accepted-object disposal after refs and layout cleanup. */

@@ -53,6 +53,10 @@ const THREE_ALIASES = [
 		replacement: resolve(THREE_SOURCE, 'config.ts'),
 	},
 	{
+		find: /^@octanejs\/three\/testing$/,
+		replacement: resolve(THREE_SOURCE, 'testing.ts'),
+	},
+	{
 		find: /^@octanejs\/three\/intrinsics(?:\/jsx-runtime)?$/,
 		replacement: resolve(THREE_SOURCE, 'intrinsics.ts'),
 	},

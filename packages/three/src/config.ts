@@ -27,10 +27,16 @@ export const threeRendererRules = [
 	},
 ] as const;
 
-// The DOM -> Three Canvas boundary lands with the root/store in Milestone 3.
-// Keeping this empty ensures the current preset does not advertise an export
-// that the package cannot mount yet.
-export const threeRendererBoundaries = {} as const;
+export const threeRendererBoundaries = {
+	'@octanejs/three': {
+		Canvas: {
+			ownerRenderer: 'dom',
+			childRenderer: THREE_RENDERER_ID,
+			prop: 'children',
+			server: 'omit-child',
+		},
+	},
+} as const;
 
 export const threeRenderers = {
 	registry: threeRendererRegistry,
