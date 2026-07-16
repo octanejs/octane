@@ -1,5 +1,10 @@
 # Validating Octane via real React libraries — plan
 
+> This document covers adapting React library bindings so they run **on Octane**.
+> For the inverse architecture—rendering compiled Octane islands inside an existing
+> real React 19 tree—see
+> **[react-hosted-octane-compat-plan.md](./react-hosted-octane-compat-plan.md)**.
+
 > Goal: measure how faithfully Octane matches React's hook/effect/store/context/
 > Suspense surface by porting **real third-party React libraries** and running a
 > representative slice of **their own test suites** — with React (compiled from the
