@@ -15,6 +15,10 @@
  *   - `hmr`: defaults to on in serve mode and is always off for SSR; pass
  *     `true`/`false` to override the client default.
  *   - `compat`: compatibility plugins placed immediately after the compiler.
+ *   - `tsx`: compile `.tsx` through the full octane compiler (default `true`).
+ *     Set `false` when React owns `.tsx` in the project — incremental adoption
+ *     with @octanejs/react-wrapper, or React-authored islands rendered through
+ *     @octanejs/react-compat — so only `.tsrx` is octane-compiled.
  */
 import { compile } from './compile.js';
 import { slotHooks } from './slot-hooks.js';
@@ -30,6 +34,7 @@ export function octane(options = {}) {
 	// otherwise be double-slotted). In a real app these live in node_modules and
 	// are skipped automatically; this is for monorepo / aliased-to-source setups.
 	const excludePaths = options.exclude ?? [];
+	const compileTsx = options.tsx !== false;
 	const plugin = {
 		name: 'octane',
 		enforce: 'pre',
@@ -45,7 +50,10 @@ export function octane(options = {}) {
 			// `.tsrx` keeps its existing always-compile behavior. Mirror Ripple's mode
 			// decision: an explicit `options.ssr` override wins; otherwise Vite's
 			// transform-level SSR flag OR the environment consumer marks a server build.
-			if (file.endsWith('.tsrx') || (file.endsWith('.tsx') && !file.includes('/node_modules/'))) {
+			if (
+				file.endsWith('.tsrx') ||
+				(compileTsx && file.endsWith('.tsx') && !file.includes('/node_modules/'))
+			) {
 				const ssr =
 					forceSsr !== undefined
 						? forceSsr

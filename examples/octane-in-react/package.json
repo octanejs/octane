@@ -1,0 +1,25 @@
+{
+  "name": "octane-in-react-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A real React app adopting Octane incrementally: compiled .tsrx components mounted through @octanejs/react-wrapper, with React children bridged into the Octane tree.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@octanejs/react-wrapper": "workspace:*",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@vitejs/plugin-react": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

@@ -1,0 +1,51 @@
+body {
+	font-family: system-ui, sans-serif;
+	margin: 0;
+	color: #1a1a2e;
+	background: #f7f7fb;
+}
+
+main {
+	max-width: 640px;
+	margin: 0 auto;
+	padding: 2rem 1rem 4rem;
+}
+
+section {
+	margin-top: 2rem;
+	padding: 1rem 1.25rem;
+	background: #fff;
+	border: 1px solid #e3e3ee;
+	border-radius: 8px;
+}
+
+label {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.counter,
+.clock {
+	margin-top: 1rem;
+	padding: 0.75rem;
+	border-left: 3px solid #e94560;
+	background: #fff5f7;
+}
+
+.counter-label {
+	margin-right: 0.75rem;
+	font-weight: 600;
+}
+
+.card {
+	margin-top: 1rem;
+	border: 1px dashed #e94560;
+	border-radius: 6px;
+	padding: 0.75rem;
+}
+
+.card-title {
+	margin: 0 0 0.5rem;
+	color: #e94560;
+}

@@ -1,0 +1,22 @@
+{
+  "name": "react-in-octane-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "An Octane app using unmodified React packages (jotai, react-hook-form) out of the box through @octanejs/react-compat — no React installed.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@octanejs/react-compat": "workspace:*",
+    "jotai": "^2.20.1",
+    "octane": "workspace:*",
+    "react-hook-form": "^7.81.0"
+  },
+  "devDependencies": {
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

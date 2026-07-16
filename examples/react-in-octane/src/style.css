@@ -1,0 +1,54 @@
+body {
+	font-family: system-ui, sans-serif;
+	margin: 0;
+	color: #16213e;
+	background: #f7f7fb;
+}
+
+main {
+	max-width: 640px;
+	margin: 0 auto;
+	padding: 2rem 1rem 4rem;
+}
+
+section {
+	margin-top: 2rem;
+	padding: 1rem 1.25rem;
+	background: #fff;
+	border: 1px solid #e3e3ee;
+	border-radius: 8px;
+}
+
+button {
+	margin-left: 0.5rem;
+}
+
+.products {
+	padding-left: 1.25rem;
+}
+
+.products li {
+	margin: 0.25rem 0;
+}
+
+.signup label {
+	display: block;
+	margin: 0.5rem 0;
+}
+
+.signup input,
+.signup select {
+	margin-left: 0.5rem;
+}
+
+.error {
+	color: #c0392b;
+	font-size: 0.875rem;
+}
+
+.watch,
+.cart-summary {
+	padding: 0.5rem;
+	background: #eef6ff;
+	border-left: 3px solid #2d6cdf;
+}
