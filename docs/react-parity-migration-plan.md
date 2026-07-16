@@ -1,7 +1,7 @@
 # React → Octane Test-Parity Migration Plan
 
 > **STATUS: HISTORICAL EXECUTION RECORD.** This migration was marked complete on
-> 2026-07-05 (with its executable-pin audit refreshed on 2026-07-14), meaning
+> 2026-07-05 (with its full stable/canary inventory audit refreshed on 2026-07-16), meaning
 > every phase and tier defined by its then-current scope was ported or accounted.
 > It was not a complete enumeration of React's current test inventory and must not
 > be used as the source for React-derived test counts. Current upstream pins,
@@ -11,6 +11,10 @@
 > user-facing summary of intentional divergences is
 > **[differences-from-react.md](./differences-from-react.md)**; keep that page
 > current when a divergence is added or closed.
+
+> The 2026-07-16 residual audit assigns every discovered case a risk, owner,
+> workstream, and status: there are zero untriaged cases. A `planned` status still
+> means supported behavior needs executable evidence; it is not counted as ported.
 
 > Original goal: systematically port the *in-scope* unit-test behaviors from `facebook/react`
 > into Octane's `.tsrx` test suite, and close the runtime gaps those tests expose —
@@ -247,20 +251,22 @@ tag, host↔component swap, over-long `@for`), supports shallow `suppressHydrati
 emits dev-only warnings with Svelte-5-style source locations (`file:line:col`). Recovery runs
 in dev + prod; warnings + LOC are dev-only and strictly gated so prod output is byte-identical.
 
-**Wave 4 server inventory and triage are complete; implementation is in progress
-(2026-07-16).** The audit reviewed the 223-case stable/canary union of the four
-`ReactDOMFizzServer*` suites and the 389 remaining `ReactDOMServerIntegration*`
-cases after Wave 1 covered the 17 untrusted-URL cases. Of those 612 Wave 4 cases,
-198 have exact live evidence, 171 have conservative durable dispositions, and 243
-remain planned. Wave 4C closed all 104 remaining Fizz cases plus 43 reconnecting
-and controlled-field cases: 114 gained executable evidence and 33 received durable
-dispositions. Its four focused suites add 80 normal cases covering stream error and
-abort recovery, synchronous iterables and thenables, script/style safety, hydration
-reconnection, render-phase state replay, raw HTML, and native controlled-field
-events. All 223 Fizz cases now have either live evidence (109) or a durable
-disposition (114); the remaining queue is entirely server-integration work. The
-strict upstream mapping counts each React case once rather than treating every
-local execution mode as a distinct upstream case.
+**Wave 4 server work is complete (2026-07-16).** The audit reviewed the 223-case
+stable/canary union of the four `ReactDOMFizzServer*` suites and the 389 remaining
+`ReactDOMServerIntegration*` cases after Wave 1 covered the 17 untrusted-URL cases.
+All 612 Wave 4 cases have exited the queue: 439 have exact live evidence and 173
+have conservative durable dispositions, with none still planned. All 223 Fizz cases
+have either live evidence (109) or a durable disposition (114); the 389-case
+server-integration tranche now has 330 covered and 59 documented outcomes.
+
+Wave 4C closed all 104 remaining Fizz cases plus 43 reconnecting and
+controlled-field cases. The final Wave 4D matrix closed the remaining 243 planned
+server-integration cases: 241 gained executable evidence and two became explicit
+Octane divergences. Its attribute, element, hook, context, and controlled-form
+suites add more than 600 collected normal-core cases across client, buffered SSR, streaming
+SSR, matching hydration, mismatch recovery, and production compilation. The strict
+upstream mapping still counts each React case once rather than treating those local
+execution modes as separate upstream ports.
 Class components, legacy roots/context, StrictMode, synthetic selective-hydration
 replay, Fiber/Fizz protocol internals, and document-orchestration APIs remain
 explicit non-goals rather than disabled tests.
@@ -270,8 +276,8 @@ explicit non-goals rather than disabled tests.
 | ~~`ReactDOMUseId-test.js` (17)~~ **DONE (2026-06-30)** — `tests/conformance/useid-determinism.test.ts` asserts client stability (across re-renders, wrapper indirection, multiple ids per component) AND **server ≡ client byte-equality after `hydrateRoot()`**. Fixed in `hydrateRoot()`: the client `_idCounter` resets to 0 at the start of hydration so it lines up with the server's per-render reset. | ~~High~~ |
 | ~~`ReactDOMServerIntegrationUserInteraction-test.js` (14)~~ **DONE (2026-07-01)** — `tests/conformance/user-input-hydration.test.ts` (6 cases): input/range/checkbox/textarea/select, controlled + uncontrolled, keep the user's typed value across hydration (octane only ever writes ATTRIBUTES, never the dirty `.value`/`.checked` property) with no spurious mismatch warning. **Rewritten (2026-07-08)** for the controlled-components model: hydration still adopts pre-hydration user input (React parity), then the first real commit/discrete event reasserts controlled values. | ~~High~~ |
 | ~~`ReactDOMHydrationDiff-test.js` (37) + `ReactDOMServerIntegrationReconnecting-test.js` (50)~~ **DONE (2026-07-01)** — ported as `tests/conformance/hydration-mismatch.test.ts` (24 outcome-level cases). Surfaced + fixed 5 runtime bugs (clone close-marker, ifBlock/switchBlock empty-branch cursor + leftover discard, setStyle + setClassName detection). Divergences documented: octane patches attrs to client (React keeps server), warns+rebuilds in place (React throws+re-renders boundary), and function components carry hydration markers (so component-form ≠ bare-element-form). | ~~Medium~~ |
-| `ReactDOMServerIntegrationHooks-test.js`, `…Refs-test.js`, `ReactDOMFizzForm-test.js` server outcomes | **In progress** — exact mapped evidence covers selected render-only hook, initial-state, ref, and form-status outcomes; the ledger retains the rest as planned or as explicit non-goals. | Medium |
-| `ReactDOMServerIntegrationElements/Attributes/Input/Select/Textarea/Fragment-test.js` | **In progress** — `ssr-serialization.test.ts` and the five-mode matrix cover representative array/bigint/text/attribute/fragment and controlled-form projections. Remaining edge cases stay planned until they gain exact evidence. | Medium |
+| ~~`ReactDOMServerIntegrationHooks-test.js`, `…Refs-test.js`, `ReactDOMFizzForm-test.js` server outcomes~~ | **DONE (2026-07-16)** — the shared five-mode matrix covers server hook replay, current-reducer render-phase updates, stable memo/ref identity, callable React-19 Context providers, ref no-ops, and initial form state without adding class or legacy APIs. | ~~Medium~~ |
+| ~~`ReactDOMServerIntegrationElements/Attributes/Input/Select/Textarea/Fragment-test.js`~~ | **DONE (2026-07-16)** — `server-integration-attributes-wave4d.test.ts`, `server-integration-elements-remaining.test.ts`, and the expanded shared matrix cover the remaining serialization, parser-normalization, raw-HTML, invalid-child/type, fragment, hydration, and native controlled-form outcomes in development and production compilation. | ~~Medium~~ |
 | ~~`ReactDOMForm-test.js` + `ReactDOMFizzForm-test.js`~~ **DONE in the earlier Tier-4 pass** — `form-actions-extra.test.ts`, `actions.test.ts`, and `form-reset.test.ts` cover queue sequencing, errors, status activation, auto-reset, and explicit reset behavior; server initial-state outcomes live in `ssr-server-semantics.test.ts`. | ~~Medium~~ |
 
 ### Tier 5 — Suspense / transitions / activity (advanced scheduling)
@@ -344,6 +350,11 @@ For each React `it(...)` we port:
   `it`/`itRenders` titles + line numbers as a `describe` skeleton with `it.todo(...)`,
   pre-tagged in/out of scope using the §2 rules. Turns "port a file" into filling
   blanks.
+- `pnpm react-parity:candidates -- --baseline stable`: scan local React source
+  citations against one pinned inventory and report ledger cases that may already
+  have executable evidence. `--exact-line --exact-title` narrows the advisory list;
+  canary-only work must pass `--baseline canary` so line drift cannot cross-map
+  stable and canary cases.
 - The **move-instrumented harness** (§1) — unblocks all of Tier 0.
 - A standard **effect-log fixture helper** — unblocks Tiers 1, 5, 6, 7.
 

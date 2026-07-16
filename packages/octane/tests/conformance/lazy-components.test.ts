@@ -327,12 +327,18 @@ describe('ReactLazy public conformance', () => {
 		});
 	}
 
-	// Per ReactLazy-test.internal.js:861 (React stable 6117d7c).
-	it('throws with a useful error when wrapping Context with lazy()', () => {
-		const context = createContext(null);
+	// Per ReactDOMServerIntegrationNewContext-test.js:297 (React canary b740af2):
+	// React 19 treats Context itself as its Provider. Because Octane preserves
+	// `Context.Provider === Context`, lazy() accepts either spelling identically.
+	it('renders Context itself when wrapped with lazy()', () => {
+		const context = createContext('default');
 		const Lazy = lazy(() => fulfilled({ default: context as any }));
-		const root = mount(LazyHost, { comp: Lazy });
-		expect(root.find('.lazy-error').textContent).toContain('lazy: expected');
+		const root = mount(LazyProviderHost, {
+			provider: Lazy,
+			context,
+			value: 'provided directly',
+		});
+		expect(root.find('.lazy-context').textContent).toBe('provided directly');
 		root.unmount();
 	});
 
