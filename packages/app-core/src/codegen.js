@@ -192,19 +192,22 @@ function getComponentExport(module, exportName) {
 
 function withRootBoundary(content, boundary) {
   let body = content;
-  if (boundary.pending) {
-    const child = body;
-    const Pending = boundary.pending;
-    body = (props, scope) => Suspense({
-      fallback: createElement(Pending, {}),
-      children: (_props, childScope) => child(props, childScope),
-    }, scope);
-  }
+  // Keep ErrorBoundary closest to the route. Suspense may retain its pending
+  // shell for an unhandled server render error, so it must wrap the configured
+  // catch boundary rather than hiding route errors from it.
   if (boundary.catch) {
     const child = body;
     const Catch = boundary.catch;
     body = (props, scope) => ErrorBoundary({
       fallback: (error, reset) => createElement(Catch, { error, reset }),
+      children: (_props, childScope) => child(props, childScope),
+    }, scope);
+  }
+  if (boundary.pending) {
+    const child = body;
+    const Pending = boundary.pending;
+    body = (props, scope) => Suspense({
+      fallback: createElement(Pending, {}),
       children: (_props, childScope) => child(props, childScope),
     }, scope);
   }

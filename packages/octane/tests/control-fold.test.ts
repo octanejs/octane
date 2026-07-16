@@ -20,6 +20,8 @@ import {
 	DirectReturnedLink,
 	ReturnedKeyedFragmentBoundary,
 	DirectReturnedKeyedFragmentBoundary,
+	DescriptorHostWithKeyedFragment,
+	DescriptorHostWithKeyedComponents,
 	ReturnedChildCodeBlock,
 } from './_fixtures/control-fold.tsrx';
 import {
@@ -481,6 +483,64 @@ describe('template directives in a returned fragment', () => {
 		const remountedDraft = container.querySelector('#direct-keyed-fragment-draft');
 		expect(remountedDraft).not.toBe(firstDraft);
 		expect(remountedDraft?.textContent).toBe('Direct keyed edits: 0');
+		root.unmount();
+		container.remove();
+	});
+
+	it('server-renders and hydrates Fragment descriptor children inside a de-opt host', () => {
+		const server = serverModule();
+		const { html } = ServerRT.renderToString(server.DescriptorHostWithKeyedFragment, {});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+
+		const before = container.querySelector('#descriptor-before');
+		const first = container.querySelector('#descriptor-a');
+		const second = container.querySelector('#descriptor-b');
+		const after = container.querySelector('#descriptor-after');
+		expect(
+			Array.from(container.querySelector('#descriptor-fragment-host')!.children).map(
+				(element) => element.id,
+			),
+		).toEqual(['descriptor-before', 'descriptor-a', 'descriptor-b', 'descriptor-after']);
+
+		const root = hydrateRoot(container, DescriptorHostWithKeyedFragment, {});
+		flushSync(() => {});
+		expect(container.querySelector('#descriptor-before')).toBe(before);
+		expect(container.querySelector('#descriptor-a')).toBe(first);
+		expect(container.querySelector('#descriptor-b')).toBe(second);
+		expect(container.querySelector('#descriptor-after')).toBe(after);
+
+		root.render(DescriptorHostWithKeyedFragment, {});
+		flushSync(() => {});
+		expect(container.querySelector('#descriptor-before')).toBe(before);
+		expect(container.querySelector('#descriptor-a')).toBe(first);
+		expect(container.querySelector('#descriptor-b')).toBe(second);
+		expect(container.querySelector('#descriptor-after')).toBe(after);
+		root.unmount();
+		container.remove();
+	});
+
+	it('hydrates keyed component descriptor children without duplicating server content', () => {
+		const server = serverModule();
+		const { html } = ServerRT.renderToString(server.DescriptorHostWithKeyedComponents, {});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const first = container.querySelector('#descriptor-component-a');
+		const second = container.querySelector('#descriptor-component-b');
+
+		const root = hydrateRoot(container, DescriptorHostWithKeyedComponents, {});
+		flushSync(() => {});
+		expect(container.querySelector('#descriptor-component-host')?.textContent).toBe('AB');
+		expect(container.querySelector('#descriptor-component-a')).toBe(first);
+		expect(container.querySelector('#descriptor-component-b')).toBe(second);
+
+		root.render(DescriptorHostWithKeyedComponents, {});
+		flushSync(() => {});
+		expect(container.querySelector('#descriptor-component-host')?.textContent).toBe('AB');
+		expect(container.querySelector('#descriptor-component-a')).toBe(first);
+		expect(container.querySelector('#descriptor-component-b')).toBe(second);
 		root.unmount();
 		container.remove();
 	});

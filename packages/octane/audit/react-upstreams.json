@@ -136,10 +136,10 @@
       "workstream": "Fizz streaming",
       "filePattern": "/ReactDOMFizzServer[^/]*-test(?:\\.internal)?\\.js$",
       "risk": "high",
-      "status": "in_progress",
+      "status": "covered",
       "classification": "adaptable",
       "owner": "SSR + hydration",
-      "rationale": "Wave 4 has exact executable evidence for 38 cases in the stable/canary union (35 stable and 38 canary), with 81 conservative durable dispositions and 104 still planned. Coverage includes public transport, suspension, abort, parser-context, context-isolation, Usable-node, hydration, and deep-tree outcomes; class, selective-hydration, experimental, internal, and document-orchestration cases remain outside Octane's supported surface."
+      "rationale": "Wave 4 has exact executable evidence for 109 cases in the stable/canary union (100 stable and 109 canary), with durable dispositions for the other 114 cases and none still planned. Coverage includes public transport, suspension, abort, parser-context, context-isolation, Usable-node, hydration, synchronous iterables and thenables, and deep-tree outcomes; class, selective-hydration, experimental, internal, and document-orchestration cases remain outside Octane's supported surface."
     },
     {
       "id": "server-integration-matrix",
@@ -149,7 +149,7 @@
       "status": "in_progress",
       "classification": "adaptable",
       "owner": "SSR + hydration",
-      "rationale": "Wave 4 has exact executable evidence for 46 rendering, serialization, hook, ref, form-control, hydration-adoption, and mismatch-recovery cases in both stable and canary, including a shared five-mode matrix. Wave 1 supplies another 17 untrusted-URL cases, for 63 covered cases in this policy; 57 cases carry durable dispositions and 286 remain planned. Class components, legacy roots/context, StrictMode double-invoke, private dispatchers, and unsupported types are explicit non-goals."
+      "rationale": "Wave 4 has exact executable evidence for 89 rendering, serialization, hook, ref, form-control, hydration-adoption, and mismatch-recovery cases in both stable and canary, including a shared five-mode matrix. Wave 1 supplies another 17 untrusted-URL cases, for 106 covered cases in this policy; 57 cases carry durable dispositions and 243 remain planned. Class components, legacy roots/context, StrictMode double-invoke, private dispatchers, and unsupported types are explicit non-goals."
     },
     {
       "id": "react-repo-eslint-rules",
@@ -163,19 +163,19 @@
     }
   ],
   "octaneSuiteBaseline": {
-    "normalCoreCases": 2756,
+    "normalCoreCases": 2853,
     "normalCoreBreakdown": {
-      "conformance": 1330,
+      "conformance": 1413,
       "differential": 137,
       "hydration": 135,
-      "other": 1154
+      "other": 1168
     },
     "profilingOnlyCases": 14,
-    "distinctCoreCasesIncludingProfiling": 2770,
-    "productionModeReruns": 2756,
-    "allWorkspaceExecutions": 8162,
-    "reactSourceAttributedFileUpperBound": 1345,
-    "reactSourceAttributedFiles": 78,
+    "distinctCoreCasesIncludingProfiling": 2867,
+    "productionModeReruns": 2853,
+    "allWorkspaceExecutions": 8477,
+    "reactSourceAttributedFileUpperBound": 1421,
+    "reactSourceAttributedFiles": 81,
     "reactSourceAttributedDefinition": "Every collected normal-core case in a local file containing at least one React upstream *-test.js or *-test.ts filename citation; this is a generous file-level upper bound, not a one-to-one port count.",
     "measuredOn": "2026-07-16"
   }

@@ -90,11 +90,18 @@ Suspense boundary delays the shell until it resolves. Streamed replacements are
 parsed in their real HTML, table/select, SVG, or MathML context, so revealing a
 boundary preserves both valid structure and namespace identity.
 
+Synchronous iterable children, including generators, are materialized once and
+use the same keyed hydration ranges as arrays. A thenable that settles while it
+is first subscribed is unwrapped in that render without publishing a fallback.
+
 `StreamOptions` extends `RenderOptions` with `onShellReady()`,
-`onShellError(err)`, and `onAllReady()`. Calling `abort(reason)` after the shell
-reports the reason through `onError`, preserves the fallback for client
-recovery, closes the destination, and invokes `onAllReady` once as the terminal
-readiness notification.
+`onShellError(err)`, and `onAllReady()`. A recoverable error in Suspense content
+reaches `onError`, preserves the emitted fallback, and marks only that boundary
+for client rendering. Calling `abort(reason)` reports the reason for each
+abandoned pending task, preserves emitted fallbacks for client recovery, closes
+the destination, and invokes `onAllReady` once as the terminal readiness
+notification; an unpublished shell still fails only once through
+`onShellError`.
 
 ### `renderToReadableStream(component, props?, options?)` — `octane/server`
 
@@ -231,7 +238,9 @@ export default defineConfig({
 ```
 
 The catch component receives `{ error, reset }`; the pending component receives
-no props. Paths must be Vite-root paths. `index.html` must contain exactly one
+no props. When both are configured, the catch boundary is closest to the route
+and the pending boundary wraps it, so route errors reach the catch UI while
+suspensions still select the pending UI. Paths must be Vite-root paths. `index.html` must contain exactly one
 `<!--ssr-head-->` marker, one `<!--ssr-body-->` marker, and one closing `</body>`
 tag; builds now fail with an actionable error when that hydration contract is
 malformed.
@@ -281,8 +290,9 @@ These are the known gaps between Octane SSR and a full streaming SSR stack:
 - **Framework-level data serialization**: only suspense seeds cross the boundary
   automatically; loader-style data APIs are app code today.
 - **Error digests**: `onError` and the shell callbacks exist, but there are no
-  React-style error digests; a post-shell error ends the stream with the
-  affected boundaries marked for client render.
+  React-style error digests. Recoverable Suspense errors retain their fallback
+  and mark that boundary for client rendering; a fatal post-shell error ends the
+  stream with every still-pending boundary marked for client rendering.
 - **React Fizz document orchestration options**: core rendering deliberately
   does not own doctype/preamble insertion, bootstrap script/module lists,
   import-map construction, response headers, or `onHeaders`. Compose the

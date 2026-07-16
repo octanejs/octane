@@ -83,6 +83,47 @@ function maxValue(card: BenchCard): number {
 	return max;
 }
 
+// The card's one-line reading: each series' geometric mean across operations,
+// relative to the card's first series (Octane .tsrx on framework cards, the
+// tuned fixture on the de-opt cards), ranked fastest-first. Rows where either
+// value is missing (unsupported combinations) drop out of that series' mean.
+interface Verdict {
+	series: SeriesDef;
+	ratio: number;
+}
+
+function verdicts(card: BenchCard): Verdict[] {
+	const reference = card.series[0];
+	const entries: Verdict[] = [];
+	for (const series of card.series) {
+		const ratios: number[] = [];
+		for (const row of card.rows) {
+			const base = row[reference.key];
+			const value = row[series.key];
+			if (typeof base === 'number' && base > 0 && typeof value === 'number' && value > 0) {
+				ratios.push(value / base);
+			}
+		}
+		if (ratios.length > 0) {
+			const mean = Math.exp(ratios.reduce((sum, r) => sum + Math.log(r), 0) / ratios.length);
+			entries.push({ series, ratio: mean });
+		}
+	}
+	return entries.sort((a, b) => a.ratio - b.ratio);
+}
+
+// Chip labels drop trailing version tokens ("React 19" → "React") — the full
+// versioned label stays in the data table header.
+function shortLabel(label: string): string {
+	return label.replace(/\s+[\d][\d.]*.*$/, '');
+}
+
+// A ratio within half a percent of the reference is a tie — show it as the
+// same "1×" as the reference chip instead of a misleadingly precise "1.00×".
+function fmtChipX(ratio: number): string {
+	return Math.abs(ratio - 1) < 0.005 ? '1×' : fmtX(ratio);
+}
+
 function indexedRows(card: BenchCard): Array<{ row: BenchRow; index: number }> {
 	return card.rows.map((row, index) => ({ row, index }));
 }
@@ -126,6 +167,11 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 	});
 	const rows = indexedRows(card);
 	const barsHeight = card.series.length * (barSize + BAR_GAP);
+	// Single-series cards keep the plain legend; everything else gets the ranked
+	// geomean strip (which doubles as the legend — same swatches).
+	const cardVerdicts =
+		card.series.length > 1 ? verdicts(card) : [];
+	const verdictNote = 'geomean vs ' + shortLabel(card.series[0].label) + ' · lower is better';
 
 	<figure class="bench-card">
 		<figcaption class="bench-card-head">
@@ -136,14 +182,29 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 				{card.description as string}
 			</span>
 		</figcaption>
-		<div class="bench-key-row" aria-hidden="true">
-			@for (const s of card.series; key s.key) {
-				<span class="bench-key">
-					<span class="bench-swatch" style={'background:' + s.color}></span>
-					{s.label as string}
+		@if (cardVerdicts.length > 0) {
+			<div class="bench-key-row">
+				@for (const v of cardVerdicts; key v.series.key) {
+					<span class="bench-key" title={v.series.label}>
+						<span class="bench-swatch" style={'background:' + v.series.color}></span>
+						{shortLabel(v.series.label)}
+						<span class="bench-key-x">{fmtChipX(v.ratio)}</span>
+					</span>
+				}
+				<span class="bench-key-note">
+					{verdictNote as string}
 				</span>
-			}
-		</div>
+			</div>
+		} @else {
+			<div class="bench-key-row" aria-hidden="true">
+				@for (const s of card.series; key s.key) {
+					<span class="bench-key">
+						<span class="bench-swatch" style={'background:' + s.color}></span>
+						{s.label as string}
+					</span>
+				}
+			</div>
+		}
 		<div class="bench-plot" aria-hidden="true">
 			<svg
 				class="bench-chart"
@@ -261,6 +322,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 			.bench-key-row {
 				display: flex;
 				flex-wrap: wrap;
+				align-items: center;
 				gap: 0.4rem 1rem;
 			}
 			.bench-key {
@@ -269,6 +331,18 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 				gap: 0.4rem;
 				color: #99a1b3;
 				font-size: 0.8rem;
+			}
+			.bench-key-x {
+				color: #f6f7f9;
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				font-size: 0.75rem;
+				font-variant-numeric: tabular-nums;
+			}
+			.bench-key-note {
+				margin-left: auto;
+				color: #6e7787;
+				font-size: 0.72rem;
+				white-space: nowrap;
 			}
 			.bench-swatch {
 				width: 10px;

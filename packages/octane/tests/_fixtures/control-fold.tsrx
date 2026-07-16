@@ -1,4 +1,4 @@
-import { Activity, Fragment, createContext, use, useState } from 'octane';
+import { Activity, Fragment, createContext, createElement, use, useState } from 'octane';
 
 // return-JSX form: a host element containing `@if` — folds to the return-based
 // fragment model (the branch helpers stay in the component for their closure; the
@@ -230,6 +230,47 @@ export function DirectReturnedKeyedFragmentBoundary(props) {
 	return <Fragment key={props.fragmentKey}>
 		<ActivityDraft id="direct-keyed-fragment-draft" prefix="Direct keyed edits: " />
 	</Fragment>;
+}
+
+// Public createElement may place a keyed Fragment among a de-opt host's other
+// descriptor children. The Fragment is transparent markup, but it remains a
+// list boundary whose leaves must line up with the client hydration ranges.
+export function DescriptorHostWithKeyedFragment() {
+	return createElement(
+		'div',
+		{ id: 'descriptor-fragment-host' },
+		createElement('span', { id: 'descriptor-before', key: 'before' }, 'Before'),
+		createElement(
+			Fragment,
+			{ key: 'group' },
+			createElement('button', { id: 'descriptor-a', key: 'a' }, 'A'),
+			createElement('button', { id: 'descriptor-b', key: 'b' }, 'B'),
+		),
+		createElement('span', { id: 'descriptor-after', key: 'after' }, 'After'),
+	);
+}
+
+function DescriptorComponentLeaf(props) {
+	return <button id={props.id}>
+		{props.label as string}
+	</button>;
+}
+
+export function DescriptorHostWithKeyedComponents() {
+	return createElement(
+		'div',
+		{ id: 'descriptor-component-host' },
+		createElement(DescriptorComponentLeaf, {
+			id: 'descriptor-component-a',
+			key: 'a',
+			label: 'A',
+		}),
+		createElement(DescriptorComponentLeaf, {
+			id: 'descriptor-component-b',
+			key: 'b',
+			label: 'B',
+		}),
+	);
 }
 
 // A render-only child `@{...}` is template syntax, not a value child. It must
