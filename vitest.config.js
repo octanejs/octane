@@ -5,6 +5,7 @@ import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
 import { octaneMdx } from './packages/mdx/src/vite.js';
 import { stylex } from './packages/stylex/src/vite.js';
+import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 
 const USER_APP_EVAL_PREFIX = '@octane-eval-submission/';
@@ -24,6 +25,38 @@ const USER_APP_EVAL_TASKS = resolve(
 	import.meta.dirname,
 	'packages/octane-evals/datasets/train/user-apps-v1/tasks',
 );
+const THREE_SOURCE = resolve(import.meta.dirname, 'packages/three/src');
+const THREE_ALIASES = [
+	{
+		// The package predates `exports`; Vitest SSR otherwise selects its CJS
+		// `main` and loads a second Three module beside the ESM test/driver graph.
+		find: /^@react-three\/fiber$/,
+		replacement: resolve(
+			import.meta.dirname,
+			'packages/three/node_modules/@react-three/fiber/dist/react-three-fiber.esm.js',
+		),
+	},
+	{
+		find: /^@octanejs\/three$/,
+		replacement: resolve(THREE_SOURCE, 'index.ts'),
+	},
+	{
+		find: /^@octanejs\/three\/core$/,
+		replacement: resolve(THREE_SOURCE, 'core/index.ts'),
+	},
+	{
+		find: /^@octanejs\/three\/renderer$/,
+		replacement: resolve(THREE_SOURCE, 'renderer.ts'),
+	},
+	{
+		find: /^@octanejs\/three\/config$/,
+		replacement: resolve(THREE_SOURCE, 'config.ts'),
+	},
+	{
+		find: /^@octanejs\/three\/intrinsics(?:\/jsx-runtime)?$/,
+		replacement: resolve(THREE_SOURCE, 'intrinsics.ts'),
+	},
+];
 const VISX_SOURCE = resolve(import.meta.dirname, 'packages/visx/src');
 const VISX_ALIASES = [
 	{
@@ -193,7 +226,13 @@ export default defineConfig({
 					// and builds.
 					octane({
 						renderers: {
-							registry: { object: 'octane/universal' },
+							registry: {
+								object: {
+									module: 'octane/universal',
+									text: 'host',
+									capabilities: ['visibility'],
+								},
+							},
 							boundaries: {
 								'/packages/octane/tests/_fixtures/universal-owned-canvas.tsrx': {
 									Canvas: {
@@ -254,7 +293,13 @@ export default defineConfig({
 					octane({
 						hmr: false,
 						renderers: {
-							registry: { object: 'octane/universal' },
+							registry: {
+								object: {
+									module: 'octane/universal',
+									text: 'host',
+									capabilities: ['visibility'],
+								},
+							},
 							boundaries: {
 								'/packages/octane/tests/_fixtures/universal-owned-canvas.tsrx': {
 									Canvas: {
@@ -856,6 +901,18 @@ export default defineConfig({
 						},
 					],
 				},
+			},
+			{
+				test: {
+					name: 'three',
+					include: ['packages/three/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/three/tests/_react-setup.ts'],
+					globals: false,
+					server: { deps: { inline: ['@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: THREE_RENDERERS })],
+				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
 			},
 			{
 				test: {

@@ -85,10 +85,10 @@ workspace manifests in `docs/packages.md`:
   graders, public reference implementations, and reproducible evaluation
   tooling. It measures framework use rather than monorepo repair. Active
   held-out prompts, tests, and gold artifacts stay outside the repository.
-- `packages/{zustand,jotai,i18next,tanstack-query,apollo-client,motion,dnd-kit,stylex,tanstack-router,remix-router,tanstack-table,tanstack-virtual,lexical,floating-ui,radix,hook-form,base-ui,sonner,recharts,visx,lucide,redux,redux-toolkit,testing-library,mdx}/`
+- `packages/{zustand,jotai,i18next,tanstack-query,apollo-client,motion,dnd-kit,stylex,tanstack-router,remix-router,tanstack-table,tanstack-virtual,lexical,floating-ui,radix,hook-form,base-ui,sonner,recharts,visx,three,lucide,redux,redux-toolkit,testing-library,mdx}/`
   (npm: `@octanejs/*`) — framework bindings, each an octane port of a React
   library (state, data-fetching, animation, styling, routing, editor,
-  positioning, UI primitives, forms, toast notifications, charts and visualization primitives, icons,
+  positioning, UI primitives, forms, toast notifications, charts and visualization primitives, web 3D, icons,
   internationalization, testing, MDX). Parity varies by
   package — some are behaviorally complete ports, others are explicitly
   partial or alpha. `docs/bindings-status.md` is the generated per-package
@@ -171,10 +171,13 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   batch replay counts, or prefetch behavior toward React
   (docs/suspense-parallel-use-plan.md). True data dependencies stay sequential;
   unwrap order, hydration-seed order, and rejection routing match React.
-- **Root component entry point and safe external-DOM cleanup.** In addition to
-  `root.render(<App />)`, Octane intentionally supports `root.render(App, props)`.
-  A root whose managed DOM was externally removed unmounts safely instead of
-  surfacing the browser's incidental `NotFoundError` for an already-detached node.
+- **Synchronous first root mount, component entry point, and safe cleanup.** The
+  first `root.render()` mounts synchronously, so render-then-unmount in one outer
+  batch can expose intermediate DOM that React's concurrent root elides. In
+  addition to `root.render(<App />)`, Octane intentionally supports
+  `root.render(App, props)`. A root whose managed DOM was externally removed
+  unmounts safely instead of surfacing the browser's incidental `NotFoundError`
+  for an already-detached node.
 - **`lazy()` accepts bare components and component-form boundaries.** React's
   module `{ default }` shape works, and Octane additionally accepts a component
   directly from the loader. Suspense and ViewTransition are ordinary Octane

@@ -1022,6 +1022,10 @@ const EVIDENCE_MODES = new Set([
 	'production-compile',
 ]);
 
+function isWorkspaceTestEvidence(file) {
+	return typeof file === 'string' && /^packages\/[^/]+\/tests\//.test(file);
+}
+
 export function validateLedger(ledger, inventories, repoRoot, upstreams) {
 	const errors = [];
 	if (ledger?.schemaVersion !== 1 || !Array.isArray(ledger?.entries)) {
@@ -1076,10 +1080,20 @@ export function validateLedger(ledger, inventories, repoRoot, upstreams) {
 					entry.risk !== 'unassessed' &&
 					typeof entry.rationale === 'string' &&
 					entry.rationale.trim().length > 0;
-				for (const name of ['classification', 'risk']) {
-					if (entry[name] !== policy[name] && !hasDocumentedPolicyOverride)
-						errors.push(`Priority case ${entry.caseId} does not satisfy ${policy.id} ${name}.`);
-				}
+				const hasCoveredPortabilityAssessment =
+					entry.status === 'covered' &&
+					['portable', 'adaptable'].includes(entry.classification) &&
+					['portable', 'adaptable'].includes(policy.classification);
+				if (
+					entry.classification !== policy.classification &&
+					!hasDocumentedPolicyOverride &&
+					!hasCoveredPortabilityAssessment
+				)
+					errors.push(
+						`Priority case ${entry.caseId} does not satisfy ${policy.id} classification.`,
+					);
+				if (entry.risk !== policy.risk && !hasDocumentedPolicyOverride)
+					errors.push(`Priority case ${entry.caseId} does not satisfy ${policy.id} risk.`);
 				for (const name of ['owner', 'workstream']) {
 					if (entry[name] !== policy[name])
 						errors.push(`Priority case ${entry.caseId} does not satisfy ${policy.id} ${name}.`);
@@ -1131,7 +1145,7 @@ export function validateLedger(ledger, inventories, repoRoot, upstreams) {
 				if (!EVIDENCE_KEYS.has(key))
 					errors.push(`${entry.caseId} evidence has unknown field ${key}.`);
 			}
-			if (typeof evidence.file !== 'string' || !evidence.file.startsWith('packages/octane/tests/'))
+			if (!isWorkspaceTestEvidence(evidence.file))
 				errors.push(`${entry.caseId} evidence has invalid file.`);
 			if (typeof evidence.testName !== 'string' || !evidence.testName.trim())
 				errors.push(`${entry.caseId} evidence has invalid testName.`);
@@ -1282,8 +1296,8 @@ export function renderCoverageReport({ upstreams, inventories, ledger }) {
 	markdown += `\n### Migration sequence and exit criteria\n\n`;
 	markdown += `1. **Wave 1 — critical blockers (completed 2026-07-15):** Effect Event semantics and shared untrusted-URL sanitization are implemented, ported, and linked to executable ledger evidence.\n`;
 	markdown += `2. **Wave 2 — public API and reconciliation (completed 2026-07-15):** supported root, fragment, element/Children, and lazy-component outcomes have live evidence; excluded outcomes have durable divergence/non-goal dispositions.\n`;
-	markdown += `3. **Wave 3 — scheduling and stores:** update reconciliation and external-store consistency.\n`;
-	markdown += `4. **Wave 4 — server matrix:** applicable Fizz streaming cases, then the five-mode server integration matrix.\n`;
+	markdown += `3. **Wave 3 — scheduling and stores (completed 2026-07-15):** supported update-reconciliation and external-store outcomes have live evidence; excluded class, legacy, Fiber-policy, and optimization-only cases have durable dispositions.\n`;
+	markdown += `4. **Wave 4 — server matrix (audit complete; implementation in progress):** 612 Fizz and server-integration cases were reviewed. Exact live evidence covers 84 Wave 4 cases, 138 have conservative durable dispositions, and 390 remain planned. The shared matrix exercises client, buffered SSR, streaming SSR, matching hydration, mismatch recovery, and production compilation; class and legacy React remain explicit non-goals.\n`;
 	markdown += `5. **Residual audit:** assign risk and a durable disposition to every remaining untriaged case, with canary drift reviewed continuously.\n\n`;
 	markdown += `A case exits the queue only as \`covered\` with live local evidence, or as a \`documented\` divergence/non-goal with rationale. Committed conformance work must remain executable; \`skip\`, \`todo\`, and expected-failure placeholders are not completion states.\n\n`;
 	markdown += `## Extraction limits\n\n`;

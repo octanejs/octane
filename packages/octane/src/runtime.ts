@@ -16,6 +16,7 @@
 import {
 	SUSPENSE_SCRIPT_ATTR,
 	STREAM_BOUNDARY_ATTR,
+	STREAM_SCRIPT_ATTR,
 	STREAM_SEED_COMMENT,
 	HYDRATION_START,
 	HYDRATION_END,
@@ -253,6 +254,25 @@ function siteLoc(scope: Scope, slotKey: number): string {
 	const lc = locs[slotKey];
 	if (lc === undefined) return '';
 	return `${scope.locFile ?? '<unknown>'}:${lc[0]}:${lc[1]}`;
+}
+
+/** DEV root-location fallback for anonymous ESM default functions. */
+function componentSourceLoc(body: unknown): string | undefined {
+	if (typeof body !== 'function') return undefined;
+	try {
+		const stamped = (body as any).__oct_loc;
+		if (typeof stamped === 'string') return stamped;
+	} catch {
+		// A user proxy/getter must not turn a diagnostic fallback into a render error.
+	}
+	try {
+		const source = Function.prototype.toString.call(body);
+		const match = /["']__octane_loc:([^"'\\\s]+)["']/.exec(source);
+		if (match !== null) return decodeURIComponent(match[1]);
+	} catch {
+		// Native/proxied functions may not expose useful source; omit the location.
+	}
+	return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -515,6 +535,12 @@ export interface Block extends Scope {
 	 */
 	drainStamp: number;
 	drainRenders: number;
+	/** True when the queued render came from a different component's render body. */
+	crossRenderUpdate: boolean;
+	/** Commit-callback loop guard, scoped to one externally-started update chain. */
+	nestedUpdateChain: number;
+	nestedUpdateCount: number;
+	nestedUpdateError: boolean;
 	/**
 	 * useEffectEvent updates publish only for the latest render of this block that
 	 * completed. Zero means this block has never called useEffectEvent. Keeping the
@@ -592,10 +618,19 @@ const RENDERER_REGION_DOM_BINDINGS = new WeakMap<
 >();
 const DOM_ROOT_DISPOSERS = new WeakMap<Block, () => void>();
 // Public root diagnostics need to distinguish an ordinary imperative unmount
-// from one requested by an effect body while the commit lifecycle is active.
+// from one requested by an effect setup/cleanup while commit lifecycle work is active.
 // Passive effects may drain outside `inFlush`, so that scheduler flag alone is
 // insufficient for the observable root warning.
 let EFFECT_BODY_DEPTH = 0;
+// Callback refs are commit-phase callbacks too. Track them separately from
+// effect callbacks so an attach that repeatedly schedules its owner participates
+// in the same bounded nested-update policy without conflating arbitrary commit
+// plumbing (notably useSyncExternalStore consistency checks) with user callbacks.
+let REF_CALLBACK_DEPTH = 0;
+// Store consistency checks are commit-spawned updates as well. Keeping a
+// distinct depth lets unstable getSnapshot values share the nested-update guard
+// without pretending the store check itself is a user effect or ref callback.
+let STORE_SYNC_DEPTH = 0;
 // Octane discovers deletion destroys while reconciling a parent, but those
 // callbacks are semantically mutation-phase work. Effect Events may be called
 // from them even though CURRENT_SCOPE still reflects the eager parent render.
@@ -607,6 +642,18 @@ function runEffectLifecycleCallback(callback: Cleanup): void {
 		callback();
 	} finally {
 		EFFECT_EVENT_LIFECYCLE_DEPTH--;
+	}
+}
+
+// Layout/passive/insertion cleanups are commit callbacks just like their setup
+// bodies. Keep their scheduled updates in the same bounded nested-update chain,
+// while leaving runEffectLifecycleCallback's Effect Event permission intact.
+function runEffectCleanupCallback(callback: Cleanup): void {
+	EFFECT_BODY_DEPTH++;
+	try {
+		runEffectLifecycleCallback(callback);
+	} finally {
+		EFFECT_BODY_DEPTH--;
 	}
 }
 
@@ -797,6 +844,12 @@ let DEFERRED_SPAWN = false;
  */
 let TRANSITION_PENDING_COUNT = 0;
 const TRANSITION_LISTENERS = new Set<() => void>();
+// useTransition/useOptimistic listeners are runtime-owned publication work.
+// When a transition boundary changes the pending count while another component
+// is rendering, their scheduled refreshes must not be diagnosed as userland
+// cross-component render updates. Keep this depth scoped to listener invocation;
+// startTransition's user callback runs only after tickTransitionCount returns.
+let TRANSITION_LISTENER_PUBLISH_DEPTH = 0;
 
 // ── Global commit coordination (entangled transitions) ──────────────────────
 // React commits a transition's whole tree atomically: when one startTransition
@@ -1273,12 +1326,17 @@ function vtWouldWrapResume(): boolean {
 function tickTransitionCount(delta: number): void {
 	TRANSITION_PENDING_COUNT += delta;
 	if (TRANSITION_PENDING_COUNT < 0) TRANSITION_PENDING_COUNT = 0;
-	for (const fn of TRANSITION_LISTENERS) {
-		try {
-			fn();
-		} catch (err) {
-			console.error(err);
+	TRANSITION_LISTENER_PUBLISH_DEPTH++;
+	try {
+		for (const fn of TRANSITION_LISTENERS) {
+			try {
+				fn();
+			} catch (err) {
+				console.error(err);
+			}
 		}
+	} finally {
+		TRANSITION_LISTENER_PUBLISH_DEPTH--;
 	}
 }
 
@@ -1444,6 +1502,50 @@ export function setIsOctaneActEnvironment(value: boolean): void {
 	IS_OCTANE_ACT_ENVIRONMENT = value;
 }
 
+const NESTED_UPDATE_LIMIT = 50;
+const ACT_DRAIN_LIMIT = NESTED_UPDATE_LIMIT + 50;
+let UPDATE_CHAIN_ID = 0;
+
+function inNestedUpdateCallback(): boolean {
+	return EFFECT_BODY_DEPTH > 0 || REF_CALLBACK_DEPTH > 0 || STORE_SYNC_DEPTH > 0;
+}
+
+class MaximumUpdateDepthError extends Error {}
+
+function maximumUpdateDepthError(): Error {
+	return new MaximumUpdateDepthError(
+		'Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.',
+	);
+}
+
+let CROSS_RENDER_WARNINGS: WeakMap<ComponentBody, WeakSet<ComponentBody>> | null = null;
+
+function componentName(block: Block): string {
+	let body = block.body as ComponentBody & { displayName?: string };
+	// A displayName assigned to the public wrapper is user-authored and wins
+	// over the wrapped body's fallback name.
+	if (body.displayName) return body.displayName;
+	// The dev compiler installs an identity-stable HMR wrapper around exported
+	// components. Diagnostics should name the authored body it delegates to, not
+	// the generated `wrapper` implementation.
+	const hmr = (body as any)[HMR] as HmrMeta | undefined;
+	if (hmr !== undefined) body = hmr.fn as typeof body;
+	return body.displayName || body.name || 'Unknown';
+}
+
+function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
+	if (process.env.NODE_ENV === 'production') return;
+	const warnings = (CROSS_RENDER_WARNINGS ??= new WeakMap());
+	let sources = warnings.get(target.body);
+	if (sources === undefined) warnings.set(target.body, (sources = new WeakSet()));
+	if (sources.has(source.body)) return;
+	sources.add(source.body);
+	console.error(
+		`Cannot update a component (\`${componentName(target)}\`) while rendering a different component ` +
+			`(\`${componentName(source)}\`). Move the update out of the rendering component body.`,
+	);
+}
+
 function scheduleRender(block: Block): void {
 	if (block.disposed) return;
 	// Test-env warning: a state update happened with no flushSync or act()
@@ -1477,6 +1579,12 @@ function scheduleRender(block: Block): void {
 	// transition priority (and useDeferredValue in the replay doesn't defer) —
 	// per ReactDeferredValue-test.js:232.
 	const renderPhaseSelf = CURRENT_BLOCK === block;
+	const renderPhaseOther =
+		CURRENT_BLOCK !== null && !renderPhaseSelf && TRANSITION_LISTENER_PUBLISH_DEPTH === 0;
+	if (renderPhaseOther) {
+		block.crossRenderUpdate = true;
+		warnCrossComponentRenderUpdate(block, CURRENT_BLOCK!);
+	}
 	const mode: 'urgent' | 'transition' =
 		TRANSITION_DEPTH > 0 ||
 		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
@@ -1490,6 +1598,24 @@ function scheduleRender(block: Block): void {
 			block.pendingDeferred = false;
 		}
 		return;
+	}
+	if (inNestedUpdateCallback()) {
+		if (block.nestedUpdateChain !== UPDATE_CHAIN_ID) {
+			block.nestedUpdateChain = UPDATE_CHAIN_ID;
+			block.nestedUpdateCount = 0;
+		}
+		if (++block.nestedUpdateCount > NESTED_UPDATE_LIMIT) block.nestedUpdateError = true;
+	} else if (CURRENT_BLOCK === null) {
+		// A user/root update starts a new chain. This prevents fifty unrelated
+		// events, roots, or wide-batch members from sharing the recursion budget
+		// while preserving the count across scheduler drains for callback-scheduled
+		// work. Updates scheduled while rendering inherit the active chain: otherwise an
+		// effect -> render-phase update -> effect cycle could reset its budget on
+		// every pass. Pure render-phase loops retain the separate drain guard below.
+		UPDATE_CHAIN_ID++;
+		block.nestedUpdateChain = UPDATE_CHAIN_ID;
+		block.nestedUpdateCount = 0;
+		block.nestedUpdateError = false;
 	}
 	block.pending = true;
 	block.pendingMode = mode;
@@ -1548,10 +1674,21 @@ function drainQueue(): { err: any } | null {
 		const block = QUEUE[i];
 		// Skip if an ancestor's cascade already re-rendered this block this flush
 		// (renderBlock cleared its `pending`) — avoids a redundant standalone render.
-		if (!block.pending) continue;
+		// A max-depth flag is not redundant work, however: it must still surface
+		// after an ancestor coalesces the flagged child's pending render.
+		if (!block.pending && !block.nestedUpdateError) continue;
 		block.pending = false;
-		if (block.disposed) continue;
+		if (block.disposed) {
+			block.nestedUpdateError = false;
+			continue;
+		}
+		const crossRenderUpdate = block.crossRenderUpdate;
+		block.crossRenderUpdate = false;
 		try {
+			if (block.nestedUpdateError) {
+				block.nestedUpdateError = false;
+				throw maximumUpdateDepthError();
+			}
 			// An update to a block inside a SUSPENSE-HIDDEN subtree (its boundary's
 			// try content is soft-detached into savedDom while the fallback shows):
 			// don't render it in place — its geometry is detached, and a fresh mount
@@ -1570,9 +1707,11 @@ function drainQueue(): { err: any } | null {
 			// ErrorBoundary, like React's equivalent) instead of hanging.
 			if (block.drainStamp === drainId) {
 				if (++block.drainRenders > RENDER_PHASE_UPDATE_LIMIT) {
-					throw new Error(
-						'Too many re-renders. Octane limits the number of renders to prevent an infinite loop.',
-					);
+					throw crossRenderUpdate
+						? maximumUpdateDepthError()
+						: new Error(
+								'Too many re-renders. Octane limits the number of renders to prevent an infinite loop.',
+							);
 				}
 			} else {
 				block.drainStamp = drainId;
@@ -1971,17 +2110,17 @@ export function flushSync<T>(fn: () => T): T {
 			// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
 			// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
 			// needed so derived layout state (e.g. a presence/exit-animation gate) is committed
-			// before flushSync returns. But octane also deliberately FORGIVES non-convergent
-			// cascades (an unstable `useSyncExternalStore` getSnapshot re-scheduling its component
-			// from every layout pass — React throws "maximum update depth"/"getSnapshot should be
-			// cached"; octane must neither hang nor burst-render). Discriminate by CONVERGENCE:
+			// before flushSync returns. Non-convergent commit cascades (for example an
+			// unstable `useSyncExternalStore` snapshot or an every-render layout update)
+			// must not monopolize this synchronous stack. Discriminate by CONVERGENCE:
 			// keep draining while each pass schedules only blocks not yet seen in this flushSync
 			// (a finite cascade propagating through the tree — it exhausts quickly since
 			// Object.is-equal setStates bail); the moment a block re-schedules ITSELF a second
 			// time, the cascade is non-convergent — stop and hand the remainder to the async
-			// scheduler, which advances it lazily (one render per microtask), exactly the
-			// pre-existing behavior divergent stores rely on. LAYOUT_CASCADE_LIMIT backstops
-			// pathological wide-but-finite chains.
+			// scheduler. Commit-spawned updates retain their per-chain count across those
+			// microtasks and surface MaximumUpdateDepthError at the bounded limit instead of
+			// starving the event loop. LAYOUT_CASCADE_LIMIT backstops pathological
+			// wide-but-finite chains.
 			if (QUEUE.length > 0) {
 				const seen = new Set<Block>(QUEUE);
 				let defer = false;
@@ -2083,8 +2222,14 @@ function drainRefDetaches(): void {
 	const q = refDetachQueue.splice(0);
 	for (let i = 0; i < q.length; i += 3) {
 		try {
-			attachRef(q[i], null, q[i + 1]);
+			REF_CALLBACK_DEPTH++;
+			try {
+				attachRef(q[i], null, q[i + 1]);
+			} finally {
+				REF_CALLBACK_DEPTH--;
+			}
 		} catch (err) {
+			if (err instanceof MaximumUpdateDepthError) throw err;
 			// A throwing ref detach must not abort the commit (the remaining detaches
 			// + attaches still run) — route to the deletion's boundary like React.
 			const handler = q[i + 2] as ((e: any) => void) | null;
@@ -2108,8 +2253,14 @@ function drainRefAttaches(): void {
 		// resurrecting an object ref the cleanup just nulled.
 		if (blockSubtreeDisposed(r.block)) continue;
 		try {
-			r.fn();
+			REF_CALLBACK_DEPTH++;
+			try {
+				r.fn();
+			} finally {
+				REF_CALLBACK_DEPTH--;
+			}
 		} catch (err) {
+			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = findTryHandler(r.block);
 			if (handler) handler(err);
 			else console.error(err);
@@ -2261,7 +2412,7 @@ function drainEffectEventUpdates(): void {
  * dev warning is suppressed (see `IS_OCTANE_ACT_ENVIRONMENT` and
  * `setIsOctaneActEnvironment`).
  *
- * The async double-loop (5 microtask ticks × up to 50 outer iterations)
+ * The async double-loop (5 microtask ticks × up to ACT_DRAIN_LIMIT iterations)
  * drains cascades like `use(promise)` → status flip → retry → renderBlock
  * that wouldn't settle in a single tick.
  */
@@ -2278,13 +2429,13 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 		return (async () => {
 			try {
 				const value = await (result as Promise<T>);
-				for (let i = 0; i < 50; i++) {
+				for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 					for (let j = 0; j < 5; j++) await Promise.resolve();
 					drainPassiveEffects();
 					if (!hasPendingWork()) return value;
 				}
 				throw new Error(
-					'act(): scheduler did not stabilize after 50 iterations — likely an infinite render loop',
+					`act(): scheduler did not stabilize after ${ACT_DRAIN_LIMIT} iterations — likely an infinite render loop`,
 				);
 			} finally {
 				actScopeDepth--;
@@ -2298,35 +2449,40 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 	// the callback queued (an in-flight thenable from `use(promise)`, an
 	// awaited async validation) can't be reached synchronously; the returned
 	// promise continues the async drain for callers that DO await.
-	for (let i = 0; i < 50; i++) {
-		// A transition-lane drain that would be wrapped in a view transition must
-		// route through flush() — flushSync is the urgent path and deliberately
-		// SKIPS the wrap. Under the test mock, startViewTransition runs its update
-		// callback synchronously, so this stays a synchronous drain; a REAL async
-		// startViewTransition under sync act() cannot be awaited here (use the
-		// async act form, which drains through the scheduled microtask flush).
-		if (vtWouldWrap()) flush();
-		else flushSync(() => {});
-		drainPassiveEffects();
-		if (!hasPendingWork()) break;
-		if (i === 49) {
-			actScopeDepth--;
-			return Promise.reject(
-				new Error(
-					'act(): scheduler did not stabilize after 50 iterations — likely an infinite render loop',
-				),
-			);
+	try {
+		for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
+			// A transition-lane drain that would be wrapped in a view transition must
+			// route through flush() — flushSync is the urgent path and deliberately
+			// SKIPS the wrap. Under the test mock, startViewTransition runs its update
+			// callback synchronously, so this stays a synchronous drain; a REAL async
+			// startViewTransition under sync act() cannot be awaited here (use the
+			// async act form, which drains through the scheduled microtask flush).
+			if (vtWouldWrap()) flush();
+			else flushSync(() => {});
+			drainPassiveEffects();
+			if (!hasPendingWork()) break;
+			if (i === ACT_DRAIN_LIMIT - 1) {
+				throw new Error(
+					`act(): scheduler did not stabilize after ${ACT_DRAIN_LIMIT} iterations — likely an infinite render loop`,
+				);
+			}
 		}
+	} catch (err) {
+		// Flush/commit failures follow the same thenable contract as callback
+		// failures. Balance the scope here because the async continuation below
+		// is never created on this path.
+		actScopeDepth--;
+		return Promise.reject(err);
 	}
 	return (async () => {
 		try {
-			for (let i = 0; i < 50; i++) {
+			for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 				for (let j = 0; j < 5; j++) await Promise.resolve();
 				drainPassiveEffects();
 				if (!hasPendingWork()) return result as T;
 			}
 			throw new Error(
-				'act(): scheduler did not stabilize after 50 iterations — likely an infinite render loop',
+				`act(): scheduler did not stabilize after ${ACT_DRAIN_LIMIT} iterations — likely an infinite render loop`,
 			);
 		} finally {
 			actScopeDepth--;
@@ -2373,8 +2529,9 @@ function fireEffectCleanup(e: PendingEffect): void {
 		const cleanup = slot.cleanup;
 		slot.cleanup = undefined;
 		try {
-			cleanup();
+			runEffectCleanupCallback(cleanup);
 		} catch (err) {
+			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = findTryHandler(e.scope.block);
 			if (handler) handler(err);
 			else console.error(err);
@@ -2386,16 +2543,17 @@ function fireEffectCleanup(e: PendingEffect): void {
 function runEffectBody(e: PendingEffect): void {
 	let cleanup: void | Cleanup;
 	try {
-		if (process.env.NODE_ENV !== 'production') EFFECT_BODY_DEPTH++;
+		EFFECT_BODY_DEPTH++;
 		try {
 			// Spread deps as positional args (see PendingEffect.args). A no-deps
 			// effect has args === undefined, so the body is called with zero args.
 			// eslint-disable-next-line prefer-spread
 			cleanup = e.fn.apply(null, (e.args ?? []) as []);
 		} finally {
-			if (process.env.NODE_ENV !== 'production') EFFECT_BODY_DEPTH--;
+			EFFECT_BODY_DEPTH--;
 		}
 	} catch (err) {
+		if (err instanceof MaximumUpdateDepthError) throw err;
 		// Route effect errors to the nearest enclosing tryBlock, if any.
 		const handler = findTryHandler(e.scope.block);
 		if (handler) handler(err);
@@ -2547,8 +2705,9 @@ function drainDeferredPassiveUnmounts(): void {
 	const q = pendingPassiveUnmounts.splice(0);
 	for (let i = 0; i < q.length; i += 2) {
 		try {
-			(q[i] as Cleanup)();
+			runEffectCleanupCallback(q[i] as Cleanup);
 		} catch (err) {
+			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = q[i + 1] as ((err: any) => void) | null;
 			if (handler !== null) handler(err);
 			else console.error(err);
@@ -2581,14 +2740,19 @@ function drainStoreSyncs(): void {
 	// synchronously re-enter this drain; it must see only entries queued AFTER this
 	// point, never re-process the batch we already own.
 	const q = storeSyncQueue.splice(0);
-	for (let i = 0; i < q.length; i++) {
-		const inst = q[i];
-		inst.queued = false;
-		// Skip a consumer whose block was unmounted, or hidden by <Activity>, between
-		// enqueue and now — same guards the effect drains apply to effects.
-		if (inst.block.disposed || inInactiveSubtree(inst.block)) continue;
-		inst.value = inst.pending;
-		if (checkStoreChanged(inst)) inst.forceUpdate();
+	STORE_SYNC_DEPTH++;
+	try {
+		for (let i = 0; i < q.length; i++) {
+			const inst = q[i];
+			inst.queued = false;
+			// Skip a consumer whose block was unmounted, or hidden by <Activity>, between
+			// enqueue and now — same guards the effect drains apply to effects.
+			if (inst.block.disposed || inInactiveSubtree(inst.block)) continue;
+			inst.value = inst.pending;
+			if (checkStoreChanged(inst)) inst.forceUpdate();
+		}
+	} finally {
+		STORE_SYNC_DEPTH--;
 	}
 }
 
@@ -2686,6 +2850,10 @@ class BlockImpl {
 	// Render-loop guard bookkeeping (see the Block interface).
 	drainStamp: number;
 	drainRenders: number;
+	crossRenderUpdate: boolean;
+	nestedUpdateChain: number;
+	nestedUpdateCount: number;
+	nestedUpdateError: boolean;
 	effectEventRenderVersion: number;
 	effectEventCompletedVersion: number;
 	// De-opt host node managed by this Block (deoptItemBody / hostElementBody), reused
@@ -2756,6 +2924,10 @@ class BlockImpl {
 		this.__thenableIdx = 0;
 		this.drainStamp = 0;
 		this.drainRenders = 0;
+		this.crossRenderUpdate = false;
+		this.nestedUpdateChain = -1;
+		this.nestedUpdateCount = 0;
+		this.nestedUpdateError = false;
 		this.effectEventRenderVersion = 0;
 		this.effectEventCompletedVersion = 0;
 		this.deoptNode = null;
@@ -3036,21 +3208,24 @@ function renderReturnedValue(block: Block, out: unknown): void {
 	} else {
 		// A nested return-based component whose server output is EMPTY owns an
 		// adjacent `<!--[--><!--]-->` range with no inner child range to adopt.
-		// Borrow that component range for the return slot instead of letting
+		// An unframed third-party SSR root receives an equivalent synthetic range.
+		// Borrow either component range for the return slot instead of letting
 		// childSlot mint an empty `<!---->` anchor during hydration. The return
 		// slot is the block's entire output, so it can safely reconcile future
 		// text/component values between the borrowed markers while the block
 		// remains their owner. This keeps hydration byte-preserving for `return
 		// null` / `false` / `''` components (including memo wrappers).
+		const returnHydration = activeHydration();
 		if (
-			activeHydration() !== null &&
+			returnHydration !== null &&
 			block.slots[0] === undefined &&
 			block.startMarker !== null &&
 			block.endMarker !== null &&
 			block.startMarker !== block.endMarker &&
 			block.startMarker.nodeType === 8 &&
 			block.endMarker.nodeType === 8 &&
-			block.startMarker.nextSibling === block.endMarker
+			(block.startMarker.nextSibling === block.endMarker ||
+				returnHydration.isUnframedRootRange(block.startMarker, block.endMarker))
 		) {
 			const borrowed: ChildSlot = {
 				__kind: 'childSlot',
@@ -3383,7 +3558,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				if (!passiveScheduled) schedulePassiveFlush();
 			} else {
 				try {
-					runEffectLifecycleCallback(cleanup);
+					runEffectCleanupCallback(cleanup);
 				} catch (err) {
 					reportTeardownError(err);
 				}
@@ -5329,6 +5504,15 @@ function activeHydration(): HydrationCapability | null {
 	return hydration !== null && hydration.isActive() ? hydration : null;
 }
 
+/** Direct-child scoped CSS resources are renderer-owned hydration sidecars. */
+function isRendererHydrationStyle(node: Node): boolean {
+	return (
+		node.nodeType === 1 &&
+		(node as Element).localName === 'style' &&
+		(node as Element).hasAttribute('data-octane')
+	);
+}
+
 /**
  * Root-local hydration state and the dynamic dispatch boundary for hydration-only
  * code. The class is constructed only by hydrateRoot, so client-only bundles can
@@ -5338,6 +5522,12 @@ class HydrationCapability {
 	depth = 0;
 	seedCursor = 0;
 	hasAdjacentRangePair = false;
+	private abandoned = false;
+	private readonly freshNodes = new WeakSet<Node>();
+	private readonly unframedRootRanges = new WeakMap<Node, Node>();
+	/** First unclaimed root sibling after a compiled root clone; undefined until known. */
+	private rootRemainder: Node | null | undefined;
+	private rootCleanupBoundary: Node | null = null;
 	readonly deferredActivities: Array<() => void> = [];
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	readonly classWrites = new Map<Element, PendingHydrationClassWrite>();
@@ -5349,7 +5539,7 @@ class HydrationCapability {
 	) {}
 
 	isActive(): boolean {
-		return this.depth === 0;
+		return this.depth === 0 && !this.abandoned;
 	}
 
 	owns(block: Block): boolean {
@@ -5422,17 +5612,149 @@ class HydrationCapability {
 		return hydrationRejectionFromSeed(seed);
 	}
 
+	/** Mark a client-built hydration replacement (and its descendants) as fresh DOM. */
+	markFresh(node: Node): void {
+		this.freshNodes.add(node);
+		let child = node.firstChild;
+		while (child !== null) {
+			this.markFresh(child);
+			child = child.nextSibling;
+		}
+	}
+
+	isFresh(node: Node): boolean {
+		return this.freshNodes.has(node);
+	}
+
+	/** Keep a client-owned root anchor alive while stale server siblings are swept. */
+	protectRootAnchor(node: Node): void {
+		this.rootCleanupBoundary = node;
+	}
+
+	/** Bound an unframed third-party component root so its returned host can adopt it. */
+	wrapUnframedRoot(cursor: Node): readonly [Comment, Comment] {
+		const parent = cursor.parentNode!;
+		const remainder = cursor.nextSibling;
+		const start = document.createComment('');
+		const end = document.createComment('');
+		parent.insertBefore(start, cursor);
+		parent.insertBefore(end, remainder);
+		this.unframedRootRanges.set(start, end);
+		this.protectRootAnchor(end);
+		this.claimRootRemainder(remainder);
+		return [start, end];
+	}
+
+	isUnframedRootRange(start: Node, end: Node): boolean {
+		return this.unframedRootRanges.get(start) === end;
+	}
+
+	/** Record the first node outside a root-owned range exactly once. */
+	claimRootRemainder(node: Node | null): void {
+		if (this.rootRemainder === undefined) this.rootRemainder = node;
+	}
+
+	private freshClone<T extends Node>(template: T): T {
+		const cloned = template.cloneNode(true) as T;
+		this.markFresh(cloned);
+		return cloned;
+	}
+
+	private fragmentRemainder(template: Node, cursor: Node | null): Node | null | undefined {
+		let expected = template.firstChild;
+		let actual = cursor;
+		while (expected !== null) {
+			if (actual === null) return undefined;
+			// A template comment is a dynamic logical hole. Its server form may be
+			// text or a marker range, so only static text/element roots compare shape.
+			if (expected.nodeType !== 8 && !hydrationNodeMatches(actual, expected)) return undefined;
+			actual = this.sibling(actual, 1);
+			expected = expected.nextSibling;
+		}
+		return actual;
+	}
+
+	/**
+	 * If a top-level cursor sits inside a server marker frame, return the first
+	 * sibling after that OUTERMOST frame. A clone can execute in a lite/provider
+	 * descendant while its DOM is still a direct child of the root container;
+	 * `cursor.nextSibling` would then be only the descendant's close marker.
+	 */
+	private framedRootRemainder(cursor: Node): Node | null | undefined {
+		const rootParent = this.rootBlock.parentNode;
+		let outerOpen: Node | null = null;
+		let depth = 0;
+		for (
+			let node = rootParent.firstChild;
+			node !== null && node !== cursor;
+			node = node.nextSibling
+		) {
+			if (this.isOpen(node)) {
+				if (depth === 0) outerOpen = node;
+				depth++;
+			} else if (this.isClose(node) && depth > 0) {
+				depth--;
+				if (depth === 0) outerOpen = null;
+			}
+		}
+		return outerOpen === null ? undefined : this.close(outerOpen).nextSibling;
+	}
+
+	/** Give up root adoption after an unframed return/fragment mismatch. */
+	abandonRoot(expected: string, actual: string, loc?: string): void {
+		if (loc) warnHydrationStructuralMismatch(loc, expected, actual);
+		let node = this.node;
+		while (node !== null) {
+			const next = node.nextSibling;
+			if (!isRendererHydrationStyle(node)) (node as ChildNode).remove();
+			node = next;
+		}
+		this.node = null;
+		this.abandoned = true;
+	}
+
 	clone<T extends Node>(template: T, loc?: string): T {
 		const cursor = this.node;
-		if (cursor === null) return template.cloneNode(true) as T;
-		if (!(template as any).__oct_frag && !hydrationNodeMatches(cursor, template)) {
+		const isFragment = (template as any).__oct_frag === true;
+		// Lite/no-template wrappers can render the logical root while sharing the
+		// public root Block, and return-based wrappers render it in a child Block.
+		// Identify the first top-level cursor by DOM ownership, then claim its
+		// remainder ONCE so later lite descendant clones cannot overwrite it.
+		const claimsRoot =
+			this.rootRemainder === undefined &&
+			(cursor !== null
+				? cursor.parentNode === this.rootBlock.parentNode
+				: CURRENT_BLOCK === this.rootBlock);
+		const framedRemainder =
+			claimsRoot && cursor !== null ? this.framedRootRemainder(cursor) : undefined;
+		const unframedRemainder = claimsRoot && cursor !== null ? cursor.nextSibling : undefined;
+		// A synthetic fragment wrapper has no server counterpart. At a root, compare
+		// its logical static roots before returning the virtual adoption view; otherwise
+		// arbitrary server markup could be mistaken for every fragment child at once.
+		if (isFragment && claimsRoot) {
+			const remainder = this.fragmentRemainder(template, cursor);
+			if (remainder === undefined) {
+				this.abandonRoot(
+					`a fragment starting with ${describeHydrationNode(template.firstChild)}`,
+					describeHydrationNode(cursor),
+					componentSourceLoc(this.rootBlock.body),
+				);
+				return this.freshClone(template);
+			}
+			this.claimRootRemainder(framedRemainder === undefined ? remainder : framedRemainder);
+		}
+		if (cursor === null) {
+			if (claimsRoot) this.claimRootRemainder(null);
+			return this.freshClone(template);
+		}
+		if (!isFragment && !hydrationNodeMatches(cursor, template)) {
 			if (process.env.NODE_ENV !== 'production' && loc)
 				warnHydrationStructuralMismatch(
 					loc,
 					describeHydrationNode(template),
 					describeHydrationNode(cursor),
 				);
-			if (isBlockClose(cursor)) return template.cloneNode(true) as T;
+			if (isBlockClose(cursor)) return this.freshClone(template);
 			if (isBlockOpen(cursor)) {
 				const close = this.close(cursor);
 				this.node = close.nextSibling;
@@ -5441,12 +5763,51 @@ class HydrationCapability {
 				this.node = cursor.nextSibling;
 				(cursor as ChildNode).remove();
 			}
-			return template.cloneNode(true) as T;
+			if (claimsRoot)
+				this.claimRootRemainder(
+					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
+				);
+			return this.freshClone(template);
 		}
-		if ((template as any).__oct_frag) {
+		if (isFragment) {
 			return { __oct_vfrag: true, firstChild: cursor } as unknown as T;
 		}
+		if (claimsRoot)
+			this.claimRootRemainder(
+				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
+			);
 		return cursor as unknown as T;
+	}
+
+	/** Remove server siblings left after the root's complete client shape was adopted. */
+	finishRoot(): void {
+		if (this.abandoned) return;
+		let remainder = this.rootRemainder === undefined ? this.node : this.rootRemainder;
+		// Cursor-based adoption may stop on an owned range marker, and mismatch
+		// recovery can append fresh replacement roots after stale server siblings.
+		// Find the first genuinely stale sibling before diagnosing, then preserve
+		// every client-owned marker/replacement while sweeping the remainder.
+		while (
+			remainder !== null &&
+			(remainder === this.rootCleanupBoundary ||
+				this.freshNodes.has(remainder) ||
+				isRendererHydrationStyle(remainder))
+		)
+			remainder = remainder.nextSibling;
+		if (remainder === null) return;
+		warnHydrationStructuralMismatch(
+			componentSourceLoc(this.rootBlock.body),
+			'the end of the root',
+			describeHydrationNode(remainder),
+		);
+		while (remainder !== null && remainder !== this.rootCleanupBoundary) {
+			const next: Node | null = remainder.nextSibling;
+			if (!this.freshNodes.has(remainder) && !isRendererHydrationStyle(remainder))
+				(remainder as ChildNode).remove();
+			remainder = next;
+		}
+		this.node = null;
+		this.rootRemainder = null;
 	}
 
 	htext(el: Node, text: string, loc?: string): Text {
@@ -5684,7 +6045,15 @@ export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
 function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 	if (root !== null) {
 		const block = scope.block;
-		block.parentNode.insertBefore(root, block.endMarker);
+		const hydration = activeHydration();
+		// clone() returns the already-attached server node during hydration. Moving
+		// that adopted root before the block anchor is usually a no-op, but with an
+		// extra trailing server sibling it would reorder the valid root after the
+		// stale node just before finishRoot removes the remainder. Fresh mismatch
+		// replacements still need the ordinary insertion path.
+		if (hydration === null || hydration.isFresh(root) || root.parentNode !== block.parentNode) {
+			block.parentNode.insertBefore(root, block.endMarker);
+		}
 	}
 	scope.slots[0] = bag;
 	return bag;
@@ -5941,6 +6310,17 @@ export function setText(node: Text, value: any): void {
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
 	// for the hot text-update path.
 	node.nodeValue = coerceText(value);
+}
+
+/**
+ * Set authored inline-script source without asking the HTML parser to interpret it.
+ * This is the client half of the compiler's `<script dangerouslySetInnerHTML>`
+ * specialization: strings containing `</script><script>...` remain one inert script
+ * node instead of becoming sibling markup. Server serialization additionally escapes
+ * closing/opening script tokens because it is concatenated into an HTML response.
+ */
+export function setScriptText(el: Element, value: any): void {
+	el.textContent = value == null ? '' : String(value);
 }
 
 // Apply a ref attachment. Accepts the three supported shapes:
@@ -6565,7 +6945,8 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		const html = value == null ? null : value.__html;
 		// `__html: false` renders 'false' (React coerces; only null/undefined clear) —
 		// keeps this path consistent with the compiled htmlOnlyChild path.
-		el.innerHTML = html == null ? '' : String(html);
+		if (el.localName === 'script') setScriptText(el, html);
+		else el.innerHTML = html == null ? '' : String(html);
 		return;
 	}
 	// Never a DOM attribute — a React warning-suppression hint (octane doesn't emit
@@ -7088,7 +7469,8 @@ function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, null, prevValue);
 	} else if (name === 'dangerouslySetInnerHTML') {
-		el.innerHTML = '';
+		if (el.localName === 'script') setScriptText(el, null);
+		else el.innerHTML = '';
 	} else if (name === 'suppressHydrationWarning') {
 		(el as any).__oct_suppress = false;
 	} else {
@@ -8426,8 +8808,10 @@ export function setValue(el: Element, value: unknown): void {
 		if (process.env.NODE_ENV !== 'production') queueDevControlledCheck(el, ctrl);
 		// Hydration ADOPTS: the server already serialized this value, and
 		// pre-hydration user input survives until the element's first real
-		// commit or discrete event (React parity) — zero writes, no warnings.
-		if (activeHydration() !== null) return;
+		// commit or discrete event (React parity) — zero writes, no warnings. A
+		// fresh structural replacement is client-built and needs normal projection.
+		const hydration = activeHydration();
+		if (hydration !== null && !hydration.isFresh(el)) return;
 		// PROPERTY first (React initInput order): the write marks the control
 		// DIRTY, so the attribute write below — and any later defaultValue
 		// binding — can never drag the live value along.
@@ -8465,7 +8849,8 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 	const b = !!value;
 	if (first) {
 		ctrl.c = b;
-		if (activeHydration() !== null) return;
+		const hydration = activeHydration();
+		if (hydration !== null && !hydration.isFresh(input)) return;
 		// PROPERTY first (marks checkedness dirty — see setValue), then the
 		// attribute baseline (React's cascade: checked wins over defaultChecked).
 		if (input.checked !== b) input.checked = b;
@@ -8535,8 +8920,10 @@ export function setSelectValue(el: Element, value: unknown): void {
 	}
 	// Hydration ADOPTS the server-emitted `selected` state — and must not
 	// enqueue the commit sync either (the post-hydration microtask commit
-	// would clobber a pre-hydration user selection).
-	if (activeHydration() !== null) return;
+	// would clobber a pre-hydration user selection). A fresh replacement has no
+	// user state to preserve and follows the ordinary client-mount path.
+	const hydration = activeHydration();
+	if (hydration !== null && !hydration.isFresh(el)) return;
 	projectSelectValue(sel, ctrl.sv, false);
 	if (!ctrl.queued) {
 		ctrl.queued = true;
@@ -9664,6 +10051,7 @@ function componentSlotImpl(
 			// Adopt the server range: its comments become our markers, cursor → content.
 			start = open as Comment;
 			end = hydration!.close(open);
+			if (parentBlock === hydration!.rootBlock) hydration!.claimRootRemainder(end.nextSibling);
 			hydration!.node = start.nextSibling;
 		} else if (singleRoot === true || (singleRoot === 2 && (comp as any).$$singleRoot === true)) {
 			// Client singleRoot: NO markers — the component's single root element
@@ -9958,10 +10346,10 @@ interface ChildSlot {
 	block: Block | null;
 	text: Text | null;
 	currentComp: ComponentBody | null;
-	// True when `currentComp` is a bare render-FUNCTION child (a `.tsrx` `{children}`
-	// body, whose identity changes every render) rather than a stable component
-	// reference. Lets the reconcile swap the block body in place by SLOT instead of
-	// re-mounting on every identity change (which loops when effects re-render).
+	// True when `currentComp` is a render-FUNCTION child rather than a component
+	// reference. Render bodies can change identity every parent render, so reconcile
+	// them by SLOT. Tagged compiler children additionally bail when the SAME function
+	// is passed through unchanged (see the component path below).
 	currentIsBodyFn: boolean;
 	// Non-null while the slot is rendering an ARRAY value via the de-opt keyed
 	// list path (reuses reconcileKeyed). Torn down when the value stops being an
@@ -10719,6 +11107,7 @@ function reconcileDeoptNode(
 				elNs !== undefined
 					? document.createElementNS(elNs, value.type)
 					: document.createElement(value.type);
+			activeHydration()?.markFresh(el);
 			applyDeoptProps(el, value.props, ownerBlock);
 		}
 		setDeoptDesc(el, value);
@@ -11168,6 +11557,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 			elNs !== undefined
 				? document.createElementNS(elNs, d.type as string)
 				: document.createElement(d.type as string);
+		hydration.markFresh(el);
 		block.deoptNode = el;
 		block.parentNode.insertBefore(el, block.endMarker);
 		applyDeoptProps(el, d.props, block);
@@ -11184,6 +11574,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 			elNs !== undefined
 				? document.createElementNS(elNs, d.type as string)
 				: document.createElement(d.type as string);
+		if (hydration !== null) hydration.markFresh(el);
 		block.deoptNode = el;
 		block.parentNode.insertBefore(el, block.endMarker);
 		applyDeoptProps(el, d.props, block);
@@ -11264,6 +11655,7 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 				(stale as ChildNode).remove();
 			}
 			el = elNs !== undefined ? document.createElementNS(elNs, tag) : document.createElement(tag);
+			hydration.markFresh(el);
 			block.deoptNode = el;
 			block.parentNode.insertBefore(el, block.endMarker);
 			applyDeoptProps(el, d.props, block);
@@ -11276,6 +11668,7 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 		// Client mount. (The tag is FIXED for this block's life — componentSlot
 		// tears down + remounts on a tag change — so no localName re-check.)
 		el = elNs !== undefined ? document.createElementNS(elNs, tag) : document.createElement(tag);
+		if (hydration !== null) hydration.markFresh(el);
 		block.deoptNode = el;
 		block.parentNode.insertBefore(el, block.endMarker);
 		applyDeoptProps(el, d.props, block);
@@ -11414,6 +11807,41 @@ export function childSlot(
 ): void {
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
+	// A placeholder from a client-built mismatch clone belongs to the replacement
+	// template; it is an insertion anchor, not server DOM to adopt. Scope the
+	// suspension to this slot so the enclosing hydration cursor remains live for
+	// later server-owned siblings and root-remainder cleanup.
+	if (hydration !== null && anchor != null && hydration.isFresh(anchor)) {
+		hydration.suspend(() =>
+			childSlot(
+				parentScope,
+				slotKey,
+				domParent,
+				value,
+				anchor,
+				ownEnd,
+				ownsHost,
+				compactable,
+				includeKeyedSingle,
+			),
+		);
+		return;
+	}
+	// React 19 treats Contexts and thenables as renderable Usable nodes. Resolve
+	// them before choosing a child regime; repeated unwrapping supports shapes
+	// such as Promise<Context<T>> while preserving the normal Suspense route for
+	// a pending thenable and the normal context dependency tracking for Context.
+	while (value !== null && typeof value === 'object') {
+		if ((value as any).$$kind === CONTEXT_TAG) {
+			value = useContextInternal(value as Context<unknown>);
+			continue;
+		}
+		if (typeof (value as any).then === 'function') {
+			value = useThenable(value as TrackedThenable<unknown>);
+			continue;
+		}
+		break;
+	}
 	const iterable = iterableChildArray(value);
 	if (iterable !== null) value = iterable;
 	const preparedList = prepareDeoptList(value, false, includeKeyedSingle);
@@ -11423,16 +11851,65 @@ export function childSlot(
 	// mode flip out of that regime, and the classifier to route the value.
 	const pureHost = preparedList === null && isHostDescriptor(value) && !descNeedsBlocks(value);
 	let state = parentScope.slots[slotKey] as ChildSlot | undefined;
+	const unframedComponentRoot =
+		state === undefined &&
+		hydration !== null &&
+		parentBlock === hydration.rootBlock &&
+		hydration.node !== null &&
+		hydration.node.parentNode === domParent &&
+		preparedList === null &&
+		isElementDescriptor(value) &&
+		typeof value.type === 'function' &&
+		!hydration.isOpen(anchor ?? null) &&
+		!hydration.isOpen(hydration.node);
+	if (
+		state === undefined &&
+		hydration !== null &&
+		parentBlock === hydration.rootBlock &&
+		!hydration.isOpen(anchor ?? null) &&
+		!hydration.isOpen(hydration.node)
+	) {
+		// Generic root returns normally serialize as one hydratable range. Plain
+		// strings/null are the two unframed root forms; accept their matching DOM,
+		// but rebuild arbitrary stale markup instead of appending beside it.
+		const cursor = hydration.node;
+		const unframedMatch =
+			value === null || value === ''
+				? cursor === null
+				: (typeof value === 'string' && cursor?.nodeType === 3) || unframedComponentRoot;
+		if (!unframedMatch) {
+			hydration.abandonRoot(
+				preparedList === null ? 'a renderable root' : 'a renderable list range',
+				hydration.describe(cursor),
+				componentSourceLoc(parentBlock.body),
+			);
+			childSlot(
+				parentScope,
+				slotKey,
+				domParent,
+				value,
+				anchor,
+				ownEnd,
+				ownsHost,
+				compactable,
+				includeKeyedSingle,
+			);
+			return;
+		}
+	}
 	if (state === undefined) {
 		let start: Comment | null;
 		let end: Comment | null;
-		if (hydration !== null && hydration.isOpen(anchor ?? null)) {
+		if (unframedComponentRoot) {
+			[start, end] = hydration!.wrapUnframedRoot(hydration!.node!);
+		} else if (hydration !== null && hydration.isOpen(anchor ?? null)) {
 			// Hydration (nested hole): the anchor resolved via child/sibling to the
 			// server's `<!--[-->`. Adopt that `<!--[-->…<!--]-->` range as our markers
 			// and point the cursor at the first content node for the Block's clone()
 			// / the text adopt below.
 			start = anchor as Comment;
 			end = hydration.close(anchor as Node);
+			if (parentBlock === hydration.rootBlock) hydration.claimRootRemainder(end.nextSibling);
 			hydration.node = start.nextSibling;
 		} else if (hydration !== null && hydration.isOpen(hydration.node)) {
 			// Hydration (sole top-level hole, e.g. a layout `<>{children}…</>`): the
@@ -11441,6 +11918,10 @@ export function childSlot(
 			// component whose only body root is `{children}` hydrate as single-root.
 			start = hydration.node as Comment;
 			end = hydration.close(hydration.node as Node);
+			if (parentBlock === hydration.rootBlock) {
+				hydration.protectRootAnchor(end);
+				hydration.claimRootRemainder(end.nextSibling);
+			}
 			hydration.node = start.nextSibling;
 		} else if (ownEnd && anchor != null) {
 			// Client mount, dedicated placeholder: reuse the slot's own `<!>` as the end
@@ -11469,6 +11950,8 @@ export function childSlot(
 			start = null;
 			end = document.createComment('');
 			domParent.insertBefore(end, anchor ?? null);
+			if (hydration !== null && parentBlock === hydration.rootBlock)
+				hydration.protectRootAnchor(end);
 		}
 		state = {
 			__kind: 'childSlot',
@@ -11729,6 +12212,25 @@ export function childSlot(
 		// loops unboundedly). Component switches arrive as DESCRIPTORS (comp = value.type),
 		// never as a bare function, so this never short-circuits a real component swap.
 		if (isBodyFn && state.block !== null && state.currentIsBodyFn) {
+			// Compiler-generated children are render functions too, so a fresh parent
+			// render must still swap their body in place (preserving descendant state).
+			// But an identity-equal tagged function is the exact same cached child value:
+			// take React's implicit same-element bailout, with lazy context propagation.
+			const taggedChildren = isChildrenBlock(comp);
+			const wasImplicitlyArmed = state.block.$$implicitBail;
+			if (taggedChildren && !wasImplicitlyArmed) {
+				// The slot previously hosted an arbitrary render function. Arm before
+				// rendering the tagged body so its context reads stamp this block.
+				state.block.$$implicitBail = true;
+				state.block.memoInChain = true;
+			}
+			if (
+				wasImplicitlyArmed &&
+				taggedChildren &&
+				comp === state.currentComp &&
+				tryImplicitBail(state.block)
+			)
+				return;
 			state.block.body = comp;
 			renderBlock(state.block);
 			state.currentComp = comp;
@@ -11893,8 +12395,9 @@ export function childSlot(
 		// must stamp ancestors (memoInChain, like memo blocks) for the bail's lazy
 		// consumer refresh to be sound. Set BEFORE renderBlock so the first render
 		// stamps. Body-fn children re-create identity per render — no bail is ever
-		// possible, so they skip the stamping cost.
-		if (!isBodyFn) {
+		// possible, so untagged ones skip the stamping cost. Tagged compiler children
+		// can be passed through with stable identity and therefore need the same stamps.
+		if (!isBodyFn || isChildrenBlock(comp)) {
 			b.$$implicitBail = true;
 			b.memoInChain = true;
 		}
@@ -12181,6 +12684,9 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 // bailing it could strand consumers. Returns true when the update was handled.
 function tryImplicitBail(block: Block): boolean {
 	if (block.$$implicitBail !== true) return false;
+	// A first attempt that suspended or threw has no committed output to reuse.
+	// Its identity-equal retry must execute until this Block mounts successfully.
+	if (!block.mounted) return false;
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	restampCtxDeps(block);
@@ -12669,14 +13175,27 @@ function mountTry(state: TrySlot): void {
 	} else if (
 		// A shell hydrated before its streamed segment swaps still has the
 		// template sentinel instead of the seed comment. Its opaque id owns the
-		// same boundary namespace even though there are no scoped seeds yet.
+		// same boundary namespace even though there are no scoped seeds yet. Octane
+		// cannot selectively hydrate that server fallback, so claim the boundary for
+		// the client: remove the sentinel and its server-rendered fallback arm before
+		// mounting a fresh try/pending block. Leaving either behind would duplicate
+		// the fallback and allow a later stream swap to overwrite client-owned DOM.
 		hydration !== null &&
 		adoptCursor !== null &&
 		adoptCursor.nodeType === 1 &&
-		(adoptCursor as Element).tagName === 'TEMPLATE'
+		(adoptCursor as Element).localName === 'template' &&
+		(adoptCursor as Element).hasAttribute(STREAM_BOUNDARY_ATTR)
 	) {
 		hasScopedBoundary = true;
 		streamedBoundaryId = (adoptCursor as Element).getAttribute(STREAM_BOUNDARY_ATTR);
+		let stale: Node | null = adoptCursor;
+		while (stale !== null && stale !== state.end) {
+			const next: Node | null = stale.nextSibling;
+			(stale as ChildNode).remove();
+			stale = next;
+		}
+		adoptCursor = state.end;
+		hydration.node = state.end;
 	}
 	if (streamedBoundaryId !== null) {
 		state.idState = {
@@ -12962,7 +13481,23 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
  * — the caller must bail out (no resume wiring for a dead boundary).
  */
 function hideTryContentAndMountPending(state: TrySlot): boolean {
-	softDetachTryBlock(state);
+	const hydration = activeHydration();
+	if (hydration !== null && !state.hasResolved && state.tryBlock !== null) {
+		// A suspension during the first hydration attempt has no committed client
+		// subtree to preserve. The try block currently owns the adopted server arm;
+		// parking that DOM in savedDom would reattach it on resume and then mount the
+		// resolved client arm alongside it. Discard the abandoned adoption attempt
+		// now, while its range is still attached, and let the retry mount one fresh
+		// client arm after the fallback. Keep the outer try markers as the cursor
+		// boundary for any following hydrating sibling.
+		const abandonedTry = state.tryBlock;
+		unmountBlock(abandonedTry);
+		state.tryBlock = null;
+		if (state.block === abandonedTry) state.block = null;
+		hydration.node = state.end;
+	} else {
+		softDetachTryBlock(state);
+	}
 	if (state.tryBlock) {
 		deactivateScope(state.tryBlock);
 		if (state.detachedRefs === null) {
@@ -14761,8 +15296,9 @@ function deactivateScope(scope: Scope): void {
 					// no cleanup and won't re-run it.
 					e.cleanup = undefined;
 					try {
-						runEffectLifecycleCallback(cleanup);
+						runEffectCleanupCallback(cleanup);
 					} catch (err) {
+						if (err instanceof MaximumUpdateDepthError) throw err;
 						const handler = findTryHandler(scope.block);
 						if (handler !== null) handler(err);
 						else console.error(err);
@@ -16547,6 +17083,8 @@ function makeRoot(
 ): Root {
 	let root!: Root;
 	let unmounted = false;
+	let nestedRootRenderChain = -1;
+	let nestedRootRenderCount = 0;
 	const registerRootDisposer = (block: Block): void => {
 		let disposing = false;
 		DOM_ROOT_DISPOSERS.set(block, () => {
@@ -16562,6 +17100,26 @@ function makeRoot(
 	root = {
 		render(bodyOrElement: unknown, props?: any) {
 			if (unmounted) throw new Error('Cannot update an unmounted root.');
+			if (inNestedUpdateCallback() || CURRENT_BLOCK !== null) {
+				if (nestedRootRenderChain !== UPDATE_CHAIN_ID) {
+					nestedRootRenderChain = UPDATE_CHAIN_ID;
+					nestedRootRenderCount = 0;
+				}
+				if (++nestedRootRenderCount > NESTED_UPDATE_LIMIT) {
+					// Surface the failure through the ordinary render-error path on the
+					// next drain. Throwing directly here could be swallowed by effect
+					// error routing or unwind an active render replacement half-finished.
+					if (rootBlock !== null && !rootBlock.disposed) {
+						rootBlock.nestedUpdateError = true;
+						scheduleRender(rootBlock);
+					}
+					return;
+				}
+			} else {
+				UPDATE_CHAIN_ID++;
+				nestedRootRenderChain = UPDATE_CHAIN_ID;
+				nestedRootRenderCount = 0;
+			}
 			// React-style `render(<App foo={x}/>)` arrives as an element descriptor:
 			// unwrap to (type, props). The `render(body, props)` form passes through.
 			let body: ComponentBody;
@@ -16598,7 +17156,12 @@ function makeRoot(
 			// Same component as the live root (incl. a just-hydrated root): update
 			// props in place and schedule. This is a NORMAL client render — `hydrating`
 			// is already false, so renderBlock reuses the adopted DOM, not rebuilds it.
-			if (rootBlock && currentBody === body && Object.is(currentKey, nextKey)) {
+			if (
+				rootBlock &&
+				!rootBlock.disposed &&
+				currentBody === body &&
+				Object.is(currentKey, nextKey)
+			) {
 				rootBlock.props = props;
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileSchedule(rootBlock, 'root-render');
@@ -16661,6 +17224,18 @@ function makeRoot(
 		unmount() {
 			if (arguments.length > 0) warnRootUnmountArgument();
 			if (unmounted) return;
+			// A public, externally initiated unmount is a new update boundary. Its
+			// effect cleanups may schedule other live roots, and must not inherit a
+			// nearly-exhausted chain from earlier work. Nested unmounts during an
+			// active render/commit lifecycle keep the current chain instead.
+			if (
+				!inFlush &&
+				CURRENT_BLOCK === null &&
+				!inNestedUpdateCallback() &&
+				EFFECT_EVENT_LIFECYCLE_DEPTH === 0
+			) {
+				UPDATE_CHAIN_ID++;
+			}
 			if (
 				process.env.NODE_ENV !== 'production' &&
 				(inFlush ||
@@ -16830,6 +17405,14 @@ export function hydrateRoot(
 		seeds = parseSeedJson(seedScript.textContent || '[]');
 		seedScript.remove();
 	}
+	// Executed stream runtime/reveal scripts remain in a real browser's DOM. They
+	// are protocol sidecars rather than authored component output, so remove only
+	// direct children carrying the renderer-owned marker before root adoption.
+	for (let child = container.firstElementChild; child !== null; ) {
+		const next = child.nextElementSibling;
+		if (child.localName === 'script' && child.hasAttribute(STREAM_SCRIPT_ATTR)) child.remove();
+		child = next;
+	}
 	// The component's server root is the container's first node — the initial
 	// cursor position. clone() adopts it; a hole-template walk advances from here.
 	// A STREAMED shell flushes its deduped <style data-octane> tags AHEAD of the
@@ -16837,12 +17420,7 @@ export function hydrateRoot(
 	// leading renderer-emitted style tags: injectStyle's document-level dedupe
 	// matches them, and they are never adopted as component DOM.
 	let firstNode = container.firstChild;
-	while (
-		firstNode !== null &&
-		firstNode.nodeType === 1 &&
-		(firstNode as Element).tagName === 'STYLE' &&
-		(firstNode as Element).hasAttribute('data-octane')
-	) {
+	while (firstNode !== null && isRendererHydrationStyle(firstNode)) {
 		firstNode = firstNode.nextSibling;
 	}
 	const hydration = new HydrationCapability(rootBlock, firstNode, seeds);
@@ -16863,6 +17441,10 @@ export function hydrateRoot(
 		// serializes only their final authored value. Resolve the last writer once so
 		// a matching server class is adopted without warnings or transient mutations.
 		hydration.flushClassWrites();
+		// A server root may contain a matching client prefix followed by stale
+		// siblings. Adoption owns only the complete client shape; discard and report
+		// anything left at the root cursor instead of leaving visible unmanaged DOM.
+		hydration.finishRoot();
 		hydrationCompleted = true;
 	} finally {
 		currentHydration = previousHydration;

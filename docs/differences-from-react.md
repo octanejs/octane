@@ -2,7 +2,7 @@
 
 Octane implements React's programming model — the same hooks, `memo`, context,
 portals, Suspense, transitions, actions, and SSR/streaming APIs. Its core suite
-contains 2,200+ distinct behavioral tests; production-compiler executions rerun
+contains 2,700+ distinct behavioral tests; production-compiler executions rerun
 the normal cases and are not additional unique coverage. That is a local suite
 count, not a count of tests ported from React. The exact pinned snapshot and
 source-attributed React scenarios, classifications, and coverage are tracked in the generated
@@ -188,6 +188,11 @@ compiled-component entry point, `root.render(App, props)`, which avoids creating
 an element descriptor at application bootstrap. A bare function passed to
 `root.render` is therefore intentional, not an invalid-child warning.
 
+The first `root.render()` mounts synchronously. React's concurrent root queues
+its initial mount, so a render followed by an unmount in the same surrounding
+batch exposes no intermediate DOM there; Octane may expose the mounted DOM
+before its synchronous unmount leaves the same empty final state.
+
 After `root.unmount()`, the root is permanently closed. If outside code removes
 some of a root's managed DOM first, unmount still performs safe cleanup instead
 of surfacing the browser's incidental `NotFoundError` from removing an already
@@ -224,6 +229,15 @@ hydration; head elements hoisted inside streamed boundaries re-create
 client-side on hydration. Hydration mismatch recovery patches attributes to the
 **client** value (React keeps the server's) and warns + rebuilds in place
 rather than throwing.
+
+Octane core also leaves document and transport orchestration to the surrounding
+server: it has no Fizz bootstrap-script/module/import-map, doctype/preamble,
+`onHeaders`, or header-construction options. One `nonce` option covers every
+inline style and script Octane emits rather than exposing separate script/style
+nonce channels. A readable stream's `allReady` settles after all boundary bytes
+have been accepted under consumer backpressure, so consumers should read while
+awaiting it. Error callbacks report the original value but do not synthesize
+React digests or React's `errorInfo` shape.
 
 ## Not implemented (by design)
 

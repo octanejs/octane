@@ -255,6 +255,7 @@ describe('website routes', () => {
 			'tanstack-virtual',
 			'recharts',
 			'visx',
+			'three',
 			'stylex',
 			'testing-library',
 		];
