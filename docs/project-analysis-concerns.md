@@ -348,11 +348,14 @@ also installs packed core and Hook Form into an isolated consumer and asserts
 one physical Octane runtime before running Vite client/server builds. The
 validator contains an executable Hook Form SSR probe as well; treat that as a
 proven runtime gate only when the complete `pnpm packages:pack:check` run
-passes. Vite discovers installed raw Octane dependency graphs, excludes source
-packages from prebundling/SSR externalization, preserves manifest-declared manual
-hook-slot directories, and honors package-owned optimizer exclusions (including
-`family/*` rules expanded to exact declared dependency names) for identity-sensitive
-transitive dependencies.
+passes. It additionally copies Pulseboard and Wayfinder into temporary external
+consumers, replaces every Octane workspace edge with the produced tarballs,
+rejects workspace links or duplicate runtimes, and runs their real client and
+metaframework production builds. Vite discovers installed raw Octane dependency
+graphs, excludes source packages from prebundling/SSR externalization, preserves
+manifest-declared manual hook-slot directories, and honors package-owned optimizer
+exclusions (including `family/*` rules expanded to exact declared dependency
+names) for identity-sensitive transitive dependencies.
 Bindings and the Vite plugin peer on Octane while retaining workspace-only dev
 dependencies; the adapter peers on the plugin.
 
@@ -373,8 +376,9 @@ compiler requirements change.
   error-disclosure contracts for `module server` RPC;
 - triage the eight Hook Form pins by scheduler, `act()`, native-event, and
   eager-bailout category;
-- preserve an executed packed-consumer hook path, not just tarball and bundle
-  inspection.
+- extend the executed packed-example canaries when a new binding architecture
+  introduces a package/compiler seam not covered by Pulseboard, Wayfinder, or
+  the Hook Form/Apollo probe.
 
 ### Cross-layer regression coverage
 
