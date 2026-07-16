@@ -246,18 +246,33 @@ to the client value, rebuilds STRUCTURAL mismatches (swapped `@if`/`@switch` bra
 tag, host↔component swap, over-long `@for`), supports shallow `suppressHydrationWarning`, and
 emits dev-only warnings with Svelte-5-style source locations (`file:line:col`). Recovery runs
 in dev + prod; warnings + LOC are dev-only and strictly gated so prod output is byte-identical.
-The remaining Tier-4 gaps are the *determinism* heuristics below — the serialization matrix
-and the deeper SSR hook/ref/form ports. useId server≡client agreement, don't-blow-away-input,
-and the React diff-matrix ports are now done (see below).
+
+**Wave 4 server inventory and triage are complete; implementation is in progress
+(2026-07-16).** The audit reviewed the 223-case stable/canary union of the four
+`ReactDOMFizzServer*` suites and the 389 remaining `ReactDOMServerIntegration*`
+cases after Wave 1 covered the 17 untrusted-URL cases. Of those 612 Wave 4 cases,
+84 have exact live evidence, 138 have conservative durable dispositions, and 390
+remain planned. The executable additions are
+`conformance/fizz-streaming.test.ts` (public transport, shell/error/abort,
+Usable-node, parser-context, context-isolation, hydration-adoption, and deep-tree
+outcomes) and `conformance/server-integration-matrix.test.ts`, whose 14 scenarios
+run independently through client, buffered SSR, streaming SSR, matching hydration,
+and mismatch recovery (70 cases), with eight focused mismatch regressions for 78
+local executions total; the production-compile project repeats the same cases. The
+strict upstream mapping credits 38 Fizz and 46 server-integration cases, rather than
+treating every local execution as a distinct upstream case.
+Class components, legacy roots/context, StrictMode, synthetic selective-hydration
+replay, Fiber/Fizz protocol internals, and document-orchestration APIs remain
+explicit non-goals rather than disabled tests.
 
 | React file | Gap | Severity |
 |---|---|---|
 | ~~`ReactDOMUseId-test.js` (17)~~ **DONE (2026-06-30)** — `tests/conformance/useid-determinism.test.ts` asserts client stability (across re-renders, wrapper indirection, multiple ids per component) AND **server ≡ client byte-equality after `hydrateRoot()`**. Fixed in `hydrateRoot()`: the client `_idCounter` resets to 0 at the start of hydration so it lines up with the server's per-render reset. | ~~High~~ |
 | ~~`ReactDOMServerIntegrationUserInteraction-test.js` (14)~~ **DONE (2026-07-01)** — `tests/conformance/user-input-hydration.test.ts` (6 cases): input/range/checkbox/textarea/select, controlled + uncontrolled, keep the user's typed value across hydration (octane only ever writes ATTRIBUTES, never the dirty `.value`/`.checked` property) with no spurious mismatch warning. **Rewritten (2026-07-08)** for the controlled-components model: hydration still adopts pre-hydration user input (React parity), then the first real commit/discrete event reasserts controlled values. | ~~High~~ |
 | ~~`ReactDOMHydrationDiff-test.js` (37) + `ReactDOMServerIntegrationReconnecting-test.js` (50)~~ **DONE (2026-07-01)** — ported as `tests/conformance/hydration-mismatch.test.ts` (24 outcome-level cases). Surfaced + fixed 5 runtime bugs (clone close-marker, ifBlock/switchBlock empty-branch cursor + leftover discard, setStyle + setClassName detection). Divergences documented: octane patches attrs to client (React keeps server), warns+rebuilds in place (React throws+re-renders boundary), and function components carry hydration markers (so component-form ≠ bare-element-form). | ~~Medium~~ |
-| `ReactDOMServerIntegrationHooks-test.js` (`:606`), `…Refs-test.js` (`:41`), `ReactDOMFizzForm-test.js` (`:442,:531,:549`) | **Effects and ref callbacks do NOT run on server**; hooks render initial values; useFormStatus not-pending / useActionState+useOptimistic return initial on server. (Octane tests "effects don't run on server" partially in `ssr.test.ts`; extend to refs + form hooks.) | Medium |
-| `ReactDOMServerIntegrationElements/Attributes/Input/Select/Textarea/Fragment-test.js` | **Serialization heuristics**: text-node/whitespace separators so hydration can split adjacent text; nullish/zero/false child coercion; boolean/reserved-attribute rules; `value`→attribute (input) vs value→children (textarea) vs selected-option (select); fragment flattening. Each `itRenders` is simultaneously server-output + hydration-adopt + mismatch-recovery. | Medium |
-| `ReactDOMForm-test.js` (47) + `ReactDOMFizzForm-test.js` (16) | useActionState dispatch-order + error-cancel (`:1099,:1328`); useFormStatus activation rule (pending only in transition/preventDefault path `:2078,:2146,:2217`); uncontrolled inputs auto-reset after action (`:1521`); function-action replay-after-hydration. (Octane `actions.test.ts` covers the basics; deepen.) | Medium |
+| `ReactDOMServerIntegrationHooks-test.js`, `…Refs-test.js`, `ReactDOMFizzForm-test.js` server outcomes | **In progress** — exact mapped evidence covers selected render-only hook, initial-state, ref, and form-status outcomes; the ledger retains the rest as planned or as explicit non-goals. | Medium |
+| `ReactDOMServerIntegrationElements/Attributes/Input/Select/Textarea/Fragment-test.js` | **In progress** — `ssr-serialization.test.ts` and the five-mode matrix cover representative array/bigint/text/attribute/fragment and controlled-form projections. Remaining edge cases stay planned until they gain exact evidence. | Medium |
+| ~~`ReactDOMForm-test.js` + `ReactDOMFizzForm-test.js`~~ **DONE in the earlier Tier-4 pass** — `form-actions-extra.test.ts`, `actions.test.ts`, and `form-reset.test.ts` cover queue sequencing, errors, status activation, auto-reset, and explicit reset behavior; server initial-state outcomes live in `ssr-server-semantics.test.ts`. | ~~Medium~~ |
 
 ### Tier 5 — Suspense / transitions / activity (advanced scheduling)
 
