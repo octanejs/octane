@@ -808,6 +808,22 @@ button[aria-disabled='true'] {
 	text-align: center;
 	font-size: 12px;
 }
+.thread-unavailable {
+	margin-top: 8px;
+	padding: 16px;
+	border: 1px solid #ead8d8;
+	border-radius: 10px;
+	color: #6b3d45;
+	background: #fff6f6;
+}
+.thread-unavailable strong {
+	font-size: 13px;
+}
+.thread-unavailable p {
+	margin: 5px 0 0;
+	font-size: 12px;
+	line-height: 1.5;
+}
 .thread-composer {
 	margin: 12px;
 	border: 1px solid #dadde7;

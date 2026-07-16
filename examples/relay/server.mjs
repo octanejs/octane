@@ -210,9 +210,13 @@ async function handleDemo(request, response) {
 
 function handleThread(request, response) {
 	const url = new URL(request.url ?? '/', `http://${host}:${port}`);
+	const channel = url.searchParams.get('channel')?.trim() ?? '';
 	const messageId = url.searchParams.get('message') ?? '';
 	const replies = threadReplies[messageId];
-	if (replies === undefined) {
+	const parent = allowedChannels.has(channel)
+		? channelMessages[channel].find((message) => message.id === messageId)
+		: undefined;
+	if (parent === undefined || replies === undefined) {
 		json(response, 404, { error: 'Thread not found' });
 		return;
 	}

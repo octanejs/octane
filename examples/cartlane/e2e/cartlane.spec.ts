@@ -4,6 +4,7 @@ import {
 	settleBrowserFrames,
 	type BrowserDiagnostics,
 } from '../../_shared/e2e/browser.ts';
+import { CHECKOUT_CITY_MAX_LENGTH, CHECKOUT_EMAIL_MAX_LENGTH } from '../src/domain.ts';
 
 const diagnosticsByPage = new WeakMap<Page, BrowserDiagnostics>();
 
@@ -115,6 +116,32 @@ test('recovers the collection, handles an empty filter, and keeps the mobile bas
 	page,
 	context,
 }) => {
+	await page.addInitScript(() => {
+		const cartKey = 'cartlane:cart:v1';
+		const orderKey = 'cartlane:last-order:v1';
+		const originalGetItem = Storage.prototype.getItem;
+		const originalSetItem = Storage.prototype.setItem;
+		originalSetItem.call(
+			window.localStorage,
+			cartKey,
+			JSON.stringify([
+				{ productId: 'field-notes', quantity: 1 },
+				{ productId: 'field-notes', quantity: 1 },
+			]),
+		);
+		Storage.prototype.getItem = function (key) {
+			if (this === window.localStorage && key === orderKey) {
+				throw new DOMException('Fixture storage read unavailable', 'SecurityError');
+			}
+			return originalGetItem.call(this, key);
+		};
+		Storage.prototype.setItem = function (key, value) {
+			if (this === window.localStorage && key === cartKey) {
+				throw new DOMException('Fixture storage write unavailable', 'QuotaExceededError');
+			}
+			return originalSetItem.call(this, key, value);
+		};
+	});
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/?scenario=catalog-failure');
 	await expect(page.getByRole('status').getByText('Opening the collection…')).toBeVisible();
@@ -133,20 +160,31 @@ test('recovers the collection, handles an empty filter, and keeps the mobile bas
 		.locator('[data-product-id="field-notes"]')
 		.getByRole('button', { name: 'Add' })
 		.click();
-	await expect(page.getByRole('link', { name: 'Basket, 1 item' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Basket, 3 items' })).toBeVisible();
 
 	await context.setOffline(true);
 	await expect(page.getByText('You are offline.')).toBeVisible();
-	await page.getByRole('link', { name: 'Basket, 1 item' }).click();
+	await page.getByRole('link', { name: 'Basket, 3 items' }).click();
 	await expect(page.getByRole('heading', { name: 'Basket', level: 1 })).toBeVisible();
-	await expect(page.locator('[data-cart-product="field-notes"]')).toBeVisible();
-	await expect(page.getByLabel('Quantity for Field notes folio')).toHaveText('1');
-	await expect(page.locator('.summary-total')).toContainText('£42');
+	await expect(page.locator('[data-cart-product="field-notes"]')).toHaveCount(1);
+	const restoredQuantity = page.getByLabel('Quantity for Field notes folio');
+	await expect(restoredQuantity).toHaveText('3');
+	await expect(page.locator('.summary-total')).toContainText('£114');
+
+	await page.locator('.quantity-form').evaluate((form) => {
+		const unknownSubmitter = document.createElement('button');
+		unknownSubmitter.type = 'submit';
+		unknownSubmitter.name = 'intent';
+		unknownSubmitter.value = 'unexpected';
+		form.append(unknownSubmitter);
+		(form as HTMLFormElement).requestSubmit(unknownSubmitter);
+		unknownSubmitter.remove();
+	});
 
 	await page.getByRole('button', { name: 'Increase Field notes folio quantity' }).click();
-	await expect(page.getByLabel('Quantity for Field notes folio')).toHaveText('2');
-	await expect(page.getByRole('link', { name: 'Basket, 2 items' })).toBeVisible();
-	await expect(page.locator('.summary-total')).toContainText('£78');
+	await expect(restoredQuantity).toHaveText('4');
+	await expect(page.getByRole('link', { name: 'Basket, 4 items' })).toBeVisible();
+	await expect(page.locator('.summary-total')).toContainText('£144');
 	await expect(page.locator('.offline-banner')).toContainText(
 		'Your basket is available; checkout will wait for a connection.',
 	);
@@ -158,6 +196,9 @@ test('recovers the collection, handles an empty filter, and keeps the mobile bas
 test('validates the native checkout form, exposes pending status, and calls the production server function', async ({
 	page,
 }) => {
+	await page.addInitScript(() => {
+		window.sessionStorage.setItem('cartlane:checkout-key:v1', ' invalid checkout key ');
+	});
 	await page.setViewportSize({ width: 390, height: 844 });
 	await openCheckout(page, 'drift-mug');
 	await expect(page.getByRole('navigation', { name: 'Checkout progress' })).toHaveText(
@@ -191,18 +232,25 @@ test('validates the native checkout form, exposes pending status, and calls the 
 	const cardNumber = page.getByRole('textbox', { name: 'Card number' });
 	const terms = page.getByRole('checkbox', { name: 'I agree to the Cartlane fixture terms.' });
 	const submit = page.getByRole('button', { name: 'Place order securely' });
+	const emailSuffix = '@example.test';
+	const boundaryEmail = 'm'.repeat(CHECKOUT_EMAIL_MAX_LENGTH - emailSuffix.length) + emailSuffix;
+	const boundaryCity = 'B'.repeat(CHECKOUT_CITY_MAX_LENGTH);
+	expect(boundaryEmail).toHaveLength(CHECKOUT_EMAIL_MAX_LENGTH);
+	expect(boundaryCity).toHaveLength(CHECKOUT_CITY_MAX_LENGTH);
+	await expect(email).toHaveAttribute('maxlength', String(CHECKOUT_EMAIL_MAX_LENGTH));
+	await expect(city).toHaveAttribute('maxlength', String(CHECKOUT_CITY_MAX_LENGTH));
 
 	await fullName.focus();
 	await page.keyboard.type('Mara Finch');
 	await page.keyboard.press('Tab');
 	await expect(email).toBeFocused();
-	await page.keyboard.type('mara@example.test');
+	await page.keyboard.type(boundaryEmail);
 	await page.keyboard.press('Tab');
 	await expect(address).toBeFocused();
 	await page.keyboard.type('18 Bramble Lane');
 	await page.keyboard.press('Tab');
 	await expect(city).toBeFocused();
-	await page.keyboard.type('Bristol');
+	await page.keyboard.type(boundaryCity);
 	await page.keyboard.press('Tab');
 	await expect(postalCode).toBeFocused();
 	await page.keyboard.type('BS1 4ST');
@@ -219,7 +267,7 @@ test('validates the native checkout form, exposes pending status, and calls the 
 	const cartPayload = page.locator('input[name="cart"]');
 	const validCartPayload = await cartPayload.inputValue();
 	await cartPayload.evaluate((input) => {
-		(input as HTMLInputElement).value = JSON.stringify([{ productId: 'weekender', quantity: -2 }]);
+		(input as HTMLInputElement).value = '{';
 	});
 	const rejectedPost = page.waitForResponse((response) =>
 		isSameOriginPost(response, checkoutOrigin),
@@ -239,9 +287,33 @@ test('validates the native checkout form, exposes pending status, and calls the 
 	await expect(page.getByRole('link', { name: 'Basket, 1 item' })).toBeVisible();
 	await expect(fullName).toHaveValue('Mara Finch');
 
+	await cartPayload.evaluate((input) => {
+		(input as HTMLInputElement).value = JSON.stringify([{ productId: 'weekender', quantity: -2 }]);
+	});
+	const invalidLinePost = page.waitForResponse((response) =>
+		isSameOriginPost(response, checkoutOrigin),
+	);
+	await submit.focus();
+	await page.keyboard.press('Enter');
+	expect((await invalidLinePost).status()).toBe(200);
+	await expect(page.getByRole('alert')).toContainText(
+		'The basket could not be verified. Review it and retry without being charged.',
+	);
+
 	await cartPayload.evaluate((input, value) => {
 		(input as HTMLInputElement).value = value;
 	}, validCartPayload);
+	await page.evaluate(() => {
+		const scope = window as Window & { cartlaneOriginalSetItem?: Storage['setItem'] };
+		const originalSetItem = Storage.prototype.setItem;
+		scope.cartlaneOriginalSetItem = originalSetItem;
+		Storage.prototype.setItem = function (key, value) {
+			if (this === window.sessionStorage && key === 'cartlane:checkout-key:v1') {
+				throw new DOMException('Fixture session write unavailable', 'QuotaExceededError');
+			}
+			return originalSetItem.call(this, key, value);
+		};
+	});
 	await submit.focus();
 	const acceptedPost = page.waitForResponse((response) =>
 		isSameOriginPost(response, checkoutOrigin),
@@ -255,9 +327,36 @@ test('validates the native checkout form, exposes pending status, and calls the 
 	).toBeVisible();
 	await expect(page.getByText('Paid once').locator('..')).toContainText('£34');
 	const orderId = await page.locator('[data-order-id]').getAttribute('data-order-id');
+	await page.evaluate(() => {
+		const scope = window as Window & { cartlaneOriginalSetItem?: Storage['setItem'] };
+		if (scope.cartlaneOriginalSetItem) {
+			Storage.prototype.setItem = scope.cartlaneOriginalSetItem;
+			delete scope.cartlaneOriginalSetItem;
+		}
+		window.sessionStorage.removeItem('cartlane:checkout-key:v1');
+	});
 	await page.reload();
 	await expect(page.locator(`[data-order-id="${orderId}"]`)).toBeVisible();
 	await expect(page.getByRole('heading', { name: orderId ?? '', level: 2 })).toBeVisible();
+	await expect(page.locator('.confirmation__lede')).toContainText(boundaryEmail);
+	await expect(page.getByText('Delivering to').locator('..')).toContainText(
+		`${boundaryCity}, BS1 4ST`,
+	);
+	await page.evaluate(() => {
+		const key = 'cartlane:last-order:v1';
+		const receipt = JSON.parse(window.localStorage.getItem(key) ?? 'null') as Record<
+			string,
+			unknown
+		> | null;
+		if (receipt === null) throw new Error('expected a stored receipt');
+		receipt.lineCount = 1.5;
+		receipt.totalCents = -100;
+		window.localStorage.setItem(key, JSON.stringify(receipt));
+	});
+	await page.reload();
+	await expect(
+		page.getByRole('heading', { name: 'We could not find that order on this device.' }),
+	).toBeVisible();
 });
 
 test('queues rapid native submits and idempotently resolves them to one order', async ({

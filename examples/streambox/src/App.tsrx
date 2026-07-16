@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'octane';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'octane';
 import { useVirtualizer } from '@octanejs/tanstack-virtual';
 import { createComments, findVideo, VIDEOS } from './seed';
 import { readWatchRoute, watchURL } from './router';
@@ -188,6 +188,7 @@ export function App() @{
 	const [online, setOnline] = useState(() => navigator.onLine);
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [mediaReady, setMediaReady] = useState(false);
+	const [mediaFailed, setMediaFailed] = useState(false);
 	const [currentTime, setCurrentTime] = useState(0);
 	const [duration, setDuration] = useState(6);
 	const [muted, setMuted] = useState(true);
@@ -212,25 +213,33 @@ export function App() @{
 	const loadCatalog = useCallback(() => {
 		setLoadState('loading');
 		setActivity('Loading local catalog');
-		if (loadTimerRef.current !== null) window.clearTimeout(loadTimerRef.current);
+		if (loadTimerRef.current !== null) {
+			window.clearTimeout(loadTimerRef.current);
+			loadTimerRef.current = null;
+		}
 		loadTimerRef.current = window.setTimeout(() => {
+			loadTimerRef.current = null;
 			if (failurePendingRef.current) {
 				failurePendingRef.current = false;
 				setLoadState('error');
 				setActivity('Catalog load failed');
 				return;
 			}
+			const activeVideo = findVideo(readWatchRoute().videoId);
 			setLoadState('ready');
-			setActivity(`${video.title} loaded from the local catalog`);
+			setActivity(`${activeVideo.title} loaded from the local catalog`);
 		}, 220);
-	}, [video.title]);
+	}, []);
 
 	useEffect(() => {
 		loadCatalog();
 		return () => {
-			if (loadTimerRef.current !== null) window.clearTimeout(loadTimerRef.current);
+			if (loadTimerRef.current !== null) {
+				window.clearTimeout(loadTimerRef.current);
+				loadTimerRef.current = null;
+			}
 		};
-	}, []);
+	}, [loadCatalog]);
 
 	useEffect(() => {
 		const syncRoute = () => setRoute(readWatchRoute());
@@ -253,12 +262,14 @@ export function App() @{
 		}
 	}, [online]);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		setMediaReady(false);
+		setMediaFailed(false);
 		setCurrentTime(0);
 		setIsPlaying(false);
 		setLastMediaEvent('Waiting for media');
-	}, [video.id]);
+		setActivity(`Loading ${video.title}`);
+	}, [video.id, video.title]);
 
 	const navigate = useCallback((videoId: string, panel: WatchPanel = 'overview') => {
 		history.pushState(null, '', watchURL(videoId, panel));
@@ -287,6 +298,18 @@ export function App() @{
 		player.currentTime = Math.min(seconds, Number.isFinite(player.duration) ? player.duration : 6);
 		player.focus({ preventScroll: true });
 	}, []);
+
+	const retryMedia = useCallback(() => {
+		const player = videoRef.current;
+		if (!player) return;
+		setMediaFailed(false);
+		setMediaReady(false);
+		setCurrentTime(0);
+		setIsPlaying(false);
+		setLastMediaEvent('Waiting for media');
+		setActivity(`Retrying ${video.title}`);
+		player.load();
+	}, [video.title]);
 
 	const commitAction = useCallback((message: string) => {
 		if (!online) setQueuedActions((count) => count + 1);
@@ -466,8 +489,16 @@ export function App() @{
 										const player = event.currentTarget as HTMLVideoElement;
 										setDuration(player.duration);
 										setMediaReady(true);
+										setMediaFailed(false);
 										setLastMediaEvent('Native event · metadata loaded');
 										setActivity(`${video.title} is ready to play`);
+									}}
+									onError={() => {
+										setMediaReady(false);
+										setMediaFailed(true);
+										setIsPlaying(false);
+										setLastMediaEvent('Native event · error');
+										setActivity(`${video.title} could not be loaded`);
 									}}
 									onPlay={() => {
 										setIsPlaying(true);
@@ -499,10 +530,21 @@ export function App() @{
 										setActivity('Playback complete');
 									}}
 								></video>
-								<div class={{ 'media-loader': true, 'media-loader--hidden': mediaReady }}>
-									<span></span>
-									Preparing local video
-								</div>
+								@if (mediaFailed) {
+									<div class="media-error" role="alert">
+										<span class="media-error__mark" aria-hidden="true">!</span>
+										<div>
+											<strong>Video playback unavailable</strong>
+											<p>The local media file could not be prepared.</p>
+										</div>
+										<button type="button" onClick={retryMedia}>Retry video</button>
+									</div>
+								} @else {
+									<div class={{ 'media-loader': true, 'media-loader--hidden': mediaReady }}>
+										<span></span>
+										Preparing local video
+									</div>
+								}
 							</div>
 							<div class="player-controls">
 								<button

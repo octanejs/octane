@@ -32,6 +32,16 @@ interface PendingHistoryLoad {
 	before: string;
 }
 
+interface ThreadLoadState {
+	key: string | null;
+	status: 'idle' | 'loading' | 'ready' | 'unavailable';
+	replies: readonly ThreadReply[];
+}
+
+function threadStateKey(channel: ChannelId, threadId: string): string {
+	return `${channel}:${threadId}`;
+}
+
 function compareMessages(left: Message, right: Message): number {
 	return left.order - right.order || left.id.localeCompare(right.id);
 }
@@ -185,6 +195,8 @@ interface ThreadPanelProps {
 	parent: Message | null;
 	replies: readonly ThreadReply[];
 	loading: boolean;
+	unavailable: boolean;
+	canReply: boolean;
 	onClose: () => void;
 	onReply: (body: string) => void;
 	headingRef: { current: HTMLHeadingElement | null };
@@ -194,6 +206,8 @@ function ThreadPanel({
 	parent,
 	replies,
 	loading,
+	unavailable,
+	canReply,
 	onClose,
 	onReply,
 	headingRef,
@@ -265,6 +279,11 @@ function ThreadPanel({
 				}
 				@if (loading) {
 					<div class="thread-loading" role="status">Loading replies…</div>
+				} @else if (unavailable) {
+					<div class="thread-unavailable" role="alert">
+						<strong>Thread unavailable</strong>
+						<p>This message does not have a thread in the current channel.</p>
+					</div>
 				} @else {
 					<>
 						<div class="reply-divider">
@@ -285,23 +304,25 @@ function ThreadPanel({
 					</>
 				}
 			</div>
-			<form class="thread-composer" onSubmit={submit}>
-				<label for="thread-reply">Reply to thread</label>
-				<textarea
-					id="thread-reply"
-					rows="3"
-					value={draft}
-					onInput={(event: InputEvent) => setDraft(
-						(event.currentTarget as HTMLTextAreaElement).value,
-					)}
-					onKeyDown={handleKeyDown}
-					placeholder="Add a useful detail…"
-				></textarea>
-				<div>
-					<span>⌘ Enter to reply</span>
-					<button type="submit" disabled={draft.trim() === ''}>Reply</button>
-				</div>
-			</form>
+			@if (canReply) {
+				<form class="thread-composer" onSubmit={submit}>
+					<label for="thread-reply">Reply to thread</label>
+					<textarea
+						id="thread-reply"
+						rows="3"
+						value={draft}
+						onInput={(event: InputEvent) => setDraft(
+							(event.currentTarget as HTMLTextAreaElement).value,
+						)}
+						onKeyDown={handleKeyDown}
+						placeholder="Add a useful detail…"
+					></textarea>
+					<div>
+						<span>⌘ Enter to reply</span>
+						<button type="submit" disabled={draft.trim() === ''}>Reply</button>
+					</div>
+				</form>
+			}
 		</aside>
 	</div>
 }
@@ -320,15 +341,23 @@ export function App() @{
 	const [loadingOlder, setLoadingOlder] = useState(false);
 	const [connection, setConnection] = useState<ConnectionState>('connecting');
 	const [paused, setPaused] = useState(false);
-	const [composer, setComposer] = useState('');
+	const [composerByChannel, setComposerByChannel] = useState<Record<ChannelId, string>>({
+		general: '',
+		design: '',
+		random: '',
+	});
 	const [activity, setActivity] = useState('Opening Relay');
-	const [threadReplies, setThreadReplies] = useState<ThreadReply[]>([]);
 	const [localThreadReplies, setLocalThreadReplies] = useState<Record<string, ThreadReply[]>>({});
-	const [threadLoading, setThreadLoading] = useState(false);
+	const [threadLoadState, setThreadLoadState] = useState<ThreadLoadState>({
+		key: null,
+		status: 'idle',
+		replies: [],
+	});
 	const sessionRef = useRef(`relay-${crypto.randomUUID()}`);
 	const sequenceByChannelRef = useRef(new Map<ChannelId, number>());
 	const requestCounterRef = useRef(0);
 	const conversationGenerationRef = useRef(0);
+	const threadGenerationRef = useRef(0);
 	const pendingHistoryLoadRef = useRef<PendingHistoryLoad | null>(null);
 	const faultPendingRef = useRef(
 		new URLSearchParams(window.location.search).get('fault') === 'history',
@@ -339,6 +368,14 @@ export function App() @{
 	const threadReturnFocusRef = useRef<HTMLElement | null>(null);
 	const prependSnapshotRef = useRef<PrependSnapshot | null>(null);
 	const channelDetails = CHANNEL_DETAILS[route.channel];
+	const composer = composerByChannel[route.channel];
+	const activeThreadKey =
+		route.threadId === null ? null : threadStateKey(route.channel, route.threadId);
+	const threadLoadIsCurrent = activeThreadKey !== null && threadLoadState.key === activeThreadKey;
+	const threadLoading =
+		activeThreadKey !== null && (!threadLoadIsCurrent || threadLoadState.status === 'loading');
+	const threadUnavailable = threadLoadIsCurrent && threadLoadState.status === 'unavailable';
+	const threadReady = threadLoadIsCurrent && threadLoadState.status === 'ready';
 
 	const navigate = useCallback((next: Route, replace = false) => {
 		const url =
@@ -431,35 +468,56 @@ export function App() @{
 
 	useLayoutEffect(() => {
 		const snapshot = prependSnapshotRef.current;
+		if (snapshot === null) return;
+		prependSnapshotRef.current = null;
 		const conversation = conversationRef.current;
-		if (snapshot === null || conversation === null) return;
+		if (conversation === null) return;
 		const anchor = conversation.querySelector<HTMLElement>(
 			`[data-message-id="${snapshot.messageId}"]`,
 		);
 		if (anchor === null) return;
 		conversation.scrollTop += anchor.getBoundingClientRect().top - snapshot.top;
-		prependSnapshotRef.current = null;
 		setActivity('Earlier messages loaded without moving your place');
 	}, [messages]);
 
 	useEffect(() => {
+		const channel = route.channel;
 		const threadId = route.threadId;
+		const generation = ++threadGenerationRef.current;
 		if (threadId === null) {
-			setThreadReplies([]);
+			setThreadLoadState({ key: null, status: 'idle', replies: [] });
 			return;
 		}
-		setThreadLoading(true);
-		void loadThread(threadId).then((thread) => {
-			if (readRoute().threadId !== threadId) return;
-			setThreadReplies(thread.replies);
-			setThreadLoading(false);
-			requestAnimationFrame(() => threadHeadingRef.current?.focus());
+		const key = threadStateKey(channel, threadId);
+		const focusResolvedThread = () => {
+			requestAnimationFrame(() => {
+				const latestRoute = readRoute();
+				if (
+					threadGenerationRef.current !== generation || latestRoute.channel !== channel ||
+						latestRoute.threadId !== threadId
+				) return;
+				threadHeadingRef.current?.focus();
+			});
+		};
+		setThreadLoadState({ key, status: 'loading', replies: [] });
+		void loadThread(channel, threadId).then((thread) => {
+			const currentRoute = readRoute();
+			if (
+				threadGenerationRef.current !== generation || currentRoute.channel !== channel ||
+					currentRoute.threadId !== threadId
+			) return;
+			setThreadLoadState({ key, status: 'ready', replies: thread.replies });
+			focusResolvedThread();
 		}).catch(() => {
-			if (readRoute().threadId !== threadId) return;
-			setThreadReplies([]);
-			setThreadLoading(false);
+			const currentRoute = readRoute();
+			if (
+				threadGenerationRef.current !== generation || currentRoute.channel !== channel ||
+					currentRoute.threadId !== threadId
+			) return;
+			setThreadLoadState({ key, status: 'unavailable', replies: [] });
+			focusResolvedThread();
 		});
-	}, [route.threadId]);
+	}, [route.channel, route.threadId]);
 
 	useEffect(() => {
 		if (route.threadId === null) return;
@@ -474,6 +532,7 @@ export function App() @{
 	}, [route.threadId]);
 
 	const openChannel = useCallback((channel: ChannelId) => {
+		threadReturnFocusRef.current = null;
 		navigate({ channel, threadId: null });
 		requestAnimationFrame(() => channelHeadingRef.current?.focus());
 	}, [navigate]);
@@ -484,10 +543,14 @@ export function App() @{
 	}, [navigate, route.channel]);
 
 	const closeThread = useCallback(() => {
+		const returnTarget = threadReturnFocusRef.current;
+		threadReturnFocusRef.current = null;
 		navigate({ channel: readRoute().channel, threadId: null });
-		requestAnimationFrame(
-			() => (threadReturnFocusRef.current ?? channelHeadingRef.current)?.focus(),
-		);
+		requestAnimationFrame(() => {
+			if (readRoute().threadId !== null) return;
+			if (returnTarget?.isConnected) returnTarget.focus();
+			else channelHeadingRef.current?.focus();
+		});
 	}, [navigate]);
 
 	const loadEarlier = useCallback(() => {
@@ -536,10 +599,12 @@ export function App() @{
 		event.preventDefault();
 		const body = composer.trim();
 		if (body === '' || paused) return;
+		const channel = route.channel;
+		const generation = conversationGenerationRef.current;
 		const requestId = `${sessionRef.current}-${++requestCounterRef.current}`;
 		const optimistic: Message = {
 			id: `optimistic-${requestId}`,
-			channel: route.channel,
+			channel,
 			author: CURRENT_USER,
 			body,
 			sentAt: 'Just now',
@@ -550,9 +615,12 @@ export function App() @{
 			delivery: 'pending',
 		};
 		setMessages((current) => normalizeMessages([...current, optimistic]));
-		setComposer('');
+		setComposerByChannel((current) => ({ ...current, [channel]: '' }));
 		setActivity('Sending your message');
-		void publishMessage(sessionRef.current, route.channel, body, requestId).catch(() => {
+		void publishMessage(sessionRef.current, channel, body, requestId).catch(() => {
+			if (
+				readRoute().channel !== channel || conversationGenerationRef.current !== generation
+			) return;
 			setMessages(
 				(current) => current.map(
 					(message) => message.clientRequestId === requestId
@@ -572,10 +640,15 @@ export function App() @{
 	}, []);
 
 	const requestUpdate = useCallback(() => {
+		const channel = route.channel;
+		const generation = conversationGenerationRef.current;
 		setActivity(
 			paused ? 'A teammate update is waiting for reconnect' : 'Requesting a teammate update',
 		);
-		void requestTeammateUpdate(sessionRef.current, route.channel).catch(() => {
+		void requestTeammateUpdate(sessionRef.current, channel).catch(() => {
+			if (
+				readRoute().channel !== channel || conversationGenerationRef.current !== generation
+			) return;
 			setActivity('The teammate update could not be queued');
 		});
 	}, [paused, route.channel]);
@@ -593,6 +666,7 @@ export function App() @{
 	const addThreadReply = useCallback((body: string) => {
 		const threadId = route.threadId;
 		if (threadId === null) return;
+		const key = threadStateKey(route.channel, threadId);
 		const reply: ThreadReply = {
 			id: `local-reply-${++requestCounterRef.current}`,
 			author: CURRENT_USER,
@@ -602,15 +676,16 @@ export function App() @{
 		setLocalThreadReplies(
 			(current) => ({
 				...current,
-				[threadId]: [...(current[threadId] ?? []), reply],
+				[key]: [...(current[key] ?? []), reply],
 			}),
 		);
 		setActivity('Reply added to thread');
-	}, [route.threadId]);
+	}, [route.channel, route.threadId]);
 
 	const visibleMessages = useMemo(
 		() => messages.map((message) => {
-			const addedReplies = localThreadReplies[message.id]?.length ?? 0;
+			const addedReplies =
+				localThreadReplies[threadStateKey(message.channel, message.id)]?.length ?? 0;
 			return addedReplies === 0
 				? message
 				: { ...message, threadCount: message.threadCount + addedReplies };
@@ -618,15 +693,21 @@ export function App() @{
 		[messages, localThreadReplies],
 	);
 	const visibleThreadReplies = useMemo(
-		() => route.threadId === null
-			? threadReplies
-			: [...threadReplies, ...(localThreadReplies[route.threadId] ?? [])],
-		[localThreadReplies, route.threadId, threadReplies],
+		() => route.threadId === null || activeThreadKey === null
+			? []
+			: [
+					...(threadReady ? threadLoadState.replies : []),
+					...(threadReady ? localThreadReplies[activeThreadKey] ?? [] : []),
+				],
+		[activeThreadKey, localThreadReplies, route.threadId, threadLoadState, threadReady],
 	);
 
 	const currentThreadParent = useMemo(
-		() => visibleMessages.find((message) => message.id === route.threadId) ?? null,
-		[route.threadId, visibleMessages],
+		() =>
+			visibleMessages.find(
+				(message) => message.channel === route.channel && message.id === route.threadId,
+			) ?? null,
+		[route.channel, route.threadId, visibleMessages],
 	);
 	<div class="relay-shell" data-testid="relay-ready">
 		<a class="skip-link" href="#conversation">Skip to conversation</a>
@@ -760,9 +841,15 @@ export function App() @{
 						id="message-composer"
 						rows="3"
 						value={composer}
-						onInput={(event: InputEvent) => setComposer(
-							(event.currentTarget as HTMLTextAreaElement).value,
-						)}
+						onInput={(event: InputEvent) => {
+							const value = (event.currentTarget as HTMLTextAreaElement).value;
+							setComposerByChannel(
+								(current) => ({
+									...current,
+									[route.channel]: value,
+								}),
+							);
+						}}
 						onKeyDown={handleComposerKey}
 						placeholder={paused
 							? 'Draft safely while updates are paused…'
@@ -796,10 +883,12 @@ export function App() @{
 		<div class="activity-announcer" role="status" aria-live="polite">{activity}</div>
 		@if (route.threadId !== null) {
 			<ThreadPortal
-				key={route.threadId}
+				key={threadStateKey(route.channel, route.threadId)}
 				parent={currentThreadParent}
 				replies={visibleThreadReplies}
 				loading={threadLoading}
+				unavailable={threadUnavailable}
+				canReply={threadReady}
 				onClose={closeThread}
 				onReply={addThreadReply}
 				headingRef={threadHeadingRef}

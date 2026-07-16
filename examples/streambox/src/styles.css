@@ -648,6 +648,53 @@ video {
 	box-shadow: 0 0 12px var(--pink);
 }
 
+.media-error {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.9rem;
+	padding: 1.25rem;
+	background: rgba(8, 9, 14, 0.9);
+	text-align: left;
+	backdrop-filter: blur(10px);
+}
+
+.media-error__mark {
+	display: grid;
+	place-items: center;
+	width: 38px;
+	height: 38px;
+	flex: 0 0 auto;
+	border-radius: 50%;
+	background: rgba(255, 91, 141, 0.16);
+	color: var(--pink);
+	font-weight: 800;
+}
+
+.media-error strong {
+	display: block;
+	margin-bottom: 0.2rem;
+}
+
+.media-error p {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.82rem;
+}
+
+.media-error button {
+	padding: 0.62rem 0.82rem;
+	flex: 0 0 auto;
+	border: 0;
+	border-radius: 9px;
+	background: #fff;
+	color: #11131a;
+	font-weight: 750;
+	cursor: pointer;
+}
+
 .player-controls {
 	display: flex;
 	align-items: center;

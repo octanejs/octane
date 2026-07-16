@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { settleBrowserFrames } from '../../_shared/e2e/browser.ts';
 import { expect, test } from './test.ts';
 
 async function openVideo(page: Page, path = '/watch/neon-tides') {
@@ -68,7 +69,113 @@ test('plays, seeks, changes volume, and ends through native media events', async
 test('preserves the live player while theater mode and deep-linked panels update around it', async ({
 	page,
 }) => {
-	await openVideo(page);
+	let releaseInitialMedia: (() => void) | undefined;
+	const initialMediaGate = new Promise<void>((resolve) => {
+		releaseInitialMedia = resolve;
+	});
+	let markInitialMediaHeld: (() => void) | undefined;
+	const initialMediaHeld = new Promise<void>((resolve) => {
+		markInitialMediaHeld = resolve;
+	});
+	let markInitialMediaDelivered: (() => void) | undefined;
+	const initialMediaDelivered = new Promise<void>((resolve) => {
+		markInitialMediaDelivered = resolve;
+	});
+	let releaseDestinationMedia: (() => void) | undefined;
+	const destinationMediaGate = new Promise<void>((resolve) => {
+		releaseDestinationMedia = resolve;
+	});
+	let markDestinationMediaHeld: (() => void) | undefined;
+	const destinationMediaHeld = new Promise<void>((resolve) => {
+		markDestinationMediaHeld = resolve;
+	});
+	let markDestinationMediaDelivered: (() => void) | undefined;
+	const destinationMediaDelivered = new Promise<void>((resolve) => {
+		markDestinationMediaDelivered = resolve;
+	});
+	let holdInitialMedia = true;
+	let holdDestinationMedia = true;
+	const mediaPattern = '**/media/streambox-demo.webm?video=*';
+	await page.route(mediaPattern, async (route) => {
+		const videoId = new URL(route.request().url()).searchParams.get('video');
+		if (videoId === 'neon-tides' && holdInitialMedia) {
+			holdInitialMedia = false;
+			const response = await route.fetch();
+			markInitialMediaHeld?.();
+			await initialMediaGate;
+			await route.fulfill({ response });
+			markInitialMediaDelivered?.();
+			return;
+		}
+		if (videoId === 'quiet-current' && holdDestinationMedia) {
+			holdDestinationMedia = false;
+			const response = await route.fetch();
+			markDestinationMediaHeld?.();
+			await destinationMediaGate;
+			await route.fulfill({ response });
+			markDestinationMediaDelivered?.();
+			return;
+		}
+		await route.continue();
+	});
+
+	await page.goto('/watch/neon-tides', { waitUntil: 'domcontentloaded' });
+	await expect(page.getByLabel('Loading Streambox video')).toHaveAttribute('aria-busy', 'true');
+	const catalogSearch = page.getByRole('searchbox', { name: 'Search videos' });
+	try {
+		await initialMediaHeld;
+		await catalogSearch.fill('quiet current');
+		await page
+			.getByLabel('Video search results')
+			.getByRole('link', { name: /The quiet current beneath the pines/ })
+			.click();
+		await destinationMediaHeld;
+		await expect(page.getByTestId('watch-ready')).toBeVisible();
+		await expect(
+			page.getByRole('heading', { name: 'The quiet current beneath the pines' }),
+		).toBeVisible();
+
+		releaseInitialMedia?.();
+		await initialMediaDelivered;
+		await settleBrowserFrames(page);
+		await expect(page.getByTestId('activity-status')).toContainText(
+			'The quiet current beneath the pines',
+		);
+		await expect(page.getByTestId('activity-status')).not.toContainText('Neon tides');
+		await expect(page.getByRole('button', { name: 'Play video' })).toBeDisabled();
+		await expect
+			.poll(() =>
+				page
+					.getByTestId('streambox-video')
+					.evaluate((video) => (video as HTMLVideoElement).readyState),
+			)
+			.toBeLessThan(1);
+
+		releaseDestinationMedia?.();
+		await destinationMediaDelivered;
+		await expect(page.getByRole('button', { name: 'Play video' })).toBeEnabled();
+		await expect
+			.poll(() =>
+				page
+					.getByTestId('streambox-video')
+					.evaluate((video) => (video as HTMLVideoElement).readyState),
+			)
+			.toBeGreaterThanOrEqual(1);
+	} finally {
+		releaseInitialMedia?.();
+		releaseDestinationMedia?.();
+		await page.unroute(mediaPattern);
+	}
+
+	await catalogSearch.fill('neon tides');
+	await page
+		.getByLabel('Video search results')
+		.getByRole('link', { name: /Neon tides: a night swim in the city/ })
+		.click();
+	await expect(
+		page.getByRole('heading', { name: 'Neon tides: a night swim in the city' }),
+	).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Play video' })).toBeEnabled();
 	const player = page.getByTestId('streambox-video');
 	await page.getByRole('button', { name: 'Play video' }).click();
 	await expect
@@ -90,7 +197,7 @@ test('preserves the live player while theater mode and deep-linked panels update
 	await page.getByRole('link', { name: /Comments/ }).click();
 	await expect(page).toHaveURL(/\/watch\/neon-tides\/comments$/);
 	await expect(page.getByRole('heading', { name: '180 comments' })).toBeVisible();
-	await page.getByRole('searchbox', { name: 'Search videos' }).fill('quiet current');
+	await catalogSearch.fill('quiet current');
 	await expect(page.getByLabel('Video search results')).toContainText(
 		'The quiet current beneath the pines',
 	);
@@ -243,10 +350,27 @@ test('retries a failed catalog and queues rapid actions while local playback sta
 	page,
 	context,
 }) => {
+	let failMediaOnce = true;
+	await page.route('**/media/streambox-demo.webm?video=neon-tides', async (route) => {
+		if (!failMediaOnce) {
+			await route.continue();
+			return;
+		}
+		failMediaOnce = false;
+		await route.fulfill({
+			status: 200,
+			contentType: 'video/webm',
+			body: 'not-a-valid-webm',
+		});
+	});
 	await page.goto('/watch/neon-tides?scenario=failure');
 	await expect(page.getByRole('alert')).toContainText('We couldn’t load this video');
 	await page.getByRole('button', { name: 'Retry loading video' }).click();
 	await expect(page.getByTestId('watch-ready')).toBeVisible();
+	const mediaFailure = page.getByRole('alert').filter({ hasText: 'Video playback unavailable' });
+	await expect(mediaFailure).toContainText('The local media file could not be prepared.');
+	await expect(page.getByTestId('media-event')).toHaveText('Native event · error');
+	await mediaFailure.getByRole('button', { name: 'Retry video' }).click();
 	await expect(page.getByRole('button', { name: 'Play video' })).toBeEnabled();
 
 	await page.getByRole('button', { name: 'Play video' }).click();

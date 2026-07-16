@@ -8,6 +8,8 @@ import {
 	useState,
 } from 'octane';
 import {
+	CHECKOUT_CITY_MAX_LENGTH,
+	CHECKOUT_EMAIL_MAX_LENGTH,
 	INITIAL_CHECKOUT_STATE,
 	PRODUCTS,
 	addCartLine,
@@ -16,6 +18,7 @@ import {
 	deliveryCost,
 	formatMoney,
 	getProduct,
+	isValidCheckoutKey,
 	orderTotal,
 	readStoredCart,
 	readStoredOrder,
@@ -37,6 +40,29 @@ import { placeOrder } from 'server';
 const CART_STORAGE_KEY = 'cartlane:cart:v1';
 const ORDER_STORAGE_KEY = 'cartlane:last-order:v1';
 const SESSION_STORAGE_KEY = 'cartlane:checkout-key:v1';
+
+type StorageKind = 'local' | 'session';
+
+function browserStorage(kind: StorageKind): Storage {
+	return kind === 'local' ? window.localStorage : window.sessionStorage;
+}
+
+function readStorage(kind: StorageKind, key: string): string | null {
+	try {
+		return browserStorage(kind).getItem(key);
+	} catch {
+		return null;
+	}
+}
+
+function writeStorage(kind: StorageKind, key: string, value: string): void {
+	try {
+		browserStorage(kind).setItem(key, value);
+	} catch {
+		// Browser storage is an enhancement. Live state and checkout still complete
+		// when privacy settings or quota make persistence unavailable.
+	}
+}
 
 function pause(milliseconds) {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -498,6 +524,7 @@ function CheckoutPage(props) @{
 								<input
 									name="email"
 									type="email"
+									maxLength={CHECKOUT_EMAIL_MAX_LENGTH}
 									autocomplete="email"
 									aria-invalid={errors.email ? 'true' : undefined}
 									aria-describedby={errors.email ? 'email-error' : undefined}
@@ -522,6 +549,7 @@ function CheckoutPage(props) @{
 									<span>Town or city</span>
 									<input
 										name="city"
+										maxLength={CHECKOUT_CITY_MAX_LENGTH}
 										autocomplete="address-level2"
 										aria-invalid={errors.city ? 'true' : undefined}
 										aria-describedby={errors.city ? 'city-error' : undefined}
@@ -684,12 +712,12 @@ export function App(props) @{
 	}, []);
 
 	useEffect(() => {
-		setLines(readStoredCart(localStorage.getItem(CART_STORAGE_KEY)));
-		setLastOrder(readStoredOrder(localStorage.getItem(ORDER_STORAGE_KEY)));
-		let key = sessionStorage.getItem(SESSION_STORAGE_KEY);
-		if (!key) {
+		setLines(readStoredCart(readStorage('local', CART_STORAGE_KEY)));
+		setLastOrder(readStoredOrder(readStorage('local', ORDER_STORAGE_KEY)));
+		let key = readStorage('session', SESSION_STORAGE_KEY);
+		if (!isValidCheckoutKey(key)) {
 			key = crypto.randomUUID();
-			sessionStorage.setItem(SESSION_STORAGE_KEY, key);
+			writeStorage('session', SESSION_STORAGE_KEY, key);
 		}
 		setCheckoutKey(key);
 		setStorageReady(true);
@@ -711,7 +739,7 @@ export function App(props) @{
 
 	useEffect(() => {
 		if (!storageReady) return;
-		localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(lines));
+		writeStorage('local', CART_STORAGE_KEY, JSON.stringify(lines));
 	}, [lines, storageReady]);
 
 	useEffect(() => {
@@ -744,6 +772,7 @@ export function App(props) @{
 	const adjustCart = useCallback(async (formData) => {
 		const productId = String(formData.get('productId') ?? '');
 		const intent = String(formData.get('intent') ?? '');
+		if (intent !== 'increase' && intent !== 'decrease' && intent !== 'remove') return;
 		await pause(45);
 		setLines((current) => {
 			const line = current.find((candidate) => candidate.productId === productId);
@@ -764,14 +793,14 @@ export function App(props) @{
 				recoverable: true,
 			};
 		}
-		let submittedLines = [];
+		let submittedLines = null;
 		try {
 			submittedLines = JSON.parse(String(formData.get('cart') ?? '[]'));
 		} catch {
-			submittedLines = [];
 		}
+		let result;
 		try {
-			const result = await placeOrder({
+			result = await placeOrder({
 				idempotencyKey: String(formData.get('idempotencyKey') ?? ''),
 				lines: submittedLines,
 				name: String(formData.get('name') ?? ''),
@@ -782,21 +811,6 @@ export function App(props) @{
 				cardNumber: String(formData.get('cardNumber') ?? ''),
 				agreeToTerms: formData.get('agreeToTerms') === 'yes',
 			});
-			if (result.status === 'success') {
-				setLastOrder(result.order);
-				localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(result.order));
-				setLines([]);
-				const nextCheckoutKey = crypto.randomUUID();
-				sessionStorage.setItem(SESSION_STORAGE_KEY, nextCheckoutKey);
-				setCheckoutKey(nextCheckoutKey);
-				const orderPath = '/orders/' + result.order.id;
-				if (window.location.pathname !== orderPath) {
-					history.pushState(null, '', orderPath);
-				}
-				setRoute({ name: 'order', orderId: result.order.id });
-				window.scrollTo({ top: 0, behavior: 'instant' });
-			}
-			return result;
 		} catch {
 			return {
 				status: 'failure',
@@ -804,6 +818,21 @@ export function App(props) @{
 				recoverable: true,
 			};
 		}
+		if (result.status === 'success') {
+			setLastOrder(result.order);
+			writeStorage('local', ORDER_STORAGE_KEY, JSON.stringify(result.order));
+			setLines([]);
+			const nextCheckoutKey = crypto.randomUUID();
+			writeStorage('session', SESSION_STORAGE_KEY, nextCheckoutKey);
+			setCheckoutKey(nextCheckoutKey);
+			const orderPath = '/orders/' + result.order.id;
+			if (window.location.pathname !== orderPath) {
+				history.pushState(null, '', orderPath);
+			}
+			setRoute({ name: 'order', orderId: result.order.id });
+			window.scrollTo({ top: 0, behavior: 'instant' });
+		}
+		return result;
 	}, INITIAL_CHECKOUT_STATE);
 
 	const visibleProducts = useMemo(() => {

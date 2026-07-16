@@ -29,6 +29,20 @@ async function openGeneral(page: Page): Promise<void> {
 	await expect(page.getByRole('status', { name: 'Realtime connection: live' })).toBeVisible();
 }
 
+async function consumeExpectedNotFoundDiagnostic(page: Page): Promise<void> {
+	const diagnostics = runtimeDiagnostics.get(page);
+	if (diagnostics === undefined) throw new Error('expected browser diagnostics for Relay journey');
+	await expect.poll(() => diagnostics.records.length).toBe(1);
+	expect(diagnostics.records).toEqual([
+		expect.objectContaining({
+			kind: 'console',
+			level: 'error',
+			message: 'Failed to load resource: the server responded with a status of 404 (Not Found)',
+		}),
+	]);
+	diagnostics.clear();
+}
+
 test('deep links across responsive channels, isolates thread drafts, and preserves a reply across reopen', async ({
 	page,
 }) => {
@@ -42,15 +56,129 @@ test('deep links across responsive channels, isolates thread drafts, and preserv
 	const threadDialog = page.getByRole('dialog', { name: 'Thread' });
 	await expect(threadDialog).toBeVisible();
 	await expect(page.getByRole('article', { name: 'Reply from Rowan Ellis' })).toBeVisible();
-	await page.evaluate(() => {
-		history.pushState(null, '', '/channels/design/thread/g-014');
-		window.dispatchEvent(new PopStateEvent('popstate'));
+
+	let releaseInvalidThread: (() => void) | undefined;
+	const invalidThreadGate = new Promise<void>((resolve) => {
+		releaseInvalidThread = resolve;
 	});
-	await expect(page).toHaveURL(/\/channels\/design\/thread\/g-014$/);
+	let markInvalidThreadHeld: (() => void) | undefined;
+	const invalidThreadHeld = new Promise<void>((resolve) => {
+		markInvalidThreadHeld = resolve;
+	});
+	await page.route('**/api/thread**', async (route) => {
+		const requestURL = new URL(route.request().url());
+		if (
+			requestURL.searchParams.get('channel') !== 'design' ||
+			requestURL.searchParams.get('message') !== 'g-014'
+		) {
+			await route.continue();
+			return;
+		}
+		const response = await route.fetch();
+		markInvalidThreadHeld?.();
+		await invalidThreadGate;
+		await route.fulfill({ response });
+	});
+	const invalidThreadResponse = page.waitForResponse((candidate) => {
+		const requestURL = new URL(candidate.url());
+		return (
+			requestURL.pathname === '/api/thread' && requestURL.searchParams.get('message') === 'g-014'
+		);
+	});
 	const designHeading = page.getByRole('heading', { name: '# design' });
-	await expect(designHeading).toBeVisible();
+	try {
+		await page.evaluate(() => {
+			interface ThreadTransitionObservation {
+				leakedRowanReply: boolean;
+				leakedReplyTextbox: boolean;
+				observer: MutationObserver;
+			}
+			const scope = window as Window & {
+				relayThreadTransition?: ThreadTransitionObservation;
+			};
+			const observation = {
+				leakedRowanReply: false,
+				leakedReplyTextbox: false,
+				observer: null as unknown as MutationObserver,
+			};
+			const inspect = (element: Element) => {
+				if (
+					element.matches('[aria-label="Reply from Rowan Ellis"]') ||
+					element.querySelector('[aria-label="Reply from Rowan Ellis"]') !== null
+				)
+					observation.leakedRowanReply = true;
+				if (element.matches('#thread-reply') || element.querySelector('#thread-reply') !== null) {
+					observation.leakedReplyTextbox = true;
+				}
+			};
+			observation.observer = new MutationObserver((records) => {
+				if (window.location.pathname !== '/channels/design/thread/g-014') return;
+				const dialog = document.querySelector('[role="dialog"]');
+				if (dialog !== null) inspect(dialog);
+				for (const record of records) {
+					for (const node of record.addedNodes) {
+						if (node instanceof Element) inspect(node);
+					}
+				}
+			});
+			observation.observer.observe(document.getElementById('panel-root') ?? document.body, {
+				childList: true,
+				subtree: true,
+				attributes: true,
+			});
+			scope.relayThreadTransition = observation;
+		});
+		await page.evaluate(() => {
+			history.pushState(null, '', '/channels/design/thread/g-014');
+			window.dispatchEvent(new PopStateEvent('popstate'));
+		});
+		await expect(page).toHaveURL(/\/channels\/design\/thread\/g-014$/);
+		await invalidThreadHeld;
+		await expect(threadDialog.getByText('Loading replies…')).toBeVisible();
+		await expect(page.getByRole('article', { name: 'Reply from Rowan Ellis' })).toHaveCount(0);
+		await expect(threadDialog.getByRole('textbox', { name: 'Reply to thread' })).toHaveCount(0);
+		expect(
+			await page.evaluate(() => {
+				const observation = (
+					window as Window & {
+						relayThreadTransition?: {
+							leakedRowanReply: boolean;
+							leakedReplyTextbox: boolean;
+						};
+					}
+				).relayThreadTransition;
+				return {
+					leakedRowanReply: observation?.leakedRowanReply ?? false,
+					leakedReplyTextbox: observation?.leakedReplyTextbox ?? false,
+				};
+			}),
+		).toEqual({ leakedRowanReply: false, leakedReplyTextbox: false });
+		releaseInvalidThread?.();
+		const invalidResponse = await invalidThreadResponse;
+		const invalidRequestURL = new URL(invalidResponse.url());
+		expect(invalidRequestURL.searchParams.get('channel')).toBe('design');
+		expect(invalidResponse.status()).toBe(404);
+		await consumeExpectedNotFoundDiagnostic(page);
+		await expect(designHeading).toBeVisible();
+		await expect(threadDialog.getByRole('alert')).toContainText('Thread unavailable');
+		await expect(threadHeading).toBeFocused();
+		await expect(threadDialog.getByRole('article')).toHaveCount(0);
+		await expect(page.getByRole('article', { name: 'Reply from Rowan Ellis' })).toHaveCount(0);
+		await expect(threadDialog.getByRole('textbox', { name: 'Reply to thread' })).toHaveCount(0);
+	} finally {
+		await page.evaluate(() => {
+			const scope = window as Window & {
+				relayThreadTransition?: { observer: MutationObserver };
+			};
+			scope.relayThreadTransition?.observer.disconnect();
+			delete scope.relayThreadTransition;
+		});
+		releaseInvalidThread?.();
+		await page.unroute('**/api/thread**');
+	}
 	await page.keyboard.press('Escape');
 	await expect(page).toHaveURL(/\/channels\/design$/);
+	await expect(designHeading).toBeFocused();
 	await page.evaluate(() => {
 		history.pushState(null, '', '/channels/general/thread/g-014');
 		window.dispatchEvent(new PopStateEvent('popstate'));
@@ -97,14 +225,89 @@ test('deep links across responsive channels, isolates thread drafts, and preserv
 		.locator('[data-message-id="g-014"]')
 		.getByRole('link', { name: '4 replies', exact: true });
 	await expect(threadLink).toBeVisible();
+
+	let releaseStaleThread: (() => void) | undefined;
+	const staleThreadGate = new Promise<void>((resolve) => {
+		releaseStaleThread = resolve;
+	});
+	let markStaleThreadHeld: (() => void) | undefined;
+	const staleThreadHeld = new Promise<void>((resolve) => {
+		markStaleThreadHeld = resolve;
+	});
+	let markStaleThreadReleased: (() => void) | undefined;
+	const staleThreadReleased = new Promise<void>((resolve) => {
+		markStaleThreadReleased = resolve;
+	});
+	let matchingThreadRequests = 0;
+	await page.route('**/api/thread**', async (route) => {
+		const requestURL = new URL(route.request().url());
+		if (
+			requestURL.searchParams.get('channel') !== 'general' ||
+			requestURL.searchParams.get('message') !== 'g-014' ||
+			++matchingThreadRequests !== 1
+		) {
+			await route.continue();
+			return;
+		}
+		const response = await route.fetch();
+		markStaleThreadHeld?.();
+		await staleThreadGate;
+		await route.fulfill({ response });
+		markStaleThreadReleased?.();
+	});
+
 	await threadLink.click();
-	await expect(page).toHaveURL(/\/channels\/general\/thread\/g-014$/);
-	await expect(threadHeading).toBeFocused();
-	await expect(authoredReply).toBeVisible();
-	await expect(threadDialog.getByRole('article')).toHaveCount(4);
+	await staleThreadHeld;
+	try {
+		await expect(page).toHaveURL(/\/channels\/general\/thread\/g-014$/);
+		await expect(threadDialog.getByText('Loading replies…')).toBeVisible();
+		await page.keyboard.press('Escape');
+		await expect(page).toHaveURL(/\/channels\/general$/);
+		await expect(threadLink).toBeFocused();
+
+		await threadLink.click();
+		await expect(page).toHaveURL(/\/channels\/general\/thread\/g-014$/);
+		await expect(threadHeading).toBeFocused();
+		await expect(authoredReply).toBeVisible();
+		await expect(threadDialog.getByRole('article')).toHaveCount(4);
+		await reply.focus();
+		releaseStaleThread?.();
+		await staleThreadReleased;
+		await settleBrowserFrames(page);
+		await expect(reply).toBeFocused();
+	} finally {
+		releaseStaleThread?.();
+		await page.unroute('**/api/thread**');
+	}
+
 	await page.keyboard.press('Escape');
 	await expect(page).toHaveURL(/\/channels\/general$/);
 	await expect(threadLink).toBeFocused();
+	await threadLink.click();
+	await expect(page).toHaveURL(/\/channels\/general\/thread\/g-014$/);
+	await expect(threadHeading).toBeFocused();
+	const detachedThreadResponse = page.waitForResponse((candidate) => {
+		const requestURL = new URL(candidate.url());
+		return (
+			requestURL.pathname === '/api/thread' &&
+			requestURL.searchParams.get('channel') === 'design' &&
+			requestURL.searchParams.get('message') === 'g-014'
+		);
+	});
+	await page.evaluate(() => {
+		history.pushState(null, '', '/channels/design/thread/g-014');
+		window.dispatchEvent(new PopStateEvent('popstate'));
+	});
+	await expect(page).toHaveURL(/\/channels\/design\/thread\/g-014$/);
+	expect((await detachedThreadResponse).status()).toBe(404);
+	await consumeExpectedNotFoundDiagnostic(page);
+	await expect(designHeading).toBeVisible();
+	await expect(threadLink).toHaveCount(0);
+	await expect(threadDialog.getByRole('alert')).toContainText('Thread unavailable');
+	await expect(threadDialog.getByRole('textbox', { name: 'Reply to thread' })).toHaveCount(0);
+	await page.keyboard.press('Escape');
+	await expect(page).toHaveURL(/\/channels\/design$/);
+	await expect(designHeading).toBeFocused();
 
 	const mobileChannels = page.getByRole('navigation', { name: 'Mobile channels' });
 	await mobileChannels.getByRole('link', { name: 'design' }).click();
@@ -369,10 +572,19 @@ test('replays missed updates once and converges retried and out-of-order sends',
 	await expect(second).toHaveCount(1);
 
 	const channels = page.getByRole('navigation', { name: 'Workspace channels' });
+	await composer.fill('General-only handoff draft');
 	await channels.getByRole('link', { name: 'design', exact: true }).click();
 	await expect(page.getByRole('heading', { name: '# design' })).toBeFocused();
+	const designComposer = page.getByRole('textbox', { name: 'Message #design' });
+	await expect(designComposer).toHaveValue('');
+	await designComposer.fill('Design-only critique draft');
 	await channels.getByRole('link', { name: 'general' }).click();
 	await expect(page.getByRole('heading', { name: '# general' })).toBeFocused();
+	await expect(composer).toHaveValue('General-only handoff draft');
+	await channels.getByRole('link', { name: 'design', exact: true }).click();
+	await expect(designComposer).toHaveValue('Design-only critique draft');
+	await channels.getByRole('link', { name: 'general' }).click();
+	await expect(composer).toHaveValue('General-only handoff draft');
 	await expect(first).toHaveCount(1);
 	await expect(second).toHaveCount(1);
 });

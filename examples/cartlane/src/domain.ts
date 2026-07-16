@@ -1,5 +1,11 @@
 export type Category = 'Desk' | 'Travel' | 'Home';
 
+export const CHECKOUT_EMAIL_MAX_LENGTH = 254;
+export const CHECKOUT_CITY_MAX_LENGTH = 100;
+export const CHECKOUT_POSTAL_CODE_MAX_LENGTH = 10;
+export const ORDER_DELIVERY_LABEL_MAX_LENGTH =
+	CHECKOUT_CITY_MAX_LENGTH + 2 + CHECKOUT_POSTAL_CODE_MAX_LENGTH;
+
 export interface Product {
 	id: string;
 	name: string;
@@ -161,6 +167,12 @@ export function clampQuantity(value: number): number {
 	return Math.max(1, Math.min(8, Math.floor(value)));
 }
 
+export function isValidCheckoutKey(value: unknown): value is string {
+	return (
+		typeof value === 'string' && value.length >= 1 && value.length <= 128 && value.trim() === value
+	);
+}
+
 export function addCartLine(
 	lines: readonly CartLine[],
 	productId: string,
@@ -221,13 +233,13 @@ export function readStoredCart(value: string | null): CartLine[] {
 	try {
 		const parsed: unknown = JSON.parse(value);
 		if (!Array.isArray(parsed)) return [];
-		const lines: CartLine[] = [];
+		let lines: CartLine[] = [];
 		for (const candidate of parsed) {
-			if (!candidate || typeof candidate !== 'object') continue;
+			if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) continue;
 			const record = candidate as Record<string, unknown>;
 			if (typeof record.productId !== 'string' || !getProduct(record.productId)) continue;
-			if (typeof record.quantity !== 'number') continue;
-			lines.push({ productId: record.productId, quantity: clampQuantity(record.quantity) });
+			if (typeof record.quantity !== 'number' || !Number.isFinite(record.quantity)) continue;
+			lines = addCartLine(lines, record.productId, clampQuantity(record.quantity));
 		}
 		return lines;
 	} catch {
@@ -239,19 +251,38 @@ export function readStoredOrder(value: string | null): OrderReceipt | null {
 	if (!value) return null;
 	try {
 		const parsed: unknown = JSON.parse(value);
-		if (!parsed || typeof parsed !== 'object') return null;
+		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
 		const record = parsed as Record<string, unknown>;
 		if (
 			typeof record.id !== 'string' ||
+			!/^CL-[A-Z0-9]{7}$/.test(record.id) ||
 			typeof record.placedAt !== 'string' ||
+			record.placedAt.trim().length === 0 ||
+			record.placedAt.length > 80 ||
 			typeof record.lineCount !== 'number' ||
+			!Number.isSafeInteger(record.lineCount) ||
+			record.lineCount < 1 ||
+			record.lineCount > PRODUCTS.length * 8 ||
 			typeof record.totalCents !== 'number' ||
+			!Number.isSafeInteger(record.totalCents) ||
+			record.totalCents <= 0 ||
 			typeof record.email !== 'string' ||
-			typeof record.deliveryLabel !== 'string'
+			record.email.length > CHECKOUT_EMAIL_MAX_LENGTH ||
+			!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(record.email) ||
+			typeof record.deliveryLabel !== 'string' ||
+			record.deliveryLabel.trim().length === 0 ||
+			record.deliveryLabel.length > ORDER_DELIVERY_LABEL_MAX_LENGTH
 		) {
 			return null;
 		}
-		return record as unknown as OrderReceipt;
+		return {
+			id: record.id,
+			placedAt: record.placedAt,
+			lineCount: record.lineCount,
+			totalCents: record.totalCents,
+			email: record.email,
+			deliveryLabel: record.deliveryLabel,
+		};
 	} catch {
 		return null;
 	}

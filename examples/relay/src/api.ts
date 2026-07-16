@@ -23,8 +23,9 @@ export function loadHistory(
 	});
 }
 
-export function loadThread(messageId: string): Promise<ThreadData> {
-	return jsonRequest<ThreadData>(`/api/thread?message=${encodeURIComponent(messageId)}`);
+export function loadThread(channel: ChannelId, messageId: string): Promise<ThreadData> {
+	const params = new URLSearchParams({ channel, message: messageId });
+	return jsonRequest<ThreadData>(`/api/thread?${params}`);
 }
 
 export function publishMessage(

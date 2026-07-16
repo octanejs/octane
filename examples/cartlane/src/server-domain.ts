@@ -5,7 +5,13 @@ import type {
 	FieldErrors,
 	OrderReceipt,
 } from './domain.ts';
-import { PRODUCTS, orderTotal } from './domain.ts';
+import {
+	CHECKOUT_CITY_MAX_LENGTH,
+	CHECKOUT_EMAIL_MAX_LENGTH,
+	PRODUCTS,
+	isValidCheckoutKey,
+	orderTotal,
+} from './domain.ts';
 
 interface SavedOrder {
 	receipt: OrderReceipt;
@@ -32,12 +38,7 @@ function stableOrderId(key: string): string {
 function normalizeRequest(value: unknown): UnverifiedCheckoutRequest | null {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
 	const record = value as Record<string, unknown>;
-	if (
-		typeof record.idempotencyKey !== 'string' ||
-		record.idempotencyKey.length < 1 ||
-		record.idempotencyKey.length > 128 ||
-		record.idempotencyKey.trim() !== record.idempotencyKey
-	) {
+	if (!isValidCheckoutKey(record.idempotencyKey)) {
 		return null;
 	}
 	return {
@@ -58,13 +59,17 @@ function validate(request: UnverifiedCheckoutRequest): FieldErrors {
 	if (request.name.trim().length < 2) {
 		errors.name = 'Enter the name shown on the delivery address.';
 	}
-	if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(request.email)) {
+	if (
+		request.email.length > CHECKOUT_EMAIL_MAX_LENGTH ||
+		!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(request.email)
+	) {
 		errors.email = 'Enter a valid email address.';
 	}
 	if (request.address.trim().length < 5) {
 		errors.address = 'Enter a street address.';
 	}
-	if (request.city.trim().length < 2) {
+	const cityLength = request.city.trim().length;
+	if (cityLength < 2 || cityLength > CHECKOUT_CITY_MAX_LENGTH) {
 		errors.city = 'Enter a town or city.';
 	}
 	if (!/^[A-Za-z0-9][A-Za-z0-9 -]{2,9}$/.test(request.postalCode.trim())) {
