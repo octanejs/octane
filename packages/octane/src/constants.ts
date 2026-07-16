@@ -92,6 +92,8 @@ export const STREAM_BOUNDARY_ATTR = 'data-oct-b';
 export const STREAM_SEGMENT_ATTR = 'data-oct-s';
 /** Per-boundary seed-JSON script attribute (inside the segment). */
 export const STREAM_SEED_ATTR = 'data-oct-seed';
+/** Renderer-owned executable/data scripts emitted by the streaming protocol. */
+export const STREAM_SCRIPT_ATTR = 'data-octane-stream';
 /** Comment-data prefix left in a swapped boundary for hydration seed scoping. */
 export const STREAM_SEED_COMMENT = 'oct-seed:';
 
@@ -115,6 +117,7 @@ import {
 	VOID_ELEMENTS as _VOID_ELEMENTS,
 	BOOLEAN_ATTR_PROPS as _BOOLEAN_ATTR_PROPS,
 	MUST_USE_PROPERTY_PROPS as _MUST_USE_PROPERTY_PROPS,
+	POSITIVE_NUMERIC_ATTR_PROPS as _POSITIVE_NUMERIC_ATTR_PROPS,
 	SVG_ONLY_TAGS as _SVG_ONLY_TAGS,
 	ATTRIBUTE_ALIASES as _ATTRIBUTE_ALIASES,
 	isEnumeratedBooleanAttr as _isEnumeratedBooleanAttr,
@@ -135,7 +138,7 @@ export const MUST_USE_PROPERTY_PROPS: Set<string> = _MUST_USE_PROPERTY_PROPS;
  * React's POSITIVE-numeric props: values below 1 (incl. 0 and non-numeric)
  * drop — `size="0"` is invalid per the HTML spec (size must be > 0).
  */
-export const POSITIVE_NUMERIC_ATTR_PROPS = new Set(['size', 'cols', 'rows', 'span']);
+export const POSITIVE_NUMERIC_ATTR_PROPS: Set<string> = _POSITIVE_NUMERIC_ATTR_PROPS;
 
 /**
  * Legal HTML attribute name: non-empty, no ASCII whitespace, `"`, `'`, `>`,

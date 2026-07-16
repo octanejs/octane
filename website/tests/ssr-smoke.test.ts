@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build } from 'vite';
+import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../src/content/benchmarks.ts';
 
 const websiteRoot = fileURLToPath(new URL('..', import.meta.url));
 const serverEntry = path.join(websiteRoot, 'dist/server/entry.js');
@@ -55,9 +56,13 @@ describe('built SSR handler', () => {
 		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
 		expect(html).toContain('<main');
 		expect(classCount(html, 'home')).toBeGreaterThan(0);
-		// The homepage ships the real Visx SVG, not an empty client chart shell.
-		expect(classCount(html, 'home-bench-chart')).toBe(1);
-		expect(classCount(html, 'visx-bar')).toBeGreaterThan(0);
+		// The complete explorer is deterministic server markup: no-JS, hydration,
+		// crawlers, and the interactive client all start from the same geometry.
+		expect(classCount(html, 'bx-fallback-table')).toBe(0);
+		expect(classCount(html, 'bx-plot')).toBe(1);
+		expect(classCount(html, 'bx-heat')).toBe(1);
+		expect(classCount(html, 'visx-bar')).toBe(0);
+		expect(classCount(html, 'home-bench-chart')).toBe(0);
 		expect(classCount(html, 'deferred-bench')).toBe(0);
 		expect(classCount(html, 'bench-plot-shell')).toBe(0);
 		// Hydration wiring: the data script names the app entry + preHydrate hook,
@@ -87,20 +92,35 @@ describe('built SSR handler', () => {
 		expect(classCount(html, 'shiki')).toBeGreaterThan(0);
 	});
 
-	it('server-renders /benchmarks: table data SSRs, charts are client-mounted shells', async () => {
+	// This route deliberately renders every chart and accessible data table; give
+	// that full integration path headroom beyond the generic unit-test timeout on
+	// slower CI runners.
+	it('server-renders /benchmarks with complete Visx charts and table data', async () => {
 		const { response, html } = await get('/benchmarks');
+		const cards = [...FRAMEWORK_CARDS, ...OCTANE_CARDS];
+		const expectedBars = cards.reduce(
+			(total, card) =>
+				total +
+				card.rows.reduce(
+					(count, row) =>
+						count + card.series.filter((series) => typeof row[series.key] === 'number').length,
+					0,
+				),
+			0,
+		);
 		expect(response.status).toBe(200);
 		expect(classCount(html, 'benchpage')).toBeGreaterThan(0);
 		expect(html).toContain('aria-labelledby="bench-frameworks"');
 		expect(html).toContain('aria-labelledby="bench-internal"');
-		// Every no-JS benchmark card ships an accessible data table.
-		expect(classCount(html, 'bench-card')).toBeGreaterThan(0);
+		// Every no-JS benchmark card ships both the real SVG and its accessible table.
+		expect(classCount(html, 'bench-card')).toBe(cards.length);
+		expect(classCount(html, 'bench-chart')).toBe(cards.length);
+		expect(classCount(html, 'visx-bar')).toBe(expectedBars);
 		expect(html).toContain('<th scope="row"');
-		expect(classCount(html, 'bench-table')).toBeGreaterThan(0);
-		// Recharts populates in layout effects, so SSR emits chart shells.
-		expect(html).toContain('bench-plot-shell');
-		expect(html).not.toContain('recharts-surface');
-	});
+		expect(classCount(html, 'bench-table')).toBe(cards.length);
+		expect(classCount(html, 'bench-plot-shell')).toBe(0);
+		expect(classCount(html, 'recharts-wrapper')).toBe(0);
+	}, 15_000);
 
 	it('SSRs the not-found page through the catch-all with a real 404', async () => {
 		const { response, html } = await get('/definitely/not/a/page');

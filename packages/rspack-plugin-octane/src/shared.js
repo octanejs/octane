@@ -1,3 +1,5 @@
+import { normalizeRendererConfig } from 'octane/compiler/renderers';
+
 const CLIENT_TARGETS = new Set(['web', 'webworker', 'electron-renderer', 'browserslist']);
 
 function targetValues(target) {
@@ -40,6 +42,7 @@ const LOADER_OPTION_KEYS = new Set([
 	'profile',
 	'parallelUse',
 	'exclude',
+	'renderers',
 ]);
 const PLUGIN_OPTION_KEYS = new Set([...LOADER_OPTION_KEYS, 'transpile']);
 
@@ -81,6 +84,8 @@ function normalizeOptions(value, plugin) {
 		throw new TypeError('@octanejs/rspack-plugin: `exclude` must be an array of path strings.');
 	}
 	if (plugin) assertBooleanOption(options, 'transpile');
+	const renderers =
+		options.renderers === undefined ? undefined : normalizeRendererConfig(options.renderers);
 
 	const normalized = {
 		...(options.root === undefined ? null : { root: options.root }),
@@ -90,6 +95,7 @@ function normalizeOptions(value, plugin) {
 		...(options.profile === undefined ? null : { profile: options.profile }),
 		...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
 		...(options.exclude === undefined ? null : { exclude: [...options.exclude] }),
+		...(renderers === undefined ? null : { renderers }),
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),
 	};
 	if (normalized.exclude) Object.freeze(normalized.exclude);
@@ -107,12 +113,21 @@ export function normalizePluginOptions(value) {
 /** Read the serializable metadata attached to an Octane-transformed module. */
 export function getOctaneRspackBuildInfo(module) {
 	const value = module?.buildInfo?.octane;
+	const nestedReferenceValid =
+		value?.clientReference !== null &&
+		typeof value?.clientReference === 'object' &&
+		typeof value.clientReference.id === 'string' &&
+		typeof value.clientReference.moduleId === 'string' &&
+		typeof value.clientReference.renderer === 'string';
 	if (
 		value &&
 		typeof value === 'object' &&
 		typeof value.canonicalId === 'string' &&
-		(value.transformKind === 'compile' || value.transformKind === 'slots') &&
-		typeof value.serverRpc === 'boolean'
+		(value.transformKind === 'compile' ||
+			value.transformKind === 'slots' ||
+			value.transformKind === 'client-only-stub') &&
+		typeof value.serverRpc === 'boolean' &&
+		(value.clientReference === undefined || nestedReferenceValid)
 	) {
 		return value;
 	}

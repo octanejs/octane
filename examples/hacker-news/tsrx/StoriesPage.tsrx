@@ -5,25 +5,21 @@ import { storiesQuery, pageItemsQuery } from '../shared/queries.js';
 import { feedForPath, PAGE_SIZE } from '../shared/routes.js';
 import { styles } from '../shared/styles.js';
 import { StoryRow } from './StoryRow.tsrx';
+import type { Feed } from '../shared/api.js';
+import type { Story, Comment } from '../shared/types.js';
 
-export function StoriesPage() @{
-	// Derive the feed from the active pathname — one StoriesPage serves every
-	// feed route ('/', '/newest', '/ask', '/show', '/jobs').
-	const pathname = useRouterState({ select: (s) => s.location.pathname });
-	const feed = feedForPath(pathname);
-	// The validated 1-based page from `?page=N` (defaults to 1).
-	const page = useSearch({ select: (s) => s.page ?? 1 });
-
-	// The id list, cached per feed (won't re-suspend on a page change).
-	const { data: ids } = useSuspenseQuery(storiesQuery(feed));
-
+function StoriesList({
+	ids,
+	items,
+	feed,
+	page,
+}: {
+	ids: number[];
+	items: (Story & Comment)[];
+	feed: Feed;
+	page: number;
+}) @{
 	const start = (page - 1) * PAGE_SIZE;
-	const pageIds = ids.slice(start, start + PAGE_SIZE);
-
-	// Batch-fetch THIS page's items keyed by the id slice. The key changes per
-	// page, so this re-suspends on a page change — which lets the router's
-	// concurrent navigation transition hold the previous page until it resolves.
-	const { data: items } = useSuspenseQuery(pageItemsQuery(pageIds));
 
 	const hasPrev = page > 1;
 	const hasMore = start + PAGE_SIZE < ids.length;
@@ -36,7 +32,7 @@ export function StoriesPage() @{
 			@if (hasPrev) {
 				<Link
 					to="."
-					search={(prev) => ({ ...prev, page: page - 1 })}
+					search={(prev: Record<string, unknown>) => ({ ...prev, page: page - 1 })}
 					data-testid="page-prev"
 					{...stylex.props(styles.pagerLink)}
 				>‹ prev</Link>
@@ -49,7 +45,7 @@ export function StoriesPage() @{
 			@if (hasMore) {
 				<Link
 					to="."
-					search={(prev) => ({ ...prev, page: page + 1 })}
+					search={(prev: Record<string, unknown>) => ({ ...prev, page: page + 1 })}
 					data-testid="page-more"
 					{...stylex.props(styles.pagerLink)}
 				>more ›</Link>
@@ -58,4 +54,27 @@ export function StoriesPage() @{
 			}
 		</nav>
 	</div>
+}
+
+export function StoriesPage() @{
+	// Derive the feed from the active pathname — one StoriesPage serves every
+	// feed route ('/', '/newest', '/ask', '/show', '/jobs').
+	const pathname = useRouterState({
+		select: (s: { location: { pathname: string } }) => s.location.pathname,
+	});
+	const feed = feedForPath(pathname);
+	// The validated 1-based page from `?page=N` (defaults to 1).
+	const page = useSearch({ select: (s: { page?: number }) => s.page ?? 1 });
+
+	// The id list, cached per feed (won't re-suspend on a page change).
+	const { data: ids } = useSuspenseQuery(storiesQuery(feed));
+	const start = (page - 1) * PAGE_SIZE;
+	const pageIds = ids.slice(start, start + PAGE_SIZE);
+
+	// Keep this dependent query sequential in the same component. Besides being
+	// the natural data flow, this is the application-level regression for replay
+	// preserving each suspense query's retained `use()` position.
+	const { data: items } = useSuspenseQuery(pageItemsQuery(pageIds));
+
+	<StoriesList ids={ids} items={items} feed={feed} page={page} />
 }

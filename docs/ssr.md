@@ -84,8 +84,24 @@ rejected boundary hydrates directly into its server-rendered `@catch` arm). Node
 destinations honor `write(false)`/`drain`; destination errors or an early close
 cancel the render.
 
+A Promise or Context may also be rendered directly as a React-19-style Usable
+node; nested Usables are unwrapped recursively. A pending Usable outside a
+Suspense boundary delays the shell until it resolves. Streamed replacements are
+parsed in their real HTML, table/select, SVG, or MathML context, so revealing a
+boundary preserves both valid structure and namespace identity.
+
+Synchronous iterable children, including generators, are materialized once and
+use the same keyed hydration ranges as arrays. A thenable that settles while it
+is first subscribed is unwrapped in that render without publishing a fallback.
+
 `StreamOptions` extends `RenderOptions` with `onShellReady()`,
-`onShellError(err)`, and `onAllReady()`.
+`onShellError(err)`, and `onAllReady()`. A recoverable error in Suspense content
+reaches `onError`, preserves the emitted fallback, and marks only that boundary
+for client rendering. Calling `abort(reason)` reports the reason for each
+abandoned pending task, preserves emitted fallbacks for client recovery, closes
+the destination, and invokes `onAllReady` once as the terminal readiness
+notification; an unpublished shell still fails only once through
+`onShellError`.
 
 ### `renderToReadableStream(component, props?, options?)` — `octane/server`
 
@@ -159,6 +175,9 @@ and the resolved server function share one SSR runtime.
 - Renders are concurrency-safe: each pass saves and restores the ambient module
   state around its synchronous run, so overlapping requests cannot observe each
   other.
+- Deep function-component trees retain bounded hook replay. Replay snapshots
+  live outside the recursive invocation frame to reduce stack pressure; the
+  conformance suite exercises a 1,000-level cold tree.
 
 ## SSR via the Vite plugin
 
@@ -176,6 +195,13 @@ your own `entry-server.ts` around `prerender()` or the streaming renderers and
 serialize any app data (for example a dehydrated query-client cache) into your
 own inline script.
 
+Development SSR validates native HTML element nesting while it renders,
+including relationships that cross component boundaries. When the browser
+would repair a placement before hydration (for example, a `<div>` inside a
+`<p>`), Octane reports both authored locations in the server console. The check
+targets parser repairs rather than the complete HTML content model, never adds
+diagnostics to returned markup, and is removed from production compilation.
+
 On the server, page and layout props also receive `state`, the same
 request-scoped `Context.state` Map middleware populated. It is deliberately not
 serialized; browser hydration receives only `{ params, url }`.
@@ -190,7 +216,9 @@ it to the await-everything `prerender`. A deploy adapter (e.g.
 `adapter: vercel()` in octane.config.ts emits Vercel's Build Output API under
 `.vercel/output` after the build. Request abort signals reach both render modes;
 the built-in Node bridge also waits for `drain` and cancels the render when the
-response socket closes.
+response socket closes. Its HTTP transport negotiates streaming gzip for
+eligible SSR and static text responses while preserving HEAD, partial,
+pre-encoded, `no-transform`, and non-compressible responses.
 
 ### Root boundaries, server functions, and CSP
 
@@ -210,7 +238,9 @@ export default defineConfig({
 ```
 
 The catch component receives `{ error, reset }`; the pending component receives
-no props. Paths must be Vite-root paths. `index.html` must contain exactly one
+no props. When both are configured, the catch boundary is closest to the route
+and the pending boundary wraps it, so route errors reach the catch UI while
+suspensions still select the pending UI. Paths must be Vite-root paths. `index.html` must contain exactly one
 `<!--ssr-head-->` marker, one `<!--ssr-body-->` marker, and one closing `</body>`
 tag; builds now fail with an actionable error when that hydration contract is
 malformed.
@@ -260,5 +290,11 @@ These are the known gaps between Octane SSR and a full streaming SSR stack:
 - **Framework-level data serialization**: only suspense seeds cross the boundary
   automatically; loader-style data APIs are app code today.
 - **Error digests**: `onError` and the shell callbacks exist, but there are no
-  React-style error digests; a post-shell error ends the stream with the
-  affected boundaries marked for client render.
+  React-style error digests. Recoverable Suspense errors retain their fallback
+  and mark that boundary for client rendering; a fatal post-shell error ends the
+  stream with every still-pending boundary marked for client rendering.
+- **React Fizz document orchestration options**: core rendering deliberately
+  does not own doctype/preamble insertion, bootstrap script/module lists,
+  import-map construction, response headers, or `onHeaders`. Compose the
+  returned stream into the surrounding document and set headers in the Vite
+  plugin, adapter, or application server instead.

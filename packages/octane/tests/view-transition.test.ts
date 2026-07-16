@@ -11,6 +11,7 @@ import { act } from './_helpers';
 import { createRoot, startTransition, addTransitionType, type Root } from '../src/index.js';
 import { compile } from '../src/compiler/compile.js';
 import * as ServerRuntime from '../src/server/index.js';
+import { activateStreamedMarkup, resetStreamRuntimeGlobals } from './_server-stream.js';
 import {
 	installViewTransitionMocks,
 	type ViewTransitionMocks,
@@ -142,11 +143,20 @@ describe('ViewTransition server output', () => {
 
 		resolve('ready');
 		await ended;
-		const tail = chunks.slice(1).join('');
-		expect(tail).toContain('id="streamed-vt-content"');
-		expect(tail).toContain('vt-name="outer-name"');
-		expect(tail).toContain('vt-update="fade"');
-		expect(tail).toContain('vt-share="pair"');
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		try {
+			container.innerHTML = chunks.join('');
+			activateStreamedMarkup(container);
+			const content = container.querySelector('#streamed-vt-content')!;
+			expect(content.textContent).toBe('ready');
+			expect(content.getAttribute('vt-name')).toBe('outer-name');
+			expect(content.getAttribute('vt-update')).toBe('fade');
+			expect(content.getAttribute('vt-share')).toBe('pair');
+		} finally {
+			container.remove();
+			resetStreamRuntimeGlobals();
+		}
 	});
 });
 

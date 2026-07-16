@@ -438,11 +438,14 @@ Independent, individually-measurable items, roughly by value:
   Guards ratcheted: total js_gzip vs ripple 2.2 → 2.05, vs solid 1.9 → 1.8.
 - **3i. Binding-lifetime specialization — LANDED 2026-07-15.** The compiler
   proves the identity of state/reducer dispatchers, getters, refs,
-  `useEffectEvent`, explicit invariant `useCallback` results, and
-  compiler-memoized local callbacks. A spread-free event using only those
-  values installs once at mount and no longer stores an element/descriptor in
-  the binding bag or emits an update helper. Any spread on the same host keeps
-  the event live so JSX source order is re-applied after spread updates.
+  explicit invariant `useCallback` results, and compiler-memoized local
+  callbacks. It separately recognizes `useEffectEvent` wrappers as
+  behaviorally non-reactive for event bindings: wrapper identity is fresh, but
+  every committed wrapper dispatches through the same committed body. A
+  spread-free event using only those values installs once at mount and no
+  longer stores an element/descriptor in the binding bag or emits an update
+  helper. Any spread on the same host keeps the event live so JSX source order
+  is re-applied after spread updates.
   Syntactically fresh class object/array/function values also skip an
   impossible identity comparison and its previous-value bag field while
   retaining the same setter frequency. The same pass completed 3d, moved the
@@ -533,11 +536,12 @@ Independent, individually-measurable items, roughly by value:
 - **3n. Narrow expression and DOM helper proofs — LANDED 2026-07-15.** A
   conditional expression is now a known string only when both arms are known
   strings, allowing the string-hole path without widening the existing type
-  proof. Dynamic, statically named lowercase HTML `data-*` attributes with a
+  proof. Dynamic, statically named lowercase `data-*` attributes with a
   proven-string expression use `setStringData`, which omits generic property,
   alias, namespace, and name-validity routing while retaining hydration,
   removal, coercion, and development-warning semantics for an inaccurate type
-  assertion.
+  assertion. The unnamespaced write is valid for HTML, SVG, and MathML hosts,
+  including component templates whose destination namespace is chosen at runtime.
 
   Two controlled-form cases receive similarly strict helpers. An
   `<input>`/`<textarea>` with exactly one `defaultValue`, no `value`, and no

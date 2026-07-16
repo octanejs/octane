@@ -10,6 +10,7 @@ export const KNOWN_BINDINGS = {
 	'@apollo/client': '@octanejs/apollo-client',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
+	'@tanstack/react-store': '@octanejs/tanstack-store',
 	'@tanstack/react-table': '@octanejs/tanstack-table',
 	'@tanstack/react-virtual': '@octanejs/tanstack-virtual',
 	'framer-motion': '@octanejs/motion',
@@ -26,6 +27,7 @@ export const KNOWN_BINDINGS = {
 	'@dnd-kit/react': '@octanejs/dnd-kit',
 	sonner: '@octanejs/sonner',
 	recharts: '@octanejs/recharts',
+	'@react-three/fiber': '@octanejs/three',
 	'@visx/visx': '@octanejs/visx',
 	'@visx/a11y': '@octanejs/visx',
 	'@visx/a11y/react': '@octanejs/visx',
@@ -80,6 +82,7 @@ export const KNOWN_BINDINGS = {
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
 	'@mdx-js/react': '@octanejs/mdx',
+	'dexie-react-hooks': '@octanejs/dexie',
 };
 
 // Workspace directory names for the maintained bindings. Keep this derived

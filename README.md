@@ -22,8 +22,10 @@ bookkeeping, and hand-maintained dependency arrays before your app ships.
 
 If you know React, you already know Octane. `useState`, `useEffect`, `memo`,
 context, portals, Suspense, transitions — same API, same mental model, checked
-the boring way against 2,200+ conformance tests lifted straight from
-`facebook/react`. Your React knowledge just works.
+the boring way against a large behavioral test suite. React-derived coverage is
+tracked case-by-case in the generated
+[React parity coverage report](./docs/react-parity-coverage.md), rather than
+inferred from the size of the whole suite. Your React knowledge just works.
 
 Speed was never going to be enough on its own, though. The reason to reach for
 Octane is the day-to-day feel:
@@ -62,6 +64,14 @@ Inferno and has worked on React, Lexical, Ripple, and Svelte.
 ## Status
 
 Octane is currently in alpha development.
+
+The core suite contains **3,500+ distinct behavioral tests** across conformance,
+differential, hydration, runtime, compiler, and SSR coverage. The `octane-prod`
+project reruns the normal suite against the production compiler path, so those
+executions are valuable mode coverage but are not counted again as unique tests.
+This is an Octane suite count, not a claim that every test was ported from React;
+the exact pinned snapshot and source-attributed React counts come from the
+[coverage ledger and report](./docs/react-parity-coverage.md).
 
 ## At a glance
 
@@ -159,6 +169,17 @@ schedule-to-render delay, Chrome Performance tracks, and a bounded console API.
 Normal production builds omit the compiler metadata and tree-shake the recorder
 unless application code imports `octane/profiling` directly. See the
 [profiling guide](https://octanejs.dev/docs/profiling).
+
+Production client compilation automatically reuses conservative same-module
+pure component regions and keyed lists by inferred lexical dependencies, using
+React-Compiler-style strict-identity snapshots and the normal context-aware
+Block/keyed-list machinery. There is nothing to configure and no flag to
+learn: the proof fails closed, so HMR, dev, profiling, and server builds use
+normal reconciliation, and effects, refs, mutable ambient reads, custom
+comparators, and Suspense/transition boundaries keep their authored
+every-render behavior. Caching render-used imported calculations and their
+descriptor output is a later phase that ships together with per-key descriptor
+reuse.
 
 ### Mount
 
@@ -316,7 +337,9 @@ Dependency arrays are optional in Octane. When one is omitted from
 `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`,
 or `useImperativeHandle`, the compiler derives it from the callback's reactive
 captures. It understands member reads and stable hook results such as state
-setters, reducer dispatchers, refs, state getters, and `useEffectEvent`.
+setters, reducer dispatchers, refs, and state getters. It also omits
+`useEffectEvent` results because Effect Events are non-reactive captures, even
+though React-compatible wrappers have a fresh identity on each render.
 
 Explicit arrays keep their React meaning and are never rewritten. Pass `null`
 for the uncommon every-render form:
@@ -490,6 +513,7 @@ generated from the workspace manifests in
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
   [`base-ui`](./packages/base-ui), [`sonner`](./packages/sonner),
   [`recharts`](./packages/recharts), [`visx`](./packages/visx),
+  [`three`](./packages/three),
   [`lucide`](./packages/lucide),
   [`redux`](./packages/redux), [`redux-toolkit`](./packages/redux-toolkit),
   [`testing-library`](./packages/testing-library),
@@ -507,7 +531,7 @@ Octane uses [pnpm](https://pnpm.io) for package management and workspace scripts
 ```bash
 pnpm install      # install workspace dependencies
 pnpm test         # run the test suite
-pnpm typecheck    # type-check the packages
+pnpm typecheck    # type-check packages, website, and examples
 pnpm format       # format with Prettier
 ```
 
@@ -519,6 +543,13 @@ lists, conditional rendering, `@switch`, dynamic components, and suspense:
 ```bash
 pnpm --filter octane-playground dev
 ```
+
+### Product examples
+
+The applications under [`examples/`](./examples) are runnable demonstrations
+and Playwright-backed regression fixtures. Validate their manifests, tooling
+contracts, strict TypeScript support code, and production builds with
+`pnpm examples:check`; run their browser journeys with `pnpm examples:e2e`.
 
 ## License
 

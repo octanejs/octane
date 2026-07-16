@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -35,8 +35,10 @@
     "./static": "./src/static/index.ts",
     "./constants": "./src/constants.ts",
     "./profiling": "./src/profiling.ts",
+    "./universal": "./src/universal.ts",
     "./compiler": "./src/compiler/index.js",
     "./compiler/bundler": "./src/compiler/bundler.js",
+    "./compiler/renderers": "./src/compiler/renderers.js",
     "./compiler/vite": "./src/compiler/vite.js",
     "./compiler/volar": "./src/compiler/volar.js"
   },
@@ -66,8 +68,13 @@
         "types": "./dist/profiling.d.ts",
         "default": "./dist/profiling.js"
       },
+      "./universal": {
+        "types": "./dist/universal.d.ts",
+        "default": "./dist/universal.js"
+      },
       "./compiler": "./dist/compiler/index.js",
       "./compiler/bundler": "./dist/compiler/bundler.js",
+      "./compiler/renderers": "./dist/compiler/renderers.js",
       "./compiler/vite": "./dist/compiler/vite.js",
       "./compiler/volar": "./dist/compiler/volar.js"
     }

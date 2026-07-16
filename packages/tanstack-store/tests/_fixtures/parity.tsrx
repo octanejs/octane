@@ -29,7 +29,7 @@ function Values() @{
 	const count = useSelector(externalStore, (state) => state.count);
 	const legacy = useStore(
 		externalStore,
-		(state) => ({ count: state.count }),
+		(state) => state,
 		(previous, next) => previous.count === next.count,
 	);
 	const [atomValue, setAtomValue] = useAtom(externalAtom);
@@ -45,7 +45,9 @@ function Values() @{
 
 	<div>
 		<p id="values">
-			{count + '/' + legacy.count + '/' + atomValue + '/' + localAtomValue + '/' + localStoreValue}
+			{count + '/' + legacy.count + ':' + legacy.ignored + '/' + atomValue + '/' + localAtomValue +
+				'/' +
+				localStoreValue}
 		</p>
 		<ContextReader />
 		<button

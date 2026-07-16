@@ -5,9 +5,13 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
-import { compactChartRows } from '../src/components/BenchBars.tsrx';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
-import { FRAMEWORK_CARDS, HOME_SUMMARY, OCTANE_CARDS } from '../src/content/benchmarks.ts';
+import {
+	FRAMEWORK_CARDS,
+	HOME_SUMMARY,
+	OCTANE_CARDS,
+	type BenchCard,
+} from '../src/content/benchmarks.ts';
 import { createHomeSummary } from '../src/content/home-benchmark.ts';
 
 afterEach(cleanup);
@@ -15,6 +19,14 @@ afterEach(cleanup);
 function findLink(root: ParentNode, href: string): HTMLAnchorElement | undefined {
 	return Array.from(root.querySelectorAll<HTMLAnchorElement>('a')).find(
 		(link) => link.getAttribute('href') === href,
+	);
+}
+
+function expectedBarCount(card: BenchCard): number {
+	return card.rows.reduce(
+		(count, row) =>
+			count + card.series.filter((series) => typeof row[series.key] === 'number').length,
+		0,
 	);
 }
 
@@ -54,43 +66,14 @@ describe('website routes', () => {
 
 		const summaryKeys = HOME_SUMMARY.series.map((series) => series.key);
 		expect(summaryKeys).toEqual(expect.arrayContaining(['preact', 'svelte']));
-
-		// Unsupported summary combinations remain absent from the table data, but
-		// the chart packs the remaining framework bars into contiguous slots.
-		const streamingRow = HOME_SUMMARY.rows.find((row) => row.op === 'streaming-ssr')!;
-		const compactStreamingRow = compactChartRows(HOME_SUMMARY).find(
-			(row: Record<string, string | number>) => row.op === 'streaming-ssr',
-		)!;
-		const originalValues = HOME_SUMMARY.series.flatMap((series) =>
-			typeof streamingRow[series.key] === 'number' ? [streamingRow[series.key]] : [],
-		);
-		const occupiedSlots = HOME_SUMMARY.series.flatMap((series, index) =>
-			typeof compactStreamingRow[series.key] === 'number' ? [index] : [],
-		);
-		expect(occupiedSlots).toEqual(
-			Array.from({ length: originalValues.length }, (_, index) => occupiedSlots[0] + index),
-		);
-		expect(
-			HOME_SUMMARY.series.flatMap((series) =>
-				typeof compactStreamingRow[series.key] === 'number'
-					? [compactStreamingRow[series.key]]
-					: [],
-			),
-		).toEqual(originalValues);
-		expect(
-			Object.values(compactStreamingRow).filter((value) => /^#[0-9a-f]{6}$/.test(String(value))),
-		).toEqual(
-			HOME_SUMMARY.series.flatMap((series) =>
-				typeof streamingRow[series.key] === 'number' ? [series.color] : [],
-			),
-		);
 	});
 
 	it('/ renders the home experience and primary navigation', async () => {
 		const { container } = await renderRoute('/');
 
 		expect(container.querySelector('main .home')).toBeTruthy();
-		expect(container.querySelector('.topnav-inner.docs-width')).toBeNull();
+		// The redesign uses one full-width top bar across every route (no docs-only width).
+		expect(container.querySelector('.topnav-inner')).toBeTruthy();
 		expect(container.querySelector('.hero h1')?.textContent?.trim()).toBeTruthy();
 		expect(container.textContent).toContain('No hand-maintained dependency arrays');
 		const heroActions = container.querySelector('.hero-actions')!;
@@ -110,37 +93,92 @@ describe('website routes', () => {
 		}
 		expect(findLink(container, '/docs/bindings')).toBeTruthy();
 
-		// The checked-in benchmark summary reaches the chart and table renderers.
-		const summary = container.querySelector('figure.bench-card');
-		expect(summary?.querySelector('figcaption')).toBeTruthy();
-		expect(summary?.querySelector('svg.home-bench-chart')).toBeTruthy();
-		const expectedBars = HOME_SUMMARY.rows.reduce(
-			(count, row) =>
-				count + HOME_SUMMARY.series.filter((series) => typeof row[series.key] === 'number').length,
-			0,
-		);
-		expect(summary?.querySelectorAll('.visx-bar')).toHaveLength(expectedBars);
-		expect(summary?.querySelector('.recharts-wrapper')).toBeNull();
-		expect(summary?.querySelector('details table')).toBeTruthy();
+		// The proven stat strip backs the feature claims with three headline numbers.
+		const proven = container.querySelector<HTMLElement>('section.proven')!;
+		expect(proven).toBeTruthy();
+		const provenStats = Array.from(proven.querySelectorAll('.proven-stat'));
+		expect(provenStats).toHaveLength(3);
+		for (const stat of provenStats) {
+			expect(stat.querySelector('.proven-number')?.textContent?.trim()).toBeTruthy();
+			expect(stat.querySelector('.proven-label')?.textContent?.trim()).toBeTruthy();
+		}
 
+		// The decision section frames the evidence below with two questions and a coda
+		// that links out to what TSRX adds.
+		const why = container.querySelector<HTMLElement>('section.why[aria-labelledby="why-heading"]')!;
+		expect(why).toBeTruthy();
+		expect(why.querySelector('#why-heading')?.textContent?.trim()).toBe(
+			'Fast should be how your app feels. Not a new way you have to think.',
+		);
+		const whyQuestions = Array.from(why.querySelectorAll('.why-question')).map((question) =>
+			question.textContent?.trim(),
+		);
+		expect(whyQuestions).toEqual([
+			'Why should someone adopt Octane today?',
+			"Why isn't Octane's rendering powered by signals?",
+		]);
+		expect(why.querySelector('.why-coda')?.textContent?.trim()).toBeTruthy();
+		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
+
+		// The home composes its sections in a fixed order: hero, features, proven, why,
+		// explorer. (Each section carries a compiler-added scoped class after its
+		// semantic one.)
+		const homeSections = Array.from(container.querySelectorAll('main .home > section')).map(
+			(section) => section.classList[0],
+		);
+		expect(homeSections).toEqual(['hero', 'features', 'proven', 'why', 'explorer']);
+
+		// The home page renders the interactive benchmark explorer from the checked-in
+		// ×-vs-Octane summary (HOME_SUMMARY). The explorer's own interactions live in
+		// benchmark-explorer.test.ts; here assert the section composes and the summary
+		// reaches both deterministic views.
+		const explorer = container.querySelector('section.explorer')!;
+		expect(explorer).toBeTruthy();
+		expect(explorer.querySelector('#explorer-heading')?.textContent?.trim()).toBeTruthy();
+		expect(findLink(explorer, '/benchmarks')).toBeTruthy();
+		const bx = explorer.querySelector('.bx')!;
+		expect(bx).toBeTruthy();
+		// Both views are present from the first render so SSR and hydration share the
+		// same geometry. Assert every suite row reaches the heatmap.
+		await waitFor(() => {
+			if (!bx.querySelector('.bx-plot')) throw new Error('explorer plot missing');
+		});
+		expect(bx.querySelectorAll('.bx-heat tbody tr')).toHaveLength(HOME_SUMMARY.rows.length);
+
+		// Section links sit with the wordmark on the left; search and the social
+		// icons form the right cluster.
 		const nav = container.querySelector('.navlinks')!;
 		for (const href of ['/docs', '/benchmarks', '/llms.txt']) {
 			expect(findLink(nav, href)).toBeTruthy();
 		}
 		expect(findLink(nav, '/view-transitions')).toBeUndefined();
-		expect(findLink(nav, 'https://github.com/octanejs/octane')).toBeTruthy();
-		expect(findLink(nav, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
+
+		const navRight = container.querySelector('.nav-right')!;
+		expect(navRight.querySelector('.search-trigger')).toBeTruthy();
+		expect(findLink(navRight, 'https://x.com/octanejs')).toBeTruthy();
+		expect(findLink(navRight, 'https://github.com/octanejs/octane')).toBeTruthy();
+		expect(findLink(navRight, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
+
+		// The footer mirrors the header's social set — X, Discord, GitHub, in that
+		// order — as an icon list beside the license line.
+		const footer = container.querySelector('footer')!;
+		expect(footer.textContent).toContain('MIT licensed');
+		const social = Array.from(footer.querySelectorAll<HTMLAnchorElement>('.footer-social a')).map(
+			(link) => link.getAttribute('href'),
+		);
+		expect(social).toEqual([
+			'https://x.com/octanejs',
+			'https://discord.gg/8puY9fFqd9',
+			'https://github.com/octanejs/octane',
+		]);
 	});
 
 	it('/benchmarks renders every configured benchmark card', async () => {
 		const { container } = await renderRoute('/benchmarks');
-		// Recharts settles over microtask/raf rounds through autoBatch.
-		for (let round = 0; round < 12; round++) {
-			await new Promise((resolve) => setTimeout(resolve, 0));
-			await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
-		}
 
 		expect(container.querySelector('main .benchpage')).toBeTruthy();
+		expect(container.querySelector('.recharts-wrapper')).toBeNull();
+		expect(container.querySelector('.bench-plot-shell')).toBeNull();
 		const sections = [
 			{ id: 'bench-frameworks', cards: FRAMEWORK_CARDS },
 			{ id: 'bench-internal', cards: OCTANE_CARDS },
@@ -151,9 +189,18 @@ describe('website routes', () => {
 			expect(section.querySelector(`#${id}`)).toBeTruthy();
 			const figures = Array.from(section.querySelectorAll('figure.bench-card'));
 			expect(figures).toHaveLength(cards.length);
-			for (const figure of figures) {
+			for (let index = 0; index < figures.length; index++) {
+				const figure = figures[index];
+				const card = cards[index];
 				expect(figure.querySelector('figcaption')).toBeTruthy();
-				expect(figure.querySelector('svg')).toBeTruthy();
+				expect(figure.querySelector('svg.bench-chart')).toBeTruthy();
+				expect(figure.querySelectorAll('.visx-bar')).toHaveLength(expectedBarCount(card));
+				if (card.series.length <= 2) {
+					expect(figure.querySelectorAll('.value-label')).toHaveLength(expectedBarCount(card));
+					expect(figure.querySelector('.visx-axis-bottom')).toBeNull();
+				} else {
+					expect(figure.querySelector('.visx-axis-bottom')).toBeTruthy();
+				}
 				expect(figure.querySelector('details.bench-table table')).toBeTruthy();
 			}
 		}
@@ -162,7 +209,8 @@ describe('website routes', () => {
 	it('/docs renders the configured default document', async () => {
 		const { container } = await renderRoute('/docs');
 		expect(container.querySelector('.prose h1')?.textContent?.trim()).toBe(defaultDoc.title);
-		expect(container.querySelector('.topnav-inner.docs-width')).toBeTruthy();
+		// Docs shares the same full-width top bar as every other route.
+		expect(container.querySelector('.topnav-inner')).toBeTruthy();
 	});
 
 	it.each(docs)('/docs/$slug renders its MDX document and active sidebar link', async (doc) => {
@@ -220,6 +268,7 @@ describe('website routes', () => {
 			'tanstack-virtual',
 			'recharts',
 			'visx',
+			'three',
 			'stylex',
 			'testing-library',
 		];

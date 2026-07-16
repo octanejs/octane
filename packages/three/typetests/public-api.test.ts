@@ -1,0 +1,201 @@
+import type { UniversalComponent } from 'octane/universal';
+import type * as THREE from 'three';
+import {
+	createEvents,
+	createPortal,
+	createRoot,
+	events,
+	useFrame,
+	useStore,
+	useThree,
+	type CanvasProps,
+	type ComputeFunction,
+	type DomEvent,
+	type EventHandlers,
+	type EventManager,
+	type EventProps,
+	type Events,
+	type FilterFunction,
+	type Intersection,
+	type IntersectionEvent,
+	type InjectState,
+	type PointerCaptureTarget,
+	type PrimitiveProps,
+	type RaycastableRepresentation,
+	type Renderer,
+	type RootState,
+	type ThreeElement,
+	type ThreeElements,
+	type ThreeEvent,
+	type ThreeRoot,
+} from '@octanejs/three';
+import {
+	createThreeTestRenderer,
+	fireEvent,
+	type ThreeTestRenderer,
+} from '@octanejs/three/testing';
+
+declare const canvas: HTMLCanvasElement;
+declare const renderer: Renderer;
+declare const Scene: UniversalComponent<{ name: string }>;
+declare const portalTarget: THREE.Group;
+
+const portalState: InjectState = {
+	events: {
+		enabled: true,
+		priority: 2,
+		compute(event, state, previous) {
+			state.pointer.set(event.offsetX, event.offsetY);
+			void previous;
+		},
+	},
+	size: { width: 320, height: 180, top: 0, left: 0 },
+};
+const portal = createPortal(null, portalTarget, portalState);
+void portal;
+// @ts-expect-error Portal targets must be Three Object3D instances.
+createPortal(null, {});
+// @ts-expect-error Portal event overrides expose the narrowed event layer surface.
+const invalidPortalState: InjectState = { events: { enabled: 'yes' } };
+void invalidPortalState;
+
+const root: ThreeRoot<HTMLCanvasElement> = createRoot(canvas);
+const configured: Promise<ThreeRoot<HTMLCanvasElement>> = root.configure({
+	gl: renderer,
+	size: { width: 640, height: 360 },
+	dpr: [1, 2],
+	frameloop: 'demand',
+});
+const asyncConfigured: Promise<ThreeRoot<HTMLCanvasElement>> = root.configure({
+	gl: async (defaults) => {
+		const configuredCanvas: HTMLCanvasElement = defaults.canvas;
+		void configuredCanvas;
+		return renderer;
+	},
+});
+root.render(Scene, { name: 'typed-scene' });
+
+const canvasProps: CanvasProps = {
+	gl: () => renderer,
+	dpr: 1,
+	frameloop: 'never',
+	shadows: 'soft',
+	style: { width: '100%', height: 320 },
+	eventSource: document.body,
+	eventPrefix: 'client',
+};
+
+const eventManager: EventManager<HTMLElement> = events(root.store);
+const coreEvents = createEvents(root.store);
+const dynamicCoreEventName: string = 'onPointerMove';
+const coreEventHandler: EventListener = coreEvents.handlePointer(dynamicCoreEventName);
+const compute: ComputeFunction = (event, state) => {
+	const source: DomEvent = event;
+	state.pointer.set(source.offsetX, source.offsetY);
+};
+const filter: FilterFunction = (items, state) => {
+	const rootState: RootState = state;
+	void rootState;
+	return items;
+};
+const eventHandlers: EventHandlers = {
+	onPointerMove(event) {
+		const intersectionEvent: IntersectionEvent<PointerEvent> = event;
+		intersectionEvent.stopPropagation();
+	},
+};
+const nativeEvents: Events = eventManager.handlers!;
+declare const intersection: Intersection;
+const captureTarget: PointerCaptureTarget = {
+	intersection,
+	target: document.body,
+};
+const meshProps: ThreeElements['mesh'] = {
+	onPointerDown(event: ThreeEvent<PointerEvent>) {
+		event.stopPropagation();
+		event.target.setPointerCapture(event.pointerId);
+	},
+};
+const geometryProps: ThreeElements['boxGeometry'] = {
+	args: [1, 1, 1],
+	// @ts-expect-error Non-raycastable intrinsic resources do not accept event handlers.
+	onPointerDown() {},
+};
+
+class CustomRaycastable implements RaycastableRepresentation {
+	raycast(_raycaster: THREE.Raycaster, _intersections: THREE.Intersection[]): void {}
+}
+
+class Resource {
+	readonly label = 'resource';
+}
+
+const customEventProps: EventProps<CustomRaycastable> = {
+	onPointerDown(event) {
+		event.stopPropagation();
+	},
+};
+const customElementProps: ThreeElement<typeof CustomRaycastable> = {
+	onPointerMove(event) {
+		event.stopPropagation();
+	},
+};
+const primitiveProps: PrimitiveProps<CustomRaycastable> = {
+	object: new CustomRaycastable(),
+	onPointerUp(event) {
+		event.stopPropagation();
+	},
+};
+const resourceElementProps: ThreeElement<typeof Resource> = {
+	// @ts-expect-error Non-raycastable custom resources do not accept event handlers.
+	onPointerDown() {},
+};
+
+function HookTypes(): void {
+	const scene = useThree((state) => state.scene);
+	const selectedWidth: number = useStore((state) => state.size.width);
+	const wholeState: RootState = useThree();
+	useFrame((state, delta, frame) => {
+		const current: RootState = state;
+		const seconds: number = delta;
+		void current;
+		void seconds;
+		void frame;
+	});
+	void scene;
+	void selectedWidth;
+	void wholeState;
+}
+
+const testRenderer: Promise<ThreeTestRenderer> = createThreeTestRenderer(Scene, {
+	name: 'test-scene',
+});
+declare const mesh: THREE.Mesh;
+const fired: Promise<unknown> = fireEvent(mesh, 'pointerDown', { pointerId: 1 });
+
+// @ts-expect-error Frameloop accepts only the three supported scheduling modes.
+root.configure({ gl: renderer, frameloop: 'sometimes' });
+
+// @ts-expect-error A DPR range requires numeric lower and upper bounds.
+root.configure({ gl: renderer, dpr: ['low', 'high'] });
+
+void configured;
+void asyncConfigured;
+void canvasProps;
+void coreEvents;
+void coreEventHandler;
+void compute;
+void filter;
+void eventHandlers;
+void nativeEvents;
+void captureTarget;
+void eventManager;
+void customEventProps;
+void customElementProps;
+void primitiveProps;
+void resourceElementProps;
+void geometryProps;
+void meshProps;
+void HookTypes;
+void testRenderer;
+void fired;

@@ -1,6 +1,6 @@
 import { QueriesObserver, QueryObserver, noop, notifyManager } from '@tanstack/query-core';
 import type { QueryClient } from '@tanstack/query-core';
-import { useState, useMemo, useSyncExternalStore, useCallback, useEffect, use } from 'octane';
+import { useState, useMemo, useSyncExternalStore, useCallback, useEffect } from 'octane';
 import { resolveClient } from './context';
 import { useIsRestoring } from './isRestoring';
 import { useQueryErrorResetBoundary } from './errorResetBoundary';
@@ -12,6 +12,7 @@ import {
 	shouldSuspend,
 	splitSlot,
 	subSlot,
+	useSuspensePromise,
 } from './internal';
 import type { QueriesOptions, QueriesResults } from './queries-types';
 
@@ -93,25 +94,29 @@ export function useQueries(options: any, ...rest: any[]): any {
 		qs('eff'),
 	);
 
-	// Suspense: if any query should suspend, suspend on Promise.all of their
-	// optimistic fetches. octane suspends via use(thenable), not `throw promise`.
-	const shouldAtLeastOneSuspend = optimisticResult.some((result: any, index: number) =>
-		shouldSuspend(defaultedQueries[index], result),
-	);
-	if (shouldAtLeastOneSuspend) {
-		const suspensePromises = optimisticResult.flatMap((result: any, index: number) => {
-			const opts = defaultedQueries[index];
-			if (opts && shouldSuspend(opts, result)) {
-				// fetchOptimistic clears the reset boundary on error (upstream
-				// suspense.ts) so a reset→retry→fail-again re-throws to the boundary.
-				return fetchOptimistic(opts, new QueryObserver(client, opts), errorResetBoundary);
-			}
-			return [];
-		});
-		if (suspensePromises.length > 0) {
-			use(Promise.all(suspensePromises));
+	// If any query should suspend, await their optimistic fetches as one retained
+	// suspense promise. Retaining it gives a sequential useQueries call the same
+	// stable replay position as useBaseQuery above.
+	const suspenseIndexes: number[] = [];
+	for (let index = 0; index < optimisticResult.length; index++) {
+		if (shouldSuspend(defaultedQueries[index], optimisticResult[index])) {
+			suspenseIndexes.push(index);
 		}
 	}
+	useSuspensePromise(
+		suspenseIndexes.length > 0,
+		JSON.stringify(suspenseIndexes.map((index) => defaultedQueries[index].queryHash)),
+		() =>
+			Promise.all(
+				suspenseIndexes.map((index) => {
+					const opts = defaultedQueries[index];
+					// fetchOptimistic clears the reset boundary on error (upstream
+					// suspense.ts) so a reset→retry→fail-again re-throws to the boundary.
+					return fetchOptimistic(opts, new QueryObserver(client, opts), errorResetBoundary);
+				}),
+			),
+		qs('sus'),
+	);
 
 	const firstError = optimisticResult.find((result: any, index: number) => {
 		const query = defaultedQueries[index];

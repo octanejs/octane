@@ -67,20 +67,16 @@ export default defineConfig({
 		// /packages/*/src, not node_modules) declare
 		// `"octane": { "hookSlots": { "manual": ["src"] } }` in their package.json, so the
 		// hook-slotting pass skips them automatically — no exclude list needed.
-		// @octanejs/recharts + @octanejs/redux carry no declaration and DO compile
-		// through the pass (explicit subSlot tags compose with it), unlike
-		// router/mdx.
+		// Bindings without a manual hook-slot declaration still compile through
+		// the pass (explicit subSlot tags compose with it), unlike router/mdx.
 		octaneMdx(websiteMdxOptions),
 		octane(),
 	],
 
 	optimizeDeps: {
-		// Vite's dep scanner can't parse .tsrx, so the deps that
-		// @octanejs/recharts/@octanejs/redux (raw workspace TS, excluded by the
-		// compiler plugin's manifest discovery)
-		// pull in are only discovered at request time — pre-declare them so the
-		// first optimize pass covers everything and dev never mid-session
-		// re-optimizes under the hydrating page.
+		// Vite's dep scanner can't parse .tsrx, so dependencies reached only
+		// through raw workspace sources or dynamic route imports are pre-declared
+		// to avoid a mid-session optimize pass under a hydrating page.
 		include: [
 			// Playground editor stack + the octane compiler's deps ('octane' is
 			// excluded by the compiler plugin, so imports from octane/compiler surface at request
@@ -97,16 +93,17 @@ export default defineConfig({
 			'@octanejs/tanstack-router > @tanstack/history',
 			'@octanejs/tanstack-router > @tanstack/router-core',
 			'@octanejs/tanstack-router > @tanstack/store',
-			'@octanejs/recharts > @reduxjs/toolkit',
-			'@octanejs/recharts > clsx',
-			'@octanejs/recharts > decimal.js-light',
-			'@octanejs/recharts > es-toolkit/compat',
-			'@octanejs/recharts > eventemitter3',
-			'@octanejs/recharts > immer',
-			'@octanejs/recharts > reselect',
-			'@octanejs/recharts > tiny-invariant',
-			'@octanejs/recharts > victory-vendor/d3-scale',
-			'@octanejs/recharts > victory-vendor/d3-shape',
+			// Visx primitives are raw workspace sources; these are the runtime
+			// dependencies reached by the site's Bar/Axis/Group/Scale surface.
+			// Resolve them through their owner under pnpm's isolated layout.
+			'@octanejs/visx > classnames',
+			'@octanejs/visx > d3-interpolate',
+			'@octanejs/visx > d3-path',
+			'@octanejs/visx > d3-scale',
+			'@octanejs/visx > d3-shape',
+			'@octanejs/visx > d3-time',
+			'@octanejs/visx > reduce-css-calc',
+			'@octanejs/visx > svg-path-properties',
 		],
 	},
 

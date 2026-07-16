@@ -12,9 +12,28 @@ import { createRequire } from 'node:module';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseModule } from '@tsrx/core';
 import { compile, isVoidJsxCodeBlockFunction } from './compile.js';
+import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
 import { findVoidRootImports, slotHooks } from './slot-hooks.js';
+import {
+	assertNoLiveClientOnlyImports,
+	createClientOnlyServerStub,
+	createClientReference,
+	findStaticRuntimeImportRequests,
+} from './client-only-server.js';
 
 export { findVoidRootImports };
+export {
+	CLIENT_REFERENCE_MANIFEST_FILENAME,
+	CLIENT_REFERENCE_MANIFEST_VERSION,
+	createClientReferenceManifest,
+} from './client-only-server.js';
+export {
+	DOM_RENDERER_ID,
+	DOM_RENDERER_MODULE,
+	RENDERER_CONFIG_VERSION,
+	normalizeRendererConfig,
+	resolveRendererForFile,
+} from './renderers.js';
 
 const OCTANE_DEPENDENCY_FIELDS = [
 	'dependencies',
@@ -79,6 +98,39 @@ function packageUsesOctane(pkg) {
 			(field) => typeof pkg[field]?.octane === 'string',
 		)
 	);
+}
+
+function packageViteOptimizeDepsExclusions(pkg) {
+	const configured = pkg.octane?.vite?.optimizeDeps?.exclude;
+	if (!Array.isArray(configured)) return [];
+	return [
+		...new Set(
+			configured.filter(
+				(dependency) =>
+					typeof dependency === 'string' &&
+					dependency.length > 0 &&
+					dependency.trim() === dependency,
+			),
+		),
+	];
+}
+
+// Vite does not expand globs in optimizeDeps.exclude. Resolve a terminal family
+// rule against dependency names declared by the app and raw source packages so
+// the adapter emits the exact package IDs Vite's resolver requires.
+function expandViteOptimizeDepsExclusions(configured, dependencyNames) {
+	const exclusions = new Set();
+	for (const request of configured) {
+		if (!request.endsWith('/*')) {
+			exclusions.add(request);
+			continue;
+		}
+		const prefix = request.slice(0, -1);
+		for (const dependency of dependencyNames) {
+			if (dependency.startsWith(prefix)) exclusions.add(dependency);
+		}
+	}
+	return exclusions;
 }
 
 function metadata(dependencies = [], missingDependencies = []) {
@@ -176,6 +228,7 @@ class OctaneBundlerCompiler {
 			profile: options.profile === true,
 			parallelUse: options.parallelUse,
 		};
+		this.renderers = normalizeRendererConfig(options.renderers);
 		// Deliberately instance-scoped: separate projects/build environments must
 		// never share nearest-manifest decisions.
 		this.manifestRuleCache = new Map();
@@ -229,6 +282,7 @@ class OctaneBundlerCompiler {
 						...Object.keys(pkg.dependencies ?? {}),
 						...Object.keys(pkg.optionalDependencies ?? {}),
 					],
+					viteOptimizeDepsExclusions: packageViteOptimizeDepsExclusions(pkg),
 					usesOctane: packageUsesOctane(pkg),
 				},
 				...metadata([manifest]),
@@ -285,6 +339,23 @@ class OctaneBundlerCompiler {
 		const lookup = this._nearestOctanePackageRule(dirname(absoluteFile));
 		addMetadata(collected, lookup);
 		return lookup.rule?.usesOctane === true;
+	}
+
+	_isFullCompileSource(file, collected) {
+		return (
+			file.endsWith('.tsrx') ||
+			(file.endsWith('.tsx') && this._isInstalledOctaneSource(file, collected))
+		);
+	}
+
+	_assertClientOnlySourceSupported(file, filename, renderer, collected) {
+		if (renderer.server !== 'client-only' || this._isFullCompileSource(file, collected)) return;
+		const error = new Error(
+			`Renderer rule ${JSON.stringify(renderer.id)} selects ${JSON.stringify(filename)} as server: "client-only", but export-preserving server stubs currently require an Octane-compiled .tsrx file or eligible raw .tsx source. Narrow the renderer rule so it cannot match ${JSON.stringify(filename)}.`,
+		);
+		error.code = 'OCTANE_CLIENT_ONLY_SOURCE_UNSUPPORTED';
+		error.filename = filename;
+		throw error;
 	}
 
 	_profileModuleId(file, collected) {
@@ -350,7 +421,11 @@ class OctaneBundlerCompiler {
 		} catch {
 			if (existsSync(projectManifestPath)) collected.dependencies.add(projectManifestPath);
 			else collected.missingDependencies.add(projectManifestPath);
-			this.discoveryCache = { packages: [], ...finishMetadata(collected) };
+			this.discoveryCache = {
+				packages: [],
+				viteOptimizeDepsExclusions: [],
+				...finishMetadata(collected),
+			};
 			return this.discoveryCache;
 		}
 
@@ -359,6 +434,8 @@ class OctaneBundlerCompiler {
 			for (const name of Object.keys(projectManifest[field] ?? {})) dependencyNames.add(name);
 		}
 		const sourceDependencies = new Set();
+		const viteOptimizeDepsExclusionRules = new Set();
+		const viteOptimizeDepsCandidates = new Set(dependencyNames);
 		const visitedPackageRoots = new Set();
 		const visit = (name, issuerRoot) => {
 			const packageRequire = createRequire(join(issuerRoot, 'package.json'));
@@ -368,6 +445,12 @@ class OctaneBundlerCompiler {
 				addMetadata(collected, lookup);
 				if (!lookup.rule?.usesOctane) return;
 				sourceDependencies.add(name);
+				for (const dependency of lookup.rule.viteOptimizeDepsExclusions) {
+					viteOptimizeDepsExclusionRules.add(dependency);
+				}
+				for (const dependency of lookup.rule.runtimeDependencies) {
+					viteOptimizeDepsCandidates.add(dependency);
+				}
 				let packageRoot = lookup.rule.root;
 				try {
 					packageRoot = realpathSync(packageRoot);
@@ -396,9 +479,14 @@ class OctaneBundlerCompiler {
 			}
 		};
 		for (const name of dependencyNames) visit(name, this.root);
+		const viteOptimizeDepsExclusions = expandViteOptimizeDepsExclusions(
+			viteOptimizeDepsExclusionRules,
+			viteOptimizeDepsCandidates,
+		);
 
 		this.discoveryCache = {
 			packages: [...sourceDependencies].sort(),
+			viteOptimizeDepsExclusions: [...viteOptimizeDepsExclusions].sort(),
 			...finishMetadata(collected),
 		};
 		return this.discoveryCache;
@@ -406,6 +494,29 @@ class OctaneBundlerCompiler {
 
 	resolveRuntimeRequest(request, environment = this.defaults.environment) {
 		return resolveOctaneRuntimeRequest(request, environment);
+	}
+
+	_canonicalModuleId(id) {
+		const file = cleanModuleId(id);
+		if (isAbsolute(file) && !isPathInside(this.root, file) && isPathInside(this.realRoot, file)) {
+			return canonicalModuleId(file, this.realRoot);
+		}
+		return canonicalModuleId(file, this.root);
+	}
+
+	/** Static requests adapters resolve before a server transform. */
+	findServerImportRequests(code, id) {
+		return findStaticRuntimeImportRequests(code, this._canonicalModuleId(id));
+	}
+
+	/** Classify a bundler-resolved module without loading or evaluating it. */
+	clientReferenceForFile(id) {
+		const file = cleanModuleId(id);
+		const filename = this._canonicalModuleId(file);
+		const renderer = resolveRendererForFile(this.renderers, filename);
+		const collected = { dependencies: new Set(), missingDependencies: new Set() };
+		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
+		return renderer.server === 'client-only' ? createClientReference(renderer.id, filename) : null;
 	}
 
 	_passThrough(code, collected) {
@@ -434,19 +545,41 @@ class OctaneBundlerCompiler {
 		}
 		const requestedHmr = normalizeHmrDialect(options.hmr ?? this.defaults.hmr);
 		const hmr = environment === 'server' ? false : requestedHmr;
-		const dev = environment === 'server' ? false : (options.dev ?? this.defaults.dev ?? !!hmr);
+		// Server HMR stays disabled, but integrations may explicitly request DEV
+		// server diagnostics (Vite does this for `serve`). With no explicit value,
+		// server transforms retain their established production default.
+		const dev = options.dev ?? this.defaults.dev ?? (environment === 'client' && !!hmr);
 		// Profiling is a client-runtime build specialization, deliberately independent
 		// of both HMR and dev hydration diagnostics. Server transforms stay byte-for-
 		// byte identical even when a shared client/server bundler configuration opts in.
 		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
 		const parallelUse = options.parallelUse ?? this.defaults.parallelUse;
-		const filename = canonicalModuleId(file, this.root);
+		const filename = this._canonicalModuleId(file);
+		const clientOnlyImports =
+			environment === 'server' && Array.isArray(options.clientOnlyImports)
+				? options.clientOnlyImports
+				: [];
 
-		const fullCompile =
-			file.endsWith('.tsrx') ||
-			(file.endsWith('.tsx') && this._isInstalledOctaneSource(file, collected));
+		const renderer = resolveRendererForFile(this.renderers, filename);
+		const fullCompile = this._isFullCompileSource(file, collected);
+		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		if (fullCompile) {
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
+			const clientReference =
+				renderer.server === 'client-only' ? createClientReference(renderer.id, filename) : null;
+			if (environment === 'server' && clientReference !== null) {
+				const stub = createClientOnlyServerStub(code, filename, renderer.id);
+				return {
+					code: stub.code,
+					map: null,
+					kind: 'client-only-stub',
+					renderer,
+					clientReference,
+					clientOnlyExports: stub.exports,
+					...finishMetadata(collected),
+				};
+			}
+			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
 			const out = compile(code, filename, {
 				hmr,
 				mode: environment,
@@ -454,16 +587,32 @@ class OctaneBundlerCompiler {
 				profile,
 				profileFilename,
 				parallelUse: parallelUse !== false,
+				// Keep the established DOM compiler call byte-for-byte equivalent. A
+				// renderer descriptor is an orthogonal compiler input only for the
+				// universal branch selected at this template boundary.
+				...(renderer.target === 'dom' ? null : { renderer }),
+				// Boundary metadata is a lexical compiler input even in a DOM-owned
+				// module: a matching imported component can delegate one prop region to
+				// another renderer. Keep the option absent for the normal empty-config
+				// DOM path so its compiler invocation and output remain unchanged.
+				...(hasRendererBoundaries ? { rendererBoundaries: this.renderers.boundaries } : null),
+				...(hasRendererBoundaries ? { rendererRegistry: this.renderers.registry } : null),
+				...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
 			});
 			return {
 				code: out.code,
 				map: out.map,
 				kind: 'compile',
+				renderer,
+				...(clientReference === null ? null : { clientReference }),
 				...(environment === 'client' && options.collectVoidComponentExports === true
 					? { voidComponentExports: findVoidComponentExports(code, filename) }
 					: {}),
 				...finishMetadata(collected),
 			};
+		}
+		if (clientOnlyImports.length > 0) {
+			assertNoLiveClientOnlyImports(code, filename, clientOnlyImports);
 		}
 		if (file.endsWith('.tsx')) return this._passThrough(code, collected);
 

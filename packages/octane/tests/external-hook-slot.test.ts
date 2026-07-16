@@ -3,6 +3,7 @@ import {
 	mkdtempSync,
 	mkdirSync,
 	readFileSync,
+	realpathSync,
 	readdirSync,
 	rmSync,
 	symlinkSync,
@@ -183,7 +184,7 @@ describe('vite plugin gate routing', () => {
 		const websiteRoot = join(process.cwd(), 'website');
 		const discovered = discoverOctaneSourceDependencies(websiteRoot);
 		expect(discovered).toContain('octane');
-		expect(discovered).toContain('@octanejs/recharts');
+		expect(discovered).toContain('@octanejs/visx');
 		expect(discovered).toContain('@octanejs/tanstack-router');
 		expect(discovered).not.toContain('@octanejs/adapter-vercel');
 
@@ -191,6 +192,204 @@ describe('vite plugin gate routing', () => {
 		expect(config.optimizeDeps.exclude).toEqual(discovered);
 		expect(config.ssr.noExternal).toEqual(discovered);
 		expect(config.resolve.dedupe).toContain('octane');
+	});
+
+	it('honors source-package Vite family exclusions without rebasing dependency resolution', () => {
+		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-vite-exclusions-'));
+		try {
+			writeFileSync(
+				join(fixtureRoot, 'package.json'),
+				JSON.stringify({
+					name: 'binding-only-consumer',
+					private: true,
+					dependencies: {
+						'@lexical/selection': '0.46.0',
+						'@octanejs/lexical': '0.1.6',
+					},
+				}),
+			);
+			const scope = join(fixtureRoot, 'node_modules/@octanejs');
+			mkdirSync(scope, { recursive: true });
+			symlinkSync(join(process.cwd(), 'packages/lexical'), join(scope, 'lexical'), 'dir');
+
+			const config = (octane().config as any)({ root: fixtureRoot });
+			expect(config.optimizeDeps.exclude).toEqual(
+				expect.arrayContaining([
+					'@lexical/list',
+					'@lexical/rich-text',
+					'@lexical/selection',
+					'@octanejs/lexical',
+					'lexical',
+				]),
+			);
+			// Vite's package resolver requires exact package IDs here. Octane expands
+			// the binding-owned family rule across both the binding and app manifests.
+			expect(config.optimizeDeps.exclude).not.toContain('@lexical/*');
+			expect(config.resolve.dedupe).toContain('octane');
+			expect(config.resolve.dedupe).not.toContain('lexical');
+			expect(config.resolve.dedupe).not.toContain('@lexical/selection');
+			expect(config.ssr.noExternal).toContain('@octanejs/lexical');
+			expect(config.ssr.noExternal).not.toContain('lexical');
+			expect(config.ssr.noExternal).not.toContain('@lexical/selection');
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('forwards declarative renderer selection through the direct Vite adapter', () => {
+		const rendererPlugin = octane({
+			hmr: false,
+			renderers: {
+				registry: { object: '/src/object-renderer.js' },
+				boundaries: {
+					'/src/object-boundaries.js': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'object',
+							prop: 'children',
+						},
+					},
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		(rendererPlugin.config as any)({ root: appRoot });
+		const transformed = (rendererPlugin.transform as any).call(
+			{},
+			'export function Scene() @{ <node /> }',
+			join(appRoot, 'src/Scene.object.tsrx'),
+		);
+
+		expect(transformed?.code).toMatch(/from ["']\/src\/object-renderer\.js["']/);
+		expect(() => octane({ renderers: { default: 'missing' } })).toThrow(
+			/default references unknown renderer "missing"/,
+		);
+	});
+
+	it('keeps client-only renderer identity stable while omitting its Vite server region', async () => {
+		const rendererPlugin = octane({
+			hmr: false,
+			renderers: {
+				registry: {
+					object: {
+						module: '/src/object-renderer.js',
+						server: 'client-only',
+					},
+				},
+				boundaries: {
+					'@scene/client': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'object',
+							prop: 'children',
+							server: 'omit-child',
+						},
+					},
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		(rendererPlugin.config as any)({ root: appRoot });
+		const sceneId = join(appRoot, 'src/scenes/Scene.object.tsrx');
+		const sceneSource = 'export default function Scene() @{ <node /> }\n';
+		const client = await (rendererPlugin.transform as any).call({}, sceneSource, sceneId);
+		const server = await (rendererPlugin.transform as any).call(
+			{ resolve: async () => null },
+			sceneSource,
+			sceneId,
+			{ ssr: true },
+		);
+
+		const clientReference = client.meta['octane:client-reference'];
+		expect(clientReference).toEqual({
+			id: 'octane-client-reference-v1:object:/src/scenes/Scene.object.tsrx',
+			moduleId: '/src/scenes/Scene.object.tsrx',
+			renderer: 'object',
+		});
+		expect(server.meta['octane:client-reference']).toEqual(clientReference);
+		expect(server.code).not.toContain('<node');
+
+		const appSource = `
+import { Canvas } from '@scene/client';
+import Scene from './scenes/Scene.object.tsrx';
+export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
+`;
+		const app = await (rendererPlugin.transform as any).call(
+			{
+				resolve: async (request: string) => ({
+					id:
+						request === './scenes/Scene.object.tsrx'
+							? sceneId
+							: join(appRoot, 'node_modules/scene-client/index.js'),
+				}),
+			},
+			appSource,
+			join(appRoot, 'src/App.tsrx'),
+			{ ssr: true },
+		);
+		expect(app.code).toContain('Canvas');
+		expect(app.code).toContain('after');
+		expect(app.code).not.toContain('Scene(');
+
+		const liveSource = appSource.replace(
+			'export function App() @{',
+			'export function App() @{ const live = Scene as unknown;',
+		);
+		await expect(
+			(rendererPlugin.transform as any).call(
+				{
+					resolve: async (request: string) => ({
+						id:
+							request === './scenes/Scene.object.tsrx'
+								? sceneId
+								: join(appRoot, 'node_modules/scene-client/index.js'),
+					}),
+				},
+				liveSource,
+				join(appRoot, 'src/LiveApp.tsrx'),
+				{ ssr: true },
+			),
+		).rejects.toMatchObject({
+			code: 'OCTANE_CLIENT_ONLY_SERVER_USE',
+			filename: '/src/LiveApp.tsrx',
+		});
+	});
+
+	it('canonicalizes client-reference identity through a symlinked Vite root', async () => {
+		const parent = mkdtempSync(join(tmpdir(), 'octane-vite-renderer-root-'));
+		try {
+			const root = join(parent, 'real-project');
+			const linkedRoot = join(parent, 'linked-project');
+			mkdirSync(join(root, 'src'), { recursive: true });
+			symlinkSync(root, linkedRoot, 'dir');
+			const rendererPlugin = octane({
+				hmr: false,
+				renderers: {
+					registry: {
+						object: {
+							module: '/src/object-renderer.js',
+							server: 'client-only',
+						},
+					},
+					rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+				},
+			});
+			(rendererPlugin.config as any)({ root: linkedRoot });
+			const sceneId = join(realpathSync(root), 'src/Scene.object.tsrx');
+			const transformed = await (rendererPlugin.transform as any).call(
+				{},
+				'export default function Scene() @{ <node /> }\n',
+				sceneId,
+			);
+
+			expect(transformed.meta['octane:client-reference']).toEqual({
+				id: 'octane-client-reference-v1:object:/src/Scene.object.tsrx',
+				moduleId: '/src/Scene.object.tsrx',
+				renderer: 'object',
+			});
+		} finally {
+			rmSync(parent, { recursive: true, force: true });
+		}
 	});
 
 	it('protects the profiling build constant throughout Vite config resolution', () => {
@@ -408,6 +607,7 @@ describe('manifest-declared manual hook slots', () => {
 			.sort();
 		expect(declared).toEqual([
 			'base-ui',
+			'dexie',
 			'dnd-kit',
 			'floating-ui',
 			'i18next',
@@ -421,9 +621,11 @@ describe('manifest-declared manual hook slots', () => {
 			'stylex',
 			'tanstack-query',
 			'tanstack-router',
+			'tanstack-store',
 			'tanstack-table',
 			'tanstack-virtual',
 			'testing-library',
+			'three',
 			'zustand',
 		]);
 	});

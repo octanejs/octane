@@ -5,6 +5,7 @@ import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
 import { octaneMdx } from './packages/mdx/src/vite.js';
 import { stylex } from './packages/stylex/src/vite.js';
+import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 
 const USER_APP_EVAL_PREFIX = '@octane-eval-submission/';
@@ -24,6 +25,42 @@ const USER_APP_EVAL_TASKS = resolve(
 	import.meta.dirname,
 	'packages/octane-evals/datasets/train/user-apps-v1/tasks',
 );
+const THREE_SOURCE = resolve(import.meta.dirname, 'packages/three/src');
+const THREE_ALIASES = [
+	{
+		// The package predates `exports`; Vitest SSR otherwise selects its CJS
+		// `main` and loads a second Three module beside the ESM test/driver graph.
+		find: /^@react-three\/fiber$/,
+		replacement: resolve(
+			import.meta.dirname,
+			'packages/three/node_modules/@react-three/fiber/dist/react-three-fiber.esm.js',
+		),
+	},
+	{
+		find: /^@octanejs\/three$/,
+		replacement: resolve(THREE_SOURCE, 'index.ts'),
+	},
+	{
+		find: /^@octanejs\/three\/core$/,
+		replacement: resolve(THREE_SOURCE, 'core/index.ts'),
+	},
+	{
+		find: /^@octanejs\/three\/renderer$/,
+		replacement: resolve(THREE_SOURCE, 'renderer.ts'),
+	},
+	{
+		find: /^@octanejs\/three\/config$/,
+		replacement: resolve(THREE_SOURCE, 'config.ts'),
+	},
+	{
+		find: /^@octanejs\/three\/testing$/,
+		replacement: resolve(THREE_SOURCE, 'testing.ts'),
+	},
+	{
+		find: /^@octanejs\/three\/intrinsics(?:\/jsx-runtime)?$/,
+		replacement: resolve(THREE_SOURCE, 'intrinsics.ts'),
+	},
+];
 const VISX_SOURCE = resolve(import.meta.dirname, 'packages/visx/src');
 const VISX_ALIASES = [
 	{
@@ -191,7 +228,46 @@ export default defineConfig({
 					// the plugin skips them automatically (nearest-manifest lookup) — the
 					// same declaration covers every project below, the website, examples,
 					// and builds.
-					octane(),
+					octane({
+						renderers: {
+							registry: {
+								object: {
+									module: 'octane/universal',
+									text: 'host',
+									capabilities: ['visibility'],
+								},
+							},
+							boundaries: {
+								'/packages/octane/tests/_fixtures/universal-owned-canvas.tsrx': {
+									Canvas: {
+										ownerRenderer: 'dom',
+										childRenderer: 'object',
+										prop: 'children',
+									},
+								},
+								'/packages/octane/tests/_fixtures/universal-renderer-boundaries.tsrx': {
+									Canvas: {
+										ownerRenderer: 'dom',
+										childRenderer: 'object',
+										prop: 'children',
+									},
+								},
+								'/packages/octane/tests/_fixtures/universal-renderer-boundaries.object.tsrx': {
+									Html: {
+										ownerRenderer: 'object',
+										childRenderer: 'dom',
+										prop: 'children',
+									},
+								},
+							},
+							rules: [
+								{
+									include: 'packages/octane/tests/_fixtures/*.object.tsrx',
+									renderer: 'object',
+								},
+							],
+						},
+					}),
 				],
 			},
 			{
@@ -217,7 +293,51 @@ export default defineConfig({
 					// prod, like React's prod bundle): they conditionalize on this.
 					env: { OCTANE_TEST_COMPILE_MODE: 'prod' },
 				},
-				plugins: [octane({ hmr: false })],
+				plugins: [
+					octane({
+						hmr: false,
+						// Exercise the default production component-region transform across
+						// the same behavioral suite; impure/logging fixtures fail its proof.
+						renderers: {
+							registry: {
+								object: {
+									module: 'octane/universal',
+									text: 'host',
+									capabilities: ['visibility'],
+								},
+							},
+							boundaries: {
+								'/packages/octane/tests/_fixtures/universal-owned-canvas.tsrx': {
+									Canvas: {
+										ownerRenderer: 'dom',
+										childRenderer: 'object',
+										prop: 'children',
+									},
+								},
+								'/packages/octane/tests/_fixtures/universal-renderer-boundaries.tsrx': {
+									Canvas: {
+										ownerRenderer: 'dom',
+										childRenderer: 'object',
+										prop: 'children',
+									},
+								},
+								'/packages/octane/tests/_fixtures/universal-renderer-boundaries.object.tsrx': {
+									Html: {
+										ownerRenderer: 'object',
+										childRenderer: 'dom',
+										prop: 'children',
+									},
+								},
+							},
+							rules: [
+								{
+									include: 'packages/octane/tests/_fixtures/*.object.tsrx',
+									renderer: 'object',
+								},
+							],
+						},
+					}),
+				],
 			},
 			{
 				// Focused production-semantics profiling build. Keeping this to the
@@ -259,6 +379,59 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/zustand\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/zustand/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'dexie',
+					include: ['packages/dexie/tests/**/*.test.ts'],
+					exclude: [
+						'packages/dexie/tests/ssr/**/*.test.ts',
+						'packages/dexie/tests/browser/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					setupFiles: ['packages/dexie/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/dexie$/,
+							replacement: resolve(import.meta.dirname, 'packages/dexie/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'dexie-browser',
+					include: ['packages/dexie/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				test: {
+					name: 'dexie-ssr',
+					include: ['packages/dexie/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dexie$/,
+							replacement: resolve(import.meta.dirname, 'packages/dexie/src/index.ts'),
 						},
 					],
 				},
@@ -829,6 +1002,18 @@ export default defineConfig({
 						},
 					],
 				},
+			},
+			{
+				test: {
+					name: 'three',
+					include: ['packages/three/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/three/tests/_react-setup.ts'],
+					globals: false,
+					server: { deps: { inline: ['@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: THREE_RENDERERS })],
+				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
 			},
 			{
 				test: {

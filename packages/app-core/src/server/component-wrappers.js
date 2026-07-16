@@ -69,6 +69,22 @@ export function createLayoutWrapper(Layout, Page, pageProps) {
 export function createRootBoundaryWrapper(Content, boundary, runtime) {
 	let body = Content;
 
+	// Compose the catch boundary closest to the route. A Suspense boundary is
+	// allowed to retain its pending shell when an unhandled server render error
+	// reaches it, so putting Suspense inside ErrorBoundary would prevent the
+	// configured catch component from observing ordinary route errors.
+	if (boundary.catch) {
+		const child = body;
+		const Catch = boundary.catch;
+		body = function RootErrorBoundary(props, scope) {
+			const children = (/** @type {any} */ _props, /** @type {any} */ childScope) =>
+				child(props, childScope, undefined);
+			const fallback = (/** @type {unknown} */ error, /** @type {() => void} */ reset) =>
+				runtime.createElement(Catch, { error, reset });
+			return runtime.ErrorBoundary({ fallback, children }, scope, undefined);
+		};
+	}
+
 	if (boundary.pending) {
 		const child = body;
 		const Pending = boundary.pending;
@@ -80,18 +96,6 @@ export function createRootBoundaryWrapper(Content, boundary, runtime) {
 				scope,
 				undefined,
 			);
-		};
-	}
-
-	if (boundary.catch) {
-		const child = body;
-		const Catch = boundary.catch;
-		body = function RootErrorBoundary(props, scope) {
-			const children = (/** @type {any} */ _props, /** @type {any} */ childScope) =>
-				child(props, childScope, undefined);
-			const fallback = (/** @type {unknown} */ error, /** @type {() => void} */ reset) =>
-				runtime.createElement(Catch, { error, reset });
-			return runtime.ErrorBoundary({ fallback, children }, scope, undefined);
 		};
 	}
 

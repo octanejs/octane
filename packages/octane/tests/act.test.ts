@@ -5,9 +5,9 @@
 //   - the warning text mirrors React's so port-from-React tests recognise it
 //   - act() always returns a Promise; awaits drain microtasks + passive effects to quiescence
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, flushSync, setIsOctaneActEnvironment } from '../src/index.js';
+import { act, createRoot, flushSync, setIsOctaneActEnvironment } from '../src/index.js';
 import { mount } from './_helpers';
-import Counter, { bump } from './_fixtures/act-warning.tsrx';
+import Counter, { ActLayoutLoop, bump } from './_fixtures/act-warning.tsrx';
 
 describe('act() — React-parity contract', () => {
 	let errSpy: ReturnType<typeof vi.spyOn>;
@@ -82,7 +82,7 @@ describe('act() — React-parity contract', () => {
 		r.unmount();
 	});
 
-	it('actScopeDepth is correctly decremented on exception (warning still suppressed after throw)', async () => {
+	it('callback failure releases the act scope and restores outside-act warnings', async () => {
 		setIsOctaneActEnvironment(true);
 		const r = mount(Counter);
 		errSpy.mockClear();
@@ -96,6 +96,32 @@ describe('act() — React-parity contract', () => {
 		flushSync(() => {});
 		expect(errSpy).toHaveBeenCalled();
 		r.unmount();
+	});
+
+	it('a synchronous drain failure releases the act scope before rejecting', async () => {
+		setIsOctaneActEnvironment(true);
+		const counter = mount(Counter);
+		const loopContainer = document.createElement('div');
+		document.body.appendChild(loopContainer);
+		const loopRoot = createRoot(loopContainer);
+		errSpy.mockClear();
+
+		await expect(act(() => loopRoot.render(ActLayoutLoop))).rejects.toThrow(
+			/Maximum update depth exceeded/,
+		);
+
+		// A post-failure update is outside act. If the synchronous error leaked the
+		// scope depth, this diagnostic would remain incorrectly suppressed.
+		errSpy.mockClear();
+		bump();
+		flushSync(() => {});
+		expect(errSpy.mock.calls.some(([message]) => String(message).includes('not wrapped'))).toBe(
+			true,
+		);
+
+		loopRoot.unmount();
+		loopContainer.remove();
+		counter.unmount();
 	});
 
 	it('nested act() — inner failure does not unbalance the outer scope', async () => {

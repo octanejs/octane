@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
+	CLIENT_REFERENCE_MANIFEST_FILENAME,
+	CLIENT_REFERENCE_MANIFEST_VERSION,
 	OCTANE_RUNTIME_REQUESTS,
 	canonicalModuleId,
+	createClientReferenceManifest,
 	createOctaneCompiler,
 	resolveOctaneRuntimeRequest,
 } from '../src/compiler/bundler.js';
@@ -27,6 +31,51 @@ function profileFiles(code: string | undefined): Set<string> {
 }
 
 describe('bundler-neutral compiler integration', () => {
+	it('normalizes the canonical cross-adapter client-reference manifest', () => {
+		const first = {
+			id: 'octane-client-reference-v1:object:/src/First.object.tsrx',
+			moduleId: '/src/First.object.tsrx',
+			renderer: 'object',
+		};
+		const second = {
+			id: 'octane-client-reference-v1:object:/src/Second.object.tsrx',
+			moduleId: '/src/Second.object.tsrx',
+			renderer: 'object',
+		};
+		expect(CLIENT_REFERENCE_MANIFEST_FILENAME).toBe('octane-client-references.json');
+		expect(
+			createClientReferenceManifest([
+				{ reference: second, chunks: ['assets/z.js'] },
+				{ reference: first, chunks: ['assets/b.js', 'assets/a.js'] },
+				{ reference: first, chunks: ['assets/a.js', 'assets/c.js'] },
+				{ reference: second, chunks: [] },
+			]),
+		).toEqual({
+			version: CLIENT_REFERENCE_MANIFEST_VERSION,
+			references: {
+				[first.id]: {
+					moduleId: first.moduleId,
+					renderer: first.renderer,
+					chunks: ['assets/a.js', 'assets/b.js', 'assets/c.js'],
+				},
+				[second.id]: {
+					moduleId: second.moduleId,
+					renderer: second.renderer,
+					chunks: ['assets/z.js'],
+				},
+			},
+		});
+		expect(() =>
+			createClientReferenceManifest([
+				{ reference: first, chunks: ['one.js'] },
+				{
+					reference: { ...first, moduleId: '/src/Conflicting.object.tsrx' },
+					chunks: ['two.js'],
+				},
+			]),
+		).toThrow(/Conflicting Octane client-reference metadata/);
+	});
+
 	it('canonicalizes root files and strips bundler queries', () => {
 		const root = resolve('/project');
 		expect(canonicalModuleId(resolve(root, 'src/App.tsrx') + '?v=1#used', root)).toBe(
@@ -58,6 +107,302 @@ describe('bundler-neutral compiler integration', () => {
 		expect(server?.kind).toBe('compile');
 		expect(server?.code).toContain("from 'octane/server'");
 		expect(server?.code).not.toContain('webpackHot');
+	});
+
+	it('selects a universal renderer by canonical filename without changing DOM output', () => {
+		const legacy = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const configured = createOctaneCompiler({
+			root: '/project',
+			hmr: false,
+			dev: false,
+			renderers: {
+				registry: { object: '/src/object-renderer.js' },
+				boundaries: {
+					'/src/object-boundaries.js': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'object',
+							prop: 'children',
+						},
+					},
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+
+		const legacyDom = legacy.transform(COMPONENT, '/project/src/App.tsrx');
+		const configuredDom = configured.transform(COMPONENT, '/project/src/App.tsrx');
+		expect(configuredDom?.renderer).toEqual({
+			id: 'dom',
+			module: 'octane',
+			target: 'dom',
+			server: 'render',
+			text: 'host',
+			capabilities: [],
+		});
+		// DOM output identity is an explicit compatibility gate for renderer selection.
+		expect(configuredDom?.code).toBe(legacyDom?.code);
+
+		const objectSource = 'export function Scene() @{ <node label="object" /> }\n';
+		const object = configured.transform(objectSource, '/project/src/scenes/Scene.object.tsrx?used');
+		expect(object?.renderer).toEqual({
+			id: 'object',
+			module: '/src/object-renderer.js',
+			target: 'universal',
+			server: 'unsupported',
+			text: 'reject',
+			capabilities: [],
+		});
+		expect(object?.code).toMatch(/from ["']\/src\/object-renderer\.js["']/);
+	});
+
+	it('emits identical client-reference identity and an inert server stub for client-only modules', async () => {
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			hmr: false,
+			renderers: {
+				registry: {
+					object: {
+						module: '/src/object-renderer.js',
+						server: 'client-only',
+					},
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		const source = `
+import './authored-setup.js';
+globalThis.__clientOnlyAuthoredSetup = true;
+export const metadata = 'client';
+export default function Scene() @{ <node /> }
+export function Named() @{ <node /> }
+`;
+		const id = '/project/src/scenes/Scene.object.tsrx';
+		const client = compiler.transform(source, id, { environment: 'client' });
+		const server = compiler.transform(source, id, { environment: 'server' });
+
+		expect(client).toMatchObject({
+			kind: 'compile',
+			clientReference: {
+				moduleId: '/src/scenes/Scene.object.tsrx',
+				renderer: 'object',
+			},
+		});
+		expect(server).toMatchObject({
+			kind: 'client-only-stub',
+			clientOnlyExports: ['Named', 'default', 'metadata'],
+			clientReference: client?.clientReference,
+		});
+		expect(server?.code).not.toContain('authored-setup');
+		expect(server?.code).not.toContain('__clientOnlyAuthoredSetup');
+		expect(server?.code).not.toContain("'client'");
+		expect(server?.code.match(/^\t\tset: fail,$/gm)).toHaveLength(1);
+
+		const stubUrl = `data:text/javascript;base64,${Buffer.from(server!.code).toString('base64')}`;
+		const execution = spawnSync(
+			process.execPath,
+			[
+				'--input-type=module',
+				'-e',
+				`const stub = await import(${JSON.stringify(stubUrl)}); try { stub.default(); } catch (error) { console.log(JSON.stringify({ keys: Object.keys(stub).sort(), code: error.code, filename: error.filename, message: error.message })); }`,
+			],
+			{ encoding: 'utf8' },
+		);
+		expect(execution.status).toBe(0);
+		const useError = JSON.parse(execution.stdout.trim());
+		expect(useError).toMatchObject({
+			keys: ['Named', 'default', 'metadata'],
+			code: 'OCTANE_CLIENT_ONLY_SERVER_USE',
+			filename: '/src/scenes/Scene.object.tsrx',
+		});
+		expect(useError.message).toMatch(/client-only export "default".*renderer "object"/i);
+	});
+
+	it('fails closed when a client-only renderer rule selects source outside the stub contract', () => {
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			renderers: {
+				registry: {
+					object: {
+						module: '/src/object-renderer.js',
+						server: 'client-only',
+					},
+				},
+				rules: [{ include: 'src/scenes/**', renderer: 'object' }],
+			},
+		});
+		for (const classify of [
+			() => compiler.clientReferenceForFile('/project/src/scenes/setup.ts'),
+			() =>
+				compiler.transform('export const setup = true;\n', '/project/src/scenes/setup.ts', {
+					environment: 'server',
+				}),
+		]) {
+			let error: any;
+			try {
+				classify();
+			} catch (cause) {
+				error = cause;
+			}
+			expect(error).toMatchObject({
+				code: 'OCTANE_CLIENT_ONLY_SOURCE_UNSUPPORTED',
+				filename: '/src/scenes/setup.ts',
+			});
+			expect(error.message).toMatch(/server: "client-only".*\.tsrx.*\.tsx/s);
+		}
+	});
+
+	it('preserves runtime TypeScript namespace and export-import names without type-only exports', () => {
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			renderers: {
+				registry: {
+					object: { module: '/src/object-renderer.js', server: 'client-only' },
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		const source = `
+export namespace RuntimeNamespace { export const value = 1 }
+export import RuntimeAlias = require('./authored-runtime.js');
+export default interface ErasedShape { value: string }
+`;
+		const server = compiler.transform(source, '/project/src/Scene.object.tsrx', {
+			environment: 'server',
+		});
+		expect(server).toMatchObject({
+			kind: 'client-only-stub',
+			clientOnlyExports: ['RuntimeAlias', 'RuntimeNamespace'],
+		});
+		expect(server?.code).not.toContain('authored-runtime');
+
+		let error: any;
+		try {
+			compiler.transform('const value = 1; export = value;\n', '/project/src/Legacy.object.tsrx', {
+				environment: 'server',
+			});
+		} catch (cause) {
+			error = cause;
+		}
+		expect(error).toMatchObject({ code: 'OCTANE_CLIENT_ONLY_EXPORT_ASSIGNMENT_UNSUPPORTED' });
+	});
+
+	it('rejects client-only bindings that remain live in ordinary server modules', () => {
+		const compiler = createOctaneCompiler({ root: '/project' });
+		const clientOnlyImports = [
+			{
+				request: './Scene.object.tsrx',
+				resolvedId: '/project/src/Scene.object.tsrx',
+				reference: {
+					id: 'octane-client-reference-v1:object:/src/Scene.object.tsrx',
+					moduleId: '/src/Scene.object.tsrx',
+					renderer: 'object',
+				},
+			},
+		];
+		let error: any;
+		try {
+			compiler.transform(
+				"import Scene from './Scene.object.tsrx';\nexport const live = Scene as unknown;\n",
+				'/project/src/leak.ts',
+				{ environment: 'server', clientOnlyImports },
+			);
+		} catch (cause) {
+			error = cause;
+		}
+		expect(error).toMatchObject({
+			code: 'OCTANE_CLIENT_ONLY_SERVER_USE',
+			filename: '/src/leak.ts',
+			loc: { line: 2 },
+		});
+		expect(error.message).toMatch(/Scene\.object\.tsrx.*server: "omit-child"/s);
+	});
+
+	it.each([
+		['enum initializer', 'enum Value { SceneValue = Scene }'],
+		['namespace initializer', 'namespace Value { export const scene = Scene }'],
+		['export assignment', 'export = Scene'],
+		['import-equals alias', 'import Alias = Scene.Member'],
+		['parameter-property default', 'class Value { constructor(public scene = Scene) {} }'],
+		['computed parameter key', 'function read({ [Scene]: value }) { return value }'],
+		[
+			'parameter default before body var',
+			'function read(value = Scene) { var Scene; return value }',
+		],
+		[
+			'body use outside a nested class static var',
+			'function read() { class Local { static { var Scene } } return Scene }',
+		],
+	])('rejects a client-only binding in a runtime TypeScript %s', (_name, statement) => {
+		const compiler = createOctaneCompiler({ root: '/project' });
+		expect(() =>
+			compiler.transform(
+				`import Scene from './Scene.object.tsrx';\n${statement}\n`,
+				'/project/src/leak.ts',
+				{
+					environment: 'server',
+					clientOnlyImports: [
+						{
+							request: './Scene.object.tsrx',
+							resolvedId: '/project/src/Scene.object.tsrx',
+							reference: {
+								id: 'octane-client-reference-v1:object:/src/Scene.object.tsrx',
+								moduleId: '/src/Scene.object.tsrx',
+								renderer: 'object',
+							},
+						},
+					],
+				},
+			),
+		).toThrow(/Client-only export "default".*server: "omit-child"/s);
+	});
+
+	it('allows a named class expression to shadow a client-only import in its own body', () => {
+		const compiler = createOctaneCompiler({ root: '/project' });
+		expect(() =>
+			compiler.transform(
+				"import Scene from './Scene.object.tsrx';\nexport const Local = class Scene { static current = Scene };\n",
+				'/project/src/shadow.ts',
+				{
+					environment: 'server',
+					clientOnlyImports: [
+						{
+							request: './Scene.object.tsrx',
+							resolvedId: '/project/src/Scene.object.tsrx',
+							reference: {
+								id: 'octane-client-reference-v1:object:/src/Scene.object.tsrx',
+								moduleId: '/src/Scene.object.tsrx',
+								renderer: 'object',
+							},
+						},
+					],
+				},
+			),
+		).not.toThrow();
+	});
+
+	it('classifies TypeScript import-equals requests and rejects their live server aliases', () => {
+		const compiler = createOctaneCompiler({ root: '/project' });
+		const source = "import Scene = require('./Scene.object.tsrx');\nexport const live = Scene;\n";
+		expect(compiler.findServerImportRequests(source, '/project/src/leak.ts')).toEqual([
+			'./Scene.object.tsrx',
+		]);
+		expect(() =>
+			compiler.transform(source, '/project/src/leak.ts', {
+				environment: 'server',
+				clientOnlyImports: [
+					{
+						request: './Scene.object.tsrx',
+						resolvedId: '/project/src/Scene.object.tsrx',
+						reference: {
+							id: 'octane-client-reference-v1:object:/src/Scene.object.tsrx',
+							moduleId: '/src/Scene.object.tsrx',
+							renderer: 'object',
+						},
+					},
+				],
+			}),
+		).toThrow(/Client-only export "\*".*server: "omit-child"/s);
 	});
 
 	it('specializes only disposable production roots with proven void imports', () => {
@@ -294,7 +639,7 @@ describe('bundler-neutral compiler integration', () => {
 				rawOctane.source,
 			);
 			expect(compiled?.kind).toBe('compile');
-			expect(compiled?.code).toContain('_$template("<p>octane</p>")');
+			expect(compiled?.code).toContain('<p>octane</p>');
 			expect(compiled?.dependencies).toContain(rawOctane.manifest);
 		} finally {
 			rmSync(fixtureRoot, { recursive: true, force: true });
@@ -380,7 +725,13 @@ describe('bundler-neutral compiler integration', () => {
 			const projectManifest = join(root, 'package.json');
 			writeFileSync(
 				projectManifest,
-				JSON.stringify({ name: 'app', dependencies: { 'raw-octane': '1.0.0' } }),
+				JSON.stringify({
+					name: 'app',
+					dependencies: {
+						'@identity-sensitive/app-extension': '1.0.0',
+						'raw-octane': '1.0.0',
+					},
+				}),
 			);
 			const packageRoot = join(root, 'node_modules/raw-octane');
 			mkdirSync(packageRoot, { recursive: true });
@@ -390,8 +741,27 @@ describe('bundler-neutral compiler integration', () => {
 				JSON.stringify({
 					name: 'raw-octane',
 					main: 'index.js',
+					dependencies: {
+						'@identity-sensitive/binding-extension': '1.0.0',
+						'identity-sensitive-core': '1.0.0',
+					},
 					peerDependencies: { octane: '*' },
 					optionalDependencies: { 'missing-child': '1.0.0' },
+					octane: {
+						vite: {
+							optimizeDeps: {
+								exclude: [
+									'@identity-sensitive/*',
+									'@identity-sensitive/*',
+									'identity-sensitive-core',
+									'identity-sensitive-core',
+									'',
+									' padded ',
+									42,
+								],
+							},
+						},
+					},
 				}),
 			);
 			writeFileSync(join(packageRoot, 'index.js'), 'export const value = 1;\n');
@@ -399,6 +769,11 @@ describe('bundler-neutral compiler integration', () => {
 			const discovered = createOctaneCompiler({ root }).discoverSourceDependencies();
 			const resolvedPackageRoot = realpathSync(packageRoot);
 			expect(discovered.packages).toEqual(['raw-octane']);
+			expect(discovered.viteOptimizeDepsExclusions).toEqual([
+				'@identity-sensitive/app-extension',
+				'@identity-sensitive/binding-extension',
+				'identity-sensitive-core',
+			]);
 			expect(discovered.dependencies).toEqual(
 				expect.arrayContaining([projectManifest, join(resolvedPackageRoot, 'package.json')]),
 			);

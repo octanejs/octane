@@ -123,10 +123,10 @@ describe('creation and tuple hooks', () => {
 
 		store.setState({ value: 1, meta: 1 });
 		await nextPaint();
-		expect(result.find('#legacy').textContent).toBe('1');
+		expect(result.find('#legacy').textContent).toBe('1/0');
 		store.setState({ value: 2, meta: 1 });
 		await nextPaint();
-		expect(result.find('#legacy').textContent).toBe('2');
+		expect(result.find('#legacy').textContent).toBe('2/1');
 		result.unmount();
 	});
 });

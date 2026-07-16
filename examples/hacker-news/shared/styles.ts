@@ -237,8 +237,7 @@ export const styles = stylex.create({
 		transformOrigin: 'left',
 	},
 	// A single placeholder story row: a wide title bar + a thin meta bar, with a
-	// subtle pulse. Used as each row's Suspense fallback and (stacked) as the
-	// route-level pending skeleton.
+	// subtle pulse. Pending.tsx/tsrx stack these for the route-level fallback.
 	skeletonRow: {
 		paddingTop: 6,
 		paddingBottom: 6,

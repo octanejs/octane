@@ -58,6 +58,8 @@ overrides:
 catalogs:
   default:
     '@apollo/client': 4.2.6
+    dexie: 4.4.4
+    fake-indexeddb: 6.2.5
     '@graphql-typed-document-node/core': ^3.1.1
     '@lucide/icons': 1.24.0
     '@babel/core': 7.29.7
@@ -122,8 +124,8 @@ catalogs:
     '@testing-library/jest-dom': ^6.9.1
     '@vitest/coverage-istanbul': 4.1.9
     '@vitest/coverage-v8': 4.1.9
-    '@tsrx/core': ^0.1.37
-    '@tsrx/prettier-plugin': ^0.3.95
+    '@tsrx/core': ^0.1.40
+    '@tsrx/prettier-plugin': ^0.3.97
     '@tsrx/ripple': ^0.1.38
     '@tsrx/react': ^0.2.37
     '@tsrx/solid': ^0.1.37
@@ -150,12 +152,14 @@ catalogs:
     '@types/node': ^24.3.0
     '@types/react': ^19.0.0
     '@types/react-dom': ^19.0.0
+    '@types/three': 0.172.0
     '@wry/equality': ^0.5.6
     '@wry/trie': ^0.5.0
     '@preact/preset-vite': ^2.10.5
     '@sveltejs/vite-plugin-svelte': ^7.2.0
     '@vitejs/plugin-react': ^6.0.2
     '@juggle/resize-observer': ^3.4.0
+    '@react-three/fiber': 9.6.1
     '@react-spring/web': ^10.0.0
     '@visx/chord': 4.0.0
     '@visx/annotation': 4.0.0
@@ -247,6 +251,7 @@ catalogs:
     svelte: ^5.56.4
     svelte-check: ^4.7.2
     terser: ^5.31.0
+    three: 0.172.0
     type-fest: ^5.6.0
     typescript: ^5.9.3
     vite: ^8.0.16

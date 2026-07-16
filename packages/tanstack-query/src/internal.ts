@@ -1,5 +1,6 @@
 // Shared internals for the binding hooks.
 import { shouldThrowError } from '@tanstack/query-core';
+import { use, useRef } from 'octane';
 
 // Derive a stable, distinct sub-slot from a wrapper's compiler-injected slot, so
 // a hook composing multiple base hooks gives each one its own identity. Tags are
@@ -87,6 +88,47 @@ export function fetchOptimistic(
 	return observer.fetchOptimistic(defaultedOptions).catch(() => {
 		errorResetBoundary.clearReset();
 	});
+}
+
+type SuspensePromise = PromiseLike<unknown> & {
+	status?: 'pending' | 'fulfilled' | 'rejected';
+};
+
+interface SuspensePromiseCache {
+	key: unknown;
+	promise: SuspensePromise | undefined;
+}
+
+/**
+ * Suspend through a stable `use()` occurrence for one query-hook call site.
+ *
+ * `use()` tracks thenables by dynamic call order. A component with two
+ * sequential suspense queries initially reaches only the first query; when it
+ * resolves, the first query no longer needs to suspend and the second query is
+ * reached for the first time. If the first call simply skips `use()`, the
+ * second query takes its call-order position and replay reuses the first
+ * query's fulfilled promise, exposing the second query's still-pending result.
+ *
+ * Retain the promise that suspended this query hook and keep reading it after
+ * it settles. That reserves the query hook's call-order position throughout
+ * the replay episode. A new query key or retry replaces a settled promise;
+ * re-renders during the same pending fetch reuse the in-flight promise.
+ */
+export function useSuspensePromise(
+	shouldSuspend: boolean,
+	key: unknown,
+	createPromise: () => PromiseLike<unknown>,
+	slot: symbol | undefined,
+): void {
+	const cache = useRef<SuspensePromiseCache>({ key: undefined, promise: undefined }, slot).current;
+	if (
+		shouldSuspend &&
+		(cache.promise === undefined || cache.key !== key || cache.promise.status !== 'pending')
+	) {
+		cache.key = key;
+		cache.promise = createPromise() as SuspensePromise;
+	}
+	if (cache.promise !== undefined) use(cache.promise);
 }
 
 // react-query's getHasError: only throw if the query errored, the boundary isn't

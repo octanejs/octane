@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/rsbuild-plugin",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -60,6 +60,7 @@
     "@rspack/core": "catalog:default",
     "@types/node": "catalog:default",
     "octane": "workspace:*",
+    "playwright": "catalog:default",
     "type-fest": "catalog:default",
     "vitest": "catalog:default"
   }
