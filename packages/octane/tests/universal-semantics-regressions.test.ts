@@ -502,7 +502,7 @@ describe('universal runtime semantic regressions', () => {
 		const container = createObjectContainer();
 		const driver =
 			failure === 'capability validation'
-				? { ...createObjectDriver(), capabilities: new Set<string>() }
+				? { ...createObjectDriver(), capabilities: { text: 'reject' as const } }
 				: createObjectDriver();
 		const root = createUniversalRoot(container, driver);
 		let state:
@@ -529,7 +529,7 @@ describe('universal runtime semantic regressions', () => {
 
 		expect(() => root.render(Component, props)).toThrow(
 			failure === 'capability validation'
-				? /does not declare the text capability/
+				? /rejects primitive text children/
 				: /Duplicate universal child key same/,
 		);
 		expect(container.commits).toHaveLength(0);

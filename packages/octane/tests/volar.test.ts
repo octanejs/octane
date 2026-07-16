@@ -1,5 +1,19 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
 import { compileToVolarMappings } from 'octane/compiler/volar';
+
+const OBJECT_RENDERERS = {
+	registry: {
+		object: {
+			module: '@fixture/object-renderer',
+			intrinsics: '@fixture/object-intrinsics',
+		},
+	},
+	rules: [{ include: '**/*.object.tsrx', renderer: 'object' }],
+};
 
 /**
  * Volar mappings tests. We exercise the IDE-facing virtual-TSX pipeline:
@@ -59,6 +73,131 @@ describe('compileToVolarMappings', () => {
 			expect(Array.isArray(m.lengths)).toBe(true);
 			expect(m.sourceOffsets.length).toBe(m.generatedOffsets.length);
 			expect(m.data).toBeDefined();
+		}
+	});
+
+	it('selects renderer intrinsics by canonical filename and shifts virtual-code mappings', () => {
+		const src = 'export function Scene() @{ <line path="route"><mesh /></line> }\n';
+		const baseline = compileToVolarMappings(src, '/src/Scene.object.tsrx');
+		const object = compileToVolarMappings(src, String.raw`\src\Scene.object.tsrx?used`, {
+			renderers: OBJECT_RENDERERS,
+		});
+		const dom = compileToVolarMappings(src, '/src/Scene.tsrx', {
+			renderers: OBJECT_RENDERERS,
+		});
+		const prelude = '/** @jsxImportSource @fixture/object-intrinsics */\n';
+
+		expect(object.code.startsWith(prelude)).toBe(true);
+		expect(dom.code).not.toContain('@jsxImportSource');
+		expect(object.code.slice(prelude.length)).toBe(baseline.code);
+		expect(object.mappings).toHaveLength(baseline.mappings.length);
+		for (let index = 0; index < object.mappings.length; index++) {
+			expect(object.mappings[index].sourceOffsets).toEqual(baseline.mappings[index].sourceOffsets);
+			expect(object.mappings[index].generatedOffsets).toEqual(
+				baseline.mappings[index].generatedOffsets.map((offset) => offset + prelude.length),
+			);
+		}
+	});
+
+	it('keeps conflicting DOM and renderer intrinsic types isolated per virtual file', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-renderers-'));
+		try {
+			const moduleRoot = join(root, 'node_modules/@fixture/object-intrinsics');
+			mkdirSync(moduleRoot, { recursive: true });
+			writeFileSync(
+				join(moduleRoot, 'package.json'),
+				JSON.stringify({
+					name: '@fixture/object-intrinsics',
+					exports: { './jsx-runtime': './jsx-runtime.d.ts' },
+				}),
+			);
+			writeFileSync(
+				join(moduleRoot, 'jsx-runtime.d.ts'),
+				`export namespace JSX {
+	interface IntrinsicElements {
+		line: { path: number };
+		path: { vertices: number };
+		audio: { listener: number };
+		source: { buffer: number };
+		mesh: { objectOnly?: boolean };
+	}
+}
+`,
+			);
+			writeFileSync(
+				join(root, 'dom-intrinsics.d.ts'),
+				`declare namespace JSX {
+	interface IntrinsicElements {
+		line: { path: string };
+		path: { d: string };
+		audio: { src: string };
+		source: { src: string };
+		mesh: { domOnly?: boolean };
+	}
+}
+`,
+			);
+			const augmentationFile = join(root, 'object-augmentation.d.ts');
+			writeFileSync(
+				augmentationFile,
+				`import '@fixture/object-intrinsics/jsx-runtime';
+declare module '@fixture/object-intrinsics/jsx-runtime' {
+	namespace JSX {
+		interface IntrinsicElements {
+			customThing: { custom: string };
+		}
+	}
+}
+`,
+			);
+
+			const dom = compileToVolarMappings(
+				'export function DomScene() @{ <><line path="route"><mesh domOnly /></line><path d="M0 0" /><audio src="tone.mp3" /><source src="tone.ogg" /></> }\n',
+				'/src/DomScene.tsrx',
+				{ renderers: OBJECT_RENDERERS },
+			);
+			const object = compileToVolarMappings(
+				'export function ObjectScene() @{ <><line path={1}><mesh objectOnly /></line><path vertices={3} /><audio listener={1} /><source buffer={2} /><customThing custom="augmented" /></> }\n',
+				'/src/ObjectScene.object.tsrx',
+				{ renderers: OBJECT_RENDERERS },
+			);
+			const invalidDom = compileToVolarMappings(
+				'export function InvalidDomScene() @{ <customThing custom="dom" /> }\n',
+				'/src/InvalidDomScene.tsrx',
+				{ renderers: OBJECT_RENDERERS },
+			);
+			const domFile = join(root, 'DomScene.tsx');
+			const objectFile = join(root, 'ObjectScene.tsx');
+			const invalidDomFile = join(root, 'InvalidDomScene.tsx');
+			writeFileSync(domFile, dom.code);
+			writeFileSync(objectFile, object.code);
+			writeFileSync(invalidDomFile, invalidDom.code);
+
+			const program = ts.createProgram({
+				rootNames: [
+					join(root, 'dom-intrinsics.d.ts'),
+					augmentationFile,
+					domFile,
+					objectFile,
+					invalidDomFile,
+				],
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+				},
+			});
+			const diagnostics = ts.getPreEmitDiagnostics(program);
+			expect(diagnostics).toHaveLength(1);
+			expect(diagnostics[0].file?.fileName).toBe(invalidDomFile);
+			expect(ts.flattenDiagnosticMessageText(diagnostics[0].messageText, '\n')).toMatch(
+				/customThing.*JSX\.IntrinsicElements/,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 

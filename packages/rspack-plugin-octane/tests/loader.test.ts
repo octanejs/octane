@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
 	canonicalModuleId: vi.fn(),
+	cleanModuleId: vi.fn(),
 	createOctaneCompiler: vi.fn(),
 	transform: vi.fn(),
 }));
 
 vi.mock('octane/compiler/bundler', () => ({
 	canonicalModuleId: mocks.canonicalModuleId,
+	cleanModuleId: mocks.cleanModuleId,
 	createOctaneCompiler: mocks.createOctaneCompiler,
 }));
 
@@ -68,6 +70,7 @@ describe('octane Rspack loader', () => {
 	beforeEach(() => {
 		mocks.transform.mockReset();
 		mocks.canonicalModuleId.mockReset().mockReturnValue('/src/App.tsrx');
+		mocks.cleanModuleId.mockReset().mockImplementation((id: string) => id.replace(/[?#].*$/, ''));
 		mocks.createOctaneCompiler.mockReset().mockImplementation(() => ({
 			transform: mocks.transform,
 		}));
@@ -107,7 +110,10 @@ describe('octane Rspack loader', () => {
 				root: '/project',
 				renderers: expect.objectContaining({
 					registry: expect.objectContaining({
-						object: { module: '/src/object-renderer.js', target: 'universal' },
+						object: expect.objectContaining({
+							module: '/src/object-renderer.js',
+							target: 'universal',
+						}),
 					}),
 					boundaries: {
 						'/src/object-boundaries.js': {
