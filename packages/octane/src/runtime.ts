@@ -4497,6 +4497,12 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 // ---------------------------------------------------------------------------
 
 const CONTEXT_TAG = Symbol.for('octane.context');
+// Compiler-owned output caches compare their own lexical dependencies, but a
+// Provider update is propagated lazily through the already-mounted Block tree
+// rather than scheduling every consumer. One module-wide epoch lets generated
+// cache guards notice that exceptional channel without retaining any concrete
+// Context, boundary, or component identity in the runtime.
+let COMPILER_CACHE_CONTEXT_EPOCH = 0;
 
 export interface Context<T> {
 	$$kind: typeof CONTEXT_TAG;
@@ -4534,6 +4540,7 @@ export function createContext<T>(defaultValue: T): Context<T> {
 		// over-invalidate every memo'd consumer of this context elsewhere.)
 		if (scope.$$ctxValues.has(ctx) && !Object.is(scope.$$ctxValues.get(ctx), props.value)) {
 			ctx.$$version++;
+			COMPILER_CACHE_CONTEXT_EPOCH++;
 		}
 		scope.$$ctxValues.set(ctx, props.value);
 		// Children between the Provider tags reach us in one of two shapes:
@@ -4565,6 +4572,7 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 	// Bump the version only when an existing value actually changes (see Provider).
 	if (scope.$$ctxValues.has(context) && !Object.is(scope.$$ctxValues.get(context), value)) {
 		context.$$version++;
+		COMPILER_CACHE_CONTEXT_EPOCH++;
 	}
 	scope.$$ctxValues.set(context, value);
 }
@@ -4726,6 +4734,17 @@ export function use<T>(usable: Context<T> | PromiseLike<T> | TrackedThenable<T>)
 		throw new Error('use(): argument is not a Context nor a thenable');
 	}
 	return useThenable(usable as TrackedThenable<T>);
+}
+
+/**
+ * Internal renderer-boundary variant of `use(thenable)`. A universal root owns
+ * and memoizes each suspended attempt, so a different thenable on resume is an
+ * authoritative next dependency rather than an uncached user promise. Replace
+ * the stored thenable even during resume replay so a sequential A -> B
+ * suspension keeps the outer host fallback visible until B settles.
+ */
+export function useRendererThenable<T>(thenable: PromiseLike<T>): T {
+	return useThenable(thenable as TrackedThenable<T>, true);
 }
 
 /**
@@ -5015,7 +5034,7 @@ function observeHydrationSeedThenable(thenable: TrackedThenable<unknown>): void 
 	);
 }
 
-function useThenable<T>(thenable: TrackedThenable<T>): T {
+function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): T {
 	const block = CURRENT_BLOCK!;
 	const state: TrackedThenable<any>[] = ((block as any).__thenables ??= []);
 	const idx = block.__thenableIdx;
@@ -5066,7 +5085,7 @@ function useThenable<T>(thenable: TrackedThenable<T>): T {
 	// eliminates). Without this, a fresh promise per replay re-suspends
 	// forever. Normal renders (updates with genuinely new promises) take the
 	// replacement path below unchanged.
-	if (stored !== undefined && RESUME_REPLAY) {
+	if (stored !== undefined && RESUME_REPLAY && !replaceOnResume) {
 		if (process.env.NODE_ENV !== 'production') warnUncachedUsePromise(block);
 		if (stored.status === 'fulfilled') return stored.value as T;
 		if (stored.status === 'rejected') throw stored.reason;
@@ -13103,6 +13122,37 @@ function refreshBlockForContext(block: Block): void {
 	}
 }
 
+/**
+ * Compiler ABI for a flat output-cache hit. Context consumers are normally
+ * reached while their parent slot reconciles; a cache hit intentionally skips
+ * that reconciliation, so an intervening Provider commit must refresh the
+ * slot's existing Block(s) directly. The common path is one numeric equality
+ * check. `previous === undefined` snapshots the epoch after a cache miss
+ * without refreshing the freshly-rendered subtree.
+ * @internal
+ */
+export function compilerCacheContext(
+	scope: Scope,
+	slotKey: number,
+	previous: number | undefined,
+): number {
+	const current = COMPILER_CACHE_CONTEXT_EPOCH;
+	if (previous === undefined || previous === current) return current;
+	const slot = scope.slots[slotKey];
+	if (slot === undefined || slot === null) return current;
+	if (slot.__kind === 'forBlockSlot') {
+		for (const item of slot.items.values()) refreshBlockForContext(item);
+		if (slot.emptyBlock) refreshBlockForContext(slot.emptyBlock);
+	} else if (slot.block) {
+		refreshBlockForContext(slot.block);
+	} else if (slot.__kind === 'childSlot' && slot.forSlot) {
+		for (const item of slot.forSlot.items.values()) refreshBlockForContext(item);
+	} else if (slot.__kind === 'childSlot' && slot.portal?.block) {
+		refreshBlockForContext(slot.portal.block);
+	}
+	return current;
+}
+
 const hasOwnProp = Object.prototype.hasOwnProperty;
 const OBJ_PROTO = Object.prototype;
 
@@ -13464,25 +13514,21 @@ export function tryBlock(
 		s.block!.props = { err: s.err, reset: () => requestReset(s) };
 		s.block!.extra = s.env;
 		renderBlock(s.block!);
+	} else if (s.branch === 2 && s.tryBlock && !s.tryBlock.disposed && s.savedDom) {
+		// Parent props can supersede the promise that originally hid this body.
+		// Retry the preserved tree now so already-ready replacement data reveals
+		// immediately and a different suspension refreshes the resume listener.
+		attemptHiddenReveal(s);
+		// The fresh attempt may still be pending. Keep the already-mounted fallback
+		// block (and its local state/focus), but render it with the latest helper and
+		// captured environment so fallback text and actions cannot lag the request.
+		if (s.branch === 2) refreshPendingBody(s);
 	} else if (s.branch === 2) {
-		// A parent render can replace the inputs captured by the try body while its
-		// previous attempt is hidden behind @pending. Retry the preserved body now,
-		// outside the resume-replay window, so use() records the fresh thenable and
-		// invalidates the old listener. Waiting for the old thenable to settle would
-		// let resume replay reuse its fulfilled value and visibly commit stale props.
-		if (s.tryBlock && !s.tryBlock.disposed && s.savedDom) {
-			attemptHiddenReveal(s);
-			// The fresh attempt may still be pending. Keep the already-mounted fallback
-			// block (and its local state/focus), but render it with the latest helper and
-			// captured environment so fallback text and actions cannot lag the request.
-			if (s.branch === 2) refreshPendingBody(s);
-		} else {
-			// First-attempt hydration intentionally discards its adopted try block rather
-			// than parking server DOM. A later prop update therefore has no hidden block
-			// to retry; mount the current body immediately instead of waiting forever for
-			// the obsolete hydration promise.
-			mountTry(s);
-		}
+		// First-attempt hydration intentionally discards its adopted try block rather
+		// than parking server DOM. A later prop update therefore has no hidden block
+		// to retry; mount the current body immediately instead of waiting forever for
+		// the obsolete hydration promise.
+		mountTry(s);
 	} else if (s.branch === 1 && s.tryBlock) {
 		// Try body is currently visible — re-render in place so we don't tear
 		// down its DOM. If the re-render suspends, handleSuspense decides

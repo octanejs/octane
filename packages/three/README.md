@@ -4,7 +4,7 @@ An experimental React Three Fiber 9-compatible web renderer for Octane. Octane
 keeps ownership of component execution, hooks, context, Suspense, refs, and
 effects; this package supplies the Three-specific host layer.
 
-Milestones 0, 2, 3, and 4 are implemented on top of Octane's renderer SDK
+Milestones 0, 2, 3, 4, and 5 are implemented on top of Octane's renderer SDK
 foundation. The current technical preview includes:
 
 - the serializable compiler preset, renderer entry point, renderer-local Three
@@ -22,13 +22,17 @@ foundation. The current technical preview includes:
   the deterministic `@octanejs/three/testing` harness;
 - R3F-compatible ray and pointer events, including 3D bubbling, hit ordering,
   propagation, hover transitions, missed clicks, pointer capture, custom event
-  managers, external DOM sources, and coordinate prefixes; and
+  managers, external DOM sources, and coordinate prefixes;
+- a Suspense-aware `useLoader` cache with constructor and instance loaders,
+  scalar and array inputs, extensions, progress, GLTF graph augmentation,
+  `preload`, `clear`, and cached error routing;
+- retained Three Suspense and Activity visibility, ownership-safe teardown, and
+  client-side Three-to-DOM pending/error projection; and
 - public behavior, prepared-driver, and same-source compiled scene evidence
   against R3F 9.6.1 with the exact Three r172 oracle.
 
-Asset loading, portals and portal event layers, full Canvas SSR/hydration
-adoption, XR, OffscreenCanvas lifecycle, and live HMR behavior follow in later
-milestones.
+Portals and portal event layers, full Canvas SSR/hydration adoption, XR,
+OffscreenCanvas lifecycle, and live HMR behavior follow in later milestones.
 
 Three deliberate correctness fixes differ from R3F 9.6.1:
 
@@ -128,6 +132,44 @@ custom `events(store)` manager factory and update it through `state.setEvents()`
 that call its own lexical hook slot; keep that compatibility form unconditional
 and in stable order. Prefer `useStore(selector, equality?)` or
 `useThree(selector, equality?)` when using Octane's conditional-hook semantics.
+
+## Assets, Suspense, and errors
+
+`useLoader` follows the R3F v9 cache contract. A loader constructor is
+instantiated once, while an existing loader instance is used directly. The
+loader identity and normalized input form the cache key; extensions and
+progress callbacks configure the first request for that key.
+
+```tsx
+import { useLoader } from '@octanejs/three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+function Model() @{
+	const gltf = useLoader(GLTFLoader, '/model.glb');
+	<primitive object={gltf.scene} />
+}
+
+export function Scene() @{
+	@try {
+		<Model />
+	} @pending {
+		<group name="loading-model" />
+	} @catch (error) {
+		<group name={'model-error:' + error.message} />
+	}
+}
+
+useLoader.preload(GLTFLoader, '/model.glb');
+// Later, when the next read must issue a fresh request:
+useLoader.clear(GLTFLoader, '/model.glb');
+```
+
+`clear` evicts the exact cache entry; it does not abort a request or dispose
+the resolved asset. Declarative Three resources remain owned by their mounted
+host tree, while objects passed through `primitive` remain caller-owned. A
+root-level Three suspension or render error is projected through `Canvas` to
+the nearest client DOM `@pending` or `@catch` arm. Streaming server fallback
+and Canvas hydration remain Milestone 7 work.
 
 ## Compatibility target
 

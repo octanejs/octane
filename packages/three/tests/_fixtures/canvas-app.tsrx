@@ -1,6 +1,7 @@
 import { Canvas } from '@octanejs/three';
 import { CanvasTheme } from './canvas-context.ts';
 import { CanvasScene, ContextCanvasScene } from './canvas-scene.three.tsrx';
+import { ProjectedAssetScene, ProjectedErrorScene } from './suspense.three.tsrx';
 
 export function CanvasApp(props) @{
 	<Canvas
@@ -30,6 +31,32 @@ export function CanvasErrorApp(props) @{
 	@try {
 		<Canvas gl={props.gl} frameloop="never" onPointerMissed={props.onPointerMissed}>
 			<CanvasScene name="never-mounted" />
+		</Canvas>
+	} @catch (error) {
+		<p class="canvas-error">
+			{error.message as string}
+		</p>
+	}
+}
+
+export function CanvasPendingProjectionApp(props) @{
+	@try {
+		<Canvas gl={props.gl} frameloop="never">
+			<ProjectedAssetScene resource={props.resource} objectRef={props.objectRef} />
+		</Canvas>
+	} @pending {
+		<p class="canvas-pending">{'Loading 3D asset'}</p>
+	} @catch (error) {
+		<p class="canvas-error">
+			{error.message as string}
+		</p>
+	}
+}
+
+export function CanvasSceneErrorApp(props) @{
+	@try {
+		<Canvas gl={props.gl} frameloop="never">
+			<ProjectedErrorScene error={props.error} objectRef={props.objectRef} />
 		</Canvas>
 	} @catch (error) {
 		<p class="canvas-error">

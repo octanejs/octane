@@ -166,6 +166,7 @@ export {
 	componentSlot,
 	componentSlotVoid,
 	componentSlotLite,
+	compilerCacheContext,
 	markChildrenBlock,
 	childSlot,
 	positionalChildren,
