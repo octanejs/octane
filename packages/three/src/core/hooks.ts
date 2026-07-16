@@ -17,7 +17,9 @@ import {
 import { getThreeEventStore, getThreeInstance, type Instance } from './driver.js';
 import {
 	getRootObjectStore,
+	readRootStoreRenderSnapshot,
 	RootStoreContext,
+	RootStoreRenderSnapshotContext,
 	useRootStoreSelector,
 	type RenderCallback,
 	type RootState,
@@ -86,6 +88,7 @@ export function useThree<T = RootState>(...args: unknown[]): T {
 	const selector = (typeof userArgs[0] === 'function' ? userArgs[0] : identity) as Selector<T>;
 	const equalityFn = (typeof userArgs[1] === 'function' ? userArgs[1] : Object.is) as EqualityFn<T>;
 	const store = useStore();
+	const renderSnapshot = useContext(RootStoreRenderSnapshotContext);
 	const cache = useRef<
 		| {
 				readonly state: RootState;
@@ -96,7 +99,7 @@ export function useThree<T = RootState>(...args: unknown[]): T {
 	>(undefined, subSlot(slot, 'useThree:cache'));
 
 	const getSnapshot = (): T => {
-		const state = store.getState();
+		const state = readRootStoreRenderSnapshot(store, renderSnapshot);
 		const previous = cache.current;
 		if (
 			previous !== undefined &&

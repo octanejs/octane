@@ -6,7 +6,13 @@
  * components. Zustand remains the framework-neutral storage primitive.
  */
 import * as THREE from 'three';
-import { createContext, useRef, useSyncExternalStore, withSlot } from 'octane/universal';
+import {
+	createContext,
+	useContext,
+	useRef,
+	useSyncExternalStore,
+	withSlot,
+} from 'octane/universal';
 import { createStore as createVanillaStore, type StoreApi } from 'zustand/vanilla';
 import type {
 	DomEvent,
@@ -453,6 +459,31 @@ interface SelectionCell<T> {
 	value: T;
 }
 
+/**
+ * Render-attempt-local state exposed by a portal without mutating its live
+ * store. An accepted portal commit clears `current`, after which consumers
+ * resume reading the store itself.
+ *
+ * This is package-private plumbing for the Three renderer. It is exported from
+ * this module so the portal and hook implementations can share it, but it is
+ * intentionally absent from the package's public barrel.
+ */
+export interface RootStoreRenderSnapshot {
+	readonly store: RootStore;
+	current: RootState | null;
+}
+
+export const RootStoreRenderSnapshotContext = createContext<RootStoreRenderSnapshot | null>(null);
+
+export function readRootStoreRenderSnapshot(
+	store: RootStore,
+	snapshot: RootStoreRenderSnapshot | null,
+): RootState {
+	return snapshot?.store === store && snapshot.current !== null
+		? snapshot.current
+		: store.getState();
+}
+
 /** Universal-hook selector used by the callable store and `useThree`. */
 export function useRootStoreSelector<T>(
 	store: RootStore,
@@ -460,12 +491,13 @@ export function useRootStoreSelector<T>(
 	equalityFn: (previous: T, next: T) => boolean = Object.is,
 	slot?: unknown,
 ): T {
+	const renderSnapshot = useContext(RootStoreRenderSnapshotContext);
 	const run = (nested: boolean): T => {
 		const cell = nested
 			? useRef<SelectionCell<T>>({ initialized: false, value: undefined as T }, 'selection')
 			: useRef<SelectionCell<T>>({ initialized: false, value: undefined as T });
 		const snapshot = () => {
-			const next = selector(store.getState());
+			const next = selector(readRootStoreRenderSnapshot(store, renderSnapshot));
 			if (!cell.current.initialized || !equalityFn(cell.current.value, next)) {
 				cell.current = { initialized: true, value: next };
 			}
