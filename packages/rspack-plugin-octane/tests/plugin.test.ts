@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolve } from 'node:path';
 
 const mocks = vi.hoisted(() => ({
 	createOctaneCompiler: vi.fn(),
@@ -111,6 +112,7 @@ describe('OctaneRspackPlugin', () => {
 	});
 
 	it('honors explicit client mode and serializable loader options', () => {
+		const existingHostPath = process.execPath;
 		const compiler = createCompiler('node');
 		const plugin = octaneRspack({
 			environment: 'client',
@@ -119,7 +121,10 @@ describe('OctaneRspackPlugin', () => {
 			parallelUse: false,
 			exclude: ['generated'],
 			renderers: {
-				registry: { object: '/src/object-renderer.js' },
+				registry: {
+					object: '/src/object-renderer.js',
+					'host-path-lookalike': existingHostPath,
+				},
 				boundaries: {
 					'/src/object-boundaries.js': {
 						Canvas: {
@@ -138,8 +143,13 @@ describe('OctaneRspackPlugin', () => {
 		expect(mocks.resolveRuntimeRequest).toHaveBeenCalledWith('octane', 'client');
 		const aliases = compiler.options.resolve.alias as Record<string, string>;
 		expect(aliases['octane$']).toMatch(/(?:^octane$|packages\/octane\/src\/index\.ts$)/);
+		expect(aliases['/src/object-renderer.js$']).toBe('/project/src/object-renderer.js');
+		expect(aliases[`${existingHostPath}$`]).toBe(
+			resolve('/project', existingHostPath.replace(/^[/\\]+/, '')),
+		);
 		expect(compiler.options.module.rules).toHaveLength(1);
-		expect(compiler.options.module.rules[0].use[0].options).toMatchObject({
+		const loaderOptions = compiler.options.module.rules[0].use[0].options;
+		expect(loaderOptions).toMatchObject({
 			root: '/project',
 			environment: 'client',
 			hmr: false,
@@ -148,7 +158,7 @@ describe('OctaneRspackPlugin', () => {
 			exclude: ['generated'],
 			renderers: expect.objectContaining({
 				default: 'dom',
-				signature: expect.stringMatching(/^octane-renderers-v2:/),
+				signature: expect.stringMatching(/^octane-renderers-v3:/),
 				boundaries: {
 					'/src/object-boundaries.js': {
 						Canvas: {
@@ -164,7 +174,10 @@ describe('OctaneRspackPlugin', () => {
 			expect.objectContaining({
 				renderers: expect.objectContaining({
 					registry: expect.objectContaining({
-						object: { module: '/src/object-renderer.js', target: 'universal' },
+						object: expect.objectContaining({
+							module: '/src/object-renderer.js',
+							target: 'universal',
+						}),
 					}),
 				}),
 			}),

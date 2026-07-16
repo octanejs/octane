@@ -56,6 +56,7 @@
   "devDependencies": {
     "@types/node": "catalog:default",
     "octane": "workspace:*",
+    "playwright": "catalog:default",
     "type-fest": "catalog:default",
     "vite": "catalog:default"
   }

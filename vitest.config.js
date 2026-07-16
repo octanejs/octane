@@ -193,7 +193,13 @@ export default defineConfig({
 					// and builds.
 					octane({
 						renderers: {
-							registry: { object: 'octane/universal' },
+							registry: {
+								object: {
+									module: 'octane/universal',
+									text: 'host',
+									capabilities: ['visibility'],
+								},
+							},
 							boundaries: {
 								'/packages/octane/tests/_fixtures/universal-owned-canvas.tsrx': {
 									Canvas: {
@@ -254,7 +260,13 @@ export default defineConfig({
 					octane({
 						hmr: false,
 						renderers: {
-							registry: { object: 'octane/universal' },
+							registry: {
+								object: {
+									module: 'octane/universal',
+									text: 'host',
+									capabilities: ['visibility'],
+								},
+							},
 							boundaries: {
 								'/packages/octane/tests/_fixtures/universal-owned-canvas.tsrx': {
 									Canvas: {

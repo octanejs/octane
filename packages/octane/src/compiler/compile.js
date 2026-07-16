@@ -45,10 +45,11 @@ import {
 	retargetRuntimeImportAliases,
 } from './compile-universal.js';
 import {
-	assertNoServerRendererBoundaries,
 	expandDomRendererRegions,
 	prepareRendererBoundaryRegions,
+	prepareServerRendererBoundaryRegions,
 } from './compile-renderer-boundaries.js';
+import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -2969,7 +2970,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, renderer?: { id: string, module: string, target: 'dom' | 'universal' }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal' }>> }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[] }} [options] —
  *   `dev: true` emits dev-only hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`); strictly gated so production output is byte-identical.
  *   `hmr: true` (backwards-compatible shorthand for `hmr: 'vite'`) wraps each
@@ -2999,20 +3000,28 @@ export function compile(source, filename, options) {
 				`Renderer ${JSON.stringify(options.renderer.id)} does not provide the serialization/hydration capability required by server compilation.`,
 			);
 		}
-		assertNoServerRendererBoundaries(
-			source,
-			filename,
+		const ownerRenderer =
 			options?.renderer?.target === 'dom'
 				? options.renderer
-				: { id: 'dom', module: 'octane', target: 'dom' },
+				: { id: 'dom', module: 'octane', target: 'dom', server: 'render' };
+		const serverBoundaryPreparation = prepareServerRendererBoundaryRegions(
+			source,
+			filename,
+			ownerRenderer,
 			options,
 		);
+		if (serverBoundaryPreparation !== null) source = serverBoundaryPreparation.source;
+		assertNoLiveClientOnlyImports(source, filename, options?.clientOnlyImports);
 		// Server (SSR) codegen: static markup + dynamic holes + control flow +
 		// nested components + scoped CSS, emitted as HTML-string-building bodies
 		// (with hydration markers) importing the server runtime from 'octane/server'.
 		// Fragment refs remain client-only because there is no server-side DOM range
 		// object for their imperative API.
-		return compileServer(source, filename, options);
+		const compiled = compileServer(source, filename, options);
+		if (serverBoundaryPreparation?.map && compiled.map) {
+			compiled.map = composeSourceMaps(compiled.map, serverBoundaryPreparation.map);
+		}
+		return compiled;
 	}
 	const ownerRenderer =
 		options?.renderer?.target === 'universal'

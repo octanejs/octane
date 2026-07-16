@@ -9,7 +9,7 @@ import type {
 import type { RenderResult, StreamOptions, RenderOptions } from 'octane/server';
 
 export function resolveOctaneConfig(
-	raw: OctaneConfigOptions,
+	raw: OctaneConfigOptions | ResolvedOctaneConfig,
 	options?: { requireAdapter?: boolean },
 ): ResolvedOctaneConfig;
 

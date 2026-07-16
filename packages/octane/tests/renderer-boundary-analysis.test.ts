@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseModule } from '@tsrx/core';
 import { compile } from '../src/compiler/compile.js';
+import { prepareServerRendererBoundaryRegions } from '../src/compiler/compile-renderer-boundaries.js';
 import { decodeMappings } from '../src/compiler/compile-universal.js';
 import {
 	analyzeRendererBoundaries,
@@ -33,6 +34,35 @@ const rendererConfig = normalizeRendererConfig({
 const boundaries = rendererConfig.boundaries;
 const rendererRegistry = rendererConfig.registry;
 const threeRenderer = { id: 'three', ...rendererRegistry.three };
+const clientOnlyRendererConfig = normalizeRendererConfig({
+	registry: {
+		object: {
+			module: '/src/object-renderer.js',
+			server: 'client-only',
+		},
+	},
+	boundaries: {
+		'@scene/client': {
+			Canvas: {
+				ownerRenderer: 'dom',
+				childRenderer: 'object',
+				prop: 'children',
+				server: 'omit-child',
+			},
+		},
+	},
+});
+const clientOnlyImports = [
+	{
+		request: './Scene.object.tsrx',
+		resolvedId: '/src/Scene.object.tsrx',
+		reference: {
+			id: 'octane-client-reference-v1:object:/src/Scene.object.tsrx',
+			moduleId: '/src/Scene.object.tsrx',
+			renderer: 'object',
+		},
+	},
+];
 
 function slice(source: string, range: readonly number[]) {
 	return source.slice(range[0], range[1]);
@@ -197,6 +227,79 @@ export function App() @{
 			filename: '/src/App.tsrx',
 		});
 		expect(serverError.message).toMatch(/@scene\/bridge#Canvas.*server.*serialization/s);
+	});
+
+	it('omits declared client-only children during server compilation without shifting authored maps', () => {
+		const source = `
+import { Canvas } from '@scene/client';
+import Scene from './Scene.object.tsrx';
+export function App() @{
+  <main>
+    <Canvas>
+      <Scene />
+    </Canvas>
+    <p data-after="mapped">after</p>
+  </main>
+}
+`;
+		const boundaryOptions = {
+			rendererBoundaries: clientOnlyRendererConfig.boundaries,
+			rendererRegistry: clientOnlyRendererConfig.registry,
+		};
+		const prepared = prepareServerRendererBoundaryRegions(
+			source,
+			'/src/App.tsrx',
+			{ id: 'dom', ...clientOnlyRendererConfig.registry.dom },
+			boundaryOptions,
+		)!;
+		expect(prepared.source).not.toContain('<Scene />');
+		expectAuthoredTrace(
+			{ code: prepared.source, map: prepared.map },
+			source,
+			'data-after',
+			'data-after',
+		);
+
+		const result = compile(source, '/src/App.tsrx', {
+			mode: 'server',
+			...boundaryOptions,
+			clientOnlyImports,
+		});
+
+		expect(result.code).toContain('Canvas');
+		expect(result.code).toContain('data-after');
+		expect(result.code).not.toContain('Scene(');
+		expect(result.map.sources).toEqual(['App.tsrx']);
+		expect(result.map.sourcesContent).toEqual([source]);
+	});
+
+	it('diagnoses a client-only binding that escapes its omitted boundary region', () => {
+		const source = `
+import { Canvas } from '@scene/client';
+import Scene from './Scene.object.tsrx';
+export function App() @{
+  const live = Scene as unknown;
+  <Canvas><Scene /></Canvas>
+}
+`;
+		let error: any;
+		try {
+			compile(source, '/src/App.tsrx', {
+				mode: 'server',
+				rendererBoundaries: clientOnlyRendererConfig.boundaries,
+				rendererRegistry: clientOnlyRendererConfig.registry,
+				clientOnlyImports,
+			});
+		} catch (cause) {
+			error = cause;
+		}
+
+		expect(error).toMatchObject({
+			code: 'OCTANE_CLIENT_ONLY_SERVER_USE',
+			filename: '/src/App.tsrx',
+			loc: { line: 5 },
+		});
+		expect(error.message).toMatch(/Scene\.object\.tsrx.*server: "omit-child"/s);
 	});
 
 	it('does not reserve generated-looking identifiers in boundary modules', () => {

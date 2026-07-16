@@ -35,7 +35,7 @@ const AUTO_RUNTIME_HOOKS = new Set([
 
 function resolveRenderer(registry, id, filename) {
 	const entry = id === 'dom' ? (registry?.dom ?? DOM_RENDERER) : registry?.[id];
-	const renderer = entry && Object.freeze({ id, module: entry.module, target: entry.target });
+	const renderer = entry && Object.freeze({ id, ...entry });
 	if (!renderer) {
 		throw new Error(
 			`Octane renderer boundary in ${filename} references ${JSON.stringify(id)} without a compiler renderer registry entry.`,
@@ -899,6 +899,87 @@ export function prepareRendererBoundaryRegions(source, filename, ownerRenderer, 
 		mappingNeedles: Object.freeze(state.mappingNeedles),
 		source: transformed.code,
 		universalUnits: Object.freeze(state.universalUnits),
+	});
+}
+
+function blankAuthoredText(source, start, end) {
+	const value = authoredText(source, start, end);
+	return {
+		code: value.code.replace(/[^\r\n]/g, ' '),
+		origins: value.origins,
+	};
+}
+
+function serverBoundaryDiagnostic(boundary, filename, message, code) {
+	const at = boundary.loc ? `${filename}:${boundary.loc.line}:${boundary.loc.column}` : filename;
+	const error = new Error(
+		`Octane renderer boundary ${JSON.stringify(`${boundary.moduleId}#${boundary.exportName}`)} ${message} (${at})`,
+	);
+	error.code = code;
+	error.filename = filename;
+	error.loc = boundary.loc;
+	return error;
+}
+
+/**
+ * Remove renderer-owned client regions before DOM SSR codegen.
+ *
+ * Replacements retain every authored newline and UTF-16 offset. Hydration keys,
+ * hook locations, later diagnostics, and the composed source map therefore keep
+ * the same source identity as the client compilation even when a large scene is
+ * absent from the server body.
+ */
+export function prepareServerRendererBoundaryRegions(
+	source,
+	filename,
+	ownerRenderer,
+	{ rendererBoundaries, rendererRegistry } = {},
+) {
+	const tree = analyzeBoundaryTree(source, filename, ownerRenderer, rendererBoundaries);
+	if (tree === null || tree.roots.length === 0) return null;
+
+	const replacements = [];
+	for (const node of tree.roots) {
+		const boundary = node.boundary;
+		if (boundary.server !== 'omit-child') {
+			throw serverBoundaryDiagnostic(
+				boundary,
+				filename,
+				'cannot compile for the server because renderer-owned client regions do not provide serialization or hydration',
+				'OCTANE_RENDERER_BOUNDARY_SERVER_UNSUPPORTED',
+			);
+		}
+		const childRenderer = resolveRenderer(rendererRegistry, boundary.childRenderer, filename);
+		if (childRenderer.server !== 'client-only') {
+			throw serverBoundaryDiagnostic(
+				boundary,
+				filename,
+				`declares server: "omit-child" but child renderer ${JSON.stringify(boundary.childRenderer)} is not server: "client-only"`,
+				'OCTANE_RENDERER_BOUNDARY_SERVER_POLICY_MISMATCH',
+			);
+		}
+
+		const region = boundary.region;
+		let bounds = null;
+		if (region.kind === 'children') bounds = region.range;
+		else if (region.kind === 'attribute') bounds = region.attributeRange;
+		if (bounds !== null && bounds[1] > bounds[0]) {
+			replacements.push({
+				start: bounds[0],
+				end: bounds[1],
+				value: blankAuthoredText(source, bounds[0], bounds[1]),
+			});
+		}
+	}
+
+	if (replacements.length === 0) {
+		return Object.freeze({ analysis: tree.analysis, map: null, source });
+	}
+	const transformed = applySourceReplacements(source, 0, source.length, replacements);
+	return Object.freeze({
+		analysis: tree.analysis,
+		map: sourceMapFromOrigins(transformed.code, transformed.origins, source, filename),
+		source: transformed.code,
 	});
 }
 

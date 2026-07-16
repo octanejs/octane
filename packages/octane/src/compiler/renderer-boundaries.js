@@ -287,6 +287,7 @@ function freezeMatch(node, match, region) {
 		ownerRenderer: match.metadata.ownerRenderer,
 		childRenderer: match.metadata.childRenderer,
 		prop: match.metadata.prop,
+		...(match.metadata.server === undefined ? null : { server: match.metadata.server }),
 		elementRange: range(node),
 		openingRange: range(opening),
 		tagRange: range(match.tag),

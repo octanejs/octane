@@ -98,6 +98,37 @@ describe('getOctaneRspackBuildInfo', () => {
 		};
 		expect(getOctaneRspackBuildInfo({ buildInfo: { octane: value } })).toBe(value);
 		expect(
+			getOctaneRspackBuildInfo({
+				buildInfo: {
+					octane: {
+						...value,
+						clientReference: {
+							id: 'octane-client-reference-v1:object:/src/App.tsrx',
+							moduleId: '/src/App.tsrx',
+							renderer: 'object',
+						},
+					},
+				},
+			}),
+		).toEqual({
+			...value,
+			clientReference: {
+				id: 'octane-client-reference-v1:object:/src/App.tsrx',
+				moduleId: '/src/App.tsrx',
+				renderer: 'object',
+			},
+		});
+		expect(
+			getOctaneRspackBuildInfo({
+				buildInfo: {
+					octane: {
+						...value,
+						clientReference: { id: 'partial' },
+					},
+				},
+			}),
+		).toBeNull();
+		expect(
 			getOctaneRspackBuildInfo({ buildInfo: { octane: { ...value, serverRpc: 'yes' } } }),
 		).toBeNull();
 		expect(getOctaneRspackBuildInfo(null)).toBeNull();

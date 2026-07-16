@@ -1,5 +1,7 @@
 import { use, useState } from 'octane';
 import { RpcProbe } from './Rpc.tsx';
+import { Canvas } from '@fixture/object-canvas';
+import { Scene } from './Scene.object.tsrx';
 
 module server {
 	export async function fixtureRpc(value: string) {
@@ -35,5 +37,8 @@ export function Page(props: { params: Record<string, string>; url: string }) @{
 		</p>
 		<button onClick={() => fixtureRpc('browser')}>Call server</button>
 		<RpcProbe />
+		<Canvas>
+			<Scene />
+		</Canvas>
 	</main>
 }

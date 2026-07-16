@@ -38,6 +38,9 @@ describe('app renderer configuration', () => {
 			id: 'object',
 			module: '@octanejs/object-renderer',
 			target: 'universal',
+			server: 'unsupported',
+			text: 'reject',
+			capabilities: [],
 		});
 		// Production re-resolution receives an already-normalized config.
 		expect(resolveOctaneConfig(config).compiler.renderers.signature).toBe(

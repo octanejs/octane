@@ -131,6 +131,167 @@ export default defineConfig({
 	);
 }
 
+function writeClientOnlyRendererApp(root: string) {
+	write(
+		root,
+		'index.html',
+		`<!doctype html>
+<html>
+	<head><!--ssr-head--></head>
+	<body><div id="root"><!--ssr-body--></div></body>
+</html>
+`,
+	);
+	write(root, 'src/object-renderer.ts', `export * from 'octane/universal';\n`);
+	write(
+		root,
+		'src/scene-setup.ts',
+		`const state = globalThis as typeof globalThis & {
+	__rsbuildAuthoredSceneSetup?: number;
+};
+
+state.__rsbuildAuthoredSceneSetup = (state.__rsbuildAuthoredSceneSetup ?? 0) + 1;
+`,
+	);
+	write(
+		root,
+		'src/Scene.object.tsrx',
+		`import './scene-setup.ts';
+
+export const sceneMetadata = 'authored-rsbuild-client-scene';
+
+export function Scene() @{
+	<scene label="rsbuild-client-only">
+		<mesh kind="proof" />
+	</scene>
+}
+`,
+	);
+	write(
+		root,
+		'src/ObjectCanvas.tsrx',
+		`import { useLayoutEffect, useState } from 'octane';
+import {
+	createObjectContainer,
+	createObjectDriver,
+	createUniversalHostBoundary,
+	createUniversalRoot,
+} from 'octane/universal';
+
+const ObjectBoundary = createUniversalHostBoundary('object');
+
+interface FixtureState {
+	__rsbuildObjectContainer?: ReturnType<typeof createObjectContainer>;
+	__rsbuildObjectRegionCount?: number;
+	__rsbuildObjectRootCount?: number;
+}
+
+export function Canvas(props: { children?: unknown }) @{
+	const [root, setRoot] = useState<ReturnType<typeof createUniversalRoot> | null>(null);
+
+	useLayoutEffect(() => {
+		const fixture = globalThis as typeof globalThis & FixtureState;
+		const container = createObjectContainer();
+		const nextRoot = createUniversalRoot(container, createObjectDriver());
+		fixture.__rsbuildObjectContainer = container;
+		fixture.__rsbuildObjectRegionCount = (fixture.__rsbuildObjectRegionCount ?? 0) + 1;
+		fixture.__rsbuildObjectRootCount = (fixture.__rsbuildObjectRootCount ?? 0) + 1;
+		setRoot(nextRoot);
+		return () => nextRoot.unmount();
+	}, []);
+
+	<section
+		class="object-canvas-shell"
+		data-object-canvas-shell=""
+		data-object-region={root === null ? 'pending' : 'ready'}
+	>
+		<canvas aria-label="generic renderer canvas" />
+		@if (root !== null && props.children !== undefined) {
+			<ObjectBoundary root={root} children={props.children} />
+		}
+	</section>
+}
+`,
+	);
+	write(
+		root,
+		'src/pre-hydrate.ts',
+		`interface FixtureHydrationState {
+	__rsbuildSsrCanvasShell?: Element | null;
+}
+
+export default function preHydrate() {
+	const fixture = globalThis as typeof globalThis & FixtureHydrationState;
+	fixture.__rsbuildSsrCanvasShell = document.querySelector('[data-object-canvas-shell]');
+}
+`,
+	);
+	write(
+		root,
+		'src/Page.tsrx',
+		`import { Canvas } from '@fixture/object-canvas';
+import { Scene } from './Scene.object.tsrx';
+
+export function Page() @{
+	<main data-rsbuild-client-only="ready">
+		<h1>Rsbuild client-only renderer</h1>
+		<Canvas>
+			<Scene />
+		</Canvas>
+	</main>
+}
+`,
+	);
+	write(
+		root,
+		'octane.config.ts',
+		`import { defineConfig, RenderRoute } from '@octanejs/rsbuild-plugin';
+
+export default defineConfig({
+	build: { outDir: 'build', minify: false },
+	compiler: {
+		renderers: {
+			registry: {
+				object: {
+					module: '/src/object-renderer.ts',
+					server: 'client-only',
+					text: 'host',
+				},
+			},
+			rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			boundaries: {
+				'@fixture/object-canvas': {
+					Canvas: {
+						ownerRenderer: 'dom',
+						childRenderer: 'object',
+						prop: 'children',
+						server: 'omit-child',
+					},
+				},
+			},
+		},
+	},
+	router: {
+		preHydrate: '/src/pre-hydrate.ts',
+		routes: [new RenderRoute({ path: '/', entry: '/src/Page.tsrx' })],
+	},
+	server: { render: 'buffered' },
+});
+`,
+	);
+}
+
+function clientOnlyRendererConfig(root: string, hmr: boolean) {
+	return {
+		plugins: [pluginOctane({ hmr })],
+		resolve: {
+			alias: {
+				'@fixture/object-canvas': join(root, 'src/ObjectCanvas.tsrx'),
+			},
+		},
+	};
+}
+
 describe('programmatic Rsbuild 2 integration', () => {
 	let root: string;
 	let linkedRoot: string;
@@ -312,6 +473,151 @@ export function App() @{
 			expect(encoded[encoded[0].value]).toBe(expected);
 		}
 	}, 120_000);
+
+	it('emits stable client-only chunks and hydrates one adopted generic region', async () => {
+		writeClientOnlyRendererApp(root);
+		await build(root, clientOnlyRendererConfig(root, false));
+
+		const clientRoot = join(root, 'build/client');
+		const serverRoot = join(root, 'build/server');
+		const clientReferenceId = 'octane-client-reference-v1:object:/src/Scene.object.tsrx';
+		const clientReferenceManifest = JSON.parse(
+			readFileSync(join(clientRoot, 'octane-client-references.json'), 'utf8'),
+		);
+		const reference = clientReferenceManifest.references[clientReferenceId];
+		expect(clientReferenceManifest.version).toBe(1);
+		expect(reference).toEqual({
+			moduleId: '/src/Scene.object.tsrx',
+			renderer: 'object',
+			chunks: [...reference.chunks].sort(),
+		});
+		expect(reference.chunks.length).toBeGreaterThan(0);
+		for (const chunk of reference.chunks) {
+			expect(existsSync(join(clientRoot, chunk))).toBe(true);
+		}
+
+		const serverCode = readJavaScript(serverRoot);
+		expect(serverCode).not.toContain('__rsbuildAuthoredSceneSetup');
+		expect(serverCode).not.toContain('authored-rsbuild-client-scene');
+		delete (globalThis as any).__rsbuildAuthoredSceneSetup;
+		const entry = pathToFileURL(join(serverRoot, 'entry.js'));
+		entry.searchParams.set('client-only-test', String(Date.now()));
+		const server = (await import(entry.href)) as {
+			handler: (request: Request) => Promise<Response>;
+		};
+		const response = await server.handler(new Request('http://example.test/'));
+		const serverHtml = await response.text();
+		expect(response.status).toBe(200);
+		expect(serverHtml).toContain('data-rsbuild-client-only="ready"');
+		expect(serverHtml).toContain('data-object-canvas-shell=""');
+		expect(serverHtml).toContain('data-object-region="pending"');
+		expect((globalThis as any).__rsbuildAuthoredSceneSetup).toBeUndefined();
+
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: {
+				// This milestone proves renderer hydration/adoption against a real dev server.
+				// Rspack HMR execution is covered by Milestone 8, so keep this
+				// browser proof on the same production-compatible compile path as the build.
+				...clientOnlyRendererConfig(root, false),
+				dev: { lazyCompilation: false },
+				mode: 'development',
+				server: { host: '127.0.0.1' },
+			},
+		});
+		const started = await instance.startDevServer({ getPortSilently: true });
+		const origin = `http://127.0.0.1:${started.port}`;
+		let browser: import('playwright').Browser | undefined;
+		try {
+			const { chromium } = await import('playwright');
+			browser = await chromium.launch({ headless: true });
+		} catch (error) {
+			await started.server.close();
+			throw new Error(
+				'[rsbuild-plugin client-only renderer] Chromium is required ' +
+					'(run `pnpm exec playwright install chromium`): ' +
+					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+			);
+		}
+
+		const page = await browser.newPage();
+		const errors: string[] = [];
+		page.on('console', (message) => {
+			if (message.type() === 'error') errors.push(message.text());
+		});
+		page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+		try {
+			await page.goto(origin + '/', { waitUntil: 'load' });
+			try {
+				await page.locator('[data-object-region="ready"]').waitFor({ timeout: 30_000 });
+			} catch (error) {
+				const browserState = await page.evaluate(() => {
+					const fixture = globalThis as typeof globalThis & {
+						__rsbuildAuthoredSceneSetup?: number;
+						__rsbuildObjectRegionCount?: number;
+						__rsbuildObjectRootCount?: number;
+						__rsbuildSsrCanvasShell?: Element | null;
+					};
+					return {
+						authoredSceneSetup: fixture.__rsbuildAuthoredSceneSetup,
+						capturedServerShell: !!fixture.__rsbuildSsrCanvasShell,
+						readyState: document.readyState,
+						regionCount: fixture.__rsbuildObjectRegionCount,
+						rootCount: fixture.__rsbuildObjectRootCount,
+					};
+				});
+				throw new Error(
+					`Rsbuild Canvas did not become ready. State: ${JSON.stringify(browserState)}. Browser errors: ${JSON.stringify(errors)}. HTML: ${await page.content()}`,
+					{ cause: error },
+				);
+			}
+			await page.evaluate(
+				() =>
+					new Promise<void>((resolveFrame) =>
+						requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame())),
+					),
+			);
+			const proof = await page.evaluate(() => {
+				const fixture = globalThis as typeof globalThis & {
+					__rsbuildAuthoredSceneSetup?: number;
+					__rsbuildObjectContainer?: {
+						children: Array<{ type: string; children: Array<{ type: string }> }>;
+						commits: unknown[];
+					};
+					__rsbuildObjectRegionCount?: number;
+					__rsbuildObjectRootCount?: number;
+					__rsbuildSsrCanvasShell?: Element | null;
+				};
+				const shell = document.querySelector('[data-object-canvas-shell]');
+				return {
+					adoptedServerShell: fixture.__rsbuildSsrCanvasShell === shell,
+					authoredSceneSetup: fixture.__rsbuildAuthoredSceneSetup,
+					commits: fixture.__rsbuildObjectContainer?.commits.length,
+					regionCount: fixture.__rsbuildObjectRegionCount,
+					rootCount: fixture.__rsbuildObjectRootCount,
+					scene: fixture.__rsbuildObjectContainer?.children.map((child) => ({
+						type: child.type,
+						children: child.children.map((nested) => nested.type),
+					})),
+					shellCount: document.querySelectorAll('[data-object-canvas-shell]').length,
+				};
+			});
+			expect(proof).toEqual({
+				adoptedServerShell: true,
+				authoredSceneSetup: 1,
+				commits: 1,
+				regionCount: 1,
+				rootCount: 1,
+				scene: [{ type: 'scene', children: ['mesh'] }],
+				shellCount: 1,
+			});
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+			await browser.close();
+			await started.server.close();
+		}
+	}, 180_000);
 
 	it('streams routed HTML and server routes through the Rsbuild Environment API in dev', async () => {
 		writeRoutedApp(root, 'streaming');

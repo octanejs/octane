@@ -600,11 +600,7 @@ function compileAttribute(attribute, context, state) {
 function compileHostElement(node, context, state) {
 	const type = jsxName(node);
 	if (type === 'Activity') {
-		throw universalError(
-			state.filename,
-			node,
-			'Activity requires an explicit renderer visibility capability.',
-		);
+		return compileActivityElement(node, context, state);
 	}
 	if (isComponentElement(node)) return compileComponentElement(node, context, state);
 	if (type === null) {
@@ -650,6 +646,72 @@ function compileHostElement(node, context, state) {
 		...(propsSlot === null ? null : { propsSlot }),
 		...(children.length === 0 ? null : { children }),
 	};
+}
+
+function rendererHasCapability(state, capability) {
+	return Array.isArray(state.renderer.capabilities)
+		? state.renderer.capabilities.includes(capability)
+		: false;
+}
+
+function compileActivityElement(node, context, state) {
+	if (!rendererHasCapability(state, 'visibility')) {
+		throw universalError(
+			state.filename,
+			node,
+			'Activity requires an explicit renderer visibility capability.',
+		);
+	}
+	const attributes = node.openingElement?.attributes ?? node.attributes ?? [];
+	let mode = null;
+	for (const attribute of attributes) {
+		if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
+			throw universalError(
+				state.filename,
+				attribute,
+				'Activity props must declare mode explicitly; spreads are unsupported.',
+			);
+		}
+		const name = attributeName(attribute);
+		if (name !== 'mode') {
+			throw universalError(
+				state.filename,
+				attribute,
+				`Activity does not support the ${JSON.stringify(name)} prop in universal content.`,
+			);
+		}
+		if (mode !== null) {
+			throw universalError(state.filename, attribute, 'Activity mode may be declared only once.');
+		}
+		const value = attribute.value;
+		if (value?.type === 'Literal') {
+			if (value.value !== 'visible' && value.value !== 'hidden') {
+				throw universalError(
+					state.filename,
+					attribute,
+					'Activity mode must be either "visible" or "hidden".',
+				);
+			}
+			mode = JSON.stringify(value.value);
+		} else if (
+			value?.type === 'JSXExpressionContainer' &&
+			value.expression &&
+			value.expression.type !== 'JSXEmptyExpression'
+		) {
+			mode = printDynamicExpression(value.expression, state);
+		} else {
+			throw universalError(
+				state.filename,
+				attribute,
+				'Activity mode must be "visible", "hidden", or an expression producing one.',
+			);
+		}
+	}
+	if (mode === null) {
+		throw universalError(state.filename, node, 'Activity requires an explicit mode prop.');
+	}
+	const body = compileBlockValue(node.children ?? [], state);
+	return addDynamic(context, `${state.helpers.activity}(${mode}, ${body})`);
 }
 
 function compileComponentElement(node, context, state) {
@@ -849,7 +911,16 @@ function compileChild(node, context, state) {
 	if (node == null) return [];
 	if (node.type === 'JSXText') {
 		const value = normalizeJsxText(node.value);
-		return value === '' ? [] : [{ kind: 'text', value }];
+		if (value === '') return [];
+		if (state.renderer.text === 'ignore') return [];
+		if (state.renderer.text !== 'host') {
+			throw universalError(
+				state.filename,
+				node,
+				`renderer ${JSON.stringify(state.renderer.id)} rejects authored text children.`,
+			);
+		}
+		return [{ kind: 'text', value }];
 	}
 	if (node.type === 'JSXExpressionContainer') {
 		if (!node.expression || node.expression.type === 'JSXEmptyExpression') return [];
@@ -873,11 +944,7 @@ function compileChild(node, context, state) {
 		);
 	}
 	if (node.type === 'JSXActivityExpression') {
-		throw universalError(
-			state.filename,
-			node,
-			'Activity requires an explicit renderer visibility capability.',
-		);
+		throw universalError(state.filename, node, 'unsupported Activity expression shape.');
 	}
 	throw universalError(state.filename, node, `unsupported template node ${node.type}.`);
 }
@@ -1656,6 +1723,7 @@ export function lowerUniversalRendererRegion(
 	state.helpers.try = allocName(state, `${prefix}Try`);
 	state.helpers.children = allocName(state, `${prefix}Children`);
 	state.helpers.context = allocName(state, `${prefix}Context`);
+	state.helpers.activity = allocName(state, `${prefix}Activity`);
 	const generatedRuntimeAliases = Object.freeze(
 		Object.fromEntries(
 			[
@@ -1749,7 +1817,8 @@ export function lowerUniversalRendererRegion(
 		`universalProps as ${state.helpers.props}, universalIf as ${state.helpers.if}, ` +
 		`universalSwitch as ${state.helpers.switch}, universalFor as ${state.helpers.for}, ` +
 		`universalTry as ${state.helpers.try}, universalChildren as ${state.helpers.children}, ` +
-		`universalContext as ${state.helpers.context}, rendererRegion as ${regionHelper}` +
+		`universalContext as ${state.helpers.context}, universalActivity as ${state.helpers.activity}, ` +
+		`rendererRegion as ${regionHelper}` +
 		(state.hmr
 			? `, hmrUniversalComponent as ${state.helpers.hmr}, UNIVERSAL_HMR as ${state.helpers.hmrSymbol}`
 			: '') +
@@ -1850,6 +1919,7 @@ export function lowerUniversalRendererRegion(
 				for: state.helpers.for,
 				try: state.helpers.try,
 				context: state.helpers.context,
+				activity: state.helpers.activity,
 			}),
 			components: Object.freeze(state.components),
 			bindings: Object.freeze([...specializationBindings]),
@@ -1868,7 +1938,7 @@ export function lowerUniversalRendererRegion(
 /**
  * @param {string} source
  * @param {string} filename
- * @param {{ id: string, module: string, target: 'universal' }} renderer
+ * @param {{ id: string, module: string, target: 'universal', text?: 'host'|'ignore'|'reject', capabilities?: readonly string[] }} renderer
  * @param {(source: string, metadata: any) => { code: string, map: any }} compileClient
  * @param {Record<string, any>} [options]
  */
@@ -1911,6 +1981,7 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 	state.helpers.try = allocName(state, '__octaneUniversalTry');
 	state.helpers.children = allocName(state, '__octaneUniversalChildren');
 	state.helpers.context = allocName(state, '__octaneUniversalContext');
+	state.helpers.activity = allocName(state, '__octaneUniversalActivity');
 	if (state.hmr) {
 		state.helpers.hmr = allocName(state, '__octaneUniversalHmr');
 		state.helpers.hmrSymbol = allocName(state, '__octaneUniversalHmrSymbol');
@@ -1939,7 +2010,7 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 		`universalProps as ${state.helpers.props}, universalIf as ${state.helpers.if}, ` +
 		`universalSwitch as ${state.helpers.switch}, universalFor as ${state.helpers.for}, ` +
 		`universalTry as ${state.helpers.try}, universalChildren as ${state.helpers.children}, ` +
-		`universalContext as ${state.helpers.context}` +
+		`universalContext as ${state.helpers.context}, universalActivity as ${state.helpers.activity}` +
 		(state.hmr
 			? `, hmrUniversalComponent as ${state.helpers.hmr}, UNIVERSAL_HMR as ${state.helpers.hmrSymbol}`
 			: '') +
@@ -1999,6 +2070,7 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 			for: state.helpers.for,
 			try: state.helpers.try,
 			context: state.helpers.context,
+			activity: state.helpers.activity,
 		},
 		components: state.components,
 		sourceMap: intermediateMap,

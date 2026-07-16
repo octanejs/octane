@@ -41,6 +41,7 @@ const UNIVERSAL_SWITCH = Symbol.for('octane.universal.switch');
 const UNIVERSAL_FOR = Symbol.for('octane.universal.for');
 const UNIVERSAL_TRY = Symbol.for('octane.universal.try');
 const UNIVERSAL_CONTEXT = Symbol.for('octane.universal.context');
+const UNIVERSAL_ACTIVITY = Symbol.for('octane.universal.activity');
 const UNIVERSAL_KEYED = Symbol.for('octane.universal.keyed');
 const UNIVERSAL_RENDERER_REGION = Symbol.for('octane.universal.renderer-region');
 const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
@@ -153,6 +154,7 @@ export type UniversalRenderable =
 	| UniversalForValue
 	| UniversalTryValue
 	| UniversalContextValue
+	| UniversalActivityValue
 	| UniversalKeyedValue
 	| readonly UniversalRenderable[]
 	| string
@@ -232,6 +234,12 @@ export interface UniversalContextValue {
 	readonly children: UniversalRenderable | (() => UniversalRenderable);
 }
 
+export interface UniversalActivityValue {
+	readonly $$kind: typeof UNIVERSAL_ACTIVITY;
+	readonly mode: 'visible' | 'hidden';
+	readonly body: () => UniversalRenderable;
+}
+
 export interface UniversalKeyedValue {
 	readonly $$kind: typeof UNIVERSAL_KEYED;
 	readonly key: UniversalKey;
@@ -260,6 +268,70 @@ export interface UniversalRenderContext {
 	effect(create: () => void | (() => void), deps?: readonly unknown[]): void;
 }
 
+export type UniversalTextPolicy = 'reject' | 'ignore' | 'host';
+
+export interface UniversalHostCapabilities {
+	/** How primitive text children are represented. Absence defaults to `reject`. */
+	readonly text?: UniversalTextPolicy;
+	/** Allows renderer-local callbacks whose function values never enter a host batch. */
+	readonly localHostCallbacks?: boolean;
+	/** Allows core-owned retained trees to change physical host visibility. */
+	readonly visibility?: boolean;
+}
+
+export interface UniversalResourceHandle {
+	readonly $$kind: 'octane.universal.resource';
+	readonly renderer: string;
+	readonly root: number;
+	readonly id: string | number;
+}
+
+export type UniversalSerializableValue =
+	| null
+	| undefined
+	| string
+	| number
+	| bigint
+	| boolean
+	| readonly UniversalSerializableValue[]
+	| Readonly<{ [name: string]: UniversalSerializableValue }>;
+
+export type UniversalHostPropEncoding =
+	| { readonly kind: 'value'; readonly value: UniversalSerializableValue }
+	| { readonly kind: 'resource'; readonly handle: UniversalResourceHandle }
+	| { readonly kind: 'unsupported'; readonly reason?: string };
+
+export interface UniversalHostPropCodecContext<Container = unknown> {
+	readonly container: Container;
+	readonly renderer: string;
+	readonly hostType: string;
+	readonly name: string;
+	readonly value: unknown;
+	createResourceHandle(id: string | number): UniversalResourceHandle;
+}
+
+export interface UniversalHostPropCodec<Container = unknown> {
+	encode(context: UniversalHostPropCodecContext<Container>): UniversalHostPropEncoding;
+}
+
+export interface UniversalHostCallbackDefinition {
+	readonly type: string;
+}
+
+export interface UniversalHostCallbackCapability {
+	classify(name: string, value: unknown): UniversalHostCallbackDefinition | null;
+}
+
+export type UniversalHostUpdateKind = 'update' | 'recreate';
+
+export interface UniversalHostUpdateCapability {
+	classify(
+		type: string,
+		previous: Readonly<Record<string, unknown>>,
+		next: Readonly<Record<string, unknown>>,
+	): UniversalHostUpdateKind;
+}
+
 export type UniversalHostCommand =
 	| {
 			readonly op: 'create';
@@ -270,6 +342,12 @@ export type UniversalHostCommand =
 	| {
 			readonly op: 'update';
 			readonly id: number;
+			readonly props: Readonly<Record<string, unknown>>;
+	  }
+	| {
+			readonly op: 'recreate';
+			readonly id: number;
+			readonly type: string;
 			readonly props: Readonly<Record<string, unknown>>;
 	  }
 	| {
@@ -284,14 +362,28 @@ export type UniversalHostCommand =
 			readonly type: string;
 			readonly listener: UniversalEventListenerDescriptor | null;
 	  }
+	| {
+			readonly op: 'lifecycle' | 'local-callback';
+			readonly id: number;
+			readonly type: string;
+			readonly listener: UniversalListenerDescriptor | null;
+	  }
+	| {
+			readonly op: 'visibility';
+			readonly id: number;
+			readonly state: 'hidden' | 'visible';
+	  }
 	| { readonly op: 'remove'; readonly parent: number | null; readonly id: number }
 	| { readonly op: 'destroy'; readonly id: number };
 
 export type UniversalEventPriority = 'discrete' | 'continuous' | 'default';
 
-/** Serializable listener identity carried by a host batch. */
-export interface UniversalEventListenerDescriptor {
+export interface UniversalListenerDescriptor {
 	readonly id: number;
+}
+
+/** Serializable listener identity carried by a host batch. */
+export interface UniversalEventListenerDescriptor extends UniversalListenerDescriptor {
 	readonly priority: UniversalEventPriority;
 }
 
@@ -311,21 +403,43 @@ export interface UniversalHostBatch {
 	readonly commands: readonly UniversalHostCommand[];
 }
 
+export interface UniversalHostCommitContext {
+	/** Invoke a renderer-local callback after its owner table has been accepted. */
+	invokeLocalCallback(listener: number, args: readonly unknown[]): unknown;
+}
+
+export interface UniversalPreparedHostBatch {
+	/** Apply the already-validated physical host mutation. This marks the batch accepted. */
+	apply(): void;
+	/** Run renderer-local callbacks after logical owner/listener publication. */
+	afterAccept?(): void;
+	/** Release every unpublished resource staged by preparation exactly once. */
+	abort(): void;
+}
+
 export interface UniversalHostDriver<Container = unknown, PublicInstance = unknown> {
 	readonly id: string;
-	readonly capabilities?: ReadonlySet<string>;
+	readonly capabilities?: UniversalHostCapabilities;
 	readonly events?: UniversalEventCapability;
-	/** Apply a fully validated ordered batch atomically. */
-	commit(container: Container, batch: UniversalHostBatch): void;
+	readonly lifecycles?: UniversalHostCallbackCapability;
+	readonly localCallbacks?: UniversalHostCallbackCapability;
+	readonly props?: UniversalHostPropCodec<Container>;
+	readonly updates?: UniversalHostUpdateCapability;
+	/** Validate and stage a batch without mutating the public host. */
+	prepareBatch(
+		container: Container,
+		batch: UniversalHostBatch,
+		context: UniversalHostCommitContext,
+	): UniversalPreparedHostBatch;
 	getPublicInstance(container: Container, id: number): PublicInstance | null;
 }
 
 export interface UniversalCommitTransport<Container = unknown> {
-	commit(
+	prepareBatch(
 		container: Container,
 		batch: UniversalHostBatch,
-		apply: (batch: UniversalHostBatch) => void,
-	): void;
+		prepare: (batch: UniversalHostBatch) => UniversalPreparedHostBatch,
+	): UniversalPreparedHostBatch;
 }
 
 export interface UniversalRootOptions<Container> {
@@ -351,6 +465,7 @@ export interface UniversalRoot<P = any> {
 	readonly renderer: string;
 	prepare(component: UniversalComponent<P>, props: P): UniversalPreparedAttempt;
 	render(component: UniversalComponent<P>, props: P): UniversalPreparedAttempt;
+	eventScope<T>(priority: UniversalEventPriority, run: () => T): T;
 	dispatchEvent(listener: number, payload: unknown): unknown;
 	unmount(): void;
 }
@@ -369,6 +484,9 @@ interface BlueprintHost {
 	ref: unknown;
 	owner: UniversalOwnerRecord;
 	events: Map<string, BlueprintEvent>;
+	lifecycles: Map<string, BlueprintHostCallback>;
+	localCallbacks: Map<string, BlueprintHostCallback>;
+	visibility: UniversalVisibility;
 	children: BlueprintNode[];
 }
 
@@ -376,6 +494,13 @@ interface BlueprintEvent {
 	readonly prop: string;
 	readonly type: string;
 	readonly priority: UniversalEventPriority;
+	readonly handler: (...args: any[]) => any;
+	readonly owner: UniversalOwnerRecord;
+}
+
+interface BlueprintHostCallback {
+	readonly prop: string;
+	readonly type: string;
 	readonly handler: (...args: any[]) => any;
 	readonly owner: UniversalOwnerRecord;
 }
@@ -393,6 +518,9 @@ interface LogicalRecord {
 	refAttached: boolean;
 	owner: UniversalOwnerRecord | null;
 	events: Map<string, CommittedEvent>;
+	lifecycles: Map<string, CommittedHostCallback>;
+	localCallbacks: Map<string, CommittedHostCallback>;
+	visibility: UniversalVisibility;
 	parent: LogicalRecord | null;
 	children: LogicalRecord[];
 }
@@ -401,14 +529,20 @@ interface CommittedEvent extends BlueprintEvent {
 	readonly listener: number;
 }
 
+interface CommittedHostCallback extends BlueprintHostCallback {
+	readonly listener: number;
+}
+
 interface DraftRecord {
 	record: LogicalRecord;
 	blueprint: BlueprintNode;
 	children: DraftRecord[];
 	isNew: boolean;
+	hostUpdate: UniversalHostUpdateKind | null;
 }
 
 type EffectPhase = 'insertion' | 'layout' | 'passive';
+type UniversalVisibility = 'visible' | 'activity-hidden' | 'suspense-hidden';
 
 interface StateHook<T = unknown> {
 	kind: 'state';
@@ -494,6 +628,7 @@ interface UniversalOwnerRecord {
 	boundaryError: unknown;
 	hasBoundaryError: boolean;
 	boundaryThenable: PromiseLike<unknown> | null;
+	visibility: UniversalVisibility;
 	mounted: boolean;
 	disposed: boolean;
 }
@@ -509,7 +644,6 @@ interface RenderAttempt {
 	owners: DraftOwner[];
 	replayEntries: readonly SuspendedMemoEntry[];
 	retryThenables: Set<PromiseLike<unknown>>;
-	retainedThenable: PromiseLike<unknown> | null;
 	nextUniversalId: number;
 	implicitSlot: number;
 }
@@ -532,6 +666,7 @@ interface DraftOwner {
 	boundaryThenable: PromiseLike<unknown> | null;
 	isBoundary: boolean;
 	canHandleSuspense: boolean;
+	visibility: UniversalVisibility;
 }
 
 interface SuspendedOwnerSegment {
@@ -561,6 +696,7 @@ let NEXT_HOOK_SLOT = 0;
 let NEXT_OWNER_ID = 1;
 let NEXT_UNIVERSAL_ID_ROOT = 1;
 let NEXT_EVENT_ROOT = 1;
+let NEXT_RESOURCE_ROOT = 1;
 const EVENT_DISPATCHERS = new Map<number, (payload: unknown) => unknown>();
 const UNIVERSAL_SLOT_STACK: unknown[] = [];
 
@@ -946,6 +1082,20 @@ export function universalContext<T>(
 	return { $$kind: UNIVERSAL_CONTEXT, context, value, children };
 }
 
+export function universalActivity(
+	mode: 'visible' | 'hidden' | string,
+	body: () => UniversalRenderable,
+): UniversalActivityValue {
+	if (mode !== 'visible' && mode !== 'hidden') {
+		throw new TypeError(
+			`Universal Activity mode must be "visible" or "hidden", received ${JSON.stringify(mode)}.`,
+		);
+	}
+	if (typeof body !== 'function')
+		throw new TypeError('universalActivity expected a body function.');
+	return { $$kind: UNIVERSAL_ACTIVITY, mode, body };
+}
+
 /** Compiler/runtime ABI for an explicitly renderer-owned component prop. */
 export function rendererRegion<P>(
 	ownerRenderer: string,
@@ -1129,6 +1279,7 @@ function createOwnerRecord(
 		boundaryError: undefined,
 		hasBoundaryError: false,
 		boundaryThenable: null,
+		visibility: 'visible',
 		mounted: false,
 		disposed: false,
 	};
@@ -1157,6 +1308,7 @@ function draftOwner(
 		boundaryThenable: record.boundaryThenable,
 		isBoundary: record.isBoundary,
 		canHandleSuspense: record.canHandleSuspense,
+		visibility: parent?.visibility ?? 'visible',
 	};
 }
 
@@ -1379,17 +1531,45 @@ function blueprintFromLogical(record: LogicalRecord): BlueprintNode {
 		ref: record.ref,
 		owner: record.owner!,
 		events: new Map(record.events),
+		lifecycles: new Map(record.lifecycles),
+		localCallbacks: new Map(record.localCallbacks),
+		visibility: record.visibility,
 		children: record.children.map(blueprintFromLogical),
 	};
 }
 
-function retainCommittedBoundary(owner: DraftOwner): BlueprintNode[] | null {
+function markDraftOwnerSuspenseHidden(owner: DraftOwner): void {
+	owner.visibility = 'suspense-hidden';
+	for (const child of owner.children) markDraftOwnerSuspenseHidden(child);
+}
+
+function markBlueprintSuspenseHidden(nodes: readonly BlueprintNode[]): void {
+	for (const node of nodes) {
+		if (node.kind === 'host') node.visibility = 'suspense-hidden';
+		markBlueprintSuspenseHidden(node.children);
+	}
+}
+
+function retainCommittedTryArm(owner: DraftOwner): BlueprintNode[] | null {
 	if (!owner.record.mounted) return null;
-	const range = findLogicalRange(owner.record.root.rootRecordForRetention(), owner.record.rangeKey);
+	const childRecord = owner.record.children.find((child) => Object.is(child.key, 'try'));
+	if (childRecord === undefined) return null;
+	const range = findLogicalRange(owner.record.root.rootRecordForRetention(), childRecord.rangeKey);
 	if (range === null) return null;
 	resetDraftChildren(owner);
-	retainCommittedOwnerTree(owner);
-	return ownerRange(owner, range.children.map(blueprintFromLogical));
+	const child = draftOwner(
+		childRecord,
+		owner,
+		childReplayPath(owner, childRecord.component, childRecord.identityPath, childRecord.key),
+	);
+	owner.children.push(child);
+	owner.claimedChildren.add(childRecord);
+	currentAttempt().owners.push(child);
+	retainCommittedOwnerTree(child);
+	markDraftOwnerSuspenseHidden(child);
+	const nodes = ownerRange(child, range.children.map(blueprintFromLogical));
+	markBlueprintSuspenseHidden(nodes);
+	return nodes;
 }
 
 function materializeValue(
@@ -1444,6 +1624,28 @@ function materializeValue(
 			);
 		}
 		return materializeValue(children.render(), expectedRenderer, key, [...path, 'children']);
+	}
+	if ((value as UniversalActivityValue)?.$$kind === UNIVERSAL_ACTIVITY) {
+		const activity = value as UniversalActivityValue;
+		if (currentAttempt().root.driverCapabilities().visibility !== true) {
+			throw new Error(
+				`Universal renderer ${JSON.stringify(expectedRenderer)} does not declare the visibility capability.`,
+			);
+		}
+		const parent = CURRENT_OWNER;
+		if (parent === null) throw new Error('Universal Activity requires an owning component.');
+		const owner = claimChildOwner(parent, null, [...path, 'activity'], null);
+		owner.visibility =
+			parent.visibility === 'suspense-hidden'
+				? 'suspense-hidden'
+				: parent.visibility === 'activity-hidden' || activity.mode === 'hidden'
+					? 'activity-hidden'
+					: 'visible';
+		const nodes = executeOwner(owner, () =>
+			materializeValue(activity.body(), expectedRenderer, null, [...path, 'activity-output']),
+		);
+		const range = ownerRange(owner, nodes);
+		return key === null ? range : [{ kind: 'range', key, children: range }];
 	}
 	if ((value as UniversalIfValue)?.$$kind === UNIVERSAL_IF) {
 		const branch = value as UniversalIfValue;
@@ -1511,6 +1713,16 @@ function materializeValue(
 		let branchKey: unknown = 'try';
 		if (owner.boundaryThenable !== null) {
 			if (boundary.pending === null) throw new UniversalSuspense(owner.boundaryThenable);
+			const retained = retainCommittedTryArm(owner);
+			if (retained !== null) {
+				if (currentAttempt().root.driverCapabilities().visibility !== true) {
+					throw new Error(
+						`Universal renderer ${JSON.stringify(expectedRenderer)} does not declare the visibility capability required by retained Suspense.`,
+					);
+				}
+				const pending = materializeScoped(owner, [...path, 'try-arm'], 'pending', boundary.pending);
+				return ownerRange(owner, [...retained, ...pending]);
+			}
 			branchKey = 'pending';
 			branch = boundary.pending;
 		} else if (owner.hasBoundaryError) {
@@ -1529,10 +1741,22 @@ function materializeValue(
 			return ownerRange(owner, nodes);
 		} catch (error) {
 			if (error instanceof UniversalSuspense) {
-				const retained = retainCommittedBoundary(owner);
+				const retained = retainCommittedTryArm(owner);
 				if (retained !== null) {
-					currentAttempt().retainedThenable = error.thenable;
-					return retained;
+					if (boundary.pending === null) throw error;
+					if (currentAttempt().root.driverCapabilities().visibility !== true) {
+						throw new Error(
+							`Universal renderer ${JSON.stringify(expectedRenderer)} does not declare the visibility capability required by retained Suspense.`,
+						);
+					}
+					currentAttempt().retryThenables.add(error.thenable);
+					const pending = materializeScoped(
+						owner,
+						[...path, 'try-arm'],
+						'pending',
+						boundary.pending,
+					);
+					return ownerRange(owner, [...retained, ...pending]);
 				}
 				currentAttempt().retryThenables.add(error.thenable);
 				resetDraftChildren(owner);
@@ -1574,6 +1798,13 @@ function materializeValue(
 		return output;
 	}
 	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') {
+		const text = currentAttempt().root.textPolicy();
+		if (text === 'ignore') return [];
+		if (text === 'reject') {
+			throw new Error(
+				`Universal renderer ${JSON.stringify(expectedRenderer)} rejects primitive text children.`,
+			);
+		}
 		return [
 			{
 				kind: 'host',
@@ -1583,6 +1814,9 @@ function materializeValue(
 				ref: null,
 				owner: CURRENT_OWNER!.record,
 				events: new Map(),
+				lifecycles: new Map(),
+				localCallbacks: new Map(),
+				visibility: CURRENT_OWNER!.visibility,
 				children: [],
 			},
 		];
@@ -1673,6 +1907,15 @@ function materializeNode(
 			),
 		);
 	}
+	if (node.type === '#text') {
+		const text = currentAttempt().root.textPolicy();
+		if (text === 'ignore') return [];
+		if (text === 'reject') {
+			throw new Error(
+				`Universal renderer ${JSON.stringify(renderer)} rejects primitive text children.`,
+			);
+		}
+	}
 	const props: Record<string, unknown> = { ...(node.props ?? {}) };
 	for (const [name, slot] of node.bindings ?? []) props[name] = values[slot];
 	let propsValue: UniversalPropsValue | null = null;
@@ -1692,24 +1935,68 @@ function materializeNode(
 	delete props.key;
 	delete props.children;
 	const events = new Map<string, BlueprintEvent>();
+	const lifecycles = new Map<string, BlueprintHostCallback>();
+	const localCallbacks = new Map<string, BlueprintHostCallback>();
 	for (const name of Object.keys(props)) {
-		const definition = currentAttempt().root.classifyEvent(name);
-		if (definition === null) continue;
 		const handler = props[name];
-		delete props[name];
-		if (handler == null) continue;
-		if (typeof handler !== 'function') {
-			throw new TypeError(
-				`Universal event prop ${JSON.stringify(name)} for renderer ${JSON.stringify(renderer)} must be a function, null, or undefined.`,
-			);
+		const lifecycle = currentAttempt().root.classifyLifecycle(name, handler);
+		if (lifecycle !== null) {
+			delete props[name];
+			if (handler == null) continue;
+			if (typeof handler !== 'function') {
+				throw new TypeError(
+					`Universal lifecycle prop ${JSON.stringify(name)} for renderer ${JSON.stringify(renderer)} must be a function, null, or undefined.`,
+				);
+			}
+			lifecycles.set(lifecycle.type, {
+				prop: name,
+				type: lifecycle.type,
+				handler: handler as (...args: any[]) => any,
+				owner: CURRENT_OWNER!.record,
+			});
+			continue;
 		}
-		events.set(definition.type, {
-			prop: name,
-			type: definition.type,
-			priority: definition.priority ?? 'default',
-			handler: handler as (...args: any[]) => any,
-			owner: CURRENT_OWNER!.record,
-		});
+		const local = currentAttempt().root.classifyLocalCallback(name, handler);
+		if (local !== null) {
+			delete props[name];
+			if (currentAttempt().root.driverCapabilities().localHostCallbacks !== true) {
+				throw new Error(
+					`Universal renderer ${JSON.stringify(renderer)} does not declare the local-host-callback capability.`,
+				);
+			}
+			if (handler == null) continue;
+			if (typeof handler !== 'function') {
+				throw new TypeError(
+					`Universal local callback prop ${JSON.stringify(name)} for renderer ${JSON.stringify(renderer)} must be a function, null, or undefined.`,
+				);
+			}
+			localCallbacks.set(local.type, {
+				prop: name,
+				type: local.type,
+				handler: handler as (...args: any[]) => any,
+				owner: CURRENT_OWNER!.record,
+			});
+			continue;
+		}
+		const definition = currentAttempt().root.classifyEvent(name);
+		if (definition !== null) {
+			delete props[name];
+			if (handler == null) continue;
+			if (typeof handler !== 'function') {
+				throw new TypeError(
+					`Universal event prop ${JSON.stringify(name)} for renderer ${JSON.stringify(renderer)} must be a function, null, or undefined.`,
+				);
+			}
+			events.set(definition.type, {
+				prop: name,
+				type: definition.type,
+				priority: definition.priority ?? 'default',
+				handler: handler as (...args: any[]) => any,
+				owner: CURRENT_OWNER!.record,
+			});
+			continue;
+		}
+		props[name] = currentAttempt().root.encodeHostProp(node.type, name, handler);
 	}
 	const children: BlueprintNode[] = [];
 	if ((node.children?.length ?? 0) > 0) {
@@ -1730,6 +2017,9 @@ function materializeNode(
 			ref,
 			owner: CURRENT_OWNER!.record,
 			events,
+			lifecycles,
+			localCallbacks,
+			visibility: CURRENT_OWNER!.visibility,
 			children,
 		},
 	];
@@ -1754,21 +2044,6 @@ function materializePlanValue(
 	return [{ kind: 'range', key: value.key, children: nodes }];
 }
 
-function assertBlueprintCapabilities(
-	nodes: readonly BlueprintNode[],
-	renderer: string,
-	capabilities: ReadonlySet<string> | undefined,
-): void {
-	for (const node of nodes) {
-		if (node.kind === 'host' && node.type === '#text' && !capabilities?.has('text')) {
-			throw new Error(
-				`Universal renderer ${JSON.stringify(renderer)} does not declare the text capability.`,
-			);
-		}
-		assertBlueprintCapabilities(node.children, renderer, capabilities);
-	}
-}
-
 function sameRecordShape(record: LogicalRecord, blueprint: BlueprintNode): boolean {
 	return (
 		record.kind === blueprint.kind &&
@@ -1789,6 +2064,9 @@ function createLogicalRecord(id: number, blueprint: BlueprintNode): LogicalRecor
 		refAttached: false,
 		owner: null,
 		events: new Map(),
+		lifecycles: new Map(),
+		localCallbacks: new Map(),
+		visibility: blueprint.kind === 'host' ? blueprint.visibility : 'visible',
 		parent: null,
 		children: [],
 	};
@@ -2738,7 +3016,8 @@ export function createPortal(): never {
 	throw new Error('The active universal renderer does not declare the portal capability.');
 }
 
-export const Activity: unique symbol = Symbol.for('octane.universal.unsupported.Activity') as any;
+/** Compiler sentinel for the supported universal Activity descriptor. */
+export const Activity: unique symbol = Symbol.for('octane.Activity') as any;
 
 function runEffectCreate(hook: EffectHook): void {
 	const cleanup = (hook.create as (...args: unknown[]) => void | (() => void))(
@@ -2812,6 +3091,74 @@ function runOwnedCommit(owner: UniversalOwnerRecord | null, work: () => void): v
 	}
 }
 
+function cloneSerializableValue(
+	value: unknown,
+	seen: WeakSet<object> = new WeakSet(),
+): UniversalSerializableValue {
+	if (
+		value === null ||
+		value === undefined ||
+		typeof value === 'string' ||
+		typeof value === 'number' ||
+		typeof value === 'bigint' ||
+		typeof value === 'boolean'
+	) {
+		return value;
+	}
+	if (typeof value !== 'object') {
+		throw new TypeError(`Unsupported serializable host value ${String(value)}.`);
+	}
+	if ((value as Partial<UniversalResourceHandle>).$$kind === 'octane.universal.resource') {
+		throw new TypeError('A resource handle must use the resource encoding branch.');
+	}
+	if (seen.has(value)) throw new TypeError('Serializable host values cannot contain cycles.');
+	seen.add(value);
+	try {
+		if (Array.isArray(value)) {
+			return Object.freeze(value.map((entry) => cloneSerializableValue(entry, seen)));
+		}
+		const prototype = Object.getPrototypeOf(value);
+		if (prototype !== Object.prototype && prototype !== null) {
+			throw new TypeError(
+				`Serializable host values require plain objects, received ${Object.prototype.toString.call(value)}.`,
+			);
+		}
+		const output: Record<string, UniversalSerializableValue> = {};
+		for (const [name, entry] of Object.entries(value)) {
+			Object.defineProperty(output, name, {
+				configurable: true,
+				enumerable: true,
+				value: cloneSerializableValue(entry, seen),
+				writable: true,
+			});
+		}
+		return Object.freeze(output);
+	} finally {
+		seen.delete(value);
+	}
+}
+
+function freezeUniversalHostBatch(
+	renderer: string,
+	version: number,
+	commands: readonly UniversalHostCommand[],
+): UniversalHostBatch {
+	const frozenCommands = commands.map((command) => {
+		if (
+			(command.op === 'event' || command.op === 'lifecycle' || command.op === 'local-callback') &&
+			command.listener !== null
+		) {
+			Object.freeze(command.listener);
+		}
+		return Object.freeze(command);
+	});
+	return Object.freeze({
+		renderer,
+		version,
+		commands: Object.freeze(frozenCommands),
+	});
+}
+
 function collectEffectEventCells(owners: readonly UniversalOwnerRecord[]): EffectEventCell[] {
 	const cells: EffectEventCell[] = [];
 	for (const owner of owners) {
@@ -2830,14 +3177,16 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	readonly renderer: string;
 	private readonly rootRecord: LogicalRecord;
 	private readonly universalIdRoot = NEXT_UNIVERSAL_ID_ROOT++;
+	private readonly resourceRoot = NEXT_RESOURCE_ROOT++;
 	private owner: UniversalOwnerRecord | null = null;
 	private bridge: BoundaryOwner | null = null;
 	private unmounted = false;
 	private nextId = 1;
 	private nextUniversalId = 1;
 	private nextListener = NEXT_EVENT_ROOT++ * 1_000_000;
-	private version = 0;
-	private readonly handlers = new Map<number, CommittedEvent>();
+	private nextBatchVersion = 1;
+	private handlers = new Map<number, CommittedEvent>();
+	private localCallbacks = new Map<number, CommittedHostCallback>();
 	private readonly publishedListeners = new Set<number>();
 	private pending: UniversalTransactionImpl<Container, PublicInstance> | null = null;
 	private suspended: UniversalSuspendedAttemptImpl | null = null;
@@ -2847,6 +3196,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private lastComponent: UniversalComponent<any> | null = null;
 	private lastProps: any;
 	private scheduled = false;
+	private eventScopeDepth = 0;
+	private eventScopePriority: UniversalEventPriority | null = null;
+	private eventScopeHandlers: ReadonlyMap<number, CommittedEvent> | null = null;
 	private passiveScheduled = false;
 	private readonly passiveTasks: (() => void)[] = [];
 
@@ -2868,6 +3220,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			refAttached: false,
 			owner: null,
 			events: new Map(),
+			lifecycles: new Map(),
+			localCallbacks: new Map(),
+			visibility: 'visible',
 			parent: null,
 			children: [],
 		};
@@ -2906,9 +3261,119 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		return this.driver.events?.classify(name) ?? null;
 	}
 
+	classifyLifecycle(name: string, value: unknown): UniversalHostCallbackDefinition | null {
+		return this.driver.lifecycles?.classify(name, value) ?? null;
+	}
+
+	classifyLocalCallback(name: string, value: unknown): UniversalHostCallbackDefinition | null {
+		return this.driver.localCallbacks?.classify(name, value) ?? null;
+	}
+
+	textPolicy(): UniversalTextPolicy {
+		return this.driver.capabilities?.text ?? 'reject';
+	}
+
+	driverCapabilities(): UniversalHostCapabilities {
+		return this.driver.capabilities ?? {};
+	}
+
+	encodeHostProp(hostType: string, name: string, value: unknown): unknown {
+		const codec = this.driver.props;
+		if (codec === undefined) return value;
+		const result = codec.encode({
+			container: this.container,
+			renderer: this.renderer,
+			hostType,
+			name,
+			value,
+			createResourceHandle: (id) => {
+				if ((typeof id !== 'string' && typeof id !== 'number') || String(id).length === 0) {
+					throw new TypeError(
+						'A universal resource handle ID must be a non-empty string or number.',
+					);
+				}
+				return Object.freeze({
+					$$kind: 'octane.universal.resource' as const,
+					renderer: this.renderer,
+					root: this.resourceRoot,
+					id,
+				});
+			},
+		});
+		if (result === null || typeof result !== 'object') {
+			throw new TypeError(
+				`Universal prop codec for ${JSON.stringify(name)} returned an invalid result.`,
+			);
+		}
+		if (result.kind === 'unsupported') {
+			throw new TypeError(
+				result.reason ??
+					`Universal renderer ${JSON.stringify(this.renderer)} does not support host prop ${JSON.stringify(name)}.`,
+			);
+		}
+		if (result.kind === 'value') return cloneSerializableValue(result.value);
+		if (result.kind !== 'resource') {
+			throw new TypeError(
+				`Universal prop codec for ${JSON.stringify(name)} returned unknown encoding ${JSON.stringify((result as any).kind)}.`,
+			);
+		}
+		const handle = result.handle;
+		if (
+			handle?.$$kind !== 'octane.universal.resource' ||
+			handle.renderer !== this.renderer ||
+			handle.root !== this.resourceRoot ||
+			(typeof handle.id !== 'string' && typeof handle.id !== 'number')
+		) {
+			throw new Error(
+				`Universal resource handle for ${JSON.stringify(name)} does not belong to renderer ${JSON.stringify(this.renderer)} and this root.`,
+			);
+		}
+		return handle;
+	}
+
+	eventScope<T>(priority: UniversalEventPriority, run: () => T): T {
+		if (priority !== 'discrete' && priority !== 'continuous' && priority !== 'default') {
+			throw new TypeError(`Unknown universal event priority ${JSON.stringify(priority)}.`);
+		}
+		if (this.eventScopeDepth > 0) {
+			if (this.eventScopePriority !== priority) {
+				throw new Error(
+					`Nested universal event scopes must retain priority ${JSON.stringify(this.eventScopePriority)}.`,
+				);
+			}
+			this.eventScopeDepth++;
+			try {
+				return run();
+			} finally {
+				this.eventScopeDepth--;
+			}
+		}
+		this.eventScopeDepth = 1;
+		this.eventScopePriority = priority;
+		this.eventScopeHandlers = this.handlers;
+		try {
+			return run();
+		} finally {
+			this.eventScopeDepth = 0;
+			this.eventScopePriority = null;
+			this.eventScopeHandlers = null;
+			if (this.scheduled) {
+				if (priority === 'discrete') this.flushScheduledWork();
+				else this.queueScheduledWork();
+			}
+		}
+	}
+
 	dispatchEvent(listener: number, payload: unknown): unknown {
-		const event = this.handlers.get(listener);
-		if (event === undefined || event.owner.disposed) {
+		if (this.eventScopeDepth === 0) {
+			const event = this.handlers.get(listener);
+			if (event === undefined || event.owner.disposed) {
+				throw new Error(`Unknown or inactive universal event listener ${listener}.`);
+			}
+			return this.eventScope(event.priority, () => this.dispatchEvent(listener, payload));
+		}
+		const event = this.eventScopeHandlers!.get(listener);
+		if (event === undefined) {
 			throw new Error(`Unknown or inactive universal event listener ${listener}.`);
 		}
 		let result: unknown;
@@ -2917,30 +3382,46 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		} catch (error) {
 			if (!routeUniversalOwnerError(event.owner, error)) throw error;
 		}
-		if (event.priority === 'discrete' && this.scheduled && this.lastComponent !== null) {
-			this.scheduled = false;
-			this.render(this.lastComponent, this.lastProps);
-		}
 		return result;
+	}
+
+	invokeLocalCallback(listener: number, args: readonly unknown[]): unknown {
+		const callback = this.localCallbacks.get(listener);
+		if (callback === undefined || callback.owner.disposed) {
+			throw new Error(`Unknown or inactive universal local callback ${listener}.`);
+		}
+		let result: unknown;
+		runOwnedCommit(callback.owner, () => {
+			result = callback.handler(...args);
+		});
+		if (typeof result !== 'function') return result;
+		const cleanup = result as () => void;
+		return () => runOwnedCommit(callback.owner, cleanup);
+	}
+
+	private flushScheduledWork(): void {
+		if (!this.scheduled) return;
+		this.scheduled = false;
+		if (this.unmounted || this.owner?.disposed || this.lastComponent === null) return;
+		if (this.bridge !== null) this.bridge.invalidate();
+		else this.render(this.lastComponent, this.lastProps);
+	}
+
+	private queueScheduledWork(): void {
+		if (!this.scheduled) return;
+		if (this.bridge !== null) {
+			this.scheduled = false;
+			this.bridge.invalidate();
+			return;
+		}
+		queueMicrotask(() => this.flushScheduledWork());
 	}
 
 	schedule(): void {
 		if (this.unmounted || this.owner?.disposed || this.lastComponent === null || this.scheduled)
 			return;
 		this.scheduled = true;
-		const bridge = this.bridge;
-		if (bridge !== null) {
-			bridge.invalidate();
-			this.scheduled = false;
-			return;
-		}
-		queueMicrotask(() => {
-			if (!this.scheduled) return;
-			this.scheduled = false;
-			if (!this.unmounted && !this.owner?.disposed && this.lastComponent !== null) {
-				this.render(this.lastComponent, this.lastProps);
-			}
-		});
+		if (this.eventScopeDepth === 0) this.queueScheduledWork();
 	}
 
 	private cancelSuspendedReplays(): void {
@@ -3113,7 +3594,6 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			owners: [owner],
 			replayEntries,
 			retryThenables: new Set(),
-			retainedThenable: null,
 			nextUniversalId: this.nextUniversalId,
 			implicitSlot: 0,
 		};
@@ -3136,13 +3616,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			CURRENT_ATTEMPT = previousAttempt;
 			CURRENT_OWNER = previousOwner;
 		}
-		if (attempt.retainedThenable !== null) {
-			const suspendedMemos = collectSuspendedMemos(attempt);
-			this.discardDraftOwners(attempt.owners);
-			return this.suspend(attempt.retainedThenable, component, props, suspendedMemos);
-		}
 		try {
-			assertBlueprintCapabilities(nodes, this.renderer, this.driver.capabilities);
 			const rootBlueprint: BlueprintRange = { kind: 'range', key: null, children: nodes };
 			const transaction = this.createTransaction(rootBlueprint, attempt, component, props);
 			this.pending = transaction;
@@ -3216,6 +3690,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					blueprint: child,
 					children: reconcileChildren(record.children, child.children),
 					isNew,
+					hostUpdate: null,
 				});
 			}
 			return output;
@@ -3226,6 +3701,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			blueprint,
 			children: reconcileChildren(this.rootRecord.children, blueprint.children),
 			isNew: false,
+			hostUpdate: null,
 		};
 		const removedRoots: LogicalRecord[] = [];
 		const findRemoved = (parent: LogicalRecord) => {
@@ -3285,22 +3761,42 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 		const creates: UniversalHostCommand[] = [];
 		const updates: UniversalHostCommand[] = [];
+		const recreated = new Set<LogicalRecord>();
 		walkDraft(draftRoot, (draft) => {
 			if (draft.record.kind !== 'host') return;
 			const blueprintHost = draft.blueprint as BlueprintHost;
+			const props = Object.freeze({ ...blueprintHost.props });
 			if (draft.isNew) {
 				creates.push({
 					op: 'create',
 					id: draft.record.id,
 					type: blueprintHost.type,
-					props: Object.freeze({ ...blueprintHost.props }),
+					props,
 				});
 			} else if (!shallowPropsEqual(draft.record.props, blueprintHost.props)) {
-				updates.push({
-					op: 'update',
-					id: draft.record.id,
-					props: Object.freeze({ ...blueprintHost.props }),
-				});
+				const kind =
+					this.driver.updates?.classify(
+						blueprintHost.type,
+						draft.record.props,
+						blueprintHost.props,
+					) ?? 'update';
+				if (kind !== 'update' && kind !== 'recreate') {
+					throw new TypeError(
+						`Universal update classifier returned invalid kind ${JSON.stringify(kind)}.`,
+					);
+				}
+				draft.hostUpdate = kind;
+				if (kind === 'recreate') {
+					recreated.add(draft.record);
+					updates.push({
+						op: 'recreate',
+						id: draft.record.id,
+						type: blueprintHost.type,
+						props,
+					});
+				} else {
+					updates.push({ op: 'update', id: draft.record.id, props });
+				}
 			}
 		});
 
@@ -3342,27 +3838,63 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				planPlacements(draft.record.id, draft.record.children, draft.children);
 			}
 		});
+		const hiddenVisibilityCommands: UniversalHostCommand[] = [];
+		const visibleVisibilityCommands: UniversalHostCommand[] = [];
+		const stageHiddenVisibility = (draft: DraftRecord) => {
+			if (draft.record.kind !== 'host') return;
+			const nextHidden = (draft.blueprint as BlueprintHost).visibility !== 'visible';
+			const previousHidden = draft.record.visibility !== 'visible';
+			if (nextHidden && (draft.isNew || recreated.has(draft.record) || !previousHidden)) {
+				hiddenVisibilityCommands.push({
+					op: 'visibility',
+					id: draft.record.id,
+					state: 'hidden',
+				});
+			}
+		};
+		const stageVisibleVisibility = (draft: DraftRecord) => {
+			if (draft.record.kind !== 'host') return;
+			const nextHidden = (draft.blueprint as BlueprintHost).visibility !== 'visible';
+			const previousHidden = draft.record.visibility !== 'visible';
+			if (!nextHidden && !draft.isNew && previousHidden) {
+				visibleVisibilityCommands.push({
+					op: 'visibility',
+					id: draft.record.id,
+					state: 'visible',
+				});
+			}
+		};
+		// Hide descendants before ancestors so attached resources can detach from
+		// their live parent; reveal parents before descendants for the inverse path.
+		walkDraftPostOrder(draftRoot, stageHiddenVisibility);
+		walkDraft(draftRoot, stageVisibleVisibility);
+		const visibilityCommands = [...hiddenVisibilityCommands, ...visibleVisibilityCommands];
 
 		const removedHosts: LogicalRecord[] = [];
 		for (const removed of removedRoots) collectRemovedPostOrder(removed, removedHosts);
 		let nextListener = this.nextListener;
 		const eventCommands: UniversalHostCommand[] = [];
 		const stagedEvents = new Map<LogicalRecord, Map<string, CommittedEvent>>();
+		const stagedVisibleEventRecords = new Set<LogicalRecord>();
 		walkDraft(draftRoot, (draft) => {
 			if (draft.record.kind !== 'host') return;
-			const blueprintEvents = (draft.blueprint as BlueprintHost).events;
+			const blueprintHost = draft.blueprint as BlueprintHost;
+			const blueprintEvents = blueprintHost.events;
+			const wasVisible = draft.record.visibility === 'visible';
+			const isVisible = blueprintHost.visibility === 'visible';
+			if (isVisible) stagedVisibleEventRecords.add(draft.record);
 			const nextEvents = new Map<string, CommittedEvent>();
 			for (const [type, event] of blueprintEvents) {
 				const previous = draft.record.events.get(type);
 				const listener = previous?.listener ?? nextListener++;
 				const committed = { ...event, listener };
 				nextEvents.set(type, committed);
-				if (
+				const changed =
 					previous === undefined ||
 					previous.handler !== event.handler ||
 					previous.priority !== event.priority ||
-					previous.owner !== event.owner
-				) {
+					previous.owner !== event.owner;
+				if (isVisible && (!wasVisible || changed)) {
 					eventCommands.push({
 						op: 'event',
 						id: draft.record.id,
@@ -3372,34 +3904,82 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 			}
 			for (const [type] of draft.record.events) {
-				if (!nextEvents.has(type)) {
+				if (wasVisible && (!isVisible || !nextEvents.has(type))) {
 					eventCommands.push({ op: 'event', id: draft.record.id, type, listener: null });
 				}
 			}
 			stagedEvents.set(draft.record, nextEvents);
 		});
 		for (const record of removedHosts) {
+			if (record.visibility !== 'visible') continue;
 			for (const [type] of record.events) {
 				eventCommands.push({ op: 'event', id: record.id, type, listener: null });
 			}
 		}
+		const stageHostCallbacks = (
+			op: 'lifecycle' | 'local-callback',
+			readBlueprint: (host: BlueprintHost) => Map<string, BlueprintHostCallback>,
+			readCommitted: (record: LogicalRecord) => Map<string, CommittedHostCallback>,
+		) => {
+			const commands: UniversalHostCommand[] = [];
+			const staged = new Map<LogicalRecord, Map<string, CommittedHostCallback>>();
+			walkDraft(draftRoot, (draft) => {
+				if (draft.record.kind !== 'host') return;
+				const blueprintCallbacks = readBlueprint(draft.blueprint as BlueprintHost);
+				const previousCallbacks = readCommitted(draft.record);
+				const nextCallbacks = new Map<string, CommittedHostCallback>();
+				for (const [type, callback] of blueprintCallbacks) {
+					const previous = previousCallbacks.get(type);
+					const listener = previous?.listener ?? nextListener++;
+					nextCallbacks.set(type, { ...callback, listener });
+					if (
+						previous === undefined ||
+						previous.handler !== callback.handler ||
+						previous.owner !== callback.owner
+					) {
+						commands.push({ op, id: draft.record.id, type, listener: { id: listener } });
+					}
+				}
+				for (const [type] of previousCallbacks) {
+					if (!nextCallbacks.has(type)) {
+						commands.push({ op, id: draft.record.id, type, listener: null });
+					}
+				}
+				staged.set(draft.record, nextCallbacks);
+			});
+			for (const record of removedHosts) {
+				for (const [type] of readCommitted(record)) {
+					commands.push({ op, id: record.id, type, listener: null });
+				}
+			}
+			return { commands, staged };
+		};
+		const lifecycleStage = stageHostCallbacks(
+			'lifecycle',
+			(host) => host.lifecycles,
+			(record) => record.lifecycles,
+		);
+		const localCallbackStage = stageHostCallbacks(
+			'local-callback',
+			(host) => host.localCallbacks,
+			(record) => record.localCallbacks,
+		);
 		const destroys: UniversalHostCommand[] = removedHosts.map((record) => ({
 			op: 'destroy',
 			id: record.id,
 		}));
-		const commands = Object.freeze([
+		const commands: UniversalHostCommand[] = [
 			...creates,
 			...updates,
 			...eventCommands,
+			...lifecycleStage.commands,
+			...localCallbackStage.commands,
 			...removes,
 			...placements,
+			...visibilityCommands,
 			...destroys,
-		]);
-		const batch: UniversalHostBatch = Object.freeze({
-			renderer: this.renderer,
-			version: this.version + 1,
-			commands,
-		});
+		];
+		const batch = freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, commands);
 		const retryThenables = [...attempt.retryThenables];
 		const retryMemos = retryThenables.length === 0 ? ([] as const) : collectSuspendedMemos(attempt);
 
@@ -3409,6 +3989,18 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			cleanup: (() => void) | null;
 		}[] = [];
 		const refAttaches: DraftRecord[] = [];
+		const hostDraftsById = new Map<number, DraftRecord>();
+		const lifecycleDrafts = new Set<DraftRecord>();
+		walkDraft(draftRoot, (draft) => {
+			if (draft.record.kind !== 'host') return;
+			hostDraftsById.set(draft.record.id, draft);
+			if (draft.isNew || draft.hostUpdate !== null) lifecycleDrafts.add(draft);
+		});
+		for (const placement of placements) {
+			if (placement.op !== 'move') continue;
+			const draft = hostDraftsById.get(placement.id);
+			if (draft !== undefined) lifecycleDrafts.add(draft);
+		}
 		for (const removed of removedRoots) {
 			walkLogical(removed, (record) => {
 				if (record.kind === 'host' && record.refAttached) {
@@ -3418,8 +4010,19 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		}
 		walkDraftPostOrder(draftRoot, (draft) => {
 			if (draft.record.kind !== 'host') return;
-			const nextRef = (draft.blueprint as BlueprintHost).ref;
-			if (!draft.isNew && !Object.is(draft.record.ref, nextRef) && draft.record.refAttached) {
+			const blueprintHost = draft.blueprint as BlueprintHost;
+			const nextRef = blueprintHost.ref;
+			const suspenseHide =
+				draft.record.visibility !== 'suspense-hidden' &&
+				blueprintHost.visibility === 'suspense-hidden';
+			const suspenseReveal =
+				draft.record.visibility === 'suspense-hidden' &&
+				blueprintHost.visibility !== 'suspense-hidden';
+			if (
+				!draft.isNew &&
+				draft.record.refAttached &&
+				(recreated.has(draft.record) || suspenseHide || !Object.is(draft.record.ref, nextRef))
+			) {
 				refDetaches.push({
 					record: draft.record,
 					ref: draft.record.ref,
@@ -3428,7 +4031,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 			if (
 				nextRef != null &&
-				(draft.isNew || !draft.record.refAttached || !Object.is(draft.record.ref, nextRef))
+				blueprintHost.visibility !== 'suspense-hidden' &&
+				(draft.isNew ||
+					recreated.has(draft.record) ||
+					suspenseReveal ||
+					!draft.record.refAttached ||
+					!Object.is(draft.record.ref, nextRef))
 			) {
 				refAttaches.push(draft);
 			}
@@ -3469,25 +4077,56 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 		}
 		const effectChanges: { owner: DraftOwner; next: EffectHook; changed: boolean }[] = [];
+		const disconnectedPreviousEffects = new Set<EffectHook>();
+		// Activity/Suspense deactivation follows deletion cleanup order: parent
+		// owners before their children. Insertion effects intentionally stay live.
+		for (const owner of draftOwnersParentFirst) {
+			if (
+				owner.record.visibility !== 'visible' ||
+				owner.visibility === 'visible' ||
+				!owner.record.mounted
+			) {
+				continue;
+			}
+			const nextBySlot = new Map(owner.seenEffects.map((effect) => [effect.slot, effect]));
+			for (const previous of owner.record.effectOrder) {
+				if (previous.phase === 'insertion' || !previous.mounted) continue;
+				const next = nextBySlot.get(previous.slot);
+				orderedEffectCleanups.push({
+					phase: previous.phase,
+					hook: next?.phase === previous.phase ? next : previous,
+				});
+				disconnectedPreviousEffects.add(previous);
+			}
+		}
 		for (const owner of draftOwnersPostOrder) {
 			const seenSlots = new Set(owner.seenEffects.map((effect) => effect.slot));
 			const nextByPrevious = new Map<EffectHook, EffectHook>();
 			for (const next of owner.seenEffects) {
+				const visibilityChanged =
+					next.phase !== 'insertion' &&
+					(owner.record.visibility === 'visible') !== (owner.visibility === 'visible');
 				const changed =
-					owner.record.hooks.get(next.slot) !== next &&
-					(next.previous === null ||
-						next.previous.phase !== next.phase ||
-						!depsEqual(next.previous.deps, next.deps) ||
-						!next.previous.mounted);
+					visibilityChanged ||
+					(owner.record.hooks.get(next.slot) !== next &&
+						(next.previous === null ||
+							next.previous.phase !== next.phase ||
+							!depsEqual(next.previous.deps, next.deps) ||
+							!next.previous.mounted));
 				effectChanges.push({ owner, next, changed });
-				if (changed && next.previous !== null && next.previous.mounted) {
+				if (
+					changed &&
+					next.previous !== null &&
+					next.previous.mounted &&
+					!disconnectedPreviousEffects.has(next.previous)
+				) {
 					nextByPrevious.set(next.previous, next);
 				}
 			}
 			for (const previous of owner.record.effectOrder) {
 				if (!seenSlots.has(previous.slot)) {
 					owner.hooks.delete(previous.slot);
-					if (previous.mounted) {
+					if (previous.mounted && !disconnectedPreviousEffects.has(previous)) {
 						orderedEffectCleanups.push({ phase: previous.phase, hook: previous });
 					}
 					continue;
@@ -3511,33 +4150,64 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					record.ref = host.ref;
 					record.owner = host.owner;
 					record.events = stagedEvents.get(record) ?? new Map();
+					record.lifecycles = lifecycleStage.staged.get(record) ?? new Map();
+					record.localCallbacks = localCallbackStage.staged.get(record) ?? new Map();
+					record.visibility = host.visibility;
 				}
 				record.children = draft.children.map((child) => child.record);
 				for (const child of draft.children) apply(child, record);
 			};
 			apply(draftRoot, null);
 		};
+		const lifecycleOrder: DraftRecord[] = [];
+		walkDraftPostOrder(draftRoot, (draft) => {
+			if (lifecycleDrafts.has(draft)) lifecycleOrder.push(draft);
+		});
+		const prepareHost = (value: UniversalHostBatch) =>
+			this.driver.prepareBatch(this.container, value, {
+				invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
+			});
+		const preparedHost =
+			this.transport === null
+				? prepareHost(batch)
+				: this.transport.prepareBatch(this.container, batch, prepareHost);
+		if (
+			preparedHost === null ||
+			typeof preparedHost !== 'object' ||
+			typeof preparedHost.apply !== 'function' ||
+			typeof preparedHost.abort !== 'function' ||
+			(preparedHost.afterAccept !== undefined && typeof preparedHost.afterAccept !== 'function')
+		) {
+			throw new TypeError('A universal host driver must return a valid prepared batch token.');
+		}
 
 		const transaction = new UniversalTransactionImpl(
 			this,
 			batch,
+			() => preparedHost.apply(),
 			() => {
-				const apply = (value: UniversalHostBatch) => this.driver.commit(this.container, value);
-				if (this.transport === null) apply(batch);
-				else this.transport.commit(this.container, batch, apply);
 				applyLogicalTopology();
 				for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
 				this.publishedListeners.clear();
-				this.handlers.clear();
-				for (const events of stagedEvents.values()) {
+				const handlers = new Map<number, CommittedEvent>();
+				for (const [record, events] of stagedEvents) {
+					if (!stagedVisibleEventRecords.has(record)) continue;
 					for (const event of events.values()) {
-						this.handlers.set(event.listener, event);
+						handlers.set(event.listener, event);
 						this.publishedListeners.add(event.listener);
 						EVENT_DISPATCHERS.set(event.listener, (payload) =>
 							this.dispatchEvent(event.listener, payload),
 						);
 					}
 				}
+				this.handlers = handlers;
+				const localCallbacks = new Map<number, CommittedHostCallback>();
+				for (const callbacks of localCallbackStage.staged.values()) {
+					for (const callback of callbacks.values()) {
+						localCallbacks.set(callback.listener, callback);
+					}
+				}
+				this.localCallbacks = localCallbacks;
 				for (const owner of removedOwners) {
 					owner.disposed = true;
 					owner.mounted = false;
@@ -3554,6 +4224,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					record.boundaryError = draft.boundaryError;
 					record.hasBoundaryError = draft.hasBoundaryError;
 					record.boundaryThenable = draft.boundaryThenable;
+					record.visibility = draft.visibility;
 					record.mounted = true;
 					record.disposed = false;
 					for (const [slot, count] of draft.appliedUpdates) {
@@ -3578,7 +4249,6 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				this.nextId = nextId;
 				this.nextUniversalId = attempt.nextUniversalId;
 				this.nextListener = nextListener;
-				this.version = batch.version;
 				for (const context of changedContexts) context.$$version++;
 				const retainedRegionCells = new Set<RendererRegionBridgeCell>();
 				for (const { next, previous } of stagedRegionBridges) {
@@ -3594,6 +4264,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					previous.deactivate();
 				}
 			},
+			() => preparedHost.afterAccept?.(),
 			() => {
 				const tasks: (() => void)[] = [];
 				for (const cleanup of orderedEffectCleanups) {
@@ -3616,6 +4287,20 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			},
 			() => {
 				const tasks: (() => void)[] = [];
+				for (const draft of lifecycleOrder) {
+					const record = draft.record;
+					for (const callback of record.lifecycles.values()) {
+						tasks.push(() =>
+							runOwnedCommit(callback.owner, () =>
+								callback.handler(this.driver.getPublicInstance(this.container, record.id)),
+							),
+						);
+					}
+				}
+				runCommitTasks(tasks);
+			},
+			() => {
+				const tasks: (() => void)[] = [];
 				for (const draft of refAttaches) {
 					const record = draft.record;
 					tasks.push(() =>
@@ -3624,8 +4309,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						),
 					);
 				}
-				for (const { next, changed } of effectChanges) {
-					if (changed && next.phase === 'layout') tasks.push(() => runOwnedEffectCreate(next));
+				for (const { owner, next, changed } of effectChanges) {
+					if (changed && next.phase === 'layout' && owner.visibility === 'visible') {
+						tasks.push(() => runOwnedEffectCreate(next));
+					}
 				}
 				runCommitTasks(tasks);
 			},
@@ -3643,7 +4330,13 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					}
 					for (const { owner, next, changed } of effectChanges) {
 						if (!changed || next.phase !== 'passive') continue;
-						if (owner.record.hooks.get(next.slot) !== next || owner.record.disposed) continue;
+						if (
+							owner.record.hooks.get(next.slot) !== next ||
+							owner.record.disposed ||
+							owner.record.visibility !== 'visible'
+						) {
+							continue;
+						}
 						tasks.push(() => runOwnedEffectCreate(next));
 					}
 					runCommitTasks(tasks);
@@ -3651,6 +4344,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					deactivateEffectEventCells(removedEffectEventCells);
 				}
 			},
+			() => preparedHost.abort(),
 			() => this.discardDraftOwners(draftOwnersParentFirst),
 		);
 		return transaction;
@@ -3662,7 +4356,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 	unmount(): void {
 		if (this.unmounted) return;
-		this.pending?.abort();
+		let pendingAbortError: unknown = NO_PENDING_PASSIVE_ERROR;
+		try {
+			this.pending?.abort();
+		} catch (error) {
+			pendingAbortError = error;
+		}
 		this.suspended?.abort();
 		this.cancelSuspendedReplays();
 		const owners: UniversalOwnerRecord[] = [];
@@ -3688,34 +4387,61 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const physical = physicalRecords(this.rootRecord.children);
 		const removedHosts: LogicalRecord[] = [];
 		for (const child of this.rootRecord.children) collectRemovedPostOrder(child, removedHosts);
+		let acceptedHostError: unknown = NO_PENDING_PASSIVE_ERROR;
 		if (removedHosts.length > 0) {
-			const batch: UniversalHostBatch = Object.freeze({
-				renderer: this.renderer,
-				version: this.version + 1,
-				commands: Object.freeze([
-					...removedHosts.flatMap((record) =>
-						[...record.events.keys()].map(
-							(type): UniversalHostCommand => ({
-								op: 'event',
-								id: record.id,
-								type,
-								listener: null,
-							}),
-						),
+			const batch = freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, [
+				...removedHosts.flatMap((record) =>
+					[...record.events.keys()].map(
+						(type): UniversalHostCommand => ({
+							op: 'event',
+							id: record.id,
+							type,
+							listener: null,
+						}),
 					),
-					...physical.map((record) => ({ op: 'remove' as const, parent: null, id: record.id })),
-					...removedHosts.map((record) => ({ op: 'destroy' as const, id: record.id })),
-				]),
-			});
-			const apply = (value: UniversalHostBatch) => this.driver.commit(this.container, value);
-			if (this.transport === null) apply(batch);
-			else this.transport.commit(this.container, batch, apply);
-			this.version = batch.version;
+				),
+				...removedHosts.flatMap((record) =>
+					[...record.lifecycles.keys()].map(
+						(type): UniversalHostCommand => ({
+							op: 'lifecycle',
+							id: record.id,
+							type,
+							listener: null,
+						}),
+					),
+				),
+				...removedHosts.flatMap((record) =>
+					[...record.localCallbacks.keys()].map(
+						(type): UniversalHostCommand => ({
+							op: 'local-callback',
+							id: record.id,
+							type,
+							listener: null,
+						}),
+					),
+				),
+				...physical.map((record) => ({ op: 'remove' as const, parent: null, id: record.id })),
+				...removedHosts.map((record) => ({ op: 'destroy' as const, id: record.id })),
+			]);
+			const prepare = (value: UniversalHostBatch) =>
+				this.driver.prepareBatch(this.container, value, {
+					invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
+				});
+			const prepared =
+				this.transport === null
+					? prepare(batch)
+					: this.transport.prepareBatch(this.container, batch, prepare);
+			try {
+				runCommitTasks([() => prepared.apply(), () => prepared.afterAccept?.()]);
+			} catch (error) {
+				acceptedHostError = error;
+			}
 		}
 		this.rootRecord.children = [];
 		for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
 		this.publishedListeners.clear();
-		this.handlers.clear();
+		this.handlers = new Map();
+		this.localCallbacks = new Map();
 		for (const owner of owners) {
 			owner.disposed = true;
 			owner.mounted = false;
@@ -3760,9 +4486,19 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			});
 		}
 		const syncTasks = [...insertionTasks, ...layoutTasks, ...refTasks];
+		if (acceptedHostError !== NO_PENDING_PASSIVE_ERROR) {
+			syncTasks.unshift(() => {
+				throw acceptedHostError;
+			});
+		}
 		if (pendingPassiveError !== NO_PENDING_PASSIVE_ERROR) {
 			syncTasks.unshift(() => {
 				throw pendingPassiveError;
+			});
+		}
+		if (pendingAbortError !== NO_PENDING_PASSIVE_ERROR) {
+			syncTasks.unshift(() => {
+				throw pendingAbortError;
 			});
 		}
 		if (passiveTasks.length > 0) {
@@ -3793,10 +4529,14 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 	constructor(
 		private readonly root: UniversalRootImpl<Container, PublicInstance>,
 		readonly batch: UniversalHostBatch,
-		private readonly acceptHost: () => void,
+		private readonly applyHost: () => void,
+		private readonly publishHost: () => void,
+		private readonly afterHostAccept: () => void,
 		private readonly afterMutation: () => void,
+		private readonly lifecycle: () => void,
 		private readonly layout: () => void,
 		private readonly passive: () => void,
+		private readonly abortHost: () => void,
 		private readonly onAbort: () => void,
 	) {}
 
@@ -3806,9 +4546,14 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 
 	commitMutation(): void {
 		if (this.state !== 'prepared' || this.hostAccepted) return;
-		this.acceptHost();
 		this.hostAccepted = true;
-		this.afterMutation();
+		runCommitTasks([
+			this.applyHost,
+			this.publishHost,
+			this.afterHostAccept,
+			this.afterMutation,
+			this.lifecycle,
+		]);
 	}
 
 	commitLayout(): void {
@@ -3872,8 +4617,11 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 			throw new Error('A universal transaction cannot be aborted after its host batch committed.');
 		}
 		this.state = 'aborted';
-		this.onAbort();
-		this.root.finish(this);
+		try {
+			runCommitTasks([this.abortHost, this.onAbort]);
+		} finally {
+			this.root.finish(this);
+		}
 	}
 }
 
@@ -4002,25 +4750,29 @@ export function createUniversalHostBoundary(renderer: string): ((
 		useDomLayoutEffect(
 			() => () => {
 				boundaryStates.delete(scope);
-				state!.pending?.abort();
+				const pending = state!.pending;
 				state!.pending = null;
-				try {
-					state!.root.unmount();
-				} finally {
-					state!.root.clearBridge(state!.owner);
-				}
+				runCommitTasks([
+					() => pending?.abort(),
+					() => state!.root.unmount(),
+					() => state!.root.clearBridge(state!.owner),
+				]);
 			},
 			[],
 			BOUNDARY_LIFETIME_SLOT,
 		);
 		queueMicrotask(() => {
 			if (state!.pending !== attempt) return;
-			attempt.abort();
 			state!.pending = null;
-			if (!state!.ownerCommitted) {
-				boundaryStates.delete(scope);
-				state!.root.clearBridge(state!.owner);
-			}
+			runCommitTasks([
+				() => attempt.abort(),
+				() => {
+					if (!state!.ownerCommitted) {
+						boundaryStates.delete(scope);
+						state!.root.clearBridge(state!.owner);
+					}
+				},
+			]);
 		});
 	}) as ((props: HostBoundaryProps, scope: Scope) => void) & {
 		readonly [UNIVERSAL_BOUNDARY]: UniversalBoundaryMetadata;
@@ -4042,12 +4794,16 @@ export interface ObjectHostInstance {
 	readonly id: number;
 	readonly type: string;
 	props: Readonly<Record<string, unknown>>;
+	visible: boolean;
 	readonly children: ObjectHostInstance[];
 }
 
 interface ObjectDriverState {
 	instances: Map<number, ObjectHostInstance>;
 	events: Map<number, Map<string, UniversalEventListenerDescriptor>>;
+	lifecycles: Map<number, Map<string, UniversalListenerDescriptor>>;
+	localCallbacks: Map<number, Map<string, UniversalListenerDescriptor>>;
+	localCleanups: Map<number, Map<string, () => void>>;
 }
 
 export interface ObjectHostContainer {
@@ -4062,7 +4818,13 @@ export interface ObjectHostContainer {
 
 export function createObjectContainer(renderer = 'object'): ObjectHostContainer {
 	assertRendererId(renderer, 'Object container renderer');
-	const state: ObjectDriverState = { instances: new Map(), events: new Map() };
+	const state: ObjectDriverState = {
+		instances: new Map(),
+		events: new Map(),
+		lifecycles: new Map(),
+		localCallbacks: new Map(),
+		localCleanups: new Map(),
+	};
 	return {
 		renderer,
 		children: [],
@@ -4072,7 +4834,11 @@ export function createObjectContainer(renderer = 'object'): ObjectHostContainer 
 		},
 		dispatchEvent(instance, type, payload) {
 			const id = typeof instance === 'number' ? instance : instance.id;
-			if (!state.instances.has(id)) throw new Error(`Object driver: unknown event target ${id}.`);
+			const current = state.instances.get(id);
+			if (current === undefined) throw new Error(`Object driver: unknown event target ${id}.`);
+			if (typeof instance !== 'number' && current !== instance) {
+				throw new Error(`Object driver: stale event target ${id}.`);
+			}
 			const listener = state.events.get(id)?.get(type.toLowerCase());
 			if (listener === undefined) {
 				throw new Error(`Object driver: target ${id} has no ${JSON.stringify(type)} listener.`);
@@ -4104,14 +4870,26 @@ export function createObjectDriver(
 	assertRendererId(renderer, 'Object driver renderer');
 	return {
 		id: renderer,
-		capabilities: new Set(['text']),
+		capabilities: { text: 'host', localHostCallbacks: true, visibility: true },
 		events: {
 			classify(name) {
 				if (!/^on[A-Z]/.test(name)) return null;
 				return { type: name.slice(2).toLowerCase(), priority: 'discrete' };
 			},
 		},
-		commit(container, batch) {
+		lifecycles: {
+			classify(name) {
+				return name === 'onUpdate' ? { type: 'update' } : null;
+			},
+		},
+		localCallbacks: {
+			classify(name, value) {
+				return name === 'attach' && (value == null || typeof value === 'function')
+					? { type: 'attach' }
+					: null;
+			},
+		},
+		prepareBatch(container, batch, context) {
 			if (container.renderer !== renderer || batch.renderer !== renderer) {
 				throw new Error(
 					`Object driver renderer mismatch: driver ${JSON.stringify(renderer)}, container ${JSON.stringify(container.renderer)}, batch ${JSON.stringify(batch.renderer)}.`,
@@ -4123,18 +4901,32 @@ export function createObjectDriver(
 				{
 					type: string;
 					props: Readonly<Record<string, unknown>>;
+					visible: boolean;
 					children: number[];
 					events: Map<string, UniversalEventListenerDescriptor>;
+					lifecycles: Map<string, UniversalListenerDescriptor>;
+					localCallbacks: Map<string, UniversalListenerDescriptor>;
 				}
 			>();
 			for (const [id, instance] of state.instances) {
 				simulated.set(id, {
 					type: instance.type,
 					props: instance.props,
+					visible: instance.visible,
 					children: instance.children.map((child) => child.id),
 					events: new Map(state.events.get(id)),
+					lifecycles: new Map(state.lifecycles.get(id)),
+					localCallbacks: new Map(state.localCallbacks.get(id)),
 				});
 			}
+			const stagedInstances = new Map<number, ObjectHostInstance>();
+			const cleanupKeys = new Set<string>();
+			const invokeKeys = new Set<string>();
+			const keyFor = (id: number, type: string) => `${id}:${type}`;
+			const parseKey = (key: string): [number, string] => {
+				const separator = key.indexOf(':');
+				return [Number(key.slice(0, separator)), key.slice(separator + 1)];
+			};
 			const rootChildren = container.children.map((child) => child.id);
 			const simulatedChildren = (parent: number | null) => {
 				if (parent === null) return rootChildren;
@@ -4149,19 +4941,73 @@ export function createObjectDriver(
 					simulated.set(command.id, {
 						type: command.type,
 						props: command.props,
+						visible: true,
 						children: [],
 						events: new Map(),
+						lifecycles: new Map(),
+						localCallbacks: new Map(),
+					});
+					stagedInstances.set(command.id, {
+						id: command.id,
+						type: command.type,
+						props: command.props,
+						visible: true,
+						children: [],
 					});
 				} else if (command.op === 'update') {
 					const value = simulated.get(command.id);
 					if (value === undefined) throw new Error(`Object driver: unknown update ${command.id}.`);
 					value.props = command.props;
+				} else if (command.op === 'recreate') {
+					const value = simulated.get(command.id);
+					const current = state.instances.get(command.id);
+					if (value === undefined || current === undefined) {
+						throw new Error(`Object driver: unknown recreate ${command.id}.`);
+					}
+					if (value.type !== command.type) {
+						throw new Error(`Object driver: recreate type mismatch for ${command.id}.`);
+					}
+					value.props = command.props;
+					stagedInstances.set(command.id, {
+						id: command.id,
+						type: command.type,
+						props: command.props,
+						visible: true,
+						children: [...current.children],
+					});
+					for (const type of value.localCallbacks.keys()) {
+						cleanupKeys.add(keyFor(command.id, type));
+						invokeKeys.add(keyFor(command.id, type));
+					}
+				} else if (command.op === 'visibility') {
+					const value = simulated.get(command.id);
+					if (value === undefined) {
+						throw new Error(`Object driver: unknown visibility target ${command.id}.`);
+					}
+					value.visible = command.state === 'visible';
 				} else if (command.op === 'event') {
 					const value = simulated.get(command.id);
 					if (value === undefined)
 						throw new Error(`Object driver: unknown event target ${command.id}.`);
 					if (command.listener === null) value.events.delete(command.type);
 					else value.events.set(command.type, command.listener);
+				} else if (command.op === 'lifecycle') {
+					const value = simulated.get(command.id);
+					if (value === undefined)
+						throw new Error(`Object driver: unknown lifecycle target ${command.id}.`);
+					if (command.listener === null) value.lifecycles.delete(command.type);
+					else value.lifecycles.set(command.type, command.listener);
+				} else if (command.op === 'local-callback') {
+					const value = simulated.get(command.id);
+					if (value === undefined)
+						throw new Error(`Object driver: unknown local callback target ${command.id}.`);
+					const key = keyFor(command.id, command.type);
+					cleanupKeys.add(key);
+					if (command.listener === null) value.localCallbacks.delete(command.type);
+					else {
+						value.localCallbacks.set(command.type, command.listener);
+						invokeKeys.add(key);
+					}
 				} else if (command.op === 'insert' || command.op === 'move') {
 					if (!simulated.has(command.id))
 						throw new Error(`Object driver: unknown child ${command.id}.`);
@@ -4177,12 +5023,22 @@ export function createObjectDriver(
 						command.before === null ? children.length : children.indexOf(command.before);
 					if (before === -1) throw new Error(`Object driver: unknown before id ${command.before}.`);
 					children.splice(before, 0, command.id);
+					if (command.op === 'move') {
+						for (const type of simulated.get(command.id)!.localCallbacks.keys()) {
+							const key = keyFor(command.id, type);
+							cleanupKeys.add(key);
+							invokeKeys.add(key);
+						}
+					}
 				} else if (command.op === 'remove') {
 					const children = simulatedChildren(command.parent);
 					const index = children.indexOf(command.id);
 					if (index === -1) throw new Error(`Object driver: child ${command.id} is not attached.`);
 					children.splice(index, 1);
-				} else {
+					for (const type of simulated.get(command.id)!.localCallbacks.keys()) {
+						cleanupKeys.add(keyFor(command.id, type));
+					}
+				} else if (command.op === 'destroy') {
 					const instance = simulated.get(command.id);
 					if (instance === undefined)
 						throw new Error(`Object driver: unknown destroy ${command.id}.`);
@@ -4197,55 +5053,144 @@ export function createObjectDriver(
 					simulated.delete(command.id);
 				}
 			}
-
-			for (const command of batch.commands) {
-				if (command.op === 'create') {
-					state.instances.set(command.id, {
-						id: command.id,
-						type: command.type,
-						props: command.props,
-						children: [],
-					});
-					state.events.set(command.id, new Map());
-				} else if (command.op === 'update') {
-					state.instances.get(command.id)!.props = command.props;
-				} else if (command.op === 'event') {
-					const events = state.events.get(command.id)!;
-					if (command.listener === null) events.delete(command.type);
-					else events.set(command.type, command.listener);
-				} else if (command.op === 'insert' || command.op === 'move') {
-					const instance = state.instances.get(command.id)!;
-					for (const parent of [
-						container.children,
-						...[...state.instances.values()].map((entry) => entry.children),
-					]) {
-						const old = parent.indexOf(instance);
-						if (old !== -1) parent.splice(old, 1);
-					}
-					const children = objectChildren(container, command.parent, state.instances);
-					const before =
-						command.before === null
-							? children.length
-							: children.indexOf(state.instances.get(command.before)!);
-					children.splice(before, 0, instance);
-				} else if (command.op === 'remove') {
-					const children = objectChildren(container, command.parent, state.instances);
-					children.splice(children.indexOf(state.instances.get(command.id)!), 1);
-				} else {
-					const instance = state.instances.get(command.id)!;
-					for (const parent of [
-						container.children,
-						...[...state.instances.values()].map((entry) => entry.children),
-					]) {
-						const attached = parent.indexOf(instance);
-						if (attached !== -1) parent.splice(attached, 1);
-					}
-					instance.children.length = 0;
-					state.instances.delete(command.id);
-					state.events.delete(command.id);
-				}
+			for (const [id, instance] of stagedInstances) {
+				const staged = simulated.get(id);
+				if (staged === undefined) continue;
+				instance.visible = staged.visible;
+				instance.children.splice(
+					0,
+					instance.children.length,
+					...staged.children.map(
+						(child) => stagedInstances.get(child) ?? state.instances.get(child)!,
+					),
+				);
 			}
-			container.commits.push(batch);
+			let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
+			let acceptedCallbacksRan = false;
+			return {
+				apply() {
+					if (status !== 'prepared') return;
+					status = 'applied';
+					const tasks: (() => void)[] = [];
+					for (const key of cleanupKeys) {
+						const [id, type] = parseKey(key);
+						const cleanups = state.localCleanups.get(id);
+						const cleanup = cleanups?.get(type);
+						if (cleanup === undefined) continue;
+						cleanups!.delete(type);
+						tasks.push(cleanup);
+					}
+					tasks.push(() => {
+						for (const command of batch.commands) {
+							if (command.op === 'create') {
+								state.instances.set(command.id, stagedInstances.get(command.id)!);
+								state.events.set(command.id, new Map());
+								state.lifecycles.set(command.id, new Map());
+								state.localCallbacks.set(command.id, new Map());
+								state.localCleanups.set(command.id, new Map());
+							} else if (command.op === 'update') {
+								state.instances.get(command.id)!.props = command.props;
+							} else if (command.op === 'recreate') {
+								const previous = state.instances.get(command.id)!;
+								const replacement = stagedInstances.get(command.id)!;
+								for (const parent of [
+									container.children,
+									...[...state.instances.values()].map((entry) => entry.children),
+								]) {
+									const index = parent.indexOf(previous);
+									if (index !== -1) parent[index] = replacement;
+								}
+								previous.children.length = 0;
+								state.instances.set(command.id, replacement);
+							} else if (command.op === 'visibility') {
+								state.instances.get(command.id)!.visible = command.state === 'visible';
+							} else if (command.op === 'event') {
+								const events = state.events.get(command.id)!;
+								if (command.listener === null) events.delete(command.type);
+								else events.set(command.type, command.listener);
+							} else if (command.op === 'lifecycle') {
+								const lifecycles = state.lifecycles.get(command.id)!;
+								if (command.listener === null) lifecycles.delete(command.type);
+								else lifecycles.set(command.type, command.listener);
+							} else if (command.op === 'local-callback') {
+								const callbacks = state.localCallbacks.get(command.id)!;
+								if (command.listener === null) callbacks.delete(command.type);
+								else callbacks.set(command.type, command.listener);
+							} else if (command.op === 'insert' || command.op === 'move') {
+								const instance = state.instances.get(command.id)!;
+								for (const parent of [
+									container.children,
+									...[...state.instances.values()].map((entry) => entry.children),
+								]) {
+									const old = parent.indexOf(instance);
+									if (old !== -1) parent.splice(old, 1);
+								}
+								const children = objectChildren(container, command.parent, state.instances);
+								const before =
+									command.before === null
+										? children.length
+										: children.indexOf(state.instances.get(command.before)!);
+								children.splice(before, 0, instance);
+							} else if (command.op === 'remove') {
+								const children = objectChildren(container, command.parent, state.instances);
+								children.splice(children.indexOf(state.instances.get(command.id)!), 1);
+							} else if (command.op === 'destroy') {
+								const instance = state.instances.get(command.id)!;
+								for (const parent of [
+									container.children,
+									...[...state.instances.values()].map((entry) => entry.children),
+								]) {
+									const attached = parent.indexOf(instance);
+									if (attached !== -1) parent.splice(attached, 1);
+								}
+								instance.children.length = 0;
+								state.instances.delete(command.id);
+								state.events.delete(command.id);
+								state.lifecycles.delete(command.id);
+								state.localCallbacks.delete(command.id);
+								state.localCleanups.delete(command.id);
+							}
+						}
+						container.commits.push(batch);
+					});
+					runCommitTasks(tasks);
+				},
+				afterAccept() {
+					if (status !== 'applied' || acceptedCallbacksRan) return;
+					acceptedCallbacksRan = true;
+					const tasks: (() => void)[] = [];
+					for (const key of invokeKeys) {
+						const [id, type] = parseKey(key);
+						const instance = state.instances.get(id);
+						const listener = state.localCallbacks.get(id)?.get(type);
+						if (instance === undefined || listener === undefined) continue;
+						tasks.push(() => {
+							let parent: ObjectHostInstance | null = null;
+							for (const candidate of state.instances.values()) {
+								if (candidate.children.includes(instance)) {
+									parent = candidate;
+									break;
+								}
+							}
+							const cleanup = context.invokeLocalCallback(listener.id, [parent, instance]);
+							if (cleanup == null) return;
+							if (typeof cleanup !== 'function') {
+								throw new TypeError(
+									'A universal local host callback must return a cleanup or nothing.',
+								);
+							}
+							state.localCleanups.get(id)!.set(type, cleanup as () => void);
+						});
+					}
+					runCommitTasks(tasks);
+				},
+				abort() {
+					if (status !== 'prepared') return;
+					status = 'aborted';
+					for (const instance of stagedInstances.values()) instance.children.length = 0;
+					stagedInstances.clear();
+				},
+			};
 		},
 		getPublicInstance(container, id) {
 			return container[OBJECT_DRIVER_STATE].instances.get(id) ?? null;

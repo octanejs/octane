@@ -50,6 +50,11 @@ The universal client target establishes and proves these seams:
 - statically declared renderer-owned props in both DOM-to-universal and
   universal-to-DOM directions, without changing `Block` or guessing renderer
   identity from dynamic ancestry;
+- renderer-declared text, visibility, intrinsic-type, and client-only server
+  policies shared by the compiler and bundler adapters;
+- prepared host acceptance, stable-ID public-instance recreation, host
+  lifecycle/local callbacks, prop codecs and resource handles, nested event
+  scopes, and retained Activity/Suspense ownership;
 - source maps, HMR, profiling, and parallel-`use()` planning on the universal
   compiler branch.
 
@@ -59,8 +64,11 @@ The current implementation does **not**:
 - replace or generalize the DOM compiler/runtime;
 - implement a Lynx runtime, Rspeedy integration, or cross-thread commit
   acknowledgement;
-- define renderer-neutral style sheets, assets, layout measurement,
-  hydration, serialization, general portals, or visibility semantics;
+- define renderer-neutral style sheets, assets, layout measurement, live host
+  serialization/adoption, or general portals;
+- project a universal child suspension or DOM-owner Activity state across a
+  mixed-renderer boundary; those are Three integration gates rather than
+  partial properties of the host-neutral core;
 - promise React Reconciler compatibility;
 - make the published experimental universal ABI a stable or supported renderer
   SDK for third-party authors.
@@ -148,10 +156,19 @@ export default defineConfig({
 	compiler: {
 		renderers: {
 			registry: {
-				three: '@octanejs/three/renderer',
+				three: {
+					module: '@octanejs/three/renderer',
+					target: 'universal',
+					server: 'client-only',
+					intrinsics: '@octanejs/three/intrinsics',
+					text: 'ignore',
+					capabilities: ['visibility'],
+				},
 				object: {
 					module: '/src/testing/object-renderer.js',
 					target: 'universal',
+					text: 'host',
+					capabilities: ['visibility'],
 				},
 			},
 			default: 'dom',
@@ -168,6 +185,7 @@ export default defineConfig({
 						ownerRenderer: 'dom',
 						childRenderer: 'three',
 						prop: 'children',
+						server: 'omit-child',
 					},
 				},
 			},
@@ -182,7 +200,17 @@ The normalized shape is equivalent to:
 interface ResolvedRendererConfig {
 	readonly default: string;
 	readonly registry: Readonly<
-		Record<string, { readonly module: string; readonly target: 'dom' | 'universal' }>
+		Record<
+			string,
+			{
+				readonly module: string;
+				readonly target: 'dom' | 'universal';
+				readonly server: 'render' | 'client-only' | 'unsupported';
+				readonly intrinsics?: string;
+				readonly text: 'reject' | 'ignore' | 'host';
+				readonly capabilities: readonly string[];
+			}
+		>
 	>;
 	readonly rules: readonly {
 		readonly include: readonly string[];
@@ -199,6 +227,7 @@ interface ResolvedRendererConfig {
 						readonly ownerRenderer: string;
 						readonly childRenderer: string;
 						readonly prop: string;
+						readonly server?: 'omit-child';
 					}
 				>
 			>
@@ -210,9 +239,10 @@ interface ResolvedRendererConfig {
 
 Normative resolution rules:
 
-1. `dom` is built in as `{ module: "octane", target: "dom" }` and cannot be
-   replaced or aliased to a universal target.
-2. A string registry entry means `{ module: value, target: "universal" }`.
+1. `dom` is built in with `server: "render"` and `text: "host"`; it cannot be
+   replaced, assigned universal capabilities, or aliased to a universal target.
+2. A string registry entry means a universal renderer with
+   `server: "unsupported"`, `text: "reject"`, and no capabilities.
 3. Renderer aliases are stable lowercase IDs. Renderer module IDs are package
    IDs or project-root IDs, not importer-relative paths or executable config.
 4. Filenames are canonical project-relative module IDs with forward slashes.
@@ -221,19 +251,21 @@ Normative resolution rules:
    its own rule; later rules still participate.
 6. Pattern sets and registry keys are canonicalized for a stable signature,
    but rule declaration order is preserved because it is semantic.
-7. Boundary metadata is keyed by stable package/project-root module ID and
-   export name. It declares a distinct owner renderer, child renderer, and one
-   JavaScript prop name. Relative module IDs and unknown renderers fail during
-   normalization.
-8. An unknown renderer, malformed pattern, unsupported key, or attempt to
+7. `server`, `text`, `intrinsics`, and sorted/deduplicated `capabilities` are
+   serializable descriptor data and participate in the stable signature.
+8. Boundary metadata is keyed by stable package/project-root module ID and
+   export name. It declares a distinct owner renderer, child renderer, one
+   JavaScript prop name, and optionally `server: "omit-child"`. Omission is
+   legal only from a server-renderable owner into a client-only child.
+9. An unknown renderer, malformed pattern, unsupported key, or attempt to
    replace `dom` fails during config normalization.
-9. No match selects `default`, which itself must name a registry entry.
+10. No match selects `default`, which itself must name a registry entry.
 
 `normalizeRendererConfig()` and `resolveRendererForFile()` live in the
 dependency-free `octane/compiler/renderers` subpath and are re-exported from
 the bundler-neutral compiler surface. `@octanejs/app-core` stores the normalized
 form in the resolved app config. This is the single resolver for direct tests,
-Vite, Rspack, Rsbuild, and future Volar integration.
+Vite, Rspack, Rsbuild, and Volar virtual files.
 
 The normalized signature is part of transform cache identity. A renderer
 module ID is intentionally data, not a callback: changing it changes the
@@ -251,11 +283,22 @@ therefore make the same lexical target decision.
 ### Server-mode rule
 
 Renderer identity resolution is environment-independent. A file cannot become
-DOM merely because it entered a server graph. Currently,
-`mode: "server"` combined with a universal renderer fails with a clear
-serialization/hydration capability diagnostic. Adapters must not silently fall
-back to DOM codegen. A Three application can keep universal-only scene modules
-out of its server graph until the renderer defines a serialization contract.
+DOM merely because it entered a server graph. A universal renderer with
+`server: "unsupported"` still fails with a serialization/hydration capability
+diagnostic. A `client-only` module instead becomes an export-preserving inert
+server stub: authored imports, declarations, and setup never execute. The DOM
+owner must declare `server: "omit-child"` on the matching boundary; after that
+region is removed, any remaining live import/re-export use fails at its authored
+location. Side-effect-only imports become no-ops.
+
+The neutral compiler, Vite, Rspack, and Rsbuild attach the same stable client
+reference identity to the client module and server stub. Adapter manifests
+record that identity beside its concrete browser chunks; the normal client app
+graph still owns execution. This is graph/hydration ownership, not
+serialization of the universal host tree. Raw Rspack proves the graph split and
+reference metadata. Vite and Rsbuild own the application hydration lifecycle
+and prove that the existing DOM shell is adopted while exactly one client
+region is mounted.
 
 ## 4. Compiler contract
 
@@ -266,12 +309,17 @@ interface CompilerRendererDescriptor {
 	readonly id: string;
 	readonly module: string;
 	readonly target: 'dom' | 'universal';
+	readonly server: 'render' | 'client-only' | 'unsupported';
+	readonly intrinsics?: string;
+	readonly text: 'reject' | 'ignore' | 'host';
+	readonly capabilities: readonly string[];
 }
 
 interface CompilerRendererBoundary {
 	readonly ownerRenderer: string;
 	readonly childRenderer: string;
 	readonly prop: string;
+	readonly server?: 'omit-child';
 }
 
 compile(source, filename, {
@@ -369,13 +417,24 @@ The executable universal target accepts normal Octane component composition:
   `@try`/`@pending`/`@catch`;
 - compiler-assigned hook slots, inferred dependencies, context
   Providers/consumers, refs, insertion/layout/passive effects, suspension,
-  error ownership, HMR, profiling, and parallel-`use()` planning.
+  error ownership, HMR, profiling, and parallel-`use()` planning;
+- `<Activity mode="visible"|"hidden">` when the selected renderer declares
+  `visibility`, with retained hosts and renderer-owned effect/event semantics.
 
-Scoped `<style>`, `Activity`, general portals, async template collections, and
+Scoped `<style>`, general portals, async template collections, and live
 universal server output remain capability gaps and diagnose rather than
-silently changing targets. Renderer-specific host/property validation belongs
-to renderer capability metadata or the driver, not to DOM attribute, class, or
-style rules in the universal core.
+silently changing targets. Static authored text follows the selected
+descriptor's `host`/`ignore`/`reject` policy; dynamic primitive materialization
+is checked again against the active driver. Renderer-specific host/property
+validation belongs to renderer capability metadata or the driver, not to DOM
+attribute, class, or style rules in the universal core.
+
+Volar prepends a file-local `@jsxImportSource` pragma only when the selected
+descriptor declares `intrinsics`. Its mappings are shifted back to authored
+TSRX offsets, so DOM and non-DOM files can assign conflicting types to names
+such as `line`, `path`, `audio`, and `source`. Renderer-local module
+augmentation extends only that renderer's catalogue; it does not merge into a
+process-global intrinsic namespace.
 
 Universal source maps compose the lowered intermediate map back to the
 original TSRX source. Boundary lowering likewise preserves the authored file
@@ -480,6 +539,7 @@ model:
 type UniversalHostCommand =
 	| { op: 'create'; id: number; type: string; props: Readonly<Record<string, unknown>> }
 	| { op: 'update'; id: number; props: Readonly<Record<string, unknown>> }
+	| { op: 'recreate'; id: number; type: string; props: Readonly<Record<string, unknown>> }
 	| { op: 'insert' | 'move'; parent: number | null; id: number; before: number | null }
 	| {
 			op: 'event';
@@ -487,6 +547,13 @@ type UniversalHostCommand =
 			type: string;
 			listener: { id: number; priority: 'discrete' | 'continuous' | 'default' } | null;
 	  }
+	| {
+			op: 'lifecycle' | 'local-callback';
+			id: number;
+			type: string;
+			listener: { id: number } | null;
+	  }
+	| { op: 'visibility'; id: number; state: 'hidden' | 'visible' }
 	| { op: 'remove'; parent: number | null; id: number }
 	| { op: 'destroy'; id: number };
 
@@ -498,33 +565,56 @@ interface UniversalHostBatch {
 
 interface UniversalHostDriver<Container, PublicInstance> {
 	readonly id: string;
-	readonly capabilities?: ReadonlySet<string>;
+	readonly capabilities?: {
+		readonly text?: 'reject' | 'ignore' | 'host';
+		readonly localHostCallbacks?: boolean;
+		readonly visibility?: boolean;
+	};
 	readonly events?: {
 		classify(name: string): {
 			type: string;
 			priority?: 'discrete' | 'continuous' | 'default';
 		} | null;
 	};
-	commit(container: Container, batch: UniversalHostBatch): void;
+	readonly updates?: {
+		classify(type: string, previous: object, next: object): 'update' | 'recreate';
+	};
+	prepareBatch(
+		container: Container,
+		batch: UniversalHostBatch,
+		context: UniversalHostCommitContext,
+	): UniversalPreparedHostBatch;
 	getPublicInstance(container: Container, id: number): PublicInstance | null;
+}
+
+interface UniversalPreparedHostBatch {
+	apply(): void;
+	afterAccept?(): void;
+	abort(): void;
+}
+
+interface UniversalHostCommitContext {
+	invokeLocalCallback(listener: number, args: readonly unknown[]): unknown;
 }
 ```
 
 `parent: null` means the root container. IDs and `before` references name
 core records, not driver object identity. `remove` detaches a live instance;
-`destroy` releases its renderer-owned resources. This distinction is needed
-for movement, temporary detachment, disposal, and future renderer-specific
-ownership rules.
+`destroy` releases its renderer-owned resources. `recreate` keeps the core ID
+and logical children while replacing the public instance, transferring final
+placement, callback/ref ownership, and disposal in one accepted commit.
+`visibility` changes physical presentation without deleting logical ownership.
 
 `version` is a monotonic prepared-batch sequence, so aborted attempts may leave
 gaps in the versions observed by a driver. Drivers order accepted batches by
 their increasing values and must not interpret a gap as a missing commit.
 
-The driver's `commit` contract is atomic: validate the full ordered batch
-before making visible changes, then apply it as one commit. A driver must not
-retain prepared instances before `commit`; creation is a command, not a
-render-time callback. A renderer that cannot provide local atomicity must place
-the batch behind a transport or host transaction that can.
+`prepareBatch()` validates and may stage host resources without mutating the
+public host. It returns an abortable token. `apply()` is the acceptance point;
+after it begins, a thrown error is an accepted commit fault rather than a
+rejected preparation. `abort()` releases unpublished staged ownership exactly
+once. `afterAccept()` is the only phase in which a local driver may invoke
+classified function-valued callbacks through the core-owned listener table.
 
 Events are an explicit optional driver capability. `classify()` decides which
 prop names are renderer events, supplies the renderer-facing type and priority,
@@ -537,9 +627,16 @@ future transport can serialize the descriptor and return that ID with its
 native payload. This is not DOM delegation and does not create a React
 synthetic-event layer.
 
-Styles, asset loading, visibility, layout, and specialized collection
-attachment remain capabilities/extensions rather than mandatory methods every
-driver must fake.
+One platform event may call `root.eventScope(priority, fn)` to pin the accepted
+listener table while it delivers target, ancestor, hover, or missed listener
+IDs. Nested scopes must keep the same priority, and scheduled work flushes once
+when the outer scope closes.
+
+Host props pass through a codec as serializable values, root-scoped resource
+handles, or explicit unsupported results. Event, lifecycle, and local-callback
+functions become listener IDs rather than entering a batch. Styles, asset
+loading, layout, and specialized collection attachment remain optional
+extensions rather than mandatory methods every driver must fake.
 
 ### Root transaction
 
@@ -548,6 +645,7 @@ interface UniversalRoot<P> {
 	readonly renderer: string;
 	prepare(component: UniversalComponent<P>, props: P): UniversalPreparedAttempt;
 	render(component: UniversalComponent<P>, props: P): UniversalPreparedAttempt;
+	eventScope<T>(priority: UniversalEventPriority, run: () => T): T;
 	dispatchEvent(listener: number, payload: unknown): unknown;
 	unmount(): void;
 }
@@ -568,20 +666,24 @@ reconciles draft records, and stages:
 - ref detach/attach work;
 - insertion, layout, and passive effect work.
 
-It does not call the driver. Suspension returns a suspended attempt and retains
-the last committed topology. A thrown render error discards the draft. A newer
-prepare aborts the older prepared transaction. Explicit abort discards all
-staged work. Because the driver has not prepared instances, all three paths
-produce zero visible object-host mutations and zero leaked prepared instances.
+It then asks the driver/transport to prepare the immutable batch. This may
+allocate unpublished host resources, but it cannot mutate the public host.
+Suspension returns a suspended attempt and retains the last committed topology.
+A thrown render error discards the draft. A newer prepare aborts the older
+prepared transaction. Explicit abort discards all staged work and invokes the
+prepared token's abort path, so all three paths produce zero visible host
+mutation and zero leaked staged instances.
 
 A successful commit has this phase ordering:
 
-1. exactly one driver/transport batch acceptance;
-2. publish logical topology and committed hook state;
-3. insertion-effect cleanups and creates;
-4. layout-effect cleanups and old ref detach work;
-5. public ref attaches and layout-effect creates;
-6. passive cleanups followed by passive creates in a later microtask if the
+1. exactly one prepared token `apply()` acceptance;
+2. publish logical topology, listener ownership, and committed hook state;
+3. invoke `afterAccept()` local callbacks;
+4. insertion-effect cleanups and creates;
+5. layout-effect cleanups and old ref detach work;
+6. deliver host lifecycles after final placement;
+7. public ref attaches and layout-effect creates;
+8. passive cleanups followed by passive creates in a later microtask if the
    hook/root is still current.
 
 Pending passive work is flushed before the next universal render attempt. This
@@ -589,9 +691,10 @@ keeps two same-turn commits distinct instead of dropping or merging the first
 commit's passive phase. Cleanup walks retain the previous render's declaration
 order even when removed hooks and dependency-changed hooks share a phase.
 
-Within the host batch, the core orders creates, updates, detach/removes,
-placements (`insert`/`move`), and final destroys so every referenced instance
-exists before placement and no destroyed instance remains attached.
+Within the host batch, the core orders creates/updates/recreates, callback and
+event descriptors, detach/removes, placements (`insert`/`move`), descendant-
+first hides, ancestor-first reveals, and final destroys so every referenced
+instance exists before placement and no destroyed instance remains attached.
 
 The driver must validate atomically so commit rejection cannot leave a partial
 host tree. Cleanup/ref/effect work is deliberately held until host acceptance:
@@ -612,20 +715,22 @@ passive cleanups, and disposes the root owner.
 
 ```ts
 interface UniversalCommitTransport<Container> {
-	commit(
+	prepareBatch(
 		container: Container,
 		batch: UniversalHostBatch,
-		applyLocally: (batch: UniversalHostBatch) => void,
-	): void;
+		prepareLocally: (batch: UniversalHostBatch) => UniversalPreparedHostBatch,
+	): UniversalPreparedHostBatch;
 }
 ```
 
 Three can omit a transport and mutate its scene graph synchronously. A future
 Lynx driver may serialize the ordered batch, coalesce platform messages, or
-hand it to another thread. The current transport is synchronous from the
-core's perspective: it has no acknowledgement, rollback, or asynchronous
-layout-read protocol. Those semantics must be designed before a cross-thread
-renderer can claim layout effects or commit failure recovery.
+hand it to another thread. The proving transport must preserve the same
+prepare/apply/abort token. The current interface is still synchronous from the
+core's perspective: it has no asynchronous acknowledgement or layout-read
+protocol. A cross-thread renderer must map remote validation and acknowledgement
+to this acceptance boundary before it can claim layout effects or commit-
+failure recovery.
 
 ## 6. Nested owners and renderer identity
 
@@ -645,6 +750,16 @@ while a retry is pending. Context Providers and consumers work between
 universal owners and inherit a bridged DOM ancestry when entered through a DOM
 boundary.
 
+Visibility is inherited through owner records. Hidden Activity and retained
+Suspense hosts keep logical/public identity, resources, state, and insertion
+effects while layout/passive effects and event delivery disconnect. Activity
+keeps refs attached; retained Suspense cycles refs through null and reattaches
+the same public instance on reveal. A fallback is a coexisting visible owner,
+not a replacement for the hidden primary, and repeated pending renders cannot
+duplicate either range. Host visibility commands are capability-gated and
+transactional, so an aborted or rejected transition leaves the accepted tree
+unchanged.
+
 The universal runtime preserves Octane's compiler-assigned slot model,
 dependency inference, current-state getter, and parallel-`use()` behavior.
 Transition/deferred/action/form compatibility APIs currently execute without a
@@ -653,7 +768,8 @@ those timing/optimization gaps do not weaken transactional ownership.
 
 Renderer identity is explicit at every durable boundary:
 
-- resolved config yields `{ id, module, target }` for a filename;
+- resolved config yields renderer/module/target plus server, text, intrinsic,
+  and capability metadata for a filename;
 - a compiled universal component carries immutable renderer metadata;
 - every static plan carries its renderer ID;
 - a universal root owns the driver and renderer ID;
@@ -721,7 +837,12 @@ compiler: {
 	renderers: {
 		boundaries: {
 			'@octanejs/three': {
-				Canvas: { ownerRenderer: 'dom', childRenderer: 'three', prop: 'children' },
+				Canvas: {
+					ownerRenderer: 'dom',
+					childRenderer: 'three',
+					prop: 'children',
+					server: 'omit-child',
+				},
 				Html: { ownerRenderer: 'three', childRenderer: 'dom', prop: 'children' },
 			},
 		},
@@ -798,7 +919,10 @@ On suspension, the boundary keeps the previously committed external host tree
 (or an empty tree on initial mount), commits nothing, and schedules the
 boundary owner after settlement. It does not yet project universal suspension
 into the parent DOM `@pending` UI or inherit DOM transition-hold timing. That
-is a separate boundary protocol gate.
+is a separate boundary protocol gate. Likewise, wrapping the DOM boundary in a
+DOM `<Activity>` does not yet propagate inherited visibility into the external
+root; portable Activity inside the universal renderer is implemented, while
+cross-boundary offscreen ownership remains a Three integration gate.
 
 Parent context, error ownership, suspension retry, and deterministic teardown
 remain attached to the component owners on both sides. A universal root under
@@ -809,8 +933,11 @@ contains a normally compiled DOM component that a renderer-owned `Html`
 implementation can mount into its concrete DOM container while preserving the
 universal owner that supplied it.
 
-Boundary-aware universal SSR/hydration remains unsupported. A universal file
-in a server graph still fails clearly instead of compiling as DOM.
+Live universal host serialization and adoption remain unsupported. A renderer
+with `server: "unsupported"` still fails rather than compiling as DOM. A
+`client-only` renderer instead preserves exports through an inert server stub,
+omits its declared child region from the DOM SSR body, and links the shell to a
+single client-region client graph while recording stable manifest identity.
 
 ## 8. Object renderer proof
 
@@ -827,6 +954,8 @@ The object driver and executable fixtures demonstrate:
 
 - initial create and insert;
 - props update without identity replacement;
+- public-instance recreation under a stable logical ID, with child transfer,
+  old/new ref churn, local callback cleanup/setup, and post-placement lifecycle;
 - insertion before an existing sibling;
 - keyed movement, including a multi-root logical range, with survivor object
   identity and nested component hook ownership preserved;
@@ -837,12 +966,16 @@ The object driver and executable fixtures demonstrate:
 - public callback/object ref attachment after commit and detachment on change
   or teardown;
 - insertion/layout/passive effect ordering around the batch;
-- explicit abort, render error, and suspension with no batch and no prepared
-  host instances;
+- prepared-token abort, render error, and suspension with no public mutation
+  and exact staged-resource release;
 - a live allocated-instance count that remains unchanged across abandoned
   attempts;
 - event classification, registration, replacement, removal, dispatch against a
-  committed public instance, priority metadata, and teardown;
+  committed public instance, nested delivery scopes, priority metadata, and
+  teardown;
+- Activity and retained Suspense visibility with host/state identity,
+  capability failure, ref/effect/event behavior, fallback coexistence, reveal,
+  rejection, and aborted/rejected transactions;
 - one recorded batch for each successful root commit and one teardown batch.
 
 Text is represented as a `#text` host only because the object driver declares a
@@ -857,23 +990,22 @@ declare, implement, or reject these independently.
 
 | Capability | Implemented behavior | Remaining contract gate |
 | --- | --- | --- |
-| Text | Object driver accepts primitive text through a `text` capability and `#text` proof host. | Define renderer-specific text creation/update and compile-time unsupported-text diagnostics. |
-| Events | Driver classification lowers event props to listener-ID/priority commands; replacement, removal, teardown, owner-routed dispatch, and discrete flushing are transactional. | A Three driver must classify its ray/pointer surface; a transported renderer must serialize native delivery/priority semantics. There is deliberately no synthetic event layer. |
+| Text | Registry and driver policies independently choose `host`, `ignore`, or `reject`; static authored text diagnoses at compile time and dynamic primitives fail at materialization when unsupported. | A concrete renderer defines whether and how it allocates/updates text hosts. |
+| Events | Driver classification lowers event props to listener-ID/priority commands; replacement, removal, teardown, owner-routed dispatch, and scoped multi-listener delivery are transactional. | A Three driver must classify its ray/pointer surface; a transported renderer must serialize native delivery/priority semantics. There is deliberately no synthetic event layer. |
 | Styles | No renderer-neutral style object or stylesheet lifecycle. | Add typed renderer extensions for material/style application and disposal; do not copy CSS rules into native renderers. |
 | Assets | No prepare-time asset allocation. | Add cancellable/resource-owned capabilities whose acquisition is staged or externally cached. |
-| Visibility / `Activity` | Unsupported and capability-gated; DOM hiding is not reused. | Define hide/show commands, effect disconnection, ref behavior, and resource retention for each renderer. |
-| Portal | `createPortal` fails clearly for the universal renderer. | Define target identity, logical ownership versus physical parent, transport scope, and cross-renderer portal restrictions. Renderer-owned child regions are not general portals. |
-| Hydration / serialization | Universal server compilation fails; no host adoption exists. | Define renderer serialization, seed identity, mismatch behavior, and whether a renderer supports hydration at all. |
+| Visibility / `Activity` | Core-owned Activity and retained Suspense issue capability-gated visibility commands, retain identity/resources/insertion effects, disconnect events and layout/passive effects, and apply their distinct ref contracts. | Three maps visibility onto `Object3D.visible` versus attachment/resource detachment; DOM-owner Activity and Three-to-DOM pending projection remain Milestone 5. |
+| Portal | `createPortal` fails clearly; the same-renderer target-handle, logical/physical ownership, root/transport scope, and event-enclave contract is specified by the Three port plan. | Implement and validate the Three capability without treating renderer regions as portals. |
+| Hydration / serialization | Client-only renderers preserve server exports, omit declared regions, and expose stable manifest identity for one client mount without serializing the host tree. | A live renderer serializer/adopter must define seed identity and mismatch behavior separately; absence remains valid. |
 | Layout measurement | Public instances are available after commit; there is no neutral measure call. | Define synchronous-local versus transport-acknowledged layout and the point at which layout effects may run. |
 | Specialized collections | Not forced into generic child insertion. | Add renderer-namespaced commands/capabilities for Three `attach`, render lists, native collections, or other ownership models. |
 
-The `capabilities` set is descriptive rather than a complete compiler
-manifest. The compiler already diagnoses deferred syntax such as scoped styles
-and Activity, and the runtime rejects portals clearly, but it cannot yet prove
-every renderer-specific unsupported prop or host type. The next capability
-manifest must make absence fail at compile time when statically knowable or
-with a renderer-naming development error at the owning root. It must never fall
-back to a DOM interpretation.
+The serializable descriptor capabilities are compiler/tooling metadata; driver
+capabilities are independently checked at the owning root. The compiler now
+fails closed for Activity and authored text when statically knowable, while the
+prop codec and driver catch runtime values. It still cannot prove every
+renderer-specific host type or property. Unsupported cases must produce a
+renderer-naming diagnostic, never a DOM interpretation.
 
 ## 10. Invariants
 
@@ -888,9 +1020,11 @@ The architecture is acceptable only while these invariants hold:
    agree on renderer identity before visible mutation.
 5. The universal core owns logical ordering and virtual ranges. Drivers own
    host instances and resources, not fake topology nodes.
-6. Preparing a render cannot call a host driver or user ref/effect commit work.
-7. Suspension, render error, supersession, and explicit abort commit zero host
-   commands and leak zero prepared instances.
+6. Preparing a render may stage through `prepareBatch`, but cannot mutate the
+   public host or run user ref/effect/lifecycle/local-callback commit work.
+7. Suspension, render error, supersession, explicit abort, and rejected
+   preparation commit zero host commands and release every unpublished staged
+   resource exactly once.
 8. Every successful universal commit reaches the host as one ordered batch.
 9. The committed logical topology advances only with the accepted batch.
 10. Reordering a keyed range preserves compatible survivor host identity and
@@ -907,6 +1041,9 @@ The architecture is acceptable only while these invariants hold:
     metadata and carry explicit owner/child identities in both directions.
 15. Unsupported browser/native concepts are capability failures, not methods
     every driver must fake.
+16. A client-only module's authored server setup never executes; its stable
+    client reference matches across adapters, and only an explicitly omitted
+    boundary region may consume its exports in a server owner.
 
 ## 11. Validation gates
 
@@ -916,21 +1053,23 @@ observation boundaries:
 | Gate | Required evidence |
 | --- | --- |
 | DOM isolation | Existing DOM compiler goldens are byte-equal when renderer config is omitted or resolves to `dom`. Existing DOM runtime tests remain unchanged. |
-| Direct compiler selection | The same source emits DOM output for `dom`, universal helper imports/plan output for a universal descriptor, and rejects renderer mismatch or universal server mode. |
-| Shared config | Normalization, first-match/exclude behavior, path canonicalization, and stable signatures are tested without a bundler. |
+| Direct compiler selection | The same source emits DOM output for `dom`, universal helper imports/plan output for a universal descriptor, rejects unsupported server mode, and produces an inert export-preserving stub for client-only mode. |
+| Shared config | Normalization, first-match/exclude behavior, server/text/intrinsic/capability metadata, path canonicalization, and stable signatures are tested without a bundler. |
 | Adapter parity | Direct bundler compiler, Vite, Rspack loader/plugin, and Rsbuild choose the same descriptor for the same normalized config and canonical filename. |
 | Logical ranges | A keyed multi-root range reorders without marker hosts and preserves public-instance identity. |
 | Component ownership | Local/imported nested components, hooks, Providers, errors, suspension, refs, and effects retain/dispose the correct keyed owner. |
 | Template composition | Host/component spreads, early returns, fragments, arrays/primitives, and every supported directive execute without runtime JSX. |
-| Atomic attempts | Suspension, render error, superseded prepare, and explicit abort leave the object tree, commit log, refs, effects, and allocated-instance count unchanged. |
+| Atomic attempts | Suspension, render error, superseded prepare, explicit abort, and rejected host preparation leave the accepted tree, commits, refs, effects, and committed-resource ownership unchanged; staged resources abort once. |
 | Batch boundary | Each successful render contributes exactly one ordered batch; teardown contributes one final batch when hosts exist. |
-| Mutation vocabulary | Create/update/insert/move/remove/destroy are all exercised through the object driver's public tree. |
+| Mutation vocabulary | Create/update/recreate/insert/move/visibility/remove/destroy plus listener/lifecycle/local-callback descriptors are exercised through the object driver's public tree. |
 | Identity diagnostics | Component/plan/root/boundary/container/driver mismatches fail with both expected and received renderer IDs in development. |
 | Mixed ownership | A DOM parent provides context to an object child; child render errors reach the DOM error owner; ref and effect ordering straddle the single object commit correctly; DOM unmount tears the external root down. |
 | Renderer regions | Imported aliases and stable module/export metadata lower `Canvas`-shaped DOM-to-universal children and `Html`-shaped universal-to-DOM children through the same descriptor mechanism. |
-| Events | Registration, replacement, removal, public-instance dispatch, priority, teardown, and abandoned work are observable on the object driver's public surface. |
-| Compiler facilities | Universal maps point to authored TSRX and HMR, profiling, and parallel-`use()` plans remain executable; the DOM golden stays byte-identical. |
-| Capability gates | Portal and Activity/visibility behavior is either implemented under an explicit capability or rejected clearly. The current implementation chooses rejection. |
+| Events | Registration, replacement, removal, scoped multi-listener dispatch, priority, teardown, and abandoned work are observable on the object driver's public surface. |
+| Retained ownership | Activity and Suspense prove host/state/resource identity, visibility, distinct ref semantics, insertion retention, layout/passive disconnection, event suppression, fallback coexistence, reveal/reject, and capability failure. |
+| Client-only graph | Neutral, Vite, Rspack, and Rsbuild builds remove server imports/regions, preserve exports without authored execution, reject live use, and agree on client-reference/manifest identity; raw Rspack proves graph split and Vite/Rsbuild prove one client mount over an adopted DOM shell. |
+| Compiler facilities | Universal maps point to authored TSRX; HMR, profiling, and parallel-`use()` plans remain executable; Volar chooses file-local intrinsics without global merging; the DOM golden stays byte-identical. |
+| Capability gates | Text and Activity/visibility compile and execute only under explicit policies; portals and every unsupported renderer concept fail clearly. |
 
 Repository-wide typechecking and formatting remain required after the focused
 compiler/runtime/adapter suites. A user-facing experimental config or package
@@ -938,24 +1077,28 @@ export receives a patch changeset even though the ABI is not stable.
 
 ## 12. Migration phases
 
-### Implemented foundation and composition slice
+### Implemented foundation, composition, and renderer-SDK slice
 
 The shared resolver, compile-option plumbing, nested universal owner graph,
 static-plan and directive lowering, transactional root, event descriptor
-protocol, object driver, and renderer-region lowering are implemented. Normal
+protocol, prepared host acceptance, object driver, and renderer-region lowering
+are implemented. Normal
 componentized client authoring—including `Canvas`-shaped DOM-to-universal and
 `Html`-shaped reverse child regions—is executable rather than an RFC-only
-design. Universal maps compose to TSRX, the high-level Vite plugin loads the
-same renderer config early, and the Vite/Rspack/Rsbuild paths share normalized
-target and boundary decisions.
+design. Stable-ID recreation, host lifecycle/local callbacks, prop codecs,
+event scopes, retained visibility, client-only server graphs/manifests, and
+file-local intrinsic catalogues are executable. Universal maps compose to TSRX,
+the high-level Vite plugin loads the same renderer config early, and the
+Vite/Rspack/Rsbuild paths share normalized target and boundary decisions.
 
 The remaining foundation limitations are capability/scheduler boundaries:
 
-- universal SSR/hydration, general portals, Activity/visibility, async template
+- live universal host serialization/adoption, general portals, async template
   collections, scoped styles, neutral layout measurement, and asynchronous
   transport acknowledgement are not implemented;
 - mixed-boundary suspension retains committed external content but does not yet
-  drive the parent renderer's fallback or transition-hold timing;
+  drive the parent renderer's fallback or transition-hold timing, and a DOM
+  Activity does not yet propagate offscreen state into an external root;
 - transition/deferred/action/form compatibility behavior has no universal lane
   scheduler, and `memo` has no universal bailout optimization;
 - a reverse renderer region contains executable normally compiled DOM content,
@@ -968,6 +1111,9 @@ The remaining foundation limitations are capability/scheduler boundaries:
 ### Next: `@octanejs/three` proving renderer
 
 Build the smallest real Three package on the implemented seam:
+
+The R3F compatibility target, ABI gates, implementation phases, effort, and
+validation matrix are tracked in [`three-port-plan.md`](./three-port-plan.md).
 
 - a typed Three intrinsic catalog and concrete `Canvas` root/container;
 - Three object creation, prop application/diffing, insert/move/remove, disposal,

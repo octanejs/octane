@@ -8,9 +8,12 @@
  * exactly the same behavior.
  */
 import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	cleanModuleId,
+	createClientReferenceManifest,
 	createOctaneCompiler,
 	discoverOctaneSourceDependencies,
 	findVoidRootImports,
@@ -20,6 +23,33 @@ export { discoverOctaneSourceDependencies };
 
 const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
 const VOID_EXPORTS_META = 'octane:void-component-exports';
+const CLIENT_REFERENCE_META = 'octane:client-reference';
+
+function realRoot(path) {
+	try {
+		return realpathSync(path);
+	} catch {
+		return path;
+	}
+}
+
+/**
+ * @param {{ getModuleInfo(id: string): { meta?: Record<string, unknown> } | null }} context
+ * @param {Record<string, { type: string, fileName?: string, modules?: Record<string, unknown> }>} bundle
+ */
+function clientReferenceManifest(context, bundle) {
+	const entries = [];
+	for (const output of Object.values(bundle)) {
+		if (output.type !== 'chunk' || output.fileName === undefined || output.modules === undefined) {
+			continue;
+		}
+		for (const moduleId of Object.keys(output.modules)) {
+			const reference = context.getModuleInfo(moduleId)?.meta?.[CLIENT_REFERENCE_META];
+			if (reference !== undefined) entries.push({ reference, chunks: [output.fileName] });
+		}
+	}
+	return createClientReferenceManifest(entries);
+}
 
 function voidImportKey(request, imported) {
 	return `${request}\0${imported}`;
@@ -73,6 +103,30 @@ async function loadVoidComponentImports(context, imports, importer) {
 	return proven;
 }
 
+async function loadClientOnlyImports(context, compiler, code, importer) {
+	if (typeof context.resolve !== 'function') return [];
+	const requests = compiler.findServerImportRequests(code, importer);
+	const classified = [];
+	await Promise.all(
+		requests.map(async (request) => {
+			let resolved;
+			try {
+				resolved = await context.resolve(request, importer, { skipSelf: true });
+			} catch {
+				return;
+			}
+			if (resolved == null || resolved.external === true || resolved.external === 'absolute') {
+				return;
+			}
+			const reference = compiler.clientReferenceForFile(resolved.id);
+			if (reference !== null) classified.push({ request, resolvedId: resolved.id, reference });
+		}),
+	);
+	return classified.sort((left, right) =>
+		left.request < right.request ? -1 : left.request > right.request ? 1 : 0,
+	);
+}
+
 function assertProfilingDefineAvailable(definitions, enabled) {
 	if (
 		definitions === null ||
@@ -92,6 +146,7 @@ function assertProfilingDefineAvailable(definitions, enabled) {
 export function octane(options = {}) {
 	let hmrEnabled = options.hmr;
 	let specializeProductionRoots = false;
+	let emitClientReferenceManifest = options.ssr !== true;
 	// Profiling is intentionally independent of serve/HMR. `ssr: true` is the
 	// adapter's explicit server-only override, where client profiling must stay off.
 	const profileEnabled = options.profile === true && options.ssr !== true;
@@ -143,8 +198,10 @@ export function octane(options = {}) {
 			// Re-check the final merged value so a later plugin cannot silently win the
 			// reserved definition and desynchronize compiler metadata from the runtime.
 			assertProfilingDefineAvailable(config.define, profileEnabled);
-			if (resolve(config.root) !== projectRoot) resetCompiler(config.root);
+			if (realRoot(resolve(config.root)) !== realRoot(projectRoot)) resetCompiler(config.root);
 			if (hmrEnabled === undefined) hmrEnabled = config.command === 'serve';
+			emitClientReferenceManifest =
+				options.ssr === false || (options.ssr !== true && !config.build?.ssr);
 			// A watch rebuild does not guarantee that an importer's cached transform
 			// reruns when only an imported module's output contract changes. Keep the
 			// proof to one-shot production builds where the graph is compiled together.
@@ -152,6 +209,16 @@ export function octane(options = {}) {
 		},
 		watchChange(id) {
 			compiler.invalidate(id);
+		},
+		generateBundle(_outputOptions, bundle) {
+			if (!emitClientReferenceManifest) return;
+			const manifest = clientReferenceManifest(this, bundle);
+			if (Object.keys(manifest.references).length === 0) return;
+			this.emitFile({
+				type: 'asset',
+				fileName: CLIENT_REFERENCE_MANIFEST_FILENAME,
+				source: JSON.stringify(manifest, null, 2) + '\n',
+			});
 		},
 		async resolveId(source, importer, resolveOptions) {
 			if (!resolveOptions?.ssr) return null;
@@ -165,7 +232,7 @@ export function octane(options = {}) {
 				forceSsr !== undefined
 					? forceSsr
 					: transformOptions?.ssr === true || this.environment?.config?.consumer === 'server';
-			const transformWithProof = (proven) => {
+			const transformWithProof = (proven, clientOnlyImports = []) => {
 				const result = compiler.transform(code, id, {
 					environment: server ? 'server' : 'client',
 					hmr: !server && hmrEnabled ? 'vite' : false,
@@ -176,6 +243,7 @@ export function octane(options = {}) {
 					parallelUse: options.parallelUse,
 					collectVoidComponentExports:
 						specializeProductionRoots && !server && !hmrEnabled && !profileEnabled,
+					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
 					...(proven?.size
 						? {
 								isVoidComponentImport: (request, imported) =>
@@ -186,21 +254,28 @@ export function octane(options = {}) {
 				if (result === null) return null;
 				for (const dependency of result.dependencies) this.addWatchFile?.(dependency);
 				if (result.kind === 'none') return null;
+				const meta = {};
+				if (result.clientReference !== undefined) {
+					meta[CLIENT_REFERENCE_META] = result.clientReference;
+				}
+				if (result.kind === 'compile' && Array.isArray(result.voidComponentExports)) {
+					meta[VOID_EXPORTS_META] = {
+						exports: result.voidComponentExports ?? [],
+						fingerprint: compiledCodeFingerprint(result.code),
+					};
+				}
 				return {
 					code: result.code,
 					map: result.map,
-					...(result.kind === 'compile' && Array.isArray(result.voidComponentExports)
-						? {
-								meta: {
-									[VOID_EXPORTS_META]: {
-										exports: result.voidComponentExports ?? [],
-										fingerprint: compiledCodeFingerprint(result.code),
-									},
-								},
-							}
-						: {}),
+					...(Object.keys(meta).length === 0 ? null : { meta }),
 				};
 			};
+
+			if (server) {
+				return loadClientOnlyImports(this, compiler, code, id).then((imports) =>
+					transformWithProof(null, imports),
+				);
+			}
 
 			const voidImports =
 				specializeProductionRoots && !server && !hmrEnabled && !profileEnabled

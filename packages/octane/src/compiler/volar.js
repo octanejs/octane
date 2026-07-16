@@ -29,6 +29,7 @@ import {
 	dedupeMappings,
 	parseModule,
 } from '@tsrx/core';
+import { resolveRendererForFile } from './renderers.js';
 
 /**
  * Platform descriptor for `createJsxTransform`. Mirrors `tsrx-react`'s React
@@ -74,6 +75,19 @@ const OCTANE_PLATFORM = {
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
 
+function createRendererTypePrelude(renderer) {
+	if (renderer.intrinsics === undefined) return '';
+	return `/** @jsxImportSource ${renderer.intrinsics} */\n`;
+}
+
+function shiftGeneratedOffsets(mappings, offset) {
+	if (offset === 0) return mappings;
+	return mappings.map((mapping) => ({
+		...mapping,
+		generatedOffsets: mapping.generatedOffsets.map((generatedOffset) => generatedOffset + offset),
+	}));
+}
+
 /**
  * Compile a .tsrx source string to a Volar `VolarMappingsResult`.
  *
@@ -84,7 +98,12 @@ const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
  *
  * @param {string} source
  * @param {string} [filename]
- * @param {{ loose?: boolean }} [options]
+ * Renderer selection deliberately uses the same canonical filename resolver as
+ * build-time compilation. A renderer may expose a JSX import-source module via
+ * `intrinsics`; when present, the virtual TSX gets a file-local pragma so host
+ * element types cannot leak into files owned by another renderer.
+ *
+ * @param {{ loose?: boolean, renderers?: unknown }} [options]
  * @returns {import('@tsrx/core/types').VolarMappingsResult}
  */
 export function compileToVolarMappings(source, filename, options) {
@@ -93,7 +112,6 @@ export function compileToVolarMappings(source, filename, options) {
 	/** @type {import('@tsrx/core/types').AST.CommentWithLocation[]} */
 	const comments = [];
 	const ast = parseModule(source, filename, {
-		...options,
 		collect: true,
 		loose: !!options?.loose,
 		errors,
@@ -106,6 +124,8 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments,
 	});
+	const renderer = resolveRendererForFile(options?.renderers, filename ?? 'untitled.tsrx');
+	const prelude = createRendererTypePrelude(renderer);
 	const result = createVolarMappingsResult({
 		ast: transformed.ast,
 		ast_from_source: ast,
@@ -114,8 +134,10 @@ export function compileToVolarMappings(source, filename, options) {
 		source_map: transformed.map,
 		errors,
 	});
+	const mappings = dedupeMappings(result.mappings);
 	return {
 		...result,
-		mappings: dedupeMappings(result.mappings),
+		code: prelude + result.code,
+		mappings: shiftGeneratedOffsets(mappings, prelude.length),
 	};
 }
