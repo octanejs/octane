@@ -3,10 +3,16 @@
 A benchmark adjacent to [`js-framework`](../js-framework/), [`dbmon`](../dbmon/)
 and [`recursive-context`](../recursive-context/). Where those measure list
 create/update throughput, **memo-wall isolates the memo bail**: 1000
-`memo(Row)` children under one parent, where a parent re-render must be
-absorbed by 1000 shallow-equal prop comparisons, a single prop change must
+`memo(Row)` children under one parent, where a parent re-render traditionally
+gets absorbed by 1000 shallow-equal prop comparisons, a single prop change must
 re-render exactly one row, and a context bump above the wall must refresh only
-the leaf consumers without re-running any bailed body.
+the leaf consumers without re-running any bailed body. Octane TSRX wall A also
+exercises the default production `autoMemo` transform: an equal `items`
+dependency reuses the whole `RowsA` region before the keyed wall. Wall B stays
+the untransformed control — autoMemo does not reach through an imported
+helper's returned descriptors (that calculation/output phase ships together
+with per-key descriptor reuse), so every wall-B parent update rebuilds all
+1000 descriptors and must be absorbed by the value-comparing memo bail.
 
 This is the canonical home for octane's `shallowEqualProps` and
 `refreshContextConsumers` numbers — if a store-fanout suite lands later it must
@@ -32,12 +38,14 @@ benchmarks/memo-wall/
 ├── octane-tsrx/   # Vite app, dev :5206 — octane authored in .tsrx
 ├── octane-jsx/    # Vite app, dev :5207 — same app authored in React-style .tsx
 ├── react/         # Vite app, dev :5208 (React 19, production mode)
+├── react-compiler/ # :5226; same React source + official React Compiler 1.0.0
 ├── solid/         # Vite app, dev :5182 (Solid 2.0 — no wall; fine-grained probes)
 ├── ripple/        # Vite app, dev :5225 (fine-grained creation/text probes)
 ├── vue-vapor/     # Vite app, dev :5223 (Vue 3.6 Vapor — no wall; fine-grained probes)
 ├── preact/       # Vite app, dev :5267 (memo + core context)
 ├── svelte/       # Vite app, dev :5278 (fine-grained creation/text probes)
 ├── run.mjs        # Playwright harness — drives all targets, enforces the gates
+├── work.mjs       # untimed Chromium precise-call-coverage work gates
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
 ```
@@ -62,20 +70,35 @@ how `<Row>` is put on screen:
 - **wall A — compiled list position**: `@for (…; key it.id) { <Row …/> }`
   (`.tsrx`) / keyed `.map` (`.tsx`) inside a `RowsA` component →
   `forBlock` → `componentSlot` → the **componentSlot arm** of `tryMemoBail`.
-  The list lives in `RowsA` (host-element root) rather than inline in the
+  Production autoMemo witnesses the imported Row's default memo contract and
+  promotes unchanged survivors through the existing PURE item path, so a
+  one-item change enters only one item helper. The list lives in `RowsA`
+  (host-element root) rather than inline in the
   Provider children because the `.tsx` dialect only folds a keyed `.map` to
   the compiled forBlock under host-only ancestors; the Octane, React, and
   Preact fixtures keep the identical structure so those columns stay comparable.
+  The default production `autoMemo` transform also caches the call to pure
+  `RowsA` by its inferred `items` capture and skips this whole path on
+  equal/context-only parent updates. The return-JSX `.tsx` descriptor-cache path
+  is a later phase and currently remains a 1000-bail control.
 - **wall B — value-position**: a plain-`.ts` helper (`src/wall-b.ts`) builds
   `createElement(Row, props)` descriptors that reach the DOM through a
   `{rows}` children hole → `childSlot`'s keyed de-opt list → the **childSlot
   arm** of `tryMemoBail`. This is the shape every `@octanejs/*` binding
-  produces. Fresh descriptor + fresh props object every render — the bail must
-  succeed on prop VALUES, not object identity.
+  produces. A fresh descriptor + fresh props object is allocated every parent
+  render — the bail must succeed on prop VALUES, not object identity. autoMemo
+  deliberately leaves this path alone: caching an imported helper's returned
+  descriptors is the calculation/output phase, deferred until per-key
+  descriptor reuse makes its miss path at least as fast as the bail it
+  replaces.
 
 For React the A/B distinction collapses (JSX IS `createElement`); both walls
-are kept so the op list and DOM stay identical across targets — expect the two
-React columns to read ~equal.
+are kept so the op list and DOM stay identical across targets. The vanilla
+column uses ordinary `@vitejs/plugin-react`. The `react-compiler` column shares
+that exact source and adds Vite's official `reactCompilerPreset()` backed by
+`babel-plugin-react-compiler@1.0.0`, so the comparison differs only by the
+production compiler. React Compiler caches the `.map`, imported helper call,
+and their JSX regions by the inferred `items` dependency.
 
 Each wall owns its own item array, an unrelated `tick` state, and a theme
 context provider ABOVE the rows. There is one context object PER WALL: an
@@ -93,6 +116,23 @@ with fresh counters and asserts the EXACT expected counts, plus a DOM check
 **`parent_rerender_equal_*` must show 0 row-body invocations — over the whole
 timed loop too — or the harness exits 1**, because a single reference-unstable
 prop silently turns the entire suite into a full-re-render measurement.
+
+Those body counters intentionally do not sit inside `RowsA` or its item helper:
+an observable mutation there would make the candidate impure and correctly
+disable automatic memoization. `work.mjs` provides the stronger, untimed gate
+after compilation using Chromium precise call coverage. For TSRX equal/context
+A it requires zero list helpers, keyed survivor visits, descriptors, shallow
+memo comparisons, and row bodies (context A additionally requires exactly 1000
+Leaf refreshes). Wall B's gates pin the memo-bail control: every parent update
+runs the helper once, builds 1000 descriptors, visits 1000 survivors, and bails
+1000 comparisons with zero row bodies. Mount and one-change A/B also carry
+exact compiled-work gates.
+
+The React Row/Inner/Leaf counters likewise make those component bodies impure,
+so React Compiler conservatively leaves them alone; the explicit `memo`
+boundaries still provide the row semantics. The proving-ground optimization is
+in the pure RowsA/Wall calculations and JSX regions, which remain compiler
+eligible and are visible in the generated `react/compiler-runtime` cache code.
 
 ## Ops
 
@@ -114,6 +154,7 @@ rep count. Default 20 iterations (+5 warmup); `node run.mjs 50` for longer.
 Native **Preact** (`:5267`) uses `memo` and core context. **Svelte 5** (`:5278`)
 reports compiler-granular behavior: component-creation probes run once, context
 consumers update selectively, and object keys recreate exactly one changed row.
+The production **React Compiler** comparison runs at `:5226`.
 
 ## Running
 
@@ -132,16 +173,32 @@ single target (the first target is the ratio baseline). Set
 failure the file still gets written, with a top-level `failed` field, and the
 process exits 1).
 
+Run the deterministic work gate against a separate unminified production build
+(stable function names are needed for precise coverage; this build is never
+used for timings):
+
+```bash
+MEMO_WALL_WORK=1 pnpm --filter octane-tsrx-memowall-bench build
+pnpm --filter octane-tsrx-memowall-bench preview
+pnpm --dir benchmarks/memo-wall bench:work
+```
+
+Set `TARGET_URL` to use a non-default preview URL and `WORK_JSON` to persist the
+per-operation counts.
+
 ## Caveats / bias notes
 
-- `one_change_*` numbers include the 999 successful bails around the single
-  miss — that's the intended "one change amid a wall" workload, not a pure
-  single-row-render cost.
-- React's `parent_rerender_equal` inherently includes re-creating 1000 element
-  descriptors per render (that IS React's model); octane wall A re-runs the
-  compiled `@for` body per survivor instead. The cross-framework ratio is the
-  honest end-to-end cost of the same authored behavior, not an
-  instruction-level apples-to-apples.
+- `one_change_*` still traverses the 1000 keyed survivors. Wall A's inferred
+  PURE path enters only the changed item helper; wall B also performs the 999
+  successful prop bails around the single miss. This is the intended "one
+  change amid a wall" workload, not a pure single-row-render cost.
+- Vanilla React and Octane JSX `parent_rerender_equal` include recreating or
+  reconciling 1000 row descriptions. Auto-memoized Octane TSRX stops at wall
+  A's inferred region/list dependencies but deliberately rebuilds wall B's
+  descriptors (imported-helper output caching is a later phase), while React
+  Compiler caches both the `.map` and the imported helper call. The
+  cross-framework ratio is the honest end-to-end cost of each production
+  compiler, not an instruction-level apples-to-apples comparison.
 - `mount` covers BOTH walls (2000 rows + providers), not 1000.
 - `ctx_through_wall_*` asserts `inner === 0`: octane's
   `refreshContextConsumers` and React's lazy context propagation both skip

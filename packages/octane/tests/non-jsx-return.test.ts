@@ -88,6 +88,8 @@ export function Parent(p) @{
 		expect(code).not.toContain('EarlyString.$$singleRoot');
 		expect(code).not.toContain('EarlyDescriptor.$$singleRoot');
 		expect(code).not.toContain('EarlyArray.$$singleRoot');
+		// autoMemo guards eligible value-returning calls outside the ordinary
+		// generic return-reconciliation helper; it does not change that helper ABI.
 		expect(code.match(/_\$componentSlot\(/g)).toHaveLength(3);
 		expect(code.match(/_\$componentSlotVoid\(/g)).toHaveLength(1);
 	});
