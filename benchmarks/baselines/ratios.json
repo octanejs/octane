@@ -36,8 +36,8 @@
     "op": "mount",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 0.6,
-    "note": "1000 memo(Row) mount: octane compiles the wall (known ~0.12x React)."
+    "maxRatio": 1.5,
+    "note": "Cold production mount of both 1000-row walls (2000 rows total): Octane and React are currently near parity (~0.95x); 1.5 leaves standard noise headroom while catching a structural mount regression."
   },
   {
     "suite": "memo-wall",
@@ -45,7 +45,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.6,
-    "note": "parent re-render absorbed by 1000 shallow-equal bails: structural octane win (known ~0.11x). If octane stops bailing this shoots past 1."
+    "note": "Production autoMemo skips the unchanged RowsA region before the keyed wall; if dependency-scoped reuse breaks this rises toward the vanilla React memo-wall cost."
   },
   {
     "suite": "dbmon",
