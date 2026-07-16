@@ -67,7 +67,7 @@ function resolveEventSource(
 	wrapper: HTMLDivElement | null,
 ): HTMLElement | null {
 	if (source === undefined) return wrapper;
-	return 'current' in source ? source.current : source;
+	return 'current' in source ? source.current ?? wrapper : source;
 }
 
 function createPrefixCompute(prefix: EventPrefix): ComputeFunction {
@@ -155,6 +155,7 @@ export function Canvas({
 	const [size, setSize] = useState<Size | null>(null);
 	const [boundaryMount, setBoundaryMount] = useState<ThreeBoundaryMount | null>(null);
 	const [error, setError] = useState<Error | null>(null);
+	const eventTarget = resolveEventSource(eventSource, wrapperRef.current);
 	eventSourceRef.current = eventSource;
 	eventPrefixRef.current = eventPrefix;
 	onCreatedRef.current = onCreated;
@@ -245,6 +246,8 @@ export function Canvas({
 		scene,
 	]);
 
+	// A stable ref object can receive a new current target during commit. Recheck after every
+	// render; bindCanvasEvents avoids reconnecting when the resolved target is unchanged.
 	useLayoutEffect(() => {
 		const root = rootRef.current;
 		if (boundaryMount === null || root === null) return;
@@ -255,7 +258,7 @@ export function Canvas({
 			eventPrefix,
 			eventBindingRef.current,
 		);
-	}, [boundaryMount, eventSource, eventPrefix]);
+	}, null);
 
 	const renderedBoundaryMount: ThreeBoundaryMount | null =
 		boundaryMount === null
@@ -270,7 +273,7 @@ export function Canvas({
 		width: '100%',
 		height: '100%',
 		overflow: 'hidden',
-		pointerEvents: eventSource === undefined ? 'auto' : 'none',
+		pointerEvents: eventTarget === wrapperRef.current ? 'auto' : 'none',
 		...style,
 	};
 

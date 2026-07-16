@@ -305,13 +305,13 @@ describe('Canvas', () => {
 		expect(state.get().events.connected).toBeUndefined();
 	});
 
-	it('keeps an onCreated event connection until the configured source changes', async () => {
+	it('preserves onCreated event ownership and tracks ref targets with wrapper fallback', async () => {
 		const { factory } = rendererHarness();
 		const configuredSource = document.createElement('section');
 		const userSource = document.createElement('section');
 		const nextSource = document.createElement('section');
 		const finalSource = document.createElement('section');
-		const sourceRef = { current: nextSource };
+		const sourceRef = { current: nextSource as HTMLElement | null };
 		const userCompute = vi.fn();
 		const onCreated = vi.fn((state: RootState) => {
 			state.events.connect?.(userSource);
@@ -366,14 +366,36 @@ describe('Canvas', () => {
 		await flushCanvasWork();
 		expect(state.get().events.connected).toBe(nextSource);
 
+		const wrapper = mounted.find('.canvas-shell') as HTMLDivElement;
 		sourceRef.current = finalSource;
 		mounted.update(CanvasApp, {
 			...props,
 			eventSource: sourceRef,
-			eventPrefix: 'screen',
+			eventPrefix: undefined,
 		});
 		await flushCanvasWork();
 		expect(state.get().events.connected).toBe(finalSource);
+		expect(wrapper.style.pointerEvents).toBe('none');
+		userCompute.mockClear();
+		dispatchCoordinates(nextSource, { offsetX: 10, offsetY: 90, clientX: 10, clientY: 90 });
+		expect(userCompute).not.toHaveBeenCalled();
+		dispatchCoordinates(finalSource, { offsetX: 25, offsetY: 75, clientX: 25, clientY: 75 });
+		expect(userCompute).toHaveBeenCalledOnce();
+
+		sourceRef.current = null;
+		mounted.update(CanvasApp, {
+			...props,
+			eventSource: sourceRef,
+			eventPrefix: undefined,
+		});
+		await flushCanvasWork();
+		expect(state.get().events.connected).toBe(wrapper);
+		expect(wrapper.style.pointerEvents).toBe('auto');
+		userCompute.mockClear();
+		dispatchCoordinates(finalSource, { offsetX: 50, offsetY: 50, clientX: 50, clientY: 50 });
+		expect(userCompute).not.toHaveBeenCalled();
+		dispatchCoordinates(wrapper, { offsetX: 75, offsetY: 25, clientX: 75, clientY: 25 });
+		expect(userCompute).toHaveBeenCalledOnce();
 	});
 
 	it('bridges ordinary Octane context from the DOM owner into Three children', async () => {
