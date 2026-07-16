@@ -273,4 +273,223 @@ describe('Three Canvas bundler and browser integration', () => {
 			await browser.close();
 		}
 	}, 60_000);
+
+	it('delivers real offset pointer events and native capture through Canvas', async () => {
+		let browser: import('playwright').Browser | undefined;
+		try {
+			const { chromium } = await import('playwright');
+			browser = await chromium.launch({
+				headless: true,
+				args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
+			});
+		} catch (error) {
+			throw new Error(
+				'[@octanejs/three browser] Chromium is required ' +
+					'(run `pnpm exec playwright install chromium`): ' +
+					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+			);
+		}
+
+		const page = await browser.newPage({ viewport: { width: 192, height: 160 } });
+		const errors: string[] = [];
+		page.on('console', (message) => {
+			if (message.type() === 'error') errors.push(message.text());
+		});
+		page.on('pageerror', (error) => errors.push(`pageerror: ${String(error)}`));
+		try {
+			await page.goto(viteOrigin, { waitUntil: 'load' });
+			await page.waitForFunction(
+				() =>
+					(globalThis as typeof globalThis & { __octaneThreeSceneReady?: boolean })
+						.__octaneThreeSceneReady === true,
+			);
+			await page.evaluate(() => {
+				const proof = globalThis as typeof globalThis & {
+					__octaneThreeEventLog?: Array<Record<string, unknown>>;
+					__octaneThreeState?: { advance(timestamp: number): void };
+				};
+				proof.__octaneThreeEventLog = [];
+				proof.__octaneThreeState?.advance(1 / 60);
+			});
+			const bounds = await page.locator('canvas').boundingBox();
+			if (bounds === null) throw new Error('Canvas had no browser bounds.');
+			const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+			const outside = { x: bounds.x + bounds.width + 24, y: center.y };
+
+			await page.mouse.move(center.x, center.y);
+			await page.mouse.down();
+			await page.mouse.move(outside.x, outside.y);
+			const duringCapture = await page.evaluate(
+				() =>
+					(
+						globalThis as typeof globalThis & {
+							__octaneThreeEventLog?: Array<Record<string, unknown>>;
+						}
+					).__octaneThreeEventLog ?? [],
+			);
+			const downIndex = duringCapture.findIndex((entry) => entry.type === 'down');
+			expect(downIndex).toBeGreaterThanOrEqual(0);
+			expect(duringCapture.slice(downIndex + 1).some((entry) => entry.type === 'move')).toBe(true);
+			expect(duringCapture.slice(downIndex + 1).some((entry) => entry.type === 'leave')).toBe(
+				false,
+			);
+			const down = duringCapture[downIndex] as {
+				object: string;
+				eventObject: string;
+				point: number[];
+				pointer: number[];
+			};
+			expect(down).toMatchObject({
+				object: 'bundler-proof-cube',
+				eventObject: 'bundler-proof-cube',
+			});
+			expect(down.pointer[0]).toBeCloseTo(0, 1);
+			expect(down.pointer[1]).toBeCloseTo(0, 1);
+			expect(down.point[2]).toBeCloseTo(1, 1);
+
+			await page.mouse.up();
+			await page.mouse.move(center.x, center.y);
+			await page.evaluate(() => {
+				const proof = globalThis as typeof globalThis & {
+					__octaneThreeEventLog?: Array<Record<string, unknown>>;
+				};
+				proof.__octaneThreeEventLog = [];
+			});
+			await page.mouse.move(outside.x, outside.y);
+			const afterRelease = await page.evaluate(
+				() =>
+					(
+						globalThis as typeof globalThis & {
+							__octaneThreeEventLog?: Array<Record<string, unknown>>;
+						}
+					).__octaneThreeEventLog ?? [],
+			);
+			expect(afterRelease.map((entry) => entry.type)).toEqual(['out', 'leave']);
+
+			await page.mouse.move(center.x, center.y);
+			await page.mouse.click(center.x, center.y);
+			const clickLog = await page.evaluate(
+				() =>
+					(
+						globalThis as typeof globalThis & {
+							__octaneThreeEventLog?: Array<Record<string, unknown>>;
+						}
+					).__octaneThreeEventLog ?? [],
+			);
+			expect(clickLog.some((entry) => entry.type === 'click')).toBe(true);
+
+			await page.reload({ waitUntil: 'load' });
+			await page.waitForFunction(
+				() =>
+					(globalThis as typeof globalThis & { __octaneThreeSceneReady?: boolean })
+						.__octaneThreeSceneReady === true,
+			);
+			await page.evaluate(() => {
+				const proof = globalThis as typeof globalThis & {
+					__octaneThreeEventLog?: Array<Record<string, unknown>>;
+					__octaneThreeReleaseOnUp?: boolean;
+					__octaneThreeState?: { advance(timestamp: number): void };
+				};
+				proof.__octaneThreeEventLog = [];
+				proof.__octaneThreeReleaseOnUp = false;
+				proof.__octaneThreeState?.advance(1 / 60);
+			});
+			const implicitReleaseBounds = await page.locator('canvas').boundingBox();
+			if (implicitReleaseBounds === null) {
+				throw new Error('Implicit-release Canvas had no browser bounds.');
+			}
+			const implicitReleaseCenter = {
+				x: implicitReleaseBounds.x + implicitReleaseBounds.width / 2,
+				y: implicitReleaseBounds.y + implicitReleaseBounds.height / 2,
+			};
+			const implicitReleaseOutside = {
+				x: implicitReleaseBounds.x + implicitReleaseBounds.width + 24,
+				y: implicitReleaseCenter.y,
+			};
+			await page.mouse.move(implicitReleaseCenter.x, implicitReleaseCenter.y);
+			await page.mouse.down();
+			await page.mouse.move(implicitReleaseOutside.x, implicitReleaseOutside.y);
+			await page.mouse.up();
+			await page.evaluate(
+				() =>
+					new Promise<void>((resolveFrame) =>
+						requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame())),
+					),
+			);
+			const implicitRelease = await page.evaluate(() => {
+				const proof = globalThis as typeof globalThis & {
+					__octaneThreeEventLog?: Array<Record<string, unknown>>;
+					__octaneThreePointerId?: number;
+					__octaneThreeState?: {
+						internal: { capturedMap: Map<number, unknown> };
+					};
+				};
+				const canvas = document.querySelector('canvas');
+				const pointerId = proof.__octaneThreePointerId;
+				return {
+					captured:
+						canvas !== null && pointerId !== undefined ? canvas.hasPointerCapture(pointerId) : true,
+					capturedMapSize: proof.__octaneThreeState?.internal.capturedMap.size,
+					upEvents: proof.__octaneThreeEventLog?.filter((entry) => entry.type === 'up').length ?? 0,
+				};
+			});
+			expect(implicitRelease).toEqual({ captured: false, capturedMapSize: 0, upEvents: 1 });
+
+			await page.reload({ waitUntil: 'load' });
+			await page.waitForFunction(
+				() =>
+					(globalThis as typeof globalThis & { __octaneThreeSceneReady?: boolean })
+						.__octaneThreeSceneReady === true,
+			);
+			await page.evaluate(() => {
+				const proof = globalThis as typeof globalThis & {
+					__octaneThreeEventLog?: Array<Record<string, unknown>>;
+					__octaneThreeRemoveOnDown?: boolean;
+					__octaneThreeState?: { advance(timestamp: number): void };
+				};
+				proof.__octaneThreeEventLog = [];
+				proof.__octaneThreeRemoveOnDown = true;
+				proof.__octaneThreeState?.advance(1 / 60);
+			});
+			const nextBounds = await page.locator('canvas').boundingBox();
+			if (nextBounds === null) throw new Error('Reloaded Canvas had no browser bounds.');
+			const nextCenter = {
+				x: nextBounds.x + nextBounds.width / 2,
+				y: nextBounds.y + nextBounds.height / 2,
+			};
+			await page.mouse.move(nextCenter.x, nextCenter.y);
+			await page.mouse.down();
+			const removedCapture = await page.evaluate(() => {
+				const proof = globalThis as typeof globalThis & {
+					__octaneThreeEventLog?: Array<Record<string, unknown>>;
+					__octaneThreePointerId?: number;
+					__octaneThreeState?: { scene: { getObjectByName(name: string): unknown } };
+				};
+				const canvas = document.querySelector('canvas');
+				const pointerId = proof.__octaneThreePointerId;
+				return {
+					captured:
+						canvas !== null && pointerId !== undefined ? canvas.hasPointerCapture(pointerId) : true,
+					meshPresent:
+						proof.__octaneThreeState?.scene.getObjectByName('bundler-proof-cube') !== undefined,
+				};
+			});
+			expect(removedCapture).toEqual({ captured: false, meshPresent: false });
+			await page.mouse.up();
+			await page.mouse.click(nextCenter.x, nextCenter.y);
+			const missLog = await page.evaluate(
+				() =>
+					(
+						globalThis as typeof globalThis & {
+							__octaneThreeEventLog?: Array<Record<string, unknown>>;
+						}
+					).__octaneThreeEventLog ?? [],
+			);
+			expect(missLog.some((entry) => entry.type === 'root-miss')).toBe(true);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+			await browser.close();
+		}
+	}, 60_000);
 });

@@ -4,7 +4,7 @@ An experimental React Three Fiber 9-compatible web renderer for Octane. Octane
 keeps ownership of component execution, hooks, context, Suspense, refs, and
 effects; this package supplies the Three-specific host layer.
 
-Milestones 0, 2, and 3 are implemented on top of Octane's renderer SDK
+Milestones 0, 2, 3, and 4 are implemented on top of Octane's renderer SDK
 foundation. The current technical preview includes:
 
 - the serializable compiler preset, renderer entry point, renderer-local Three
@@ -19,19 +19,28 @@ foundation. The current technical preview includes:
   resize/DPR/viewport state, shadows and color configuration;
 - one shared `always`/`demand`/`never` frame loop, global frame effects,
   `useStore`, `useThree`, `useFrame`, `useGraph`, managed-instance helpers, and
-  the deterministic `@octanejs/three/testing` harness; and
+  the deterministic `@octanejs/three/testing` harness;
+- R3F-compatible ray and pointer events, including 3D bubbling, hit ordering,
+  propagation, hover transitions, missed clicks, pointer capture, custom event
+  managers, external DOM sources, and coordinate prefixes; and
 - public behavior, prepared-driver, and same-source compiled scene evidence
   against R3F 9.6.1 with the exact Three r172 oracle.
 
-Ray and pointer events begin in Milestone 4. Asset loading, portals, full Canvas
-SSR/hydration adoption, XR, OffscreenCanvas lifecycle, and live HMR behavior
-follow in later milestones. Event configuration currently rejects with a clear
-technical-preview diagnostic instead of silently accepting a non-functional
-surface.
+Asset loading, portals and portal event layers, full Canvas SSR/hydration
+adoption, XR, OffscreenCanvas lifecycle, and live HMR behavior follow in later
+milestones.
 
-One deliberate correctness fix differs from R3F 9.6.1: removing a pierced prop
-such as `material-color` resets the nested material property, instead of
-writing the default to a same-named leaf on the root object.
+Three deliberate correctness fixes differ from R3F 9.6.1:
+
+- removing a pierced prop such as `material-color` resets the nested material
+  property, instead of writing the default to a same-named leaf on the root
+  object; and
+- reconstructing a captured or hovered object rewrites every stored
+  intersection to the replacement, so subsequent captured events reach the
+  live handler instead of retaining the retired object; and
+- retained Activity subtrees are excluded from recursive raycasts while
+  hidden, rather than allowing an interactive visible ancestor to pierce an
+  invisible descendant.
 
 ## Compiler configuration
 
@@ -105,7 +114,14 @@ root.store.getState().advance(1 / 60);
 
 Tests can inject the WebGL-free deterministic harness from
 `@octanejs/three/testing`; it drives the same root, host commits, hooks, and
-public `advance()` loop as an application.
+public `advance()` loop as an application. Its awaitable `fireEvent()` helper
+directly invokes the latest committed handler and settles scheduled work when
+raycasting itself is not under test.
+
+`Canvas` installs the default web event manager. Use `eventSource` to subscribe
+through another element and `eventPrefix` (`offset`, `client`, `page`, `layer`,
+or `screen`) to choose the coordinate pair. Programmatic roots can supply a
+custom `events(store)` manager factory and update it through `state.setEvents()`.
 
 `useStore()` returns the upstream-compatible callable store. Because a later
 `store(selector)` call is a dynamic function call, the compiler cannot assign

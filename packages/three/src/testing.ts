@@ -8,6 +8,12 @@
  */
 import type * as THREE from 'three';
 import type { UniversalComponent } from 'octane/universal';
+import {
+	dispatchThreeEvent,
+	getThreeEventListener,
+	getThreeEventStore,
+	runThreeEventScope,
+} from './core/driver.js';
 import { createRoot, type CanvasLike, type ThreeRoot } from './core/root.js';
 import type { Renderer, RootStore } from './core/store.js';
 
@@ -33,6 +39,22 @@ export interface TestingRenderer extends Renderer {
 	readonly disposed: boolean;
 }
 
+/** Additional values copied onto a directly-fired testing event. */
+export interface MockEventData {
+	[key: string]: unknown;
+}
+
+/** R3F test-renderer-compatible event payload produced by {@link fireEvent}. */
+export interface MockSyntheticEvent extends MockEventData {
+	camera: THREE.Camera;
+	stopPropagation(): void;
+	target: object;
+	currentTarget: object;
+	sourceEvent: MockEventData;
+}
+
+export type FireEvent = (object: object, name: string, data?: MockEventData) => Promise<unknown>;
+
 export interface ThreeTestRenderer {
 	readonly canvas: CanvasLike;
 	readonly scene: THREE.Scene;
@@ -40,6 +62,8 @@ export interface ThreeTestRenderer {
 	readonly root: ThreeRoot<CanvasLike>;
 	readonly renderer: TestingRenderer;
 	update<P>(component: UniversalComponent<P>, props: P): RootStore;
+	/** Directly invokes an event handler on a managed Three object. */
+	fireEvent: FireEvent;
 	/**
 	 * Advances the configured `frameloop="never"` root by explicit deltas.
 	 * A short delta array repeats its final value for the remaining frames.
@@ -117,6 +141,54 @@ function deltaForFrame(delta: number | readonly number[], index: number): number
 	return value;
 }
 
+function toEventHandlerName(name: string): string {
+	return name.startsWith('on') ? name : `on${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+}
+
+function warnMissingEventHandler(name: string): void {
+	console.warn(
+		`Handler for ${name} was not found. You must pass event names in camelCase or name of the handler https://github.com/pmndrs/react-three-fiber/blob/master/packages/test-renderer/markdown/rttr.md#create-fireevent`,
+	);
+}
+
+async function dispatchTestingEvent(
+	object: object,
+	name: string,
+	data: MockEventData = {},
+): Promise<unknown> {
+	const handlerName = toEventHandlerName(name);
+	const listener = getThreeEventListener(object, handlerName);
+	const store = getThreeEventStore(object);
+	if (listener === undefined || store === undefined) {
+		warnMissingEventHandler(name);
+		return undefined;
+	}
+
+	const event = {
+		camera: store.getState().camera,
+		stopPropagation() {},
+		target: object,
+		currentTarget: object,
+		sourceEvent: data,
+		...data,
+	} as MockSyntheticEvent;
+
+	const result = runThreeEventScope(store, listener.priority, () =>
+		dispatchThreeEvent(store, listener.id, event),
+	);
+	const resolved = await result;
+	// Continuous scopes schedule their commit in a microtask. Let that commit and
+	// any passive work it queues settle before the caller observes the scene.
+	await Promise.resolve();
+	return resolved;
+}
+
+/**
+ * Directly invoke the latest committed event listener for a managed Three object.
+ * Both `pointerDown` and `onPointerDown` naming forms are accepted.
+ */
+export const fireEvent: FireEvent = dispatchTestingEvent;
+
 /** Creates a configured, deterministic Three root without requesting WebGL. */
 export async function createThreeTestRenderer<P>(
 	component: UniversalComponent<P>,
@@ -161,6 +233,10 @@ export async function createThreeTestRenderer<P>(
 			assertMounted();
 			return root.render(nextComponent, nextProps);
 		},
+		fireEvent(object, name, data) {
+			assertMounted();
+			return dispatchTestingEvent(object, name, data);
+		},
 		advanceFrames(frames, delta = 1) {
 			assertMounted();
 			assertFrameCount(frames);
@@ -180,4 +256,4 @@ export async function createThreeTestRenderer<P>(
 /** R3F test-renderer-compatible short name for the component-plus-props API. */
 export const create = createThreeTestRenderer;
 
-export default { create };
+export default { create, fireEvent };

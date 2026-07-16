@@ -5,9 +5,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const directory = dirname(fileURLToPath(import.meta.url));
-const fixture = join(directory, '_fixtures/basic.three.tsrx');
 const cache = join(directory, '.react-cache');
-const output = join(cache, 'basic.three.js');
+const fixtures = ['basic.three', 'events-differential.three'] as const;
 
 function assertPinnedOracle(): void {
 	const fiberPackage = JSON.parse(
@@ -25,19 +24,24 @@ function assertPinnedOracle(): void {
 
 export async function setup(): Promise<void> {
 	assertPinnedOracle();
-	const source = readFileSync(fixture, 'utf8');
-	const compiled = compileToReact(source, fixture);
-	if (compiled.errors?.length) {
-		throw new Error(`@tsrx/react could not compile ${fixture}: ${JSON.stringify(compiled.errors)}`);
-	}
-	const transformed = transformSync(compiled.code, {
-		loader: 'tsx',
-		jsx: 'automatic',
-		jsxImportSource: 'react',
-		target: 'esnext',
-		format: 'esm',
-		sourcefile: fixture,
-	});
 	mkdirSync(cache, { recursive: true });
-	writeFileSync(output, transformed.code);
+	for (const name of fixtures) {
+		const fixture = join(directory, `_fixtures/${name}.tsrx`);
+		const source = readFileSync(fixture, 'utf8');
+		const compiled = compileToReact(source, fixture);
+		if (compiled.errors?.length) {
+			throw new Error(
+				`@tsrx/react could not compile ${fixture}: ${JSON.stringify(compiled.errors)}`,
+			);
+		}
+		const transformed = transformSync(compiled.code, {
+			loader: 'tsx',
+			jsx: 'automatic',
+			jsxImportSource: 'react',
+			target: 'esnext',
+			format: 'esm',
+			sourcefile: fixture,
+		});
+		writeFileSync(join(cache, `${name}.js`), transformed.code);
+	}
 }

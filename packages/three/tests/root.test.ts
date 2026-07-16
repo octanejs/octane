@@ -4,6 +4,7 @@ import {
 	createRoot,
 	getRootState,
 	type DefaultGLProps,
+	type Events,
 	type Renderer,
 	type RootState,
 	type ThreeRoot,
@@ -31,6 +32,22 @@ function createRenderer(canvas: HTMLCanvasElement): RendererHarness {
 		shadowMap: { enabled: false, type: THREE.PCFShadowMap },
 		outputColorSpace: THREE.LinearSRGBColorSpace,
 		toneMapping: THREE.NoToneMapping,
+	};
+}
+
+function createEventHandlers(): Events {
+	const handle: EventListener = () => {};
+	return {
+		onClick: handle,
+		onContextMenu: handle,
+		onDoubleClick: handle,
+		onWheel: handle,
+		onPointerDown: handle,
+		onPointerUp: handle,
+		onPointerLeave: handle,
+		onPointerMove: handle,
+		onPointerCancel: handle,
+		onLostPointerCapture: handle,
 	};
 }
 
@@ -279,7 +296,7 @@ describe('Three root configuration', () => {
 		expect(state.raycaster.camera).toBe(second);
 	});
 
-	it('does not drain pending scene work after a queued configuration rejects', async () => {
+	it('does not drain pending scene work after event-manager construction rejects', async () => {
 		const canvas = document.createElement('canvas');
 		const renderer = createRenderer(canvas);
 		const root = testRoot(canvas);
@@ -292,7 +309,9 @@ describe('Three root configuration', () => {
 		const rejected = root.configure({
 			size: { width: 80, height: 60 },
 			frameloop: 'never',
-			events: () => ({ priority: 1, enabled: true, connected: false }),
+			events: () => {
+				throw new Error('event manager unavailable');
+			},
 		});
 		let group: THREE.Group | null = null;
 		root.render(RootScene, {
@@ -300,7 +319,7 @@ describe('Three root configuration', () => {
 			groupRef: (value: THREE.Group | null) => (group = value),
 		});
 
-		await expect(rejected).rejects.toThrow('Pointer event configuration is not available');
+		await expect(rejected).rejects.toThrow('event manager unavailable');
 		await Promise.resolve();
 		expect(group).toBeNull();
 		expect(root.store.getState().scene.children).toEqual([]);
@@ -348,20 +367,137 @@ describe('Three root configuration', () => {
 		expect(replacement.store.getState().scene).toBeInstanceOf(THREE.Scene);
 	});
 
-	it('rejects deferred pointer configuration and use after unmount clearly', async () => {
+	it('preserves a handler-backed custom event manager, then disconnects it on unmount', async () => {
 		const canvas = document.createElement('canvas');
 		const root = testRoot(canvas);
-		await expect(
-			root.configure({
-				gl: createRenderer(canvas),
-				size: { width: 20, height: 20 },
-				events: () => ({ priority: 1, enabled: true, connected: false }),
+		const manager = {
+			priority: 3,
+			enabled: true,
+			connected: undefined as HTMLCanvasElement | undefined,
+			handlers: createEventHandlers(),
+			connect: vi.fn((target: HTMLCanvasElement) => {
+				manager.connected = target;
 			}),
-		).rejects.toThrow('Pointer event configuration is not available');
+			disconnect: vi.fn(() => {
+				manager.connected = undefined;
+			}),
+		};
+		const eventFactory = vi.fn(() => manager);
+		await root.configure({
+			gl: createRenderer(canvas),
+			size: { width: 20, height: 20 },
+			events: eventFactory,
+		});
+		root.render(RootScene, { name: 'events', groupRef: () => {} });
+		expect(eventFactory).toHaveBeenCalledOnce();
+		expect(manager.connect).toHaveBeenCalledWith(canvas);
+
+		const replacementFactory = vi.fn(() => ({
+			priority: 1,
+			enabled: false,
+			connected: undefined,
+		}));
+		await root.configure({
+			size: { width: 20, height: 20 },
+			events: replacementFactory,
+		});
+		expect(eventFactory).toHaveBeenCalledOnce();
+		expect(replacementFactory).not.toHaveBeenCalled();
+		expect(root.store.getState().events).toBe(manager);
+
 		root.unmount();
+		expect(manager.disconnect).toHaveBeenCalledOnce();
 		await expect(root.configure()).rejects.toThrow('Cannot configure an unmounted root');
 		expect(() => root.render(RootScene, { name: 'late', groupRef: () => {} })).toThrow(
 			'Cannot render an unmounted root',
 		);
+	});
+
+	it('replaces a connected handler-less manager and reconnects its target', async () => {
+		const canvas = document.createElement('canvas');
+		const external = document.createElement('section');
+		const root = testRoot(canvas);
+		const initial = {
+			priority: 3,
+			enabled: true,
+			connected: undefined as HTMLElement | undefined,
+			connect: vi.fn((target: HTMLElement) => {
+				initial.connected = target;
+			}),
+			disconnect: vi.fn(() => {
+				initial.connected = undefined;
+			}),
+		};
+		const replacement = {
+			priority: 1,
+			enabled: true,
+			connected: undefined as HTMLElement | undefined,
+			handlers: createEventHandlers(),
+			connect: vi.fn((target: HTMLElement) => {
+				replacement.connected = target;
+			}),
+			disconnect: vi.fn(() => {
+				replacement.connected = undefined;
+			}),
+		};
+		const initialFactory = vi.fn(() => initial);
+		const replacementFactory = vi.fn(() => replacement);
+
+		await root.configure({
+			gl: createRenderer(canvas),
+			size: { width: 20, height: 20 },
+			events: initialFactory,
+			onCreated(state) {
+				state.events.connect?.(external);
+			},
+		});
+		root.render(RootScene, { name: 'handler-less-events', groupRef: () => {} });
+		expect(initial.connect).toHaveBeenCalledOnce();
+		expect(initial.connected).toBe(external);
+
+		await root.configure({
+			size: { width: 20, height: 20 },
+			events: replacementFactory,
+		});
+
+		expect(initialFactory).toHaveBeenCalledOnce();
+		expect(replacementFactory).toHaveBeenCalledOnce();
+		expect(initial.disconnect).toHaveBeenCalledOnce();
+		expect(replacement.connect).toHaveBeenCalledOnce();
+		expect(replacement.connect).toHaveBeenCalledWith(external);
+		expect(root.store.getState().events).toBe(replacement);
+
+		root.unmount();
+		expect(replacement.disconnect).toHaveBeenCalledOnce();
+	});
+
+	it('preserves an event target connected by onCreated', async () => {
+		const canvas = document.createElement('canvas');
+		const external = document.createElement('section');
+		const root = testRoot(canvas);
+		const manager = {
+			priority: 1,
+			enabled: true,
+			connected: undefined as HTMLElement | undefined,
+			connect: vi.fn((target: HTMLElement) => {
+				manager.connected = target;
+				root.store.getState().setEvents({ connected: target });
+			}),
+			disconnect: vi.fn(),
+		};
+		await root.configure({
+			gl: createRenderer(canvas),
+			size: { width: 20, height: 20 },
+			events: () => manager,
+			onCreated(state) {
+				state.events.connect?.(external);
+			},
+		});
+
+		root.render(RootScene, { name: 'external-events', groupRef: () => {} });
+
+		expect(manager.connect).toHaveBeenCalledOnce();
+		expect(manager.connect).toHaveBeenCalledWith(external);
+		expect(root.store.getState().events.connected).toBe(external);
 	});
 });

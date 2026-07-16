@@ -8,7 +8,11 @@ export function CanvasApp(props) @{
 		gl={props.gl}
 		frameloop="never"
 		raycaster={props.raycaster}
+		events={props.events}
+		eventSource={props.eventSource}
+		eventPrefix={props.eventPrefix}
 		onCreated={props.onCreated}
+		onPointerMissed={props.onPointerMissed}
 		fallback={<span class="canvas-fallback">{'WebGL unavailable'}</span>}
 		className="canvas-shell"
 		data-label={props.label}

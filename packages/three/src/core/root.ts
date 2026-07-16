@@ -16,7 +16,13 @@ import {
 	type UniversalRoot,
 } from 'octane/universal';
 import { applyThreeProps } from './props.js';
-import { createThreeContainer, createThreeDriver, type ThreeHostContainer } from './driver.js';
+import {
+	createThreeContainer,
+	createThreeDriver,
+	type ThreeHostContainer,
+	type ThreeHostEnvironment,
+} from './driver.js';
+import type { EventManager } from './events.js';
 import { advance, invalidate, registerRootStore, unregisterRootStore } from './loop.js';
 import {
 	RootStoreContext,
@@ -26,7 +32,6 @@ import {
 	destroyRootStore,
 	type Camera,
 	type Dpr,
-	type EventManager,
 	type Frameloop,
 	type Performance,
 	type Renderer,
@@ -80,10 +85,10 @@ export interface RenderProps<TCanvas extends CanvasLike = CanvasLike> {
 	raycaster?: Partial<THREE.Raycaster> & { params?: Partial<THREE.Raycaster['params']> };
 	scene?: THREE.Scene | Partial<THREE.Scene>;
 	camera?: CameraProps;
-	/** Pointer event managers land in Milestone 4 and currently reject. */
+	/** Event manager installed while the current manager has no native handler table. */
 	events?: (store: RootStore) => EventManager<any>;
 	onCreated?: (state: RootState) => void;
-	/** Pointer miss delivery lands in Milestone 4 and currently rejects. */
+	/** Response for pointer clicks that miss every target. */
 	onPointerMissed?: (event: MouseEvent) => void;
 }
 
@@ -102,6 +107,7 @@ interface PendingRender {
 interface RootProviderProps {
 	readonly store: RootStore;
 	readonly onCreated?: (state: RootState) => void;
+	readonly eventTarget?: unknown;
 	readonly component?: UniversalComponent<any>;
 	readonly componentProps?: any;
 	readonly region?: RendererRegion<any>;
@@ -118,6 +124,7 @@ interface ThreeRootInternals<TCanvas extends CanvasLike> {
 	pendingConfigurations: number;
 	lastPendingConfig: RenderProps<TCanvas> | null;
 	lastPendingPromise: Promise<ThreeRoot<TCanvas>> | null;
+	eventsManagedByBoundary: boolean;
 	configured: boolean;
 	configurationReady: boolean;
 	disposed: boolean;
@@ -145,6 +152,10 @@ const RootProvider = defineUniversalComponent<RootProviderProps>('three', (props
 			const state = props.store.getState();
 			state.internal.active = true;
 			props.onCreated?.(state);
+			const events = props.store.getState().events;
+			if (props.eventTarget !== undefined && !events.connected) {
+				events.connect?.(props.eventTarget);
+			}
 			state.invalidate();
 			return () => {
 				state.internal.active = false;
@@ -294,16 +305,31 @@ function configureShadows(renderer: Renderer, shadows: RenderProps<any>['shadows
 function ensureHostRoot(internals: ThreeRootInternals<any>): void {
 	if (internals.hostRoot !== null) return;
 	const state = internals.store.getState();
-	const environment = {
+	let hostRoot: UniversalRoot | null = null;
+	const environment: ThreeHostEnvironment = {
 		store: internals.store,
 		invalidate: () => internals.store.getState().invalidate(),
+		eventScope(priority, run) {
+			const root = hostRoot;
+			if (root === null) {
+				throw new Error('@octanejs/three: Event dispatch started before the host root existed.');
+			}
+			return root.eventScope(priority, run);
+		},
+		dispatchEvent(listener, payload) {
+			if (hostRoot === null) {
+				throw new Error('@octanejs/three: Event dispatch started before the host root existed.');
+			}
+			return hostRoot.dispatchEvent(listener, payload);
+		},
 		get linear() {
 			return internals.store.getState().linear;
 		},
 	};
 	const container = createThreeContainer({ scene: state.scene, environment });
+	hostRoot = createUniversalRoot(container, createThreeDriver());
 	internals.container = container;
-	internals.hostRoot = createUniversalRoot(container, createThreeDriver());
+	internals.hostRoot = hostRoot;
 }
 
 async function ensureRenderer<TCanvas extends CanvasLike>(
@@ -356,15 +382,12 @@ async function applyConfiguration<TCanvas extends CanvasLike>(
 	generation: number,
 ): Promise<void> {
 	if (internals.disposed || internals.generation !== generation) return;
-	if (props.events !== undefined || props.onPointerMissed !== undefined) {
-		throw new Error(
-			'@octanejs/three: Pointer event configuration is not available in the technical preview; it lands in Milestone 4.',
-		);
-	}
 	const {
 		gl: glConfig,
 		size: configuredSize,
 		scene: sceneOptions,
+		events: eventFactory,
+		onPointerMissed,
 		onCreated,
 		shadows = false,
 		linear = false,
@@ -408,8 +431,27 @@ async function applyConfiguration<TCanvas extends CanvasLike>(
 	}
 	associateRootObject(internals.store.getState().scene, internals.store);
 	ensureHostRoot(internals);
-
 	state = internals.store.getState();
+	if (eventFactory !== undefined && state.events.handlers === undefined) {
+		const previousEvents = state.events;
+		const previousTarget = previousEvents.connected;
+		const manager = eventFactory(internals.store);
+		if (previousTarget) previousEvents.disconnect?.();
+		internals.store.setState({ events: manager });
+		state = internals.store.getState();
+		if (previousTarget && !state.events.connected) {
+			state.events.connect?.(previousTarget);
+			state = internals.store.getState();
+		}
+	}
+	if (state.onPointerMissed !== onPointerMissed) {
+		internals.store.setState({ onPointerMissed });
+		state = internals.store.getState();
+	}
+	if (state.internal.active && !internals.eventsManagedByBoundary && !state.events.connected) {
+		state.events.connect?.(internals.canvas);
+	}
+
 	const size = computeInitialSize(internals.canvas, configuredSize);
 	if (!sameSize(size, state.size)) state.setSize(size.width, size.height, size.top, size.left);
 	state = internals.store.getState();
@@ -445,6 +487,7 @@ function performRender(internals: ThreeRootInternals<any>, pending: PendingRende
 	internals.hostRoot.render(RootProvider, {
 		store: internals.store,
 		onCreated: internals.onCreated,
+		eventTarget: internals.canvas,
 		component: pending.component,
 		componentProps: pending.props,
 	});
@@ -531,12 +574,12 @@ export function createRoot<TCanvas extends CanvasLike>(canvas: TCanvas): ThreeRo
 			state.internal.frames = 0;
 			unregisterRootStore(store);
 			try {
-				internals.hostRoot?.unmount();
+				state.events.disconnect?.();
 			} finally {
-				internals.container?.flushDisposals();
 				try {
-					state.events.disconnect?.();
+					internals.hostRoot?.unmount();
 				} finally {
+					internals.container?.flushDisposals();
 					try {
 						state.xr.disconnect();
 					} finally {
@@ -560,6 +603,7 @@ export function createRoot<TCanvas extends CanvasLike>(canvas: TCanvas): ThreeRo
 		pendingConfigurations: 0,
 		lastPendingConfig: null,
 		lastPendingPromise: null,
+		eventsManagedByBoundary: false,
 		configured: false,
 		configurationReady: false,
 		disposed: false,
@@ -595,6 +639,7 @@ export function createThreeBoundaryMount(
 	if (!internals.configurationReady || internals.hostRoot === null) {
 		throw new Error('@octanejs/three: Canvas children cannot mount before configure() settles.');
 	}
+	internals.eventsManagedByBoundary = true;
 	return {
 		root: internals.hostRoot,
 		component: RootProvider,
