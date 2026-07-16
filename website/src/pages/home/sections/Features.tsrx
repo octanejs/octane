@@ -29,9 +29,9 @@ export function Features() @{
 		@for (const feature of FEATURES; key feature.title) {
 			<article class="card">
 				<header class="card-head">
-					<h3 class="card-title">
+					<h2 class="card-title">
 						{feature.title as string}
-					</h3>
+					</h2>
 				</header>
 				<div class="card-content">
 					<p class="card-body">

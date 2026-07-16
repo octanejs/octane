@@ -4,7 +4,7 @@
 // can feed it the full grid next.
 import { Link } from '@octanejs/tanstack-router';
 import { BenchmarkExplorer } from '../../../components/BenchmarkExplorer.tsrx';
-import { HOME_SUMMARY } from '../../../content/benchmarks.ts';
+import { HOME_SUMMARY } from '../../../content/home-benchmark.ts';
 
 export function Explorer() @{
 	<section class="explorer" aria-labelledby="explorer-heading">

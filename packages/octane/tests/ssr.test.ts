@@ -29,6 +29,7 @@ const fixture = (name: string) => readFileSync(join(FIXTURES, `${name}.tsrx`), '
 const basic = evalServer(fixture('basic'), 'basic.tsrx');
 const ssr = evalServer(fixture('ssr'), 'ssr.tsrx');
 const spreadHooks = evalServer(fixture('spread-hook-args'), 'spread-hook-args.tsrx');
+const styleMap = evalServer(fixture('style-map'), 'style-map.tsrx');
 
 describe('SSR Phase 1 — basic fixtures', () => {
 	it('renders static markup, dynamic text, and attributes', async () => {
@@ -94,6 +95,32 @@ describe('SSR Phase 1 — ssr fixture (style / spread / innerHTML / components /
 		expect(out).toMatchSnapshot('Scoped');
 		expect(out.css).toContain('.box.tsrx-');
 		expect(out.html).toContain('class="box tsrx-');
+	});
+
+	it('collects module style-map CSS while rendering a component that uses the map', () => {
+		const out = RT.renderToString(styleMap.Picker, { kind: 'red' });
+		expect(out.css).toContain('.red.tsrx-');
+		expect(out.css).toContain('color: rgb(200, 0, 0)');
+		expect(out.html).toMatch(/class="[^"]*\btsrx-[^"]+"/);
+		expect(out.html).toMatch(/class="[^"]*\bred\b[^"]*"/);
+	});
+
+	it('preserves source-order cascade when a style map follows its component', () => {
+		const mod = evalServer(
+			`
+				export function Card() @{
+					<>
+						<style>.tone { color: blue; }</style>
+						<div class={theme.tone}>{'card'}</div>
+					</>
+				}
+				const theme = <style>.tone { color: red; }</style>;
+			`,
+			'style-map-order.tsrx',
+		);
+		const { css } = RT.renderToString(mod.Card);
+		expect(css.indexOf('color: blue')).toBeGreaterThan(-1);
+		expect(css.indexOf('color: red')).toBeGreaterThan(css.indexOf('color: blue'));
 	});
 });
 

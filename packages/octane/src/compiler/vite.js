@@ -242,9 +242,10 @@ export function octane(options = {}) {
 				const result = compiler.transform(code, id, {
 					environment: server ? 'server' : 'client',
 					hmr: !server && hmrEnabled ? 'vite' : false,
-					// Preserve the existing Vite gate: source locations are emitted only
-					// for a client serve transform where HMR is active.
-					dev: !server && !!hmrEnabled,
+					// DEV server transforms also carry SSR-only diagnostics. HMR itself
+					// remains client-only; an explicit `hmr: false` keeps both transforms
+					// on the production compiler path.
+					dev: !!hmrEnabled,
 					profile: !server && profileEnabled,
 					parallelUse: options.parallelUse,
 					collectVoidComponentExports:

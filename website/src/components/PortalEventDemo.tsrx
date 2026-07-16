@@ -93,7 +93,7 @@ export function PortalEventDemo() @{
 				border: 1px solid transparent;
 				border-radius: 999px;
 				background: var(--accent);
-				color: var(--text);
+				color: var(--on-accent);
 				font: inherit;
 				font-size: 0.82rem;
 				font-weight: 700;

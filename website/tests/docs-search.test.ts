@@ -47,6 +47,18 @@ describe('docs search index', () => {
 			}
 		}
 	});
+
+	it('shows string-expression callout prose without MDX syntax', async () => {
+		const index = await loadSearchIndex();
+		const [result] = searchDocs(index, 'Node.js 22');
+		const snippets = result.lines.map((line) => line.parts.map((part) => part.text).join(''));
+
+		expect(result.slug).toBe('quick-start');
+		expect(snippets.join(' ')).toContain(
+			'requires Node.js 22 or newer. Octane is currently alpha software',
+		);
+		expect(snippets.join(' ')).not.toMatch(/[{}]/);
+	});
 });
 
 describe('docs search ranking', () => {

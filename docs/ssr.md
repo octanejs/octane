@@ -188,6 +188,13 @@ your own `entry-server.ts` around `prerender()` or the streaming renderers and
 serialize any app data (for example a dehydrated query-client cache) into your
 own inline script.
 
+Development SSR validates native HTML element nesting while it renders,
+including relationships that cross component boundaries. When the browser
+would repair a placement before hydration (for example, a `<div>` inside a
+`<p>`), Octane reports both authored locations in the server console. The check
+targets parser repairs rather than the complete HTML content model, never adds
+diagnostics to returned markup, and is removed from production compilation.
+
 On the server, page and layout props also receive `state`, the same
 request-scoped `Context.state` Map middleware populated. It is deliberately not
 serialized; browser hydration receives only `{ params, url }`.
@@ -202,7 +209,9 @@ it to the await-everything `prerender`. A deploy adapter (e.g.
 `adapter: vercel()` in octane.config.ts emits Vercel's Build Output API under
 `.vercel/output` after the build. Request abort signals reach both render modes;
 the built-in Node bridge also waits for `drain` and cancels the render when the
-response socket closes.
+response socket closes. Its HTTP transport negotiates streaming gzip for
+eligible SSR and static text responses while preserving HEAD, partial,
+pre-encoded, `no-transform`, and non-compressible responses.
 
 ### Root boundaries, server functions, and CSP
 

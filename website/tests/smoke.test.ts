@@ -128,21 +128,20 @@ describe('website routes', () => {
 		);
 		expect(homeSections).toEqual(['hero', 'features', 'proven', 'why', 'explorer']);
 
-		// The home page stages the interactive benchmark explorer over the checked-in
+		// The home page renders the interactive benchmark explorer from the checked-in
 		// ×-vs-Octane summary (HOME_SUMMARY). The explorer's own interactions live in
 		// benchmark-explorer.test.ts; here assert the section composes and the summary
-		// reaches the mounted views.
+		// reaches both deterministic views.
 		const explorer = container.querySelector('section.explorer')!;
 		expect(explorer).toBeTruthy();
 		expect(explorer.querySelector('#explorer-heading')?.textContent?.trim()).toBeTruthy();
 		expect(findLink(explorer, '/benchmarks')).toBeTruthy();
 		const bx = explorer.querySelector('.bx')!;
 		expect(bx).toBeTruthy();
-		// Interactive views are mount-gated: the SSR fallback table swaps for the bar
-		// chart + heatmap on mount. Wait for the plot, then assert every suite row of
-		// the summary reaches the heatmap.
+		// Both views are present from the first render so SSR and hydration share the
+		// same geometry. Assert every suite row reaches the heatmap.
 		await waitFor(() => {
-			if (!bx.querySelector('.bx-plot')) throw new Error('explorer not mounted');
+			if (!bx.querySelector('.bx-plot')) throw new Error('explorer plot missing');
 		});
 		expect(bx.querySelectorAll('.bx-heat tbody tr')).toHaveLength(HOME_SUMMARY.rows.length);
 

@@ -545,7 +545,10 @@ class OctaneBundlerCompiler {
 		}
 		const requestedHmr = normalizeHmrDialect(options.hmr ?? this.defaults.hmr);
 		const hmr = environment === 'server' ? false : requestedHmr;
-		const dev = environment === 'server' ? false : (options.dev ?? this.defaults.dev ?? !!hmr);
+		// Server HMR stays disabled, but integrations may explicitly request DEV
+		// server diagnostics (Vite does this for `serve`). With no explicit value,
+		// server transforms retain their established production default.
+		const dev = options.dev ?? this.defaults.dev ?? (environment === 'client' && !!hmr);
 		// Profiling is a client-runtime build specialization, deliberately independent
 		// of both HMR and dev hydration diagnostics. Server transforms stay byte-for-
 		// byte identical even when a shared client/server bundler configuration opts in.
