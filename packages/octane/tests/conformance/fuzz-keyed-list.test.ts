@@ -379,6 +379,10 @@ describe('reconcileKeyed FUZZ — K_DISP shortcut boundary', () => {
 					const moved = idxs.map((idx) => items[idx]);
 					moved.unshift(moved.pop()!); // rotate right
 					for (let p = 0; p < idxs.length; p++) items[idxs[p]] = moved[p];
+					// Production auto-memo treats props as immutable render snapshots, like
+					// React Compiler. Publish the mutation as a fresh list identity while
+					// preserving the exact K_DISP reconciliation workload.
+					items = items.slice();
 					actions.push({
 						kind: 'replace-all',
 						items: items.slice(),

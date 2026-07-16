@@ -13,7 +13,9 @@ export default defineConfig({
 	},
 	build: {
 		target: 'esnext',
-		minify: 'terser',
+		// Precise-call-coverage gates need stable function names. This is a separate,
+		// untimed build; normal timing bundles retain the production terser path.
+		minify: process.env.MEMO_WALL_WORK === '1' ? false : 'terser',
 		terserOptions: {
 			compress: {
 				passes: 5,

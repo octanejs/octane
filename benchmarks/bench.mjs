@@ -224,6 +224,7 @@ const SUITES = [
 			{ filter: 'octane-tsrx-memowall-bench', port: 5206 },
 			{ filter: 'octane-jsx-memowall-bench', port: 5207 },
 			{ filter: 'react-memowall-bench', port: 5208 },
+			{ filter: 'react-compiler-memowall-bench', port: 5226 },
 			{ filter: 'solid-memowall-bench', port: 5182 },
 			{ filter: 'ripple-memowall-bench', port: 5225 },
 			{ filter: 'vue-vapor-memowall-bench', port: 5223 },
