@@ -163,7 +163,18 @@ export function loadSearchIndex(): Promise<SearchRecord[]> {
 					const order = docs.findIndex((d) => d.slug === slug);
 					const doc = order === -1 ? undefined : docs[order];
 					const rank = order === -1 ? docs.length : order;
-					return recordsFor(slug, doc?.title ?? slug, rank, await load());
+					const records = recordsFor(slug, doc?.title ?? slug, rank, await load());
+					if (doc?.searchTerms?.length) {
+						const target =
+							records.find((record) => record.id === doc.sections?.[0]?.id) ?? records[0];
+						if (target) {
+							const block = { text: doc.searchTerms.join(' · '), code: false };
+							target.blocks.push(block);
+							target.text += ' ' + block.text;
+							target.haystack += ' ' + block.text.toLowerCase();
+						}
+					}
+					return records;
 				}),
 			).then((groups) => groups.flat()),
 		);
