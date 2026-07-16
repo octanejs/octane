@@ -56,11 +56,11 @@ describe('built SSR handler', () => {
 		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
 		expect(html).toContain('<main');
 		expect(classCount(html, 'home')).toBeGreaterThan(0);
-		// The home benchmark explorer server-renders its accessible fallback data
-		// table (the interactive bar chart + heatmap swap in on mount); no client-only
-		// chart shell or charting-library markup is emitted server-side, so no-JS and
-		// crawlers still get every number.
-		expect(classCount(html, 'bx-fallback-table')).toBe(1);
+		// The complete explorer is deterministic server markup: no-JS, hydration,
+		// crawlers, and the interactive client all start from the same geometry.
+		expect(classCount(html, 'bx-fallback-table')).toBe(0);
+		expect(classCount(html, 'bx-plot')).toBe(1);
+		expect(classCount(html, 'bx-heat')).toBe(1);
 		expect(classCount(html, 'visx-bar')).toBe(0);
 		expect(classCount(html, 'home-bench-chart')).toBe(0);
 		expect(classCount(html, 'deferred-bench')).toBe(0);

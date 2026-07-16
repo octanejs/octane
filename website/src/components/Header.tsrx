@@ -43,7 +43,7 @@ export function Header() @{
 					</svg>
 				</button>
 				<Link to="/" class="wordmark" aria-label="Octane home">
-					<img src={logoUrl} alt="Octane" class="wordmark-img" />
+					<img src={logoUrl} alt="Octane" class="wordmark-img" width="123" height="30" />
 				</Link>
 				<nav
 					id="site-nav"

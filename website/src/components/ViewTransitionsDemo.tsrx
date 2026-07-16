@@ -134,7 +134,7 @@ export function ViewTransitionsDemo() @{
 			}
 			.vtdemo-btn {
 				background: #ff415a;
-				color: #f4eee8;
+				color: var(--on-accent);
 				font-weight: 600;
 				border: none;
 				padding: 0.5rem 1.1rem;

@@ -9,8 +9,6 @@
 // document's lede record (no hash). Each record keeps its paragraphs and code
 // lines as separate blocks so a result can list the individual matching lines
 // under its section heading, rather than one flattened blob.
-import { docs } from '../content/docs.ts';
-
 export interface SearchBlock {
 	text: string;
 	/** Came from a ``` fence — rendered monospace. */
@@ -68,12 +66,20 @@ function slugOf(path: string): string {
 
 /** Strip JSX/HTML tags and markdown syntax off a run of prose. */
 function cleanProse(raw: string): string {
-	return raw
-		.replace(/<[^>]+>/g, ' ')
-		.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-		.replace(/[`*_>#|]/g, ' ')
-		.replace(/\s+/g, ' ')
-		.trim();
+	return (
+		raw
+			// MDX callouts use a string expression when plain Markdown would create a
+			// nested paragraph inside an authored <p>. Keep the authored sentence in
+			// search results without exposing the expression braces or quotes.
+			.replace(/\{\s*(['"`])((?:\\.|(?!\1)[\s\S])*)\1\s*\}/g, (_match, _quote, value: string) =>
+				value.replace(/\\(['"`\\])/g, '$1'),
+			)
+			.replace(/<[^>]+>/g, ' ')
+			.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+			.replace(/[`*_>#|]/g, ' ')
+			.replace(/\s+/g, ' ')
+			.trim()
+	);
 }
 
 /**
@@ -150,15 +156,17 @@ let indexPromise: Promise<SearchRecord[]> | null = null;
 /** Build (once) and return the flat section index. Safe to call repeatedly. */
 export function loadSearchIndex(): Promise<SearchRecord[]> {
 	if (!indexPromise) {
-		indexPromise = Promise.all(
-			Object.entries(rawDocs).map(async ([path, load]) => {
-				const slug = slugOf(path);
-				const order = docs.findIndex((d) => d.slug === slug);
-				const doc = order === -1 ? undefined : docs[order];
-				const rank = order === -1 ? docs.length : order;
-				return recordsFor(slug, doc?.title ?? slug, rank, await load());
-			}),
-		).then((groups) => groups.flat());
+		indexPromise = import('../content/docs.ts').then(({ docs }) =>
+			Promise.all(
+				Object.entries(rawDocs).map(async ([path, load]) => {
+					const slug = slugOf(path);
+					const order = docs.findIndex((d) => d.slug === slug);
+					const doc = order === -1 ? undefined : docs[order];
+					const rank = order === -1 ? docs.length : order;
+					return recordsFor(slug, doc?.title ?? slug, rank, await load());
+				}),
+			).then((groups) => groups.flat()),
+		);
 	}
 	return indexPromise;
 }
