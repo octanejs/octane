@@ -527,6 +527,23 @@ function childrenIterator(children: any): (() => Iterator<any>) | null {
 	return typeof iterator === 'function' ? iterator : null;
 }
 
+function iterableChildArray(value: any): any[] | null {
+	if (
+		value == null ||
+		typeof value === 'string' ||
+		Array.isArray(value) ||
+		isElementDescriptor(value)
+	)
+		return null;
+	const iterator = childrenIterator(value);
+	if (iterator === null) return null;
+	const out: any[] = [];
+	const cursor = iterator.call(value);
+	let step: IteratorResult<any>;
+	while (!(step = cursor.next()).done) out.push(step.value);
+	return out;
+}
+
 interface ChildrenThenable<T = any> extends PromiseLike<T> {
 	status?: 'pending' | 'fulfilled' | 'rejected';
 	value?: T;
@@ -544,12 +561,16 @@ function resolveChildrenThenable(thenable: ChildrenThenable): any {
 		thenable.status = 'pending';
 		thenable.then(
 			(value) => {
-				thenable.status = 'fulfilled';
-				thenable.value = value;
+				if (thenable.status === 'pending') {
+					thenable.status = 'fulfilled';
+					thenable.value = value;
+				}
 			},
 			(reason) => {
-				thenable.status = 'rejected';
-				thenable.reason = reason;
+				if (thenable.status === 'pending') {
+					thenable.status = 'rejected';
+					thenable.reason = reason;
+				}
 			},
 		);
 	}
@@ -793,6 +814,8 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 	) {
 		return ssrChild(use(v as Context<unknown> | PromiseLike<unknown>), scope);
 	}
+	const iterable = iterableChildArray(v);
+	if (iterable !== null) v = iterable;
 	// An ARRAY child (e.g. `{xs.map(x => <li/>)}`) → the client's childSlot routes
 	// it to the de-opt keyed list, whose hydration ADOPTS one `<!--[-->…<!--]-->`
 	// range PER ITEM (see mountItem's hydrating branch). So wrap each item in its
@@ -901,6 +924,9 @@ function ssrHostElement(
 	// semantics even when the authored spelling is uppercase. Preserve that
 	// spelling in the serialized tag, but normalize every behavior/safety check.
 	const semanticTag = tag.toLowerCase();
+	const iterable = iterableChildArray(children);
+	const iterableChildren = iterable !== null;
+	if (iterable !== null) children = iterable;
 	let attrs = '';
 	let innerHTML: unknown = undefined;
 	// Controlled form props (mirrors the compiled ssrEmitElement routing):
@@ -960,7 +986,12 @@ function ssrHostElement(
 		const raw = innerHTML == null ? '' : String(innerHTML);
 		// HTML tag names are ASCII case-insensitive on the public descriptor path
 		// (`createElement('SCRIPT', …)` creates a real script in the browser too).
-		inner = semanticTag === 'script' ? escapeEntireInlineScriptContent(raw) : raw;
+		inner =
+			semanticTag === 'script'
+				? escapeEntireInlineScriptContent(raw)
+				: semanticTag === 'style'
+					? escapeEntireInlineStyleContent(raw)
+					: raw;
 	} else if (rawInner !== undefined) {
 		inner = rawInner;
 	} else if (hasChildren) {
@@ -971,7 +1002,7 @@ function ssrHostElement(
 		// children are rebuilt by the client de-opt reconciler, so they stay as plain
 		// marker-less markup via `ssrDescriptorContent`.
 		const build = () =>
-			serverDescNeedsBlocks(children)
+			iterableChildren || serverDescNeedsBlocks(children)
 				? ssrDeoptBlockChildren(children, scope)
 				: ssrDescriptorContent(children, scope);
 		// A controlled <select> projects `selected` onto the options serialized
@@ -999,6 +1030,8 @@ function ssrHostElement(
 // is `<!--[-->`(item)`<!--[-->`…`<!--]-->`(component)`<!--]-->`. Without the extra item
 // wrapper the client mints fresh markers (hydration mismatch).
 function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
+	const iterable = iterableChildArray(children);
+	if (iterable !== null) children = iterable;
 	if (Array.isArray(children)) {
 		return withAsyncListScope('host-child', () => {
 			let out = '';
@@ -1008,9 +1041,16 @@ function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
 					item !== null && typeof item === 'object' && (item as any).$$kind === ELEMENT_TAG
 						? (item as ElementDescriptor).key
 						: null;
-				out += withAsyncIdentity('item', explicit != null ? explicit : i, () =>
-					ssrBlock(ssrChild(item, scope)),
-				);
+				out += withAsyncIdentity('item', explicit != null ? explicit : i, () => {
+					// The de-opt list's own item range is sufficient for pure host/text
+					// values: deoptItemBody adopts/reconciles the node directly inside it.
+					// Component-bearing values need their additional nested childSlot
+					// range so their component blocks remain independently owned.
+					const body = serverDescNeedsBlocks(item)
+						? ssrChild(item, scope)
+						: ssrDescriptorContent(item, scope);
+					return ssrBlock(body);
+				});
 			}
 			return ssrBlock(out);
 		});
@@ -1023,10 +1063,18 @@ function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
 // through the block-bearing `ssrChild` path rather than plain markup).
 function serverDescNeedsBlocks(v: unknown): boolean {
 	if (v == null || typeof v !== 'object') return false;
+	// Arrays are the ordinary descriptor-children container. Inspect their
+	// descendants before the generic iterable check below; treating every array
+	// as an opaque iterable forces pure host/text trees onto the block path and
+	// injects hydration markers inside otherwise plain <strong>/<tspan> content.
 	if (Array.isArray(v)) {
 		for (let i = 0; i < v.length; i++) if (serverDescNeedsBlocks(v[i])) return true;
 		return false;
 	}
+	// Iterables route through the same keyed-list path as arrays. Avoid consuming
+	// a one-shot iterator merely to inspect it; the serializer materializes it
+	// exactly once when the host content is rendered.
+	if (!isElementDescriptor(v) && childrenIterator(v) !== null) return true;
 	const d = v as ElementDescriptor;
 	if (d.$$kind === ELEMENT_TAG) {
 		return typeof d.type === 'function' || serverDescNeedsBlocks(d.children);
@@ -1395,6 +1443,19 @@ export function ssrInnerHtml(sources: unknown[]): string | undefined {
 		if (s != null) return s.__html == null ? '' : String(s.__html);
 	}
 	return undefined;
+}
+
+// Like React's style-text serializer, replace only the `s` in a case-insensitive
+// `<style` / `</style` token. The CSS escape keeps the stylesheet semantics while
+// preventing the HTML parser from terminating the element early.
+const INLINE_STYLE_TOKEN = /(<\/|<)(s)(tyle)/gi;
+
+function escapeEntireInlineStyleContent(value: string): string {
+	return value.replace(
+		INLINE_STYLE_TOKEN,
+		(_match, prefix: string, s: string, suffix: string) =>
+			`${prefix}${s === 's' ? '\\73 ' : '\\53 '}${suffix}`,
+	);
 }
 
 // React's whole-inline-script escape: replace only the `s` in each case-
@@ -2690,6 +2751,7 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		reason?: unknown;
 	};
 	let status = instrumented.status;
+	const wasUninstrumented = status === undefined;
 	if (status === 'fulfilled') {
 		if (SERIAL !== null) SERIAL.push(instrumented.value);
 		return instrumented.value as T;
@@ -2698,7 +2760,38 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		recordHydrationRejection(instrumented.reason);
 		throw instrumented.reason;
 	}
-	if (typeof status === 'string') {
+	if (wasUninstrumented) {
+		// Track an uninstrumented thenable before deciding to suspend. A custom
+		// thenable may call either continuation synchronously; in that case the
+		// value/error is observable in this same render and no pending arm should
+		// ever be published. Native Promises settle in a microtask and continue
+		// through the normal streaming retry path.
+		instrumented.status = 'pending';
+		instrumented.then(
+			(value) => {
+				if (instrumented.status === 'pending') {
+					instrumented.status = 'fulfilled';
+					instrumented.value = value;
+				}
+			},
+			(reason) => {
+				if (instrumented.status === 'pending') {
+					instrumented.status = 'rejected';
+					instrumented.reason = reason;
+				}
+			},
+		);
+		status = instrumented.status;
+		if (status === 'fulfilled') {
+			if (SERIAL !== null) SERIAL.push(instrumented.value);
+			return instrumented.value as T;
+		}
+		if (status === 'rejected') {
+			recordHydrationRejection(instrumented.reason);
+			throw instrumented.reason;
+		}
+	}
+	if (!wasUninstrumented && typeof status === 'string') {
 		instrumented.then(NOOP, NOOP);
 		status = instrumented.status;
 		if (status === 'fulfilled') {
@@ -2825,7 +2918,31 @@ export function puBatch(thenables: unknown[], warm?: () => void): void {
 			reason?: unknown;
 		};
 		let status = instrumented.status;
-		if (typeof status === 'string' && status !== 'fulfilled' && status !== 'rejected') {
+		const wasUninstrumented = status === undefined;
+		if (wasUninstrumented) {
+			instrumented.status = 'pending';
+			instrumented.then(
+				(value) => {
+					if (instrumented.status === 'pending') {
+						instrumented.status = 'fulfilled';
+						instrumented.value = value;
+					}
+				},
+				(reason) => {
+					if (instrumented.status === 'pending') {
+						instrumented.status = 'rejected';
+						instrumented.reason = reason;
+					}
+				},
+			);
+			status = instrumented.status;
+		}
+		if (
+			!wasUninstrumented &&
+			typeof status === 'string' &&
+			status !== 'fulfilled' &&
+			status !== 'rejected'
+		) {
 			instrumented.then(NOOP, NOOP);
 			status = instrumented.status;
 		}
@@ -3728,7 +3845,14 @@ function runFullFramedPass(
 	}
 	let css = '';
 	for (const [hash, sheet] of cssMap) {
-		css += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
+		css +=
+			'<style data-octane="' +
+			hash +
+			'"' +
+			nonceAttr +
+			'>' +
+			escapeEntireInlineStyleContent(sheet) +
+			'</style>';
 	}
 	return {
 		body,
@@ -4156,7 +4280,13 @@ interface StreamBoundary {
 	id: string;
 	/** Discovery order, used as the stable tiebreaker among reachable siblings. */
 	order: number;
-	state: 'pending' | 'done';
+	state: 'pending' | 'done' | 'errored';
+	/** Recoverable render error retained for the public streaming onError callback. */
+	error?: unknown;
+	/** Whether this boundary's recoverable error has reached onError. */
+	errorReported?: boolean;
+	/** Whether its client-render recovery instruction was accepted by the transport. */
+	errorFlushed?: boolean;
 	/** Inner branch-range html (`<!--[-->…<!--]-->`) from the resolving pass. */
 	html: string;
 	/** This boundary's `use()` seed slice from the resolving pass. */
@@ -4261,7 +4391,7 @@ function pruneStreamBoundariesAbsentFromShell(
  *   suspend, @pending  → ssrBlock(ssrBlock(pendingHtml))
  *   suspend, no arm    → ssrBlock('')
  *   error, @catch      → ssrBlock(ssrBlock(catchHtml))
- *   error, no @catch   → rethrow
+ *   error, no @catch   → rethrow (buffered) / stream fallback for client recovery
  * In streaming mode a suspended boundary additionally carries the
  * `<template data-oct-b>` sentinel, and a REGISTERED boundary keeps returning
  * its pending form (content ships via its segment).
@@ -4455,7 +4585,7 @@ export function ssrTry(
 				// Registered (was pending in an earlier pass): capture the content +
 				// this boundary's seed slice for its segment; the surrounding pass
 				// keeps seeing the pending form so the shell shape stays stable.
-				if (entry.state !== 'done') {
+				if (entry.state === 'pending') {
 					entry.state = 'done';
 					entry.html =
 						vtOuter !== null
@@ -4532,6 +4662,43 @@ export function ssrTry(
 					return pendingForm();
 				}
 				return ssrBlock(inner);
+			}
+			if (stream !== null) {
+				// Fizz keeps a Suspense shell valid when its primary content throws:
+				// publish the fallback, report the error, and mark this boundary for a
+				// client render. Buffered renderers still rethrow below because they have
+				// no progressive recovery channel.
+				if (SERIAL !== null) SERIAL.length = serialStart;
+				if (entry === undefined) {
+					const pendingIdOffset = Math.max(0, ID_COUNTER - outerIdCounter);
+					restoreOuterIds();
+					const order = stream.nextId++;
+					entry = {
+						id: stream.token + '-' + order.toString(36),
+						order,
+						state: 'errored',
+						error: e,
+						html: '',
+						seeds: [],
+						pendingIdOffset,
+						namespace,
+						ancestors: ancestorKeys,
+						owners: ownerKeys,
+					};
+					stream.boundaries.set(key, entry);
+					enterBoundaryIds(pendingIdOffset);
+				} else if (entry.state === 'pending') {
+					entry.state = 'errored';
+					entry.error = e;
+					ID_COUNTER = entry.pendingIdOffset;
+				} else if (entry.state === 'errored') {
+					ID_COUNTER = entry.pendingIdOffset;
+				} else {
+					throw e;
+				}
+				const fallback = pendingForm();
+				pruneUnrepresentedStreamDescendants(stream, key, fallback);
+				return fallback;
 			}
 			throw e;
 		}
@@ -4661,6 +4828,17 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 	);
 }
 
+function boundaryErrorChunk(b: StreamBoundary, nonceAttr: string): string {
+	return (
+		'<script ' +
+		STREAM_SCRIPT_ATTR +
+		nonceAttr +
+		'>$OCTRX(' +
+		JSON.stringify(b.id).replace(/</g, '\\u003c') +
+		')</script>'
+	);
+}
+
 /** The shared streaming engine both public APIs drive. */
 async function runStream(
 	component: ServerComponent,
@@ -4723,12 +4901,50 @@ async function runStream(
 			}
 		}
 	};
+	const reportRecoverableBoundaryErrors = (): void => {
+		for (const boundary of stream.boundaries.values()) {
+			if (boundary.state !== 'errored' || boundary.errorReported) continue;
+			boundary.errorReported = true;
+			options?.onError?.(boundary.error);
+		}
+	};
+	const reachableErroredBoundaries = (): StreamBoundary[] =>
+		[...stream.boundaries.values()]
+			.filter((boundary) => {
+				if (boundary.state !== 'errored' || boundary.errorFlushed) return false;
+				for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+					const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+					if (ancestor !== undefined) return flushedSegments.has(ancestor.id);
+				}
+				return true;
+			})
+			.sort((a, b) => a.order - b.order);
+	const flushRecoverableBoundaryErrors = (): void | Promise<void> => {
+		const errors = reachableErroredBoundaries();
+		if (errors.length === 0) return;
+		let chunk = '';
+		for (const boundary of errors) chunk += boundaryErrorChunk(boundary, nonceAttr);
+		const write = sink.write(chunk);
+		const markFlushed = (): void => {
+			for (const boundary of errors) boundary.errorFlushed = true;
+		};
+		if (write === undefined) {
+			markFlushed();
+			return;
+		}
+		return write.then(markFlushed);
+	};
 
 	let pass: FullPassResult;
 	let shellBoundaryKeys: Set<string>;
+	let preShellSuspended: SuspendedList = [];
 	try {
 		signal?.throwIfAborted();
 		({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
+		preShellSuspended = pass.suspended;
+		// An AbortSignal can fire from user code during the shell pass. It is still
+		// a pre-shell abort: do not publish the fallback produced later in that pass.
+		signal?.throwIfAborted();
 		// A bare Usable outside @try/Suspense blocks the shell. Fizz waits for it
 		// and retries the root; emitting this pass would otherwise complete with an
 		// empty response even though resumable work was recorded. Bound the retry
@@ -4747,19 +4963,30 @@ async function runStream(
 			}
 			await settleFirstOfWave(pass.suspended, resolved, timeoutMs, signal);
 			({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
+			preShellSuspended = pass.suspended;
+			signal?.throwIfAborted();
 		}
 		pruneStreamBoundariesAbsentFromShell(stream, shellBoundaryKeys);
 	} catch (err) {
-		options?.onError?.(err);
+		const reports = signal?.aborted ? Math.max(1, preShellSuspended.length) : 1;
+		for (let i = 0; i < reports; i++) options?.onError?.(err);
 		sink.shellError(err);
 		return;
 	}
+	reportRecoverableBoundaryErrors();
 	// SHELL: styles first (so painted fallbacks are styled), hoisted head, body,
 	// the shell-scope seed script, then the swap runtime iff anything is pending.
 	let shell = '';
 	for (const [hash, sheet] of pass.cssEntries) {
 		emittedCss.add(hash);
-		shell += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
+		shell +=
+			'<style data-octane="' +
+			hash +
+			'"' +
+			nonceAttr +
+			'>' +
+			escapeEntireInlineStyleContent(sheet) +
+			'</style>';
 	}
 	shell += pass.head + pass.body;
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
@@ -4801,6 +5028,8 @@ async function runStream(
 				observedDone.add(boundary.id);
 			}
 		}
+		const initialErrorWrite = flushRecoverableBoundaryErrors();
+		if (initialErrorWrite !== undefined) await initialErrorWrite;
 		while ([...stream.boundaries.values()].some((b) => b.state === 'pending')) {
 			signal?.throwIfAborted();
 			if (suspended.length === 0) {
@@ -4819,11 +5048,19 @@ async function runStream(
 			await settleFirstOfWave(suspended, resolved, timeoutMs, signal);
 			pass = renderFullPass().pass;
 			suspended = pass.suspended;
+			reportRecoverableBoundaryErrors();
 			let chunk = '';
 			for (const [hash, sheet] of pass.cssEntries) {
 				if (emittedCss.has(hash)) continue;
 				emittedCss.add(hash);
-				chunk += '<style data-octane="' + hash + '"' + nonceAttr + '>' + sheet + '</style>';
+				chunk +=
+					'<style data-octane="' +
+					hash +
+					'"' +
+					nonceAttr +
+					'>' +
+					escapeEntireInlineStyleContent(sheet) +
+					'</style>';
 			}
 			let madeProgress = false;
 			for (const boundary of stream.boundaries.values()) {
@@ -4848,24 +5085,22 @@ async function runStream(
 				// chunk through any active backpressure gate.
 				for (const b of done) flushedSegments.add(b.id);
 			}
+			const errorWrite = flushRecoverableBoundaryErrors();
+			if (errorWrite !== undefined) await errorWrite;
 		}
 	} catch (err) {
 		// Abort / timeout / render/write failure after the shell: mark every
 		// boundary whose segment was not accepted. A live consumer receives these
 		// through the same pressure gate; a disconnected consumer rejects and the
 		// renderer simply stops.
-		options?.onError?.(err);
+		const pendingBoundaryCount = [...stream.boundaries.values()].filter(
+			(boundary) => boundary.state === 'pending' && !flushedSegments.has(boundary.id),
+		).length;
+		const reports = signal?.aborted ? Math.max(1, pendingBoundaryCount) : 1;
+		for (let i = 0; i < reports; i++) options?.onError?.(err);
 		let tail = '';
 		for (const b of stream.boundaries.values()) {
-			if (!flushedSegments.has(b.id)) {
-				tail +=
-					'<script ' +
-					STREAM_SCRIPT_ATTR +
-					nonceAttr +
-					'>$OCTRX(' +
-					JSON.stringify(b.id).replace(/</g, '\\u003c') +
-					')</script>';
-			}
+			if (!flushedSegments.has(b.id) && !b.errorFlushed) tail += boundaryErrorChunk(b, nonceAttr);
 		}
 		if (tail !== '') {
 			try {

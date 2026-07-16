@@ -245,7 +245,41 @@ describe('production SSR build', () => {
 		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
 		const response = await handler(new Request('http://localhost/pages/error'));
 		expect(response.status).toBe(200);
-		expect(await response.text()).toContain('Fixture failed: Error: fixture root boundary');
+		const prodHtml = await response.text();
+		expect(prodHtml).toContain('Fixture failed: Error: fixture root boundary');
+
+		const devResponse = await fetch(devOrigin + '/pages/error');
+		expect(devResponse.status).toBe(200);
+		expect(bodyRegionOf(await devResponse.text())).toBe(bodyRegionOf(prodHtml));
+
+		let browser: import('playwright').Browser | undefined;
+		try {
+			const { chromium } = await import('playwright');
+			browser = await chromium.launch({ headless: true });
+		} catch (error) {
+			throw new Error(
+				'[vite-plugin root boundary] Chromium is required ' +
+					'(run `pnpm exec playwright install chromium`): ' +
+					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+			);
+		}
+
+		const page = await browser.newPage();
+		const errors: string[] = [];
+		page.on('console', (message) => {
+			if (message.type() === 'error') errors.push(message.text());
+		});
+		page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+		try {
+			await page.goto(devOrigin + '/pages/error', { waitUntil: 'load' });
+			expect(await page.locator('.root-catch').textContent()).toBe(
+				'Fixture failed: Error: fixture root boundary',
+			);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+			await browser.close();
+		}
 	});
 
 	it('applies the middleware CSP nonce in dev and production', async () => {
