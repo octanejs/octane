@@ -82,7 +82,7 @@ const demoStyles = <style>
 	}
 	.primary {
 		background: var(--accent);
-		color: white;
+		color: var(--on-accent);
 	}
 	.secondary {
 		border-color: var(--border);

@@ -119,6 +119,7 @@ export {
 	ssrTextareaValue,
 	ssrSelectScope,
 	ssrOption,
+	ssrElement,
 	ssrComponent,
 	ssrComponentNS,
 	ssrInNamespace,

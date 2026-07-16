@@ -17,10 +17,6 @@ import { loadSearchIndex, searchDocs } from '../lib/docs-search.ts';
 import type { SearchGroup, SearchRecord } from '../lib/docs-search.ts';
 import searchUrl from '../assets/search.svg';
 
-function isMac(): boolean {
-	return typeof navigator !== 'undefined' && /mac/i.test(navigator.platform);
-}
-
 interface DialogProps {
 	onClose: () => void;
 }
@@ -406,11 +402,9 @@ function SearchDialog(props: DialogProps) @{
 
 export function DocsSearch() @{
 	const [open, setOpen] = useState(false);
-	const [mac, setMac] = useState(false);
 
 	// ⌘K / Ctrl-K from anywhere, and `/` when the user is not already typing.
 	useEffect(() => {
-		setMac(isMac());
 		const onKey = (event: KeyboardEvent) => {
 			// contentEditable surfaces (e.g. the CodeMirror editor on /playground) are
 			// typing targets too — otherwise `/` there opens the palette instead of
@@ -432,16 +426,19 @@ export function DocsSearch() @{
 	});
 
 	<>
-		<button type="button" class="search-trigger" onClick={() => setOpen(true)}>
+		<button
+			type="button"
+			class="search-trigger"
+			aria-label="Search documentation"
+			onClick={() => setOpen(true)}
+		>
 			<span
 				class="search-trigger-icon"
 				style={'--icon:url("' + searchUrl + '")'}
 				aria-hidden="true"
 			></span>
 			<span class="search-trigger-label">Search docs</span>
-			<kbd class="search-trigger-kbd">
-				{mac ? '⌘K' : 'Ctrl K'}
-			</kbd>
+			<kbd class="search-trigger-kbd">⌘/Ctrl K</kbd>
 		</button>
 		@if (open) {
 			<SearchDialogPortal onClose={() => setOpen(false)} />
@@ -485,6 +482,16 @@ export function DocsSearch() @{
 				font-family: inherit;
 				font-size: 0.7rem;
 				line-height: 1.4;
+			}
+			.search-trigger-label,
+			.search-trigger-kbd {
+				white-space: nowrap;
+			}
+			/* Keep the fixed-height header compact before the icon-only breakpoint. */
+			@media (max-width: 960px) {
+				.search-trigger-kbd {
+					display: none;
+				}
 			}
 			/* Below the nav breakpoint the trigger collapses to its icon. */
 			@media (max-width: 720px) {
