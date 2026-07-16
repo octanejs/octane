@@ -156,22 +156,24 @@ export function useFormGroup<
 		name: opts.name,
 	}));
 
-	const [formGroupApi, setFormGroupApi] = useState(() => {
+	const [formGroupApiState, setFormGroupApi] = useState(() => {
 		return new FormGroupApi({
 			...opts,
 		});
 	});
+	let formGroupApi = formGroupApiState;
 
 	// We only want to
 	// update on name changes since those are at risk of becoming stale. The field
 	// state must be up to date for the internal JSX render.
 	// The other options can freely be in `fieldApi.update`
 	if (prevOptions.form !== opts.form || prevOptions.name !== opts.name) {
-		setFormGroupApi(
-			new FormGroupApi({
-				...opts,
-			}),
-		);
+		// Use the replacement for the rest of this render so selectors and the
+		// render prop never observe state from the previous form or group name.
+		formGroupApi = new FormGroupApi({
+			...opts,
+		});
+		setFormGroupApi(formGroupApi);
 		setPrevOptions({ form: opts.form, name: opts.name });
 	}
 

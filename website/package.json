@@ -16,8 +16,8 @@
     "@codemirror/view": "catalog:default",
     "@octanejs/adapter-vercel": "workspace:*",
     "@octanejs/mdx": "workspace:*",
-    "@octanejs/recharts": "workspace:*",
     "@octanejs/tanstack-router": "workspace:*",
+    "@octanejs/visx": "workspace:*",
     "@octanejs/vite-plugin": "workspace:*",
     "shiki": "catalog:default"
   },

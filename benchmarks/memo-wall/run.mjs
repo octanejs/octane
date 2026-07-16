@@ -26,8 +26,8 @@
 // synchronously where the framework allows it (react flushSync, solid flush());
 // vue-vapor's hooks return a nextTick() thenable the harness awaits inside the
 // timed window — gc() is forced before every timed sample, and sub-millisecond
-// ops loop `reps` invocations inside the timed window and divide
-// (performance.now() would otherwise quantize a 1000-bail sweep to ~0).
+// ops loop enough invocations inside the timed window to keep newly auto-memoized
+// regions above performance.now()'s resolution before dividing by the rep count.
 //
 // FINE-GRAINED COLUMNS (solid / vue-vapor): there is no memo wall — component
 // bodies run once, so the probes count CREATIONS plus leaf TEXT-EFFECT re-runs
@@ -41,6 +41,7 @@
 //   pnpm --filter octane-tsrx-memowall-bench preview   # :5206
 //   pnpm --filter octane-jsx-memowall-bench  preview   # :5207
 //   pnpm --filter react-memowall-bench       preview   # :5208
+//   pnpm --filter react-compiler-memowall-bench preview # :5226
 // (swap `preview` → `dev` for the unminified dev build).
 //
 // Usage:  node run.mjs [iter]   # default 20
@@ -54,6 +55,8 @@ import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 const ITER = parseInt(process.argv[2] || '20', 10);
 const WARMUP = 5;
 const YIELD_MS = 5;
+const TARGET_BATCH_MS = 8;
+const MAX_REPS = 65_536;
 const ROWS = 1000;
 
 const TARGETS = process.env.TARGETS
@@ -62,6 +65,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'octane-tsrx', url: 'http://localhost:5206/' },
 			{ name: 'octane-jsx', url: 'http://localhost:5207/' },
 			{ name: 'react', url: 'http://localhost:5208/' },
+			{ name: 'react-compiler', url: 'http://localhost:5226/' },
 			{ name: 'solid', url: 'http://localhost:5182/' },
 			{ name: 'ripple', url: 'http://localhost:5225/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5223/' },
@@ -71,7 +75,7 @@ const TARGETS = process.env.TARGETS
 
 const Z = { rowA: 0, innerA: 0, leafA: 0, rowB: 0, innerB: 0, leafB: 0 };
 
-// Per op: the window hook, the inner-loop rep count, and the EXACT expected
+// Per op: the window hook, the calibration's initial rep count, and the EXACT expected
 // window.__renders delta for ONE invocation. `zeroRowLoop` additionally
 // asserts that the counters stayed at zero across the WHOLE timed loop (every
 // warmup + timed invocation must bail, not just the verification one).
@@ -172,32 +176,49 @@ async function measureMount(browser, url) {
 	return { samples, ...verify };
 }
 
-// LOOP op — mount once (untimed), then time the op in a tight in-page loop
-// (`reps` invocations per sample, divided) with gc() before each sample.
-// Afterwards: capture the whole-loop counters, then run ONE verification
-// invocation with fresh counters + a DOM snapshot.
+// LOOP op — mount once (untimed), calibrate the target-specific repetition
+// count to an 8ms batch, then time that batch and divide by its reps. Afterwards:
+// capture the whole-loop counters, then run ONE verification invocation with
+// fresh counters + a DOM snapshot.
 async function measureLoop(browser, url, op) {
 	const { ctx, page } = await freshPage(browser, url);
 	await page.evaluate(() => window.__mount());
 	await sleep(50);
 	const res = await page.evaluate(
-		async ({ hook, reps, WARMUP, ITER, YIELD_MS }) => {
+		async ({ hook, initialReps, WARMUP, ITER, YIELD_MS, TARGET_BATCH_MS, MAX_REPS }) => {
 			const fn = window[hook];
 			if (typeof fn !== 'function') throw new Error('missing ' + hook);
 			const gc = window.gc || (() => {});
-			window.__resetRenders();
-			const out = [];
-			for (let i = 0; i < WARMUP + ITER; i++) {
-				gc();
+			const runBatch = async (count) => {
 				const t0 = performance.now();
 				// Async-commit targets (vue-vapor — hooks return a nextTick()
 				// thenable; see its main.js) await the flush BETWEEN reps so the
 				// reps don't coalesce into one commit; sync targets are unchanged.
-				for (let k = 0; k < reps; k++) {
+				for (let k = 0; k < count; k++) {
 					const r = fn();
 					if (r && typeof r.then === 'function') await r;
 				}
-				const dt = (performance.now() - t0) / reps;
+				return performance.now() - t0;
+			};
+
+			// Warm the operation before calibration, then scale until the measured
+			// batch clears the timer-resolution floor. Calibration is untimed work;
+			// its render counters are reset before the sampled loop below.
+			let reps = initialReps;
+			await runBatch(reps);
+			while (reps < MAX_REPS) {
+				gc();
+				const elapsed = await runBatch(reps);
+				if (elapsed >= TARGET_BATCH_MS) break;
+				const estimated = elapsed > 0 ? Math.ceil((reps * TARGET_BATCH_MS) / elapsed) : reps * 10;
+				reps = Math.min(MAX_REPS, Math.max(reps * 2, estimated));
+			}
+			await new Promise((r) => setTimeout(r, YIELD_MS));
+			window.__resetRenders();
+			const out = [];
+			for (let i = 0; i < WARMUP + ITER; i++) {
+				gc();
+				const dt = (await runBatch(reps)) / reps;
 				if (i >= WARMUP) out.push(dt);
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 			}
@@ -221,9 +242,17 @@ async function measureLoop(browser, url, op) {
 				midInnerA: t('#wall-a .rows > .item:nth-child(' + (state.mid + 1) + ') .inner'),
 				midInnerB: t('#wall-b .rows > .item:nth-child(' + (state.mid + 1) + ') .inner'),
 			};
-			return { samples: out, loop, delta, state, dom };
+			return { samples: out, reps, loop, delta, state, dom };
 		},
-		{ hook: op.hook, reps: op.reps, WARMUP, ITER, YIELD_MS },
+		{
+			hook: op.hook,
+			initialReps: op.reps,
+			WARMUP,
+			ITER,
+			YIELD_MS,
+			TARGET_BATCH_MS,
+			MAX_REPS,
+		},
 	);
 	await ctx.close();
 	return res;
@@ -296,11 +325,15 @@ async function runTarget(t, failures) {
 	}
 
 	const results = {};
-	const meta = { gates: 'pass' };
+	const meta = { gates: 'pass', reps: { mount: 1 } };
 	for (const op of OPS) {
 		console.error(`  → ${op.name}`);
 		const res =
 			op.hook === null ? await measureMount(browser, t.url) : await measureLoop(browser, t.url, op);
+		if (op.hook !== null) {
+			meta.reps[op.name] = res.reps;
+			console.error(`    calibrated ${res.reps} reps/sample`);
+		}
 		results[op.name] = { ...summarize(res.samples), samples: res.samples.length };
 		if (op.name === 'mount') meta.mountRenders = res.delta;
 		const errs = checkGates(op, res);

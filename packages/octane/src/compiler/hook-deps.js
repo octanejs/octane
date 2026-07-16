@@ -11,10 +11,11 @@ const DEPENDENCY_HOOKS = new Map([
 	['useImperativeHandle', { callback: 1, deps: 2 }],
 ]);
 
-// Results whose identity is guaranteed for the lifetime of a hook cell. A
-// useCallback result is deliberately absent: it is memoized, but its identity
-// can still change when its own dependencies change.
-const STABLE_RESULT_HOOKS = new Set(['useRef', 'useEffectEvent']);
+// Results omitted from compiler-inferred dependency arrays. useRef is
+// lifetime-stable. useEffectEvent is intentionally NOT identity-stable, but is
+// non-reactive by API contract: including its fresh wrapper would re-run an
+// effect on every render and defeat the hook's purpose.
+const OMITTED_DEPENDENCY_RESULT_HOOKS = new Set(['useRef', 'useEffectEvent']);
 const STABLE_TUPLE_RESULTS = new Map([
 	['useState', new Set([1, 2])],
 	['useReducer', new Set([1, 2])],
@@ -46,7 +47,7 @@ function declareName(scope, name, details = null) {
 			name,
 			scope,
 			imported: false,
-			stable: false,
+			dependencyInvariant: false,
 			octaneImport: null,
 			octaneNamespace: false,
 		};
@@ -307,6 +308,17 @@ function buildScopes(ast, onlyImported) {
 			// copied with the call AST when the full compiler lowers setup statements.
 			const importedName = canonicalHookName(node, scope, true);
 			if (importedName !== null) node._octaneImportedHook = importedName;
+			// The auto-callback stability pass also preserves Octane's historical
+			// unbound-hook shorthand (`useState(...)` without an import). Record that
+			// fact from this lexical scope walk so it can distinguish a genuinely
+			// unbound shorthand from a same-named parameter/local/module binding.
+			// Absence is intentionally meaningful: a lexically bound non-Octane
+			// callee must never inherit stability merely because its spelling looks
+			// like a built-in hook.
+			const callee = unwrapValue(node.callee);
+			if (callee?.type === 'Identifier' && resolveBinding(scope, callee.name) === null) {
+				node._octaneUnboundCallee = true;
+			}
 			const name = canonicalHookName(node, scope, onlyImported);
 			const config = DEPENDENCY_HOOKS.get(name);
 			if (config && node.arguments.length === config.deps) {
@@ -365,7 +377,7 @@ function collectPatternBindings(pattern, scope, into) {
 	}
 }
 
-function markStableBindings(analysis, onlyImported) {
+function markDependencyInvariantBindings(analysis, onlyImported) {
 	let changed = true;
 	while (changed) {
 		changed = false;
@@ -377,12 +389,13 @@ function markStableBindings(analysis, onlyImported) {
 				init?.type === 'CallExpression' ? canonicalHookName(init, scope, onlyImported) : null;
 
 			if (decl.id.type === 'Identifier') {
-				let stable = callName !== null && STABLE_RESULT_HOOKS.has(callName);
-				if (!stable && init?.type === 'Identifier') {
-					stable = resolveBinding(scope, init.name)?.stable === true;
+				let dependencyInvariant =
+					callName !== null && OMITTED_DEPENDENCY_RESULT_HOOKS.has(callName);
+				if (!dependencyInvariant && init?.type === 'Identifier') {
+					dependencyInvariant = resolveBinding(scope, init.name)?.dependencyInvariant === true;
 				}
-				if (stable && bindings[0] && !bindings[0].binding.stable) {
-					bindings[0].binding.stable = true;
+				if (dependencyInvariant && bindings[0] && !bindings[0].binding.dependencyInvariant) {
+					bindings[0].binding.dependencyInvariant = true;
 					changed = true;
 				}
 				continue;
@@ -395,8 +408,8 @@ function markStableBindings(analysis, onlyImported) {
 					const element = decl.id.elements?.[index];
 					if (!element || element.type !== 'Identifier') continue;
 					const binding = resolveBinding(scope, element.name);
-					if (binding && !binding.stable) {
-						binding.stable = true;
+					if (binding && !binding.dependencyInvariant) {
+						binding.dependencyInvariant = true;
 						changed = true;
 					}
 				}
@@ -460,7 +473,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 		if (
 			binding === null ||
 			binding.imported ||
-			binding.stable ||
+			binding.dependencyInvariant ||
 			(callbackScope !== null && scopeIsWithin(binding.scope, callbackScope))
 		) {
 			return;
@@ -478,7 +491,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 		if (
 			binding === null ||
 			binding.imported ||
-			binding.stable ||
+			binding.dependencyInvariant ||
 			(callbackScope !== null && scopeIsWithin(binding.scope, callbackScope))
 		) {
 			return;
@@ -669,7 +682,11 @@ function collectCallbackReference(expression, analysis) {
 	const scope = analysis.nodeScopes.get(root);
 	const binding = scope ? resolveBinding(scope, root.name) : null;
 	const value = unwrapValue(expression);
-	if (binding === null || binding.imported || (value.type === 'Identifier' && binding.stable)) {
+	if (
+		binding === null ||
+		binding.imported ||
+		(value.type === 'Identifier' && binding.dependencyInvariant)
+	) {
 		return [];
 	}
 	// A referenced callback is itself the scheduled value. Preserve its complete
@@ -701,7 +718,7 @@ function cloneDependency(node) {
 export function analyzeHookDependencies(ast, options = {}) {
 	const onlyImported = options.onlyImported === true;
 	const analysis = buildScopes(ast, onlyImported);
-	markStableBindings(analysis, onlyImported);
+	markDependencyInvariantBindings(analysis, onlyImported);
 	const inferred = new Map();
 
 	for (const candidate of analysis.candidates) {

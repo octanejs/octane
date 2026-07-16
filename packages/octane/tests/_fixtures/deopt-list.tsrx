@@ -46,6 +46,16 @@ export function JsxList(props) @{
 	)}</ul>
 }
 
+// A return-JSX component with a typed destructured parameter, matching ordinary
+// TSX function syntax used by application components.
+export function DestructuredJsxList({ items }: { items: Array<{ id: number; label: string }> }) {
+	return <ul>{items.map(
+		(it) => <li key={it.id}>
+			{it.label as string}
+		</li>,
+	)}</ul>;
+}
+
 export function JsxListStateful() @{
 	const [items, setItems] = useState([
 		{ id: 1, label: 'a' },

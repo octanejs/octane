@@ -40,8 +40,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tanstack/store": "0.11.0",
-    "@octanejs/redux": "workspace:*"
+    "@tanstack/store": "0.11.0"
   },
   "peerDependencies": {
     "octane": "workspace:*"

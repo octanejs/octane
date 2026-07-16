@@ -655,6 +655,7 @@ describe('useForm', () => {
 		expect(mockFn).toHaveBeenCalledTimes(0);
 		await waitFor(() => getByText(error));
 		expect(getByText(error)).toBeInTheDocument();
+		expect(mockFn).toHaveBeenCalledTimes(1);
 	});
 
 	it("should set errors on the fields from the form's onChange validator", async () => {
@@ -869,8 +870,52 @@ describe('useForm', () => {
 		const target = getByTestId('formId-target');
 		const result = getByTestId('formId-result');
 
+		expect(target).toHaveAttribute('form', 'test');
+		expect(target).toHaveTextContent('test');
 		await user.click(target);
 		expect(result).toHaveTextContent('1');
+	});
+
+	it('mounts a replacement form when an explicit formId is removed', async () => {
+		const mountedIds: string[] = [];
+
+		function Comp() {
+			const [formId, setFormId] = useState<string | undefined>('first');
+			const [, forceRender] = useReducer((count) => count + 1, 0);
+			const form = useForm({
+				formId,
+				listeners: {
+					onMount: () => mountedIds.push(formId ?? 'fallback'),
+				},
+			});
+
+			return (
+				<>
+					<span data-testid="dynamic-form-id">{form.formId}</span>
+					<button data-testid="clear-form-id" onClick={() => setFormId(undefined)}>
+						clear
+					</button>
+					<button data-testid="rerender-form" onClick={forceRender}>
+						rerender
+					</button>
+				</>
+			);
+		}
+
+		const { getByTestId } = render(<Comp />);
+		const id = getByTestId('dynamic-form-id');
+		expect(id).toHaveTextContent('first');
+		expect(mountedIds).toEqual(['first']);
+
+		await user.click(getByTestId('clear-form-id'));
+		await waitFor(() => expect(mountedIds).toEqual(['first', 'fallback']));
+		expect(id).not.toHaveTextContent('first');
+		const fallbackId = id.textContent;
+		expect(fallbackId).not.toBe('');
+
+		await user.click(getByTestId('rerender-form'));
+		expect(id).toHaveTextContent(fallbackId!);
+		expect(mountedIds).toEqual(['first', 'fallback']);
 	});
 
 	it('should allow custom component keys for arrays', async () => {

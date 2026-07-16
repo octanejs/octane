@@ -62,6 +62,7 @@ export const BOOLEAN_ATTR_PROPS = new Set([
 	'async',
 	'autoplay',
 	'controls',
+	'credentialless',
 	'default',
 	'defer',
 	'disabled',
@@ -91,6 +92,12 @@ export const BOOLEAN_ATTR_PROPS = new Set([
  * literals and SSR keep the attribute (correct initial state). Lowercased.
  */
 export const MUST_USE_PROPERTY_PROPS = new Set(['muted', 'multiple', 'selected']);
+
+/**
+ * React's positive-numeric props. Values below 1 (including zero and values
+ * that do not coerce to a number) are omitted instead of serialized.
+ */
+export const POSITIVE_NUMERIC_ATTR_PROPS = new Set(['size', 'cols', 'rows', 'span']);
 
 /**
  * Tags that exist ONLY in the SVG namespace (no HTML element shares the name),
@@ -141,6 +148,11 @@ export const SVG_ONLY_TAGS = new Set([
 	'feTile',
 	'feTurbulence',
 	'filter',
+	'font-face',
+	'font-face-format',
+	'font-face-name',
+	'font-face-src',
+	'font-face-uri',
 	'foreignObject',
 	'g',
 	'glyph',

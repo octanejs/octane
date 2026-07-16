@@ -92,6 +92,11 @@ export function MaybeControlled(props) @{
 export function DefaultsInput(props) @{
 	<input id="dvi" defaultValue={props.dv} />
 }
+// A spread can introduce a controlled value writer, so the following direct
+// defaultValue must retain the full value/default cascade.
+export function SpreadDefaultInput(props) @{
+	<input id="sdi" {...props.sp} defaultValue={props.dv} />
+}
 export function DefaultsCheckbox(props) @{
 	<input id="dci" type="checkbox" defaultChecked={props.dc} />
 }
@@ -99,6 +104,19 @@ export function DefaultsCheckbox(props) @{
 // Controlled select over STATIC options (projection at binding time).
 export function StaticSelect(props) @{
 	<select id="ss" value={props.value} onInput={props.onInput}>
+		<option value="a">A</option>
+		<option value="b">B</option>
+		<option value="c">C</option>
+	</select>
+}
+
+export function CaptureSelect(props) @{
+	<select
+		id="cs"
+		value={props.value}
+		onChangeCapture={props.onChangeCapture}
+		onChange={props.onChange}
+	>
 		<option value="a">A</option>
 		<option value="b">B</option>
 		<option value="c">C</option>

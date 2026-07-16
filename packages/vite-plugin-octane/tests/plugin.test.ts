@@ -3,11 +3,12 @@
 // option forwarding to the bundled compiler, the appType default, and the
 // config resolution of `router.preHydrate` / RenderRoute `status`.
 import { fileURLToPath } from 'node:url';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createServer } from 'vite';
+import type { RenderBuiltAssetUrl, UserConfig } from 'vite';
 import { octane, isViteOwnedUrl, resolveOctaneConfig, RenderRoute } from '../src/index.js';
 import { RESOLVED_ADAPTER_BROWSER_STUB_ID } from '../src/project-codegen.js';
 import type { Component } from '@octanejs/vite-plugin';
@@ -89,6 +90,126 @@ describe('octane() plugin factory', () => {
 		expect(transform.call({}, code, '/repo/src/useThing.ts')).not.toBeNull();
 	});
 
+	it('forwards inline renderer rules to the bundled compiler', () => {
+		const [compiler] = octane({
+			hmr: false,
+			renderers: {
+				registry: { object: 'octane/universal' },
+				boundaries: {
+					'@octanejs/object-renderer': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'object',
+							prop: 'children',
+						},
+					},
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		(compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+		const transform = compiler.transform as (code: string, id: string) => { code: string };
+		const result = transform.call(
+			{},
+			'export function Scene() @{ <node /> }',
+			'/repo/src/scenes/Scene.object.tsrx',
+		);
+
+		expect(result.code).toMatch(/from ["']octane\/universal["']/);
+		expect(() =>
+			octane({
+				renderers: {
+					boundaries: {
+						'@octanejs/object-renderer': {
+							Canvas: {
+								ownerRenderer: 'dom',
+								childRenderer: 'missing',
+								prop: 'children',
+							},
+						},
+					},
+				},
+			}),
+		).toThrow(/childRenderer references unknown renderer "missing"/);
+	});
+
+	it('loads app renderer metadata before transforms and restarts for imported config changes', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-renderers-'));
+		const configPath = join(root, 'octane.config.ts');
+		const rendererConfigPath = join(root, 'renderer.config.ts');
+		try {
+			await writeFile(
+				rendererConfigPath,
+				`export const renderers = {
+	registry: { object: 'octane/universal' },
+	boundaries: {
+		'@octanejs/object-renderer': {
+			Canvas: { ownerRenderer: 'dom', childRenderer: 'object', prop: 'children' },
+		},
+	},
+	rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+};
+`,
+			);
+			await writeFile(
+				configPath,
+				`import { renderers } from './renderer.config.ts';
+export default { compiler: { renderers } };
+`,
+			);
+			const watchedRendererConfigPath = await realpath(rendererConfigPath);
+
+			const [compiler, meta] = octane({ hmr: false });
+			await (compiler.config as (config: { root: string }) => unknown)({ root });
+			const transform = compiler.transform as (code: string, id: string) => { code: string };
+			const appConfigured = transform.call(
+				{},
+				'export function Scene() @{ <node /> }',
+				join(root, 'src/scenes/Scene.object.tsrx'),
+			);
+			expect(appConfigured.code).toMatch(/from ["']octane\/universal["']/);
+			expect(appConfigured.code).toContain('"object"');
+
+			const add = vi.fn();
+			(meta.configureServer as (server: unknown) => void)({
+				watcher: { add },
+				middlewares: { use: vi.fn() },
+			});
+			expect(add).toHaveBeenCalledWith(
+				expect.arrayContaining([configPath, watchedRendererConfigPath]),
+			);
+
+			const restart = vi.fn(async () => undefined);
+			const hotUpdate = meta.hotUpdate as {
+				handler(context: unknown): Promise<unknown>;
+			};
+			await hotUpdate.handler.call(
+				{ environment: { name: 'client' } },
+				{ file: watchedRendererConfigPath, modules: [], server: { restart } },
+			);
+			expect(restart).toHaveBeenCalledOnce();
+
+			const [inlineCompiler] = octane({
+				hmr: false,
+				renderers: {
+					registry: { inline: 'octane/universal' },
+					rules: [{ include: 'src/**/*.object.tsrx', renderer: 'inline' }],
+				},
+			});
+			await (inlineCompiler.config as (config: { root: string }) => unknown)({ root });
+			const inlineConfigured = (
+				inlineCompiler.transform as (code: string, id: string) => { code: string }
+			).call(
+				{},
+				'export function Scene() @{ <node /> }',
+				join(root, 'src/scenes/Scene.object.tsrx'),
+			);
+			expect(inlineConfigured.code).toContain('"inline"');
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+
 	it("keeps Vite's SPA default without app config and uses 'custom' for routed apps", async () => {
 		const [, meta] = octane();
 		const config = meta.config as (
@@ -118,6 +239,61 @@ describe('octane() plugin factory', () => {
 		expect(
 			(await config({}, { command: 'serve', mode: 'production', isPreview: true })).appType,
 		).toBe(undefined);
+	});
+
+	it('keeps routed production chunk URLs independent of the document base', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-built-urls-'));
+		const userRenderBuiltUrl = vi.fn<RenderBuiltAssetUrl>((filename) =>
+			filename === 'assets/custom.js' ? 'https://cdn.example/custom.js' : undefined,
+		);
+		try {
+			await writeFile(join(root, 'index.html'), '<main id="root"></main>');
+			await writeFile(
+				join(root, 'octane.config.ts'),
+				`export default {
+	router: {
+		routes: [{ type: 'render', path: '/', entry: '/src/Page.tsrx', before: [] }],
+	},
+};
+`,
+			);
+			const [, meta] = octane();
+			const config = meta.config as (
+				userConfig: UserConfig,
+				env: { command: 'build'; mode: string },
+			) => Promise<UserConfig>;
+			const result = await config(
+				{
+					root,
+					experimental: {
+						importGlobRestoreExtension: true,
+						renderBuiltUrl: userRenderBuiltUrl,
+					},
+				},
+				{ command: 'build', mode: 'production' },
+			);
+
+			expect(result.experimental?.importGlobRestoreExtension).toBe(true);
+			const renderBuiltUrl = result.experimental?.renderBuiltUrl;
+			expect(renderBuiltUrl).toBeTypeOf('function');
+			const clientJsAsset = {
+				type: 'asset',
+				hostId: 'assets/hydrate.js',
+				hostType: 'js',
+				ssr: false,
+			} as const;
+			expect(renderBuiltUrl?.('assets/custom.js', clientJsAsset)).toBe(
+				'https://cdn.example/custom.js',
+			);
+			expect(renderBuiltUrl?.('assets/Page.js', clientJsAsset)).toEqual({ relative: true });
+			expect(renderBuiltUrl?.('assets/Page.css', { ...clientJsAsset, hostType: 'css' })).toBe(
+				undefined,
+			);
+			expect(renderBuiltUrl?.('assets/server.js', { ...clientJsAsset, ssr: true })).toBe(undefined);
+			expect(renderBuiltUrl?.('favicon.svg', { ...clientJsAsset, type: 'public' })).toBe(undefined);
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
 	});
 
 	it('serves the Vite SPA fallback when no octane.config.ts exists', async () => {

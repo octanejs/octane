@@ -113,12 +113,12 @@ export function AtomTuple(props: { atom: Atom<number> }) @{
 export function LegacyStore(props: { store: Store<{ value: number; meta: number }> }) @{
 	const value = useStore(
 		props.store,
-		(state) => ({ value: state.value }),
+		(state) => state,
 		(previous, next) => previous.value === next.value,
 	);
 
 	<p id="legacy">
-		{value.value as string}
+		{value.value + '/' + value.meta}
 	</p>
 }
 

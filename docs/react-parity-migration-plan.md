@@ -1,21 +1,31 @@
 # React → Octane Test-Parity Migration Plan
 
-> **STATUS: COMPLETE (2026-07-05; executable-pin audit refreshed 2026-07-14).**
-> Every phase and tier below is ported or accounted, and the committed suite now
-> has zero skipped or expected-failure tests. Historical checkpoint counts below
-> record the migration as it happened. The distilled, user-facing summary of every intentional
-> divergence is **[differences-from-react.md](./differences-from-react.md)** —
-> keep that page current when a divergence is added or closed; this document is
-> the historical execution record and porting methodology.
+> **STATUS: HISTORICAL EXECUTION RECORD.** This migration was marked complete on
+> 2026-07-05 (with its full stable/canary inventory audit refreshed on 2026-07-16), meaning
+> every phase and tier defined by its then-current scope was ported or accounted.
+> It was not a complete enumeration of React's current test inventory and must not
+> be used as the source for React-derived test counts. Current upstream pins,
+> case-level classifications, and coverage totals live in the generated
+> **[React parity coverage report](./react-parity-coverage.md)**. Historical
+> checkpoint counts below record the migration as it happened. The distilled,
+> user-facing summary of intentional divergences is
+> **[differences-from-react.md](./differences-from-react.md)**; keep that page
+> current when a divergence is added or closed.
 
-> Goal: systematically port the *in-scope* unit-test behaviors from `facebook/react`
+> The 2026-07-16 residual audit assigns every discovered case a risk, owner,
+> workstream, and status: there are zero untriaged cases. A `planned` status still
+> means supported behavior needs executable evidence; it is not counted as ported.
+
+> Original goal: systematically port the *in-scope* unit-test behaviors from `facebook/react`
 > into Octane's `.tsrx` test suite, and close the runtime gaps those tests expose —
 > so "you can swap React for Octane" is proven, not asserted.
 
-This plan was produced by cross-referencing the **entire React test inventory**
-(76 react-reconciler + 129 react-dom + 25 react-core test files, ~230 files) against
-Octane's current 97 test files, and verifying the highest-stakes findings against
-`packages/octane/src/runtime.ts`.
+This plan was originally produced by cross-referencing its **then-current React
+test inventory** (76 react-reconciler + 129 react-dom + 25 react-core test files,
+~230 files) against Octane's then-current 97 test files, and verifying the
+highest-stakes findings against `packages/octane/src/runtime.ts`. Treat that
+inventory and every count below as a historical checkpoint; use the live report
+linked above for current accounting.
 
 ---
 
@@ -57,11 +67,15 @@ Octane is function-components + hooks + concurrent-root + DOM + SSR/hydration. T
 following React test areas are **out of scope by design** — document the divergence,
 don't port:
 
+Rows explicitly marked **historical exclusion, superseded** are retained only to
+explain the old plan; they are no longer current scope decisions.
+
 | React area | Why out of scope |
 |---|---|
 | Class components, `createClass`, `this.refs`, string refs | Octane has no class components. *Port the underlying reconciler/effect OUTCOME via function components + hooks where the behavior is renderer-level.* |
 | `componentDidCatch` / `getDerivedStateFromError` mechanics | Octane uses `@try`/`@catch`. Port the catch OUTCOME, not the lifecycle. |
 | Legacy / sync mode, legacy roots | Octane is concurrent-root only. |
+| Initial concurrent-root mount batching | **Intentional divergence.** Octane's first `root.render()` mounts synchronously. A render followed by `root.unmount()` in the same surrounding batch can therefore expose intermediate DOM before the synchronous unmount leaves an empty final state; React's concurrent root can elide that mount. |
 | Rules-of-hooks enforcement, hook-order warnings | **Intentional divergence** — Octane tracks hooks by call site; conditional hooks are legal. |
 | Omitted dependency arrays | **Intentional divergence** — for effect-family hooks, `useMemo`, `useCallback`, and `useImperativeHandle`, omission asks the compiler to infer dependencies from lexical captures. Explicit arrays retain React semantics; `null` is the explicit every-render/recompute form. |
 | StrictMode double-invoke of effects/render | Octane has no StrictMode (verified: no `StrictMode`/double-invoke in runtime). |
@@ -72,13 +86,13 @@ don't port:
 | **`useSyncExternalStore` commit-time getSnapshot re-read** (the `useSyncExternalStore-test.js` `:144` tearing check) | **Intentional divergence (decided 2026-07-03).** React's `updateSyncExternalStore` re-pushes `updateStoreInstance` whenever `inst.getSnapshot !== getSnapshot`, giving a commit-time snapshot re-read even for an unchanged value. Octane drops that: getSnapshot is refreshed in RENDER, and the commit-time store-sync (drainStoreSyncs) only runs when the read snapshot actually moved off the last-committed value (or the store was swapped) — so an unchanged snapshot with an unstable inline getSnapshot (the zustand/query pattern) enqueues nothing. Consequence: a store that mutates WITHOUT notifying in the render→commit window is no longer caught on a render where ONLY getSnapshot identity changed. Octane's synchronous renderer closes React's motivating concurrent-interleaving window, and any store that actually notifies is unaffected (onStoreChange compares against the render-fresh getSnapshot). Do NOT "fix" this back toward React's per-render commit re-read. See `useSyncExternalStore` in `runtime.ts`. |
 | Owner-based identity (`should NOT replace children with different owners`) | Modern React already dropped owner identity — confirm Octane matches (mount=1, unmount=0) but it's a 1-test check, not an area. |
 | Server Components / RSC / Flight | Not supported. |
-| Fizz **streaming** APIs (renderToPipeableStream, progressive chunks, shell hydration, selective/priority hydration of streamed boundaries) | Octane SSR is non-streaming. *Salvage the OUTCOME-level hydration tests (mismatch recovery, useId match, input value preservation), skip the streaming machinery.* |
+| Fizz **streaming** APIs (renderToPipeableStream, progressive chunks, shell hydration, selective/priority hydration of streamed boundaries) | **Historical exclusion, superseded.** Octane now ships `renderToPipeableStream` and `renderToReadableStream`; Fizz cases require case-by-case triage in the [live coverage report](./react-parity-coverage.md). Selective hydration's synthetic-event replay remains outside Octane's native-event model. |
 | `SuspenseList` (`revealOrder`/`tail`) | Not in Octane's component set (verify, then skip the whole `ReactSuspenseList-test.js`, the SuspenseList parts of `ReactDOMUseId`/`ReactContextPropagation`). |
 | CPU Suspense (`unstable_expectedLoadTime`), Suspensey commit phase (suspend-on-resource-load during commit), `unstable_avoidThisFallback`, `unstable_suspenseCallback` | Unstable/unsupported APIs. |
 | Profiler (`actualDuration`/`treeBaseDuration`), DevTools component-stack/displayName | Not supported. |
-| ViewTransitions | **Planned** — see `docs/view-transitions-plan.md` (conformance skeleton landed; phases pending). |
-| Float/resource hoisting (`ReactDOMFloat`) | Out (Octane has limited head-singleton support only). |
-| `React.Children.*` utilities (`ReactChildren-test.js`) | Octane uses `@for`. Only the missing-key-warning *policy* is conceptually portable. |
+| ViewTransitions | **Historical exclusion, superseded.** The implementation and its in-scope React ports are complete; see [view-transitions-plan.md](./view-transitions-plan.md) and the live ledger. |
+| Float/resource hoisting (`ReactDOMFloat`) | **Historical blanket exclusion, superseded.** Resource hints and head hoisting now exist, so these cases must be triaged individually against the supported surface. |
+| `React.Children.*` utilities (`ReactChildren-test.js`) | **Historical exclusion, superseded.** Octane now exports `Children`, `createElement`, and `cloneElement`; their upstream cases belong in the live inventory. |
 
 **Verify-existence flags** before porting their files: `useEffectEvent` (exists —
 `callbacks.test.ts`), `useMemoCache`/React-Compiler `c()` cache (likely absent →
@@ -236,18 +250,35 @@ to the client value, rebuilds STRUCTURAL mismatches (swapped `@if`/`@switch` bra
 tag, host↔component swap, over-long `@for`), supports shallow `suppressHydrationWarning`, and
 emits dev-only warnings with Svelte-5-style source locations (`file:line:col`). Recovery runs
 in dev + prod; warnings + LOC are dev-only and strictly gated so prod output is byte-identical.
-The remaining Tier-4 gaps are the *determinism* heuristics below — the serialization matrix
-and the deeper SSR hook/ref/form ports. useId server≡client agreement, don't-blow-away-input,
-and the React diff-matrix ports are now done (see below).
+
+**Wave 4 server work is complete (2026-07-16).** The audit reviewed the 223-case
+stable/canary union of the four `ReactDOMFizzServer*` suites and the 389 remaining
+`ReactDOMServerIntegration*` cases after Wave 1 covered the 17 untrusted-URL cases.
+All 612 Wave 4 cases have exited the queue: 439 have exact live evidence and 173
+have conservative durable dispositions, with none still planned. All 223 Fizz cases
+have either live evidence (109) or a durable disposition (114); the 389-case
+server-integration tranche now has 330 covered and 59 documented outcomes.
+
+Wave 4C closed all 104 remaining Fizz cases plus 43 reconnecting and
+controlled-field cases. The final Wave 4D matrix closed the remaining 243 planned
+server-integration cases: 241 gained executable evidence and two became explicit
+Octane divergences. Its attribute, element, hook, context, and controlled-form
+suites add more than 600 collected normal-core cases across client, buffered SSR, streaming
+SSR, matching hydration, mismatch recovery, and production compilation. The strict
+upstream mapping still counts each React case once rather than treating those local
+execution modes as separate upstream ports.
+Class components, legacy roots/context, StrictMode, synthetic selective-hydration
+replay, Fiber/Fizz protocol internals, and document-orchestration APIs remain
+explicit non-goals rather than disabled tests.
 
 | React file | Gap | Severity |
 |---|---|---|
 | ~~`ReactDOMUseId-test.js` (17)~~ **DONE (2026-06-30)** — `tests/conformance/useid-determinism.test.ts` asserts client stability (across re-renders, wrapper indirection, multiple ids per component) AND **server ≡ client byte-equality after `hydrateRoot()`**. Fixed in `hydrateRoot()`: the client `_idCounter` resets to 0 at the start of hydration so it lines up with the server's per-render reset. | ~~High~~ |
 | ~~`ReactDOMServerIntegrationUserInteraction-test.js` (14)~~ **DONE (2026-07-01)** — `tests/conformance/user-input-hydration.test.ts` (6 cases): input/range/checkbox/textarea/select, controlled + uncontrolled, keep the user's typed value across hydration (octane only ever writes ATTRIBUTES, never the dirty `.value`/`.checked` property) with no spurious mismatch warning. **Rewritten (2026-07-08)** for the controlled-components model: hydration still adopts pre-hydration user input (React parity), then the first real commit/discrete event reasserts controlled values. | ~~High~~ |
 | ~~`ReactDOMHydrationDiff-test.js` (37) + `ReactDOMServerIntegrationReconnecting-test.js` (50)~~ **DONE (2026-07-01)** — ported as `tests/conformance/hydration-mismatch.test.ts` (24 outcome-level cases). Surfaced + fixed 5 runtime bugs (clone close-marker, ifBlock/switchBlock empty-branch cursor + leftover discard, setStyle + setClassName detection). Divergences documented: octane patches attrs to client (React keeps server), warns+rebuilds in place (React throws+re-renders boundary), and function components carry hydration markers (so component-form ≠ bare-element-form). | ~~Medium~~ |
-| `ReactDOMServerIntegrationHooks-test.js` (`:606`), `…Refs-test.js` (`:41`), `ReactDOMFizzForm-test.js` (`:442,:531,:549`) | **Effects and ref callbacks do NOT run on server**; hooks render initial values; useFormStatus not-pending / useActionState+useOptimistic return initial on server. (Octane tests "effects don't run on server" partially in `ssr.test.ts`; extend to refs + form hooks.) | Medium |
-| `ReactDOMServerIntegrationElements/Attributes/Input/Select/Textarea/Fragment-test.js` | **Serialization heuristics**: text-node/whitespace separators so hydration can split adjacent text; nullish/zero/false child coercion; boolean/reserved-attribute rules; `value`→attribute (input) vs value→children (textarea) vs selected-option (select); fragment flattening. Each `itRenders` is simultaneously server-output + hydration-adopt + mismatch-recovery. | Medium |
-| `ReactDOMForm-test.js` (47) + `ReactDOMFizzForm-test.js` (16) | useActionState dispatch-order + error-cancel (`:1099,:1328`); useFormStatus activation rule (pending only in transition/preventDefault path `:2078,:2146,:2217`); uncontrolled inputs auto-reset after action (`:1521`); function-action replay-after-hydration. (Octane `actions.test.ts` covers the basics; deepen.) | Medium |
+| ~~`ReactDOMServerIntegrationHooks-test.js`, `…Refs-test.js`, `ReactDOMFizzForm-test.js` server outcomes~~ | **DONE (2026-07-16)** — the shared five-mode matrix covers server hook replay, current-reducer render-phase updates, stable memo/ref identity, callable React-19 Context providers, ref no-ops, and initial form state without adding class or legacy APIs. | ~~Medium~~ |
+| ~~`ReactDOMServerIntegrationElements/Attributes/Input/Select/Textarea/Fragment-test.js`~~ | **DONE (2026-07-16)** — `server-integration-attributes-wave4d.test.ts`, `server-integration-elements-remaining.test.ts`, and the expanded shared matrix cover the remaining serialization, parser-normalization, raw-HTML, invalid-child/type, fragment, hydration, and native controlled-form outcomes in development and production compilation. | ~~Medium~~ |
+| ~~`ReactDOMForm-test.js` + `ReactDOMFizzForm-test.js`~~ **DONE in the earlier Tier-4 pass** — `form-actions-extra.test.ts`, `actions.test.ts`, and `form-reset.test.ts` cover queue sequencing, errors, status activation, auto-reset, and explicit reset behavior; server initial-state outcomes live in `ssr-server-semantics.test.ts`. | ~~Medium~~ |
 
 ### Tier 5 — Suspense / transitions / activity (advanced scheduling)
 
@@ -319,6 +350,11 @@ For each React `it(...)` we port:
   `it`/`itRenders` titles + line numbers as a `describe` skeleton with `it.todo(...)`,
   pre-tagged in/out of scope using the §2 rules. Turns "port a file" into filling
   blanks.
+- `pnpm react-parity:candidates -- --baseline stable`: scan local React source
+  citations against one pinned inventory and report ledger cases that may already
+  have executable evidence. `--exact-line --exact-title` narrows the advisory list;
+  canary-only work must pass `--baseline canary` so line drift cannot cross-map
+  stable and canary cases.
 - The **move-instrumented harness** (§1) — unblocks all of Tier 0.
 - A standard **effect-log fixture helper** — unblocks Tiers 1, 5, 6, 7.
 
@@ -586,13 +622,14 @@ while an Action is in flight.
 - **Global commit coordination — DONE for #1 + #4 (`conformance/entangled-commit.test.ts`,
   flipped `transitions.test.ts` entangled test):** a single `startTransition` that fans
   out to multiple suspending boundaries now holds every affected boundary's prior content
-  until all are data-ready, then reveals them together. Implemented as
-  a data-ready barrier in runtime.ts: `HELD_TRANSITIONS` tracks boundaries holding prior
-  content; each stages its reveal as its data resolves; when `STAGED_REVEALS.size ===
-  HELD_TRANSITIONS.size` the batch flushes in one commit. `commitResume` was extracted
-  from `attachResume`'s retry; abandon paths (urgent supersede / error / unmount) drop a
-  boundary from the group so the rest aren't stranded. The cross-boundary reveal gap is
-  closed; same-identity parent/sibling rollback remains outside this coordinator (#4).
+  until all are staged, then reveals them together. For fallback-visible boundaries,
+  settling a thenable first retries the detached primary under capture; only a fully
+  completed body enters `STAGED_REVEALS`, so true dependent-use chains cannot satisfy the
+  barrier early. Their DOM, refs, and layout effects commit as one tree-ordered batch.
+  Abandon/supersession paths remove stale readiness. Pre-timeout visible holds still use
+  the documented per-swap model: a resume may discover another suspension while rendering
+  the live tree, so global same-identity parent/sibling rollback remains outside this
+  coordinator (#4).
 - **#5 reveal throttling — investigated and DISMISSED (octane matches default React).**
   The provisional divergence used the wrong oracle (the `-test.internal.js` suite). The
   public default-flags test `ReactUse-test.js:1096` reveals `A(Loading B...)` immediately

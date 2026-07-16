@@ -12,7 +12,7 @@ const SUMMARY_SERIES: SeriesDef[] = [
 	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
 	{ key: 'svelte', label: 'Svelte 5', color: '#f57547' },
 	{ key: 'ripple', label: 'Ripple 0.3', color: '#9085e9' },
-	{ key: 'vue-vapor', label: 'Vue Vapor 3.6', color: '#e06ec4' },
+	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 beta', color: '#e06ec4' },
 ];
 
 export const HOME_SUMMARY: BenchCard = {
@@ -85,12 +85,12 @@ export const HOME_SUMMARY: BenchCard = {
 		{
 			op: 'memo-wall',
 			'octane-tsrx': 1,
-			react: 2.029245095468859,
-			preact: 2.458141887959391,
-			solid: 0.25280885564071065,
-			svelte: 0.6518266516283755,
-			ripple: 1.0838076870657005,
-			'vue-vapor': 0.22033043111352227,
+			react: 4.875128928835251,
+			preact: 6.225394162055643,
+			solid: 0.2894263405066609,
+			svelte: 1.024572971131265,
+			ripple: 2.444735865955871,
+			'vue-vapor': 0.2857193612481236,
 		},
 		{
 			op: 'recursive-context',
@@ -152,12 +152,12 @@ export const HOME_SUMMARY: BenchCard = {
 		{
 			op: 'bundle-size',
 			'octane-tsrx': 1,
-			react: 0.9016499908468174,
-			preact: 0.5241231546520693,
-			solid: 0.6391550821731882,
-			svelte: 0.7421281350723717,
-			ripple: 0.7041097632363424,
-			'vue-vapor': 0.7094376934894691,
+			react: 1.1391297210633704,
+			preact: 0.6621685454695447,
+			solid: 0.8074979846540854,
+			svelte: 0.9375924406146786,
+			ripple: 0.8895606569464001,
+			'vue-vapor': 0.777911963556173,
 		},
 		{
 			op: 'ssr-throughput',

@@ -7,8 +7,8 @@ import { compile } from 'octane/compiler';
 // DevTools element→source layer. It MUST be strictly dev-gated so PRODUCTION output is
 // byte-identical (zero runtime cost). These tests pin both halves of that contract.
 
-const dev = (src: string): string => compile(src, 'App.tsrx', { dev: true }).code;
-const prod = (src: string): string => compile(src, 'App.tsrx').code;
+const dev = (src: string): string => compile(src, 'App.tsrx', { dev: true, autoMemo: false }).code;
+const prod = (src: string): string => compile(src, 'App.tsrx', { autoMemo: false }).code;
 
 describe('dev hydration source-LOC plumbing (P1)', () => {
 	const WITH_CONSTRUCTS = `export function App(props) @{
@@ -85,5 +85,17 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 		const locLine = out.split('\n').find((l) => l.includes('__s.locs ='))!;
 		expect(locLine).toMatch(/\[3, \d+\]/);
 		expect(locLine).toMatch(/\[4, \d+\]/);
+	});
+
+	it('preserves anonymous default-export function identity while embedding root LOC', () => {
+		const arrow = dev('export default () => null;');
+		expect(arrow).toMatch(/export default \(\) => \{/);
+		expect(arrow).toContain('__octane_loc:');
+		expect(arrow).not.toContain('__component');
+
+		const declaration = dev('export default function() { return null; }');
+		expect(declaration).toMatch(/export default function\s*\(\)\s*\{/);
+		expect(declaration).toContain('__octane_loc:');
+		expect(declaration).not.toContain('export default (');
 	});
 });

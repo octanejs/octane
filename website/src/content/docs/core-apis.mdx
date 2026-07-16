@@ -495,8 +495,10 @@ uses a deterministic online server value; an application store can serialize its
 server snapshot instead.
 
 `useLayoutEffect` runs earlier when you must measure or adjust layout before paint.
-`useInsertionEffect` is for styling libraries. `useEffectEvent` creates a stable callback
-that an effect can call without making the effect reactive to the callback's captures.
+`useInsertionEffect` is for styling libraries. `useEffectEvent` creates a non-reactive
+callback that an effect can call without reconnecting when its captures change. Its
+wrapper identity is fresh on each render, but a wrapper registered by a committed effect
+always calls the latest committed body; do not add Effect Events to dependency arrays.
 
 <h2 id="async-ui">Loading data and code</h2>
 

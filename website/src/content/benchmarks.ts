@@ -75,8 +75,8 @@ export interface BenchCard {
 
 // ---------------------------------------------------------------------------
 // Series identity — fixed hue per framework, everywhere.
-// Validated set: #ff415a #c98500 #1e93b0 #7478fb #1baf7a #f57547 #9085e9
-// #e06ec4 (dark, on #2b3138). Every color clears 3:1 contrast on the panel;
+// Validated set: #ff415a #c98500 #1e93b0 #4bafe7 #7478fb #1baf7a #f57547
+// #9085e9 #e06ec4 (dark, on #2b3138). Every color clears 3:1 contrast on the panel;
 // the palette keeps at least ΔE 10 across protan/deutan/tritan simulations.
 // Preact and Svelte wear accessible indigo/coral variants of their brand hues.
 // Vue can't wear its brand green — it collapses into Solid's under tritan
@@ -87,11 +87,12 @@ const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'octane-tsrx', label: 'Octane (.tsrx)', color: '#ff415a' },
 	{ key: 'octane-jsx', label: 'Octane (.tsx)', color: '#c98500' },
 	{ key: 'react', label: 'React 19', color: '#1e93b0' },
+	{ key: 'react-compiler', label: 'React Compiler 1.0', color: '#4bafe7' },
 	{ key: 'preact', label: 'Preact 10', color: '#7478fb' },
 	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
 	{ key: 'svelte', label: 'Svelte 5', color: '#f57547' },
 	{ key: 'ripple', label: 'Ripple 0.3', color: '#9085e9' },
-	{ key: 'vue-vapor', label: 'Vue Vapor 3.6', color: '#e06ec4' },
+	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 beta', color: '#e06ec4' },
 ];
 
 // Octane-internal variants — ordinal ramp of the brand hue, validated with
@@ -224,7 +225,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		memoWall,
 		'memo-wall',
 		'memo-wall',
-		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. Solid, Svelte, Ripple and Vue Vapor have no parent re-render to absorb, so their near-zero wall ops are the fine-grained model’s honest number.',
+		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. React Compiler is shown separately from vanilla React; Solid, Svelte, Ripple and Vue Vapor have no parent re-render to absorb, so their near-zero wall ops are the fine-grained model’s honest number.',
 	),
 	frameworkCard(
 		recursiveContext,

@@ -1,10 +1,18 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdtempSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import rspack from '@rspack/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { OctaneRspackPlugin } from '../src/index.js';
+import { getOctaneRspackBuildInfo, OctaneRspackPlugin } from '../src/index.js';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const profilerGlobal = '__OCTANE_PROFILER__';
@@ -111,6 +119,49 @@ describe('programmatic Rspack integration', () => {
 		);
 		write(
 			root,
+			'node_modules/@fixture/object-renderer/package.json',
+			JSON.stringify({
+				name: '@fixture/object-renderer',
+				type: 'module',
+				exports: './index.js',
+			}) + '\n',
+		);
+		write(
+			root,
+			'node_modules/@fixture/object-renderer/index.js',
+			`export const rendererGraphMarker = 'client-object-renderer';
+export const defineUniversalComponent = (_renderer, component) => component;
+export const universalPlan = (_renderer, plan) => plan;
+export const universalValue = (plan) => plan;
+export const universalComponent = () => null;
+export const universalProps = (value) => value;
+export const universalIf = () => null;
+export const universalSwitch = () => null;
+export const universalFor = () => null;
+export const universalTry = () => null;
+export const universalChildren = (value) => value;
+export const universalContext = () => null;
+export const universalActivity = () => null;
+export const rendererRegion = (_owner, _child, body) => body;
+export const warmChild = () => undefined;
+`,
+		);
+		write(
+			root,
+			'node_modules/@fixture/object-boundaries/package.json',
+			JSON.stringify({
+				name: '@fixture/object-boundaries',
+				type: 'module',
+				exports: './index.js',
+			}) + '\n',
+		);
+		write(
+			root,
+			'node_modules/@fixture/object-boundaries/index.js',
+			'export function Canvas(props) { return props.children; }\n',
+		);
+		write(
+			root,
 			'src/App.tsrx',
 			`import { useState } from 'octane';
 
@@ -130,7 +181,7 @@ export function App() @{
 	afterEach(() => {
 		Reflect.deleteProperty(globalThis, profilerGlobal);
 		Reflect.deleteProperty(globalThis, runGlobal);
-		rmSync(root, { recursive: true, force: true });
+		rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	});
 
 	function installRealProfileFixture(includeRawBinding: boolean) {
@@ -213,6 +264,134 @@ ${includeRawBinding ? "export { Raw } from '@fixture/raw';" : ''}
 				true,
 			);
 		}
+	}, 30_000);
+
+	it('splits client-only renderer dependencies from the raw server graph with stable module identity', async () => {
+		write(
+			root,
+			'src/object-renderer.js',
+			readFileSync(join(root, 'node_modules/@fixture/object-renderer/index.js'), 'utf8'),
+		);
+		const scene = write(
+			root,
+			'src/Scene.object.tsrx',
+			`import './scene-setup.js';
+export const metadata = 'authored-client-metadata';
+export default function Scene() @{ <group><mesh /></group> }
+`,
+		);
+		const sceneSetup = write(
+			root,
+			'src/scene-setup.js',
+			`globalThis.__octane_client_only_setup__ = 'authored-scene-setup';\n`,
+		);
+		write(
+			root,
+			'src/App.tsrx',
+			`import { Canvas } from '@fixture/object-boundaries';
+import './Scene.object.tsrx';
+import Scene from './Scene.object.tsrx';
+export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
+`,
+		);
+		write(root, 'src/index.js', `export { App } from './App.tsrx';\n`);
+
+		const renderers = {
+			registry: {
+				object: {
+					module: '/src/object-renderer.js',
+					server: 'client-only' as const,
+				},
+			},
+			boundaries: {
+				'@fixture/object-boundaries': {
+					Canvas: {
+						ownerRenderer: 'dom',
+						childRenderer: 'object',
+						prop: 'children',
+						server: 'omit-child' as const,
+					},
+				},
+			},
+			rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+		};
+		const build = async (environment: 'client' | 'server') => {
+			const outputPath = join(root, `dist-client-only-${environment}`);
+			const stats = await compile({
+				context: root,
+				mode: 'development',
+				target: environment === 'client' ? 'web' : 'node',
+				entry: './src/index.js',
+				optimization: { minimize: false },
+				output: { path: outputPath, filename: 'bundle.js' },
+				plugins: [new OctaneRspackPlugin({ renderers })],
+			});
+			return {
+				bundle: readFileSync(join(outputPath, 'bundle.js'), 'utf8'),
+				manifest: existsSync(join(outputPath, 'octane-client-references.json'))
+					? JSON.parse(readFileSync(join(outputPath, 'octane-client-references.json'), 'utf8'))
+					: null,
+				// Snapshot native module wrappers before the compiler is collected.
+				modules: [...stats.compilation.modules].map((item: any) => ({
+					buildInfo: JSON.parse(JSON.stringify(item.buildInfo ?? {})),
+					identifier: item.identifier?.(),
+					resource: item.resource ?? item.nameForCondition?.(),
+				})),
+			};
+		};
+
+		const client = await build('client');
+		const server = await build('server');
+		const moduleFor = (modules: any[], resource: string) =>
+			modules.find((item) => item.resource === resource || item.identifier?.includes(resource));
+		const clientScene = moduleFor(client.modules, scene);
+		const serverScene = moduleFor(server.modules, scene);
+		const clientInfo = getOctaneRspackBuildInfo(clientScene)!;
+		const serverInfo = getOctaneRspackBuildInfo(serverScene)!;
+		const clientReference = clientInfo?.clientReference;
+
+		expect(clientInfo).toMatchObject({
+			transformKind: 'compile',
+			clientReference: {
+				moduleId: '/src/Scene.object.tsrx',
+				renderer: 'object',
+			},
+		});
+		expect(serverInfo).toMatchObject({
+			transformKind: 'client-only-stub',
+			clientReference,
+		});
+		expect(client.manifest).toEqual({
+			version: 1,
+			references: {
+				[clientReference.id]: {
+					moduleId: clientReference.moduleId,
+					renderer: clientReference.renderer,
+					chunks: ['bundle.js'],
+				},
+			},
+		});
+		expect(server.manifest).toBeNull();
+		expect(moduleFor(client.modules, sceneSetup)).toBeDefined();
+		expect(moduleFor(server.modules, sceneSetup)).toBeUndefined();
+		expect(client.bundle).toContain('client-object-renderer');
+		expect(client.bundle).toContain('authored-scene-setup');
+		expect(server.bundle).not.toContain('client-object-renderer');
+		expect(server.bundle).not.toContain('authored-scene-setup');
+		expect(server.bundle).not.toContain('authored-client-metadata');
+		expect(server.bundle).toContain('after');
+
+		write(
+			root,
+			'src/App.tsrx',
+			`import { Canvas } from '@fixture/object-boundaries';
+import Scene from './Scene.object.tsrx';
+export function App() @{ const live = Scene as unknown; <Canvas><Scene /></Canvas> }
+`,
+		);
+		await expect(build('server')).rejects.toThrow(
+			/Client-only export "default".*server: "omit-child"/s,
+		);
 	}, 30_000);
 
 	it('emits parseable webpack HMR wiring when Rspack marks the loader context hot', async () => {

@@ -1,6 +1,6 @@
 import { useCallback } from 'octane';
-import { useSyncExternalStoreWithSelector } from '@octanejs/redux';
 import { splitSlot, subSlot } from './internal';
+import { useSyncExternalStoreWithSelector } from './useSyncExternalStoreWithSelector';
 
 export interface UseSelectorOptions<TSelected> {
 	compare?: (a: TSelected, b: TSelected) => boolean;

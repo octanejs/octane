@@ -202,7 +202,8 @@ export function useForm<
 	>,
 ) {
 	const fallbackFormId = useFormId();
-	const [prevFormId, setPrevFormId] = useState<string>(opts?.formId as never);
+	const formId = opts?.formId ?? fallbackFormId;
+	const [prevFormId, setPrevFormId] = useState(formId);
 
 	const [formApi, setFormApi] = useState(() => {
 		return new FormApi<
@@ -218,11 +219,10 @@ export function useForm<
 			TOnDynamicAsync,
 			TOnServer,
 			TSubmitMeta
-		>({ ...opts, formId: opts?.formId ?? fallbackFormId });
+		>({ ...opts, formId });
 	});
 
-	if (prevFormId !== opts?.formId) {
-		const formId = opts?.formId ?? fallbackFormId;
+	if (prevFormId !== formId) {
 		setFormApi(new FormApi({ ...opts, formId }));
 		setPrevFormId(formId);
 	}
@@ -270,7 +270,7 @@ export function useForm<
 		return extendedApi;
 	}, [formApi]);
 
-	useIsomorphicLayoutEffect(formApi.mount, []);
+	useIsomorphicLayoutEffect(formApi.mount, [formApi]);
 
 	/**
 	 * formApi.update should not have any side effects. Think of it like a `useRef`

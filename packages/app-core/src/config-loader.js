@@ -27,8 +27,9 @@ const DEFAULT_CONFIG_FILE = 'octane.config.ts';
 const OCTANE_EXTENSION_PATTERN = /\.tsrx$/;
 const BUILTINS = new Set([...builtinModules, ...builtinModules.map((id) => `node:${id}`)]);
 
-// Validation + defaults have no compiler/esbuild imports and remain safe to
-// include in production server bundles.
+// Validation + defaults have no compiler transform/esbuild imports and remain
+// safe to include in production server bundles. Their renderer config helper
+// is a dependency-free compiler subpath.
 export { resolveOctaneConfig } from './resolve-config.js';
 
 /**

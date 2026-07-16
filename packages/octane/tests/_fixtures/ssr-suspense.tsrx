@@ -265,6 +265,73 @@ export function StyledBoundary(props) @{
 	</div>
 }
 
+function LateStyledContent(props) @{
+	<>
+		<span class="late-content">
+			{props.value as string}
+		</span>
+		<style>
+			.late-content {
+				color: rgb(4, 5, 6);
+			}
+		</style>
+	</>
+}
+
+// The parent suspends BEFORE the styled child is entered, so this stylesheet
+// first appears beside the resolved stream segment rather than in the shell.
+export function LateStyledBoundary(props) @{
+	<div id="late-sbox">
+		@try {
+			const value = use(props.promise);
+			<LateStyledContent value={value} />
+		} @pending {
+			<span class="late-loading">{'loading'}</span>
+		}
+	</div>
+}
+
+function TransientObjectItem(props) @{
+	@try {
+		const value = use(props.promise);
+		<span class="transient-object-ready">
+			{value as string}
+		</span>
+	} @pending {
+		<i class="transient-object-loading">loading</i>
+	}
+}
+
+export function TransientObjectKeyBoundary(props) @{
+	const item = {};
+	<div id="transient-object-key">
+		@for (const value of [item]; key value) {
+			<TransientObjectItem promise={props.promise} />
+		}
+	</div>
+}
+
+function StableKeyReorderItem(props) @{
+	@try {
+		const value = use(props.promise);
+		<span class="stable-key-ready" data-item={props.id}>
+			{props.id + ':' + value}
+		</span>
+	} @pending {
+		<i class="stable-key-loading" data-item={props.id}>
+			{props.id + ':loading'}
+		</i>
+	}
+}
+
+export function StableKeyReorderBoundary(props) @{
+	<div id="stable-key-reorder">
+		@for (const item of props.items; key item) {
+			<StableKeyReorderItem id={item.id} promise={item.promise} />
+		}
+	</div>
+}
+
 // Nested suspense: the outer use() must resolve before the inner @try body (and
 // its own use()) is even reached — exercises the multi-pass retry loop.
 export function Nested(props) @{

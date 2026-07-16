@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@octanejs/testing-library';
 import { userEvent } from '@testing-library/user-event';
+import { useState } from 'octane';
 import { useForm } from '@octanejs/tanstack-form';
 
 const user = userEvent.setup();
@@ -93,6 +94,43 @@ describe('form.FormGroup', () => {
 		await user.type(getByTestId('step1-name'), 'updated');
 
 		await waitFor(() => expect(getByTestId('group-value').textContent).toBe('{"name":"updated"}'));
+	});
+
+	it('uses the current group state throughout a name change render', async () => {
+		const observedValues: string[] = [];
+
+		function Comp() {
+			const [groupName, setGroupName] = useState<'step1' | 'step2'>('step1');
+			const form = useForm({
+				defaultValues: {
+					step1: { label: 'first' },
+					step2: { label: 'second' },
+				},
+			});
+
+			return (
+				<>
+					<button data-testid="change-group" onClick={() => setGroupName('step2')}>
+						change
+					</button>
+					<form.FormGroup name={groupName}>
+						{(group) => {
+							observedValues.push(group.state.value.label);
+							return <span data-testid="group-label">{group.state.value.label}</span>;
+						}}
+					</form.FormGroup>
+				</>
+			);
+		}
+
+		const { getByTestId } = render(<Comp />);
+		expect(getByTestId('group-label')).toHaveTextContent('first');
+
+		observedValues.length = 0;
+		await user.click(getByTestId('change-group'));
+
+		expect(getByTestId('group-label')).toHaveTextContent('second');
+		expect(observedValues).not.toContain('first');
 	});
 
 	it('should call onGroupSubmitInvalid when group-level validation fails', async () => {

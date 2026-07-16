@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as ServerRuntime from 'octane/server';
 import { prerender } from 'octane/static';
+import { resetStreamRuntimeGlobals } from './_server-stream.js';
 
 function evalServer(source: string, filename: string): Record<string, any> {
 	let code = compile(source, filename, { mode: 'server' }).code;
@@ -304,30 +305,35 @@ describe('SSR stream state regressions', () => {
 		).pipe(output.destination);
 
 		const shell = output.chunks[0];
-		const [alphaBoundary, betaBoundary] = boundaryIds(shell);
-		expect(alphaBoundary).toBeTruthy();
-		expect(betaBoundary).toBeTruthy();
-		expect(alphaBoundary).not.toBe(betaBoundary);
 		expect(shell).toContain('data-shell-id=":page-in-0:"');
 
 		beta.resolve('beta-ready');
 		await vi.waitFor(() => {
 			expect(output.chunks.some((chunk) => chunk.includes('beta-ready'))).toBe(true);
 		});
-		const betaChunk = output.chunks.find((chunk) => chunk.includes('beta-ready'))!;
-		expect(betaChunk).toContain('data-oct-s="' + betaBoundary + '"');
-		expect(betaChunk).toContain('data-boundary-id=":page-b' + betaBoundary + '-in-0:"');
 
 		alpha.resolve('alpha-ready');
 		await output.ended;
-		const alphaChunk = output.chunks.find((chunk) => chunk.includes('alpha-ready'))!;
-		expect(alphaChunk).toContain('data-oct-s="' + alphaBoundary + '"');
-		expect(alphaChunk).toContain('data-boundary-id=":page-b' + alphaBoundary + '-in-0:"');
 
 		for (const values of seen.values()) expect(new Set(values).size).toBe(1);
 		const stableIds = ['alpha', 'beta', 'shell'].map((label) => seen.get(label)![0]);
 		expect(new Set(stableIds).size).toBe(3);
 		expect(seen.get('shell')![0]).toBe(':page-in-0:');
+
+		// The transport deliberately carries resolved markup as parsing-safe JSON.
+		// Assert the browser-visible reveal and public useId values after the swap
+		// runtime activates instead of pinning the private carrier representation.
+		const container = activateChunks(output.chunks);
+		expect(container.querySelector('.alpha')!.textContent).toBe('alpha-ready');
+		expect(container.querySelector('.beta')!.textContent).toBe('beta-ready');
+		expect(container.querySelector('.alpha')!.getAttribute('data-boundary-id')).toBe(
+			seen.get('alpha')![0],
+		);
+		expect(container.querySelector('.beta')!.getAttribute('data-boundary-id')).toBe(
+			seen.get('beta')![0],
+		);
+		container.remove();
+		resetStreamRuntimeGlobals();
 	});
 
 	it('retires unresolved boundaries owned only by a removed fallback', async () => {
@@ -346,10 +352,12 @@ describe('SSR stream state regressions', () => {
 
 		outer.resolve('READY');
 		await output.ended;
-		const html = output.chunks.join('');
-		expect(html).toContain('class="outer-ready"');
-		expect(html).not.toContain('$OCTRX(');
+		const container = activateChunks(output.chunks);
+		expect(container.querySelector('.outer-ready')!.textContent).toBe('READY');
+		expect(container.querySelector('.fallback-inner-pending')).toBeNull();
 		expect(onError).not.toHaveBeenCalled();
+		container.remove();
+		resetStreamRuntimeGlobals();
 	});
 
 	it('retires unresolved content descendants omitted by an outer catch segment', async () => {
@@ -365,11 +373,13 @@ describe('SSR stream state regressions', () => {
 
 		outer.reject(new Error('outer failed'));
 		await output.ended;
-		const html = output.chunks.join('');
-		expect(html).toContain('class="outer-catch"');
-		expect(html).toContain('outer failed');
-		expect(html).not.toContain('$OCTRX(');
+		const container = activateChunks(output.chunks);
+		expect(container.querySelector('.outer-catch')!.textContent).toBe('outer failed');
+		expect(container.querySelector('.outer-pending')).toBeNull();
+		expect(container.querySelector('.content-inner-pending')).toBeNull();
 		expect(onError).not.toHaveBeenCalled();
+		container.remove();
+		resetStreamRuntimeGlobals();
 	});
 
 	it('keeps buffered content and pending-arm child caches disjoint', async () => {
@@ -433,9 +443,7 @@ describe('SSR stream state regressions', () => {
 		expect(container.querySelector('[data-label="content"]')!.textContent).toBe('content:INNER');
 		expect(container.querySelector('[data-label="fallback"]')).toBeNull();
 		container.remove();
-		delete (window as any).$OCTS;
-		delete (window as any).$OCTRC;
-		delete (window as any).$OCTRX;
+		resetStreamRuntimeGlobals();
 	});
 
 	it.each([
@@ -482,7 +490,7 @@ describe('SSR stream state regressions', () => {
 		]);
 	});
 
-	it('fails a late ancestor-catch stream promptly instead of spinning 50 passes', async () => {
+	it('keeps a late content error inside its already-flushed Suspense boundary', async () => {
 		const inner = deferred<string>();
 		const output = collector();
 		const onError = vi.fn();
@@ -491,13 +499,17 @@ describe('SSR stream state regressions', () => {
 			{ inner: inner.promise },
 			{ onError, timeoutMs: 100 },
 		).pipe(output.destination);
-		const [innerId] = boundaryIds(output.chunks[0]);
 
-		inner.reject(new Error('inner failed'));
+		const error = new Error('inner failed');
+		inner.reject(error);
 		await output.ended;
 		expect(onError).toHaveBeenCalledTimes(1);
-		expect(String(onError.mock.calls[0][0])).toContain('no longer has resumable work');
-		expect(String(onError.mock.calls[0][0])).not.toContain('50 consecutive');
-		expect(output.chunks.join('')).toContain('$OCTRX(' + JSON.stringify(innerId) + ')');
+		expect(onError).toHaveBeenCalledWith(error);
+
+		const container = activateChunks(output.chunks);
+		expect(container.querySelector('.late-pending')?.textContent).toBe('waiting');
+		expect(container.querySelector('.late-catch')).toBeNull();
+		container.remove();
+		resetStreamRuntimeGlobals();
 	});
 });

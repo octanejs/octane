@@ -643,6 +643,7 @@ describe('useField', () => {
 		expect(mockFn).toHaveBeenCalledTimes(0);
 		await waitFor(() => getByText(error));
 		expect(getByText(error)).toBeInTheDocument();
+		expect(mockFn).toHaveBeenCalledTimes(1);
 	});
 
 	it('should handle strict mode properly with conditional fields', async () => {

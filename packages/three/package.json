@@ -1,0 +1,77 @@
+{
+  "name": "@octanejs/three",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "React Three Fiber-compatible web bindings for Octane's universal renderer.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/three"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./core": "./src/core/index.ts",
+    "./renderer": "./src/renderer.ts",
+    "./config": "./src/config.ts",
+    "./testing": "./src/testing.ts",
+    "./intrinsics": "./src/intrinsics.ts",
+    "./intrinsics/jsx-runtime": "./src/intrinsics.ts"
+  },
+  "scripts": {
+    "test": "pnpm upstream:check && vitest run --root ../.. --project three",
+    "upstream:check": "node scripts/check-upstream-crosswalk.mjs"
+  },
+  "dependencies": {
+    "@types/three": "catalog:default",
+    "zustand": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*",
+    "three": ">=0.172.0 <0.173.0"
+  },
+  "devDependencies": {
+    "@octanejs/rsbuild-plugin": "workspace:*",
+    "@octanejs/rspack-plugin": "workspace:*",
+    "@octanejs/vite-plugin": "workspace:*",
+    "@react-three/fiber": "catalog:default",
+    "@rsbuild/core": "catalog:default",
+    "@rspack/core": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "three": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

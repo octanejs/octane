@@ -11,12 +11,13 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**0 active pin(s) across 25 binding package(s).**
+**0 active pin(s) across 29 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
 | `@octanejs/apollo-client` | 0 |
 | `@octanejs/base-ui` | 0 |
+| `@octanejs/dexie` | 0 |
 | `@octanejs/dnd-kit` | 0 |
 | `@octanejs/floating-ui` | 0 |
 | `@octanejs/hook-form` | 0 |
@@ -33,10 +34,13 @@ surface and evidence.
 | `@octanejs/remix-router` | 0 |
 | `@octanejs/sonner` | 0 |
 | `@octanejs/stylex` | 0 |
+| `@octanejs/tanstack-form` | 0 |
 | `@octanejs/tanstack-query` | 0 |
 | `@octanejs/tanstack-router` | 0 |
 | `@octanejs/tanstack-store` | 0 |
 | `@octanejs/tanstack-table` | 0 |
 | `@octanejs/tanstack-virtual` | 0 |
 | `@octanejs/testing-library` | 0 |
+| `@octanejs/three` | 0 |
+| `@octanejs/visx` | 0 |
 | `@octanejs/zustand` | 0 |

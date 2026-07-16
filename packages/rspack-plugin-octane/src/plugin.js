@@ -1,9 +1,18 @@
 import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createOctaneCompiler } from 'octane/compiler/bundler';
-import { inferRspackEnvironment, normalizePluginOptions } from './shared.js';
+import {
+	CLIENT_REFERENCE_MANIFEST_FILENAME,
+	createClientReferenceManifest,
+	createOctaneCompiler,
+} from 'octane/compiler/bundler';
+import {
+	getOctaneRspackBuildInfo,
+	inferRspackEnvironment,
+	normalizePluginOptions,
+} from './shared.js';
 
 const PLUGIN_NAME = 'OctaneRspackPlugin';
 const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
@@ -11,6 +20,14 @@ const PLUGIN_VERSION = createRequire(import.meta.url)('../package.json').version
 const loaderPath = fileURLToPath(new URL('./loader.js', import.meta.url));
 const OCTANE_RULE = /\.(?:tsrx|tsx|ts|js)$/i;
 const TYPESCRIPT_RULE = /\.(?:tsrx|tsx|ts)$/i;
+
+function realRoot(path) {
+	try {
+		return realpathSync(path);
+	} catch {
+		return path;
+	}
+}
 
 function addUniqueExtensions(resolveOptions) {
 	const extensions = resolveOptions.extensions ?? ['.js', '.json', '.wasm'];
@@ -43,9 +60,95 @@ function addRuntimeAlias(resolveOptions, request, root) {
 	};
 }
 
+function projectRendererModule(request, root) {
+	// Renderer config uses project-root IDs such as `/src/object-renderer.ts`.
+	// They are never host-filesystem absolute paths, even if the same path happens
+	// to exist on a developer machine or inside a container.
+	return resolve(root, request.replace(/^[/\\]+/, ''));
+}
+
+function addProjectRendererAliases(resolveOptions, renderers, root) {
+	if (renderers === undefined) return;
+	const aliases = resolveOptions.alias === false ? {} : (resolveOptions.alias ?? {});
+	const additions = {};
+	for (const renderer of Object.values(renderers.registry)) {
+		if (!renderer.module.startsWith('/')) continue;
+		additions[`${renderer.module}$`] = projectRendererModule(renderer.module, root);
+	}
+	resolveOptions.alias = { ...aliases, ...additions };
+}
+
 function addDependencies(collection, values) {
 	if (!collection?.add) return;
 	for (const value of values ?? []) collection.add(value);
+}
+
+function iterable(value) {
+	return value && typeof value === 'object' && Symbol.iterator in value ? value : [];
+}
+
+function isJavaScriptAsset(filename) {
+	return (
+		/\.(?:c|m)?js(?:\?|$)/.test(filename) && !/\.hot-update\.(?:c|m)?js(?:\?|$)/.test(filename)
+	);
+}
+
+function moduleChunks(compilation, module, inherited) {
+	const chunks = new Set(inherited);
+	for (const chunk of iterable(compilation.chunkGraph.getModuleChunksIterable(module)))
+		chunks.add(chunk);
+	return chunks;
+}
+
+function visitClientReferenceModules(
+	compilation,
+	module,
+	inheritedChunks,
+	visit,
+	seen = new Set(),
+) {
+	if (!module || seen.has(module)) return;
+	seen.add(module);
+	const chunks = moduleChunks(compilation, module, inheritedChunks);
+	visit(module, chunks);
+	for (const child of iterable(module.modules)) {
+		visitClientReferenceModules(compilation, child, chunks, visit, seen);
+	}
+	if (module.rootModule) {
+		visitClientReferenceModules(compilation, module.rootModule, chunks, visit, seen);
+	}
+}
+
+/** Emit the client-only module identity mapped to its concrete browser chunks. */
+function emitClientReferenceManifest(compiler, compilation) {
+	const entries = [];
+	for (const topLevelModule of iterable(compilation.modules)) {
+		visitClientReferenceModules(
+			compilation,
+			topLevelModule,
+			[],
+			(module, chunks) => {
+				const reference = getOctaneRspackBuildInfo(module)?.clientReference;
+				if (reference === undefined) return;
+				const files = new Set();
+				for (const chunk of chunks) {
+					for (const file of iterable(chunk?.files)) {
+						const filename = String(file);
+						if (isJavaScriptAsset(filename)) files.add(filename);
+					}
+				}
+				entries.push({ reference, chunks: files });
+			},
+			new Set(),
+		);
+	}
+	const manifest = createClientReferenceManifest(entries);
+	if (Object.keys(manifest.references).length === 0) return;
+	const source = JSON.stringify(manifest, null, 2) + '\n';
+	compilation.emitAsset(
+		CLIENT_REFERENCE_MANIFEST_FILENAME,
+		new compiler.webpack.sources.RawSource(source),
+	);
 }
 
 function defineMatchesBoolean(value, expected) {
@@ -110,11 +213,13 @@ export class OctaneRspackPlugin {
 	apply(compiler) {
 		const configuredRoot = this.options.root;
 		const compilerRoot = compiler.options.context ?? process.cwd();
-		const root = configuredRoot
-			? isAbsolute(configuredRoot)
-				? configuredRoot
-				: resolve(compilerRoot, configuredRoot)
-			: compilerRoot;
+		const root = realRoot(
+			configuredRoot
+				? isAbsolute(configuredRoot)
+					? configuredRoot
+					: resolve(compilerRoot, configuredRoot)
+				: compilerRoot,
+		);
 		const environment = this.options.environment ?? inferRspackEnvironment(compiler.options.target);
 		const profile = environment === 'client' && this.options.profile === true;
 		const hmr =
@@ -132,6 +237,7 @@ export class OctaneRspackPlugin {
 			profile,
 			parallelUse: this.options.parallelUse !== false,
 			exclude: this.options.exclude ?? [],
+			renderers: this.options.renderers?.signature,
 			transpile: this.options.transpile !== false,
 		});
 		installProfilingDefine(compiler, profile);
@@ -142,12 +248,14 @@ export class OctaneRspackPlugin {
 			...(this.options.parallelUse === undefined
 				? null
 				: { parallelUse: this.options.parallelUse }),
+			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
 		});
 		const runtimeRequest = neutralCompiler.resolveRuntimeRequest('octane', environment);
 
 		compiler.options.resolve ??= {};
 		addUniqueExtensions(compiler.options.resolve);
 		addRuntimeAlias(compiler.options.resolve, runtimeRequest, root);
+		addProjectRendererAliases(compiler.options.resolve, this.options.renderers, root);
 
 		compiler.options.module ??= {};
 		compiler.options.module.rules ??= [];
@@ -161,6 +269,7 @@ export class OctaneRspackPlugin {
 				? null
 				: { parallelUse: this.options.parallelUse }),
 			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),
+			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
 		};
 		compiler.options.module.rules.push({
 			test: OCTANE_RULE,
@@ -196,6 +305,15 @@ export class OctaneRspackPlugin {
 			const current = discover();
 			addDependencies(compilation.fileDependencies, current.dependencies);
 			addDependencies(compilation.missingDependencies, current.missingDependencies);
+			if (environment === 'client') {
+				compilation.hooks.processAssets.tap(
+					{
+						name: PLUGIN_NAME,
+						stage: compiler.webpack.Compilation.PROCESS_ASSETS_STAGE_REPORT,
+					},
+					() => emitClientReferenceManifest(compiler, compilation),
+				);
+			}
 		});
 	}
 }

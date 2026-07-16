@@ -14,7 +14,7 @@
 // with the exact setup command when it is missing.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 
@@ -159,6 +159,52 @@ async function loadRoute(base: string, path: string) {
 	return { page, errors, main };
 }
 
+interface RouteGeometry {
+	bodyHeight: number;
+	footerTop: number;
+	explorerHeight: number | null;
+	calloutHeight: number | null;
+	calloutFollowingTop: number | null;
+	searchWidth: number;
+}
+
+async function measureRouteGeometry(
+	base: string,
+	path: string,
+	javaScriptEnabled: boolean,
+): Promise<RouteGeometry> {
+	const context = await browser.newContext({
+		javaScriptEnabled,
+		viewport: { width: 1440, height: 900 },
+	});
+	const page = await context.newPage();
+	try {
+		await page.goto(base + path, { waitUntil: 'load' });
+		await page.evaluate(async (hydrated) => {
+			await document.fonts.ready;
+			if (!hydrated) return;
+			await new Promise<void>((resolve) =>
+				requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+			);
+		}, javaScriptEnabled);
+		return await page.evaluate(() => {
+			const rect = (selector: string) => document.querySelector(selector)?.getBoundingClientRect();
+			const callout = document.querySelector('.doc-callout');
+			const following = callout?.nextElementSibling?.getBoundingClientRect();
+			return {
+				bodyHeight: document.body.getBoundingClientRect().height,
+				footerTop: rect('footer')?.top ?? -1,
+				explorerHeight: rect('section.explorer .bx')?.height ?? null,
+				calloutHeight: callout?.getBoundingClientRect().height ?? null,
+				calloutFollowingTop: following?.top ?? null,
+				searchWidth: rect('.search-trigger')?.width ?? -1,
+			};
+		});
+	} finally {
+		await context.close();
+	}
+}
+
 async function waitForLocatorText(
 	locator: import('playwright').Locator,
 	expected: string,
@@ -224,6 +270,67 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			}
 		},
 	);
+
+	it('the homepage benchmark explorer preserves its complete SSR view through hydration', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/');
+		try {
+			const explorer = page.locator('section.explorer .bx');
+			await explorer.waitFor();
+
+			// The bar chart and heatmap are already present in SSR output. Keeping them
+			// through hydration prevents the large footer jump the fallback swap caused.
+			expect(await page.locator('.bx-plot').count()).toBe(1);
+			expect(await page.locator('.bx-heat').count()).toBe(1);
+			expect(await page.locator('.bx-fallback-table').count()).toBe(0);
+
+			const real = errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
+	it('the benchmark Visx charts preserve their server geometry through hydration', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
+		try {
+			const charts = page.locator('svg.bench-chart');
+			expect(await charts.count()).toBe(18);
+			const firstChart = charts.first();
+			const serverChart = await firstChart.elementHandle();
+			expect(serverChart).toBeTruthy();
+			const geometry = await firstChart.evaluate((svg) => ({
+				width: svg.getAttribute('width'),
+				height: svg.getAttribute('height'),
+				viewBox: svg.getAttribute('viewBox'),
+				bars: svg.querySelectorAll('.visx-bar').length,
+			}));
+
+			await page.waitForTimeout(750);
+
+			expect(await page.locator('.recharts-wrapper').count()).toBe(0);
+			expect(await page.locator('.bench-plot-shell').count()).toBe(0);
+			expect(await charts.count()).toBe(18);
+			expect(
+				await page.evaluate(
+					(original) => document.querySelector('svg.bench-chart') === original,
+					serverChart,
+				),
+			).toBe(true);
+			expect(
+				await firstChart.evaluate((svg) => ({
+					width: svg.getAttribute('width'),
+					height: svg.getAttribute('height'),
+					viewBox: svg.getAttribute('viewBox'),
+					bars: svg.querySelectorAll('.visx-bar').length,
+				})),
+			).toEqual(geometry);
+			expect(geometry.bars).toBeGreaterThan(0);
+			const real = errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
 
 	it('the Core APIs live examples handle events after hydration', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis');
@@ -384,6 +491,62 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			await page.close();
 		}
 	}, 30_000);
+
+	// HOT-server regression: editing app modules (HMR update + ssr page reload)
+	// stamps `?t=` cache-busting timestamps onto the modules' importer chains.
+	// The generated hydrate entry must keep loading the SAME browser module
+	// instances as the page's own import chain afterwards — a bare
+	// (analysis-hidden) dynamic import fetched timestamp-less URLs, splitting
+	// the app-router singleton in two (preHydrate committed matches on one
+	// instance, the page rendered the empty other) and breaking hydration on
+	// EVERY reload until the dev server was restarted. Touching router.ts — a
+	// plain .ts module with no self-accepting HMR handler — deterministically
+	// propagates the invalidation up the client chain; the route module edit is
+	// the shape from the original report. Deliberately LAST in this describe:
+	// the invalidation stamps persist in the dev server for the rest of its life.
+	it('hydrates cleanly on reload after HMR edits (hot server)', async () => {
+		const files = [
+			join(WEBSITE, 'src/pages/benchmarks/Benchmarks.tsrx'),
+			join(WEBSITE, 'src/app/router.ts'),
+		];
+		const originals = files.map((f) => readFileSync(f, 'utf8'));
+		const restore = () => files.forEach((f, i) => writeFileSync(f, originals[i]));
+		try {
+			// Prime the dev server's client + SSR module graphs and keep the page —
+			// with its live HMR websocket — OPEN while editing (the editing-session
+			// shape: the route is on screen while its files are edited). A plain
+			// navigation: this first visit may race Vite's dependency-optimization
+			// reload, which is irrelevant to the assertion below.
+			const primer = await browser.newPage();
+			await primer.goto(`http://localhost:${DEV_PORT}/benchmarks`, { waitUntil: 'networkidle' });
+
+			// Touch each file — every write triggers the paired `(client) hmr
+			// update` / full-reload + `(ssr) page reload` invalidations.
+			for (let i = 0; i < files.length; i++) {
+				writeFileSync(files[i], originals[i] + `\n// e2e-hmr-touch ${i}\n`);
+				await new Promise((r) => setTimeout(r, 700));
+			}
+			restore();
+			await new Promise((r) => setTimeout(r, 700));
+			await primer.close();
+
+			// A FULL reload after the edits must hydrate the route cleanly. Let the
+			// module fetches + preHydrate router load finish before judging —
+			// hydration (and its mismatch warnings) lands well after `load` here.
+			const { page, errors, main } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
+			try {
+				await page.waitForLoadState('networkidle');
+				await page.waitForTimeout(500);
+				const real = errors.filter((e) => !e.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+				expect(main).toContain('Benchmark');
+			} finally {
+				await page.close();
+			}
+		} finally {
+			restore();
+		}
+	}, 45_000);
 });
 
 describe.sequential('website production build → hydration (octane-preview)', () => {
@@ -413,6 +576,23 @@ describe.sequential('website production build → hydration (octane-preview)', (
 			expect(main.length).toBeGreaterThan(0);
 		} finally {
 			await page.close();
+		}
+	});
+
+	it('keeps no-JS SSR and hydrated layout geometry identical', { timeout: 30_000 }, async () => {
+		const base = `http://localhost:${PREVIEW_PORT}`;
+		for (const route of ['/', '/docs', '/docs/core-apis']) {
+			const noJs = await measureRouteGeometry(base, route, false);
+			const hydrated = await measureRouteGeometry(base, route, true);
+			for (const key of Object.keys(noJs) as (keyof RouteGeometry)[]) {
+				const serverValue = noJs[key];
+				const clientValue = hydrated[key];
+				if (serverValue === null || clientValue === null) {
+					expect(clientValue, `${route} ${key}`).toBe(serverValue);
+				} else {
+					expect(Math.abs(clientValue - serverValue), `${route} ${key}`).toBeLessThan(1);
+				}
+			}
 		}
 	});
 

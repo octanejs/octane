@@ -1,0 +1,3011 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "repository": "https://github.com/pmndrs/react-three-fiber",
+    "version": "9.6.1",
+    "commit": "2a528745e9aa7c9e6cca41e404b59d45cf0d0cc7",
+    "threeOracleVersion": "0.172.0",
+    "publicEntry": "packages/fiber/src/index.tsx",
+    "fiberTestRoot": "packages/fiber/tests",
+    "testRendererTestRoot": "packages/test-renderer/src/__tests__",
+    "countingPolicy": "One entry per executable it/test declaration; todo declarations are excluded, and a parameterized declaration retains its source template as one plan-counted case."
+  },
+  "allowedClassifications": [
+    "behavioral",
+    "differential",
+    "browser-only",
+    "type-package",
+    "not-applicable"
+  ],
+  "expectedTotals": {
+    "exports": 90,
+    "tests": 157,
+    "fiberTests": 129,
+    "testRendererTests": 28,
+    "entries": 247,
+    "unclassified": 0,
+    "testsBySource": {
+      "packages/fiber/tests/canvas.native.test.tsx": 4,
+      "packages/fiber/tests/canvas.test.tsx": 5,
+      "packages/fiber/tests/events.test.tsx": 15,
+      "packages/fiber/tests/hooks.test.tsx": 9,
+      "packages/fiber/tests/index.test.tsx": 18,
+      "packages/fiber/tests/polyfills.test.ts": 5,
+      "packages/fiber/tests/reconciler.test.ts": 1,
+      "packages/fiber/tests/renderer.test.tsx": 26,
+      "packages/fiber/tests/utils.test.ts": 46,
+      "packages/test-renderer/src/__tests__/RTTR.core.test.tsx": 18,
+      "packages/test-renderer/src/__tests__/RTTR.events.test.tsx": 2,
+      "packages/test-renderer/src/__tests__/RTTR.hooks.test.tsx": 3,
+      "packages/test-renderer/src/__tests__/RTTR.methods.test.tsx": 5
+    }
+  },
+  "exports": [
+    {
+      "id": "export:_roots",
+      "name": "_roots",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/renderer.tsx",
+        "line": 41
+      },
+      "classification": "not-applicable",
+      "reason": "The underscore-prefixed React reconciler root registry is internal state and is replaced by Octane root ownership.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "export:act",
+      "name": "act",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/utils.tsx",
+        "line": 36
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"act\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/public-api.test.ts"
+    },
+    {
+      "id": "export:Act",
+      "name": "Act",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/utils.tsx",
+        "line": 28
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Act\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:addAfterEffect",
+      "name": "addAfterEffect",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/loop.ts",
+        "line": 29
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"addAfterEffect\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/loop.test.ts"
+    },
+    {
+      "id": "export:addEffect",
+      "name": "addEffect",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/loop.ts",
+        "line": 23
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"addEffect\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/loop.test.ts"
+    },
+    {
+      "id": "export:addTail",
+      "name": "addTail",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/loop.ts",
+        "line": 35
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"addTail\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/loop.test.ts"
+    },
+    {
+      "id": "export:advance",
+      "name": "advance",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/loop.ts",
+        "line": 163
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"advance\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/loop.test.ts"
+    },
+    {
+      "id": "export:applyProps",
+      "name": "applyProps",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/utils.tsx",
+        "line": 401
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"applyProps\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "export:Args",
+      "name": "Args",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/reconciler.tsx",
+        "line": 88
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Args\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:AttachFnType",
+      "name": "AttachFnType",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/reconciler.tsx",
+        "line": 76
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"AttachFnType\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:AttachType",
+      "name": "AttachType",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/reconciler.tsx",
+        "line": 77
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"AttachType\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:buildGraph",
+      "name": "buildGraph",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/utils.tsx",
+        "line": 192
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"buildGraph\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "export:Camera",
+      "name": "Camera",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/utils.tsx",
+        "line": 38
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Camera\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:CameraProps",
+      "name": "CameraProps",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/renderer.tsx",
+        "line": 55
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"CameraProps\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Canvas",
+      "name": "Canvas",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/web/Canvas.tsx",
+        "line": 173
+      },
+      "classification": "browser-only",
+      "reason": "Public export \"Canvas\" depends on DOM pointer or Canvas integration and requires the real-browser lane.",
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
+    },
+    {
+      "id": "export:CanvasProps",
+      "name": "CanvasProps",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/web/Canvas.tsx",
+        "line": 18
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"CanvasProps\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Catalogue",
+      "name": "Catalogue",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/reconciler.tsx",
+        "line": 81
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Catalogue\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Color",
+      "name": "Color",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 31
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Color\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:ComputeFunction",
+      "name": "ComputeFunction",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/events.ts",
+        "line": 69
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ComputeFunction\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:ConstructorRepresentation",
+      "name": "ConstructorRepresentation",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/reconciler.tsx",
+        "line": 79
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ConstructorRepresentation\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:context",
+      "name": "context",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 144
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"context\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/public-api.test.ts"
+    },
+    {
+      "id": "export:createEvents",
+      "name": "createEvents",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/events.ts",
+        "line": 173
+      },
+      "classification": "behavioral",
+      "reason": "The renderer-neutral raycast and propagation dispatcher is covered without WebGL through public root events.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "export:createPortal",
+      "name": "createPortal",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/renderer.tsx",
+        "line": 493
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"createPortal\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/portal.test.ts"
+    },
+    {
+      "id": "export:createRoot",
+      "name": "createRoot",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/renderer.tsx",
+        "line": 142
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"createRoot\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/public-api.test.ts"
+    },
+    {
+      "id": "export:Disposable",
+      "name": "Disposable",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/utils.tsx",
+        "line": 204
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Disposable\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:dispose",
+      "name": "dispose",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/utils.tsx",
+        "line": 210
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"dispose\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "export:DomEvent",
+      "name": "DomEvent",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/events.ts",
+        "line": 36
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"DomEvent\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Dpr",
+      "name": "Dpr",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 18
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Dpr\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:ElementProps",
+      "name": "ElementProps",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 49
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ElementProps\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Euler",
+      "name": "Euler",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 34
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Euler\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:EventHandlers",
+      "name": "EventHandlers",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/events.ts",
+        "line": 51
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"EventHandlers\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:EventManager",
+      "name": "EventManager",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/events.ts",
+        "line": 71
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"EventManager\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:EventProps",
+      "name": "EventProps",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 41
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"EventProps\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:events",
+      "name": "events",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/web/events.ts",
+        "line": 18
+      },
+      "classification": "behavioral",
+      "reason": "The public DOM manager is installed on a root and exercised through its native handler table.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "export:Events",
+      "name": "Events",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/events.ts",
+        "line": 38
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Events\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:extend",
+      "name": "extend",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/reconciler.tsx",
+        "line": 148
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"extend\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/public-api.test.ts"
+    },
+    {
+      "id": "export:Extensions",
+      "name": "Extensions",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/hooks.tsx",
+        "line": 79
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Extensions\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/loader-api.test.ts"
+    },
+    {
+      "id": "export:FilterFunction",
+      "name": "FilterFunction",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/events.ts",
+        "line": 68
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"FilterFunction\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:flushGlobalEffects",
+      "name": "flushGlobalEffects",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/loop.ts",
+        "line": 46
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"flushGlobalEffects\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/loop.test.ts"
+    },
+    {
+      "id": "export:flushSync",
+      "name": "flushSync",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/renderer.tsx",
+        "line": 580
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"flushSync\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/public-api.test.ts"
+    },
+    {
+      "id": "export:Frameloop",
+      "name": "Frameloop",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 25
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Frameloop\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:getRootState",
+      "name": "getRootState",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/utils.tsx",
+        "line": 134
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"getRootState\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "export:GlobalEffectType",
+      "name": "GlobalEffectType",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/loop.ts",
+        "line": 44
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"GlobalEffectType\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:GlobalRenderCallback",
+      "name": "GlobalRenderCallback",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/loop.ts",
+        "line": 4
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"GlobalRenderCallback\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:GLProps",
+      "name": "GLProps",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/renderer.tsx",
+        "line": 49
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"GLProps\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:InjectState",
+      "name": "InjectState",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/renderer.tsx",
+        "line": 482
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"InjectState\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Instance",
+      "name": "Instance",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/reconciler.tsx",
+        "line": 107
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Instance\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:InstanceProps",
+      "name": "InstanceProps",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/reconciler.tsx",
+        "line": 100
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"InstanceProps\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Intersection",
+      "name": "Intersection",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/events.ts",
+        "line": 6
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Intersection\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:invalidate",
+      "name": "invalidate",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/loop.ts",
+        "line": 134
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"invalidate\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/loop.test.ts"
+    },
+    {
+      "id": "export:Layers",
+      "name": "Layers",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 32
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Layers\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:LoaderResult",
+      "name": "LoaderResult",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/hooks.tsx",
+        "line": 71
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"LoaderResult\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/loader-api.test.ts"
+    },
+    {
+      "id": "export:MathProps",
+      "name": "MathProps",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 24
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"MathProps\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:MathRepresentation",
+      "name": "MathRepresentation",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 10
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"MathRepresentation\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:MathType",
+      "name": "MathType",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 18
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"MathType\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:MathTypes",
+      "name": "MathTypes",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 16
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"MathTypes\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Matrix3",
+      "name": "Matrix3",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 35
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Matrix3\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Matrix4",
+      "name": "Matrix4",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 36
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Matrix4\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:ObjectMap",
+      "name": "ObjectMap",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/utils.tsx",
+        "line": 118
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ObjectMap\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Performance",
+      "name": "Performance",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 41
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Performance\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Quaternion",
+      "name": "Quaternion",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 33
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Quaternion\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:RaycastableRepresentation",
+      "name": "RaycastableRepresentation",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 38
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"RaycastableRepresentation\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:ReactProps",
+      "name": "ReactProps",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 43
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ReactProps\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:ReactThreeFiber",
+      "name": "ReactThreeFiber",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 1
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ReactThreeFiber\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:reconciler",
+      "name": "reconciler",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/reconciler.tsx",
+        "line": 461
+      },
+      "classification": "not-applicable",
+      "reason": "The exported React reconciler instance is an implementation escape hatch replaced by Octane universal roots.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "export:ReconcilerRoot",
+      "name": "ReconcilerRoot",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/renderer.tsx",
+        "line": 115
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ReconcilerRoot\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:RenderCallback",
+      "name": "RenderCallback",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 39
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"RenderCallback\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Renderer",
+      "name": "Renderer",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 54
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Renderer\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:RenderProps",
+      "name": "RenderProps",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/renderer.tsx",
+        "line": 67
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"RenderProps\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:RootState",
+      "name": "RootState",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 78
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"RootState\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:RootStore",
+      "name": "RootStore",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 142
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"RootStore\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Size",
+      "name": "Size",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 19
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Size\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Subscription",
+      "name": "Subscription",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 12
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Subscription\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:ThreeElement",
+      "name": "ThreeElement",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 53
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ThreeElement\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:ThreeElements",
+      "name": "ThreeElements",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 64
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ThreeElements\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:ThreeEvent",
+      "name": "ThreeEvent",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/events.ts",
+        "line": 35
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ThreeEvent\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:ThreeToJSXElements",
+      "name": "ThreeToJSXElements",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 57
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"ThreeToJSXElements\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:unmountComponentAtNode",
+      "name": "unmountComponentAtNode",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/renderer.tsx",
+        "line": 453
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"unmountComponentAtNode\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/public-api.test.ts"
+    },
+    {
+      "id": "export:useFrame",
+      "name": "useFrame",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/hooks.tsx",
+        "line": 46
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"useFrame\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+    },
+    {
+      "id": "export:useGraph",
+      "name": "useGraph",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/hooks.tsx",
+        "line": 60
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"useGraph\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+    },
+    {
+      "id": "export:useInstanceHandle",
+      "name": "useInstanceHandle",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/hooks.tsx",
+        "line": 14
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"useInstanceHandle\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+    },
+    {
+      "id": "export:useLoader",
+      "name": "useLoader",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/hooks.tsx",
+        "line": 137
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"useLoader\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
+    },
+    {
+      "id": "export:useStore",
+      "name": "useStore",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/hooks.tsx",
+        "line": 24
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"useStore\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+    },
+    {
+      "id": "export:useThree",
+      "name": "useThree",
+      "kind": "value",
+      "source": {
+        "path": "packages/fiber/src/core/hooks.tsx",
+        "line": 34
+      },
+      "classification": "behavioral",
+      "reason": "Public runtime export \"useThree\" has an observable Octane equivalent that requires direct behavioral coverage.",
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+    },
+    {
+      "id": "export:Vector2",
+      "name": "Vector2",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 28
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Vector2\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Vector3",
+      "name": "Vector3",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 29
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Vector3\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Vector4",
+      "name": "Vector4",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 30
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Vector4\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:VectorRepresentation",
+      "name": "VectorRepresentation",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/three-types.ts",
+        "line": 13
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"VectorRepresentation\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:Viewport",
+      "name": "Viewport",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 26
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"Viewport\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "export:XRManager",
+      "name": "XRManager",
+      "kind": "type",
+      "source": {
+        "path": "packages/fiber/src/core/store.ts",
+        "line": 73
+      },
+      "classification": "type-package",
+      "reason": "Pinned public export \"XRManager\" belongs to the package and compile-time compatibility matrix.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    }
+  ],
+  "tests": [
+    {
+      "id": "test:fiber:canvas-native:8",
+      "suite": "fiber",
+      "title": "native Canvas > should correctly mount",
+      "source": {
+        "path": "packages/fiber/tests/canvas.native.test.tsx",
+        "line": 8
+      },
+      "classification": "not-applicable",
+      "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:canvas-native:20",
+      "suite": "fiber",
+      "title": "native Canvas > should forward ref",
+      "source": {
+        "path": "packages/fiber/tests/canvas.native.test.tsx",
+        "line": 20
+      },
+      "classification": "not-applicable",
+      "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:canvas-native:34",
+      "suite": "fiber",
+      "title": "native Canvas > should forward context",
+      "source": {
+        "path": "packages/fiber/tests/canvas.native.test.tsx",
+        "line": 34
+      },
+      "classification": "not-applicable",
+      "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:canvas-native:56",
+      "suite": "fiber",
+      "title": "native Canvas > should correctly unmount",
+      "source": {
+        "path": "packages/fiber/tests/canvas.native.test.tsx",
+        "line": 56
+      },
+      "classification": "not-applicable",
+      "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:canvas:6",
+      "suite": "fiber",
+      "title": "web Canvas > should correctly mount",
+      "source": {
+        "path": "packages/fiber/tests/canvas.test.tsx",
+        "line": 6
+      },
+      "classification": "browser-only",
+      "reason": "The Canvas contract depends on a DOM canvas boundary and must be verified in the browser and SSR/hydration lanes.",
+      "evidenceTarget": "packages/three/tests/browser/canvas.test.ts"
+    },
+    {
+      "id": "test:fiber:canvas:18",
+      "suite": "fiber",
+      "title": "web Canvas > should forward ref",
+      "source": {
+        "path": "packages/fiber/tests/canvas.test.tsx",
+        "line": 18
+      },
+      "classification": "browser-only",
+      "reason": "The Canvas contract depends on a DOM canvas boundary and must be verified in the browser and SSR/hydration lanes.",
+      "evidenceTarget": "packages/three/tests/browser/canvas.test.ts"
+    },
+    {
+      "id": "test:fiber:canvas:32",
+      "suite": "fiber",
+      "title": "web Canvas > should forward context",
+      "source": {
+        "path": "packages/fiber/tests/canvas.test.tsx",
+        "line": 32
+      },
+      "classification": "browser-only",
+      "reason": "The Canvas contract depends on a DOM canvas boundary and must be verified in the browser and SSR/hydration lanes.",
+      "evidenceTarget": "packages/three/tests/browser/canvas.test.ts"
+    },
+    {
+      "id": "test:fiber:canvas:54",
+      "suite": "fiber",
+      "title": "web Canvas > should correctly unmount",
+      "source": {
+        "path": "packages/fiber/tests/canvas.test.tsx",
+        "line": 54
+      },
+      "classification": "browser-only",
+      "reason": "The Canvas contract depends on a DOM canvas boundary and must be verified in the browser and SSR/hydration lanes.",
+      "evidenceTarget": "packages/three/tests/browser/canvas.test.ts"
+    },
+    {
+      "id": "test:fiber:canvas:66",
+      "suite": "fiber",
+      "title": "web Canvas > plays nice with react SSR",
+      "source": {
+        "path": "packages/fiber/tests/canvas.test.tsx",
+        "line": 66
+      },
+      "classification": "browser-only",
+      "reason": "The Canvas contract depends on a DOM canvas boundary and must be verified in the browser and SSR/hydration lanes.",
+      "evidenceTarget": "packages/three/tests/browser/canvas.test.ts"
+    },
+    {
+      "id": "test:fiber:events:11",
+      "suite": "fiber",
+      "title": "events > can handle onPointerDown",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 11
+      },
+      "classification": "browser-only",
+      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
+    },
+    {
+      "id": "test:fiber:events:34",
+      "suite": "fiber",
+      "title": "events > can handle onPointerMissed",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 34
+      },
+      "classification": "behavioral",
+      "reason": "Miss delivery is deterministic and covered through the public WebGL-free root event path.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "test:fiber:events:59",
+      "suite": "fiber",
+      "title": "events > should not fire onPointerMissed when same element is clicked",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 59
+      },
+      "classification": "behavioral",
+      "reason": "Click target gating and non-miss behavior are deterministic public root contracts.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "test:fiber:events:94",
+      "suite": "fiber",
+      "title": "events > should not fire onPointerMissed on parent when child element is clicked",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 94
+      },
+      "classification": "behavioral",
+      "reason": "Physical Three ancestry and parent miss suppression are deterministic root behavior.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "test:fiber:events:131",
+      "suite": "fiber",
+      "title": "events > can handle onPointerMissed on Canvas",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 131
+      },
+      "classification": "browser-only",
+      "reason": "The public Canvas miss callback is covered from a real DOM source through the browser fixture.",
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
+    },
+    {
+      "id": "test:fiber:events:153",
+      "suite": "fiber",
+      "title": "events > can handle onPointerMove",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 153
+      },
+      "classification": "behavioral",
+      "reason": "Move, enter, over, out, and leave ordering is deterministic raycast behavior.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "test:fiber:events:193",
+      "suite": "fiber",
+      "title": "events > should handle stopPropagation",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 193
+      },
+      "classification": "behavioral",
+      "reason": "Raycast propagation and hover occlusion are deterministic public event behavior.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "test:fiber:events:231",
+      "suite": "fiber",
+      "title": "events > should handle stopPropagation on click events",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 231
+      },
+      "classification": "behavioral",
+      "reason": "Click propagation is covered through the same public ordered-hit dispatcher.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "test:fiber:events:273",
+      "suite": "fiber",
+      "title": "events > swapping instances > re-registers events when a primitive object prop is swapped",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 273
+      },
+      "classification": "behavioral",
+      "reason": "Primitive reconstruction event transfer is observable without WebGL.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "test:fiber:events:316",
+      "suite": "fiber",
+      "title": "events > swapping instances > re-registers events when an args change reconstructs the instance",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 316
+      },
+      "classification": "behavioral",
+      "reason": "Args reconstruction event transfer is deterministic host and root behavior.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "test:fiber:events:360",
+      "suite": "fiber",
+      "title": "events > swapping instances > keeps previous event state when an instance is swapped",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 360
+      },
+      "classification": "behavioral",
+      "reason": "Hover and capture state transfer across reconstruction is deterministic root behavior.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "test:fiber:events:448",
+      "suite": "fiber",
+      "title": "events > web pointer capture > should release when the capture target is unmounted",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 448
+      },
+      "classification": "browser-only",
+      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
+    },
+    {
+      "id": "test:fiber:events:487",
+      "suite": "fiber",
+      "title": "events > web pointer capture > should not leave when captured",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 487
+      },
+      "classification": "browser-only",
+      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
+    },
+    {
+      "id": "test:fiber:events:544",
+      "suite": "fiber",
+      "title": "events > can handle primitives",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 544
+      },
+      "classification": "behavioral",
+      "reason": "Primitive descendant bubbling is a deterministic physical Three ancestry contract.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
+    },
+    {
+      "id": "test:fiber:events:571",
+      "suite": "fiber",
+      "title": "events > can handle a DOM offset canvas",
+      "source": {
+        "path": "packages/fiber/tests/events.test.tsx",
+        "line": 571
+      },
+      "classification": "browser-only",
+      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
+    },
+    {
+      "id": "test:fiber:hooks:29",
+      "suite": "fiber",
+      "title": "hooks > can handle useThree hook",
+      "source": {
+        "path": "packages/fiber/tests/hooks.test.tsx",
+        "line": 29
+      },
+      "classification": "behavioral",
+      "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+    },
+    {
+      "id": "test:fiber:hooks:63",
+      "suite": "fiber",
+      "title": "hooks > can handle useFrame hook",
+      "source": {
+        "path": "packages/fiber/tests/hooks.test.tsx",
+        "line": 63
+      },
+      "classification": "behavioral",
+      "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+    },
+    {
+      "id": "test:fiber:hooks:89",
+      "suite": "fiber",
+      "title": "hooks > can handle useLoader hook",
+      "source": {
+        "path": "packages/fiber/tests/hooks.test.tsx",
+        "line": 89
+      },
+      "classification": "behavioral",
+      "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
+    },
+    {
+      "id": "test:fiber:hooks:116",
+      "suite": "fiber",
+      "title": "hooks > can handle useLoader hook with an array of strings",
+      "source": {
+        "path": "packages/fiber/tests/hooks.test.tsx",
+        "line": 116
+      },
+      "classification": "behavioral",
+      "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
+    },
+    {
+      "id": "test:fiber:hooks:162",
+      "suite": "fiber",
+      "title": "hooks > can handle useLoader with an existing loader instance",
+      "source": {
+        "path": "packages/fiber/tests/hooks.test.tsx",
+        "line": 162
+      },
+      "classification": "behavioral",
+      "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
+    },
+    {
+      "id": "test:fiber:hooks:180",
+      "suite": "fiber",
+      "title": "hooks > can handle useLoader with a loader extension",
+      "source": {
+        "path": "packages/fiber/tests/hooks.test.tsx",
+        "line": 180
+      },
+      "classification": "behavioral",
+      "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
+    },
+    {
+      "id": "test:fiber:hooks:197",
+      "suite": "fiber",
+      "title": "hooks > can handle useGraph hook",
+      "source": {
+        "path": "packages/fiber/tests/hooks.test.tsx",
+        "line": 197
+      },
+      "classification": "behavioral",
+      "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+    },
+    {
+      "id": "test:fiber:hooks:252",
+      "suite": "fiber",
+      "title": "hooks > can handle useInstanceHandle hook",
+      "source": {
+        "path": "packages/fiber/tests/hooks.test.tsx",
+        "line": 252
+      },
+      "classification": "behavioral",
+      "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+    },
+    {
+      "id": "test:fiber:hooks:265",
+      "suite": "fiber",
+      "title": "hooks > can handle future (19.x) hooks without crashing",
+      "source": {
+        "path": "packages/fiber/tests/hooks.test.tsx",
+        "line": 265
+      },
+      "classification": "not-applicable",
+      "reason": "This guards forwarding of future React hook tags through React reconciler; Octane uses compiler-assigned hook slots instead.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:index:39",
+      "suite": "fiber",
+      "title": "createRoot > should return a Zustand store",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 39
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:44",
+      "suite": "fiber",
+      "title": "createRoot > will make an Orthographic Camera & set the position",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 44
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:55",
+      "suite": "fiber",
+      "title": "createRoot > should handle an performance changing functions",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 55
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:89",
+      "suite": "fiber",
+      "title": "createRoot > should handle the DPR prop reactively",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 89
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:103",
+      "suite": "fiber",
+      "title": "createRoot > should set PCFSoftShadowMap as the default shadow map",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 103
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:110",
+      "suite": "fiber",
+      "title": "createRoot > should set tonemapping to ACESFilmicToneMapping and outputColorSpace to SRGBColorSpace if linear is false",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 110
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:118",
+      "suite": "fiber",
+      "title": "createRoot > should toggle render mode in xr",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 118
+      },
+      "classification": "browser-only",
+      "reason": "The XR renderer-mode contract requires the browser WebXR integration lane rather than a host-driver-only assertion.",
+      "evidenceTarget": "packages/three/tests/browser/xr.test.ts"
+    },
+    {
+      "id": "test:fiber:index:137",
+      "suite": "fiber",
+      "title": "createRoot > should respect frameloop=\"never\" in xr",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 137
+      },
+      "classification": "browser-only",
+      "reason": "The XR renderer-mode contract requires the browser WebXR integration lane rather than a host-driver-only assertion.",
+      "evidenceTarget": "packages/three/tests/browser/xr.test.ts"
+    },
+    {
+      "id": "test:fiber:index:151",
+      "suite": "fiber",
+      "title": "createRoot > should set renderer props via gl prop",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 151
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:160",
+      "suite": "fiber",
+      "title": "createRoot > should update scene via scene prop",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 160
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:170",
+      "suite": "fiber",
+      "title": "createRoot > should set a custom scene via scene prop",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 170
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:182",
+      "suite": "fiber",
+      "title": "createRoot > should set a renderer via gl callback",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 182
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:193",
+      "suite": "fiber",
+      "title": "createRoot > should respect color management preferences via gl",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 193
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:213",
+      "suite": "fiber",
+      "title": "createRoot > should respect legacy prop",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 213
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:index:229",
+      "suite": "fiber",
+      "title": "createPortal > should create a state enclave",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 229
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/portal.test.ts"
+    },
+    {
+      "id": "test:fiber:index:266",
+      "suite": "fiber",
+      "title": "createPortal > should handle unmounted containers",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 266
+      },
+      "classification": "behavioral",
+      "reason": "The case asserts public root configuration, store, renderer, portal, color, or lifecycle behavior.",
+      "evidenceTarget": "packages/three/tests/portal.test.ts"
+    },
+    {
+      "id": "test:fiber:index:303",
+      "suite": "fiber",
+      "title": "exports > matches public API",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 303
+      },
+      "classification": "type-package",
+      "reason": "This case freezes the package export and web/native type surface rather than a rendered scene behavior.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "test:fiber:index:308",
+      "suite": "fiber",
+      "title": "exports > are consistent between targets",
+      "source": {
+        "path": "packages/fiber/tests/index.test.tsx",
+        "line": 308
+      },
+      "classification": "type-package",
+      "reason": "This case freezes the package export and web/native type surface rather than a rendered scene behavior.",
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+    },
+    {
+      "id": "test:fiber:polyfills:10",
+      "suite": "fiber",
+      "title": "polyfills > loads images via data textures",
+      "source": {
+        "path": "packages/fiber/tests/polyfills.test.ts",
+        "line": 10
+      },
+      "classification": "not-applicable",
+      "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:polyfills:17",
+      "suite": "fiber",
+      "title": "polyfills > creates a safe image URI for JSI",
+      "source": {
+        "path": "packages/fiber/tests/polyfills.test.ts",
+        "line": 17
+      },
+      "classification": "not-applicable",
+      "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:polyfills:22",
+      "suite": "fiber",
+      "title": "polyfills > unpacks drawables in Android APK",
+      "source": {
+        "path": "packages/fiber/tests/polyfills.test.ts",
+        "line": 22
+      },
+      "classification": "not-applicable",
+      "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:polyfills:27",
+      "suite": "fiber",
+      "title": "polyfills > loads files via the file system",
+      "source": {
+        "path": "packages/fiber/tests/polyfills.test.ts",
+        "line": 27
+      },
+      "classification": "not-applicable",
+      "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:polyfills:33",
+      "suite": "fiber",
+      "title": "polyfills > loads files via http",
+      "source": {
+        "path": "packages/fiber/tests/polyfills.test.ts",
+        "line": 33
+      },
+      "classification": "not-applicable",
+      "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:reconciler:25",
+      "suite": "fiber",
+      "title": "reconciler > should work with ${env} builds of React",
+      "source": {
+        "path": "packages/fiber/tests/reconciler.test.ts",
+        "line": 25
+      },
+      "classification": "not-applicable",
+      "reason": "This case verifies React reconciler development and production integration, which Octane replaces with its compiler and universal root.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:fiber:renderer:47",
+      "suite": "fiber",
+      "title": "renderer > should render empty JSX",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 47
+      },
+      "classification": "differential",
+      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
+      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:54",
+      "suite": "fiber",
+      "title": "renderer > should render native elements",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 54
+      },
+      "classification": "differential",
+      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
+      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:63",
+      "suite": "fiber",
+      "title": "renderer > should render extended elements",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 63
+      },
+      "classification": "differential",
+      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
+      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:78",
+      "suite": "fiber",
+      "title": "renderer > should render primitives",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 78
+      },
+      "classification": "differential",
+      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
+      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:89",
+      "suite": "fiber",
+      "title": "renderer > should remove children from primitive when unmounted",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 89
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:118",
+      "suite": "fiber",
+      "title": "renderer > should remove then add children from primitive when key changes",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 118
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:152",
+      "suite": "fiber",
+      "title": "renderer > should go through lifecycle",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 152
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:178",
+      "suite": "fiber",
+      "title": "renderer > should forward ref three object",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 178
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:205",
+      "suite": "fiber",
+      "title": "renderer > should handle children",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 205
+      },
+      "classification": "differential",
+      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
+      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:220",
+      "suite": "fiber",
+      "title": "renderer > should handle attach",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 220
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:252",
+      "suite": "fiber",
+      "title": "renderer > should update props reactively",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 252
+      },
+      "classification": "differential",
+      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
+      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:273",
+      "suite": "fiber",
+      "title": "renderer > should handle event props reactively",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 273
+      },
+      "classification": "behavioral",
+      "reason": "Direct testing events prove that committed handler updates replace the previously delivered listener.",
+      "evidenceTarget": "packages/three/tests/testing-events.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:297",
+      "suite": "fiber",
+      "title": "renderer > should handle the args prop reactively",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 297
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:352",
+      "suite": "fiber",
+      "title": "renderer > should handle the object prop reactively",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 352
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:397",
+      "suite": "fiber",
+      "title": "renderer > should handle unmount",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 397
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:478",
+      "suite": "fiber",
+      "title": "renderer > can swap 4 array primitives",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 478
+      },
+      "classification": "differential",
+      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
+      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:513",
+      "suite": "fiber",
+      "title": "renderer > can swap 4 array primitives via attach",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 513
+      },
+      "classification": "differential",
+      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
+      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:549",
+      "suite": "fiber",
+      "title": "renderer > should gracefully handle text",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 549
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:561",
+      "suite": "fiber",
+      "title": "renderer > should gracefully interrupt when building up the tree",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 561
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/suspense.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:608",
+      "suite": "fiber",
+      "title": "renderer > should toggle visibility during Suspense non-destructively",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 608
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/suspense.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:632",
+      "suite": "fiber",
+      "title": "renderer > should hide suspended objects when displaying fallback",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 632
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/suspense.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:748",
+      "suite": "fiber",
+      "title": "renderer > preserves camera frustum props for perspective",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 748
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:754",
+      "suite": "fiber",
+      "title": "renderer > preserves camera frustum props for orthographic",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 754
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:765",
+      "suite": "fiber",
+      "title": "renderer > resolves conflicting and prefixed elements",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 765
+      },
+      "classification": "differential",
+      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
+      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:784",
+      "suite": "fiber",
+      "title": "renderer > should properly handle array of components with changing keys and order",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 784
+      },
+      "classification": "differential",
+      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
+      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+    },
+    {
+      "id": "test:fiber:renderer:842",
+      "suite": "fiber",
+      "title": "renderer > should update scene synchronously with flushSync",
+      "source": {
+        "path": "packages/fiber/tests/renderer.test.tsx",
+        "line": 842
+      },
+      "classification": "behavioral",
+      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:39",
+      "suite": "fiber",
+      "title": "is > should tell me if something is a function",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 39
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:48",
+      "suite": "fiber",
+      "title": "is > should tell me if something is an object",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 48
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:58",
+      "suite": "fiber",
+      "title": "is > should tell me if something is a string",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 58
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:68",
+      "suite": "fiber",
+      "title": "is > should tell me if something is a number",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 68
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:78",
+      "suite": "fiber",
+      "title": "is > should tell me if something is undefined",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 78
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:88",
+      "suite": "fiber",
+      "title": "is > should tell me if something is an array",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 88
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:97",
+      "suite": "fiber",
+      "title": "is > should tell me if something is equal",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 97
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:137",
+      "suite": "fiber",
+      "title": "dispose > should dispose of objects and their properties",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 137
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:148",
+      "suite": "fiber",
+      "title": "dispose > should not dispose of a THREE.Scene",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 148
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:162",
+      "suite": "fiber",
+      "title": "getInstanceProps > should filter internal props without accessing them",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 162
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:178",
+      "suite": "fiber",
+      "title": "prepare > should create an instance descriptor",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 178
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:189",
+      "suite": "fiber",
+      "title": "prepare > should not overwrite descriptors",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 189
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:200",
+      "suite": "fiber",
+      "title": "resolve > should resolve pierced props",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 200
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:209",
+      "suite": "fiber",
+      "title": "resolve > should prioritize direct property over piercing",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 209
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:221",
+      "suite": "fiber",
+      "title": "resolve > should handle undefined direct property values",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 221
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:230",
+      "suite": "fiber",
+      "title": "resolve > should handle null direct property values",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 230
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:239",
+      "suite": "fiber",
+      "title": "resolve > should return non-object as root when piercing fails due to non-object intermediate",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 239
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:248",
+      "suite": "fiber",
+      "title": "resolve > should return null as root when piercing fails due to null intermediate",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 248
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:257",
+      "suite": "fiber",
+      "title": "resolve > should handle non-dashed keys normally",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 257
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:268",
+      "suite": "fiber",
+      "title": "attach / detach > should attach & detach using string values",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 268
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:281",
+      "suite": "fiber",
+      "title": "attach / detach > should attach & detach using attachFns",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 281
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:299",
+      "suite": "fiber",
+      "title": "attach / detach > should create array when using array-index syntax",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 299
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/driver.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:315",
+      "suite": "fiber",
+      "title": "diffProps > should filter changed props",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 315
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:323",
+      "suite": "fiber",
+      "title": "diffProps > invalidates pierced props when root is changed",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 323
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:335",
+      "suite": "fiber",
+      "title": "diffProps > should pick removed props for HMR",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 335
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:343",
+      "suite": "fiber",
+      "title": "diffProps > should reset removed props for HMR",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 343
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:349",
+      "suite": "fiber",
+      "title": "diffProps > should filter reserved props without accessing them",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 349
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:366",
+      "suite": "fiber",
+      "title": "applyProps > should apply props to foreign objects",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 366
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:371",
+      "suite": "fiber",
+      "title": "applyProps > should not throw when applying unknown props",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 371
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:378",
+      "suite": "fiber",
+      "title": "applyProps > should throw when applying unknown props due to non-object intermediate",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 378
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:384",
+      "suite": "fiber",
+      "title": "applyProps > should filter reserved props without accessing them",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 384
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:400",
+      "suite": "fiber",
+      "title": "applyProps > should overwrite non-atomic properties",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 400
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:409",
+      "suite": "fiber",
+      "title": "applyProps > should merge shader material uniforms into a stable target",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 409
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:433",
+      "suite": "fiber",
+      "title": "applyProps > should merge pierced uniform props into stable shader uniforms",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 433
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:447",
+      "suite": "fiber",
+      "title": "applyProps > should prefer to copy potentially read-only math classes",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 447
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:458",
+      "suite": "fiber",
+      "title": "applyProps > should not copy if props are supersets of another",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 458
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:484",
+      "suite": "fiber",
+      "title": "applyProps > should prefer to set when props are an array",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 484
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:491",
+      "suite": "fiber",
+      "title": "applyProps > should set with scalar shorthand where applicable",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 491
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:512",
+      "suite": "fiber",
+      "title": "applyProps > should pierce into nested properties",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 512
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:519",
+      "suite": "fiber",
+      "title": "applyProps > should not apply a prop if it is undefined",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 519
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:526",
+      "suite": "fiber",
+      "title": "applyProps > should not apply a prop to an instance if it is a reserved event",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 526
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:534",
+      "suite": "fiber",
+      "title": "applyProps > should not fallthrough to set/copy for primitive types",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 534
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/props.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:559",
+      "suite": "fiber",
+      "title": "updateCamera > updates camera matrices",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 559
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:575",
+      "suite": "fiber",
+      "title": "updateCamera > respects camera.manual",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 575
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/root.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:591",
+      "suite": "fiber",
+      "title": "findInitialRoot > finds the nearest root for portals",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 591
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/portal.test.ts"
+    },
+    {
+      "id": "test:fiber:utils:601",
+      "suite": "fiber",
+      "title": "findInitialRoot > falls back to the local root",
+      "source": {
+        "path": "packages/fiber/tests/utils.test.ts",
+        "line": 601
+      },
+      "classification": "behavioral",
+      "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
+      "evidenceTarget": "packages/three/tests/portal.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:10",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > renders JSX",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 10
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:26",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > renders a simple component with hooks",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 26
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:44",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > renders a simple component with useTransition",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 44
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:68",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > renders an empty scene",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 68
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:79",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > can render a composite component & correctly build simple graph",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 79
+      },
+      "classification": "not-applicable",
+      "reason": "The asserted test-renderer subject relies on React class components, which are an explicit Octane exclusion.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:105",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > renders some basics with an update",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 105
+      },
+      "classification": "not-applicable",
+      "reason": "The asserted test-renderer subject relies on React class components, which are an explicit Octane exclusion.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:146",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > updates types & names",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 146
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:174",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > exposes the instance",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 174
+      },
+      "classification": "not-applicable",
+      "reason": "The asserted test-renderer subject relies on React class components, which are an explicit Octane exclusion.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:205",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > updates children",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 205
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:245",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > does the full lifecycle",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 245
+      },
+      "classification": "not-applicable",
+      "reason": "The asserted test-renderer subject relies on React class components, which are an explicit Octane exclusion.",
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:272",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > gives a ref to native components",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 272
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:280",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > toTree() handles nested Fragments",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 280
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:293",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > correctly builds a tree",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 293
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:332",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > toTree() handles complicated tree of fragments",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 332
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:354",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > correctly searches through multiple levels in regular objects",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 354
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:388",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > Can search from retrieved primitive Instance",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 388
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:408",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > root instance and refs return the same value",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 408
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-core:415",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Core > handles primitive objects and their children correctly in toGraph",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.core.test.tsx",
+        "line": 415
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-events:7",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Events > should fire an event",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.events.test.tsx",
+        "line": 7
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing-events.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-events:39",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Events > should not throw if the handle name is incorrect",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.events.test.tsx",
+        "line": 39
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing-events.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-hooks:8",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Hooks > can handle useThree hook",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.hooks.test.tsx",
+        "line": 8
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-hooks:37",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Hooks > can handle useLoader hook",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.hooks.test.tsx",
+        "line": 37
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-hooks:55",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer Hooks > can handle useFrame hook using test renderers advanceFrames function",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.hooks.test.tsx",
+        "line": 55
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-methods:21",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer instance methods > should pass the parent",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.methods.test.tsx",
+        "line": 21
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-methods:30",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer instance methods > searches via .find() / .findAll()",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.methods.test.tsx",
+        "line": 30
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-methods:51",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer instance methods > searches via .findByType() / findAllByType()",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.methods.test.tsx",
+        "line": 51
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-methods:72",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer instance methods > searches via .findByProps() / .findAllByProps()",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.methods.test.tsx",
+        "line": 72
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    },
+    {
+      "id": "test:test-renderer:rttr-methods:100",
+      "suite": "test-renderer",
+      "title": "ReactThreeTestRenderer instance methods > searches RegExp via .findByProps() / .findAllByProps()",
+      "source": {
+        "path": "packages/test-renderer/src/__tests__/RTTR.methods.test.tsx",
+        "line": 100
+      },
+      "classification": "behavioral",
+      "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
+    }
+  ]
+}

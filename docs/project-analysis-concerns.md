@@ -8,7 +8,7 @@ quickly.
 The repository now has substantially stronger mechanical guardrails than the
 original audit snapshot:
 
-- the generated inventory contains 22 publishable packages, including 18
+- the generated inventory contains 33 publishable packages, including 26
   framework bindings;
 - the core executable React-parity backlog is **0 pins**;
 - the binding executable backlog is **0 pins**;
@@ -136,8 +136,13 @@ Dedicated conformance, identity, behavioral hydration, streaming, and
 browser tests cover many of these axes. The website browser suite now checks
 all public routes in development and production, fails on page/hydration
 errors, exercises client navigation, and interacts with the sandboxed
-playground. It still does not replace the Hacker News or Lexical example E2E
-suites, which are not part of root `pnpm test`.
+playground. A separate example-app CI job builds the release-gated Hacker News,
+Lexical Playground, Cinebase, Threadline, Flowboard, Streambox, Relay, Cartlane,
+Pagecraft, Gridlab, Draftboard, Mailroom, Pulseboard, and Wayfinder applications
+and runs their Playwright journeys; its result is aggregated by the protected
+`typecheck` context.
+Keeping it outside the sharded `pnpm test` command avoids repeating each browser
+suite per shard.
 
 When adding a feature, choose the suite by observable rather than assuming a
 final-HTML differential test is sufficient.
@@ -343,9 +348,11 @@ also installs packed core and Hook Form into an isolated consumer and asserts
 one physical Octane runtime before running Vite client/server builds. The
 validator contains an executable Hook Form SSR probe as well; treat that as a
 proven runtime gate only when the complete `pnpm packages:pack:check` run
-passes. Vite discovers direct installed raw Octane dependencies, excludes them
-from prebundling/SSR externalization, and preserves manifest-declared manual
-hook-slot directories.
+passes. Vite discovers installed raw Octane dependency graphs, excludes source
+packages from prebundling/SSR externalization, preserves manifest-declared manual
+hook-slot directories, and honors package-owned optimizer exclusions (including
+`family/*` rules expanded to exact declared dependency names) for identity-sensitive
+transitive dependencies.
 Bindings and the Vite plugin peer on Octane while retaining workspace-only dev
 dependencies; the adapter peers on the plugin.
 
@@ -373,8 +380,8 @@ compiler requirements change.
 
 - keep streaming changes covered through core Node/Web transports, plugin HTML
   composition, cancellation, nonce emission, and real hydration;
-- add release-gated browser coverage for examples when changes touch their
-  router/query/style/editor integrations;
+- keep the release-gated example browser job deterministic as new router,
+  query, style, editor, and product-shaped fixtures join it;
 - keep marker topology and DOM identity assertions beside normalized
   differential tests.
 

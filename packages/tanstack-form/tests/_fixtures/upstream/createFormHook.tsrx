@@ -565,6 +565,8 @@ describe('createFormHook', () => {
 		const target = getByTestId('formId-target');
 		const result = getByTestId('formId-result');
 
+		expect(target).toHaveAttribute('form', 'test');
+		expect(target).toHaveTextContent('test');
 		await user.click(target);
 		expect(result).toHaveTextContent('1');
 	});
