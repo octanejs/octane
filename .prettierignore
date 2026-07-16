@@ -59,3 +59,10 @@ packages/tanstack-form/tests/_fixtures/upstream/*.tsrx
 # RuleSync generated files (source lives in .rulesync/; run `pnpm rules:generate`).
 # The .md outputs are already covered above; .cursor/ holds a .mdc with no Prettier parser.
 .cursor/
+
+# TanStack AI's TSRX hook modules and their declaration companions preserve
+# deeply generic inline signatures the TSRX Prettier plugin currently mangles;
+# keep the clean source stable until that formatter bug is fixed.
+packages/tanstack-ai/src/*.tsrx
+packages/tanstack-ai/src/*.tsrx.d.ts
+packages/tanstack-ai/tests/_fixtures/*.tsrx
