@@ -38,6 +38,12 @@ behavioral, differential, browser-only, type/package evidence, or not
 applicable. It is release evidence, not permission to copy Fiber ownership
 internals into Octane.
 
+Milestone 5 follows the pinned `useLoader` observable contract: constructor
+loaders are singleton instances, cache identity combines the loader and
+normalized input, GLTF-shaped results receive the public graph map, and
+`preload`/`clear` share that same key. Cache eviction does not imply asset
+disposal; disposal follows Octane's declarative host ownership instead.
+
 ## License provenance
 
 React Three Fiber is MIT-licensed, Copyright 2019–2025 Poimandres. Adapted

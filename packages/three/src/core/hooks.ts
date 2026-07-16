@@ -25,9 +25,9 @@ import {
 } from './store.js';
 
 export interface ObjectMap {
-	readonly nodes: Record<string, THREE.Object3D>;
-	readonly materials: Record<string, THREE.Material>;
-	readonly meshes: Record<string, THREE.Mesh>;
+	nodes: Record<string, THREE.Object3D>;
+	materials: Record<string, THREE.Material>;
+	meshes: Record<string, THREE.Mesh>;
 }
 
 export interface RefObject<T> {

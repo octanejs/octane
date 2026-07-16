@@ -18,6 +18,7 @@ export {
 	useFrame,
 	useGraph,
 	useInstanceHandle,
+	useLoader,
 	useStore,
 	useThree,
 } from './core/index.js';
@@ -61,6 +62,8 @@ export type {
 	Intersection,
 	IntersectionEvent,
 	ObjectMap,
+	Extensions,
+	LoaderResult,
 	Performance,
 	RefObject,
 	RenderCallback,

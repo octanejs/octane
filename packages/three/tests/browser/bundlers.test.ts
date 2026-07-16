@@ -114,10 +114,16 @@ describe('Three Canvas bundler and browser integration', () => {
 		expect(viteFiles).toContain('index.html');
 		expect(viteFiles.some((file) => /(?:^|\/)assets\/.*\.js$/.test(file))).toBe(true);
 		expect(readJavaScript(viteOutput)).toContain('bundler-proof-cube');
+		expect(readFileSync(resolve(viteOutput, 'three-loader-proof.txt'), 'utf8').trim()).toBe(
+			'loaded-over-http',
+		);
 
 		expect(rsbuildFiles).toContain('index.html');
 		expect(rsbuildFiles.some((file) => /\.js$/.test(file))).toBe(true);
 		expect(readJavaScript(rsbuildOutput)).toContain('bundler-proof-cube');
+		expect(readFileSync(resolve(rsbuildOutput, 'three-loader-proof.txt'), 'utf8').trim()).toBe(
+			'loaded-over-http',
+		);
 
 		for (const output of [viteOutput, rsbuildOutput]) {
 			const manifest = JSON.parse(
@@ -135,6 +141,67 @@ describe('Three Canvas bundler and browser integration', () => {
 			}
 		}
 	});
+
+	it('loads and caches a real browser asset through the Three loader path', async () => {
+		let browser: import('playwright').Browser | undefined;
+		try {
+			const { chromium } = await import('playwright');
+			browser = await chromium.launch({
+				headless: true,
+				args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
+			});
+		} catch (error) {
+			throw new Error(
+				'[@octanejs/three browser] Chromium is required ' +
+					'(run `pnpm exec playwright install chromium`): ' +
+					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+			);
+		}
+
+		const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
+		const errors: string[] = [];
+		const responses: string[] = [];
+		page.on('console', (message) => {
+			if (message.type() === 'error') errors.push(message.text());
+		});
+		page.on('pageerror', (error) => errors.push(`pageerror: ${String(error)}`));
+		page.on('response', (response) => {
+			if (response.url().endsWith('/three-loader-proof.txt')) responses.push(response.url());
+		});
+		try {
+			await page.goto(viteOrigin, { waitUntil: 'load' });
+			await page.waitForFunction(
+				() =>
+					(globalThis as typeof globalThis & { __octaneThreeAsset?: string }).__octaneThreeAsset ===
+					'loaded-over-http\n',
+			);
+			const proof = await page.evaluate(() => {
+				const fixture = globalThis as typeof globalThis & {
+					__octaneThreeAsset?: string;
+					__octaneThreeState?: {
+						scene: { children: Array<{ name: string }> };
+					};
+				};
+				return {
+					asset: fixture.__octaneThreeAsset,
+					scene: fixture.__octaneThreeState?.scene.children.map((child) => child.name),
+				};
+			});
+			expect(proof).toEqual({
+				asset: 'loaded-over-http\n',
+				scene: [
+					'browser-asset-first:loaded-over-http',
+					'browser-asset-second:loaded-over-http',
+					'bundler-proof-cube',
+				],
+			});
+			expect(responses).toHaveLength(1);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+			await browser.close();
+		}
+	}, 60_000);
 
 	it('compiles the Three scene as a self-accepting client module under raw Rspack HMR', () => {
 		expect(bundlerEvidence.buildInfo).toMatchObject({
@@ -174,8 +241,8 @@ describe('Three Canvas bundler and browser integration', () => {
 			await page.goto(viteOrigin, { waitUntil: 'load' });
 			await page.waitForFunction(
 				() =>
-					(globalThis as typeof globalThis & { __octaneThreeSceneReady?: boolean })
-						.__octaneThreeSceneReady === true,
+					(globalThis as typeof globalThis & { __octaneThreeAsset?: string }).__octaneThreeAsset ===
+					'loaded-over-http\n',
 			);
 			await page.evaluate(
 				() =>
@@ -264,7 +331,11 @@ describe('Three Canvas bundler and browser integration', () => {
 				frameCount: 1,
 				frameloop: 'never',
 				glError: 0,
-				scene: ['bundler-proof-cube'],
+				scene: [
+					'browser-asset-first:loaded-over-http',
+					'browser-asset-second:loaded-over-http',
+					'bundler-proof-cube',
+				],
 				size: { width: 64, height: 64 },
 			});
 			expect(errors).toEqual([]);

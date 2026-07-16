@@ -4642,6 +4642,17 @@ export function use<T>(usable: Context<T> | PromiseLike<T> | TrackedThenable<T>)
 }
 
 /**
+ * Internal renderer-boundary variant of `use(thenable)`. A universal root owns
+ * and memoizes each suspended attempt, so a different thenable on resume is an
+ * authoritative next dependency rather than an uncached user promise. Replace
+ * the stored thenable even during resume replay so a sequential A -> B
+ * suspension keeps the outer host fallback visible until B settles.
+ */
+export function useRendererThenable<T>(thenable: PromiseLike<T>): T {
+	return useThenable(thenable as TrackedThenable<T>, true);
+}
+
+/**
  * React's `useContext(Context)` — reads the nearest Provider's value (or the
  * context default). A thin alias for the context branch of `use()`: context
  * reads carry no per-call-site state, so there is no hook slot and the compiler
@@ -4914,7 +4925,7 @@ function isHydrationRejection(error: unknown): error is HydrationRejectionExcept
 	);
 }
 
-function useThenable<T>(thenable: TrackedThenable<T>): T {
+function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): T {
 	const block = CURRENT_BLOCK!;
 	const state: TrackedThenable<any>[] = ((block as any).__thenables ??= []);
 	const idx = block.__thenableIdx;
@@ -4964,7 +4975,7 @@ function useThenable<T>(thenable: TrackedThenable<T>): T {
 	// eliminates). Without this, a fresh promise per replay re-suspends
 	// forever. Normal renders (updates with genuinely new promises) take the
 	// replacement path below unchanged.
-	if (stored !== undefined && RESUME_REPLAY) {
+	if (stored !== undefined && RESUME_REPLAY && !replaceOnResume) {
 		if (process.env.NODE_ENV !== 'production') warnUncachedUsePromise(block);
 		if (stored.status === 'fulfilled') return stored.value as T;
 		if (stored.status === 'rejected') throw stored.reason;
@@ -13090,8 +13101,13 @@ export function tryBlock(
 		s.block!.props = { err: s.err, reset: () => requestReset(s) };
 		s.block!.extra = s.env;
 		renderBlock(s.block!);
+	} else if (s.branch === 2 && s.tryBlock && s.savedDom) {
+		// Parent props can supersede the promise that originally hid this body.
+		// Retry the preserved tree now so already-ready replacement data reveals
+		// immediately and a different suspension refreshes the resume listener.
+		attemptHiddenReveal(s);
 	} else if (s.branch === 2) {
-		// Already pending — no work; will be swapped when thenable resolves.
+		// A pending arm without a preserved body has no current work to retry.
 	} else if (s.branch === 1 && s.tryBlock) {
 		// Try body is currently visible — re-render in place so we don't tear
 		// down its DOM. If the re-render suspends, handleSuspense decides
@@ -13110,18 +13126,6 @@ export function tryBlock(
 		} catch (err) {
 			if (isSuspenseException(err)) handleSuspense(s, err.thenable, s.tryBlock);
 			else switchToCatch(s, err);
-		}
-	} else if (s.tryBlock && s.savedDom) {
-		// Pending is visible AND we have a preserved try block — re-render it
-		// (it'll throw again at the same use() since the promise hasn't
-		// resolved). This entry point is hit when the surrounding component
-		// re-renders for an unrelated reason while we're suspended.
-		s.tryBlock.body = s.tryBody;
-		s.tryBlock.extra = s.env;
-		try {
-			renderBlock(s.tryBlock);
-		} catch {
-			/* expected: still pending; handled by attachResume */
 		}
 	} else {
 		mountTry(s);
@@ -13680,6 +13684,7 @@ function attemptHiddenReveal(state: TrySlot): void {
 	if (tryBlock === null || tryBlock.disposed || state.savedDom === null) return;
 	reattachTryBlock(state);
 	tryBlock.body = state.tryBody;
+	tryBlock.extra = state.env;
 	tryBlock.inactive = false;
 	try {
 		renderBlock(tryBlock);
