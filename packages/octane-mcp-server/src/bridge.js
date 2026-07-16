@@ -10,6 +10,7 @@ export const KNOWN_BINDINGS = {
 	'@apollo/client': '@octanejs/apollo-client',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
+	'@tanstack/react-store': '@octanejs/tanstack-store',
 	'@tanstack/react-table': '@octanejs/tanstack-table',
 	'@tanstack/react-virtual': '@octanejs/tanstack-virtual',
 	'framer-motion': '@octanejs/motion',
