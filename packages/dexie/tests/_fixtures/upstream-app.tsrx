@@ -46,7 +46,9 @@ function ItemLoader({ db, id }: { db: any; id: number }) @{
 	// Include db.name so per-test databases do not share the module-level
 	// suspending cache entry (upstream uses a singleton db + ['item', id]).
 	const item = useSuspendingLiveQuery(() => db.items.get(id) as Promise<Item | undefined>, [
-		'item', db.name, id,
+		'item',
+		db.name,
+		id,
 	]) as Item | undefined;
 	@if (!item) {
 		<p class="not-found-item">
