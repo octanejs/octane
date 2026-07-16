@@ -10,6 +10,7 @@ export {
 	useThree,
 } from './hooks.js';
 export { useLoader } from './loader.js';
+export { createPortal } from './portal.js';
 export { dispose } from './props.js';
 export {
 	addAfterEffect,
@@ -58,6 +59,7 @@ export type {
 export type { Instance } from './driver.js';
 export type { ObjectMap, RefObject } from './hooks.js';
 export type { Extensions, LoaderResult } from './loader.js';
+export type { InjectState } from './portal.js';
 export type { GlobalEffectType, GlobalRenderCallback } from './loop.js';
 export type {
 	CameraProps,

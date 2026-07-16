@@ -45,6 +45,7 @@ const UNIVERSAL_TRY = Symbol.for('octane.universal.try');
 const UNIVERSAL_CONTEXT = Symbol.for('octane.universal.context');
 const UNIVERSAL_ACTIVITY = Symbol.for('octane.universal.activity');
 const UNIVERSAL_KEYED = Symbol.for('octane.universal.keyed');
+const UNIVERSAL_PORTAL = Symbol.for('octane.universal.portal');
 const UNIVERSAL_RENDERER_REGION = Symbol.for('octane.universal.renderer-region');
 const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
 
@@ -146,9 +147,16 @@ export interface UniversalListValue {
 	readonly empty?: UniversalRenderable;
 }
 
+export interface UniversalPortalValue {
+	readonly $$kind: typeof UNIVERSAL_PORTAL;
+	readonly children: UniversalRenderable;
+	readonly target: unknown;
+}
+
 export type UniversalRenderable =
 	| UniversalPlanValue
 	| UniversalListValue
+	| UniversalPortalValue
 	| UniversalComponentValue
 	| UniversalChildrenValue
 	| UniversalIfValue
@@ -288,6 +296,35 @@ export interface UniversalResourceHandle {
 	readonly id: string | number;
 }
 
+/** Opaque, root-scoped placement parent for a renderer-owned portal target. */
+export interface UniversalPortalTargetHandle {
+	readonly $$kind: 'octane.universal.portal-target';
+	readonly renderer: string;
+	readonly root: number;
+	readonly id: string | number;
+}
+
+export interface UniversalPortalTargetRegistration {
+	readonly handle: UniversalPortalTargetHandle;
+	release(): void;
+}
+
+export interface UniversalPortalTargetContext<Container = unknown> {
+	readonly container: Container;
+	readonly renderer: string;
+	readonly target: unknown;
+	readonly transported: boolean;
+	createPortalTargetHandle(id: string | number): UniversalPortalTargetHandle;
+}
+
+export interface UniversalPortalCapability<Container = unknown> {
+	prepareTarget(
+		context: UniversalPortalTargetContext<Container>,
+	): UniversalPortalTargetRegistration;
+}
+
+export type UniversalHostParent = number | null | UniversalPortalTargetHandle;
+
 export type UniversalSerializableValue =
 	| null
 	| undefined
@@ -354,7 +391,7 @@ export type UniversalHostCommand =
 	  }
 	| {
 			readonly op: 'insert' | 'move';
-			readonly parent: number | null;
+			readonly parent: UniversalHostParent;
 			readonly id: number;
 			readonly before: number | null;
 	  }
@@ -375,7 +412,7 @@ export type UniversalHostCommand =
 			readonly id: number;
 			readonly state: 'hidden' | 'visible';
 	  }
-	| { readonly op: 'remove'; readonly parent: number | null; readonly id: number }
+	| { readonly op: 'remove'; readonly parent: UniversalHostParent; readonly id: number }
 	| { readonly op: 'destroy'; readonly id: number };
 
 export type UniversalEventPriority = 'discrete' | 'continuous' | 'default';
@@ -427,6 +464,7 @@ export interface UniversalHostDriver<Container = unknown, PublicInstance = unkno
 	readonly localCallbacks?: UniversalHostCallbackCapability;
 	readonly props?: UniversalHostPropCodec<Container>;
 	readonly updates?: UniversalHostUpdateCapability;
+	readonly portals?: UniversalPortalCapability<Container>;
 	/** Validate and stage a batch without mutating the public host. */
 	prepareBatch(
 		container: Container,
@@ -492,6 +530,14 @@ interface BlueprintHost {
 	children: BlueprintNode[];
 }
 
+interface BlueprintPortal {
+	kind: 'portal';
+	key: UniversalKey | null;
+	target: unknown;
+	registration: UniversalPortalTargetRegistration | null;
+	children: BlueprintNode[];
+}
+
 interface BlueprintEvent {
 	readonly prop: string;
 	readonly type: string;
@@ -507,11 +553,11 @@ interface BlueprintHostCallback {
 	readonly owner: UniversalOwnerRecord;
 }
 
-type BlueprintNode = BlueprintRange | BlueprintHost;
+type BlueprintNode = BlueprintRange | BlueprintHost | BlueprintPortal;
 
 interface LogicalRecord {
 	id: number;
-	kind: 'range' | 'host';
+	kind: 'range' | 'host' | 'portal';
 	key: UniversalKey | null;
 	type: string | null;
 	props: Record<string, unknown>;
@@ -523,6 +569,7 @@ interface LogicalRecord {
 	lifecycles: Map<string, CommittedHostCallback>;
 	localCallbacks: Map<string, CommittedHostCallback>;
 	visibility: UniversalVisibility;
+	portalRegistration: UniversalPortalTargetRegistration | null;
 	parent: LogicalRecord | null;
 	children: LogicalRecord[];
 }
@@ -699,6 +746,7 @@ let NEXT_OWNER_ID = 1;
 let NEXT_UNIVERSAL_ID_ROOT = 1;
 let NEXT_EVENT_ROOT = 1;
 let NEXT_RESOURCE_ROOT = 1;
+let NEXT_PORTAL_ROOT = 1;
 const EVENT_DISPATCHERS = new Map<number, (payload: unknown) => unknown>();
 const UNIVERSAL_SLOT_STACK: unknown[] = [];
 
@@ -1525,6 +1573,15 @@ function blueprintFromLogical(record: LogicalRecord): BlueprintNode {
 			children: record.children.map(blueprintFromLogical),
 		};
 	}
+	if (record.kind === 'portal') {
+		return {
+			kind: 'portal',
+			key: record.key,
+			target: null,
+			registration: record.portalRegistration,
+			children: record.children.map(blueprintFromLogical),
+		};
+	}
 	return {
 		kind: 'host',
 		key: record.key,
@@ -1626,6 +1683,18 @@ function materializeValue(
 			);
 		}
 		return materializeValue(children.render(), expectedRenderer, key, [...path, 'children']);
+	}
+	if ((value as UniversalPortalValue)?.$$kind === UNIVERSAL_PORTAL) {
+		const portal = value as UniversalPortalValue;
+		return [
+			{
+				kind: 'portal',
+				key,
+				target: portal.target,
+				registration: null,
+				children: materializeValue(portal.children, expectedRenderer, null, [...path, 'portal']),
+			},
+		];
 	}
 	if ((value as UniversalActivityValue)?.$$kind === UNIVERSAL_ACTIVITY) {
 		const activity = value as UniversalActivityValue;
@@ -2069,6 +2138,7 @@ function createLogicalRecord(id: number, blueprint: BlueprintNode): LogicalRecor
 		lifecycles: new Map(),
 		localCallbacks: new Map(),
 		visibility: blueprint.kind === 'host' ? blueprint.visibility : 'visible',
+		portalRegistration: null,
 		parent: null,
 		children: [],
 	};
@@ -2093,7 +2163,7 @@ function physicalRecords(records: readonly LogicalRecord[]): LogicalRecord[] {
 	const output: LogicalRecord[] = [];
 	for (const record of records) {
 		if (record.kind === 'host') output.push(record);
-		else output.push(...physicalRecords(record.children));
+		else if (record.kind === 'range') output.push(...physicalRecords(record.children));
 	}
 	return output;
 }
@@ -2102,7 +2172,7 @@ function physicalDrafts(records: readonly DraftRecord[]): DraftRecord[] {
 	const output: DraftRecord[] = [];
 	for (const record of records) {
 		if (record.record.kind === 'host') output.push(record);
-		else output.push(...physicalDrafts(record.children));
+		else if (record.record.kind === 'range') output.push(...physicalDrafts(record.children));
 	}
 	return output;
 }
@@ -3014,8 +3084,8 @@ export function memo<P>(
 	return component;
 }
 
-export function createPortal(): never {
-	throw new Error('The active universal renderer does not declare the portal capability.');
+export function createPortal(children: UniversalRenderable, target: unknown): UniversalPortalValue {
+	return Object.freeze({ $$kind: UNIVERSAL_PORTAL, children, target });
 }
 
 /** Compiler sentinel for the supported universal Activity descriptor. */
@@ -3180,6 +3250,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private readonly rootRecord: LogicalRecord;
 	private readonly universalIdRoot = NEXT_UNIVERSAL_ID_ROOT++;
 	private readonly resourceRoot = NEXT_RESOURCE_ROOT++;
+	private readonly portalRoot = NEXT_PORTAL_ROOT++;
+	private readonly portalHandles = new Map<string | number, UniversalPortalTargetHandle>();
 	private owner: UniversalOwnerRecord | null = null;
 	private bridge: BoundaryOwner | null = null;
 	private unmounted = false;
@@ -3225,6 +3297,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			lifecycles: new Map(),
 			localCallbacks: new Map(),
 			visibility: 'visible',
+			portalRegistration: null,
 			parent: null,
 			children: [],
 		};
@@ -3277,6 +3350,81 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 	driverCapabilities(): UniversalHostCapabilities {
 		return this.driver.capabilities ?? {};
+	}
+
+	private createPortalTargetHandle(id: string | number): UniversalPortalTargetHandle {
+		if ((typeof id !== 'string' && typeof id !== 'number') || String(id).length === 0) {
+			throw new TypeError(
+				'A universal portal target handle ID must be a non-empty string or number.',
+			);
+		}
+		const previous = this.portalHandles.get(id);
+		if (previous !== undefined) return previous;
+		const handle = Object.freeze({
+			$$kind: 'octane.universal.portal-target' as const,
+			renderer: this.renderer,
+			root: this.portalRoot,
+			id,
+		});
+		this.portalHandles.set(id, handle);
+		return handle;
+	}
+
+	private preparePortalTarget(target: unknown): UniversalPortalTargetRegistration {
+		const capability = this.driver.portals;
+		if (capability === undefined) {
+			throw new Error(
+				`Universal renderer ${JSON.stringify(this.renderer)} does not declare the portal capability.`,
+			);
+		}
+		const registration = capability.prepareTarget({
+			container: this.container,
+			renderer: this.renderer,
+			target,
+			transported: this.transport !== null,
+			createPortalTargetHandle: (id) => this.createPortalTargetHandle(id),
+		});
+		const release =
+			registration !== null &&
+			typeof registration === 'object' &&
+			typeof registration.release === 'function'
+				? registration.release.bind(registration)
+				: null;
+		try {
+			if (registration === null || typeof registration !== 'object' || release === null) {
+				throw new TypeError(
+					'A universal portal capability must return a valid target registration.',
+				);
+			}
+			const handle = registration.handle;
+			if (
+				handle?.$$kind !== 'octane.universal.portal-target' ||
+				handle.renderer !== this.renderer ||
+				handle.root !== this.portalRoot ||
+				(typeof handle.id !== 'string' && typeof handle.id !== 'number') ||
+				this.portalHandles.get(handle.id) !== handle
+			) {
+				throw new Error(
+					`Universal portal target handle does not belong to renderer ${JSON.stringify(this.renderer)} and this root.`,
+				);
+			}
+			let released = false;
+			return Object.freeze({
+				handle,
+				release() {
+					if (released) return;
+					released = true;
+					release();
+				},
+			});
+		} catch (error) {
+			try {
+				release?.();
+			} catch {
+				// Preserve the capability-contract diagnostic that invalidated the registration.
+			}
+			throw error;
+		}
 	}
 
 	encodeHostProp(hostType: string, name: string, value: unknown): unknown {
@@ -3645,6 +3793,42 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		component: UniversalComponent<any>,
 		props: any,
 	): UniversalTransactionImpl<Container, PublicInstance> {
+		const stagedPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
+		const preparePortals = (node: BlueprintNode) => {
+			if (node.kind === 'portal' && node.registration === null) {
+				node.registration = this.preparePortalTarget(node.target);
+				stagedPortalRegistrations.add(node.registration);
+			}
+			for (const child of node.children) preparePortals(child);
+		};
+		try {
+			preparePortals(blueprint);
+			return this.createPreparedTransaction(
+				blueprint,
+				attempt,
+				component,
+				props,
+				stagedPortalRegistrations,
+			);
+		} catch (error) {
+			for (const registration of stagedPortalRegistrations) {
+				try {
+					registration.release();
+				} catch {
+					// Preserve the error that prevented a transaction from being prepared.
+				}
+			}
+			throw error;
+		}
+	}
+
+	private createPreparedTransaction(
+		blueprint: BlueprintRange,
+		attempt: RenderAttempt,
+		component: UniversalComponent<any>,
+		props: any,
+		stagedPortalRegistrations: Set<UniversalPortalTargetRegistration>,
+	): UniversalTransactionImpl<Container, PublicInstance> {
 		let nextId = this.nextId;
 		const used = new Set<LogicalRecord>([this.rootRecord]);
 		const reconcileChildren = (
@@ -3683,6 +3867,20 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						record = candidate;
 					}
 				}
+				if (record?.kind === 'portal' && child.kind === 'portal') {
+					const previousRegistration = record.portalRegistration;
+					const nextRegistration = child.registration;
+					if (
+						previousRegistration !== null &&
+						nextRegistration !== null &&
+						previousRegistration !== nextRegistration &&
+						Object.is(previousRegistration.handle, nextRegistration.handle)
+					) {
+						stagedPortalRegistrations.delete(nextRegistration);
+						nextRegistration.release();
+						child.registration = previousRegistration;
+					}
+				}
 				const isNew = record === undefined;
 				record ??= createLogicalRecord(nextId++, child);
 				claimed.add(record);
@@ -3713,6 +3911,23 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 		};
 		findRemoved(this.rootRecord);
+		const previousPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
+		for (const child of this.rootRecord.children) {
+			walkLogical(child, (record) => {
+				if (record.kind === 'portal' && record.portalRegistration !== null) {
+					previousPortalRegistrations.add(record.portalRegistration);
+				}
+			});
+		}
+		const nextPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
+		walkDraft(draftRoot, (draft) => {
+			if (draft.blueprint.kind !== 'portal') return;
+			const registration = draft.blueprint.registration;
+			if (registration === null) {
+				throw new Error('A universal portal target was not prepared before reconciliation.');
+			}
+			nextPortalRegistrations.add(registration);
+		});
 
 		const previousRegionBridges = new Set<UniversalRendererRegionOwnerBridge>();
 		for (const child of this.rootRecord.children) {
@@ -3805,19 +4020,24 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const removes: UniversalHostCommand[] = [];
 		const placements: UniversalHostCommand[] = [];
 		const planPlacements = (
-			parentId: number | null,
+			parentId: UniversalHostParent,
 			oldRecords: readonly LogicalRecord[],
 			newDrafts: readonly DraftRecord[],
+			sourceParentId: UniversalHostParent = parentId,
+			forceMove = false,
 		) => {
 			const oldPhysical = physicalRecords(oldRecords);
 			const newPhysical = physicalDrafts(newDrafts);
 			const desiredIds = new Set(newPhysical.map((entry) => entry.record.id));
 			for (const old of oldPhysical) {
-				if (!desiredIds.has(old.id)) removes.push({ op: 'remove', parent: parentId, id: old.id });
+				if (!desiredIds.has(old.id)) {
+					removes.push({ op: 'remove', parent: sourceParentId, id: old.id });
+				}
 			}
-			const current = oldPhysical
-				.filter((entry) => desiredIds.has(entry.id))
-				.map((entry) => entry.id);
+			const previousIds = new Set(oldPhysical.map((entry) => entry.id));
+			const current = forceMove
+				? []
+				: oldPhysical.filter((entry) => desiredIds.has(entry.id)).map((entry) => entry.id);
 			for (let index = 0; index < newPhysical.length; index++) {
 				const draft = newPhysical[index];
 				const id = draft.record.id;
@@ -3825,7 +4045,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				const currentIndex = current.indexOf(id);
 				const before = current[index] ?? null;
 				if (currentIndex === -1) {
-					placements.push({ op: 'insert', parent: parentId, id, before });
+					placements.push({
+						op: forceMove && previousIds.has(id) ? 'move' : 'insert',
+						parent: parentId,
+						id,
+						before,
+					});
 				} else {
 					current.splice(currentIndex, 1);
 					placements.push({ op: 'move', parent: parentId, id, before });
@@ -3838,8 +4063,33 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				planPlacements(null, this.rootRecord.children, draft.children);
 			} else if (draft.record.kind === 'host') {
 				planPlacements(draft.record.id, draft.record.children, draft.children);
+			} else if (draft.record.kind === 'portal') {
+				const nextRegistration = (draft.blueprint as BlueprintPortal).registration!;
+				const previousRegistration = draft.record.portalRegistration;
+				const retainedTarget =
+					previousRegistration !== null &&
+					Object.is(previousRegistration.handle, nextRegistration.handle);
+				planPlacements(
+					nextRegistration.handle,
+					draft.record.children,
+					draft.children,
+					previousRegistration?.handle ?? nextRegistration.handle,
+					previousRegistration !== null && !retainedTarget,
+				);
 			}
 		});
+		for (const removed of removedRoots) {
+			walkLogical(removed, (record) => {
+				if (record.kind !== 'portal' || record.portalRegistration === null) return;
+				for (const child of physicalRecords(record.children)) {
+					removes.push({
+						op: 'remove',
+						parent: record.portalRegistration.handle,
+						id: child.id,
+					});
+				}
+			});
+		}
 		const hiddenVisibilityCommands: UniversalHostCommand[] = [];
 		const visibleVisibilityCommands: UniversalHostCommand[] = [];
 		const stageHiddenVisibility = (draft: DraftRecord) => {
@@ -4140,6 +4390,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 		}
 
+		let portalReleaseError: unknown = NO_PENDING_PASSIVE_ERROR;
 		const applyLogicalTopology = () => {
 			const apply = (draft: DraftRecord, parent: LogicalRecord | null) => {
 				const record = draft.record;
@@ -4155,11 +4406,22 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					record.lifecycles = lifecycleStage.staged.get(record) ?? new Map();
 					record.localCallbacks = localCallbackStage.staged.get(record) ?? new Map();
 					record.visibility = host.visibility;
+				} else if (record.kind === 'portal') {
+					record.portalRegistration = (draft.blueprint as BlueprintPortal).registration;
 				}
 				record.children = draft.children.map((child) => child.record);
 				for (const child of draft.children) apply(child, record);
 			};
 			apply(draftRoot, null);
+			stagedPortalRegistrations.clear();
+			for (const registration of previousPortalRegistrations) {
+				if (nextPortalRegistrations.has(registration)) continue;
+				try {
+					registration.release();
+				} catch (error) {
+					if (portalReleaseError === NO_PENDING_PASSIVE_ERROR) portalReleaseError = error;
+				}
+			}
 		};
 		const lifecycleOrder: DraftRecord[] = [];
 		walkDraftPostOrder(draftRoot, (draft) => {
@@ -4265,6 +4527,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					deactivatedRegionCells.add(cell);
 					previous.deactivate();
 				}
+				if (portalReleaseError !== NO_PENDING_PASSIVE_ERROR) throw portalReleaseError;
 			},
 			() => preparedHost.afterAccept?.(),
 			() => {
@@ -4347,7 +4610,14 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 			},
 			() => preparedHost.abort(),
-			() => this.discardDraftOwners(draftOwnersParentFirst),
+			() => {
+				const tasks = [...stagedPortalRegistrations].map(
+					(registration) => () => registration.release(),
+				);
+				stagedPortalRegistrations.clear();
+				tasks.push(() => this.discardDraftOwners(draftOwnersParentFirst));
+				runCommitTasks(tasks);
+			},
 		);
 		return transaction;
 	}
@@ -4387,6 +4657,21 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			});
 		}
 		const physical = physicalRecords(this.rootRecord.children);
+		const portalRegistrations = new Set<UniversalPortalTargetRegistration>();
+		const portalRemoves: UniversalHostCommand[] = [];
+		for (const child of this.rootRecord.children) {
+			walkLogical(child, (record) => {
+				if (record.kind !== 'portal' || record.portalRegistration === null) return;
+				portalRegistrations.add(record.portalRegistration);
+				for (const physicalChild of physicalRecords(record.children)) {
+					portalRemoves.push({
+						op: 'remove',
+						parent: record.portalRegistration.handle,
+						id: physicalChild.id,
+					});
+				}
+			});
+		}
 		const removedHosts: LogicalRecord[] = [];
 		for (const child of this.rootRecord.children) collectRemovedPostOrder(child, removedHosts);
 		let acceptedHostError: unknown = NO_PENDING_PASSIVE_ERROR;
@@ -4423,6 +4708,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					),
 				),
 				...physical.map((record) => ({ op: 'remove' as const, parent: null, id: record.id })),
+				...portalRemoves,
 				...removedHosts.map((record) => ({ op: 'destroy' as const, id: record.id })),
 			]);
 			const prepare = (value: UniversalHostBatch) =>
@@ -4440,6 +4726,14 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 		}
 		this.rootRecord.children = [];
+		let portalReleaseError: unknown = NO_PENDING_PASSIVE_ERROR;
+		for (const registration of portalRegistrations) {
+			try {
+				registration.release();
+			} catch (error) {
+				if (portalReleaseError === NO_PENDING_PASSIVE_ERROR) portalReleaseError = error;
+			}
+		}
 		for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
 		this.publishedListeners.clear();
 		this.handlers = new Map();
@@ -4491,6 +4785,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		if (acceptedHostError !== NO_PENDING_PASSIVE_ERROR) {
 			syncTasks.unshift(() => {
 				throw acceptedHostError;
+			});
+		}
+		if (portalReleaseError !== NO_PENDING_PASSIVE_ERROR) {
+			syncTasks.unshift(() => {
+				throw portalReleaseError;
 			});
 		}
 		if (pendingPassiveError !== NO_PENDING_PASSIVE_ERROR) {
@@ -5037,6 +5336,9 @@ export function createObjectDriver(
 						invokeKeys.add(key);
 					}
 				} else if (command.op === 'insert' || command.op === 'move') {
+					if (command.parent !== null && typeof command.parent !== 'number') {
+						throw new Error('Object driver does not support portal target parents.');
+					}
 					if (!simulated.has(command.id))
 						throw new Error(`Object driver: unknown child ${command.id}.`);
 					for (const value of [
@@ -5059,6 +5361,9 @@ export function createObjectDriver(
 						}
 					}
 				} else if (command.op === 'remove') {
+					if (command.parent !== null && typeof command.parent !== 'number') {
+						throw new Error('Object driver does not support portal target parents.');
+					}
 					const children = simulatedChildren(command.parent);
 					const index = children.indexOf(command.id);
 					if (index === -1) throw new Error(`Object driver: child ${command.id} is not attached.`);
@@ -5145,6 +5450,9 @@ export function createObjectDriver(
 								if (command.listener === null) callbacks.delete(command.type);
 								else callbacks.set(command.type, command.listener);
 							} else if (command.op === 'insert' || command.op === 'move') {
+								if (command.parent !== null && typeof command.parent !== 'number') {
+									throw new Error('Object driver does not support portal target parents.');
+								}
 								const instance = state.instances.get(command.id)!;
 								for (const parent of [
 									container.children,
@@ -5160,6 +5468,9 @@ export function createObjectDriver(
 										: children.indexOf(state.instances.get(command.before)!);
 								children.splice(before, 0, instance);
 							} else if (command.op === 'remove') {
+								if (command.parent !== null && typeof command.parent !== 'number') {
+									throw new Error('Object driver does not support portal target parents.');
+								}
 								const children = objectChildren(container, command.parent, state.instances);
 								children.splice(children.indexOf(state.instances.get(command.id)!), 1);
 							} else if (command.op === 'destroy') {
