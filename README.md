@@ -502,6 +502,7 @@ generated from the workspace manifests in
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
   [`base-ui`](./packages/base-ui), [`sonner`](./packages/sonner),
   [`recharts`](./packages/recharts), [`visx`](./packages/visx),
+  [`three`](./packages/three),
   [`lucide`](./packages/lucide),
   [`redux`](./packages/redux), [`redux-toolkit`](./packages/redux-toolkit),
   [`testing-library`](./packages/testing-library),

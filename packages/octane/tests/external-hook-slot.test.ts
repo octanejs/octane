@@ -623,6 +623,7 @@ describe('manifest-declared manual hook slots', () => {
 			'tanstack-table',
 			'tanstack-virtual',
 			'testing-library',
+			'three',
 			'zustand',
 		]);
 	});

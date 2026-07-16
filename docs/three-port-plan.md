@@ -475,6 +475,11 @@ decision and tests.
 
 ### Milestone 0 — scaffold and evidence harness (0.5–1 engineer-week)
 
+Status: implemented. The package scaffold, compiler preset, renderer-local
+intrinsics, workspace validation wiring, pinned R3F/Three provenance, complete
+90-export/157-test crosswalk, and first same-source compiled scene oracle close
+this milestone's exit gate.
+
 - Create `packages/three`, renderer config fixtures, `status.json`, and package
   inventory/typecheck wiring.
 - Pin R3F 9.6.1 and the exact Three oracle version.
@@ -515,6 +520,12 @@ one client region with stable manifest identity. Mixed-renderer language
 tooling selects the correct, non-global intrinsic catalogue.
 
 ### Milestone 2 — Three driver and catalogue (2–3 engineer-weeks)
+
+Status: implemented. The catalogue, both `extend` forms, real Three host driver,
+public host-behavior suite, prepared transition coverage, and exact same-source
+R3F differential scene close this milestone's exit gate across mount, prop
+update, keyed reorder, reconstruction, and unmount. Canvas, root store/config,
+frame loop, and hooks remain Milestone 3; ray/pointer events remain Milestone 4.
 
 - Catalogue/object and constructor-component `extend` overloads, `primitive`,
   `args`, prop diff/application, attachment, ordered insertion/moves,
