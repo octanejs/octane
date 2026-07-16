@@ -1,0 +1,19 @@
+{
+  "upstream": {
+    "package": "@tanstack/react-form",
+    "version": "1.33.2"
+  },
+  "surface": "Ports the complete @tanstack/react-form 1.33.2 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.2 unchanged and using @octanejs/tanstack-store for subscriptions.",
+  "divergences": [
+    "Octane uses native events: text controls call `field.handleChange` from `onInput`; TanStack Form's `onChange` validator and listener option names remain unchanged.",
+    "Octane has no StrictMode double-invoke and always provides `useId`, so the adapter omits StrictMode scenarios and the legacy random-UUID fallback.",
+    "Component registration accepts Octane function components; class components are not supported by Octane."
+  ],
+  "ssr": "Supported and tested: fields and form subscriptions render their initial snapshots through octane/server without a DOM.",
+  "notes": [
+    "Renderer-bearing adapter modules are authored as TSRX and ship checked declaration emits with inline renderer aliases, Octane-prefixed public adapter types, and source-owned recursive contracts.",
+    "The ported React adapter suite has 82 executable behavioral tests with no skipped, todo, or expected-failure cases; upstream compile-time tests cover hook, field, group, and component-composition inference.",
+    "Differential coverage compiles one shared form through this adapter and real @tanstack/react-form@1.33.2, comparing values, validation, array mutations, and reset output after every interaction."
+  ],
+  "verified": "2026-07-15"
+}
