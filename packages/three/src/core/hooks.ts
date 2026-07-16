@@ -162,7 +162,7 @@ export function buildGraph(object: THREE.Object3D): ObjectMap {
 		) {
 			graph.materials[material.name] = material;
 		}
-		if (mesh.isMesh === true && graph.meshes[node.name] === undefined) {
+		if (mesh.isMesh === true && node.name !== '' && graph.meshes[node.name] === undefined) {
 			graph.meshes[node.name] = mesh;
 		}
 	});

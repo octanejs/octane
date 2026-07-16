@@ -137,7 +137,7 @@ export function Canvas({
 			size,
 		}).then(() => {
 			if (cancelled) return;
-			setBoundaryMount(createThreeBoundaryMount(root, children));
+			setBoundaryMount(createThreeBoundaryMount(root));
 		}).catch((reason) => {
 			if (!cancelled) setError(configurationError(reason));
 		});
@@ -146,7 +146,6 @@ export function Canvas({
 		};
 	}, [
 		size,
-		children,
 		gl,
 		events,
 		eventSource,
@@ -166,6 +165,14 @@ export function Canvas({
 		onCreated,
 	]);
 
+	const renderedBoundaryMount: ThreeBoundaryMount | null =
+		boundaryMount === null
+			? null
+			: {
+					...boundaryMount,
+					props: { ...boundaryMount.props, region: children },
+				};
+
 	const wrapperStyle: CanvasStyle = {
 		position: 'relative',
 		width: '100%',
@@ -179,12 +186,12 @@ export function Canvas({
 		<div style={{ width: '100%', height: '100%' }}>
 			<canvas ref={[canvasRef, ref]} style={{ display: 'block' }}>{fallback}</canvas>
 		</div>
-		{boundaryMount === null
+		{renderedBoundaryMount === null
 			? null
 			: <ThreeBoundary
-					root={boundaryMount.root}
-					component={boundaryMount.component}
-					props={boundaryMount.props}
+					root={renderedBoundaryMount.root}
+					component={renderedBoundaryMount.component}
+					props={renderedBoundaryMount.props}
 				/>}
 	</div>;
 }

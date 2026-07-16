@@ -53,7 +53,9 @@ describe('Three hooks and graph helpers', () => {
 		first.name = 'first';
 		const second = new THREE.Mesh(new THREE.SphereGeometry(), secondMaterial);
 		second.name = 'second';
-		root.add(first, second);
+		const unnamedFirst = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+		const unnamedSecond = new THREE.Mesh(new THREE.SphereGeometry(), new THREE.MeshBasicMaterial());
+		root.add(first, unnamedFirst, second, unnamedSecond);
 
 		const graph = buildGraph(root);
 

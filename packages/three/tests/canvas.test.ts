@@ -151,7 +151,7 @@ describe('Canvas', () => {
 		expect(renderer.dispose).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not expose scene children until an asynchronous renderer settles', async () => {
+	it('keeps scene child updates independent from asynchronous renderer configuration', async () => {
 		const { renderer } = rendererHarness();
 		let settle!: (renderer: Renderer) => void;
 		const pending = new Promise<Renderer>((resolve) => {
@@ -160,15 +160,17 @@ describe('Canvas', () => {
 		const factory = vi.fn(() => pending);
 		const objectRef = { current: null as { name: string } | null };
 		const onCreated = vi.fn<(state: RootState) => void>();
-		mounted = mount(CanvasApp, {
+		const raycaster = { near: 1 };
+		const props = {
 			gl: factory,
 			canvasRef: null,
 			objectRef,
 			onCreated,
 			label: 'async',
-			name: 'async-scene',
 			background: 'transparent',
-		});
+			raycaster,
+		};
+		mounted = mount(CanvasApp, { ...props, name: 'async-scene' });
 
 		ControlledResizeObserver.instances[0].emit({ width: 320, height: 200 });
 		await flushCanvasWork();
@@ -176,10 +178,24 @@ describe('Canvas', () => {
 		expect(onCreated).not.toHaveBeenCalled();
 		expect(objectRef.current).toBeNull();
 
+		mounted.update(CanvasApp, { ...props, name: 'latest-before-ready' });
+		expect(objectRef.current).toBeNull();
+
 		settle(renderer);
 		await flushCanvasWork();
 		expect(onCreated).toHaveBeenCalledTimes(1);
-		expect(objectRef.current?.name).toBe('async-scene');
+		expect(objectRef.current?.name).toBe('latest-before-ready');
+
+		const state = onCreated.mock.calls[0][0];
+		const sceneObject = objectRef.current;
+		state.raycaster.near = 42;
+
+		mounted.update(CanvasApp, { ...props, name: 'latest-after-ready' });
+		expect(objectRef.current).toBe(sceneObject);
+		expect(objectRef.current?.name).toBe('latest-after-ready');
+
+		await flushCanvasWork();
+		expect(state.raycaster.near).toBe(42);
 	});
 
 	it('activates an empty Canvas and calls onCreated with an empty scene', async () => {

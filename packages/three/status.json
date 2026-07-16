@@ -9,7 +9,7 @@
     "The programmatic root renders an Octane component plus props rather than a React element descriptor.",
     "The upstream callable store selector remains order-based because dynamic function calls cannot receive compiler slots; compiler-visible useStore(selector) and useThree(selector) preserve Octane's conditional-hook semantics.",
     "Pointer event configuration rejects clearly until the Milestone 4 event system lands.",
-    "buildGraph omits unnamed and array-valued material entries instead of publishing empty or undefined material keys.",
+    "buildGraph omits unnamed mesh and material entries, plus array-valued material entries, instead of publishing empty or undefined keys.",
     "Removing a pierced prop resets its original nested target; R3F 9.6.1 mistakenly writes that default to the leaf key on the root object."
   ],
   "ssr": "Three scene modules are classified client-only and Canvas.children is configured as an omitted server region. Package-level DOM-shell server output and hydration adoption remain Milestone 7 work.",

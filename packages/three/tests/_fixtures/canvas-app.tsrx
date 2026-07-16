@@ -7,6 +7,7 @@ export function CanvasApp(props) @{
 		ref={props.canvasRef}
 		gl={props.gl}
 		frameloop="never"
+		raycaster={props.raycaster}
 		onCreated={props.onCreated}
 		fallback={<span class="canvas-fallback">{'WebGL unavailable'}</span>}
 		className="canvas-shell"
