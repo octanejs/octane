@@ -1,0 +1,68 @@
+[
+  {
+    "title": "Shared state",
+    "description": "Small stores, atoms, Redux, RTK Query, and TanStack Store.",
+    "packages": [
+      "@octanejs/zustand",
+      "@octanejs/jotai",
+      "@octanejs/redux",
+      "@octanejs/redux-toolkit",
+      "@octanejs/tanstack-store"
+    ]
+  },
+  {
+    "title": "Data and routing",
+    "description": "GraphQL, server state, live IndexedDB data, type-safe routes, and React Router-style APIs.",
+    "packages": [
+      "@octanejs/apollo-client",
+      "@octanejs/dexie",
+      "@octanejs/tanstack-query",
+      "@octanejs/tanstack-router",
+      "@octanejs/remix-router"
+    ]
+  },
+  {
+    "title": "UI and interaction",
+    "description": "Primitives, positioning, motion, drag and drop, toasts, and icons.",
+    "packages": [
+      "@octanejs/radix",
+      "@octanejs/base-ui",
+      "@octanejs/floating-ui",
+      "@octanejs/motion",
+      "@octanejs/dnd-kit",
+      "@octanejs/sonner",
+      "@octanejs/lucide"
+    ]
+  },
+  {
+    "title": "Forms and content",
+    "description": "Forms, rich-text editing, MDX, and translations.",
+    "packages": [
+      "@octanejs/hook-form",
+      "@octanejs/tanstack-form",
+      "@octanejs/lexical",
+      "@octanejs/mdx",
+      "@octanejs/i18next"
+    ]
+  },
+  {
+    "title": "Data-heavy screens",
+    "description": "Tables, large virtual lists, charts, and visualization primitives.",
+    "packages": [
+      "@octanejs/tanstack-table",
+      "@octanejs/tanstack-virtual",
+      "@octanejs/recharts",
+      "@octanejs/visx"
+    ]
+  },
+  {
+    "title": "Web 3D",
+    "description": "Technical-preview, React Three Fiber-style scene graphs on Octane's universal renderer.",
+    "packages": ["@octanejs/three"]
+  },
+  {
+    "title": "Styling and tests",
+    "description": "Compiled StyleX and DOM-first component tests.",
+    "packages": ["@octanejs/stylex", "@octanejs/testing-library"]
+  }
+]
