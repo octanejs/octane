@@ -36,6 +36,7 @@ import {
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SEGMENT_ATTR,
 	STREAM_SEED_ATTR,
+	STREAM_SCRIPT_ATTR,
 	STREAM_SEED_COMMENT,
 	POSITIVE_NUMERIC_ATTR_PROPS,
 	BOOLEAN_ATTR_PROPS,
@@ -44,6 +45,7 @@ import {
 	isEnumeratedBooleanAttr,
 	cssStyleValue,
 	ATTRIBUTE_ALIASES,
+	SVG_ONLY_TAGS,
 	// No end tag, no children — `ssrChild` descriptor serialization matches the
 	// static-markup emission of `ssrEmitElement`.
 	VOID_ELEMENTS,
@@ -52,6 +54,10 @@ import {
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
 // hyphenated style keys stay byte-equal across the two runtimes).
 import { normalizeClass, styleName } from './css.js';
+import {
+	invalidHtmlNestingWithAncestor,
+	invalidHtmlNestingWithParent,
+} from './html-tree-validation.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 export { normalizeClass };
 
@@ -59,6 +65,16 @@ interface SSRScope {
 	parent: SSRScope | null;
 	/** Context Provider values stamped on this scope (lazily allocated). */
 	$$ctxValues: Map<unknown, unknown> | null;
+}
+
+type ParserNamespace = 'html' | 'svg' | 'mathml';
+
+interface SsrElementContext {
+	tag: string;
+	parent: SsrElementContext | null;
+	namespace: ParserNamespace;
+	childrenNamespace: ParserNamespace;
+	location?: string;
 }
 
 type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
@@ -140,6 +156,8 @@ interface Frame {
 	// Discovery re-runs restore it before replaying the component so identical
 	// child positions in @try content/pending/catch arms never share cache keys.
 	asyncScope: string;
+	/** Parser context supplied by, or inherited through, the component call site. */
+	namespace?: 'html' | 'svg' | 'mathml';
 }
 interface Job {
 	comp: ServerComponent;
@@ -165,6 +183,15 @@ let CURRENT_PARENT_SCOPE: SSRScope | null = null;
 // alone cannot distinguish a child rendered at the same position in an @try's
 // content and pending arms, even though those are separate client block scopes.
 let ASYNC_SCOPE = '';
+// DEV SSR HTML-parser context. Compiler-emitted ssrElement wrappers keep native
+// elements on this stack while their children execute, including through
+// component calls. The warning set is render-local and shared by canonical
+// retries, so one authored relationship reports once without leaking between
+// requests. Discovery passes leave it null because their output is discarded.
+let CURRENT_SSR_ELEMENT: SsrElementContext | null = null;
+// null = validation disabled (outside a canonical render / discovery pass),
+// undefined = enabled but no warning set allocated yet.
+let SSR_NESTING_WARNINGS: Set<string> | null | undefined = null;
 
 // Walk a frame to its dotted path ('' for the root). Memoized per frame.
 function framePath(f: Frame): string {
@@ -196,6 +223,102 @@ function nextChildSegment(frame: Frame): number {
 
 function ssrScope(parent: SSRScope | null): SSRScope {
 	return { parent, $$ctxValues: null };
+}
+
+function ssrElementNamespaces(
+	tag: string,
+	parent: SsrElementContext | null,
+): { namespace: ParserNamespace; childrenNamespace: ParserNamespace } {
+	const inherited = parent?.childrenNamespace ?? FRAME?.namespace ?? 'html';
+	const namespace: ParserNamespace =
+		tag === 'svg'
+			? 'svg'
+			: tag === 'math'
+				? 'mathml'
+				: inherited === 'html' && SVG_ONLY_TAGS.has(tag)
+					? 'svg'
+					: inherited;
+	const childrenNamespace: ParserNamespace =
+		tag === 'foreignObject'
+			? 'html'
+			: tag === 'svg'
+				? 'svg'
+				: tag === 'math'
+					? 'mathml'
+					: inherited === 'html' && SVG_ONLY_TAGS.has(tag)
+						? 'svg'
+						: inherited;
+	return { namespace, childrenNamespace };
+}
+
+function reportInvalidHtmlNesting(message: string): void {
+	const warning =
+		'Octane SSR invalid HTML nesting: ' +
+		message +
+		'\n\nThe browser will repair this HTML before hydration. This can shift content and cause a hydration mismatch.';
+	let seen = SSR_NESTING_WARNINGS;
+	if (seen === null) return;
+	if (seen === undefined) {
+		seen = new Set();
+		SSR_NESTING_WARNINGS = seen;
+		if (RESOLVED !== null) RESOLVED.nestingWarnings = seen;
+	}
+	if (seen.has(warning)) return;
+	seen.add(warning);
+	console.error(warning);
+}
+
+/** Compiler ABI: validate and scope one native element during a DEV SSR render. */
+export function ssrElement(
+	tag: string,
+	location: string | undefined,
+	render: () => string,
+): string {
+	if (process.env.NODE_ENV === 'production' || SSR_NESTING_WARNINGS === null) return render();
+
+	const parent = CURRENT_SSR_ELEMENT;
+	const { namespace, childrenNamespace } = ssrElementNamespaces(tag, parent);
+	const semanticTag = tag.toLowerCase();
+	const element: SsrElementContext = {
+		tag: semanticTag,
+		parent,
+		namespace,
+		childrenNamespace,
+		location,
+	};
+
+	// Foreign-content parsing is independent of the HTML repair rules. Stop at
+	// that boundary; <foreignObject> children naturally start a fresh HTML chain.
+	if (namespace === 'html' && parent?.namespace === 'html') {
+		const parentMessage = invalidHtmlNestingWithParent(
+			semanticTag,
+			parent.tag,
+			location,
+			parent.location,
+		);
+		if (parentMessage !== null) reportInvalidHtmlNesting(parentMessage);
+
+		let ancestor = parent.parent;
+		const ancestors = [parent.tag];
+		while (ancestor !== null && ancestor.namespace === 'html') {
+			ancestors.push(ancestor.tag);
+			const ancestorMessage = invalidHtmlNestingWithAncestor(
+				semanticTag,
+				ancestors,
+				location,
+				ancestor.location,
+			);
+			if (ancestorMessage !== null) reportInvalidHtmlNesting(ancestorMessage);
+			ancestor = ancestor.parent;
+		}
+	}
+
+	CURRENT_SSR_ELEMENT = element;
+	try {
+		return render();
+	} finally {
+		CURRENT_SSR_ELEMENT = parent;
+	}
 }
 
 const NOOP = (): void => {};
@@ -659,6 +782,17 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 	// an empty hole still occupies one logical node, keeping sibling cursor
 	// alignment intact. `ssrComponent` already wraps its output in block markers.
 	if (v == null || v === false || v === true) return ssrBlock('');
+	// React 19 Usables are valid renderable nodes, not only valid arguments to
+	// an explicit use() call. Unwrap recursively so a promise may resolve to a
+	// Context (and a Context value may itself be another Usable) before the
+	// ordinary child classifier serializes the final value. Pending thenables
+	// still route through the nearest streaming/buffered Suspense boundary.
+	if (
+		typeof v === 'object' &&
+		((v as any).$$kind === CONTEXT_TAG || typeof (v as any).then === 'function')
+	) {
+		return ssrChild(use(v as Context<unknown> | PromiseLike<unknown>), scope);
+	}
 	// An ARRAY child (e.g. `{xs.map(x => <li/>)}`) → the client's childSlot routes
 	// it to the de-opt keyed list, whose hydration ADOPTS one `<!--[-->…<!--]-->`
 	// range PER ITEM (see mountItem's hydrating branch). So wrap each item in its
@@ -763,13 +897,18 @@ function ssrHostElement(
 	if (!VALID_TAG_NAME.test(tag)) {
 		throw new Error('Invalid tag: ' + tag);
 	}
+	// Public string descriptors follow HTML's ASCII case-insensitive tag
+	// semantics even when the authored spelling is uppercase. Preserve that
+	// spelling in the serialized tag, but normalize every behavior/safety check.
+	const semanticTag = tag.toLowerCase();
 	let attrs = '';
 	let innerHTML: unknown = undefined;
 	// Controlled form props (mirrors the compiled ssrEmitElement routing):
 	// input maps the value/defaultValue and checked/defaultChecked cascades
 	// onto the native attributes; textarea routes value/defaultValue into the
 	// CONTENT position; select feeds them to the option-projection scope.
-	const isCtlTag = tag === 'input' || tag === 'textarea' || tag === 'select';
+	const isCtlTag =
+		semanticTag === 'input' || semanticTag === 'textarea' || semanticTag === 'select';
 	if (props != null) {
 		for (const k in props) {
 			const val = props[k];
@@ -784,13 +923,13 @@ function ssrHostElement(
 				isCtlTag &&
 				(k === 'value' ||
 					k === 'defaultValue' ||
-					(tag === 'input' && (k === 'checked' || k === 'defaultChecked')))
+					(semanticTag === 'input' && (k === 'checked' || k === 'defaultChecked')))
 			) {
 				continue; // serialized from the cascade below / the content position
 			}
-			attrs += ssrAttrEntry(k, val, tag);
+			attrs += ssrAttrEntry(k, val, semanticTag);
 		}
-		if (tag === 'input') {
+		if (semanticTag === 'input') {
 			attrs += ssrValueAttr(props.value != null ? props.value : props.defaultValue);
 			attrs += ssrCheckedAttr(props.checked != null ? props.checked : props.defaultChecked);
 		}
@@ -802,19 +941,26 @@ function ssrHostElement(
 	// Controlled <textarea>: the prop IS the content — React's contract
 	// (children + defaultValue throws; children + value warns dev-side, the
 	// value wins; the compiled path rejects both at compile time).
-	if (tag === 'textarea' && props != null && (props.value != null || props.defaultValue != null)) {
+	if (
+		semanticTag === 'textarea' &&
+		props != null &&
+		(props.value != null || props.defaultValue != null)
+	) {
 		if (hasChildren && props.value == null) {
 			throw new Error('If you supply `defaultValue` on a <textarea>, do not pass children.');
 		}
 		const inner = ssrTextareaValue(props.value != null ? props.value : props.defaultValue);
 		return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
 	}
-	if (VOID_ELEMENTS.has(tag) && !hasChildren && innerHTML === undefined) {
+	if (VOID_ELEMENTS.has(semanticTag) && !hasChildren && innerHTML === undefined) {
 		return '<' + tag + attrs + '/>';
 	}
 	let inner = '';
 	if (innerHTML !== undefined) {
-		inner = innerHTML == null ? '' : String(innerHTML);
+		const raw = innerHTML == null ? '' : String(innerHTML);
+		// HTML tag names are ASCII case-insensitive on the public descriptor path
+		// (`createElement('SCRIPT', …)` creates a real script in the browser too).
+		inner = semanticTag === 'script' ? escapeEntireInlineScriptContent(raw) : raw;
 	} else if (rawInner !== undefined) {
 		inner = rawInner;
 	} else if (hasChildren) {
@@ -831,13 +977,15 @@ function ssrHostElement(
 		// A controlled <select> projects `selected` onto the options serialized
 		// inside its children (compiled options included — the scope is global).
 		inner =
-			tag === 'select' && props != null && (props.value != null || props.defaultValue != null)
+			semanticTag === 'select' &&
+			props != null &&
+			(props.value != null || props.defaultValue != null)
 				? ssrSelectScope(props.value, props.defaultValue, !!props.multiple, build)
 				: build();
 	}
 	// <option> assembles via ssrOption so an active select scope can mark it
 	// ` selected` (its value prop already serialized as a plain attribute).
-	if (tag === 'option') {
+	if (semanticTag === 'option') {
 		return ssrOption(props != null && props.value != null ? props.value : undefined, attrs, inner);
 	}
 	return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
@@ -956,7 +1104,7 @@ function encodeAsyncIdentityString(value: string): string {
 	return encoded;
 }
 
-function asyncIdentityKey(value: unknown, objectIs: boolean): string {
+function asyncIdentityKey(value: unknown, objectIs: boolean, positionFallback?: string): string {
 	switch (typeof value) {
 		case 'string':
 			return 's' + encodeAsyncIdentityString(value);
@@ -976,9 +1124,15 @@ function asyncIdentityKey(value: unknown, objectIs: boolean): string {
 			if (ids === undefined) return 'o' + encodeAsyncIdentityString(String(value));
 			let id = ids.get(value);
 			if (id === undefined) {
-				id = RESOLVED!.nextAsyncIdentity++;
+				id =
+					positionFallback === undefined
+						? undefined
+						: RESOLVED!.asyncPositionIdentities.get(positionFallback);
+				if (id === undefined) id = RESOLVED!.nextAsyncIdentity++;
 				ids.set(value, id);
 			}
+			if (positionFallback !== undefined)
+				RESOLVED!.asyncPositionIdentities.set(positionFallback, id);
 			return 'o' + id.toString(36);
 		}
 	}
@@ -989,9 +1143,11 @@ function withAsyncIdentity<T>(
 	identity: unknown,
 	fn: () => T,
 	objectIs: boolean = false,
+	positionFallback?: string,
 ): T {
 	const prev = ASYNC_SCOPE;
-	ASYNC_SCOPE = prev + '|@' + siteKey + ':' + asyncIdentityKey(identity, objectIs);
+	const position = prev + '|@' + siteKey;
+	ASYNC_SCOPE = position + ':' + asyncIdentityKey(identity, objectIs, positionFallback);
 	try {
 		return fn();
 	} finally {
@@ -1014,7 +1170,15 @@ export function ssrControl<T>(siteKey: string, fn: () => T): T {
 
 /** Compiler-emitted identity membrane for one arm/item inside ssrControl. */
 export function ssrArm<T>(armKey: unknown, fn: () => T): T {
-	return withAsyncIdentity('arm', armKey, fn);
+	const frame = FRAME;
+	const occurrence =
+		frame === null ? 0 : nextFrameOccurrence(frame, '@arm-position:' + ASYNC_SCOPE);
+	// A freshly allocated object key has no cross-pass identity. Reuse the same
+	// lexical item position only as its fallback lookup. The final scope remains
+	// keyed solely by armKey, so a stable primitive/object key keeps its identity
+	// when an @for reorders between streaming passes.
+	const fallbackPosition = ASYNC_SCOPE + '|@arm-position:' + occurrence;
+	return withAsyncIdentity('arm', armKey, fn, false, fallbackPosition);
 }
 
 /**
@@ -1231,6 +1395,31 @@ export function ssrInnerHtml(sources: unknown[]): string | undefined {
 		if (s != null) return s.__html == null ? '' : String(s.__html);
 	}
 	return undefined;
+}
+
+// React's whole-inline-script escape: replace only the `s` in each case-
+// insensitive `<script` / `</script` token. The resulting `\u0073` / `\u0053`
+// stays valid JavaScript while preventing the HTML parser from opening or closing
+// a script element early. Other `<`, `>`, `&`, U+2028 and U+2029 characters remain
+// untouched because they can be meaningful JavaScript syntax.
+const INLINE_SCRIPT_TOKEN = /(<\/|<)(s)(cript)/gi;
+
+function escapeEntireInlineScriptContent(value: string): string {
+	return value.replace(
+		INLINE_SCRIPT_TOKEN,
+		(_match, prefix: string, s: string, suffix: string) =>
+			`${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
+	);
+}
+
+/**
+ * Resolve source-ordered `dangerouslySetInnerHTML` writers for a script and make
+ * the resulting whole-script body safe to concatenate into an HTML response.
+ * `undefined` still means "no writer", preserving the normal children fallback.
+ */
+export function ssrScriptInnerHtml(sources: unknown[]): string | undefined {
+	const html = ssrInnerHtml(sources);
+	return html === undefined ? undefined : escapeEntireInlineScriptContent(html);
 }
 
 // ---------------------------------------------------------------------------
@@ -1526,6 +1715,133 @@ function stateHook<S, A>(
 	return [rec.value as S, rec.dispatch as (action: A) => void, getter];
 }
 
+// Keep the large retry snapshot off the recursive component-call stack. Fizz
+// supports very deep trees; retaining dozens of snapshot locals in
+// invokeComponentBody's live frame would exhaust the JavaScript stack first.
+function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
+	const css = CSS;
+	const head = HEAD;
+	const serial = SERIAL;
+	const susp = SUSPENDED;
+	const jobs = DEFERRED;
+	const stream = STREAM;
+	return {
+		id: ID_COUNTER,
+		css,
+		cssEntries: css === null ? null : new Map(css),
+		head,
+		headLength: head !== null ? head.html.length : 0,
+		headHints: head === null ? null : new Set(head.hints),
+		serial,
+		serialLength: serial !== null ? serial.length : 0,
+		susp,
+		suspLength: susp !== null ? susp.length : 0,
+		jobs,
+		jobsLength: jobs !== null ? jobs.length : 0,
+		context: scope.$$ctxValues,
+		vtTrySeq: VT_SSR_TRY_SEQ,
+		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
+		vtStack: VT_SSR_STACK.map((candidate) => ({
+			candidate,
+			consumed: candidate.consumed,
+		})),
+		stream,
+		streamNextId: stream?.nextId ?? 0,
+		streamActiveTryKeys: stream?.activeTryKeys.slice() ?? [],
+		streamActiveOwnerKeys: stream?.activeOwnerKeys.slice() ?? [],
+		streamPassBoundaryKeys:
+			stream?.activePassBoundaryKeys === null || stream?.activePassBoundaryKeys === undefined
+				? null
+				: new Set(stream.activePassBoundaryKeys),
+		asyncScope: ASYNC_SCOPE,
+		streamBoundaries:
+			stream === null
+				? null
+				: Array.from(stream.boundaries, ([key, entry]) => ({
+						key,
+						entry,
+						id: entry.id,
+						order: entry.order,
+						state: entry.state,
+						html: entry.html,
+						seeds: entry.seeds.slice(),
+						pendingIdOffset: entry.pendingIdOffset,
+						ancestors: entry.ancestors.slice(),
+						owners: entry.owners.slice(),
+						namespace: entry.namespace,
+					})),
+		frameDeferred: frame?.deferred ?? false,
+		frameNextChild: frame?.nextChild ?? 0,
+		frameScopedChildren:
+			frame?.scopedChildren === null || frame?.scopedChildren === undefined
+				? null
+				: new Map(frame.scopedChildren),
+		frameOccurrences: frame?.occ === null || frame?.occ === undefined ? null : new Map(frame.occ),
+	};
+}
+
+function rewindComponentReplayState(
+	snapshot: ReturnType<typeof captureComponentReplayState>,
+	scope: SSRScope,
+	frame: Frame | null,
+): void {
+	ID_COUNTER = snapshot.id;
+	ASYNC_SCOPE = snapshot.asyncScope;
+	if (snapshot.css !== null && snapshot.cssEntries !== null) {
+		snapshot.css.clear();
+		for (const [hash, sheet] of snapshot.cssEntries) snapshot.css.set(hash, sheet);
+	}
+	if (snapshot.head !== null && snapshot.headHints !== null) {
+		snapshot.head.html = snapshot.head.html.slice(0, snapshot.headLength);
+		snapshot.head.hints.clear();
+		for (const key of snapshot.headHints) snapshot.head.hints.add(key);
+	}
+	if (snapshot.serial !== null) snapshot.serial.length = snapshot.serialLength;
+	if (snapshot.susp !== null) snapshot.susp.length = snapshot.suspLength;
+	if (snapshot.jobs !== null) snapshot.jobs.length = snapshot.jobsLength;
+	VT_SSR_TRY_SEQ = snapshot.vtTrySeq;
+	VT_SSR_HAS_CANDIDATES = snapshot.vtHasCandidates;
+	VT_SSR_STACK.length = 0;
+	for (const entry of snapshot.vtStack) {
+		entry.candidate.consumed = entry.consumed;
+		VT_SSR_STACK.push(entry.candidate);
+	}
+	const stream = snapshot.stream;
+	if (stream !== null && snapshot.streamBoundaries !== null) {
+		stream.nextId = snapshot.streamNextId;
+		if (stream.activePassBoundaryKeys !== null && snapshot.streamPassBoundaryKeys !== null) {
+			stream.activePassBoundaryKeys.clear();
+			for (const key of snapshot.streamPassBoundaryKeys) stream.activePassBoundaryKeys.add(key);
+		}
+		stream.activeTryKeys.length = 0;
+		stream.activeTryKeys.push(...snapshot.streamActiveTryKeys);
+		stream.activeOwnerKeys.length = 0;
+		stream.activeOwnerKeys.push(...snapshot.streamActiveOwnerKeys);
+		stream.boundaries.clear();
+		for (const saved of snapshot.streamBoundaries) {
+			const entry = saved.entry;
+			entry.id = saved.id;
+			entry.order = saved.order;
+			entry.state = saved.state;
+			entry.html = saved.html;
+			entry.seeds = saved.seeds.slice();
+			entry.pendingIdOffset = saved.pendingIdOffset;
+			entry.ancestors = saved.ancestors.slice();
+			entry.owners = saved.owners.slice();
+			entry.namespace = saved.namespace;
+			stream.boundaries.set(saved.key, entry);
+		}
+	}
+	scope.$$ctxValues = snapshot.context;
+	if (frame !== null) {
+		frame.deferred = snapshot.frameDeferred;
+		frame.nextChild = snapshot.frameNextChild;
+		frame.scopedChildren =
+			snapshot.frameScopedChildren === null ? null : new Map(snapshot.frameScopedChildren);
+		frame.occ = snapshot.frameOccurrences === null ? null : new Map(snapshot.frameOccurrences);
+	}
+}
+
 // Invoke a component body, re-invoking while render-phase dispatches fired
 // (bounded). Each retry REWINDS everything the discarded pass emitted into the
 // ambient pass state — useId numbering, suspense seed order/registrations,
@@ -1542,56 +1858,7 @@ function invokeComponentBody(
 ): unknown {
 	const prevHP = HOOK_PASS;
 	const hp: HookPass = { hooks: new Map(), occ: new Map(), update: false };
-	// Entry watermarks/snapshots for the rewind, taken BEFORE the first pass.
-	const id0 = ID_COUNTER;
-	const css = CSS;
-	const css0 = css === null ? null : new Map(css);
-	const head = HEAD;
-	const headLen = head !== null ? head.html.length : 0;
-	const headHints0 = head === null ? null : new Set(head.hints);
-	const serial = SERIAL;
-	const serialLen = serial !== null ? serial.length : 0;
-	const susp = SUSPENDED;
-	const suspLen = susp !== null ? susp.length : 0;
-	const jobs = DEFERRED;
-	const jobsLen = jobs !== null ? jobs.length : 0;
-	const ctx0 = scope.$$ctxValues;
-	const vtTrySeq0 = VT_SSR_TRY_SEQ;
-	const vtHasCandidates0 = VT_SSR_HAS_CANDIDATES;
-	const vtStack0 = VT_SSR_STACK.map((candidate) => ({
-		candidate,
-		consumed: candidate.consumed,
-	}));
-	const stream = STREAM;
-	const streamNextId0 = stream?.nextId ?? 0;
-	const streamActiveTryKeys0 = stream?.activeTryKeys.slice() ?? [];
-	const streamActiveOwnerKeys0 = stream?.activeOwnerKeys.slice() ?? [];
-	const asyncScope0 = ASYNC_SCOPE;
-	const streamBoundaries0 =
-		stream === null
-			? null
-			: Array.from(stream.boundaries, ([key, entry]) => ({
-					key,
-					entry,
-					id: entry.id,
-					order: entry.order,
-					state: entry.state,
-					html: entry.html,
-					seeds: entry.seeds.slice(),
-					pendingIdOffset: entry.pendingIdOffset,
-					ancestors: entry.ancestors.slice(),
-					owners: entry.owners.slice(),
-				}));
-	let deferred0 = false;
-	let nextChild0 = 0;
-	let scopedChildren0: Map<string, number> | null = null;
-	let occ0: Map<string, number> | null = null;
-	if (frame !== null) {
-		deferred0 = frame.deferred;
-		nextChild0 = frame.nextChild;
-		scopedChildren0 = frame.scopedChildren === null ? null : new Map(frame.scopedChildren);
-		occ0 = frame.occ === null ? null : new Map(frame.occ);
-	}
+	const snapshot = captureComponentReplayState(scope, frame);
 	HOOK_PASS = hp;
 	try {
 		let out = comp(props ?? {}, scope, undefined);
@@ -1604,54 +1871,7 @@ function invokeComponentBody(
 			}
 			hp.update = false;
 			hp.occ = new Map();
-			ID_COUNTER = id0;
-			ASYNC_SCOPE = asyncScope0;
-			if (css !== null && css0 !== null) {
-				css.clear();
-				for (const [hash, sheet] of css0) css.set(hash, sheet);
-			}
-			if (head !== null && headHints0 !== null) {
-				head.html = head.html.slice(0, headLen);
-				head.hints.clear();
-				for (const key of headHints0) head.hints.add(key);
-			}
-			if (serial !== null) serial.length = serialLen;
-			if (susp !== null) susp.length = suspLen;
-			if (jobs !== null) jobs.length = jobsLen;
-			VT_SSR_TRY_SEQ = vtTrySeq0;
-			VT_SSR_HAS_CANDIDATES = vtHasCandidates0;
-			VT_SSR_STACK.length = 0;
-			for (const snapshot of vtStack0) {
-				snapshot.candidate.consumed = snapshot.consumed;
-				VT_SSR_STACK.push(snapshot.candidate);
-			}
-			if (stream !== null && streamBoundaries0 !== null) {
-				stream.nextId = streamNextId0;
-				stream.activeTryKeys.length = 0;
-				stream.activeTryKeys.push(...streamActiveTryKeys0);
-				stream.activeOwnerKeys.length = 0;
-				stream.activeOwnerKeys.push(...streamActiveOwnerKeys0);
-				stream.boundaries.clear();
-				for (const snapshot of streamBoundaries0) {
-					const entry = snapshot.entry;
-					entry.id = snapshot.id;
-					entry.order = snapshot.order;
-					entry.state = snapshot.state;
-					entry.html = snapshot.html;
-					entry.seeds = snapshot.seeds.slice();
-					entry.pendingIdOffset = snapshot.pendingIdOffset;
-					entry.ancestors = snapshot.ancestors.slice();
-					entry.owners = snapshot.owners.slice();
-					stream.boundaries.set(snapshot.key, entry);
-				}
-			}
-			scope.$$ctxValues = ctx0;
-			if (frame !== null) {
-				frame.deferred = deferred0;
-				frame.nextChild = nextChild0;
-				frame.scopedChildren = scopedChildren0 === null ? null : new Map(scopedChildren0);
-				frame.occ = occ0 === null ? null : new Map(occ0);
-			}
+			rewindComponentReplayState(snapshot, scope, frame);
 			out = comp(props ?? {}, scope, undefined);
 		}
 		return out;
@@ -1697,6 +1917,9 @@ function renderComponentFramed(
 		// instead, mirroring the client where such a return flows through the block's
 		// childSlot. Normalize it the same way (ssrChild = the server childSlot), or it
 		// would stringify to `[object Object]`.
+		// Every component gets an independent replay boundary. A body with no
+		// syntactic calls can still execute user code through a getter, Proxy, or
+		// coercion; that code may call hooks or schedule render-phase updates.
 		const out = invokeComponentBody(comp, props, scope, frame);
 		const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, scope);
 		// Wrap the child's output in a hydration block range so the client's
@@ -1731,78 +1954,140 @@ export function ssrComponent(
 	key?: unknown,
 	identityScoped?: boolean,
 ): string {
+	// Component recursion is one of SSR's hottest and deepest paths. Install the
+	// same async-identity membrane inline instead of recursing back through
+	// ssrComponent from two wrapper callbacks. Besides avoiding callback overhead,
+	// this keeps realistically deep function-component trees below the engine's
+	// call-stack ceiling while preserving the exact identity path bytes.
+	const previousIdentityScope = ASYNC_SCOPE;
 	if (identityScoped !== true) {
-		return withAsyncIdentity('component-type', comp, () => {
-			const render = () => ssrComponent(parent, comp, props, inherit, undefined, true);
-			return key != null ? withAsyncIdentity('component-key', key, render, true) : render();
-		});
+		ASYNC_SCOPE = previousIdentityScope + '|@component-type:' + asyncIdentityKey(comp, false);
+		if (key != null) ASYNC_SCOPE += '|@component-key:' + asyncIdentityKey(key, true);
 	}
-	// Boundary builtins decline inherit by IDENTITY — mirrors componentSlot's
-	// client-side decline exactly (member/aliased/dynamic tags resolving to
-	// Suspense/ErrorBoundary/ViewTransition keep their pair; both sides agree
-	// by identity).
-	if (inherit === true && (comp === Suspense || comp === ErrorBoundary || comp === ViewTransition))
-		inherit = false;
-	// A member/dynamic tag (`<obj.tag/>`, `<{expr}/>`) can resolve to a host tag
-	// STRING at runtime (e.g. MDX's `_components.h1` mapping, unoverridden). The
-	// client renders these — a value-lowered `createElement(obj.tag, …)` routes
-	// `typeof type === 'string'` through the de-opt host path — so the server
-	// must too, instead of CALLING the string as a component body. Serialize the
-	// host element inside the same single `<!--[-->…<!--]-->` range a component
-	// body gets (exactly ssrChild's host-descriptor shape), so the client's
-	// adoption sees one uniform block whichever kind the tag resolved to.
-	// Children arrive as `props.children` — plain values/descriptors from a
-	// value-position call site (ssrHostElement's content path handles those), or
-	// a render FUNCTION from a template one.
-	if (typeof comp === 'string') {
-		const kids = props?.children;
-		if (typeof kids === 'function') {
-			// A TEMPLATE call site compiles children to a `__schildren$N` render fn.
-			// Call it directly (`(undefined, scope)`, the ssrChildrenHtml/ProviderBody
-			// convention) and inline its HTML as the element's plain content — the
-			// shape a static host tag emits (`<h1>hi</h1>`, holes inside carry their
-			// own blocks). Routing the fn through ssrHostElement's descriptor-content
-			// path would render it as a nested COMPONENT body instead: wrong calling
-			// convention and a stray `<!--[-->…<!--]-->` around the element's content.
-			// A non-compiled fn (a render-prop child on a tag that resolved to a
-			// string) returns a descriptor, not HTML — normalize via ssrChild, exactly
-			// like renderComponentFramed normalizes a de-opt body's return.
-			const out = (kids as any)(undefined, parent);
-			const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, parent);
-			const html = ssrHostElement(comp, props, null, parent, inner);
-			return inherit ? html : ssrBlock(html);
-		}
-		const html = ssrHostElement(comp, props, kids, parent);
-		return inherit ? html : ssrBlock(html);
-	}
-	const pf = FRAME;
-	// A fresh child frame: its `seg` is the parent's next child index (built into
-	// the path so sibling instances of the same component get distinct keys). `pf`
-	// is only null defensively (render() always installs a root frame); use an
-	// ad-hoc root frame so keys still work.
-	const frame: Frame =
-		pf === null
-			? {
-					parent: null,
-					seg: 0,
-					nextChild: 0,
-					scopedChildren: null,
-					occ: null,
-					path: null,
-					deferred: false,
-					asyncScope: ASYNC_SCOPE,
+	try {
+		const explicitNamespace = NEXT_COMPONENT_NAMESPACE;
+		NEXT_COMPONENT_NAMESPACE = null;
+		// Boundary builtins decline inherit by IDENTITY — mirrors componentSlot's
+		// client-side decline exactly (member/aliased/dynamic tags resolving to
+		// Suspense/ErrorBoundary/ViewTransition keep their pair; both sides agree
+		// by identity).
+		if (
+			inherit === true &&
+			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition)
+		)
+			inherit = false;
+		// A member/dynamic tag (`<obj.tag/>`, `<{expr}/>`) can resolve to a host tag
+		// STRING at runtime (e.g. MDX's `_components.h1` mapping, unoverridden). The
+		// client renders these — a value-lowered `createElement(obj.tag, …)` routes
+		// `typeof type === 'string'` through the de-opt host path — so the server
+		// must too, instead of CALLING the string as a component body. Serialize the
+		// host element inside the same single `<!--[-->…<!--]-->` range a component
+		// body gets (exactly ssrChild's host-descriptor shape), so the client's
+		// adoption sees one uniform block whichever kind the tag resolved to.
+		// Children arrive as `props.children` — plain values/descriptors from a
+		// value-position call site (ssrHostElement's content path handles those), or
+		// a render FUNCTION from a template one.
+		if (typeof comp === 'string') {
+			const inheritedNamespace = explicitNamespace ?? FRAME?.namespace ?? 'html';
+			const childNamespace =
+				comp === 'foreignObject'
+					? 'html'
+					: comp === 'svg' || (inheritedNamespace === 'html' && SVG_ONLY_TAGS.has(comp))
+						? 'svg'
+						: comp === 'math'
+							? 'mathml'
+							: inheritedNamespace;
+			return ssrInNamespace(childNamespace, () => {
+				const kids = props?.children;
+				if (typeof kids === 'function') {
+					// A TEMPLATE call site compiles children to a `__schildren$N` render fn.
+					// Call it directly (`(undefined, scope)`, the ssrChildrenHtml/ProviderBody
+					// convention) and inline its HTML as the element's plain content — the
+					// shape a static host tag emits (`<h1>hi</h1>`, holes inside carry their
+					// own blocks). Routing the fn through ssrHostElement's descriptor-content
+					// path would render it as a nested COMPONENT body instead: wrong calling
+					// convention and a stray `<!--[-->…<!--]-->` around the element's content.
+					// A non-compiled fn (a render-prop child on a tag that resolved to a
+					// string) returns a descriptor, not HTML — normalize via ssrChild, exactly
+					// like renderComponentFramed normalizes a de-opt body's return.
+					const out = (kids as any)(undefined, parent);
+					const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, parent);
+					const html = ssrHostElement(comp, props, null, parent, inner);
+					return inherit ? html : ssrBlock(html);
 				}
-			: {
-					parent: pf,
-					seg: nextChildSegment(pf),
-					nextChild: 0,
-					scopedChildren: null,
-					occ: null,
-					path: null,
-					deferred: false,
-					asyncScope: ASYNC_SCOPE,
-				};
-	return renderComponentFramed(comp, props, parent, frame, inherit);
+				const html = ssrHostElement(comp, props, kids, parent);
+				return inherit ? html : ssrBlock(html);
+			});
+		}
+		const pf = FRAME;
+		// A fresh child frame: its `seg` is the parent's next child index (built into
+		// the path so sibling instances of the same component get distinct keys). `pf`
+		// is only null defensively (render() always installs a root frame); use an
+		// ad-hoc root frame so keys still work.
+		const frame: Frame =
+			pf === null
+				? {
+						parent: null,
+						seg: 0,
+						nextChild: 0,
+						scopedChildren: null,
+						occ: null,
+						path: null,
+						deferred: false,
+						asyncScope: ASYNC_SCOPE,
+					}
+				: {
+						parent: pf,
+						seg: nextChildSegment(pf),
+						nextChild: 0,
+						scopedChildren: null,
+						occ: null,
+						path: null,
+						deferred: false,
+						asyncScope: ASYNC_SCOPE,
+					};
+		// Function components are transparent to the HTML parser. Carry the active
+		// namespace through arbitrary wrapper chains; an explicitly compiled host
+		// transition (`<svg>`, `<math>`, or `<foreignObject>`) overrides it for the
+		// next component frame through ssrComponentNS.
+		frame.namespace = explicitNamespace ?? pf?.namespace;
+		return renderComponentFramed(comp, props, parent, frame, inherit);
+	} finally {
+		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
+	}
+}
+
+let NEXT_COMPONENT_NAMESPACE: 'html' | 'svg' | 'mathml' | null = null;
+
+/** Compiler ABI for a component call whose output is parsed in foreign content. */
+export function ssrComponentNS(
+	parent: SSRScope,
+	comp: ServerComponent | string,
+	props: any,
+	namespace: 'html' | 'svg' | 'mathml',
+	inherit?: boolean,
+	key?: unknown,
+): string {
+	const previous = NEXT_COMPONENT_NAMESPACE;
+	NEXT_COMPONENT_NAMESPACE = namespace;
+	try {
+		return ssrComponent(parent, comp, props, inherit, key);
+	} finally {
+		NEXT_COMPONENT_NAMESPACE = previous;
+	}
+}
+
+/** Run a renderable hole under a lexically proven parser namespace. */
+export function ssrInNamespace(namespace: 'html' | 'svg' | 'mathml', render: () => string): string {
+	const frame = FRAME;
+	if (frame === null) return render();
+	const previous = frame.namespace;
+	frame.namespace = namespace;
+	try {
+		return render();
+	} finally {
+		frame.namespace = previous;
+	}
 }
 
 // A component's children reach the server body as a render FUNCTION (the
@@ -1840,6 +2125,7 @@ export function Suspense(
 		(_arg, s) => ssrChildrenHtml(props.children, s),
 		(_arg, s) => ssrChild(props.fallback, s),
 		null,
+		FRAME?.namespace ?? 'html',
 	);
 }
 
@@ -2393,6 +2679,37 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		if (SERIAL !== null) SERIAL.push(entry.value);
 		return entry.value as T;
 	}
+	// React-compatible instrumented thenables expose their synchronous state on
+	// the thenable itself. A custom pending status still receives a no-op probe:
+	// Flight-style thenables use that first subscription for lazy initialization,
+	// then the streaming scheduler attaches the actual wake-up subscription.
+	// Re-check after probing because a thenable may fulfill or reject inline.
+	const instrumented = usable as PromiseLike<T> & {
+		status?: unknown;
+		value?: T;
+		reason?: unknown;
+	};
+	let status = instrumented.status;
+	if (status === 'fulfilled') {
+		if (SERIAL !== null) SERIAL.push(instrumented.value);
+		return instrumented.value as T;
+	}
+	if (status === 'rejected') {
+		recordHydrationRejection(instrumented.reason);
+		throw instrumented.reason;
+	}
+	if (typeof status === 'string') {
+		instrumented.then(NOOP, NOOP);
+		status = instrumented.status;
+		if (status === 'fulfilled') {
+			if (SERIAL !== null) SERIAL.push(instrumented.value);
+			return instrumented.value as T;
+		}
+		if (status === 'rejected') {
+			recordHydrationRejection(instrumented.reason);
+			throw instrumented.reason;
+		}
+	}
 	// First time we reach this site this render — record the thenable so render()'s
 	// loop can await it, then suspend so the nearest @try shows @pending this pass.
 	if (SUSPENDED !== null) SUSPENDED.push({ promise: usable as PromiseLike<unknown>, key });
@@ -2499,6 +2816,27 @@ export function puBatch(thenables: unknown[], warm?: () => void): void {
 		const t = thenables[i] as PromiseLike<unknown> | null | undefined;
 		if (t == null || typeof (t as any).then !== 'function') continue;
 		if (pu !== null && pu.resolvedT.has(t)) continue;
+		// `puBatch` runs before the corresponding use() calls, so it must perform
+		// the same status probe for already-instrumented thenables. Otherwise the
+		// batch suspends before use() can trigger a Flight-style lazy subscription.
+		const instrumented = t as PromiseLike<unknown> & {
+			status?: unknown;
+			value?: unknown;
+			reason?: unknown;
+		};
+		let status = instrumented.status;
+		if (typeof status === 'string' && status !== 'fulfilled' && status !== 'rejected') {
+			instrumented.then(NOOP, NOOP);
+			status = instrumented.status;
+		}
+		if (status === 'fulfilled') {
+			pu?.resolvedT.set(t, { value: instrumented.value });
+			continue;
+		}
+		if (status === 'rejected') {
+			pu?.resolvedT.set(t, { reason: instrumented.reason });
+			continue;
+		}
 		pending = true;
 		// Re-registering a still-pending thenable on a later pass is deliberate:
 		// the STREAMING loop awaits each pass's SUSPENDED list, so dropping a
@@ -3201,7 +3539,11 @@ type SuspenseOutcome = { value: unknown } | { reason: unknown };
 type ResolvedMap = Map<string, SuspenseOutcome> & {
 	/** Render-local stable ids for non-primitive control/list keys. */
 	asyncIdentities: Map<unknown, number>;
+	/** Cross-pass fallback ids for transient object keys at one lexical position. */
+	asyncPositionIdentities: Map<string, number>;
 	nextAsyncIdentity: number;
+	/** Lazily allocated DEV SSR invalid-nesting warnings reported by this render. */
+	nestingWarnings?: Set<string>;
 	pu: {
 		created: Map<string, { deps: unknown[]; value: unknown }>;
 		resolvedT: Map<PromiseLike<unknown>, SuspenseOutcome>;
@@ -3214,6 +3556,7 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 function newResolvedMap(): ResolvedMap {
 	const m = new Map() as ResolvedMap;
 	m.asyncIdentities = new Map();
+	m.asyncPositionIdentities = new Map();
 	m.nextAsyncIdentity = 0;
 	m.pu = { created: new Map(), resolvedT: new Map(), warm: new Map() };
 	return m;
@@ -3226,6 +3569,8 @@ interface FullPassResult {
 	serial: unknown[];
 	suspended: SuspendedList;
 	deferred: Job[];
+	/** A bare suspension escaped the root instead of being owned by an ssrTry. */
+	rootSuspended: boolean;
 	/** Whether this pass rendered ViewTransition candidate attributes that need
 	 *  the final residual-candidate cleanup scan. */
 	vtCandidates: boolean;
@@ -3254,6 +3599,8 @@ interface Ambient {
 	props: any;
 	parentScope: SSRScope | null;
 	asyncScope: string;
+	ssrElement: SsrElementContext | null;
+	nestingWarnings: Set<string> | null | undefined;
 	vtTrySeq: number;
 	vtHasCandidates: boolean;
 	vtStack: Array<{ candidate: VtSsrCandidate; consumed: boolean }>;
@@ -3275,6 +3622,8 @@ function saveAmbient(): Ambient {
 		props: CURRENT_PROPS,
 		parentScope: CURRENT_PARENT_SCOPE,
 		asyncScope: ASYNC_SCOPE,
+		ssrElement: CURRENT_SSR_ELEMENT,
+		nestingWarnings: SSR_NESTING_WARNINGS,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
 		vtStack: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed })),
@@ -3296,6 +3645,8 @@ function restoreAmbient(a: Ambient): void {
 	CURRENT_PROPS = a.props;
 	CURRENT_PARENT_SCOPE = a.parentScope;
 	ASYNC_SCOPE = a.asyncScope;
+	CURRENT_SSR_ELEMENT = a.ssrElement;
+	SSR_NESTING_WARNINGS = a.nestingWarnings;
 	VT_SSR_TRY_SEQ = a.vtTrySeq;
 	VT_SSR_HAS_CANDIDATES = a.vtHasCandidates;
 	VT_SSR_STACK.length = 0;
@@ -3336,6 +3687,8 @@ function runFullFramedPass(
 	const serial = (SERIAL = [] as unknown[]);
 	const deferred = (DEFERRED = [] as Job[]);
 	RESOLVED = resolved;
+	CURRENT_SSR_ELEMENT = null;
+	SSR_NESTING_WARNINGS = resolved.nestingWarnings;
 	const root = ssrScope(null);
 	CURRENT_SCOPE = root;
 	// A root frame so use() keys resolve; the root component is the fallback
@@ -3355,6 +3708,7 @@ function runFullFramedPass(
 	CURRENT_PARENT_SCOPE = null;
 	let body = '';
 	let vtCandidates = false;
+	let rootSuspended = false;
 	try {
 		// Normalize the root's return the same way ssrComponent normalizes child
 		// components: a compiled component returns its HTML string, but a plain
@@ -3367,6 +3721,7 @@ function runFullFramedPass(
 		// already in `suspended`, so fall through to the await + retry. Any other
 		// throw is a genuine render failure — propagate it (the finally restores).
 		if (!ssrIsSuspense(err)) throw err;
+		rootSuspended = true;
 	} finally {
 		vtCandidates = VT_SSR_HAS_CANDIDATES;
 		restoreAmbient(saved);
@@ -3382,6 +3737,7 @@ function runFullFramedPass(
 		serial,
 		suspended,
 		deferred,
+		rootSuspended,
 		vtCandidates,
 		cssEntries: cssMap,
 	};
@@ -3412,6 +3768,8 @@ function runDiscoveryRound(
 	SERIAL = [] as unknown[];
 	const deferred = (DEFERRED = [] as Job[]);
 	RESOLVED = resolved;
+	CURRENT_SSR_ELEMENT = null;
+	SSR_NESTING_WARNINGS = null;
 	FRAME = null;
 	CURRENT_COMP = null;
 	CURRENT_PROPS = null;
@@ -3760,8 +4118,9 @@ export function renderToStaticMarkup(
 //      (settleFirstOfWave) — then re-run a full pass against the now-warmer
 //      RESOLVED cache. `ssrTry` captures each registered boundary's
 //      freshly-rendered content + its `use()` seed slice; newly-completed
-//      boundaries flush as hidden segments
-//      `<div hidden data-oct-s="opaque-id">…` followed by the swap script
+//      boundaries flush as hidden parsing-safe segments followed by the swap
+//      script. A nested `<template>` preserves table/select content; SVG and
+//      MathML segments additionally carry their namespace container.
 //      which swaps the content into the boundary's live range. Waves repeat
 //      until no boundary is pending (MAX_SUSPENSE_PASSES bounds CONSECUTIVE
 //      passes that complete no boundary — one pass per resolution wave is the
@@ -3804,6 +4163,8 @@ interface StreamBoundary {
 	seeds: unknown[];
 	/** Number of boundary-local useIds consumed before the shell suspended. */
 	pendingIdOffset: number;
+	/** Namespace inherited by this boundary's content arm. */
+	namespace: 'html' | 'svg' | 'mathml';
 	/** Enclosing `ssrTry` keys, outermost first (including non-suspending tries). */
 	ancestors: string[];
 	/** Enclosing content/fallback owners used to prune vanished template paths. */
@@ -3814,6 +4175,8 @@ interface StreamState {
 	boundaries: Map<string, StreamBoundary>;
 	nextId: number;
 	token: string;
+	/** Boundary positions reached by the active full-tree pass, when tracked. */
+	activePassBoundaryKeys: Set<string> | null;
 	/** Content-arm nesting while the synchronous pass walks `ssrTry` calls. */
 	activeTryKeys: string[];
 	/** All arm owners (content/catch/fallback) while walking nested `ssrTry` calls. */
@@ -3876,6 +4239,19 @@ function pruneUnrepresentedStreamDescendants(
 	}
 }
 
+// Root suspension can abandon the entire pre-shell pass after it has already
+// registered boundaries. The first complete pass defines the shell that will
+// actually ship, so registrations not reached by that pass have no template
+// from which a segment (or terminal recovery instruction) could be observed.
+function pruneStreamBoundariesAbsentFromShell(
+	stream: StreamState,
+	shellBoundaryKeys: Set<string>,
+): void {
+	for (const key of stream.boundaries.keys()) {
+		if (!shellBoundaryKeys.has(key)) stream.boundaries.delete(key);
+	}
+}
+
 /**
  * Compiled `@try` / JSX `<Suspense>` boundary. `siteKey` is the compiler's
  * source-position hash; combined with the frame path + per-frame occurrence it
@@ -3896,6 +4272,7 @@ export function ssrTry(
 	tryFn: (arg: unknown, scope: SSRScope) => string,
 	pendFn: ((arg: unknown, scope: SSRScope) => string) | null,
 	catchFn: ((err: unknown, scope: SSRScope) => string) | null,
+	namespace: 'html' | 'svg' | 'mathml' = FRAME?.namespace ?? 'html',
 ): string {
 	VT_SSR_TRY_SEQ++;
 	// Consume the nearest un-consumed outer ViewTransition candidate: its
@@ -3927,9 +4304,11 @@ export function ssrTry(
 	let ancestorKeys: string[] = [];
 	let ownerKeys: string[] = [];
 	if (stream !== null) {
+		stream.activePassBoundaryKeys?.add(key);
 		ancestorKeys = stream.activeTryKeys.slice();
 		ownerKeys = stream.activeOwnerKeys.slice();
 		entry = stream.boundaries.get(key);
+		if (entry !== undefined) entry.namespace = namespace;
 		if (entry !== undefined && entry.state === 'pending') {
 			entry.ancestors = ancestorKeys;
 			entry.owners = ownerKeys;
@@ -4008,10 +4387,58 @@ export function ssrTry(
 			);
 		// Once this boundary has final content, any fallback-only descendants are
 		// doomed. Render the placeholder shape without registering new stream work.
-		const fallback =
-			entry !== undefined && entry.state === 'done'
-				? withStream(null, renderFallback)
-				: renderFallback();
+		let fallback: string;
+		if (entry !== undefined && entry.state === 'done') {
+			// Once content completes, the fallback is permanently unobservable, but
+			// its HTML still supplies the balanced placeholder shape for this pass.
+			// Snapshot every pass-local output/work queue it can touch and rewind in
+			// `finally`: a nested @try may catch its own suspension and return normally,
+			// so cleanup cannot live only in the outer-suspension catch path.
+			const suspendedStart = SUSPENDED?.length ?? 0;
+			const deferredStart = DEFERRED?.length ?? 0;
+			const serialStart = SERIAL?.length ?? 0;
+			const css = CSS;
+			const cssSnapshot = css === null ? null : new Map(css);
+			const head = HEAD;
+			const headHtml = head?.html;
+			const headHints = head === null ? null : new Set(head.hints);
+			const vtTrySeq = VT_SSR_TRY_SEQ;
+			const vtHasCandidates = VT_SSR_HAS_CANDIDATES;
+			const vtStack = VT_SSR_STACK.map((candidate) => ({
+				candidate,
+				consumed: candidate.consumed,
+			}));
+			try {
+				fallback = withStream(null, renderFallback);
+			} catch (error) {
+				// A direct suspension has no nested pending arm whose HTML can be kept.
+				// The outer template remains balanced with an empty fallback range.
+				if (!ssrIsSuspense(error)) throw error;
+				fallback = '';
+			} finally {
+				if (SUSPENDED !== null) SUSPENDED.length = suspendedStart;
+				if (DEFERRED !== null) DEFERRED.length = deferredStart;
+				if (SERIAL !== null) SERIAL.length = serialStart;
+				if (css !== null && cssSnapshot !== null) {
+					css.clear();
+					for (const [hash, sheet] of cssSnapshot) css.set(hash, sheet);
+				}
+				if (head !== null && headHints !== null) {
+					head.html = headHtml!;
+					head.hints.clear();
+					for (const hint of headHints) head.hints.add(hint);
+				}
+				VT_SSR_TRY_SEQ = vtTrySeq;
+				VT_SSR_HAS_CANDIDATES = vtHasCandidates;
+				VT_SSR_STACK.length = 0;
+				for (const snapshot of vtStack) {
+					snapshot.candidate.consumed = snapshot.consumed;
+					VT_SSR_STACK.push(snapshot.candidate);
+				}
+			}
+		} else {
+			fallback = renderFallback();
+		}
 		if (entry !== undefined) {
 			return ssrBlock(
 				'<template ' + STREAM_BOUNDARY_ATTR + '="' + entry.id + '"></template>' + fallback,
@@ -4068,6 +4495,7 @@ export function ssrTry(
 							html: '',
 							seeds: [],
 							pendingIdOffset,
+							namespace,
 							ancestors: ancestorKeys,
 							owners: ownerKeys,
 						};
@@ -4114,7 +4542,7 @@ export function ssrTry(
 }
 
 // The inline client swap runtime, emitted ONCE (before the first segment).
-// $OCTRC(id): stash the segment's seed JSON on window.$OCTS, remove the
+// $OCTRC(id, namespaceCarrier): stash the segment's seed JSON on window.$OCTS, remove the
 // fallback (template's siblings up to the balanced block close), move the
 // segment's children into place, and replace the template with the
 // `<!--oct-seed:id-->` scoping comment. `id` is the full render-scoped opaque
@@ -4127,24 +4555,27 @@ const STREAM_RUNTIME_JS =
 	// for safe integer N >= 2. Keep this in sync with hydrationMarkerMultiplicity.
 	'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
 	'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s;};' +
-	'window.$OCTRC=function(id){' +
+	'window.$OCTRC=function(id,nc){' +
 	"var t=d.querySelector('template[" +
 	STREAM_BOUNDARY_ATTR +
 	"=\"'+id+'\"]');" +
 	"var s=d.querySelector('[" +
 	STREAM_SEGMENT_ATTR +
 	"=\"'+id+'\"]');" +
-	'if(!t||!s)return;' +
-	'var sd=s.querySelector("script[' +
+	'if(!s)return;if(!t){s.remove();return;}' +
+	'var q=s.firstElementChild,z=d.createElement("template"),c=s;' +
+	'if(q&&q.localName==="script"){try{z.innerHTML=JSON.parse(q.textContent);c=z.content;}catch(e){return;}}' +
+	'var sd=c.querySelector("script[' +
 	STREAM_SEED_ATTR +
 	']");' +
 	'if(sd){S[id]=sd.textContent;sd.parentNode.removeChild(sd);}' +
+	'if(nc)c=c.firstElementChild;' +
 	'var n=t.nextSibling,depth=1;' +
 	'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
 	'if(M(v,"["))depth++;else if(M(v,"]")){depth--;if(depth===0)break;}' +
 	'n.parentNode.removeChild(n);n=x;}' +
 	'var p=t.parentNode;' +
-	'while(s.firstChild)p.insertBefore(s.firstChild,n);' +
+	'while(c.firstChild)p.insertBefore(c.firstChild,n);' +
 	'p.replaceChild(d.createComment("' +
 	STREAM_SEED_COMMENT +
 	'"+id),t);' +
@@ -4192,18 +4623,40 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 		seedScript =
 			'<script type="application/json" ' + STREAM_SEED_ATTR + nonceAttr + '>' + json + '</script>';
 	}
+	// ViewTransition arm candidates are renderer-only staging attributes. Strip
+	// them while this is still markup: once the parsing-safe carrier below turns
+	// the segment into a JSON string, vtSsrStrip can no longer recognize quoted
+	// HTML attributes inside it.
+	const html = vtSsrStrip(b.html);
+	const content =
+		b.namespace === 'svg'
+			? seedScript + '<svg>' + html + '</svg>'
+			: b.namespace === 'mathml'
+				? seedScript + '<math>' + html + '</math>'
+				: seedScript + html;
+	const hasNamespaceCarrier = b.namespace === 'html' ? '' : ',1';
+	// The resolved arm may contain trusted raw HTML with a literal `</template>`.
+	// Putting it directly inside the protocol carrier would let the HTML parser
+	// terminate that carrier early and strand nodes outside the revealed content.
+	// Store the complete markup as script-safe JSON and parse it into a detached
+	// template in $OCTRC instead; `<` escaping makes the data script uncloseable.
+	const payload = JSON.stringify(content).replace(/</g, '\\u003c');
 	return (
 		'<div hidden ' +
 		STREAM_SEGMENT_ATTR +
 		'="' +
 		escapeAttr(b.id) +
-		'">' +
-		seedScript +
-		b.html +
-		'</div><script' +
+		'"><script type="application/json" ' +
+		STREAM_SCRIPT_ATTR +
+		nonceAttr +
+		'>' +
+		payload +
+		'</script></div><script ' +
+		STREAM_SCRIPT_ATTR +
 		nonceAttr +
 		'>$OCTRC(' +
 		JSON.stringify(b.id).replace(/</g, '\\u003c') +
+		hasNamespaceCarrier +
 		')</script>'
 	);
 }
@@ -4224,19 +4677,78 @@ async function runStream(
 		boundaries: new Map(),
 		nextId: 0,
 		token: createStreamToken(),
+		activePassBoundaryKeys: null,
 		activeTryKeys: [],
 		activeOwnerKeys: [],
+	};
+	const renderFullPass = (): {
+		pass: FullPassResult;
+		boundaryKeys: Set<string>;
+	} => {
+		const boundaryKeys = new Set<string>();
+		const previousBoundaryKeys = stream.activePassBoundaryKeys;
+		stream.activePassBoundaryKeys = boundaryKeys;
+		try {
+			return {
+				pass: withStream(stream, () =>
+					runFullFramedPass(component, props, resolved, nonceAttr, identifierPrefix),
+				),
+				boundaryKeys,
+			};
+		} finally {
+			stream.activePassBoundaryKeys = previousBoundaryKeys;
+		}
 	};
 	const emittedCss = new Set<string>();
 	const flushedSegments = new Set<string>();
 	const observedDone = new Set<string>();
+	const reachableDoneSegments = (): StreamBoundary[] => {
+		const done: StreamBoundary[] = [];
+		const reachable = new Set(flushedSegments);
+		for (;;) {
+			const next = [...stream.boundaries.values()]
+				.filter((boundary) => {
+					if (boundary.state !== 'done' || reachable.has(boundary.id)) return false;
+					for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+						const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+						if (ancestor !== undefined) return reachable.has(ancestor.id);
+					}
+					return true;
+				})
+				.sort((a, b) => a.order - b.order);
+			if (next.length === 0) return done;
+			for (const boundary of next) {
+				done.push(boundary);
+				reachable.add(boundary.id);
+			}
+		}
+	};
 
 	let pass: FullPassResult;
+	let shellBoundaryKeys: Set<string>;
 	try {
 		signal?.throwIfAborted();
-		pass = withStream(stream, () =>
-			runFullFramedPass(component, props, resolved, nonceAttr, identifierPrefix),
-		);
+		({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
+		// A bare Usable outside @try/Suspense blocks the shell. Fizz waits for it
+		// and retries the root; emitting this pass would otherwise complete with an
+		// empty response even though resumable work was recorded. Bound the retry
+		// chain independently from later per-boundary streaming waves.
+		let rootAttempts = 0;
+		while (pass.rootSuspended) {
+			if (pass.suspended.length === 0) {
+				throw new Error('octane SSR: a root suspension no longer has resumable work.');
+			}
+			if (++rootAttempts > MAX_SUSPENSE_PASSES) {
+				throw new Error(
+					'octane SSR: ' +
+						MAX_SUSPENSE_PASSES +
+						' root streaming passes completed without producing a shell.',
+				);
+			}
+			await settleFirstOfWave(pass.suspended, resolved, timeoutMs, signal);
+			({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
+		}
+		pruneStreamBoundariesAbsentFromShell(stream, shellBoundaryKeys);
 	} catch (err) {
 		options?.onError?.(err);
 		sink.shellError(err);
@@ -4252,7 +4764,8 @@ async function runStream(
 	shell += pass.head + pass.body;
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
-	if (anyPending) shell += '<script' + nonceAttr + '>' + STREAM_RUNTIME_JS + '</script>';
+	if (anyPending)
+		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + STREAM_RUNTIME_JS + '</script>';
 	try {
 		const shellWrite = sink.write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
 		if (shellWrite !== undefined) await shellWrite;
@@ -4273,6 +4786,21 @@ async function runStream(
 	// completes its boundary.
 	let attempt = 0;
 	try {
+		// A bare root suspension may have delayed the shell long enough for an
+		// earlier nested boundary to finish. Its final pass still emits that
+		// boundary's pending form, so deliver the already-ready segment immediately
+		// after the shell instead of waiting for a pending sibling that may not exist.
+		const initiallyDone = reachableDoneSegments();
+		if (initiallyDone.length > 0) {
+			let chunk = '';
+			for (const boundary of initiallyDone) chunk += segmentChunk(boundary, nonceAttr);
+			const segmentWrite = sink.write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+			if (segmentWrite !== undefined) await segmentWrite;
+			for (const boundary of initiallyDone) {
+				flushedSegments.add(boundary.id);
+				observedDone.add(boundary.id);
+			}
+		}
 		while ([...stream.boundaries.values()].some((b) => b.state === 'pending')) {
 			signal?.throwIfAborted();
 			if (suspended.length === 0) {
@@ -4289,9 +4817,7 @@ async function runStream(
 				);
 			}
 			await settleFirstOfWave(suspended, resolved, timeoutMs, signal);
-			pass = withStream(stream, () =>
-				runFullFramedPass(component, props, resolved, nonceAttr, identifierPrefix),
-			);
+			pass = renderFullPass().pass;
 			suspended = pass.suspended;
 			let chunk = '';
 			for (const [hash, sheet] of pass.cssEntries) {
@@ -4313,25 +4839,7 @@ async function runStream(
 			// shell-reachable siblings first, then children whose nearest registered
 			// ancestor is already flushed or earlier in this same chunk. Browser script
 			// execution then introduces each child template before its `$OCTRC` call.
-			const done: StreamBoundary[] = [];
-			const reachable = new Set(flushedSegments);
-			for (;;) {
-				const next = [...stream.boundaries.values()]
-					.filter((boundary) => {
-						if (boundary.state !== 'done' || reachable.has(boundary.id)) return false;
-						for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
-							const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-							if (ancestor !== undefined) return reachable.has(ancestor.id);
-						}
-						return true;
-					})
-					.sort((a, b) => a.order - b.order);
-				if (next.length === 0) break;
-				for (const boundary of next) {
-					done.push(boundary);
-					reachable.add(boundary.id);
-				}
-			}
+			const done = reachableDoneSegments();
 			for (const b of done) chunk += segmentChunk(b, nonceAttr);
 			if (chunk !== '') {
 				const segmentWrite = sink.write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
@@ -4351,7 +4859,8 @@ async function runStream(
 		for (const b of stream.boundaries.values()) {
 			if (!flushedSegments.has(b.id)) {
 				tail +=
-					'<script' +
+					'<script ' +
+					STREAM_SCRIPT_ATTR +
 					nonceAttr +
 					'>$OCTRX(' +
 					JSON.stringify(b.id).replace(/</g, '\\u003c') +
@@ -4544,37 +5053,57 @@ export function renderToPipeableStream(
 		removeOuterAbort?.();
 		finishEnd();
 	};
-	runStream(
-		component,
-		props,
-		{ ...options, signal: controller.signal },
-		{
-			write(chunk, terminal) {
-				return queueWrite(chunk, terminal);
+	let started = false;
+	const startRender = (): void => {
+		if (started) return;
+		started = true;
+		void runStream(
+			component,
+			props,
+			{ ...options, signal: controller.signal },
+			{
+				write(chunk, terminal) {
+					return queueWrite(chunk, terminal);
+				},
+				shellReady() {
+					options?.onShellReady?.();
+				},
+				shellError(err) {
+					options?.onShellError?.(err);
+					flushEnd();
+				},
+				allReady() {
+					options?.onAllReady?.();
+					flushEnd();
+				},
+				fatal() {
+					// Once the shell exists, abort/error degradation is a terminal
+					// completion of the pipeable request. Fizz fires onAllReady after its
+					// recovery instructions have been accepted even though onError also
+					// reported the reason; consumers use this callback to end surrounding
+					// document work in both success and aborted paths.
+					options?.onAllReady?.();
+					flushEnd();
+				},
 			},
-			shellReady() {
-				options?.onShellReady?.();
-			},
-			shellError(err) {
-				options?.onShellError?.(err);
-				flushEnd();
-			},
-			allReady() {
-				options?.onAllReady?.();
-				flushEnd();
-			},
-			fatal() {
-				flushEnd();
-			},
-		},
-	).catch((err) => {
-		options?.onError?.(err);
-		flushEnd();
-	});
+		).catch((err) => {
+			options?.onError?.(err);
+			flushEnd();
+		});
+	};
+	// Fizz callbacks never run before the caller receives the `{ pipe, abort }`
+	// handle. Starting from a microtask preserves that ordering when the caller
+	// waits for onShellReady; an immediate pipe() starts synchronously so existing
+	// direct-pipe consumers still receive the shell without an extra turn.
+	queueMicrotask(startRender);
 	return {
 		pipe(dest) {
 			if (pipeCalled) throw new Error('octane SSR: pipe() may only be called once.');
 			pipeCalled = true;
+			// Produce the shell into the pre-pipe buffer first. Besides retaining the
+			// established synchronous direct-pipe behavior for late destination errors,
+			// this prevents destination pressure from delaying shell readiness itself.
+			startRender();
 			const nodeDest = dest as Destination;
 			destination = nodeDest;
 			if (nodeDest.once !== undefined) {

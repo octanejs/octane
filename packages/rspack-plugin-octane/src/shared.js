@@ -116,12 +116,21 @@ export function normalizePluginOptions(value) {
 /** Read the serializable metadata attached to an Octane-transformed module. */
 export function getOctaneRspackBuildInfo(module) {
 	const value = module?.buildInfo?.octane;
+	const nestedReferenceValid =
+		value?.clientReference !== null &&
+		typeof value?.clientReference === 'object' &&
+		typeof value.clientReference.id === 'string' &&
+		typeof value.clientReference.moduleId === 'string' &&
+		typeof value.clientReference.renderer === 'string';
 	if (
 		value &&
 		typeof value === 'object' &&
 		typeof value.canonicalId === 'string' &&
-		(value.transformKind === 'compile' || value.transformKind === 'slots') &&
-		typeof value.serverRpc === 'boolean'
+		(value.transformKind === 'compile' ||
+			value.transformKind === 'slots' ||
+			value.transformKind === 'client-only-stub') &&
+		typeof value.serverRpc === 'boolean' &&
+		(value.clientReference === undefined || nestedReferenceValid)
 	) {
 		return value;
 	}

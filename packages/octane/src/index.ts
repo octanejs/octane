@@ -127,6 +127,7 @@ export {
 	child,
 	sibling,
 	setText,
+	setScriptText,
 	setAttribute,
 	setStringData,
 	setClassName,

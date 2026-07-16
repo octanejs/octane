@@ -8,15 +8,22 @@
 
 export const DOM_RENDERER_ID = 'dom';
 export const DOM_RENDERER_MODULE = 'octane';
-export const RENDERER_CONFIG_VERSION = 2;
+export const RENDERER_CONFIG_VERSION = 3;
 
 const RENDERER_ID = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
 const MODULE_EXPORT_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const PROP_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const CONFIG_KEYS = new Set(['boundaries', 'default', 'registry', 'rules', 'signature']);
 const RULE_KEYS = new Set(['exclude', 'include', 'renderer']);
-const REGISTRY_ENTRY_KEYS = new Set(['module', 'target']);
-const BOUNDARY_ENTRY_KEYS = new Set(['childRenderer', 'ownerRenderer', 'prop']);
+const REGISTRY_ENTRY_KEYS = new Set([
+	'capabilities',
+	'intrinsics',
+	'module',
+	'server',
+	'target',
+	'text',
+]);
+const BOUNDARY_ENTRY_KEYS = new Set(['childRenderer', 'ownerRenderer', 'prop', 'server']);
 
 function configError(message) {
 	return new Error(`octane/compiler/renderers: ${message}`);
@@ -56,15 +63,33 @@ function validateModuleId(value, path) {
 	return value;
 }
 
+function normalizeCapabilities(value, path) {
+	if (value === undefined) return Object.freeze([]);
+	if (!Array.isArray(value)) {
+		throw configError(`${path} must be an array of lowercase capability names.`);
+	}
+	const capabilities = value.map((capability, index) =>
+		validateRendererId(capability, `${path}[${index}]`),
+	);
+	return Object.freeze([...new Set(capabilities)].sort());
+}
+
 function normalizeRegistryEntry(id, value, path) {
 	let moduleId;
 	let target;
+	let server;
+	let intrinsics;
+	let text;
+	let capabilities;
 	if (typeof value === 'string') {
 		moduleId = validateModuleId(value, path);
 		target = 'universal';
+		server = 'unsupported';
+		text = 'reject';
+		capabilities = Object.freeze([]);
 	} else {
 		if (!isRecord(value)) {
-			throw configError(`${path} must be a renderer module ID or { module, target } object.`);
+			throw configError(`${path} must be a renderer module ID or renderer descriptor object.`);
 		}
 		assertKnownKeys(value, REGISTRY_ENTRY_KEYS, path);
 		moduleId = validateModuleId(value.module, `${path}.module`);
@@ -72,10 +97,42 @@ function normalizeRegistryEntry(id, value, path) {
 		if (target !== 'dom' && target !== 'universal') {
 			throw configError(`${path}.target must be "dom" or "universal".`);
 		}
+
+		server = value.server ?? (target === 'dom' ? 'render' : 'unsupported');
+		if (server !== 'render' && server !== 'client-only' && server !== 'unsupported') {
+			throw configError(
+				`${path}.server must be "render", "client-only", or "unsupported" when provided.`,
+			);
+		}
+		if (target === 'dom' && server !== 'render') {
+			throw configError(`${path}.server must be "render" for the DOM renderer.`);
+		}
+		if (target === 'universal' && server === 'render') {
+			throw configError(
+				`${path}.server cannot be "render" until the universal renderer provides a validated server serializer.`,
+			);
+		}
+
+		if (value.intrinsics !== undefined) {
+			intrinsics = validateModuleId(value.intrinsics, `${path}.intrinsics`);
+		}
+
+		text = value.text ?? (target === 'dom' ? 'host' : 'reject');
+		if (text !== 'reject' && text !== 'ignore' && text !== 'host') {
+			throw configError(`${path}.text must be "reject", "ignore", or "host".`);
+		}
+		capabilities = normalizeCapabilities(value.capabilities, `${path}.capabilities`);
 	}
 
 	if (id === DOM_RENDERER_ID) {
-		if (moduleId !== DOM_RENDERER_MODULE || target !== 'dom') {
+		if (
+			moduleId !== DOM_RENDERER_MODULE ||
+			target !== 'dom' ||
+			server !== 'render' ||
+			intrinsics !== undefined ||
+			text !== 'host' ||
+			capabilities.length !== 0
+		) {
 			throw configError(
 				`compiler.renderers.registry.dom is built in as { module: ${JSON.stringify(DOM_RENDERER_MODULE)}, target: "dom" } and cannot be replaced.`,
 			);
@@ -84,7 +141,14 @@ function normalizeRegistryEntry(id, value, path) {
 		throw configError(`${path}.target cannot be "dom"; use the built-in "dom" renderer.`);
 	}
 
-	return Object.freeze({ module: moduleId, target });
+	return Object.freeze({
+		module: moduleId,
+		target,
+		server,
+		...(intrinsics === undefined ? {} : { intrinsics }),
+		text,
+		capabilities,
+	});
 }
 
 function normalizeBoundaries(value, registry) {
@@ -151,9 +215,31 @@ function normalizeBoundaries(value, registry) {
 				);
 			}
 
+			const server = rawBoundary.server;
+			if (server !== undefined && server !== 'omit-child') {
+				throw configError(`${path}.server must be "omit-child" when provided.`);
+			}
+			if (server === 'omit-child') {
+				if (registry[ownerRenderer].server !== 'render') {
+					throw configError(
+						`${path}.server can omit a child only when ownerRenderer supports server rendering.`,
+					);
+				}
+				if (registry[childRenderer].server !== 'client-only') {
+					throw configError(
+						`${path}.server can omit a child only when childRenderer is explicitly "client-only".`,
+					);
+				}
+			}
+
 			exports.push([
 				exportName,
-				Object.freeze({ ownerRenderer, childRenderer, prop: rawBoundary.prop }),
+				Object.freeze({
+					ownerRenderer,
+					childRenderer,
+					prop: rawBoundary.prop,
+					...(server === undefined ? {} : { server }),
+				}),
 			]);
 		}
 		modules.push([moduleId, Object.freeze(Object.fromEntries(exports))]);
@@ -338,7 +424,16 @@ export function normalizeRendererConfig(input = {}) {
 		throw configError('compiler.renderers.registry must be an object of renderer module IDs.');
 	}
 	const entries = [
-		[DOM_RENDERER_ID, Object.freeze({ module: DOM_RENDERER_MODULE, target: 'dom' })],
+		[
+			DOM_RENDERER_ID,
+			Object.freeze({
+				module: DOM_RENDERER_MODULE,
+				target: 'dom',
+				server: 'render',
+				text: 'host',
+				capabilities: Object.freeze([]),
+			}),
+		],
 	];
 	for (const [idValue, moduleValue] of Object.entries(rawRegistry).sort(([a], [b]) =>
 		a < b ? -1 : a > b ? 1 : 0,
@@ -390,16 +485,27 @@ export function normalizeRendererConfig(input = {}) {
 
 	const signature = stableSignature({
 		default: defaultRenderer,
-		registry: entries.map(([id, { module, target }]) => [id, module, target]),
+		registry: entries.map(([id, { module, target, server, intrinsics, text, capabilities }]) => [
+			id,
+			module,
+			target,
+			server,
+			intrinsics ?? null,
+			text,
+			capabilities,
+		]),
 		rules: rules.map(({ renderer, include, exclude }) => [renderer, include, exclude]),
 		boundaries: Object.entries(boundaries).flatMap(([moduleId, exports]) =>
-			Object.entries(exports).map(([exportName, { ownerRenderer, childRenderer, prop }]) => [
-				moduleId,
-				exportName,
-				ownerRenderer,
-				childRenderer,
-				prop,
-			]),
+			Object.entries(exports).map(
+				([exportName, { ownerRenderer, childRenderer, prop, server }]) => [
+					moduleId,
+					exportName,
+					ownerRenderer,
+					childRenderer,
+					prop,
+					server ?? null,
+				],
+			),
 		),
 	});
 	return Object.freeze({

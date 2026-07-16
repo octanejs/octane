@@ -2,6 +2,91 @@
   "schemaVersion": 1,
   "examples": [
     {
+      "directory": "examples/cartlane",
+      "id": "cartlane",
+      "title": "Cartlane",
+      "summary": "A production-built commerce checkout proving Octane native form actions, pending state, idempotent server functions, SSR, and hydration.",
+      "status": "active",
+      "renderModes": ["client", "streaming-ssr", "hydration"],
+      "dialects": ["tsrx"],
+      "bindings": [],
+      "octaneFeatures": [
+        "controlled-inputs",
+        "form-actions",
+        "hydration",
+        "module-server",
+        "native-events",
+        "streaming-ssr",
+        "tsrx-control-flow",
+        "use-action-state",
+        "use-form-status"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "adopt-product-and-add-by-keyboard",
+          "title": "Adopt a server-rendered product input, preserve its value, and add to the basket by keyboard",
+          "kind": "ssr-hydration",
+          "spec": "e2e/cartlane.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "recover-catalog-offline-mobile",
+          "title": "Retry the catalog, recover from an empty filter, and use the mobile basket offline",
+          "kind": "resilience",
+          "spec": "e2e/cartlane.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "validate-and-place-order",
+          "title": "Reject a tampered cart, validate native checkout, and place an order through a server function",
+          "kind": "golden",
+          "spec": "e2e/cartlane.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "idempotent-overlapping-submit",
+          "title": "Queue rapid checkout submissions and resolve both to one charged order",
+          "kind": "resilience",
+          "spec": "e2e/cartlane.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "decline-offline-retry",
+          "title": "Preserve checkout details through a payment decline and an offline retry",
+          "kind": "resilience",
+          "spec": "e2e/cartlane.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "delayed-hydration",
+          "description": "An opt-in delay leaves the real server product form interactive before hydration so adoption and typed-value preservation are observable."
+        },
+        {
+          "id": "catalog-load-failure",
+          "description": "The scenario query fails one deterministic collection load and succeeds on explicit retry without changing the basket."
+        },
+        {
+          "id": "fixture-card-decline",
+          "description": "The local server function rejects the documented 4000 fixture card while preserving every uncontrolled native form field for retry."
+        },
+        {
+          "id": "tampered-cart-payload",
+          "description": "A negative quantity is injected into the submitted cart; the server-owned catalog rejects it without an order or charge before a valid retry succeeds."
+        },
+        {
+          "id": "offline-checkout",
+          "description": "A disconnected browser retains the basket and checkout fields, reports the blocked action, and safely retries after reconnecting."
+        },
+        {
+          "id": "duplicate-order-submit",
+          "description": "Two rapid native submissions cross the RPC boundary but share one idempotency key and resolve to one order and one charge."
+        }
+      ]
+    },
+    {
       "directory": "examples/cinebase",
       "id": "cinebase",
       "title": "Cinebase",
@@ -72,6 +157,77 @@
       ]
     },
     {
+      "directory": "examples/draftboard",
+      "id": "draftboard",
+      "title": "Draftboard",
+      "summary": "A production-built SVG whiteboard proving Octane pointer capture, imperative refs, keyed identity, keyboard history, portals, and resilient autosave.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": [],
+      "octaneFeatures": [
+        "high-frequency-updates",
+        "imperative-handles",
+        "keyed-reconciliation",
+        "native-events",
+        "portals",
+        "refs-as-props",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deep-link-load-empty-autosave",
+          "title": "Load deterministic deep-linked boards and persist a first object from the empty canvas",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "captured-group-drag-identity",
+          "title": "Capture a high-frequency multi-object drag beyond the SVG while a keyed survivor retains identity",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "draw-pan-zoom",
+          "title": "Draw a rectangle, zoom through the canvas handle, and pan the native SVG surface",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "imperative-focus-keyboard-history-portal",
+          "title": "Focus imperatively, undo and redo keyboard edits, and restore focus from portaled help",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "failure-offline-rapid-convergence",
+          "title": "Retry deterministic failures while rapid offline edits converge to the latest saved board",
+          "kind": "resilience",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "initial-load-failure",
+          "description": "The load-failure scenario fails one deterministic board load and succeeds on explicit retry."
+        },
+        {
+          "id": "autosave-failure",
+          "description": "The save-failure scenario keeps edits visible through one failed autosave and saves the latest document on retry."
+        },
+        {
+          "id": "offline-edit-queue",
+          "description": "Native offline events queue completed canvas actions and reconnect saves the latest document."
+        }
+      ]
+    },
+    {
       "directory": "examples/flowboard",
       "id": "flowboard",
       "title": "Flowboard",
@@ -134,6 +290,80 @@
         {
           "id": "offline-local-moves",
           "description": "The browser disconnects while several issue moves remain usable and visibly queued locally."
+        }
+      ]
+    },
+    {
+      "directory": "examples/gridlab",
+      "id": "gridlab",
+      "title": "Gridlab",
+      "summary": "A local-first virtualized spreadsheet proving Octane keyboard, clipboard, IME, formula, focus, and overlapping sync behavior.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/tanstack-virtual"],
+      "octaneFeatures": [
+        "controlled-inputs",
+        "keyed-reconciliation",
+        "native-events",
+        "refs-as-props",
+        "tsrx-control-flow",
+        "two-axis-virtualization"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deterministic-formulas-empty-responsive",
+          "title": "Open deterministic formulas, restore an empty workbook, and keep the mobile grid usable",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "two-axis-virtual-focus",
+          "title": "Scroll both virtual axes while selection focus survives and navigate to a distant cell",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "native-clipboard-range",
+          "title": "Copy and paste a native tabular selection without losing cell focus",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "ime-editor-formulas",
+          "title": "Keep composition in the cell editor and recalculate committed formulas",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "offline-overlap-recovery",
+          "title": "Retry load and sync failures without dropping rapid edits across an offline interleaving",
+          "kind": "resilience",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "initial-load-failure",
+          "description": "The deterministic fixture fails once before a user-triggered retry opens the workbook."
+        },
+        {
+          "id": "offline-edit-queue",
+          "description": "Repeated and cross-cell changes remain local while the browser is offline and sync on reconnection."
+        },
+        {
+          "id": "overlapping-sync-failure",
+          "description": "The first save fails while a newer edit overlaps its in-flight snapshot; retry preserves the latest revision."
+        },
+        {
+          "id": "corrupt-local-workbook",
+          "description": "Out-of-range or malformed persisted cells are discarded before the deterministic sample workbook opens."
         }
       ]
     },
@@ -240,6 +470,224 @@
         }
       ],
       "faultScenarios": []
+    },
+    {
+      "directory": "examples/pagecraft",
+      "id": "pagecraft",
+      "title": "Pagecraft",
+      "summary": "A resilient document workspace proving real Lexical selection, rich-text history, and versioned autosave across network races.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/lexical"],
+      "octaneFeatures": [
+        "compiler-inferred-effects",
+        "keyed-reconciliation",
+        "native-events",
+        "refs",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deep-link-keyboard-navigation",
+          "title": "Open a document deep link, retain keyboard focus, and flush edits through immediate navigation",
+          "kind": "golden",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "selection-format-history",
+          "title": "Format a live contenteditable selection and restore it through undo, redo, and reload",
+          "kind": "golden",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "overlapping-autosave",
+          "title": "Retain save ownership across route remounts and settle versioned autosaves out of order",
+          "kind": "resilience",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "save-failure-offline-recovery",
+          "title": "Retry a rejected save and persist an offline edit after reconnection",
+          "kind": "resilience",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "load-retry-empty-missing",
+          "title": "Reject malformed editor data, recover loading, and distinguish blank and missing documents",
+          "kind": "resilience",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "temporary-load-failure",
+          "description": "The fault=load query rejects one deterministic document load and then succeeds from the retry control."
+        },
+        {
+          "id": "rejected-autosave",
+          "description": "The fault=save query rejects the first debounced mutation while retaining the local editor state for an explicit retry."
+        },
+        {
+          "id": "out-of-order-autosave",
+          "description": "A slow first mutation completes after a fast second mutation, and version checks preserve the newest serialized editor state."
+        },
+        {
+          "id": "offline-edit",
+          "description": "Browser offline state pauses autosave while keeping the visible draft, then reconnect automatically persists it."
+        },
+        {
+          "id": "malformed-editor-state",
+          "description": "Lexical parses untrusted serialized state at both the save and load boundaries, rejecting unknown nodes without mounting corrupt content."
+        }
+      ]
+    },
+    {
+      "directory": "examples/relay",
+      "id": "relay",
+      "title": "Relay",
+      "summary": "A production-built team chat proving real SSE subscriptions, anchored history prepends, and duplicate-free reconnect replay.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": [],
+      "octaneFeatures": [
+        "keyed-reconciliation",
+        "layout-effects",
+        "native-events",
+        "portals",
+        "realtime-subscriptions",
+        "refs-as-props",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "responsive-channel-thread-links",
+          "title": "Deep-link responsive channels and complete a portaled thread by keyboard",
+          "kind": "golden",
+          "spec": "e2e/relay.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "production-sse-delivery",
+          "title": "Receive and reconcile teammate and optimistic messages through the production SSE boundary",
+          "kind": "golden",
+          "spec": "e2e/relay.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "anchored-history-prepend",
+          "title": "Preserve the visual anchor, focus, and survivor identity while rejecting stale cross-channel history",
+          "kind": "golden",
+          "spec": "e2e/relay.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "reconnect-replay-interleaving",
+          "title": "Replay missed updates once and settle rapid sends acknowledged out of order",
+          "kind": "resilience",
+          "spec": "e2e/relay.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "history-failure-recovery",
+          "title": "Recover a failed history load without losing a draft and visit an intentional empty channel",
+          "kind": "resilience",
+          "spec": "e2e/relay.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "history-load-failure",
+          "description": "The fault=history URL fails its first deterministic history result and succeeds on retry without replacing the composer draft."
+        },
+        {
+          "id": "cross-channel-history-race",
+          "description": "A completed general-channel pagination response is held across navigation and released only after the design channel is active, where it must be ignored."
+        },
+        {
+          "id": "disconnected-event-replay",
+          "description": "Teammate events published while the EventSource is paused replay by sequence on reconnect and remain deduplicated."
+        },
+        {
+          "id": "out-of-order-acknowledgements",
+          "description": "A deliberately slow first send settles after a fast second send while final message order and uniqueness remain stable."
+        }
+      ]
+    },
+    {
+      "directory": "examples/streambox",
+      "id": "streambox",
+      "title": "Streambox",
+      "summary": "A production-built video platform proving Octane native media events, persistent player DOM state, and virtualized comments.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/tanstack-virtual"],
+      "octaneFeatures": [
+        "controlled-inputs",
+        "keyed-reconciliation",
+        "native-events",
+        "persistent-dom",
+        "refs-as-props",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "native-media-lifecycle",
+          "title": "Play, pause, seek, change volume, and finish through native media events",
+          "kind": "golden",
+          "spec": "e2e/streambox.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "persistent-player-navigation",
+          "title": "Preserve the live video node through same-video routes and isolate engagement across videos",
+          "kind": "golden",
+          "spec": "e2e/streambox.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "virtual-comment-conversation",
+          "title": "Window 180 comments, sort them, and recover from an empty search",
+          "kind": "golden",
+          "spec": "e2e/streambox.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "responsive-keyboard-deep-link",
+          "title": "Open a transcript deep link on mobile and control playback by keyboard",
+          "kind": "golden",
+          "spec": "e2e/streambox.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "failure-offline-interleaving",
+          "title": "Retry a catalog failure and queue rapid actions while local playback stays offline",
+          "kind": "resilience",
+          "spec": "e2e/streambox.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "initial-catalog-failure",
+          "description": "The scenario query fails the first deterministic catalog load and succeeds on explicit retry."
+        },
+        {
+          "id": "offline-local-playback",
+          "description": "The browser disconnects after media is ready; playback remains usable and product actions queue until reconnect."
+        }
+      ]
     },
     {
       "directory": "examples/threadline",

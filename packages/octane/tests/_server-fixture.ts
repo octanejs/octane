@@ -58,6 +58,7 @@ export function loadServerFixture<T extends ServerFixtureModule = ServerFixtureM
 		/export\s+(const|let|var)\s+(\w+)\s*=/g,
 		(_match: string, kind: string, name: string) => `${kind} ${name} = __exports.${name} =`,
 	);
+	code = code.replace(/export\s+default\s+/g, '__exports.default = ');
 
 	if (/^\s*import\s/m.test(code) || /^\s*export\s/m.test(code)) {
 		throw new Error(

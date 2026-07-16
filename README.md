@@ -65,7 +65,7 @@ Inferno and has worked on React, Lexical, Ripple, and Svelte.
 
 Octane is currently in alpha development.
 
-The core suite contains **2,200+ distinct behavioral tests** across conformance,
+The core suite contains **2,700+ distinct behavioral tests** across conformance,
 differential, hydration, runtime, compiler, and SSR coverage. The `octane-prod`
 project reruns the normal suite against the production compiler path, so those
 executions are valuable mode coverage but are not counted again as unique tests.
@@ -513,6 +513,7 @@ generated from the workspace manifests in
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
   [`base-ui`](./packages/base-ui), [`sonner`](./packages/sonner),
   [`recharts`](./packages/recharts), [`visx`](./packages/visx),
+  [`three`](./packages/three),
   [`lucide`](./packages/lucide),
   [`redux`](./packages/redux), [`redux-toolkit`](./packages/redux-toolkit),
   [`testing-library`](./packages/testing-library),

@@ -1,7 +1,21 @@
-import { isAbsolute, resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import remapping from '@jridgewell/remapping';
-import { canonicalModuleId, createOctaneCompiler } from 'octane/compiler/bundler';
+import { canonicalModuleId, cleanModuleId, createOctaneCompiler } from 'octane/compiler/bundler';
 import { inferRspackEnvironment, normalizeLoaderOptions } from './shared.js';
+
+function realRoot(path) {
+	try {
+		return realpathSync(path);
+	} catch {
+		return path;
+	}
+}
+
+function realModuleId(id) {
+	const file = cleanModuleId(id);
+	return realRoot(file) + id.slice(file.length);
+}
 
 function clearBuildInfo(module) {
 	if (module?.buildInfo && typeof module.buildInfo === 'object') {
@@ -31,6 +45,33 @@ function composeSourceMaps(outputMap, inputSourceMap) {
 	return String(chained.mappings).length > 0 ? chained : outputMap;
 }
 
+async function resolveClientOnlyImports(context, compiler, source, id) {
+	if (typeof context.getResolve !== 'function') return [];
+	const requests = compiler.findServerImportRequests(String(source), id);
+	if (requests.length === 0) return [];
+	const resolver = context.getResolve({ dependencyType: 'esm' });
+	const issuer = dirname(cleanModuleId(id));
+	const classified = [];
+	await Promise.all(
+		requests.map(async (request) => {
+			let resolved;
+			try {
+				resolved = await resolver(issuer, request);
+			} catch {
+				// Rspack's normal dependency factory reports unresolved imports with its
+				// full request/issuer trace. Do not replace that diagnostic here.
+				return;
+			}
+			if (typeof resolved !== 'string') return;
+			const reference = compiler.clientReferenceForFile(resolved);
+			if (reference !== null) classified.push({ request, resolvedId: resolved, reference });
+		}),
+	);
+	return classified.sort((left, right) =>
+		left.request < right.request ? -1 : left.request > right.request ? 1 : 0,
+	);
+}
+
 /**
  * Rspack's ESM loader entry. A compiler instance is intentionally scoped to
  * one invocation: Rspack owns output caching and invalidates it from the file
@@ -44,11 +85,13 @@ export default function octaneLoader(source, inputSourceMap) {
 	try {
 		const options = normalizeLoaderOptions(this.getOptions?.() ?? {});
 		const loaderRoot = this.rootContext ?? process.cwd();
-		const root = options.root
-			? isAbsolute(options.root)
-				? options.root
-				: resolve(loaderRoot, options.root)
-			: loaderRoot;
+		const root = realRoot(
+			options.root
+				? isAbsolute(options.root)
+					? options.root
+					: resolve(loaderRoot, options.root)
+				: loaderRoot,
+		);
 		const environment = options.environment ?? inferRspackEnvironment(this.target);
 		const hmr =
 			environment === 'client' && this.hot === true && options.hmr !== false ? 'webpack' : false;
@@ -64,37 +107,69 @@ export default function octaneLoader(source, inputSourceMap) {
 			...(options.autoMemo === undefined ? null : { autoMemo: options.autoMemo }),
 			...(options.renderers === undefined ? null : { renderers: options.renderers }),
 		});
-		const id = this.resource ?? this.resourcePath;
-		const result = compiler.transform(String(source), id, {
-			environment,
-			hmr,
-			dev,
-			profile,
-			...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
-			...(options.autoMemo === undefined ? null : { autoMemo: options.autoMemo }),
-		});
+		const id = realModuleId(this.resource ?? this.resourcePath);
+		const finish = (clientOnlyImports, callback) => {
+			try {
+				const result = compiler.transform(String(source), id, {
+					environment,
+					hmr,
+					dev,
+					profile,
+					...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
+					...(options.autoMemo === undefined ? null : { autoMemo: options.autoMemo }),
+					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
+				});
 
-		if (result === null) {
-			this.callback(null, source, this.sourceMap === false ? undefined : inputSourceMap);
-			return;
-		}
+				if (result === null) {
+					callback(null, source, this.sourceMap === false ? undefined : inputSourceMap);
+					return;
+				}
 
-		registerDependencies(this, result);
-		if (result.kind === 'none') {
-			this.callback(null, source, this.sourceMap === false ? undefined : inputSourceMap);
-			return;
+				registerDependencies(this, result);
+				if (result.kind === 'none') {
+					callback(null, source, this.sourceMap === false ? undefined : inputSourceMap);
+					return;
+				}
+				setBuildInfo(this._module, {
+					canonicalId: canonicalModuleId(id, root),
+					transformKind: result.kind,
+					serverRpc:
+						result.kind === 'compile' &&
+						(result.code.includes('_$__serverRpc(') ||
+							result.code.includes('export const _$_server_$_')),
+					...(result.clientReference === undefined
+						? null
+						: { clientReference: { ...result.clientReference } }),
+				});
+				const sourceMap =
+					this.sourceMap === false ? undefined : composeSourceMaps(result.map, inputSourceMap);
+				callback(null, result.code, sourceMap);
+			} catch (error) {
+				callback(error instanceof Error ? error : new Error(String(error)));
+			}
+		};
+
+		const callback = this.callback.bind(this);
+		const currentReference =
+			environment === 'server' && typeof compiler.clientReferenceForFile === 'function'
+				? compiler.clientReferenceForFile(id)
+				: null;
+		if (
+			environment === 'server' &&
+			currentReference === null &&
+			typeof this.getResolve === 'function'
+		) {
+			const requests = compiler.findServerImportRequests(String(source), id);
+			if (requests.length > 0) {
+				const asyncCallback = this.async?.() ?? callback;
+				resolveClientOnlyImports(this, compiler, source, id).then(
+					(imports) => finish(imports, asyncCallback),
+					(error) => asyncCallback(error instanceof Error ? error : new Error(String(error))),
+				);
+				return;
+			}
 		}
-		setBuildInfo(this._module, {
-			canonicalId: canonicalModuleId(id, root),
-			transformKind: result.kind,
-			serverRpc:
-				result.kind === 'compile' &&
-				(result.code.includes('_$__serverRpc(') ||
-					result.code.includes('export const _$_server_$_')),
-		});
-		const sourceMap =
-			this.sourceMap === false ? undefined : composeSourceMaps(result.map, inputSourceMap);
-		this.callback(null, result.code, sourceMap);
+		finish([], callback);
 	} catch (error) {
 		this.callback(error instanceof Error ? error : new Error(String(error)));
 	}

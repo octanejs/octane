@@ -26,10 +26,10 @@ function writeRendererConfig(root: string, module = '/src/object-renderer.js', p
 		root,
 		'renderer.config.ts',
 		`export const renderers = {
-	registry: { object: ${JSON.stringify(module)} },
+	registry: { object: { module: ${JSON.stringify(module)}, server: 'client-only' } },
 	boundaries: {
 		'/src/object-boundaries.js': {
-			Canvas: { ownerRenderer: 'dom', childRenderer: 'object', prop: ${JSON.stringify(prop)} },
+			Canvas: { ownerRenderer: 'dom', childRenderer: 'object', prop: ${JSON.stringify(prop)}, server: 'omit-child' },
 		},
 	},
 	rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
@@ -95,7 +95,11 @@ describe('Rsbuild renderer configuration', () => {
 				expect(plugin.options.renderers).toMatchObject({
 					default: 'dom',
 					registry: {
-						object: { module: '/src/object-renderer.js', target: 'universal' },
+						object: {
+							module: '/src/object-renderer.js',
+							target: 'universal',
+							server: 'client-only',
+						},
 					},
 					boundaries: {
 						'/src/object-boundaries.js': {
@@ -103,6 +107,7 @@ describe('Rsbuild renderer configuration', () => {
 								ownerRenderer: 'dom',
 								childRenderer: 'object',
 								prop: 'children',
+								server: 'omit-child',
 							},
 						},
 					},

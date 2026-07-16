@@ -10,7 +10,7 @@ export const OCTANE_NONCE_STATE_KEY: 'octane.nonce';
 export const DEFAULT_OUTDIR: 'dist';
 export const ENTRY_FILENAME: 'entry.js';
 export function resolveOctaneConfig(
-	raw: OctaneConfigOptions,
+	raw: OctaneConfigOptions | ResolvedOctaneConfig,
 	options?: { requireAdapter?: boolean },
 ): ResolvedOctaneConfig;
 
@@ -200,6 +200,14 @@ export type ExperimentalRendererRegistryEntry =
 	| {
 			module: string;
 			target?: 'dom' | 'universal';
+			/** Explicit server policy; universal renderers currently support client-only or unsupported. */
+			server?: 'render' | 'client-only' | 'unsupported';
+			/** JSX import-source module used for file-local intrinsic element types. */
+			intrinsics?: string;
+			/** Policy for authored text children. @default 'reject' */
+			text?: 'reject' | 'ignore' | 'host';
+			/** Serializable feature flags consumed by compiler and runtime integrations. */
+			capabilities?: readonly string[];
 	  };
 
 /**
@@ -214,6 +222,8 @@ export interface ExperimentalRendererBoundaryOptions {
 	childRenderer: string;
 	/** Component prop containing the renderer-owned region, usually `children`. */
 	prop: string;
+	/** Omit a client-only child region from server output. */
+	server?: 'omit-child';
 }
 
 /** @experimental See {@link ExperimentalRendererRuleOptions}. */
@@ -244,6 +254,10 @@ export interface ExperimentalResolvedRendererRule {
 export interface ExperimentalResolvedRendererRegistryEntry {
 	readonly module: string;
 	readonly target: 'dom' | 'universal';
+	readonly server: 'render' | 'client-only' | 'unsupported';
+	readonly intrinsics?: string;
+	readonly text: 'reject' | 'ignore' | 'host';
+	readonly capabilities: readonly string[];
 }
 
 /** @experimental Canonical renderer-owned child-region metadata. */
@@ -251,6 +265,7 @@ export interface ExperimentalResolvedRendererBoundary {
 	readonly ownerRenderer: string;
 	readonly childRenderer: string;
 	readonly prop: string;
+	readonly server?: 'omit-child';
 }
 
 /** @experimental Canonical form used by compiler integrations and cache keys. */
