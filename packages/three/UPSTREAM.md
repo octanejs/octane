@@ -44,6 +44,13 @@ normalized input, GLTF-shaped results receive the public graph map, and
 `preload`/`clear` share that same key. Cache eviction does not imply asset
 disposal; disposal follows Octane's declarative host ownership instead.
 
+Milestone 6 follows the pinned `createPortal` contract: the supplied
+`Object3D` is a borrowed physical target, the portal store has an immediate
+`previousRoot` plus local scene/raycaster/pointer/event state, and pointer
+events bubble through physical Three ancestry. Octane's universal portal range
+retains logical context, error, effect, and scheduling ownership without
+embedding React Reconciler or representing the target as a fake host child.
+
 ## License provenance
 
 React Three Fiber is MIT-licensed, Copyright 2019–2025 Poimandres. Adapted
