@@ -7209,10 +7209,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
  * follow the generic data-attribute contract: nullish/function/symbol remove,
  * while booleans, numbers and objects stringify. This matters when an `as
  * string` assertion or an external typed value is inaccurate at runtime. The
- * compiler restricts this helper to lowercase HTML data names, so it needs
- * none of the generic attribute alias/property routing tables. Hydration still
- * goes through the capability boundary so mismatch recovery and
- * `suppressHydrationWarning` remain identical to setAttribute.
+ * compiler restricts this helper to lowercase data names, which are applied as
+ * unnamespaced attributes in HTML, SVG, and MathML, so it needs none of the
+ * generic attribute alias/property routing tables. Hydration still goes through
+ * the capability boundary so mismatch recovery and `suppressHydrationWarning`
+ * remain identical to setAttribute.
  */
 export function setStringData(el: Element, name: string, value: unknown): void {
 	const t = typeof value;

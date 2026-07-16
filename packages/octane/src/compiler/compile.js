@@ -11169,15 +11169,15 @@ function emitElementHtml(
 				ns: hostNs,
 			});
 		} else if (
-			hostNs === 'html' &&
 			/^data-[a-z][a-z0-9_-]*$/.test(attrName) &&
 			isKnownStringExpression(inner, ctx.knownStringLocals)
 		) {
-			// A lowercase, statically named HTML data attribute with an already-string
-			// value needs none of setAttribute's alias, coercion, namespace, controlled-
-			// property, or invalid-name machinery. Keep the proof deliberately narrow:
-			// unknown values, cased names, foreign namespaces, and every non-data attr
-			// retain the generic React-parity path.
+			// A lowercase, statically named data attribute with an already-string value
+			// needs none of setAttribute's alias, coercion, namespace, controlled-property,
+			// or invalid-name machinery. Element.setAttribute applies the same unnamespaced
+			// data attribute in HTML, SVG, and MathML, so destination-opaque component
+			// templates can retain this specialization. Unknown values, cased names, and
+			// every non-data attr retain the generic React-parity path.
 			bindings.push({
 				id: bindings.length,
 				kind: 'stringData',
