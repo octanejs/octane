@@ -1,61 +1,79 @@
 // After a redeploy purges the previous build's hashed chunks, a stale tab's
-// lazy route import 404s and Vite reports `vite:preloadError`. Importing the
-// client router module installs a handler that reloads the page so the tab
-// picks up the new deployment. The guard is time-bounded: a repeat failure on
-// the same URL right after a reload surfaces the error instead of looping,
-// but a long-lived tab that healed once can still recover from a LATER
-// redeploy on the same URL.
+// lazy route imports 404 and Vite reports `vite:preloadError`. The client
+// router module reloads the page so the tab picks up the new deployment.
+// Within one page lifetime every failure after the first (a navigation loads
+// layout + page chunks together) rides the scheduled reload; across reloads
+// the guard is time-bounded, so a chunk that KEEPS failing surfaces its error
+// instead of looping while a later redeploy can still self-heal.
+// Each installStaleChunkReload() call below models one page lifetime sharing
+// the tab's sessionStorage — what a real reload produces.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import '../src/app/router-client.ts';
-
-const reload = vi.fn();
+import { installStaleChunkReload } from '../src/app/router-client.ts';
 
 beforeEach(() => {
 	vi.useFakeTimers();
 	sessionStorage.clear();
-	reload.mockClear();
-	Object.defineProperty(window, 'location', {
-		value: { href: 'https://octanejs.dev/docs', reload },
-		writable: true,
-	});
 });
 
 afterEach(() => {
 	vi.useRealTimers();
 });
 
-function failPreload(): Event {
-	const event = new Event('vite:preloadError', { cancelable: true });
-	window.dispatchEvent(event);
-	return event;
+function pageLifetime(href = 'https://octanejs.dev/docs') {
+	const target = new EventTarget();
+	const reload = vi.fn();
+	installStaleChunkReload({
+		addEventListener: target.addEventListener.bind(target),
+		location: { href, reload },
+		sessionStorage,
+	});
+	const failPreload = () => {
+		const event = new Event('vite:preloadError', { cancelable: true });
+		target.dispatchEvent(event);
+		return event;
+	};
+	return { reload, failPreload };
 }
 
 describe('stale-chunk reload', () => {
 	it('reloads when a lazy chunk fails to load', () => {
-		const event = failPreload();
-		expect(reload).toHaveBeenCalledTimes(1);
+		const tab = pageLifetime();
+		const event = tab.failPreload();
+		expect(tab.reload).toHaveBeenCalledTimes(1);
 		expect(event.defaultPrevented).toBe(true);
 	});
 
-	it('does not loop when the same URL keeps failing — the error surfaces', () => {
-		failPreload();
+	it('parallel chunk failures (layout + page) all ride the one scheduled reload', () => {
+		const tab = pageLifetime();
+		const first = tab.failPreload();
+		const second = tab.failPreload();
+		expect(tab.reload).toHaveBeenCalledTimes(1);
+		expect(first.defaultPrevented).toBe(true);
+		expect(second.defaultPrevented).toBe(true);
+	});
+
+	it('does not loop when the chunk still fails after the reload — the error surfaces', () => {
+		pageLifetime().failPreload();
 		vi.advanceTimersByTime(2_000); // a realistic reload round-trip
-		const second = failPreload();
-		expect(reload).toHaveBeenCalledTimes(1);
-		expect(second.defaultPrevented).toBe(false);
+		const reloaded = pageLifetime();
+		const event = reloaded.failPreload();
+		expect(reloaded.reload).not.toHaveBeenCalled();
+		expect(event.defaultPrevented).toBe(false);
 	});
 
 	it('recovers from a LATER redeploy on the same URL in a long-lived tab', () => {
-		failPreload();
+		pageLifetime().failPreload();
 		vi.advanceTimersByTime(60 * 60 * 1000); // the next deployment, an hour on
-		failPreload();
-		expect(reload).toHaveBeenCalledTimes(2);
+		const later = pageLifetime();
+		later.failPreload();
+		expect(later.reload).toHaveBeenCalledTimes(1);
 	});
 
 	it('a failure on a different URL still gets its own reload', () => {
-		failPreload();
-		(window.location as unknown as { href: string }).href = 'https://octanejs.dev/benchmarks';
-		failPreload();
-		expect(reload).toHaveBeenCalledTimes(2);
+		pageLifetime('https://octanejs.dev/docs').failPreload();
+		vi.advanceTimersByTime(2_000);
+		const other = pageLifetime('https://octanejs.dev/benchmarks');
+		other.failPreload();
+		expect(other.reload).toHaveBeenCalledTimes(1);
 	});
 });
