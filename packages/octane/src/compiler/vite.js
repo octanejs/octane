@@ -144,6 +144,14 @@ function assertProfilingDefineAvailable(definitions, enabled) {
 }
 
 export function octane(options = {}) {
+	if (options.parallelUse !== undefined) {
+		// Removed 2026-07-16: the parallel-use() pipeline is unconditional compiled
+		// semantics (docs/suspense-parallel-use-plan.md). Warn instead of throwing
+		// so existing configs keep building, but the timing change is not silent.
+		console.warn(
+			'octane/compiler/vite: the `parallelUse` option was removed — the parallel use() transform is always on and this option is ignored. Delete it from octane().',
+		);
+	}
 	let hmrEnabled = options.hmr;
 	let specializeProductionRoots = false;
 	let emitClientReferenceManifest = options.ssr !== true;

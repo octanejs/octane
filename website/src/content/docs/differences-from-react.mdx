@@ -117,6 +117,12 @@ const user = use(fetchUser(id));
 const teams = use(fetchTeams(id)); // starts alongside fetchUser
 ```
 
+Two known gaps are tracked while this area is under active work: independence
+analysis stops at module boundaries (independent `use()` reads inside an
+imported custom hook still serialize), and a transition-wrapped update
+currently reveals newly-loaded content progressively — never rolling back —
+where React holds the previous screen until the whole update completes.
+
 <h2 id="errors-and-server">Errors and server rendering</h2>
 
 Octane has no class components, so error boundaries use a template block or the

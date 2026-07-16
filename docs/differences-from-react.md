@@ -185,6 +185,16 @@ the same code:
   creates a fresh promise for a slot that already holds one reuses the stored
   thenable ("uncached promise" dev warning), and a replay that discovers a new
   pending `use()` behind a data dependency gets a dev waterfall diagnostic.
+- **Known gaps (regression-pinned in `benchmarks/async-composition`):** the
+  independence analysis stops at module boundaries, so two independent `use()`
+  reads inside an imported custom hook still serialize; a parent with no
+  `use()` of its own never triggers its warm plan, so adjacent async siblings
+  are discovered serially; and a transition-wrapped update currently reveals
+  newly-resolved content progressively — monotonic, never rolling back, and a
+  dependent value never renders against stale input — where React holds the
+  previous screen until the whole boundary completes (a runtime gap independent
+  of this transform). The benchmark enforces one-way ceilings on all three so
+  they can only improve.
 
 ## Root component entry points and container ownership
 
