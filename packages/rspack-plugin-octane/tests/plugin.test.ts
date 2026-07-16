@@ -118,7 +118,6 @@ describe('OctaneRspackPlugin', () => {
 			environment: 'client',
 			hmr: false,
 			dev: true,
-			parallelUse: false,
 			exclude: ['generated'],
 			renderers: {
 				registry: {
@@ -154,7 +153,6 @@ describe('OctaneRspackPlugin', () => {
 			environment: 'client',
 			hmr: false,
 			dev: true,
-			parallelUse: false,
 			exclude: ['generated'],
 			renderers: expect.objectContaining({
 				default: 'dom',
@@ -234,7 +232,10 @@ describe('OctaneRspackPlugin', () => {
 		);
 	});
 
-	it('rejects a non-boolean profile option at the public constructor', () => {
+	it('rejects invalid options at the public constructor', () => {
 		expect(() => new OctaneRspackPlugin({ profile: 'yes' } as any)).toThrow(/profile/);
+		expect(() => new OctaneRspackPlugin({ parallelUse: false } as any)).toThrow(
+			/unknown option `parallelUse`/,
+		);
 	});
 });

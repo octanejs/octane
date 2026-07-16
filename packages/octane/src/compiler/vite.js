@@ -155,7 +155,6 @@ export function octane(options = {}) {
 		root: projectRoot,
 		exclude: options.exclude,
 		profile: profileEnabled,
-		parallelUse: options.parallelUse,
 		renderers: options.renderers,
 	});
 	// An explicit override of Vite's per-module SSR auto-detection.
@@ -167,7 +166,6 @@ export function octane(options = {}) {
 			root: projectRoot,
 			exclude: options.exclude,
 			profile: profileEnabled,
-			parallelUse: options.parallelUse,
 			renderers: options.renderers,
 		});
 	};
@@ -247,7 +245,6 @@ export function octane(options = {}) {
 					// on the production compiler path.
 					dev: !!hmrEnabled,
 					profile: !server && profileEnabled,
-					parallelUse: options.parallelUse,
 					collectVoidComponentExports:
 						specializeProductionRoots && !server && !hmrEnabled && !profileEnabled,
 					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),

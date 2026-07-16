@@ -108,15 +108,14 @@ The useful transition behavior remains: when a slower replacement suspends, the
 current screen can stay visible and `isPending` can explain the wait. `flushSync`
 drains the full update queue, while passive effects still run after paint.
 
-Octane also removes avoidable `use()` waterfalls by default. Independent requests can
-start together; a request that needs an earlier result remains sequential:
+Octane always applies its compiler transform for avoidable `use()` waterfalls.
+Requests it can prove independent can start together; a request that needs an
+earlier result remains sequential:
 
 ```tsrx
 const user = use(fetchUser(id));
 const teams = use(fetchTeams(id)); // starts alongside fetchUser
 ```
-
-Set `parallelUse: false` when you specifically need React's serial start timing.
 
 <h2 id="errors-and-server">Errors and server rendering</h2>
 

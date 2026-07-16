@@ -24,6 +24,8 @@ packages:
   - benchmarks/bundle-size
   - benchmarks/async-waterfall
   - benchmarks/async-waterfall/*
+  - benchmarks/async-composition
+  - benchmarks/async-composition/*
   - benchmarks/todomvc
   - benchmarks/todomvc/*
   - benchmarks/chat-stream

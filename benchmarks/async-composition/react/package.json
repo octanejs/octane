@@ -1,0 +1,20 @@
+{
+  "name": "react-async-composition-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "React 19 reference fixture for the async-composition benchmark.",
+  "scripts": {
+    "dev": "vite --host --port 5284 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5284 --strictPort"
+  },
+  "dependencies": {
+    "react": "catalog:default",
+    "react-dom": "catalog:default"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "catalog:default",
+    "vite": "catalog:default"
+  }
+}
