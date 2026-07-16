@@ -7,6 +7,55 @@
 // match-commit wait as examples/hacker-news's entry-client.
 import { makeRouter } from './router.ts';
 
+// A new deployment purges the previous build's hashed chunks, so a tab still
+// running the old bundle 404s when it lazy-imports a route chunk ("Failed to
+// fetch dynamically imported module"). Vite surfaces those as
+// `vite:preloadError` — reload so the stale client picks up the fresh
+// deployment instead of stranding the navigation. Two guards, two scopes:
+// within ONE page lifetime a route navigation loads several chunks at once
+// (layout + page), so every failure after the first is swallowed — they all
+// ride the reload the first one scheduled. ACROSS reloads the guard is
+// time-bounded, not once-per-URL: a repeat failure on the same URL right
+// after a reload means the chunk is genuinely broken, so the error surfaces
+// instead of looping — while a long-lived tab that healed once can still
+// recover from the next redeploy weeks later. Without storage (blocked
+// cookies) reloads cannot be bounded, so the error surfaces there too.
+export const RELOAD_RETRY_WINDOW_MS = 10_000;
+
+interface ReloadHost {
+	addEventListener(type: string, listener: (event: Event) => void): void;
+	location: { href: string; reload(): void };
+	sessionStorage: Pick<Storage, 'getItem' | 'setItem'>;
+}
+
+export function installStaleChunkReload(host: ReloadHost): void {
+	let reloadScheduled = false;
+	host.addEventListener('vite:preloadError', (event) => {
+		if (reloadScheduled) {
+			event.preventDefault();
+			return;
+		}
+		const key = 'octane:preload-error-reload';
+		const now = Date.now();
+		try {
+			const last = JSON.parse(host.sessionStorage.getItem(key) ?? 'null');
+			if (last?.href === host.location.href && now - last.time < RELOAD_RETRY_WINDOW_MS) {
+				return;
+			}
+			host.sessionStorage.setItem(key, JSON.stringify({ href: host.location.href, time: now }));
+		} catch {
+			return;
+		}
+		reloadScheduled = true;
+		event.preventDefault();
+		host.location.reload();
+	});
+}
+
+if (typeof window !== 'undefined') {
+	installStaleChunkReload(window);
+}
+
 export const clientRouter: any = typeof document === 'undefined' ? null : makeRouter();
 
 export async function waitForRouterMatches(
