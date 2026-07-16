@@ -29,7 +29,7 @@ export function NotFound() @{
 			}
 			.notfound :global(a.notfound-home) {
 				background: #ff415a;
-				color: #f4eee8;
+				color: var(--on-accent);
 				font-weight: 600;
 				padding: 0.7rem 1.4rem;
 				border-radius: 9999px;

@@ -54,6 +54,10 @@ import {
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
 // hyphenated style keys stay byte-equal across the two runtimes).
 import { normalizeClass, styleName } from './css.js';
+import {
+	invalidHtmlNestingWithAncestor,
+	invalidHtmlNestingWithParent,
+} from './html-tree-validation.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 export { normalizeClass };
 
@@ -61,6 +65,16 @@ interface SSRScope {
 	parent: SSRScope | null;
 	/** Context Provider values stamped on this scope (lazily allocated). */
 	$$ctxValues: Map<unknown, unknown> | null;
+}
+
+type ParserNamespace = 'html' | 'svg' | 'mathml';
+
+interface SsrElementContext {
+	tag: string;
+	parent: SsrElementContext | null;
+	namespace: ParserNamespace;
+	childrenNamespace: ParserNamespace;
+	location?: string;
 }
 
 type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
@@ -169,6 +183,15 @@ let CURRENT_PARENT_SCOPE: SSRScope | null = null;
 // alone cannot distinguish a child rendered at the same position in an @try's
 // content and pending arms, even though those are separate client block scopes.
 let ASYNC_SCOPE = '';
+// DEV SSR HTML-parser context. Compiler-emitted ssrElement wrappers keep native
+// elements on this stack while their children execute, including through
+// component calls. The warning set is render-local and shared by canonical
+// retries, so one authored relationship reports once without leaking between
+// requests. Discovery passes leave it null because their output is discarded.
+let CURRENT_SSR_ELEMENT: SsrElementContext | null = null;
+// null = validation disabled (outside a canonical render / discovery pass),
+// undefined = enabled but no warning set allocated yet.
+let SSR_NESTING_WARNINGS: Set<string> | null | undefined = null;
 
 // Walk a frame to its dotted path ('' for the root). Memoized per frame.
 function framePath(f: Frame): string {
@@ -200,6 +223,102 @@ function nextChildSegment(frame: Frame): number {
 
 function ssrScope(parent: SSRScope | null): SSRScope {
 	return { parent, $$ctxValues: null };
+}
+
+function ssrElementNamespaces(
+	tag: string,
+	parent: SsrElementContext | null,
+): { namespace: ParserNamespace; childrenNamespace: ParserNamespace } {
+	const inherited = parent?.childrenNamespace ?? FRAME?.namespace ?? 'html';
+	const namespace: ParserNamespace =
+		tag === 'svg'
+			? 'svg'
+			: tag === 'math'
+				? 'mathml'
+				: inherited === 'html' && SVG_ONLY_TAGS.has(tag)
+					? 'svg'
+					: inherited;
+	const childrenNamespace: ParserNamespace =
+		tag === 'foreignObject'
+			? 'html'
+			: tag === 'svg'
+				? 'svg'
+				: tag === 'math'
+					? 'mathml'
+					: inherited === 'html' && SVG_ONLY_TAGS.has(tag)
+						? 'svg'
+						: inherited;
+	return { namespace, childrenNamespace };
+}
+
+function reportInvalidHtmlNesting(message: string): void {
+	const warning =
+		'Octane SSR invalid HTML nesting: ' +
+		message +
+		'\n\nThe browser will repair this HTML before hydration. This can shift content and cause a hydration mismatch.';
+	let seen = SSR_NESTING_WARNINGS;
+	if (seen === null) return;
+	if (seen === undefined) {
+		seen = new Set();
+		SSR_NESTING_WARNINGS = seen;
+		if (RESOLVED !== null) RESOLVED.nestingWarnings = seen;
+	}
+	if (seen.has(warning)) return;
+	seen.add(warning);
+	console.error(warning);
+}
+
+/** Compiler ABI: validate and scope one native element during a DEV SSR render. */
+export function ssrElement(
+	tag: string,
+	location: string | undefined,
+	render: () => string,
+): string {
+	if (process.env.NODE_ENV === 'production' || SSR_NESTING_WARNINGS === null) return render();
+
+	const parent = CURRENT_SSR_ELEMENT;
+	const { namespace, childrenNamespace } = ssrElementNamespaces(tag, parent);
+	const semanticTag = tag.toLowerCase();
+	const element: SsrElementContext = {
+		tag: semanticTag,
+		parent,
+		namespace,
+		childrenNamespace,
+		location,
+	};
+
+	// Foreign-content parsing is independent of the HTML repair rules. Stop at
+	// that boundary; <foreignObject> children naturally start a fresh HTML chain.
+	if (namespace === 'html' && parent?.namespace === 'html') {
+		const parentMessage = invalidHtmlNestingWithParent(
+			semanticTag,
+			parent.tag,
+			location,
+			parent.location,
+		);
+		if (parentMessage !== null) reportInvalidHtmlNesting(parentMessage);
+
+		let ancestor = parent.parent;
+		const ancestors = [parent.tag];
+		while (ancestor !== null && ancestor.namespace === 'html') {
+			ancestors.push(ancestor.tag);
+			const ancestorMessage = invalidHtmlNestingWithAncestor(
+				semanticTag,
+				ancestors,
+				location,
+				ancestor.location,
+			);
+			if (ancestorMessage !== null) reportInvalidHtmlNesting(ancestorMessage);
+			ancestor = ancestor.parent;
+		}
+	}
+
+	CURRENT_SSR_ELEMENT = element;
+	try {
+		return render();
+	} finally {
+		CURRENT_SSR_ELEMENT = parent;
+	}
 }
 
 const NOOP = (): void => {};
@@ -3423,6 +3542,8 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	/** Cross-pass fallback ids for transient object keys at one lexical position. */
 	asyncPositionIdentities: Map<string, number>;
 	nextAsyncIdentity: number;
+	/** Lazily allocated DEV SSR invalid-nesting warnings reported by this render. */
+	nestingWarnings?: Set<string>;
 	pu: {
 		created: Map<string, { deps: unknown[]; value: unknown }>;
 		resolvedT: Map<PromiseLike<unknown>, SuspenseOutcome>;
@@ -3478,6 +3599,8 @@ interface Ambient {
 	props: any;
 	parentScope: SSRScope | null;
 	asyncScope: string;
+	ssrElement: SsrElementContext | null;
+	nestingWarnings: Set<string> | null | undefined;
 	vtTrySeq: number;
 	vtHasCandidates: boolean;
 	vtStack: Array<{ candidate: VtSsrCandidate; consumed: boolean }>;
@@ -3499,6 +3622,8 @@ function saveAmbient(): Ambient {
 		props: CURRENT_PROPS,
 		parentScope: CURRENT_PARENT_SCOPE,
 		asyncScope: ASYNC_SCOPE,
+		ssrElement: CURRENT_SSR_ELEMENT,
+		nestingWarnings: SSR_NESTING_WARNINGS,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
 		vtStack: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed })),
@@ -3520,6 +3645,8 @@ function restoreAmbient(a: Ambient): void {
 	CURRENT_PROPS = a.props;
 	CURRENT_PARENT_SCOPE = a.parentScope;
 	ASYNC_SCOPE = a.asyncScope;
+	CURRENT_SSR_ELEMENT = a.ssrElement;
+	SSR_NESTING_WARNINGS = a.nestingWarnings;
 	VT_SSR_TRY_SEQ = a.vtTrySeq;
 	VT_SSR_HAS_CANDIDATES = a.vtHasCandidates;
 	VT_SSR_STACK.length = 0;
@@ -3560,6 +3687,8 @@ function runFullFramedPass(
 	const serial = (SERIAL = [] as unknown[]);
 	const deferred = (DEFERRED = [] as Job[]);
 	RESOLVED = resolved;
+	CURRENT_SSR_ELEMENT = null;
+	SSR_NESTING_WARNINGS = resolved.nestingWarnings;
 	const root = ssrScope(null);
 	CURRENT_SCOPE = root;
 	// A root frame so use() keys resolve; the root component is the fallback
@@ -3639,6 +3768,8 @@ function runDiscoveryRound(
 	SERIAL = [] as unknown[];
 	const deferred = (DEFERRED = [] as Job[]);
 	RESOLVED = resolved;
+	CURRENT_SSR_ELEMENT = null;
+	SSR_NESTING_WARNINGS = null;
 	FRAME = null;
 	CURRENT_COMP = null;
 	CURRENT_PROPS = null;
