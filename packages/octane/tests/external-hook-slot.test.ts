@@ -607,6 +607,7 @@ describe('manifest-declared manual hook slots', () => {
 			.sort();
 		expect(declared).toEqual([
 			'base-ui',
+			'dexie',
 			'dnd-kit',
 			'floating-ui',
 			'i18next',

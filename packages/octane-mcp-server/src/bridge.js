@@ -81,6 +81,7 @@ export const KNOWN_BINDINGS = {
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
 	'@mdx-js/react': '@octanejs/mdx',
+	'dexie-react-hooks': '@octanejs/dexie',
 };
 
 // Workspace directory names for the maintained bindings. Keep this derived

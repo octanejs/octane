@@ -35,9 +35,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --prod false --frozen-lockfile
 
-      # The website ssr-hydration e2e drives a real Chromium (dev-SSR +
-      # production-preview hydration across every route). Without a browser the
-      # spec skips itself — installing here makes CI actually enforce it.
+      # Website ssr-hydration e2e and Dexie upstream browser scenarios both drive
+      # real Chromium. Without a browser those specs fail; installing here makes
+      # CI actually enforce them.
       - name: Install Playwright Chromium
         run: pnpm --filter website exec playwright install --with-deps chromium
 
