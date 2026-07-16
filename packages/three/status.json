@@ -3,7 +3,7 @@
     "package": "@react-three/fiber",
     "version": "9.6.1 (2a528745)"
   },
-  "surface": "Technical-preview Milestones 0, 2, 3, 4, 5, and 6 surface: renderer configuration and DOM Canvas boundary, compiler ABI and renderer-local Three intrinsic types, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, ownership-aware disposal, promise-returning programmatic roots, callable root state, scene/camera/raycaster and resize/DPR/viewport configuration, shadows/colors, one shared frame loop, global effects, useStore/useThree/useFrame/useGraph and managed-instance helpers, the ray/pointer event system with DOM sources and custom managers, a keyed useLoader cache with preload/clear and GLTF graph augmentation, retained Suspense/Activity behavior, client Three-to-DOM pending/error projection, same-renderer createPortal targets with state/event enclaves and physical Three event bubbling, and a deterministic testing harness.",
+  "surface": "Technical-preview Milestones 0, 2, 3, 4, 5, 6, and 7 surface: renderer configuration and DOM Canvas boundary, compiler ABI and renderer-local Three intrinsic types, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, ownership-aware disposal, promise-returning programmatic roots, callable root state, scene/camera/raycaster and resize/DPR/viewport configuration, shadows/colors, one shared frame loop, global effects, useStore/useThree/useFrame/useGraph and managed-instance helpers, the ray/pointer event system with DOM sources and custom managers, a keyed useLoader cache with preload/clear and GLTF graph augmentation, retained Suspense/Activity behavior, client Three-to-DOM pending/error projection, same-renderer createPortal targets with state/event enclaves and physical Three event bubbling, client-only Canvas shell streaming and production Vite/Rsbuild hydration adoption with the matching raw Rspack graph split, and a deterministic testing harness.",
   "divergences": [
     "Octane owns component execution, hooks, context, scheduling, Suspense, refs, and effects instead of embedding React Reconciler.",
     "The programmatic root renders an Octane component plus props rather than a React element descriptor.",
@@ -14,12 +14,12 @@
     "Hidden retained Activity subtrees are excluded from recursive raycasts; Three r172 ignores Object3D.visible during raycasting, so R3F 9.6.1 can otherwise pierce a hidden descendant through an interactive visible ancestor.",
     "Managed and externally leased portal targets are root-scoped and cross-root portal placement is rejected before mutation; this makes the universal target-handle lifetime explicit."
   ],
-  "ssr": "Three scene modules are classified client-only and Canvas.children is configured as an omitted server region. Client-side Three pending/error projection is implemented; package-level DOM-shell streaming output and hydration adoption remain Milestone 7 work.",
+  "ssr": "Three scene modules are client-only and Canvas.children is omitted from the server graph. Canvas streams its DOM shell and native fallback, then production Vite and Rsbuild hydration adopt those nodes and create one Three root on the client; raw Rspack proves the equivalent client/server graph split without claiming an application SSR lifecycle.",
   "verified": "2026-07-16",
   "notes": [
     "The behavioral oracle is pinned to three@0.172.0; the broad upstream three >=0.156 range is not advertised until a minimum-version lane passes.",
-    "The checked-in crosswalk classifies 90 upstream public exports and 157 executable upstream tests with zero unclassified cases; Milestone 6 adds portal placement, state/context, event, teardown, diagnostic, type, differential, and universal transaction evidence.",
-    "Full Canvas SSR/hydration and XR/HMR hardening follow in later milestones.",
+    "The checked-in crosswalk classifies 90 upstream public exports and 157 executable upstream tests with zero unclassified cases; Milestone 7 adds concrete Canvas server-exclusion, streamed-shell, hydration-adoption, client-reference, projection, and teardown evidence.",
+    "XR/HMR and direct-root lifecycle hardening follow in later milestones.",
     "React Native/Expo, R3F 10 WebGPU/TSL APIs, and Drei are outside this package's current compatibility target."
   ],
   "docs": ["docs/three-port-plan.md", "packages/three/UPSTREAM.md"]

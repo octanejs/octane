@@ -4,7 +4,7 @@ An experimental React Three Fiber 9-compatible web renderer for Octane. Octane
 keeps ownership of component execution, hooks, context, Suspense, refs, and
 effects; this package supplies the Three-specific host layer.
 
-Milestones 0, 2, 3, 4, 5, and 6 are implemented on top of Octane's renderer SDK
+Milestones 0, 2, 3, 4, 5, 6, and 7 are implemented on top of Octane's renderer SDK
 foundation. The current technical preview includes:
 
 - the serializable compiler preset, renderer entry point, renderer-local Three
@@ -30,12 +30,14 @@ foundation. The current technical preview includes:
   client-side Three-to-DOM pending/error projection;
 - same-renderer `createPortal` placement into borrowed `Object3D` targets,
   R3F-shaped state/event enclaves, nested context retention, one shared frame
-  loop, physical Three event bubbling, and root-scoped target teardown; and
+  loop, physical Three event bubbling, and root-scoped target teardown;
+- client-only Canvas SSR that streams and hydrates the existing DOM shell and
+  native canvas fallback without executing Three scene setup, constructors, or
+  loaders on the server; and
 - public behavior, prepared-driver, and same-source compiled scene evidence
   against R3F 9.6.1 with the exact Three r172 oracle.
 
-Full Canvas SSR/hydration adoption, XR, OffscreenCanvas lifecycle, and live HMR
-behavior follow in later milestones.
+XR, OffscreenCanvas lifecycle, and live HMR behavior follow in later milestones.
 
 Three deliberate correctness fixes differ from R3F 9.6.1:
 
@@ -66,8 +68,9 @@ export default defineConfig({
 ```
 
 The same serializable `threeRenderers` value can be supplied to the Rsbuild and
-low-level Rspack integrations. Vite and Rsbuild additionally own application
-SSR and hydration; the Rspack plugin owns compilation and HMR only.
+low-level Rspack integrations. Vite and Rsbuild own the production application
+SSR/hydration lifecycle; the Rspack plugin owns the equivalent client/server
+graph split, compilation, and HMR transforms rather than an application server.
 
 The preset selects `@octanejs/three/renderer`, keeps Three scene modules
 client-only on the server, ignores authored text inside scenes, exposes a
@@ -201,8 +204,10 @@ useLoader.clear(GLTFLoader, '/model.glb');
 the resolved asset. Declarative Three resources remain owned by their mounted
 host tree, while objects passed through `primitive` remain caller-owned. A
 root-level Three suspension or render error is projected through `Canvas` to
-the nearest client DOM `@pending` or `@catch` arm. Streaming server fallback
-and Canvas hydration remain Milestone 7 work.
+the nearest client DOM `@pending` or `@catch` arm. On the server, `Canvas`
+streams its DOM shell and native `<canvas>` fallback without evaluating the
+client-only scene. Hydration adopts that shell before measurement creates one
+fresh Three root on the client.
 
 ## Compatibility target
 

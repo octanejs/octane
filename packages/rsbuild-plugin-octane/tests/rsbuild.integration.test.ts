@@ -407,10 +407,14 @@ export function App() @{
 
 		const clientRoot = join(root, 'build/client');
 		const serverRoot = join(root, 'build/server');
+		const clientCode = readJavaScript(clientRoot);
 		expect(existsSync(join(clientRoot, 'index.html'))).toBe(false);
 		expect(existsSync(join(serverRoot, 'entry.js'))).toBe(true);
 		expect(existsSync(join(serverRoot, 'index.html'))).toBe(true);
 		expect(existsSync(join(serverRoot, 'octane-client-assets.json'))).toBe(true);
+		// Production browser output must not depend on Node's absent `process`
+		// global when Octane selects its production runtime branches.
+		expect(clientCode).not.toContain('process.env.NODE_ENV');
 
 		const html = readFileSync(join(serverRoot, 'index.html'), 'utf8');
 		expect(html).toContain('data-octane-hydrate');

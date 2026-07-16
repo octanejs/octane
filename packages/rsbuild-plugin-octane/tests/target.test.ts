@@ -139,6 +139,25 @@ describe('Rsbuild build.target mapping', () => {
 		}
 	});
 
+	it.each([
+		['build', 'production'],
+		['dev', 'development'],
+	] as const)('defines the Octane mode only in browser output for %s', async (action, mode) => {
+		writeApp(root, JSON.stringify('es2022'));
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+		});
+		await instance.initConfigs({ action });
+
+		expect(
+			instance.getNormalizedConfig({ environment: 'web' }).source.define['process.env.NODE_ENV'],
+		).toBe(JSON.stringify(mode));
+		expect(instance.getNormalizedConfig({ environment: 'node' }).source.define).not.toHaveProperty(
+			'process.env.NODE_ENV',
+		);
+	});
+
 	it('rejects ambiguous mixed ES and browser target arrays', async () => {
 		writeApp(root, JSON.stringify(['es2018', 'chrome100']));
 		const instance = await createRsbuild({

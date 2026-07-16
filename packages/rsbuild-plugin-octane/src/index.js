@@ -412,6 +412,23 @@ export function pluginOctane(inlineOptions = {}) {
 				});
 			});
 
+			api.modifyEnvironmentConfig((config, { mergeEnvironmentConfig }) => {
+				// Octane and several framework bindings use this conventional guard for
+				// diagnostics and production-only branches. Rsbuild does not define it
+				// when a programmatic build inherits mode "none", so scope the define to
+				// browser environments where the Node `process` global is unavailable.
+				if (config.output.target === 'node') return config;
+				return mergeEnvironmentConfig(config, {
+					source: {
+						define: {
+							'process.env.NODE_ENV': JSON.stringify(
+								isProductionBuild() ? 'production' : 'development',
+							),
+						},
+					},
+				});
+			});
+
 			if (appEnabled) {
 				api.transform(
 					{
