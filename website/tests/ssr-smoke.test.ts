@@ -92,6 +92,9 @@ describe('built SSR handler', () => {
 		expect(classCount(html, 'shiki')).toBeGreaterThan(0);
 	});
 
+	// This route deliberately renders every chart and accessible data table; give
+	// that full integration path headroom beyond the generic unit-test timeout on
+	// slower CI runners.
 	it('server-renders /benchmarks with complete Visx charts and table data', async () => {
 		const { response, html } = await get('/benchmarks');
 		const cards = [...FRAMEWORK_CARDS, ...OCTANE_CARDS];
@@ -117,7 +120,7 @@ describe('built SSR handler', () => {
 		expect(classCount(html, 'bench-table')).toBe(cards.length);
 		expect(classCount(html, 'bench-plot-shell')).toBe(0);
 		expect(classCount(html, 'recharts-wrapper')).toBe(0);
-	});
+	}, 15_000);
 
 	it('SSRs the not-found page through the catch-all with a real 404', async () => {
 		const { response, html } = await get('/definitely/not/a/page');
