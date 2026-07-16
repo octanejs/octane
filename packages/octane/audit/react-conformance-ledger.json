@@ -53,7 +53,7 @@
     },
     {
       "caseId": "react-case-v1:0034fb9a5b8ac30c690a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting added style values",
@@ -61,7 +61,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers the public style recovery outcome at upstream line 174.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting added style values",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0036e2b15059c1d43a64",
@@ -199,15 +206,15 @@
     },
     {
       "caseId": "react-case-v1:00cc68e9d08acd76f4b5",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can get the component owner stacks for onError in dev",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Octane's public server onError callback receives the thrown value only; React's development-only errorInfo.ownerStack/captureOwnerStack diagnostic channel is not part of the Octane API."
     },
     {
       "caseId": "react-case-v1:00ce75db5da96d7a4260",
@@ -461,7 +468,7 @@
     },
     {
       "caseId": "react-case-v1:01b54e5d7e0ccd2df4b6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should reconnect a div with a number and string version of number",
@@ -469,7 +476,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers clean number/string node adoption at upstream line 215.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should reconnect a div with a number and string version of number",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:01bab467ed6d8bd25d61",
@@ -1089,7 +1103,7 @@
     },
     {
       "caseId": "react-case-v1:04e0d8b7e568d219fc20",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can not deeply ignore reconnecting reordered children",
@@ -1097,7 +1111,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers deep reordered-child recovery at upstream line 387.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can not deeply ignore reconnecting reordered children",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:04e59ac9c11e58842861",
@@ -1673,7 +1694,7 @@
     },
     {
       "caseId": "react-case-v1:0778b31a87d51f22fb49",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "only includes separators between adjacent text nodes",
@@ -1681,7 +1702,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Adjacent text remains visibly distinct and matching hydration adopts the revealed DOM; Octane does not pin React Fizz's private comment-separator spelling.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "keeps adjacent streamed text distinct and hydrates the revealed DOM in place",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:07822f7307cd2f8d199e",
@@ -2073,7 +2101,7 @@
     },
     {
       "caseId": "react-case-v1:0947138912e2ec214035",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can distinguish an empty component from an empty text component",
@@ -2081,7 +2109,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers empty component/text adoption at upstream line 345.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can distinguish an empty component from an empty text component",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0951cb424918ab3689d6",
@@ -2149,7 +2184,7 @@
     },
     {
       "caseId": "react-case-v1:09d21021f06bc58b9119",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting reordered style values",
@@ -2157,7 +2192,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers reordered-style convergence at upstream line 192.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting reordered style values",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:09de62c19e81df41bddc",
@@ -2221,7 +2263,7 @@
     },
     {
       "caseId": "react-case-v1:0a1eccfe163d4c88b7c2",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting different numbers",
@@ -2229,7 +2271,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers numeric text recovery at upstream line 218.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting different numbers",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0a26524a41cf4b3fc57b",
@@ -2325,15 +2374,15 @@
     },
     {
       "caseId": "react-case-v1:0a9d7eb03b0c13611dc0",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "#24578 Hydration errors caused by a suspending component should not become recoverable when nested in an ancestor Suspense that is showing primary content",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "This case depends on React Fiber selective hydration and its recoverable-error scheduling beneath an ancestor Suspense boundary. Octane deliberately uses eager hydration recovery and has no synthetic-event replay/selective hydration."
     },
     {
       "caseId": "react-case-v1:0a9f108af2534d3013e3",
@@ -3195,16 +3244,16 @@
     },
     {
       "caseId": "react-case-v1:0e588f8af6109539c678",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": null,
       "titleExpression": "'recreates the fallback if server errors and hydration suspends but ' + 'client receives new props'",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The dynamically titled upstream FIXME case recreates a fallback after a server error, hydration suspension, and new client props. That selective-hydration retry policy is outside Octane's eager hydration model."
     },
     {
       "caseId": "react-case-v1:0e6e08f1d33cacf124a4",
@@ -3224,7 +3273,7 @@
     },
     {
       "caseId": "react-case-v1:0e74177db53188535e6c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should not insert separators for text inside Suspense boundaries even if they would otherwise be considered text-embedded",
@@ -3232,7 +3281,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Nested streamed text resolves without visible separator artifacts and hydrates in place; only React's private marker encoding differs.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "keeps adjacent streamed text distinct and hydrates the revealed DOM in place",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0e750c634bd446242f3f",
@@ -3328,7 +3384,7 @@
     },
     {
       "caseId": "react-case-v1:0eecd5fba3a106333d56",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should be able to abort the fallback if the main content finishes first",
@@ -3336,7 +3392,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "When primary content completes while fallback work is still suspended, Octane abandons that fallback, publishes the content, and completes readiness once.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
+          "testName": "fires onAllReady once when content resolves while the fallback remains suspended",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0f143d4038d5aeb7f198",
@@ -3656,7 +3719,7 @@
     },
     {
       "caseId": "react-case-v1:1142b90fd2b9a1e4bc34",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can explicitly ignore reconnecting a div with different dangerouslySetInnerHTML",
@@ -3664,7 +3727,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers shallow suppression retaining server raw HTML without diagnostics at upstream line 445.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can explicitly ignore reconnecting a div with different dangerouslySetInnerHTML",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1164ed710b3e9b994400",
@@ -4238,7 +4308,7 @@
     },
     {
       "caseId": "react-case-v1:14eaa2e4c0d07811c2c0",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting added style attribute",
@@ -4246,7 +4316,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers adding the client style attribute at upstream line 165.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting added style attribute",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:14f07973e7443c8e152b",
@@ -4857,15 +4934,15 @@
     },
     {
       "caseId": "react-case-v1:180e5bfee075b045566c",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should warn in dev when given an array of length 2 or more",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Octane hoists title as a text-only metadata expression but does not reproduce React's development-only validation warning and empty-title policy for arrays containing two or more values."
     },
     {
       "caseId": "react-case-v1:183e3222a76130f2468e",
@@ -5233,15 +5310,15 @@
     },
     {
       "caseId": "react-case-v1:1a6127eadc07efb813c7",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can get the component owner stacks during rendering in dev",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "React.captureOwnerStack and development owner-stack collection during rendering are private diagnostic surfaces that Octane does not expose."
     },
     {
       "caseId": "react-case-v1:1a72bc8804fe6b40d10b",
@@ -6352,7 +6429,7 @@
     },
     {
       "caseId": "react-case-v1:1f671dc1a2911be73de2",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js",
       "title": "supports custom abort reasons with an Error",
@@ -6360,7 +6437,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The readable transport reports the caller's Error object once for each boundary abandoned by the abort.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "reports a caller-provided Error reason for every aborted boundary",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1f6aac0fb3dfa065cb57",
@@ -6703,7 +6787,7 @@
     },
     {
       "caseId": "react-case-v1:20f91a4f90f7ac56acca",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should asynchronously load the suspense boundary",
@@ -6711,7 +6795,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A suspended boundary flushes its fallback shell and later reveals the resolved primary content through the public stream.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/streaming-ssr.test.ts",
+          "testName": "flushes the shell with the fallback + template sentinel, then the segment",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:211a8f2348516990aa51",
@@ -7319,15 +7410,15 @@
     },
     {
       "caseId": "react-case-v1:23d7bfa18b419dfa4024",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "handles an error on the client if the server ends up erroring",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The upstream recovery assertion is built around a class ErrorBoundary plus selective hydration. Class components are an explicit Octane non-goal, and streamed hydration recovery is eager."
     },
     {
       "caseId": "react-case-v1:23e40ffe8f17e06b427f",
@@ -7367,7 +7458,7 @@
     },
     {
       "caseId": "react-case-v1:2412c1a35a7a1607fdc8",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not report a rejection reason after abort has finished",
@@ -7375,7 +7466,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "After abort has completed, a later rejection cannot publish a second onError reason.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "does not report a promise rejection after an abort has completed",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2418b792a9707df2fe25",
@@ -7468,7 +7566,7 @@
     },
     {
       "caseId": "react-case-v1:248e88d30894e5cbfb0e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting a div with different text dangerouslySetInnerHTML",
@@ -7476,7 +7574,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers diagnosing a text raw-HTML mismatch while retaining server content at upstream line 411.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting a div with different text dangerouslySetInnerHTML",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2493d5eee63bf63097c2",
@@ -7668,7 +7773,7 @@
     },
     {
       "caseId": "react-case-v1:25579af0e13d748537bd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "basic use(promise)",
@@ -7676,7 +7781,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Multiple resolved Promise Usables unwrap to the expected concatenated output across parent and child components, and matching hydration preserves the server DOM.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps use() values isolated across parent and child components",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:255978d64db8d7f74d22",
@@ -7868,15 +7980,15 @@
     },
     {
       "caseId": "react-case-v1:26d69a55ddbae258d079",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not recreate the fallback if server errors and hydration suspends",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The case specifies whether React recreates a fallback during selective hydration after a server error. Octane has no selective hydration retry lane or synthetic event replay."
     },
     {
       "caseId": "react-case-v1:26e7a47060c2bfaba63f",
@@ -8017,15 +8129,15 @@
     },
     {
       "caseId": "react-case-v1:27be132e112d379b25a9",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "warns if script has complex children",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "TSRX treats a static script body as an embedded JavaScript document; dynamic script source uses dangerouslySetInnerHTML and Octane enforces closing-tag safety, but it does not emit React's complex-script-children development warning."
     },
     {
       "caseId": "react-case-v1:27c6e00eafc159ebb8e2",
@@ -8497,15 +8609,15 @@
     },
     {
       "caseId": "react-case-v1:2a0166717f7f3d1c0b7c",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "reports an in-flight root task after another root task fatals while aborting",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "This assertion is about the order React reports private in-flight root task records while abort itself triggers a fatal shell path, not a distinct public HTML or lifecycle contract."
     },
     {
       "caseId": "react-case-v1:2a06baa302fbdd4f23c7",
@@ -8938,7 +9050,7 @@
     },
     {
       "caseId": "react-case-v1:2c3f9c08e880a961c075",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should correctly handle different promises in React.use() across lazy components",
@@ -8946,7 +9058,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Promise identities remain isolated across a lazy module boundary, producing value1value2 in the parent branch and value2 in the lazy child.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps data promises distinct across a lazily loaded component boundary",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2c419215ded29fad79b8",
@@ -9120,7 +9239,7 @@
     },
     {
       "caseId": "react-case-v1:2d2e88d283aa0d8835b5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting a div with children separated by different whitespace on the server",
@@ -9128,7 +9247,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers server-only whitespace recovery at upstream line 316.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting a div with children separated by different whitespace on the server",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2d36fea8884684bc2285",
@@ -9553,7 +9679,7 @@
     },
     {
       "caseId": "react-case-v1:2fc3edac03f49d8eafa6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can not deeply ignore errors reconnecting different attribute values",
@@ -9561,7 +9687,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers the shallow scope of suppression for a deep attribute mismatch at upstream line 150.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can not deeply ignore errors reconnecting different attribute values",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2fd38d72db79cd5c1a07",
@@ -9759,7 +9892,7 @@
     },
     {
       "caseId": "react-case-v1:30fdf1245a500af6a9fe",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "reports abort errors for every suspended task when aborting fatals the shell",
@@ -9767,7 +9900,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A pre-shell abort reports every suspended Octane task while failing the unpublished shell exactly once.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "reports each suspended task on a pre-shell abort but fails the shell once",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:31094af873320f767a52",
@@ -10779,7 +10919,7 @@
     },
     {
       "caseId": "react-case-v1:3500d5bd3465a5fb0bc9",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationUserInteraction-test.js",
       "title": "should not blow away user-entered text on successful reconnect to a controlled checkbox",
@@ -10787,7 +10927,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable native-event hydration evidence adopts the checkbox and preserves its pre-hydration checked state without synthesizing an event at upstream line 341.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/user-interaction-wave4c.test.ts",
+          "testName": "should not blow away user-entered text on successful reconnect to a controlled checkbox",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3502858a42176129a3c1",
@@ -11239,7 +11386,7 @@
     },
     {
       "caseId": "react-case-v1:37891e20cbeb35c6d012",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js",
       "title": "should reject the promise when an error is thrown inside a fallback",
@@ -11247,7 +11394,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A fallback render error rejects the readable shell and reaches onError through the public server API.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "treats an error thrown by a Suspense fallback as a shell failure",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:37963147cdbe19bdf083",
@@ -11722,7 +11876,7 @@
     },
     {
       "caseId": "react-case-v1:39a097a4de136d9d47ed",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "supports iterable",
@@ -11730,7 +11884,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Re-iterable Set children stream in order and matching hydration preserves both host nodes; descriptor-nested iterable coverage protects the public createElement path too.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "streams synchronous iterable children and hydrates their host nodes in place",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:39a79dc71de6cde4c69a",
@@ -12903,7 +13064,7 @@
     },
     {
       "caseId": "react-case-v1:3f6ff62716cbdec7db6b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "unwraps thenable that fulfills synchronously without suspending",
@@ -12911,7 +13072,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Port the server-specific no-suspension contract for an uninstrumented thenable that fulfills synchronously from then()."
+      "rationale": "An uninstrumented thenable that fulfills inline is consumed in the same render, publishes no fallback, and retains first-settlement semantics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "unwraps a thenable that fulfills synchronously without publishing a fallback",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3f736e0f7eb992a8e3e6",
@@ -13230,16 +13398,16 @@
     },
     {
       "caseId": "react-case-v1:40dfbc063f18aa97a8d0",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": null,
       "titleExpression": "'does not recreate the fallback if server errors and hydration suspends ' + 'and root receives a transition'",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The upstream FIXME combines server error recovery, a hydration suspension, and a root transition. Its selective-hydration transition lane has no Octane equivalent."
     },
     {
       "caseId": "react-case-v1:40e41437190112f23e15",
@@ -13385,15 +13553,15 @@
     },
     {
       "caseId": "react-case-v1:41c836686cb871300a3b",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "(outdated behavior) suspending after erroring will cause errors previously queued to be silenced until the boundary resolves",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Upstream labels this behavior outdated and gates it FIXME; it depends on Fiber selectively silencing queued hydration errors until a boundary resolves."
     },
     {
       "caseId": "react-case-v1:41d31c546c41a75050fe",
@@ -13469,7 +13637,7 @@
     },
     {
       "caseId": "react-case-v1:4222d2a15126a0ca1e14",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "basic use(context)",
@@ -13477,7 +13645,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "use(Context) reads the active provider value through suspended stream retries and restores the default value outside the provider, including across concurrent requests.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "restores each Provider value across suspended concurrent streams",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:42237125f3daa7ca16d1",
@@ -13665,7 +13840,7 @@
     },
     {
       "caseId": "react-case-v1:43350811f14e8e560b2d",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should NOT warn for using generator functions as components",
@@ -13673,7 +13848,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A synchronous generator used as a component yields both host children, produces HelloWorld, and hydrates those nodes in place without diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "renders a synchronous generator function component as its yielded children",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:434122494564d74d2c34",
@@ -14628,7 +14810,7 @@
     },
     {
       "caseId": "react-case-v1:48520120add4966e174a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js",
       "title": "should not report aborts after the shell has fatally errored",
@@ -14636,7 +14818,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Once a fatal shell error completes the request, a later abort does not publish another onError or onShellError notification.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "does not report a later abort after a fatal shell error",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:486d29f25b4c79eedfc0",
@@ -14664,7 +14853,7 @@
     },
     {
       "caseId": "react-case-v1:4875e23b848dacbd8165",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should not error when discarding deeply nested Suspense boundaries in a parent fallback partially complete before the parent boundary resolves",
@@ -14672,7 +14861,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Resolving primary content retires deeply nested suspended fallback work and completes without publishing abandoned fallback DOM or resources.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
+          "testName": "finishes after resolved content abandons a nested suspended fallback",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:487cf6de822afd6bf924",
@@ -14724,7 +14920,7 @@
     },
     {
       "caseId": "react-case-v1:48b3d0d8f25133e95aab",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js",
       "title": "should not error the stream when an error is thrown inside suspense boundary",
@@ -14732,7 +14928,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A pipeable Suspense content error is recoverable: the fallback remains, onError reports the error, onShellError stays silent, and onAllReady fires once.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "keeps the shell valid when content throws inside a Suspense boundary",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:48c0a2b323ca6f3dfe65",
@@ -14919,7 +15122,7 @@
     },
     {
       "caseId": "react-case-v1:49837ae25c5d5490b311",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationUserInteraction-test.js",
       "title": "a controlled textarea",
@@ -14927,7 +15130,20 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable native-input adaptation covers controlled textarea behavior across client render, adoption, and mismatch recovery at upstream line 187.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/user-interaction-wave4c.test.ts",
+          "testName": "a controlled textarea",
+          "modes": [
+            "client",
+            "server-string",
+            "hydrate-match",
+            "hydrate-mismatch",
+            "production-compile"
+          ]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4985333bb9cd0155fed9",
@@ -15015,7 +15231,7 @@
     },
     {
       "caseId": "react-case-v1:4a30f400e7fe9297fec4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can abort during render in a lazy initializer for a component",
@@ -15023,7 +15239,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The supported AbortSignal adaptation cancels synchronously from user code during the render pass before the following suspension, rejecting cleanly instead of hanging.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "rejects when an AbortSignal is triggered during render before suspension",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4a31270eca983b6ef814",
@@ -15111,7 +15334,7 @@
     },
     {
       "caseId": "react-case-v1:4a96b6245733b2c259db",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "useActionState hydrates without a mismatch",
@@ -15119,7 +15342,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The stronger render-phase replay case includes useActionState server output and verifies matching hydration preserves the emitted node without a mismatch.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "hydrates useActionState after render-phase updates without replacing its output",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4aab4bd10aa7d71bd6e3",
@@ -15322,7 +15552,7 @@
     },
     {
       "caseId": "react-case-v1:4b74c83e1efcf499ccb8",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js",
       "title": "should report abort errors for every suspended task but fail the shell only once",
@@ -15330,19 +15560,26 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The Octane-shaped pass uses one pending boundary and two parallel root tasks; abort reports all three tasks while failing the unpublished shell once.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "reports each suspended task on a pre-shell abort but fails the shell once",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4bb26a8b0e5964203838",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "reports a root task before rendering a suspended child returned after aborting",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The test distinguishes React's private root-task notification order when a component returns a suspended child after invoking abort; Octane does not expose task records."
     },
     {
       "caseId": "react-case-v1:4bba92535bd7eb7d4d34",
@@ -16147,7 +16384,7 @@
     },
     {
       "caseId": "react-case-v1:4fbe92baccf4412f584e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not escape <, >, or & characters",
@@ -16155,7 +16392,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Inline script text retains valid <, >, and & characters while closing-tag-like tokens are neutralized in buffered and streaming output.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps valid inline script characters while preventing closing-tag injection",
+          "modes": ["server-string", "server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4fd4a01ccba4ef50fb81",
@@ -16275,7 +16519,7 @@
     },
     {
       "caseId": "react-case-v1:508da804f9321b29912c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can explicitly ignore reconnecting different text in two code blocks",
@@ -16283,7 +16527,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers shallow text mismatch suppression and server-value retention at upstream line 242.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can explicitly ignore reconnecting different text in two code blocks",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5096698264cc6ecbbbc7",
@@ -16359,7 +16610,7 @@
     },
     {
       "caseId": "react-case-v1:50fc9bcb2a25e7292757",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should recover the outer context when an error happens inside a provider",
@@ -16367,11 +16618,18 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "After an error inside a nested provider, the catch arm observes the error, the following sibling reads the outer value, and content outside reads the default.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "restores the outer context after an error inside a nested provider",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:50feffedc5f3490941d7",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should warn for using other types of iterators as children",
@@ -16379,7 +16637,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A custom self-iterating one-shot iterator renders HelloWorld in order and matching hydration preserves its host nodes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "renders a custom one-shot iterator returned as children",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5103bbab63497cb2831c",
@@ -16587,7 +16852,7 @@
     },
     {
       "caseId": "react-case-v1:52334b18da8aa1632567",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "useActionState hydrates without a mismatch if there's a render phase update",
@@ -16595,7 +16860,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Server and client drain render-phase state updates to the same final useActionState output before hydration comparison, preserving the server node.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "hydrates useActionState after render-phase updates without replacing its output",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:523703229834f868342d",
@@ -16881,7 +17153,7 @@
     },
     {
       "caseId": "react-case-v1:53dca4a1622f110a56f9",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should reconnect number and string versions of a number",
@@ -16889,7 +17161,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers clean number/string style equivalence and node adoption at upstream line 186.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should reconnect number and string versions of a number",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:53eda710fc5a1b928d16",
@@ -17166,7 +17445,7 @@
     },
     {
       "caseId": "react-case-v1:55115c6e04594339eb41",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting different element types of children",
@@ -17174,7 +17453,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers structural child replacement at upstream line 122.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting different element types of children",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:551286914c35cdd40151",
@@ -17218,7 +17504,7 @@
     },
     {
       "caseId": "react-case-v1:555495ea2a38dd42aa34",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can abort synchronously during render",
@@ -17226,7 +17512,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Cancellation initiated synchronously from component code during render rejects the readable request with the signal reason and does not hang.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "rejects when an AbortSignal is triggered during render before suspension",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5555a994da636c18e649",
@@ -17258,7 +17551,7 @@
     },
     {
       "caseId": "react-case-v1:5577d578f5d209bd74ff",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "Supports custom abort reasons with a string",
@@ -17266,7 +17559,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A caller-provided string abort reason is preserved and reported for each abandoned boundary.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "reports a caller-provided string reason for every aborted boundary",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:557f3a352eaee0b2c339",
@@ -18128,7 +18428,7 @@
     },
     {
       "caseId": "react-case-v1:5a0d4e03b4d55e0a04a4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "use a promise that's already been instrumented and resolved",
@@ -18136,7 +18436,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "An already-instrumented fulfilled thenable contributes its value to the initial completed output without publishing a fallback.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "uses an already-instrumented fulfilled thenable in the first shell",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5a1fe70c345800fba279",
@@ -18597,7 +18904,7 @@
     },
     {
       "caseId": "react-case-v1:5c3a99c227380157ee23",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js",
       "title": "should reject if passing an already aborted signal",
@@ -18605,7 +18912,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "An already-aborted signal rejects renderToReadableStream with the original reason and reports the same reason through onError.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "rejects immediately when the readable signal is already aborted",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5c3e651edf2924f83023",
@@ -18740,7 +19054,7 @@
     },
     {
       "caseId": "react-case-v1:5cfb75868d6a61c5a0c1",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js",
       "title": "should be able to abort before something suspends",
@@ -18748,7 +19062,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "If user code aborts the signal during the shell pass before its child suspends, the readable render rejects instead of publishing that pass's fallback.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "rejects when an AbortSignal is triggered during render before suspension",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5cfcbf5fd0c0b55abf70",
@@ -18898,7 +19219,7 @@
     },
     {
       "caseId": "react-case-v1:5d989aa000c8d90d7566",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "client renders a boundary if it does not resolve before aborting",
@@ -18906,7 +19227,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "An aborted pending streamed boundary is replaced by the client value during hydration rather than leaving the server fallback active.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "client-renders an aborted streamed boundary during hydration",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5da019fa272666227ba2",
@@ -19968,15 +20296,15 @@
     },
     {
       "caseId": "react-case-v1:62c5a9aae906004cccbe",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "#23331: does not warn about hydration mismatches if something suspended in an earlier sibling",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The issue regression is specifically about Fiber suppressing mismatch diagnostics behind an earlier selectively hydrating sibling. Octane eagerly recovers streamed boundaries."
     },
     {
       "caseId": "react-case-v1:62c75486c44745019053",
@@ -20735,7 +21063,7 @@
     },
     {
       "caseId": "react-case-v1:667091afefc2e682ed5c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can render custom elements with children on ther server",
@@ -20743,7 +21071,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Streaming SSR preserves a custom element and its nested div child with the expected public DOM structure.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "streams a custom element with nested host children",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:667504b1a1193d59ee18",
@@ -20771,7 +21106,7 @@
     },
     {
       "caseId": "react-case-v1:66b790106a842abbdb9a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should client render a boundary if a lazy component rejects",
@@ -20779,7 +21114,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Octane adapts React's lazy-rejection client recovery to its supported public @try/@catch boundary: rejection replaces the streamed lazy fallback with the catch outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "replaces a streamed lazy fallback with the public catch outcome on rejection",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:66b9877dff2d18744391",
@@ -20971,7 +21313,7 @@
     },
     {
       "caseId": "react-case-v1:67eea65ee63e9a666dcd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "use(promise) in multiple components",
@@ -20979,7 +21321,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Four Promise Usables in parent and child components retain call-site isolation and hydrate from the server values without exposing a fallback.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps use() values isolated across parent and child components",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:67f07570609271261e10",
@@ -21069,15 +21418,15 @@
     },
     {
       "caseId": "react-case-v1:6881f3ae63784d8f16ec",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "supports async generator component",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Async generator components are behind React's experimental enableAsyncIterableChildren gate. Octane deliberately rejects async/generator component syntax and directs async data through use()."
     },
     {
       "caseId": "react-case-v1:689cdb1942a415a7eb12",
@@ -21681,7 +22030,7 @@
     },
     {
       "caseId": "react-case-v1:6b3807f598820c3c44b1",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting different number from text",
@@ -21689,7 +22038,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers number-to-text mismatch recovery at upstream line 221.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting different number from text",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:6b3ec86474eb1e8d00d0",
@@ -21960,7 +22316,7 @@
     },
     {
       "caseId": "react-case-v1:6c97b10901765559427f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "Errors in boundaries should be sent to the client and reported on client render - Error after flushing",
@@ -21968,7 +22324,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A rejection after the fallback has streamed publishes the supported catch arm and hydration adopts that streamed error result without replacing its DOM.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/streaming-ssr.test.ts",
+          "testName": "hydrates a streamed catch arm from a rejection seed without replacing its DOM",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:6c9e42fefa920718f009",
@@ -22036,15 +22399,15 @@
     },
     {
       "caseId": "react-case-v1:6d1c80195987f1a47e28",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "the \"S\" in \"</?[Ss]style\" strings are replaced with unicode escaped lowercase s or S depending on case, preserving case sensitivity of nearby characters inside hoistable style tags",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "This variant targets React's hoistable style resource model (href/precedence and resource placement). Octane has scoped styles and ordinary raw style safety but no React style-resource protocol."
     },
     {
       "caseId": "react-case-v1:6d2ef5eea68cc1ad1094",
@@ -23264,15 +23627,15 @@
     },
     {
       "caseId": "react-case-v1:73c5b1202a2895382916",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "reports a root task that suspends directly after aborting during render",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Whether a private React root task record suspends immediately after reentrant abort is implementation bookkeeping; Octane exposes completion, errors, and bytes rather than task records."
     },
     {
       "caseId": "react-case-v1:73d8c2c7608e6a92c9c7",
@@ -23328,7 +23691,7 @@
     },
     {
       "caseId": "react-case-v1:742d8668d57c62a64f49",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "handles stack overflows inside components themselves",
@@ -23336,11 +23699,18 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A component recursion overflow is surfaced once through the public root stream error callbacks and produces no partial shell.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "reports a component stack overflow as a root stream failure",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:74466f3a9da28b4d5ac2",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js",
       "title": "should error the stream when an error is thrown inside a fallback",
@@ -23348,7 +23718,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A fallback render error leaves the pipeable response empty and reaches both onError and onShellError with the original error.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "treats an error thrown by a Suspense fallback as a shell failure",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:744efbec2adc00856a52",
@@ -23507,7 +23884,7 @@
     },
     {
       "caseId": "react-case-v1:74d55c72a7712746ba7c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "the \"S\" in \"</?[Ss]style\" strings are replaced with unicode escaped lowercase s or S depending on case, preserving case sensitivity of nearby characters",
@@ -23515,7 +23892,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Raw style text escapes each case-sensitive </?style opener by replacing only its S/s with the matching CSS unicode escape, preserving surrounding case and one style element.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps raw style text in one element when it contains closing-tag-like tokens",
+          "modes": ["server-string", "server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:74dc58c696a31b632c53",
@@ -24628,7 +25012,7 @@
     },
     {
       "caseId": "react-case-v1:7b9b2f082f2aba55dfe4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "Supports custom abort reasons with an Error",
@@ -24636,7 +25020,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A caller-provided Error abort reason reaches onError unchanged and the stream closes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "surfaces caller-provided string and Error abort reasons and closes the stream",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7b9d859425947874e2a1",
@@ -25036,15 +25427,15 @@
     },
     {
       "caseId": "react-case-v1:7de15f3f916b9e77ed31",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should warn in dev if you pass a React Component as a child to <title>",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Octane's hoisted title surface is text-only and does not implement React's development warning/stringification path for a component element used as title children."
     },
     {
       "caseId": "react-case-v1:7de553c3e6d2502b12a8",
@@ -25123,7 +25514,7 @@
     },
     {
       "caseId": "react-case-v1:7e3b61976c5d4fecef12",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationUserInteraction-test.js",
       "title": "should not blow away user-selected value on successful reconnect to an controlled select",
@@ -25131,7 +25522,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable native-event hydration evidence adopts the select and preserves its pre-hydration selected value without synthesizing an event at upstream line 379.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/user-interaction-wave4c.test.ts",
+          "testName": "should not blow away user-selected value on successful reconnect to an controlled select",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7e3db69ea1f55313c022",
@@ -25242,7 +25640,7 @@
     },
     {
       "caseId": "react-case-v1:7e8fce00f438848de644",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js",
       "title": "should not error the stream when an error is thrown inside suspense boundary",
@@ -25250,7 +25648,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A readable Suspense content error retains its fallback, resolves allReady, and reports only through onError rather than rejecting the shell.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "keeps the shell valid when content throws inside a Suspense boundary",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7e9f9e85bfc66ab23448",
@@ -25739,7 +26144,7 @@
     },
     {
       "caseId": "react-case-v1:80c5b73504f6170dea07",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should resume the context from where it left off",
@@ -25747,7 +26152,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Context snapshots resume at each suspended stream's provider value and restore the default after leaving the provider.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "restores each Provider value across suspended concurrent streams",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:80d177cbd26b82beb714",
@@ -27261,7 +27673,7 @@
     },
     {
       "caseId": "react-case-v1:88aa12afdfb8fedd0ff1",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not perform any additional work after fatally erroring",
@@ -27269,7 +27681,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "After a fatal shell error closes the request, resolving an earlier pending component does not resume or invoke that component's render work.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "does not resume pending component work after a fatal shell error",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:88cd08e7c1b524b4b64f",
@@ -27332,7 +27751,7 @@
     },
     {
       "caseId": "react-case-v1:8935c0b52a281f626d57",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "the \"S\" in \"</?[Ss]cript\" strings are replaced with unicode escaped lowercase s or S depending on case, preserving case sensitivity of nearby characters",
@@ -27340,7 +27759,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Inline script serialization neutralizes both lower- and upper-case closing/opening script tokens while keeping one script element.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps valid inline script characters while preventing closing-tag injection",
+          "modes": ["server-string", "server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:893bbd582445dea05aeb",
@@ -28656,7 +29082,7 @@
     },
     {
       "caseId": "react-case-v1:8f41dbaf330fc1eafdc6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting reordered children",
@@ -28664,7 +29090,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers reordered direct-child recovery at upstream line 294.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting reordered children",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8f43d5497f45a035c3ab",
@@ -28703,7 +29136,7 @@
     },
     {
       "caseId": "react-case-v1:8f5c887f729f0ec6c7c5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting empty style attribute",
@@ -28711,7 +29144,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers removing an empty server style attribute at upstream line 168.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting empty style attribute",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8f871997b42d7a66abdb",
@@ -28882,7 +29322,7 @@
     },
     {
       "caseId": "react-case-v1:9069df6700ddfa0602ed",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationUserInteraction-test.js",
       "title": "a controlled select",
@@ -28890,7 +29330,20 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable native-change adaptation covers controlled select behavior across client render, adoption, and mismatch recovery at upstream line 237.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/user-interaction-wave4c.test.ts",
+          "testName": "a controlled select",
+          "modes": [
+            "client",
+            "server-string",
+            "hydrate-match",
+            "hydrate-mismatch",
+            "production-compile"
+          ]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:907b80a5c521344390b1",
@@ -29175,7 +29628,7 @@
     },
     {
       "caseId": "react-case-v1:91d1b844f01d32de2285",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "using a rejected promise will throw",
@@ -29183,7 +29636,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Replacing the upstream class boundary with Octane's supported @catch surface, a rejected Promise Usable selects the catch arm and streams the rejection message.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/streaming-ssr.test.ts",
+          "testName": "streams the @catch arm when the promise rejects",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:91de826deba644690e30",
@@ -29592,7 +30052,7 @@
     },
     {
       "caseId": "react-case-v1:9434bf8675c6830d50ca",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not try to write to the stream after it has been closed",
@@ -29600,7 +30060,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A resource hint scheduled after readable completion is ignored without a late destination write or visible resource tag.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "ignores a resource hint scheduled after the readable stream has closed",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:94391465b1867f684669",
@@ -29741,7 +30208,7 @@
     },
     {
       "caseId": "react-case-v1:94e684f6e56149a6043c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationUserInteraction-test.js",
       "title": "a controlled text input",
@@ -29749,7 +30216,20 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable native-input adaptation covers controlled text-input behavior across client render, adoption, and mismatch recovery at upstream line 159.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/user-interaction-wave4c.test.ts",
+          "testName": "a controlled text input",
+          "modes": [
+            "client",
+            "server-string",
+            "hydrate-match",
+            "hydrate-mismatch",
+            "production-compile"
+          ]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:94edc95df44437a90dfd",
@@ -30297,15 +30777,15 @@
     },
     {
       "caseId": "react-case-v1:98493031c05fddff3de1",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should warn in dev if you pass an object that does not implement toString as a child to <title>",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Octane can stringify title text values but does not reproduce React's development-only warning for a plain object using Object.prototype.toString."
     },
     {
       "caseId": "react-case-v1:984a47f1ee725fd6daeb",
@@ -30368,7 +30848,7 @@
     },
     {
       "caseId": "react-case-v1:98ad717d01cf7244288f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationUserInteraction-test.js",
       "title": "a controlled checkbox",
@@ -30376,7 +30856,20 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable native-input adaptation covers controlled checkbox behavior across client render, adoption, and mismatch recovery at upstream line 215.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/user-interaction-wave4c.test.ts",
+          "testName": "a controlled checkbox",
+          "modes": [
+            "client",
+            "server-string",
+            "hydrate-match",
+            "hydrate-mismatch",
+            "production-compile"
+          ]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:98b53d16b2e480bae6bc",
@@ -30531,7 +31024,7 @@
     },
     {
       "caseId": "react-case-v1:99f95f2bf7bc432c8c5e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting missing style attribute",
@@ -30539,7 +31032,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers removing a server-only style attribute at upstream line 162.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting missing style attribute",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9a04d6dd6b2646c5aff6",
@@ -30575,15 +31075,15 @@
     },
     {
       "caseId": "react-case-v1:9a30a67755809932f5f1",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "client renders a boundary if it errors before finishing the fallback",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "This case specifies selective client rendering when primary content errors before React has finished rendering a suspending fallback. Octane's eager recovery has no equivalent fallback task lane."
     },
     {
       "caseId": "react-case-v1:9a33545b62a953ff4bcf",
@@ -31127,7 +31627,7 @@
     },
     {
       "caseId": "react-case-v1:9d50c0af5c5a7655df44",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not prepend a text separators if the segments first emission is a non-Text Node",
@@ -31135,7 +31635,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "When a streamed segment's first emission is an element, reveal produces the expected helloworld DOM with no visible text separator.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "reveals text after an element and an element after text without visible separators",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9d58a572916355e57ca8",
@@ -31175,15 +31682,15 @@
     },
     {
       "caseId": "react-case-v1:9d77a81d96e718b2fb6b",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not log for errors after the first hydration error",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "React suppresses hydration errors after the first boundary failure in this scenario; Octane intentionally reports one durable diagnostic per mismatched source site during eager recovery."
     },
     {
       "caseId": "react-case-v1:9d7992152a5a7103f032",
@@ -31282,15 +31789,15 @@
     },
     {
       "caseId": "react-case-v1:9ddbcf1478410dff6f46",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "uses a rejection reason from a lazy component before the abort finishes",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "React's result depends on a lazy rejection interleaving inside asynchronous abort traversal. Octane completes abort synchronously; later rejections are ignored, so there is no public 'during abort' scheduling window."
     },
     {
       "caseId": "react-case-v1:9ddca26e37245ce5d7ba",
@@ -31954,7 +32461,7 @@
     },
     {
       "caseId": "react-case-v1:a1150f0521f08cf1d2ff",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js",
       "title": "should be able to complete by abort when the fallback is also suspended",
@@ -31962,7 +32469,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Aborting nested primary and fallback work retains the outer fallback, reports both pending boundary tasks, and completes pipeable readiness once.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "completes an emitted shell when both primary content and its fallback are suspended",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a1195663c5e3cb01a596",
@@ -31998,7 +32512,7 @@
     },
     {
       "caseId": "react-case-v1:a13ed1a25a059bec1ec9",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "logs multiple hydration errors in the same render",
@@ -32006,7 +32520,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Distinct hydration mismatch source sites each publish one diagnostic in the same render, rather than collapsing the whole render to one message.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
+          "testName": "publishes one hydration mismatch diagnostic per mismatched source site",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a15718d348f1b14a948e",
@@ -32558,7 +33079,7 @@
     },
     {
       "caseId": "react-case-v1:a4486894cec37c52cd7e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can resolve async content in table parents",
@@ -32566,7 +33087,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Resolved streamed table content is revealed in table parser context and remains a valid table DOM subtree.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "reveals streamed table content in its required parser context",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a449ae94e0c1270685e7",
@@ -32782,7 +33310,7 @@
     },
     {
       "caseId": "react-case-v1:a546ca194b160cf15a16",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js",
       "title": "should reject if aborting before the shell is complete",
@@ -32790,7 +33318,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Aborting while a bare root Usable blocks shell production rejects the readable render with the caller's reason.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "rejects a readable render aborted before its root shell completes",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a5500f6598ef3f3c95bd",
@@ -33184,7 +33719,7 @@
     },
     {
       "caseId": "react-case-v1:a7451cc9802474b43c1b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not escape \\u2028, or \\u2029 characters",
@@ -33192,11 +33727,18 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Inline JavaScript retains literal U+2028 and U+2029 characters in buffered and streaming output.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps valid inline script characters while preventing closing-tag injection",
+          "modes": ["server-string", "server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a762a972bd7482f4622f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationUserInteraction-test.js",
       "title": "should not blow away user-entered text on successful reconnect to a controlled input",
@@ -33204,7 +33746,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable native-event hydration evidence adopts the input and preserves its pre-hydration value without synthesizing an event at upstream line 300.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/user-interaction-wave4c.test.ts",
+          "testName": "should not blow away user-entered text on successful reconnect to a controlled input",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a7a0afa70729f4e7b969",
@@ -33240,15 +33789,15 @@
     },
     {
       "caseId": "react-case-v1:a7c4f1a01b6ca8023147",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "client renders remaining boundaries below the error in shell",
       "baselines": ["stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "React emits client-render instructions for remaining boundaries below a shell error. Octane treats an unpublished shell failure as terminal and has no selective boundary hydration instruction protocol."
     },
     {
       "caseId": "react-case-v1:a7db6d1c9715b4efd30d",
@@ -33393,7 +33942,7 @@
     },
     {
       "caseId": "react-case-v1:a834fbb5b79b312121ac",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not prepend a text separators if the segment follows a non-Text Node",
@@ -33401,7 +33950,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A segment following a non-text node reveals with the expected visible DOM and no separator text artifact.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "reveals text after an element and an element after text without visible separators",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a839a4442f6c960bade8",
@@ -33512,7 +34068,7 @@
     },
     {
       "caseId": "react-case-v1:a8abd3f31b3976f03c28",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can explicitly ignore errors reconnecting added attributes",
@@ -33520,7 +34076,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers shallow suppression retaining the absent server attribute without diagnostics at upstream line 138.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can explicitly ignore errors reconnecting added attributes",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a8ac9016eb40840e67f5",
@@ -33902,15 +34465,15 @@
     },
     {
       "caseId": "react-case-v1:ab1a21eb9265320dc2ea",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "supports async iterable children",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Async iterable children are behind React's experimental enableAsyncIterableChildren gate. Octane supports synchronous iterables and intentionally has no async-child iteration protocol."
     },
     {
       "caseId": "react-case-v1:ab2c99bba61c2c02d42b",
@@ -34238,7 +34801,7 @@
     },
     {
       "caseId": "react-case-v1:acebc7fd28d462938df6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js",
       "title": "should fail the shell if you abort before work has begun",
@@ -34246,7 +34809,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Aborting the returned pipeable handle before starting Octane's render deterministically fails the shell with no output or all-ready notification.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "fails the pipeable shell when aborted before rendering begins",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:acec2c4c3be22405722c",
@@ -34346,7 +34916,7 @@
     },
     {
       "caseId": "react-case-v1:ad69bf8c0772a077eec7",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationUserInteraction-test.js",
       "title": "should not blow away user-interaction on successful reconnect to a controlled range input",
@@ -34354,7 +34924,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable native-event hydration evidence adopts the range input and preserves its pre-hydration value without synthesizing an event at upstream line 317.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/user-interaction-wave4c.test.ts",
+          "testName": "should not blow away user-interaction on successful reconnect to a controlled range input",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ad7aacf00335856a8418",
@@ -34584,7 +35161,7 @@
     },
     {
       "caseId": "react-case-v1:ae75c9240d07f51f649e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting a div with different dangerouslySetInnerHTML",
@@ -34592,7 +35169,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers diagnosing a markup raw-HTML mismatch while retaining server content at upstream line 405.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting a div with different dangerouslySetInnerHTML",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ae88079397d652a6c951",
@@ -34984,7 +35568,7 @@
     },
     {
       "caseId": "react-case-v1:b047ccfcb9c80f5bf419",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not report aborts after fatally erroring",
@@ -34992,7 +35576,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Once a fatal shell error completes the request, a later abort does not publish another onError or onShellError notification.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "does not report a later abort after a fatal shell error",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b05195f0f80c7715cc1c",
@@ -35060,7 +35651,7 @@
     },
     {
       "caseId": "react-case-v1:b0f8aa7706f85f542da5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should warn for using generators as children props",
@@ -35068,7 +35659,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A one-shot generator object supplied as children produces HelloWorld and matching hydration preserves both yielded host nodes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "renders one-shot generator objects supplied as children",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b1082f3a71d6dc3dfc9f",
@@ -35668,7 +36266,7 @@
     },
     {
       "caseId": "react-case-v1:b47ed68fd176639d0b63",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting missing children",
@@ -35676,7 +36274,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers inserting missing client children at upstream line 256.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting missing children",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b4905d0d2039aca03d43",
@@ -35947,7 +36552,7 @@
     },
     {
       "caseId": "react-case-v1:b595238cca66f549f1f7",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js",
       "title": "emits all HTML as one unit if we wait until the end to start",
@@ -35955,7 +36560,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Work can reach all-ready before pipe is attached, and the late destination receives UI whose resolved content replaces the fallback; exact transport chunk coalescing is not a correctness contract.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "delivers resolved content when pipe starts after all work is ready",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b598831be2796ea903fd",
@@ -35991,7 +36603,7 @@
     },
     {
       "caseId": "react-case-v1:b5af3f34e4438c64681c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting different text in two code blocks",
@@ -35999,7 +36611,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers adjacent text mismatch recovery at upstream line 224.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting different text in two code blocks",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b5baa364c7ab895e9fcf",
@@ -36228,7 +36847,7 @@
     },
     {
       "caseId": "react-case-v1:b6a3690f6abc4c790488",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should reconnect Bare Element to Pure Component",
@@ -36236,7 +36855,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers bare-element to function-component adoption at upstream line 91.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should reconnect Bare Element to Pure Component",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b6a44467d229e6533b68",
@@ -36706,7 +37332,7 @@
     },
     {
       "caseId": "react-case-v1:b8c671a1033ef024789e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationUserInteraction-test.js",
       "title": "should not blow away user-entered text on successful reconnect to a controlled textarea",
@@ -36714,7 +37340,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable native-event hydration evidence adopts the textarea and preserves its pre-hydration value without synthesizing an event at upstream line 359.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/user-interaction-wave4c.test.ts",
+          "testName": "should not blow away user-entered text on successful reconnect to a controlled textarea",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b8c6c25e601fcf2a72af",
@@ -36726,7 +37359,7 @@
     },
     {
       "caseId": "react-case-v1:b8db5f69cc3f34a84910",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting a div with children separated by different whitespace",
@@ -36734,7 +37367,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers differing inter-child whitespace recovery at upstream line 326.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting a div with children separated by different whitespace",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b8ea5fb6b67ca777026b",
@@ -36873,15 +37513,15 @@
     },
     {
       "caseId": "react-case-v1:b980bf174424ea95b5cf",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "logs regular (non-hydration) errors when the UI recovers",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The test exercises React's client concurrent-render retry and global error logging after a recoverable non-hydration render error, not a server-stream contract. Octane renders synchronously without that retry heuristic."
     },
     {
       "caseId": "react-case-v1:b99a67d0188ca7837b69",
@@ -37059,7 +37699,7 @@
     },
     {
       "caseId": "react-case-v1:bad7adaa95f1988b7979",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerEdge-test.js",
       "title": "does not try to write to the stream after it has been closed",
@@ -37067,7 +37707,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A resource hint scheduled after readable completion is ignored without a late write, transport error, or visible resource tag.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "ignores a resource hint scheduled after the readable stream has closed",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:baee9d8ecac42147a07f",
@@ -37258,15 +37905,15 @@
     },
     {
       "caseId": "react-case-v1:bc187fe275dc8add9491",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can support throwing after aborting during a render",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The upstream assertion depends on reentrant pipeable-handle abort followed by a throw during React task traversal. Octane's supported AbortSignal cancellation wins synchronously and does not expose the same task-error ordering."
     },
     {
       "caseId": "react-case-v1:bc1a4209a36fc6c7e0f9",
@@ -37372,7 +38019,7 @@
     },
     {
       "caseId": "react-case-v1:bc7a0545c127658641e2",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js",
       "title": "supports custom abort reasons with a string",
@@ -37380,7 +38027,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The readable transport preserves a caller-provided string reason and reports it once for each boundary abandoned by the abort.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "reports a caller-provided string reason for every aborted boundary",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:bc7b9375fff9774dbc23",
@@ -37552,7 +38206,7 @@
     },
     {
       "caseId": "react-case-v1:bd2fa05ce3af19a7d045",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js",
       "title": "should start writing after pipe",
@@ -37560,7 +38214,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The pipeable renderer does not write to a host destination until pipe supplies it, so host-authored prefix bytes remain first.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "writes the pipeable response only after pipe supplies a destination",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:bd36c428af42eefe4419",
@@ -37588,7 +38249,7 @@
     },
     {
       "caseId": "react-case-v1:bd4c52c7897e8f77dbae",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can stream into an SVG container",
@@ -37596,7 +38257,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A streamed segment revealed beneath an SVG root preserves the SVG namespace.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "preserves the SVG namespace when a streamed segment is revealed",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:bd54db248f3d19b01f09",
@@ -37720,7 +38388,7 @@
     },
     {
       "caseId": "react-case-v1:bdb201eb1eb75e62dd46",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can not ignore reconnecting more children",
@@ -37728,7 +38396,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers the shallow scope of suppression when the client has more children at upstream line 353.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can not ignore reconnecting more children",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:bdb41d29dc97b0d25c16",
@@ -38042,15 +38717,15 @@
     },
     {
       "caseId": "react-case-v1:bfa0d12018e65f41802b",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "shouldn't render styles with mismatched nonce",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "React arbitrates per-style resource nonce values against the request nonce. Octane has no precedence-based style-resource model; one request nonce consistently stamps every renderer-owned inline artifact."
     },
     {
       "caseId": "react-case-v1:bfafbed8ffb0ca6b976a",
@@ -38541,15 +39216,15 @@
     },
     {
       "caseId": "react-case-v1:c26617fbf50c3d3a8619",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not log for errors after a preceding fiber suspends",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "This case is about Fiber hydration diagnostic ordering when an earlier fiber suspends. Octane does not selectively hydrate fibers and instead performs eager source-site recovery."
     },
     {
       "caseId": "react-case-v1:c26f77101d53423e8e4d",
@@ -39006,7 +39681,7 @@
     },
     {
       "caseId": "react-case-v1:c444f1d88e7c14e8f11d",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should be able to Suspend after aborting in the same component without hanging the render",
@@ -39014,7 +39689,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "User code can trigger AbortSignal cancellation and then reach a suspension in the same synchronous render without hanging the readable request.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "rejects when an AbortSignal is triggered during render before suspension",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c446a8534fa2d59c2045",
@@ -39434,7 +40116,7 @@
     },
     {
       "caseId": "react-case-v1:c5e228956714b7af1a66",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can resolve async content in esoteric parents",
@@ -39442,7 +40124,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Streamed option, col, and MathML content is revealed in each element's required native parser context.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "reveals option, col, and MathML segments in their native contexts",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c5ebdc16c0e05b36412b",
@@ -39470,7 +40159,7 @@
     },
     {
       "caseId": "react-case-v1:c61f46519b9355dd8ba1",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js",
       "title": "should not attempt to render the fallback if the main content completes first",
@@ -39478,7 +40167,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A synchronously completed primary arm renders its content without evaluating or serializing the Suspense fallback.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "does not render a Suspense fallback when primary content completes synchronously",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c623a923f9cb07825a51",
@@ -39670,7 +40366,7 @@
     },
     {
       "caseId": "react-case-v1:c7224f0cd1fc99b786fd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting a div with children separated by whitespace on the client",
@@ -39678,7 +40374,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers client-only inter-child whitespace recovery at upstream line 306.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting a div with children separated by whitespace on the client",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c72895107550143e569b",
@@ -40061,7 +40764,7 @@
     },
     {
       "caseId": "react-case-v1:c9003b674f63ba2ce5ef",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should not error when discarding deeply nested Suspense boundaries in a parent fallback partially complete before the parent boundary resolves with empty segments",
@@ -40069,7 +40772,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Completing outer content retires nested fallback-only boundaries even when their abandoned segments contribute no visible output.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
+          "testName": "finishes after resolved content abandons a nested suspended fallback",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c900498cb48ca4a2dff1",
@@ -40772,7 +41482,7 @@
     },
     {
       "caseId": "react-case-v1:cc17fa348552ba4c6dea",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can not ignore reconnecting reordered children",
@@ -40780,7 +41490,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers the shallow scope of suppression for reordered children at upstream line 375.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can not ignore reconnecting reordered children",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:cc2e8e380c81f3aad5a5",
@@ -41145,7 +41862,7 @@
     },
     {
       "caseId": "react-case-v1:cde09e407e1a822cf373",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting a div with different object dangerouslySetInnerHTML",
@@ -41153,7 +41870,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers diagnosing an object-coerced raw-HTML mismatch while retaining server content at upstream line 423.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting a div with different object dangerouslySetInnerHTML",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:cde41edf96f4a25f25bc",
@@ -41930,15 +42654,15 @@
     },
     {
       "caseId": "react-case-v1:d22a4ad6effddc62b7e1",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "hydration warnings for mismatched text with multiple text nodes caused by suspending should be suppressed",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Suppression of text mismatch warnings caused by a selectively suspending Fiber is part of React's selective hydration diagnostic policy, which Octane intentionally does not implement."
     },
     {
       "caseId": "react-case-v1:d238a2e72bc0f87fdeb7",
@@ -43891,7 +44615,7 @@
     },
     {
       "caseId": "react-case-v1:dba34354327ffe9c93a3",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can explicitly ignore reconnecting different style values",
@@ -43899,7 +44623,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers shallow style mismatch suppression and server-value retention at upstream line 204.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can explicitly ignore reconnecting different style values",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:dba79561d57348da312a",
@@ -43953,15 +44684,15 @@
     },
     {
       "caseId": "react-case-v1:dbdb28fd24ad30d7ff95",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "calls getServerSnapshot instead of getSnapshot (with selector and isEqual)",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The source calls the separate use-sync-external-store/with-selector shim with selector and isEqual. Octane core exposes useSyncExternalStore; selector/equality wrappers live in bindings rather than the core Fizz API."
     },
     {
       "caseId": "react-case-v1:dbde563715ac965d0e45",
@@ -44099,7 +44830,7 @@
     },
     {
       "caseId": "react-case-v1:dc6474941ef398fd24ab",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can explicitly ignore errors reconnecting missing attributes",
@@ -44107,7 +44838,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers shallow suppression retaining a server-only attribute without diagnostics at upstream line 132.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can explicitly ignore errors reconnecting missing attributes",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:dc64e662efb170f892b5",
@@ -44457,15 +45195,15 @@
     },
     {
       "caseId": "react-case-v1:de5b774fc0601e77789a",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should include a component stack across suspended boundaries",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Octane's public server error callback does not include React's private componentStack/errorInfo diagnostic payload across suspended task boundaries."
     },
     {
       "caseId": "react-case-v1:de81a82c7095b4ab37cb",
@@ -45387,7 +46125,7 @@
     },
     {
       "caseId": "react-case-v1:e31670dd46558310b4d4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should support nonce for bootstrap and runtime scripts",
@@ -45395,7 +46133,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Octane's single nonce option covers its shell runtime, segment swap, hydration seed, scoped style, and degraded recovery scripts; React bootstrap-script orchestration is intentionally absent.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/streaming-ssr.test.ts",
+          "testName": "puts the CSP nonce on shell, segment, seed, style, and degraded scripts",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e3198052e9ed8c846ce7",
@@ -45962,7 +46707,7 @@
     },
     {
       "caseId": "react-case-v1:e5dfb3f023a3ea846d91",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can distinguish an empty component from a dom node",
@@ -45970,7 +46715,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable function-component hydration evidence covers removing a server DOM node for an empty client component at upstream line 335.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can distinguish an empty component from a dom node",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e5ebfdbc3801bd87384f",
@@ -46216,15 +46968,15 @@
     },
     {
       "caseId": "react-case-v1:e747debbbc9c8889b510",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can abort during render in a lazy initializer for an element",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The case relies on React lazy resolving to an element value plus reentrant abort from that initializer. Octane's supported lazy surface resolves components and intentionally does not support nested/lazy element wrappers."
     },
     {
       "caseId": "react-case-v1:e7512cc485e8af5c7adb",
@@ -46488,7 +47240,7 @@
     },
     {
       "caseId": "react-case-v1:e8d105d027dda411411b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "can abort during a synchronous thenable resolution",
@@ -46496,7 +47248,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The AbortSignal adaptation invokes cancellation during the same synchronous render pass before the following suspension and rejects deterministically without a fallback hang.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "rejects when an AbortSignal is triggered during render before suspension",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e8d791ea332a875b9ba1",
@@ -46692,7 +47451,7 @@
     },
     {
       "caseId": "react-case-v1:e9afcadd5b961ef6c619",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can explicitly ignore errors reconnecting added style values",
@@ -46700,7 +47459,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers shallow suppression retaining the server style without diagnostics at upstream line 198.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can explicitly ignore errors reconnecting added style values",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e9beba2df65d534a670c",
@@ -46907,15 +47673,22 @@
     },
     {
       "caseId": "react-case-v1:ead0c05cfa9df1beb56e",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "waits for pending content to come in from the server and then hydrates it",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Octane deliberately does not wait for selective server-boundary hydration; matching streamed content that suspends on the client is recovered eagerly with stable visible content.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
+          "testName": "eagerly recovers a matching streamed boundary that suspends during hydration",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ead2128f43792f58b908",
@@ -47894,7 +48667,7 @@
     },
     {
       "caseId": "react-case-v1:ef4e03490bbf864603d5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "useId is consistent for siblings when component suspends with nested lazy",
@@ -47902,7 +48675,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The supported sibling-boundary adaptation gives each streamed sibling an independent useId seed scope and hydrates both values without replacement; nested lazy wrappers are not required.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/streaming-ssr.test.ts",
+          "testName": "hydrates two streamed sibling boundaries, each from its own seed scope",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ef5c5ae442a28ac30aa2",
@@ -48708,7 +49488,7 @@
     },
     {
       "caseId": "react-case-v1:f2a5b9b5135e4e7d8c71",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js",
       "title": "should be able to complete by aborting even if the promise never resolves",
@@ -48716,7 +49496,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A readable shell with a never-resolving boundary closes after abort, retains its fallback, reports the abort, and rejects allReady with the signal reason.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "closes a readable shell when aborting a boundary whose promise never resolves",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f2ae1a7531106573a3ec",
@@ -49750,7 +50537,7 @@
     },
     {
       "caseId": "react-case-v1:f8a1132f875ce58cca68",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "does not insert text separators even when adjacent text is in a delayed segment",
@@ -49758,7 +50545,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Adjacent text split across delayed segments resolves to the exact visible text and hydrates the revealed DOM in place without separator artifacts.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "keeps adjacent streamed text distinct and hydrates the revealed DOM in place",
+          "modes": ["server-stream", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f8be12d99ee0487c7480",
@@ -49862,7 +50656,7 @@
     },
     {
       "caseId": "react-case-v1:f95b991e354af616c704",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "should error reconnecting a div with different number dangerouslySetInnerHTML",
@@ -49870,7 +50664,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers diagnosing a numeric raw-HTML mismatch while retaining server content at upstream line 417.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "should error reconnecting a div with different number dangerouslySetInnerHTML",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f95ec973b4a18b8c59bc",
@@ -49930,7 +50731,7 @@
     },
     {
       "caseId": "react-case-v1:f99bea96e1ef1e7bbdfa",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationReconnecting-test.js",
       "title": "can not ignore reconnecting fewer children",
@@ -49938,7 +50739,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Executable hydration evidence covers the shallow scope of suppression when the client has fewer children at upstream line 364.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/reconnecting-wave4c.test.ts",
+          "testName": "can not ignore reconnecting fewer children",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f9a6f185f7989eb19eb4",
@@ -49966,7 +50774,7 @@
     },
     {
       "caseId": "react-case-v1:fa03d983d875e8b9cd71",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "Errors in boundaries should be sent to the client and reported on client render - Error before flushing",
@@ -49974,7 +50782,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "An error thrown by primary content before shell completion is contained by Suspense: the fallback shell remains valid, onError reports once, and readiness completes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "keeps the shell valid when content throws inside a Suspense boundary",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:fa0e0660e6f2b4683bfa",
@@ -50029,15 +50844,15 @@
     },
     {
       "caseId": "react-case-v1:fa372163b4c379e81428",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "supresses hydration warnings when an error occurs within a Suspense boundary",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "The assertion is specifically React's selective hydration warning suppression when a server-error instruction reaches a Suspense boundary. Octane uses eager recovery diagnostics."
     },
     {
       "caseId": "react-case-v1:fa406459c70a9b199b1b",
@@ -50274,7 +51089,7 @@
     },
     {
       "caseId": "react-case-v1:fbc8bac14705b802d6b1",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js",
       "title": "should asynchronously load a lazy component",
@@ -50282,7 +51097,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "A lazy component streams its fallback first and reveals the loaded component once the module resolves.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "streams a lazy component after its module resolves",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:fbd2080d14f28512039b",
@@ -50437,7 +51259,7 @@
     },
     {
       "caseId": "react-case-v1:fc6e3fc6106c02eb05d4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js",
       "title": "should encode title properly",
@@ -50445,7 +51267,14 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Readable SSR preserves title text through Octane's React-19-style title hoisting and HTML escaping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-transport.test.ts",
+          "testName": "encodes title text through the readable document stream",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:fcae4f90b1b560984913",

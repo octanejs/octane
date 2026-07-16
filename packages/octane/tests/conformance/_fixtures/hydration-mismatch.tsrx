@@ -201,6 +201,28 @@ export function DangerHtml(props) @{
 	/>
 }
 
+export function DangerHtmlStructuralServer() @{
+	<span id="dh-structural-server">{'server'}</span>
+}
+
+export function DangerHtmlStructuralClient() @{
+	<div id="dh-structural-client" dangerouslySetInnerHTML={{ __html: '<b>client</b>' }} />
+}
+
+export function DetachedTextRenderReplay() @{
+	const [step, setStep] = useState(0);
+	if (step < 2) setStep(step + 1);
+	<section id="detached-text-replay">
+		@if (step === 1) {
+			<em id="detached-text-transient">{'transient'}</em>
+		} @else {
+			<span id="detached-text-final">
+				{(step === 0 ? 'attempt' : 'final') as string}
+			</span>
+		}
+	</section>
+}
+
 // suppressHydrationWarning on an element with a divergent ATTRIBUTE (Per Reconnecting:144).
 export function SuppressedAttr(props) @{
 	<div id="supa" class={props.isClient ? 'client' : 'server'} suppressHydrationWarning>

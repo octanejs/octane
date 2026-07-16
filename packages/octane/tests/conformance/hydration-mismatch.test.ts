@@ -235,14 +235,32 @@ describe('conformance: hydration mismatch (ReactDOMHydrationDiff + ReactDOMServe
 			expect(warns().length).toBe(1);
 		});
 
-		// Per ReactDOMHydrationDiff-test.js:196 / Reconnecting:405. dangerouslySetInnerHTML is a
-		// PROPERTY write, not diffed during hydration (React doesn't diff it either). Octane emits
-		// no mismatch warning and applies the client html. Intentional divergence from React's
-		// "attributes didn't match … won't be patched up" warning for this prop.
-		it('dangerouslySetInnerHTML difference is not flagged; client html applied (Per :196)', async () => {
+		// Per ReactDOMHydrationDiff-test.js:196 / Reconnecting:405. Raw HTML hydration follows
+		// React's attribute-like policy: diagnose the difference and keep the server content.
+		it('dangerouslySetInnerHTML difference warns and keeps server html (Per :196)', async () => {
 			await reconnect('DangerHtml', { isClient: false }, { isClient: true });
-			expect(container.querySelector('#dh')!.innerHTML).toBe('<i>client</i>');
-			expect(warns()).toEqual([]);
+			expect(container.querySelector('#dh')!.innerHTML).toBe('<i>server</i>');
+			expect(warns().length).toBeGreaterThanOrEqual(1);
+		});
+
+		// Per Reconnecting:122/:405 — structural recovery creates a fresh host node;
+		// its raw HTML is client-owned and must be written rather than treated as an
+		// adopted value that React's mismatch policy would retain.
+		it('writes raw html into a fresh structural replacement (Per Reconnecting:122/:405)', async () => {
+			await crossReconnect('DangerHtmlStructuralServer', 'DangerHtmlStructuralClient', {});
+			expect(container.querySelector('#dh-structural-server')).toBeNull();
+			expect(container.querySelector('#dh-structural-client')!.innerHTML).toBe('<b>client</b>');
+			expect(warns().length).toBeGreaterThanOrEqual(1);
+		});
+
+		// Per ReactDOMFizzServer-test.js:6677/:6729. A render-phase replay can
+		// detach the first adopted text node before the final attempt converges;
+		// that stale node must not publish a value-mismatch diagnostic.
+		it('ignores detached text from a render-phase hydration replay (Per Fizz:6677/:6729)', async () => {
+			await reconnect('DetachedTextRenderReplay', {}, {});
+			expect(container.querySelector('#detached-text-transient')).toBeNull();
+			expect(container.querySelector('#detached-text-final')?.textContent).toBe('final');
+			expect(warns().filter((message) => message.includes('server rendered text'))).toEqual([]);
 		});
 
 		// Per Reconnecting:144 "can explicitly ignore errors reconnecting different attribute values".

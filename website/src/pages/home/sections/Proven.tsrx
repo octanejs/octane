@@ -4,10 +4,10 @@ import { Link } from '@octanejs/tanstack-router';
 export function Proven() @{
 	<section class="proven">
 		<div class="proven-stat">
-			<span class="proven-number">7,000+</span>
+			<span class="proven-number">8,000+</span>
 			<span class="proven-label">
 				{'test executions across the runtime, compiler, SSR and bindings, including ' +
-					'compiler-mode reruns; the core suite has 2,700+ distinct cases. '}
+					'compiler-mode reruns; the core suite has 2,800+ distinct cases. '}
 				<a
 					href="https://github.com/octanejs/octane/blob/main/docs/react-parity-coverage.md"
 					target="_blank"

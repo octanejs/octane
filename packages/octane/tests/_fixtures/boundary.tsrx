@@ -1,4 +1,4 @@
-import { Suspense, ErrorBoundary, use } from 'octane';
+import { Suspense, ErrorBoundary, use, useState } from 'octane';
 
 export function Suspender(props) @{
 	const v = use(props.promise);
@@ -9,14 +9,30 @@ export function Suspender(props) @{
 
 export function SuspenseHost(props) @{
 	<Suspense fallback="loading">
-		<Suspender promise={props.promise} />
+		<ErrorBoundary fallback="caught">
+			<UpdateSuspender promise={props.promise} />
+		</ErrorBoundary>
 	</Suspense>
+}
+
+function UpdateSuspender(props) @{
+	const [pending, setPending] = useState(false);
+	<section>
+		<button id="suspend" onClick={() => setPending(true)}>suspend</button>
+		@if (pending) {
+			<Suspender promise={props.promise} />
+		} @else {
+			<span id="ready">ready</span>
+		}
+	</section>
 }
 
 // Inline JSX fallback — exercises the component-prop JSX lowering.
 export function SuspenseHostJsx(props) @{
 	<Suspense fallback={<span id="fb">spinner</span>}>
-		<Suspender promise={props.promise} />
+		<ErrorBoundary fallback="caught">
+			<Suspender promise={props.promise} />
+		</ErrorBoundary>
 	</Suspense>
 }
 

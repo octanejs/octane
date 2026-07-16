@@ -9176,7 +9176,7 @@ function planJsx(
 		}
 		if (b.kind === 'style') ctx.runtimeNeeded.add('setStyle');
 		if (b.kind === 'formAction') ctx.runtimeNeeded.add('setFormAction');
-		if (b.kind === 'htmlOnlyChild' && b.script) ctx.runtimeNeeded.add('setScriptText');
+		if (b.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setHTML');
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
 			// the update helper but still share the compact mount helper call.
@@ -9810,13 +9810,9 @@ function emitBindingMount(b, elVar, bag) {
     }`;
 		}
 		case 'htmlOnlyChild': {
-			const coerce = b.knownString ? '_v' : 'String(_v)';
-			const setter = b.script
-				? `_$setScriptText(${elVar}, _v)`
-				: `${elVar}.innerHTML = (_v == null ? '' : ${coerce})`;
 			return `    {
       const _v = ${E};
-      ${setter};
+      _$setHTML(${elVar}, _v);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
@@ -10007,11 +10003,7 @@ function emitBindingUpdate(b, bag) {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setText(${F('_txt')}, _v); ${F('_prev')} = _v; } }`;
 		}
 		case 'htmlOnlyChild': {
-			const coerce = b.knownString ? '_v' : 'String(_v)';
-			const setter = b.script
-				? `_$setScriptText(${F('_el')}, _v)`
-				: `${F('_el')}.innerHTML = (_v == null ? '' : ${coerce})`;
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { ${setter}; ${F('_prev')} = _v; } }`;
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setHTML(${F('_el')}, _v); ${F('_prev')} = _v; } }`;
 		}
 		case 'attr': {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;

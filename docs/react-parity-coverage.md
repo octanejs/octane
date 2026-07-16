@@ -11,16 +11,16 @@ This report separates distinct Octane tests, React upstream scenarios, renderer/
 
 | Measure | Count |
 | --- | ---: |
-| Normal core cases | 2,756 |
-| ↳ conformance | 1,330 |
+| Normal core cases | 2,853 |
+| ↳ conformance | 1,413 |
 | ↳ differential | 137 |
 | ↳ hydration | 135 |
-| ↳ other runtime/compiler/SSR | 1,154 |
+| ↳ other runtime/compiler/SSR | 1,168 |
 | Profiling-only cases | 14 |
-| Distinct core cases including profiling | 2,770 |
-| Production-compile reruns of normal core | 2,756 |
-| All workspace executions | 8,162 |
-| React-source-attributed file upper bound | 1,345 cases in 78 files |
+| Distinct core cases including profiling | 2,867 |
+| Production-compile reruns of normal core | 2,853 |
+| All workspace executions | 8,477 |
+| React-source-attributed file upper bound | 1,421 cases in 81 files |
 
 The production project reruns the same normal core cases in another compile mode; it is not another set of conformance ports. The React-source-attributed definition is: Every collected normal-core case in a local file containing at least one React upstream *-test.js or *-test.ts filename citation; this is a generous file-level upper bound, not a one-to-one port count. Counts were measured on 2026-07-16.
 
@@ -85,8 +85,8 @@ Every concrete case in either pinned inventory has exactly one ledger dispositio
 
 | Baseline | Cases | Untriaged | Planned | In progress | Covered | Documented | Blocked |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| stable | 5,345 | 4,449 | 378 | 0 | 317 | 201 | 0 |
-| canary | 5,413 | 4,506 | 389 | 0 | 324 | 194 | 0 |
+| stable | 5,345 | 4,449 | 241 | 0 | 425 | 230 | 0 |
+| canary | 5,413 | 4,506 | 243 | 0 | 438 | 226 | 0 |
 
 Classifications are `portable`, `adaptable`, `divergence`, and `non_goal`. A covered case requires live local test evidence; divergence and non-goal dispositions require a rationale.
 
@@ -104,8 +104,8 @@ Suite policies are machine-readable in `react-upstreams.json`; the first matchin
 | Lazy components | 40 / 40 | 41 / 41 | high | covered | runtime | Nineteen lazy resolution, rejection, function-component default-prop, memo, identity, and reorder cases have executable evidence; three ergonomic/component-form differences and twenty unsupported class, forwardRef, legacy-root, owner-stack, or exotic-type cases have durable documented dispositions. |
 | External stores | 19 / 19 | 19 / 19 | high | covered | runtime | Seventeen snapshot, notification, selector, error, and hydration outcomes have executable evidence; React 17 legacy-shim timing and selector invocation-count optimization are documented non-goals. |
 | Update reconciliation | 42 / 42 | 45 / 45 | high | covered | runtime | Twenty-five function/hook batching, ordering, deletion, re-entry, and loop-stability outcomes have executable evidence; synchronous first-mount timing is an executable documented divergence and twenty-one class, legacy, Fiber, or owner-stack cases are documented non-goals. |
-| Fizz streaming | 207 / 207 | 207 / 207 | high | in_progress | SSR + hydration | Wave 4 has exact executable evidence for 38 cases in the stable/canary union (35 stable and 38 canary), with 81 conservative durable dispositions and 104 still planned. Coverage includes public transport, suspension, abort, parser-context, context-isolation, Usable-node, hydration, and deep-tree outcomes; class, selective-hydration, experimental, internal, and document-orchestration cases remain outside Octane's supported surface. |
-| Server integration matrix | 387 / 1,569 | 389 / 1,579 | high | in_progress | SSR + hydration | Wave 4 has exact executable evidence for 46 rendering, serialization, hook, ref, form-control, hydration-adoption, and mismatch-recovery cases in both stable and canary, including a shared five-mode matrix. Wave 1 supplies another 17 untrusted-URL cases, for 63 covered cases in this policy; 57 cases carry durable dispositions and 286 remain planned. Class components, legacy roots/context, StrictMode double-invoke, private dispatchers, and unsupported types are explicit non-goals. |
+| Fizz streaming | 207 / 207 | 207 / 207 | high | covered | SSR + hydration | Wave 4 has exact executable evidence for 109 cases in the stable/canary union (100 stable and 109 canary), with durable dispositions for the other 114 cases and none still planned. Coverage includes public transport, suspension, abort, parser-context, context-isolation, Usable-node, hydration, synchronous iterables and thenables, and deep-tree outcomes; class, selective-hydration, experimental, internal, and document-orchestration cases remain outside Octane's supported surface. |
+| Server integration matrix | 387 / 1,569 | 389 / 1,579 | high | in_progress | SSR + hydration | Wave 4 has exact executable evidence for 89 rendering, serialization, hook, ref, form-control, hydration-adoption, and mismatch-recovery cases in both stable and canary, including a shared five-mode matrix. Wave 1 supplies another 17 untrusted-URL cases, for 106 covered cases in this policy; 57 cases carry durable dispositions and 243 remain planned. Class components, legacy roots/context, StrictMode double-invoke, private dispatchers, and unsupported types are explicit non-goals. |
 | React repository lint rules | 5 / 5 | 5 / 5 | low | documented | tooling | React's internal ESLint RuleTester fixtures validate repository tooling, not observable UI framework behavior in Octane. |
 
 ### Migration sequence and exit criteria
@@ -113,7 +113,7 @@ Suite policies are machine-readable in `react-upstreams.json`; the first matchin
 1. **Wave 1 — critical blockers (completed 2026-07-15):** Effect Event semantics and shared untrusted-URL sanitization are implemented, ported, and linked to executable ledger evidence.
 2. **Wave 2 — public API and reconciliation (completed 2026-07-15):** supported root, fragment, element/Children, and lazy-component outcomes have live evidence; excluded outcomes have durable divergence/non-goal dispositions.
 3. **Wave 3 — scheduling and stores (completed 2026-07-15):** supported update-reconciliation and external-store outcomes have live evidence; excluded class, legacy, Fiber-policy, and optimization-only cases have durable dispositions.
-4. **Wave 4 — server matrix (audit complete; implementation in progress):** 612 Fizz and server-integration cases were reviewed. Exact live evidence covers 84 Wave 4 cases, 138 have conservative durable dispositions, and 390 remain planned. The shared matrix exercises client, buffered SSR, streaming SSR, matching hydration, mismatch recovery, and production compilation; class and legacy React remain explicit non-goals.
+4. **Wave 4 — server matrix (audit complete; implementation in progress):** 612 Fizz and server-integration cases were reviewed. Exact live evidence covers 198 Wave 4 cases, 171 have conservative durable dispositions, and 243 remain planned. All 223 Fizz cases now have either executable evidence or a durable disposition. The shared matrix exercises client, buffered SSR, streaming SSR, matching hydration, mismatch recovery, and production compilation; class and legacy React remain explicit non-goals.
 5. **Residual audit:** assign risk and a durable disposition to every remaining untriaged case, with canary drift reviewed continuously.
 
 A case exits the queue only as `covered` with live local evidence, or as a `documented` divergence/non-goal with rationale. Committed conformance work must remain executable; `skip`, `todo`, and expected-failure placeholders are not completion states.

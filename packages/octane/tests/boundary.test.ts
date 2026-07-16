@@ -3,11 +3,14 @@ import { mount, nextPaint } from './_helpers';
 import { SuspenseHost, SuspenseHostJsx, ErrorHost } from './_fixtures/boundary.tsrx';
 
 describe('<Suspense> component', () => {
-	it('shows fallback while pending, then the content when resolved', async () => {
+	it('shows an outer fallback when a nested ErrorBoundary child suspends', async () => {
 		let resolveFn: (v: string) => void = () => {};
 		const promise = new Promise<string>((r) => (resolveFn = r));
 		const r = mount(SuspenseHost, { promise });
+		expect(r.find('#ready').textContent).toBe('ready');
+		(r.find('#suspend') as HTMLButtonElement).click();
 		expect(r.container.textContent).toContain('loading');
+		expect(r.container.textContent).not.toContain('caught');
 		resolveFn('hi');
 		await nextPaint();
 		expect(r.find('#v').textContent).toBe('v:hi');
@@ -19,6 +22,7 @@ describe('<Suspense> component', () => {
 		const promise = new Promise<string>((r) => (resolveFn = r));
 		const r = mount(SuspenseHostJsx, { promise });
 		expect(r.find('#fb').textContent).toBe('spinner');
+		expect(r.container.textContent).not.toContain('caught');
 		resolveFn('hi');
 		await nextPaint();
 		expect(r.find('#v').textContent).toBe('v:hi');

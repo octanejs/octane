@@ -490,7 +490,7 @@ describe('SSR stream state regressions', () => {
 		]);
 	});
 
-	it('fails a late ancestor-catch stream promptly instead of spinning 50 passes', async () => {
+	it('keeps a late content error inside its already-flushed Suspense boundary', async () => {
 		const inner = deferred<string>();
 		const output = collector();
 		const onError = vi.fn();
@@ -499,13 +499,17 @@ describe('SSR stream state regressions', () => {
 			{ inner: inner.promise },
 			{ onError, timeoutMs: 100 },
 		).pipe(output.destination);
-		const [innerId] = boundaryIds(output.chunks[0]);
 
-		inner.reject(new Error('inner failed'));
+		const error = new Error('inner failed');
+		inner.reject(error);
 		await output.ended;
 		expect(onError).toHaveBeenCalledTimes(1);
-		expect(String(onError.mock.calls[0][0])).toContain('no longer has resumable work');
-		expect(String(onError.mock.calls[0][0])).not.toContain('50 consecutive');
-		expect(output.chunks.join('')).toContain('$OCTRX(' + JSON.stringify(innerId) + ')');
+		expect(onError).toHaveBeenCalledWith(error);
+
+		const container = activateChunks(output.chunks);
+		expect(container.querySelector('.late-pending')?.textContent).toBe('waiting');
+		expect(container.querySelector('.late-catch')).toBeNull();
+		container.remove();
+		resetStreamRuntimeGlobals();
 	});
 });
