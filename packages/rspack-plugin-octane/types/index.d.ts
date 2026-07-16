@@ -16,6 +16,10 @@ export type OctaneRendererRegistryEntry =
 	| {
 			module: string;
 			target?: 'dom' | 'universal';
+			server?: 'render' | 'client-only' | 'unsupported';
+			intrinsics?: string;
+			text?: 'reject' | 'ignore' | 'host';
+			capabilities?: readonly string[];
 	  };
 
 /** Static metadata for a component prop lowered for another renderer. */
@@ -23,6 +27,7 @@ export interface OctaneRendererBoundaryOptions {
 	ownerRenderer: string;
 	childRenderer: string;
 	prop: string;
+	server?: 'omit-child';
 }
 
 /** @experimental Declarative renderer selection shared with other Octane compilers. */
@@ -32,6 +37,33 @@ export interface OctaneRendererConfigOptions {
 	boundaries?: Readonly<Record<string, Readonly<Record<string, OctaneRendererBoundaryOptions>>>>;
 	default?: string;
 	rules?: readonly OctaneRendererRuleOptions[];
+}
+
+/** Canonical renderer configuration accepted when another Octane integration resolved it. */
+export interface OctaneResolvedRendererConfig {
+	readonly registry: Readonly<
+		Record<
+			string,
+			{
+				readonly module: string;
+				readonly target: 'dom' | 'universal';
+				readonly server: 'render' | 'client-only' | 'unsupported';
+				readonly intrinsics?: string;
+				readonly text: 'reject' | 'ignore' | 'host';
+				readonly capabilities: readonly string[];
+			}
+		>
+	>;
+	readonly boundaries: Readonly<
+		Record<string, Readonly<Record<string, Readonly<OctaneRendererBoundaryOptions>>>>
+	>;
+	readonly default: string;
+	readonly rules: readonly {
+		readonly include: readonly string[];
+		readonly exclude: readonly string[];
+		readonly renderer: string;
+	}[];
+	readonly signature: string;
 }
 
 export interface OctaneRspackLoaderOptions {
@@ -50,7 +82,7 @@ export interface OctaneRspackLoaderOptions {
 	/** Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. */
 	exclude?: string[];
 	/** @experimental Renderer registry and ordered per-file selection rules. */
-	renderers?: OctaneRendererConfigOptions;
+	renderers?: OctaneRendererConfigOptions | OctaneResolvedRendererConfig;
 }
 
 export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
@@ -64,8 +96,14 @@ export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
 
 export interface OctaneRspackBuildInfo {
 	canonicalId: string;
-	transformKind: 'compile' | 'slots';
+	transformKind: 'compile' | 'slots' | 'client-only-stub';
 	serverRpc: boolean;
+	/** Stable identity shared by the client compile and its inert server stub. */
+	clientReference?: {
+		readonly id: string;
+		readonly moduleId: string;
+		readonly renderer: string;
+	};
 }
 
 export declare class OctaneRspackPlugin implements RspackPluginInstance {

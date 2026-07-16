@@ -14,6 +14,19 @@ export function MixedBoundaryApp(props) @{
 	</UniversalTheme.Provider>
 }
 
+function ThrowAfterBoundary() {
+	throw new Error('DOM sibling failed after renderer boundary');
+}
+
+export function AbandonedBoundaryApp(props) @{
+	<>
+		<SceneCanvas root={props.root}>
+			<Scene log={props.log} />
+		</SceneCanvas>
+		<ThrowAfterBoundary />
+	</>
+}
+
 export function InlineAlternatingBoundaryApp(props) @{
 	<SceneCanvas root={props.root}>
 		<Html>

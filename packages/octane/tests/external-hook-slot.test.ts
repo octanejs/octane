@@ -3,6 +3,7 @@ import {
 	mkdtempSync,
 	mkdirSync,
 	readFileSync,
+	realpathSync,
 	readdirSync,
 	rmSync,
 	symlinkSync,
@@ -212,7 +213,8 @@ describe('vite plugin gate routing', () => {
 			expect(config.optimizeDeps.exclude).toEqual(
 				expect.arrayContaining(['@octanejs/lexical', 'lexical']),
 			);
-			expect(config.resolve.dedupe).toEqual(['octane']);
+			expect(config.resolve.dedupe).toContain('octane');
+			expect(config.resolve.dedupe).not.toContain('lexical');
 			expect(config.ssr.noExternal).toContain('@octanejs/lexical');
 			expect(config.ssr.noExternal).not.toContain('lexical');
 		} finally {
@@ -248,6 +250,132 @@ describe('vite plugin gate routing', () => {
 		expect(() => octane({ renderers: { default: 'missing' } })).toThrow(
 			/default references unknown renderer "missing"/,
 		);
+	});
+
+	it('keeps client-only renderer identity stable while omitting its Vite server region', async () => {
+		const rendererPlugin = octane({
+			hmr: false,
+			renderers: {
+				registry: {
+					object: {
+						module: '/src/object-renderer.js',
+						server: 'client-only',
+					},
+				},
+				boundaries: {
+					'@scene/client': {
+						Canvas: {
+							ownerRenderer: 'dom',
+							childRenderer: 'object',
+							prop: 'children',
+							server: 'omit-child',
+						},
+					},
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		(rendererPlugin.config as any)({ root: appRoot });
+		const sceneId = join(appRoot, 'src/scenes/Scene.object.tsrx');
+		const sceneSource = 'export default function Scene() @{ <node /> }\n';
+		const client = await (rendererPlugin.transform as any).call({}, sceneSource, sceneId);
+		const server = await (rendererPlugin.transform as any).call(
+			{ resolve: async () => null },
+			sceneSource,
+			sceneId,
+			{ ssr: true },
+		);
+
+		const clientReference = client.meta['octane:client-reference'];
+		expect(clientReference).toEqual({
+			id: 'octane-client-reference-v1:object:/src/scenes/Scene.object.tsrx',
+			moduleId: '/src/scenes/Scene.object.tsrx',
+			renderer: 'object',
+		});
+		expect(server.meta['octane:client-reference']).toEqual(clientReference);
+		expect(server.code).not.toContain('<node');
+
+		const appSource = `
+import { Canvas } from '@scene/client';
+import Scene from './scenes/Scene.object.tsrx';
+export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
+`;
+		const app = await (rendererPlugin.transform as any).call(
+			{
+				resolve: async (request: string) => ({
+					id:
+						request === './scenes/Scene.object.tsrx'
+							? sceneId
+							: join(appRoot, 'node_modules/scene-client/index.js'),
+				}),
+			},
+			appSource,
+			join(appRoot, 'src/App.tsrx'),
+			{ ssr: true },
+		);
+		expect(app.code).toContain('Canvas');
+		expect(app.code).toContain('after');
+		expect(app.code).not.toContain('Scene(');
+
+		const liveSource = appSource.replace(
+			'export function App() @{',
+			'export function App() @{ const live = Scene as unknown;',
+		);
+		await expect(
+			(rendererPlugin.transform as any).call(
+				{
+					resolve: async (request: string) => ({
+						id:
+							request === './scenes/Scene.object.tsrx'
+								? sceneId
+								: join(appRoot, 'node_modules/scene-client/index.js'),
+					}),
+				},
+				liveSource,
+				join(appRoot, 'src/LiveApp.tsrx'),
+				{ ssr: true },
+			),
+		).rejects.toMatchObject({
+			code: 'OCTANE_CLIENT_ONLY_SERVER_USE',
+			filename: '/src/LiveApp.tsrx',
+		});
+	});
+
+	it('canonicalizes client-reference identity through a symlinked Vite root', async () => {
+		const parent = mkdtempSync(join(tmpdir(), 'octane-vite-renderer-root-'));
+		try {
+			const root = join(parent, 'real-project');
+			const linkedRoot = join(parent, 'linked-project');
+			mkdirSync(join(root, 'src'), { recursive: true });
+			symlinkSync(root, linkedRoot, 'dir');
+			const rendererPlugin = octane({
+				hmr: false,
+				renderers: {
+					registry: {
+						object: {
+							module: '/src/object-renderer.js',
+							server: 'client-only',
+						},
+					},
+					rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+				},
+			});
+			(rendererPlugin.config as any)({ root: linkedRoot });
+			const sceneId = join(realpathSync(root), 'src/Scene.object.tsrx');
+			const transformed = await (rendererPlugin.transform as any).call(
+				{},
+				'export default function Scene() @{ <node /> }\n',
+				sceneId,
+			);
+
+			expect(transformed.meta['octane:client-reference']).toEqual({
+				id: 'octane-client-reference-v1:object:/src/Scene.object.tsrx',
+				moduleId: '/src/Scene.object.tsrx',
+				renderer: 'object',
+			});
+		} finally {
+			rmSync(parent, { recursive: true, force: true });
+		}
 	});
 
 	it('protects the profiling build constant throughout Vite config resolution', () => {

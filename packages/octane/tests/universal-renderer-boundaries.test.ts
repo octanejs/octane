@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createRoot, type ComponentBody } from '../src/index.js';
 import {
 	createObjectContainer,
@@ -15,6 +15,7 @@ import {
 } from '../src/universal.js';
 import { mount } from './_helpers.js';
 import {
+	AbandonedBoundaryApp,
 	InlineAlternatingBoundaryApp,
 	MixedBoundaryApp,
 } from './_fixtures/universal-mixed-boundaries.tsrx';
@@ -163,6 +164,59 @@ describe('compiler-owned renderer child regions', () => {
 		expect(container.children).toEqual([]);
 		expect(refs.at(-1)).toBe(null);
 		expect(log).toContain('scene-cleanup:light:2');
+	});
+
+	it('clears an abandoned boundary bridge when prepared host abort throws', () => {
+		const container = createObjectContainer();
+		const baseDriver = createObjectDriver();
+		const root = createUniversalRoot(container, {
+			...baseDriver,
+			prepareBatch(target, batch, context) {
+				const prepared = baseDriver.prepareBatch(target, batch, context);
+				return {
+					...prepared,
+					abort() {
+						prepared.abort();
+						throw new Error('boundary prepared abort fault');
+					},
+				};
+			},
+		});
+		const queued: Array<() => void> = [];
+		const queue = vi
+			.spyOn(globalThis, 'queueMicrotask')
+			.mockImplementation((callback) => queued.push(callback));
+		try {
+			expect(() =>
+				mount(AbandonedBoundaryApp, {
+					root,
+					log: () => {},
+				}),
+			).toThrow('DOM sibling failed after renderer boundary');
+
+			let abortFault: unknown;
+			for (const callback of [...queued]) {
+				try {
+					callback();
+				} catch (error) {
+					if ((error as Error).message === 'boundary prepared abort fault') abortFault = error;
+					else throw error;
+				}
+			}
+			expect(abortFault).toMatchObject({ message: 'boundary prepared abort fault' });
+			expect(container.children).toEqual([]);
+			expect(container.instanceCount).toBe(0);
+		} finally {
+			queue.mockRestore();
+		}
+
+		const remounted = mount(MixedBoundaryApp, {
+			root,
+			theme: 'remounted',
+			log: () => {},
+		});
+		expect(container.children.map((child) => child.type)).toEqual(['scene', 'mesh']);
+		remounted.unmount();
 	});
 
 	it('materializes the shared reverse Html region as an executable DOM component', () => {
@@ -358,7 +412,12 @@ describe('reverse renderer owner bridge', () => {
 		const region = committedDomRegion(container);
 		const dom = mount(region.component as ComponentBody<any>, region.props);
 		await flushBridgeWork();
+		expect(container.children).toHaveLength(2);
 		expect(container.children[0]).toMatchObject({
+			type: 'html-region',
+			visible: false,
+		});
+		expect(container.children[1]).toMatchObject({
 			type: 'status',
 			props: { value: 'pending' },
 		});
@@ -366,7 +425,11 @@ describe('reverse renderer owner bridge', () => {
 		resolve();
 		await thenable;
 		await flushBridgeWork();
-		expect(container.children[0].type).toBe('html-region');
+		expect(container.children).toHaveLength(1);
+		expect(container.children[0]).toMatchObject({
+			type: 'html-region',
+			visible: true,
+		});
 		dom.unmount();
 		root.unmount();
 	});

@@ -24,7 +24,12 @@ import { mount } from './_helpers.js';
 import { UniversalBoundaryFixture, UniversalTheme } from './_fixtures/universal-boundary.tsrx';
 import { CompiledUniversalScene } from './_fixtures/compiled-universal.object.tsrx';
 
-const renderer = { id: 'object', module: 'octane/universal', target: 'universal' } as const;
+const renderer = {
+	id: 'object',
+	module: 'octane/universal',
+	target: 'universal',
+	text: 'host',
+} as const;
 
 const itemPlan = universalPlan('object', {
 	kind: 'range',
@@ -468,9 +473,19 @@ describe('universal logical topology and transactions', () => {
 		const log: string[] = [];
 		const driver = {
 			...baseDriver,
-			commit(target: typeof container, batch: (typeof container.commits)[number]) {
-				log.push('host');
-				baseDriver.commit(target, batch);
+			prepareBatch(
+				target: typeof container,
+				batch: (typeof container.commits)[number],
+				context: Parameters<typeof baseDriver.prepareBatch>[2],
+			) {
+				const prepared = baseDriver.prepareBatch(target, batch, context);
+				return {
+					...prepared,
+					apply() {
+						log.push('host');
+						prepared.apply();
+					},
+				};
 			},
 		};
 		const root = createUniversalRoot(container, driver);
@@ -625,10 +640,10 @@ describe('universal logical topology and transactions', () => {
 		const transported: unknown[] = [];
 		const root = createUniversalRoot(container, driver, {
 			transport: {
-				commit(target, batch, apply) {
+				prepareBatch(target, batch, prepare) {
 					transported.push(batch);
-					apply(batch);
 					expect(target).toBe(container);
+					return prepare(batch);
 				},
 			},
 		});
@@ -670,9 +685,13 @@ describe('universal logical topology and transactions', () => {
 		let reject = false;
 		const driver = {
 			...baseDriver,
-			commit(target: typeof container, batch: (typeof container.commits)[number]) {
+			prepareBatch(
+				target: typeof container,
+				batch: (typeof container.commits)[number],
+				context: Parameters<typeof baseDriver.prepareBatch>[2],
+			) {
 				if (reject) throw new Error('host rejected');
-				baseDriver.commit(target, batch);
+				return baseDriver.prepareBatch(target, batch, context);
 			},
 		};
 		const root = createUniversalRoot(container, driver);
@@ -906,12 +925,12 @@ describe('universal logical topology and transactions', () => {
 
 	it('requires drivers to opt into text instead of assuming a fake-DOM text API', () => {
 		const container = createObjectContainer();
-		const driver = { ...createObjectDriver(), capabilities: new Set<string>() };
+		const driver = { ...createObjectDriver(), capabilities: { text: 'reject' as const } };
 		const root = createUniversalRoot(container, driver);
 		const textPlan = universalPlan('object', { kind: 'text', value: 'hello' });
 		const Text = defineUniversalComponent('object', () => universalValue(textPlan));
 
-		expect(() => root.render(Text, undefined)).toThrow(/does not declare the text capability/);
+		expect(() => root.render(Text, undefined)).toThrow(/rejects primitive text children/);
 		expect(container.commits).toHaveLength(0);
 		expect(container.instanceCount).toBe(0);
 	});
@@ -1222,15 +1241,20 @@ describe('universal nested boundary ownership', () => {
 		root.unmount();
 	});
 
-	it('retains committed content without a batch, allocation, ref, or effect publication while updating work suspends', async () => {
+	it('hides committed content beside a fallback and reconnects it after suspended work settles', async () => {
 		const { container, root } = objectRoot();
-		const plan = universalPlan('object', {
+		const primaryPlan = universalPlan('object', {
 			kind: 'host',
 			type: 'mesh',
 			bindings: [
 				['ref', 0],
 				['value', 1],
 			],
+		});
+		const fallbackPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'fallback',
+			bindings: [['value', 0]],
 		});
 		const log: string[] = [];
 		const ref = (value: unknown) => log.push(value === null ? 'ref:null' : 'ref:mesh');
@@ -1248,9 +1272,9 @@ describe('universal nested boundary ownership', () => {
 						[value],
 						Symbol.for('retained-layout'),
 					);
-					return universalValue(plan, [ref, value]);
+					return universalValue(primaryPlan, [ref, value]);
 				},
-				() => universalValue(plan, [ref, 'pending']),
+				() => universalValue(fallbackPlan, ['pending']),
 			),
 		);
 
@@ -1264,12 +1288,18 @@ describe('universal nested boundary ownership', () => {
 			resolve = done;
 		});
 		const suspended = root.render(Boundary, undefined);
-		expect(suspended.status).toBe('suspended');
+		expect(suspended.status).toBe('committed');
 		expect(container.children[0]).toBe(committed);
 		expect(container.children[0].props.value).toBe('one');
-		expect(container.commits).toHaveLength(1);
-		expect(container.instanceCount).toBe(1);
-		expect(log).toEqual(['ref:mesh', 'layout:one']);
+		expect(container.children[0].visible).toBe(false);
+		expect(container.children[1]).toMatchObject({
+			type: 'fallback',
+			props: { value: 'pending' },
+			visible: true,
+		});
+		expect(container.commits).toHaveLength(2);
+		expect(container.instanceCount).toBe(2);
+		expect(log).toEqual(['ref:mesh', 'layout:one', 'cleanup:one', 'ref:null']);
 
 		resolve('two');
 		await pending;
@@ -1277,9 +1307,18 @@ describe('universal nested boundary ownership', () => {
 		await Promise.resolve();
 		expect(container.children[0]).toBe(committed);
 		expect(container.children[0].props.value).toBe('two');
-		expect(container.commits).toHaveLength(2);
+		expect(container.children[0].visible).toBe(true);
+		expect(container.children).toHaveLength(1);
+		expect(container.commits).toHaveLength(3);
 		expect(container.instanceCount).toBe(1);
-		expect(log).toEqual(['ref:mesh', 'layout:one', 'cleanup:one', 'layout:two']);
+		expect(log).toEqual([
+			'ref:mesh',
+			'layout:one',
+			'cleanup:one',
+			'ref:null',
+			'ref:mesh',
+			'layout:two',
+		]);
 		root.unmount();
 	});
 });
