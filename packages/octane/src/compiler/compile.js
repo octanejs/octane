@@ -1655,7 +1655,12 @@ function containsRenderCall(stmts) {
 		) {
 			return; // deferred — runs at event/invoke time, not during render
 		}
-		if (t === 'CallExpression' || t === 'NewExpression' || t === 'TaggedTemplateExpression') {
+		if (
+			t === 'CallExpression' ||
+			t === 'OptionalCallExpression' ||
+			t === 'NewExpression' ||
+			t === 'TaggedTemplateExpression'
+		) {
 			found = true;
 			return;
 		}
@@ -1900,6 +1905,10 @@ function isComponentFunction(node) {
 function isReturnJsxFunction(node) {
 	if (!node) return false;
 	if (node.type !== 'FunctionDeclaration' && node.type !== 'FunctionExpression') return false;
+	// Anonymous default functions stay on the generic value-lowering path. The
+	// specialized path needs a stable declaration binding, while ESM correctly
+	// infers the anonymous default's public function name without one.
+	if (node.id == null) return false;
 	if (node.async || node.generator) return false;
 	if (!node.body || node.body.type !== 'BlockStatement') return false;
 	return (node.body.body || []).some(
@@ -2585,6 +2594,73 @@ function devLoc(ctx, node) {
 	return l ? [l.line, l.column | 0] : undefined;
 }
 
+/** Embed anonymous-default root LOC without changing its ESM identity semantics. */
+function stampAnonymousDefaultFunctionLoc(node, ctx) {
+	if (!ctx.dev || node?.type !== 'ExportDefaultDeclaration') return node;
+	const declaration = unwrapTsExpr(node.declaration);
+	if (
+		(declaration?.type !== 'ArrowFunctionExpression' &&
+			declaration?.type !== 'FunctionExpression' &&
+			declaration?.type !== 'FunctionDeclaration') ||
+		declaration.id != null
+	)
+		return node;
+	const loc = devLoc(ctx, declaration);
+	if (loc === undefined) return node;
+	// Keep the function itself as the direct ExportDefaultDeclaration value. ESM
+	// then retains the inferred public name "default", and an anonymous default
+	// function declaration keeps its instantiation/hoisting behavior in cycles.
+	// The mismatch path reads this inert DEV-only directive from Function#toString
+	// when no binding exists on which the normal __oct_loc metadata can live.
+	const payload = encodeURIComponent(`${ctx.mapSourceName}:${loc[0]}:${loc[1]}`).replace(
+		/'/g,
+		'%27',
+	);
+	const marker = {
+		type: 'ExpressionStatement',
+		expression: { type: 'Literal', value: `__octane_loc:${payload}` },
+	};
+	let stamped;
+	if (
+		declaration.type === 'ArrowFunctionExpression' &&
+		declaration.body.type !== 'BlockStatement'
+	) {
+		stamped = {
+			...declaration,
+			expression: false,
+			body: {
+				type: 'BlockStatement',
+				body: [marker, { type: 'ReturnStatement', argument: declaration.body }],
+			},
+		};
+	} else if (declaration.body?.type === 'BlockStatement') {
+		stamped = {
+			...declaration,
+			body: { ...declaration.body, body: [marker, ...(declaration.body.body || [])] },
+		};
+	} else {
+		return node;
+	}
+	const replaceInner = (current) => {
+		if (current === declaration) return stamped;
+		if (
+			current &&
+			(current.type === 'TSAsExpression' ||
+				current.type === 'TSNonNullExpression' ||
+				current.type === 'TSTypeAssertion' ||
+				current.type === 'TSSatisfiesExpression' ||
+				current.type === 'ParenthesizedExpression')
+		) {
+			return { ...current, expression: replaceInner(current.expression) };
+		}
+		return current;
+	};
+	return {
+		...node,
+		declaration: replaceInner(node.declaration),
+	};
+}
+
 function profileSourceLoc(node) {
 	const loc = node?._octaneProfileLoc ?? node?.loc?.start;
 	return {
@@ -3163,6 +3239,11 @@ export function compile(source, filename, options) {
 		profileComponents: [],
 		profileComponentIds: new Set(),
 		profileComponentCandidates: new Set(),
+		// DEV-only source locations stamped on top-level function bindings. Root
+		// return/fragment mismatches have no host element to carry __oct_loc, so
+		// hydrateRoot reads this binding-level fallback for its warning.
+		devFunctionLocs: [],
+		devFunctionLocAliases: [],
 		// Source-map inputs, read by printNodeWithMap to ask esrap for real
 		// per-token mappings against the original .tsrx.
 		mapSource: source,
@@ -3175,6 +3256,70 @@ export function compile(source, filename, options) {
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
+	}
+	if (ctx.dev) {
+		for (const node of ast.body) {
+			const declaration =
+				node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'
+					? node.declaration
+					: node;
+			const candidates = [];
+			if (
+				declaration?.type === 'FunctionDeclaration' &&
+				declaration.id != null &&
+				declaration.body != null
+			) {
+				candidates.push({ name: declaration.id.name, node: declaration });
+			} else if (declaration?.type === 'VariableDeclaration') {
+				for (const declarator of declaration.declarations || []) {
+					const init = unwrapTsExpr(declarator.init);
+					if (
+						declarator.id?.type === 'Identifier' &&
+						(init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression')
+					) {
+						candidates.push({ name: declarator.id.name, node: init });
+					} else if (declarator.id?.type === 'Identifier') {
+						const factory = profileFactoryName(init, ctx);
+						if (factory !== 'memo' && factory !== 'lazy') continue;
+						const wrapped = unwrapTsExpr(init.arguments?.[0]);
+						if (factory === 'memo' && wrapped?.type === 'Identifier') {
+							ctx.devFunctionLocAliases.push({
+								name: declarator.id.name,
+								source: wrapped.name,
+							});
+						} else if (
+							wrapped?.type === 'ArrowFunctionExpression' ||
+							wrapped?.type === 'FunctionExpression'
+						) {
+							const loc = devLoc(ctx, wrapped);
+							if (loc !== undefined) {
+								ctx.devFunctionLocAliases.push({
+									name: declarator.id.name,
+									loc: `${ctx.mapSourceName}:${loc[0]}:${loc[1]}`,
+								});
+							}
+						} else {
+							const loc = devLoc(ctx, init);
+							if (loc !== undefined) {
+								ctx.devFunctionLocAliases.push({
+									name: declarator.id.name,
+									loc: `${ctx.mapSourceName}:${loc[0]}:${loc[1]}`,
+								});
+							}
+						}
+					}
+				}
+			}
+			for (const candidate of candidates) {
+				const loc = devLoc(ctx, candidate.node);
+				if (loc !== undefined) {
+					ctx.devFunctionLocs.push({
+						name: candidate.name,
+						loc: `${ctx.mapSourceName}:${loc[0]}:${loc[1]}`,
+					});
+				}
+			}
+		}
 	}
 	const universalUnits =
 		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
@@ -3498,7 +3643,7 @@ export function compile(source, filename, options) {
 			// `const el = <App/>`) to createElement(...) before printing — esrap
 			// can't print raw JSX, and this is what makes root.render(<App/>) match
 			// React's shape.
-			const lowered = rewriteJsxValues(hooked, ctx);
+			const lowered = stampAnonymousDefaultFunctionLoc(rewriteJsxValues(hooked, ctx), ctx);
 			// Top-level passthrough (imports, plain consts/functions): print with
 			// esrap's real map — col 0, no re-indent, single line offset.
 			const base = bodyLine;
@@ -3627,6 +3772,18 @@ export function compile(source, filename, options) {
 		const stamps = [];
 		for (const [name, info] of ctx.componentInfo) {
 			if (info.singleRoot === true) stamps.push(`${name}.$$singleRoot = true;`);
+		}
+		for (const entry of ctx.devFunctionLocs) {
+			stamps.push(
+				`try { ${entry.name}.__oct_loc = ${JSON.stringify(entry.loc)}; } catch { /* frozen component */ }`,
+			);
+		}
+		for (const entry of ctx.devFunctionLocAliases) {
+			stamps.push(
+				entry.source === undefined
+					? `try { ${entry.name}.__oct_loc = ${JSON.stringify(entry.loc)}; } catch { /* frozen component */ }`
+					: `try { ${entry.name}.__oct_loc = ${entry.source}.__oct_loc; } catch { /* frozen component */ }`,
+			);
 		}
 		if (stamps.length > 0) stampBlock = stamps.join('\n') + '\n';
 	}
@@ -3881,6 +4038,7 @@ function ssrCompileBody(
 	cssEntries,
 	parentNs = 'html',
 	localSetupSlots = false,
+	componentNs = null,
 ) {
 	const params = node.params.map((p) => printNode(p)).join(', ');
 
@@ -3999,7 +4157,7 @@ function ssrCompileBody(
 	const prevInheritRoot = ctx._ssrInheritRoot;
 	ctx._ssrInheritRoot =
 		!!(node.body && node.body.type === 'JSXCodeBlock') && inheritSoleCompRoot(bodyNodes, ctx);
-	const htmlExpr = ssrEmitNodes(bodyNodes, ctx, name, inlinedSubs, parentNs, cssHash);
+	const htmlExpr = ssrEmitNodes(bodyNodes, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 	ctx._ssrInheritRoot = prevInheritRoot;
 	ctx._tsxValuePos = prevValuePos;
 
@@ -4066,7 +4224,16 @@ function hasTextNeighbor(kinds, i) {
 // `<textarea>`/`<listing>`) — the parser discards a '\n' immediately after the
 // opening tag, so the FIRST emitted text part protects a leading newline by
 // doubling it (React parity; a comment/element first part shields it already).
-function ssrEmitNodes(nodes, ctx, name, inlinedSubs, parentNs, cssHash, nlGuardFirst = false) {
+function ssrEmitNodes(
+	nodes,
+	ctx,
+	name,
+	inlinedSubs,
+	parentNs,
+	cssHash,
+	componentNs,
+	nlGuardFirst = false,
+) {
 	const parts = [];
 	// Adjacent text nodes MERGE when the browser re-parses the serialized HTML,
 	// which would fuse a dynamic text hole with its text neighbour into ONE node
@@ -4084,7 +4251,7 @@ function ssrEmitNodes(nodes, ctx, name, inlinedSubs, parentNs, cssHash, nlGuardF
 		const kind = textAdjacencyKind(n, ctx);
 		if (kind === 'empty') continue; // serializes nothing — skip, adjacency-transparent
 		const nlGuard = nlGuardFirst && parts.length === 0;
-		const p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard);
+		const p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash, componentNs, nlGuard);
 		if (p) {
 			if (kind !== 'other' && prevText !== null && (kind === 'dyn' || prevText === 'dyn')) {
 				parts.push(JSON.stringify('<!-- -->'));
@@ -4096,7 +4263,16 @@ function ssrEmitNodes(nodes, ctx, name, inlinedSubs, parentNs, cssHash, nlGuardF
 	return parts.length ? parts.join(' + ') : "''";
 }
 
-function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = false) {
+function ssrEmitNode(
+	node,
+	ctx,
+	name,
+	inlinedSubs,
+	parentNs,
+	cssHash,
+	componentNs,
+	nlGuard = false,
+) {
 	switch (node.type) {
 		case 'Text': {
 			const expr = node.expression;
@@ -4126,23 +4302,27 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = 
 			// createElement(...) descriptors — exactly like ssrEmitTsrxExpression and
 			// the client makeChildCall. Without it the raw JSX leaks into the emitted
 			// ssrChild(...) call as unparseable source.
-			return `_$ssrChild(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx), cssHash))}, __s)`;
+			const childExpr = `_$ssrChild(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx), cssHash))}, __s)`;
+			if (componentNs === null) return childExpr;
+			ctx.runtimeNeeded.add('ssrInNamespace');
+			return `_$ssrInNamespace(${JSON.stringify(componentNs)}, () => ${childExpr})`;
 		}
 		case 'Element':
-			if (isComponentTag(node)) return ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash);
-			return ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			if (isComponentTag(node))
+				return ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
+			return ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'TSRXExpression':
-			return ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash);
+			return ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash, componentNs);
 		case 'IfStatement':
-			return ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			return ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'ForOfStatement':
-			return ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			return ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'TryStatement':
-			return ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			return ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'SwitchStatement':
-			return ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			return ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'ActivityStatement':
-			return ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			return ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'FragmentStart':
 		case 'FragmentEnd':
 			return ssrUnsupported('fragment refs (`<Fragment ref={…}>`)');
@@ -4151,7 +4331,7 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = 
 	}
 }
 
-function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const tag = elementTagName(node);
 	rejectVoidElementContent(tag, node, ctx);
 	rejectTextareaValueChildren(tag, node, ctx);
@@ -4160,6 +4340,15 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	// the inherited ns — svg subtrees would never enter the svg namespace).
 	const selfNs = nsForSelf(tag, parentNs);
 	const childNs = nsForChildren(tag, selfNs);
+	// The static namespace walk starts each independently compiled component in
+	// HTML, but a component can be invoked under foreign content at runtime.
+	// Preserve that inherited context through ordinary hosts/wrappers and emit an
+	// explicit override only at a parser transition we can prove lexically.
+	let childComponentNs = componentNs;
+	if (tag === 'foreignObject') childComponentNs = 'html';
+	else if (tag === 'svg') childComponentNs = 'svg';
+	else if (tag === 'math') childComponentNs = 'mathml';
+	else if (childNs !== 'html') childComponentNs = childNs;
 
 	// `parts` are JS expressions concatenated with `+`. `lit` accumulates the
 	// current static run so adjacent literals fold into one quoted chunk.
@@ -4489,6 +4678,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	) {
 		ctx.runtimeNeeded.add('ssrChildText');
 		childrenExpr = `_$ssrChildText(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx), cssHash))}, __s)`;
+		if (childComponentNs !== null) {
+			ctx.runtimeNeeded.add('ssrInNamespace');
+			childrenExpr = `_$ssrInNamespace(${JSON.stringify(childComponentNs)}, () => ${childrenExpr})`;
+		}
 	} else {
 		// pre/textarea/listing: the parser eats a '\n' right after the opening tag —
 		// the first text part must protect a leading newline (see ssrEmitNodes).
@@ -4500,6 +4693,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			inlinedSubs,
 			childNs,
 			cssHash,
+			childComponentNs,
 			nlGuardFirst,
 		);
 	}
@@ -4540,9 +4734,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	if (htmlSources.length > 0) {
 		// Raw HTML (explicit and/or spread-supplied) wins over children when present
 		// at runtime (last source wins); otherwise the children render.
-		ctx.runtimeNeeded.add('ssrInnerHtml');
+		const innerHtmlHelper = tag === 'script' ? 'ssrScriptInnerHtml' : 'ssrInnerHtml';
+		ctx.runtimeNeeded.add(innerHtmlHelper);
 		flush();
-		parts.push(`(_$ssrInnerHtml([${htmlSources.join(', ')}]) ?? (${childrenExpr}))`);
+		parts.push(`(_$${innerHtmlHelper}([${htmlSources.join(', ')}]) ?? (${childrenExpr}))`);
 	} else if (childrenExpr !== "''") {
 		flush();
 		parts.push(childrenExpr);
@@ -4552,7 +4747,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	return finalize();
 }
 
-function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
+function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// M3 inherit-range: consume the body-root flag ONCE, before this component's
 	// props/children compile below (they recurse into ssrEmitNodes/ssrCompileSub
 	// and must not inherit it). Set by ssrCompileBody only for the sole
@@ -4629,7 +4824,15 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 			// (returns an HTML string). The component decides whether/where to render
 			// them by calling props.children(scope) — e.g. a context Provider does exactly
 			// that. Mirrors the client `@{}` convention (componentSlot + a render fn).
-			const sub = ssrCompileSub(node.children, ctx, '__schildren', [], cssHash, 'html');
+			const sub = ssrCompileSub(
+				node.children,
+				ctx,
+				'__schildren',
+				[],
+				cssHash,
+				parentNs,
+				componentNs,
+			);
 			inlinedSubs.push(sub.fn + ';');
 			// Tag the server children-block like the client does (see the client
 			// emission in lowerComponentCall): a consumer's `typeof children ===
@@ -4641,10 +4844,17 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 			propParts.push(`"children": _$markChildrenBlock(${sub.fnName})`);
 		}
 	}
-	ctx.runtimeNeeded.add('ssrComponent');
-	const trailing =
-		keyExpr !== null ? `, ${inherit ? 'true' : 'false'}, (${keyExpr})` : inherit ? ', true' : '';
-	return `_$ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} }${trailing})`;
+	const explicitNamespace = componentNs !== null;
+	const helper = explicitNamespace ? 'ssrComponentNS' : 'ssrComponent';
+	ctx.runtimeNeeded.add(helper);
+	const trailing = explicitNamespace
+		? `, ${JSON.stringify(componentNs)}, ${inherit ? 'true' : 'false'}${keyExpr === null ? '' : `, (${keyExpr})`}`
+		: keyExpr !== null
+			? `, ${inherit ? 'true' : 'false'}, (${keyExpr})`
+			: inherit
+				? ', true'
+				: '';
+	return `_$${helper}(__s, ${compExpr}, { ${propParts.join(', ')} }${trailing})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -4659,20 +4869,29 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 // Compile a list of body statements into a server sub-function `function NAME(__s,
 // …params, __extra) { return <html>; }`. Returns { fnName, fn }; the caller pushes
 // `fn` into the enclosing inlinedSubs.
-function ssrCompileSub(bodyStmts, ctx, baseName, paramNodes, cssHash, parentNs) {
+function ssrCompileSub(bodyStmts, ctx, baseName, paramNodes, cssHash, parentNs, componentNs) {
 	const fnName = `${baseName}$${ctx.nextHelperId++}`;
 	const synth = { params: paramNodes || [], body: bodyStmts };
-	const fn = ssrCompileBody(synth, ctx, fnName, cssHash, [], parentNs || 'html');
+	const fn = ssrCompileBody(
+		synth,
+		ctx,
+		fnName,
+		cssHash,
+		[],
+		parentNs || 'html',
+		false,
+		componentNs,
+	);
 	return { fnName, fn };
 }
 
-function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @if test (it bypasses the
 	// setup rewrite, so without a stable key it collides with sibling/body use()).
 	const testExpr = printExpr(rewriteHookCalls(node.test, ctx, name));
 	const thenStmts =
 		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
-	const thenSub = ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs);
+	const thenSub = ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs, componentNs);
 	inlinedSubs.push(thenSub.fn + ';');
 	let elseCall = "''";
 	if (node.alternate) {
@@ -4680,7 +4899,7 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		// ssrEmitNode and gets its own marker.
 		const elseStmts =
 			node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
-		const elseSub = ssrCompileSub(elseStmts, ctx, '__selse', [], cssHash, parentNs);
+		const elseSub = ssrCompileSub(elseStmts, ctx, '__selse', [], cssHash, parentNs, componentNs);
 		inlinedSubs.push(elseSub.fn + ';');
 		elseCall = `${elseSub.fnName}(undefined, __s)`;
 	}
@@ -4696,12 +4915,20 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	return `_$ssrBlock(_$ssrControl("${ssrControlKey('if', node)}", () => ((${testExpr}) ? ${thenInner} : ${elseInner})))`;
 }
 
-function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// React's server contract renders visible content and omits hidden content
 	// entirely. Keep the body behind a thunk so a hidden Activity does not execute
 	// child components/hooks or start descendant data work on the server.
 	const modeExpr = node.mode ? printExpr(rewriteHookCalls(node.mode, ctx, name)) : "'visible'";
-	const bodySub = ssrCompileSub(node.children || [], ctx, '__sactivity', [], cssHash, parentNs);
+	const bodySub = ssrCompileSub(
+		node.children || [],
+		ctx,
+		'__sactivity',
+		[],
+		cssHash,
+		parentNs,
+		componentNs,
+	);
 	inlinedSubs.push(bodySub.fn + ';');
 	ctx.runtimeNeeded.add('ssrActivity');
 	ctx.runtimeNeeded.add('ssrControl');
@@ -4709,18 +4936,26 @@ function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	return `_$ssrControl("${ssrControlKey('activity', node)}", () => _$ssrActivity(${modeExpr}, () => _$ssrArm("visible", () => ${bodySub.fnName}(undefined, __s))))`;
 }
 
-function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @for iterable expression.
 	const itemsExpr = printExpr(rewriteHookCalls(node.right, ctx, name));
 	const itemId = node.left.declarations[0].id; // Identifier or destructuring Pattern
 	const params = [itemId];
 	if (node.index) params.push(node.index);
-	const itemSub = ssrCompileSub(node.body.body, ctx, '__sitem', params, cssHash, parentNs);
+	const itemSub = ssrCompileSub(
+		node.body.body,
+		ctx,
+		'__sitem',
+		params,
+		cssHash,
+		parentNs,
+		componentNs,
+	);
 	inlinedSubs.push(itemSub.fn + ';');
 	let emptyCall = "''";
 	if (node.empty) {
 		const emptyStmts = node.empty.type === 'BlockStatement' ? node.empty.body : [node.empty];
-		const emptySub = ssrCompileSub(emptyStmts, ctx, '__sempty', [], cssHash, parentNs);
+		const emptySub = ssrCompileSub(emptyStmts, ctx, '__sempty', [], cssHash, parentNs, componentNs);
 		inlinedSubs.push(emptySub.fn + ';');
 		emptyCall = `_$ssrArm("empty", () => ${emptySub.fnName}(undefined, __s))`;
 	}
@@ -4783,14 +5018,22 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	return `_$ssrControl("${ssrControlKey('for', node)}", () => { const __items = Array.from((${itemsExpr}) ?? []); if (__items.length === 0) return _$ssrForBlock(${emptyCall}, false); let __html = ''; for (let __i = 0; __i < __items.length; __i++) { const __it = __items[__i]; __html += ${renderItem}; } return _$ssrForBlock(__html, true); })`;
 }
 
-function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @switch discriminant.
 	const discExpr = printExpr(rewriteHookCalls(node.discriminant, ctx, name));
 	const arms = [];
 	let defaultCall = "''";
 	let caseIndex = 0;
 	for (const c of node.cases || []) {
-		const sub = ssrCompileSub(c.consequent || [], ctx, '__scase', [], cssHash, parentNs);
+		const sub = ssrCompileSub(
+			c.consequent || [],
+			ctx,
+			'__scase',
+			[],
+			cssHash,
+			parentNs,
+			componentNs,
+		);
 		inlinedSubs.push(sub.fn + ';');
 		// Inner ssrBlock wraps the matched case's content (see ssrEmitIf) so the
 		// client adopts it as the branch range during hydration (no inserted markers).
@@ -4810,15 +5053,23 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	return `_$ssrBlock(_$ssrControl("${ssrControlKey('switch', node)}", () => { const __d = (${discExpr}); return ${selector}; }))`;
 }
 
-function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
-	const trySub = ssrCompileSub(node.block.body, ctx, '__stry', [], cssHash, parentNs);
+function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
+	const trySub = ssrCompileSub(node.block.body, ctx, '__stry', [], cssHash, parentNs, componentNs);
 	inlinedSubs.push(trySub.fn + ';');
 	// Each arm's content is wrapped in an INNER ssrBlock (see ssrEmitIf) so the
 	// client adopts it as the boundary's branch range during hydration without
 	// inserting comment markers (byte-for-byte). The OUTER ssrBlock is the slot.
 	let pendFnName = 'null'; // no @pending → ssrTry renders an empty slot on suspend
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
-		const pendSub = ssrCompileSub(node.pending.body, ctx, '__spend', [], cssHash, parentNs);
+		const pendSub = ssrCompileSub(
+			node.pending.body,
+			ctx,
+			'__spend',
+			[],
+			cssHash,
+			parentNs,
+			componentNs,
+		);
 		inlinedSubs.push(pendSub.fn + ';');
 		pendFnName = pendSub.fnName;
 	}
@@ -4832,6 +5083,7 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			params,
 			cssHash,
 			parentNs,
+			componentNs,
 		);
 		inlinedSubs.push(catchSub.fn + ';');
 		// A no-param @catch simply ignores the error argument ssrTry passes.
@@ -4845,7 +5097,8 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	// inline try/catch emit for buffered renders (hydration compatibility).
 	// `siteKey` is a stable source-position hash so a boundary keeps its identity
 	// across streaming passes (the runtime adds the frame path per instance).
-	return `_$ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName})`;
+	const namespaceArg = componentNs === null ? '' : `, ${JSON.stringify(componentNs)}`;
+	return `_$ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName}${namespaceArg})`;
 }
 
 // Deterministic per-boundary site key for ssrTry — same scheme as headKey:
@@ -4872,7 +5125,7 @@ function ssrControlKey(kind, node) {
 // rewriteJsxValues, exactly like the client's makeChildCall) and route through
 // ssrChild, which renders the resulting host/component descriptors (array → one
 // hydration block per item, host → `<tag>…</tag>`, primitive → text).
-function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash) {
+function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash, componentNs) {
 	const expr = node.expression;
 	if (
 		expr &&
@@ -4888,7 +5141,10 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash) {
 	// rewriteHookCalls first (key any `use(thenable)` in the hole — it bypasses the
 	// setup rewrite), then rewriteJsxValues (lower nested JSX to createElement).
 	const lowered = rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx);
-	return `_$ssrChild(${printExpr(resolveStyleExpr(lowered, cssHash))}, __s)`;
+	const childExpr = `_$ssrChild(${printExpr(resolveStyleExpr(lowered, cssHash))}, __s)`;
+	if (componentNs === null) return childExpr;
+	ctx.runtimeNeeded.add('ssrInNamespace');
+	return `_$ssrInNamespace(${JSON.stringify(componentNs)}, () => ${childExpr})`;
 }
 
 // ===========================================================================
@@ -8887,6 +9143,7 @@ function planJsx(
 		}
 		if (b.kind === 'style') ctx.runtimeNeeded.add('setStyle');
 		if (b.kind === 'formAction') ctx.runtimeNeeded.add('setFormAction');
+		if (b.kind === 'htmlOnlyChild' && b.script) ctx.runtimeNeeded.add('setScriptText');
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
 			// the update helper but still share the compact mount helper call.
@@ -9521,9 +9778,12 @@ function emitBindingMount(b, elVar, bag) {
 		}
 		case 'htmlOnlyChild': {
 			const coerce = b.knownString ? '_v' : 'String(_v)';
+			const setter = b.script
+				? `_$setScriptText(${elVar}, _v)`
+				: `${elVar}.innerHTML = (_v == null ? '' : ${coerce})`;
 			return `    {
       const _v = ${E};
-      ${elVar}.innerHTML = (_v == null ? '' : ${coerce});
+      ${setter};
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
@@ -9715,7 +9975,10 @@ function emitBindingUpdate(b, bag) {
 		}
 		case 'htmlOnlyChild': {
 			const coerce = b.knownString ? '_v' : 'String(_v)';
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { ${F('_el')}.innerHTML = (_v == null ? '' : ${coerce}); ${F('_prev')} = _v; } }`;
+			const setter = b.script
+				? `_$setScriptText(${F('_el')}, _v)`
+				: `${F('_el')}.innerHTML = (_v == null ? '' : ${coerce})`;
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { ${setter}; ${F('_prev')} = _v; } }`;
 		}
 		case 'attr': {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
@@ -10141,6 +10404,7 @@ function emitElementHtml(
 					id: bindings.length,
 					kind: 'htmlOnlyChild',
 					expr: printExpr(dangerHtmlExpr(obj)),
+					script: tag === 'script',
 					path,
 				});
 				continue;
