@@ -8,7 +8,7 @@ The machine-readable [`catalog.json`](catalog.json) is generated from each
 application's `example.json`. It records rendering modes, dialects, bindings,
 framework features, commands, browser journeys, and deterministic fault
 scenarios. See the [product examples roadmap](../docs/examples-roadmap.md) for
-the planned application waves.
+the delivery waves and the distinct regression responsibility of each app.
 
 ## Current applications
 
@@ -21,10 +21,13 @@ the planned application waves.
 | [Gridlab](gridlab) | A virtualized spreadsheet using independent row and column virtualizers, native clipboard events, and composition-safe editing | Strict TypeScript support code, production TSRX build, and virtualization, focus, clipboard, IME, and recovery Playwright journeys |
 | [Hacker News](hacker-news) | The same routed reader in React-style TSX and TSRX, with Suspense, StyleX, deterministic data, SSR, and hydration | Strict TypeScript support code, both production client builds, shared Playwright journeys across both dialects |
 | [Lexical Playground](lexical-playground) | A real rich-text editor using the Octane Lexical binding, including history, formatting, decorator portals, and a slash picker | Strict TypeScript support code, production TSRX build, production-preview Playwright journeys |
+| [Mailroom](mailroom) | An email client using Remix Router fetchers and navigation blockers, durable drafts, and an offline outbox | Strict TypeScript support code, production TSRX build, and deep-link, draft, blocker, outbox, and recovery Playwright journeys |
 | [Pagecraft](pagecraft) | A document workspace using Lexical, contenteditable selection, deep links, and overlapping autosaves | Strict TypeScript support code, production TSRX build, and selection, formatting, navigation, autosave, and recovery Playwright journeys |
+| [Pulseboard](pulseboard) | An analytics console using Visx, TanStack Table, live measurement, and virtualized operational logs | Strict TypeScript support code, production TSRX build, and chart, measurement, table, virtualization, and recovery Playwright journeys |
 | [Relay](relay) | A team workspace using a real SSE boundary, optimistic messages, reconnect replay, anchored history, and portaled threads | Strict TypeScript support code, production TSRX build, deterministic event service, and realtime, identity, keyboard, and recovery Playwright journeys |
 | [Streambox](streambox) | A video platform using native media events, a persistent player node, and TanStack Virtual comments | Strict TypeScript support code, production TSRX build, local seekable media, and playback, identity, virtualization, navigation, and recovery Playwright journeys |
 | [Threadline](threadline) | A social timeline using Zustand, optimistic mutations, keyed prepends, and live composer state | Strict TypeScript support code, production TSRX build, and navigation, identity, rapid-interleaving, and rollback Playwright journeys |
+| [Wayfinder](wayfinder) | A streaming travel planner using parallel `use()`, out-of-order Suspense reveals, request aborts, and CSP-safe hydration | Strict TypeScript support code, production client/server builds, and SSR adoption, streaming, abort, CSP, and recovery Playwright journeys |
 
 ## Repository commands
 

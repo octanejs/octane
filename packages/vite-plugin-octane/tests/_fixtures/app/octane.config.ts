@@ -24,9 +24,19 @@ export default defineConfig({
 		},
 	},
 	middlewares: [
-		(context, next) => {
+		async (context, next) => {
 			context.state.set(OCTANE_NONCE_STATE_KEY, 'fixture-nonce');
-			return next();
+			const response = await next();
+			const headers = new Headers(response.headers);
+			headers.set(
+				'Content-Security-Policy',
+				"default-src 'self'; script-src 'self' 'nonce-fixture-nonce'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws:",
+			);
+			return new Response(response.body, {
+				status: response.status,
+				statusText: response.statusText,
+				headers,
+			});
 		},
 	],
 	rootBoundary: {

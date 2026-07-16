@@ -69,6 +69,11 @@ interface SSRScope {
 
 type ParserNamespace = 'html' | 'svg' | 'mathml';
 
+// Public string descriptors are HTML-ASCII-case-insensitive. Keep foreign
+// namespace inference on the same contract even though the shared table stores
+// SVG's canonical mixed-case spellings (for example foreignObject/clipPath).
+const SVG_ONLY_LOWERCASE_TAGS = new Set(Array.from(SVG_ONLY_TAGS, (tag) => tag.toLowerCase()));
+
 interface SsrElementContext {
 	tag: string;
 	parent: SsrElementContext | null;
@@ -225,30 +230,37 @@ function ssrScope(parent: SSRScope | null): SSRScope {
 	return { parent, $$ctxValues: null };
 }
 
+function parserNamespacesForTag(
+	tag: string,
+	inherited: ParserNamespace,
+): { namespace: ParserNamespace; childrenNamespace: ParserNamespace } {
+	const semanticTag = tag.toLowerCase();
+	const namespace: ParserNamespace =
+		semanticTag === 'svg'
+			? 'svg'
+			: semanticTag === 'math'
+				? 'mathml'
+				: inherited === 'html' && SVG_ONLY_LOWERCASE_TAGS.has(semanticTag)
+					? 'svg'
+					: inherited;
+	const childrenNamespace: ParserNamespace =
+		semanticTag === 'foreignobject'
+			? 'html'
+			: semanticTag === 'svg'
+				? 'svg'
+				: semanticTag === 'math'
+					? 'mathml'
+					: inherited === 'html' && SVG_ONLY_LOWERCASE_TAGS.has(semanticTag)
+						? 'svg'
+						: inherited;
+	return { namespace, childrenNamespace };
+}
+
 function ssrElementNamespaces(
 	tag: string,
 	parent: SsrElementContext | null,
 ): { namespace: ParserNamespace; childrenNamespace: ParserNamespace } {
-	const inherited = parent?.childrenNamespace ?? FRAME?.namespace ?? 'html';
-	const namespace: ParserNamespace =
-		tag === 'svg'
-			? 'svg'
-			: tag === 'math'
-				? 'mathml'
-				: inherited === 'html' && SVG_ONLY_TAGS.has(tag)
-					? 'svg'
-					: inherited;
-	const childrenNamespace: ParserNamespace =
-		tag === 'foreignObject'
-			? 'html'
-			: tag === 'svg'
-				? 'svg'
-				: tag === 'math'
-					? 'mathml'
-					: inherited === 'html' && SVG_ONLY_TAGS.has(tag)
-						? 'svg'
-						: inherited;
-	return { namespace, childrenNamespace };
+	return parserNamespacesForTag(tag, parent?.childrenNamespace ?? FRAME?.namespace ?? 'html');
 }
 
 function reportInvalidHtmlNesting(message: string): void {
@@ -332,6 +344,13 @@ const ELEMENT_TAG = Symbol.for('octane.element');
 const PORTAL_TAG = Symbol.for('octane.portal');
 
 /**
+ * React-compatible Fragment sentinel. Value-position `<Fragment>` sites compile
+ * to ordinary element descriptors in both modes; ssrChild recognizes this type
+ * and flattens its children with the same wrapper/key rules as the client.
+ */
+export const Fragment: unique symbol = Symbol.for('octane.Fragment');
+
+/**
  * React-19 `<Activity>` sentinel. Server-compiled template sites lower directly
  * to `ssrActivity`; this export keeps `import { Activity } from 'octane'`
  * resolvable after the server compiler retargets it to `octane/server`.
@@ -343,7 +362,7 @@ interface ElementDescriptor {
 	// A server ComponentBody (component-value form, e.g. `{<Comp/>}`) OR a host tag
 	// string (`'li'`), produced when host JSX appears at a VALUE position (a
 	// `.map(...)` callback, a render-prop arrow body, an array literal).
-	type: ServerComponent | string;
+	type: ServerComponent | string | typeof Fragment;
 	props: any;
 	// React-style `key`, lifted out of props (consulted by the client's de-opt list
 	// path on hydration; the server only renders it into markup).
@@ -395,13 +414,14 @@ function finalizeElementDescriptor(descriptor: ElementDescriptor): ElementDescri
 // literal) to this call in BOTH modes, so the same lowered call resolves to the
 // client-or-server `createElement` per build, and `ssrChild` renders the result.
 export function createElement(
-	type: ServerComponent | string,
+	type: ServerComponent | string | typeof Fragment,
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
 	let kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : src?.children;
+	if (children.length > 1) POSITIONAL_CHILDREN.add(children);
 	if (children.length > 1 && process.env.NODE_ENV !== 'production') Object.freeze(children);
 	// Lift `key` OUT of props (React semantics — key is never a real prop), and mirror
 	// positional children into `props.children` for the same React element shape as the
@@ -420,17 +440,124 @@ export function createElement(
 	});
 }
 
-// Server half of the client runtime's `positionalChildren` (see runtime.ts): the
-// compiler lowers a VALUE-position fragment to `positionalChildren([...])` in
-// BOTH modes so the same emitted call resolves per build. The tag only informs
-// the client de-opt reconciler's key choice — the server just renders the array
-// (`ssrChild`), so here it's the identity.
+// Multiple createElement children and compiler-lowered shorthand fragments are
+// fixed positional siblings, not reorderable runtime arrays. Track their wrapper
+// kind exactly like the client so nested array/Fragment identity paths remain
+// stable across server retries and hydration.
+const POSITIONAL_CHILDREN = new WeakSet<object>();
+
+// Server half of the client runtime's `positionalChildren` (see runtime.ts).
 export function positionalChildren(children: unknown[]): unknown[] {
+	POSITIONAL_CHILDREN.add(children);
 	return children;
 }
 
 function isElementDescriptor(v: any): v is ElementDescriptor {
 	return v != null && v.$$kind === ELEMENT_TAG;
+}
+
+function isFragmentDescriptor(value: any): value is ElementDescriptor {
+	return isElementDescriptor(value) && value.type === Fragment;
+}
+
+function fragmentDescriptorChildren(value: ElementDescriptor): any[] {
+	const children = value.children;
+	if (children == null) return [];
+	return Array.isArray(children) ? children : [children];
+}
+
+type SsrDeoptWrapperKind = 'array' | 'fragment';
+
+interface PreparedSsrDeoptList {
+	items: any[];
+	keys: any[];
+}
+
+function ssrDeoptWrapperKind(value: any[]): SsrDeoptWrapperKind {
+	return POSITIONAL_CHILDREN.has(value as object) ? 'fragment' : 'array';
+}
+
+function ssrDeoptKey(item: any, index: number): any {
+	return isElementDescriptor(item) && item.key != null ? item.key : index;
+}
+
+function scopedSsrDeoptKey(
+	path: readonly (string | number)[],
+	item: any,
+	index: number,
+	key: any,
+): string {
+	const explicit = isElementDescriptor(item) && item.key != null;
+	return JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]);
+}
+
+// Mirror the client runtime's flattenReactChildContainer exactly: array and
+// Fragment wrappers disappear from the rendered leaf list, while their nesting,
+// kind, and explicit keys remain encoded into each leaf identity. Markup then has
+// one hydration range per leaf inside the owning child-slot range.
+function flattenSsrChildContainer(
+	outItems: any[],
+	outKeys: any[],
+	children: any[],
+	kind: SsrDeoptWrapperKind,
+	path: readonly (string | number)[],
+): void {
+	const count = children.length;
+	for (let i = 0; i < count; i++) {
+		const item = children[i];
+		if (isFragmentDescriptor(item)) {
+			const nested = fragmentDescriptorChildren(item);
+			if (item.key != null) {
+				flattenSsrChildContainer(outItems, outKeys, nested, 'fragment', [
+					...path,
+					'keyed-fragment',
+					item.key,
+				]);
+			} else {
+				const nestedPath =
+					kind === 'fragment'
+						? [...path, 'wrapper', count === 1 ? 0 : i]
+						: count === 1
+							? path
+							: [...path, 'position', i, 'fragment'];
+				flattenSsrChildContainer(outItems, outKeys, nested, 'fragment', nestedPath);
+			}
+			continue;
+		}
+		if (Array.isArray(item)) {
+			const nestedKind = ssrDeoptWrapperKind(item);
+			const nestedPath =
+				nestedKind === kind
+					? [...path, 'wrapper', count === 1 ? 0 : i]
+					: count === 1
+						? path
+						: [...path, 'position', i, nestedKind];
+			flattenSsrChildContainer(outItems, outKeys, item, nestedKind, nestedPath);
+			continue;
+		}
+		outItems.push(item);
+		outKeys.push(scopedSsrDeoptKey(path, item, i, ssrDeoptKey(item, i)));
+	}
+}
+
+function prepareSsrDeoptList(value: any, includeKeyedSingle: boolean): PreparedSsrDeoptList | null {
+	const items: any[] = [];
+	const keys: any[] = [];
+	if (isFragmentDescriptor(value)) {
+		const path = value.key == null ? [] : ['keyed-fragment', value.key];
+		flattenSsrChildContainer(items, keys, fragmentDescriptorChildren(value), 'fragment', path);
+		return { items, keys };
+	}
+	if (Array.isArray(value)) {
+		flattenSsrChildContainer(items, keys, value, ssrDeoptWrapperKind(value), []);
+		return { items, keys };
+	}
+	if (includeKeyedSingle && isElementDescriptor(value) && value.key != null) {
+		items.push(value);
+		keys.push(scopedSsrDeoptKey([], value, 0, value.key));
+		return { items, keys };
+	}
+	return null;
 }
 
 // Server halves of the client runtime's React-compatible element utilities
@@ -797,6 +924,10 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
  * `{x as string}` / literals / `+`-concats to `ssrText`, everything else here.
  */
 export function ssrChild(v: unknown, scope: SSRScope): string {
+	return ssrChildValue(v, scope, true);
+}
+
+function ssrChildValue(v: unknown, scope: SSRScope, includeKeyedSingle: boolean): string {
 	// Every renderable hole serializes to ONE `<!--[-->…<!--]-->` range so the
 	// client's childSlot adopts a uniform marker pair on hydration regardless of
 	// whether the value is a component, an element, a primitive, or empty — and
@@ -812,20 +943,27 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 		typeof v === 'object' &&
 		((v as any).$$kind === CONTEXT_TAG || typeof (v as any).then === 'function')
 	) {
-		return ssrChild(use(v as Context<unknown> | PromiseLike<unknown>), scope);
+		return ssrChildValue(
+			use(v as Context<unknown> | PromiseLike<unknown>),
+			scope,
+			includeKeyedSingle,
+		);
 	}
 	const iterable = iterableChildArray(v);
 	if (iterable !== null) v = iterable;
-	// An ARRAY child (e.g. `{xs.map(x => <li/>)}`) → the client's childSlot routes
-	// it to the de-opt keyed list, whose hydration ADOPTS one `<!--[-->…<!--]-->`
-	// range PER ITEM (see mountItem's hydrating branch). So wrap each item in its
-	// own block, then the whole list in the outer childSlot block. A nested array
-	// (fragment-of-arrays) flattens into more sibling item blocks — matching the
-	// client's recursive de-opt build.
-	if (Array.isArray(v)) {
+	// Arrays, iterables, Fragment descriptors, and keyed single descriptors use the client's
+	// de-opt keyed-list shape: one outer child-slot range plus one range per
+	// flattened leaf. Item rendering disables keyed-single preparation so the
+	// descriptor cannot recursively wrap itself.
+	const preparedList = prepareSsrDeoptList(v, includeKeyedSingle);
+	if (preparedList !== null) {
 		return withAsyncListScope('child', () => {
 			let out = '';
-			for (let i = 0; i < v.length; i++) out += ssrChildItem(v[i], scope, i, '');
+			for (let i = 0; i < preparedList.items.length; i++) {
+				const item = preparedList.items[i];
+				const key = preparedList.keys[i];
+				out += withAsyncIdentity('item', key, () => ssrChildValue(item, scope, false));
+			}
 			return ssrBlock(out);
 		});
 	}
@@ -874,27 +1012,6 @@ export function ssrChildText(v: unknown, scope: SSRScope): string {
 	if (v == null || v === false || v === true) return '';
 	if (typeof v === 'object' || typeof v === 'function') return ssrChild(v, scope);
 	return escapeHtml(v);
-}
-
-// One item of an array child: each is its own `<!--[-->…<!--]-->` block (the unit
-// the client de-opt list adopts on hydration). A nested array flattens into more
-// sibling item blocks (React fragment-of-arrays) — NOT the extra wrapping block
-// ssrChild gives a whole array hole — while every non-array item reuses ssrChild's
-// per-value serialization (host element, component, primitive, or empty).
-function ssrChildItem(v: unknown, scope: SSRScope, index: number, prefix: string): string {
-	if (Array.isArray(v)) {
-		let out = '';
-		const nestedPrefix = prefix + index + ':';
-		for (let i = 0; i < v.length; i++) out += ssrChildItem(v[i], scope, i, nestedPrefix);
-		return out;
-	}
-	const explicit =
-		v !== null && typeof v === 'object' && (v as any).$$kind === ELEMENT_TAG
-			? (v as ElementDescriptor).key
-			: null;
-	const rawKey = explicit != null ? explicit : index;
-	const key = prefix === '' ? rawKey : prefix + String(rawKey);
-	return withAsyncIdentity('item', key, () => ssrChild(v, scope));
 }
 
 // Serialize a HOST element descriptor (`createElement('span', props, ...children)`)
@@ -995,6 +1112,7 @@ function ssrHostElement(
 	} else if (rawInner !== undefined) {
 		inner = rawInner;
 	} else if (hasChildren) {
+		const { childrenNamespace } = parserNamespacesForTag(semanticTag, FRAME?.namespace ?? 'html');
 		// A de-opt host whose children contain COMPONENTS renders those children on the
 		// client through `hostElementBody` → `childSlot` (a Block path that ADOPTS markers
 		// on hydration), so they must carry the full childSlot/block marker structure —
@@ -1002,9 +1120,11 @@ function ssrHostElement(
 		// children are rebuilt by the client de-opt reconciler, so they stay as plain
 		// marker-less markup via `ssrDescriptorContent`.
 		const build = () =>
-			iterableChildren || serverDescNeedsBlocks(children)
-				? ssrDeoptBlockChildren(children, scope)
-				: ssrDescriptorContent(children, scope);
+			ssrInNamespace(childrenNamespace, () =>
+				iterableChildren || serverDescNeedsBlocks(children)
+					? ssrDeoptBlockChildren(children, scope)
+					: ssrDescriptorContent(children, scope),
+			);
 		// A controlled <select> projects `selected` onto the options serialized
 		// inside its children (compiled options included — the scope is global).
 		inner =
@@ -1025,31 +1145,29 @@ function ssrHostElement(
 // Serialize a de-opt host's component-bearing children the way the client's
 // `hostElementBody` → `childSlot` adopts them. A SINGLE child is one childSlot block
 // (`ssrChild`). An ARRAY routes through the de-opt keyed list (`childSlot` → `forSlot`
-// → `deoptItemBody`): an OUTER childSlot block wraps one ITEM block per element, and
-// each item block in turn wraps the element's own content block — so a component item
-// is `<!--[-->`(item)`<!--[-->`…`<!--]-->`(component)`<!--]-->`. Without the extra item
-// wrapper the client mints fresh markers (hydration mismatch).
+// → `deoptItemBody`): an OUTER childSlot block contains one range per flattened leaf.
+// Pure host/text leaves receive an explicit item range. A component-bearing leaf's
+// own childSlot range is coextensive with — and borrowed as — its list item range;
+// adding another wrapper would leave stale server content beside the hydrated item.
 function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
 	const iterable = iterableChildArray(children);
 	if (iterable !== null) children = iterable;
-	if (Array.isArray(children)) {
+	const preparedList = prepareSsrDeoptList(children, true);
+	if (preparedList !== null) {
 		return withAsyncListScope('host-child', () => {
 			let out = '';
-			for (let i = 0; i < children.length; i++) {
-				const item = children[i];
-				const explicit =
-					item !== null && typeof item === 'object' && (item as any).$$kind === ELEMENT_TAG
-						? (item as ElementDescriptor).key
-						: null;
-				out += withAsyncIdentity('item', explicit != null ? explicit : i, () => {
+			for (let i = 0; i < preparedList.items.length; i++) {
+				const item = preparedList.items[i];
+				const key = preparedList.keys[i];
+				out += withAsyncIdentity('item', key, () => {
 					// The de-opt list's own item range is sufficient for pure host/text
 					// values: deoptItemBody adopts/reconciles the node directly inside it.
-					// Component-bearing values need their additional nested childSlot
-					// range so their component blocks remain independently owned.
-					const body = serverDescNeedsBlocks(item)
-						? ssrChild(item, scope)
-						: ssrDescriptorContent(item, scope);
-					return ssrBlock(body);
+					// A component-bearing value already contributes the coextensive range
+					// borrowed by its nested childSlot; wrapping it again would make hydration
+					// mount a duplicate beside the server content.
+					return serverDescNeedsBlocks(item)
+						? ssrChildValue(item, scope, false)
+						: ssrBlock(ssrDescriptorContent(item, scope));
 				});
 			}
 			return ssrBlock(out);
@@ -1077,6 +1195,9 @@ function serverDescNeedsBlocks(v: unknown): boolean {
 	if (!isElementDescriptor(v) && childrenIterator(v) !== null) return true;
 	const d = v as ElementDescriptor;
 	if (d.$$kind === ELEMENT_TAG) {
+		// A Fragment below a host descriptor is reconciled by childSlot's
+		// fragment-aware list path, including when all of its leaves are pure hosts.
+		if (d.type === Fragment) return true;
 		return typeof d.type === 'function' || serverDescNeedsBlocks(d.children);
 	}
 	return false;
@@ -2050,14 +2171,10 @@ export function ssrComponent(
 		// a render FUNCTION from a template one.
 		if (typeof comp === 'string') {
 			const inheritedNamespace = explicitNamespace ?? FRAME?.namespace ?? 'html';
-			const childNamespace =
-				comp === 'foreignObject'
-					? 'html'
-					: comp === 'svg' || (inheritedNamespace === 'html' && SVG_ONLY_TAGS.has(comp))
-						? 'svg'
-						: comp === 'math'
-							? 'mathml'
-							: inheritedNamespace;
+			const childNamespace = parserNamespacesForTag(
+				comp.toLowerCase(),
+				inheritedNamespace,
+			).childrenNamespace;
 			return ssrInNamespace(childNamespace, () => {
 				const kids = props?.children;
 				if (typeof kids === 'function') {
@@ -3493,6 +3610,48 @@ export function ssrHeadEl(
 		s += '>' + (text == null ? '' : escapeHtml(text)) + '</' + tag + '>';
 	}
 	HEAD.html += s;
+}
+
+interface NamespaceHeadProps {
+	headKey: string;
+	tag: string;
+	attrs: Record<string, unknown> | null;
+	text: unknown;
+}
+
+// Server twin of runtime.ts's namespaceHead compiler ABI. An opaque component
+// boundary inherits its parser namespace through FRAME. HTML children contribute
+// to the render's head buffer; SVG/MathML children serialize as an ordinary host
+// descriptor in the component's body range.
+/** @internal Compiler-generated. */
+export function namespaceHead(props: NamespaceHeadProps): ElementDescriptor | null {
+	if ((FRAME?.namespace ?? 'html') !== 'html') {
+		return createElement(props.tag, props.attrs, props.text);
+	}
+	let headAttrs: Record<string, unknown> | null = null;
+	if (props.attrs !== null) {
+		headAttrs = {};
+		for (const key in props.attrs) {
+			if (key === 'key' || key === 'ref' || key === 'class' || key === 'className') continue;
+			headAttrs[key] = props.attrs[key];
+		}
+	}
+	ssrHeadEl(props.headKey, props.tag, headAttrs, props.text);
+	return null;
+}
+
+/** @internal Compiler-generated descriptor factory for namespaceHead. */
+export function namespaceHeadElement(
+	headKey: string,
+	tag: string,
+	attrs: Record<string, unknown> | null,
+	text: unknown,
+	authoredKey?: unknown,
+): ElementDescriptor {
+	const key = authoredKey !== undefined ? authoredKey : (attrs as any)?.key;
+	const config: any = { headKey, tag, attrs, text };
+	if (key !== undefined) config.key = key;
+	return createElement(namespaceHead as unknown as ServerComponent, config);
 }
 
 // ---------------------------------------------------------------------------

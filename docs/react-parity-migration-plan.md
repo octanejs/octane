@@ -611,13 +611,14 @@ while an Action is in flight.
 - **Global commit coordination — DONE for #1 + #4 (`conformance/entangled-commit.test.ts`,
   flipped `transitions.test.ts` entangled test):** a single `startTransition` that fans
   out to multiple suspending boundaries now holds every affected boundary's prior content
-  until all are data-ready, then reveals them together. Implemented as
-  a data-ready barrier in runtime.ts: `HELD_TRANSITIONS` tracks boundaries holding prior
-  content; each stages its reveal as its data resolves; when `STAGED_REVEALS.size ===
-  HELD_TRANSITIONS.size` the batch flushes in one commit. `commitResume` was extracted
-  from `attachResume`'s retry; abandon paths (urgent supersede / error / unmount) drop a
-  boundary from the group so the rest aren't stranded. The cross-boundary reveal gap is
-  closed; same-identity parent/sibling rollback remains outside this coordinator (#4).
+  until all are staged, then reveals them together. For fallback-visible boundaries,
+  settling a thenable first retries the detached primary under capture; only a fully
+  completed body enters `STAGED_REVEALS`, so true dependent-use chains cannot satisfy the
+  barrier early. Their DOM, refs, and layout effects commit as one tree-ordered batch.
+  Abandon/supersession paths remove stale readiness. Pre-timeout visible holds still use
+  the documented per-swap model: a resume may discover another suspension while rendering
+  the live tree, so global same-identity parent/sibling rollback remains outside this
+  coordinator (#4).
 - **#5 reveal throttling — investigated and DISMISSED (octane matches default React).**
   The provisional divergence used the wrong oracle (the `-test.internal.js` suite). The
   public default-flags test `ReactUse-test.js:1096` reveals `A(Loading B...)` immediately

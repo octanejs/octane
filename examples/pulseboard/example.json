@@ -1,0 +1,80 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "pulseboard",
+  "title": "Pulseboard",
+  "summary": "A production-built analytics console proving responsive Visx SVG measurement, accessible TanStack Table state, measured TanStack Virtual logs, keyboard navigation, and deterministic recovery.",
+  "status": "active",
+  "renderModes": ["client"],
+  "dialects": ["tsrx"],
+  "bindings": ["@octanejs/tanstack-table", "@octanejs/tanstack-virtual", "@octanejs/visx"],
+  "octaneFeatures": [
+    "async-recovery",
+    "keyed-reconciliation",
+    "layout-effects",
+    "native-events",
+    "refs-as-props",
+    "responsive-measurement",
+    "tsrx-control-flow"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "deep-link-svg-measurement",
+      "title": "Load a report deep link and preserve responsive, measured SVG geometry across navigation",
+      "kind": "golden",
+      "spec": "e2e/pulseboard.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "keyboard-chart-range-convergence",
+      "title": "Navigate the compact console and SVG points by keyboard while overlapping range requests converge",
+      "kind": "golden",
+      "spec": "e2e/pulseboard.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "accessible-campaign-table",
+      "title": "Sort, filter, select, empty, and restore an accessible TanStack campaign report",
+      "kind": "golden",
+      "spec": "e2e/pulseboard.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "measured-virtual-activity",
+      "title": "Window hundreds of measured activity rows and reveal a deterministic off-screen incident",
+      "kind": "golden",
+      "spec": "e2e/pulseboard.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "failure-empty-recovery",
+      "title": "Retry load and refresh failures without hiding retained data, then restore an empty segment",
+      "kind": "resilience",
+      "spec": "e2e/pulseboard.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "load-failure",
+      "description": "The first deterministic dashboard load fails before report state is applied and succeeds on explicit retry."
+    },
+    {
+      "id": "refresh-failure",
+      "description": "The first snapshot refresh fails while the previous analytics remain usable, then succeeds on explicit retry."
+    },
+    {
+      "id": "empty",
+      "description": "The empty scenario renders a no-traffic segment that can restore the full deterministic sample."
+    },
+    {
+      "id": "overlapping-ranges",
+      "description": "Rapid 7-day and 30-day requests complete with different deterministic delays while only the latest choice is applied."
+    }
+  ]
+}

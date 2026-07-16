@@ -1,0 +1,26 @@
+{
+  "name": "wayfinder-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A deterministic streaming travel planner proving Octane parallel use, out-of-order Suspense, abort isolation, CSP, and hydration.",
+  "scripts": {
+    "dev": "vite --host --port 5231 --strictPort",
+    "build": "vite build",
+    "preview": "octane-preview --port 5231 --strictPort",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "playwright test --config e2e/playwright.config.ts",
+    "e2e": "pnpm test:e2e"
+  },
+  "dependencies": {
+    "@octanejs/vite-plugin": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

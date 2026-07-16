@@ -9,7 +9,7 @@ Last reviewed against React 19 contracts.
 
 ---
 
-## 1. Entangled-transition partial-commit — ✅ CLOSED
+## 1. Entangled-transition partial-commit — ✅ CLOSED for fully staged reveals
 
 **Where it shows up:** [transitions.test.ts](__tests__/transitions.test.ts) —
 `'entangles sibling boundaries: holds ALL prior content until every sibling resolves,
@@ -20,14 +20,15 @@ Suspense boundaries to suspend, React holds the prior DOM of EVERY sibling until
 their promises resolve, then reveals them together — never a half-updated screen
 mid-transition.
 
-**octane now matches** via global commit coordination (`HELD_TRANSITIONS` /
+**octane matches for fully staged reveals** via commit coordination (`HELD_TRANSITIONS` /
 `STAGED_REVEALS` in runtime.ts): a boundary holding prior content for an in-flight
-transition does NOT reveal when its own promise resolves — it stages and waits until
-EVERY held boundary in the transition is data-ready (`STAGED_REVEALS.size ===
-HELD_TRANSITIONS.size`), then `flushStagedReveals` commits them all in one batch. The
-hold (and thus `isPending`) stays up until that batch. Abandoning a held boundary
-(urgent supersede / error / unmount) drops it from the group so the rest aren't
-stranded. This also closes #4's observable cross-boundary-reveal gap.
+transition does not reveal as soon as one input resolves. Once fallback is visible,
+Octane retries the detached primary under capture and stages it only after the entire
+body completes; exact set membership then flushes every staged member's DOM, refs, and
+layout effects in one tree-ordered batch. Superseding inputs invalidate stale readiness,
+and abandon paths remove the boundary so siblings are not stranded. A pre-timeout live
+retry can still discover a later dependent suspension while committing; that is the
+global-WIP limitation retained in #4, not covered by this closed fallback-visible case.
 
 ---
 
@@ -86,17 +87,20 @@ together.
 commits atomically on completion, or — on suspend — is discarded with the suspend
 re-thrown so the enclosing `@try` holds the OLD subtree live and resumes on settle.
 The IMPLEMENTATION is still per-swap off-screen (not one global double-buffered tree),
-but the OBSERVABLE cross-boundary gap is now closed: a transition that fans out to
-several suspending regions no longer reveals them piecewise — the global commit
-coordinator (Divergence #1) holds every region's prior content and reveals them
-together once all are data-ready (`entangled-commit.test.ts` exercises two off-screen
-if-block swaps in one transition revealing together, effects firing in one batch).
+but the OBSERVABLE cross-boundary gap is closed for fully staged regions: after fallbacks
+are visible, the coordinator (Divergence #1) retries detached primaries to completion and
+reveals their DOM plus ref/layout lifecycle in one batch. Independent per-swap WIPs also
+retain their old content until ready (`entangled-commit.test.ts`).
 
 **Remaining limitation:** this is still not a global WIP. During an ordinary synchronous
 transition, a same-identity parent can patch bindings outside a suspending `@try` before a
 descendant throws. octane then holds the old boundary content beside already-updated
 parent/sibling UI; React retains the whole prior screen. The async Action batching in #6
 prevents that tear while an Action is in flight, but does not close the synchronous case.
+Likewise, a pre-timeout live boundary retry can resolve one use() and then suspend on a
+later true dependency after an earlier staged sibling has started committing; preventing
+that requires the same absent global WIP. Fallback-visible retries are capture-safe and do
+not have this limitation.
 Time-based cross-boundary fallback throttling is the separate Divergence #5.
 
 ---
@@ -196,10 +200,10 @@ React on, including:
 - Sibling boundaries on a shared promise commit in the same frame.
 - Unmounting a suspended boundary mid-pending cancels the retry cleanly (no late
   commits).
-- Entangled-boundary reveal: one `startTransition` that fans out to multiple suspending
-  boundaries holds each boundary's prior content until all are data-ready, then reveals
-  them together (global commit coordinator; Divergence #1/#4). This does not imply global
-  parent/sibling rollback; see #4's remaining synchronous limitation.
+- Entangled fallback-visible reveal: one `startTransition` that fans out to multiple
+  suspending boundaries holds each fallback until every detached primary fully stages,
+  then reveals their DOM/ref/layout lifecycle together (coordinator; Divergence #1/#4).
+  Pre-timeout live retries and global parent/sibling rollback retain #4's limitation.
 - Async Action entanglement: ordinary state/reducer updates stay staged until the Action
   settles, post-`await` explicit transitions join the batch, and urgent discrete updates
   still commit immediately (`transitions.test.ts`; Divergence #6).

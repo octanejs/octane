@@ -639,7 +639,7 @@ export default interface ErasedShape { value: string }
 				rawOctane.source,
 			);
 			expect(compiled?.kind).toBe('compile');
-			expect(compiled?.code).toContain('_$template("<p>octane</p>")');
+			expect(compiled?.code).toContain('<p>octane</p>');
 			expect(compiled?.dependencies).toContain(rawOctane.manifest);
 		} finally {
 			rmSync(fixtureRoot, { recursive: true, force: true });

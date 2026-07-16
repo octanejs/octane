@@ -8,7 +8,7 @@ quickly.
 The repository now has substantially stronger mechanical guardrails than the
 original audit snapshot:
 
-- the generated inventory contains 22 publishable packages, including 18
+- the generated inventory contains 33 publishable packages, including 26
   framework bindings;
 - the core executable React-parity backlog is **0 pins**;
 - the binding executable backlog is **0 pins**;
@@ -138,8 +138,9 @@ all public routes in development and production, fails on page/hydration
 errors, exercises client navigation, and interacts with the sandboxed
 playground. A separate example-app CI job builds the release-gated Hacker News,
 Lexical Playground, Cinebase, Threadline, Flowboard, Streambox, Relay, Cartlane,
-Pagecraft, Gridlab, and Draftboard applications and runs their Playwright
-journeys; its result is aggregated by the protected `typecheck` context.
+Pagecraft, Gridlab, Draftboard, Mailroom, Pulseboard, and Wayfinder applications
+and runs their Playwright journeys; its result is aggregated by the protected
+`typecheck` context.
 Keeping it outside the sharded `pnpm test` command avoids repeating each browser
 suite per shard.
 

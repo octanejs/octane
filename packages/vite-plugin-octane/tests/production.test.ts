@@ -12,9 +12,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { EventEmitter } from 'node:events';
+import { EventEmitter, once } from 'node:events';
+import type { Server } from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, createServer, type ViteDevServer } from 'vite';
+import { createNodeServer } from '../../app-core/src/server/node-http.js';
 
 const fixtureRoot = fileURLToPath(new URL('./_fixtures/app', import.meta.url));
 const packageRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -50,6 +52,8 @@ function dataScriptOf(html: string): string {
 
 let devServer: ViteDevServer | null = null;
 let devOrigin = '';
+let productionServer: Server | null = null;
+let productionOrigin = '';
 
 beforeAll(async () => {
 	linkPackage('octane', path.join(repoRoot, 'packages/octane'));
@@ -71,9 +75,25 @@ beforeAll(async () => {
 	const address = devServer.httpServer?.address();
 	if (!address || typeof address !== 'object') throw new Error('dev server has no address');
 	devOrigin = `http://localhost:${address.port}`;
+
+	const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
+	productionServer = createNodeServer(handler, {
+		staticDir: path.join(distDir, 'client'),
+	}).listen(0);
+	await once(productionServer, 'listening');
+	const productionAddress = productionServer.address();
+	if (!productionAddress || typeof productionAddress !== 'object') {
+		throw new Error('production server has no address');
+	}
+	productionOrigin = `http://localhost:${productionAddress.port}`;
 }, 180_000);
 
 afterAll(async () => {
+	if (productionServer !== null) {
+		await new Promise<void>((resolve, reject) => {
+			productionServer!.close((error) => (error ? reject(error) : resolve()));
+		});
+	}
 	await devServer?.close();
 	fs.rmSync(distDir, { recursive: true, force: true });
 	fs.rmSync(path.join(fixtureRoot, 'node_modules'), { recursive: true, force: true });
@@ -165,7 +185,7 @@ describe('production SSR build', () => {
 		}
 	});
 
-	it('adopts the Canvas shell and mounts one generic client region in Chromium', async () => {
+	it('hydrates under strict CSP despite a hostile document base', async () => {
 		let browser: import('playwright').Browser | undefined;
 		try {
 			const { chromium } = await import('playwright');
@@ -178,62 +198,108 @@ describe('production SSR build', () => {
 			);
 		}
 
-		const page = await browser.newPage();
-		const errors: string[] = [];
-		page.on('console', (message) => {
-			if (message.type() === 'error') errors.push(message.text());
-		});
-		page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
 		try {
-			await page.goto(devOrigin + '/', { waitUntil: 'load' });
-			await page.locator('[data-object-region="ready"]').waitFor();
-			await page.evaluate(
-				() =>
-					new Promise<void>((resolve) =>
-						requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-					),
-			);
-			const proof = await page.evaluate(() => {
-				const fixture = globalThis as typeof globalThis & {
-					__fixtureAuthoredSceneSetup?: number;
-					__fixtureObjectContainer?: {
-						children: Array<{ type: string; children: Array<{ type: string }> }>;
-						commits: unknown[];
+			for (const target of [
+				{ name: 'development', origin: devOrigin },
+				{ name: 'production', origin: productionOrigin },
+			]) {
+				const page = await browser.newPage();
+				const errors: string[] = [];
+				await page.addInitScript(() => {
+					const fixture = globalThis as typeof globalThis & {
+						__fixtureCspViolations?: string[];
 					};
-					__fixtureObjectRegionCount?: number;
-					__fixtureObjectRootCount?: number;
-					__fixtureSsrCanvasShell?: Element | null;
-				};
-				const shell = document.querySelector('[data-object-canvas-shell]');
-				return {
-					adoptedServerShell: fixture.__fixtureSsrCanvasShell === shell,
-					authoredSceneSetup: fixture.__fixtureAuthoredSceneSetup,
-					commits: fixture.__fixtureObjectContainer?.commits.length,
-					regionCount: fixture.__fixtureObjectRegionCount,
-					rootCount: fixture.__fixtureObjectRootCount,
-					scene: fixture.__fixtureObjectContainer?.children.map((child) => ({
-						type: child.type,
-						children: child.children.map((nested) => nested.type),
-					})),
-					shellCount: document.querySelectorAll('[data-object-canvas-shell]').length,
-				};
-			});
+					fixture.__fixtureCspViolations = [];
+					document.addEventListener('securitypolicyviolation', (event) => {
+						fixture.__fixtureCspViolations?.push(event.violatedDirective + ': ' + event.blockedURI);
+					});
+				});
+				page.on('console', (message) => {
+					if (message.type() === 'error') errors.push(message.text());
+				});
+				page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+				try {
+					await page.goto(target.origin + '/', { waitUntil: 'load' });
+					expect(await page.evaluate(() => document.baseURI)).toBe(
+						'https://hostile-base.invalid/nested/',
+					);
+					try {
+						await page.locator('[data-object-region="ready"]').waitFor({ timeout: 30_000 });
+					} catch (error) {
+						const browserState = await page.evaluate(() => {
+							const fixture = globalThis as typeof globalThis & {
+								__fixtureCspViolations?: string[];
+							};
+							return {
+								baseURI: document.baseURI,
+								cspViolations: fixture.__fixtureCspViolations,
+								resources: performance.getEntriesByType('resource').map((entry) => entry.name),
+							};
+						});
+						throw new Error(
+							`Strict-CSP ${target.name} fixture did not hydrate. State: ${JSON.stringify(browserState)}. Browser errors: ${JSON.stringify(errors)}.`,
+							{ cause: error },
+						);
+					}
+					await page.evaluate(
+						() =>
+							new Promise<void>((resolve) =>
+								requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+							),
+					);
+					const proof = await page.evaluate(() => {
+						const fixture = globalThis as typeof globalThis & {
+							__fixtureAuthoredSceneSetup?: number;
+							__fixtureObjectContainer?: {
+								children: Array<{ type: string; children: Array<{ type: string }> }>;
+								commits: unknown[];
+							};
+							__fixtureObjectRegionCount?: number;
+							__fixtureObjectRootCount?: number;
+							__fixtureSsrCanvasShell?: Element | null;
+							__fixtureCspViolations?: string[];
+						};
+						const shell = document.querySelector('[data-object-canvas-shell]');
+						return {
+							adoptedServerShell: fixture.__fixtureSsrCanvasShell === shell,
+							authoredSceneSetup: fixture.__fixtureAuthoredSceneSetup,
+							commits: fixture.__fixtureObjectContainer?.commits.length,
+							regionCount: fixture.__fixtureObjectRegionCount,
+							rootCount: fixture.__fixtureObjectRootCount,
+							cspViolations: fixture.__fixtureCspViolations,
+							scene: fixture.__fixtureObjectContainer?.children.map((child) => ({
+								type: child.type,
+								children: child.children.map((nested) => nested.type),
+							})),
+							shellCount: document.querySelectorAll('[data-object-canvas-shell]').length,
+						};
+					});
 
-			expect(proof).toEqual({
-				adoptedServerShell: true,
-				authoredSceneSetup: 1,
-				commits: 1,
-				regionCount: 1,
-				rootCount: 1,
-				scene: [{ type: 'scene', children: ['mesh'] }],
-				shellCount: 1,
-			});
-			expect(errors).toEqual([]);
+					expect(proof).toEqual({
+						adoptedServerShell: true,
+						authoredSceneSetup: 1,
+						commits: 1,
+						cspViolations: [],
+						regionCount: 1,
+						rootCount: 1,
+						scene: [{ type: 'scene', children: ['mesh'] }],
+						shellCount: 1,
+					});
+					await page.getByRole('button', { name: 'Increment fixture' }).click();
+					await expect.poll(() => page.locator('.count').textContent()).toBe('Count: 2');
+					await page.getByRole('button', { name: 'Check hydration module identity' }).click();
+					await expect
+						.poll(() => page.locator('[data-hydration-module-identity]').textContent())
+						.toBe('page shared; pre-hydrate shared');
+					expect(errors, `${target.name} browser errors`).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			}
 		} finally {
-			await page.close();
 			await browser.close();
 		}
-	}, 60_000);
+	}, 120_000);
 
 	it('returns 404 for unmatched routes (no catch-all in the fixture)', async () => {
 		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
@@ -282,11 +348,17 @@ describe('production SSR build', () => {
 		}
 	});
 
-	it('applies the middleware CSP nonce in dev and production', async () => {
+	it('applies the middleware nonce and strict CSP in dev and production', async () => {
 		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
-		const prodHtml = await (await handler(new Request('http://localhost/'))).text();
-		const devHtml = await (await fetch(devOrigin + '/')).text();
-		for (const html of [prodHtml, devHtml]) {
+		const responses = [
+			await handler(new Request('http://localhost/')),
+			await fetch(devOrigin + '/'),
+		];
+		for (const response of responses) {
+			expect(response.headers.get('content-security-policy')).toContain(
+				"script-src 'self' 'nonce-fixture-nonce'",
+			);
+			const html = await response.text();
 			expect(html).toMatch(/<script[^>]*id="__octane_data"[^>]*nonce="fixture-nonce"/);
 			expect(html).toMatch(
 				/<script(?=[^>]*data-octane-hydrate)(?=[^>]*nonce="fixture-nonce")[^>]*>/,

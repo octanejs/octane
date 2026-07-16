@@ -536,11 +536,12 @@ Independent, individually-measurable items, roughly by value:
 - **3n. Narrow expression and DOM helper proofs — LANDED 2026-07-15.** A
   conditional expression is now a known string only when both arms are known
   strings, allowing the string-hole path without widening the existing type
-  proof. Dynamic, statically named lowercase HTML `data-*` attributes with a
+  proof. Dynamic, statically named lowercase `data-*` attributes with a
   proven-string expression use `setStringData`, which omits generic property,
   alias, namespace, and name-validity routing while retaining hydration,
   removal, coercion, and development-warning semantics for an inaccurate type
-  assertion.
+  assertion. The unnamespaced write is valid for HTML, SVG, and MathML hosts,
+  including component templates whose destination namespace is chosen at runtime.
 
   Two controlled-form cases receive similarly strict helpers. An
   `<input>`/`<textarea>` with exactly one `defaultValue`, no `value`, and no

@@ -22328,7 +22328,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/streaming-ssr.test.ts",
-          "testName": "hydrates a streamed catch arm from a rejection seed without replacing its DOM",
+          "testName": "hydrates a streamed catch arm in place and consumes the superseded client rejection",
           "modes": ["server-stream", "hydrate-match", "production-compile"]
         }
       ]

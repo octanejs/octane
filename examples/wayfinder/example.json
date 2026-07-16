@@ -1,0 +1,89 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "wayfinder",
+  "title": "Wayfinder",
+  "summary": "A streaming travel planner proving Octane parallel use, out-of-order Suspense reveals, abort isolation, strict CSP, and hydration adoption.",
+  "status": "active",
+  "renderModes": ["client", "streaming-ssr", "hydration"],
+  "dialects": ["tsrx"],
+  "bindings": [],
+  "octaneFeatures": [
+    "abort-controller",
+    "csp-nonce",
+    "hydration",
+    "native-events",
+    "parallel-use",
+    "streaming-ssr",
+    "suspense",
+    "tsrx-control-flow"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "parallel-plan-out-of-order-stream",
+      "title": "Stream a real trip shell, reveal later weather before earlier fares, and complete a mutually gated parallel plan",
+      "kind": "ssr-hydration",
+      "spec": "e2e/wayfinder.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "csp-hydration-adoption",
+      "title": "Adopt a nonce-protected server trip and preserve a note typed before delayed hydration",
+      "kind": "ssr-hydration",
+      "spec": "e2e/wayfinder.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "keyboard-save-deep-link",
+      "title": "Plan and save a city by keyboard, change its month, and restore it from the deep-linked shelf",
+      "kind": "golden",
+      "spec": "e2e/wayfinder.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "abort-and-stale-isolation",
+      "title": "Abort a slow destination search and keep a rapid trip switch on the latest route after stale work settles",
+      "kind": "resilience",
+      "spec": "e2e/wayfinder.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "empty-failure-retry-mobile",
+      "title": "Recover search and forecast failures, clear an empty result, and use the planner at mobile width",
+      "kind": "resilience",
+      "spec": "e2e/wayfinder.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "delayed-hydration",
+      "description": "The hydrateDelay query leaves real server trip content editable before hydration so DOM adoption and note preservation remain observable."
+    },
+    {
+      "id": "out-of-order-regions",
+      "description": "The later weather boundary resolves before the earlier fare boundary, producing a deterministic out-of-order stream without a live service."
+    },
+    {
+      "id": "mutually-gated-planning",
+      "description": "Route and stay resources cannot complete unless both independent use creations start, turning parallel discovery into a functional result rather than a timing assertion."
+    },
+    {
+      "id": "superseded-search",
+      "description": "The lo search is deliberately slower than ky; a native AbortController cancels it and late work cannot replace the current result."
+    },
+    {
+      "id": "search-outage",
+      "description": "The outage query fails once and returns a deterministic city after an explicit retry."
+    },
+    {
+      "id": "weather-outage",
+      "description": "The weather-failure scenario streams an error arm once and succeeds through the public retry action."
+    }
+  ]
+}

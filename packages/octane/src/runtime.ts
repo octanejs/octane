@@ -581,6 +581,8 @@ interface EffectSlot {
 	phase: Phase;
 }
 
+type EffectDepsSnapshot = Map<EffectSlot, any[] | undefined>;
+
 interface PendingEffect {
 	scope: Scope;
 	slot: HookSlot;
@@ -867,23 +869,25 @@ const TRANSITION_LISTENERS = new Set<() => void>();
 let TRANSITION_LISTENER_PUBLISH_DEPTH = 0;
 
 // ── Global commit coordination (entangled transitions) ──────────────────────
-// React commits a transition's whole tree atomically: when one startTransition
-// fans out to several Suspense boundaries that all suspend, the prior content of
-// EVERY boundary stays on screen until ALL their data is ready, then they reveal
-// together — the user never sees a half-updated screen mid-transition. octane
-// commits per-boundary, so without coordination boundary A would reveal the moment
-// its own promise resolves while sibling B is still pending.
+// React commits a transition's whole tree atomically. Octane's documented model
+// is narrower: it coordinates per-boundary reveals, while ordinary pre-timeout
+// same-identity renders retain the global-WIP divergence documented in
+// SUSPENSE_DIVERGENCE.md #4. In particular, fallback-hidden boundaries can prove
+// their whole primary ready under a captured retry and reveal their DOM + public
+// ref/layout lifecycle together; without coordination A would reveal while B's
+// fallback remained visible.
 //
 // `HELD_TRANSITIONS` is the set of boundaries currently holding prior content for an
 // in-flight transition (transitionHeld === true). `STAGED_REVEALS` is the subset
-// whose data has resolved but whose reveal is DEFERRED waiting for the rest. When
-// `STAGED_REVEALS.size === HELD_TRANSITIONS.size` every held boundary is data-ready,
-// so we flush them all in one batch (`flushStagedReveals`). Abandoning a held
+// whose current retry is staged waiting for the rest. A fallback-hidden retry joins
+// only after its entire body completes (not merely its first thenable). When exact
+// membership matches, `flushStagedReveals` commits the group. Abandoning a held
 // boundary (urgent supersede / error / unmount) removes it and re-checks, so the
 // remaining group isn't stranded waiting on a boundary that will never resolve.
 const HELD_TRANSITIONS = new Set<TrySlot>();
 const STAGED_REVEALS = new Set<TrySlot>();
 let flushingStagedReveals = false;
+let deferringStagedRevealEffects = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // View Transitions (docs/view-transitions-plan.md, Phase 1).
@@ -1439,6 +1443,13 @@ interface RefAttach {
 	seq: number;
 	block: Block | null;
 }
+
+interface SuspenseRefEntry {
+	ref: any;
+	el: Element | FragmentInstance;
+	/** Owning scope preserves child-before-parent commit ordering and error routing. */
+	scope: Scope;
+}
 const refAttachQueue: RefAttach[] = [];
 
 // Off-screen (WIP) effect capture. While a transition swaps in a NEW subtree that
@@ -1462,6 +1473,16 @@ interface OffscreenCapture {
 	stores: StoreInst<any>[];
 }
 let WIP_CAPTURE: OffscreenCapture | null = null;
+
+function createOffscreenCapture(): OffscreenCapture {
+	return {
+		effects: [[], [], []],
+		events: [],
+		eventActions: [],
+		refs: [],
+		stores: [],
+	};
+}
 
 // Active append targets for Effect Event render output. renderBlockInner takes
 // length checkpoints and truncates on throw, so a later sibling suspension rolls
@@ -1757,7 +1778,7 @@ function drainQueue(): { err: any } | null {
 			// before the suspending promise resolved), the boundary reveals now.
 			const hiddenTry = findSuspenseHiddenTry(block);
 			if (hiddenTry !== null) {
-				attemptHiddenReveal(hiddenTry);
+				attemptHiddenReveal(hiddenTry, block.pendingMode ?? 'urgent');
 				continue;
 			}
 			// Guarded render-phase updates (derived state) converge in a couple of
@@ -3708,6 +3729,10 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				// its parent's unmount, and a second pass through unmountBlock
 				// would re-walk the same scopes / double-fire cleanups.
 				if (k === 'trySlotSlot') {
+					discardOffscreenCapture(val.stagedCapture);
+					val.stagedCapture = null;
+					val.stagedEffectDeps = null;
+					val.detachedRefs = null;
 					if (val.tryBlock && val.tryBlock !== val.block) {
 						val.tryBlock.disposed = true;
 						val.pendingThenable = null;
@@ -4995,6 +5020,20 @@ function isHydrationRejection(error: unknown): error is HydrationRejectionExcept
 	);
 }
 
+/**
+ * Hydration uses the server's settled value/reason as the canonical first-render
+ * result, but evaluating the client component has already created its matching
+ * thenable. Observe that thenable without letting its eventual result replace
+ * the seed. Otherwise a later client-side rejection is reported as unhandled
+ * even though the authored use() is visibly handled by its hydrated @catch arm.
+ */
+function observeHydrationSeedThenable(thenable: TrackedThenable<unknown>): void {
+	thenable.then(
+		() => undefined,
+		() => undefined,
+	);
+}
+
 function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): T {
 	const block = CURRENT_BLOCK!;
 	const state: TrackedThenable<any>[] = ((block as any).__thenables ??= []);
@@ -5013,6 +5052,7 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 		hydration.seedCursor < hydration.seeds.length
 	) {
 		const seed = hydration.seeds[hydration.seedCursor++];
+		observeHydrationSeedThenable(thenable);
 		const rejection = hydration.rejectionFromSeed(seed);
 		if (rejection !== null) {
 			thenable.status = 'rejected';
@@ -5492,12 +5532,26 @@ export function useId(slot?: HookSlot): string {
 // Templates: parse-once HTML → clone-per-instance
 // ---------------------------------------------------------------------------
 
-// Namespace flag: 0 = HTML, 1 = SVG, 2 = MathML. The compiler picks the
-// constant; we never look at namespaceURI at runtime.
-export function template(html: string, ns: number = 0, frag: number = 0): Element {
+// Namespace flags: 0 = HTML, 1 = SVG, 2 = MathML, 3 = opaque component
+// destination. An opaque template is not parsed at module evaluation: ordinary
+// component bodies and component children can be inserted under HTML, SVG, or
+// MathML, so clone() resolves their concrete parser context from the render
+// block's actual parent and caches one parsed template per destination.
+interface OpaqueTemplateRecord {
+	html: string;
+	frag: number;
+	parsed: Array<Element | undefined>;
+}
+
+const OPAQUE_TEMPLATE = Symbol('octane.opaque-template');
+
+function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Element {
 	const t = document.createElement('template');
 	if (ns === 0) {
-		t.innerHTML = html;
+		// Fixed HTML multi-root templates arrive pre-wrapped by the compiler. Opaque
+		// multi-root templates carry raw markup because their eventual namespace is
+		// unknown, so add the equivalent wrapper only after HTML wins at clone time.
+		t.innerHTML = frag ? `<octane-frag>${html}</octane-frag>` : html;
 		const root = t.content.firstChild as Element;
 		// Multi-root HTML templates arrive wrapped in a synthetic <octane-frag>. The
 		// wrapper never exists in the server DOM (the roots render bare), so stamp it
@@ -5522,6 +5576,15 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 		return wrapEl;
 	}
 	return wrapEl.firstChild as Element;
+}
+
+export function template(html: string, ns: number = 0, frag: number = 0): Element {
+	if (ns === 3) {
+		return {
+			[OPAQUE_TEMPLATE]: { html, frag, parsed: [] } satisfies OpaqueTemplateRecord,
+		} as unknown as Element;
+	}
+	return parseTemplate(html, ns === 1 ? 1 : ns === 2 ? 2 : 0, frag);
 }
 
 // ---------------------------------------------------------------------------
@@ -6145,6 +6208,24 @@ function parseSeedJson(raw: string): unknown[] | null {
 }
 
 export function clone<T extends Node>(node: T, loc?: string): T {
+	// Every ordinary template is a DOM Node, so keep its hot path to one numeric
+	// property read. Only the compiler's flag-3 token consults the private Symbol.
+	const opaque =
+		(node as any).nodeType === undefined
+			? ((node as any)[OPAQUE_TEMPLATE] as OpaqueTemplateRecord | undefined)
+			: undefined;
+	if (opaque !== undefined) {
+		const inherited =
+			CURRENT_SCOPE === null ? undefined : deoptChildNamespace(CURRENT_SCOPE.block.parentNode);
+		const ns: 0 | 1 | 2 = inherited === SVG_NS ? 1 : inherited === MATHML_NS ? 2 : 0;
+		let parsed = opaque.parsed[ns];
+		if (parsed === undefined) {
+			parsed = parseTemplate(opaque.html, ns, opaque.frag);
+			opaque.parsed[ns] = parsed;
+		}
+		const hydration = activeHydration();
+		return (hydration === null ? parsed.cloneNode(true) : hydration.clone(parsed, loc)) as T;
+	}
 	const hydration = activeHydration();
 	return hydration === null ? (node.cloneNode(true) as T) : hydration.clone(node, loc);
 }
@@ -7044,6 +7125,7 @@ const XMLNS_NS = 'http://www.w3.org/2000/xmlns/';
 // `template(html, ns)` instead). HTML_NS is what document.createElement produces in
 // an HTML document, so it's the reuse-check baseline for non-SVG elements.
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const MATHML_NS = 'http://www.w3.org/1998/Math/MathML';
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
 // Namespace for a de-opt host tag: `<svg>` always opens SVG; an SVG-ONLY tag
@@ -7054,8 +7136,22 @@ const HTML_NS = 'http://www.w3.org/1999/xhtml';
 // and de-opt descriptors namespace identically.
 function inferTagNs(tag: string, inherited: string | undefined): string | undefined {
 	if (tag === 'svg') return SVG_NS;
+	if (tag === 'math') return MATHML_NS;
 	if (inherited === undefined && SVG_ONLY_TAGS.has(tag)) return SVG_NS;
 	return inherited;
+}
+
+// Namespace inherited by a de-opt child from the DOM node it is actually being
+// inserted into. Component children are an opaque compile-time boundary, so the
+// runtime parent is the only authoritative source. `foreignObject` is itself an
+// SVG element but switches its children back to HTML; HTML is represented by an
+// undefined namespace because document.createElement is the fast/default path.
+function deoptChildNamespace(parent: Node): string | undefined {
+	if (parent.nodeType !== 1) return undefined;
+	const el = parent as Element;
+	if (el.namespaceURI === SVG_NS) return el.localName === 'foreignObject' ? undefined : SVG_NS;
+	if (el.namespaceURI === MATHML_NS) return MATHML_NS;
+	return undefined;
 }
 
 function attrNamespace(name: string): string | null {
@@ -7265,10 +7361,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
  * follow the generic data-attribute contract: nullish/function/symbol remove,
  * while booleans, numbers and objects stringify. This matters when an `as
  * string` assertion or an external typed value is inaccurate at runtime. The
- * compiler restricts this helper to lowercase HTML data names, so it needs
- * none of the generic attribute alias/property routing tables. Hydration still
- * goes through the capability boundary so mismatch recovery and
- * `suppressHydrationWarning` remain identical to setAttribute.
+ * compiler restricts this helper to lowercase data names, which are applied as
+ * unnamespaced attributes in HTML, SVG, and MathML, so it needs none of the
+ * generic attribute alias/property routing tables. Hydration still goes through
+ * the capability boundary so mismatch recovery and `suppressHydrationWarning`
+ * remain identical to setAttribute.
  */
 export function setStringData(el: Element, name: string, value: unknown): void {
 	const t = typeof value;
@@ -7820,6 +7917,72 @@ export function headBlock(
 		const t = String(text);
 		if (el.textContent !== t) el.textContent = t;
 	}
+}
+
+interface NamespaceHeadProps {
+	headKey: string;
+	tag: string;
+	attrs: Record<string, any> | null;
+	text: unknown;
+}
+
+// Compiler ABI for a head singleton passed through an opaque component's
+// `children` prop. The caller cannot know whether that component will place the
+// child in HTML or foreign content, so resolve against this component block's
+// actual DOM parent. Slot 0 is reserved for renderReturnedValue; the conditional
+// head state deliberately lives at slot 1.
+//
+// This is a component (rather than a special descriptor kind) so normal block
+// ownership handles hydration, keys, updates, refs, and teardown. HTML owns a
+// document-head entry; SVG/MathML returns an ordinary host descriptor and lets
+// the return-value child slot own the inline element.
+/** @internal Compiler-generated. */
+export function namespaceHead(props: NamespaceHeadProps, scope: Scope): ElementDescriptor | null {
+	const slot = 1;
+	const inherited = deoptChildNamespace(scope.block.parentNode);
+	if (inherited !== undefined) {
+		// A retained component can move between an HTML and foreign-content
+		// destination without changing identity. Tear down the prior head entry
+		// before returning the inline descriptor for this pass.
+		const state = scope.slots[slot] as HeadSlot | undefined;
+		if (state !== undefined) {
+			state.el.remove();
+			scope.slots[slot] = undefined;
+		}
+		return createElement(props.tag, props.attrs ?? undefined, props.text);
+	}
+
+	// Direct `key`/`ref`/`class` attributes are omitted by the compiler; filter
+	// the same names out of spreads here. Event props intentionally remain —
+	// headBlock attaches them directly because document.head sits outside the
+	// delegated event root.
+	let headAttrs: Record<string, any> | null = null;
+	if (props.attrs !== null) {
+		headAttrs = {};
+		for (const key in props.attrs) {
+			if (key === 'key' || key === 'ref' || key === 'class' || key === 'className') continue;
+			headAttrs[key] = props.attrs[key];
+		}
+	}
+	headBlock(scope, slot, props.headKey, props.tag, headAttrs, props.text);
+	return null;
+}
+
+/** @internal Compiler-generated descriptor factory for namespaceHead. */
+export function namespaceHeadElement(
+	headKey: string,
+	tag: string,
+	attrs: Record<string, any> | null,
+	text: unknown,
+	authoredKey?: unknown,
+): ElementDescriptor {
+	// A key from an explicit attribute wins; otherwise preserve a key copied by
+	// an already-evaluated spread. The raw attrs object is built once by generated
+	// code, so getters/spreads never run twice merely to discover the key.
+	const key = authoredKey !== undefined ? authoredKey : attrs?.key;
+	const config: any = { headKey, tag, attrs, text };
+	if (key !== undefined) config.key = key;
+	return createElement(namespaceHead, config);
 }
 
 export function injectStyle(id: string, css: string): void {
@@ -10609,13 +10772,7 @@ function renderOffscreen(
 	const ref = afterNode.nextSibling;
 	domParent.insertBefore(start, ref);
 	domParent.insertBefore(end, ref);
-	const capture: OffscreenCapture = {
-		effects: [[], [], []],
-		events: [],
-		eventActions: [],
-		refs: [],
-		stores: [],
-	};
+	const capture = createOffscreenCapture();
 	const prev = WIP_CAPTURE;
 	WIP_CAPTURE = capture;
 	const block = createBlock(
@@ -10655,21 +10812,38 @@ function renderOffscreen(
 // nodes are connected). Shared by every commit site — commitOffscreen (childSlot, which
 // also DOM-moves the range) and the componentSlot / renderBranchSlot commit branches
 // (which adopt the WIP's markers in place, so no DOM move is needed).
-function spliceWipCapture(wip: OffscreenWip): void {
+
+function spliceOffscreenCapture(capture: OffscreenCapture): void {
 	for (let p = 0 as Phase; p < 3; p++) {
-		const src = wip.capture.effects[p];
-		for (let i = 0; i < src.length; i++) effectQueues[p].push(src[i]);
+		const src = capture.effects[p];
+		const target = WIP_CAPTURE !== null ? WIP_CAPTURE.effects[p] : effectQueues[p];
+		for (let i = 0; i < src.length; i++) target.push(src[i]);
 	}
-	for (let i = 0; i < wip.capture.events.length; i++) {
-		enqueueEffectEventUpdate(wip.capture.events[i]);
+	const eventTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.events : effectEventQueue;
+	for (let i = 0; i < capture.events.length; i++) {
+		eventTarget.push(capture.events[i]);
 	}
-	for (let i = 0; i < wip.capture.eventActions.length; i++) {
-		enqueueEffectEventCommitAction(wip.capture.eventActions[i]);
+	const eventActionTarget =
+		WIP_CAPTURE !== null ? WIP_CAPTURE.eventActions : effectEventCommitActions;
+	for (let i = 0; i < capture.eventActions.length; i++) {
+		eventActionTarget.push(capture.eventActions[i]);
 	}
-	for (let i = 0; i < wip.capture.refs.length; i++) refAttachQueue.push(wip.capture.refs[i]);
+	const refTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue;
+	for (let i = 0; i < capture.refs.length; i++) refTarget.push(capture.refs[i]);
 	// Store-syncs enqueued off-screen now belong to committed DOM — hand them to the
 	// live queue so the surrounding commit's drainStoreSyncs reconciles them.
-	for (let i = 0; i < wip.capture.stores.length; i++) storeSyncQueue.push(wip.capture.stores[i]);
+	const storeTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.stores : storeSyncQueue;
+	for (let i = 0; i < capture.stores.length; i++) storeTarget.push(capture.stores[i]);
+}
+
+function spliceWipCapture(wip: OffscreenWip): void {
+	spliceOffscreenCapture(wip.capture);
+}
+
+/** Drop captured commit work that never became visible. */
+function discardOffscreenCapture(capture: OffscreenCapture | null): void {
+	if (capture === null) return;
+	for (let i = 0; i < capture.stores.length; i++) capture.stores[i].queued = false;
 }
 
 // Commit a COMPLETED off-screen WIP: move its node range into final position (before
@@ -11309,8 +11483,7 @@ function reconcileDeoptNode(
 		}
 		setDeoptDesc(el, value);
 		if (!hasDangerHTML(value.props)) {
-			const childNs = elNs === SVG_NS && value.type !== 'foreignObject' ? SVG_NS : undefined;
-			reconcileDeoptChildren(el, value.children, ownerBlock, childNs);
+			reconcileDeoptChildren(el, value.children, ownerBlock);
 		}
 		return el;
 	}
@@ -11329,12 +11502,11 @@ function reconcileDeoptNode(
 // children match by `key`, unkeyed children match positionally (React-shape). Nodes
 // not reused are removed; survivors are reordered to match the descriptor. No markers
 // are introduced — the element fully owns its children, so this is raw-DOM reuse.
-function reconcileDeoptChildren(
-	el: Element,
-	children: any,
-	ownerBlock: Block,
-	childNs?: string,
-): void {
+function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): void {
+	// The element that owns these children is authoritative. This matters when a
+	// component or dynamic tag made the lexical namespace unknowable, and when an
+	// SVG foreignObject resets its descendants to HTML.
+	const childNs = deoptChildNamespace(el);
 	const next: any[] = [];
 	const nextKeys: any[] = [];
 	flattenDeoptChildrenKeyed(next, nextKeys, children, '');
@@ -11621,7 +11793,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		prev = startM != null ? startM.nextSibling : null;
 		if (prev === endM) prev = null; // empty item range → nothing to adopt
 	}
-	const node = reconcileDeoptNode(prev, item, block);
+	const node = reconcileDeoptNode(prev, item, block, deoptChildNamespace(block.parentNode));
 	if (node !== prev) {
 		// Built a fresh node (first mount, or a tag/type change) — insert it at
 		// the old node's position, THEN drop the old one. Insert-before-remove
@@ -11705,12 +11877,10 @@ function descNeedsBlocks(value: any): boolean {
 function hostElementBody(d: ElementDescriptor, block: Block): void {
 	let el = block.deoptNode as Element | null;
 	const hydration = activeHydration();
-	// A root `<svg>` — or any SVG-ONLY tag (see SVG_ONLY_TAGS) — opens the SVG
-	// namespace. (Component children inside an SVG are an uncommon case; they
-	// mount via childSlot below, which does not yet thread the SVG namespace —
-	// the pure-host SVG path through reconcileDeoptChildren does, and SVG-only
-	// child tags self-infer through the same table.)
-	const elNs = inferTagNs(d.type as string, undefined);
+	// Component/value boundaries are namespace-transparent. Derive the inherited
+	// namespace from the block's actual DOM parent; explicit <svg>/<math> roots
+	// still override it through inferTagNs.
+	const elNs = inferTagNs(d.type as string, deoptChildNamespace(block.parentNode));
 	// Hydration first render: ADOPT the server-rendered host element sitting at the
 	// cursor instead of building a fresh one (which would orphan the server node and
 	// desync the marker walk). Then point the cursor at its first child so the childSlot
@@ -11814,9 +11984,9 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 	const tag = d.type as string;
 	let el = block.deoptNode as Element | null;
 	const hydration = activeHydration();
-	// A root `<svg>` or SVG-only tag opens the SVG namespace (parity with
-	// hostElementBody).
-	const elNs = inferTagNs(tag, undefined);
+	// Component tags can resolve to host strings under SVG/MathML. Inherit from
+	// the actual destination rather than assuming every dynamic host is HTML.
+	const elNs = inferTagNs(tag, deoptChildNamespace(block.parentNode));
 	if (el === null) {
 		if (
 			hydration !== null &&
@@ -12363,7 +12533,7 @@ export function childSlot(
 				// always yields a node for a host descriptor; the null checks are
 				// shape-parity with the marked path below.
 				const prev = state.hostNode;
-				const node = reconcileDeoptNode(prev, value, parentBlock);
+				const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
 				if (node !== prev) {
 					if (prev !== null && prev.parentNode !== null) {
 						if (node !== null) prev.parentNode.insertBefore(node, prev);
@@ -12387,7 +12557,7 @@ export function childSlot(
 				prev = state.start.nextSibling;
 				if (prev === state.end) prev = null;
 			}
-			const node = reconcileDeoptNode(prev, value, parentBlock);
+			const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
 			if (node !== prev) {
 				if (prev != null && prev !== node && prev.parentNode !== null) {
 					detachDeoptTreeRefs(prev, null);
@@ -12526,7 +12696,8 @@ export function childSlot(
 			state.hostNode.nodeType === 1 /* Element */ &&
 			(state.hostNode as Element).localName === (props as ElementDescriptor).type &&
 			(state.hostNode as Element).namespaceURI ===
-				(inferTagNs((props as ElementDescriptor).type as string, undefined) ?? HTML_NS) &&
+				(inferTagNs((props as ElementDescriptor).type as string, deoptChildNamespace(domParent)) ??
+					HTML_NS) &&
 			!hasDangerHTML((props as ElementDescriptor).props) &&
 			!hasDangerHTML(getDeoptDesc(state.hostNode)?.props ?? null)
 		) {
@@ -13222,6 +13393,10 @@ interface TrySlot {
 	err: any;
 	/** The thenable we're currently waiting on (so duplicate listeners don't fire). */
 	pendingThenable: TrackedThenable<any> | null;
+	/** Commit work from a successful hidden transition retry, held until its group reveals. */
+	stagedCapture: OffscreenCapture | null;
+	/** Effect deps from before `stagedCapture`, restored if it is superseded. */
+	stagedEffectDeps: EffectDepsSnapshot | null;
 	/**
 	 * True if a transition-priority render suspended on this try block AND we
 	 * incremented TRANSITION_PENDING_COUNT to keep useTransition's isPending
@@ -13244,9 +13419,11 @@ interface TrySlot {
 	 * callback refs invoked with null). React treats ref attachment like a layout
 	 * effect — destroyed on hide, recreated on reveal — even though the DOM node is
 	 * preserved. Captured on the FIRST hide (a re-suspend during a partial resolve
-	 * doesn't re-detach), re-attached + cleared on reveal. null = nothing detached.
+	 * doesn't re-detach). The list keeps the detached identities alive as a hide
+	 * sentinel; reveal re-enumerates the CURRENT ref manifests so superseded refs
+	 * cannot reattach. null = nothing detached.
 	 */
-	detachedRefs: { ref: any; el: any }[] | null;
+	detachedRefs: SuspenseRefEntry[] | null;
 	domParent: Node;
 	parentBlock: Block;
 	/**
@@ -13311,6 +13488,8 @@ export function tryBlock(
 			hasResolved: false,
 			err: null,
 			pendingThenable: null,
+			stagedCapture: null,
+			stagedEffectDeps: null,
 			transitionHeld: false,
 			transitionTimeoutId: null,
 			detachedRefs: null,
@@ -13335,13 +13514,21 @@ export function tryBlock(
 		s.block!.props = { err: s.err, reset: () => requestReset(s) };
 		s.block!.extra = s.env;
 		renderBlock(s.block!);
-	} else if (s.branch === 2 && s.tryBlock && s.savedDom) {
+	} else if (s.branch === 2 && s.tryBlock && !s.tryBlock.disposed && s.savedDom) {
 		// Parent props can supersede the promise that originally hid this body.
 		// Retry the preserved tree now so already-ready replacement data reveals
 		// immediately and a different suspension refreshes the resume listener.
 		attemptHiddenReveal(s);
+		// The fresh attempt may still be pending. Keep the already-mounted fallback
+		// block (and its local state/focus), but render it with the latest helper and
+		// captured environment so fallback text and actions cannot lag the request.
+		if (s.branch === 2) refreshPendingBody(s);
 	} else if (s.branch === 2) {
-		// A pending arm without a preserved body has no current work to retry.
+		// First-attempt hydration intentionally discards its adopted try block rather
+		// than parking server DOM. A later prop update therefore has no hidden block
+		// to retry; mount the current body immediately instead of waiting forever for
+		// the obsolete hydration promise.
+		mountTry(s);
 	} else if (s.branch === 1 && s.tryBlock) {
 		// Try body is currently visible — re-render in place so we don't tear
 		// down its DOM. If the re-render suspends, handleSuspense decides
@@ -13370,6 +13557,10 @@ export function tryBlock(
 
 function mountTry(state: TrySlot): void {
 	const hydration = activeHydration();
+	discardOffscreenCapture(state.stagedCapture);
+	state.stagedCapture = null;
+	state.stagedEffectDeps = null;
+	state.detachedRefs = null;
 	// Fresh start. If there's leftover state from a prior cycle (e.g. after
 	// catch reset), clear it first. Compare `block` against the tryBlock we are
 	// about to unmount so a visible try body isn't sent through unmountBlock a
@@ -13754,6 +13945,11 @@ function hideTryContentAndMountPending(state: TrySlot): boolean {
 	}
 	state.block = null;
 	state.branch = 2;
+	return mountPendingBody(state);
+}
+
+/** Mount the current @pending helper without changing the preserved try body. */
+function mountPendingBody(state: TrySlot): boolean {
 	if (state.pendingBody) {
 		const bStart = document.createComment('pend-b');
 		const bEnd = document.createComment('/pend-b');
@@ -13784,6 +13980,30 @@ function hideTryContentAndMountPending(state: TrySlot): boolean {
 		}
 	}
 	return true;
+}
+
+/** Re-render an already-visible @pending arm with the latest parent environment. */
+function refreshPendingBody(state: TrySlot): void {
+	if (state.branch !== 2) return;
+	const pendingBlock = state.block !== state.tryBlock ? state.block : null;
+	if (state.pendingBody === null) {
+		if (pendingBlock) unmountBlock(pendingBlock);
+		state.block = null;
+		return;
+	}
+	if (pendingBlock === null) {
+		mountPendingBody(state);
+		return;
+	}
+	pendingBlock.body = state.pendingBody;
+	pendingBlock.extra = state.env;
+	try {
+		renderBlock(pendingBlock);
+	} catch (err) {
+		unmountBlock(pendingBlock);
+		state.block = null;
+		switchToCatch(state, err);
+	}
 }
 
 /**
@@ -13832,6 +14052,9 @@ function commitResumeInner(state: TrySlot): void {
 	STAGED_REVEALS.delete(state);
 	try {
 		if (state.tryBlock && !state.tryBlock.disposed) {
+			const stagedCapture = state.stagedCapture;
+			state.stagedCapture = null;
+			state.stagedEffectDeps = null;
 			if (state.savedDom) {
 				if (state.block && state.block !== state.tryBlock) {
 					unmountBlock(state.block);
@@ -13849,28 +14072,63 @@ function commitResumeInner(state: TrySlot): void {
 			// Reveal: clear the hidden-subtree inactive flag (set on hide) so its effects
 			// re-enqueue + re-fire (recreate) during this resume render.
 			state.tryBlock.inactive = false;
-			// Mark the replay window: useThenable's fresh-thenable reuse leniency
-			// and the waterfall diagnostic apply only while a resolved suspension
-			// is being replayed (ordinary updates must keep replacing thenables).
-			const prevReplay = RESUME_REPLAY;
-			RESUME_REPLAY = true;
-			try {
-				renderBlock(state.tryBlock);
+			if (stagedCapture !== null) {
+				// attemptHiddenReveal already completed this exact transition render while
+				// the fallback was visible. Commit its deferred effects/refs/store checks now
+				// that the entangled group is revealing; re-rendering would both duplicate
+				// render work and lose mount-only ref attaches captured by that hidden pass.
+				state.tryBlock.pendingMode = null;
+				state.tryBlock.pendingDeferred = false;
+				// Ref attach closures captured by a hidden pass can be stale after a
+				// later same-node ref supersession. Reveal uses the current manifest.
+				if (state.detachedRefs !== null) stagedCapture.refs.length = 0;
+				spliceOffscreenCapture(stagedCapture);
 				state.hasResolved = true;
-				// Reveal: re-attach the host refs detached on hide (same preserved nodes),
-				// before commitEffects fires the recreated layout effects (which may read
-				// them). The re-render above leaves them detached — the stored ref value is
-				// unchanged, so a component's own attach path no-ops on it.
-				if (state.detachedRefs !== null) {
-					const refs = state.detachedRefs;
-					state.detachedRefs = null;
-					for (let i = 0; i < refs.length; i++) attachRef(refs[i].ref, refs[i].el);
+			} else {
+				// Mark the replay window: useThenable's fresh-thenable reuse leniency
+				// and the waterfall diagnostic apply only while a resolved suspension
+				// is being replayed (ordinary updates must keep replacing thenables).
+				const resumeCapture = createOffscreenCapture();
+				const effectDeps = snapshotSubtreeEffectDeps(state.tryBlock);
+				const previousCapture = WIP_CAPTURE;
+				const refDetachCheckpoint = refDetachQueue.length;
+				const prevReplay = RESUME_REPLAY;
+				RESUME_REPLAY = true;
+				WIP_CAPTURE = resumeCapture;
+				let didThrow = false;
+				let renderError: unknown = null;
+				try {
+					renderBlock(state.tryBlock);
+				} catch (err) {
+					didThrow = true;
+					renderError = err;
+				} finally {
+					WIP_CAPTURE = previousCapture;
+					RESUME_REPLAY = prevReplay;
 				}
-			} catch (err) {
-				if (isSuspenseException(err)) handleSuspense(state, err.thenable, state.tryBlock!);
-				else switchToCatch(state, err);
-			} finally {
-				RESUME_REPLAY = prevReplay;
+				if (!didThrow) {
+					if (state.detachedRefs !== null) {
+						refDetachQueue.splice(refDetachCheckpoint);
+						resumeCapture.refs.length = 0;
+					}
+					spliceOffscreenCapture(resumeCapture);
+					state.hasResolved = true;
+				} else {
+					refDetachQueue.splice(refDetachCheckpoint);
+					restoreSubtreeEffectDeps(state.tryBlock, effectDeps);
+					discardOffscreenCapture(resumeCapture);
+					if (isSuspenseException(renderError)) {
+						handleSuspense(state, renderError.thenable, state.tryBlock);
+					} else {
+						switchToCatch(state, renderError);
+					}
+				}
+			}
+			if (state.branch === 1) {
+				// Reveal: re-attach the host refs detached on hide (same preserved nodes),
+				// before commitEffects fires recreated layout effects. Enumerating now
+				// ensures an aborted A→B hidden retry never resurrects stale ref A.
+				queueCurrentHiddenRefs(state);
 			}
 		} else {
 			mountTry(state);
@@ -13881,7 +14139,7 @@ function commitResumeInner(state: TrySlot): void {
 		// promises resolved, another still pending) enqueued effects for the now-hidden
 		// subtree that the effect drains must SKIP (inactive) and CLEAR — without draining here
 		// the LAYOUT queue stays non-empty and the scheduler never goes quiescent.
-		commitEffects();
+		if (!deferringStagedRevealEffects) commitEffects();
 	} finally {
 		if (wasHeld) tickTransitionCount(-1);
 	}
@@ -13918,15 +14176,153 @@ function findSuspenseHiddenTry(block: Block): TrySlot | null {
  * the reveal (drop the pending arm, reactivate effects + refs — the
  * commitResume choreography) or re-stash and stay on the fallback.
  */
-function attemptHiddenReveal(state: TrySlot): void {
+function snapshotSubtreeEffectDeps(scope: Scope): EffectDepsSnapshot {
+	const snapshot: EffectDepsSnapshot = new Map();
+	const visit = (current: Scope): void => {
+		const hooks = current.hooks;
+		if (hooks !== null) {
+			for (const slot of hooks.values()) {
+				const effect = slot as EffectSlot | undefined;
+				if (effect?.effect === true) {
+					snapshot.set(effect, effect.deps);
+				}
+			}
+		}
+		forEachSubtreeChild(current, visit);
+	};
+	visit(scope);
+	return snapshot;
+}
+
+/** Roll hook-cell deps back after a speculative render whose captured commit was discarded. */
+function restoreSubtreeEffectDeps(scope: Scope, snapshot: EffectDepsSnapshot): void {
+	const visit = (current: Scope): void => {
+		const hooks = current.hooks;
+		if (hooks !== null) {
+			for (const slot of hooks.values()) {
+				const effect = slot as EffectSlot | undefined;
+				if (effect?.effect !== true) continue;
+				effect.deps = snapshot.has(effect) ? snapshot.get(effect) : undefined;
+			}
+		}
+		forEachSubtreeChild(current, visit);
+	};
+	visit(scope);
+}
+
+/**
+ * A hidden retry can mount a ref and then suspend later, or supersede that ref on
+ * the same preserved node in a subsequent retry. Captured attach closures are
+ * therefore never authoritative. At reveal, enumerate the committed manifests
+ * and attach exactly the refs in the subtree's current visible branches.
+ */
+function queueCurrentHiddenRefs(state: TrySlot): void {
+	if (state.detachedRefs === null || state.tryBlock === null) return;
+	state.detachedRefs = null;
+	const refs: SuspenseRefEntry[] = [];
+	collectVisibleSubtreeRefs(state.tryBlock, refs);
+	for (let i = 0; i < refs.length; i++) {
+		const entry = refs[i];
+		queueRefAttach(entry.scope, () => attachRef(entry.ref, entry.el));
+	}
+}
+
+function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transition'): void {
 	const tryBlock = state.tryBlock;
 	if (tryBlock === null || tryBlock.disposed || state.savedDom === null) return;
+	// A fresh retry invalidates any readiness proved by an earlier attempt even
+	// when that attempt had no retained capture (e.g. an ordinary thenable settle
+	// added this boundary to STAGED_REVEALS). It becomes ready again only after the
+	// new inputs complete below.
+	STAGED_REVEALS.delete(state);
+	if (state.stagedCapture !== null) {
+		// A newer parent render supersedes commit work staged by an earlier hidden
+		// attempt. Its effects/store checks never became visible, so discard them;
+		// the fresh render below becomes the only candidate for this boundary.
+		const supersededCapture = state.stagedCapture;
+		const supersededEffectDeps = state.stagedEffectDeps;
+		state.stagedCapture = null;
+		state.stagedEffectDeps = null;
+		if (supersededEffectDeps !== null) {
+			restoreSubtreeEffectDeps(tryBlock, supersededEffectDeps);
+		}
+		discardOffscreenCapture(supersededCapture);
+		deactivateScope(tryBlock);
+	}
 	reattachTryBlock(state);
 	tryBlock.body = state.tryBody;
 	tryBlock.extra = state.env;
 	tryBlock.inactive = false;
+	const retryMode =
+		scheduledMode ??
+		tryBlock.pendingMode ??
+		CURRENT_BLOCK?.currentRenderMode ??
+		('urgent' as const);
+	const stagesHeldTransition = retryMode === 'transition' && HELD_TRANSITIONS.has(state);
+	// Every hidden retry is speculative until its whole body completes. Capture
+	// commit work even for urgent retries: a ref/effect can mount before a later
+	// sibling suspends, and must not leak while the fallback remains visible.
+	const hiddenCapture = createOffscreenCapture();
+	const effectDeps = snapshotSubtreeEffectDeps(tryBlock);
+	const previousCapture = WIP_CAPTURE;
+	const refDetachCheckpoint = refDetachQueue.length;
+	WIP_CAPTURE = hiddenCapture;
+	let didThrow = false;
+	let thrown: unknown = null;
 	try {
 		renderBlock(tryBlock);
+	} catch (err) {
+		didThrow = true;
+		thrown = err;
+	} finally {
+		WIP_CAPTURE = previousCapture;
+	}
+	// The subtree's refs were already detached when its fallback appeared. Ref
+	// identity changes during speculative retries must not detach again, and their
+	// opaque attach closures are replaced by a current-manifest snapshot on reveal.
+	refDetachQueue.splice(refDetachCheckpoint);
+	hiddenCapture.refs.length = 0;
+	if (didThrow) {
+		// A suspended/errored retry did not commit. Its captured effect/ref/store
+		// work and ref-identity detaches belong to that abandoned attempt, so none
+		// may escape into the parent commit while the fallback remains visible.
+		restoreSubtreeEffectDeps(tryBlock, effectDeps);
+		discardOffscreenCapture(hiddenCapture);
+		if (isSuspenseException(thrown)) {
+			deactivateScope(tryBlock);
+			// Still suspended — re-stash the try DOM (the pending arm never moved)
+			// and keep/refresh the resume wiring for the (possibly new) thenable.
+			softDetachTryBlock(state);
+			tryBlock.inactive = true;
+			attachResume(state, thrown.thenable);
+		} else {
+			switchToCatch(state, thrown);
+			// A saved-DOM retry can run directly from a thenable microtask, outside
+			// the scheduler's normal render→commit drain. Its terminal catch arm is a
+			// real commit and must publish refs/effects now. Parent/drain-driven hidden
+			// attempts already have an enclosing commit and leave it there.
+			if (!inFlush && CURRENT_BLOCK === null) commitEffects();
+		}
+		return;
+	}
+	// A transition-priority update can supersede the inputs of one member of
+	// an entangled group after the timeout has already exposed its fallback.
+	// Rendering the fresh inputs proves this boundary is data-ready, but it
+	// must not reveal ahead of siblings that are still held. Park the updated
+	// primary again and stage its commit work in the same barrier used by
+	// thenable resumes. An urgent update remains a true supersession and takes
+	// the immediate reveal path below.
+	if (stagesHeldTransition) {
+		state.pendingThenable = null;
+		state.stagedCapture = hiddenCapture;
+		state.stagedEffectDeps = effectDeps;
+		softDetachTryBlock(state);
+		tryBlock.inactive = true;
+		STAGED_REVEALS.add(state);
+		queueMicrotask(flushStagedRevealsIfReady);
+		return;
+	}
+	try {
 		// Success — reveal without the suspending promise ever resolving.
 		if (state.block !== null && state.block !== tryBlock) {
 			unmountBlock(state.block);
@@ -13937,11 +14333,8 @@ function attemptHiddenReveal(state: TrySlot): void {
 		// Invalidate the wired resume: when the original thenable eventually
 		// settles, its retry sees a mismatched pendingThenable and no-ops.
 		state.pendingThenable = null;
-		if (state.detachedRefs !== null) {
-			const refs = state.detachedRefs;
-			state.detachedRefs = null;
-			for (let i = 0; i < refs.length; i++) attachRef(refs[i].ref, refs[i].el);
-		}
+		spliceOffscreenCapture(hiddenCapture);
+		queueCurrentHiddenRefs(state);
 		if (state.transitionTimeoutId !== null) {
 			clearTimeout(state.transitionTimeoutId);
 			state.transitionTimeoutId = null;
@@ -13958,15 +14351,7 @@ function attemptHiddenReveal(state: TrySlot): void {
 			queueMicrotask(flushStagedRevealsIfReady);
 		}
 	} catch (err) {
-		if (isSuspenseException(err)) {
-			// Still suspended — re-stash the try DOM (the pending arm never moved)
-			// and keep/refresh the resume wiring for the (possibly new) thenable.
-			softDetachTryBlock(state);
-			tryBlock.inactive = true;
-			attachResume(state, (err as SuspenseException).thenable);
-		} else {
-			switchToCatch(state, err);
-		}
+		switchToCatch(state, err);
 	}
 }
 
@@ -13979,7 +14364,7 @@ function enterHeldTransition(state: TrySlot): void {
 /**
  * Remove a boundary from the coordination sets when it stops holding WITHOUT a normal
  * reveal — urgent supersede, error, or unmount. If the remaining held boundaries are
- * now all data-ready, commit them (don't strand them waiting on a boundary that left).
+ * now all fully staged, commit them (don't strand them waiting on a boundary that left).
  */
 function abandonHeldTransition(state: TrySlot): void {
 	if (!HELD_TRANSITIONS.has(state)) return;
@@ -13988,11 +14373,38 @@ function abandonHeldTransition(state: TrySlot): void {
 	flushStagedRevealsIfReady();
 }
 
-/** Commit all staged reveals together once every held boundary is data-ready. */
+/** Commit a staged group once exact membership shows every held boundary is ready. */
 function flushStagedRevealsIfReady(): void {
-	if (STAGED_REVEALS.size > 0 && STAGED_REVEALS.size === HELD_TRANSITIONS.size) {
-		flushStagedReveals();
+	// Stale readiness can never satisfy the barrier. Defensive pruning covers
+	// terminal paths as well as superseding hidden retries; then require exact set
+	// membership rather than relying on equal cardinality alone.
+	for (const state of STAGED_REVEALS) {
+		if (!HELD_TRANSITIONS.has(state)) STAGED_REVEALS.delete(state);
 	}
+	if (STAGED_REVEALS.size === 0 || STAGED_REVEALS.size !== HELD_TRANSITIONS.size) return;
+	for (const state of HELD_TRANSITIONS) {
+		if (!STAGED_REVEALS.has(state)) return;
+	}
+	flushStagedReveals();
+}
+
+function compareStagedRevealDomOrder(a: TrySlot, b: TrySlot): number {
+	if (a === b) return 0;
+	const position = a.start.compareDocumentPosition(b.start);
+	if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+	if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+	return 0;
+}
+
+/** Rebase speculative enqueue order onto final source/tree commit order. */
+function rebaseOffscreenCaptureSeq(capture: OffscreenCapture): void {
+	const effects = capture.effects[INSERTION].concat(
+		capture.effects[LAYOUT],
+		capture.effects[PASSIVE],
+	).sort((a, b) => a.seq - b.seq);
+	for (let i = 0; i < effects.length; i++) effects[i].seq = commitSeq++;
+	const refs = capture.refs.slice().sort((a, b) => a.seq - b.seq);
+	for (let i = 0; i < refs.length; i++) refs[i].seq = commitSeq++;
 }
 
 function flushStagedReveals(): void {
@@ -14002,16 +14414,41 @@ function flushStagedReveals(): void {
 		const run = (): void => {
 			const batch = [...STAGED_REVEALS];
 			STAGED_REVEALS.clear();
-			for (const s of batch) {
-				// A prior reveal in this batch may have torn down a later one (a boundary that
-				// renders a sibling boundary). Skip any that were disposed meanwhile.
-				if (s.tryBlock !== null && s.tryBlock.disposed) continue;
-				commitResume(s);
+			// Only fallback-hidden members have completed rollback-safe render
+			// captures. A pre-timeout visible hold remains within Octane's documented
+			// per-swap/global-WIP limitation and may discover another suspension while
+			// committing, so do not promise lifecycle-atomic batching for a mixed batch.
+			const deferEffects = batch.every((state) => state.stagedCapture !== null);
+			if (deferEffects) {
+				// Promise resolution order is not source order. Commit left-to-right and
+				// rebase each capture's enqueue sequence so the shared effect/ref drain
+				// preserves sibling tree order even when the right boundary readies first.
+				batch.sort(compareStagedRevealDomOrder);
+				for (const state of batch) rebaseOffscreenCaptureSeq(state.stagedCapture!);
+			}
+			const previousDeferral = deferringStagedRevealEffects;
+			deferringStagedRevealEffects = deferEffects;
+			try {
+				for (const s of batch) {
+					// A prior reveal in this batch may have torn down a later one (a boundary that
+					// renders a sibling boundary). Skip any that were disposed meanwhile.
+					if (s.tryBlock !== null && s.tryBlock.disposed) continue;
+					commitResume(s);
+				}
+			} finally {
+				deferringStagedRevealEffects = previousDeferral;
+				if (deferEffects) {
+					// For fully rendered hidden captures, the reveal barrier includes the
+					// public lifecycle boundary: refs/layout run only after every member's
+					// DOM commits, in one globally sorted commit batch.
+					commitEffects();
+				}
 			}
 		};
-		// The entangled batch reveals atomically — and animates as ONE view
-		// transition (the per-boundary wrap in commitResume is gated off by
-		// flushingStagedReveals while inside this).
+		// The staged group animates as ONE view transition (the per-boundary wrap
+		// in commitResume is gated off by flushingStagedReveals). Fully captured
+		// fallback-hidden members also share the lifecycle commit above; a mixed
+		// pre-timeout batch retains the documented per-swap limitation.
 		if (vtWouldWrapResume()) vtFlush(run);
 		else run();
 	} finally {
@@ -14038,11 +14475,19 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 			state.transitionTimeoutId = null;
 		}
 		// Entangled-transition commit barrier: a boundary holding prior content for an
-		// in-flight transition does NOT reveal the moment its own data resolves — it
-		// waits until EVERY held boundary in the transition is data-ready, then they all
-		// reveal together (React's atomic-commit contract). The boundary stays held (its
-		// counter stays up, so isPending stays true) until the batch flush.
+		// in-flight transition does not reveal the moment one input resolves. A hidden
+		// primary proves its whole body below; visible holds retain the documented
+		// per-swap limitation. The boundary stays held (and isPending stays true) until
+		// the staged group flushes.
 		if (HELD_TRANSITIONS.has(state)) {
+			// Once the timeout has exposed @pending, settling one thenable is not
+			// sufficient proof that this member is reveal-ready: a later dependent
+			// use() may still suspend. Retry the detached primary under the hidden
+			// capture and enter STAGED_REVEALS only if the whole body completes.
+			if (state.savedDom !== null) {
+				attemptHiddenReveal(state, 'transition');
+				return;
+			}
 			STAGED_REVEALS.add(state);
 			if (STAGED_REVEALS.size < HELD_TRANSITIONS.size) return; // others still pending
 			flushStagedReveals();
@@ -14628,6 +15073,7 @@ function requestReset(state: TrySlot): void {
 	state.branch = -1;
 	state.err = null;
 	state.hasResolved = false;
+	state.detachedRefs = null;
 	if (
 		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 		__OCTANE_PROFILE_ENABLED__ &&
@@ -14639,6 +15085,10 @@ function requestReset(state: TrySlot): void {
 
 function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd?: Node): void {
 	const hydration = activeHydration();
+	discardOffscreenCapture(state.stagedCapture);
+	state.stagedCapture = null;
+	state.stagedEffectDeps = null;
+	state.detachedRefs = null;
 	// Cancel any pending transition-fallback timeout — catch is a terminal
 	// state, so a timeout-driven swap to @pending would conflict with the
 	// catch branch about to mount.
@@ -15386,7 +15836,11 @@ export function activityBlock(
  * content subtree is soft-detached, not disposed, so it must still be visited).
  * Shared by detachSubtreeRefs and deactivateScope, which recurse via `visit`.
  */
-function forEachSubtreeChild(scope: Scope, visit: (child: Scope) => void): void {
+function forEachSubtreeChild(
+	scope: Scope,
+	visit: (child: Scope) => void,
+	includeHiddenTry: boolean = true,
+): void {
 	const children = scope.children;
 	for (let i = 0, n = children.length; i < n; i++) visit(children[i].scope);
 	const slots = scope._slots;
@@ -15398,7 +15852,12 @@ function forEachSubtreeChild(scope: Scope, visit: (child: Scope) => void): void 
 				if (val.emptyBlock) visit(val.emptyBlock);
 			} else if (val.block) {
 				visit(val.block);
-				if (val.__kind === 'trySlotSlot' && val.tryBlock && val.tryBlock !== val.block) {
+				if (
+					includeHiddenTry &&
+					val.__kind === 'trySlotSlot' &&
+					val.tryBlock &&
+					val.tryBlock !== val.block
+				) {
 					visit(val.tryBlock);
 				}
 			}
@@ -15416,12 +15875,17 @@ function forEachSubtreeChild(scope: Scope, visit: (child: Scope) => void): void 
 // slots[0] (no key scan, and the fields take normal 1-char names). De-opt host slots
 // store `state.ref` + the node. We recurse through children + control-flow slots via
 // forEachSubtreeChild (the same walk deactivateScope uses).
-function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
+function detachSubtreeRefs(
+	scope: Scope,
+	out: SuspenseRefEntry[],
+	shouldDetach: boolean = true,
+	includeHiddenTry: boolean = true,
+): void {
 	// A block managing a de-opt host subtree (deoptItemBody / pure-host items):
 	// every node the de-opt reconciler built carries its descriptor (DEOPT_DESC),
 	// whose props may hold a ref — walk the DOM subtree for them.
 	const deoptRoot = (scope as any).deoptNode as Node | null | undefined;
-	if (deoptRoot != null) detachDeoptTreeRefs(deoptRoot, out);
+	if (deoptRoot != null) detachDeoptTreeRefs(deoptRoot, out, shouldDetach, scope);
 	const rm = scope.refFields;
 	if (rm !== null) {
 		const bag = scope.slots[0];
@@ -15433,23 +15897,23 @@ function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 					const ref = bag[rm[j + 1]];
 					if (ref == null) continue;
 					const el = bag[rm[j + 2]];
-					out.push({ ref, el });
-					attachRef(ref, null, el);
+					out.push({ ref, el, scope });
+					if (shouldDetach) attachRef(ref, null, el);
 				} else if (kind === 's') {
 					// Spread binding: the committed spread object may carry a ref.
 					const ref = bag[rm[j + 1]]?.ref;
 					if (ref == null) continue;
 					const el = bag[rm[j + 2]];
 					if (el == null) continue;
-					out.push({ ref, el });
-					attachRef(ref, null, el);
+					out.push({ ref, el, scope });
+					if (shouldDetach) attachRef(ref, null, el);
 				} else {
 					// 'f' — <Fragment ref>: detach the FragmentInstance's current ref;
 					// reveal re-attaches the same instance.
 					const fi = bag[rm[j + 1]];
 					if (fi == null || fi._currentRef == null) continue;
-					out.push({ ref: fi._currentRef, el: fi });
-					attachRef(fi._currentRef, null, fi);
+					out.push({ ref: fi._currentRef, el: fi, scope });
+					if (shouldDetach) attachRef(fi._currentRef, null, fi);
 				}
 			}
 		}
@@ -15460,15 +15924,24 @@ function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 		if (s === null || typeof s !== 'object') continue;
 		// De-opt host element slot (value-position `<tag>` / motion-style): { el, anchor, ref }.
 		if (s.ref != null && s.anchor !== undefined && s.el instanceof Element) {
-			out.push({ ref: s.ref, el: s.el });
-			attachRef(s.ref, null, s.el);
+			out.push({ ref: s.ref, el: s.el, scope });
+			if (shouldDetach) attachRef(s.ref, null, s.el);
 		}
 		// childSlot managing a pure-host de-opt node — same DEOPT_DESC walk.
 		if (s.__kind === 'childSlot' && s.hostNode != null) {
-			detachDeoptTreeRefs(s.hostNode, out);
+			detachDeoptTreeRefs(s.hostNode, out, shouldDetach, scope);
 		}
 	}
-	forEachSubtreeChild(scope, (child) => detachSubtreeRefs(child, out));
+	forEachSubtreeChild(
+		scope,
+		(child) => detachSubtreeRefs(child, out, shouldDetach, includeHiddenTry),
+		includeHiddenTry,
+	);
+}
+
+/** Collect the refs that belong to the subtree's CURRENT visible branches. */
+function collectVisibleSubtreeRefs(scope: Scope, out: SuspenseRefEntry[]): void {
+	detachSubtreeRefs(scope, out, false, false);
 }
 
 // Walk a de-opt-built DOM subtree detaching every stamped descriptor ref
@@ -15478,13 +15951,18 @@ function detachSubtreeRefs(scope: Scope, out: { ref: any; el: any }[]): void {
 // reconcileDeoptNode builds gets setDeoptDesc), so recurse through children —
 // EXCEPT foreign `<!--portal-->…<!--/portal-->` ranges: a portal targeting one of
 // these elements owns its content's refs (its slot detaches them on ITS teardown).
-function detachDeoptTreeRefs(node: Node, out: { ref: any; el: any }[] | null): void {
+function detachDeoptTreeRefs(
+	node: Node,
+	out: SuspenseRefEntry[] | null,
+	shouldDetach: boolean = true,
+	ownerScope?: Scope,
+): void {
 	const ref = getDeoptDesc(node)?.props?.ref;
 	if (ref != null) {
 		if (out !== null) {
 			// Suspense-hide: detach NOW (the caller re-attaches on reveal).
-			out.push({ ref, el: node });
-			attachRef(ref, null, node as Element);
+			out.push({ ref, el: node as Element, scope: ownerScope! });
+			if (shouldDetach) attachRef(ref, null, node as Element);
 		} else {
 			// Teardown: DEFER the detach to commit (drainRefDetaches), before the
 			// mount attaches. Teardown runs mid-render (reconcile/unmount), and a
@@ -15507,7 +15985,7 @@ function detachDeoptTreeRefs(node: Node, out: { ref: any; el: any }[] | null): v
 			c = nodeAfterPortalRange(c, rangeEnd);
 			continue;
 		}
-		detachDeoptTreeRefs(c, out);
+		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope);
 		c = c.nextSibling;
 	}
 }

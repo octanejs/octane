@@ -17,6 +17,7 @@ import {
 	ParallelInOneBoundary,
 	WaterfallBody,
 	ReplayChurnBody,
+	PendingPropSwap,
 } from './_fixtures/suspense.tsrx';
 
 interface Deferred<T> {
@@ -58,6 +59,28 @@ describe('Suspense — basic', () => {
 		const r = mount(BasicSuspense, { promise: p });
 		expect(r.find('.resolved').textContent).toBe('already');
 		expect(r.findAll('.fallback')).toHaveLength(0);
+		r.unmount();
+	});
+
+	it('keeps a newer pending prop when an older request settles last', async () => {
+		const older = deferred<string>();
+		const newer = deferred<string>();
+		const r = mount(PendingPropSwap, { promise: older.promise, label: 'Loading older' });
+		expect(r.find('.fallback').textContent).toBe('Loading older');
+
+		r.update(PendingPropSwap, { promise: newer.promise, label: 'Loading current' });
+		expect(r.find('.fallback').textContent).toBe('Loading current');
+
+		await act(() => {
+			older.resolve('stale');
+		});
+		expect(r.find('.fallback').textContent).toBe('Loading current');
+		expect(r.findAll('.resolved')).toHaveLength(0);
+
+		await act(() => {
+			newer.resolve('current');
+		});
+		expect(r.find('.resolved').textContent).toBe('current');
 		r.unmount();
 	});
 });

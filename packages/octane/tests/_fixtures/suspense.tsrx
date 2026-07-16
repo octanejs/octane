@@ -16,6 +16,24 @@ export function BasicSuspense(props) @{
 	</>
 }
 
+// A pending arm captures parent props too. When a newer request supersedes a
+// suspended one, both the hidden primary and the visible fallback must observe
+// the same current render rather than splitting across generations.
+export function PendingPropSwap(props) @{
+	<>
+		@try {
+			const value = use(props.promise);
+			<div class="resolved">
+				{value as string}
+			</div>
+		} @pending {
+			<div class="fallback">
+				{props.label as string}
+			</div>
+		}
+	</>
+}
+
 // `use` of a rejected promise rethrows the reason — caught by `catch`,
 // independent from the `pending` arm.
 export function CatchRejection(props) @{
