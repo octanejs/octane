@@ -9,11 +9,12 @@
 import * as THREE from 'three';
 import type {
 	UniversalEventListenerDescriptor,
+	UniversalEventPriority,
 	UniversalHostBatch,
 	UniversalHostDriver,
 	UniversalListenerDescriptor,
 } from 'octane/universal';
-import type { RootStore } from './store.js';
+import { removeInteractivity, swapInteractivity, type RootStore } from './store.js';
 import { createThreeObject, registerThreeNamespace, THREE_RENDERER_ID } from './catalogue.js';
 import {
 	attachString,
@@ -27,6 +28,32 @@ import { applyThreeProps, diffThreeProps } from './props.js';
 const THREE_DRIVER_STATE = Symbol('octane.three.driver.state');
 const OBJECT_INSTANCES = new WeakMap<object, ThreeHostInstance>();
 const PUBLIC_INSTANCES = new WeakMap<ThreeHostInstance, Instance>();
+const STORE_CONTAINERS = new WeakMap<RootStore, ThreeHostContainer>();
+const ACTIVE_EVENT_SCOPES = new WeakSet<RootStore>();
+
+const THREE_EVENT_PRIORITIES: Readonly<Record<string, UniversalEventPriority>> = Object.freeze({
+	onClick: 'discrete',
+	onContextMenu: 'discrete',
+	onDoubleClick: 'discrete',
+	onPointerDown: 'discrete',
+	onPointerUp: 'discrete',
+	onPointerCancel: 'discrete',
+	onPointerMissed: 'discrete',
+	onLostPointerCapture: 'discrete',
+	onWheel: 'continuous',
+	onPointerMove: 'continuous',
+	onPointerOver: 'continuous',
+	onPointerOut: 'continuous',
+	onPointerEnter: 'continuous',
+	onPointerLeave: 'continuous',
+});
+
+/** Canonical priority lookup shared by host descriptors and native dispatch. */
+export function getThreeHostEventPriority(name: string): UniversalEventPriority | undefined {
+	return Object.prototype.hasOwnProperty.call(THREE_EVENT_PRIORITIES, name)
+		? THREE_EVENT_PRIORITIES[name]
+		: undefined;
+}
 
 type ParentId = number | null | undefined;
 
@@ -96,11 +123,26 @@ interface ThreeDriverState {
 	disposalScheduled: boolean;
 }
 
+interface InteractionSnapshot {
+	readonly object: THREE.Object3D;
+	readonly live: boolean;
+	readonly eligible: boolean;
+}
+
+interface LogicalInteractionInstance {
+	readonly parent: ParentId;
+	readonly visible: boolean;
+}
+
 export interface ThreeHostEnvironment {
 	/** Called once after an accepted host batch, without requiring WebGL. */
 	invalidate?(): void;
 	/** Root state associated with a configured managed scene. */
 	readonly store?: RootStore;
+	/** Run all Three handlers from one platform event in one universal scope. */
+	eventScope?<T>(priority: UniversalEventPriority, run: () => T): T;
+	/** Dispatch a committed Three listener through its universal owner. */
+	dispatchEvent?(listener: number, payload: unknown): unknown;
 	/** Disable the default managed-root sRGB texture conversion. */
 	linear?: boolean;
 	/** Schedule accepted-object disposal after refs and layout cleanup. */
@@ -179,6 +221,7 @@ export function createThreeContainer(
 		},
 		[THREE_DRIVER_STATE]: state,
 	};
+	if (environment.store !== undefined) STORE_CONTAINERS.set(environment.store, container);
 	return container;
 }
 
@@ -245,6 +288,81 @@ function parseKey(key: string): readonly [number, string] {
 
 function isObject3D(value: unknown): value is THREE.Object3D {
 	return (value as THREE.Object3D | null)?.isObject3D === true;
+}
+
+function hasLiveRootConnection(
+	id: number,
+	instances: ReadonlyMap<number, LogicalInteractionInstance>,
+): boolean {
+	const seen = new Set<number>();
+	let currentId = id;
+	while (true) {
+		if (seen.has(currentId)) return false;
+		seen.add(currentId);
+		const instance = instances.get(currentId);
+		if (instance === undefined || !instance.visible) return false;
+		if (instance.parent === null) return true;
+		if (instance.parent === undefined) return false;
+		currentId = instance.parent;
+	}
+}
+
+function interactionSnapshot(
+	id: number,
+	object: unknown,
+	eventCount: number,
+	instances: ReadonlyMap<number, LogicalInteractionInstance>,
+): InteractionSnapshot | undefined {
+	if (!isObject3D(object)) return undefined;
+	const live = hasLiveRootConnection(id, instances);
+	return {
+		object,
+		live,
+		eligible: eventCount > 0 && object.raycast !== null && live,
+	};
+}
+
+function appendInteractivity(store: RootStore, object: THREE.Object3D): void {
+	const interaction = store.getState().internal.interaction;
+	if (!interaction.includes(object)) interaction.push(object);
+}
+
+function removeInteractionMembership(store: RootStore, object: THREE.Object3D): void {
+	const internal = store.getState().internal;
+	internal.interaction = internal.interaction.filter((candidate) => candidate !== object);
+}
+
+function reconcileInteractivity(
+	store: RootStore,
+	previous: InteractionSnapshot | undefined,
+	next: InteractionSnapshot | undefined,
+	replacement: boolean,
+): void {
+	const interaction = store.getState().internal.interaction;
+	const wasTracked = previous !== undefined && interaction.includes(previous.object);
+	const preservesPosition = wasTracked && previous.eligible && next?.eligible === true;
+	const transfersIdentity =
+		replacement &&
+		previous !== undefined &&
+		next !== undefined &&
+		next.live &&
+		previous.object !== next.object;
+	if (transfersIdentity) swapInteractivity(store, previous.object, next.object);
+
+	if (preservesPosition) {
+		appendInteractivity(store, next.object);
+		return;
+	}
+	if (previous !== undefined) {
+		const previousObject = transfersIdentity ? next!.object : previous.object;
+		const lostEligibility = previous.eligible && next?.live === true && !next.eligible;
+		if (next?.live === true && !lostEligibility) {
+			removeInteractionMembership(store, previousObject);
+		} else {
+			removeInteractivity(store, previousObject);
+		}
+	}
+	if (next?.eligible === true) appendInteractivity(store, next.object);
 }
 
 function objectForParent(
@@ -502,6 +620,68 @@ export function getThreeInstance<O extends object>(object: O): Instance<O> | nul
 	return instance === undefined ? null : getPublicInstance<O>(instance);
 }
 
+/** Return the committed universal listener descriptor for a managed Three object. */
+export function getThreeEventListener(
+	object: object,
+	type: string,
+): UniversalEventListenerDescriptor | undefined {
+	return OBJECT_INSTANCES.get(object)?.events.get(type);
+}
+
+/** Test whether a managed Three object has any, or any selected, event listeners. */
+export function hasThreeEventListeners(object: object, types?: readonly string[]): boolean {
+	const events = OBJECT_INSTANCES.get(object)?.events;
+	if (events === undefined) return false;
+	if (types === undefined) return events.size > 0;
+	return types.some((type) => events.has(type));
+}
+
+/** Return the configured root store that owns a managed Three object. */
+export function getThreeEventStore(object: object): RootStore | undefined {
+	return OBJECT_INSTANCES.get(object)?.container.environment.store;
+}
+
+/** Whether a raycast hit is connected through a visible managed Three path. */
+export function isThreeEventHitLive(object: THREE.Object3D): boolean {
+	let candidate: THREE.Object3D | null = object;
+	while (candidate !== null) {
+		const instance = OBJECT_INSTANCES.get(candidate);
+		if (instance !== undefined) {
+			return hasLiveRootConnection(instance.id, instance.container[THREE_DRIVER_STATE].instances);
+		}
+		candidate = candidate.parent;
+	}
+	return true;
+}
+
+/** Keep all Three handlers for one platform event in one universal event scope. */
+export function runThreeEventScope<T>(
+	store: RootStore,
+	priority: UniversalEventPriority,
+	run: () => T,
+): T {
+	if (ACTIVE_EVENT_SCOPES.has(store)) return run();
+	const eventScope = STORE_CONTAINERS.get(store)?.environment.eventScope;
+	if (eventScope === undefined) {
+		throw new Error('@octanejs/three: The configured root has no universal event scope.');
+	}
+	ACTIVE_EVENT_SCOPES.add(store);
+	try {
+		return eventScope(priority, run);
+	} finally {
+		ACTIVE_EVENT_SCOPES.delete(store);
+	}
+}
+
+/** Dispatch a committed Three listener through its universal owner and scheduler. */
+export function dispatchThreeEvent(store: RootStore, listener: number, payload: unknown): unknown {
+	const dispatchEvent = STORE_CONTAINERS.get(store)?.environment.dispatchEvent;
+	if (dispatchEvent === undefined) {
+		throw new Error('@octanejs/three: The configured root has no universal event dispatcher.');
+	}
+	return dispatchEvent(listener, payload);
+}
+
 /** Apply imperative Three props and invalidate the owning root when managed. */
 export function applyProps<T extends object>(
 	object: T,
@@ -522,6 +702,12 @@ export function createThreeDriver(
 	return {
 		id: renderer,
 		capabilities: { text: 'ignore', localHostCallbacks: true, visibility: true },
+		events: {
+			classify(name) {
+				const priority = getThreeHostEventPriority(name);
+				return priority === undefined ? null : { type: name, priority };
+			},
+		},
 		lifecycles: {
 			classify(name) {
 				return name === 'onUpdate' ? { type: 'update' } : null;
@@ -741,6 +927,13 @@ export function createThreeDriver(
 				for (const object of unpublishedOwned) disposeOwnedNow(object);
 				throw error;
 			}
+			const previousInteractions = new Map<number, InteractionSnapshot | undefined>();
+			for (const [id, instance] of state.instances) {
+				previousInteractions.set(
+					id,
+					interactionSnapshot(id, instance.object, instance.events.size, state.instances),
+				);
+			}
 
 			let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
 			let callbacksRan = false;
@@ -785,9 +978,32 @@ export function createThreeDriver(
 								});
 							});
 						} else if (command.op === 'recreate') {
+							const replacement = stagedReplacements.get(command.id)!;
+							if (!replacement.propsApplied) {
+								tasks.push(() => {
+									applyThreeProps(replacement.object, command.props, undefined, {
+										colorSpace: container.environment.linear !== true,
+									});
+								});
+							}
+							tasks.push(() => {
+								const store = container.environment.store;
+								if (store === undefined) return;
+								const previous = previousInteractions.get(command.id);
+								const simulated = simulation.get(command.id);
+								const next =
+									simulated === undefined
+										? undefined
+										: interactionSnapshot(
+												command.id,
+												replacement.object,
+												simulated.events.size,
+												simulation,
+											);
+								reconcileInteractivity(store, previous, next, true);
+							});
 							tasks.push(() => {
 								const instance = state.instances.get(command.id)!;
-								const replacement = stagedReplacements.get(command.id)!;
 								const previousObject = instance.object;
 								const previousOwned = instance.owned;
 								OBJECT_INSTANCES.delete(previousObject);
@@ -797,11 +1013,6 @@ export function createThreeDriver(
 								instance.type = replacement.type;
 								OBJECT_INSTANCES.set(instance.object, instance);
 								unpublishedOwned.delete(replacement.object);
-								if (!replacement.propsApplied) {
-									applyThreeProps(instance.object, command.props, undefined, {
-										colorSpace: container.environment.linear !== true,
-									});
-								}
 								if (previousOwned && instance.type !== 'primitive') {
 									enqueueDisposal(container, previousObject);
 								}
@@ -827,12 +1038,32 @@ export function createThreeDriver(
 						}
 					});
 
+					tasks.push(() => {
+						const store = container.environment.store;
+						if (store === undefined) return;
+						for (const [id, simulated] of simulation) {
+							if (stagedReplacements.has(id)) continue;
+							const instance = state.instances.get(id)!;
+							const interaction = interactionSnapshot(
+								id,
+								instance.object,
+								simulated.events.size,
+								simulation,
+							);
+							reconcileInteractivity(store, previousInteractions.get(id), interaction, false);
+						}
+					});
+
 					tasks.push(() => synchronizePhysicalTree(container, state, destroyed));
 
 					for (const id of destroyed) {
 						tasks.push(() => {
 							const instance = state.instances.get(id);
 							if (instance === undefined) return;
+							const store = container.environment.store;
+							if (store !== undefined && isObject3D(instance.object)) {
+								removeInteractivity(store, instance.object);
+							}
 							if (shouldDisposeRemoved(instance, state, destroyed)) {
 								enqueueDisposal(container, instance.object);
 							}

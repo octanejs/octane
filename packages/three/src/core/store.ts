@@ -8,6 +8,15 @@
 import * as THREE from 'three';
 import { createContext, useRef, useSyncExternalStore, withSlot } from 'octane/universal';
 import { createStore as createVanillaStore, type StoreApi } from 'zustand/vanilla';
+import type {
+	DomEvent,
+	EventManager,
+	Intersection,
+	PointerCaptureTarget,
+	ThreeEvent,
+} from './events.js';
+
+export type { EventManager } from './events.js';
 
 export type Dpr = number | readonly [min: number, max: number];
 
@@ -69,16 +78,6 @@ export interface Renderer {
 	[key: string]: any;
 }
 
-export interface EventManager<TTarget = unknown> {
-	priority: number;
-	enabled: boolean;
-	connected: TTarget | false;
-	handlers?: Readonly<Record<string, unknown>>;
-	connect?(target: TTarget): void;
-	disconnect?(): void;
-	[key: string]: unknown;
-}
-
 export interface XRManager {
 	connect(): void;
 	disconnect(): void;
@@ -102,12 +101,12 @@ export interface Performance {
 
 export interface InternalState {
 	interaction: THREE.Object3D[];
-	hovered: Map<string, unknown>;
+	hovered: Map<string, ThreeEvent<DomEvent>>;
 	subscribers: Subscription[];
-	capturedMap: Map<number, Map<THREE.Object3D, unknown>>;
+	capturedMap: Map<number, Map<THREE.Object3D, PointerCaptureTarget>>;
 	initialClick: [x: number, y: number];
 	initialHits: THREE.Object3D[];
-	lastEvent: { current: unknown | null };
+	lastEvent: { current: DomEvent | null };
 	active: boolean;
 	priority: number;
 	frames: number;
@@ -172,6 +171,246 @@ type Advance = (
 const identity = <T>(value: T): T => value;
 const STORE_CLEANUPS = new WeakMap<RootStore, () => void>();
 const ROOT_OBJECT_STORES = new WeakMap<object, RootStore>();
+
+interface PointerCaptureIdentity {
+	eventObject: THREE.Object3D;
+	intersection: Intersection;
+	pointerIds: Set<number>;
+}
+
+const POINTER_CAPTURE_IDENTITIES = new WeakMap<object, PointerCaptureIdentity>();
+const ACTIVE_POINTER_CAPTURE_IDENTITIES = new WeakMap<
+	THREE.Object3D,
+	Set<PointerCaptureIdentity>
+>();
+const POINTER_CAPTURE_TARGET_IDENTITIES = new WeakMap<
+	PointerCaptureTarget,
+	PointerCaptureIdentity
+>();
+
+/** Create the mutable identity cell used by an event's pointer-capture facade. */
+export function createPointerCaptureIdentity(intersection: Intersection): PointerCaptureIdentity {
+	return { eventObject: intersection.eventObject, intersection, pointerIds: new Set() };
+}
+
+/** Associate a public capture facade with its renderer-owned identity cell. */
+export function registerPointerCaptureFacade(
+	facade: object,
+	identity: PointerCaptureIdentity,
+): void {
+	POINTER_CAPTURE_IDENTITIES.set(facade, identity);
+}
+
+export function makeIntersectionId(
+	event: Pick<Intersection, 'eventObject' | 'object' | 'index' | 'instanceId'>,
+): string {
+	return `${(event.eventObject ?? event.object).uuid}/${event.index}/${event.instanceId}`;
+}
+
+function replaceIntersectionObject(
+	intersection: Intersection,
+	previous: THREE.Object3D,
+	next: THREE.Object3D,
+): Intersection {
+	const object = intersection.object === previous ? next : intersection.object;
+	const eventObject = intersection.eventObject === previous ? next : intersection.eventObject;
+	if (object === intersection.object && eventObject === intersection.eventObject)
+		return intersection;
+	return { ...intersection, object, eventObject };
+}
+
+function pointerCaptureIdentityObjects(identity: PointerCaptureIdentity): Set<THREE.Object3D> {
+	return new Set([identity.eventObject, identity.intersection.object]);
+}
+
+function indexPointerCaptureIdentity(identity: PointerCaptureIdentity): void {
+	if (identity.pointerIds.size === 0) return;
+	for (const object of pointerCaptureIdentityObjects(identity)) {
+		const identities = ACTIVE_POINTER_CAPTURE_IDENTITIES.get(object);
+		if (identities === undefined) {
+			ACTIVE_POINTER_CAPTURE_IDENTITIES.set(object, new Set([identity]));
+		} else {
+			identities.add(identity);
+		}
+	}
+}
+
+function unindexPointerCaptureIdentity(identity: PointerCaptureIdentity): void {
+	for (const object of pointerCaptureIdentityObjects(identity)) {
+		const identities = ACTIVE_POINTER_CAPTURE_IDENTITIES.get(object);
+		if (identities === undefined) continue;
+		identities.delete(identity);
+		if (identities.size === 0) ACTIVE_POINTER_CAPTURE_IDENTITIES.delete(object);
+	}
+}
+
+function activatePointerCaptureIdentity(
+	capture: PointerCaptureTarget,
+	identity: PointerCaptureIdentity,
+	pointerId: number,
+): void {
+	POINTER_CAPTURE_TARGET_IDENTITIES.set(capture, identity);
+	if (identity.pointerIds.has(pointerId)) return;
+	identity.pointerIds.add(pointerId);
+	if (identity.pointerIds.size === 1) indexPointerCaptureIdentity(identity);
+}
+
+function deactivatePointerCaptureIdentity(capture: PointerCaptureTarget, pointerId: number): void {
+	const identity = POINTER_CAPTURE_TARGET_IDENTITIES.get(capture);
+	if (identity === undefined || !identity.pointerIds.delete(pointerId)) return;
+	if (identity.pointerIds.size === 0) unindexPointerCaptureIdentity(identity);
+}
+
+function transferPointerCaptureIdentity(
+	identity: PointerCaptureIdentity,
+	previous: THREE.Object3D,
+	next: THREE.Object3D,
+): void {
+	const intersection = replaceIntersectionObject(identity.intersection, previous, next);
+	const eventObject = identity.eventObject === previous ? next : identity.eventObject;
+	if (intersection === identity.intersection && eventObject === identity.eventObject) return;
+
+	const active = identity.pointerIds.size > 0;
+	if (active) unindexPointerCaptureIdentity(identity);
+	identity.eventObject = eventObject;
+	identity.intersection = intersection;
+	if (active) indexPointerCaptureIdentity(identity);
+}
+
+function transferActivePointerCaptureIdentities(
+	previous: THREE.Object3D,
+	next: THREE.Object3D,
+): void {
+	const identities = ACTIVE_POINTER_CAPTURE_IDENTITIES.get(previous);
+	if (identities === undefined) return;
+	for (const identity of [...identities]) {
+		transferPointerCaptureIdentity(identity, previous, next);
+	}
+}
+
+function transferPointerCaptureEventIdentity(
+	event: ThreeEvent<DomEvent>,
+	previous: THREE.Object3D,
+	next: THREE.Object3D,
+): void {
+	for (const facade of [event.target, event.currentTarget]) {
+		const identity = POINTER_CAPTURE_IDENTITIES.get(facade);
+		if (identity === undefined) continue;
+		transferPointerCaptureIdentity(identity, previous, next);
+	}
+}
+
+export function setInternalPointerCapture(
+	capturedMap: Map<number, Map<THREE.Object3D, PointerCaptureTarget>>,
+	object: THREE.Object3D,
+	capture: PointerCaptureTarget,
+	identity: PointerCaptureIdentity,
+	pointerId: number,
+): void {
+	let captures = capturedMap.get(pointerId);
+	if (captures === undefined) {
+		captures = new Map();
+		capturedMap.set(pointerId, captures);
+	}
+	const previous = captures.get(object);
+	if (previous !== undefined) deactivatePointerCaptureIdentity(previous, pointerId);
+	captures.set(object, capture);
+	activatePointerCaptureIdentity(capture, identity, pointerId);
+}
+
+export function releaseInternalPointerCapture(
+	capturedMap: Map<number, Map<THREE.Object3D, PointerCaptureTarget>>,
+	object: THREE.Object3D,
+	captures: Map<THREE.Object3D, PointerCaptureTarget>,
+	pointerId: number,
+): void {
+	const capture = captures.get(object);
+	if (capture === undefined) return;
+	deactivatePointerCaptureIdentity(capture, pointerId);
+	captures.delete(object);
+	if (captures.size !== 0) return;
+	capturedMap.delete(pointerId);
+	capture.target.releasePointerCapture(pointerId);
+}
+
+export function clearInternalPointerCaptures(
+	capturedMap: Map<number, Map<THREE.Object3D, PointerCaptureTarget>>,
+	pointerId: number,
+): void {
+	const captures = capturedMap.get(pointerId);
+	if (captures === undefined) return;
+	for (const capture of captures.values()) {
+		deactivatePointerCaptureIdentity(capture, pointerId);
+	}
+	capturedMap.delete(pointerId);
+}
+
+/** Transfer every observable interaction identity during an accepted reconstruction. */
+export function swapInteractivity(
+	store: RootStore,
+	previous: THREE.Object3D,
+	next: THREE.Object3D,
+): void {
+	const { internal } = store.getState();
+	for (let index = 0; index < internal.interaction.length; index++) {
+		if (internal.interaction[index] === previous) internal.interaction[index] = next;
+	}
+	for (let index = 0; index < internal.initialHits.length; index++) {
+		if (internal.initialHits[index] === previous) internal.initialHits[index] = next;
+	}
+	transferActivePointerCaptureIdentities(previous, next);
+	for (const [key, hovered] of [...internal.hovered]) {
+		const replaced = replaceIntersectionObject(hovered, previous, next);
+		const intersections = hovered.intersections.map((intersection) =>
+			replaceIntersectionObject(intersection, previous, next),
+		);
+		const nestedChanged = intersections.some(
+			(intersection, index) => intersection !== hovered.intersections[index],
+		);
+		if (replaced === hovered && !nestedChanged) continue;
+
+		transferPointerCaptureEventIdentity(hovered, previous, next);
+		const nextHovered = { ...replaced, intersections } as ThreeEvent<DomEvent>;
+		internal.hovered.delete(key);
+		internal.hovered.set(makeIntersectionId(nextHovered), nextHovered);
+	}
+	for (const [pointerId, captures] of internal.capturedMap) {
+		for (const [eventObject, capture] of [...captures]) {
+			const nextEventObject = eventObject === previous ? next : eventObject;
+			const intersection = replaceIntersectionObject(capture.intersection, previous, next);
+			if (nextEventObject === eventObject && intersection === capture.intersection) continue;
+
+			const nextCapture = { ...capture, intersection };
+			const identity = POINTER_CAPTURE_TARGET_IDENTITIES.get(capture);
+			if (identity !== undefined) POINTER_CAPTURE_TARGET_IDENTITIES.set(nextCapture, identity);
+			captures.delete(eventObject);
+			const collision = captures.get(nextEventObject);
+			if (collision !== undefined) deactivatePointerCaptureIdentity(collision, pointerId);
+			captures.set(nextEventObject, nextCapture);
+		}
+	}
+}
+
+/** Remove all interaction state for an object that left the accepted host tree. */
+export function removeInteractivity(store: RootStore, object: THREE.Object3D): void {
+	const { internal } = store.getState();
+	internal.interaction = internal.interaction.filter((candidate) => candidate !== object);
+	internal.initialHits = internal.initialHits.filter((candidate) => candidate !== object);
+	for (const [key, hovered] of internal.hovered) {
+		if (hovered.eventObject === object || hovered.object === object) internal.hovered.delete(key);
+	}
+	for (const [pointerId, captures] of internal.capturedMap) {
+		for (const [eventObject, capture] of [...captures]) {
+			if (
+				eventObject === object ||
+				capture.intersection.object === object ||
+				capture.intersection.eventObject === object
+			) {
+				releaseInternalPointerCapture(internal.capturedMap, eventObject, captures, pointerId);
+			}
+		}
+	}
+}
 
 export function associateRootObject(object: object, store: RootStore): void {
 	ROOT_OBJECT_STORES.set(object, store);
@@ -294,7 +533,7 @@ export function createRootStore(invalidate: Invalidate, advance: Advance): RootS
 			scene: null as unknown as THREE.Scene,
 			raycaster: null as unknown as THREE.Raycaster,
 			clock: new THREE.Clock(),
-			events: { priority: 1, enabled: true, connected: false },
+			events: { priority: 1, enabled: true, connected: undefined },
 			xr: { connect() {}, disconnect() {} },
 			controls: null,
 			pointer,

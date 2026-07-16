@@ -75,7 +75,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Act\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:addAfterEffect",
@@ -147,7 +147,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Args\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:AttachFnType",
@@ -159,7 +159,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"AttachFnType\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:AttachType",
@@ -171,7 +171,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"AttachType\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:buildGraph",
@@ -195,7 +195,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Camera\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:CameraProps",
@@ -207,7 +207,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"CameraProps\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Canvas",
@@ -219,7 +219,7 @@
       },
       "classification": "browser-only",
       "reason": "Public export \"Canvas\" depends on DOM pointer or Canvas integration and requires the real-browser lane.",
-      "evidenceTarget": "packages/three/tests/browser/public-api.test.ts"
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
     },
     {
       "id": "export:CanvasProps",
@@ -231,7 +231,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"CanvasProps\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Catalogue",
@@ -243,7 +243,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Catalogue\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Color",
@@ -255,7 +255,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Color\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:ComputeFunction",
@@ -267,7 +267,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ComputeFunction\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:ConstructorRepresentation",
@@ -279,7 +279,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ConstructorRepresentation\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:context",
@@ -301,9 +301,9 @@
         "path": "packages/fiber/src/core/events.ts",
         "line": 173
       },
-      "classification": "browser-only",
-      "reason": "Public export \"createEvents\" depends on DOM pointer or Canvas integration and requires the real-browser lane.",
-      "evidenceTarget": "packages/three/tests/browser/public-api.test.ts"
+      "classification": "behavioral",
+      "reason": "The renderer-neutral raycast and propagation dispatcher is covered without WebGL through public root events.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "export:createPortal",
@@ -339,7 +339,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Disposable\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:dispose",
@@ -363,7 +363,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"DomEvent\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Dpr",
@@ -375,7 +375,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Dpr\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:ElementProps",
@@ -387,7 +387,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ElementProps\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Euler",
@@ -399,7 +399,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Euler\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:EventHandlers",
@@ -411,7 +411,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"EventHandlers\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:EventManager",
@@ -423,7 +423,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"EventManager\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:EventProps",
@@ -435,7 +435,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"EventProps\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:events",
@@ -445,9 +445,9 @@
         "path": "packages/fiber/src/web/events.ts",
         "line": 18
       },
-      "classification": "browser-only",
-      "reason": "Public export \"events\" depends on DOM pointer or Canvas integration and requires the real-browser lane.",
-      "evidenceTarget": "packages/three/tests/browser/public-api.test.ts"
+      "classification": "behavioral",
+      "reason": "The public DOM manager is installed on a root and exercised through its native handler table.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "export:Events",
@@ -459,7 +459,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Events\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:extend",
@@ -483,7 +483,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Extensions\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:FilterFunction",
@@ -495,7 +495,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"FilterFunction\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:flushGlobalEffects",
@@ -531,7 +531,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Frameloop\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:getRootState",
@@ -555,7 +555,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"GlobalEffectType\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:GlobalRenderCallback",
@@ -567,7 +567,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"GlobalRenderCallback\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:GLProps",
@@ -579,7 +579,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"GLProps\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:InjectState",
@@ -591,7 +591,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"InjectState\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Instance",
@@ -603,7 +603,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Instance\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:InstanceProps",
@@ -615,7 +615,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"InstanceProps\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Intersection",
@@ -627,7 +627,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Intersection\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:invalidate",
@@ -651,7 +651,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Layers\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:LoaderResult",
@@ -663,7 +663,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"LoaderResult\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:MathProps",
@@ -675,7 +675,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"MathProps\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:MathRepresentation",
@@ -687,7 +687,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"MathRepresentation\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:MathType",
@@ -699,7 +699,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"MathType\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:MathTypes",
@@ -711,7 +711,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"MathTypes\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Matrix3",
@@ -723,7 +723,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Matrix3\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Matrix4",
@@ -735,7 +735,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Matrix4\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:ObjectMap",
@@ -747,7 +747,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ObjectMap\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Performance",
@@ -759,7 +759,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Performance\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Quaternion",
@@ -771,7 +771,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Quaternion\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:RaycastableRepresentation",
@@ -783,7 +783,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"RaycastableRepresentation\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:ReactProps",
@@ -795,7 +795,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ReactProps\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:ReactThreeFiber",
@@ -807,7 +807,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ReactThreeFiber\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:reconciler",
@@ -831,7 +831,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ReconcilerRoot\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:RenderCallback",
@@ -843,7 +843,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"RenderCallback\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Renderer",
@@ -855,7 +855,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Renderer\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:RenderProps",
@@ -867,7 +867,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"RenderProps\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:RootState",
@@ -879,7 +879,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"RootState\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:RootStore",
@@ -891,7 +891,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"RootStore\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Size",
@@ -903,7 +903,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Size\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Subscription",
@@ -915,7 +915,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Subscription\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:ThreeElement",
@@ -927,7 +927,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ThreeElement\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:ThreeElements",
@@ -939,7 +939,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ThreeElements\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:ThreeEvent",
@@ -951,7 +951,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ThreeEvent\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:ThreeToJSXElements",
@@ -963,7 +963,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"ThreeToJSXElements\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:unmountComponentAtNode",
@@ -1059,7 +1059,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Vector2\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Vector3",
@@ -1071,7 +1071,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Vector3\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Vector4",
@@ -1083,7 +1083,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Vector4\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:VectorRepresentation",
@@ -1095,7 +1095,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"VectorRepresentation\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:Viewport",
@@ -1107,7 +1107,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Viewport\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "export:XRManager",
@@ -1119,7 +1119,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"XRManager\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     }
   ],
   "tests": [
@@ -1241,7 +1241,7 @@
       },
       "classification": "browser-only",
       "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
     },
     {
       "id": "test:fiber:events:34",
@@ -1251,9 +1251,9 @@
         "path": "packages/fiber/tests/events.test.tsx",
         "line": 34
       },
-      "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "classification": "behavioral",
+      "reason": "Miss delivery is deterministic and covered through the public WebGL-free root event path.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "test:fiber:events:59",
@@ -1263,9 +1263,9 @@
         "path": "packages/fiber/tests/events.test.tsx",
         "line": 59
       },
-      "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "classification": "behavioral",
+      "reason": "Click target gating and non-miss behavior are deterministic public root contracts.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "test:fiber:events:94",
@@ -1275,9 +1275,9 @@
         "path": "packages/fiber/tests/events.test.tsx",
         "line": 94
       },
-      "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "classification": "behavioral",
+      "reason": "Physical Three ancestry and parent miss suppression are deterministic root behavior.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "test:fiber:events:131",
@@ -1288,8 +1288,8 @@
         "line": 131
       },
       "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "reason": "The public Canvas miss callback is covered from a real DOM source through the browser fixture.",
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
     },
     {
       "id": "test:fiber:events:153",
@@ -1299,9 +1299,9 @@
         "path": "packages/fiber/tests/events.test.tsx",
         "line": 153
       },
-      "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "classification": "behavioral",
+      "reason": "Move, enter, over, out, and leave ordering is deterministic raycast behavior.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "test:fiber:events:193",
@@ -1311,9 +1311,9 @@
         "path": "packages/fiber/tests/events.test.tsx",
         "line": 193
       },
-      "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "classification": "behavioral",
+      "reason": "Raycast propagation and hover occlusion are deterministic public event behavior.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "test:fiber:events:231",
@@ -1323,9 +1323,9 @@
         "path": "packages/fiber/tests/events.test.tsx",
         "line": 231
       },
-      "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "classification": "behavioral",
+      "reason": "Click propagation is covered through the same public ordered-hit dispatcher.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "test:fiber:events:273",
@@ -1335,9 +1335,9 @@
         "path": "packages/fiber/tests/events.test.tsx",
         "line": 273
       },
-      "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "classification": "behavioral",
+      "reason": "Primitive reconstruction event transfer is observable without WebGL.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "test:fiber:events:316",
@@ -1347,9 +1347,9 @@
         "path": "packages/fiber/tests/events.test.tsx",
         "line": 316
       },
-      "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "classification": "behavioral",
+      "reason": "Args reconstruction event transfer is deterministic host and root behavior.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "test:fiber:events:360",
@@ -1359,9 +1359,9 @@
         "path": "packages/fiber/tests/events.test.tsx",
         "line": 360
       },
-      "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "classification": "behavioral",
+      "reason": "Hover and capture state transfer across reconstruction is deterministic root behavior.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "test:fiber:events:448",
@@ -1373,7 +1373,7 @@
       },
       "classification": "browser-only",
       "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
     },
     {
       "id": "test:fiber:events:487",
@@ -1385,7 +1385,7 @@
       },
       "classification": "browser-only",
       "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
     },
     {
       "id": "test:fiber:events:544",
@@ -1395,9 +1395,9 @@
         "path": "packages/fiber/tests/events.test.tsx",
         "line": 544
       },
-      "classification": "browser-only",
-      "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "classification": "behavioral",
+      "reason": "Primitive descendant bubbling is a deterministic physical Three ancestry contract.",
+      "evidenceTarget": "packages/three/tests/events.test.ts"
     },
     {
       "id": "test:fiber:events:571",
@@ -1409,7 +1409,7 @@
       },
       "classification": "browser-only",
       "reason": "The pointer and raycast contract depends on DOM event coordinates, capture, and a real Canvas event source.",
-      "evidenceTarget": "packages/three/tests/browser/events.test.ts"
+      "evidenceTarget": "packages/three/tests/browser/bundlers.test.ts"
     },
     {
       "id": "test:fiber:hooks:29",
@@ -1721,7 +1721,7 @@
       },
       "classification": "type-package",
       "reason": "This case freezes the package export and web/native type surface rather than a rendered scene behavior.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "test:fiber:index:308",
@@ -1733,7 +1733,7 @@
       },
       "classification": "type-package",
       "reason": "This case freezes the package export and web/native type surface rather than a rendered scene behavior.",
-      "evidenceTarget": "packages/three/typetests/public-api.ts"
+      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
     },
     {
       "id": "test:fiber:polyfills:10",
@@ -1948,8 +1948,8 @@
         "line": 273
       },
       "classification": "behavioral",
-      "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
-      "evidenceTarget": "packages/three/tests/driver.test.ts"
+      "reason": "Direct testing events prove that committed handler updates replace the previously delivered listener.",
+      "evidenceTarget": "packages/three/tests/testing-events.test.ts"
     },
     {
       "id": "test:fiber:renderer:297",

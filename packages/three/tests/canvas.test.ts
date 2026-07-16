@@ -1,13 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'octane';
-import type { Renderer, RootState } from '../src/core/index.js';
+import { events as createPointerEvents } from '../src/index.js';
+import type { EventManager, Renderer, RootState } from '../src/core/index.js';
 import { mount, type MountResult } from '../../octane/tests/_helpers.js';
-import {
-	CanvasApp,
-	CanvasErrorApp,
-	ContextCanvasApp,
-	EmptyCanvasApp,
-} from './_fixtures/canvas-app.tsrx';
+import { CanvasApp, ContextCanvasApp, EmptyCanvasApp } from './_fixtures/canvas-app.tsrx';
 
 class ControlledResizeObserver implements ResizeObserver {
 	static instances: ControlledResizeObserver[] = [];
@@ -77,6 +73,23 @@ async function flushCanvasWork(): Promise<void> {
 	for (let index = 0; index < 8; index++) await Promise.resolve();
 	flushSync(() => {});
 	for (let index = 0; index < 4; index++) await Promise.resolve();
+}
+
+function dispatchCoordinates(
+	target: HTMLElement,
+	values: { offsetX: number; offsetY: number; clientX: number; clientY: number },
+): void {
+	const event = new MouseEvent('pointermove', {
+		bubbles: true,
+		clientX: values.clientX,
+		clientY: values.clientY,
+	});
+	Object.defineProperties(event, {
+		offsetX: { configurable: true, value: values.offsetX },
+		offsetY: { configurable: true, value: values.offsetY },
+		pointerId: { configurable: true, value: 1 },
+	});
+	target.dispatchEvent(event);
 }
 
 describe('Canvas', () => {
@@ -210,21 +223,179 @@ describe('Canvas', () => {
 		expect(onCreated.mock.calls[0][0].scene.children).toEqual([]);
 	});
 
-	it('routes unsupported pointer configuration through the owning DOM boundary', async () => {
+	it('connects one event manager and rebinds external sources and coordinate prefixes', async () => {
 		const { factory } = rendererHarness();
-		mounted = mount(CanvasErrorApp, {
+		const firstSource = document.createElement('section');
+		const secondSource = document.createElement('section');
+		const thirdSource = document.createElement('section');
+		const onCreated = vi.fn<(state: RootState) => void>();
+		const eventFactory = vi.fn((store) => {
+			const manager = createPointerEvents(store);
+			return { ...manager, customField: 'retained' } as EventManager<HTMLElement>;
+		});
+		const props = {
 			gl: factory,
+			canvasRef: null,
+			objectRef: { current: null },
+			onCreated,
 			onPointerMissed: () => {},
+			events: eventFactory,
+			label: 'events',
+			background: 'transparent',
+			raycaster: undefined,
+			name: 'event-scene',
+		};
+		mounted = mount(CanvasApp, {
+			...props,
+			eventSource: firstSource,
+			eventPrefix: 'client',
 		});
 
-		ControlledResizeObserver.instances[0].emit({ width: 300, height: 150 });
+		ControlledResizeObserver.instances[0].emit({ width: 100, height: 100 });
 		await flushCanvasWork();
-
-		expect(mounted.find('.canvas-error').textContent).toMatch(
-			/Pointer event configuration.*Milestone 4/,
+		const state = onCreated.mock.calls[0][0];
+		expect(eventFactory).toHaveBeenCalledOnce();
+		expect(eventFactory).toHaveBeenCalledWith(
+			expect.objectContaining({ getState: expect.any(Function) }),
 		);
-		expect(factory).not.toHaveBeenCalled();
-		expect(ControlledResizeObserver.instances[0].disconnect).toHaveBeenCalledTimes(1);
+		expect(state.get().events.connected).toBe(firstSource);
+		expect(
+			(state.get().events as EventManager<HTMLElement> & { customField: string }).customField,
+		).toBe('retained');
+		expect((mounted.find('.canvas-shell') as HTMLDivElement).style.pointerEvents).toBe('none');
+
+		dispatchCoordinates(firstSource, { offsetX: 10, offsetY: 90, clientX: 75, clientY: 25 });
+		expect([state.pointer.x, state.pointer.y]).toEqual([0.5, 0.5]);
+
+		mounted.update(CanvasApp, {
+			...props,
+			eventSource: secondSource,
+			eventPrefix: 'offset',
+		});
+		await flushCanvasWork();
+		expect(eventFactory).toHaveBeenCalledOnce();
+		expect(factory).toHaveBeenCalledOnce();
+		expect(onCreated).toHaveBeenCalledOnce();
+		expect(state.get().events.connected).toBe(secondSource);
+
+		dispatchCoordinates(firstSource, { offsetX: 50, offsetY: 50, clientX: 50, clientY: 50 });
+		expect([state.pointer.x, state.pointer.y]).toEqual([0.5, 0.5]);
+		dispatchCoordinates(secondSource, { offsetX: 25, offsetY: 75, clientX: 90, clientY: 10 });
+		expect([state.pointer.x, state.pointer.y]).toEqual([-0.5, -0.5]);
+
+		const userCompute = vi.fn();
+		state.setEvents({ compute: userCompute });
+		mounted.update(CanvasApp, {
+			...props,
+			eventSource: thirdSource,
+			eventPrefix: 'offset',
+		});
+		await flushCanvasWork();
+		expect(state.get().events.compute).toBe(userCompute);
+		mounted.update(CanvasApp, {
+			...props,
+			eventSource: thirdSource,
+			eventPrefix: undefined,
+		});
+		await flushCanvasWork();
+		expect(state.get().events.compute).toBe(userCompute);
+
+		mounted.unmount();
+		mounted = null;
+		expect(state.get().events.connected).toBeUndefined();
+	});
+
+	it('preserves onCreated event ownership and tracks ref targets with wrapper fallback', async () => {
+		const { factory } = rendererHarness();
+		const configuredSource = document.createElement('section');
+		const userSource = document.createElement('section');
+		const nextSource = document.createElement('section');
+		const finalSource = document.createElement('section');
+		const sourceRef = { current: nextSource as HTMLElement | null };
+		const userCompute = vi.fn();
+		const onCreated = vi.fn((state: RootState) => {
+			state.events.connect?.(userSource);
+			state.setEvents({ compute: userCompute });
+		});
+		const props = {
+			gl: factory,
+			canvasRef: null,
+			objectRef: { current: null },
+			onCreated,
+			onPointerMissed: () => {},
+			events: createPointerEvents,
+			label: 'on-created-events',
+			background: 'transparent',
+			raycaster: undefined,
+			name: 'on-created-event-scene',
+		};
+		mounted = mount(CanvasApp, {
+			...props,
+			eventSource: configuredSource,
+			eventPrefix: undefined,
+		});
+
+		ControlledResizeObserver.instances[0].emit({ width: 100, height: 100 });
+		await flushCanvasWork();
+		const state = onCreated.mock.calls[0][0];
+		expect(state.get().events.connected).toBe(userSource);
+		expect(state.get().events.compute).toBe(userCompute);
+
+		mounted.update(CanvasApp, {
+			...props,
+			eventSource: configuredSource,
+			eventPrefix: 'client',
+		});
+		await flushCanvasWork();
+		expect(state.get().events.connected).toBe(userSource);
+		expect(state.get().events.compute).not.toBe(userCompute);
+
+		mounted.update(CanvasApp, {
+			...props,
+			eventSource: configuredSource,
+			eventPrefix: undefined,
+		});
+		await flushCanvasWork();
+		expect(state.get().events.compute).toBe(userCompute);
+
+		mounted.update(CanvasApp, {
+			...props,
+			eventSource: sourceRef,
+			eventPrefix: undefined,
+		});
+		await flushCanvasWork();
+		expect(state.get().events.connected).toBe(nextSource);
+
+		const wrapper = mounted.find('.canvas-shell') as HTMLDivElement;
+		sourceRef.current = finalSource;
+		mounted.update(CanvasApp, {
+			...props,
+			eventSource: sourceRef,
+			eventPrefix: undefined,
+		});
+		await flushCanvasWork();
+		expect(state.get().events.connected).toBe(finalSource);
+		expect(wrapper.style.pointerEvents).toBe('none');
+		userCompute.mockClear();
+		dispatchCoordinates(nextSource, { offsetX: 10, offsetY: 90, clientX: 10, clientY: 90 });
+		expect(userCompute).not.toHaveBeenCalled();
+		dispatchCoordinates(finalSource, { offsetX: 25, offsetY: 75, clientX: 25, clientY: 75 });
+		expect(userCompute).toHaveBeenCalledOnce();
+
+		sourceRef.current = null;
+		mounted.update(CanvasApp, {
+			...props,
+			eventSource: sourceRef,
+			eventPrefix: undefined,
+		});
+		await flushCanvasWork();
+		expect(state.get().events.connected).toBe(wrapper);
+		expect(wrapper.style.pointerEvents).toBe('auto');
+		userCompute.mockClear();
+		dispatchCoordinates(finalSource, { offsetX: 50, offsetY: 50, clientX: 50, clientY: 50 });
+		expect(userCompute).not.toHaveBeenCalled();
+		dispatchCoordinates(wrapper, { offsetX: 75, offsetY: 25, clientX: 75, clientY: 25 });
+		expect(userCompute).toHaveBeenCalledOnce();
 	});
 
 	it('bridges ordinary Octane context from the DOM owner into Three children', async () => {

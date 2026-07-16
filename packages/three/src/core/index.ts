@@ -20,16 +20,19 @@ export {
 } from './loop.js';
 export { createRoot, unmountComponentAtNode } from './root.js';
 export { RootStoreContext as context, calculateDpr } from './store.js';
+export { createEvents } from './events.js';
 export type {
 	Args,
 	Attach,
 	Catalogue,
 	ConstructorRepresentation,
+	EventProps,
 	InstanceProps,
 	MathRepresentation,
 	MathType,
 	MathTypes,
 	PrimitiveProps,
+	RaycastableRepresentation,
 	ThreeElement,
 	ThreeElements,
 	ThreeInstanceProps,
@@ -39,6 +42,18 @@ export type {
 	ThreeToJSXElements,
 	VectorRepresentation,
 } from './catalogue.js';
+export type {
+	ComputeFunction,
+	DomEvent,
+	EventHandlers,
+	EventManager,
+	Events,
+	FilterFunction,
+	Intersection,
+	IntersectionEvent,
+	PointerCaptureTarget,
+	ThreeEvent,
+} from './events.js';
 export type { Instance } from './driver.js';
 export type { ObjectMap, RefObject } from './hooks.js';
 export type { GlobalEffectType, GlobalRenderCallback } from './loop.js';
@@ -53,7 +68,6 @@ export type {
 export type {
 	Camera,
 	Dpr,
-	EventManager,
 	Frameloop,
 	InternalState,
 	Performance,
