@@ -646,7 +646,10 @@ thenable's settled result regardless of the new thenable's identity), so it
 tolerates a fresh Octane pass per replay provided Octane's unwrap order is
 deterministic across replays — which the strata design already requires. The
 hosted-session variant needs real per-request storage (`AsyncLocalStorage` on
-Node) and an explicit answer for edge runtimes without it.
+Node) and an explicit answer for edge runtimes without it. A Fizz-provided
+request cache is not an option: in React 19.2.7, `React.cache` outside Flight is
+a non-memoizing passthrough and Fizz's async dispatcher `getCacheForType` throws
+(see the internals inventory in §17).
 
 Module-global mutable request state is forbidden. The chosen mechanism must retain
 Octane's parallel-`use()` strata, stable call-site identity, rejection routing, and
@@ -740,7 +743,11 @@ ownership primitive.
   Ordinary React nesting around several sibling islands is supported.
 - **Multiple ReactDOM copies/renderers:** cache Fiber property keys per discovered
   renderer/suffix rather than assuming one module-global key. Unsupported renderer
-  shapes fall back to `HostContextRequest`.
+  shapes fall back to `HostContextRequest`. The DevTools hook
+  (`__REACT_DEVTOOLS_GLOBAL_HOOK__.renderers`) is a read-only renderer census —
+  runtime version pinning plus a fail-fast diagnostic when the renderer that owns
+  the host is not the React copy `octane/react` imported (`currentDispatcherRef`
+  identity).
 
 ## 11. Zero-cost and allocation budget
 
@@ -797,8 +804,14 @@ Recommended package shape:
 - Client ownership is an implementation of the existing
   `RendererRegionOwnerBridge`; changes to that interface remain renderer-neutral
   and keep its universal-renderer users working.
-- Private Fiber code lives in the React package behind one adapter module and a
-  React-minor compatibility matrix.
+- Private React internals — the Fiber property scrape, `ReactSharedInternals.T`,
+  `ReactDOMSharedInternals.p`, and the DevTools renderer census — live in the
+  React package behind one adapter module and a React-minor compatibility
+  matrix. Every internal must sit behind feature detection and degrade to
+  reduced fidelity, never incorrectness: transition/priority entanglement may
+  downgrade to default priority; only the Fiber bootstrap has a
+  correctness-adjacent role, and it already carries the public
+  `HostContextRequest` fallback.
 
 Do not reuse PR #23's `react()` Vite alias plugin in a React host application. It
 would replace the actual React renderer whose context dependencies, boundaries,
@@ -1050,7 +1063,11 @@ not `O(islands × global event types)`.
 8. Whether a future stream multiplexer can support progressive Octane boundary
    waves inside Fizz.
 9. Whether React transition priority can/should cross updates originating in the
-   Octane scheduler.
+   Octane scheduler. The candidate mechanism is pinned (§17 internals
+   inventory): `ReactSharedInternals.T` marks transition scopes in both
+   directions and `ReactDOMSharedInternals.p` preserves discrete priority
+   across deferred Octane flushes. Open is whether the semantics are wanted,
+   not how.
 10. Whether a future React Fragment-ref/range API can remove the host element
     without compromising ownership and events.
 11. Durable server-session/replay storage across Fizz retries.
@@ -1169,6 +1186,51 @@ Prototypes against the repository's React/ReactDOM 19 toolchain established:
 
 These prototypes are evidence, not the implementation. Phase 0 converts each one
 into committed behavioral coverage before core changes begin.
+
+### React 19.2.7 internals inventory
+
+A source audit of the installed React/ReactDOM 19.2.7 builds pinned which
+internals help and which cannot. Adopted levers (fidelity-only, isolated in the
+version-tested adapter per §12):
+
+- `ReactSharedInternals.T`: `startTransition` sets `T = {}` synchronously around
+  its scope. Reading `T !== null` when an Octane update is scheduled detects a
+  React transition scope; setting `T` around Octane's own `startTransition`
+  lets React updates issued inside inherit transition treatment.
+- `ReactDOMSharedInternals.p`: `resolveUpdatePriority()` consults `p` before
+  falling back to `window.event`. Synchronous Octane handlers already inherit
+  discrete priority through `window.event`; a deferred Octane flush that calls a
+  React setter loses it. Setting `p` around a discrete-originated flush —
+  exactly what `flushSync` does internally — preserves it.
+- `__REACT_DEVTOOLS_GLOBAL_HOOK__.renderers`: read-only renderer census for
+  runtime version pinning and multi-copy diagnostics (§10).
+- `captureOwnerStack()` (public, development builds): React owner stacks on
+  island error/hydration diagnostics.
+
+Verified dead ends — do not re-investigate without a React version change:
+
+- **Fizz request-scoped cache:** `React.cache` outside Flight is a non-memoizing
+  passthrough and Fizz's `DefaultAsyncDispatcher.getCacheForType` throws
+  "Not implemented.", so the durable server-session question (§15) cannot be
+  solved with `cache()`.
+- **DevTools `findFiberByHostInstance`:** removed from the React 19.2 injection
+  payload (absent from development and production builds); the payload is only
+  `{bundleType, version, rendererPackageName, currentDispatcherRef,
+  reconcilerVersion}`. The `__reactFiber$` property scrape is the only
+  host→Fiber channel.
+- **Manual `fiber.dependencies` injection:** React resets `dependencies` at
+  every render start, so an injected context entry survives only until the
+  wrapper's next render; all it would elide is the coalesced first-discovery
+  notification.
+- **Running the hosted client render inside React's render phase** with the live
+  dispatcher: React render attempts are replayable and abortable while Octane
+  rendering is DOM-effectful; the §6.2 registry loop is the minimal safe form —
+  replay the context reads in React render, never the render itself.
+- **`unstable_createEventHandle`** (React-ancestor visibility for external
+  portals): experimental-channel only; not compiled into stable 19.2.
+- **`hook.onCommitFiberRoot` batching of island publishes:** violates lifecycle
+  rule 4 (§5) — outer React layout effects must synchronously observe committed
+  Octane DOM.
 
 ## 18. Definition of done
 
