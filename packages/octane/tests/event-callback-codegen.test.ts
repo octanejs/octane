@@ -79,12 +79,16 @@ describe('compiler-owned native event callbacks', () => {
 			hmr: false,
 			dev: false,
 		}).code;
-		const assignments = (code: string) => code.match(/\["\$\$click"\] = \(event\)/g)?.length ?? 0;
+		const directAssignments = (code: string) =>
+			code.match(/\["\$\$click"\] = \(event\)/g)?.length ?? 0;
+		const sourceResolvedWrites = (code: string) =>
+			code.match(/_\$setHostPropSources\(/g)?.length ?? 0;
 
 		// The old installed wrapper reads the same committed cell, so an isolated
 		// native slot needs no per-render write. A spread can overwrite that slot,
-		// therefore the explicit event remains live to reassert JSX source order.
-		expect(assignments(mountOnly)).toBe(1);
-		expect(assignments(spreadShared)).toBe(2);
+		// therefore the final source resolver remains live on mount and update to
+		// reassert JSX source order.
+		expect(directAssignments(mountOnly)).toBe(1);
+		expect(sourceResolvedWrites(spreadShared)).toBe(2);
 	});
 });

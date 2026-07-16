@@ -194,6 +194,48 @@ describe('vite plugin gate routing', () => {
 		expect(config.resolve.dedupe).toContain('octane');
 	});
 
+	it('honors source-package Vite family exclusions without rebasing dependency resolution', () => {
+		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-vite-exclusions-'));
+		try {
+			writeFileSync(
+				join(fixtureRoot, 'package.json'),
+				JSON.stringify({
+					name: 'binding-only-consumer',
+					private: true,
+					dependencies: {
+						'@lexical/selection': '0.46.0',
+						'@octanejs/lexical': '0.1.6',
+					},
+				}),
+			);
+			const scope = join(fixtureRoot, 'node_modules/@octanejs');
+			mkdirSync(scope, { recursive: true });
+			symlinkSync(join(process.cwd(), 'packages/lexical'), join(scope, 'lexical'), 'dir');
+
+			const config = (octane().config as any)({ root: fixtureRoot });
+			expect(config.optimizeDeps.exclude).toEqual(
+				expect.arrayContaining([
+					'@lexical/list',
+					'@lexical/rich-text',
+					'@lexical/selection',
+					'@octanejs/lexical',
+					'lexical',
+				]),
+			);
+			// Vite's package resolver requires exact package IDs here. Octane expands
+			// the binding-owned family rule across both the binding and app manifests.
+			expect(config.optimizeDeps.exclude).not.toContain('@lexical/*');
+			expect(config.resolve.dedupe).toContain('octane');
+			expect(config.resolve.dedupe).not.toContain('lexical');
+			expect(config.resolve.dedupe).not.toContain('@lexical/selection');
+			expect(config.ssr.noExternal).toContain('@octanejs/lexical');
+			expect(config.ssr.noExternal).not.toContain('lexical');
+			expect(config.ssr.noExternal).not.toContain('@lexical/selection');
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
 	it('forwards declarative renderer selection through the direct Vite adapter', () => {
 		const rendererPlugin = octane({
 			hmr: false,
@@ -565,6 +607,7 @@ describe('manifest-declared manual hook slots', () => {
 			.sort();
 		expect(declared).toEqual([
 			'base-ui',
+			'dexie',
 			'dnd-kit',
 			'floating-ui',
 			'i18next',
@@ -578,6 +621,7 @@ describe('manifest-declared manual hook slots', () => {
 			'stylex',
 			'tanstack-query',
 			'tanstack-router',
+			'tanstack-store',
 			'tanstack-table',
 			'tanstack-virtual',
 			'testing-library',

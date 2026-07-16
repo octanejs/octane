@@ -3,7 +3,7 @@
 [TanStack AI](https://tanstack.com/ai) bindings for the
 [Octane](https://github.com/octanejs/octane) UI framework.
 
-This package ports `@tanstack/ai-react@0.16.4` onto Octane while reusing
+This package ports `@tanstack/ai-react@0.17.0` onto Octane while reusing
 `@tanstack/ai` and `@tanstack/ai-client` unchanged. The runtime export surface
 matches the React adapter, so migration starts by changing the package import:
 
@@ -93,10 +93,14 @@ initial message snapshot without browser-only setup.
   `onInput`; there is no synthetic `onChange` layer.
 - Octane has no StrictMode double-invoke and always provides `useId`, so no
   random-id fallback is needed.
+- Realtime reconnects and token refreshes use the latest `getToken` and adapter
+  supplied to the hook; upstream captures the first render's callbacks.
+- The declared realtime `onStatusChange` callback is invoked alongside the
+  hook's state update; upstream 0.17.0 currently drops the external callback.
 - One upstream `useChat` test case ("auto-resume on mount / when the browser
   comes back online") is omitted: it targets
   `ChatClient.prototype.maybeAutoResume`, an API absent from the pinned (and
-  latest published) `@tanstack/ai-client@0.20.0` and never invoked by
+  latest published) `@tanstack/ai-client@0.21.0` and never invoked by
   `useChat`. It is untestable in this binding until that dependency ships the
   method.
 
@@ -106,7 +110,7 @@ The port runs TanStack AI's React adapter tests against Octane across all
 eleven hooks, with no skipped, todo, or expected-failure cases (except the
 untestable auto-resume case above). A differential test compiles a shared
 chat fixture for Octane and React and compares streamed output after each
-step; output is byte-equal against real `@tanstack/ai-react@0.16.4`. An SSR
+step; output is byte-equal against real `@tanstack/ai-react@0.17.0`. An SSR
 fixture and the upstream compile-time type tests are also included.
 
 Current scope and verification status are tracked in the generated

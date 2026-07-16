@@ -38,6 +38,26 @@ behavioral, differential, browser-only, type/package evidence, or not
 applicable. It is release evidence, not permission to copy Fiber ownership
 internals into Octane.
 
+Milestone 5 follows the pinned `useLoader` observable contract: constructor
+loaders are singleton instances, cache identity combines the loader and
+normalized input, GLTF-shaped results receive the public graph map, and
+`preload`/`clear` share that same key. Cache eviction does not imply asset
+disposal; disposal follows Octane's declarative host ownership instead.
+
+Milestone 6 follows the pinned `createPortal` contract: the supplied
+`Object3D` is a borrowed physical target, the portal store has an immediate
+`previousRoot` plus local scene/raycaster/pointer/event state, and pointer
+events bubble through physical Three ancestry. Octane's universal portal range
+retains logical context, error, effect, and scheduling ownership without
+embedding React Reconciler or representing the target as a fake host child.
+
+Milestone 7 follows the pinned web `Canvas` contract: the server emits the
+ordinary DOM wrapper, canvas, and native fallback while omitting Three children.
+Hydration adopts those DOM nodes, then positive client measurement creates one
+fresh Three root. Scene setup, constructors, and loaders remain outside the
+server execution path; client Three suspension and errors project through the
+owning DOM boundary, and deleting the Canvas tears down the nested root.
+
 ## License provenance
 
 React Three Fiber is MIT-licensed, Copyright 2019–2025 Poimandres. Adapted

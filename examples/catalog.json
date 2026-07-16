@@ -157,6 +157,77 @@
       ]
     },
     {
+      "directory": "examples/draftboard",
+      "id": "draftboard",
+      "title": "Draftboard",
+      "summary": "A production-built SVG whiteboard proving Octane pointer capture, imperative refs, keyed identity, keyboard history, portals, and resilient autosave.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": [],
+      "octaneFeatures": [
+        "high-frequency-updates",
+        "imperative-handles",
+        "keyed-reconciliation",
+        "native-events",
+        "portals",
+        "refs-as-props",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deep-link-load-empty-autosave",
+          "title": "Load deterministic deep-linked boards and persist a first object from the empty canvas",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "captured-group-drag-identity",
+          "title": "Capture a high-frequency multi-object drag beyond the SVG while a keyed survivor retains identity",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "draw-pan-zoom",
+          "title": "Draw a rectangle, zoom through the canvas handle, and pan the native SVG surface",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "imperative-focus-keyboard-history-portal",
+          "title": "Focus imperatively, undo and redo keyboard edits, and restore focus from portaled help",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "failure-offline-rapid-convergence",
+          "title": "Retry deterministic failures while rapid offline edits converge to the latest saved board",
+          "kind": "resilience",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "initial-load-failure",
+          "description": "The load-failure scenario fails one deterministic board load and succeeds on explicit retry."
+        },
+        {
+          "id": "autosave-failure",
+          "description": "The save-failure scenario keeps edits visible through one failed autosave and saves the latest document on retry."
+        },
+        {
+          "id": "offline-edit-queue",
+          "description": "Native offline events queue completed canvas actions and reconnect saves the latest document."
+        }
+      ]
+    },
+    {
       "directory": "examples/flowboard",
       "id": "flowboard",
       "title": "Flowboard",
@@ -219,6 +290,80 @@
         {
           "id": "offline-local-moves",
           "description": "The browser disconnects while several issue moves remain usable and visibly queued locally."
+        }
+      ]
+    },
+    {
+      "directory": "examples/gridlab",
+      "id": "gridlab",
+      "title": "Gridlab",
+      "summary": "A local-first virtualized spreadsheet proving Octane keyboard, clipboard, IME, formula, focus, and overlapping sync behavior.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/tanstack-virtual"],
+      "octaneFeatures": [
+        "controlled-inputs",
+        "keyed-reconciliation",
+        "native-events",
+        "refs-as-props",
+        "tsrx-control-flow",
+        "two-axis-virtualization"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deterministic-formulas-empty-responsive",
+          "title": "Open deterministic formulas, restore an empty workbook, and keep the mobile grid usable",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "two-axis-virtual-focus",
+          "title": "Scroll both virtual axes while selection focus survives and navigate to a distant cell",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "native-clipboard-range",
+          "title": "Copy and paste a native tabular selection without losing cell focus",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "ime-editor-formulas",
+          "title": "Keep composition in the cell editor and recalculate committed formulas",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "offline-overlap-recovery",
+          "title": "Retry load and sync failures without dropping rapid edits across an offline interleaving",
+          "kind": "resilience",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "initial-load-failure",
+          "description": "The deterministic fixture fails once before a user-triggered retry opens the workbook."
+        },
+        {
+          "id": "offline-edit-queue",
+          "description": "Repeated and cross-cell changes remain local while the browser is offline and sync on reconnection."
+        },
+        {
+          "id": "overlapping-sync-failure",
+          "description": "The first save fails while a newer edit overlaps its in-flight snapshot; retry preserves the latest revision."
+        },
+        {
+          "id": "corrupt-local-workbook",
+          "description": "Out-of-range or malformed persisted cells are discarded before the deterministic sample workbook opens."
         }
       ]
     },
@@ -325,6 +470,245 @@
         }
       ],
       "faultScenarios": []
+    },
+    {
+      "directory": "examples/mailroom",
+      "id": "mailroom",
+      "title": "Mailroom",
+      "summary": "A local-first email client proving real data-router fetchers, navigation blockers, durable drafts, and automatic offline outbox delivery.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/remix-router"],
+      "octaneFeatures": [
+        "compiler-inferred-effects",
+        "keyed-reconciliation",
+        "native-events",
+        "refs",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deep-link-keyboard-fetcher",
+          "title": "Open a message deep link, navigate by keyboard, and persist a fetcher-owned star without navigating",
+          "kind": "golden",
+          "spec": "e2e/mailroom.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "compact-accessible-mailboxes",
+          "title": "Navigate every compact mailbox link by accessible name and keyboard without overflowing the mobile page",
+          "kind": "golden",
+          "spec": "e2e/mailroom.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "draft-blocker-focus-save",
+          "title": "Block a dirty draft navigation, restore editor focus, save through a fetcher, and leave safely",
+          "kind": "golden",
+          "spec": "e2e/mailroom.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "draft-route-reset-identity",
+          "title": "Reset the editor across draft routes and update one adopted draft identity across repeated saves",
+          "kind": "golden",
+          "spec": "e2e/mailroom.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "offline-outbox-reconnect",
+          "title": "Queue a message offline, retain it across route remounts, and deliver it automatically after reconnection",
+          "kind": "resilience",
+          "spec": "e2e/mailroom.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "load-retry-empty-missing",
+          "title": "Retry a deterministic loader failure and distinguish empty and missing mailbox states",
+          "kind": "resilience",
+          "spec": "e2e/mailroom.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "overlap-navigation-send-retry",
+          "title": "Keep a slow fetcher mutation alive across navigation and recover a rejected online send",
+          "kind": "resilience",
+          "spec": "e2e/mailroom.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "mailbox-load-failure",
+          "description": "The fault=load query rejects the first inbox loader for a session and succeeds on explicit revalidation."
+        },
+        {
+          "id": "slow-message-mutation",
+          "description": "The fault=slow-mutation query keeps a shell-mounted shared fetcher active while the user navigates to another mailbox."
+        },
+        {
+          "id": "send-failure",
+          "description": "The fault=send query rejects the first online send for a session while retaining every draft field for explicit retry."
+        },
+        {
+          "id": "offline-outbox",
+          "description": "Native offline state stores a complete queued message locally, and the online event drives automatic fetcher delivery."
+        }
+      ]
+    },
+    {
+      "directory": "examples/pagecraft",
+      "id": "pagecraft",
+      "title": "Pagecraft",
+      "summary": "A resilient document workspace proving real Lexical selection, rich-text history, and versioned autosave across network races.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/lexical"],
+      "octaneFeatures": [
+        "compiler-inferred-effects",
+        "keyed-reconciliation",
+        "native-events",
+        "refs",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deep-link-keyboard-navigation",
+          "title": "Open a document deep link, retain keyboard focus, and flush edits through immediate navigation",
+          "kind": "golden",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "selection-format-history",
+          "title": "Format a live contenteditable selection and restore it through undo, redo, and reload",
+          "kind": "golden",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "overlapping-autosave",
+          "title": "Retain save ownership across route remounts and settle versioned autosaves out of order",
+          "kind": "resilience",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "save-failure-offline-recovery",
+          "title": "Retry a rejected save and persist an offline edit after reconnection",
+          "kind": "resilience",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "load-retry-empty-missing",
+          "title": "Reject malformed editor data, recover loading, and distinguish blank and missing documents",
+          "kind": "resilience",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "temporary-load-failure",
+          "description": "The fault=load query rejects one deterministic document load and then succeeds from the retry control."
+        },
+        {
+          "id": "rejected-autosave",
+          "description": "The fault=save query rejects the first debounced mutation while retaining the local editor state for an explicit retry."
+        },
+        {
+          "id": "out-of-order-autosave",
+          "description": "A slow first mutation completes after a fast second mutation, and version checks preserve the newest serialized editor state."
+        },
+        {
+          "id": "offline-edit",
+          "description": "Browser offline state pauses autosave while keeping the visible draft, then reconnect automatically persists it."
+        },
+        {
+          "id": "malformed-editor-state",
+          "description": "Lexical parses untrusted serialized state at both the save and load boundaries, rejecting unknown nodes without mounting corrupt content."
+        }
+      ]
+    },
+    {
+      "directory": "examples/pulseboard",
+      "id": "pulseboard",
+      "title": "Pulseboard",
+      "summary": "A production-built analytics console proving responsive Visx SVG measurement, accessible TanStack Table state, measured TanStack Virtual logs, keyboard navigation, and deterministic recovery.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/tanstack-table", "@octanejs/tanstack-virtual", "@octanejs/visx"],
+      "octaneFeatures": [
+        "async-recovery",
+        "keyed-reconciliation",
+        "layout-effects",
+        "native-events",
+        "refs-as-props",
+        "responsive-measurement",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deep-link-svg-measurement",
+          "title": "Load a report deep link and preserve responsive, measured SVG geometry across navigation",
+          "kind": "golden",
+          "spec": "e2e/pulseboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "keyboard-chart-range-convergence",
+          "title": "Navigate the compact console and SVG points by keyboard while overlapping range requests converge",
+          "kind": "golden",
+          "spec": "e2e/pulseboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "accessible-campaign-table",
+          "title": "Sort, filter, select, empty, and restore an accessible TanStack campaign report",
+          "kind": "golden",
+          "spec": "e2e/pulseboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "measured-virtual-activity",
+          "title": "Window hundreds of measured activity rows and reveal a deterministic off-screen incident",
+          "kind": "golden",
+          "spec": "e2e/pulseboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "failure-empty-recovery",
+          "title": "Retry load and refresh failures without hiding retained data, then restore an empty segment",
+          "kind": "resilience",
+          "spec": "e2e/pulseboard.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "load-failure",
+          "description": "The first deterministic dashboard load fails before report state is applied and succeeds on explicit retry."
+        },
+        {
+          "id": "refresh-failure",
+          "description": "The first snapshot refresh fails while the previous analytics remain usable, then succeeds on explicit retry."
+        },
+        {
+          "id": "empty",
+          "description": "The empty scenario renders a no-traffic segment that can restore the full deterministic sample."
+        },
+        {
+          "id": "overlapping-ranges",
+          "description": "Rapid 7-day and 30-day requests complete with different deterministic delays while only the latest choice is applied."
+        }
+      ]
     },
     {
       "directory": "examples/relay",
@@ -534,6 +918,90 @@
         {
           "id": "out-of-order-acknowledgements",
           "description": "Two rapid reactions complete on deliberately different delays without clobbering one another."
+        }
+      ]
+    },
+    {
+      "directory": "examples/wayfinder",
+      "id": "wayfinder",
+      "title": "Wayfinder",
+      "summary": "A streaming travel planner proving Octane parallel use, out-of-order Suspense reveals, abort isolation, strict CSP, and hydration adoption.",
+      "status": "active",
+      "renderModes": ["client", "streaming-ssr", "hydration"],
+      "dialects": ["tsrx"],
+      "bindings": [],
+      "octaneFeatures": [
+        "abort-controller",
+        "csp-nonce",
+        "hydration",
+        "native-events",
+        "parallel-use",
+        "streaming-ssr",
+        "suspense",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "parallel-plan-out-of-order-stream",
+          "title": "Stream a real trip shell, reveal later weather before earlier fares, and complete a mutually gated parallel plan",
+          "kind": "ssr-hydration",
+          "spec": "e2e/wayfinder.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "csp-hydration-adoption",
+          "title": "Adopt a nonce-protected server trip and preserve a note typed before delayed hydration",
+          "kind": "ssr-hydration",
+          "spec": "e2e/wayfinder.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "keyboard-save-deep-link",
+          "title": "Plan and save a city by keyboard, change its month, and restore it from the deep-linked shelf",
+          "kind": "golden",
+          "spec": "e2e/wayfinder.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "abort-and-stale-isolation",
+          "title": "Abort a slow destination search and keep a rapid trip switch on the latest route after stale work settles",
+          "kind": "resilience",
+          "spec": "e2e/wayfinder.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "empty-failure-retry-mobile",
+          "title": "Recover search and forecast failures, clear an empty result, and use the planner at mobile width",
+          "kind": "resilience",
+          "spec": "e2e/wayfinder.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "delayed-hydration",
+          "description": "The hydrateDelay query leaves real server trip content editable before hydration so DOM adoption and note preservation remain observable."
+        },
+        {
+          "id": "out-of-order-regions",
+          "description": "The later weather boundary resolves before the earlier fare boundary, producing a deterministic out-of-order stream without a live service."
+        },
+        {
+          "id": "mutually-gated-planning",
+          "description": "Route and stay resources cannot complete unless both independent use creations start, turning parallel discovery into a functional result rather than a timing assertion."
+        },
+        {
+          "id": "superseded-search",
+          "description": "The lo search is deliberately slower than ky; a native AbortController cancels it and late work cannot replace the current result."
+        },
+        {
+          "id": "search-outage",
+          "description": "The outage query fails once and returns a deterministic city after an explicit retry."
+        },
+        {
+          "id": "weather-outage",
+          "description": "The weather-failure scenario streams an error arm once and succeeds through the public retry action."
         }
       ]
     }

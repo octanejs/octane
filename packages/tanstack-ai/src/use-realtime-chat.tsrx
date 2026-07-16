@@ -3,6 +3,7 @@ import { RealtimeClient } from '@tanstack/ai-client'
 import type {
   RealtimeMessage,
   RealtimeMode,
+  RealtimeSessionConfig,
   RealtimeStatus,
 } from '@tanstack/ai'
 import type {
@@ -70,9 +71,6 @@ export function useRealtimeChat(
   const [error, setError] = useState<Error | null>(null)
   const [inputLevel, setInputLevel] = useState(0)
   const [outputLevel, setOutputLevel] = useState(0)
-  const [vadMode, setVADModeState] = useState<'server' | 'semantic' | 'manual'>(
-    options.vadMode ?? 'server',
-  )
 
   // Refs
   const clientRef = useRef<RealtimeClient | null>(null)
@@ -89,8 +87,18 @@ export function useRealtimeChat(
     // `undefined` for absent values.
     const initial = optionsRef.current
     clientRef.current = new RealtimeClient({
-      getToken: initial.getToken,
-      adapter: initial.adapter,
+      // OCTANE DIVERGENCE: upstream captures the first transport callbacks.
+      // Ref-backed delegates keep the client stable while reconnects and token
+      // refreshes observe the latest render's authentication and adapter.
+      getToken: () => optionsRef.current.getToken(),
+      adapter: {
+        get provider() {
+          return optionsRef.current.adapter.provider
+        },
+        connect(token, tools) {
+          return optionsRef.current.adapter.connect(token, tools)
+        },
+      },
       ...(initial.tools !== undefined && { tools: initial.tools }),
       ...(initial.instructions !== undefined && {
         instructions: initial.instructions,
@@ -117,6 +125,9 @@ export function useRealtimeChat(
       }),
       onStatusChange: (newStatus) => {
         setStatus(newStatus)
+        // OCTANE DIVERGENCE: upstream declares this callback but does not
+        // forward status changes beyond its own hook state.
+        optionsRef.current.onStatusChange?.(newStatus)
       },
       onModeChange: (newMode) => {
         setMode(newMode)
@@ -125,6 +136,12 @@ export function useRealtimeChat(
       onMessage: (message) => {
         setMessages((prev) => [...prev, message])
         optionsRef.current.onMessage?.(message)
+      },
+      onUsage: (usage) => {
+        optionsRef.current.onUsage?.(usage)
+      },
+      onGoAway: (timeLeft) => {
+        optionsRef.current.onGoAway?.(timeLeft)
       },
       onError: (err) => {
         setError(err)
@@ -248,14 +265,9 @@ export function useRealtimeChat(
     )
   }, [])
 
-  // VAD mode control
-  const setVADMode = useCallback(
-    (newMode: 'server' | 'semantic' | 'manual') => {
-      setVADModeState(newMode)
-      // TODO: Update session config if connected
-    },
-    [],
-  )
+  const updateSession = useCallback((config: RealtimeSessionConfig) => {
+    clientRef.current?.updateSession(config)
+  }, [])
 
   return {
     // Connection state
@@ -289,8 +301,7 @@ export function useRealtimeChat(
     getInputTimeDomainData,
     getOutputTimeDomainData,
 
-    // VAD control
-    vadMode,
-    setVADMode,
+    // Session control
+    updateSession,
   }
 }

@@ -221,7 +221,7 @@ describe('useChat', () => {
 
 			const initialMessages = result.current.messages;
 
-			rerender();
+			rerender({ connection: adapter });
 
 			// Client should be the same instance, state should persist
 			expect(result.current.messages).toBe(initialMessages);
@@ -230,7 +230,7 @@ describe('useChat', () => {
 		// OMITTED — upstream's "should auto-resume on mount and when the browser
 		// comes back online" case spies on `ChatClient.prototype.maybeAutoResume`,
 		// an API that does not exist in the pinned (and latest published)
-		// `@tanstack/ai-client@0.20.0` that `@tanstack/ai-react@0.16.4` depends on;
+		// `@tanstack/ai-client@0.21.0` that `@tanstack/ai-react@0.17.0` depends on;
 		// it is a work-in-progress method present only in the upstream test file,
 		// not in any shipped `ai-client` nor invoked by `useChat` itself. The
 		// behavior is a ChatClient (dependency) concern, out of scope for this
@@ -315,7 +315,7 @@ describe('useChat', () => {
 
 			const messageCount = result.current.messages.length;
 
-			rerender();
+			rerender({ connection: adapter });
 
 			// State should persist after re-render
 			expect(result.current.messages.length).toBe(messageCount);
@@ -985,18 +985,40 @@ describe('useChat', () => {
 
 	describe('edge cases and error handling', () => {
 		describe('options changes', () => {
-			it('should maintain client instance when options change', () => {
-				const adapter1 = createMockConnectionAdapter();
+			it('should use an updated connection without losing conversation state', async () => {
+				const firstConnect = vi.fn();
+				const adapter1 = createMockConnectionAdapter({
+					chunks: createTextChunks('First response', 'first-response'),
+					onConnect: firstConnect,
+				});
 				const { result, rerender } = renderUseChat({ connection: adapter1 });
 
-				const initialMessages = result.current.messages;
+				await result.current.sendMessage('First request');
+				await waitFor(() => {
+					expect(firstConnect).toHaveBeenCalledTimes(1);
+					expect(result.current.messages).toHaveLength(2);
+				});
 
-				const adapter2 = createMockConnectionAdapter();
+				const secondConnect = vi.fn();
+				const adapter2 = createMockConnectionAdapter({
+					chunks: createTextChunks('Second response', 'second-response'),
+					onConnect: secondConnect,
+				});
 				rerender({ connection: adapter2 });
 
-				// Client instance should persist (current implementation doesn't update)
-				// This documents current behavior - options changes don't update client
-				expect(result.current.messages).toBe(initialMessages);
+				await result.current.sendMessage('Second request');
+
+				await waitFor(() => {
+					expect(secondConnect).toHaveBeenCalledTimes(1);
+					expect(result.current.messages).toHaveLength(4);
+				});
+				expect(firstConnect).toHaveBeenCalledTimes(1);
+				const renderedText = result.current.messages
+					.flatMap((message) => message.parts)
+					.filter((part) => part.type === 'text')
+					.map((part) => part.content);
+				expect(renderedText).toContain('First response');
+				expect(renderedText).toContain('Second response');
 			});
 
 			it('should handle body changes', () => {
@@ -1430,6 +1452,7 @@ describe('useChat', () => {
 				// Find tool call
 				const assistantMessage = result.current.messages.find((m) => m.role === 'assistant');
 				const toolCallPart = assistantMessage?.parts.find((p) => p.type === 'tool-call');
+				expect(toolCallPart?.input).toEqual({ param: 'value' });
 
 				if (toolCallPart && toolCallPart.type === 'tool-call') {
 					await result.current.addToolResult({

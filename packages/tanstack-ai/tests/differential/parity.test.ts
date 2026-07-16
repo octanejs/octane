@@ -1,6 +1,6 @@
 /**
  * Differential parity: the SAME `parity.tsrx` runs through @octanejs/tanstack-ai
- * (octane) AND the real @tanstack/ai-react@0.16.4 (the setup rewrites
+ * (octane) AND the real @tanstack/ai-react@0.17.0 (the setup rewrites
  * `@octanejs/tanstack-ai` → `@tanstack/ai-react` and `octane` → `react`). Both
  * sides drive an identical deterministic in-memory connection adapter, so the
  * rendered chat transcript must be byte-identical after each step — proving the

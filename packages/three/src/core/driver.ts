@@ -9,10 +9,19 @@
 import * as THREE from 'three';
 import type {
 	UniversalEventListenerDescriptor,
+	UniversalEventPriority,
 	UniversalHostBatch,
 	UniversalHostDriver,
 	UniversalListenerDescriptor,
+	UniversalPortalTargetHandle,
 } from 'octane/universal';
+import {
+	getInitialRootStore,
+	getRootObjectStore,
+	removeInteractivity,
+	swapInteractivity,
+	type RootStore,
+} from './store.js';
 import { createThreeObject, registerThreeNamespace, THREE_RENDERER_ID } from './catalogue.js';
 import {
 	attachString,
@@ -26,8 +35,62 @@ import { applyThreeProps, diffThreeProps } from './props.js';
 const THREE_DRIVER_STATE = Symbol('octane.three.driver.state');
 const OBJECT_INSTANCES = new WeakMap<object, ThreeHostInstance>();
 const PUBLIC_INSTANCES = new WeakMap<ThreeHostInstance, Instance>();
+const STORE_CONTAINERS = new WeakMap<RootStore, ThreeHostContainer>();
+const ACTIVE_EVENT_SCOPES = new WeakSet<RootStore>();
+const THREE_PORTAL_TARGET = Symbol('octane.three.portal-target');
+const EXTERNAL_PORTAL_TARGET_LEASES = new WeakMap<THREE.Object3D, ExternalTargetLease>();
 
-type ParentId = number | null | undefined;
+const THREE_EVENT_PRIORITIES: Readonly<Record<string, UniversalEventPriority>> = Object.freeze({
+	onClick: 'discrete',
+	onContextMenu: 'discrete',
+	onDoubleClick: 'discrete',
+	onPointerDown: 'discrete',
+	onPointerUp: 'discrete',
+	onPointerCancel: 'discrete',
+	onPointerMissed: 'discrete',
+	onLostPointerCapture: 'discrete',
+	onWheel: 'continuous',
+	onPointerMove: 'continuous',
+	onPointerOver: 'continuous',
+	onPointerOut: 'continuous',
+	onPointerEnter: 'continuous',
+	onPointerLeave: 'continuous',
+});
+
+/** Canonical priority lookup shared by host descriptors and native dispatch. */
+export function getThreeHostEventPriority(name: string): UniversalEventPriority | undefined {
+	return Object.prototype.hasOwnProperty.call(THREE_EVENT_PRIORITIES, name)
+		? THREE_EVENT_PRIORITIES[name]
+		: undefined;
+}
+
+type ParentId = number | UniversalPortalTargetHandle | null | undefined;
+
+interface ThreePortalTargetInput {
+	readonly [THREE_PORTAL_TARGET]: true;
+	readonly object: THREE.Object3D;
+	readonly store: RootStore;
+	readonly binding: ThreePortalTargetBinding;
+}
+
+export interface ThreePortalTargetBinding {
+	current: THREE.Object3D;
+}
+
+interface ExternalTargetLease {
+	readonly container: ThreeHostContainer;
+	count: number;
+}
+
+interface ThreePortalTargetDomain {
+	readonly handle: UniversalPortalTargetHandle;
+	readonly store: RootStore;
+	readonly binding: ThreePortalTargetBinding;
+	readonly source:
+		| { readonly kind: 'managed'; readonly id: number }
+		| { readonly kind: 'external'; readonly object: THREE.Object3D };
+	refCount: number;
+}
 
 type PhysicalPlacement =
 	| {
@@ -67,6 +130,7 @@ interface ThreeHostInstance {
 	readonly lifecycles: Map<string, UniversalListenerDescriptor>;
 	readonly localCallbacks: Map<string, UniversalListenerDescriptor>;
 	readonly localCleanups: Map<string, () => void>;
+	store: RootStore | undefined;
 	physical: PhysicalPlacement | null;
 }
 
@@ -91,13 +155,49 @@ interface StagedObject {
 interface ThreeDriverState {
 	readonly instances: Map<number, ThreeHostInstance>;
 	readonly rootChildren: number[];
+	readonly portalChildren: Map<string | number, number[]>;
+	readonly portalTargets: Map<string | number, ThreePortalTargetDomain>;
+	readonly portalTargetCache: WeakMap<RootStore, WeakMap<THREE.Object3D, ThreePortalTargetDomain>>;
 	readonly disposalQueue: Array<() => void>;
+	nextPortalTarget: number;
 	disposalScheduled: boolean;
+}
+
+interface InteractionSnapshot {
+	readonly object: THREE.Object3D;
+	readonly store: RootStore;
+	readonly live: boolean;
+	readonly eligible: boolean;
+}
+
+interface LogicalInteractionInstance {
+	readonly parent: ParentId;
+	readonly visible: boolean;
+}
+
+/** Package-private adapter consumed by the universal portal target capability. */
+export function createThreePortalTargetBinding(object: THREE.Object3D): ThreePortalTargetBinding {
+	return { current: object };
+}
+
+/** Package-private adapter consumed by the universal portal target capability. */
+export function createThreePortalTarget(
+	object: THREE.Object3D,
+	store: RootStore,
+	binding: ThreePortalTargetBinding,
+): ThreePortalTargetInput {
+	return Object.freeze({ [THREE_PORTAL_TARGET]: true as const, object, store, binding });
 }
 
 export interface ThreeHostEnvironment {
 	/** Called once after an accepted host batch, without requiring WebGL. */
 	invalidate?(): void;
+	/** Root state associated with a configured managed scene. */
+	readonly store?: RootStore;
+	/** Run all Three handlers from one platform event in one universal scope. */
+	eventScope?<T>(priority: UniversalEventPriority, run: () => T): T;
+	/** Dispatch a committed Three listener through its universal owner. */
+	dispatchEvent?(listener: number, payload: unknown): unknown;
 	/** Disable the default managed-root sRGB texture conversion. */
 	linear?: boolean;
 	/** Schedule accepted-object disposal after refs and layout cleanup. */
@@ -157,7 +257,11 @@ export function createThreeContainer(
 	const state: ThreeDriverState = {
 		instances: new Map(),
 		rootChildren: [],
+		portalChildren: new Map(),
+		portalTargets: new Map(),
+		portalTargetCache: new WeakMap(),
 		disposalQueue: [],
+		nextPortalTarget: 1,
 		disposalScheduled: false,
 	};
 	const environment = options.environment ?? {};
@@ -176,6 +280,7 @@ export function createThreeContainer(
 		},
 		[THREE_DRIVER_STATE]: state,
 	};
+	if (environment.store !== undefined) STORE_CONTAINERS.set(environment.store, container);
 	return container;
 }
 
@@ -205,12 +310,74 @@ function cloneSimulation(state: ThreeDriverState): Map<number, SimulatedInstance
 	return simulation;
 }
 
+function isPortalParent(parent: ParentId): parent is UniversalPortalTargetHandle {
+	return (
+		parent !== null &&
+		parent !== undefined &&
+		typeof parent === 'object' &&
+		parent.$$kind === 'octane.universal.portal-target'
+	);
+}
+
+function sameParent(left: ParentId, right: ParentId): boolean {
+	if (left === right) return true;
+	return (
+		isPortalParent(left) &&
+		isPortalParent(right) &&
+		left.renderer === right.renderer &&
+		left.root === right.root &&
+		Object.is(left.id, right.id)
+	);
+}
+
+function clonePortalChildren(state: ThreeDriverState): Map<string | number, number[]> {
+	return new Map(
+		[...state.portalChildren].map(([target, children]) => [target, [...children]] as const),
+	);
+}
+
+function portalRegistration(
+	state: ThreeDriverState,
+	handle: UniversalPortalTargetHandle,
+): ThreePortalTargetDomain {
+	const registration = state.portalTargets.get(handle.id);
+	if (
+		registration === undefined ||
+		registration.refCount === 0 ||
+		registration.handle.renderer !== handle.renderer ||
+		registration.handle.root !== handle.root ||
+		!Object.is(registration.handle.id, handle.id)
+	) {
+		throw new Error('@octanejs/three: Unknown, stale, or foreign portal target handle.');
+	}
+	return registration;
+}
+
 function simulatedChildren(
 	rootChildren: number[],
+	portalChildren: Map<string | number, number[]>,
+	portalTargets: ReadonlyMap<string | number, ThreePortalTargetDomain>,
 	simulation: Map<number, SimulatedInstance>,
-	parent: number | null,
+	parent: Exclude<ParentId, undefined>,
 ): number[] {
 	if (parent === null) return rootChildren;
+	if (isPortalParent(parent)) {
+		const registration = portalTargets.get(parent.id);
+		if (
+			registration === undefined ||
+			registration.refCount === 0 ||
+			registration.handle.renderer !== parent.renderer ||
+			registration.handle.root !== parent.root
+		) {
+			throw new Error('@octanejs/three: Unknown, stale, or foreign portal parent.');
+		}
+		let children = portalChildren.get(parent.id);
+		if (children === undefined) {
+			children = [];
+			portalChildren.set(parent.id, children);
+		}
+		return children;
+	}
 	const instance = simulation.get(parent);
 	if (instance === undefined) throw new Error(`@octanejs/three: Unknown parent ${parent}.`);
 	return instance.children;
@@ -218,13 +385,21 @@ function simulatedChildren(
 
 function detachSimulatedChild(
 	rootChildren: number[],
+	portalChildren: Map<string | number, number[]>,
+	portalTargets: ReadonlyMap<string | number, ThreePortalTargetDomain>,
 	simulation: Map<number, SimulatedInstance>,
 	id: number,
 ): void {
 	const child = simulation.get(id);
 	if (child === undefined) return;
 	if (child.parent !== undefined) {
-		const siblings = simulatedChildren(rootChildren, simulation, child.parent);
+		const siblings = simulatedChildren(
+			rootChildren,
+			portalChildren,
+			portalTargets,
+			simulation,
+			child.parent,
+		);
 		const index = siblings.indexOf(id);
 		if (index !== -1) siblings.splice(index, 1);
 	}
@@ -244,12 +419,166 @@ function isObject3D(value: unknown): value is THREE.Object3D {
 	return (value as THREE.Object3D | null)?.isObject3D === true;
 }
 
+function resolvePortalDomainObject(
+	state: ThreeDriverState,
+	registration: ThreePortalTargetDomain,
+): THREE.Object3D {
+	if (registration.source.kind === 'external') return registration.source.object;
+	const object = state.instances.get(registration.source.id)?.object;
+	if (!isObject3D(object)) {
+		throw new Error('@octanejs/three: A managed portal target is no longer mounted.');
+	}
+	return object;
+}
+
+function resolvePortalTargetObject(
+	state: ThreeDriverState,
+	handle: UniversalPortalTargetHandle,
+): THREE.Object3D {
+	return resolvePortalDomainObject(state, portalRegistration(state, handle));
+}
+
+function storeForInstance(
+	id: number,
+	instances: ReadonlyMap<number, LogicalInteractionInstance>,
+	portalTargets: ReadonlyMap<string | number, ThreePortalTargetDomain>,
+	rootStore: RootStore | undefined,
+): RootStore | undefined {
+	const seen = new Set<number>();
+	let currentId = id;
+	while (true) {
+		if (seen.has(currentId)) return undefined;
+		seen.add(currentId);
+		const instance = instances.get(currentId);
+		if (instance === undefined) return undefined;
+		if (instance.parent === null) return rootStore;
+		if (instance.parent === undefined) return undefined;
+		if (isPortalParent(instance.parent)) {
+			return portalTargets.get(instance.parent.id)?.store;
+		}
+		currentId = instance.parent;
+	}
+}
+
+function hasLiveRootConnection(
+	id: number,
+	instances: ReadonlyMap<number, LogicalInteractionInstance>,
+	portalTargets: ReadonlyMap<string | number, ThreePortalTargetDomain>,
+): boolean {
+	const seen = new Set<number>();
+	let currentId = id;
+	while (true) {
+		if (seen.has(currentId)) return false;
+		seen.add(currentId);
+		const instance = instances.get(currentId);
+		if (instance === undefined || !instance.visible) return false;
+		if (instance.parent === null) return true;
+		if (instance.parent === undefined) return false;
+		if (isPortalParent(instance.parent)) {
+			const target = portalTargets.get(instance.parent.id);
+			if (target === undefined || target.refCount === 0) return false;
+			if (target.source.kind === 'managed') {
+				currentId = target.source.id;
+				continue;
+			}
+			let ancestor: THREE.Object3D | null = target.source.object;
+			while (ancestor !== null) {
+				const managed = OBJECT_INSTANCES.get(ancestor);
+				if (managed !== undefined) {
+					return hasLiveRootConnection(managed.id, instances, portalTargets);
+				}
+				ancestor = ancestor.parent;
+			}
+			return true;
+		}
+		currentId = instance.parent;
+	}
+}
+
+function interactionSnapshot(
+	id: number,
+	object: unknown,
+	eventCount: number,
+	instances: ReadonlyMap<number, LogicalInteractionInstance>,
+	portalTargets: ReadonlyMap<string | number, ThreePortalTargetDomain>,
+	rootStore: RootStore | undefined,
+): InteractionSnapshot | undefined {
+	if (!isObject3D(object)) return undefined;
+	const store = storeForInstance(id, instances, portalTargets, rootStore);
+	if (store === undefined) return undefined;
+	const live = hasLiveRootConnection(id, instances, portalTargets);
+	return {
+		object,
+		store,
+		live,
+		eligible: eventCount > 0 && object.raycast !== null && live,
+	};
+}
+
+function appendInteractivity(store: RootStore, object: THREE.Object3D): void {
+	const interaction = store.getState().internal.interaction;
+	if (!interaction.includes(object)) interaction.push(object);
+}
+
+function removeInteractionMembership(store: RootStore, object: THREE.Object3D): void {
+	const internal = store.getState().internal;
+	internal.interaction = internal.interaction.filter((candidate) => candidate !== object);
+}
+
+function reconcileInteractivity(
+	previous: InteractionSnapshot | undefined,
+	next: InteractionSnapshot | undefined,
+	replacement: boolean,
+): void {
+	const previousStore = previous === undefined ? undefined : getInitialRootStore(previous.store);
+	const nextStore = next === undefined ? undefined : getInitialRootStore(next.store);
+	const store = nextStore ?? previousStore;
+	if (store === undefined) return;
+	if (
+		previous !== undefined &&
+		next !== undefined &&
+		previousStore !== undefined &&
+		nextStore !== undefined &&
+		previousStore !== nextStore
+	) {
+		removeInteractivity(previousStore, previous.object);
+		if (next.eligible) appendInteractivity(nextStore, next.object);
+		return;
+	}
+	const interaction = store.getState().internal.interaction;
+	const wasTracked = previous !== undefined && interaction.includes(previous.object);
+	const preservesPosition = wasTracked && previous.eligible && next?.eligible === true;
+	const transfersIdentity =
+		replacement &&
+		previous !== undefined &&
+		next !== undefined &&
+		next.live &&
+		previous.object !== next.object;
+	if (transfersIdentity) swapInteractivity(store, previous.object, next.object);
+
+	if (preservesPosition) {
+		appendInteractivity(store, next.object);
+		return;
+	}
+	if (previous !== undefined) {
+		const previousObject = transfersIdentity ? next!.object : previous.object;
+		const lostEligibility = previous.eligible && next?.live === true && !next.eligible;
+		if (next?.live === true && !lostEligibility) {
+			removeInteractionMembership(store, previousObject);
+		} else {
+			removeInteractivity(store, previousObject);
+		}
+	}
+	if (next?.eligible === true) appendInteractivity(store, next.object);
+}
+
 function objectForParent(
 	container: ThreeHostContainer,
 	state: ThreeDriverState,
-	parent: number | null,
+	parent: Exclude<ParentId, undefined>,
 ): any {
 	if (parent === null) return container.scene;
+	if (isPortalParent(parent)) return resolvePortalTargetObject(state, parent);
 	return state.instances.get(parent)?.object;
 }
 
@@ -304,6 +633,18 @@ function detachPhysical(instance: ThreeHostInstance): void {
 	placement.parent.remove(placement.object);
 }
 
+function receivesVisibilityOverlay(instance: ThreeHostInstance, state: ThreeDriverState): boolean {
+	if (instance.visible) return false;
+	if (
+		instance.parent === null ||
+		instance.parent === undefined ||
+		isPortalParent(instance.parent)
+	) {
+		return true;
+	}
+	return state.instances.get(instance.parent)?.visible !== false;
+}
+
 function reorderManagedChildren(parent: THREE.Object3D, desired: readonly THREE.Object3D[]): void {
 	if (desired.length < 2) return;
 	const desiredSet = new Set(desired);
@@ -319,6 +660,14 @@ function synchronizePhysicalTree(
 	state: ThreeDriverState,
 	destroyed: ReadonlySet<number>,
 ): void {
+	for (const registration of state.portalTargets.values()) {
+		if (registration.refCount === 0) continue;
+		const target = resolvePortalDomainObject(state, registration);
+		registration.binding.current = target;
+		if (registration.store.getState().scene !== target) {
+			registration.store.setState({ scene: target as THREE.Scene });
+		}
+	}
 	const desired = new Map<
 		number,
 		| { kind: 'none' }
@@ -357,7 +706,12 @@ function synchronizePhysicalTree(
 				});
 			}
 			attachTasks.push(() => {
-				instance.object.visible = instance.visible && instance.props.visible !== false;
+				// React hides only the first host objects in a retained range. Their
+				// descendants remain authored as-is and are culled by the hidden parent.
+				// Logical visibility still remains false throughout the range so events,
+				// effects, and local callbacks stay disconnected while it is retained.
+				instance.object.visible =
+					!receivesVisibilityOverlay(instance, state) && instance.props.visible !== false;
 			});
 		} else if (target.kind === 'attachment' && instance.physical === null) {
 			attachTasks.push(() => {
@@ -375,7 +729,7 @@ function synchronizePhysicalTree(
 	runAll(attachTasks);
 
 	const orderTasks: Array<() => void> = [];
-	const orderParent = (parentId: number | null, children: readonly number[]) => {
+	const orderParent = (parentId: Exclude<ParentId, undefined>, children: readonly number[]) => {
 		const parent = objectForParent(container, state, parentId);
 		if (!isObject3D(parent)) return;
 		const ordered = children.flatMap((id) => {
@@ -389,6 +743,10 @@ function synchronizePhysicalTree(
 	};
 	orderParent(null, state.rootChildren);
 	for (const instance of state.instances.values()) orderParent(instance.id, instance.children);
+	for (const registration of state.portalTargets.values()) {
+		if (registration.refCount === 0) continue;
+		orderParent(registration.handle, state.portalChildren.get(registration.handle.id) ?? []);
+	}
 	runAll(orderTasks);
 }
 
@@ -404,7 +762,7 @@ function shouldDisposeRemoved(
 	while (current !== undefined && destroyed.has(current.id)) {
 		if (current.props.dispose === null) return false;
 		current =
-			current.parent === null || current.parent === undefined
+			current.parent === null || current.parent === undefined || isPortalParent(current.parent)
 				? undefined
 				: state.instances.get(current.parent);
 	}
@@ -431,6 +789,7 @@ function createHostInstance(
 		lifecycles: new Map(),
 		localCallbacks: new Map(),
 		localCleanups: new Map(),
+		store: container.environment.store,
 		physical: null,
 	};
 }
@@ -475,7 +834,13 @@ function getPublicInstance<O = any>(instance: ThreeHostInstance): Instance<O> {
 			return publicProps;
 		},
 		get parent() {
-			if (instance.parent === null || instance.parent === undefined) return null;
+			if (
+				instance.parent === null ||
+				instance.parent === undefined ||
+				isPortalParent(instance.parent)
+			) {
+				return null;
+			}
 			const parent = instance.container[THREE_DRIVER_STATE].instances.get(instance.parent);
 			return parent === undefined ? null : getPublicInstance(parent);
 		},
@@ -499,6 +864,70 @@ export function getThreeInstance<O extends object>(object: O): Instance<O> | nul
 	return instance === undefined ? null : getPublicInstance<O>(instance);
 }
 
+/** Return the committed universal listener descriptor for a managed Three object. */
+export function getThreeEventListener(
+	object: object,
+	type: string,
+): UniversalEventListenerDescriptor | undefined {
+	return OBJECT_INSTANCES.get(object)?.events.get(type);
+}
+
+/** Test whether a managed Three object has any, or any selected, event listeners. */
+export function hasThreeEventListeners(object: object, types?: readonly string[]): boolean {
+	const events = OBJECT_INSTANCES.get(object)?.events;
+	if (events === undefined) return false;
+	if (types === undefined) return events.size > 0;
+	return types.some((type) => events.has(type));
+}
+
+/** Return the configured root store that owns a managed Three object. */
+export function getThreeEventStore(object: object): RootStore | undefined {
+	return OBJECT_INSTANCES.get(object)?.store;
+}
+
+/** Whether a raycast hit is connected through a visible managed Three path. */
+export function isThreeEventHitLive(object: THREE.Object3D): boolean {
+	let candidate: THREE.Object3D | null = object;
+	while (candidate !== null) {
+		const instance = OBJECT_INSTANCES.get(candidate);
+		if (instance !== undefined) {
+			const state = instance.container[THREE_DRIVER_STATE];
+			return hasLiveRootConnection(instance.id, state.instances, state.portalTargets);
+		}
+		candidate = candidate.parent;
+	}
+	return true;
+}
+
+/** Keep all Three handlers for one platform event in one universal event scope. */
+export function runThreeEventScope<T>(
+	store: RootStore,
+	priority: UniversalEventPriority,
+	run: () => T,
+): T {
+	const initialStore = getInitialRootStore(store);
+	if (ACTIVE_EVENT_SCOPES.has(initialStore)) return run();
+	const eventScope = STORE_CONTAINERS.get(initialStore)?.environment.eventScope;
+	if (eventScope === undefined) {
+		throw new Error('@octanejs/three: The configured root has no universal event scope.');
+	}
+	ACTIVE_EVENT_SCOPES.add(initialStore);
+	try {
+		return eventScope(priority, run);
+	} finally {
+		ACTIVE_EVENT_SCOPES.delete(initialStore);
+	}
+}
+
+/** Dispatch a committed Three listener through its universal owner and scheduler. */
+export function dispatchThreeEvent(store: RootStore, listener: number, payload: unknown): unknown {
+	const dispatchEvent = STORE_CONTAINERS.get(getInitialRootStore(store))?.environment.dispatchEvent;
+	if (dispatchEvent === undefined) {
+		throw new Error('@octanejs/three: The configured root has no universal event dispatcher.');
+	}
+	return dispatchEvent(listener, payload);
+}
+
 /** Apply imperative Three props and invalidate the owning root when managed. */
 export function applyProps<T extends object>(
 	object: T,
@@ -519,6 +948,12 @@ export function createThreeDriver(
 	return {
 		id: renderer,
 		capabilities: { text: 'ignore', localHostCallbacks: true, visibility: true },
+		events: {
+			classify(name) {
+				const priority = getThreeHostEventPriority(name);
+				return priority === undefined ? null : { type: name, priority };
+			},
+		},
 		lifecycles: {
 			classify(name) {
 				return name === 'onUpdate' ? { type: 'update' } : null;
@@ -542,6 +977,143 @@ export function createThreeDriver(
 				return 'update';
 			},
 		},
+		portals: {
+			prepareTarget(context) {
+				if (context.transported) {
+					throw new Error(
+						'@octanejs/three: Local Object3D portal targets cannot cross a commit transport.',
+					);
+				}
+				const target = context.target as Partial<ThreePortalTargetInput> | null;
+				if (target?.[THREE_PORTAL_TARGET] !== true || !isObject3D(target.object)) {
+					throw new TypeError('@octanejs/three: createPortal target must be a Three Object3D.');
+				}
+				if (target.store === undefined || typeof target.store.getState !== 'function') {
+					throw new TypeError('@octanejs/three: Portal target is missing its state enclave.');
+				}
+				if (
+					target.binding === undefined ||
+					target.binding === null ||
+					!isObject3D(target.binding.current)
+				) {
+					throw new TypeError('@octanejs/three: Portal target is missing its physical binding.');
+				}
+				const rootStore = context.container.environment.store;
+				if (rootStore === undefined || getInitialRootStore(target.store) !== rootStore) {
+					throw new Error('@octanejs/three: Portal target store belongs to another root.');
+				}
+
+				const state = context.container[THREE_DRIVER_STATE];
+				let byObject = state.portalTargetCache.get(target.store);
+				if (byObject === undefined) {
+					byObject = new WeakMap();
+					state.portalTargetCache.set(target.store, byObject);
+				}
+				let domain = byObject.get(target.object);
+				if (domain !== undefined && domain.binding !== target.binding) {
+					throw new Error(
+						'@octanejs/three: Portal target binding does not match its state enclave.',
+					);
+				}
+				const effectiveTarget =
+					domain === undefined ? target.object : resolvePortalDomainObject(state, domain);
+
+				const assertTargetScope = (object: THREE.Object3D) => {
+					const instance = OBJECT_INSTANCES.get(object);
+					if (instance !== undefined && instance.container !== context.container) {
+						throw new Error('@octanejs/three: Cannot portal into an object owned by another root.');
+					}
+					const objectRootStore = getRootObjectStore(object);
+					if (objectRootStore !== undefined && getInitialRootStore(objectRootStore) !== rootStore) {
+						throw new Error('@octanejs/three: Cannot portal into a scene owned by another root.');
+					}
+					const objectLease = EXTERNAL_PORTAL_TARGET_LEASES.get(object);
+					if (objectLease !== undefined && objectLease.container !== context.container) {
+						throw new Error(
+							'@octanejs/three: External portal target is already leased by another root.',
+						);
+					}
+				};
+
+				const targetAncestors = new Set<THREE.Object3D>();
+				for (
+					let ancestor: THREE.Object3D | null = effectiveTarget;
+					ancestor !== null;
+					ancestor = ancestor.parent
+				) {
+					if (targetAncestors.has(ancestor)) {
+						throw new Error('@octanejs/three: Portal target has cyclic Object3D ancestry.');
+					}
+					targetAncestors.add(ancestor);
+					assertTargetScope(ancestor);
+				}
+				const descendants = [...effectiveTarget.children];
+				const visited = new Set<THREE.Object3D>([effectiveTarget]);
+				while (descendants.length > 0) {
+					const descendant = descendants.pop()!;
+					if (visited.has(descendant)) continue;
+					visited.add(descendant);
+					assertTargetScope(descendant);
+					descendants.push(...descendant.children);
+				}
+				if (domain === undefined) {
+					const managed = OBJECT_INSTANCES.get(target.object);
+					const id = state.nextPortalTarget++;
+					domain = {
+						handle: context.createPortalTargetHandle(id),
+						store: target.store,
+						binding: target.binding,
+						source:
+							managed === undefined
+								? { kind: 'external', object: target.object }
+								: { kind: 'managed', id: managed.id },
+						refCount: 0,
+					};
+					byObject.set(target.object, domain);
+					state.portalTargets.set(id, domain);
+				}
+
+				let lease: ExternalTargetLease | undefined;
+				if (domain.source.kind === 'external') {
+					const externalObject = domain.source.object;
+					lease = EXTERNAL_PORTAL_TARGET_LEASES.get(externalObject);
+					if (lease !== undefined && lease.container !== context.container) {
+						throw new Error(
+							'@octanejs/three: External portal target is already leased by another root.',
+						);
+					}
+					if (lease === undefined) {
+						lease = { container: context.container, count: 0 };
+						EXTERNAL_PORTAL_TARGET_LEASES.set(externalObject, lease);
+					}
+					lease.count++;
+				}
+				domain.refCount++;
+				let released = false;
+				return {
+					handle: domain.handle,
+					release() {
+						if (released) return;
+						released = true;
+						domain!.refCount--;
+						if (domain!.source.kind === 'external') {
+							const activeLease = EXTERNAL_PORTAL_TARGET_LEASES.get(domain!.source.object);
+							if (activeLease !== undefined && activeLease === lease) {
+								activeLease.count--;
+								if (activeLease.count === 0) {
+									EXTERNAL_PORTAL_TARGET_LEASES.delete(domain!.source.object);
+								}
+							}
+						}
+						if (domain!.refCount === 0) {
+							state.portalTargets.delete(domain!.handle.id);
+							state.portalChildren.delete(domain!.handle.id);
+							byObject!.delete(target.object!);
+						}
+					},
+				};
+			},
+		},
 		prepareBatch(container, batch, context) {
 			if (container.renderer !== renderer || batch.renderer !== renderer) {
 				throw new Error(
@@ -551,6 +1123,7 @@ export function createThreeDriver(
 			const state = container[THREE_DRIVER_STATE];
 			const simulation = cloneSimulation(state);
 			const rootChildren = [...state.rootChildren];
+			const portalChildren = clonePortalChildren(state);
 			const stagedCreates = new Map<
 				number,
 				{ instance: ThreeHostInstance; staged: StagedObject }
@@ -636,10 +1209,16 @@ export function createThreeDriver(
 						}
 					} else if (command.op === 'remove') {
 						const instance = simulation.get(command.id);
-						if (instance === undefined || instance.parent !== command.parent) {
+						if (instance === undefined || !sameParent(instance.parent, command.parent)) {
 							throw new Error(`@octanejs/three: Instance ${command.id} is not attached there.`);
 						}
-						detachSimulatedChild(rootChildren, simulation, command.id);
+						detachSimulatedChild(
+							rootChildren,
+							portalChildren,
+							state.portalTargets,
+							simulation,
+							command.id,
+						);
 						for (const type of instance.localCallbacks.keys()) {
 							cleanupKeys.add(keyFor(command.id, type));
 						}
@@ -648,8 +1227,20 @@ export function createThreeDriver(
 						if (instance === undefined) {
 							throw new Error(`@octanejs/three: Unknown placement target ${command.id}.`);
 						}
-						detachSimulatedChild(rootChildren, simulation, command.id);
-						const siblings = simulatedChildren(rootChildren, simulation, command.parent);
+						detachSimulatedChild(
+							rootChildren,
+							portalChildren,
+							state.portalTargets,
+							simulation,
+							command.id,
+						);
+						const siblings = simulatedChildren(
+							rootChildren,
+							portalChildren,
+							state.portalTargets,
+							simulation,
+							command.parent,
+						);
 						const before =
 							command.before === null ? siblings.length : siblings.indexOf(command.before);
 						if (before === -1) {
@@ -682,7 +1273,13 @@ export function createThreeDriver(
 						if (instance === undefined) {
 							throw new Error(`@octanejs/three: Unknown destroy target ${command.id}.`);
 						}
-						detachSimulatedChild(rootChildren, simulation, command.id);
+						detachSimulatedChild(
+							rootChildren,
+							portalChildren,
+							state.portalTargets,
+							simulation,
+							command.id,
+						);
 						instance.children.length = 0;
 						simulation.delete(command.id);
 						destroyed.add(command.id);
@@ -700,6 +1297,51 @@ export function createThreeDriver(
 					}
 					return committed.object;
 				};
+				const finalPortalObject = (handle: UniversalPortalTargetHandle): THREE.Object3D => {
+					const registration = portalRegistration(state, handle);
+					if (registration.source.kind === 'external') return registration.source.object;
+					if (!simulation.has(registration.source.id)) {
+						throw new Error(
+							'@octanejs/three: Cannot retain a portal whose managed target is unmounting.',
+						);
+					}
+					const object = finalObject(registration.source.id);
+					if (!isObject3D(object)) {
+						throw new Error('@octanejs/three: Managed portal target is not an Object3D.');
+					}
+					return object;
+				};
+
+				const finalObjectParents = new Map<THREE.Object3D, THREE.Object3D>();
+				for (const [id, instance] of simulation) {
+					if (instance.parent === undefined || instance.localCallbacks.has('attach')) continue;
+					const object = finalObject(id);
+					if (!isObject3D(object)) continue;
+					const path = getEffectiveAttachment(
+						object,
+						instance.props.attach as string | null | undefined,
+					);
+					if (typeof path === 'string') continue;
+
+					const parent =
+						instance.parent === null
+							? container.scene
+							: isPortalParent(instance.parent)
+								? finalPortalObject(instance.parent)
+								: finalObject(instance.parent);
+					if (isObject3D(parent)) finalObjectParents.set(object, parent);
+				}
+				for (const [object, parent] of finalObjectParents) {
+					const seen = new Set<THREE.Object3D>([object]);
+					let ancestor: THREE.Object3D | null = parent;
+					while (ancestor !== null) {
+						if (seen.has(ancestor)) {
+							throw new Error('@octanejs/three: Portal placement would create an Object3D cycle.');
+						}
+						seen.add(ancestor);
+						ancestor = finalObjectParents.get(ancestor) ?? ancestor.parent;
+					}
+				}
 
 				// String attachments are physical mutations, so validate their final
 				// parent path while the batch is still rejectable. Parent prop patches
@@ -717,6 +1359,8 @@ export function createThreeDriver(
 					let overrides: Readonly<Record<string, unknown>> = {};
 					if (instance.parent === null) {
 						parent = container.scene;
+					} else if (isPortalParent(instance.parent)) {
+						parent = finalPortalObject(instance.parent);
 					} else {
 						const parentId = instance.parent;
 						const parentSimulation = simulation.get(parentId);
@@ -737,6 +1381,20 @@ export function createThreeDriver(
 			} catch (error) {
 				for (const object of unpublishedOwned) disposeOwnedNow(object);
 				throw error;
+			}
+			const previousInteractions = new Map<number, InteractionSnapshot | undefined>();
+			for (const [id, instance] of state.instances) {
+				previousInteractions.set(
+					id,
+					interactionSnapshot(
+						id,
+						instance.object,
+						instance.events.size,
+						state.instances,
+						state.portalTargets,
+						container.environment.store,
+					),
+				);
 			}
 
 			let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
@@ -782,11 +1440,35 @@ export function createThreeDriver(
 								});
 							});
 						} else if (command.op === 'recreate') {
+							const replacement = stagedReplacements.get(command.id)!;
+							if (!replacement.propsApplied) {
+								tasks.push(() => {
+									applyThreeProps(replacement.object, command.props, undefined, {
+										colorSpace: container.environment.linear !== true,
+									});
+								});
+							}
+							tasks.push(() => {
+								const previous = previousInteractions.get(command.id);
+								const simulated = simulation.get(command.id);
+								const next =
+									simulated === undefined
+										? undefined
+										: interactionSnapshot(
+												command.id,
+												replacement.object,
+												simulated.events.size,
+												simulation,
+												state.portalTargets,
+												container.environment.store,
+											);
+								reconcileInteractivity(previous, next, true);
+							});
 							tasks.push(() => {
 								const instance = state.instances.get(command.id)!;
-								const replacement = stagedReplacements.get(command.id)!;
 								const previousObject = instance.object;
 								const previousOwned = instance.owned;
+								const previousProps = instance.props;
 								OBJECT_INSTANCES.delete(previousObject);
 								instance.object = replacement.object;
 								instance.owned = replacement.owned;
@@ -794,10 +1476,8 @@ export function createThreeDriver(
 								instance.type = replacement.type;
 								OBJECT_INSTANCES.set(instance.object, instance);
 								unpublishedOwned.delete(replacement.object);
-								if (!replacement.propsApplied) {
-									applyThreeProps(instance.object, command.props, undefined, {
-										colorSpace: container.environment.linear !== true,
-									});
+								if (isObject3D(previousObject)) {
+									previousObject.visible = previousProps.visible !== false;
 								}
 								if (previousOwned && instance.type !== 'primitive') {
 									enqueueDisposal(container, previousObject);
@@ -808,6 +1488,10 @@ export function createThreeDriver(
 
 					tasks.push(() => {
 						state.rootChildren.splice(0, state.rootChildren.length, ...rootChildren);
+						state.portalChildren.clear();
+						for (const [target, children] of portalChildren) {
+							state.portalChildren.set(target, [...children]);
+						}
 						for (const [id, simulated] of simulation) {
 							const instance = state.instances.get(id)!;
 							instance.type = simulated.type;
@@ -821,6 +1505,28 @@ export function createThreeDriver(
 							for (const entry of simulated.lifecycles) instance.lifecycles.set(...entry);
 							instance.localCallbacks.clear();
 							for (const entry of simulated.localCallbacks) instance.localCallbacks.set(...entry);
+							instance.store = storeForInstance(
+								id,
+								simulation,
+								state.portalTargets,
+								container.environment.store,
+							);
+						}
+					});
+
+					tasks.push(() => {
+						for (const [id, simulated] of simulation) {
+							if (stagedReplacements.has(id)) continue;
+							const instance = state.instances.get(id)!;
+							const interaction = interactionSnapshot(
+								id,
+								instance.object,
+								simulated.events.size,
+								simulation,
+								state.portalTargets,
+								container.environment.store,
+							);
+							reconcileInteractivity(previousInteractions.get(id), interaction, false);
 						}
 					});
 
@@ -830,6 +1536,15 @@ export function createThreeDriver(
 						tasks.push(() => {
 							const instance = state.instances.get(id);
 							if (instance === undefined) return;
+							if (instance.store !== undefined && isObject3D(instance.object)) {
+								removeInteractivity(getInitialRootStore(instance.store), instance.object);
+							}
+							// Visibility is a renderer-owned retention overlay. Do not leak a
+							// suspense/activity-hidden flag onto an object after ownership ends;
+							// restore the authored value before refs and consumers can observe it.
+							if (isObject3D(instance.object)) {
+								instance.object.visible = instance.props.visible !== false;
+							}
 							if (shouldDisposeRemoved(instance, state, destroyed)) {
 								enqueueDisposal(container, instance.object);
 							}
@@ -838,6 +1553,7 @@ export function createThreeDriver(
 							instance.events.clear();
 							instance.lifecycles.clear();
 							instance.localCallbacks.clear();
+							instance.store = undefined;
 							instance.parent = undefined;
 							instance.children.length = 0;
 							state.instances.delete(id);

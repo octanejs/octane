@@ -2,7 +2,7 @@
 
 Octane implements React's programming model — the same hooks, `memo`, context,
 portals, Suspense, transitions, actions, and SSR/streaming APIs. Its core suite
-contains 2,700+ distinct behavioral tests; production-compiler executions rerun
+contains 3,500+ distinct behavioral tests; production-compiler executions rerun
 the normal cases and are not additional unique coverage. That is a local suite
 count, not a count of tests ported from React. The exact pinned snapshot and
 source-attributed React scenarios, classifications, and coverage are tracked in the generated
@@ -112,7 +112,7 @@ semantics; `muted`/`multiple`/`selected` dynamic writes set the DOM
 **property** (mustUseProperty); `autoFocus` writes no attribute — the element
 is focused in the commit phase of its mount. Also matched: `aria-*` and
 `spellcheck`/`contenteditable`/`draggable` stringify booleans; empty
-`src`/`href` are stripped (except `<a>`/`<area>`); function/symbol values are
+`src`/`href` are stripped (except `<a>`); function/symbol values are
 removed; `dangerouslySetInnerHTML` shape and children-exclusivity throw; the
 canonical camelCase aliases (`strokeWidth` → `stroke-width`, `xlinkHref`,
 `className`/`htmlFor`) write the native attribute.
@@ -123,7 +123,10 @@ there is no exhaustive `possibleStandardNames` DEV table. Only a curated slice
 of genuinely-broken casings warns in dev (`autofocus` → `autoFocus`,
 `defaultvalue` → `defaultValue`, `defaultchecked` → `defaultChecked`,
 lowercase `on*` function props → camelCase). Odd objects coerce leniently via
-`toString()` (with a dev `[object Object]` warning) instead of throwing.
+`toString()` (with a dev `[object Object]` warning) instead of throwing. Octane
+also retains `<area href="">` as a current-document hyperlink, while React
+strips it; a statically authored lowercase SVG `textlength` is canonicalized by
+the browser parser instead of following React's imperative warning path.
 
 ## `class`/`className` compose clsx-style
 
@@ -147,8 +150,10 @@ time-slicing, expiration, or selective hydration. Consequences:
 - `flushSync` drains the whole queue (transition work included) and never runs
   passive effects synchronously — passives are always post-paint.
 - Priority (`urgent` vs `transition`) governs **suspense hold semantics** —
-  transition renders keep prior content on suspend, entangled boundaries reveal
-  atomically — not commit deferral.
+  transition renders keep prior content on suspend, and fallback-visible boundaries
+  whose retries fully stage reveal together through refs/layout effects — not general
+  commit deferral. Same-identity synchronous rendering remains per-swap rather than a
+  global React-style WIP tree (see `SUSPENSE_DIVERGENCE.md` #4).
 - Multiple unhandled root errors in one flush throw an `AggregateError`; an
   unhandled error unmounts its root's whole tree (both match React).
 - `useSyncExternalStore` skips React's commit-time getSnapshot re-read for

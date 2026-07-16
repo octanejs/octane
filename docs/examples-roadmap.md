@@ -42,9 +42,9 @@ or assets to copy.
 | 4 | Mailroom | Email client | Router fetchers, blockers, drafts and offline outbox |
 | 4 | Wayfinder | Travel planner | Parallel `use()`, out-of-order streaming, abort and CSP |
 
-Waves 0–2 are implemented as release-gated fixtures. Waves 3–4 remain planned
-work; their product names and evidence targets reserve distinct regression
-responsibilities rather than prescribing a specific visual design.
+Waves 0–4 are implemented as release-gated fixtures. Each product name reserves
+a distinct regression responsibility rather than prescribing a specific visual
+design.
 
 Hacker News remains the dedicated `.tsx` and `.tsrx` parity application.
 Duplicating every new application in both dialects would double maintenance
@@ -52,9 +52,8 @@ without giving each example a distinct regression responsibility.
 
 ## Product-application graduation contract
 
-Wave 0 records the evidence the two existing examples provide today. The
-product-shaped applications in Waves 1–4 should not graduate from experimental
-to active until they provide:
+Wave 0 established the evidence contract around the two examples that predated
+this roadmap. All 14 applications now follow the same graduation contract:
 
 - several connected, deep-linkable user journeys rather than a showcase page;
 - deterministic seeded data and no live network dependency in CI;

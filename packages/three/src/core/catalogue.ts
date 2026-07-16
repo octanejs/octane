@@ -12,6 +12,7 @@ import {
 	universalProps,
 	universalValue,
 } from 'octane/universal';
+import type { EventHandlers } from './events.js';
 
 export const THREE_RENDERER_ID = 'three';
 
@@ -55,6 +56,12 @@ export interface ThreeInstanceProps<T = unknown> {
 	onUpdate?: (self: T) => void;
 	ref?: ThreeRef<T>;
 }
+
+export interface RaycastableRepresentation {
+	raycast(raycaster: THREE.Raycaster, intersects: THREE.Intersection[]): void;
+}
+
+export type EventProps<T> = T extends RaycastableRepresentation ? EventHandlers : {};
 
 /** R3F-compatible logical instance props, separate from authored JSX props. */
 export type InstanceProps<T = any, P = any> = (P extends ConstructorRepresentation
@@ -102,7 +109,7 @@ type MathProps<T> = {
 export type ThreeElement<T extends ConstructorRepresentation> = Mutable<
 	Overwrite<
 		Partial<Overwrite<Properties<InstanceType<T>>, MathProps<InstanceType<T>>>>,
-		ArgsProp<T> & ThreeInstanceProps<InstanceType<T>>
+		ArgsProp<T> & ThreeInstanceProps<InstanceType<T>> & EventProps<InstanceType<T>>
 	>
 >;
 
@@ -117,7 +124,8 @@ export type ThreeToJSXElements<T extends Record<string, unknown>> = ThreeToEleme
 type ThreeNamespaceElements = ThreeToElements<typeof THREE>;
 
 export type PrimitiveProps<T extends object = Record<string, unknown>> = Partial<Properties<T>> &
-	ThreeInstanceProps<T> & {
+	ThreeInstanceProps<T> &
+	EventProps<T> & {
 		args?: never;
 		object: T;
 	};

@@ -178,7 +178,11 @@ export function octane(options = {}) {
 		config(config) {
 			assertProfilingDefineAvailable(config.define, profileEnabled);
 			resetCompiler(config.root ?? process.cwd());
-			const sourceDependencies = compiler.discoverSourceDependencies().packages;
+			const discovery = compiler.discoverSourceDependencies();
+			const sourceDependencies = discovery.packages;
+			const optimizeDepsExclusions = [
+				...new Set([...sourceDependencies, ...discovery.viteOptimizeDepsExclusions]),
+			].sort();
 			return {
 				// The runtime uses this reserved constant to make normal builds erase
 				// profiling branches completely. Keep it defined in both modes so Vite's
@@ -187,9 +191,11 @@ export function octane(options = {}) {
 					__OCTANE_PROFILE_ENABLED__: JSON.stringify(profileEnabled),
 				},
 				// Raw Octane dependencies must reach this plugin, never esbuild's dep
-				// prebundle or Node's SSR external loader. Dedupe the runtime as an
-				// additional guard for linked/local package layouts.
-				optimizeDeps: { exclude: sourceDependencies },
+				// prebundle or Node's SSR external loader. A raw package can also declare
+				// exact dependencies or an installed `family/*` that must stay out of
+				// Vite's rolling optimizer; this keeps module-identity-sensitive packages
+				// from mixing cold-crawl generations.
+				optimizeDeps: { exclude: optimizeDepsExclusions },
 				resolve: { dedupe: ['octane'] },
 				ssr: { noExternal: sourceDependencies },
 			};
@@ -236,9 +242,10 @@ export function octane(options = {}) {
 				const result = compiler.transform(code, id, {
 					environment: server ? 'server' : 'client',
 					hmr: !server && hmrEnabled ? 'vite' : false,
-					// Preserve the existing Vite gate: source locations are emitted only
-					// for a client serve transform where HMR is active.
-					dev: !server && !!hmrEnabled,
+					// DEV server transforms also carry SSR-only diagnostics. HMR itself
+					// remains client-only; an explicit `hmr: false` keeps both transforms
+					// on the production compiler path.
+					dev: !!hmrEnabled,
 					profile: !server && profileEnabled,
 					parallelUse: options.parallelUse,
 					collectVoidComponentExports:

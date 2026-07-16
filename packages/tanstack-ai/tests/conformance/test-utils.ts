@@ -27,5 +27,7 @@ import { useChat } from '../../src/use-chat.tsrx';
 export function renderUseChat(
 	options?: UseChatOptions,
 ): RenderHookResult<UseChatReturn, UseChatOptions> {
-	return renderHook(() => useChat(options!));
+	return renderHook((hookOptions: UseChatOptions) => useChat(hookOptions), {
+		initialProps: options!,
+	});
 }

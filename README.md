@@ -65,7 +65,7 @@ Inferno and has worked on React, Lexical, Ripple, and Svelte.
 
 Octane is currently in alpha development.
 
-The core suite contains **2,700+ distinct behavioral tests** across conformance,
+The core suite contains **3,500+ distinct behavioral tests** across conformance,
 differential, hydration, runtime, compiler, and SSR coverage. The `octane-prod`
 project reruns the normal suite against the production compiler path, so those
 executions are valuable mode coverage but are not counted again as unique tests.
@@ -169,6 +169,17 @@ schedule-to-render delay, Chrome Performance tracks, and a bounded console API.
 Normal production builds omit the compiler metadata and tree-shake the recorder
 unless application code imports `octane/profiling` directly. See the
 [profiling guide](https://octanejs.dev/docs/profiling).
+
+Production client compilation automatically reuses conservative same-module
+pure component regions and keyed lists by inferred lexical dependencies, using
+React-Compiler-style strict-identity snapshots and the normal context-aware
+Block/keyed-list machinery. There is nothing to configure and no flag to
+learn: the proof fails closed, so HMR, dev, profiling, and server builds use
+normal reconciliation, and effects, refs, mutable ambient reads, custom
+comparators, and Suspense/transition boundaries keep their authored
+every-render behavior. Caching render-used imported calculations and their
+descriptor output is a later phase that ships together with per-key descriptor
+reuse.
 
 ### Mount
 
@@ -493,7 +504,9 @@ generated from the workspace manifests in
   held-out material stays outside the repository.
 - The `@octanejs/*` framework bindings — each an octane port of a React library:
   [`zustand`](./packages/zustand), [`jotai`](./packages/jotai),
-  [`query`](./packages/tanstack-query), [`apollo-client`](./packages/apollo-client),
+  [`ai`](./packages/tanstack-ai), [`query`](./packages/tanstack-query),
+  [`store`](./packages/tanstack-store),
+  [`form`](./packages/tanstack-form), [`apollo-client`](./packages/apollo-client),
   [`motion`](./packages/motion),
   [`stylex`](./packages/stylex), [`router`](./packages/tanstack-router),
   [`remix-router`](./packages/remix-router),

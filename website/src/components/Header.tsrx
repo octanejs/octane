@@ -1,5 +1,5 @@
 // The sticky top bar: two clusters — wordmark + section links on the left,
-// search and the Discord/GitHub icons on the right. Router <Link>s are separate
+// search and the X/Discord/GitHub icons on the right. Router <Link>s are separate
 // components, so their classes are styled through :global() descendant holes.
 // Below 720px the left link row collapses behind a hamburger into a dropdown
 // panel, while search and the social icons stay in the bar as icons.
@@ -7,6 +7,7 @@ import { useState } from 'octane';
 import { Link } from '@octanejs/tanstack-router';
 import { DocsSearch } from './DocsSearch.tsrx';
 import logoUrl from '../assets/octane-logo.svg';
+import xUrl from '../assets/x.svg';
 import discordUrl from '../assets/discord.svg';
 import githubUrl from '../assets/github.svg';
 
@@ -43,7 +44,7 @@ export function Header() @{
 					</svg>
 				</button>
 				<Link to="/" class="wordmark" aria-label="Octane home">
-					<img src={logoUrl} alt="Octane" class="wordmark-img" />
+					<img src={logoUrl} alt="Octane" class="wordmark-img" width="123" height="30" />
 				</Link>
 				<nav
 					id="site-nav"
@@ -62,6 +63,20 @@ export function Header() @{
 			<div class="nav-right">
 				<DocsSearch />
 				<span class="nav-sep" aria-hidden="true"></span>
+				<a
+					class="nav-icon"
+					href="https://x.com/octanejs"
+					target="_blank"
+					rel="noreferrer"
+					title="X"
+					aria-label="Octane on X"
+				>
+					<span
+						class="nav-icon-glyph"
+						style={'--icon:url("' + xUrl + '")'}
+						aria-hidden="true"
+					></span>
+				</a>
 				<a
 					class="nav-icon"
 					href="https://discord.gg/8puY9fFqd9"

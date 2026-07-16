@@ -3,18 +3,23 @@
     "package": "@react-three/fiber",
     "version": "9.6.1 (2a528745)"
   },
-  "surface": "Experimental Milestones 0 and 2 surface: renderer configuration, compiler ABI, renderer-local Three intrinsic types, the pinned upstream evidence crosswalk, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, and ownership-aware disposal. Canvas, the root store/configuration, frame loop/hooks, and pointer events are deferred to Milestone 3 and later.",
+  "surface": "Technical-preview Milestones 0, 2, 3, 4, 5, 6, and 7 surface: renderer configuration and DOM Canvas boundary, compiler ABI and renderer-local Three intrinsic types, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, ownership-aware disposal, promise-returning programmatic roots, callable root state, scene/camera/raycaster and resize/DPR/viewport configuration, shadows/colors, one shared frame loop, global effects, useStore/useThree/useFrame/useGraph and managed-instance helpers, the ray/pointer event system with DOM sources and custom managers, a keyed useLoader cache with preload/clear and GLTF graph augmentation, retained Suspense/Activity behavior, client Three-to-DOM pending/error projection, same-renderer createPortal targets with state/event enclaves and physical Three event bubbling, client-only Canvas shell streaming and production Vite/Rsbuild hydration adoption with the matching raw Rspack graph split, and a deterministic testing harness.",
   "divergences": [
     "Octane owns component execution, hooks, context, scheduling, Suspense, refs, and effects instead of embedding React Reconciler.",
-    "The forthcoming programmatic root API will render an Octane component plus props rather than a React element descriptor.",
-    "Removing a pierced prop resets its original nested target; R3F 9.6.1 mistakenly writes that default to the leaf key on the root object."
+    "The programmatic root renders an Octane component plus props rather than a React element descriptor.",
+    "The upstream callable store selector remains order-based because dynamic function calls cannot receive compiler slots; compiler-visible useStore(selector) and useThree(selector) preserve Octane's conditional-hook semantics.",
+    "buildGraph omits unnamed mesh and material entries, plus array-valued material entries, instead of publishing empty or undefined keys.",
+    "Removing a pierced prop resets its original nested target; R3F 9.6.1 mistakenly writes that default to the leaf key on the root object.",
+    "Reconstructing a captured or hovered object rewrites nested stored intersections to the replacement; R3F 9.6.1 updates only the outer hover identity and capture-map key, which leaves captured delivery pointing at the retired object.",
+    "Hidden retained Activity subtrees are excluded from recursive raycasts; Three r172 ignores Object3D.visible during raycasting, so R3F 9.6.1 can otherwise pierce a hidden descendant through an interactive visible ancestor.",
+    "Managed and externally leased portal targets are root-scoped and cross-root portal placement is rejected before mutation; this makes the universal target-handle lifetime explicit."
   ],
-  "ssr": "The current Three scene surface is client-only. Canvas begins in Milestone 3; its DOM server shell, omitted child-region streaming, and hydration adoption are planned for Milestone 7.",
+  "ssr": "Three scene modules are client-only and Canvas.children is omitted from the server graph. Canvas streams its DOM shell and native fallback, then production Vite and Rsbuild hydration adopt those nodes and create one Three root on the client; raw Rspack proves the equivalent client/server graph split without claiming an application SSR lifecycle.",
   "verified": "2026-07-16",
   "notes": [
     "The behavioral oracle is pinned to three@0.172.0; the broad upstream three >=0.156 range is not advertised until a minimum-version lane passes.",
-    "The checked-in crosswalk classifies 90 upstream public exports and 157 executable upstream tests with zero unclassified cases; current Milestone 2 evidence contains 18 passing tests across public host behavior, prepared driver transitions, exact lifecycle ordering, and a same-source compiled R3F differential scene.",
-    "Canvas, createRoot/root configuration, the root store, frame loop, and hooks are Milestone 3 work; ray and pointer events begin in Milestone 4.",
+    "The checked-in crosswalk classifies 90 upstream public exports and 157 executable upstream tests with zero unclassified cases; Milestone 7 adds concrete Canvas server-exclusion, streamed-shell, hydration-adoption, client-reference, projection, and teardown evidence.",
+    "XR/HMR and direct-root lifecycle hardening follow in later milestones.",
     "React Native/Expo, R3F 10 WebGPU/TSL APIs, and Drei are outside this package's current compatibility target."
   ],
   "docs": ["docs/three-port-plan.md", "packages/three/UPSTREAM.md"]

@@ -928,8 +928,13 @@ export function validateInventory(inventory, upstreams, expectedBaseline) {
 	return errors;
 }
 
-function triagePolicyForFile(upstreams, file) {
-	return upstreams?.triagePolicies?.find((policy) => new RegExp(policy.filePattern).test(file));
+function triagePolicyForCase(upstreams, file, testCase) {
+	const title = testCase?.title ?? testCase?.titleExpression ?? '';
+	return upstreams?.triagePolicies?.find(
+		(policy) =>
+			new RegExp(policy.filePattern).test(file) &&
+			(policy.titlePattern === undefined || new RegExp(policy.titlePattern, 'i').test(title)),
+	);
 }
 
 function upstreamCaseDetails(inventories) {
@@ -958,21 +963,25 @@ export function syncLedger(ledger, inventories, upstreams) {
 	const existing = new Map(ledger.entries.map((entry) => [entry.caseId, entry]));
 	for (const detail of upstreamCaseDetails(inventories).values()) {
 		const current = existing.get(detail.caseId) ?? {};
-		const policy = triagePolicyForFile(upstreams, detail.sourceFile);
-		const disposition =
-			policy && (!current.status || current.status === 'untriaged')
-				? {
-						status: policy.status,
-						classification: policy.classification,
-						risk: policy.risk,
-						owner: policy.owner,
-						workstream: policy.workstream,
-						rationale: policy.rationale,
-					}
-				: {
-						status: current.status ?? 'untriaged',
-						risk: current.risk ?? 'unassessed',
-					};
+		const policy = triagePolicyForCase(upstreams, detail.sourceFile, detail);
+		const shouldApplyPolicy =
+			policy &&
+			(!current.status ||
+				current.status === 'untriaged' ||
+				(policy.replacePlanned === true && current.status === 'planned'));
+		const disposition = shouldApplyPolicy
+			? {
+					status: policy.status,
+					classification: policy.classification,
+					risk: policy.risk,
+					owner: policy.owner,
+					workstream: policy.workstream,
+					rationale: policy.rationale,
+				}
+			: {
+					status: current.status ?? 'untriaged',
+					risk: current.risk ?? 'unassessed',
+				};
 		const entry = {
 			...current,
 			...detail,
@@ -1069,7 +1078,7 @@ export function validateLedger(ledger, inventories, repoRoot, upstreams) {
 			}
 			if (JSON.stringify(entry.baselines) !== JSON.stringify(expectedDetail.baselines))
 				errors.push(`Ledger case ${entry.caseId} has stale baselines.`);
-			const policy = triagePolicyForFile(upstreams, expectedDetail.sourceFile);
+			const policy = triagePolicyForCase(upstreams, expectedDetail.sourceFile, expectedDetail);
 			if (policy) {
 				if (entry.status === 'untriaged')
 					errors.push(`Priority case ${entry.caseId} may not remain untriaged.`);
@@ -1200,9 +1209,11 @@ function coverageFor(inventory, ledgerById) {
 }
 
 function priorityStats(policy, inventory, upstreams) {
-	const cases = inventory.suites.flatMap((suite) => {
-		return triagePolicyForFile(upstreams, suite.file)?.id === policy.id ? suite.cases : [];
-	});
+	const cases = inventory.suites.flatMap((suite) =>
+		suite.cases.filter(
+			(testCase) => triagePolicyForCase(upstreams, suite.file, testCase)?.id === policy.id,
+		),
+	);
 	return {
 		cases: cases.length,
 		minimumRegistrations: cases.reduce(
@@ -1297,8 +1308,8 @@ export function renderCoverageReport({ upstreams, inventories, ledger }) {
 	markdown += `1. **Wave 1 — critical blockers (completed 2026-07-15):** Effect Event semantics and shared untrusted-URL sanitization are implemented, ported, and linked to executable ledger evidence.\n`;
 	markdown += `2. **Wave 2 — public API and reconciliation (completed 2026-07-15):** supported root, fragment, element/Children, and lazy-component outcomes have live evidence; excluded outcomes have durable divergence/non-goal dispositions.\n`;
 	markdown += `3. **Wave 3 — scheduling and stores (completed 2026-07-15):** supported update-reconciliation and external-store outcomes have live evidence; excluded class, legacy, Fiber-policy, and optimization-only cases have durable dispositions.\n`;
-	markdown += `4. **Wave 4 — server matrix (audit complete; implementation in progress):** 612 Fizz and server-integration cases were reviewed. Exact live evidence covers 84 Wave 4 cases, 138 have conservative durable dispositions, and 390 remain planned. The shared matrix exercises client, buffered SSR, streaming SSR, matching hydration, mismatch recovery, and production compilation; class and legacy React remain explicit non-goals.\n`;
-	markdown += `5. **Residual audit:** assign risk and a durable disposition to every remaining untriaged case, with canary drift reviewed continuously.\n\n`;
+	markdown += `4. **Wave 4 — server matrix (completed 2026-07-16):** all 612 Fizz and server-integration cases have exited the queue. Exact live evidence covers 439 cases and 173 have conservative durable dispositions; none remain planned. The shared matrix exercises client, buffered SSR, streaming SSR, matching hydration, mismatch recovery, and production compilation; class and legacy React remain explicit non-goals.\n`;
+	markdown += `5. **Residual audit (completed 2026-07-16):** every case in the stable/canary union has an assigned risk, owner, workstream, and durable status. There are zero untriaged cases; supported planned work remains visible rather than being mislabeled as a port, while class, legacy, private-renderer, synthetic-event, and Server Component surfaces have explicit non-goal dispositions.\n\n`;
 	markdown += `A case exits the queue only as \`covered\` with live local evidence, or as a \`documented\` divergence/non-goal with rationale. Committed conformance work must remain executable; \`skip\`, \`todo\`, and expected-failure placeholders are not completion states.\n\n`;
 	markdown += `## Extraction limits\n\n`;
 	markdown += `The inventory follows React's pinned OSS source Jest discovery rule: direct files under \`__tests__\` in \`packages\` and \`scripts\`, with the source-config exclusions recorded in [react-upstreams.json](../packages/octane/audit/react-upstreams.json). It recognizes direct \`it\`/\`test\` registrations, gate pragmas and transformed gates, static \`.each\` matrices, registrar loops, and the React DOM server integration helpers. Dynamic loops/matrices are retained as manual-review cases with unknown expansion counts. Possible custom registrar names are recorded per suite for audit rather than silently counted as exact.\n`;

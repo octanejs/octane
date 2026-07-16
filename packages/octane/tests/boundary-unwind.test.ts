@@ -3,6 +3,7 @@ import { mount, nextPaint } from './_helpers';
 import {
 	DeepThrowHost,
 	RethrowingCatch,
+	RethrowingCatchUnderIf,
 	DeepSuspenseHost,
 	StateFlipHost,
 } from './_fixtures/boundary-unwind.tsrx';
@@ -29,6 +30,22 @@ describe('boundary unwinding through nested components and hosts', () => {
 	it('a catch branch that rethrows forwards the ORIGINAL error to the outer boundary', () => {
 		const r = mount(RethrowingCatch, { bang: true });
 		expect(r.container.textContent).toContain('outer:deep-boom');
+		r.unmount();
+	});
+
+	// The router MatchesInner shape: the rethrown error crosses an @if whose
+	// branch mount is still on the stack. The outer boundary must report the
+	// ORIGINAL error — not a DOM bookkeeping error from switching arms while the
+	// @if's insertion anchors were being swept out from under it.
+	it('a rethrowing catch under an in-progress @if mount forwards the ORIGINAL error', () => {
+		const r = mount(RethrowingCatchUnderIf, { on: true, bang: true });
+		expect(r.container.textContent).toContain('outer:deep-boom');
+		r.unmount();
+	});
+
+	it('the @if-wrapped inner boundary renders normally when nothing throws', () => {
+		const r = mount(RethrowingCatchUnderIf, { on: true, bang: false });
+		expect(r.find('.ok').textContent).toBe('ok');
 		r.unmount();
 	});
 

@@ -100,6 +100,39 @@ function packageUsesOctane(pkg) {
 	);
 }
 
+function packageViteOptimizeDepsExclusions(pkg) {
+	const configured = pkg.octane?.vite?.optimizeDeps?.exclude;
+	if (!Array.isArray(configured)) return [];
+	return [
+		...new Set(
+			configured.filter(
+				(dependency) =>
+					typeof dependency === 'string' &&
+					dependency.length > 0 &&
+					dependency.trim() === dependency,
+			),
+		),
+	];
+}
+
+// Vite does not expand globs in optimizeDeps.exclude. Resolve a terminal family
+// rule against dependency names declared by the app and raw source packages so
+// the adapter emits the exact package IDs Vite's resolver requires.
+function expandViteOptimizeDepsExclusions(configured, dependencyNames) {
+	const exclusions = new Set();
+	for (const request of configured) {
+		if (!request.endsWith('/*')) {
+			exclusions.add(request);
+			continue;
+		}
+		const prefix = request.slice(0, -1);
+		for (const dependency of dependencyNames) {
+			if (dependency.startsWith(prefix)) exclusions.add(dependency);
+		}
+	}
+	return exclusions;
+}
+
 function metadata(dependencies = [], missingDependencies = []) {
 	return { dependencies, missingDependencies };
 }
@@ -249,6 +282,7 @@ class OctaneBundlerCompiler {
 						...Object.keys(pkg.dependencies ?? {}),
 						...Object.keys(pkg.optionalDependencies ?? {}),
 					],
+					viteOptimizeDepsExclusions: packageViteOptimizeDepsExclusions(pkg),
 					usesOctane: packageUsesOctane(pkg),
 				},
 				...metadata([manifest]),
@@ -387,7 +421,11 @@ class OctaneBundlerCompiler {
 		} catch {
 			if (existsSync(projectManifestPath)) collected.dependencies.add(projectManifestPath);
 			else collected.missingDependencies.add(projectManifestPath);
-			this.discoveryCache = { packages: [], ...finishMetadata(collected) };
+			this.discoveryCache = {
+				packages: [],
+				viteOptimizeDepsExclusions: [],
+				...finishMetadata(collected),
+			};
 			return this.discoveryCache;
 		}
 
@@ -396,6 +434,8 @@ class OctaneBundlerCompiler {
 			for (const name of Object.keys(projectManifest[field] ?? {})) dependencyNames.add(name);
 		}
 		const sourceDependencies = new Set();
+		const viteOptimizeDepsExclusionRules = new Set();
+		const viteOptimizeDepsCandidates = new Set(dependencyNames);
 		const visitedPackageRoots = new Set();
 		const visit = (name, issuerRoot) => {
 			const packageRequire = createRequire(join(issuerRoot, 'package.json'));
@@ -405,6 +445,12 @@ class OctaneBundlerCompiler {
 				addMetadata(collected, lookup);
 				if (!lookup.rule?.usesOctane) return;
 				sourceDependencies.add(name);
+				for (const dependency of lookup.rule.viteOptimizeDepsExclusions) {
+					viteOptimizeDepsExclusionRules.add(dependency);
+				}
+				for (const dependency of lookup.rule.runtimeDependencies) {
+					viteOptimizeDepsCandidates.add(dependency);
+				}
 				let packageRoot = lookup.rule.root;
 				try {
 					packageRoot = realpathSync(packageRoot);
@@ -433,9 +479,14 @@ class OctaneBundlerCompiler {
 			}
 		};
 		for (const name of dependencyNames) visit(name, this.root);
+		const viteOptimizeDepsExclusions = expandViteOptimizeDepsExclusions(
+			viteOptimizeDepsExclusionRules,
+			viteOptimizeDepsCandidates,
+		);
 
 		this.discoveryCache = {
 			packages: [...sourceDependencies].sort(),
+			viteOptimizeDepsExclusions: [...viteOptimizeDepsExclusions].sort(),
 			...finishMetadata(collected),
 		};
 		return this.discoveryCache;
@@ -494,7 +545,10 @@ class OctaneBundlerCompiler {
 		}
 		const requestedHmr = normalizeHmrDialect(options.hmr ?? this.defaults.hmr);
 		const hmr = environment === 'server' ? false : requestedHmr;
-		const dev = environment === 'server' ? false : (options.dev ?? this.defaults.dev ?? !!hmr);
+		// Server HMR stays disabled, but integrations may explicitly request DEV
+		// server diagnostics (Vite does this for `serve`). With no explicit value,
+		// server transforms retain their established production default.
+		const dev = options.dev ?? this.defaults.dev ?? (environment === 'client' && !!hmr);
 		// Profiling is a client-runtime build specialization, deliberately independent
 		// of both HMR and dev hydration diagnostics. Server transforms stay byte-for-
 		// byte identical even when a shared client/server bundler configuration opts in.

@@ -24,7 +24,7 @@ import type {
 } from './types'
 
 export function useChat<
-  TTools extends ReadonlyArray<AnyClientTool> = any,
+  const TTools extends ReadonlyArray<AnyClientTool> = any,
   TSchema extends SchemaInput | undefined = undefined,
   TContext = InferredClientContext<TTools>,
 >(
@@ -47,11 +47,11 @@ export function useChat<
   type Partial = DeepPartial<InferSchemaType<NonNullable<TSchema>>>
   type Final = InferSchemaType<NonNullable<TSchema>>
 
-  // Track current messages in a ref to preserve them when client is recreated
+  // Track the rendered snapshot so a replacement client only synchronizes
+  // state when its messages actually differ.
   const messagesRef = useRef<Array<UIMessage<TTools>>>(
     options.initialMessages || [],
   )
-  const isFirstMountRef = useRef(true)
   const activeClientRef = useRef<ChatClient | null>(null)
   const cleanupInvalidationRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -67,7 +67,6 @@ export function useChat<
   // Create ChatClient instance with callbacks to sync state
   const client = useMemo(() => {
     const messagesToUse = options.initialMessages || []
-    isFirstMountRef.current = false
 
     // Build options with conditional spreads for fields whose source
     // type is `T | undefined` but the ChatClient target uses a strict
@@ -168,6 +167,17 @@ export function useChat<
       setMessages(clientMessages)
     }
   }, [client])
+
+  // OCTANE DIVERGENCE: upstream captures the initial transport. ChatClient
+  // owns transport swaps, including aborting an active request and
+  // resubscribing when needed, so keep its conversation state stable while
+  // applying the latest transport.
+  useEffect(() => {
+    const transport = options.connection
+      ? { connection: options.connection }
+      : { fetcher: options.fetcher }
+    client.updateOptions(transport)
+  }, [client, options.connection, options.fetcher])
 
   // Sync each wire-payload slot in its own effect so an unrelated option
   // changing doesn't re-run the others. `updateOptions` declares strict-optional

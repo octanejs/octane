@@ -53,6 +53,10 @@ const THREE_ALIASES = [
 		replacement: resolve(THREE_SOURCE, 'config.ts'),
 	},
 	{
+		find: /^@octanejs\/three\/testing$/,
+		replacement: resolve(THREE_SOURCE, 'testing.ts'),
+	},
+	{
 		find: /^@octanejs\/three\/intrinsics(?:\/jsx-runtime)?$/,
 		replacement: resolve(THREE_SOURCE, 'intrinsics.ts'),
 	},
@@ -292,6 +296,8 @@ export default defineConfig({
 				plugins: [
 					octane({
 						hmr: false,
+						// Exercise the default production component-region transform across
+						// the same behavioral suite; impure/logging fixtures fail its proof.
 						renderers: {
 							registry: {
 								object: {
@@ -379,6 +385,59 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'dexie',
+					include: ['packages/dexie/tests/**/*.test.ts'],
+					exclude: [
+						'packages/dexie/tests/ssr/**/*.test.ts',
+						'packages/dexie/tests/browser/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					setupFiles: ['packages/dexie/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/dexie$/,
+							replacement: resolve(import.meta.dirname, 'packages/dexie/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'dexie-browser',
+					include: ['packages/dexie/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				test: {
+					name: 'dexie-ssr',
+					include: ['packages/dexie/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dexie$/,
+							replacement: resolve(import.meta.dirname, 'packages/dexie/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'jotai',
 					include: ['packages/jotai/tests/**/*.test.ts'],
 					environment: 'jsdom',
@@ -456,6 +515,99 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/i18next\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/i18next/src') + '/$1.js',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-store',
+					include: [
+						'packages/tanstack-store/tests/conformance/**/*.test.ts',
+						'packages/tanstack-store/tests/differential/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/tanstack-store/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-store-ssr',
+					include: ['packages/tanstack-store/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-form',
+					include: [
+						'packages/tanstack-form/tests/conformance/**/*.test.ts',
+						'packages/tanstack-form/tests/differential/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/tanstack-form/tests/differential/_setup.ts'],
+					setupFiles: ['packages/tanstack-form/tests/conformance/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-form/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-form-ssr',
+					include: ['packages/tanstack-form/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-form/src/index.ts'),
 						},
 					],
 				},

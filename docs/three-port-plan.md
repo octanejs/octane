@@ -433,7 +433,7 @@ decision and tests.
 - Typed `ThreeElements`, math/color shorthand props, constructor inference,
   events on raycastable objects, and custom `extend` types.
 - Vite and Rsbuild application builds, a raw Rspack compilation/HMR fixture,
-  and one real-browser WebGL smoke. Pointer parity remains a later milestone.
+  and real-browser WebGL and pointer-event smoke coverage.
 
 ### Required for stable R3F v9 web/core parity
 
@@ -538,6 +538,21 @@ disposal assertions.
 
 ### Milestone 3 — store, Canvas, loop, and hooks (2–3 engineer-weeks)
 
+Status: implemented. The technical-preview surface now includes the callable
+vanilla store, serialized promise-returning root configuration, pending
+configuration teardown, package-owned universal store provider, measured DOM
+Canvas boundary, shared frame scheduler, public hooks/graph helpers, and the
+deterministic testing harness. Dedicated client-only Vite, Rsbuild, raw Rspack,
+and Chromium evidence closes the milestone without claiming the full Canvas
+SSR/hydration lifecycle reserved for Milestone 7.
+
+The upstream `useStore()(selector)` compatibility form remains order-based:
+the compiler cannot assign lexical slots to calls through arbitrary dynamic
+function values. Octane scene code should use the compiler-visible
+`useStore(selector, equality?)` extension or `useThree(selector, equality?)`
+when relying on conditional-hook semantics. Fully slotting arbitrary returned
+hook functions would require a separate compiler/dataflow contract.
+
 - Root store/configuration, scene/camera/raycaster/renderer, resize/DPR/
   viewport, color/shadows, Canvas boundary, cleanup, frame loop, global effects,
   `useStore`, `useThree`, `useFrame`, `useGraph`, and basic testing helper.
@@ -554,6 +569,15 @@ technical-preview cut if deferred features reject clearly.
 
 ### Milestone 4 — ray/pointer events (2–3 engineer-weeks)
 
+Status: implemented. The renderer-neutral dispatcher, default web event
+manager, Canvas source/prefix binding, interaction-state transfer, and direct
+testing helper now cover R3F 9.6.1 hit ordering, Three ancestry bubbling,
+hover, misses, propagation, pointer capture, custom managers, and reconstruction.
+The same-source differential suite compares normalized R3F/Octane event logs
+and resulting interaction state; the Chromium fixture proves native connection,
+capture, release, lost-capture cleanup, removal, and misses. Retained Activity
+subtrees leave raycast eligibility while hidden and rejoin it when visible.
+
 - Universal event classification and priority, DOM event connection, pointer
   normalization, intersections, bubbling, hover, misses, propagation, capture,
   event-layer priorities, custom managers, and reconstruction-state transfer.
@@ -566,6 +590,16 @@ closed by Milestone 6.
 
 ### Milestone 5 — assets, Suspense, Activity, and errors (2–3 engineer-weeks)
 
+Status: implemented. The keyed loader cache supports constructor and existing
+loader instances, scalar and array inputs, extensions/progress, GLTF graph
+augmentation, `preload`, exact-key `clear`, and cached rejection routing.
+Retained Three Suspense/Activity evidence proves initial allocation safety,
+hidden update identity and fallback visibility, resolve/reject teardown, and
+caller-owned primitive preservation. Client Three root suspension and errors
+project to the nearest DOM pending/catch boundary without tearing down a
+retained Canvas root, and a production-browser fixture performs a real asset
+request. Canvas streaming SSR/hydration remains Milestone 7.
+
 - Keyed loader cache and `useLoader` helpers, browser loader path, visibility,
   fallback/retained content, aborted resource safety, and Three-to-DOM error and
   pending projection.
@@ -576,16 +610,31 @@ unmount release only owned resources.
 
 ### Milestone 6 — portals and portal events (2–3 engineer-weeks)
 
+Status: implemented. Universal core now owns logical portal ranges,
+transactional root-scoped target registrations, and portal placement domains.
+The Three adapter supplies borrowed Object3D targets, R3F-style state/event
+enclaves, shared frame/interaction state, physical event ancestry, target
+validation, and deterministic teardown.
+
 - Three portal target handles and state enclaves, inherited/overridden root
   state, logical context retention, event-manager integration, teardown, and
   invalid target/scope diagnostics.
 
 Exit: portals preserve logical context while targeting an external `Object3D`;
-state overrides are isolated; ray/pointer events cross the portal's physical
-scene and logical ancestry correctly; teardown removes handlers and resources
-without corrupting either root.
+state overrides are isolated; ray/pointer events use the portal layer and
+bubble through physical Three ancestry while retaining logical handler
+ownership; teardown removes handlers and resources without corrupting either
+root.
 
 ### Milestone 7 — client-only Canvas SSR and hydration (2–3 engineer-weeks)
+
+Status: implemented. The concrete Three boundary now streams its DOM shell and
+native canvas fallback while the server compiler omits scene execution.
+Production Vite and Rsbuild builds retain stable client-reference identity,
+adopt the server shell, and create one client Three root; raw Rspack proves the
+same client/server graph classification without claiming an application SSR
+lifecycle. Browser evidence covers pending/error projection and deterministic
+teardown after hydration.
 
 - Implement the concrete Three `Canvas` server shell and omitted child region,
   client chunk linkage, hydration adoption, streaming fallback, error/pending

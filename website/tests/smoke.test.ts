@@ -44,7 +44,7 @@ async function renderRoute(url: string) {
 }
 
 describe('website routes', () => {
-	it('publishes Preact and Svelte measurements for every supported comparison', () => {
+	it('publishes each framework only where the checked benchmark has measurements', () => {
 		expect(HOME_SUMMARY).toEqual(createHomeSummary(FRAMEWORK_CARDS));
 
 		for (const card of FRAMEWORK_CARDS) {
@@ -66,6 +66,18 @@ describe('website routes', () => {
 
 		const summaryKeys = HOME_SUMMARY.series.map((series) => series.key);
 		expect(summaryKeys).toEqual(expect.arrayContaining(['preact', 'svelte']));
+		expect(summaryKeys).not.toContain('react-compiler');
+
+		const memoWall = FRAMEWORK_CARDS.find((card) => card.id === 'memo-wall')!;
+		expect(memoWall.series.map((series) => series.key)).toContain('react-compiler');
+		for (const card of FRAMEWORK_CARDS) {
+			if (card.id !== 'memo-wall') {
+				expect(
+					card.series.map((series) => series.key),
+					card.id,
+				).not.toContain('react-compiler');
+			}
+		}
 	});
 
 	it('/ renders the home experience and primary navigation', async () => {
@@ -128,21 +140,20 @@ describe('website routes', () => {
 		);
 		expect(homeSections).toEqual(['hero', 'features', 'proven', 'why', 'explorer']);
 
-		// The home page stages the interactive benchmark explorer over the checked-in
+		// The home page renders the interactive benchmark explorer from the checked-in
 		// ×-vs-Octane summary (HOME_SUMMARY). The explorer's own interactions live in
 		// benchmark-explorer.test.ts; here assert the section composes and the summary
-		// reaches the mounted views.
+		// reaches both deterministic views.
 		const explorer = container.querySelector('section.explorer')!;
 		expect(explorer).toBeTruthy();
 		expect(explorer.querySelector('#explorer-heading')?.textContent?.trim()).toBeTruthy();
 		expect(findLink(explorer, '/benchmarks')).toBeTruthy();
 		const bx = explorer.querySelector('.bx')!;
 		expect(bx).toBeTruthy();
-		// Interactive views are mount-gated: the SSR fallback table swaps for the bar
-		// chart + heatmap on mount. Wait for the plot, then assert every suite row of
-		// the summary reaches the heatmap.
+		// Both views are present from the first render so SSR and hydration share the
+		// same geometry. Assert every suite row reaches the heatmap.
 		await waitFor(() => {
-			if (!bx.querySelector('.bx-plot')) throw new Error('explorer not mounted');
+			if (!bx.querySelector('.bx-plot')) throw new Error('explorer plot missing');
 		});
 		expect(bx.querySelectorAll('.bx-heat tbody tr')).toHaveLength(HOME_SUMMARY.rows.length);
 
@@ -156,8 +167,22 @@ describe('website routes', () => {
 
 		const navRight = container.querySelector('.nav-right')!;
 		expect(navRight.querySelector('.search-trigger')).toBeTruthy();
+		expect(findLink(navRight, 'https://x.com/octanejs')).toBeTruthy();
 		expect(findLink(navRight, 'https://github.com/octanejs/octane')).toBeTruthy();
 		expect(findLink(navRight, 'https://discord.gg/8puY9fFqd9')).toBeTruthy();
+
+		// The footer mirrors the header's social set — X, Discord, GitHub, in that
+		// order — as an icon list beside the license line.
+		const footer = container.querySelector('footer')!;
+		expect(footer.textContent).toContain('MIT licensed');
+		const social = Array.from(footer.querySelectorAll<HTMLAnchorElement>('.footer-social a')).map(
+			(link) => link.getAttribute('href'),
+		);
+		expect(social).toEqual([
+			'https://x.com/octanejs',
+			'https://discord.gg/8puY9fFqd9',
+			'https://github.com/octanejs/octane',
+		]);
 	});
 
 	it('/benchmarks renders every configured benchmark card', async () => {
@@ -236,6 +261,8 @@ describe('website routes', () => {
 			'jotai',
 			'redux',
 			'redux-toolkit',
+			'tanstack-store',
+			'tanstack-ai',
 			'apollo-client',
 			'tanstack-query',
 			'tanstack-router',
@@ -248,6 +275,7 @@ describe('website routes', () => {
 			'sonner',
 			'lucide',
 			'hook-form',
+			'tanstack-form',
 			'lexical',
 			'mdx',
 			'i18next',

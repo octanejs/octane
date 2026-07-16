@@ -6,7 +6,10 @@
 //
 // A fresh descriptor + fresh props OBJECT is allocated every parent render —
 // that is the point: the memo bail must succeed on prop VALUES (all primitives
-// + the module-level selectRow handler), not on object identity.
+// + the module-level selectRow handler), not on object identity. autoMemo
+// deliberately does not cache through an imported helper's returned
+// descriptors; that calculation/output phase ships together with per-key
+// descriptor reuse so its miss path is at parity first.
 import { createElement } from 'octane';
 
 import { Row } from './rows.tsrx';

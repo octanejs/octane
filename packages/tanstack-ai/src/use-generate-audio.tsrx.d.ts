@@ -1,6 +1,6 @@
 // Declaration companion generated from use-generate-audio.tsrx.
-import { AudioGenerationResult, StreamChunk } from '@tanstack/ai';
-import { AIDevtoolsDisplayOptions, AudioGenerateInput, ConnectConnectionAdapter, GenerationClientState, GenerationFetcher, InferGenerationOutputFromReturn } from '@tanstack/ai-client';
+import type { AudioGenerationResult, StreamChunk } from '@tanstack/ai';
+import type { AIDevtoolsDisplayOptions, AudioGenerateInput, ConnectConnectionAdapter, GenerationClientState, GenerationFetcher, InferGenerationOutputFromReturn } from '@tanstack/ai-client';
 /**
  * Options for the useGenerateAudio hook.
  *

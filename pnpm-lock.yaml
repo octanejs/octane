@@ -181,26 +181,35 @@ catalogs:
       specifier: ^7.2.0
       version: 7.2.0
     '@tanstack/ai':
-      specifier: 0.40.0
-      version: 0.40.0
+      specifier: 0.41.0
+      version: 0.41.0
     '@tanstack/ai-client':
-      specifier: 0.20.0
-      version: 0.20.0
+      specifier: 0.21.0
+      version: 0.21.0
     '@tanstack/ai-react':
-      specifier: 0.16.4
-      version: 0.16.4
+      specifier: 0.17.0
+      version: 0.17.0
+    '@tanstack/form-core':
+      specifier: 1.33.2
+      version: 1.33.2
     '@tanstack/history':
       specifier: 1.162.0
       version: 1.162.0
     '@tanstack/query-core':
       specifier: ^5.0.0
       version: 5.101.0
+    '@tanstack/react-form':
+      specifier: 1.33.2
+      version: 1.33.2
     '@tanstack/react-query':
       specifier: ^5.0.0
       version: 5.101.0
     '@tanstack/react-router':
       specifier: 1.170.16
       version: 1.170.16
+    '@tanstack/react-store':
+      specifier: ^0.11.0
+      version: 0.11.0
     '@tanstack/react-table':
       specifier: 8.21.3
       version: 8.21.3
@@ -438,6 +447,9 @@ catalogs:
     devalue:
       specifier: ^5.8.1
       version: 5.8.1
+    dexie:
+      specifier: 4.4.4
+      version: 4.4.4
     es-toolkit:
       specifier: ^1.39.3
       version: 1.47.0
@@ -447,6 +459,9 @@ catalogs:
     eventemitter3:
       specifier: ^5.0.1
       version: 5.0.4
+    fake-indexeddb:
+      specifier: 6.2.5
+      version: 6.2.5
     graphql:
       specifier: ^16.11.0
       version: 16.14.2
@@ -711,7 +726,7 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
@@ -810,7 +825,7 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
@@ -957,7 +972,7 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
@@ -1085,7 +1100,7 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
@@ -1264,7 +1279,7 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
@@ -1401,7 +1416,35 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  benchmarks/memo-wall/react-compiler:
+    dependencies:
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@babel/core':
+        specifier: catalog:default
+        version: 7.29.7
+      '@rolldown/plugin-babel':
+        specifier: 0.2.3
+        version: 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      '@vitejs/plugin-react':
+        specifier: catalog:default
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      babel-plugin-react-compiler:
+        specifier: 1.0.0
+        version: 1.0.0
       terser:
         specifier: catalog:default
         version: 5.48.0
@@ -1656,7 +1699,7 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
@@ -1787,7 +1830,7 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
@@ -1906,7 +1949,7 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
@@ -2165,7 +2208,7 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
@@ -2296,11 +2339,52 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  examples/draftboard:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   examples/flowboard:
     dependencies:
       '@octanejs/dnd-kit':
         specifier: workspace:*
         version: link:../../packages/dnd-kit
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/gridlab:
+    dependencies:
+      '@octanejs/tanstack-virtual':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-virtual
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -2392,6 +2476,90 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  examples/mailroom:
+    dependencies:
+      '@octanejs/remix-router':
+        specifier: workspace:*
+        version: link:../../packages/remix-router
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/pagecraft:
+    dependencies:
+      '@lexical/list':
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      '@lexical/rich-text':
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      '@lexical/selection':
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      '@octanejs/lexical':
+        specifier: workspace:*
+        version: link:../../packages/lexical
+      lexical:
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/pulseboard:
+    dependencies:
+      '@octanejs/tanstack-table':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-table
+      '@octanejs/tanstack-virtual':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-virtual
+      '@octanejs/visx':
+        specifier: workspace:*
+        version: link:../../packages/visx
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   examples/relay:
     dependencies:
       octane:
@@ -2441,6 +2609,28 @@ importers:
       '@octanejs/zustand':
         specifier: workspace:*
         version: link:../../packages/zustand
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/wayfinder:
+    dependencies:
+      '@octanejs/vite-plugin':
+        specifier: workspace:*
+        version: link:../../packages/vite-plugin-octane
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -2556,6 +2746,43 @@ importers:
       react-dom:
         specifier: catalog:default
         version: 19.2.7(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
+  packages/dexie:
+    dependencies:
+      dexie:
+        specifier: catalog:default
+        version: 4.4.4
+    devDependencies:
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.37(react@19.2.7)
+      dexie-react-hooks:
+        specifier: 4.4.0
+        version: 4.4.0(dexie@4.4.4)(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      fake-indexeddb:
+        specifier: catalog:default
+        version: 6.2.5
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
         version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
@@ -3235,17 +3462,57 @@ importers:
     dependencies:
       '@tanstack/ai':
         specifier: catalog:default
-        version: 0.40.0
+        version: 0.41.0
       '@tanstack/ai-client':
         specifier: catalog:default
-        version: 0.20.0
+        version: 0.21.0
     devDependencies:
       '@octanejs/testing-library':
         specifier: workspace:*
         version: link:../testing-library
       '@tanstack/ai-react':
         specifier: catalog:default
-        version: 0.16.4(@tanstack/ai@0.40.0)(@types/react@19.2.17)(react@19.2.7)
+        version: 0.17.0(@tanstack/ai@0.41.0)(@types/react@19.2.17)(react@19.2.7)
+      '@testing-library/jest-dom':
+        specifier: catalog:default
+        version: 6.9.1
+      '@testing-library/user-event':
+        specifier: ^14.6.1
+        version: 14.6.1(@testing-library/dom@10.4.1)
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.37(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
+  packages/tanstack-form:
+    dependencies:
+      '@octanejs/tanstack-store':
+        specifier: workspace:*
+        version: link:../tanstack-store
+      '@tanstack/form-core':
+        specifier: catalog:default
+        version: 1.33.2
+    devDependencies:
+      '@octanejs/testing-library':
+        specifier: workspace:*
+        version: link:../testing-library
+      '@tanstack/react-form':
+        specifier: catalog:default
+        version: 1.33.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@testing-library/jest-dom':
         specifier: catalog:default
         version: 6.9.1
@@ -3314,6 +3581,34 @@ importers:
       '@tanstack/react-router':
         specifier: catalog:default
         version: 1.170.16(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.37(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
+  packages/tanstack-store:
+    dependencies:
+      '@tanstack/store':
+        specifier: 0.11.0
+        version: 0.11.0
+    devDependencies:
+      '@tanstack/react-store':
+        specifier: catalog:default
+        version: 0.11.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.37(react@19.2.7)
@@ -3410,10 +3705,28 @@ importers:
       '@types/three':
         specifier: catalog:default
         version: 0.172.0
+      zustand:
+        specifier: catalog:default
+        version: 5.0.14(@types/react@19.2.17)(immer@11.1.11)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     devDependencies:
+      '@octanejs/rsbuild-plugin':
+        specifier: workspace:*
+        version: link:../rsbuild-plugin-octane
+      '@octanejs/rspack-plugin':
+        specifier: workspace:*
+        version: link:../rspack-plugin-octane
+      '@octanejs/vite-plugin':
+        specifier: workspace:*
+        version: link:../vite-plugin-octane
       '@react-three/fiber':
         specifier: catalog:default
         version: 9.6.1(@types/react@19.2.17)(immer@11.1.11)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.172.0)
+      '@rsbuild/core':
+        specifier: catalog:default
+        version: 2.1.5
+      '@rspack/core':
+        specifier: catalog:default
+        version: 2.1.3(@swc/helpers@0.5.23)
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.37(react@19.2.7)
@@ -3423,6 +3736,9 @@ importers:
       octane:
         specifier: workspace:*
         version: link:../octane
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
       react:
         specifier: catalog:default
         version: 19.2.7
@@ -3435,6 +3751,9 @@ importers:
       typescript:
         specifier: catalog:default
         version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
         version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
@@ -5520,6 +5839,23 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@rolldown/plugin-babel@0.2.3':
+    resolution: {integrity: sha512-+zEk16yGlz1F9STiRr6uG9hmIXb6nprjLczV/htGptYuLoCuxb+itZ03RKCEeOhBpDDd1NU7qF6x1VLMUp62bw==}
+    engines: {node: '>=22.12.0 || ^24.0.0'}
+    peerDependencies:
+      '@babel/core': ^7.29.0 || ^8.0.0-rc.1
+      '@babel/plugin-transform-runtime': ^7.29.0 || ^8.0.0-rc.1
+      '@babel/runtime': ^7.27.0 || ^8.0.0-rc.1
+      rolldown: ^1.0.0-rc.5
+      vite: ^8.0.0
+    peerDependenciesMeta:
+      '@babel/plugin-transform-runtime':
+        optional: true
+      '@babel/runtime':
+        optional: true
+      vite:
+        optional: true
+
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
@@ -5699,17 +6035,17 @@ packages:
   '@swc/helpers@0.5.23':
     resolution: {integrity: sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==}
 
-  '@tanstack/ai-client@0.20.0':
-    resolution: {integrity: sha512-pxx940CaZ/eQGYiYpOWvVuQCBLqnJgS/PUn6+vKtyV6W4G8vZ+SqJf3UI/pDyqre7wv048G5cu6/EEj8dBn5JA==}
+  '@tanstack/ai-client@0.21.0':
+    resolution: {integrity: sha512-Q9QvXoxWU2QqMnB5x7i0rCLi7mKLtSHHlHtWOV407gdEUOAUPEnUJJ0POSeCQl8zhb6d/P5pn27JP0ppitKCmw==}
 
   '@tanstack/ai-event-client@0.6.8':
     resolution: {integrity: sha512-h7/HLz9u2LF9ba6uKFMnSZkFlkzQONJ5u3Hi+4qGxpsHyvcGRtW6v186jaFLoklndhEwyC49ytkC4eafi7Qq8w==}
 
-  '@tanstack/ai-react@0.16.4':
-    resolution: {integrity: sha512-GTVX0Th8oz5VPKymUJei/9V9p3II2lJfE3sVhGHKY+tG4aRFnGsys0dwTCHCjEsSjZWWLtmm/ryrpdaT7P8tcg==}
+  '@tanstack/ai-react@0.17.0':
+    resolution: {integrity: sha512-xWdSM1NdfHTFjC5/SHgtG6OHZwJUGgQmsl8XiRWilhkh8dgI4BCLJQISJC8e/36ANH4BRp3CSkueFOmMT1sghg==}
     peerDependencies:
       '@mcp-ui/client': ^7
-      '@tanstack/ai': ^0.40.0
+      '@tanstack/ai': ^0.41.0
       '@types/react': '>=18.0.0'
       react: '>=18.0.0'
     peerDependenciesMeta:
@@ -5719,8 +6055,8 @@ packages:
   '@tanstack/ai-utils@0.3.1':
     resolution: {integrity: sha512-fgbjd5DohL3k5rTWr/KInauLVYMiHVm0cnmTsNrzL3cr4wWhEld5vmFSrjiwUWACAuONjZa+uBXuS+ZSO8fwDQ==}
 
-  '@tanstack/ai@0.40.0':
-    resolution: {integrity: sha512-7942RQkjHccHRL9lTuqAjcgt5z+281HJEvWSSEIX9ZDgntSj5Xt9cOK8SL5tXtGrjj2ZpGnzaFdog5lE4QD07A==}
+  '@tanstack/ai@0.41.0':
+    resolution: {integrity: sha512-cq6ye9/rTfcwBDv9z2t1iCUIXL+lGdtM2HZm/KiLu3u6i+MH57W7i4tbB5uTUtcCnDmOlQ7EHD97esyNJpGtNw==}
     engines: {node: '>=18'}
     peerDependencies:
       '@opentelemetry/api': '>=1.9.0'
@@ -5733,12 +6069,28 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
+  '@tanstack/form-core@1.33.2':
+    resolution: {integrity: sha512-F60zJd15bGrXKonc1kpRYnNRNfiES7F+hgvrPMrsZznPLqZtO2DIg76OU6R25kCYkqYQY5xvuKteuWcUsc587A==}
+
   '@tanstack/history@1.162.0':
     resolution: {integrity: sha512-79pf/RkhteYZTRgcR4F9kbk84P2N8rugQJswxfIqovlbRiT3yI7eBE+5QorIrZaOKktsgzRlXh1l/du/xpl4iA==}
     engines: {node: '>=20.19'}
 
+  '@tanstack/pacer-lite@0.1.1':
+    resolution: {integrity: sha512-y/xtNPNt/YeyoVxE/JCx+T7yjEzpezmbb+toK8DDD1P4m7Kzs5YR956+7OKexG3f8aXgC3rLZl7b1V+yNUSy5w==}
+    engines: {node: '>=18'}
+
   '@tanstack/query-core@5.101.0':
     resolution: {integrity: sha512-cQetA74EB+seWySv1TTKr828TnP0u39m6LykwDXIo84SNortpDkp30TMEjkqtYCNP9c40uT/iwl6MLiufEt0Ow==}
+
+  '@tanstack/react-form@1.33.2':
+    resolution: {integrity: sha512-nEfayOu+27q5cZ5E0G5dmnddqLcLjdFCatbL/LCs/iLD469a1o1yYJlr8RISV3GfnqsBpm0hf+8kM4okh5fPCw==}
+    peerDependencies:
+      '@tanstack/react-start': '*'
+      react: ^17.0.0 || ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@tanstack/react-start':
+        optional: true
 
   '@tanstack/react-query@5.101.0':
     resolution: {integrity: sha512-rLlJXSpkqfizLWgkR5+eLeIk0MvTx/meEIR7LRjxic+qxiQP8zVjq7BqQkiCMNLQBlLfuOLqqr6KO5GtrDlmSg==}
@@ -5751,6 +6103,12 @@ packages:
     peerDependencies:
       react: '>=18.0.0 || >=19.0.0'
       react-dom: '>=18.0.0 || >=19.0.0'
+
+  '@tanstack/react-store@0.11.0':
+    resolution: {integrity: sha512-tX4YXh3PDkmpvGQWkWqKpzs/MSqbtuwY9dWdWhtV9Q50PmO+jOkUKIWIX4G85dwt7lxdHLXsiaEKPdKmC8F41w==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   '@tanstack/react-store@0.9.3':
     resolution: {integrity: sha512-y2iHd/N9OkoQbFJLUX1T9vbc2O9tjH0pQRgTcx1/Nz4IlwLvkgpuglXUx+mXt0g5ZDFrEeDnONPqkbfxXJKwRg==}
@@ -5774,6 +6132,9 @@ packages:
   '@tanstack/router-core@1.171.13':
     resolution: {integrity: sha512-+NOwEj1kO/6IGmpHRIZHasYxYWpyBQGNIZAST9aNrk9Q3YlU9SgqVnl1pbLa9qAKfeNdXQIRve0RQb/0kyDeDA==}
     engines: {node: '>=20.19'}
+
+  '@tanstack/store@0.11.0':
+    resolution: {integrity: sha512-WlzzCt3xi0G6pCAJu1U+2jiECwabETDpQDi3hfkFZvJii9AuZqEKbOiVarX1/bWhTNjU486yQtJCCasi/0q+Cw==}
 
   '@tanstack/store@0.9.3':
     resolution: {integrity: sha512-8reSzl/qGWGGVKhBoxXPMWzATSbZLZFWhwBAFO9NAyp0TxzfBP0mIrGb8CP8KrQTmvzXlR/vFPPUrHTLBGyFyw==}
@@ -6632,6 +6993,9 @@ packages:
     peerDependencies:
       '@babel/core': ^7.20.12
 
+  babel-plugin-react-compiler@1.0.0:
+    resolution: {integrity: sha512-Ixm8tFfoKKIPYdCCKYTsqv+Fd4IJ0DQqMyEimo+pxUOMUR9cVPlwTrFt9Avu+3cb6Zp3mAzl+t1MrG2fxxKsxw==}
+
   babel-plugin-transform-hook-names@1.0.2:
     resolution: {integrity: sha512-5gafyjyyBTTdX/tQQ0hRgu4AhNHG/hqWi0ZZmg2xvs2FgRkJXzDNKBZCyoYqgFkovfDrgM8OoKg8karoUvWeCw==}
     peerDependencies:
@@ -7004,6 +7368,15 @@ packages:
   devlop@1.1.0:
     resolution: {integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==}
 
+  dexie-react-hooks@4.4.0:
+    resolution: {integrity: sha512-ObLXBS5+4BJU8vtSvBx6b9fY6zZYgniAtwxzjCHsUQadgbqYN6935X2/1TWw4Rf2N1aZV1io5/ziox4vKuxABA==}
+    peerDependencies:
+      dexie: '>=4.2.0-alpha.1 <5.0.0'
+      react: '>=16'
+
+  dexie@4.4.4:
+    resolution: {integrity: sha512-jIwsYI8Os2hgnqc6O49YwFDKGc5v5QjGx0wPVp543ip1F53VFAKMLthV2pQosQcVTv3eAskTWYspOx195PM0FQ==}
+
   dir-glob@3.0.1:
     resolution: {integrity: sha512-WkrWp9GR4KXfKGYzOLmTuGVi1UWFfws377n9cc55/tb6DuqyF6pcQ5AbiHEshaDpY9v6oaSr2XCDidGmMwdzIA==}
     engines: {node: '>=8'}
@@ -7203,6 +7576,10 @@ packages:
 
   extendable-error@0.1.7:
     resolution: {integrity: sha512-UOiS2in6/Q0FK0R0q6UY9vYpQ21mr/Qn1KOnte7vsACuNJf514WvCCUHSRCPcgjPT2bAhNIJdlE6bVap1GKmeg==}
+
+  fake-indexeddb@6.2.5:
+    resolution: {integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w==}
+    engines: {node: '>=18'}
 
   fast-check@3.23.2:
     resolution: {integrity: sha512-h5+1OzzfCC3Ef7VbtKdcv7zsstUQwUDlYpUTvjeUsJAssPgLn7QzbboPtL5ro04Mq0rPOsMzl7q5hIbRs2wD1A==}
@@ -11243,6 +11620,15 @@ snapshots:
   '@rolldown/binding-win32-x64-msvc@1.0.3':
     optional: true
 
+  '@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
+    dependencies:
+      '@babel/core': 7.29.7
+      picomatch: 4.0.4
+      rolldown: 1.0.3
+    optionalDependencies:
+      '@babel/runtime': 7.29.7
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   '@rolldown/pluginutils@1.0.1': {}
 
   '@rollup/pluginutils@4.2.1':
@@ -11422,9 +11808,9 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@tanstack/ai-client@0.20.0':
+  '@tanstack/ai-client@0.21.0':
     dependencies:
-      '@tanstack/ai': 0.40.0
+      '@tanstack/ai': 0.41.0
       '@tanstack/ai-event-client': 0.6.8
       '@tanstack/ai-utils': 0.3.1
     transitivePeerDependencies:
@@ -11434,10 +11820,10 @@ snapshots:
     dependencies:
       '@tanstack/devtools-event-client': 0.4.4
 
-  '@tanstack/ai-react@0.16.4(@tanstack/ai@0.40.0)(@types/react@19.2.17)(react@19.2.7)':
+  '@tanstack/ai-react@0.17.0(@tanstack/ai@0.41.0)(@types/react@19.2.17)(react@19.2.7)':
     dependencies:
-      '@tanstack/ai': 0.40.0
-      '@tanstack/ai-client': 0.20.0
+      '@tanstack/ai': 0.41.0
+      '@tanstack/ai-client': 0.21.0
       '@types/react': 19.2.17
       react: 19.2.7
     transitivePeerDependencies:
@@ -11445,7 +11831,7 @@ snapshots:
 
   '@tanstack/ai-utils@0.3.1': {}
 
-  '@tanstack/ai@0.40.0':
+  '@tanstack/ai@0.41.0':
     dependencies:
       '@ag-ui/core': 0.0.52
       '@standard-schema/spec': 1.1.0
@@ -11455,9 +11841,25 @@ snapshots:
 
   '@tanstack/devtools-event-client@0.4.4': {}
 
+  '@tanstack/form-core@1.33.2':
+    dependencies:
+      '@tanstack/devtools-event-client': 0.4.4
+      '@tanstack/pacer-lite': 0.1.1
+      '@tanstack/store': 0.11.0
+
   '@tanstack/history@1.162.0': {}
 
+  '@tanstack/pacer-lite@0.1.1': {}
+
   '@tanstack/query-core@5.101.0': {}
+
+  '@tanstack/react-form@1.33.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      '@tanstack/form-core': 1.33.2
+      '@tanstack/react-store': 0.11.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react: 19.2.7
+    transitivePeerDependencies:
+      - react-dom
 
   '@tanstack/react-query@5.101.0(react@19.2.7)':
     dependencies:
@@ -11472,6 +11874,13 @@ snapshots:
       isbot: 5.1.43
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
+
+  '@tanstack/react-store@0.11.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      '@tanstack/store': 0.11.0
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      use-sync-external-store: 1.6.0(react@19.2.7)
 
   '@tanstack/react-store@0.9.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
@@ -11498,6 +11907,8 @@ snapshots:
       cookie-es: 3.1.1
       seroval: 1.5.4
       seroval-plugins: 1.5.4(seroval@1.5.4)
+
+  '@tanstack/store@0.11.0': {}
 
   '@tanstack/store@0.9.3': {}
 
@@ -12248,10 +12659,13 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@vitejs/plugin-react@6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
+  '@vitejs/plugin-react@6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
       vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+    optionalDependencies:
+      '@rolldown/plugin-babel': 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      babel-plugin-react-compiler: 1.0.0
 
   '@vitejs/plugin-vue@6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))':
     dependencies:
@@ -12511,6 +12925,10 @@ snapshots:
       html-entities: 2.3.3
       parse5: 7.3.0
       validate-html-nesting: 1.2.4
+
+  babel-plugin-react-compiler@1.0.0:
+    dependencies:
+      '@babel/types': 7.29.7
 
   babel-plugin-transform-hook-names@1.0.2(@babel/core@7.29.7):
     dependencies:
@@ -12832,6 +13250,13 @@ snapshots:
     dependencies:
       dequal: 2.0.3
 
+  dexie-react-hooks@4.4.0(dexie@4.4.4)(react@19.2.7):
+    dependencies:
+      dexie: 4.4.4
+      react: 19.2.7
+
+  dexie@4.4.4: {}
+
   dir-glob@3.0.1:
     dependencies:
       path-type: 4.0.0
@@ -13083,6 +13508,8 @@ snapshots:
   extend@3.0.2: {}
 
   extendable-error@0.1.7: {}
+
+  fake-indexeddb@6.2.5: {}
 
   fast-check@3.23.2:
     dependencies:

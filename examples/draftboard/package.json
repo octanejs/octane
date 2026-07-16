@@ -1,0 +1,24 @@
+{
+  "name": "draftboard-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A deterministic SVG whiteboard exercising Octane pointer events, imperative refs, portals, history, and resilient autosave.",
+  "scripts": {
+    "dev": "vite --host --port 5228 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --host --port 5228 --strictPort",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "playwright test --config e2e/playwright.config.ts"
+  },
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

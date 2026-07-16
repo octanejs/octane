@@ -39,11 +39,11 @@ export type DeepPartial<T> =
  * level via `ChatTransport`.
  *
  * This extends ChatClientOptions but omits the state change callbacks that are
- * managed internally by React state:
- * - `onMessagesChange` - Managed by React state (exposed as `messages`)
- * - `onLoadingChange` - Managed by React state (exposed as `isLoading`)
- * - `onErrorChange` - Managed by React state (exposed as `error`)
- * - `onStatusChange` - Managed by React state (exposed as `status`)
+ * managed internally by hook state:
+ * - `onMessagesChange` - Managed by hook state (exposed as `messages`)
+ * - `onLoadingChange` - Managed by hook state (exposed as `isLoading`)
+ * - `onErrorChange` - Managed by hook state (exposed as `error`)
+ * - `onStatusChange` - Managed by hook state (exposed as `status`)
  *
  * All other callbacks (onResponse, onChunk, onFinish, onError) are
  * passed through to the underlying ChatClient and can be used for side effects.
@@ -55,8 +55,8 @@ export type DeepPartial<T> =
  * inference on the client — server-side validation still runs against the
  * schema you pass to `chat({ outputSchema })` on the server route.
  *
- * Note: Connection and body changes will recreate the ChatClient instance.
- * To update these options, remount the component or use a key prop.
+ * Changing `connection` or `fetcher` updates the active ChatClient in place,
+ * preserving its state. Changing `id` creates a fresh client.
  */
 export type UseChatOptions<
 	TTools extends ReadonlyArray<AnyClientTool> = any,

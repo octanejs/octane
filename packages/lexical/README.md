@@ -66,6 +66,12 @@ React hooks to octane's (1:1 in nearly all cases), `forwardRef` to octane's
 ref-as-prop, `@floating-ui/react` to `@floating-ui/dom`, and the class-based
 `LexicalErrorBoundary` to octane's `<ErrorBoundary>`.
 
+Lexical node classes require one module-family identity. The package manifest marks
+both `lexical` and the `@lexical/*` family as Vite prebundle exclusions. Octane expands
+the family rule to the exact `@lexical` packages declared by the binding and app before
+passing it to Vite, so a cold dependency crawl cannot mix optimizer generations as it
+discovers additional Lexical modules.
+
 ## Status
 
 Current scope, known divergences, and verification status are tracked in the
