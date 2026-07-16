@@ -44,7 +44,7 @@ async function renderRoute(url: string) {
 }
 
 describe('website routes', () => {
-	it('publishes Preact and Svelte measurements for every supported comparison', () => {
+	it('publishes each framework only where the checked benchmark has measurements', () => {
 		expect(HOME_SUMMARY).toEqual(createHomeSummary(FRAMEWORK_CARDS));
 
 		for (const card of FRAMEWORK_CARDS) {
@@ -66,6 +66,18 @@ describe('website routes', () => {
 
 		const summaryKeys = HOME_SUMMARY.series.map((series) => series.key);
 		expect(summaryKeys).toEqual(expect.arrayContaining(['preact', 'svelte']));
+		expect(summaryKeys).not.toContain('react-compiler');
+
+		const memoWall = FRAMEWORK_CARDS.find((card) => card.id === 'memo-wall')!;
+		expect(memoWall.series.map((series) => series.key)).toContain('react-compiler');
+		for (const card of FRAMEWORK_CARDS) {
+			if (card.id !== 'memo-wall') {
+				expect(
+					card.series.map((series) => series.key),
+					card.id,
+				).not.toContain('react-compiler');
+			}
+		}
 	});
 
 	it('/ renders the home experience and primary navigation', async () => {
