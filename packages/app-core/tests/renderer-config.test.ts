@@ -12,7 +12,25 @@ describe('app renderer configuration', () => {
 			compiler: {
 				renderers: {
 					registry: { object: '@octanejs/object-renderer' },
+					boundaries: {
+						'@octanejs/object-renderer': {
+							Canvas: {
+								ownerRenderer: 'dom',
+								childRenderer: 'object',
+								prop: 'children',
+							},
+						},
+					},
 					rules: [{ include: '**/*.object.tsrx', renderer: 'object' }],
+				},
+			},
+		});
+		expect(config.compiler.renderers.boundaries).toEqual({
+			'@octanejs/object-renderer': {
+				Canvas: {
+					ownerRenderer: 'dom',
+					childRenderer: 'object',
+					prop: 'children',
 				},
 			},
 		});
@@ -20,6 +38,9 @@ describe('app renderer configuration', () => {
 			id: 'object',
 			module: '@octanejs/object-renderer',
 			target: 'universal',
+			server: 'unsupported',
+			text: 'reject',
+			capabilities: [],
 		});
 		// Production re-resolution receives an already-normalized config.
 		expect(resolveOctaneConfig(config).compiler.renderers.signature).toBe(

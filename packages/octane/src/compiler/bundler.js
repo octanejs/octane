@@ -14,8 +14,19 @@ import { parseModule } from '@tsrx/core';
 import { compile, isVoidJsxCodeBlockFunction } from './compile.js';
 import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
 import { findVoidRootImports, slotHooks } from './slot-hooks.js';
+import {
+	assertNoLiveClientOnlyImports,
+	createClientOnlyServerStub,
+	createClientReference,
+	findStaticRuntimeImportRequests,
+} from './client-only-server.js';
 
 export { findVoidRootImports };
+export {
+	CLIENT_REFERENCE_MANIFEST_FILENAME,
+	CLIENT_REFERENCE_MANIFEST_VERSION,
+	createClientReferenceManifest,
+} from './client-only-server.js';
 export {
 	DOM_RENDERER_ID,
 	DOM_RENDERER_MODULE,
@@ -296,6 +307,23 @@ class OctaneBundlerCompiler {
 		return lookup.rule?.usesOctane === true;
 	}
 
+	_isFullCompileSource(file, collected) {
+		return (
+			file.endsWith('.tsrx') ||
+			(file.endsWith('.tsx') && this._isInstalledOctaneSource(file, collected))
+		);
+	}
+
+	_assertClientOnlySourceSupported(file, filename, renderer, collected) {
+		if (renderer.server !== 'client-only' || this._isFullCompileSource(file, collected)) return;
+		const error = new Error(
+			`Renderer rule ${JSON.stringify(renderer.id)} selects ${JSON.stringify(filename)} as server: "client-only", but export-preserving server stubs currently require an Octane-compiled .tsrx file or eligible raw .tsx source. Narrow the renderer rule so it cannot match ${JSON.stringify(filename)}.`,
+		);
+		error.code = 'OCTANE_CLIENT_ONLY_SOURCE_UNSUPPORTED';
+		error.filename = filename;
+		throw error;
+	}
+
 	_profileModuleId(file, collected) {
 		const absoluteFile = isAbsolute(file) ? resolve(file) : resolve(this.root, file);
 		const isInstalledPath = /(?:^|[\\/])node_modules(?:[\\/]|$)/.test(absoluteFile);
@@ -417,6 +445,29 @@ class OctaneBundlerCompiler {
 		return resolveOctaneRuntimeRequest(request, environment);
 	}
 
+	_canonicalModuleId(id) {
+		const file = cleanModuleId(id);
+		if (isAbsolute(file) && !isPathInside(this.root, file) && isPathInside(this.realRoot, file)) {
+			return canonicalModuleId(file, this.realRoot);
+		}
+		return canonicalModuleId(file, this.root);
+	}
+
+	/** Static requests adapters resolve before a server transform. */
+	findServerImportRequests(code, id) {
+		return findStaticRuntimeImportRequests(code, this._canonicalModuleId(id));
+	}
+
+	/** Classify a bundler-resolved module without loading or evaluating it. */
+	clientReferenceForFile(id) {
+		const file = cleanModuleId(id);
+		const filename = this._canonicalModuleId(file);
+		const renderer = resolveRendererForFile(this.renderers, filename);
+		const collected = { dependencies: new Set(), missingDependencies: new Set() };
+		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
+		return renderer.server === 'client-only' ? createClientReference(renderer.id, filename) : null;
+	}
+
 	_passThrough(code, collected) {
 		if (collected.dependencies.size === 0 && collected.missingDependencies.size === 0) {
 			return null;
@@ -449,14 +500,32 @@ class OctaneBundlerCompiler {
 		// byte identical even when a shared client/server bundler configuration opts in.
 		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
 		const parallelUse = options.parallelUse ?? this.defaults.parallelUse;
-		const filename = canonicalModuleId(file, this.root);
+		const filename = this._canonicalModuleId(file);
+		const clientOnlyImports =
+			environment === 'server' && Array.isArray(options.clientOnlyImports)
+				? options.clientOnlyImports
+				: [];
 
-		const fullCompile =
-			file.endsWith('.tsrx') ||
-			(file.endsWith('.tsx') && this._isInstalledOctaneSource(file, collected));
+		const renderer = resolveRendererForFile(this.renderers, filename);
+		const fullCompile = this._isFullCompileSource(file, collected);
+		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		if (fullCompile) {
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
-			const renderer = resolveRendererForFile(this.renderers, filename);
+			const clientReference =
+				renderer.server === 'client-only' ? createClientReference(renderer.id, filename) : null;
+			if (environment === 'server' && clientReference !== null) {
+				const stub = createClientOnlyServerStub(code, filename, renderer.id);
+				return {
+					code: stub.code,
+					map: null,
+					kind: 'client-only-stub',
+					renderer,
+					clientReference,
+					clientOnlyExports: stub.exports,
+					...finishMetadata(collected),
+				};
+			}
+			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
 			const out = compile(code, filename, {
 				hmr,
 				mode: environment,
@@ -468,17 +537,28 @@ class OctaneBundlerCompiler {
 				// renderer descriptor is an orthogonal compiler input only for the
 				// universal branch selected at this template boundary.
 				...(renderer.target === 'dom' ? null : { renderer }),
+				// Boundary metadata is a lexical compiler input even in a DOM-owned
+				// module: a matching imported component can delegate one prop region to
+				// another renderer. Keep the option absent for the normal empty-config
+				// DOM path so its compiler invocation and output remain unchanged.
+				...(hasRendererBoundaries ? { rendererBoundaries: this.renderers.boundaries } : null),
+				...(hasRendererBoundaries ? { rendererRegistry: this.renderers.registry } : null),
+				...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
 			});
 			return {
 				code: out.code,
 				map: out.map,
 				kind: 'compile',
 				renderer,
+				...(clientReference === null ? null : { clientReference }),
 				...(environment === 'client' && options.collectVoidComponentExports === true
 					? { voidComponentExports: findVoidComponentExports(code, filename) }
 					: {}),
 				...finishMetadata(collected),
 			};
+		}
+		if (clientOnlyImports.length > 0) {
+			assertNoLiveClientOnlyImports(code, filename, clientOnlyImports);
 		}
 		if (file.endsWith('.tsx')) return this._passThrough(code, collected);
 

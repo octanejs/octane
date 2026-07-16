@@ -62,4 +62,29 @@ describe('compiler-owned native event callbacks', () => {
 		expect(code).toContain('useCallback');
 		expect(code).toMatch(/\bconst singleton\b/);
 	});
+
+	it('retains an Effect Event mount wrapper only for an unshared native event slot', () => {
+		const source = (spread: string) => `
+      import { useEffectEvent } from 'octane';
+      export function App(props) @{
+        const event = useEffectEvent(() => props.log(props.value));
+        <button ${spread} onClick={event}>go</button>
+      }
+    `;
+		const mountOnly = compile(source(''), 'effect-event-slot.tsrx', {
+			hmr: false,
+			dev: false,
+		}).code;
+		const spreadShared = compile(source('{...props.attrs}'), 'effect-event-spread-slot.tsrx', {
+			hmr: false,
+			dev: false,
+		}).code;
+		const assignments = (code: string) => code.match(/\["\$\$click"\] = \(event\)/g)?.length ?? 0;
+
+		// The old installed wrapper reads the same committed cell, so an isolated
+		// native slot needs no per-render write. A spread can overwrite that slot,
+		// therefore the explicit event remains live to reassert JSX source order.
+		expect(assignments(mountOnly)).toBe(1);
+		expect(assignments(spreadShared)).toBe(2);
+	});
 });

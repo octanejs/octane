@@ -11,12 +11,12 @@ export function CallbackIdentity(props) @{
 	</button>
 }
 
-// useEffectEvent — stable identity, always invokes the latest closure.
+// useEffectEvent — a registered wrapper always invokes the latest committed closure.
 // Demonstrates the classic "effect that subscribes once but always uses the
 // latest count" pattern without re-subscribing on every count change.
 export function EffectEventSubscriber(props) @{
 	const [count, setCount] = useState(0);
-	// The handler reads `count` at call-time, but its identity is stable.
+	// The effect registers one render's wrapper; its shared cell stays fresh.
 	const onTick = useEffectEvent(() => {
 		props.tickLog.push('count=' + count);
 	});
@@ -34,7 +34,7 @@ export function EffectEventSubscriber(props) @{
 	</button>
 }
 
-// useEffectEvent identity check.
+// useEffectEvent returns a fresh wrapper on every render.
 export function EffectEventIdentity(props) @{
 	const [n, setN] = useState(0);
 	const ev = useEffectEvent(() => n);

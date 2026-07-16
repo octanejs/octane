@@ -8,12 +8,22 @@
 
 export const DOM_RENDERER_ID = 'dom';
 export const DOM_RENDERER_MODULE = 'octane';
-export const RENDERER_CONFIG_VERSION = 1;
+export const RENDERER_CONFIG_VERSION = 3;
 
 const RENDERER_ID = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
-const CONFIG_KEYS = new Set(['default', 'registry', 'rules', 'signature']);
+const MODULE_EXPORT_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const PROP_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const CONFIG_KEYS = new Set(['boundaries', 'default', 'registry', 'rules', 'signature']);
 const RULE_KEYS = new Set(['exclude', 'include', 'renderer']);
-const REGISTRY_ENTRY_KEYS = new Set(['module', 'target']);
+const REGISTRY_ENTRY_KEYS = new Set([
+	'capabilities',
+	'intrinsics',
+	'module',
+	'server',
+	'target',
+	'text',
+]);
+const BOUNDARY_ENTRY_KEYS = new Set(['childRenderer', 'ownerRenderer', 'prop', 'server']);
 
 function configError(message) {
 	return new Error(`octane/compiler/renderers: ${message}`);
@@ -53,15 +63,33 @@ function validateModuleId(value, path) {
 	return value;
 }
 
+function normalizeCapabilities(value, path) {
+	if (value === undefined) return Object.freeze([]);
+	if (!Array.isArray(value)) {
+		throw configError(`${path} must be an array of lowercase capability names.`);
+	}
+	const capabilities = value.map((capability, index) =>
+		validateRendererId(capability, `${path}[${index}]`),
+	);
+	return Object.freeze([...new Set(capabilities)].sort());
+}
+
 function normalizeRegistryEntry(id, value, path) {
 	let moduleId;
 	let target;
+	let server;
+	let intrinsics;
+	let text;
+	let capabilities;
 	if (typeof value === 'string') {
 		moduleId = validateModuleId(value, path);
 		target = 'universal';
+		server = 'unsupported';
+		text = 'reject';
+		capabilities = Object.freeze([]);
 	} else {
 		if (!isRecord(value)) {
-			throw configError(`${path} must be a renderer module ID or { module, target } object.`);
+			throw configError(`${path} must be a renderer module ID or renderer descriptor object.`);
 		}
 		assertKnownKeys(value, REGISTRY_ENTRY_KEYS, path);
 		moduleId = validateModuleId(value.module, `${path}.module`);
@@ -69,10 +97,42 @@ function normalizeRegistryEntry(id, value, path) {
 		if (target !== 'dom' && target !== 'universal') {
 			throw configError(`${path}.target must be "dom" or "universal".`);
 		}
+
+		server = value.server ?? (target === 'dom' ? 'render' : 'unsupported');
+		if (server !== 'render' && server !== 'client-only' && server !== 'unsupported') {
+			throw configError(
+				`${path}.server must be "render", "client-only", or "unsupported" when provided.`,
+			);
+		}
+		if (target === 'dom' && server !== 'render') {
+			throw configError(`${path}.server must be "render" for the DOM renderer.`);
+		}
+		if (target === 'universal' && server === 'render') {
+			throw configError(
+				`${path}.server cannot be "render" until the universal renderer provides a validated server serializer.`,
+			);
+		}
+
+		if (value.intrinsics !== undefined) {
+			intrinsics = validateModuleId(value.intrinsics, `${path}.intrinsics`);
+		}
+
+		text = value.text ?? (target === 'dom' ? 'host' : 'reject');
+		if (text !== 'reject' && text !== 'ignore' && text !== 'host') {
+			throw configError(`${path}.text must be "reject", "ignore", or "host".`);
+		}
+		capabilities = normalizeCapabilities(value.capabilities, `${path}.capabilities`);
 	}
 
 	if (id === DOM_RENDERER_ID) {
-		if (moduleId !== DOM_RENDERER_MODULE || target !== 'dom') {
+		if (
+			moduleId !== DOM_RENDERER_MODULE ||
+			target !== 'dom' ||
+			server !== 'render' ||
+			intrinsics !== undefined ||
+			text !== 'host' ||
+			capabilities.length !== 0
+		) {
 			throw configError(
 				`compiler.renderers.registry.dom is built in as { module: ${JSON.stringify(DOM_RENDERER_MODULE)}, target: "dom" } and cannot be replaced.`,
 			);
@@ -81,7 +141,111 @@ function normalizeRegistryEntry(id, value, path) {
 		throw configError(`${path}.target cannot be "dom"; use the built-in "dom" renderer.`);
 	}
 
-	return Object.freeze({ module: moduleId, target });
+	return Object.freeze({
+		module: moduleId,
+		target,
+		server,
+		...(intrinsics === undefined ? {} : { intrinsics }),
+		text,
+		capabilities,
+	});
+}
+
+function normalizeBoundaries(value, registry) {
+	if (value === undefined) return Object.freeze({});
+	if (!isRecord(value)) {
+		throw configError(
+			'compiler.renderers.boundaries must be an object keyed by module ID and export name.',
+		);
+	}
+
+	const modules = [];
+	for (const [moduleValue, rawExports] of Object.entries(value).sort(([a], [b]) =>
+		a < b ? -1 : a > b ? 1 : 0,
+	)) {
+		const moduleId = validateModuleId(
+			moduleValue,
+			`compiler.renderers.boundaries module ${JSON.stringify(moduleValue)}`,
+		);
+		const modulePath = `compiler.renderers.boundaries[${JSON.stringify(moduleId)}]`;
+		if (!isRecord(rawExports) || Object.keys(rawExports).length === 0) {
+			throw configError(`${modulePath} must contain at least one boundary export.`);
+		}
+
+		const exports = [];
+		for (const [exportName, rawBoundary] of Object.entries(rawExports).sort(([a], [b]) =>
+			a < b ? -1 : a > b ? 1 : 0,
+		)) {
+			const path = `${modulePath}[${JSON.stringify(exportName)}]`;
+			if (!MODULE_EXPORT_NAME.test(exportName)) {
+				throw configError(
+					`${path} must use a JavaScript export name (for example "Canvas", "Html", or "default").`,
+				);
+			}
+			if (!isRecord(rawBoundary)) {
+				throw configError(`${path} must be a renderer boundary metadata object.`);
+			}
+			assertKnownKeys(rawBoundary, BOUNDARY_ENTRY_KEYS, path);
+
+			const ownerRenderer = validateRendererId(rawBoundary.ownerRenderer, `${path}.ownerRenderer`);
+			const childRenderer = validateRendererId(rawBoundary.childRenderer, `${path}.childRenderer`);
+			if (!Object.hasOwn(registry, ownerRenderer)) {
+				throw configError(
+					`${path}.ownerRenderer references unknown renderer ${JSON.stringify(ownerRenderer)}.`,
+				);
+			}
+			if (!Object.hasOwn(registry, childRenderer)) {
+				throw configError(
+					`${path}.childRenderer references unknown renderer ${JSON.stringify(childRenderer)}.`,
+				);
+			}
+			if (ownerRenderer === childRenderer) {
+				throw configError(
+					`${path} must switch renderers; ownerRenderer and childRenderer are both ${JSON.stringify(ownerRenderer)}.`,
+				);
+			}
+			if (typeof rawBoundary.prop !== 'string' || !PROP_NAME.test(rawBoundary.prop)) {
+				throw configError(
+					`${path}.prop must be a JavaScript prop name (for example "children" or "content").`,
+				);
+			}
+			if (rawBoundary.prop === 'key' || rawBoundary.prop === '__proto__') {
+				throw configError(
+					`${path}.prop cannot be ${JSON.stringify(rawBoundary.prop)} because that name cannot carry a renderer-owned component prop.`,
+				);
+			}
+
+			const server = rawBoundary.server;
+			if (server !== undefined && server !== 'omit-child') {
+				throw configError(`${path}.server must be "omit-child" when provided.`);
+			}
+			if (server === 'omit-child') {
+				if (registry[ownerRenderer].server !== 'render') {
+					throw configError(
+						`${path}.server can omit a child only when ownerRenderer supports server rendering.`,
+					);
+				}
+				if (registry[childRenderer].server !== 'client-only') {
+					throw configError(
+						`${path}.server can omit a child only when childRenderer is explicitly "client-only".`,
+					);
+				}
+			}
+
+			exports.push([
+				exportName,
+				Object.freeze({
+					ownerRenderer,
+					childRenderer,
+					prop: rawBoundary.prop,
+					...(server === undefined ? {} : { server }),
+				}),
+			]);
+		}
+		modules.push([moduleId, Object.freeze(Object.fromEntries(exports))]);
+	}
+
+	return Object.freeze(Object.fromEntries(modules));
 }
 
 function normalizePattern(value, path) {
@@ -260,7 +424,16 @@ export function normalizeRendererConfig(input = {}) {
 		throw configError('compiler.renderers.registry must be an object of renderer module IDs.');
 	}
 	const entries = [
-		[DOM_RENDERER_ID, Object.freeze({ module: DOM_RENDERER_MODULE, target: 'dom' })],
+		[
+			DOM_RENDERER_ID,
+			Object.freeze({
+				module: DOM_RENDERER_MODULE,
+				target: 'dom',
+				server: 'render',
+				text: 'host',
+				capabilities: Object.freeze([]),
+			}),
+		],
 	];
 	for (const [idValue, moduleValue] of Object.entries(rawRegistry).sort(([a], [b]) =>
 		a < b ? -1 : a > b ? 1 : 0,
@@ -277,6 +450,7 @@ export function normalizeRendererConfig(input = {}) {
 	}
 	entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 	const registry = Object.fromEntries(entries);
+	const boundaries = normalizeBoundaries(input.boundaries, registry);
 
 	const defaultRenderer = validateRendererId(
 		input.default ?? DOM_RENDERER_ID,
@@ -311,13 +485,34 @@ export function normalizeRendererConfig(input = {}) {
 
 	const signature = stableSignature({
 		default: defaultRenderer,
-		registry: entries.map(([id, { module, target }]) => [id, module, target]),
+		registry: entries.map(([id, { module, target, server, intrinsics, text, capabilities }]) => [
+			id,
+			module,
+			target,
+			server,
+			intrinsics ?? null,
+			text,
+			capabilities,
+		]),
 		rules: rules.map(({ renderer, include, exclude }) => [renderer, include, exclude]),
+		boundaries: Object.entries(boundaries).flatMap(([moduleId, exports]) =>
+			Object.entries(exports).map(
+				([exportName, { ownerRenderer, childRenderer, prop, server }]) => [
+					moduleId,
+					exportName,
+					ownerRenderer,
+					childRenderer,
+					prop,
+					server ?? null,
+				],
+			),
+		),
 	});
 	return Object.freeze({
 		default: defaultRenderer,
 		registry: Object.freeze(registry),
 		rules: Object.freeze(rules),
+		boundaries,
 		signature,
 	});
 }

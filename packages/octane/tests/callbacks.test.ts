@@ -36,15 +36,14 @@ describe('useCallback', () => {
 });
 
 describe('useEffectEvent', () => {
-	it('returns a stable function identity across renders', () => {
+	it('returns a fresh function identity across renders', () => {
 		const observe = vi.fn();
 		const r = mount(EffectEventIdentity, { observe });
 		const first = observe.mock.calls[0][0];
 		r.click('button');
 		r.click('button');
 		const observed = observe.mock.calls.map((c) => c[0]);
-		// Every observed identity is the same function.
-		for (const fn of observed) expect(fn).toBe(first);
+		for (const fn of observed.slice(1)) expect(fn).not.toBe(first);
 		r.unmount();
 	});
 

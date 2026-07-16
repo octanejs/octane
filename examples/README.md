@@ -14,8 +14,14 @@ the planned application waves.
 
 | Application | Purpose | Validation |
 | --- | --- | --- |
+| [Cartlane](cartlane) | A commerce checkout using native form actions, server functions, pending state, streaming SSR, and hydration | Strict TypeScript support code, production client and server builds, and validation, idempotency, offline recovery, and hydration Playwright journeys |
+| [Cinebase](cinebase) | A film and television catalog using Apollo Client, request-scoped data, streaming SSR, and hydration | Strict TypeScript support code, production TSRX client build, deterministic server fixtures, and SSR/hydration Playwright journeys |
+| [Flowboard](flowboard) | An issue and project board using dnd-kit, refs, keyed identity, and portaled interaction surfaces | Strict TypeScript support code, production TSRX build, and pointer, keyboard, identity, and recovery Playwright journeys |
 | [Hacker News](hacker-news) | The same routed reader in React-style TSX and TSRX, with Suspense, StyleX, deterministic data, SSR, and hydration | Strict TypeScript support code, both production client builds, shared Playwright journeys across both dialects |
 | [Lexical Playground](lexical-playground) | A real rich-text editor using the Octane Lexical binding, including history, formatting, decorator portals, and a slash picker | Strict TypeScript support code, production TSRX build, production-preview Playwright journeys |
+| [Relay](relay) | A team workspace using a real SSE boundary, optimistic messages, reconnect replay, anchored history, and portaled threads | Strict TypeScript support code, production TSRX build, deterministic event service, and realtime, identity, keyboard, and recovery Playwright journeys |
+| [Streambox](streambox) | A video platform using native media events, a persistent player node, and TanStack Virtual comments | Strict TypeScript support code, production TSRX build, local seekable media, and playback, identity, virtualization, navigation, and recovery Playwright journeys |
+| [Threadline](threadline) | A social timeline using Zustand, optimistic mutations, keyed prepends, and live composer state | Strict TypeScript support code, production TSRX build, and navigation, identity, rapid-interleaving, and rollback Playwright journeys |
 
 ## Repository commands
 

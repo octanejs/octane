@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { compile } from '../src/compiler/compile.js';
+import * as UniversalRuntime from '../src/universal.js';
 import {
 	createObjectContainer,
 	createObjectDriver,
@@ -9,6 +10,8 @@ import {
 	universalKey,
 	universalList,
 	universalPlan,
+	universalProps,
+	universalTry,
 	universalValue,
 	use,
 	useContext as useUniversalContext,
@@ -21,7 +24,12 @@ import { mount } from './_helpers.js';
 import { UniversalBoundaryFixture, UniversalTheme } from './_fixtures/universal-boundary.tsrx';
 import { CompiledUniversalScene } from './_fixtures/compiled-universal.object.tsrx';
 
-const renderer = { id: 'object', module: 'octane/universal', target: 'universal' } as const;
+const renderer = {
+	id: 'object',
+	module: 'octane/universal',
+	target: 'universal',
+	text: 'host',
+} as const;
 
 const itemPlan = universalPlan('object', {
 	kind: 'range',
@@ -89,30 +97,207 @@ describe('universal compiler target', () => {
 		expect(output).not.toContain('<scene');
 	});
 
-	it('fails closed when unsupported JSX or runtime hooks remain after plan lowering', () => {
+	it('lowers nested components, dynamic JSX values, and ordered spreads without a DOM deopt', () => {
+		const source = `
+			import { Imported as Alias } from './Imported.object.tsrx';
+			const Library = { Child: Alias };
+			const Local = ({value, children}) => <node value={value}>{children}</node>;
+			export function Scene({Current, before, after, ok}) {
+				if (!ok) return null;
+				return <scene {...before} tone="warm" {...after} tone="final">
+					<Local value={1}><leaf /></Local>
+					<Alias value={2} />
+					<Library.Child value={3} />
+					<{Current} value={4} />
+					{ok ? <active /> : <inactive />}
+				</scene>;
+			}
+		`;
+		const output = compile(source, '/src/Scene.object.tsrx', {
+			renderer,
+			hmr: false,
+		});
+
+		expect(output.code).toContain('universalComponent as __octaneUniversalComponent');
+		expect(output.code).toContain('universalProps as __octaneUniversalProps');
+		expect(output.code).toContain("['spread', before]");
+		expect(output.code).toContain('[\'set\', "tone", "warm"]');
+		expect(output.code).toContain("['spread', after]");
+		expect(output.code).toContain('[\'set\', "tone", "final"]');
+		expect(output.code).toContain('__octaneUniversalComponent("object", Library.Child');
+		expect(output.code).toContain('__octaneUniversalComponent("object", Current');
+		expect(output.code).not.toMatch(/<[A-Za-z{]/);
+		expect(output.map.sourcesContent).toEqual([source]);
+		expect(output.map.sources).toEqual(['Scene.object.tsrx']);
+	});
+
+	it('lowers every universal directive and preserves explicit host keys in the prop program', () => {
+		const source = `
+			export function Scene({items, mode, host}) @{
+				<scene key={mode} {...host}>
+					@if (mode === 'if') { <yes /> } @else { <no /> }
+					@switch (mode) {
+						@case 'one': { <one /> }
+						@default: { <other /> }
+					}
+					@for (const item of items; key item.id) {
+						<node key={item.id} value={item.value} />
+					} @empty { <empty /> }
+					@try { <ready /> } @pending { <pending /> } @catch (error) {
+						<failed error={error} />
+					}
+				</scene>
+			}
+		`;
+		const output = compile(source, '/src/Directives.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+
+		expect(output).toContain('universalIf as __octaneUniversalIf');
+		expect(output).toContain('universalSwitch as __octaneUniversalSwitch');
+		expect(output).toContain('universalFor as __octaneUniversalFor');
+		expect(output).toContain('universalTry as __octaneUniversalTry');
+		expect(output).toContain('[\'set\', "key", mode]');
+		expect(output).toContain("['spread', host]");
+		expect(output).toContain('(item, __octaneUniversalIndex) => item.id');
+		expect(output).not.toContain('"key":');
+	});
+
+	it('keeps HMR, profiling, and parallel-use planning on universal components', () => {
+		const source = `
+			import { use } from 'octane';
+			export function Scene({loadA, loadB}) {
+				const a = use(loadA());
+				const b = use(loadB());
+				return <scene a={a} b={b} />;
+			}
+		`;
+		const output = compile(source, '/src/Profiled.object.tsrx', {
+			renderer,
+			hmr: true,
+			profile: true,
+		}).code;
+
+		expect(output).toContain('hmrUniversalComponent as __octaneUniversalHmr');
+		expect(output).toContain('UNIVERSAL_HMR as __octaneUniversalHmrSymbol');
+		expect(output).toContain('__profileComponent as __octaneProfileComponent');
+		expect(output).toContain('useBatch as _$useBatch');
+		expect(output).toContain('_$useBatch([__pu$0, __pu$1])');
+		expect(output).toContain('__warm:');
+		expect(output).toContain('import.meta.hot.accept');
+		expect(output).toContain('"componentId":"/src/Profiled.object.tsrx#Scene@3:10"');
+		expect(output).toContain('"line":4,"column":14');
+	});
+
+	it('preserves nested function hoisting and executes supported universal useId hooks', () => {
+		const source = `import { useId } from 'octane';
+			export function Parent({show}) {
+				if (show) return <Child />;
+				function Child() {
+					const id = useId();
+					return <node id={id} />;
+				}
+				return null;
+			}`;
+		let output = compile(source, '/src/Hoisted.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Parent =', 'const Parent =');
+		const Parent = new Function('__universal', `${output}\nreturn Parent;`)(
+			UniversalRuntime,
+		) as (props: { show: boolean }) => unknown;
+		const { container, root } = objectRoot();
+
+		root.render(Parent as any, { show: true });
+		const node = container.children[0];
+		const id = node.props.id;
+		expect(id).toMatch(/^:octane-u[0-9a-z]+:$/);
+		root.unmount();
+	});
+
+	it('reuses useId allocations after errored, suspended, and explicitly aborted drafts', () => {
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [['id', 0]],
+		});
+		const never = new Promise<never>(() => {});
+		for (const discard of ['error', 'suspend', 'abort'] as const) {
+			const { container, root } = objectRoot();
+			const observed: string[] = [];
+			const Component = defineUniversalComponent(
+				'object',
+				(props: { mode: 'ready' | typeof discard }) => {
+					const id = UniversalRuntime.useId('transactional-id');
+					observed.push(id);
+					if (props.mode === 'error') throw new Error('discard id draft');
+					if (props.mode === 'suspend') use(never);
+					return universalValue(plan, [id]);
+				},
+			);
+
+			if (discard === 'error') {
+				expect(() => root.render(Component, { mode: discard })).toThrow('discard id draft');
+			} else if (discard === 'suspend') {
+				expect(root.render(Component, { mode: discard }).status).toBe('suspended');
+			} else {
+				const prepared = root.prepare(Component, { mode: 'ready' });
+				expect(prepared.status).toBe('prepared');
+				prepared.abort();
+			}
+
+			const discardedId = observed[0];
+			root.render(Component, { mode: 'ready' });
+			expect(container.children[0].props.id).toBe(discardedId);
+			expect(observed.at(-1)).toBe(discardedId);
+			root.unmount();
+		}
+	});
+
+	it('reclaims useId allocations from discarded try arms before committing a fallback', () => {
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'fallback',
+			bindings: [['id', 0]],
+		});
+		const never = new Promise<never>(() => {});
+		for (const discard of ['error', 'suspend'] as const) {
+			const { container, root } = objectRoot();
+			let discardedId!: string;
+			const Component = defineUniversalComponent('object', () =>
+				universalTry(
+					() => {
+						discardedId = UniversalRuntime.useId('discarded-arm-id');
+						if (discard === 'error') throw new Error('discard try arm');
+						use(never);
+					},
+					() => universalValue(plan, [UniversalRuntime.useId('committed-pending-id')]),
+					() => universalValue(plan, [UniversalRuntime.useId('committed-catch-id')]),
+				),
+			);
+
+			root.render(Component, undefined);
+			expect(container.children[0].props.id).toBe(discardedId);
+			root.unmount();
+		}
+	});
+
+	it('still diagnoses runtime APIs without a universal implementation', () => {
 		expect(() =>
 			compile(
-				'export function Scene({ok}) @{ <scene>{ok ? <node /> : null}</scene> }',
-				'/src/Scene.object.tsrx',
-				{ renderer },
-			),
-		).toThrow(/cannot fall back to DOM codegen/);
-		expect(() =>
-			compile(
-				`export function Scene() @{ <scene /> }
-				 const Nested = () => <node />;`,
-				'/src/Nested.object.tsrx',
-				{ renderer },
-			),
-		).toThrow(/cannot fall back to DOM codegen/);
-		expect(() =>
-			compile(
-				`import { useId } from 'octane';
-				 export function Scene() @{ const id = useId(); <scene id={id} /> }`,
+				`import { lazy } from 'octane';
+				 export const Scene = lazy(() => import('./Scene.object.tsrx'));`,
 				'/src/UnsupportedHook.object.tsrx',
 				{ renderer },
 			),
-		).toThrow(/runtime import "useId" is not supported/);
+		).toThrow(/runtime import "lazy" has no universal renderer implementation/);
 	});
 
 	it('capability-gates universal server serialization', () => {
@@ -174,6 +359,46 @@ describe('universal compiler target', () => {
 });
 
 describe('universal logical topology and transactions', () => {
+	it('preserves nested owner, hook, and host identity across equivalent HMR plans', async () => {
+		const { container, root } = objectRoot();
+		const childPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [['count', 0]],
+		});
+		let setCount!: (value: number) => void;
+		const Child = defineUniversalComponent('object', () => {
+			const [count, update] = useUniversalState(1, 'hmr-child-state');
+			setCount = update;
+			return universalValue(childPlan, [count]);
+		});
+		const createImplementation = () => {
+			const parentPlan = universalPlan('object', {
+				kind: 'if',
+				conditionSlot: 0,
+				then: {
+					kind: 'component',
+					renderer: 'object',
+					component: Child,
+				},
+			});
+			return defineUniversalComponent('object', () => universalValue(parentPlan, [true]));
+		};
+		const Parent = UniversalRuntime.hmrUniversalComponent('object', createImplementation());
+
+		root.render(Parent, undefined);
+		const host = container.children[0];
+		setCount(5);
+		await Promise.resolve();
+		expect(host.props.count).toBe(5);
+
+		(Parent as any)[UniversalRuntime.UNIVERSAL_HMR].update(createImplementation());
+		await Promise.resolve();
+		expect(container.children[0]).toBe(host);
+		expect(host.props.count).toBe(5);
+		root.unmount();
+	});
+
 	it('creates, updates, moves, inserts, and removes keyed ranges while preserving survivors', () => {
 		const { container, root } = objectRoot();
 		root.render(Scene, {
@@ -248,9 +473,19 @@ describe('universal logical topology and transactions', () => {
 		const log: string[] = [];
 		const driver = {
 			...baseDriver,
-			commit(target: typeof container, batch: (typeof container.commits)[number]) {
-				log.push('host');
-				baseDriver.commit(target, batch);
+			prepareBatch(
+				target: typeof container,
+				batch: (typeof container.commits)[number],
+				context: Parameters<typeof baseDriver.prepareBatch>[2],
+			) {
+				const prepared = baseDriver.prepareBatch(target, batch, context);
+				return {
+					...prepared,
+					apply() {
+						log.push('host');
+						prepared.apply();
+					},
+				};
 			},
 		};
 		const root = createUniversalRoot(container, driver);
@@ -405,10 +640,10 @@ describe('universal logical topology and transactions', () => {
 		const transported: unknown[] = [];
 		const root = createUniversalRoot(container, driver, {
 			transport: {
-				commit(target, batch, apply) {
+				prepareBatch(target, batch, prepare) {
 					transported.push(batch);
-					apply(batch);
 					expect(target).toBe(container);
+					return prepare(batch);
 				},
 			},
 		});
@@ -450,9 +685,13 @@ describe('universal logical topology and transactions', () => {
 		let reject = false;
 		const driver = {
 			...baseDriver,
-			commit(target: typeof container, batch: (typeof container.commits)[number]) {
+			prepareBatch(
+				target: typeof container,
+				batch: (typeof container.commits)[number],
+				context: Parameters<typeof baseDriver.prepareBatch>[2],
+			) {
 				if (reject) throw new Error('host rejected');
-				baseDriver.commit(target, batch);
+				return baseDriver.prepareBatch(target, batch, context);
 			},
 		};
 		const root = createUniversalRoot(container, driver);
@@ -686,18 +925,44 @@ describe('universal logical topology and transactions', () => {
 
 	it('requires drivers to opt into text instead of assuming a fake-DOM text API', () => {
 		const container = createObjectContainer();
-		const driver = { ...createObjectDriver(), capabilities: new Set<string>() };
+		const driver = { ...createObjectDriver(), capabilities: { text: 'reject' as const } };
 		const root = createUniversalRoot(container, driver);
 		const textPlan = universalPlan('object', { kind: 'text', value: 'hello' });
 		const Text = defineUniversalComponent('object', () => universalValue(textPlan));
 
-		expect(() => root.render(Text, undefined)).toThrow(/does not declare the text capability/);
+		expect(() => root.render(Text, undefined)).toThrow(/rejects primitive text children/);
 		expect(container.commits).toHaveLength(0);
 		expect(container.instanceCount).toBe(0);
 	});
 });
 
 describe('mixed DOM and universal ownership', () => {
+	it('preserves deliberate null and undefined values across a DOM context bridge', () => {
+		for (const theme of [null, undefined]) {
+			const { container, root } = objectRoot();
+			const plan = universalPlan('object', {
+				kind: 'host',
+				type: 'node',
+				bindings: [['theme', 0]],
+			});
+			const Child = defineUniversalComponent('object', () =>
+				universalValue(plan, [useUniversalContext(UniversalTheme)]),
+			);
+			const mounted = mount(UniversalBoundaryFixture, {
+				root,
+				component: Child,
+				childProps: {},
+				theme,
+				log: () => {},
+				failAfterPrepare: false,
+			});
+
+			expect(Object.prototype.hasOwnProperty.call(container.children[0].props, 'theme')).toBe(true);
+			expect(container.children[0].props.theme).toBe(theme);
+			mounted.unmount();
+		}
+	});
+
 	it('preserves context, ref/layout ordering, and parent-first teardown', () => {
 		const { container, root } = objectRoot();
 		const log: string[] = [];
@@ -876,5 +1141,184 @@ describe('mixed DOM and universal ownership', () => {
 		expect(container.instanceCount).toBe(0);
 		expect(() => root.render(Safe, undefined)).toThrow(/unmounted universal root/);
 		mounted.unmount();
+	});
+});
+
+describe('universal nested boundary ownership', () => {
+	it('registers, replaces, removes, and tears down renderer event listeners', () => {
+		const { container, root } = objectRoot();
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'mesh',
+			propsSlot: 0,
+		});
+		const SceneWithEvent = defineUniversalComponent(
+			'object',
+			(props: { handler: ((payload: string) => void) | null }) =>
+				universalValue(plan, [universalProps([['set', 'onPointerDown', props.handler]])]),
+		);
+		const log: string[] = [];
+
+		root.render(SceneWithEvent, { handler: (payload) => log.push(`first:${payload}`) });
+		const mesh = container.children[0];
+		const firstCommand = container.commits[0].commands.find((command) => command.op === 'event');
+		expect(firstCommand).toMatchObject({
+			op: 'event',
+			type: 'pointerdown',
+			listener: { priority: 'discrete' },
+		});
+		container.dispatchEvent(mesh, 'pointerdown', 'one');
+
+		root.render(SceneWithEvent, { handler: (payload) => log.push(`second:${payload}`) });
+		const replacement = container.commits[1].commands.find((command) => command.op === 'event');
+		expect(replacement).toMatchObject({
+			op: 'event',
+			listener: { id: (firstCommand as any).listener.id },
+		});
+		container.dispatchEvent(mesh.id, 'pointerdown', 'two');
+
+		root.render(SceneWithEvent, { handler: null });
+		expect(container.commits[2].commands).toContainEqual({
+			op: 'event',
+			id: mesh.id,
+			type: 'pointerdown',
+			listener: null,
+		});
+		expect(() => container.dispatchEvent(mesh, 'pointerdown', 'three')).toThrow(
+			/no "pointerdown" listener/,
+		);
+		expect(log).toEqual(['first:one', 'second:two']);
+
+		root.unmount();
+		expect(() => container.dispatchEvent(mesh, 'pointerdown', 'four')).toThrow(
+			/unknown event target/,
+		);
+	});
+
+	it('keeps a caught error active until its reset callback retries the body', async () => {
+		const { container, root } = objectRoot();
+		const bodyPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'body',
+			bindings: [['value', 0]],
+		});
+		const catchPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'catch',
+			bindings: [['value', 0]],
+		});
+		let shouldThrow = true;
+		let bodyAttempts = 0;
+		let reset!: () => void;
+		const Boundary = defineUniversalComponent('object', () =>
+			universalTry(
+				() => {
+					bodyAttempts++;
+					if (shouldThrow) throw new Error('broken');
+					return universalValue(bodyPlan, ['ready']);
+				},
+				null,
+				(error, retry) => {
+					reset = retry;
+					return universalValue(catchPlan, [(error as Error).message]);
+				},
+			),
+		);
+
+		root.render(Boundary, undefined);
+		expect(container.children[0]).toMatchObject({ type: 'catch', props: { value: 'broken' } });
+		expect(bodyAttempts).toBe(1);
+
+		shouldThrow = false;
+		root.render(Boundary, undefined);
+		expect(container.children[0]).toMatchObject({ type: 'catch', props: { value: 'broken' } });
+		expect(bodyAttempts).toBe(1);
+
+		reset();
+		await Promise.resolve();
+		expect(container.children[0]).toMatchObject({ type: 'body', props: { value: 'ready' } });
+		expect(bodyAttempts).toBe(2);
+		root.unmount();
+	});
+
+	it('hides committed content beside a fallback and reconnects it after suspended work settles', async () => {
+		const { container, root } = objectRoot();
+		const primaryPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'mesh',
+			bindings: [
+				['ref', 0],
+				['value', 1],
+			],
+		});
+		const fallbackPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'fallback',
+			bindings: [['value', 0]],
+		});
+		const log: string[] = [];
+		const ref = (value: unknown) => log.push(value === null ? 'ref:null' : 'ref:mesh');
+		let pending: Promise<string> | null = null;
+		let resolve!: (value: string) => void;
+		const Boundary = defineUniversalComponent('object', () =>
+			universalTry(
+				() => {
+					const value = pending === null ? 'one' : use(pending);
+					useUniversalLayoutEffect(
+						() => {
+							log.push(`layout:${value}`);
+							return () => log.push(`cleanup:${value}`);
+						},
+						[value],
+						Symbol.for('retained-layout'),
+					);
+					return universalValue(primaryPlan, [ref, value]);
+				},
+				() => universalValue(fallbackPlan, ['pending']),
+			),
+		);
+
+		root.render(Boundary, undefined);
+		const committed = container.children[0];
+		expect(log).toEqual(['ref:mesh', 'layout:one']);
+		expect(container.commits).toHaveLength(1);
+		expect(container.instanceCount).toBe(1);
+
+		pending = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const suspended = root.render(Boundary, undefined);
+		expect(suspended.status).toBe('committed');
+		expect(container.children[0]).toBe(committed);
+		expect(container.children[0].props.value).toBe('one');
+		expect(container.children[0].visible).toBe(false);
+		expect(container.children[1]).toMatchObject({
+			type: 'fallback',
+			props: { value: 'pending' },
+			visible: true,
+		});
+		expect(container.commits).toHaveLength(2);
+		expect(container.instanceCount).toBe(2);
+		expect(log).toEqual(['ref:mesh', 'layout:one', 'cleanup:one', 'ref:null']);
+
+		resolve('two');
+		await pending;
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(container.children[0]).toBe(committed);
+		expect(container.children[0].props.value).toBe('two');
+		expect(container.children[0].visible).toBe(true);
+		expect(container.children).toHaveLength(1);
+		expect(container.commits).toHaveLength(3);
+		expect(container.instanceCount).toBe(1);
+		expect(log).toEqual([
+			'ref:mesh',
+			'layout:one',
+			'cleanup:one',
+			'ref:null',
+			'ref:mesh',
+			'layout:two',
+		]);
+		root.unmount();
 	});
 });

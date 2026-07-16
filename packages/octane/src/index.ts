@@ -86,6 +86,7 @@ export {
 	__useStateWithGetter,
 	__useReducerWithGetter,
 	__createVoidRoot,
+	bindRendererRegionOwner,
 	// Module-load "this module uses <ViewTransition>" hint (view-transitions plan).
 	__vtSeen,
 	template,
@@ -126,6 +127,7 @@ export {
 	child,
 	sibling,
 	setText,
+	setScriptText,
 	setAttribute,
 	setStringData,
 	setClassName,

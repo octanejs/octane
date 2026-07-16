@@ -1,0 +1,21 @@
+{
+  "upstream": {
+    "package": "@react-three/fiber",
+    "version": "9.6.1 (2a528745)"
+  },
+  "surface": "Experimental Milestones 0 and 2 surface: renderer configuration, compiler ABI, renderer-local Three intrinsic types, the pinned upstream evidence crosswalk, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, and ownership-aware disposal. Canvas, the root store/configuration, frame loop/hooks, and pointer events are deferred to Milestone 3 and later.",
+  "divergences": [
+    "Octane owns component execution, hooks, context, scheduling, Suspense, refs, and effects instead of embedding React Reconciler.",
+    "The forthcoming programmatic root API will render an Octane component plus props rather than a React element descriptor.",
+    "Removing a pierced prop resets its original nested target; R3F 9.6.1 mistakenly writes that default to the leaf key on the root object."
+  ],
+  "ssr": "The current Three scene surface is client-only. Canvas begins in Milestone 3; its DOM server shell, omitted child-region streaming, and hydration adoption are planned for Milestone 7.",
+  "verified": "2026-07-16",
+  "notes": [
+    "The behavioral oracle is pinned to three@0.172.0; the broad upstream three >=0.156 range is not advertised until a minimum-version lane passes.",
+    "The checked-in crosswalk classifies 90 upstream public exports and 157 executable upstream tests with zero unclassified cases; current Milestone 2 evidence contains 18 passing tests across public host behavior, prepared driver transitions, exact lifecycle ordering, and a same-source compiled R3F differential scene.",
+    "Canvas, createRoot/root configuration, the root store, frame loop, and hooks are Milestone 3 work; ray and pointer events begin in Milestone 4.",
+    "React Native/Expo, R3F 10 WebGPU/TSL APIs, and Drei are outside this package's current compatibility target."
+  ],
+  "docs": ["docs/three-port-plan.md", "packages/three/UPSTREAM.md"]
+}

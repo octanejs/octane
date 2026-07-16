@@ -1,10 +1,14 @@
 # Differences from React
 
 Octane implements React's programming model — the same hooks, `memo`, context,
-portals, Suspense, transitions, actions, and SSR/streaming APIs — verified by
-~2,000 conformance tests ported from `facebook/react` (see
-`react-parity-migration-plan.md` for the proof). The differences below are
-**deliberate**. Everything not listed here is a bug: file it.
+portals, Suspense, transitions, actions, and SSR/streaming APIs. Its core suite
+contains 2,700+ distinct behavioral tests; production-compiler executions rerun
+the normal cases and are not additional unique coverage. That is a local suite
+count, not a count of tests ported from React. The exact pinned snapshot and
+source-attributed React scenarios, classifications, and coverage are tracked in the generated
+[React parity coverage report](./react-parity-coverage.md).
+
+The differences below are **deliberate**; parity outside them is the goal.
 
 ## No rules of hooks (except plain JS loops)
 
@@ -25,7 +29,9 @@ Dependency arrays are optional for `useEffect`, `useLayoutEffect`,
 Omitting the list asks the compiler to derive it from the callback's lexical
 captures. The analysis tracks one-level member paths and omits values whose
 identity Octane can prove stable, including state setters, reducer dispatchers,
-refs, state getters, and `useEffectEvent` results.
+refs, and state getters. It also omits `useEffectEvent` results because Effect
+Events are non-reactive captures, despite their intentionally fresh wrapper
+identity.
 
 An explicit array is authoritative and retains React's exact behavior. Pass
 `null` to opt out of tracking and run an effect—or recompute a memo—after every
@@ -175,6 +181,35 @@ vite plugin for React-timing waterfall semantics). Idiomatic sequential
   thenable ("uncached promise" dev warning), and a replay that discovers a new
   pending `use()` behind a data dependency gets a dev waterfall diagnostic.
 
+## Root component entry points and container ownership
+
+`root.render(<App />)` is React-compatible. Octane also retains its original
+compiled-component entry point, `root.render(App, props)`, which avoids creating
+an element descriptor at application bootstrap. A bare function passed to
+`root.render` is therefore intentional, not an invalid-child warning.
+
+The first `root.render()` mounts synchronously. React's concurrent root queues
+its initial mount, so a render followed by an unmount in the same surrounding
+batch exposes no intermediate DOM there; Octane may expose the mounted DOM
+before its synchronous unmount leaves the same empty final state.
+
+After `root.unmount()`, the root is permanently closed. If outside code removes
+some of a root's managed DOM first, unmount still performs safe cleanup instead
+of surfacing the browser's incidental `NotFoundError` from removing an already
+detached node.
+
+## `lazy()` module resolution
+
+Like React, `lazy(load)` accepts a thenable that resolves to a module object with
+a `default` component. Octane additionally accepts a bare component as the
+resolved value, making named dynamic imports usable without a default-export
+shim. Nested lazy wrappers are rejected.
+
+React's Suspense and ViewTransition values are exotic element types and React
+rejects wrapping them in `lazy()`. Octane exposes those boundaries as ordinary
+component functions, so a lazy wrapper preserves their normal component
+behavior.
+
 ## Errors: `@try` / `@catch`, not class boundaries
 
 `@catch (err, reset)` (and the JSX `<ErrorBoundary>`) replaces class
@@ -195,11 +230,20 @@ client-side on hydration. Hydration mismatch recovery patches attributes to the
 **client** value (React keeps the server's) and warns + rebuilds in place
 rather than throwing.
 
+Octane core also leaves document and transport orchestration to the surrounding
+server: it has no Fizz bootstrap-script/module/import-map, doctype/preamble,
+`onHeaders`, or header-construction options. One `nonce` option covers every
+inline style and script Octane emits rather than exposing separate script/style
+nonce channels. A readable stream's `allReady` settles after all boundary bytes
+have been accepted under consumer backpressure, so consumers should read while
+awaiting it. Error callbacks report the original value but do not synthesize
+React digests or React's `errorInfo` shape.
+
 ## Not implemented (by design)
 
-Class components, Server Components/RSC, `StrictMode` double-invoke,
+Class components, legacy `ReactDOM.render` roots, Server Components/RSC, `StrictMode` double-invoke,
 `Profiler`, `SuspenseList`, `forwardRef`/`createRef` (refs are props),
-`useDebugValue` is a no-op, `cache()`, `React.Children` beyond the basics.
+`useDebugValue` is a no-op, and `cache()`.
 Resource hints ARE supported
 (`preload`/`preinit`/`preconnect`/`prefetchDNS`). React-19 custom-element
 listener semantics ARE supported (a function-valued lowercase `on*` prop on a

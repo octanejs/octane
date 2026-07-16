@@ -38,7 +38,18 @@ import {
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { applyHookDependencies } from './hook-deps.js';
-import { compileUniversal } from './compile-universal.js';
+import {
+	addSourceMapNeedles,
+	compileUniversal,
+	composeSourceMaps,
+	retargetRuntimeImportAliases,
+} from './compile-universal.js';
+import {
+	expandDomRendererRegions,
+	prepareRendererBoundaryRegions,
+	prepareServerRendererBoundaryRegions,
+} from './compile-renderer-boundaries.js';
+import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -54,6 +65,7 @@ import {
 	cssStyleValue,
 	hyphenateStyleName,
 } from '../dom-tables.js';
+import { sanitizeURLAttribute } from '../sanitize-url.js';
 
 // React parity: a void element must neither have children nor use
 // `dangerouslySetInnerHTML` — React throws (ReactDOMComponent-test.js:1794/:1807).
@@ -180,7 +192,10 @@ function bakeStaticAttr(attrName, lv, tag) {
 	if (!isCustom && (BOOLEAN_ATTR_PROPS.has(lower) || MUST_USE_PROPERTY_PROPS.has(lower))) {
 		return lv ? ` ${lower}=""` : '';
 	}
-	if (typeof lv === 'string') return ` ${attrName}="${escapeAttr(lv)}"`;
+	if (typeof lv === 'string') {
+		const value = sanitizeURLAttribute(tag, attrName, lv);
+		return ` ${attrName}="${escapeAttr(value)}"`;
+	}
 	if (typeof lv === 'number') return ` ${attrName}="${lv}"`;
 	return '';
 }
@@ -240,6 +255,22 @@ function rejectTextareaValueChildren(tag, node, ctx) {
 // the same export — valid JS).
 export function rtAlias(name) {
 	return '_$' + name;
+}
+
+// Renderer-specialized units share this compiler pass with their owning DOM
+// module, but compiler-inserted hook helpers must execute against the child
+// renderer's CURRENT_SCOPE. Each unit therefore supplies collision-proof
+// aliases imported from its renderer runtime. Ordinary DOM code keeps the
+// historical `_$name` aliases and merged `octane` import.
+function runtimeAliasForContext(ctx, name) {
+	return ctx._universalRuntimeUnit?.generatedRuntimeAliases?.[name] ?? rtAlias(name);
+}
+
+function requireRuntimeForContext(ctx, name) {
+	const alias = ctx._universalRuntimeUnit?.generatedRuntimeAliases?.[name];
+	if (alias !== undefined) return alias;
+	ctx.runtimeNeeded.add(name);
+	return rtAlias(name);
 }
 
 // Merge one import list: user specifiers verbatim (preserving `x as y`
@@ -914,7 +945,7 @@ function collectComponentLocals(componentNode) {
  * Stability sources:
  *   - useState / useReducer setters and state getters (second/third slots)
  *   - useRef returns (the ref object itself, not .current)
- *   - useCallback / useEffectEvent returns
+ *   - useCallback returns
  *   - Arrows previously declared in this body whose free vars are themselves
  *     all stable — transitive (auto-callback adds them back into the set)
  *
@@ -956,10 +987,10 @@ function computeStableLocals(statements, componentLocals) {
 					stable.add(decl.id.elements[2].name);
 				}
 				if (callName === 'useState' || callName === 'useReducer') continue;
-				// x = useRef(...) / useCallback(...) / useEffectEvent(...) — the
+				// x = useRef(...) / useCallback(...) — the
 				// return value is stable for the lifetime of the component.
 				if (
-					(callName === 'useRef' || callName === 'useCallback' || callName === 'useEffectEvent') &&
+					(callName === 'useRef' || callName === 'useCallback') &&
 					decl.id.type === 'Identifier'
 				) {
 					stable.add(decl.id.name);
@@ -1018,10 +1049,7 @@ function computeInvariantLocals(statements, componentLocals, autoCallback) {
 					if (getter?.type === 'Identifier') invariant.add(getter.name);
 					continue;
 				}
-				if (
-					(callName === 'useRef' || callName === 'useEffectEvent') &&
-					decl.id.type === 'Identifier'
-				) {
+				if (callName === 'useRef' && decl.id.type === 'Identifier') {
 					invariant.add(decl.id.name);
 					continue;
 				}
@@ -1044,6 +1072,32 @@ function computeInvariantLocals(statements, componentLocals, autoCallback) {
 		}
 	}
 	return invariant;
+}
+
+/**
+ * Values that are safe to install once specifically as native event handlers.
+ * This is a strict superset of identity invariants: useEffectEvent deliberately
+ * returns a fresh wrapper each render, but every wrapper for one hook cell calls
+ * through the same latest-committed implementation. Keeping the mount wrapper
+ * installed is therefore behaviorally invariant even though observing or
+ * passing the freshly returned wrapper must retain its React identity semantics.
+ */
+function computeEventInvariantLocals(statements, identityInvariant) {
+	const eventInvariant = new Set(identityInvariant);
+	for (const stmt of statements) {
+		if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') continue;
+		for (const decl of stmt.declarations || []) {
+			if (decl.id.type !== 'Identifier') continue;
+			const init = unwrapTsExpr(decl.init);
+			if (!init) continue;
+			if (init.type === 'CallExpression' && stableHookCallName(init) === 'useEffectEvent') {
+				eventInvariant.add(decl.id.name);
+			} else if (init.type === 'Identifier' && eventInvariant.has(init.name)) {
+				eventInvariant.add(decl.id.name);
+			}
+		}
+	}
+	return eventInvariant;
 }
 
 // Resolve only hook identities whose lexical provenance is trustworthy for
@@ -1601,7 +1655,12 @@ function containsRenderCall(stmts) {
 		) {
 			return; // deferred — runs at event/invoke time, not during render
 		}
-		if (t === 'CallExpression' || t === 'NewExpression' || t === 'TaggedTemplateExpression') {
+		if (
+			t === 'CallExpression' ||
+			t === 'OptionalCallExpression' ||
+			t === 'NewExpression' ||
+			t === 'TaggedTemplateExpression'
+		) {
 			found = true;
 			return;
 		}
@@ -1846,6 +1905,10 @@ function isComponentFunction(node) {
 function isReturnJsxFunction(node) {
 	if (!node) return false;
 	if (node.type !== 'FunctionDeclaration' && node.type !== 'FunctionExpression') return false;
+	// Anonymous default functions stay on the generic value-lowering path. The
+	// specialized path needs a stable declaration binding, while ESM correctly
+	// infers the anonymous default's public function name without one.
+	if (node.id == null) return false;
 	if (node.async || node.generator) return false;
 	if (!node.body || node.body.type !== 'BlockStatement') return false;
 	return (node.body.body || []).some(
@@ -2531,8 +2594,75 @@ function devLoc(ctx, node) {
 	return l ? [l.line, l.column | 0] : undefined;
 }
 
+/** Embed anonymous-default root LOC without changing its ESM identity semantics. */
+function stampAnonymousDefaultFunctionLoc(node, ctx) {
+	if (!ctx.dev || node?.type !== 'ExportDefaultDeclaration') return node;
+	const declaration = unwrapTsExpr(node.declaration);
+	if (
+		(declaration?.type !== 'ArrowFunctionExpression' &&
+			declaration?.type !== 'FunctionExpression' &&
+			declaration?.type !== 'FunctionDeclaration') ||
+		declaration.id != null
+	)
+		return node;
+	const loc = devLoc(ctx, declaration);
+	if (loc === undefined) return node;
+	// Keep the function itself as the direct ExportDefaultDeclaration value. ESM
+	// then retains the inferred public name "default", and an anonymous default
+	// function declaration keeps its instantiation/hoisting behavior in cycles.
+	// The mismatch path reads this inert DEV-only directive from Function#toString
+	// when no binding exists on which the normal __oct_loc metadata can live.
+	const payload = encodeURIComponent(`${ctx.mapSourceName}:${loc[0]}:${loc[1]}`).replace(
+		/'/g,
+		'%27',
+	);
+	const marker = {
+		type: 'ExpressionStatement',
+		expression: { type: 'Literal', value: `__octane_loc:${payload}` },
+	};
+	let stamped;
+	if (
+		declaration.type === 'ArrowFunctionExpression' &&
+		declaration.body.type !== 'BlockStatement'
+	) {
+		stamped = {
+			...declaration,
+			expression: false,
+			body: {
+				type: 'BlockStatement',
+				body: [marker, { type: 'ReturnStatement', argument: declaration.body }],
+			},
+		};
+	} else if (declaration.body?.type === 'BlockStatement') {
+		stamped = {
+			...declaration,
+			body: { ...declaration.body, body: [marker, ...(declaration.body.body || [])] },
+		};
+	} else {
+		return node;
+	}
+	const replaceInner = (current) => {
+		if (current === declaration) return stamped;
+		if (
+			current &&
+			(current.type === 'TSAsExpression' ||
+				current.type === 'TSNonNullExpression' ||
+				current.type === 'TSTypeAssertion' ||
+				current.type === 'TSSatisfiesExpression' ||
+				current.type === 'ParenthesizedExpression')
+		) {
+			return { ...current, expression: replaceInner(current.expression) };
+		}
+		return current;
+	};
+	return {
+		...node,
+		declaration: replaceInner(node.declaration),
+	};
+}
+
 function profileSourceLoc(node) {
-	const loc = node?.loc?.start;
+	const loc = node?._octaneProfileLoc ?? node?.loc?.start;
 	return {
 		line: loc?.line ?? 0,
 		column: loc?.column ?? 0,
@@ -2780,8 +2910,9 @@ function annotateProfileHookOwners(root, ctx) {
 			nextOwner = profileOwner(ctx, node, node.id.name);
 		}
 		if (node.type === 'CallExpression') {
+			const authoredOwner = node._octaneUniversalProfileOwner;
 			Object.defineProperty(node, '_octaneProfileOwner', {
-				value: nextOwner,
+				value: authoredOwner ?? nextOwner,
 				configurable: true,
 			});
 		}
@@ -2915,7 +3046,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, renderer?: { id: string, module: string, target: 'dom' | 'universal' } }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[] }} [options] —
  *   `dev: true` emits dev-only hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`); strictly gated so production output is byte-identical.
  *   `hmr: true` (backwards-compatible shorthand for `hmr: 'vite'`) wraps each
@@ -2928,9 +3059,13 @@ function instrumentProfileComponents(ast, ctx) {
  *   template-clone DOM runtime; `'server'` emits HTML-string SSR output (static
  *   chunks interleaved with `ssr*` helpers) carrying the hydration markers the
  *   client `hydrateRoot` adopts.
+ *   `rendererBoundaries` and `rendererRegistry` are the normalized static
+ *   boundary table and renderer registry. Pass them together when a client
+ *   module may contain an explicitly renderer-owned component prop.
  * @returns {{ code: string, map: any }}
  */
 export function compile(source, filename, options) {
+	const authoredSource = source;
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
@@ -2941,18 +3076,92 @@ export function compile(source, filename, options) {
 				`Renderer ${JSON.stringify(options.renderer.id)} does not provide the serialization/hydration capability required by server compilation.`,
 			);
 		}
+		const ownerRenderer =
+			options?.renderer?.target === 'dom'
+				? options.renderer
+				: { id: 'dom', module: 'octane', target: 'dom', server: 'render' };
+		const serverBoundaryPreparation = prepareServerRendererBoundaryRegions(
+			source,
+			filename,
+			ownerRenderer,
+			options,
+		);
+		if (serverBoundaryPreparation !== null) source = serverBoundaryPreparation.source;
+		assertNoLiveClientOnlyImports(source, filename, options?.clientOnlyImports);
 		// Server (SSR) codegen: static markup + dynamic holes + control flow +
 		// nested components + scoped CSS, emitted as HTML-string-building bodies
 		// (with hydration markers) importing the server runtime from 'octane/server'.
 		// Fragment refs remain client-only because there is no server-side DOM range
 		// object for their imperative API.
-		return compileServer(source, filename, options);
+		const compiled = compileServer(source, filename, options);
+		if (serverBoundaryPreparation?.map && compiled.map) {
+			compiled.map = composeSourceMaps(compiled.map, serverBoundaryPreparation.map);
+		}
+		return compiled;
 	}
+	const ownerRenderer =
+		options?.renderer?.target === 'universal'
+			? options.renderer
+			: options?.renderer?.target === 'dom'
+				? options.renderer
+				: { id: 'dom', module: 'octane', target: 'dom' };
+	const rendererBoundaryPreparation = options?.__rendererBoundariesLowered
+		? null
+		: prepareRendererBoundaryRegions(source, filename, ownerRenderer, options);
+	if (rendererBoundaryPreparation !== null) source = rendererBoundaryPreparation.source;
 	if (options?.renderer?.target === 'universal') {
 		const renderer = options.renderer;
-		return compileUniversal(source, filename, renderer, (lowered) =>
-			compile(lowered, filename, { ...options, renderer: undefined }),
+		let reverseSourceMapComposed = false;
+		const result = compileUniversal(
+			source,
+			filename,
+			renderer,
+			(lowered, universal) => {
+				const domRegions = rendererBoundaryPreparation?.domRegions;
+				let domSource = lowered;
+				let expansionMap = null;
+				if (domRegions && domRegions.length > 0) {
+					const authoredLoweredMap = rendererBoundaryPreparation
+						? composeSourceMaps(universal.sourceMap, rendererBoundaryPreparation.map)
+						: universal.sourceMap;
+					const expanded = expandDomRendererRegions(lowered, renderer, domRegions, {
+						filename,
+						map: authoredLoweredMap,
+						source: authoredSource,
+					});
+					domSource = expanded.source;
+					expansionMap = expanded.map;
+				}
+				const compiled = compile(domSource, filename, {
+					...options,
+					renderer: undefined,
+					rendererBoundaries: undefined,
+					rendererRegistry: undefined,
+					__rendererBoundariesLowered: true,
+					__universal: universal,
+					__universalUnits: rendererBoundaryPreparation?.universalUnits,
+				});
+				if (expansionMap !== null) {
+					compiled.map = composeSourceMaps(compiled.map, expansionMap);
+					compiled.__universalSourceMapComposed = true;
+					reverseSourceMapComposed = true;
+				}
+				return compiled;
+			},
+			options,
 		);
+		if (rendererBoundaryPreparation !== null && result.map && !reverseSourceMapComposed) {
+			result.map = composeSourceMaps(result.map, rendererBoundaryPreparation.map);
+		}
+		if (rendererBoundaryPreparation !== null && result.map) {
+			result.map = addSourceMapNeedles(
+				result.map,
+				result.code,
+				authoredSource,
+				rendererBoundaryPreparation.mappingNeedles,
+			);
+		}
+		return result;
 	}
 	const ast = parseModule(source, filename);
 	// Drop type-only statements (interface / type / declare / import-export type)
@@ -3014,6 +3223,7 @@ export function compile(source, filename, options) {
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
 		currentInvariantLocals: null, // Set<string> of component-lifetime-stable local values
+		currentEventInvariantLocals: null, // Set<string> safe to retain in native event slots
 		currentProfileComponentId: null,
 		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
 		nextHookSymId: 0,
@@ -3029,6 +3239,11 @@ export function compile(source, filename, options) {
 		profileComponents: [],
 		profileComponentIds: new Set(),
 		profileComponentCandidates: new Set(),
+		// DEV-only source locations stamped on top-level function bindings. Root
+		// return/fragment mismatches have no host element to carry __oct_loc, so
+		// hydrateRoot reads this binding-level fallback for its warning.
+		devFunctionLocs: [],
+		devFunctionLocAliases: [],
 		// Source-map inputs, read by printNodeWithMap to ask esrap for real
 		// per-token mappings against the original .tsrx.
 		mapSource: source,
@@ -3042,6 +3257,84 @@ export function compile(source, filename, options) {
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
 	}
+	if (ctx.dev) {
+		for (const node of ast.body) {
+			const declaration =
+				node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'
+					? node.declaration
+					: node;
+			const candidates = [];
+			if (
+				declaration?.type === 'FunctionDeclaration' &&
+				declaration.id != null &&
+				declaration.body != null
+			) {
+				candidates.push({ name: declaration.id.name, node: declaration });
+			} else if (declaration?.type === 'VariableDeclaration') {
+				for (const declarator of declaration.declarations || []) {
+					const init = unwrapTsExpr(declarator.init);
+					if (
+						declarator.id?.type === 'Identifier' &&
+						(init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression')
+					) {
+						candidates.push({ name: declarator.id.name, node: init });
+					} else if (declarator.id?.type === 'Identifier') {
+						const factory = profileFactoryName(init, ctx);
+						if (factory !== 'memo' && factory !== 'lazy') continue;
+						const wrapped = unwrapTsExpr(init.arguments?.[0]);
+						if (factory === 'memo' && wrapped?.type === 'Identifier') {
+							ctx.devFunctionLocAliases.push({
+								name: declarator.id.name,
+								source: wrapped.name,
+							});
+						} else if (
+							wrapped?.type === 'ArrowFunctionExpression' ||
+							wrapped?.type === 'FunctionExpression'
+						) {
+							const loc = devLoc(ctx, wrapped);
+							if (loc !== undefined) {
+								ctx.devFunctionLocAliases.push({
+									name: declarator.id.name,
+									loc: `${ctx.mapSourceName}:${loc[0]}:${loc[1]}`,
+								});
+							}
+						} else {
+							const loc = devLoc(ctx, init);
+							if (loc !== undefined) {
+								ctx.devFunctionLocAliases.push({
+									name: declarator.id.name,
+									loc: `${ctx.mapSourceName}:${loc[0]}:${loc[1]}`,
+								});
+							}
+						}
+					}
+				}
+			}
+			for (const candidate of candidates) {
+				const loc = devLoc(ctx, candidate.node);
+				if (loc !== undefined) {
+					ctx.devFunctionLocs.push({
+						name: candidate.name,
+						loc: `${ctx.mapSourceName}:${loc[0]}:${loc[1]}`,
+					});
+				}
+			}
+		}
+	}
+	const universalUnits =
+		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
+	ctx._universalRuntimeUnitsByBinding = new Map();
+	for (const unit of universalUnits) {
+		for (const binding of unit.bindings ?? []) {
+			const previous = ctx._universalRuntimeUnitsByBinding.get(binding);
+			if (previous !== undefined && previous !== unit) {
+				throw new Error(`Universal renderer specialization binding ${binding} is ambiguous.`);
+			}
+			ctx._universalRuntimeUnitsByBinding.set(binding, unit);
+		}
+	}
+	if (options?.__universal) transformUniversalParallelUse(ast, ctx, options.__universal);
+	for (const unit of universalUnits) transformUniversalParallelUse(ast, ctx, unit);
 	if (ctx.profile) {
 		ctx.profileComponentCandidates = collectProfileComponentCandidates(ast);
 		annotateProfileHookOwners(ast, ctx);
@@ -3338,12 +3631,19 @@ export function compile(source, filename, options) {
 			// hooks get a per-call-site symbol (and custom-hook calls inside get one to
 			// forward). Harmless for non-hook code (only `use*` calls are touched).
 			const fnName = node.id?.name || node.declaration?.id?.name || 'module';
-			const hooked = rewriteHookCalls(node, ctx, fnName);
+			const previousUniversalUnit = ctx._universalRuntimeUnit;
+			ctx._universalRuntimeUnit = universalRuntimeUnitForTopLevelNode(node, ctx);
+			let hooked;
+			try {
+				hooked = rewriteHookCalls(node, ctx, fnName);
+			} finally {
+				ctx._universalRuntimeUnit = previousUniversalUnit;
+			}
 			// Lower any JSX component value (e.g. `root.render(<App/>)` or
 			// `const el = <App/>`) to createElement(...) before printing — esrap
 			// can't print raw JSX, and this is what makes root.render(<App/>) match
 			// React's shape.
-			const lowered = rewriteJsxValues(hooked, ctx);
+			const lowered = stampAnonymousDefaultFunctionLoc(rewriteJsxValues(hooked, ctx), ctx);
 			// Top-level passthrough (imports, plain consts/functions): print with
 			// esrap's real map — col 0, no re-indent, single line offset.
 			const base = bodyLine;
@@ -3473,6 +3773,18 @@ export function compile(source, filename, options) {
 		for (const [name, info] of ctx.componentInfo) {
 			if (info.singleRoot === true) stamps.push(`${name}.$$singleRoot = true;`);
 		}
+		for (const entry of ctx.devFunctionLocs) {
+			stamps.push(
+				`try { ${entry.name}.__oct_loc = ${JSON.stringify(entry.loc)}; } catch { /* frozen component */ }`,
+			);
+		}
+		for (const entry of ctx.devFunctionLocAliases) {
+			stamps.push(
+				entry.source === undefined
+					? `try { ${entry.name}.__oct_loc = ${JSON.stringify(entry.loc)}; } catch { /* frozen component */ }`
+					: `try { ${entry.name}.__oct_loc = ${entry.source}.__oct_loc; } catch { /* frozen component */ }`,
+			);
+		}
 		if (stamps.length > 0) stampBlock = stamps.join('\n') + '\n';
 	}
 
@@ -3506,10 +3818,27 @@ export function compile(source, filename, options) {
 		srcCol0: s.srcCol0,
 	}));
 
-	return {
+	const result = {
 		code: prelude + body + stampBlock + hmrBlock + profileBlock,
 		map: buildSourceMap(source, ctx.mapSourceName, segments),
 	};
+	for (const unit of universalUnits) {
+		result.code = retargetRuntimeImportAliases(
+			result.code,
+			unit.renderer.module,
+			unit.runtimeAliases,
+		);
+	}
+	if (rendererBoundaryPreparation !== null) {
+		result.map = composeSourceMaps(result.map, rendererBoundaryPreparation.map);
+		result.map = addSourceMapNeedles(
+			result.map,
+			result.code,
+			authoredSource,
+			rendererBoundaryPreparation.mappingNeedles,
+		);
+	}
+	return result;
 }
 
 // ===========================================================================
@@ -3709,6 +4038,7 @@ function ssrCompileBody(
 	cssEntries,
 	parentNs = 'html',
 	localSetupSlots = false,
+	componentNs = null,
 ) {
 	const params = node.params.map((p) => printNode(p)).join(', ');
 
@@ -3827,7 +4157,7 @@ function ssrCompileBody(
 	const prevInheritRoot = ctx._ssrInheritRoot;
 	ctx._ssrInheritRoot =
 		!!(node.body && node.body.type === 'JSXCodeBlock') && inheritSoleCompRoot(bodyNodes, ctx);
-	const htmlExpr = ssrEmitNodes(bodyNodes, ctx, name, inlinedSubs, parentNs, cssHash);
+	const htmlExpr = ssrEmitNodes(bodyNodes, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 	ctx._ssrInheritRoot = prevInheritRoot;
 	ctx._tsxValuePos = prevValuePos;
 
@@ -3894,7 +4224,16 @@ function hasTextNeighbor(kinds, i) {
 // `<textarea>`/`<listing>`) — the parser discards a '\n' immediately after the
 // opening tag, so the FIRST emitted text part protects a leading newline by
 // doubling it (React parity; a comment/element first part shields it already).
-function ssrEmitNodes(nodes, ctx, name, inlinedSubs, parentNs, cssHash, nlGuardFirst = false) {
+function ssrEmitNodes(
+	nodes,
+	ctx,
+	name,
+	inlinedSubs,
+	parentNs,
+	cssHash,
+	componentNs,
+	nlGuardFirst = false,
+) {
 	const parts = [];
 	// Adjacent text nodes MERGE when the browser re-parses the serialized HTML,
 	// which would fuse a dynamic text hole with its text neighbour into ONE node
@@ -3912,7 +4251,7 @@ function ssrEmitNodes(nodes, ctx, name, inlinedSubs, parentNs, cssHash, nlGuardF
 		const kind = textAdjacencyKind(n, ctx);
 		if (kind === 'empty') continue; // serializes nothing — skip, adjacency-transparent
 		const nlGuard = nlGuardFirst && parts.length === 0;
-		const p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard);
+		const p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash, componentNs, nlGuard);
 		if (p) {
 			if (kind !== 'other' && prevText !== null && (kind === 'dyn' || prevText === 'dyn')) {
 				parts.push(JSON.stringify('<!-- -->'));
@@ -3924,7 +4263,16 @@ function ssrEmitNodes(nodes, ctx, name, inlinedSubs, parentNs, cssHash, nlGuardF
 	return parts.length ? parts.join(' + ') : "''";
 }
 
-function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = false) {
+function ssrEmitNode(
+	node,
+	ctx,
+	name,
+	inlinedSubs,
+	parentNs,
+	cssHash,
+	componentNs,
+	nlGuard = false,
+) {
 	switch (node.type) {
 		case 'Text': {
 			const expr = node.expression;
@@ -3954,23 +4302,27 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = 
 			// createElement(...) descriptors — exactly like ssrEmitTsrxExpression and
 			// the client makeChildCall. Without it the raw JSX leaks into the emitted
 			// ssrChild(...) call as unparseable source.
-			return `_$ssrChild(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx), cssHash))}, __s)`;
+			const childExpr = `_$ssrChild(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx), cssHash))}, __s)`;
+			if (componentNs === null) return childExpr;
+			ctx.runtimeNeeded.add('ssrInNamespace');
+			return `_$ssrInNamespace(${JSON.stringify(componentNs)}, () => ${childExpr})`;
 		}
 		case 'Element':
-			if (isComponentTag(node)) return ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash);
-			return ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			if (isComponentTag(node))
+				return ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
+			return ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'TSRXExpression':
-			return ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash);
+			return ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash, componentNs);
 		case 'IfStatement':
-			return ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			return ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'ForOfStatement':
-			return ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			return ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'TryStatement':
-			return ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			return ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'SwitchStatement':
-			return ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			return ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'ActivityStatement':
-			return ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash);
+			return ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'FragmentStart':
 		case 'FragmentEnd':
 			return ssrUnsupported('fragment refs (`<Fragment ref={…}>`)');
@@ -3979,7 +4331,7 @@ function ssrEmitNode(node, ctx, name, inlinedSubs, parentNs, cssHash, nlGuard = 
 	}
 }
 
-function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const tag = elementTagName(node);
 	rejectVoidElementContent(tag, node, ctx);
 	rejectTextareaValueChildren(tag, node, ctx);
@@ -3988,6 +4340,15 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	// the inherited ns — svg subtrees would never enter the svg namespace).
 	const selfNs = nsForSelf(tag, parentNs);
 	const childNs = nsForChildren(tag, selfNs);
+	// The static namespace walk starts each independently compiled component in
+	// HTML, but a component can be invoked under foreign content at runtime.
+	// Preserve that inherited context through ordinary hosts/wrappers and emit an
+	// explicit override only at a parser transition we can prove lexically.
+	let childComponentNs = componentNs;
+	if (tag === 'foreignObject') childComponentNs = 'html';
+	else if (tag === 'svg') childComponentNs = 'svg';
+	else if (tag === 'math') childComponentNs = 'mathml';
+	else if (childNs !== 'html') childComponentNs = childNs;
 
 	// `parts` are JS expressions concatenated with `+`. `lit` accumulates the
 	// current static run so adjacent literals fold into one quoted chunk.
@@ -4317,6 +4678,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	) {
 		ctx.runtimeNeeded.add('ssrChildText');
 		childrenExpr = `_$ssrChildText(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx), cssHash))}, __s)`;
+		if (childComponentNs !== null) {
+			ctx.runtimeNeeded.add('ssrInNamespace');
+			childrenExpr = `_$ssrInNamespace(${JSON.stringify(childComponentNs)}, () => ${childrenExpr})`;
+		}
 	} else {
 		// pre/textarea/listing: the parser eats a '\n' right after the opening tag —
 		// the first text part must protect a leading newline (see ssrEmitNodes).
@@ -4328,6 +4693,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			inlinedSubs,
 			childNs,
 			cssHash,
+			childComponentNs,
 			nlGuardFirst,
 		);
 	}
@@ -4368,9 +4734,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	if (htmlSources.length > 0) {
 		// Raw HTML (explicit and/or spread-supplied) wins over children when present
 		// at runtime (last source wins); otherwise the children render.
-		ctx.runtimeNeeded.add('ssrInnerHtml');
+		const innerHtmlHelper = tag === 'script' ? 'ssrScriptInnerHtml' : 'ssrInnerHtml';
+		ctx.runtimeNeeded.add(innerHtmlHelper);
 		flush();
-		parts.push(`(_$ssrInnerHtml([${htmlSources.join(', ')}]) ?? (${childrenExpr}))`);
+		parts.push(`(_$${innerHtmlHelper}([${htmlSources.join(', ')}]) ?? (${childrenExpr}))`);
 	} else if (childrenExpr !== "''") {
 		flush();
 		parts.push(childrenExpr);
@@ -4380,7 +4747,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	return finalize();
 }
 
-function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
+function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// M3 inherit-range: consume the body-root flag ONCE, before this component's
 	// props/children compile below (they recurse into ssrEmitNodes/ssrCompileSub
 	// and must not inherit it). Set by ssrCompileBody only for the sole
@@ -4457,7 +4824,15 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 			// (returns an HTML string). The component decides whether/where to render
 			// them by calling props.children(scope) — e.g. a context Provider does exactly
 			// that. Mirrors the client `@{}` convention (componentSlot + a render fn).
-			const sub = ssrCompileSub(node.children, ctx, '__schildren', [], cssHash, 'html');
+			const sub = ssrCompileSub(
+				node.children,
+				ctx,
+				'__schildren',
+				[],
+				cssHash,
+				parentNs,
+				componentNs,
+			);
 			inlinedSubs.push(sub.fn + ';');
 			// Tag the server children-block like the client does (see the client
 			// emission in lowerComponentCall): a consumer's `typeof children ===
@@ -4469,10 +4844,17 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 			propParts.push(`"children": _$markChildrenBlock(${sub.fnName})`);
 		}
 	}
-	ctx.runtimeNeeded.add('ssrComponent');
-	const trailing =
-		keyExpr !== null ? `, ${inherit ? 'true' : 'false'}, (${keyExpr})` : inherit ? ', true' : '';
-	return `_$ssrComponent(__s, ${compExpr}, { ${propParts.join(', ')} }${trailing})`;
+	const explicitNamespace = componentNs !== null;
+	const helper = explicitNamespace ? 'ssrComponentNS' : 'ssrComponent';
+	ctx.runtimeNeeded.add(helper);
+	const trailing = explicitNamespace
+		? `, ${JSON.stringify(componentNs)}, ${inherit ? 'true' : 'false'}${keyExpr === null ? '' : `, (${keyExpr})`}`
+		: keyExpr !== null
+			? `, ${inherit ? 'true' : 'false'}, (${keyExpr})`
+			: inherit
+				? ', true'
+				: '';
+	return `_$${helper}(__s, ${compExpr}, { ${propParts.join(', ')} }${trailing})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -4487,20 +4869,29 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, cssHash) {
 // Compile a list of body statements into a server sub-function `function NAME(__s,
 // …params, __extra) { return <html>; }`. Returns { fnName, fn }; the caller pushes
 // `fn` into the enclosing inlinedSubs.
-function ssrCompileSub(bodyStmts, ctx, baseName, paramNodes, cssHash, parentNs) {
+function ssrCompileSub(bodyStmts, ctx, baseName, paramNodes, cssHash, parentNs, componentNs) {
 	const fnName = `${baseName}$${ctx.nextHelperId++}`;
 	const synth = { params: paramNodes || [], body: bodyStmts };
-	const fn = ssrCompileBody(synth, ctx, fnName, cssHash, [], parentNs || 'html');
+	const fn = ssrCompileBody(
+		synth,
+		ctx,
+		fnName,
+		cssHash,
+		[],
+		parentNs || 'html',
+		false,
+		componentNs,
+	);
 	return { fnName, fn };
 }
 
-function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @if test (it bypasses the
 	// setup rewrite, so without a stable key it collides with sibling/body use()).
 	const testExpr = printExpr(rewriteHookCalls(node.test, ctx, name));
 	const thenStmts =
 		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
-	const thenSub = ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs);
+	const thenSub = ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs, componentNs);
 	inlinedSubs.push(thenSub.fn + ';');
 	let elseCall = "''";
 	if (node.alternate) {
@@ -4508,7 +4899,7 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 		// ssrEmitNode and gets its own marker.
 		const elseStmts =
 			node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
-		const elseSub = ssrCompileSub(elseStmts, ctx, '__selse', [], cssHash, parentNs);
+		const elseSub = ssrCompileSub(elseStmts, ctx, '__selse', [], cssHash, parentNs, componentNs);
 		inlinedSubs.push(elseSub.fn + ';');
 		elseCall = `${elseSub.fnName}(undefined, __s)`;
 	}
@@ -4524,12 +4915,20 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	return `_$ssrBlock(_$ssrControl("${ssrControlKey('if', node)}", () => ((${testExpr}) ? ${thenInner} : ${elseInner})))`;
 }
 
-function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// React's server contract renders visible content and omits hidden content
 	// entirely. Keep the body behind a thunk so a hidden Activity does not execute
 	// child components/hooks or start descendant data work on the server.
 	const modeExpr = node.mode ? printExpr(rewriteHookCalls(node.mode, ctx, name)) : "'visible'";
-	const bodySub = ssrCompileSub(node.children || [], ctx, '__sactivity', [], cssHash, parentNs);
+	const bodySub = ssrCompileSub(
+		node.children || [],
+		ctx,
+		'__sactivity',
+		[],
+		cssHash,
+		parentNs,
+		componentNs,
+	);
 	inlinedSubs.push(bodySub.fn + ';');
 	ctx.runtimeNeeded.add('ssrActivity');
 	ctx.runtimeNeeded.add('ssrControl');
@@ -4537,18 +4936,26 @@ function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	return `_$ssrControl("${ssrControlKey('activity', node)}", () => _$ssrActivity(${modeExpr}, () => _$ssrArm("visible", () => ${bodySub.fnName}(undefined, __s))))`;
 }
 
-function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @for iterable expression.
 	const itemsExpr = printExpr(rewriteHookCalls(node.right, ctx, name));
 	const itemId = node.left.declarations[0].id; // Identifier or destructuring Pattern
 	const params = [itemId];
 	if (node.index) params.push(node.index);
-	const itemSub = ssrCompileSub(node.body.body, ctx, '__sitem', params, cssHash, parentNs);
+	const itemSub = ssrCompileSub(
+		node.body.body,
+		ctx,
+		'__sitem',
+		params,
+		cssHash,
+		parentNs,
+		componentNs,
+	);
 	inlinedSubs.push(itemSub.fn + ';');
 	let emptyCall = "''";
 	if (node.empty) {
 		const emptyStmts = node.empty.type === 'BlockStatement' ? node.empty.body : [node.empty];
-		const emptySub = ssrCompileSub(emptyStmts, ctx, '__sempty', [], cssHash, parentNs);
+		const emptySub = ssrCompileSub(emptyStmts, ctx, '__sempty', [], cssHash, parentNs, componentNs);
 		inlinedSubs.push(emptySub.fn + ';');
 		emptyCall = `_$ssrArm("empty", () => ${emptySub.fnName}(undefined, __s))`;
 	}
@@ -4611,14 +5018,22 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	return `_$ssrControl("${ssrControlKey('for', node)}", () => { const __items = Array.from((${itemsExpr}) ?? []); if (__items.length === 0) return _$ssrForBlock(${emptyCall}, false); let __html = ''; for (let __i = 0; __i < __items.length; __i++) { const __it = __items[__i]; __html += ${renderItem}; } return _$ssrForBlock(__html, true); })`;
 }
 
-function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
+function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @switch discriminant.
 	const discExpr = printExpr(rewriteHookCalls(node.discriminant, ctx, name));
 	const arms = [];
 	let defaultCall = "''";
 	let caseIndex = 0;
 	for (const c of node.cases || []) {
-		const sub = ssrCompileSub(c.consequent || [], ctx, '__scase', [], cssHash, parentNs);
+		const sub = ssrCompileSub(
+			c.consequent || [],
+			ctx,
+			'__scase',
+			[],
+			cssHash,
+			parentNs,
+			componentNs,
+		);
 		inlinedSubs.push(sub.fn + ';');
 		// Inner ssrBlock wraps the matched case's content (see ssrEmitIf) so the
 		// client adopts it as the branch range during hydration (no inserted markers).
@@ -4638,15 +5053,23 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	return `_$ssrBlock(_$ssrControl("${ssrControlKey('switch', node)}", () => { const __d = (${discExpr}); return ${selector}; }))`;
 }
 
-function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
-	const trySub = ssrCompileSub(node.block.body, ctx, '__stry', [], cssHash, parentNs);
+function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
+	const trySub = ssrCompileSub(node.block.body, ctx, '__stry', [], cssHash, parentNs, componentNs);
 	inlinedSubs.push(trySub.fn + ';');
 	// Each arm's content is wrapped in an INNER ssrBlock (see ssrEmitIf) so the
 	// client adopts it as the boundary's branch range during hydration without
 	// inserting comment markers (byte-for-byte). The OUTER ssrBlock is the slot.
 	let pendFnName = 'null'; // no @pending → ssrTry renders an empty slot on suspend
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
-		const pendSub = ssrCompileSub(node.pending.body, ctx, '__spend', [], cssHash, parentNs);
+		const pendSub = ssrCompileSub(
+			node.pending.body,
+			ctx,
+			'__spend',
+			[],
+			cssHash,
+			parentNs,
+			componentNs,
+		);
 		inlinedSubs.push(pendSub.fn + ';');
 		pendFnName = pendSub.fnName;
 	}
@@ -4660,6 +5083,7 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 			params,
 			cssHash,
 			parentNs,
+			componentNs,
 		);
 		inlinedSubs.push(catchSub.fn + ';');
 		// A no-param @catch simply ignores the error argument ssrTry passes.
@@ -4673,7 +5097,8 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash) {
 	// inline try/catch emit for buffered renders (hydration compatibility).
 	// `siteKey` is a stable source-position hash so a boundary keeps its identity
 	// across streaming passes (the runtime adds the frame path per instance).
-	return `_$ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName})`;
+	const namespaceArg = componentNs === null ? '' : `, ${JSON.stringify(componentNs)}`;
+	return `_$ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName}${namespaceArg})`;
 }
 
 // Deterministic per-boundary site key for ssrTry — same scheme as headKey:
@@ -4700,7 +5125,7 @@ function ssrControlKey(kind, node) {
 // rewriteJsxValues, exactly like the client's makeChildCall) and route through
 // ssrChild, which renders the resulting host/component descriptors (array → one
 // hydration block per item, host → `<tag>…</tag>`, primitive → text).
-function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash) {
+function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash, componentNs) {
 	const expr = node.expression;
 	if (
 		expr &&
@@ -4716,7 +5141,10 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, cssHash) {
 	// rewriteHookCalls first (key any `use(thenable)` in the hole — it bypasses the
 	// setup rewrite), then rewriteJsxValues (lower nested JSX to createElement).
 	const lowered = rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx);
-	return `_$ssrChild(${printExpr(resolveStyleExpr(lowered, cssHash))}, __s)`;
+	const childExpr = `_$ssrChild(${printExpr(resolveStyleExpr(lowered, cssHash))}, __s)`;
+	if (componentNs === null) return childExpr;
+	ctx.runtimeNeeded.add('ssrInNamespace');
+	return `_$ssrInNamespace(${JSON.stringify(componentNs)}, () => ${childExpr})`;
 }
 
 // ===========================================================================
@@ -5120,7 +5548,9 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// Keep the lifetime-stability proof live only while planning this body's JSX.
 	// Nested hoisted helpers derive a filtered inherited set in hoistBodyHelper.
 	const prevInvariantLocals = ctx.currentInvariantLocals;
+	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
 	const invariantLocals = new Set(prevInvariantLocals || []);
+	const eventInvariantLocals = new Set(prevEventInvariantLocals || []);
 	if (ctx.currentComponentLocals) {
 		const bodyInvariants =
 			bodyInvariantLocals ||
@@ -5132,8 +5562,12 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		for (const local of bodyInvariants) {
 			invariantLocals.add(local);
 		}
+		for (const local of computeEventInvariantLocals(statements, bodyInvariants)) {
+			eventInvariantLocals.add(local);
+		}
 	}
 	ctx.currentInvariantLocals = invariantLocals;
+	ctx.currentEventInvariantLocals = eventInvariantLocals;
 	// M3 inherit-range: only a real `@{ … }` (JSXCodeBlock) component body spans
 	// its block's whole range — synthetic sub-bodies (@if/@for/@try arms,
 	// children render-fns) pass statement arrays and stay unflagged. planJsx
@@ -5142,6 +5576,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx._inheritBody = !!(node.body && node.body.type === 'JSXCodeBlock');
 	const plan = planJsx(jsxNodes, ctx, name, inlinedSubs, parentNs, cssHash, mountCallbackSinks);
 	ctx.currentInvariantLocals = prevInvariantLocals;
+	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	ctx._inheritBody = prevInheritBody;
 	ctx._foldedDirectiveCalls = prevFDC;
 
@@ -5198,6 +5633,332 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		for (const mapping of setupMaps) mapping.fnRelLine--;
 	}
 	return `function ${name}(${sig}) {\n${needsBlock ? '  const __block = __s.block;\n' : ''}${bodyCode}\n}`;
+}
+
+/**
+ * The universal first pass deliberately removes JSX before it re-enters the
+ * shared client compiler. That keeps DOM planning out of renderer-neutral
+ * output, but it also means the ordinary component recognizer cannot see the
+ * generated component bodies. Apply the renderer-independent parallel-use
+ * passes to those explicitly identified bodies here, while the same hook-slot
+ * allocator/import collector is still active.
+ */
+function universalRuntimeUnitForTopLevelNode(node, ctx) {
+	let declaration = node;
+	if (node?.type === 'ExportNamedDeclaration' || node?.type === 'ExportDefaultDeclaration') {
+		declaration = node.declaration;
+	}
+	const names = [];
+	if (declaration?.id?.type === 'Identifier') names.push(declaration.id.name);
+	if (declaration?.type === 'VariableDeclaration') {
+		for (const item of declaration.declarations ?? []) {
+			if (item.id?.type === 'Identifier') names.push(item.id.name);
+		}
+	}
+	let unit;
+	for (const name of names) {
+		const candidate = ctx._universalRuntimeUnitsByBinding?.get(name);
+		if (candidate === undefined) continue;
+		if (unit !== undefined && unit !== candidate) {
+			throw new Error(`Top-level declaration mixes universal renderer specializations: ${names}.`);
+		}
+		unit = candidate;
+	}
+	return unit;
+}
+
+function transformUniversalParallelUse(ast, ctx, metadata) {
+	if ((!ctx.parallelUse && !ctx.profile) || !metadata?.componentHelper) return;
+	const previousUseAliases = ctx._parallelUseAliases;
+	const previousUniversalUnit = ctx._universalRuntimeUnit;
+	ctx._universalRuntimeUnit = metadata;
+	ctx._parallelUseAliases = new Set(
+		(metadata.runtimeImports ?? [])
+			.filter((entry) => entry.imported === 'use')
+			.map((entry) => entry.local),
+	);
+	const transformed = new WeakSet();
+	const components = new Map();
+	for (const entry of metadata.components || []) {
+		const queue = components.get(entry.name) || [];
+		queue.push(entry);
+		components.set(entry.name, queue);
+	}
+	const takeComponent = (name) => components.get(name)?.shift() || null;
+	let regionIndex = 0;
+
+	const calleeName = (node) =>
+		node?.type === 'CallExpression' && node.callee?.type === 'Identifier' ? node.callee.name : null;
+	const isFunction = (node) =>
+		node?.type === 'FunctionExpression' || node?.type === 'ArrowFunctionExpression';
+	const unwrapAssignedFunction = (node) => {
+		if (isFunction(node)) return node;
+		if (
+			node?.type === 'CallExpression' &&
+			node.callee?.type === 'MemberExpression' &&
+			!node.callee.computed &&
+			node.callee.object?.type === 'Identifier' &&
+			node.callee.object.name === 'Object' &&
+			node.callee.property?.type === 'Identifier' &&
+			node.callee.property.name === 'assign' &&
+			isFunction(node.arguments?.[0])
+		) {
+			return node.arguments[0];
+		}
+		return null;
+	};
+
+	const collectWarmChildren = (root) => {
+		const output = [];
+		const visit = (node) => {
+			if (!node || typeof node !== 'object') return;
+			if (Array.isArray(node)) {
+				for (const child of node) visit(child);
+				return;
+			}
+			if (isFunction(node)) return;
+			if (
+				node.type === 'CallExpression' &&
+				calleeName(node) === metadata.componentValueHelper &&
+				node.arguments?.[1]?.type === 'Identifier'
+			) {
+				const propsCall = node.arguments[2];
+				const entries = propsCall?.arguments?.[0];
+				if (
+					calleeName(propsCall) === metadata.propsHelper &&
+					propsCall.arguments.length === 1 &&
+					entries?.type === 'ArrayExpression'
+				) {
+					const props = [];
+					let supported = true;
+					for (const entry of entries.elements || []) {
+						const parts = entry?.type === 'ArrayExpression' ? entry.elements : null;
+						const kind = parts?.[0]?.value;
+						const key = parts?.[1]?.value;
+						if (
+							kind !== 'set' ||
+							typeof key !== 'string' ||
+							!/^[$A-Z_a-z][$\w]*$/.test(key) ||
+							key === 'key' ||
+							key === 'ref' ||
+							parts?.[2] == null
+						) {
+							supported = false;
+							break;
+						}
+						props.push({ key, value: parts[2] });
+					}
+					if (supported) {
+						output.push({
+							compName: node.arguments[1].name,
+							props,
+							guards: [],
+							locals: null,
+						});
+					}
+				}
+			}
+			for (const [key, child] of Object.entries(node)) {
+				if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+				visit(child);
+			}
+		};
+		visit(root);
+		return output;
+	};
+
+	const parseWarmExpression = (source) => {
+		const parsed = parseModule(`const __octaneUniversalWarm = (${source});`, ctx.filename);
+		return parsed.body[0].declarations[0].init;
+	};
+	const annotateAuthoredHooks = (fn, component, componentName) => {
+		if (!ctx.profile || !component?.hooks?.length) return;
+		const queues = new Map();
+		for (const hook of component.hooks) {
+			const queue = queues.get(hook.name) || [];
+			queue.push(hook);
+			queues.set(hook.name, queue);
+		}
+		const owner = {
+			name: componentName,
+			id: `${ctx.profileFilename || '<anon>'}#${componentName}@${component.line}:${component.column}`,
+		};
+		const visit = (node) => {
+			if (!node || typeof node !== 'object') return;
+			if (Array.isArray(node)) {
+				for (const child of node) visit(child);
+				return;
+			}
+			if (node.type === 'CallExpression' && calleeName(node) === metadata.componentHelper) {
+				for (let index = 0; index < (node.arguments?.length || 0); index++) {
+					if (index !== 1) visit(node.arguments[index]);
+				}
+				return;
+			}
+			if (node.type === 'CallExpression') {
+				let hookName = null;
+				if (node.callee?.type === 'Identifier' && !node.callee.name.startsWith('_$')) {
+					hookName = ctx.octaneImportLocals?.get(node.callee.name) ?? node.callee.name;
+				} else if (
+					node.callee?.type === 'MemberExpression' &&
+					!node.callee.computed &&
+					node.callee.property?.type === 'Identifier'
+				) {
+					hookName = node.callee.property.name;
+				}
+				const hook = queues.get(hookName)?.shift();
+				if (hook !== undefined) {
+					Object.defineProperty(node, '_octaneProfileLoc', {
+						value: { line: hook.line, column: hook.column },
+						configurable: true,
+					});
+					Object.defineProperty(node, '_octaneUniversalProfileOwner', {
+						value: owner,
+						configurable: true,
+					});
+				}
+			}
+			for (const [key, child] of Object.entries(node)) {
+				if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+				visit(child);
+			}
+		};
+		visit(fn.body);
+	};
+	const assignWarmPlan = (fn, source) => ({
+		type: 'CallExpression',
+		callee: {
+			type: 'MemberExpression',
+			object: { type: 'Identifier', name: 'Object' },
+			property: { type: 'Identifier', name: 'assign' },
+			computed: false,
+			optional: false,
+		},
+		arguments: [
+			fn,
+			{
+				type: 'ObjectExpression',
+				properties: [
+					{
+						type: 'Property',
+						key: { type: 'Identifier', name: '__warm' },
+						value: parseWarmExpression(source),
+						kind: 'init',
+						method: false,
+						shorthand: false,
+						computed: false,
+					},
+				],
+			},
+		],
+		optional: false,
+	});
+
+	const transformFunction = (fn, name, component) => {
+		if (!isFunction(fn) || transformed.has(fn)) return fn;
+		transformed.add(fn);
+		annotateAuthoredHooks(fn, component, name);
+		if (!ctx.parallelUse) {
+			scan(fn.body, name);
+			return fn;
+		}
+		if (fn.body?.type !== 'BlockStatement') {
+			scan(fn.body, name);
+			return fn;
+		}
+		const previousLocals = ctx.currentComponentLocals;
+		const previousProfile = ctx.currentProfileComponentId;
+		ctx.currentComponentLocals = collectComponentLocals(fn);
+		if (component && ctx.profile) {
+			ctx.currentProfileComponentId = `${ctx.profileFilename || '<anon>'}#${name}@${component.line}:${component.column}`;
+		}
+		let warmSource = null;
+		try {
+			const creations = [];
+			const warmChildren = component ? collectWarmChildren(fn.body) : [];
+			let statements = parallelUseMemoizePass(fn.body.body || [], ctx, name, creations, [], null);
+			const warm = component
+				? buildWarmArtifacts(fn, ctx, name, creations, warmChildren)
+				: { thunk: null, warmSrc: null };
+			statements = rewriteParallelUse(statements, ctx, name, warm.thunk);
+			fn.body = { ...fn.body, body: statements };
+			warmSource = warm.warmSrc;
+		} finally {
+			ctx.currentComponentLocals = previousLocals;
+			ctx.currentProfileComponentId = previousProfile;
+		}
+		scan(fn.body, name);
+		return warmSource === null ? fn : assignWarmPlan(fn, warmSource);
+	};
+
+	const transformThunkValue = (node, ownerName) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) transformThunkValue(child, ownerName);
+			return;
+		}
+		if (isFunction(node)) {
+			transformFunction(node, `${ownerName}.region${regionIndex++}`, null);
+			return;
+		}
+		if (node.type === 'ArrayExpression') {
+			for (const child of node.elements || []) transformThunkValue(child, ownerName);
+			return;
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+			transformThunkValue(child, ownerName);
+		}
+	};
+
+	function scan(node, ownerName = 'module') {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) scan(child, ownerName);
+			return;
+		}
+		if (isFunction(node)) return;
+		if (node.type === 'CallExpression') {
+			const name = calleeName(node);
+			if (name === metadata.componentHelper) {
+				const fn = unwrapAssignedFunction(node.arguments?.[1]);
+				if (fn !== null) {
+					const componentName = fn.id?.name || ownerName;
+					const transformedFn = transformFunction(fn, componentName, takeComponent(componentName));
+					if (transformedFn !== fn) node.arguments[1] = transformedFn;
+				}
+				for (let index = 0; index < (node.arguments?.length || 0); index++) {
+					if (index !== 1) scan(node.arguments[index], ownerName);
+				}
+				return;
+			}
+			const regions = metadata.regionHelpers || {};
+			let thunkIndexes = null;
+			if (name === regions.children) thunkIndexes = [1];
+			else if (name === regions.if) thunkIndexes = [1, 2];
+			else if (name === regions.switch) thunkIndexes = [1, 2];
+			else if (name === regions.for) thunkIndexes = [2, 3];
+			else if (name === regions.try) thunkIndexes = [0, 1, 2];
+			if (thunkIndexes !== null) {
+				for (const index of thunkIndexes) transformThunkValue(node.arguments?.[index], ownerName);
+				for (let index = 0; index < (node.arguments?.length || 0); index++) {
+					if (!thunkIndexes.includes(index)) scan(node.arguments[index], ownerName);
+				}
+				return;
+			}
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+			scan(child, ownerName);
+		}
+	}
+
+	try {
+		for (const node of ast.body || []) scan(node);
+	} finally {
+		ctx._parallelUseAliases = previousUseAliases;
+		ctx._universalRuntimeUnit = previousUniversalUnit;
+	}
 }
 
 // ===========================================================================
@@ -5300,6 +6061,21 @@ function isInvariantBindingExpr(node, ctx) {
 	return (
 		isInvariantLiteral(value) ||
 		(value && value.type === 'Identifier' && ctx.currentInvariantLocals?.has(value.name) === true)
+	);
+}
+
+// Native event slots may retain a useEffectEvent wrapper even though its
+// per-render return identity is fresh: every wrapper dispatches through the
+// hook cell's latest committed body. This proof must never feed general JSX
+// props, memo bailouts, callback inference, or event-bundle arguments.
+function isEventHandlerInvariantExpr(node, ctx) {
+	if (ctx.hmr) return false;
+	const value = unwrapTsExpr(node);
+	return (
+		isInvariantLiteral(value) ||
+		(value &&
+			value.type === 'Identifier' &&
+			ctx.currentEventInvariantLocals?.has(value.name) === true)
 	);
 }
 
@@ -5406,7 +6182,7 @@ const FN_TYPES = new Set(['FunctionExpression', 'FunctionDeclaration', 'ArrowFun
 
 // Is this statement a `const/let x = use(<arg>)` declaration (or a bare
 // `use(<arg>)` expression statement)? Returns the use CallExpression or null.
-function useCallOfStatement(stmt) {
+function useCallOfStatement(stmt, ctx) {
 	let call = null;
 	if (
 		stmt.type === 'VariableDeclaration' &&
@@ -5422,7 +6198,7 @@ function useCallOfStatement(stmt) {
 		call &&
 		call.type === 'CallExpression' &&
 		call.callee.type === 'Identifier' &&
-		call.callee.name === 'use' &&
+		(call.callee.name === 'use' || ctx?._parallelUseAliases?.has(call.callee.name)) &&
 		call.arguments.length >= 1
 	) {
 		return call;
@@ -5442,7 +6218,7 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 	function rewriteStmt(stmt) {
 		if (!stmt || typeof stmt !== 'object') return stmt;
 		if (LOOP_TYPES.has(stmt.type) || FN_TYPES.has(stmt.type)) return stmt;
-		const call = useCallOfStatement(stmt);
+		const call = useCallOfStatement(stmt, ctx);
 		if (call) {
 			const rewritten = rewriteUseCall(call);
 			if (rewritten === call) return stmt;
@@ -5483,11 +6259,11 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 		// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 		// SSRScope per pass makes client useMemo semantics useless there).
 		const memoHelper = ctx.mode === 'server' ? 'puMemo' : 'useMemo';
-		ctx.runtimeNeeded.add(memoHelper);
+		const memoAlias = requireRuntimeForContext(ctx, memoHelper);
 		creations.push({ symVar, expr: arg, deps, guards: [...guards], locals });
 		const memoCall = {
 			type: 'CallExpression',
-			callee: { type: 'Identifier', name: `_$${memoHelper}` },
+			callee: { type: 'Identifier', name: memoAlias },
 			arguments: [
 				{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: arg },
 				{ type: 'ArrayExpression', elements: deps },
@@ -5670,7 +6446,7 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 			run = null;
 		};
 		for (const stmt of stmts) {
-			const call = stmt && typeof stmt === 'object' ? useCallOfStatement(stmt) : null;
+			const call = stmt && typeof stmt === 'object' ? useCallOfStatement(stmt, ctx) : null;
 			if (call) {
 				const creation = unwrapTsExpr(call.arguments[0]);
 				const free = collectFreeIdentifiers(creation, []);
@@ -5764,7 +6540,7 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 		// with the render loop and suspends ONCE (identity-resolved on the next
 		// pass — see runtime.server.ts).
 		const batchHelper = ctx.mode === 'server' ? 'puBatch' : 'useBatch';
-		ctx.runtimeNeeded.add(batchHelper);
+		const batchAlias = requireRuntimeForContext(ctx, batchHelper);
 		const batchArgs = [
 			{
 				type: 'ArrayExpression',
@@ -5777,7 +6553,7 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 			type: 'ExpressionStatement',
 			expression: {
 				type: 'CallExpression',
-				callee: { type: 'Identifier', name: `_$${batchHelper}` },
+				callee: { type: 'Identifier', name: batchAlias },
 				arguments: batchArgs,
 				optional: false,
 			},
@@ -5837,9 +6613,11 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		const call = { type: 'ExpressionStatement', expression: callExpr };
 		return g ? { type: 'IfStatement', test: g, consequent: call, alternate: null } : call;
 	};
+	const warmMemoAlias = runtimeAliasForContext(ctx, 'warmMemo');
+	const warmChildAlias = runtimeAliasForContext(ctx, 'warmChild');
 	const memoCall = (c) => ({
 		type: 'CallExpression',
-		callee: { type: 'Identifier', name: '_$warmMemo' },
+		callee: { type: 'Identifier', name: warmMemoAlias },
 		arguments: [
 			{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: c.expr },
 			{ type: 'ArrayExpression', elements: c.deps },
@@ -5849,7 +6627,7 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 	});
 	const childCall = (w) => ({
 		type: 'CallExpression',
-		callee: { type: 'Identifier', name: '_$warmChild' },
+		callee: { type: 'Identifier', name: warmChildAlias },
 		arguments: [
 			{ type: 'Identifier', name: w.compName },
 			{
@@ -5868,8 +6646,8 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		optional: false,
 	});
 
-	if (warmMemos.length > 0) ctx.runtimeNeeded.add('warmMemo');
-	if (warmKids.length > 0) ctx.runtimeNeeded.add('warmChild');
+	if (warmMemos.length > 0) requireRuntimeForContext(ctx, 'warmMemo');
+	if (warmKids.length > 0) requireRuntimeForContext(ctx, 'warmChild');
 
 	// In-body warm thunk: children only — the body's own creations already ran
 	// as real memos by the time the batch throws.
@@ -6284,9 +7062,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				// `useCallback`), whose callee is renamed to the `_$` alias below so a
 				// user binding of the same name can't shadow it.
 				if (isBuiltin) {
-					if (n.callee._octaneGenerated) ctx.runtimeNeeded.add(name);
+					if (n.callee._octaneGenerated) requireRuntimeForContext(ctx, name);
 					else ctx.userRuntimeNames.add(localName === name ? name : `${name} as ${localName}`);
-					if (getterHelper !== null) ctx.runtimeNeeded.add(getterHelper);
+					if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
 				}
 				if (isServerUse)
 					ctx.userRuntimeNames.add(localName === name ? 'use' : `use as ${localName}`);
@@ -6328,10 +7106,10 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					// sites keeps independent state — base hooks are "owned by octane" and
 					// need no wrapper). The TRAILING `sym` is retained so existing library
 					// bindings that extract the slot from their last argument keep working.
-					ctx.runtimeNeeded.add('withSlot');
+					const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
 					return {
 						type: 'CallExpression',
-						callee: { type: 'Identifier', name: '_$withSlot' },
+						callee: { type: 'Identifier', name: withSlotAlias },
 						arguments: [
 							{ type: 'Identifier', name: symVar },
 							n.callee,
@@ -6345,9 +7123,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					...n,
 					callee:
 						getterHelper !== null
-							? { type: 'Identifier', name: rtAlias(getterHelper) }
+							? { type: 'Identifier', name: runtimeAliasForContext(ctx, getterHelper) }
 							: n.callee._octaneGenerated
-								? { type: 'Identifier', name: rtAlias(name) }
+								? { type: 'Identifier', name: runtimeAliasForContext(ctx, name) }
 								: n.callee,
 					arguments: appendHookSlotArgument(name, args, slot, numericSlot),
 				};
@@ -6373,7 +7151,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				const annotatedOwner = ctx.profile ? n._octaneProfileOwner : null;
 				const profileOwner = annotatedOwner?.name || componentName;
 				const getterHelper = n._octaneStateGetter ? STATE_GETTER_HELPERS[name] : null;
-				if (getterHelper !== null) ctx.runtimeNeeded.add(getterHelper);
+				if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
 				const numericSlot =
 					!ctx.hmr &&
 					!ctx.profile &&
@@ -6401,7 +7179,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				return {
 					...n,
 					callee:
-						getterHelper !== null ? { type: 'Identifier', name: rtAlias(getterHelper) } : n.callee,
+						getterHelper !== null
+							? { type: 'Identifier', name: runtimeAliasForContext(ctx, getterHelper) }
+							: n.callee,
 					arguments: appendHookSlotArgument(name, args, slot, numericSlot),
 				};
 			}
@@ -6438,12 +7218,12 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				},
 				true,
 			);
-			ctx.runtimeNeeded.add('withSlot');
+			const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
 			const object = rewriteHookCalls(n.callee.object, ctx, componentName, localRoot);
 			const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName, localRoot));
 			return {
 				type: 'CallExpression',
-				callee: { type: 'Identifier', name: '_$withSlot' },
+				callee: { type: 'Identifier', name: withSlotAlias },
 				arguments: [
 					{ type: 'Identifier', name: symVar },
 					{
@@ -7182,7 +7962,22 @@ export function hookSlotHash(filename) {
 const HOOK_SLOT_BASE_HELPER = '/*__OCTANE_HOOK_SLOT_BASE__*/';
 
 function ensureHookSlotBase(ctx) {
-	if (ctx._hookSlotBase) return;
+	const unit = ctx._universalRuntimeUnit;
+	if (unit !== undefined) {
+		ctx._universalHookSlotBases ??= new Map();
+		const existing = ctx._universalHookSlotBases.get(unit);
+		if (existing !== undefined) return existing;
+		const base = Object.freeze({
+			baseName: allocCompilerName(ctx, '_hs$'),
+			helperName: requireRuntimeForContext(ctx, 'hookSlots'),
+		});
+		ctx._universalHookSlotBases.set(unit, base);
+		ctx.hoistedHelpers.push({ ...base, kind: 'hookSlotBase' });
+		return base;
+	}
+	if (ctx._hookSlotBase) {
+		return { baseName: ctx._hookSlotBaseName, helperName: ctx._hookSlotsHelperName };
+	}
 	ctx._hookSlotBase = true;
 	ctx._hookSlotBaseName = allocCompilerName(ctx, '_hs$');
 	ctx._hookSlotsHelperName = allocCompilerName(ctx, '_$hookSlots');
@@ -7191,15 +7986,20 @@ function ensureHookSlotBase(ctx) {
 	// joinHoistedHelpers fills in the final site count once the whole module has
 	// been compiled, avoiding fixed-size ranges and cross-module collisions.
 	ctx.hoistedHelpers.push(HOOK_SLOT_BASE_HELPER);
+	return { baseName: ctx._hookSlotBaseName, helperName: ctx._hookSlotsHelperName };
 }
 
 function joinHoistedHelpers(ctx) {
 	return ctx.hoistedHelpers
-		.map((helper) =>
-			helper === HOOK_SLOT_BASE_HELPER
-				? `const ${ctx._hookSlotBaseName} = /* @__PURE__ */ ${ctx._hookSlotsHelperName}(${ctx.nextHookSymId});`
-				: helper,
-		)
+		.map((helper) => {
+			if (helper === HOOK_SLOT_BASE_HELPER) {
+				return `const ${ctx._hookSlotBaseName} = /* @__PURE__ */ ${ctx._hookSlotsHelperName}(${ctx.nextHookSymId});`;
+			}
+			if (helper?.kind === 'hookSlotBase') {
+				return `const ${helper.baseName} = /* @__PURE__ */ ${helper.helperName}(${ctx.nextHookSymId});`;
+			}
+			return helper;
+		})
 		.join('\n');
 }
 
@@ -7229,8 +8029,8 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false) {
 		// caller's Scope with other modules, so reserve a runtime-global range and
 		// keep a Symbol description that resolveSlot can safely compose.
 		if (forceSymbol) {
-			ensureHookSlotBase(ctx);
-			const numericExpr = id === 0 ? ctx._hookSlotBaseName : `${ctx._hookSlotBaseName} + ${id}`;
+			const { baseName } = ensureHookSlotBase(ctx);
+			const numericExpr = id === 0 ? baseName : `${baseName} + ${id}`;
 			symbolExpr = `Symbol(${numericExpr})`;
 		} else {
 			symbolExpr = String(id);
@@ -8343,6 +9143,7 @@ function planJsx(
 		}
 		if (b.kind === 'style') ctx.runtimeNeeded.add('setStyle');
 		if (b.kind === 'formAction') ctx.runtimeNeeded.add('setFormAction');
+		if (b.kind === 'htmlOnlyChild' && b.script) ctx.runtimeNeeded.add('setScriptText');
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
 			// the update helper but still share the compact mount helper call.
@@ -8977,9 +9778,12 @@ function emitBindingMount(b, elVar, bag) {
 		}
 		case 'htmlOnlyChild': {
 			const coerce = b.knownString ? '_v' : 'String(_v)';
+			const setter = b.script
+				? `_$setScriptText(${elVar}, _v)`
+				: `${elVar}.innerHTML = (_v == null ? '' : ${coerce})`;
 			return `    {
       const _v = ${E};
-      ${elVar}.innerHTML = (_v == null ? '' : ${coerce});
+      ${setter};
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
@@ -9171,7 +9975,10 @@ function emitBindingUpdate(b, bag) {
 		}
 		case 'htmlOnlyChild': {
 			const coerce = b.knownString ? '_v' : 'String(_v)';
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { ${F('_el')}.innerHTML = (_v == null ? '' : ${coerce}); ${F('_prev')} = _v; } }`;
+			const setter = b.script
+				? `_$setScriptText(${F('_el')}, _v)`
+				: `${F('_el')}.innerHTML = (_v == null ? '' : ${coerce})`;
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { ${setter}; ${F('_prev')} = _v; } }`;
 		}
 		case 'attr': {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
@@ -9597,6 +10404,7 @@ function emitElementHtml(
 					id: bindings.length,
 					kind: 'htmlOnlyChild',
 					expr: printExpr(dangerHtmlExpr(obj)),
+					script: tag === 'script',
 					path,
 				});
 				continue;
@@ -9745,7 +10553,7 @@ function emitElementHtml(
 						printExprWithTsrx(a, ctx, componentName, inlinedSubs),
 					),
 					mountOnly:
-						isInvariantBindingExpr(bundleInfo.callee, ctx) &&
+						isEventHandlerInvariantExpr(bundleInfo.callee, ctx) &&
 						bundleInfo.args.every((arg) => isInvariantBindingExpr(arg, ctx)),
 				});
 			} else {
@@ -9757,7 +10565,7 @@ function emitElementHtml(
 					eventName,
 					slotKey,
 					ns: hostNs,
-					mountOnly: isInvariantBindingExpr(inner, ctx),
+					mountOnly: isEventHandlerInvariantExpr(inner, ctx),
 				});
 			}
 		} else if (attrName === 'class') {
@@ -10309,11 +11117,15 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 	// helper's env values are emitted as plain identifiers at its call site.)
 	const prevLocals = ctx.currentComponentLocals;
 	const prevInvariantLocals = ctx.currentInvariantLocals;
+	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
 	const extended = new Set(prevLocals);
 	for (const n of collectComponentLocals(fake)) extended.add(n);
 	ctx.currentComponentLocals = extended;
 	ctx.currentInvariantLocals = new Set(
 		(envNames || []).filter((name) => prevInvariantLocals?.has(name) === true),
+	);
+	ctx.currentEventInvariantLocals = new Set(
+		(envNames || []).filter((name) => prevEventInvariantLocals?.has(name) === true),
 	);
 	let code;
 	try {
@@ -10321,6 +11133,7 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentInvariantLocals = prevInvariantLocals;
+		ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	}
 	ctx.hoistedHelpers.push(code + ';');
 	return helperName;

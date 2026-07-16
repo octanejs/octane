@@ -1,0 +1,75 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "threadline",
+  "title": "Threadline",
+  "summary": "A production-built social timeline exercising Zustand external state, optimistic mutations, and keyed survivor identity.",
+  "status": "active",
+  "renderModes": ["client"],
+  "dialects": ["tsrx"],
+  "bindings": ["@octanejs/zustand"],
+  "octaneFeatures": [
+    "external-store",
+    "keyed-reconciliation",
+    "native-events",
+    "optimistic-updates",
+    "refs-as-props",
+    "tsrx-control-flow"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "deep-linked-timelines",
+      "title": "Navigate and follow from responsive deep-linked profiles, saved posts, and an empty profile",
+      "kind": "golden",
+      "spec": "e2e/threadline.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "keyed-live-prepend",
+      "title": "Preserve a survivor node, focused composer, and draft across keyed prepends",
+      "kind": "golden",
+      "spec": "e2e/threadline.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "offline-mutation-recovery",
+      "title": "Roll back an optimistic post and concurrent likes, then retry every mutation after reconnecting",
+      "kind": "resilience",
+      "spec": "e2e/threadline.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "out-of-order-likes",
+      "title": "Settle rapid optimistic reactions acknowledged out of order",
+      "kind": "resilience",
+      "spec": "e2e/threadline.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "initial-load-retry",
+      "title": "Retain a rapid optimistic publish across initial load failure and seed recovery",
+      "kind": "resilience",
+      "spec": "e2e/threadline.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "initial-load-failure",
+      "description": "The fault=initial-load URL fails once, preserves an optimistic publish, and merges it ahead of the seed after retry."
+    },
+    {
+      "id": "offline-mutation-rollback",
+      "description": "Posts and concurrent reactions update optimistically while offline, roll back visibly, and retain an independent retry action."
+    },
+    {
+      "id": "out-of-order-acknowledgements",
+      "description": "Two rapid reactions complete on deliberately different delays without clobbering one another."
+    }
+  ]
+}

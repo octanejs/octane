@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { useLayoutEffect, useState } from 'octane';
 
 // Exposes its `setN` via a module-level shim so tests can fire updates from
 // outside the component body — exactly the situation `act()` warns about.
@@ -13,4 +13,14 @@ export default function Counter() @{
 	<div class="c">
 		{n as number}
 	</div>
+}
+
+export function ActLayoutLoop() @{
+	const [value, setValue] = useState(0);
+	useLayoutEffect(() => {
+		setValue((current) => current + 1);
+	}, null);
+	<span>
+		{value as number}
+	</span>
 }

@@ -1,0 +1,23 @@
+{
+  "name": "relay-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A deterministic team chat exercising real SSE subscriptions, anchored history, and reconnect replay in Octane.",
+  "scripts": {
+    "dev": "node server.mjs",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build && playwright test --config e2e/playwright.config.ts",
+    "e2e": "pnpm test:e2e"
+  },
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

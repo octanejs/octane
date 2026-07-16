@@ -60,6 +60,7 @@
     "@rspack/core": "catalog:default",
     "@types/node": "catalog:default",
     "octane": "workspace:*",
+    "playwright": "catalog:default",
     "type-fest": "catalog:default",
     "vitest": "catalog:default"
   }

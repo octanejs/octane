@@ -20,6 +20,8 @@ const fixtureRoot = fileURLToPath(new URL('./_fixtures/app', import.meta.url));
 const packageRoot = fileURLToPath(new URL('../', import.meta.url));
 const repoRoot = path.resolve(packageRoot, '../..');
 const distDir = path.join(fixtureRoot, 'dist');
+const sceneFile = path.join(fixtureRoot, 'src/Scene.object.tsrx');
+const clientReferenceId = 'octane-client-reference-v1:object:/src/Scene.object.tsrx';
 
 function linkPackage(name: string, target: string) {
 	const dest = path.join(fixtureRoot, 'node_modules', name);
@@ -105,6 +107,39 @@ describe('production SSR build', () => {
 		}
 	});
 
+	it('maps the server-stub client reference to its emitted browser chunk', async () => {
+		const manifestPath = path.join(distDir, 'client/octane-client-references.json');
+		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+		const reference = manifest.references[clientReferenceId];
+		expect(manifest.version).toBe(1);
+		expect(reference).toEqual({
+			moduleId: '/src/Scene.object.tsrx',
+			renderer: 'object',
+			chunks: [...reference.chunks].sort(),
+		});
+		expect(reference.chunks.length).toBeGreaterThan(0);
+		for (const chunk of reference.chunks) {
+			expect(fs.existsSync(path.join(distDir, 'client', chunk))).toBe(true);
+		}
+
+		await fetch(devOrigin + '/');
+		const graph = devServer!.environments.ssr.moduleGraph;
+		const sceneModules = [...(graph.getModulesByFile(sceneFile) ?? [])];
+		const stubReference = sceneModules
+			.map(
+				(module) =>
+					module.info?.meta?.['octane:client-reference'] ??
+					module.meta?.['octane:client-reference'],
+			)
+			.find((value) => value?.id === clientReferenceId);
+		expect(stubReference).toEqual({
+			id: clientReferenceId,
+			moduleId: reference.moduleId,
+			renderer: reference.renderer,
+		});
+		expect((globalThis as any).__fixtureAuthoredSceneSetup).toBeUndefined();
+	});
+
 	it('renders a route through the built handler, byte-matching dev SSR', async () => {
 		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
 
@@ -129,6 +164,76 @@ describe('production SSR build', () => {
 			expect(prodHtml).toContain(`<p class="url">${url}</p>`);
 		}
 	});
+
+	it('adopts the Canvas shell and mounts one generic client region in Chromium', async () => {
+		let browser: import('playwright').Browser | undefined;
+		try {
+			const { chromium } = await import('playwright');
+			browser = await chromium.launch({ headless: true });
+		} catch (error) {
+			throw new Error(
+				'[vite-plugin client-only renderer] Chromium is required ' +
+					'(run `pnpm exec playwright install chromium`): ' +
+					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+			);
+		}
+
+		const page = await browser.newPage();
+		const errors: string[] = [];
+		page.on('console', (message) => {
+			if (message.type() === 'error') errors.push(message.text());
+		});
+		page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+		try {
+			await page.goto(devOrigin + '/', { waitUntil: 'load' });
+			await page.locator('[data-object-region="ready"]').waitFor();
+			await page.evaluate(
+				() =>
+					new Promise<void>((resolve) =>
+						requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+					),
+			);
+			const proof = await page.evaluate(() => {
+				const fixture = globalThis as typeof globalThis & {
+					__fixtureAuthoredSceneSetup?: number;
+					__fixtureObjectContainer?: {
+						children: Array<{ type: string; children: Array<{ type: string }> }>;
+						commits: unknown[];
+					};
+					__fixtureObjectRegionCount?: number;
+					__fixtureObjectRootCount?: number;
+					__fixtureSsrCanvasShell?: Element | null;
+				};
+				const shell = document.querySelector('[data-object-canvas-shell]');
+				return {
+					adoptedServerShell: fixture.__fixtureSsrCanvasShell === shell,
+					authoredSceneSetup: fixture.__fixtureAuthoredSceneSetup,
+					commits: fixture.__fixtureObjectContainer?.commits.length,
+					regionCount: fixture.__fixtureObjectRegionCount,
+					rootCount: fixture.__fixtureObjectRootCount,
+					scene: fixture.__fixtureObjectContainer?.children.map((child) => ({
+						type: child.type,
+						children: child.children.map((nested) => nested.type),
+					})),
+					shellCount: document.querySelectorAll('[data-object-canvas-shell]').length,
+				};
+			});
+
+			expect(proof).toEqual({
+				adoptedServerShell: true,
+				authoredSceneSetup: 1,
+				commits: 1,
+				regionCount: 1,
+				rootCount: 1,
+				scene: [{ type: 'scene', children: ['mesh'] }],
+				shellCount: 1,
+			});
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+			await browser.close();
+		}
+	}, 60_000);
 
 	it('returns 404 for unmatched routes (no catch-all in the fixture)', async () => {
 		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
