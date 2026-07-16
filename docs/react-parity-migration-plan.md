@@ -251,16 +251,16 @@ in dev + prod; warnings + LOC are dev-only and strictly gated so prod output is 
 (2026-07-16).** The audit reviewed the 223-case stable/canary union of the four
 `ReactDOMFizzServer*` suites and the 389 remaining `ReactDOMServerIntegration*`
 cases after Wave 1 covered the 17 untrusted-URL cases. Of those 612 Wave 4 cases,
-84 have exact live evidence, 138 have conservative durable dispositions, and 390
-remain planned. The executable additions are
-`conformance/fizz-streaming.test.ts` (public transport, shell/error/abort,
-Usable-node, parser-context, context-isolation, hydration-adoption, and deep-tree
-outcomes) and `conformance/server-integration-matrix.test.ts`, whose 14 scenarios
-run independently through client, buffered SSR, streaming SSR, matching hydration,
-and mismatch recovery (70 cases), with eight focused mismatch regressions for 78
-local executions total; the production-compile project repeats the same cases. The
-strict upstream mapping credits 38 Fizz and 46 server-integration cases, rather than
-treating every local execution as a distinct upstream case.
+198 have exact live evidence, 171 have conservative durable dispositions, and 243
+remain planned. Wave 4C closed all 104 remaining Fizz cases plus 43 reconnecting
+and controlled-field cases: 114 gained executable evidence and 33 received durable
+dispositions. Its four focused suites add 80 normal cases covering stream error and
+abort recovery, synchronous iterables and thenables, script/style safety, hydration
+reconnection, render-phase state replay, raw HTML, and native controlled-field
+events. All 223 Fizz cases now have either live evidence (109) or a durable
+disposition (114); the remaining queue is entirely server-integration work. The
+strict upstream mapping counts each React case once rather than treating every
+local execution mode as a distinct upstream case.
 Class components, legacy roots/context, StrictMode, synthetic selective-hydration
 replay, Fiber/Fizz protocol internals, and document-orchestration APIs remain
 explicit non-goals rather than disabled tests.
