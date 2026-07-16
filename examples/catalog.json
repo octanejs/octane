@@ -157,6 +157,77 @@
       ]
     },
     {
+      "directory": "examples/draftboard",
+      "id": "draftboard",
+      "title": "Draftboard",
+      "summary": "A production-built SVG whiteboard proving Octane pointer capture, imperative refs, keyed identity, keyboard history, portals, and resilient autosave.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": [],
+      "octaneFeatures": [
+        "high-frequency-updates",
+        "imperative-handles",
+        "keyed-reconciliation",
+        "native-events",
+        "portals",
+        "refs-as-props",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deep-link-load-empty-autosave",
+          "title": "Load deterministic deep-linked boards and persist a first object from the empty canvas",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "captured-group-drag-identity",
+          "title": "Capture a high-frequency multi-object drag beyond the SVG while a keyed survivor retains identity",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "draw-pan-zoom",
+          "title": "Draw a rectangle, zoom through the canvas handle, and pan the native SVG surface",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "imperative-focus-keyboard-history-portal",
+          "title": "Focus imperatively, undo and redo keyboard edits, and restore focus from portaled help",
+          "kind": "golden",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "failure-offline-rapid-convergence",
+          "title": "Retry deterministic failures while rapid offline edits converge to the latest saved board",
+          "kind": "resilience",
+          "spec": "e2e/draftboard.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "initial-load-failure",
+          "description": "The load-failure scenario fails one deterministic board load and succeeds on explicit retry."
+        },
+        {
+          "id": "autosave-failure",
+          "description": "The save-failure scenario keeps edits visible through one failed autosave and saves the latest document on retry."
+        },
+        {
+          "id": "offline-edit-queue",
+          "description": "Native offline events queue completed canvas actions and reconnect saves the latest document."
+        }
+      ]
+    },
+    {
       "directory": "examples/flowboard",
       "id": "flowboard",
       "title": "Flowboard",
@@ -219,6 +290,80 @@
         {
           "id": "offline-local-moves",
           "description": "The browser disconnects while several issue moves remain usable and visibly queued locally."
+        }
+      ]
+    },
+    {
+      "directory": "examples/gridlab",
+      "id": "gridlab",
+      "title": "Gridlab",
+      "summary": "A local-first virtualized spreadsheet proving Octane keyboard, clipboard, IME, formula, focus, and overlapping sync behavior.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/tanstack-virtual"],
+      "octaneFeatures": [
+        "controlled-inputs",
+        "keyed-reconciliation",
+        "native-events",
+        "refs-as-props",
+        "tsrx-control-flow",
+        "two-axis-virtualization"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deterministic-formulas-empty-responsive",
+          "title": "Open deterministic formulas, restore an empty workbook, and keep the mobile grid usable",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "two-axis-virtual-focus",
+          "title": "Scroll both virtual axes while selection focus survives and navigate to a distant cell",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "native-clipboard-range",
+          "title": "Copy and paste a native tabular selection without losing cell focus",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "ime-editor-formulas",
+          "title": "Keep composition in the cell editor and recalculate committed formulas",
+          "kind": "golden",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "offline-overlap-recovery",
+          "title": "Retry load and sync failures without dropping rapid edits across an offline interleaving",
+          "kind": "resilience",
+          "spec": "e2e/gridlab.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "initial-load-failure",
+          "description": "The deterministic fixture fails once before a user-triggered retry opens the workbook."
+        },
+        {
+          "id": "offline-edit-queue",
+          "description": "Repeated and cross-cell changes remain local while the browser is offline and sync on reconnection."
+        },
+        {
+          "id": "overlapping-sync-failure",
+          "description": "The first save fails while a newer edit overlaps its in-flight snapshot; retry preserves the latest revision."
+        },
+        {
+          "id": "corrupt-local-workbook",
+          "description": "Out-of-range or malformed persisted cells are discarded before the deterministic sample workbook opens."
         }
       ]
     },
@@ -325,6 +470,83 @@
         }
       ],
       "faultScenarios": []
+    },
+    {
+      "directory": "examples/pagecraft",
+      "id": "pagecraft",
+      "title": "Pagecraft",
+      "summary": "A resilient document workspace proving real Lexical selection, rich-text history, and versioned autosave across network races.",
+      "status": "active",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/lexical"],
+      "octaneFeatures": [
+        "compiler-inferred-effects",
+        "keyed-reconciliation",
+        "native-events",
+        "refs",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "deep-link-keyboard-navigation",
+          "title": "Open a document deep link, retain keyboard focus, and flush edits through immediate navigation",
+          "kind": "golden",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "selection-format-history",
+          "title": "Format a live contenteditable selection and restore it through undo, redo, and reload",
+          "kind": "golden",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "overlapping-autosave",
+          "title": "Retain save ownership across route remounts and settle versioned autosaves out of order",
+          "kind": "resilience",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "save-failure-offline-recovery",
+          "title": "Retry a rejected save and persist an offline edit after reconnection",
+          "kind": "resilience",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "load-retry-empty-missing",
+          "title": "Reject malformed editor data, recover loading, and distinguish blank and missing documents",
+          "kind": "resilience",
+          "spec": "e2e/pagecraft.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "temporary-load-failure",
+          "description": "The fault=load query rejects one deterministic document load and then succeeds from the retry control."
+        },
+        {
+          "id": "rejected-autosave",
+          "description": "The fault=save query rejects the first debounced mutation while retaining the local editor state for an explicit retry."
+        },
+        {
+          "id": "out-of-order-autosave",
+          "description": "A slow first mutation completes after a fast second mutation, and version checks preserve the newest serialized editor state."
+        },
+        {
+          "id": "offline-edit",
+          "description": "Browser offline state pauses autosave while keeping the visible draft, then reconnect automatically persists it."
+        },
+        {
+          "id": "malformed-editor-state",
+          "description": "Lexical parses untrusted serialized state at both the save and load boundaries, rejecting unknown nodes without mounting corrupt content."
+        }
+      ]
     },
     {
       "directory": "examples/relay",

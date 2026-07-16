@@ -159,6 +159,52 @@ async function loadRoute(base: string, path: string) {
 	return { page, errors, main };
 }
 
+interface RouteGeometry {
+	bodyHeight: number;
+	footerTop: number;
+	explorerHeight: number | null;
+	calloutHeight: number | null;
+	calloutFollowingTop: number | null;
+	searchWidth: number;
+}
+
+async function measureRouteGeometry(
+	base: string,
+	path: string,
+	javaScriptEnabled: boolean,
+): Promise<RouteGeometry> {
+	const context = await browser.newContext({
+		javaScriptEnabled,
+		viewport: { width: 1440, height: 900 },
+	});
+	const page = await context.newPage();
+	try {
+		await page.goto(base + path, { waitUntil: 'load' });
+		await page.evaluate(async (hydrated) => {
+			await document.fonts.ready;
+			if (!hydrated) return;
+			await new Promise<void>((resolve) =>
+				requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+			);
+		}, javaScriptEnabled);
+		return await page.evaluate(() => {
+			const rect = (selector: string) => document.querySelector(selector)?.getBoundingClientRect();
+			const callout = document.querySelector('.doc-callout');
+			const following = callout?.nextElementSibling?.getBoundingClientRect();
+			return {
+				bodyHeight: document.body.getBoundingClientRect().height,
+				footerTop: rect('footer')?.top ?? -1,
+				explorerHeight: rect('section.explorer .bx')?.height ?? null,
+				calloutHeight: callout?.getBoundingClientRect().height ?? null,
+				calloutFollowingTop: following?.top ?? null,
+				searchWidth: rect('.search-trigger')?.width ?? -1,
+			};
+		});
+	} finally {
+		await context.close();
+	}
+}
+
 async function waitForLocatorText(
 	locator: import('playwright').Locator,
 	expected: string,
@@ -225,16 +271,15 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		},
 	);
 
-	it('the homepage benchmark explorer hydrates its SSR fallback into the interactive views', async () => {
+	it('the homepage benchmark explorer preserves its complete SSR view through hydration', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/');
 		try {
 			const explorer = page.locator('section.explorer .bx');
 			await explorer.waitFor();
 
-			// SSR ships the accessible fallback data table; hydration adopts it in
-			// place (identical DOM, no mismatch), then the mount effect swaps in the
-			// interactive bar chart + heatmap. Wait for the plot to prove the swap ran.
-			await page.locator('.bx-plot').waitFor();
+			// The bar chart and heatmap are already present in SSR output. Keeping them
+			// through hydration prevents the large footer jump the fallback swap caused.
+			expect(await page.locator('.bx-plot').count()).toBe(1);
 			expect(await page.locator('.bx-heat').count()).toBe(1);
 			expect(await page.locator('.bx-fallback-table').count()).toBe(0);
 
@@ -475,6 +520,23 @@ describe.sequential('website production build → hydration (octane-preview)', (
 			expect(main.length).toBeGreaterThan(0);
 		} finally {
 			await page.close();
+		}
+	});
+
+	it('keeps no-JS SSR and hydrated layout geometry identical', { timeout: 30_000 }, async () => {
+		const base = `http://localhost:${PREVIEW_PORT}`;
+		for (const route of ['/', '/docs', '/docs/core-apis']) {
+			const noJs = await measureRouteGeometry(base, route, false);
+			const hydrated = await measureRouteGeometry(base, route, true);
+			for (const key of Object.keys(noJs) as (keyof RouteGeometry)[]) {
+				const serverValue = noJs[key];
+				const clientValue = hydrated[key];
+				if (serverValue === null || clientValue === null) {
+					expect(clientValue, `${route} ${key}`).toBe(serverValue);
+				} else {
+					expect(Math.abs(clientValue - serverValue), `${route} ${key}`).toBeLessThan(1);
+				}
+			}
 		}
 	});
 

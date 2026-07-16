@@ -56,11 +56,11 @@ describe('built SSR handler', () => {
 		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
 		expect(html).toContain('<main');
 		expect(classCount(html, 'home')).toBeGreaterThan(0);
-		// The home benchmark explorer server-renders its accessible fallback data
-		// table (the interactive bar chart + heatmap swap in on mount); no client-only
-		// chart shell or charting-library markup is emitted server-side, so no-JS and
-		// crawlers still get every number.
-		expect(classCount(html, 'bx-fallback-table')).toBe(1);
+		// The complete explorer is deterministic server markup: no-JS, hydration,
+		// crawlers, and the interactive client all start from the same geometry.
+		expect(classCount(html, 'bx-fallback-table')).toBe(0);
+		expect(classCount(html, 'bx-plot')).toBe(1);
+		expect(classCount(html, 'bx-heat')).toBe(1);
 		expect(classCount(html, 'visx-bar')).toBe(0);
 		expect(classCount(html, 'home-bench-chart')).toBe(0);
 		expect(classCount(html, 'deferred-bench')).toBe(0);
@@ -92,6 +92,9 @@ describe('built SSR handler', () => {
 		expect(classCount(html, 'shiki')).toBeGreaterThan(0);
 	});
 
+	// This route deliberately renders every chart and accessible data table; give
+	// that full integration path headroom beyond the generic unit-test timeout on
+	// slower CI runners.
 	it('server-renders /benchmarks with complete Visx charts and table data', async () => {
 		const { response, html } = await get('/benchmarks');
 		const cards = [...FRAMEWORK_CARDS, ...OCTANE_CARDS];
@@ -117,7 +120,7 @@ describe('built SSR handler', () => {
 		expect(classCount(html, 'bench-table')).toBe(cards.length);
 		expect(classCount(html, 'bench-plot-shell')).toBe(0);
 		expect(classCount(html, 'recharts-wrapper')).toBe(0);
-	});
+	}, 15_000);
 
 	it('SSRs the not-found page through the catch-all with a real 404', async () => {
 		const { response, html } = await get('/definitely/not/a/page');

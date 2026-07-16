@@ -1,10 +1,17 @@
 // /benchmarks — the checked-in runtime, SSR, async and size baselines, charted
-// with deterministic @octanejs/visx SVG (the site dogfoods its own charting binding). Two
-// sections: cross-framework comparisons, then the octane-internal de-opt
-// ("authoring cliff") suites. All numbers are the checked-in benchmark scores;
-// the page cannot drift from the repo because the JSON is imported at build time.
+// with deterministic @octanejs/visx SVG (the site dogfoods its own charting binding).
+// Three sections: the normalized at-a-glance explorer (the same linked bar/heatmap
+// component the home page stages, fed the matrix recomputed from FRAMEWORK_CARDS so
+// it can never drift from the cards below), then the cross-framework comparisons,
+// then the octane-internal de-opt ("authoring cliff") suites. All numbers are the
+// checked-in benchmark scores; the page cannot drift from the repo because the
+// JSON is imported at build time.
 import { BenchBars } from '../../components/BenchBars.tsrx';
+import { BenchmarkExplorer } from '../../components/BenchmarkExplorer.tsrx';
 import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../../content/benchmarks.ts';
+import { createHomeSummary } from '../../content/home-benchmark.ts';
+
+const OVERVIEW = createHomeSummary(FRAMEWORK_CARDS);
 
 export function Benchmarks() @{
 	<div class="benchpage">
@@ -25,11 +32,24 @@ export function Benchmarks() @{
 			</p>
 		</header>
 
+		<section class="benchpage-section" aria-labelledby="bench-overview">
+			<h2 id="bench-overview" class="benchpage-h2">Every suite at a glance</h2>
+			<p class="benchpage-note">
+				Start here: each cell is the geometric mean of that suite’s per-operation scores relative to
+				Octane — 1× is Octane, below 1× is faster than Octane. Pick frameworks and a suite for the
+				bar view, or scan the whole grid and re-baseline it to each suite’s fastest framework. The
+				sections below have the full per-operation charts in milliseconds.
+			</p>
+			<BenchmarkExplorer card={OVERVIEW} />
+		</section>
+
 		<section class="benchpage-section" aria-labelledby="bench-frameworks">
 			<h2 id="bench-frameworks" class="benchpage-h2">Octane vs the field</h2>
 			<p class="benchpage-note">
 				Octane compiled from .tsrx and .tsx, against React 19, Preact 10, Solid, Svelte 5, Ripple
-				and Vue Vapor — each framework’s fixture written the way its docs recommend.
+				and Vue Vapor — each framework’s fixture written the way its docs recommend. The ranked
+				chips on each card are that suite’s one-line reading: every framework’s geometric mean
+				across the card’s operations, relative to Octane, fastest first.
 			</p>
 			<div class="benchpage-grid">
 				@for (const card of FRAMEWORK_CARDS; key card.id) {

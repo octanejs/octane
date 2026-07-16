@@ -3047,8 +3047,10 @@ function instrumentProfileComponents(ast, ctx) {
  * @param {string} source
  * @param {string} filename
  * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[] }} [options] —
- *   `dev: true` emits dev-only hydration source-location metadata (per-component
- *   `__s.locs`/`__s.locFile`); strictly gated so production output is byte-identical.
+ *   `dev: true` emits client hydration source-location metadata (per-component
+ *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
+ *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
+ *   production output carries no diagnostic calls or metadata.
  *   `hmr: true` (backwards-compatible shorthand for `hmr: 'vite'`) wraps each
  *   exported component in `hmr(Component)` and emits Vite
  *   `import.meta.hot.accept(...)` wiring. `hmr: 'webpack'` emits Rspack/webpack
@@ -3882,6 +3884,7 @@ function compileServer(source, filename, options) {
 		usedCompilerNames: collectIdentifierNames(ast),
 		mode: 'server',
 		hmr: false, // SSR never hot-swaps in place; client/server production slot shapes stay aligned
+		dev: !!(options && options.dev),
 		// SSR MIRROR of the parallel-`use()` pipeline (docs/suspense-parallel-use-
 		// plan.md Phase 5): the same memoize (Pass A) + hoist/batch (Pass B)
 		// transforms run on server bodies, emitting `_$puMemo`/`_$puBatch` — the
@@ -3897,6 +3900,7 @@ function compileServer(source, filename, options) {
 		userRuntimeDefaults: new Set(),
 		hoistedHelpers: [],
 		cssInjections: [],
+		moduleCssInjections: [],
 		currentComponentLocals: null,
 		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
 		nextHookSymId: 0,
@@ -3915,6 +3919,20 @@ function compileServer(source, filename, options) {
 	// M3 inherit-range exclusion set — must match the client compile's
 	// (see inheritSoleCompRoot; both modes read the same import declarations).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
+
+	// Style maps are module values and can be referenced by a component declared
+	// before the map itself. Lower every top-level map before compiling any
+	// component, then activate the module's sheets from each component body so
+	// injectStyle runs while a render-local CSS collector exists. This mirrors the
+	// client module's eager registration without retaining CSS globally on the
+	// server (which would leak unrelated imports and request history into output).
+	for (const node of ast.body) {
+		applyStyleMap(node, ctx);
+		if (node.type === 'ExportNamedDeclaration' && node.declaration) {
+			applyStyleMap(node.declaration, ctx);
+		}
+	}
+	ctx.moduleCssInjections = ctx.cssInjections.slice();
 
 	let body = emitServerModulePrelude(serverModuleInfo, ctx);
 	for (const node of ast.body) {
@@ -3943,10 +3961,6 @@ function compileServer(source, filename, options) {
 			// User imports from 'octane' resolve to the server runtime instead.
 			addUserImportSpecifiers(ctx, node);
 		} else {
-			applyStyleMap(node, ctx);
-			if (node.type === 'ExportNamedDeclaration' && node.declaration) {
-				applyStyleMap(node.declaration, ctx);
-			}
 			body += printNode(rewriteJsxValues(node, ctx)) + '\n';
 		}
 	}
@@ -3993,7 +4007,9 @@ function compileServerComponent(node, ctx) {
 	// active server render collects CSS only for components it actually renders).
 	const beforeCss = ctx.cssInjections.length;
 	const cssHash = applyCssScoping(node, ctx);
-	const cssEntries = ctx.cssInjections.slice(beforeCss);
+	const cssEntries = [...ctx.moduleCssInjections, ...ctx.cssInjections.slice(beforeCss)].sort(
+		(a, b) => a.order - b.order,
+	);
 
 	const prevLocals = ctx.currentComponentLocals;
 	const prevKnownStr = ctx.knownStringLocals;
@@ -4401,10 +4417,23 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// Wrap the assembled string in an IIFE that binds the spread temps when any
 	// exist (so the temp names resolve); otherwise return the bare concatenation.
 	const finalize = () => {
-		const body = parts.join(' + ');
-		if (spreadTemps.length === 0) return body;
-		const decls = spreadTemps.map((t) => `const ${t.tempName} = (${t.argExpr});`).join(' ');
-		return `(() => { ${decls} return ${body}; })()`;
+		let body = parts.join(' + ');
+		if (spreadTemps.length > 0) {
+			const decls = spreadTemps.map((t) => `const ${t.tempName} = (${t.argExpr});`).join(' ');
+			body = `(() => { ${decls} return ${body}; })()`;
+		}
+		if (!ctx.dev) return body;
+
+		// Keep the element active while its children execute so the server runtime
+		// can validate parser-repaired relationships through component boundaries.
+		// Production output takes the branch above: no helper import, source string,
+		// callback, or runtime work.
+		const loc = node.loc && node.loc.start;
+		const source = loc
+			? JSON.stringify(`${ctx.mapSourceName}:${loc.line}:${loc.column}`)
+			: 'void 0';
+		ctx.runtimeNeeded.add('ssrElement');
+		return `_$ssrElement(${JSON.stringify(tag)}, ${source}, () => (${body}))`;
 	};
 
 	for (let attrI = 0; attrI < attrs.length; attrI++) {
@@ -5186,7 +5215,7 @@ function applyStyleMap(stmt, ctx) {
 		analyzeCss(sheet);
 		prepareStylesheetForRender(sheet, true);
 		const css = renderStylesheets([sheet]);
-		ctx.cssInjections.push({ hash, css });
+		ctx.cssInjections.push({ hash, css, order: styleNode.start ?? stmt.start ?? 0 });
 		ctx.runtimeNeeded.add('injectStyle');
 		// Replace the JSXStyleElement init with the class-map ObjectExpression.
 		decl.init = createStyleClassMapFromStylesheet(sheet);
@@ -5307,7 +5336,11 @@ function applyCssScoping(componentNode, ctx) {
 		prepareStylesheetForRender(sheet);
 	}
 	const css = renderStylesheets(styleSheets);
-	ctx.cssInjections.push({ hash: cssHash, css });
+	ctx.cssInjections.push({
+		hash: cssHash,
+		css,
+		order: styleSheets[0]?.start ?? componentNode.start ?? 0,
+	});
 	ctx.runtimeNeeded.add('injectStyle');
 	// Mutate the render tree: add hash class to every native element AND
 	// strip JSXStyleElement nodes (annotateWithHash returns null for them when
@@ -5349,7 +5382,7 @@ function compileComponent(node, ctx, options) {
 		prepareStylesheetForRender(node.css);
 		const css = renderStylesheets([node.css]);
 		cssHash = node.css.hash;
-		ctx.cssInjections.push({ hash: cssHash, css });
+		ctx.cssInjections.push({ hash: cssHash, css, order: node.start ?? 0 });
 		ctx.runtimeNeeded.add('injectStyle');
 	}
 
@@ -9143,7 +9176,7 @@ function planJsx(
 		}
 		if (b.kind === 'style') ctx.runtimeNeeded.add('setStyle');
 		if (b.kind === 'formAction') ctx.runtimeNeeded.add('setFormAction');
-		if (b.kind === 'htmlOnlyChild' && b.script) ctx.runtimeNeeded.add('setScriptText');
+		if (b.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setHTML');
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
 			// the update helper but still share the compact mount helper call.
@@ -9777,13 +9810,9 @@ function emitBindingMount(b, elVar, bag) {
     }`;
 		}
 		case 'htmlOnlyChild': {
-			const coerce = b.knownString ? '_v' : 'String(_v)';
-			const setter = b.script
-				? `_$setScriptText(${elVar}, _v)`
-				: `${elVar}.innerHTML = (_v == null ? '' : ${coerce})`;
 			return `    {
       const _v = ${E};
-      ${setter};
+      _$setHTML(${elVar}, _v);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
@@ -9974,11 +10003,7 @@ function emitBindingUpdate(b, bag) {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setText(${F('_txt')}, _v); ${F('_prev')} = _v; } }`;
 		}
 		case 'htmlOnlyChild': {
-			const coerce = b.knownString ? '_v' : 'String(_v)';
-			const setter = b.script
-				? `_$setScriptText(${F('_el')}, _v)`
-				: `${F('_el')}.innerHTML = (_v == null ? '' : ${coerce})`;
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { ${setter}; ${F('_prev')} = _v; } }`;
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setHTML(${F('_el')}, _v); ${F('_prev')} = _v; } }`;
 		}
 		case 'attr': {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;

@@ -2287,11 +2287,52 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  examples/draftboard:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   examples/flowboard:
     dependencies:
       '@octanejs/dnd-kit':
         specifier: workspace:*
         version: link:../../packages/dnd-kit
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/gridlab:
+    dependencies:
+      '@octanejs/tanstack-virtual':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-virtual
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -2358,6 +2399,40 @@ importers:
         specifier: catalog:default
         version: 0.46.0(typescript@5.9.3)
       '@lexical/table':
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      '@octanejs/lexical':
+        specifier: workspace:*
+        version: link:../../packages/lexical
+      lexical:
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/pagecraft:
+    dependencies:
+      '@lexical/list':
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      '@lexical/rich-text':
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      '@lexical/selection':
         specifier: catalog:default
         version: 0.46.0(typescript@5.9.3)
       '@octanejs/lexical':
@@ -3361,10 +3436,28 @@ importers:
       '@types/three':
         specifier: catalog:default
         version: 0.172.0
+      zustand:
+        specifier: catalog:default
+        version: 5.0.14(@types/react@19.2.17)(immer@11.1.11)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     devDependencies:
+      '@octanejs/rsbuild-plugin':
+        specifier: workspace:*
+        version: link:../rsbuild-plugin-octane
+      '@octanejs/rspack-plugin':
+        specifier: workspace:*
+        version: link:../rspack-plugin-octane
+      '@octanejs/vite-plugin':
+        specifier: workspace:*
+        version: link:../vite-plugin-octane
       '@react-three/fiber':
         specifier: catalog:default
         version: 9.6.1(@types/react@19.2.17)(immer@11.1.11)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.172.0)
+      '@rsbuild/core':
+        specifier: catalog:default
+        version: 2.1.5
+      '@rspack/core':
+        specifier: catalog:default
+        version: 2.1.3(@swc/helpers@0.5.23)
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.37(react@19.2.7)
@@ -3374,6 +3467,9 @@ importers:
       octane:
         specifier: workspace:*
         version: link:../octane
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
       react:
         specifier: catalog:default
         version: 19.2.7
@@ -3386,6 +3482,9 @@ importers:
       typescript:
         specifier: catalog:default
         version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
         version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
