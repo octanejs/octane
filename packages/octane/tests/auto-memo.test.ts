@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { compile } from '../src/compiler/compile.js';
 import { mount } from './_helpers';
 import { AutoMemoApp } from './_fixtures/auto-memo.tsrx';
+import { ParentCaptureApp } from './_fixtures/auto-memo-parent-capture.tsrx';
 
 function trailingVersion(text: string | null): number {
 	return Number(text?.match(/(\d+)$/)?.[1]);
@@ -10,7 +11,10 @@ function trailingVersion(text: string | null): number {
 function expectCompilerRegion(code: string): void {
 	expect(code).toMatch(/const __memoCommitted[\w$]* = __s\.slots\._m\$\d+;/);
 	expect(code).toMatch(/__s\.slots\[\d+\] === undefined \|\| __memoCache/);
-	expect(code).toMatch(/__memoCache[\w$]*\[\d+\] !== \([^)]+\)/);
+	// Dependencies are snapshotted into temporaries once per render; the guard
+	// compares and publishes those exact values.
+	expect(code).toMatch(/const __memoDep[\w$]* = \([^)]+\);/);
+	expect(code).toMatch(/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*/);
 	expect(code).toMatch(
 		/if \(__memoCache[\w$]* === __memoCommitted[\w$]*\) __memoCache[\w$]* = __memoCache[\w$]*\.slice\(\);/,
 	);
@@ -61,6 +65,23 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	it('re-renders keyed survivors when a captured parent local changes', () => {
+		const root = mount(ParentCaptureApp);
+		const cells = () =>
+			[...root.container.querySelectorAll('.cell')].map((node) => node.textContent);
+		expect(cells()).toEqual(['a!', 'b!']);
+
+		// Identity-equal items, changed parent capture: every survivor re-renders.
+		root.click('#capture-suffix');
+		expect(cells()).toEqual(['a!!', 'b!!']);
+
+		// Changed item, unchanged capture: only the keyed identity drives the miss.
+		root.click('#capture-item');
+		expect(cells()).toEqual(['ax!!', 'b!!']);
+
+		root.unmount();
+	});
+
 	it('emits the full memo boundary by default only for a production-safe call', () => {
 		const source = `
 			function Rows(props) @{
@@ -96,14 +117,14 @@ describe('compiler-owned component-region memoization', () => {
 		expectCompilerRegion(defaultBuild);
 		expect(defaultBuild).toContain('componentSlotVoid as');
 		expect(defaultBuild).toContain('componentSlot as');
-		expect(defaultBuild).toMatch(/__memoCache[\w$]*\[\d+\] !== \(props\.items\)/);
-		expect(defaultBuild).toMatch(/__memoCache[\w$]*\[\d+\] !== \(props\.label\)/);
-		expect(defaultBuild).not.toMatch(/__memoCache[\w$]*\[\d+\] !== \(props\)/);
+		expect(defaultBuild).toMatch(/const __memoDep[\w$]* = \(props\.items\);/);
+		expect(defaultBuild).toMatch(/const __memoDep[\w$]* = \(props\.label\);/);
+		expect(defaultBuild).not.toMatch(/const __memoDep[\w$]* = \(props\);/);
 		expect(defaultBuild).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== \([^)]+\)\) \{ _\$componentSlotVoid\([^;\n]*, Rows,/,
+			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{ _\$componentSlotVoid\([^;\n]*, Rows,/,
 		);
 		expect(defaultBuild).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== \([^)]+\)\) \{ _\$componentSlot\([^;\n]*, Returned,/,
+			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{ _\$componentSlot\([^;\n]*, Returned,/,
 		);
 		expectNoCompilerRegion(optedOut);
 		expectNoCompilerRegion(hmrBuild);
@@ -121,9 +142,9 @@ describe('compiler-owned component-region memoization', () => {
 		expectCompilerRegion(typed);
 		expect(typed).toContain('componentSlotVoid as');
 		expect(typed).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== \([^)]+\)\) \{ _\$componentSlotVoid\([^;\n]*, Child,/,
+			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{ _\$componentSlotVoid\([^;\n]*, Child,/,
 		);
-		expect(typed).not.toMatch(/__memoCache[\w$]*\[\d+\] !== \(Foo\)/);
+		expect(typed).not.toMatch(/const __memoDep[\w$]* = \(Foo\);/);
 
 		const shadowed = compile(
 			`function Other() @{ <i>{'module component'}</i> }
@@ -134,7 +155,7 @@ describe('compiler-owned component-region memoization', () => {
 		).code;
 		expectCompilerRegion(shadowed);
 		expect(shadowed).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== \(Other\)\) \{ _\$componentSlotVoid\([^;\n]*, Child, \{ "value": \(Other\) \}/,
+			/const __memoDep[\w$]* = \(Other\);[^\n]*_\$componentSlotVoid\([^;\n]*, Child, \{ "value": \(Other\) \}/,
 		);
 
 		const nestedDefaultMemo = compile(
@@ -150,7 +171,7 @@ describe('compiler-owned component-region memoization', () => {
 		expect(nestedDefaultMemo).toContain('componentSlotVoid as');
 		expect(nestedDefaultMemo).toContain('compilerCacheContext as');
 		expect(nestedDefaultMemo).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== \([^)]+\)\) \{ _\$componentSlotVoid\([^;\n]*, Rows,/,
+			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{ _\$componentSlotVoid\([^;\n]*, Rows,/,
 		);
 
 		const nestedCustomMemo = compile(
@@ -172,7 +193,7 @@ describe('compiler-owned component-region memoization', () => {
 			'auto-memo-transitive-capture.tsrx',
 			{ hmr: false, autoMemo: true },
 		).code;
-		expect(transitiveCapture.match(/__memoCache[\w$]*\[\d+\] !== \(live\)/g)).toHaveLength(2);
+		expect(transitiveCapture.match(/const __memoDep[\w$]* = \(live\);/g)).toHaveLength(2);
 	});
 
 	it('falls back for impure calls, refs, and direct Suspense boundaries', () => {

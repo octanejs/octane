@@ -1,9 +1,5 @@
 ---
 "octane": patch
-"@octanejs/vite-plugin": patch
-"@octanejs/rspack-plugin": patch
-"@octanejs/rsbuild-plugin": patch
-"@octanejs/mdx": patch
 ---
 
-Automatically reuse conservative pure TSRX component regions and render-used imported calculation/list output by inferred dependencies in production builds while preserving context and child-owned updates; expose `autoMemo: false` as an opt-out.
+Automatically reuse conservative pure TSRX component regions and keyed lists by inferred dependencies in production client builds, preserving context propagation and child-owned state. Always on in production compilation; dev/HMR/profiling/server builds keep normal reconciliation.

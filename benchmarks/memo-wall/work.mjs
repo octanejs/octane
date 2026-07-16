@@ -103,16 +103,20 @@ const OPS = [
 			Leaf: 1,
 		},
 	},
+	// Wall B renders through an imported helper's returned descriptors, which
+	// autoMemo deliberately does not cache (per-key descriptor reuse is a later
+	// phase). Every parent update therefore rebuilds all 1000 descriptors and
+	// must be absorbed by value-comparing memo bails — zero row bodies.
 	{
 		name: 'context_B',
 		hook: '__ctxB',
 		expect: {
 			RowsA: 0,
-			updateSurvivor: 0,
+			updateSurvivor: ROWS,
 			itemBody: 0,
-			buildValueRows: 0,
-			createElement: 0,
-			shallowEqualProps: 0,
+			buildValueRows: 1,
+			createElement: ROWS,
+			shallowEqualProps: ROWS,
 			RowImpl: 0,
 			InnerImpl: 0,
 			Leaf: ROWS,
@@ -123,11 +127,11 @@ const OPS = [
 		hook: '__tickB',
 		expect: {
 			RowsA: 0,
-			updateSurvivor: 0,
+			updateSurvivor: ROWS,
 			itemBody: 0,
-			buildValueRows: 0,
-			createElement: 0,
-			shallowEqualProps: 0,
+			buildValueRows: 1,
+			createElement: ROWS,
+			shallowEqualProps: ROWS,
 			RowImpl: 0,
 			InnerImpl: 0,
 			Leaf: 0,

@@ -79,8 +79,6 @@ export interface OctaneRspackLoaderOptions {
 	profile?: boolean;
 	/** Enable Octane's parallel `use()` compilation pipeline. Default `true`. */
 	parallelUse?: boolean;
-	/** Enable compiler-inferred component/calculation-region memoization in production. Default `true`. */
-	autoMemo?: boolean;
 	/** Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. */
 	exclude?: string[];
 	/** @experimental Renderer registry and ordered per-file selection rules. */

@@ -89,39 +89,6 @@ describe('octane() plugin factory', () => {
 		expect(transform.call({}, code, '/repo/src/useThing.ts')).not.toBeNull();
 	});
 
-	it('forwards the production autoMemo opt-out to the bundled compiler', () => {
-		const source = `
-			function Child(props) @{ <span>{props.value}</span> }
-			export function App(props) @{ <Child value={props.value} /> }
-		`;
-		const transformWith = (autoMemo?: boolean, command: 'build' | 'serve' = 'build') => {
-			const [compiler] = octane({ hmr: false, autoMemo });
-			(compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
-			(
-				compiler.configResolved as (config: {
-					root: string;
-					command: 'build' | 'serve';
-					build: { watch: null };
-				}) => void
-			)({ root: '/repo', command, build: { watch: null } });
-			const transform = compiler.transform as (code: string, id: string) => { code: string };
-			return transform.call({}, source, '/repo/src/App.tsrx').code;
-		};
-
-		const defaultBuild = transformWith();
-		const optedOut = transformWith(false);
-		const explicitProductionServe = transformWith(undefined, 'serve');
-
-		expect(defaultBuild).toContain('__memoCommitted');
-		expect(defaultBuild).toContain('componentSlotVoid as');
-		expect(optedOut).not.toContain('__memoCommitted');
-		// Vitest's production project uses an explicit `hmr: false` serve transform.
-		// Keep that path equivalent to a production build so the default-on compiler
-		// optimization receives runtime coverage there too.
-		expect(explicitProductionServe).toContain('__memoCommitted');
-		expect(explicitProductionServe).toContain('componentSlotVoid as');
-	});
-
 	it('forwards inline renderer rules to the bundled compiler', () => {
 		const [compiler] = octane({
 			hmr: false,

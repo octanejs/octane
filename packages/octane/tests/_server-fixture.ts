@@ -17,8 +17,6 @@ export interface ServerFixtureOptions {
 	id?: string;
 	/** Additional public compiler options; `mode: 'server'` is always enforced. */
 	compileOptions?: Record<string, unknown>;
-	/** Named fixture imports supplied by the test instead of evaluated as modules. */
-	modules?: Record<string, Record<string, unknown>>;
 }
 
 export function loadServerFixture<T extends ServerFixtureModule = ServerFixtureModule>(
@@ -38,13 +36,6 @@ export function loadServerFixture<T extends ServerFixtureModule = ServerFixtureM
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
 		(_match: string, names: string) =>
 			`const {${names.replace(/\s+as\s+/g, ': ')}} = __serverRuntime;`,
-	);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"];?/g,
-		(match: string, names: string, source: string) => {
-			if (!Object.hasOwn(options.modules ?? {}, source)) return match;
-			return `const {${names.replace(/\s+as\s+/g, ': ')}} = __fixtureModules[${JSON.stringify(source)}];`;
-		},
 	);
 
 	// Fixtures are authored as normal ESM. Publish named declarations onto a
@@ -68,11 +59,10 @@ export function loadServerFixture<T extends ServerFixtureModule = ServerFixtureM
 
 	const evaluate = new Function(
 		'__serverRuntime',
-		'__fixtureModules',
 		'__exports',
 		`'use strict';\n` +
 			code +
 			`\n//# sourceURL=${options.id ?? defaultId}?server-fixture\nreturn __exports;`,
 	);
-	return evaluate(ServerRuntime, options.modules ?? {}, {}) as T;
+	return evaluate(ServerRuntime, {}) as T;
 }

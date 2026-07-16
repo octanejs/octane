@@ -81,7 +81,7 @@ describe('Rsbuild renderer configuration', () => {
 				cwd: root,
 				rsbuildConfig: {
 					dev: { watchFiles: { paths: 'content/**/*.md', type: 'reload-page' } },
-					plugins: [pluginOctane({ hmr: false, autoMemo: false })],
+					plugins: [pluginOctane({ hmr: false })],
 				},
 			});
 			const configs = await instance.initConfigs({ action: 'build' });
@@ -91,7 +91,6 @@ describe('Rsbuild renderer configuration', () => {
 
 			expect(plugins).toHaveLength(withRoute ? 2 : 1);
 			for (const plugin of plugins) {
-				expect(plugin.options.autoMemo).toBe(false);
 				expect(plugin.options.renderers).toMatchObject({
 					default: 'dom',
 					registry: {

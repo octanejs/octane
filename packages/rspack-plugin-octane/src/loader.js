@@ -104,7 +104,6 @@ export default function octaneLoader(source, inputSourceMap) {
 			profile,
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
 			...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
-			...(options.autoMemo === undefined ? null : { autoMemo: options.autoMemo }),
 			...(options.renderers === undefined ? null : { renderers: options.renderers }),
 		});
 		const id = realModuleId(this.resource ?? this.resourcePath);
@@ -116,7 +115,6 @@ export default function octaneLoader(source, inputSourceMap) {
 					dev,
 					profile,
 					...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
-					...(options.autoMemo === undefined ? null : { autoMemo: options.autoMemo }),
 					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
 				});
 

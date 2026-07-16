@@ -4,11 +4,12 @@
 // list → the childSlot arm of tryMemoBail. This is exactly the shape every
 // @octanejs binding produces (no compiled template for the rows at all).
 //
-// Whenever `items` changes, a fresh descriptor + fresh props OBJECT is allocated
-// for every row. Production autoMemo skips this helper entirely while its input
-// snapshot is equal; on a one-item change, the memo wall must still succeed on
-// prop VALUES (all primitives + the module-level selectRow handler), not object
-// identity.
+// A fresh descriptor + fresh props OBJECT is allocated every parent render —
+// that is the point: the memo bail must succeed on prop VALUES (all primitives
+// + the module-level selectRow handler), not on object identity. autoMemo
+// deliberately does not cache through an imported helper's returned
+// descriptors; that calculation/output phase ships together with per-key
+// descriptor reuse so its miss path is at parity first.
 import { createElement } from 'octane';
 
 import { Row } from './rows.tsrx';

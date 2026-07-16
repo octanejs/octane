@@ -46,8 +46,6 @@ Set `transpile: false` when an existing rule already strips TypeScript. Set
 `hmr: false` to disable Octane HMR codegen even when Rspack HMR is active.
 Set `profile: true` to produce a client profiling build; server compilations
 always keep profiling disabled.
-Production client builds enable compiler-inferred component/calculation-region memoization
-by default. Pass `autoMemo: false` to disable it.
 The experimental `renderers` option accepts the same declarative registry,
 filename rules, and module/export boundary metadata as `compiler.renderers` in
 Octane app config:

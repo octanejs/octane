@@ -15,8 +15,6 @@ export interface OctaneRsbuildPluginOptions {
 	profile?: boolean;
 	/** Disable the compiler's parallel `use()` transform. */
 	parallelUse?: boolean;
-	/** Enable compiler-inferred component/calculation-region memoization in production. Default `true`. */
-	autoMemo?: boolean;
 	/** Ad-hoc path fragments skipped by the plain TypeScript/JavaScript hook-slot pass. */
 	exclude?: string[];
 	/** Rsbuild environment name used for the browser bundle. @default 'web' */

@@ -227,7 +227,6 @@ class OctaneBundlerCompiler {
 			dev: options.dev,
 			profile: options.profile === true,
 			parallelUse: options.parallelUse,
-			autoMemo: options.autoMemo,
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
 		// Deliberately instance-scoped: separate projects/build environments must
@@ -555,7 +554,6 @@ class OctaneBundlerCompiler {
 		// byte identical even when a shared client/server bundler configuration opts in.
 		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
 		const parallelUse = options.parallelUse ?? this.defaults.parallelUse;
-		const autoMemo = options.autoMemo ?? this.defaults.autoMemo;
 		const filename = this._canonicalModuleId(file);
 		const clientOnlyImports =
 			environment === 'server' && Array.isArray(options.clientOnlyImports)
@@ -589,7 +587,6 @@ class OctaneBundlerCompiler {
 				profile,
 				profileFilename,
 				parallelUse: parallelUse !== false,
-				autoMemo: autoMemo !== false,
 				// Keep the established DOM compiler call byte-for-byte equivalent. A
 				// renderer descriptor is an orthogonal compiler input only for the
 				// universal branch selected at this template boundary.

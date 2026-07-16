@@ -21,9 +21,11 @@ import { bindWallA, bindWallB, initialItemsA, initialItemsB, selectRow } from '.
 //   wall B — value-position: the plain-.ts wall-b helper builds
 //     `createElement(Row, props)` descriptors that reach the DOM through the
 //     `{rows}` children hole → childSlot's keyed de-opt list → the childSlot
-//     arm of tryMemoBail. Production autoMemo caches both the helper result and
-//     that output region while `items` is unchanged; an item change deliberately
-//     rebuilds all descriptors. This is the shape every @octanejs binding produces.
+//     arm of tryMemoBail. autoMemo does not reach through an imported helper's
+//     returned descriptors (that calculation/output phase ships together with
+//     per-key descriptor reuse), so every parent render rebuilds all 1000
+//     descriptors and the bail must succeed on prop VALUES, not object
+//     identity. This is the shape every @octanejs binding produces.
 //
 // Each wall owns its items, an unrelated `tick`, and its theme. The theme
 // provider sits ABOVE the rows inside the wall, so a ctx op re-renders the

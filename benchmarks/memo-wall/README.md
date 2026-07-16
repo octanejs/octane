@@ -8,10 +8,11 @@ gets absorbed by 1000 shallow-equal prop comparisons, a single prop change must
 re-render exactly one row, and a context bump above the wall must refresh only
 the leaf consumers without re-running any bailed body. Octane TSRX wall A also
 exercises the default production `autoMemo` transform: an equal `items`
-dependency reuses the whole `RowsA` region before the keyed wall. Wall B proves
-the calculation/output half of the transform: unchanged `items` reuse the
-imported descriptor calculation and its keyed child region before list
-preparation.
+dependency reuses the whole `RowsA` region before the keyed wall. Wall B stays
+the untransformed control — autoMemo does not reach through an imported
+helper's returned descriptors (that calculation/output phase ships together
+with per-key descriptor reuse), so every wall-B parent update rebuilds all
+1000 descriptors and must be absorbed by the value-comparing memo bail.
 
 This is the canonical home for octane's `shallowEqualProps` and
 `refreshContextConsumers` numbers — if a store-fanout suite lands later it must
@@ -84,13 +85,12 @@ how `<Row>` is put on screen:
   `createElement(Row, props)` descriptors that reach the DOM through a
   `{rows}` children hole → `childSlot`'s keyed de-opt list → the **childSlot
   arm** of `tryMemoBail`. This is the shape every `@octanejs/*` binding
-  produces. In production TSRX, `autoMemo` caches the render-used helper call
-  by its imported function and immutable `items` snapshot, then gives the
-  resulting value to a dependency-scoped `childSlot` region. Equal and
-  context-only parent updates therefore do zero helper, descriptor, survivor,
-  or memo-comparison work. When `items` changes, the plain helper still creates
-  1000 fresh descriptor/props objects; that deliberate one-change control must
-  bail on prop VALUES, not object identity.
+  produces. A fresh descriptor + fresh props object is allocated every parent
+  render — the bail must succeed on prop VALUES, not object identity. autoMemo
+  deliberately leaves this path alone: caching an imported helper's returned
+  descriptors is the calculation/output phase, deferred until per-key
+  descriptor reuse makes its miss path at least as fast as the bail it
+  replaces.
 
 For React the A/B distinction collapses (JSX IS `createElement`); both walls
 are kept so the op list and DOM stay identical across targets. The vanilla
@@ -120,11 +120,13 @@ prop silently turns the entire suite into a full-re-render measurement.
 Those body counters intentionally do not sit inside `RowsA` or its item helper:
 an observable mutation there would make the candidate impure and correctly
 disable automatic memoization. `work.mjs` provides the stronger, untimed gate
-after compilation using Chromium precise call coverage. For TSRX equal A and B
-it requires zero list helpers, keyed survivor visits, descriptors, shallow memo
-comparisons, and row bodies; context A/B additionally require exactly 1000 Leaf
-refreshes while all wall-construction work stays zero. Mount and one-change A/B
-also carry exact compiled-work gates.
+after compilation using Chromium precise call coverage. For TSRX equal/context
+A it requires zero list helpers, keyed survivor visits, descriptors, shallow
+memo comparisons, and row bodies (context A additionally requires exactly 1000
+Leaf refreshes). Wall B's gates pin the memo-bail control: every parent update
+runs the helper once, builds 1000 descriptors, visits 1000 survivors, and bails
+1000 comparisons with zero row bodies. Mount and one-change A/B also carry
+exact compiled-work gates.
 
 The React Row/Inner/Leaf counters likewise make those component bodies impure,
 so React Compiler conservatively leaves them alone; the explicit `memo`
@@ -191,8 +193,10 @@ per-operation counts.
   successful prop bails around the single miss. This is the intended "one
   change amid a wall" workload, not a pure single-row-render cost.
 - Vanilla React and Octane JSX `parent_rerender_equal` include recreating or
-  reconciling 1000 row descriptions. Auto-memoized Octane TSRX and React
-  Compiler stop at inferred calculation/output dependencies. The
+  reconciling 1000 row descriptions. Auto-memoized Octane TSRX stops at wall
+  A's inferred region/list dependencies but deliberately rebuilds wall B's
+  descriptors (imported-helper output caching is a later phase), while React
+  Compiler caches both the `.map` and the imported helper call. The
   cross-framework ratio is the honest end-to-end cost of each production
   compiler, not an instruction-level apples-to-apples comparison.
 - `mount` covers BOTH walls (2000 rows + providers), not 1000.

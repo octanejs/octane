@@ -14,8 +14,6 @@ export interface OctanePluginOptions {
 	hmr?: boolean;
 	/** Enable component profiling in client transforms. */
 	profile?: boolean;
-	/** Enable or disable default production dependency-scoped component/calculation memoization. */
-	autoMemo?: boolean;
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.
