@@ -628,6 +628,14 @@ root.
 
 ### Milestone 7 — client-only Canvas SSR and hydration (2–3 engineer-weeks)
 
+Status: implemented. The concrete Three boundary now streams its DOM shell and
+native canvas fallback while the server compiler omits scene execution.
+Production Vite and Rsbuild builds retain stable client-reference identity,
+adopt the server shell, and create one client Three root; raw Rspack proves the
+same client/server graph classification without claiming an application SSR
+lifecycle. Browser evidence covers pending/error projection and deterministic
+teardown after hydration.
+
 - Implement the concrete Three `Canvas` server shell and omitted child region,
   client chunk linkage, hydration adoption, streaming fallback, error/pending
   projection, and teardown.

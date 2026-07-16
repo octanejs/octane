@@ -51,6 +51,13 @@ events bubble through physical Three ancestry. Octane's universal portal range
 retains logical context, error, effect, and scheduling ownership without
 embedding React Reconciler or representing the target as a fake host child.
 
+Milestone 7 follows the pinned web `Canvas` contract: the server emits the
+ordinary DOM wrapper, canvas, and native fallback while omitting Three children.
+Hydration adopts those DOM nodes, then positive client measurement creates one
+fresh Three root. Scene setup, constructors, and loaders remain outside the
+server execution path; client Three suspension and errors project through the
+owning DOM boundary, and deleting the Canvas tears down the nested root.
+
 ## License provenance
 
 React Three Fiber is MIT-licensed, Copyright 2019–2025 Poimandres. Adapted
