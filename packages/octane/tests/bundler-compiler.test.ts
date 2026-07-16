@@ -427,8 +427,16 @@ describe('bundler-neutral compiler integration', () => {
 				JSON.stringify({
 					name: 'raw-octane',
 					main: 'index.js',
+					dependencies: { 'singleton-core': '1.0.0' },
 					peerDependencies: { octane: '*' },
 					optionalDependencies: { 'missing-child': '1.0.0' },
+					octane: {
+						vite: {
+							optimizeDeps: {
+								exclude: ['singleton-core', 'singleton-core', '', ' padded ', 42],
+							},
+						},
+					},
 				}),
 			);
 			writeFileSync(join(packageRoot, 'index.js'), 'export const value = 1;\n');
@@ -436,6 +444,7 @@ describe('bundler-neutral compiler integration', () => {
 			const discovered = createOctaneCompiler({ root }).discoverSourceDependencies();
 			const resolvedPackageRoot = realpathSync(packageRoot);
 			expect(discovered.packages).toEqual(['raw-octane']);
+			expect(discovered.viteOptimizeDepsExclusions).toEqual(['singleton-core']);
 			expect(discovered.dependencies).toEqual(
 				expect.arrayContaining([projectManifest, join(resolvedPackageRoot, 'package.json')]),
 			);

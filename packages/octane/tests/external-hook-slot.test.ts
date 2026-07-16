@@ -193,6 +193,33 @@ describe('vite plugin gate routing', () => {
 		expect(config.resolve.dedupe).toContain('octane');
 	});
 
+	it('honors source-package Vite exclusions without rebasing dependency resolution', () => {
+		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-vite-exclusions-'));
+		try {
+			writeFileSync(
+				join(fixtureRoot, 'package.json'),
+				JSON.stringify({
+					name: 'binding-only-consumer',
+					private: true,
+					dependencies: { '@octanejs/lexical': '0.1.6' },
+				}),
+			);
+			const scope = join(fixtureRoot, 'node_modules/@octanejs');
+			mkdirSync(scope, { recursive: true });
+			symlinkSync(join(process.cwd(), 'packages/lexical'), join(scope, 'lexical'), 'dir');
+
+			const config = (octane().config as any)({ root: fixtureRoot });
+			expect(config.optimizeDeps.exclude).toEqual(
+				expect.arrayContaining(['@octanejs/lexical', 'lexical']),
+			);
+			expect(config.resolve.dedupe).toEqual(['octane']);
+			expect(config.ssr.noExternal).toContain('@octanejs/lexical');
+			expect(config.ssr.noExternal).not.toContain('lexical');
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
 	it('forwards declarative renderer selection through the direct Vite adapter', () => {
 		const rendererPlugin = octane({
 			hmr: false,

@@ -11,6 +11,13 @@
       "manual": [
         "src"
       ]
+    },
+    "vite": {
+      "optimizeDeps": {
+        "exclude": [
+          "lexical"
+        ]
+      }
     }
   },
   "description": "Lexical bindings for the octane renderer — reuses the framework-agnostic @lexical/* core and reimplements the @lexical/react layer on octane's hooks.",

@@ -123,7 +123,11 @@ export function octane(options = {}) {
 		config(config) {
 			assertProfilingDefineAvailable(config.define, profileEnabled);
 			resetCompiler(config.root ?? process.cwd());
-			const sourceDependencies = compiler.discoverSourceDependencies().packages;
+			const discovery = compiler.discoverSourceDependencies();
+			const sourceDependencies = discovery.packages;
+			const optimizeDepsExclusions = [
+				...new Set([...sourceDependencies, ...discovery.viteOptimizeDepsExclusions]),
+			].sort();
 			return {
 				// The runtime uses this reserved constant to make normal builds erase
 				// profiling branches completely. Keep it defined in both modes so Vite's
@@ -132,9 +136,10 @@ export function octane(options = {}) {
 					__OCTANE_PROFILE_ENABLED__: JSON.stringify(profileEnabled),
 				},
 				// Raw Octane dependencies must reach this plugin, never esbuild's dep
-				// prebundle or Node's SSR external loader. Dedupe the runtime as an
-				// additional guard for linked/local package layouts.
-				optimizeDeps: { exclude: sourceDependencies },
+				// prebundle or Node's SSR external loader. A raw package can also declare
+				// dependencies that must stay out of Vite's rolling optimizer; this keeps
+				// module-identity-sensitive packages from mixing cold-crawl generations.
+				optimizeDeps: { exclude: optimizeDepsExclusions },
 				resolve: { dedupe: ['octane'] },
 				ssr: { noExternal: sourceDependencies },
 			};

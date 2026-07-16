@@ -1,0 +1,28 @@
+{
+  "name": "pagecraft-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A document workspace built with Octane and @octanejs/lexical, exercising deep links, rich-text selection, versioned autosave, and failure recovery.",
+  "scripts": {
+    "dev": "node server.mjs",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build && PAGECRAFT_DIST=1 playwright test --config e2e/playwright.config.ts && PAGECRAFT_COLD_DEV=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "PAGECRAFT_COLD_DEV=1 playwright test --config e2e/playwright.config.ts"
+  },
+  "dependencies": {
+    "@lexical/list": "catalog:default",
+    "@lexical/rich-text": "catalog:default",
+    "@lexical/selection": "catalog:default",
+    "@octanejs/lexical": "workspace:*",
+    "lexical": "catalog:default",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

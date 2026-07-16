@@ -55,6 +55,26 @@ normal client-only SPA behavior intact, including its `import.meta.hot` HMR
 dialect. Add an Octane config with routes to activate the full app layer:
 routing, streaming SSR, hydration, production client/server builds, and preview.
 
+Raw-source Octane packages are discovered recursively. A binding whose dependency
+must stay outside Vite's rolling dependency optimizer can declare that package-owned
+constraint in its manifest:
+
+```json
+{
+	"octane": {
+		"vite": {
+			"optimizeDeps": {
+				"exclude": ["identity-sensitive-core"]
+			}
+		}
+	}
+}
+```
+
+The Vite adapter adds those entries to `optimizeDeps.exclude` automatically. This
+metadata is for raw binding authors; applications consuming the binding do not need
+to repeat it in `vite.config.ts`.
+
 <h2 id="rspack">Rspack</h2>
 
 The Rspack package is deliberately low-level. It compiles `.tsrx`, eligible

@@ -2278,11 +2278,52 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  examples/draftboard:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   examples/flowboard:
     dependencies:
       '@octanejs/dnd-kit':
         specifier: workspace:*
         version: link:../../packages/dnd-kit
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/gridlab:
+    dependencies:
+      '@octanejs/tanstack-virtual':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-virtual
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -2349,6 +2390,40 @@ importers:
         specifier: catalog:default
         version: 0.46.0(typescript@5.9.3)
       '@lexical/table':
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      '@octanejs/lexical':
+        specifier: workspace:*
+        version: link:../../packages/lexical
+      lexical:
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+    devDependencies:
+      '@playwright/test':
+        specifier: catalog:default
+        version: 1.61.0
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
+  examples/pagecraft:
+    dependencies:
+      '@lexical/list':
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      '@lexical/rich-text':
+        specifier: catalog:default
+        version: 0.46.0(typescript@5.9.3)
+      '@lexical/selection':
         specifier: catalog:default
         version: 0.46.0(typescript@5.9.3)
       '@octanejs/lexical':

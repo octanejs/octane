@@ -89,6 +89,21 @@ function packageUsesOctane(pkg) {
 	);
 }
 
+function packageViteOptimizeDepsExclusions(pkg) {
+	const configured = pkg.octane?.vite?.optimizeDeps?.exclude;
+	if (!Array.isArray(configured)) return [];
+	return [
+		...new Set(
+			configured.filter(
+				(dependency) =>
+					typeof dependency === 'string' &&
+					dependency.length > 0 &&
+					dependency.trim() === dependency,
+			),
+		),
+	];
+}
+
 function metadata(dependencies = [], missingDependencies = []) {
 	return { dependencies, missingDependencies };
 }
@@ -238,6 +253,7 @@ class OctaneBundlerCompiler {
 						...Object.keys(pkg.dependencies ?? {}),
 						...Object.keys(pkg.optionalDependencies ?? {}),
 					],
+					viteOptimizeDepsExclusions: packageViteOptimizeDepsExclusions(pkg),
 					usesOctane: packageUsesOctane(pkg),
 				},
 				...metadata([manifest]),
@@ -359,7 +375,11 @@ class OctaneBundlerCompiler {
 		} catch {
 			if (existsSync(projectManifestPath)) collected.dependencies.add(projectManifestPath);
 			else collected.missingDependencies.add(projectManifestPath);
-			this.discoveryCache = { packages: [], ...finishMetadata(collected) };
+			this.discoveryCache = {
+				packages: [],
+				viteOptimizeDepsExclusions: [],
+				...finishMetadata(collected),
+			};
 			return this.discoveryCache;
 		}
 
@@ -368,6 +388,7 @@ class OctaneBundlerCompiler {
 			for (const name of Object.keys(projectManifest[field] ?? {})) dependencyNames.add(name);
 		}
 		const sourceDependencies = new Set();
+		const viteOptimizeDepsExclusions = new Set();
 		const visitedPackageRoots = new Set();
 		const visit = (name, issuerRoot) => {
 			const packageRequire = createRequire(join(issuerRoot, 'package.json'));
@@ -377,6 +398,9 @@ class OctaneBundlerCompiler {
 				addMetadata(collected, lookup);
 				if (!lookup.rule?.usesOctane) return;
 				sourceDependencies.add(name);
+				for (const dependency of lookup.rule.viteOptimizeDepsExclusions) {
+					viteOptimizeDepsExclusions.add(dependency);
+				}
 				let packageRoot = lookup.rule.root;
 				try {
 					packageRoot = realpathSync(packageRoot);
@@ -408,6 +432,7 @@ class OctaneBundlerCompiler {
 
 		this.discoveryCache = {
 			packages: [...sourceDependencies].sort(),
+			viteOptimizeDepsExclusions: [...viteOptimizeDepsExclusions].sort(),
 			...finishMetadata(collected),
 		};
 		return this.discoveryCache;
