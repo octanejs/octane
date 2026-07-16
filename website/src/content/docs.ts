@@ -8,6 +8,7 @@ import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
 import Bindings from './docs/bindings.mdx';
 import Profiling from './docs/profiling.mdx';
+import { BINDING_CATEGORIES, BINDING_COUNT } from './bindings.ts';
 
 export interface DocEntry {
 	slug: string;
@@ -15,6 +16,7 @@ export interface DocEntry {
 	description: string;
 	group: 'Start here' | 'Learn Octane' | 'Explore';
 	sections?: readonly DocSection[];
+	searchTerms?: readonly string[];
 	component: (props?: Record<string, unknown>) => unknown;
 }
 
@@ -122,8 +124,13 @@ export const docs: DocEntry[] = [
 	{
 		slug: 'bindings',
 		title: 'Bindings',
-		description: 'Find Octane bindings for state, data fetching, routing, UI, forms, and more.',
+		description: `Browse all ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,
 		group: 'Explore',
+		searchTerms: BINDING_CATEGORIES.flatMap((category) => [
+			category.title,
+			category.description,
+			...category.packages,
+		]),
 		sections: [
 			{ id: 'find-a-binding', title: 'Find a binding' },
 			{ id: 'install-and-use', title: 'Install and use' },

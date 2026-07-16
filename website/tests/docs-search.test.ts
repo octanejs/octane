@@ -85,6 +85,16 @@ describe('docs search ranking', () => {
 		expect(top.id).toBe('install');
 	});
 
+	it('finds packages supplied by the curated bindings directory', async () => {
+		const index = await loadSearchIndex();
+		const [top] = searchDocs(index, '@octanejs/dexie');
+		const snippets = top.lines.map((line) => line.parts.map((part) => part.text).join(''));
+
+		expect(top.slug).toBe('bindings');
+		expect(top.id).toBe('find-a-binding');
+		expect(snippets.join(' ')).toContain('@octanejs/dexie');
+	});
+
 	it('requires every term to match, and ignores queries shorter than two characters', async () => {
 		const index = await loadSearchIndex();
 
