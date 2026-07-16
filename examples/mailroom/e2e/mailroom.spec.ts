@@ -173,7 +173,15 @@ test('resets the editor between draft routes and updates one draft across repeat
 	await page.getByRole('link', { name: 'Compose', exact: true }).click();
 	const dialog = page.getByRole('dialog', { name: 'Leave this draft?' });
 	await expect(dialog).toBeVisible();
-	await dialog.getByRole('button', { name: 'Discard changes' }).click();
+	const keepWriting = dialog.getByRole('button', { name: 'Keep writing' });
+	const discardChanges = dialog.getByRole('button', { name: 'Discard changes' });
+	await expect(keepWriting).toBeFocused();
+	await page.keyboard.press('Tab');
+	await expect(discardChanges).toBeFocused();
+	await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+	await expect(page.getByRole('button', { name: 'Queue for later' })).toBeVisible();
+	await expect(discardChanges).toBeFocused();
+	await discardChanges.press('Enter');
 	await expect(page).toHaveURL(new RegExp(`/compose/new[?]session=${session}$`));
 	await expect(recipient).toHaveValue('');
 	await expect(subject).toHaveValue('');

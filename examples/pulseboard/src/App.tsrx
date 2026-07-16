@@ -737,9 +737,11 @@ export function App() @{
 	const refreshFailurePendingRef = useRef(scenarioSet().has('refresh-failure'));
 	const loadTimerRef = useRef<number | null>(null);
 	const rangeGenerationRef = useRef(0);
+	const rangeTimerRef = useRef<number | null>(null);
 	const refreshGenerationRef = useRef(0);
 	const mobileNavigationButtonRef = useRef<HTMLButtonElement | null>(null);
 	const normalizedSearchQuery = globalSearchQuery.trim().toLowerCase();
+	const trendPoints = useMemo(() => trendFor(view, range), [view, range]);
 	const searchResults =
 		normalizedSearchQuery === ''
 			? []
@@ -767,6 +769,12 @@ export function App() @{
 	useEffect(() => {
 		loadDashboard();
 		const onPopState = () => {
+			rangeGenerationRef.current += 1;
+			if (rangeTimerRef.current !== null) {
+				window.clearTimeout(rangeTimerRef.current);
+				rangeTimerRef.current = null;
+			}
+			setPendingRange(null);
 			setView(readView());
 			setRange(readRange());
 		};
@@ -774,6 +782,7 @@ export function App() @{
 		return () => {
 			window.removeEventListener('popstate', onPopState);
 			if (loadTimerRef.current !== null) window.clearTimeout(loadTimerRef.current);
+			if (rangeTimerRef.current !== null) window.clearTimeout(rangeTimerRef.current);
 		};
 	}, []);
 
@@ -807,6 +816,7 @@ export function App() @{
 	};
 
 	const changeRange = (nextRange: DateRange) => {
+		if (rangeTimerRef.current !== null) window.clearTimeout(rangeTimerRef.current);
 		const generation = ++rangeGenerationRef.current;
 		setPendingRange(nextRange);
 		const delay =
@@ -815,8 +825,9 @@ export function App() @{
 				: generation % 3 === 2
 					? 150
 					: 70;
-		window.setTimeout(() => {
+		rangeTimerRef.current = window.setTimeout(() => {
 			if (generation !== rangeGenerationRef.current) return;
+			rangeTimerRef.current = null;
 			setRange(nextRange);
 			setPendingRange(null);
 			history.replaceState(null, '', hrefFor(readView(), nextRange));
@@ -1001,7 +1012,7 @@ export function App() @{
 							<MetricCards view={view} />
 							<div class="dashboard-grid">
 								<TrendPanel
-									points={trendFor(view, range)}
+									points={trendPoints}
 									range={range}
 									pendingRange={pendingRange}
 									onRange={changeRange}

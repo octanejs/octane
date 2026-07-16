@@ -128,9 +128,21 @@ test('supports compact keyboard chart exploration while rapid range requests con
 		'3,268 visitors',
 	);
 	await page.keyboard.press('ArrowRight');
-	await expect(
-		chart.getByRole('button', { name: 'Jul 10: 3,342 visitors, 260 conversions' }),
-	).toBeFocused();
+	const secondPoint = chart.getByRole('button', {
+		name: 'Jul 10: 3,342 visitors, 260 conversions',
+	});
+	await expect(secondPoint).toBeFocused();
+
+	const notifications = page.locator('button[aria-controls="pulseboard-notifications"]');
+	await notifications.evaluate((button: HTMLButtonElement) => button.click());
+	await expect(page.getByRole('region', { name: 'Notifications' })).toBeVisible();
+	await expect(secondPoint).toBeFocused();
+	await expect(secondPoint).toHaveAttribute('tabindex', '0');
+	await expect(page.getByRole('status').filter({ hasText: 'Jul 10' })).toContainText(
+		'3,342 visitors',
+	);
+	await notifications.evaluate((button: HTMLButtonElement) => button.click());
+	await expect(page.getByRole('region', { name: 'Notifications' })).toHaveCount(0);
 
 	const thirtyDays = page.getByRole('button', { name: '30 days' });
 	const sevenDays = page.getByRole('button', { name: '7 days' });
@@ -147,6 +159,40 @@ test('supports compact keyboard chart exploration while rapid range requests con
 	await expect(page.getByRole('status').filter({ hasText: 'Jul 15' })).toContainText(
 		'3,824 visitors',
 	);
+});
+
+test('browser history cancels a pending range request and keeps the restored report authoritative', async ({
+	page,
+}) => {
+	await openDashboard(page);
+	await page.getByRole('link', { name: 'Revenue' }).click();
+	await expect(page).toHaveURL(/\/workspaces\/northstar\/revenue\?range=7d$/);
+
+	await page.getByRole('button', { name: '30 days' }).click();
+	await expect(
+		page.getByRole('status').filter({ hasText: 'Loading the 30-day window' }),
+	).toBeVisible();
+	await page.goBack();
+
+	await expect(page).toHaveURL(/\/workspaces\/northstar\/overview\?range=7d$/);
+	await expect(page.getByRole('heading', { name: 'Growth overview' })).toBeVisible();
+	await expect(page.getByRole('button', { name: '7 days' })).toHaveAttribute(
+		'aria-pressed',
+		'true',
+	);
+	await expect(page.getByRole('status').filter({ hasText: /Loading the .* window/ })).toHaveCount(
+		0,
+	);
+
+	// The abandoned request must not mutate the history entry after its delayed work settles.
+	await page.evaluate(() => new Promise<void>((resolve) => window.setTimeout(resolve, 350)));
+	await expect(page).toHaveURL(/\/workspaces\/northstar\/overview\?range=7d$/);
+	await expect(page.getByRole('group', { name: 'Visitors trend, last 7 days' })).toBeVisible();
+
+	await page.goForward();
+	await expect(page).toHaveURL(/\/workspaces\/northstar\/revenue\?range=7d$/);
+	await page.goBack();
+	await expect(page).toHaveURL(/\/workspaces\/northstar\/overview\?range=7d$/);
 });
 
 test('sorts, filters, selects, and recovers the accessible campaign report', async ({ page }) => {

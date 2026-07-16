@@ -458,7 +458,7 @@ function Compose() {
 
 	useEffect(() => {
 		if (blocker.state === 'blocked') stayRef.current?.focus();
-	});
+	}, [blocker.state]);
 
 	useEffect(() => {
 		const result = fetcher.data as MailActionResult | undefined;
