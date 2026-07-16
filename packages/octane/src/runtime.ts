@@ -332,6 +332,21 @@ function warnHydrationValueMismatch(
 	);
 }
 
+function warnHydrationKeptServerValue(
+	loc: string | undefined,
+	what: string,
+	serverVal: unknown,
+	clientVal: unknown,
+): void {
+	if (process.env.NODE_ENV === 'production' || !loc) return;
+	console.error(
+		`Octane hydration mismatch at ${loc}: server rendered ${what} ` +
+			`${JSON.stringify(serverVal)} but the client rendered ${JSON.stringify(clientVal)}. ` +
+			'The server value was kept. If this difference is intentional, add ' +
+			'suppressHydrationWarning to the element.',
+	);
+}
+
 /** DEV-only human-readable description of the server node at the cursor (for warnings). */
 function describeHydrationNode(node: Node | null): string {
 	if (node === null) return 'nothing';
@@ -1639,6 +1654,50 @@ function blockDepth(b: Block): number {
 	let d = 0;
 	for (let p = b.parentBlock; p !== null; p = p.parentBlock) d++;
 	return d;
+}
+
+function belongsToBlockTree(block: Block, root: Block): boolean {
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		if (current === root) return true;
+	}
+	return false;
+}
+
+/**
+ * Hydration is one synchronous commit. A render-phase state update must therefore
+ * replay before adoption finishes; otherwise the first attempt compares its
+ * throwaway value against converged server HTML and publishes a false mismatch.
+ * Drain only this root's queued descendants, leaving pre-existing work for other
+ * roots in the ordinary scheduler queue.
+ */
+function drainHydrationRenderPhaseUpdates(root: Block): void {
+	let renders: Map<Block, number> | null = null;
+	for (;;) {
+		let index = -1;
+		for (let i = 0; i < QUEUE.length; i++) {
+			if (belongsToBlockTree(QUEUE[i], root)) {
+				index = i;
+				break;
+			}
+		}
+		if (index === -1) return;
+		const block = QUEUE.splice(index, 1)[0];
+		if (!block.pending || block.disposed) continue;
+
+		const seen = (renders ??= new Map()).get(block) ?? 0;
+		if (seen >= RENDER_PHASE_UPDATE_LIMIT) {
+			throw new Error(
+				'Too many re-renders. Octane limits the number of renders to prevent an infinite loop.',
+			);
+		}
+		renders.set(block, seen + 1);
+		block.crossRenderUpdate = false;
+		try {
+			renderBlock(block);
+		} catch (error) {
+			handleRenderError(block, error);
+		}
+	}
 }
 
 // Sort a render wave shallow-first (ancestors before descendants). If A is an
@@ -4589,6 +4648,7 @@ export const ViewTransition: ComponentBody<ViewTransitionProps> = (props, scope)
  * `@try { … } @catch (e) { fallback }`. `fallback` is either a renderable or a
  * `(error, reset) => renderable` render prop (react-error-boundary style). When a
  * descendant throws during render/effects, the boundary swaps to the fallback.
+ * Suspensions propagate to an enclosing Suspense boundary instead.
  */
 export const ErrorBoundary: ComponentBody<{
 	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
@@ -4613,6 +4673,8 @@ export const ErrorBoundary: ComponentBody<{
 		catchBody,
 		null,
 		block.endMarker,
+		undefined,
+		true,
 	);
 };
 
@@ -5508,6 +5570,11 @@ interface PendingHydrationClassWrite {
 	remove: boolean;
 }
 
+interface PendingHydrationTextWarning {
+	loc: string | undefined;
+	server: string | null;
+}
+
 let currentHydration: HydrationCapability | null = null;
 
 function activeHydration(): HydrationCapability | null {
@@ -5542,6 +5609,7 @@ class HydrationCapability {
 	readonly deferredActivities: Array<() => void> = [];
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	readonly classWrites = new Map<Element, PendingHydrationClassWrite>();
+	private readonly textWarnings = new Map<Text, PendingHydrationTextWarning>();
 
 	constructor(
 		readonly rootBlock: Block,
@@ -5605,6 +5673,24 @@ class HydrationCapability {
 
 	warnStructural(loc: string | undefined, expected: string, actual: string): void {
 		warnHydrationStructuralMismatch(loc, expected, actual);
+	}
+
+	recordTextMismatch(node: Text, loc: string | undefined, server: string | null): void {
+		if (!this.textWarnings.has(node)) this.textWarnings.set(node, { loc, server });
+	}
+
+	flushTextWarnings(): void {
+		for (const [node, pending] of this.textWarnings) {
+			// A render-phase replay can replace the first attempt's text node before
+			// hydration converges. Detached attempts are not observable output and must
+			// not publish a mismatch after the final live tree has matched the server.
+			if (!this.rootBlock.parentNode.contains(node)) continue;
+			const client = node.nodeValue;
+			if (pending.server !== client) {
+				warnHydrationValueMismatch(pending.loc, 'text', pending.server, client);
+			}
+		}
+		this.textWarnings.clear();
 	}
 
 	removeRange(start: Node, end: Node): void {
@@ -5827,7 +5913,7 @@ class HydrationCapability {
 			const server = (first as Text).nodeValue;
 			if (server !== text && !isCRLFNormalizedMatch(server, text) && !isHydrationSuppressed(el)) {
 				if (process.env.NODE_ENV !== 'production')
-					warnHydrationValueMismatch(loc || (el as any).__oct_loc, 'text', server, text);
+					this.recordTextMismatch(first as Text, loc || (el as any).__oct_loc, server);
 				(first as Text).nodeValue = text;
 			}
 			return first as Text;
@@ -5844,13 +5930,27 @@ class HydrationCapability {
 				const host = posNode.parentNode;
 				if (!isHydrationSuppressed(host)) {
 					if (process.env.NODE_ENV !== 'production')
-						warnHydrationValueMismatch(host && (host as any).__oct_loc, 'text', server, text);
+						this.recordTextMismatch(posNode as Text, host && (host as any).__oct_loc, server);
 					(posNode as Text).nodeValue = text;
 				}
 			}
 			return posNode as Text;
 		}
-		const created = document.createTextNode(text);
+		const host = posNode?.parentNode ?? null;
+		const suppressed = isHydrationSuppressed(host);
+		// A non-empty client text binding where the server has no text node is a
+		// structural mismatch, just like an extra client element. Build the client
+		// text so recovery succeeds, but publish the normal dev diagnostic. A
+		// suppressed host keeps the absent server value by installing only an empty
+		// tracking node; later real commits can update that node normally.
+		if (text !== '' && !suppressed && process.env.NODE_ENV !== 'production') {
+			warnHydrationStructuralMismatch(
+				host && (host as any).__oct_loc,
+				`text ${JSON.stringify(text)}`,
+				describeHydrationNode(posNode),
+			);
+		}
+		const created = document.createTextNode(suppressed ? '' : text);
 		if (posNode !== null && posNode.parentNode !== null) {
 			posNode.parentNode.insertBefore(created, posNode);
 		}
@@ -5933,15 +6033,30 @@ class HydrationCapability {
 		}
 	}
 
-	applyStyle(el: HTMLElement | SVGElement, value: any, prev: any): boolean {
+	applyStyle(el: HTMLElement | SVGElement, value: any, _prev: any): boolean {
 		const mode = hydrationMismatchMode(el);
 		if (mode === 1) return true;
-		if (mode !== 2) return false;
 		const style = (el as HTMLElement).style;
+		const hadStyleAttribute = el.hasAttribute('style');
 		const before = style.cssText;
-		applyStyleValue(style, value, prev);
-		if (style.cssText !== before && process.env.NODE_ENV !== 'production') {
-			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, style.cssText);
+		// A hydration write describes the COMPLETE client style, while `prev` is
+		// only the client compiler's uninitialized slot value. Diffing against that
+		// slot leaves server-only declarations behind (`{width: 1}` -> `{}` / null)
+		// and cannot observe declaration-order differences. First serialize the
+		// complete client value through detached CSSOM. Comparing canonical cssText
+		// preserves the server's original attribute bytes when declarations are
+		// semantically and order-equivalent (`#fff` vs rgb(), compact whitespace),
+		// while still detecting reordered, missing, added, and empty styles.
+		const expectedStyle = document.createElement('div').style;
+		applyStyleValue(expectedStyle, value, undefined);
+		const expected = expectedStyle.cssText;
+		const expectsStyleAttribute = expected !== '';
+		if (before === expected && hadStyleAttribute === expectsStyleAttribute) return true;
+
+		if (expectsStyleAttribute) style.cssText = expected;
+		else el.removeAttribute('style');
+		if (mode === 2 && process.env.NODE_ENV !== 'production') {
+			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, expected);
 		}
 		return true;
 	}
@@ -6332,6 +6447,25 @@ export function setText(node: Text, value: any): void {
  */
 export function setScriptText(el: Element, value: any): void {
 	el.textContent = value == null ? '' : String(value);
+}
+
+/** React-compatible hydration for `dangerouslySetInnerHTML`. */
+export function setHTML(el: Element, value: any): void {
+	const next = value == null ? '' : String(value);
+	const hydration = activeHydration();
+	if (hydration !== null && !hydration.isFresh(el)) {
+		const server = el.localName === 'script' ? (el.textContent ?? '') : el.innerHTML;
+		if (server === next || isHydrationSuppressed(el)) return;
+		warnHydrationKeptServerValue(
+			(el as any).__oct_loc,
+			'`dangerouslySetInnerHTML` content',
+			server,
+			next,
+		);
+		return;
+	}
+	if (el.localName === 'script') setScriptText(el, next);
+	else el.innerHTML = next;
 }
 
 // Apply a ref attachment. Accepts the three supported shapes:
@@ -6956,8 +7090,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		const html = value == null ? null : value.__html;
 		// `__html: false` renders 'false' (React coerces; only null/undefined clear) —
 		// keeps this path consistent with the compiled htmlOnlyChild path.
-		if (el.localName === 'script') setScriptText(el, html);
-		else el.innerHTML = html == null ? '' : String(html);
+		setHTML(el, html);
 		return;
 	}
 	// Never a DOM attribute — a React warning-suppression hint (octane doesn't emit
@@ -7335,13 +7468,10 @@ const IMPORTANT_SUFFIX = '!important';
 
 export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): void {
 	const style = (el as HTMLElement).style;
-	// Hydration VALUE-mismatch detection for `style`: apply the client value (patches for
-	// free, as with attributes) then, in dev, warn if it actually changed the adopted server
-	// style. The before/after `cssText` compare needs no manual serialization and no-ops when
-	// the styles match. `suppressHydrationWarning` keeps the server style + suppresses.
-	// `hydrationMismatchMode` gates the compare exactly like the attribute/class sites, so a
-	// non-suppressed prod hydration pays no cssText serialization for the (loc-gated,
-	// guaranteed-no-op) warning.
+	// Hydration treats the authored style as a complete value: rebuild it once so
+	// server-only declarations and an empty server style attribute cannot survive.
+	// In dev, compare the before/after cssText and diagnose a real difference;
+	// `suppressHydrationWarning` keeps the complete server style unchanged.
 	const hydration = activeHydration();
 	if (hydration !== null && hydration.applyStyle(el, value, prev)) return;
 	applyStyleValue(style, value, prev);
@@ -7480,8 +7610,7 @@ function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, null, prevValue);
 	} else if (name === 'dangerouslySetInnerHTML') {
-		if (el.localName === 'script') setScriptText(el, null);
-		else el.innerHTML = '';
+		setHTML(el, null);
 	} else if (name === 'suppressHydrationWarning') {
 		(el as any).__oct_suppress = false;
 	} else {
@@ -9975,6 +10104,28 @@ function componentSlotImpl(
 ): void {
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
+	// A component nested inside a client-built replacement range must mount as
+	// ordinary client DOM. Its fresh anchor is not server output to adopt; keep
+	// the outer hydration cursor active for later server-owned siblings while
+	// suspending adoption only for this component subtree.
+	if (hydration !== null && anchor != null && hydration.isFresh(anchor)) {
+		hydration.suspend(() =>
+			componentSlotImpl(
+				outputHandler,
+				parentScope,
+				slotKey,
+				domParent,
+				comp,
+				props,
+				anchor,
+				key,
+				singleRoot,
+				inherit,
+				hasKey,
+			),
+		);
+		return;
+	}
 	// A STRING comp: a dynamic JSX tag — `<props.parts.title>`, `<Tag/>` with
 	// `const Tag = 'h1'`, `<{expr}/>` — that resolved to a HOST tag name at
 	// runtime. Render it as a host element through `hostStringTagBody`: the
@@ -10044,8 +10195,10 @@ function componentSlotImpl(
 		// by consulting the parked cursor (host.firstChild for the first appended
 		// child; the cursor is already on the open marker otherwise).
 		let open: Node | null = null;
+		let hydrationCursor: Node | null = null;
 		if (!inherited && hydration !== null && hydration.isOpen(anchor ?? null)) {
 			open = anchor as Node;
+			hydrationCursor = open;
 		} else if (!inherited && hydration !== null && !hydration.isOpen(anchor ?? null)) {
 			// The anchor is null (appended child) or a non-open marker (the slot is the
 			// sole hole of a control-flow arm, so its anchor is the arm's end marker).
@@ -10053,6 +10206,7 @@ function componentSlotImpl(
 			// `<!--[-->`; adopt from it, the same way childSlot's cursor branch does.
 			let c: Node | null = hydration.node;
 			if (c === null || c.parentNode !== domParent) c = domParent.firstChild;
+			hydrationCursor = c;
 			if (c !== null && hydration.isOpen(c)) open = c;
 		}
 		if (inherited) {
@@ -10072,6 +10226,25 @@ function componentSlotImpl(
 			start = null;
 			end = null;
 		} else {
+			if (hydration !== null) {
+				// A non-single-root component requires the server's component range.
+				// If it is absent, the server rendered a different child shape (most
+				// importantly a DOM node where the client function returns null). Own
+				// the slot up to its next static anchor, discard that stale range, and
+				// park hydration on the fresh close marker so the client body builds
+				// rather than adopting an unrelated sibling.
+				const stale = hydrationCursor;
+				const loc = siteLoc(parentScope, slotKey);
+				if (process.env.NODE_ENV !== 'production' && loc) {
+					warnHydrationStructuralMismatch(loc, 'a component range', describeHydrationNode(stale));
+				}
+				let node = stale;
+				while (node !== null && node !== anchor && !isBlockClose(node)) {
+					const next = node.nextSibling;
+					(node as ChildNode).remove();
+					node = next;
+				}
+			}
 			start = document.createComment('comp');
 			end = document.createComment('/comp');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
@@ -10079,6 +10252,11 @@ function componentSlotImpl(
 			// and must sit before its enclosing block's endMarker).
 			domParent.insertBefore(start, anchor ?? null);
 			domParent.insertBefore(end, anchor ?? null);
+			if (hydration !== null) {
+				hydration.markFresh(start);
+				hydration.markFresh(end);
+				hydration.node = end;
+			}
 		}
 		state = {
 			__kind: 'componentSlotSlot',
@@ -11480,6 +11658,13 @@ function descNeedsBlocks(value: any): boolean {
 		}
 		return false;
 	}
+	// A host descriptor can contain a re-iterable collection or a one-shot
+	// iterator as its positional children. Route it through hostElementBody so
+	// childSlot materializes the iterable exactly once and reconciles its values
+	// as a keyed list. The raw host reconciler treats unknown objects as empty;
+	// consuming here merely to inspect for component descendants would also
+	// exhaust generators before the real render.
+	if (!isElementDescriptor(value) && childrenIterator(value) !== null) return true;
 	if (value.$$kind === ELEMENT_TAG) {
 		// A Fragment descriptor is reconciled by childSlot's fragment-aware list
 		// path. If it appears below a host descriptor, keep that host on the Block
@@ -12977,6 +13162,12 @@ interface TrySlot {
 	catchBody: ComponentBody | null;
 	pendingBody: ComponentBody | null;
 	/**
+	 * JSX ErrorBoundary catches errors but lets suspensions reach an enclosing
+	 * Suspense boundary. Compiler-authored @try blocks keep their existing
+	 * no-@pending behavior when this is false.
+	 */
+	propagateSuspense: boolean;
+	/**
 	 * Hoisted-helper env tuple (compiled-output Phase 2): the construct's
 	 * captured parent locals, shared by the try/pending/catch helpers and
 	 * refreshed by the compiled call site every parent render. Stamped as
@@ -13036,6 +13227,8 @@ export function tryBlock(
 	anchor?: Node | null,
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see TrySlot.env.
 	env?: any[],
+	// JSX ErrorBoundary must not become a catch-only Suspense boundary.
+	propagateSuspense = false,
 ): void {
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
@@ -13074,6 +13267,7 @@ export function tryBlock(
 			tryBody,
 			catchBody,
 			pendingBody,
+			propagateSuspense,
 			env,
 			hasResolved: false,
 			err: null,
@@ -13092,6 +13286,7 @@ export function tryBlock(
 		state.tryBody = tryBody;
 		state.catchBody = catchBody;
 		state.pendingBody = pendingBody;
+		state.propagateSuspense = propagateSuspense;
 		state.env = env;
 	}
 	const s = state;
@@ -13124,8 +13319,10 @@ export function tryBlock(
 			releaseHeldTransition(s);
 			s.pendingThenable = null;
 		} catch (err) {
-			if (isSuspenseException(err)) handleSuspense(s, err.thenable, s.tryBlock);
-			else switchToCatch(s, err);
+			if (isSuspenseException(err)) {
+				if (s.propagateSuspense) throw err;
+				handleSuspense(s, err.thenable, s.tryBlock);
+			} else switchToCatch(s, err);
 		}
 	} else {
 		mountTry(s);
@@ -13235,9 +13432,11 @@ function mountTry(state: TrySlot): void {
 	(b as any).__trySlot = state;
 	// Register handlers so descendant effect/render errors can find us.
 	(b as any).$$tryHandler = (err: any) => switchToCatch(state, err);
-	(b as any).__suspenseHandler = (thenable: TrackedThenable<any>, sourceBlock: Block) => {
-		handleSuspense(state, thenable, sourceBlock);
-	};
+	if (!state.propagateSuspense) {
+		(b as any).__suspenseHandler = (thenable: TrackedThenable<any>, sourceBlock: Block) => {
+			handleSuspense(state, thenable, sourceBlock);
+		};
+	}
 	state.tryBlock = b;
 	state.block = b;
 	// Install this boundary's streamed seed scope (if any) for the subtree render.
@@ -13252,6 +13451,7 @@ function mountTry(state: TrySlot): void {
 		state.hasResolved = true;
 	} catch (err) {
 		if (isSuspenseException(err)) {
+			if (state.propagateSuspense) throw err;
 			handleSuspense(state, err.thenable, b);
 		} else {
 			const adoptServerCatch = hydration?.isRejection(err) === true;
@@ -17433,6 +17633,7 @@ export function hydrateRoot(
 	currentHydration = hydration;
 	try {
 		renderBlock(rootBlock);
+		drainHydrationRenderPhaseUpdates(rootBlock);
 		// Empty server Activity ranges deliberately had no body to adopt. Mount
 		// those preserved client trees only after every server-rendered sibling has
 		// consumed its useId/seed positions, with hydration suspended for the new DOM.
@@ -17446,6 +17647,10 @@ export function hydrateRoot(
 		// serializes only their final authored value. Resolve the last writer once so
 		// a matching server class is adopted without warnings or transient mutations.
 		hydration.flushClassWrites();
+		// Text diagnostics are deferred until render-phase updates converge. The
+		// final live value is compared with the original server value, so throwaway
+		// render attempts cannot publish false hydration mismatches.
+		hydration.flushTextWarnings();
 		// A server root may contain a matching client prefix followed by stale
 		// siblings. Adoption owns only the complete client shape; discard and report
 		// anything left at the root cursor instead of leaving visible unmanaged DOM.
