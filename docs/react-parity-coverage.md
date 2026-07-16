@@ -11,16 +11,16 @@ This report separates distinct Octane tests, React upstream scenarios, renderer/
 
 | Measure | Count |
 | --- | ---: |
-| Normal core cases | 3,530 |
-| ↳ conformance | 2,079 |
+| Normal core cases | 3,584 |
+| ↳ conformance | 2,075 |
 | ↳ differential | 137 |
 | ↳ hydration | 135 |
-| ↳ other runtime/compiler/SSR | 1,179 |
+| ↳ other runtime/compiler/SSR | 1,237 |
 | Profiling-only cases | 14 |
-| Distinct core cases including profiling | 3,544 |
-| Production-compile reruns of normal core | 3,530 |
-| All workspace executions | 9,807 |
-| React-source-attributed file upper bound | 2,094 cases in 88 files |
+| Distinct core cases including profiling | 3,598 |
+| Production-compile reruns of normal core | 3,584 |
+| All workspace executions | 9,955 |
+| React-source-attributed file upper bound | 2,079 cases in 84 files |
 
 The production project reruns the same normal core cases in another compile mode; it is not another set of conformance ports. The React-source-attributed definition is: Every collected normal-core case in a local file containing at least one React upstream *-test.js or *-test.ts filename citation; this is a generous file-level upper bound, not a one-to-one port count. Counts were measured on 2026-07-16.
 

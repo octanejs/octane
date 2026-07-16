@@ -4,7 +4,7 @@ import { Link } from '@octanejs/tanstack-router';
 export function Proven() @{
 	<section class="proven">
 		<div class="proven-stat">
-			<span class="proven-number">9,800+</span>
+			<span class="proven-number">9,900+</span>
 			<span class="proven-label">
 				{'test executions across the runtime, compiler, SSR and bindings, including ' +
 					'compiler-mode reruns; the core suite has 3,500+ distinct cases. '}

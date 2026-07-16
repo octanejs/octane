@@ -68,6 +68,7 @@ interface SSRScope {
 }
 
 type ParserNamespace = 'html' | 'svg' | 'mathml';
+type AttributeNamespace = ParserNamespace | 'opaque';
 
 // Public string descriptors are HTML-ASCII-case-insensitive. Keep foreign
 // namespace inference on the same contract even though the shared table stores
@@ -1412,6 +1413,13 @@ export function ssrPortal(): string {
 	return EMPTY_COMMENT;
 }
 
+// An `opaque` compiler site inherits the namespace chosen for the component at
+// runtime. Resolve it before applying namespace-sensitive custom-element and
+// native SVG/MathML attribute rules.
+function resolveAttributeNamespace(namespace: AttributeNamespace): ParserNamespace {
+	return namespace === 'opaque' ? (FRAME?.namespace ?? 'html') : namespace;
+}
+
 /**
  * A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit.
  * `tag` and `namespace` (when the emit site knows them) gate the tag-sensitive
@@ -1423,8 +1431,9 @@ export function ssrAttr(
 	name: string,
 	v: unknown,
 	tag?: string,
-	namespace: ParserNamespace = 'html',
+	namespace: AttributeNamespace = 'html',
 ): string {
+	namespace = resolveAttributeNamespace(namespace);
 	const isCustomTag = namespace === 'html' && tag !== undefined && tag.indexOf('-') !== -1;
 	// React-parity aliases (ATTRIBUTE_ALIASES, constants.ts): `htmlFor` → `for`,
 	// `strokeWidth` → `stroke-width`, `xlinkHref` → `xlink:href`, … — serialize
@@ -1559,8 +1568,9 @@ function ssrAttrEntry(
 	k: string,
 	v: unknown,
 	tag?: string,
-	namespace: ParserNamespace = 'html',
+	namespace: AttributeNamespace = 'html',
 ): string {
+	namespace = resolveAttributeNamespace(namespace);
 	if (k === 'key' || k === 'ref' || k === 'children') return '';
 	if (k === 'suppressHydrationWarning' || k === 'suppressContentEditableWarning') return '';
 	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
@@ -1581,8 +1591,9 @@ type SsrAttributeSource = readonly [isSpread: boolean, sourceOrName: unknown, va
 function normalizeSsrAttributeName(
 	name: string,
 	tag: string | undefined,
-	namespace: ParserNamespace,
+	namespace: AttributeNamespace,
 ): string {
+	namespace = resolveAttributeNamespace(namespace);
 	if (name === 'className') return 'class';
 	const isCustom = namespace === 'html' && tag !== undefined && tag.indexOf('-') !== -1;
 	if (!isCustom) return ATTRIBUTE_ALIASES.get(name) ?? name;
@@ -1609,9 +1620,10 @@ function isAggregatedFormAttribute(tag: string | undefined, name: string): boole
 export function ssrAttrs(
 	sources: readonly SsrAttributeSource[],
 	tag?: string,
-	namespace: ParserNamespace = 'html',
+	namespace: AttributeNamespace = 'html',
 	skipFormControls = false,
 ): string {
+	namespace = resolveAttributeNamespace(namespace);
 	interface PropWriter {
 		rawName: string;
 		value: unknown;
@@ -1741,9 +1753,10 @@ export function ssrSpread(
 	obj: unknown,
 	tag?: string,
 	skipClass = false,
-	namespace: ParserNamespace = 'html',
+	namespace: AttributeNamespace = 'html',
 	skipFormControls = false,
 ): string {
+	namespace = resolveAttributeNamespace(namespace);
 	if (obj == null) return '';
 	let out = '';
 	for (const k of Object.keys(Object(obj))) {

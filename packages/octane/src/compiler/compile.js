@@ -171,9 +171,7 @@ const CONTROLLED_KIND_HELPERS = {
 function bakeStaticAttr(attrName, lv, tag, namespace = 'html') {
 	if (lv == null) return '';
 	const isCustom =
-		(namespace === 'html' || namespace === 'opaque') &&
-		tag !== undefined &&
-		tag.includes('-');
+		(namespace === 'html' || namespace === 'opaque') && tag !== undefined && tag.includes('-');
 	const lower = attrName.toLowerCase();
 	// class/className compose clsx-style at every apply site. Literal false/null
 	// drop above/below; every other literal writes the normalized class string.
@@ -1050,11 +1048,7 @@ function normalizeJsxAttrName(raw, tag, namespace = 'html') {
 	// `className` → `class` applies EVERYWHERE, custom elements included (React
 	// special-cases it in setPropOnCustomElement); only the alias table is raw.
 	if (raw === 'className') return 'class';
-	if (
-		(namespace === 'html' || namespace === 'opaque') &&
-		tag !== undefined &&
-		tag.includes('-')
-	)
+	if ((namespace === 'html' || namespace === 'opaque') && tag !== undefined && tag.includes('-'))
 		return raw;
 	return ATTRIBUTE_ALIASES.get(raw) || raw;
 }

@@ -357,19 +357,19 @@
     }
   ],
   "octaneSuiteBaseline": {
-    "normalCoreCases": 3530,
+    "normalCoreCases": 3584,
     "normalCoreBreakdown": {
-      "conformance": 2079,
+      "conformance": 2075,
       "differential": 137,
       "hydration": 135,
-      "other": 1179
+      "other": 1237
     },
     "profilingOnlyCases": 14,
-    "distinctCoreCasesIncludingProfiling": 3544,
-    "productionModeReruns": 3530,
-    "allWorkspaceExecutions": 9807,
-    "reactSourceAttributedFileUpperBound": 2094,
-    "reactSourceAttributedFiles": 88,
+    "distinctCoreCasesIncludingProfiling": 3598,
+    "productionModeReruns": 3584,
+    "allWorkspaceExecutions": 9955,
+    "reactSourceAttributedFileUpperBound": 2079,
+    "reactSourceAttributedFiles": 84,
     "reactSourceAttributedDefinition": "Every collected normal-core case in a local file containing at least one React upstream *-test.js or *-test.ts filename citation; this is a generous file-level upper bound, not a one-to-one port count.",
     "measuredOn": "2026-07-16"
   }
