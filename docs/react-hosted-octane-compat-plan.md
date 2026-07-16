@@ -293,7 +293,16 @@ Lifecycle rules:
    and tears down layout effects.
 7. Dispose on a real unmount. React StrictMode's development setup/cleanup probe
    requires idempotent setup and a cancelable deferred final-dispose check rather
-   than blindly destroying the root in every layout cleanup.
+   than blindly destroying the root in every layout cleanup. The same deferred
+   check is the candidate hide/probe/unmount discriminator: React's deletion
+   removes the host from the document within the same commit, while StrictMode
+   probes and Suspense hiding leave it connected (hidden content keeps its DOM
+   under `display: none`). A post-commit connectivity check on the host —
+   canceled by a new attachment generation — can therefore separate all three
+   without a private signal. Phase 0 must prove this against React 19 commit
+   ordering before it becomes the mechanism, and reconcile it with the external
+   DOM-removal guarantee (a disposed-by-removal island must tolerate a later
+   React commit that still believes the Fiber is alive).
 8. Keep the bridge active until Octane teardown finishes. During actual React
    deletion, an Octane cleanup error cannot be surfaced by scheduling state on the
    deleting controller; `routeError()` should decline it so the synchronous throw
@@ -309,9 +318,9 @@ Octane layout effects, refs, and event activity. Reusing Octane's existing
 Activity/hidden-tree machinery is preferable to inventing another visibility
 model.
 
-Do not use one `useSyncExternalStore` instance per island. One stable React
-invalidation hook owned by the wrapper is sufficient for context discovery and
-status changes.
+Do not allocate a `useSyncExternalStore` subscription object per context entry
+or per store. One stable React invalidation hook per wrapper — a plain state
+bump — is sufficient for context discovery and status changes.
 
 ## 6. Transparent React context
 
@@ -475,6 +484,18 @@ the underlying wakeable. For each pending episode:
    to a precisely tested supersession rule; never retry-spin on an already fulfilled
    relay.
 
+Context changes during a pending episode need their own supersession rule,
+because the normal publish channel is closed: a wrapper re-render that reads
+changed `React.use(context)` values still throws the relay, so it never reaches
+the layout commit that would publish the new snapshot to Octane. The new value
+may be exactly what stops the suspension. Phase 0/3 must choose how a
+changed-snapshot re-render supersedes the episode — complete the wrapper without
+throwing so the snapshot commits (transition-like reveal of the prior Octane
+DOM, with a fresh episode if the retry re-suspends), or an out-of-band
+generation-guarded publish that keeps the fallback up while Octane retries. The
+wrapper must never throw a stale relay while holding a newer snapshot without
+one of these paths recorded.
+
 Every relay/retry callback carries the controller generation and pending-episode
 token. A settlement from a superseded attempt or unmounted island must become a
 no-op. If the current root was disposed after an initial routed suspension, retry
@@ -546,7 +567,11 @@ Add a separate selective hosted-target path:
   listeners.
 - The normative trigger is the first committed event binding in that hosted root,
   so conditionally absent handlers do not install listeners merely because their
-  module was imported.
+  module was imported. Note the current runtime activates at binding time during
+  render (`delegateEvents` is called from the binding path), not at commit;
+  hosted activation must either defer to commit or be idempotent and
+  rollback-tolerant so an abandoned suspended attempt does not leave listeners
+  that the structural counts forbid.
 - A compiler-generated per-body event manifest may optimize the static path if it
   wins measurements, but it must activate only when that body actually mounts and
   cannot replace binding-time handling for dynamic cases.
@@ -572,8 +597,14 @@ Octane's `$$portalParent` repairs Octane's logical event walk, but a portal targ
 outside the React root has no native path through the React wrapper. If cross-root
 portal events must bubble through React, create a React portal-owned subhost lazily
 for that portal target and render Octane inside it. Keep this portal-only machinery
-out of ordinary islands. V1 may instead reject/document external targets until the
-portal bridge has its own design and tests.
+out of ordinary islands. V1 should document rather than reject external targets:
+Octane's own semantics remain fully correct (`$$portalParent` plus portal
+delegation targets keep Octane handlers, propagation, and context intact), and
+body-target portals are pervasive in the existing bindings (radix, floating-ui,
+sonner), so a hard rejection would make most real component libraries unusable
+inside islands. The only loss is React-ancestor visibility of those events —
+identical to any non-React DOM on the page — and the React portal-owned subhost
+remains the future fix where that visibility is required.
 
 ## 9. SSR, React streaming, and hydration
 
@@ -608,6 +639,14 @@ choose one request-safe mechanism:
 - delegation of the root thenable to `React.use(thenable)` while the React server
   dispatcher is active, combined with persistent Octane call-site memo state; or
 - an equivalent request-local replay record.
+
+The `React.use(thenable)` delegation is the leading candidate: Fizz replay state
+is positional (the nth `use()` call in a retried component reuses the nth tracked
+thenable's settled result regardless of the new thenable's identity), so it
+tolerates a fresh Octane pass per replay provided Octane's unwrap order is
+deterministic across replays — which the strata design already requires. The
+hosted-session variant needs real per-request storage (`AsyncLocalStorage` on
+Node) and an explicit answer for edge runtimes without it.
 
 Module-global mutable request state is forbidden. The chosen mechanism must retain
 Octane's parallel-`use()` strata, stable call-site identity, rejection routing, and
@@ -683,7 +722,16 @@ ownership primitive.
   Octane root identity semantics and reset context discovery associated only with
   the former tree.
 - **Props updates:** React commits first, then the hosted root receives the new
-  props. Coalesce props and context changes into one Octane update.
+  props. Coalesce props and context changes into one Octane update. Pin an
+  explicit republish policy for parent rerenders that change nothing: React
+  semantics say a parent rerender re-renders children, but at hundreds of
+  islands one top-level React state change would otherwise trigger that many
+  synchronous pre-paint Octane flushes. `React.memo` around the wrapper cannot
+  mitigate this — the transported child element is recreated every parent
+  render — so the controller should shallow-compare the transported
+  `{ type, props, key }` and skip the Octane update when nothing changed. This
+  bail must be scale-tested (many islands under one rerendering parent) and its
+  divergence from strict rerender-cascade semantics documented.
 - **Unmount while pending:** invalidate the episode, detach listeners, cancel retry
   callbacks, and ensure a late wakeable cannot recreate the root or notify React.
 - **External DOM removal:** retain Octane's safe cleanup guarantee.
@@ -734,6 +782,11 @@ Recommended package shape:
 - Client/server conditional exports select the DOM controller or hosted SSR
   implementation. A tiny framework adapter may be needed where a bundler does not
   expose reliable SSR conditions, but it is one-time project setup.
+- The client entry carries a `'use client'` directive so `OctaneCompat` is a
+  valid client boundary in RSC-based hosts (Next-like toolchains) even though
+  Flight integration is a non-goal; the `react-server` condition must resolve to
+  the client-boundary stub rather than the hosted SSR implementation, which is
+  Fizz-only.
 - The existing Octane compiler continues compiling `.tsrx`; hosted event
   activation requires no per-component option. Static metadata is optional if the
   implementation spike proves it is the cheapest committed-binding fast path.
@@ -771,6 +824,9 @@ Mocking the bridge protocol alone is insufficient.
   only where a renderer-neutral bridge behavior changes.
 - A parent React layout effect observes the fully committed Octane DOM/context
   update, pinning child/parent commit ordering.
+- An Octane layout effect that calls a React state setter during the island's
+  synchronous flush inside React's commit phase (re-entrancy is legal for React
+  layout effects; prove the hosted flush inherits that contract).
 
 ### Context
 
@@ -837,6 +893,9 @@ Mocking the bridge protocol alone is insufficient.
   identity.
 - Development/production hydration, several sibling islands, provider updates
   immediately after hydration, and Fiber-fallback/remount behavior.
+- An island inside a late-revealed streamed Suspense boundary: Fizz's
+  `completeBoundary` relocates segment DOM into place — Octane hydration must
+  adopt the relocated nodes' identity after the reveal.
 - Hydration mismatch diagnostics remain attributable and do not corrupt sibling
   React DOM.
 
@@ -1003,6 +1062,9 @@ not `O(islands × global event types)`.
     including CSP.
 15. Whether React retains a newly discovered context dependency in an immediately
     suspended wrapper render or the rare two-commit handshake is mandatory.
+16. The supersession path for context snapshots that change during a pending
+    episode: complete the wrapper without throwing so the snapshot commits, or
+    an out-of-band generation-guarded publish (§7).
 
 ## 16. Rejected alternatives
 

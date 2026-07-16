@@ -85,12 +85,12 @@ export const HOME_SUMMARY: BenchCard = {
 		{
 			op: 'memo-wall',
 			'octane-tsrx': 1,
-			react: 2.029245095468859,
-			preact: 2.458141887959391,
-			solid: 0.25280885564071065,
-			svelte: 0.6518266516283755,
-			ripple: 1.0838076870657005,
-			'vue-vapor': 0.22033043111352227,
+			react: 4.875128928835251,
+			preact: 6.225394162055643,
+			solid: 0.2894263405066609,
+			svelte: 1.024572971131265,
+			ripple: 2.444735865955871,
+			'vue-vapor': 0.2857193612481236,
 		},
 		{
 			op: 'recursive-context',
