@@ -150,8 +150,10 @@ time-slicing, expiration, or selective hydration. Consequences:
 - `flushSync` drains the whole queue (transition work included) and never runs
   passive effects synchronously — passives are always post-paint.
 - Priority (`urgent` vs `transition`) governs **suspense hold semantics** —
-  transition renders keep prior content on suspend, entangled boundaries reveal
-  atomically — not commit deferral.
+  transition renders keep prior content on suspend, and fallback-visible boundaries
+  whose retries fully stage reveal together through refs/layout effects — not general
+  commit deferral. Same-identity synchronous rendering remains per-swap rather than a
+  global React-style WIP tree (see `SUSPENSE_DIVERGENCE.md` #4).
 - Multiple unhandled root errors in one flush throw an `AggregateError`; an
   unhandled error unmounts its root's whole tree (both match React).
 - `useSyncExternalStore` skips React's commit-time getSnapshot re-read for

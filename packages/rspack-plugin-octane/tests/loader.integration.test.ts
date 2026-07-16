@@ -172,7 +172,11 @@ describe('loader with the neutral compiler', () => {
 			resourcePath,
 			source: `export function Raw() { return <span>raw</span>; }\n`,
 		});
-		expect(String(result.content)).toContain('_$template("<span>raw</span>")');
+		expect(getOctaneRspackBuildInfo(result.module)).toEqual({
+			canonicalId: '/node_modules/@fixture/raw/index.tsx',
+			transformKind: 'compile',
+			serverRpc: false,
+		});
 		expect(result.dependencies).toContain(realpathSync(join(packageRoot, 'package.json')));
 	});
 

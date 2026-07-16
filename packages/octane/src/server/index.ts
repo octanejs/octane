@@ -79,6 +79,7 @@ export {
 	// Suspense / error boundaries as JSX components (alongside the @try directive)
 	Suspense,
 	ErrorBoundary,
+	Fragment,
 	Activity,
 	// Transparent server twin of the client ViewTransition boundary (client-only
 	// behavior; SSR annotations are view-transitions plan Phase 5).
@@ -141,6 +142,8 @@ export {
 	ssrPortal,
 	injectStyle,
 	ssrHeadEl,
+	namespaceHead,
+	namespaceHeadElement,
 	// SSR parallel-use mirror (compiler targets — see suspense-parallel-use plan).
 	puMemo,
 	puBatch,

@@ -385,6 +385,59 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'dexie',
+					include: ['packages/dexie/tests/**/*.test.ts'],
+					exclude: [
+						'packages/dexie/tests/ssr/**/*.test.ts',
+						'packages/dexie/tests/browser/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					setupFiles: ['packages/dexie/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/dexie$/,
+							replacement: resolve(import.meta.dirname, 'packages/dexie/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'dexie-browser',
+					include: ['packages/dexie/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				test: {
+					name: 'dexie-ssr',
+					include: ['packages/dexie/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dexie$/,
+							replacement: resolve(import.meta.dirname, 'packages/dexie/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'jotai',
 					include: ['packages/jotai/tests/**/*.test.ts'],
 					environment: 'jsdom',

@@ -1,9 +1,10 @@
 // The live twin of the hero's code sample (content/home-sample.mdx): the same
 // component, running. Its `useEffect` sits behind the same `if (!props.paused)`
-// condition the sample shows — and writes to the visible log line instead of
-// console.log, so "a hook can sit behind a condition" is something the reader
-// can watch happen rather than take on trust. Toggle `paused` and the effect
-// stops firing while the state hook below it keeps its slot.
+// condition the sample shows — and logs to the console exactly as the sample
+// promises, plus a visible log line so "a hook can sit behind a condition" is
+// something the reader can watch happen without opening devtools. Toggle
+// `paused` and the effect stops firing while the state hook below it keeps its
+// slot.
 import { useState, useEffect } from 'octane';
 
 function Counter(props: { paused: boolean; onLog: (message: string) => void }) @{
@@ -11,6 +12,7 @@ function Counter(props: { paused: boolean; onLog: (message: string) => void }) @
 
 	if (!props.paused) {
 		useEffect(() => {
+			console.log('count is now', count);
 			props.onLog('count is now ' + count);
 		}); // the compiler infers [count]
 	}
